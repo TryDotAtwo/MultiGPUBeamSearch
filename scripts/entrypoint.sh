@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
+export NVTE_CUDA_INCLUDE_PATH="${NVTE_CUDA_INCLUDE_PATH:-${CUDA_HOME}/include}"
+export NCCL_IB_DISABLE="${NCCL_IB_DISABLE:-0}"
+export NCCL_ASYNC_ERROR_HANDLING="${NCCL_ASYNC_ERROR_HANDLING:-1}"
+export NCCL_DEBUG="${NCCL_DEBUG:-WARN}"
+export NCCL_P2P_LEVEL="${NCCL_P2P_LEVEL:-NVL}"
+export NCCL_NET_GDR_LEVEL="${NCCL_NET_GDR_LEVEL:-PHB}"
+export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-9.0}"
+
+exec "$@"
+

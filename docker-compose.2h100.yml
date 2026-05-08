@@ -1,0 +1,40 @@
+services:
+  beam-2h100:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cayley-beam-h100:latest
+    ipc: host
+    network_mode: host
+    shm_size: 64gb
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    environment:
+      WORLD_SIZE: "2"
+      GLOBAL_BEAM_WIDTH: "65536"
+      B_MICRO: "32768"
+      SCORE_RING_DEPTH: "8"
+      NET_RING_DEPTH: "3"
+      BUCKET_CAP_PER_PEER: "65536"
+      K_EXPAND_TILE: "32768"
+      INFERENCE_PARALLELISM: "1"
+      USE_CUDA_GRAPHS: "1"
+      INFERENCE_BACKEND: "torchscript_ensemble"
+      BETA: "1.20"
+      HASH_LOAD_FACTOR: "0.45"
+      PROBE_LIMIT: "256"
+      MAX_DEPTH: "100"
+      LOG_EVERY: "25"
+      NCCL_IB_DISABLE: "0"
+      NCCL_P2P_LEVEL: "NVL"
+      NCCL_NET_GDR_LEVEL: "PHB"
+      NCCL_DEBUG: "WARN"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu]
+    command: ["bash", "scripts/run_local_2h100.sh"]
