@@ -1,6 +1,72 @@
-# CayleyBeam100H100
+# MultiGPUBeamSearch
 
 GPU-resident distributed beam search for the Cayley puzzle workload. The current runnable path uses CUDA, PyTorch tensors, a pybind11/C++ extension, CUDA Graphs, and NCCL across multiple GPUs.
+
+## Run On Yandex 2xA100
+
+Published image:
+
+```text
+cr.yandex/crp7o66ucs8c14sjctp5/multigpu-beam-search:a100-kaggle-2t4-baseline
+```
+
+On the VM, verify GPU access first:
+
+```bash
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+```
+
+Pull the image:
+
+```bash
+docker pull cr.yandex/crp7o66ucs8c14sjctp5/multigpu-beam-search:a100-kaggle-2t4-baseline
+```
+
+Run the full 2-GPU beam-search configuration equivalent to the successful Kaggle 2xT4 run:
+
+```bash
+mkdir -p output
+docker run --rm -it \
+  --gpus all \
+  --ipc=host \
+  --network=host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  -v "$PWD/output:/workspace/CayleyBeam100H100/output" \
+  -e SUBMISSION_PATH=/workspace/CayleyBeam100H100/output/submission.csv \
+  -e NCCL_DEBUG=INFO \
+  -e NCCL_IB_DISABLE=0 \
+  cr.yandex/crp7o66ucs8c14sjctp5/multigpu-beam-search:a100-kaggle-2t4-baseline
+```
+
+The image command defaults to:
+
+```bash
+bash scripts/run_local_2h100.sh
+```
+
+The default script runs:
+
+```bash
+torchrun --standalone --nnodes=1 --nproc_per_node=2 scripts/solve_testcsv_2gpu.py
+```
+
+If InfiniBand/RDMA fails, rerun with:
+
+```bash
+-e NCCL_IB_DISABLE=1
+```
+
+InfiniBand/RDMA diagnostics:
+
+```bash
+lsmod | egrep 'mlx5|ib_uverbs|rdma' || true
+ibv_devinfo || true
+ibstat || true
+rdma link || true
+nvidia-smi topo -m
+```
 
 ## Quick Docker Run
 
@@ -17,8 +83,8 @@ NVIDIA Container Toolkit
 Build:
 
 ```bash
-git clone <github-repo-url> CayleyBeam100H100
-cd CayleyBeam100H100
+git clone https://github.com/TryDotAtwo/MultiGPUBeamSearch.git
+cd MultiGPUBeamSearch
 docker build -t cayley-beam-h100:latest .
 ```
 

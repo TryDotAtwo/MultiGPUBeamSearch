@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:25.04-py3
+ARG BASE_IMAGE=pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel
 FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -37,10 +37,10 @@ RUN chmod +x scripts/*.sh scripts/*.py
 
 RUN python - <<'PY'
 import importlib.util
-mods = ["torch", "transformer_engine"]
+mods = ["torch"]
 missing = [m for m in mods if importlib.util.find_spec(m) is None]
 if missing:
-    raise SystemExit(f"missing_modules={missing}; use NGC PyTorch 22.09+ or install transformer_engine[pytorch]")
+    raise SystemExit(f"missing_modules={missing}; use a PyTorch CUDA devel image")
 PY
 
 RUN python setup.py build_ext --inplace

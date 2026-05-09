@@ -1,5 +1,16 @@
 # Project Memory
 
+## 2026-05-09 yandex_2xa100_container_push
+
+- prompt_summary: User prepared Yandex Cloud 2xA100 VM workflow, requested Yandex Container Registry push, SSH preparation, InfiniBand/NCCL testing preparation, and exact README instructions for running the full Kaggle-equivalent beam instead of a smoke run.
+- docker_base_change: Dockerfile base image changed from private/auth-required `nvcr.io/nvidia/pytorch:25.04-py3` to public `pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel` because NGC returned `401 Unauthorized`.
+- transformer_engine_check_change: hard build-time requirement for `transformer_engine` was removed; current FullBeamNice TorchScript solver path does not require Transformer Engine for the 2xA100 run.
+- yandex_image_pushed: image `cr.yandex/crp7o66ucs8c14sjctp5/multigpu-beam-search:a100-kaggle-2t4-baseline` pushed successfully with digest `sha256:b43c12874691f886b5f54aadfa0cf269fca74e72deae1cc8417fb5a4f617184a`.
+- ssh_key_preparation: `ssh-key-1778315981146.zip` was extracted locally into ignored `.ssh/`; private key content was not printed; ACL was restricted to current Windows user.
+- deployment_docs_added: added `docs/YANDEX_2XA100_RUNBOOK.md` and `scripts/push_yandex_container.ps1`; README now includes exact Yandex 2xA100 pull/run commands and IB/RDMA diagnostics.
+- full_beam_default: container default command remains `bash scripts/run_local_2h100.sh`; default runner uses `torchrun --standalone --nnodes=1 --nproc_per_node=2 scripts/solve_testcsv_2gpu.py` with Kaggle 2xT4-equivalent `GLOBAL_BEAM_WIDTH=65536`, `MAX_DEPTH=100`, CUDA Graphs, and FullBeamNice TorchScript scorer.
+- no_algorithm_files_modified: true.
+
 ## 2026-05-08 docker_github_packaging
 
 - prompt_summary: User requested Docker packaging for easy SSH/VM launch of the current beam-search solver, inspection of Kaggle launch behavior first, assessment of 2xA100 changes, and GitHub publication for cluster use.
