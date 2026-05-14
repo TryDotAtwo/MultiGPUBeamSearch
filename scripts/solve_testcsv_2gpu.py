@@ -199,6 +199,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
     prepass_stop_at_width = os.environ.get("PREPASS_STOP_AT_WIDTH", "1").strip().lower() not in {"", "0", "false", "no", "off"}
     prepass_width_frac = float(os.environ.get("PREPASS_STOP_WIDTH_FRAC", "0.98"))
     target_width_stop = max(1, int(float(cfg["global_beam_width"]) * prepass_width_frac))
+    fanout = int(cfg.get("fanout", 24))
+    dynamic_prepass = os.environ.get("PREPASS_DYNAMIC_WIDTH", "1").strip().lower() not in {"", "0", "false", "no", "off"}
     uniform_active = False
     if prepass_depth > 0:
         engine.set_prepass_light_solved_scan(True)
@@ -331,18 +333,30 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                 )
             found_depth = depth
             break
-        if (
+        candidate_upper = int(sums[5]) * fanout
+        should_stop_prepass = (
             uniform_active
             and prepass_stop_at_width
             and depth >= start_depth
             and depth <= prepass_depth
-            and sums[5] >= target_width_stop
-        ):
-            if cfg["rank"] == 0 and depth_log_every > 0:
+            and (
+                int(sums[5]) >= target_width_stop
+                or (dynamic_prepass and candidate_upper > int(cfg["global_beam_width"]))
+            )
+        )
+
+        if should_stop_prepass:
+            if cfg["rank"] == 0:
                 print(
                     "PREPASS_WIDTH_REACHED "
                     + json.dumps(
-                        {"depth": depth, "current_size_sum": sums[5], "target_width_stop": target_width_stop},
+                        {
+                            "depth": depth,
+                            "current_size_sum": int(sums[5]),
+                            "candidate_upper": candidate_upper,
+                            "global_beam_width": int(cfg["global_beam_width"]),
+                            "target_width_stop": target_width_stop,
+                        },
                         ensure_ascii=False,
                     ),
                     flush=True,
@@ -457,6 +471,10 @@ def main() -> None:
     os.environ.setdefault("HASH_LOAD_FACTOR", "0.45")
     os.environ.setdefault("PROBE_LIMIT", "256")
     os.environ.setdefault("MAX_DEPTH", "100")
+    os.environ.setdefault("PREPASS_DEPTH", "60")
+    os.environ.setdefault("PREPASS_DYNAMIC_WIDTH", "1")
+    os.environ.setdefault("PREPASS_STOP_AT_WIDTH", "1")
+    os.environ.setdefault("PREPASS_STOP_WIDTH_FRAC", "0.98")
     os.environ.setdefault("HISTOGRAM_PERIOD_MICRO", "2")
     os.environ.setdefault("NCCL_IB_DISABLE", "1")
     os.environ.setdefault("NCCL_P2P_DISABLE", "1")
