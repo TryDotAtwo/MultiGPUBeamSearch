@@ -297,8 +297,7 @@ def main() -> None:
 
     solved_rows: list[dict[str, str]] = []
     t0 = time.time()
-    num_micro = (int(cfg["global_beam_width"] + cfg["world_size"] - 1) // int(cfg["world_size"]) + int(cfg["b_micro"]) - 1) // int(cfg["b_micro"])
-    graph_expected = os.environ.get("USE_CUDA_GRAPHS", "0") != "0" and num_micro <= int(cfg.get("cuda_graph_max_micro", 512))
+    graph_expected = os.environ.get("USE_CUDA_GRAPHS", "0") != "0"
     if cfg["rank"] == 0 and append_each:
         initialize_submission(output_path, resume=resume_submission)
     for pos, (sample_id, state) in enumerate(rows):

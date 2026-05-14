@@ -570,9 +570,8 @@
 - prompt_summary: User confirmed CUDA Graph caused huge-beam OOM and requested fixing CUDA Graph usage without breaking static-buffer architecture.
 - root_cause: current `capture_cuda_graph()` captured a full depth; at `GLOBAL_BEAM_WIDTH=70M`, `N_LOCAL=35M`, `B_MICRO=8192`, this records about 4273 microbatches per rank, including TorchScript forward calls, and can create a large CUDA/PyTorch graph-private memory pool.
 - source_patch_cpp: `TorchScriptEnsembleBackend` no longer retains scorer output tensors in `outputs_by_slot`; scorer output remains transient and is copied/quantized into the preallocated `score_ring` slot.
-- source_patch_cpp_graph_guard: added `cuda_graph_max_micro` config; `BeamEngine::step()` uses CUDA Graph only when `num_micro <= cuda_graph_max_micro`; huge beams automatically run the normal static-stream path instead of full-depth graph capture.
-- source_patch_python: `beam_engine.py` reads `CUDA_GRAPH_MAX_MICRO` into config; `scripts/solve_testcsv_2gpu.py` only asserts graph capture when graph is expected for the current microbatch count.
-- notebook_patch: user-friendly notebooks expose `USE_CUDA_GRAPHS=1` and `CUDA_GRAPH_MAX_MICRO=512`; comments explain that graphs remain enabled for small/medium beams and are automatically bypassed for huge beams to avoid VRAM blow-up.
+- reverted_graph_guard: User rejected `CUDA_GRAPH_MAX_MICRO` as a bogus knob; removed `cuda_graph_max_micro` from C++ config, Python config, solver graph expectation, notebooks, and environment export.
+- remaining_cuda_graph_state: `USE_CUDA_GRAPHS` is again the single graph toggle; `TorchScriptEnsembleBackend` still does not retain `outputs_by_slot`, preserving the static `score_ring` path improvement.
 
 ## 2026-05-14 bucket_cap_per_peer_question
 

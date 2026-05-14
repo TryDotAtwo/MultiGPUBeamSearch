@@ -84,7 +84,6 @@ struct EngineConfig {
     double beta = 1.10;
     double hash_load_factor = 0.60;
     int max_depth = 1;
-    int cuda_graph_max_micro = 512;
 
     int64_t n_local = 0;
     int64_t k_keep = 0;
@@ -123,9 +122,7 @@ static EngineConfig config_from_dict(const py::dict& d) {
     if (d.contains("beta")) c.beta = d["beta"].cast<double>();
     if (d.contains("hash_load_factor")) c.hash_load_factor = d["hash_load_factor"].cast<double>();
     if (d.contains("max_depth")) c.max_depth = d["max_depth"].cast<int>();
-    if (d.contains("cuda_graph_max_micro")) c.cuda_graph_max_micro = d["cuda_graph_max_micro"].cast<int>();
     if (c.max_depth < 1) c.max_depth = 1;
-    if (c.cuda_graph_max_micro < 1) c.cuda_graph_max_micro = 1;
     if (c.inference_parallelism < 1) c.inference_parallelism = 1;
     if (c.inference_parallelism > c.score_ring_depth) c.inference_parallelism = c.score_ring_depth;
     if (c.k_expand_tile < 0) c.k_expand_tile = 0;
@@ -433,9 +430,7 @@ public:
     void step(int histogram_period_micro) {
         if (cfg_.world_size > 1 && !nccl_inited_) throw std::runtime_error("NCCL is not initialized");
         if (histogram_period_micro <= 0) histogram_period_micro = 8;
-        const int64_t num_micro = (cfg_.n_local + cfg_.b_micro - 1) / cfg_.b_micro;
-        const bool graph_safe_for_size = num_micro <= static_cast<int64_t>(cfg_.cuda_graph_max_micro);
-        if (use_cuda_graphs_ && graph_safe_for_size) {
+        if (use_cuda_graphs_) {
             if (!cuda_graph_captured_) capture_cuda_graph(histogram_period_micro);
             CUDA_CHECK(cudaGraphLaunch(cuda_graph_exec_, stream_infer_));
             CUDA_CHECK(cudaStreamSynchronize(stream_infer_));
@@ -956,7 +951,6 @@ py::dict derive_sizes(py::dict cfg_dict) {
 #endif
     d["inference_parallelism"] = cfg.inference_parallelism;
     d["k_expand_tile"] = cfg.k_expand_tile;
-    d["cuda_graph_max_micro"] = cfg.cuda_graph_max_micro;
     return d;
 }
 
