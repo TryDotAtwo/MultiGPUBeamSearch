@@ -59,10 +59,10 @@ def main() -> None:
     if args.inference_backend == "fullbeamnice_static":
         sizes.update({
             "fullbeamnice_static_weights_fp16": 23_978_008 * 2,
-            "fullbeamnice_static_act1": args.b_micro * 1536 * 2,
-            "fullbeamnice_static_act2": args.b_micro * 512 * 2,
-            "fullbeamnice_static_act3": args.b_micro * 512 * 2,
-            "fullbeamnice_static_out": args.b_micro * 24 * 2,
+            "fullbeamnice_static_act1": args.inference_parallelism * args.b_micro * 1536 * 2,
+            "fullbeamnice_static_act2": args.inference_parallelism * args.b_micro * 512 * 2,
+            "fullbeamnice_static_act3": args.inference_parallelism * args.b_micro * 512 * 2,
+            "fullbeamnice_static_out": args.inference_parallelism * args.b_micro * 24 * 2,
         })
     total = sum(sizes.values())
     t4_bytes = 15 * 1024**3

@@ -160,11 +160,12 @@ def allocate_buffers(ext, cfg: Dict[str, Any]) -> Dict[str, torch.Tensor]:
     }
     if str(cfg.get("inference_backend", "")).strip().lower() == "fullbeamnice_static":
         b_micro = int(cfg["b_micro"])
+        lanes = int(cfg["inference_parallelism"])
         buffers.update({
-            "fb_act1": torch.empty((b_micro, 1536), dtype=torch.float16, device=device),
-            "fb_act2": torch.empty((b_micro, 512), dtype=torch.float16, device=device),
-            "fb_act3": torch.empty((b_micro, 512), dtype=torch.float16, device=device),
-            "fb_out": torch.empty((b_micro, 24), dtype=torch.float16, device=device),
+            "fb_act1": torch.empty((lanes, b_micro, 1536), dtype=torch.float16, device=device),
+            "fb_act2": torch.empty((lanes, b_micro, 512), dtype=torch.float16, device=device),
+            "fb_act3": torch.empty((lanes, b_micro, 512), dtype=torch.float16, device=device),
+            "fb_out": torch.empty((lanes, b_micro, 24), dtype=torch.float16, device=device),
         })
     for tensor in buffers.values():
         tensor.zero_()

@@ -21,6 +21,19 @@
 - kaggle_debug_config: user-friendly Kaggle notebook config set to `SAMPLE_START=1`, `SAMPLE_COUNT=1`, `GLOBAL_BEAM_WIDTH=81_000_000`, `B_MICRO=8192`, `BETA=1.01`, `MAX_DEPTH=60`, `HASH_LOAD_FACTOR=0.45`, `PROBE_LIMIT=128`, `HISTORY_BACKEND=cpu`, `CPU_HISTORY_CHECKPOINT=1`, `RESUME_BEAMSEARCH=1`, `RESUME_SUBMISSION=0`, `CPU_HISTORY_WORKERS=2`, `BEAM_DEBUG=1`, `DEPTH_LOG_EVERY=1`.
 - remote_verification_status: Kaggle 2xT4 compile/runtime verification blocked because local Kaggle CLI now returns `401 Unauthorized` for `kaggle kernels list` and JSON parse failure for `kaggle kernels push`; no remote Kaggle run was stopped or killed.
 
+## 2026-05-14 lane_safe_cutlass_fusion
+
+- prompt_summary: User requested `[INFERENCE_PARALLELISM, B_MICRO, hidden]` activation buffers and fusion of `CUTLASS GEMM + bias + ReLU` plus final `GEMM + bias + action_perm + quantize`.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- source_patch_buffers: `beam_engine.py` now allocates `fb_act1`, `fb_act2`, `fb_act3`, and `fb_out` with leading lane dimension `INFERENCE_PARALLELISM`; `FullBeamNiceStaticBackend.forward(...)` receives `infer_lane` and uses lane-specific activation slices.
+- source_patch_shared_weights: FullBeamNice FP16 weights remain one shared set per rank; multiple inference lanes share read-only weights and write only lane-private activation buffers.
+- source_patch_cutlass_fusion: CUTLASS GEMM launcher now supports `LinearCombinationRelu` epilogue; hidden and residual linear layers prefill output buffers with bias or residual+bias, then CUTLASS performs `GEMM + C + ReLU` in the epilogue.
+- source_patch_final_layer: final output buffer is prefilled with `out_bias`, then CUTLASS performs final `GEMM + bias`; `action_perm + quantize + score_ring layout write` remains a dedicated CUDA scatter kernel because score ring layout is action-major int16 and not a simple row-major FP16 CUTLASS output.
+- source_patch_sizing: T4/H100 sizing scripts multiply static FullBeamNice activation buffers by `INFERENCE_PARALLELISM`.
+- local_verification: `python -m py_compile beam_engine.py scripts\solve_testcsv_2gpu.py scripts\t4_sizing.py scripts\h100_sizing.py scripts\static_fullbeamnice_inference.py` passed.
+- sizing_result_2xt4_requested: with `GLOBAL_BEAM_WIDTH=81,000,000`, `WORLD_SIZE=2`, `B_MICRO=8192`, `INFERENCE_PARALLELISM=2`, `BETA=1.01`, `HASH_LOAD_FACTOR=0.45`, `HISTORY_BACKEND=cpu`, `INFERENCE_BACKEND=fullbeamnice_static`, total modeled static GPU buffers are `14.161 GiB` per rank with `0.839 GiB` modeled T4 headroom before CUDA/NCCL/runtime overhead.
+- local_compile_status: local PyTorch extension compile remains blocked by missing Windows MSVC `cl.exe`.
+
 ## 2026-05-14 user_friendly_kaggle_notebook
 
 - prompt_summary: User requested a user-friendly Kaggle notebook with first-cell primary config, second-cell advanced config with comments/examples, metrics histogram cell, submit cell, competition input files from Kaggle competition input, code cloned from GitHub, separate custom scorer documentation cell, and Yandex Cloud TODO cell.

@@ -23,6 +23,7 @@ def main() -> None:
     p.add_argument("--k-expand-tile", type=int, default=0)
     p.add_argument("--fanout", type=int, default=24)
     p.add_argument("--score-ring-depth", type=int, default=64)
+    p.add_argument("--inference-parallelism", type=int, default=int(os.getenv("INFERENCE_PARALLELISM", "1")))
     p.add_argument("--net-ring-depth", type=int, default=3)
     p.add_argument("--state-size-bytes", type=int, default=120)
     p.add_argument("--max-depth", type=int, default=1)
@@ -61,16 +62,16 @@ def main() -> None:
     if args.inference_backend == "fullbeamnice_static":
         sizes.update({
             "fullbeamnice_static_weights_fp16": 23_978_008 * 2,
-            "fullbeamnice_static_act1": args.b_micro * 1536 * 2,
-            "fullbeamnice_static_act2": args.b_micro * 512 * 2,
-            "fullbeamnice_static_act3": args.b_micro * 512 * 2,
-            "fullbeamnice_static_out": args.b_micro * 24 * 2,
+            "fullbeamnice_static_act1": args.inference_parallelism * args.b_micro * 1536 * 2,
+            "fullbeamnice_static_act2": args.inference_parallelism * args.b_micro * 512 * 2,
+            "fullbeamnice_static_act3": args.inference_parallelism * args.b_micro * 512 * 2,
+            "fullbeamnice_static_out": args.inference_parallelism * args.b_micro * 24 * 2,
         })
     total = sum(sizes.values())
     h100_bytes = 80 * 1024**3
 
     print("entity_id=h100_sizing; type=memory_model; state=calculated")
-    print(f"params: WORLD_SIZE={args.world_size}; GLOBAL_BEAM_WIDTH={args.global_beam_width}; B_MICRO={args.b_micro}; K_EXPAND_TILE={args.k_expand_tile}; FANOUT={args.fanout}; BUCKET_CAP_PER_PEER={args.bucket_cap_per_peer}; MAX_DEPTH={args.max_depth}; HISTORY_BACKEND={args.history_backend}; INFERENCE_BACKEND={args.inference_backend}")
+    print(f"params: WORLD_SIZE={args.world_size}; GLOBAL_BEAM_WIDTH={args.global_beam_width}; B_MICRO={args.b_micro}; K_EXPAND_TILE={args.k_expand_tile}; FANOUT={args.fanout}; BUCKET_CAP_PER_PEER={args.bucket_cap_per_peer}; INFERENCE_PARALLELISM={args.inference_parallelism}; MAX_DEPTH={args.max_depth}; HISTORY_BACKEND={args.history_backend}; INFERENCE_BACKEND={args.inference_backend}")
     print(f"derived: N_LOCAL={n_local}; K_KEEP={k_keep}; K_WORK={k_work}; HASH_CAPACITY={hash_capacity}")
     for name, size in sizes.items():
         print(f"buffer={name}; bytes={size}; MiB={mib(size):.2f}; GiB={gib(size):.3f}")

@@ -8,6 +8,7 @@
 #include <cutlass/half.h>
 #include <cutlass/arch/arch.h>
 #include <cutlass/arch/mma.h>
+#include <cutlass/epilogue/thread/linear_combination_relu.h>
 #define BEAM_HAS_CUTLASS 1
 #else
 #define BEAM_HAS_CUTLASS 0
@@ -250,6 +251,34 @@ extern "C" __global__ void kernel_fullbeamnice_bias_relu(
     x[lane] = __float2half_rn(v);
 }
 
+extern "C" __global__ void kernel_fullbeamnice_fill_bias(
+    half* __restrict__ x,
+    const half* __restrict__ bias,
+    int rows,
+    int cols
+) {
+    int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    int64_t total = static_cast<int64_t>(rows) * cols;
+    if (lane >= total) return;
+    int col = static_cast<int>(lane % cols);
+    x[lane] = bias[col];
+}
+
+extern "C" __global__ void kernel_fullbeamnice_fill_residual_bias(
+    half* __restrict__ x,
+    const half* __restrict__ residual,
+    const half* __restrict__ bias,
+    int rows,
+    int cols
+) {
+    int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    int64_t total = static_cast<int64_t>(rows) * cols;
+    if (lane >= total) return;
+    int col = static_cast<int>(lane % cols);
+    float v = __half2float(residual[lane]) + __half2float(bias[col]);
+    x[lane] = __float2half_rn(v);
+}
+
 extern "C" __global__ void kernel_fullbeamnice_residual_bias_relu(
     half* __restrict__ x,
     const half* __restrict__ residual,
@@ -284,7 +313,8 @@ extern "C" __global__ void kernel_fullbeamnice_quantize_to_ring(
     int row = static_cast<int>(lane / fanout);
     int action = static_cast<int>(lane - static_cast<int64_t>(row) * fanout);
     int src_action = action_perm[action];
-    float q = __half2float(out[static_cast<int64_t>(row) * fanout + src_action]) + __half2float(out_bias[src_action]);
+    float q = __half2float(out[static_cast<int64_t>(row) * fanout + src_action]);
+    if (out_bias) q += __half2float(out_bias[src_action]);
     float y = score_bias - q * score_scale;
     if (y < 0.0f) y = 0.0f;
     if (y > 65535.0f) y = 65535.0f;
@@ -921,10 +951,11 @@ extern "C" void launch_fullbeamnice_cutlass_gemm(
     int m,
     int k,
     int n,
+    int epilogue_relu,
     cudaStream_t stream
 ) {
 #if BEAM_HAS_CUTLASS
-    using CutlassGemm = cutlass::gemm::device::Gemm<
+    using CutlassGemmLinear = cutlass::gemm::device::Gemm<
         cutlass::half_t,
         cutlass::layout::RowMajor,
         cutlass::half_t,
@@ -935,21 +966,50 @@ extern "C" void launch_fullbeamnice_cutlass_gemm(
         cutlass::arch::OpClassTensorOp,
         cutlass::arch::Sm75
     >;
-    CutlassGemm gemm_op;
-    CutlassGemm::Arguments args(
-        {m, n, k},
-        {reinterpret_cast<const cutlass::half_t*>(a), k},
-        {reinterpret_cast<const cutlass::half_t*>(b), n},
-        {reinterpret_cast<const cutlass::half_t*>(c), n},
-        {reinterpret_cast<cutlass::half_t*>(c), n},
-        {1.0f, 0.0f}
-    );
-    cutlass::Status status = gemm_op(args, nullptr, stream);
+    using CutlassGemmRelu = cutlass::gemm::device::Gemm<
+        cutlass::half_t,
+        cutlass::layout::RowMajor,
+        cutlass::half_t,
+        cutlass::layout::RowMajor,
+        cutlass::half_t,
+        cutlass::layout::RowMajor,
+        float,
+        cutlass::arch::OpClassTensorOp,
+        cutlass::arch::Sm75,
+        cutlass::gemm::GemmShape<128, 128, 32>,
+        cutlass::gemm::GemmShape<64, 64, 32>,
+        cutlass::gemm::GemmShape<16, 8, 8>,
+        cutlass::epilogue::thread::LinearCombinationRelu<cutlass::half_t, 8, float, float>
+    >;
+    cutlass::Status status;
+    if (epilogue_relu) {
+        CutlassGemmRelu gemm_op;
+        CutlassGemmRelu::Arguments args(
+            {m, n, k},
+            {reinterpret_cast<const cutlass::half_t*>(a), k},
+            {reinterpret_cast<const cutlass::half_t*>(b), n},
+            {reinterpret_cast<const cutlass::half_t*>(c), n},
+            {reinterpret_cast<cutlass::half_t*>(c), n},
+            {1.0f, 1.0f}
+        );
+        status = gemm_op(args, nullptr, stream);
+    } else {
+        CutlassGemmLinear gemm_op;
+        CutlassGemmLinear::Arguments args(
+            {m, n, k},
+            {reinterpret_cast<const cutlass::half_t*>(a), k},
+            {reinterpret_cast<const cutlass::half_t*>(b), n},
+            {reinterpret_cast<const cutlass::half_t*>(c), n},
+            {reinterpret_cast<cutlass::half_t*>(c), n},
+            {1.0f, 1.0f}
+        );
+        status = gemm_op(args, nullptr, stream);
+    }
     if (status != cutlass::Status::kSuccess) {
         throw std::runtime_error("CUTLASS GEMM launch failed");
     }
 #else
-    (void)a; (void)b; (void)c; (void)m; (void)k; (void)n; (void)stream;
+    (void)a; (void)b; (void)c; (void)m; (void)k; (void)n; (void)epilogue_relu; (void)stream;
     throw std::runtime_error("CUTLASS headers are required for fullbeamnice_static");
 #endif
 }
@@ -965,6 +1025,33 @@ extern "C" void launch_fullbeamnice_bias_relu(
     const int64_t total = static_cast<int64_t>(rows) * cols;
     const int blocks = static_cast<int>((total + threads - 1) / threads);
     beam_engine::kernel_fullbeamnice_bias_relu<<<blocks, threads, 0, stream>>>(x, bias, rows, cols);
+}
+
+extern "C" void launch_fullbeamnice_fill_bias(
+    half* x,
+    const half* bias,
+    int rows,
+    int cols,
+    cudaStream_t stream
+) {
+    const int threads = 256;
+    const int64_t total = static_cast<int64_t>(rows) * cols;
+    const int blocks = static_cast<int>((total + threads - 1) / threads);
+    beam_engine::kernel_fullbeamnice_fill_bias<<<blocks, threads, 0, stream>>>(x, bias, rows, cols);
+}
+
+extern "C" void launch_fullbeamnice_fill_residual_bias(
+    half* x,
+    const half* residual,
+    const half* bias,
+    int rows,
+    int cols,
+    cudaStream_t stream
+) {
+    const int threads = 256;
+    const int64_t total = static_cast<int64_t>(rows) * cols;
+    const int blocks = static_cast<int>((total + threads - 1) / threads);
+    beam_engine::kernel_fullbeamnice_fill_residual_bias<<<blocks, threads, 0, stream>>>(x, residual, bias, rows, cols);
 }
 
 extern "C" void launch_fullbeamnice_residual_bias_relu(

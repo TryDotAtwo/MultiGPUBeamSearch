@@ -55,7 +55,9 @@ extern "C" void launch_uniform_inference(const uint8_t*, uint16_t*, int, int, in
 extern "C" void launch_copy_i16_scores_to_ring(const int16_t*, uint16_t*, int, int, int, int, cudaStream_t);
 extern "C" void launch_quantize_f32_scores_to_ring(const float*, uint16_t*, int, int, int, int, float, float, cudaStream_t);
 extern "C" void launch_fullbeamnice_embed_relu(const uint8_t*, const uint8_t*, const half*, const half*, half*, int, int, int, int64_t, int, cudaStream_t);
-extern "C" void launch_fullbeamnice_cutlass_gemm(const half*, const half*, half*, int, int, int, cudaStream_t);
+extern "C" void launch_fullbeamnice_cutlass_gemm(const half*, const half*, half*, int, int, int, int, cudaStream_t);
+extern "C" void launch_fullbeamnice_fill_bias(half*, const half*, int, int, cudaStream_t);
+extern "C" void launch_fullbeamnice_fill_residual_bias(half*, const half*, const half*, int, int, cudaStream_t);
 extern "C" void launch_fullbeamnice_bias_relu(half*, const half*, int, int, cudaStream_t);
 extern "C" void launch_fullbeamnice_residual_bias_relu(half*, const half*, const half*, int, int, cudaStream_t);
 extern "C" void launch_fullbeamnice_quantize_to_ring(const half*, const half*, const int32_t*, uint16_t*, int, int, int, int, float, float, cudaStream_t);
@@ -173,6 +175,7 @@ struct InferenceBackend {
                          const torch::Tensor& current_active_flags,
                          torch::Tensor& score_ring,
                          int slot,
+                         int lane,
                          int64_t start_state,
                          int micro_size,
                          const EngineConfig& cfg,
@@ -184,6 +187,7 @@ struct DummyInferenceBackend final : public InferenceBackend {
                  const torch::Tensor& current_active_flags,
                  torch::Tensor& score_ring,
                  int slot,
+                 int lane,
                  int64_t start_state,
                  int micro_size,
                  const EngineConfig& cfg,
@@ -193,6 +197,7 @@ struct DummyInferenceBackend final : public InferenceBackend {
             reinterpret_cast<const uint8_t*>(current_active_flags.data_ptr<uint8_t>()),
             reinterpret_cast<uint16_t*>(score_ring.data_ptr<int16_t>()),
             slot, cfg.state_size_bytes, cfg.fanout, cfg.b_micro, start_state, micro_size, stream);
+        (void)lane;
         CUDA_CHECK(cudaGetLastError());
     }
 };
@@ -205,6 +210,7 @@ struct UniformScoreBackend final : public InferenceBackend {
                  const torch::Tensor& current_active_flags,
                  torch::Tensor& score_ring,
                  int slot,
+                 int lane,
                  int64_t start_state,
                  int micro_size,
                  const EngineConfig& cfg,
@@ -213,6 +219,7 @@ struct UniformScoreBackend final : public InferenceBackend {
             reinterpret_cast<const uint8_t*>(current_active_flags.data_ptr<uint8_t>()),
             reinterpret_cast<uint16_t*>(score_ring.data_ptr<int16_t>()),
             slot, cfg.b_micro, cfg.fanout, start_state, micro_size, score_q, stream);
+        (void)lane;
         CUDA_CHECK(cudaGetLastError());
     }
 };
@@ -237,11 +244,13 @@ struct TorchScriptEnsembleBackend final : public InferenceBackend {
                  const torch::Tensor&,
                  torch::Tensor& score_ring,
                  int slot,
+                 int lane,
                  int64_t start_state,
                  int micro_size,
                  const EngineConfig& cfg,
                  cudaStream_t stream) override {
         if (modules.empty()) throw std::runtime_error("torchscript ensemble is empty");
+        (void)lane;
         const int module_idx = shared_module ? 0 : slot % static_cast<int>(modules.size());
         auto torch_stream = c10::cuda::getStreamFromExternal(
             stream,
@@ -282,7 +291,7 @@ struct TorchScriptEnsembleBackend final : public InferenceBackend {
 };
 
 struct TEInferenceBackend final : public InferenceBackend {
-    void forward(const torch::Tensor&, const torch::Tensor&, torch::Tensor&, int, int64_t, int, const EngineConfig&, cudaStream_t) override {
+    void forward(const torch::Tensor&, const torch::Tensor&, torch::Tensor&, int, int, int64_t, int, const EngineConfig&, cudaStream_t) override {
         throw std::runtime_error("TEInferenceBackend placeholder: use torchscript_ensemble on Kaggle/T4; wire Transformer Engine backend on H100 build");
     }
 };
@@ -356,15 +365,21 @@ struct FullBeamNiceStaticBackend final : public InferenceBackend {
                  const torch::Tensor& current_active_flags,
                  torch::Tensor& score_ring,
                  int slot,
+                 int lane,
                  int64_t start_state,
                  int micro_size,
                  const EngineConfig& cfg,
                  cudaStream_t stream) override {
         if (micro_size <= 0) return;
-        auto* act1_ptr = reinterpret_cast<half*>(act1.data_ptr<at::Half>());
-        auto* act2_ptr = reinterpret_cast<half*>(act2.data_ptr<at::Half>());
-        auto* act3_ptr = reinterpret_cast<half*>(act3.data_ptr<at::Half>());
-        auto* out_ptr = reinterpret_cast<half*>(out.data_ptr<at::Half>());
+        const int lane_idx = lane % cfg.inference_parallelism;
+        auto* act1_base = reinterpret_cast<half*>(act1.data_ptr<at::Half>());
+        auto* act2_base = reinterpret_cast<half*>(act2.data_ptr<at::Half>());
+        auto* act3_base = reinterpret_cast<half*>(act3.data_ptr<at::Half>());
+        auto* out_base = reinterpret_cast<half*>(out.data_ptr<at::Half>());
+        auto* act1_ptr = act1_base + static_cast<int64_t>(lane_idx) * cfg.b_micro * 1536;
+        auto* act2_ptr = act2_base + static_cast<int64_t>(lane_idx) * cfg.b_micro * 512;
+        auto* act3_ptr = act3_base + static_cast<int64_t>(lane_idx) * cfg.b_micro * 512;
+        auto* out_ptr = out_base + static_cast<int64_t>(lane_idx) * cfg.b_micro * FANOUT_FIXED;
         launch_fullbeamnice_embed_relu(
             reinterpret_cast<const uint8_t*>(beam_current.data_ptr<uint8_t>()),
             reinterpret_cast<const uint8_t*>(current_active_flags.data_ptr<uint8_t>()),
@@ -372,22 +387,23 @@ struct FullBeamNiceStaticBackend final : public InferenceBackend {
             reinterpret_cast<const half*>(embed_bias.data_ptr<at::Half>()),
             act1_ptr, cfg.b_micro, state_size, num_classes, start_state, micro_size, stream);
         CUDA_CHECK(cudaGetLastError());
-        launch_fullbeamnice_cutlass_gemm(act1_ptr, reinterpret_cast<const half*>(hidden_w_t.data_ptr<at::Half>()), act2_ptr, micro_size, 1536, 512, stream);
-        launch_fullbeamnice_bias_relu(act2_ptr, reinterpret_cast<const half*>(hidden_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_fill_bias(act2_ptr, reinterpret_cast<const half*>(hidden_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_cutlass_gemm(act1_ptr, reinterpret_cast<const half*>(hidden_w_t.data_ptr<at::Half>()), act2_ptr, micro_size, 1536, 512, 1, stream);
 
-        launch_fullbeamnice_cutlass_gemm(act2_ptr, reinterpret_cast<const half*>(res0_fc1_w_t.data_ptr<at::Half>()), act3_ptr, micro_size, 512, 512, stream);
-        launch_fullbeamnice_bias_relu(act3_ptr, reinterpret_cast<const half*>(res0_fc1_bias.data_ptr<at::Half>()), micro_size, 512, stream);
-        launch_fullbeamnice_cutlass_gemm(act3_ptr, reinterpret_cast<const half*>(res0_fc2_w_t.data_ptr<at::Half>()), act1_ptr, micro_size, 512, 512, stream);
-        launch_fullbeamnice_residual_bias_relu(act1_ptr, act2_ptr, reinterpret_cast<const half*>(res0_fc2_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_fill_bias(act3_ptr, reinterpret_cast<const half*>(res0_fc1_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_cutlass_gemm(act2_ptr, reinterpret_cast<const half*>(res0_fc1_w_t.data_ptr<at::Half>()), act3_ptr, micro_size, 512, 512, 1, stream);
+        launch_fullbeamnice_fill_residual_bias(act1_ptr, act2_ptr, reinterpret_cast<const half*>(res0_fc2_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_cutlass_gemm(act3_ptr, reinterpret_cast<const half*>(res0_fc2_w_t.data_ptr<at::Half>()), act1_ptr, micro_size, 512, 512, 1, stream);
 
-        launch_fullbeamnice_cutlass_gemm(act1_ptr, reinterpret_cast<const half*>(res1_fc1_w_t.data_ptr<at::Half>()), act2_ptr, micro_size, 512, 512, stream);
-        launch_fullbeamnice_bias_relu(act2_ptr, reinterpret_cast<const half*>(res1_fc1_bias.data_ptr<at::Half>()), micro_size, 512, stream);
-        launch_fullbeamnice_cutlass_gemm(act2_ptr, reinterpret_cast<const half*>(res1_fc2_w_t.data_ptr<at::Half>()), act3_ptr, micro_size, 512, 512, stream);
-        launch_fullbeamnice_residual_bias_relu(act3_ptr, act1_ptr, reinterpret_cast<const half*>(res1_fc2_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_fill_bias(act2_ptr, reinterpret_cast<const half*>(res1_fc1_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_cutlass_gemm(act1_ptr, reinterpret_cast<const half*>(res1_fc1_w_t.data_ptr<at::Half>()), act2_ptr, micro_size, 512, 512, 1, stream);
+        launch_fullbeamnice_fill_residual_bias(act3_ptr, act1_ptr, reinterpret_cast<const half*>(res1_fc2_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_cutlass_gemm(act2_ptr, reinterpret_cast<const half*>(res1_fc2_w_t.data_ptr<at::Half>()), act3_ptr, micro_size, 512, 512, 1, stream);
 
-        launch_fullbeamnice_cutlass_gemm(act3_ptr, reinterpret_cast<const half*>(out_w_t.data_ptr<at::Half>()), out_ptr, micro_size, 512, FANOUT_FIXED, stream);
+        launch_fullbeamnice_fill_bias(out_ptr, reinterpret_cast<const half*>(out_bias.data_ptr<at::Half>()), micro_size, FANOUT_FIXED, stream);
+        launch_fullbeamnice_cutlass_gemm(act3_ptr, reinterpret_cast<const half*>(out_w_t.data_ptr<at::Half>()), out_ptr, micro_size, 512, FANOUT_FIXED, 0, stream);
         launch_fullbeamnice_quantize_to_ring(
-            out_ptr, reinterpret_cast<const half*>(out_bias.data_ptr<at::Half>()), action_perm.data_ptr<int32_t>(),
+            out_ptr, nullptr, action_perm.data_ptr<int32_t>(),
             reinterpret_cast<uint16_t*>(score_ring.data_ptr<int16_t>()),
             slot, cfg.b_micro, FANOUT_FIXED, micro_size, score_scale, score_bias, stream);
         CUDA_CHECK(cudaGetLastError());
@@ -527,7 +543,7 @@ public:
         for (int r = 0; r < repeats; ++r) {
             for (int lane = 0; lane < cfg_.inference_parallelism; ++lane) {
                 int slot = lane % cfg_.score_ring_depth;
-                inference_->forward(beam_current_, current_active_flags_, score_ring_, slot, 0, micro_size, cfg_, stream_infer_lanes_[lane]);
+                inference_->forward(beam_current_, current_active_flags_, score_ring_, slot, lane, 0, micro_size, cfg_, stream_infer_lanes_[lane]);
             }
         }
         for (auto st : stream_infer_lanes_) CUDA_CHECK(cudaStreamSynchronize(st));
@@ -950,7 +966,7 @@ private:
             if (mb >= cfg_.score_ring_depth) CUDA_CHECK(cudaStreamWaitEvent(infer_stream, score_consumed_[score_slot], 0));
             if (mb >= cfg_.net_ring_depth) CUDA_CHECK(cudaStreamWaitEvent(stream_ingest_, net_consumed_[net_slot], 0));
 
-            inference_->forward(beam_current_, current_active_flags_, score_ring_, score_slot, start, micro_size, cfg_, infer_stream);
+            inference_->forward(beam_current_, current_active_flags_, score_ring_, score_slot, infer_lane, start, micro_size, cfg_, infer_stream);
             CUDA_CHECK(cudaEventRecord(score_ready_[score_slot], infer_stream));
 
             CUDA_CHECK(cudaStreamWaitEvent(stream_ingest_, score_ready_[score_slot], 0));
