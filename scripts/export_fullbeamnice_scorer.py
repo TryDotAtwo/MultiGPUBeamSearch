@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import os
@@ -140,68 +139,6 @@ class FullBeamNiceCurrentOrderScorer(nn.Module):
         return torch.where(score >= 32768, score - 65536, score).to(torch.int16)
 
 
-class Canonical24ScoreAdapter(nn.Module):
-    def __init__(
-        self,
-        base: nn.Module,
-        output_kind: str,
-        *,
-        action_names: Sequence[str] | None = None,
-        higher_is_better: bool = True,
-        score_scale: float = 1.0,
-        score_bias: float = 0.0,
-    ):
-        super().__init__()
-        self.base = base
-        self.output_kind = output_kind
-        self.higher_is_better = bool(higher_is_better)
-        self.score_scale = float(score_scale)
-        self.score_bias = float(score_bias)
-        table = torch.tensor(action_table_from_current_order(), dtype=torch.long)
-        self.register_buffer("action_table", table, persistent=True)
-        if action_names is None:
-            action_names = CURRENT_ACTION_NAMES
-        mapping = [-1 for _ in CURRENT_ACTION_NAMES]
-        for source_idx, name in enumerate(action_names):
-            if name in CURRENT_ACTION_NAMES:
-                mapping[CURRENT_ACTION_NAMES.index(name)] = int(source_idx)
-        self.register_buffer("source_index_for_current", torch.tensor(mapping, dtype=torch.long), persistent=True)
-
-    def _remap_action_outputs(self, raw: torch.Tensor) -> torch.Tensor:
-        valid = self.source_index_for_current >= 0
-        src_idx = torch.clamp(self.source_index_for_current, min=0)
-        gathered = raw.index_select(1, src_idx)
-        zeros = torch.zeros_like(gathered)
-        return torch.where(valid.unsqueeze(0), gathered, zeros)
-
-    def _value1_after_move(self, states_u8: torch.Tensor) -> torch.Tensor:
-        bsz = states_u8.size(0)
-        expanded = states_u8.unsqueeze(1).expand(-1, len(CURRENT_ACTION_NAMES), -1)
-        gather_index = self.action_table.unsqueeze(0).expand(bsz, -1, -1)
-        children = torch.gather(expanded, 2, gather_index)
-        raw = self.base(children.reshape(-1, states_u8.size(1)))
-        if raw.dim() == 2 and raw.size(1) == 1:
-            raw = raw[:, 0]
-        return raw.reshape(bsz, len(CURRENT_ACTION_NAMES))
-
-    def forward(self, states_u8: torch.Tensor) -> torch.Tensor:
-        if self.output_kind == "value1_after_move":
-            raw = self._value1_after_move(states_u8)
-        else:
-            raw = self.base(states_u8)
-            if raw.dim() == 1:
-                raw = raw.unsqueeze(1)
-            if self.output_kind in ("action12", "action24", "heuristic24"):
-                raw = self._remap_action_outputs(raw)
-            else:
-                raise RuntimeError("unsupported output_kind")
-        score = raw.float()
-        if not self.higher_is_better:
-            score = -score
-        score = torch.clamp(torch.round(score * self.score_scale + self.score_bias), 0.0, 65535.0).to(torch.int32)
-        return torch.where(score >= 32768, score - 65536, score).to(torch.int16)
-
-
 def load_info(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -217,13 +154,6 @@ def action_permutation_for_current_order(generator_path: Path) -> list[int]:
     return out
 
 
-def action_table_from_current_order() -> list[list[int]]:
-    import data_loader
-
-    generators = data_loader.get_generators()
-    return [generators[name].astype(int).tolist() for name in CURRENT_ACTION_NAMES]
-
-
 def build_model(info: dict, target_path: Path) -> Pilgrim:
     target = torch.load(target_path, map_location="cpu", weights_only=True)
     return Pilgrim(
@@ -235,34 +165,6 @@ def build_model(info: dict, target_path: Path) -> Pilgrim:
         hd2=int(info["hd2"]),
         nrd=int(info["nrd"]),
     )
-
-
-def load_custom_initializer(path: Path) -> tuple[nn.Module, dict]:
-    spec = importlib.util.spec_from_file_location("custom_scorer_initializer", str(path))
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot import scorer initializer: {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["custom_scorer_initializer"] = module
-    spec.loader.exec_module(module)
-    if hasattr(module, "create_scorer"):
-        result = module.create_scorer()
-    elif hasattr(module, "build_scorer"):
-        result = module.build_scorer()
-    elif hasattr(module, "MODEL"):
-        result = module.MODEL
-    else:
-        raise RuntimeError("SCORER_INIT_PY must define create_scorer(), build_scorer(), or MODEL")
-    if isinstance(result, tuple):
-        model, meta = result
-    elif isinstance(result, dict):
-        model = result["model"]
-        meta = {k: v for k, v in result.items() if k != "model"}
-    else:
-        model = result
-        meta = {}
-    if not isinstance(model, nn.Module):
-        raise TypeError("custom scorer initializer must return torch.nn.Module")
-    return model, dict(meta)
 
 
 def export_module(module: nn.Module, example: torch.Tensor, path: Path) -> None:
@@ -277,7 +179,6 @@ def main() -> None:
     ap.add_argument("--out-dir", default=str(PROJECT_DIR / "runtime" / "fullbeamnice_scorers"))
     ap.add_argument("--copies", type=int, default=int(os.environ.get("INFERENCE_PARALLELISM", "1")))
     ap.add_argument("--physical-copies", type=int, default=int(os.environ.get("TORCHSCRIPT_PHYSICAL_COPIES", "1")))
-    ap.add_argument("--scorer-init-py", default=os.environ.get("SCORER_INIT_PY", ""))
     ap.add_argument("--score-scale", type=float, default=float(os.environ.get("FULLBEAMNICE_SCORE_SCALE", "1024.0")))
     ap.add_argument("--score-bias", type=float, default=float(os.environ.get("FULLBEAMNICE_SCORE_BIAS", "65535.0")))
     args = ap.parse_args()
@@ -288,12 +189,8 @@ def main() -> None:
     metadata_path = root / "logs" / "model_p900-t000-q-sym_1777988767.json"
     weights_path = root / "weights" / "p900-t000-q-sym_1777988767_best.pth"
 
-    if args.scorer_init_py:
-        info = {"model_name": "custom_scorer", "model_id": "custom"}
-        action_perm = list(range(len(CURRENT_ACTION_NAMES)))
-    else:
-        info = load_info(metadata_path)
-        action_perm = action_permutation_for_current_order(generator_path)
+    info = load_info(metadata_path)
+    action_perm = action_permutation_for_current_order(generator_path)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     if torch.cuda.is_available():
@@ -307,31 +204,17 @@ def main() -> None:
 
     physical_copies = max(1, int(args.physical_copies))
     for i in range(physical_copies):
-        if args.scorer_init_py:
-            model, meta = load_custom_initializer(Path(args.scorer_init_py))
-            model.eval()
-            model.to(device)
-            wrapped = Canonical24ScoreAdapter(
-                model,
-                str(meta.get("output_kind", "action24")),
-                action_names=meta.get("action_names"),
-                higher_is_better=bool(meta.get("higher_is_better", True)),
-                score_scale=float(meta.get("score_scale", os.environ.get("SCORER_SCORE_SCALE", "1.0"))),
-                score_bias=float(meta.get("score_bias", os.environ.get("SCORER_SCORE_BIAS", "0.0"))),
-            ).eval().to(device)
-            path = out_dir / f"custom_scorer_copy{i:02d}.ts"
-        else:
-            model = build_model(info, target_path)
-            state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
-            model.load_state_dict(state_dict, strict=True)
-            model.eval()
-            if device.type == "cuda":
-                model.half()
-                model.dtype = torch.float16
-            model.to(device)
-            wrapped = FullBeamNiceCurrentOrderScorer(model, action_perm, args.score_scale, args.score_bias).eval()
-            wrapped.to(device)
-            path = out_dir / f"fullbeamnice_q_to_score_copy{i:02d}.ts"
+        model = build_model(info, target_path)
+        state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
+        model.load_state_dict(state_dict, strict=True)
+        model.eval()
+        if device.type == "cuda":
+            model.half()
+            model.dtype = torch.float16
+        model.to(device)
+        wrapped = FullBeamNiceCurrentOrderScorer(model, action_perm, args.score_scale, args.score_bias).eval()
+        wrapped.to(device)
+        path = out_dir / f"fullbeamnice_q_to_score_copy{i:02d}.ts"
         export_module(wrapped, example, path)
         paths.append(str(path))
 
@@ -346,7 +229,6 @@ def main() -> None:
         "score_scale": args.score_scale,
         "score_bias": args.score_bias,
         "action_permutation": action_perm,
-        "scorer_init_py": args.scorer_init_py,
         "paths": paths,
     }, ensure_ascii=False))
 

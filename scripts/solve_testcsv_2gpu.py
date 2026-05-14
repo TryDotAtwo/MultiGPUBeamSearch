@@ -250,7 +250,7 @@ def existing_submission_ids(path: Path) -> set[int]:
 
 def main() -> None:
     os.environ.setdefault("USE_CUDA_GRAPHS", "1")
-    os.environ.setdefault("INFERENCE_BACKEND", "central_hamming")
+    os.environ.setdefault("INFERENCE_BACKEND", "torchscript_ensemble")
     os.environ.setdefault("INFERENCE_PARALLELISM", "1")
     os.environ.setdefault("K_EXPAND_TILE", "32768")
     os.environ.setdefault("GLOBAL_BEAM_WIDTH", str(2**16))
@@ -273,8 +273,7 @@ def main() -> None:
     local_rank = int(os.environ.get("LOCAL_RANK", "0"))
     torch.cuda.set_device(local_rank)
     device = torch.device("cuda", local_rank)
-    if cfg["inference_backend"] == "torchscript_ensemble":
-        export_scorer(cfg)
+    export_scorer(cfg)
 
     ext = beam_engine.build_extension(verbose=os.environ.get("BUILD_VERBOSE", "0") == "1")
     buffers = beam_engine.allocate_buffers(ext, cfg)

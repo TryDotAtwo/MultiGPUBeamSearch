@@ -581,6 +581,14 @@
 - retained_code: TorchScript support remains in code as an opt-in backend, but the default Kaggle path no longer exports or loads TorchScript.
 - local_verification: `python -m py_compile beam_engine.py scripts\solve_testcsv_2gpu.py` passed; both notebooks JSON-parse; notebook text has `question_runs=0` and `non_ascii=0`.
 
+## 2026-05-14 restore_fullbeamnice_action24
+
+- prompt_summary: User clarified that the old working path was the FullBeamNice TorchScript scorer with native 24 outputs; the unwanted change was support for arbitrary neural outputs/adapters, not TorchScript itself.
+- source_patch_solver: `scripts/solve_testcsv_2gpu.py` default restored to `INFERENCE_BACKEND=torchscript_ensemble`; FullBeamNice scorer export is unconditional again for the solver path.
+- source_patch_exporter: `scripts/export_fullbeamnice_scorer.py` now exports only the fixed FullBeamNice action24 scorer; custom `SCORER_INIT_PY`, `Canonical24ScoreAdapter`, `action12`, `value1_after_move`, and `heuristic24` adapter paths are removed from active exporter code.
+- notebook_patch: user-friendly notebooks default `INFERENCE_BACKEND='torchscript_ensemble'`; custom scorer cell now states custom scorer support is disabled and active scorer is `FullBeamNice action24`.
+- retained_fix: `beam_engine.cpp` still avoids retaining `outputs_by_slot`; TorchScript output tensor remains transient before copy/quantize into static `score_ring`.
+
 ## 2026-05-14 bucket_cap_per_peer_question
 
 - prompt_summary: User asked briefly what `BUCKET_CAP_PER_PEER` does.
