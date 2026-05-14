@@ -573,9 +573,20 @@
 - reverted_graph_guard: User rejected `CUDA_GRAPH_MAX_MICRO` as a bogus knob; removed `cuda_graph_max_micro` from C++ config, Python config, solver graph expectation, notebooks, and environment export.
 - remaining_cuda_graph_state: `USE_CUDA_GRAPHS` is again the single graph toggle; `TorchScriptEnsembleBackend` still does not retain `outputs_by_slot`, preserving the static `score_ring` path improvement.
 
+## 2026-05-14 disable_torchscript_default
+
+- prompt_summary: User requested removing TorchScript for now and returning to the previous lightweight scorer behavior.
+- source_patch_solver: `scripts/solve_testcsv_2gpu.py` now defaults `INFERENCE_BACKEND=central_hamming` instead of `torchscript_ensemble`; `export_scorer(cfg)` runs only when `INFERENCE_BACKEND=torchscript_ensemble`.
+- notebook_patch: user-friendly notebooks expose `INFERENCE_BACKEND='central_hamming'`; environment export uses the notebook variable; `SCORER_INIT_PY` comments now state that the initializer is used only with `torchscript_ensemble`.
+- retained_code: TorchScript support remains in code as an opt-in backend, but the default Kaggle path no longer exports or loads TorchScript.
+- local_verification: `python -m py_compile beam_engine.py scripts\solve_testcsv_2gpu.py` passed; both notebooks JSON-parse; notebook text has `question_runs=0` and `non_ascii=0`.
+
 ## 2026-05-14 bucket_cap_per_peer_question
 
 - prompt_summary: User asked briefly what `BUCKET_CAP_PER_PEER` does.
 - symbol_search: `rg "BUCKET_CAP_PER_PEER"` and related patterns found no exact symbol in current workspace files.
 - answer_basis: explained likely distributed static-buffer meaning: fixed maximum candidate/message slots in one preallocated send/receive bucket for one peer GPU/rank.
 - source_changes: documentation memory only; no algorithm/code change.
+- followup_prompt: User asked for a short explanation of the same previous entity.
+- followup_prompt_ru: User asked to explain the same previous entity in Russian.
+- followup_stream3: User asked whether `BUCKET_CAP_PER_PEER` is for stream type 3; answer should clarify that this is likely the per-peer fixed bucket capacity used by that stream path when stream 3 sends/receives peer-partitioned candidates/messages, not the stream id itself.
