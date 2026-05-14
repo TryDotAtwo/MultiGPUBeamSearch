@@ -23,6 +23,17 @@ import data_loader
 PROJECT_DIR = Path(__file__).resolve().parent
 
 
+def history_backend() -> str:
+    value = os.environ.get("HISTORY_BACKEND", "gpu").strip().lower()
+    if value not in {"gpu", "cpu"}:
+        raise ValueError(f"HISTORY_BACKEND must be gpu or cpu, got {value!r}")
+    return value
+
+
+def _flag_enabled(name: str, default: str = "0") -> bool:
+    return os.environ.get(name, default).strip().lower() not in {"", "0", "false", "no", "off"}
+
+
 def make_default_config() -> Dict[str, Any]:
     world_size = int(os.environ.get("WORLD_SIZE", "1"))
     rank = int(os.environ.get("RANK", "0"))
@@ -52,20 +63,33 @@ def make_default_config() -> Dict[str, Any]:
         "inference_backend": os.environ.get("INFERENCE_BACKEND", "central_hamming"),
         "max_depth": int(os.environ.get("MAX_DEPTH", "4")),
         "histogram_period_micro": int(os.environ.get("HISTOGRAM_PERIOD_MICRO", "4")),
+        "history_backend": history_backend(),
+        "cpu_history_checkpoint": _flag_enabled("CPU_HISTORY_CHECKPOINT"),
     }
 
 
 def build_extension(verbose: bool = True):
     sources = [str(PROJECT_DIR / "beam_engine.cpp"), str(PROJECT_DIR / "beam_kernels.cu")]
-    extra_cflags = ["-O3", "-std=c++17"]
-    extra_cuda_cflags = ["-O3", "--use_fast_math", "-lineinfo", "-std=c++17"]
+    hist_cpu = history_backend() == "cpu"
+    checkpoint_on = _flag_enabled("CPU_HISTORY_CHECKPOINT")
+    debug_on = _flag_enabled("BEAM_DEBUG") or _flag_enabled("ENGINE_DEBUG")
+    variant = f"h{'cpu' if hist_cpu else 'gpu'}_c{int(checkpoint_on)}_d{int(debug_on)}"
+    macros = [
+        f"-DBEAM_HISTORY_CPU={1 if hist_cpu else 0}",
+        f"-DBEAM_CHECKPOINT_ON={1 if checkpoint_on else 0}",
+        f"-DBEAM_DEBUG_ON={1 if debug_on else 0}",
+    ]
+    extra_cflags = ["-O3", "-std=c++17", *macros]
+    extra_cuda_cflags = ["-O3", "--use_fast_math", "-lineinfo", "-std=c++17", *macros]
     extra_ldflags = ["-lnccl"]
-    if os.path.exists("/kaggle/working") and "TMPDIR" not in os.environ:
+    if os.name != "nt" and os.path.exists("/kaggle/working") and "TMPDIR" not in os.environ:
         os.environ["TMPDIR"] = "/kaggle/working/.tmp"
         os.makedirs(os.environ["TMPDIR"], exist_ok=True)
+    if "TORCH_EXTENSIONS_DIR" not in os.environ:
+        os.environ["TORCH_EXTENSIONS_DIR"] = str(PROJECT_DIR / "runtime" / "torch_extensions")
         
     return load(
-        name="beam_engine_ext",
+        name=f"beam_engine_ext_{variant}",
         sources=sources,
         extra_cflags=extra_cflags,
         extra_cuda_cflags=extra_cuda_cflags,
@@ -98,8 +122,7 @@ def allocate_buffers(ext, cfg: Dict[str, Any]) -> Dict[str, torch.Tensor]:
     hash_slot_bytes = int(sizes["hash_slot_bytes"])
     send_recv_records = int(sizes["send_recv_records"])
     state_size = int(cfg["state_size_bytes"])
-    history_depth = max(1, int(cfg.get("max_depth", 1)))
-    history_records = history_depth * n_local
+    history_records = int(sizes["history_records"])
 
     buffers = {
         "beam_current": torch.empty((n_local, state_size), dtype=torch.uint8, device=device),
@@ -149,8 +172,8 @@ def configure_engine(ext, cfg: Dict[str, Any], buffers: Dict[str, torch.Tensor])
         paths = [p for p in str(cfg.get("torchscript_scorer_paths", "")).split(os.pathsep) if p]
         if not paths:
             raise ValueError("INFERENCE_BACKEND=torchscript_ensemble requires TORCHSCRIPT_SCORER_PATHS")
-        if int(cfg.get("inference_parallelism", 1)) != len(paths):
-            print(f"[beam_engine] warning: INFERENCE_PARALLELISM={cfg.get('inference_parallelism')} but {len(paths)} TorchScript paths were provided")
+        if len(paths) > 1:
+            print(f"[beam_engine] warning: {len(paths)} TorchScript paths were provided; one path is enough for shared-weight multi-lane inference")
         engine.load_torchscript_ensemble(paths)
     if cfg["world_size"] > 1:
         engine.init_nccl(create_nccl_id(ext, cfg))

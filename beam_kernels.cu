@@ -2,6 +2,10 @@
 #include <stdint.h>
 #include "beam_engine_common.hpp"
 
+#ifndef BEAM_HISTORY_CPU
+#define BEAM_HISTORY_CPU 0
+#endif
+
 namespace beam_engine {
 
 __constant__ uint8_t c_action_permutation[FANOUT_FIXED][STATE_SIZE_BYTES_FIXED];
@@ -569,7 +573,11 @@ extern "C" __global__ void kernel_compact_next_to_current(
     current_active_flags[pos] = 1;
     int history_depth = history_depth_cell[0];
     if (history_depth >= 0) {
+#if BEAM_HISTORY_CPU
+        int64_t hpos = pos;
+#else
         int64_t hpos = static_cast<int64_t>(history_depth) * n_local + pos;
+#endif
         BeamMeta meta = next_meta[idx];
         history_parent_idx[hpos] = static_cast<int32_t>(meta.parent_idx);
         history_parent_rank[hpos] = meta.parent_rank;
@@ -580,7 +588,11 @@ extern "C" __global__ void kernel_compact_next_to_current(
         beam_status[STATUS_FOUND] = 1;
         beam_status[STATUS_LOCAL_FOUND] = 1;
         beam_status[STATUS_FOUND_LOCAL_INDEX] = pos;
+#if BEAM_HISTORY_CPU
+        beam_status[STATUS_FOUND_ACTION] = static_cast<int>(history_action[pos]);
+#else
         beam_status[STATUS_FOUND_ACTION] = static_cast<int>(history_action[static_cast<int64_t>(history_depth) * n_local + pos]);
+#endif
     }
 }
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 
 
 def mib(x: int) -> float:
@@ -25,6 +26,7 @@ def main() -> None:
     p.add_argument("--net-ring-depth", type=int, default=3)
     p.add_argument("--state-size-bytes", type=int, default=120)
     p.add_argument("--max-depth", type=int, default=1)
+    p.add_argument("--history-backend", choices=["gpu", "cpu"], default=os.getenv("HISTORY_BACKEND", "gpu").lower())
     p.add_argument("--gamma", type=float, default=1.05)
     p.add_argument("--beta", type=float, default=1.10)
     p.add_argument("--hash-load-factor", type=float, default=0.60)
@@ -35,6 +37,7 @@ def main() -> None:
     k_work = int(args.beta * k_keep + 0.5)
     hash_capacity = int(k_work / args.hash_load_factor + 0.5)
 
+    history_depth = 1 if args.history_backend == "cpu" else args.max_depth
     sizes = {
         "beam_current": n_local * args.state_size_bytes,
         "next_state_pool": k_work * args.state_size_bytes,
@@ -48,17 +51,17 @@ def main() -> None:
         "recv_buckets": args.net_ring_depth * args.world_size * args.bucket_cap_per_peer * 160,
         "send_counts": args.net_ring_depth * args.world_size * 4,
         "recv_counts": args.net_ring_depth * args.world_size * 4,
-        "history_parent_idx": args.max_depth * n_local * 4,
-        "history_parent_rank": args.max_depth * n_local,
-        "history_action": args.max_depth * n_local,
-        "history_valid": args.max_depth * n_local,
+        "history_parent_idx": history_depth * n_local * 4,
+        "history_parent_rank": history_depth * n_local,
+        "history_action": history_depth * n_local,
+        "history_valid": history_depth * n_local,
         "histograms_threshold_counters": 65536 * 4 * 2 + 2 * 4 + 8 * 4,
     }
     total = sum(sizes.values())
     h100_bytes = 80 * 1024**3
 
     print("entity_id=h100_sizing; type=memory_model; state=calculated")
-    print(f"params: WORLD_SIZE={args.world_size}; GLOBAL_BEAM_WIDTH={args.global_beam_width}; B_MICRO={args.b_micro}; K_EXPAND_TILE={args.k_expand_tile}; FANOUT={args.fanout}; BUCKET_CAP_PER_PEER={args.bucket_cap_per_peer}; MAX_DEPTH={args.max_depth}")
+    print(f"params: WORLD_SIZE={args.world_size}; GLOBAL_BEAM_WIDTH={args.global_beam_width}; B_MICRO={args.b_micro}; K_EXPAND_TILE={args.k_expand_tile}; FANOUT={args.fanout}; BUCKET_CAP_PER_PEER={args.bucket_cap_per_peer}; MAX_DEPTH={args.max_depth}; HISTORY_BACKEND={args.history_backend}")
     print(f"derived: N_LOCAL={n_local}; K_KEEP={k_keep}; K_WORK={k_work}; HASH_CAPACITY={hash_capacity}")
     for name, size in sizes.items():
         print(f"buffer={name}; bytes={size}; MiB={mib(size):.2f}; GiB={gib(size):.3f}")

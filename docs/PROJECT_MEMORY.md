@@ -1,5 +1,180 @@
 # Project Memory
 
+## 2026-05-14 user_friendly_kaggle_notebook
+
+- prompt_summary: User requested a user-friendly Kaggle notebook with first-cell primary config, second-cell advanced config with comments/examples, metrics histogram cell, submit cell, competition input files from Kaggle competition input, code cloned from GitHub, separate custom scorer documentation cell, and Yandex Cloud TODO cell.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- implementation_scope: create `notebooks/kaggle_user_friendly_cpu_history.ipynb` and `kaggle_user_friendly_kernel_stage` for Kaggle testing; preserve solver hot-path code.
+- notebook_config_primary: first cell contains `SAMPLE_START`, `SAMPLE_COUNT`, `GLOBAL_BEAM_WIDTH`, `B_MICRO`, `BETA` with Russian comments and examples.
+- notebook_config_advanced: second cell contains `MAX_DEPTH`, `INFERENCE_PARALLELISM`, `K_EXPAND_TILE`, `SCORE_RING_DEPTH`, `NET_RING_DEPTH`, `BUCKET_CAP_PER_PEER`, `HASH_LOAD_FACTOR`, `PROBE_LIMIT`, `HISTORY_BACKEND`, checkpoint/resume flags, logging, timeout, GitHub clone config, model dataset hint, scorer initializer path, and submission path.
+- notebook_data_source_change: notebook copies `puzzle_info.json`, `sample_submission.csv`, and `test.csv` from `/kaggle/input/cayley-py-megaminx` into cloned project `data/`; attached dataset is used only for `FullBeamNice` model files.
+- notebook_code_source_change: notebook clones `https://github.com/TryDotAtwo/MultiGPUBeamSearch.git` branch `master` into `/kaggle/working/CayleyBeam100H100`.
+- notebook_docs_cells: custom scorer cell documents `SCORER_INIT_PY`, `action24`, `action12`, `value1_after_move`, `heuristic24`, canonical `[B,24]` contract, and TODO for arbitrary generator count; Yandex Cloud cell is comments/TODO only and executes no cloud sync code.
+- notebook_metrics_submit: metrics cell prints `total_count`, `unsolved_count`, `solved_percent`, `total_len`, all/solved length statistics, `solved_lengths`, and ASCII histogram; submit cell builds requested `submit_message` and runs `kaggle competitions submit`.
+- verification_status: notebook JSON and stage metadata validate locally; GitHub push and Kaggle 2xT4 test pending.
+
+
+## 2026-05-14 solution_found_check_cost_answer
+
+- prompt_summary: User asked briefly whether the solution-found check takes much time.
+- answer_fact: `kernel_check_current_solved` is a linear scan over the current frontier comparing active states to `central_state`.
+- answer_fact: cost is memory-read bound and small relative to neural inference, candidate expansion, hash/dedup, NCCL exchange, thresholding, prune, and compaction for large depths.
+- caveat: at very large frontier sizes the scan is not free, but expected dominant runtime remains inference plus Stream2/Stream3 candidate processing.
+- code_change_status: project memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-14 solution_found_check_stage_answer
+
+- prompt_summary: User asked briefly at what stage the solver checks whether a solution is found.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- inspected_code: `docs/ARCHITECTURE.md`, `beam_engine.cpp`, `beam_kernels.cu`.
+- answer_fact: `reset_search(...)` checks the initial/current frontier with `launch_check_current_solved(...)` before the first expansion.
+- answer_fact: each depth step checks the current frontier for `central_state` at the start of `enqueue_one_depth(...)`, then after prune/rebuild it compacts survivors via `launch_compact_next_to_current(...)`; only compacted survivors publish final found status for the next frontier.
+- answer_fact: multi-GPU global found status is synchronized in `enqueue_found_allreduce_and_finish()` via NCCL `ncclAllReduce(..., ncclMax, ...)`.
+- answer_fact: host loop `BeamEngine.search(...)` reads `status().found` before expanding the next depth and returns success at that depth.
+- code_change_status: project memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-14 cpu_history_archive_shared_scorer_implementation
+
+- prompt_summary: User approved implementing CPU-history archive, optional disk checkpoint/resume, shared single TorchScript scorer with multiple inference lanes, custom Python scorer initializer API, incremental `submission.csv`, and Kaggle verification matrix.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- implementation_constraints: preserve current 3-stream architecture; keep static arrays; default mode must preserve current GPU-history behavior; disabled debug/checkpoint/history code should be compiled out through extension variants where practical.
+- design_lock: `HISTORY_BACKEND=gpu` keeps full-depth GPU transition history; `HISTORY_BACKEND=cpu` keeps one GPU transition layer and copies compacted transitions into preallocated CPU archive storage after each depth.
+- design_lock: CPU archive reconstructs CPU frontier from transitions and rank-sharded CPU frontier files/checkpoints; exact resume requires a CPU-derived frontier checkpoint, not transition-only replay at restart time.
+- design_lock: scorer export should produce one TorchScript file per rank; C++ should load one module and dispatch multiple inference lanes to the shared module when `INFERENCE_PARALLELISM>1`.
+- verification_plan: Python syntax checks, sizing checks for GPU/CPU history, compile smoke where local CUDA toolchain permits, Kaggle CLI verification if available without stopping remote kernels.
+- source_patch_python_control: `beam_engine.py` adds `HISTORY_BACKEND`, `CPU_HISTORY_CHECKPOINT`, compile-time extension variants `beam_engine_ext_h{gpu|cpu}_c{0|1}_d{0|1}`, and static history buffer sizing through `ext.derive_sizes(cfg)`.
+- source_patch_cpp_cuda: `beam_engine.cpp` and `beam_kernels.cu` add `BEAM_HISTORY_CPU`, `BEAM_DEBUG_ON`, one-layer GPU transition history for CPU-history mode, and shared single-module TorchScript inference lanes when only one scorer path is loaded.
+- source_patch_cpu_archive: `cpu_history_archive.py` adds preallocated CPU RAM transition arrays, pinned fixed-capacity host transfer slabs, rank-sharded frontier/transition checkpoint files, atomic manifest with `config_hash`, and resume upload of local frontier to `beam_current`.
+- source_patch_solver: `scripts/solve_testcsv_2gpu.py` adds CPU-history reconstruction, checkpoint resume flow, `RESUME_SUBMISSION=1` skip of already written sample IDs, and continued per-sample `submission.csv` append/flush behavior.
+- source_patch_scorer: `scripts/export_fullbeamnice_scorer.py` changes `--copies` semantics to inference lanes, adds `--physical-copies`, supports `SCORER_INIT_PY`, and emits canonical `[B,24]` higher-is-better TorchScript scores for `action24`, `action12`, `value1_after_move`, and `heuristic24`.
+- source_patch_sizing: `scripts/t4_sizing.py` and `scripts/h100_sizing.py` add `HISTORY_BACKEND`; CPU-history mode sizes GPU transition history as one depth instead of `MAX_DEPTH` depths.
+- local_verification: `python -m py_compile beam_engine.py cpu_history_archive.py scripts\solve_testcsv_2gpu.py scripts\export_fullbeamnice_scorer.py scripts\t4_sizing.py scripts\h100_sizing.py` passed.
+- local_verification: CPU archive fake transition/checkpoint test passed; T4 sizing reports `HISTORY_BACKEND=cpu` total static buffers `0.696 GiB` vs `HISTORY_BACKEND=gpu` `0.764 GiB` for `GLOBAL_BEAM_WIDTH=262144`, `WORLD_SIZE=2`, `MAX_DEPTH=80`.
+- local_cuda_compile_status: local extension compile is blocked by missing `ninja` in the local Python environment after fixing local temp/extension directory permissions; Kaggle compile remains required.
+- kaggle_packaging_status: dataset stage and matrix kernel stage prepared for `trydotatwo/cayleybeam-fullbeamnice-project` and `trydotatwo/cayleybeam-cpu-history-shared-scorer-test`; remote verification still pending.
+- kaggle_dataset_update: dataset `trydotatwo/cayleybeam-fullbeamnice-project` uploaded with updated CPU-history/shared-scorer sources; dataset file listing confirmed updated `cpu_history_archive.py`, `beam_engine.cpp`, `beam_engine.py`, `beam_kernels.cu`, solver/exporter scripts, and docs.
+- kaggle_kernel_v1: first push without effective accelerator assignment ran on single P100 and failed with `invalid device ordinal`; no remote stop/cancel/kill command was used.
+- kaggle_kernel_v2_v3: explicit `kaggle kernels push ... --accelerator NvidiaTeslaT4` assigned 2xTesla_T4; v2 passed checkpoint/resume smoke and failed first matrix with static hash overflow at depth 5; v3 passed checkpoint/resume smoke and `2**18,count20`, then failed `2**16,count50` with static hash overflow at depth 5.
+- kaggle_capacity_test_adjustment: matrix kernel now uses `BETA=1.20` for `2**18,count20`, `BETA=32.0` for smaller-beam matrix cases, `HASH_LOAD_FACTOR=0.35`, and `PROBE_LIMIT=512`; static sizing remains below `0.343 GiB` for the largest adjusted smaller-beam case and below T4 memory limits.
+- kaggle_kernel_v4_result: kernel `trydotatwo/cayleybeam-cpu-history-shared-scorer-test` version 4 completed on `2xTesla_T4`; no remote stop/cancel/kill command was used.
+- kaggle_kernel_v4_passed: log contains `CPU_HISTORY_RESUME_SMOKE_OK` and `CPU_HISTORY_SHARED_SCORER_MATRIX_OK`; row-count checks passed for `submission_beam_2_18_count20.csv=20`, `submission_beam_2_16_count50.csv=50`, `submission_beam_2_14_count100.csv=100`, `submission_beam_2_12_count1001.csv=1001`, `resume_part1.csv=1`, `resume_part2.csv=1`.
+- kaggle_kernel_v4_artifacts: outputs downloaded to `kaggle_outputs/cpu_history_shared_scorer_v4`; checkpoint manifest shows `sample_id=-1`, `depth=2`, `rank_count=2`, `n_local=8192`, `global_beam_width=16384`, `complete=true`.
+- code_change_status: implementation complete locally; Kaggle 2xT4 matrix verification passed.
+
+## 2026-05-13 kaggle_status_submit_append_fix
+
+- prompt_summary: User asked to persist root-cause classification that Kaggle notebook is only an orchestration wrapper, persist CPU-history-archive architecture notes, test everything in a new Kaggle 2xT4 notebook, and make `submission.csv` update after every solved sample without hurting speed.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- root_cause_classification: `kaggle_notebook_fault_scope` is not notebook-only; notebook launches `scripts/solve_testcsv_2gpu.py`; likely runtime inconsistency is in `beam_engine.cpp`/`beam_kernels.cu`; notebook correctly stops on path-validation failure.
+- architecture_note_persisted: `cpu_history_archive_design` is reasonable; GPU can keep only current compacted transition layer, copy compacted survivor transitions to CPU RAM after depth compaction, and CPU can maintain the current history graph without storing states.
+- source_patch_cpp: `beam_engine.cpp` now clears `STATUS_LOCAL_FOUND` immediately before compaction together with `STATUS_FOUND`, `STATUS_FOUND_LOCAL_INDEX`, and `STATUS_FOUND_ACTION`, so only `kernel_compact_next_to_current` should publish local found for the compacted survivor layer.
+- source_patch_solver: `scripts/solve_testcsv_2gpu.py` now all-reduces `local_found`, asserts global found has a local owner, rejects invalid owner index, optionally emits `DEPTH_RESULT`, initializes `submission.csv` at start, and appends/flushed one row after each solved sample when `SUBMISSION_APPEND_EACH=1`.
+- notebook_added: `notebooks/kaggle_2xt4_status_submit_append_debug.ipynb` runs a 2xT4 known scramble test, checks status owner reporting, checks incremental append output, and asserts `STATUS_APPEND_TEST_OK`.
+- local_verification: `python -m py_compile scripts\solve_testcsv_2gpu.py scripts\fullbeamnice_current_solver_2gpu.py beam_engine.py` passed; notebook JSON validation passed; T4 sizing for debug config reported `total_static_buffers_GiB=0.095`.
+- kaggle_dataset_update: first dataset upload without `--dir-mode` skipped folders; corrected by uploading `trydotatwo/cayleybeam-fullbeamnice-project` again with `--dir-mode zip`, including `scripts`, `FullBeamNice`, `docs`, and `notebooks`.
+- kaggle_kernel_run: pushed new private kernel `trydotatwo/cayleybeam-status-submit-2t4-debug` with `--accelerator NvidiaTeslaT4`; status reached `KernelWorkerStatus.COMPLETE`; no stop/cancel operation was used.
+- kaggle_result: downloaded output to `kaggle_outputs/status_submit_2t4_v1`; log contains `DEPTH_RESULT` depth 2 with `found_sum=2`, `local_found_sum=1`, `bucket_overflow=0`, `hash_overflow=0`, `cuda_graph_captured_sum=2`; log contains `SAMPLE_RESULT` with `found=true`, `depth=2`, `path=-R.-U`; log contains `SUBMISSION_WRITTEN` with `append_each=true`; log contains `STATUS_APPEND_TEST_OK`.
+- submission_result: `kaggle_outputs/status_submit_2t4_v1/submission.csv` contains header plus one row `-1,-R.-U`.
+- code_change_status: runtime status fix, solver append behavior, and new Kaggle debug notebook added; CPU-history archive is documented as design direction, not implemented yet.
+
+## 2026-05-13 path_validation_failed_local_found_stale_risk
+
+- prompt_summary: User pasted Kaggle failure where samples 100 and 101 solved, then `scripts/solve_testcsv_2gpu.py` failed with `FATAL_EXIT type=AssertionError; message=path validation failed`, `variant=direct`, `distance=50`.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- inspected_code: `scripts/solve_testcsv_2gpu.py`, `scripts/fullbeamnice_current_solver_2gpu.py`, `beam_engine.cpp`, `beam_kernels.cu`, `beam_engine_common.hpp`, `beam_engine.py`.
+- failure_interpretation: this is not a `BETA`/capacity failure; shown log contains path-validation failure after a reported found path, not bucket/hash overflow.
+- likely_root_cause: `STATUS_LOCAL_FOUND` can remain stale because `clear_step_state_async` clears counters/hist/active/compacted/max-score but not `STATUS_LOCAL_FOUND`, and the pre-compaction `cudaMemsetAsync(beam_status + STATUS_FOUND, 0, 3*sizeof(int32_t))` clears only indices `[STATUS_FOUND, STATUS_FOUND_LOCAL_INDEX, STATUS_FOUND_ACTION]`, not `STATUS_LOCAL_FOUND` at index 7.
+- consequence: `solve_testcsv_2gpu.py` chooses `found_rank` from gathered `local_found`; stale `local_found=1` can make a rank report `found_local_index` that does not point to the actual compacted central state, so `reconstruct_path(...)` walks a valid-looking but wrong history chain and CPU validation fails with nonzero distance.
+- supporting_prior_signal: previous debug output pattern showed a rank with global found status and `found_local_index=0` where `state_is_central=false`, while another rank had the actual central state.
+- fix_direction_requires_approval: clear `STATUS_LOCAL_FOUND` together with found fields at each step/reset boundary before compaction and ensure only `kernel_compact_next_to_current` publishes local found for a compacted central survivor.
+- code_change_status: documentation memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-13 kaggle_kernel_stop_forbidden
+
+- prompt_summary: User explicitly stated that Kaggle kernels must never be stopped under any circumstances.
+- operational_rule: never stop, cancel, interrupt, kill, or otherwise terminate Kaggle kernels or Kaggle notebook runs.
+- scope: all Kaggle kernels, Kaggle notebook runs, Kaggle CLI operations, and remote Kaggle execution monitoring.
+- allowed_actions: read logs, read status, download outputs when permitted, analyze local artifacts, report diagnostics.
+- forbidden_actions: `kaggle kernels stop`, UI stop/cancel, process termination of remote Kaggle runs, any equivalent stop/kill/cancel operation.
+- priority: critical; this rule overrides diagnostic convenience and timeout cleanup preferences for remote Kaggle kernels.
+- code_change_status: project memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-13 torchscript_copy_weight_check
+
+- prompt_summary: User asked whether `--copies 2` creates real duplicate model weights in VRAM and requested a short answer based on code inspection.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- inspected_code: `scripts/export_fullbeamnice_scorer.py`, `scripts/solve_testcsv_2gpu.py`, `beam_engine.py`, `beam_engine.cpp`.
+- answer_fact: `scripts/export_fullbeamnice_scorer.py` loops over `args.copies`; each iteration calls `build_model(...)`, loads the checkpoint with `torch.load(...)`, calls `model.load_state_dict(...)`, moves that model to CUDA, traces/freezes it, and saves a separate `.ts` file.
+- answer_fact: `beam_engine.py` passes all scorer paths to `engine.load_torchscript_ensemble(paths)`.
+- answer_fact: `beam_engine.cpp` stores `std::vector<torch::jit::Module> modules` and calls `torch::jit::load(path, device)` once per path; inference selects `modules[slot % modules.size()]`.
+- conclusion: current code does not implement shared TorchScript weight storage across copies; `--copies 2` creates and loads two independent TorchScript modules, so two real weight copies in VRAM are expected per rank.
+- code_change_status: documentation memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-13 fullbeamnice_model_size_estimate
+
+- prompt_summary: User asked how much VRAM two current FullBeamNice TorchScript weight copies consume.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- inspected_files: `FullBeamNice/weights/p900-t000-q-sym_1777988767_best.pth`, `FullBeamNice/logs/model_p900-t000-q-sym_1777988767.json`, `runtime/**/*.ts`.
+- measured_checkpoint_size: `p900-t000-q-sym_1777988767_best.pth` is `95,961,231` bytes, about `91.5 MiB`.
+- model_parameter_count: `23,978,008`.
+- vram_weight_estimate: fp16 weights are about `45.7 MiB` per copy and `91.5 MiB` for two copies; fp32 weights are about `91.5 MiB` per copy and `183 MiB` for two copies.
+- caveat: TorchScript/CUDA runtime, allocator fragmentation, cuDNN/cuBLAS workspace, activations, graph capture, and duplicated module metadata add extra VRAM beyond raw weight tensors.
+- code_change_status: documentation memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-13 inference_parallelism_memory_scope_check
+
+- prompt_summary: User asked to verify in code whether two scorers only affect Stream1 and should occupy little memory.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- inspected_code: `beam_engine.cpp`, `beam_engine.py`, `scripts/t4_sizing.py`.
+- answer_fact: `INFERENCE_PARALLELISM` is clamped to `score_ring_depth`, creates only `stream_infer_lanes_` CUDA streams/events at engine construction, and selects `infer_lane = mb % inference_parallelism` in `enqueue_one_depth`.
+- answer_fact: static solver buffers are not multiplied by `INFERENCE_PARALLELISM`; `score_ring` size is `score_ring_depth * B_MICRO * fanout * 2`, independent of lane count.
+- answer_fact: TorchScript backend selects `modules[slot % modules.size()]` and writes each result into the shared `score_ring`.
+- caveat: `TorchScriptEnsembleBackend` stores `outputs_by_slot[slot] = y`, so up to `score_ring_depth` TorchScript output tensors can remain referenced; for `B_MICRO=32768`, `fanout=24`, `int16`, one output is about `1.5 MiB`, so this is not a multi-GiB item.
+- conclusion: code supports the user's intuition that `INFERENCE_PARALLELISM=2` primarily affects Stream1 scheduling and scorer/module duplication; direct static memory delta is small, so large OOM is more likely from TorchScript/CUDA runtime behavior during export/load/capture rather than beam static arrays.
+- code_change_status: documentation memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-13 beam_1e9_beta_1_01_memory_estimate
+
+- prompt_summary: User asked to calculate static buffer memory for `GLOBAL_BEAM_WIDTH=1,000,000,000`, `BETA=1.01`, `WORLD_SIZE=2`.
+- sizing_command: `GLOBAL_BEAM_WIDTH=1000000000 WORLD_SIZE=2 BETA=1.01 MAX_DEPTH=100 B_MICRO=32768 K_EXPAND_TILE=32768 SCORE_RING_DEPTH=8 NET_RING_DEPTH=2 BUCKET_CAP_PER_PEER=524288 HASH_LOAD_FACTOR=0.45 python scripts/t4_sizing.py`.
+- derived: `N_LOCAL=500,000,000`, `K_KEEP=525,000,000`, `K_WORK=530,250,000`, `HASH_CAPACITY=1,178,333,333`.
+- per_rank_static_buffers: `532,140,112,604` bytes, `495.594 GiB`, about `0.484 TiB`.
+- two_rank_static_buffers_total: about `991.188 GiB`, about `0.968 TiB`.
+- largest_per_rank_buffers: history total about `325.963 GiB`; state pools plus hash/meta about `166.059 GiB`.
+- caveat: estimate excludes TorchScript weights/runtime, CUDA context, NCCL internals, inference outputs, allocator fragmentation, and workspace.
+- code_change_status: documentation memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-13 max_beam_capacity_depth80
+
+- prompt_summary: User asked how much beam fits on `100xH100` and `2xA100` when history depth is `80`.
+- assumptions: `BETA=1.01`, `GAMMA=1.05`, `HASH_LOAD_FACTOR=0.45`, `MAX_DEPTH=80`, `B_MICRO=32768`, `K_EXPAND_TILE=32768`, `SCORE_RING_DEPTH=8`, `NET_RING_DEPTH=2`, `BUCKET_CAP_PER_PEER=524288`; estimates are static buffers only.
+- result_100xH100_80GiB: maximum global beam about `5,670,292,900`; per-rank local beam `56,702,929`; per-rank static buffers exactly about `80.000 GiB`.
+- result_2xA100_80GiB: maximum global beam about `184,665,850`; per-rank local beam `92,332,925`; per-rank static buffers exactly about `80.000 GiB`.
+- result_2xA100_40GiB: maximum global beam about `91,591,580`; per-rank local beam `45,795,790`; per-rank static buffers exactly about `40.000 GiB`.
+- caveat: practical beam should be lower because estimates exclude model/runtime, CUDA context, NCCL internals, allocator fragmentation, graph capture, and inference workspaces.
+- code_change_status: documentation memory update only; no algorithm/runtime logic modified.
+
+## 2026-05-11 algorithm_optimality_expand_cost_assessment
+
+- prompt_summary: User asked whether current algorithm phases are logically optimal and whether neighbor expansion is expensive.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- inspected_code: `beam_kernels.cu`, `beam_engine.cpp`.
+- assessment: current phase ordering is logical for correctness and static-array GPU residency: inference first, score-ring expansion, threshold filter, state materialization, hash/routing, distributed exchange, dedup, histogram threshold, prune/reclaim, hash rebuild, compact.
+- cost_assessment: neighbor expansion is not the dominant neural cost; per candidate it performs 120-byte permutation copy, two 120-byte hash/fingerprint passes, possible 120-byte candidate storage or network bucket copy, and hash-table probing/atomics.
+- likely_bottleneck_order: neural inference and hash/dedup memory traffic/atomics dominate more often than pure action permutation; remote candidate exchange can dominate at high multi-GPU scale.
+- optimization_note: possible improvements include inverse-move masking, pre-hash/permutation fusion, stronger early thresholding, score-top candidate filtering before full state materialization, and better distributed load balancing; all are algorithmic/runtime changes requiring explicit approval.
+- code_change_status: read-only inspection plus project memory update; no algorithm files modified.
+
+## 2026-05-11 nn_scoring_dedup_explanation
+
+- prompt_summary: User asked whether neural inference scores each neighbor separately or one inference returns scores for all 24 neighbors, and how score+state dedup/top-k works.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- inspected_code: `beam_engine.cpp`, `beam_kernels.cu`, `beam_engine.py`, `scripts/export_fullbeamnice_scorer.py`, `scripts/solve_testcsv_2gpu.py`.
+- answer_fact: TorchScript scorer receives current states as `[micro_size,120]` and returns `[micro_size,fanout]`, where `fanout=24`; no separate neural forward per neighbor is used on the TorchScript FullBeamNice path.
+- answer_fact: CUDA `kernel_process_score_slot` iterates candidate lanes after inference; each lane maps to `(parent_state, action)`, reads the precomputed score from `score_ring`, applies the action to materialize candidate state, hashes candidate state, routes by owner, deduplicates through the hash table, and updates/replaces metadata by score.
+- answer_fact: top-k is threshold/histogram based; global score histogram computes `threshold_cell`, candidates with `score <= threshold` are filtered/pruned, and static free-list reclaim plus hash rebuild keep resident candidates bounded.
+- code_change_status: read-only source inspection plus project memory update; no algorithm files modified.
+
 ## 2026-05-09 yandex_2xa100_container_push
 
 - prompt_summary: User prepared Yandex Cloud 2xA100 VM workflow, requested Yandex Container Registry push, SSH preparation, InfiniBand/NCCL testing preparation, and exact README instructions for running the full Kaggle-equivalent beam instead of a smoke run.

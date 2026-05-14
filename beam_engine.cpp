@@ -16,7 +16,13 @@
 #include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDAGuard.h>
 
+#ifndef BEAM_HISTORY_CPU
+#define BEAM_HISTORY_CPU 0
+#endif
 
+#ifndef BEAM_DEBUG_ON
+#define BEAM_DEBUG_ON 0
+#endif
 
 
 namespace py = pybind11;
@@ -177,6 +183,7 @@ struct DummyInferenceBackend final : public InferenceBackend {
 struct TorchScriptEnsembleBackend final : public InferenceBackend {
     std::vector<torch::jit::Module> modules;
     std::vector<torch::Tensor> outputs_by_slot;
+    bool shared_module = false;
 
     explicit TorchScriptEnsembleBackend(const std::vector<std::string>& paths, const c10::Device& device) {
         if (paths.empty()) throw std::runtime_error("torchscript ensemble requires at least one module path");
@@ -187,6 +194,7 @@ struct TorchScriptEnsembleBackend final : public InferenceBackend {
             m.eval();
             modules.emplace_back(std::move(m));
         }
+        shared_module = modules.size() == 1;
     }
 
     void forward(const torch::Tensor& beam_current,
@@ -198,7 +206,7 @@ struct TorchScriptEnsembleBackend final : public InferenceBackend {
                  const EngineConfig& cfg,
                  cudaStream_t stream) override {
         if (modules.empty()) throw std::runtime_error("torchscript ensemble is empty");
-        const int module_idx = slot % static_cast<int>(modules.size());
+        const int module_idx = shared_module ? 0 : slot % static_cast<int>(modules.size());
         auto torch_stream = c10::cuda::getStreamFromExternal(
             stream,
             static_cast<c10::DeviceIndex>(beam_current.device().index())
@@ -411,9 +419,15 @@ public:
     bool cuda_graph_captured() const { return cuda_graph_captured_; }
 
     void enable_debug(bool verbose, bool print_counters, int log_period) {
+#if BEAM_DEBUG_ON
         debug_config.verbose = verbose;
         debug_config.print_counters = print_counters;
         debug_config.log_period = log_period;
+#else
+        (void)verbose;
+        (void)print_counters;
+        (void)log_period;
+#endif
     }
 
     void step(int histogram_period_micro) {
@@ -487,7 +501,11 @@ public:
         if (depth < 0 || depth >= cfg_.max_depth) throw std::runtime_error("history depth out of range");
         if (local_index < 0 || local_index >= cfg_.n_local) throw std::runtime_error("history local index out of range");
         CUDA_CHECK(cudaStreamSynchronize(stream_infer_));
+#if BEAM_HISTORY_CPU
+        int64_t pos = local_index;
+#else
         int64_t pos = static_cast<int64_t>(depth) * cfg_.n_local + local_index;
+#endif
         auto parent_cpu = history_parent_idx_.slice(0, pos, pos + 1).cpu();
         auto rank_cpu = history_parent_rank_.slice(0, pos, pos + 1).cpu();
         auto action_cpu = history_action_.slice(0, pos, pos + 1).cpu();
@@ -861,6 +879,7 @@ private:
 
         CUDA_CHECK(cudaMemsetAsync(current_active_flags_.data_ptr<uint8_t>(), 0, current_active_flags_.numel(), stream_ingest_));
         CUDA_CHECK(cudaMemsetAsync(beam_status_.data_ptr<int32_t>() + STATUS_FOUND, 0, 3 * sizeof(int32_t), stream_ingest_));
+        CUDA_CHECK(cudaMemsetAsync(beam_status_.data_ptr<int32_t>() + STATUS_LOCAL_FOUND, 0, sizeof(int32_t), stream_ingest_));
         launch_compact_next_to_current(
             reinterpret_cast<const uint8_t*>(next_state_pool_.data_ptr<uint8_t>()),
             reinterpret_cast<const BeamMeta*>(next_meta_.data_ptr<uint8_t>()),
@@ -885,7 +904,9 @@ private:
     void capture_cuda_graph(int histogram_period_micro) {
         if (cuda_graph_captured_) return;
         if (!inference_warmed_) warmup_inference(2);
+#if BEAM_DEBUG_ON
         if (debug_config.verbose) std::cout << "[BeamEngine] capturing CUDA Graph" << std::endl;
+#endif
         CUDA_CHECK(cudaStreamBeginCapture(stream_infer_, cudaStreamCaptureModeGlobal));
         enqueue_one_depth(histogram_period_micro);
         CUDA_CHECK(cudaStreamEndCapture(stream_infer_, &cuda_graph_));
@@ -924,7 +945,13 @@ py::dict derive_sizes(py::dict cfg_dict) {
     d["beam_meta_bytes"] = static_cast<int>(sizeof(BeamMeta));
     d["hash_slot_bytes"] = static_cast<int>(sizeof(HashSlot));
     d["send_recv_records"] = static_cast<int64_t>(cfg.net_ring_depth) * cfg.world_size * cfg.bucket_cap_per_peer;
+#if BEAM_HISTORY_CPU
+    d["history_records"] = cfg.n_local;
+    d["history_backend_cpu"] = 1;
+#else
     d["history_records"] = static_cast<int64_t>(cfg.max_depth) * cfg.n_local;
+    d["history_backend_cpu"] = 0;
+#endif
     d["inference_parallelism"] = cfg.inference_parallelism;
     d["k_expand_tile"] = cfg.k_expand_tile;
     return d;
