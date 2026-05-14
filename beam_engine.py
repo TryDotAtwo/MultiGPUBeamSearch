@@ -63,6 +63,7 @@ def make_default_config() -> Dict[str, Any]:
         "inference_backend": os.environ.get("INFERENCE_BACKEND", "central_hamming"),
         "max_depth": int(os.environ.get("MAX_DEPTH", "4")),
         "histogram_period_micro": int(os.environ.get("HISTOGRAM_PERIOD_MICRO", "4")),
+        "cuda_graph_max_micro": int(os.environ.get("CUDA_GRAPH_MAX_MICRO", "512")),
         "history_backend": history_backend(),
         "cpu_history_checkpoint": _flag_enabled("CPU_HISTORY_CHECKPOINT"),
     }

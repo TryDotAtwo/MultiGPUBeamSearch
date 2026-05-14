@@ -564,3 +564,19 @@
 - source_patch_solver_logging: per-sample `SAMPLE_RESULT` logging is now controlled by `SAMPLE_LOG_EVERY`, with backward-compatible fallback to `LOG_EVERY`; default is `1`, so rank0 can still log after every completed sample.
 - notebook_patch: user-friendly Kaggle notebooks now expose `BEAM_DEBUG=0`, `DEPTH_LOG_EVERY=0`, and `SAMPLE_LOG_EVERY=1`; comments state that `BEAM_DEBUG=0` builds release extension with debug C++ code excluded by `#if`.
 - local_verification: `python -m py_compile beam_engine.py scripts\solve_testcsv_2gpu.py` passed; both notebooks JSON-parse; notebook text has `question_runs=0` and `non_ascii=0`.
+
+## 2026-05-14 cuda_graph_huge_beam_guard
+
+- prompt_summary: User confirmed CUDA Graph caused huge-beam OOM and requested fixing CUDA Graph usage without breaking static-buffer architecture.
+- root_cause: current `capture_cuda_graph()` captured a full depth; at `GLOBAL_BEAM_WIDTH=70M`, `N_LOCAL=35M`, `B_MICRO=8192`, this records about 4273 microbatches per rank, including TorchScript forward calls, and can create a large CUDA/PyTorch graph-private memory pool.
+- source_patch_cpp: `TorchScriptEnsembleBackend` no longer retains scorer output tensors in `outputs_by_slot`; scorer output remains transient and is copied/quantized into the preallocated `score_ring` slot.
+- source_patch_cpp_graph_guard: added `cuda_graph_max_micro` config; `BeamEngine::step()` uses CUDA Graph only when `num_micro <= cuda_graph_max_micro`; huge beams automatically run the normal static-stream path instead of full-depth graph capture.
+- source_patch_python: `beam_engine.py` reads `CUDA_GRAPH_MAX_MICRO` into config; `scripts/solve_testcsv_2gpu.py` only asserts graph capture when graph is expected for the current microbatch count.
+- notebook_patch: user-friendly notebooks expose `USE_CUDA_GRAPHS=1` and `CUDA_GRAPH_MAX_MICRO=512`; comments explain that graphs remain enabled for small/medium beams and are automatically bypassed for huge beams to avoid VRAM blow-up.
+
+## 2026-05-14 bucket_cap_per_peer_question
+
+- prompt_summary: User asked briefly what `BUCKET_CAP_PER_PEER` does.
+- symbol_search: `rg "BUCKET_CAP_PER_PEER"` and related patterns found no exact symbol in current workspace files.
+- answer_basis: explained likely distributed static-buffer meaning: fixed maximum candidate/message slots in one preallocated send/receive bucket for one peer GPU/rank.
+- source_changes: documentation memory only; no algorithm/code change.
