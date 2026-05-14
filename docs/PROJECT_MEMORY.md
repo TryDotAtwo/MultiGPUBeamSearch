@@ -34,6 +34,17 @@
 - sizing_result_2xt4_requested: with `GLOBAL_BEAM_WIDTH=81,000,000`, `WORLD_SIZE=2`, `B_MICRO=8192`, `INFERENCE_PARALLELISM=2`, `BETA=1.01`, `HASH_LOAD_FACTOR=0.45`, `HISTORY_BACKEND=cpu`, `INFERENCE_BACKEND=fullbeamnice_static`, total modeled static GPU buffers are `14.161 GiB` per rank with `0.839 GiB` modeled T4 headroom before CUDA/NCCL/runtime overhead.
 - local_compile_status: local PyTorch extension compile remains blocked by missing Windows MSVC `cl.exe`.
 
+## 2026-05-14 kaggle_2xt4_static_cutlass_test_blocked
+
+- prompt_summary: User requested Kaggle 2xT4 validation for static CUTLASS FullBeamNice backend with `GLOBAL_BEAM_WIDTH=81_000_000`, `SAMPLE_START=1`, `SAMPLE_COUNT=1`, `BETA=1.01`, `MAX_DEPTH=60`, `HASH_LOAD_FACTOR=0.45`, `PROBE_LIMIT=128`, `HISTORY_BACKEND=cpu`, `CPU_HISTORY_CHECKPOINT=1`, `RESUME_BEAMSEARCH=1`, `RESUME_SUBMISSION=0`, `CPU_HISTORY_WORKERS=2`, debug run `BEAM_DEBUG=1`, `DEPTH_LOG_EVERY=1`, then final run `BEAM_DEBUG=0`, `DEPTH_LOG_EVERY=0`.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- notebook_config_verified: `kaggle_user_friendly_kernel_stage/kaggle_user_friendly_cpu_history.ipynb` currently contains requested debug config and `INFERENCE_BACKEND='fullbeamnice_static'`, `INFERENCE_PARALLELISM=2`.
+- local_kaggle_cli_check: `kaggle --version` returned `Kaggle CLI 2.0.2`.
+- local_kaggle_auth_failure: `kaggle kernels list -m` returned `401 Client Error: Unauthorized`.
+- local_kaggle_push_failure: `kaggle kernels push -p kaggle_user_friendly_kernel_stage --accelerator NvidiaTeslaT4` returned `Expecting value: line 1 column 1 (char 0)`, consistent with unauthorized/non-JSON API response.
+- remote_verification_status: Kaggle debug and release runs not started because Kaggle API credentials are invalid/expired in the local environment.
+- safety_note: no Kaggle kernel was stopped, canceled, interrupted, or killed.
+
 ## 2026-05-14 user_friendly_kaggle_notebook
 
 - prompt_summary: User requested a user-friendly Kaggle notebook with first-cell primary config, second-cell advanced config with comments/examples, metrics histogram cell, submit cell, competition input files from Kaggle competition input, code cloned from GitHub, separate custom scorer documentation cell, and Yandex Cloud TODO cell.
