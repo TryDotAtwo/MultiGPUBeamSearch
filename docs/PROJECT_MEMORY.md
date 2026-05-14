@@ -9,7 +9,7 @@
 - source_patch_notebooks: `notebooks/kaggle_user_friendly_cpu_history.ipynb` and `kaggle_user_friendly_kernel_stage/kaggle_user_friendly_cpu_history.ipynb` add `DEPTH_TUNING_LOG` and pass into `base_env`.
 - source_patch_kaggle_stage: `kaggle_user_friendly_kernel_stage/kernel-metadata.json` added for `kaggle kernels push` targeting `trydotatwo/cayleybeam-user-friendly-cpu-history`.
 - caveat: `wall_ms` merges Stream1+2+3 completion per rank; separate stream timings need Nsight; tuning log adds sync overhead — disable for final runs.
-- remote_verification_status: git push and `kaggle kernels push` attempted from agent shell; outcome recorded below.
+- remote_verification_status: `git push origin master` succeeded (commits through `23bcaac`); `kaggle kernels push -p kaggle_user_friendly_kernel_stage --accelerator NvidiaTeslaT4` succeeded as kernel version 8; progress URL `https://www.kaggle.com/trydotatwo/cayleybeam-user-friendly-cpu-history`.
 
 ## 2026-05-14 prepass_fill_phase_torchscript_opt_in
 
