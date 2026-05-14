@@ -44,6 +44,7 @@
 - local_kaggle_push_failure: `kaggle kernels push -p kaggle_user_friendly_kernel_stage --accelerator NvidiaTeslaT4` returned `Expecting value: line 1 column 1 (char 0)`, consistent with unauthorized/non-JSON API response.
 - remote_verification_status: Kaggle debug and release runs not started because Kaggle API credentials are invalid/expired in the local environment.
 - safety_note: no Kaggle kernel was stopped, canceled, interrupted, or killed.
+- retry_2026_05_14: user requested another attempt; `kaggle kernels list -m` still returned `401 Client Error: Unauthorized`; `kaggle kernels push -p kaggle_user_friendly_kernel_stage --accelerator NvidiaTeslaT4` still returned `Expecting value: line 1 column 1`; no Kaggle run was started.
 
 ## 2026-05-14 user_friendly_kaggle_notebook
 
