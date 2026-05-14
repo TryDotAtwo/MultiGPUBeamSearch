@@ -17,7 +17,9 @@
 - local_verification: static FullBeamNice CPU FP32 compare passed with `max_abs_score_diff=1`; CUDA FP16 compare passed with `max_abs_score_diff=36`.
 - local_compile_status: local PyTorch extension compile remains blocked by missing Windows MSVC `cl.exe`; `ninja` was installed successfully, but CUDA extension compilation still requires MSVC on Windows.
 - sizing_result_2xt4_requested: with `GLOBAL_BEAM_WIDTH=81,000,000`, `WORLD_SIZE=2`, `B_MICRO=8192`, `K_EXPAND_TILE=16384`, `BETA=1.01`, `HASH_LOAD_FACTOR=0.45`, `HISTORY_BACKEND=cpu`, `INFERENCE_BACKEND=fullbeamnice_static`, total modeled static GPU buffers are `14.121 GiB` per rank with `0.879 GiB` modeled T4 headroom before CUDA/NCCL/runtime overhead.
-- remote_verification_status: Kaggle 2xT4 compile/runtime verification pending.
+- git_push_status: commits `4b894ae Add CUTLASS FullBeamNice static scorer` and `2cfb767 Set Kaggle debug config for static scorer` pushed to `origin/master`.
+- kaggle_debug_config: user-friendly Kaggle notebook config set to `SAMPLE_START=1`, `SAMPLE_COUNT=1`, `GLOBAL_BEAM_WIDTH=81_000_000`, `B_MICRO=8192`, `BETA=1.01`, `MAX_DEPTH=60`, `HASH_LOAD_FACTOR=0.45`, `PROBE_LIMIT=128`, `HISTORY_BACKEND=cpu`, `CPU_HISTORY_CHECKPOINT=1`, `RESUME_BEAMSEARCH=1`, `RESUME_SUBMISSION=0`, `CPU_HISTORY_WORKERS=2`, `BEAM_DEBUG=1`, `DEPTH_LOG_EVERY=1`.
+- remote_verification_status: Kaggle 2xT4 compile/runtime verification blocked because local Kaggle CLI now returns `401 Unauthorized` for `kaggle kernels list` and JSON parse failure for `kaggle kernels push`; no remote Kaggle run was stopped or killed.
 
 ## 2026-05-14 user_friendly_kaggle_notebook
 
