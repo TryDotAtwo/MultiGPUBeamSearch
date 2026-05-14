@@ -528,3 +528,26 @@
 - observed_logs: 1-rank run completed; 2-rank cell emitted c10d hostname warnings and no `CompletedProcess` confirmation in stored output.
 - root_cause: 2-rank notebook cell manually forced `HOSTNAME=127.0.0.1`, `MASTER_ADDR=127.0.0.1`, `MASTER_PORT=29505`, and `NCCL_COMM_ID=127.0.0.1:29505` while also using `torch.distributed.run --standalone`; this mixed two rendezvous/control-plane configurations and produced fragile Kaggle networking behavior.
 - fix_plan: save corrected notebook copy; allow `torchrun --standalone` to own rendezvous; keep Kaggle-safe NCCL disables; add timeout and unbuffered output; clean mojibake comments and status prints.
+
+## 2026-05-14 user_friendly_kaggle_notebook
+
+- prompt_summary: User requested a user-friendly Kaggle notebook with primary config cell, advanced config cell, metrics cell, submit cell, competition-file inputs from Kaggle competition mount, model-only dataset input, GitHub project clone, custom scorer documentation, Yandex Cloud TODO-only cell, and 2xT4 validation.
+- source_files_changed: `notebooks/kaggle_user_friendly_cpu_history.ipynb`, `kaggle_user_friendly_kernel_stage/kaggle_user_friendly_cpu_history.ipynb`, `kaggle_user_friendly_kernel_stage/kernel-metadata.json`.
+- notebook_config_layout: first cell contains only `SAMPLE_START`, `SAMPLE_COUNT`, `GLOBAL_BEAM_WIDTH`, `B_MICRO`, `BETA`; second cell contains advanced parameters including `LOG_EVERY`, `HISTORY_BACKEND`, `TIMEOUT_SEC`, checkpoint/resume flags, GitHub URL/branch, model dataset hint, and scorer initializer path.
+- notebook_data_source_rule: project source is cloned from `https://github.com/TryDotAtwo/MultiGPUBeamSearch.git` branch `master`; Kaggle competition files `puzzle_info.json`, `sample_submission.csv`, and `test.csv` are discovered recursively under `/kaggle/input` and copied into project `data/`; model files remain sourced from dataset `trydotatwo/cayleybeam-fullbeamnice-project`.
+- notebook_docs_added: custom scorer cell documents `SCORER_INIT_PY`, `output_kind=action24`, `action12`, `value1_after_move`, `heuristic24`, canonical `[B,24]` higher-is-better scores, and TODO for arbitrary generator count beyond 24.
+- notebook_cloud_cell: Yandex Cloud integration cell is comment/TODO-only and prints `YANDEX_CLOUD_STATUS: disabled; current_run_location=Kaggle_only`; no cloud code is active.
+- notebook_metrics_cell: computes and prints `total_count`, `unsolved_count`, `solved_percent`, `total_len`, `mean_len_all`, `median_len_all`, `max_len_solved`, `min_len_solved`, `mean_len_solved`, `median_len_solved`, `solved_lengths`, and ASCII solved-length histogram.
+- notebook_submit_cell: builds requested `submit_message` and runs `kaggle competitions submit -c cayley-py-megaminx -f /kaggle/working/submission.csv -m "$submit_message"`.
+- git_commit_main: `0794e30 Add CPU history archive and user-friendly Kaggle notebook` pushed to `origin/master`.
+- git_commit_fix: `ab98087 Find Kaggle competition files recursively` pushed to `origin/master`; fix replaced hardcoded competition mount path with recursive file discovery preferring `/kaggle/input/competitions/...`.
+- kaggle_kernel: `trydotatwo/cayleybeam-user-friendly-cpu-history`; metadata requests `enable_gpu=true`, `enable_internet=true`, `competition_sources=["cayley-py-megaminx"]`, `dataset_sources=["trydotatwo/cayleybeam-fullbeamnice-project"]`.
+- kaggle_v1_result: status `ERROR`; root cause `FileNotFoundError` from hardcoded `/kaggle/input/cayley-py-megaminx`; hardware log confirmed `2x Tesla T4`.
+- kaggle_v2_result: status `KernelWorkerStatus.COMPLETE`; run cloned GitHub source, detected competition directory `/kaggle/input/competitions/cayley-py-megaminx`, detected model dataset `/kaggle/input/datasets/trydotatwo/cayleybeam-fullbeamnice-project`, and executed 2-rank `torch.distributed.run` on `2x Tesla T4`.
+- kaggle_v2_config: `GLOBAL_BEAM_WIDTH=4096`, `B_MICRO=8192`, `BETA=32.0`, `MAX_DEPTH=100`, `INFERENCE_PARALLELISM=2`, `K_EXPAND_TILE=16384`, `HISTORY_BACKEND=cpu`.
+- kaggle_v2_memory: `scripts/t4_sizing.py` reported `total_static_buffers_GiB=0.098`, `memory_ok=True`.
+- kaggle_v2_solver_result: log contains `SAMPLE_RESULT {"pos": 0, "id": 0, "found": false, "depth": -1, "path_len": 0, "path": "", "cuda_graph_captured_sum": 2, "elapsed_sec": 2.576}` and `SUBMISSION_WRITTEN {"path": "/kaggle/working/submission.csv", "rows": 1, "append_each": true, "elapsed_sec": 2.576}`.
+- kaggle_v2_metrics: `total_count=1`, `unsolved_count=1`, `solved_percent=0.0`, `total_len=0`, `mean_len_all=0`, `median_len_all=0`, `solved_lengths=[]`.
+- kaggle_v2_submit: log contains `SUBMIT_MESSAGE: test run: beam=4096 depth=100 samples=0..0 parallelism=2 b_micro=8192 k_tile=16384 beta=32.0` and `Successfully submitted to CayleyPy Megaminx Solve Optimally`.
+- kaggle_cli_note: `kaggle kernels output` hit a local Windows cp1251 encoding failure while printing downloaded output filenames, but `kaggle kernels logs` succeeded and confirmed remote completion; downloaded `submission.csv` contains header plus row `0,`.
+- safety_note: no Kaggle kernel was stopped or killed during validation.
