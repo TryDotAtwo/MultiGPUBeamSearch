@@ -555,3 +555,12 @@
 - followup_2026_05_14_mojibake_validation: JSON parse passed for both notebooks; combined notebook text has `question_runs=0` for `???` and `non_ascii=0`, so Kaggle UI cannot show mojibake for these comments.
 - followup_2026_05_14_timeout_fix: Kaggle v3 after comment fix failed because `TIMEOUT_SEC=0` was documented as disabled but passed to `run_live` as a literal zero, causing immediate `TimeoutError`; patched solver call to pass `None if TIMEOUT_SEC <= 0 else TIMEOUT_SEC`.
 - kaggle_v4_result_after_fixes: kernel version 4 completed on 2xT4; logs confirmed ASCII custom scorer/Yandex cells, GitHub clone, competition data discovery, model dataset discovery, memory sizing, 2-rank solver returncode `0`, `SUBMISSION_WRITTEN rows=1`, metrics cell output, and successful Kaggle competition submit.
+
+## 2026-05-14 release_debug_flag_cleanup
+
+- prompt_summary: User requested `BEAM_DEBUG_ON` release behavior so unnecessary C++/CUDA debug code is excluded from release builds, while per-sample progress logging remains configurable.
+- existing_engine_support: `beam_engine.py` already builds extension variants with `-DBEAM_DEBUG_ON=0/1`, extension name suffix `_d0/_d1`, and `beam_engine.cpp` already wraps engine debug code in `#if BEAM_DEBUG_ON`.
+- source_patch_solver: `scripts/solve_testcsv_2gpu.py` now treats `DEPTH_LOG_EVERY` as active only when `BEAM_DEBUG` or `ENGINE_DEBUG` is enabled; default release mode has `depth_log_every=0` regardless of `DEPTH_LOG_EVERY`.
+- source_patch_solver_logging: per-sample `SAMPLE_RESULT` logging is now controlled by `SAMPLE_LOG_EVERY`, with backward-compatible fallback to `LOG_EVERY`; default is `1`, so rank0 can still log after every completed sample.
+- notebook_patch: user-friendly Kaggle notebooks now expose `BEAM_DEBUG=0`, `DEPTH_LOG_EVERY=0`, and `SAMPLE_LOG_EVERY=1`; comments state that `BEAM_DEBUG=0` builds release extension with debug C++ code excluded by `#if`.
+- local_verification: `python -m py_compile beam_engine.py scripts\solve_testcsv_2gpu.py` passed; both notebooks JSON-parse; notebook text has `question_runs=0` and `non_ascii=0`.

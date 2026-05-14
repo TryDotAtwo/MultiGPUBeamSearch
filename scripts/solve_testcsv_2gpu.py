@@ -108,7 +108,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
         start_depth = int(resume_depth)
     found_depth = -1
     final_sums = None
-    depth_log_every = int(os.environ.get("DEPTH_LOG_EVERY", "0"))
+    beam_debug = os.environ.get("BEAM_DEBUG", os.environ.get("ENGINE_DEBUG", "0")).strip().lower() not in {"", "0", "false", "no", "off"}
+    depth_log_every = int(os.environ.get("DEPTH_LOG_EVERY", "0")) if beam_debug else 0
     for depth in range(start_depth, max_depth + 1):
         if depth > start_depth:
             engine.step(histogram_period_micro=cfg["histogram_period_micro"])
@@ -280,7 +281,7 @@ def main() -> None:
     rows = load_test_rows()
     max_depth = int(os.environ["MAX_DEPTH"])
     output_path = Path(os.environ.get("SUBMISSION_PATH", str(PROJECT_DIR / "submission.csv")))
-    log_every = int(os.environ.get("LOG_EVERY", "25"))
+    sample_log_every = int(os.environ.get("SAMPLE_LOG_EVERY", os.environ.get("LOG_EVERY", "1")))
     append_each = os.environ.get("SUBMISSION_APPEND_EACH", "1") != "0"
     resume_submission = os.environ.get("RESUME_SUBMISSION", "0") != "0"
     if cfg["rank"] == 0 and resume_submission:
@@ -310,7 +311,7 @@ def main() -> None:
             solved_rows.append(row)
             if append_each:
                 append_submission_row(output_path, sample_id, result["path"])
-            if log_every > 0 and (pos % log_every == 0 or pos + 1 == len(rows)):
+            if sample_log_every > 0 and (pos % sample_log_every == 0 or pos + 1 == len(rows)):
                 print(
                     "SAMPLE_RESULT "
                     + json.dumps(
