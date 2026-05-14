@@ -1,5 +1,17 @@
 #include <cuda_runtime.h>
+#include <cuda_fp16.h>
 #include <stdint.h>
+#include <stdexcept>
+#if __has_include(<cutlass/gemm/device/gemm.h>)
+#include <cutlass/gemm/device/gemm.h>
+#include <cutlass/layout/matrix.h>
+#include <cutlass/half.h>
+#include <cutlass/arch/arch.h>
+#include <cutlass/arch/mma.h>
+#define BEAM_HAS_CUTLASS 1
+#else
+#define BEAM_HAS_CUTLASS 0
+#endif
 #include "beam_engine_common.hpp"
 
 #ifndef BEAM_HISTORY_CPU
@@ -131,6 +143,25 @@ extern "C" __global__ void kernel_dummy_inference(
     }
 }
 
+extern "C" __global__ void kernel_uniform_inference(
+    const uint8_t* __restrict__ current_active_flags,
+    uint16_t* __restrict__ score_ring,
+    int slot,
+    int b_micro,
+    int fanout,
+    int64_t start_state,
+    int micro_size,
+    uint16_t score_q
+) {
+    int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    int64_t total = static_cast<int64_t>(micro_size) * fanout;
+    if (lane >= total) return;
+    int local_idx = static_cast<int>(lane % micro_size);
+    int action = static_cast<int>(lane / micro_size);
+    int64_t parent_idx = start_state + local_idx;
+    uint16_t* slot_scores = score_ring + static_cast<int64_t>(slot) * b_micro * fanout;
+    slot_scores[static_cast<int64_t>(action) * b_micro + local_idx] = current_active_flags[parent_idx] ? score_q : 0;
+}
 
 extern "C" __global__ void kernel_copy_i16_scores_to_ring(
     const int16_t* __restrict__ model_scores,
@@ -171,6 +202,95 @@ extern "C" __global__ void kernel_quantize_f32_scores_to_ring(
     uint16_t q = static_cast<uint16_t>(y + 0.5f);
     uint16_t* slot_scores = score_ring + static_cast<int64_t>(slot) * b_micro * fanout;
     slot_scores[static_cast<int64_t>(action) * b_micro + idx] = q;
+}
+
+extern "C" __global__ void kernel_fullbeamnice_embed_relu(
+    const uint8_t* __restrict__ beam_current,
+    const uint8_t* __restrict__ current_active_flags,
+    const half* __restrict__ embed_w_t,
+    const half* __restrict__ embed_bias,
+    half* __restrict__ act1,
+    int b_micro,
+    int state_size,
+    int num_classes,
+    int64_t start_state,
+    int micro_size
+) {
+    int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    int64_t total = static_cast<int64_t>(micro_size) * 1536;
+    if (lane >= total) return;
+    int row = static_cast<int>(lane / 1536);
+    int hidden = static_cast<int>(lane - static_cast<int64_t>(row) * 1536);
+    int64_t parent_idx = start_state + row;
+    float acc = __half2float(embed_bias[hidden]);
+    if (current_active_flags[parent_idx]) {
+        const uint8_t* state = beam_current + parent_idx * state_size;
+        for (int pos = 0; pos < state_size; ++pos) {
+            int token = pos * num_classes + static_cast<int>(state[pos]);
+            acc += __half2float(embed_w_t[static_cast<int64_t>(token) * 1536 + hidden]);
+        }
+    }
+    if (acc < 0.0f) acc = 0.0f;
+    act1[static_cast<int64_t>(row) * 1536 + hidden] = __float2half_rn(acc);
+    (void)b_micro;
+}
+
+extern "C" __global__ void kernel_fullbeamnice_bias_relu(
+    half* __restrict__ x,
+    const half* __restrict__ bias,
+    int rows,
+    int cols
+) {
+    int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    int64_t total = static_cast<int64_t>(rows) * cols;
+    if (lane >= total) return;
+    int col = static_cast<int>(lane % cols);
+    float v = __half2float(x[lane]) + __half2float(bias[col]);
+    if (v < 0.0f) v = 0.0f;
+    x[lane] = __float2half_rn(v);
+}
+
+extern "C" __global__ void kernel_fullbeamnice_residual_bias_relu(
+    half* __restrict__ x,
+    const half* __restrict__ residual,
+    const half* __restrict__ bias,
+    int rows,
+    int cols
+) {
+    int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    int64_t total = static_cast<int64_t>(rows) * cols;
+    if (lane >= total) return;
+    int col = static_cast<int>(lane % cols);
+    float v = __half2float(x[lane]) + __half2float(residual[lane]) + __half2float(bias[col]);
+    if (v < 0.0f) v = 0.0f;
+    x[lane] = __float2half_rn(v);
+}
+
+extern "C" __global__ void kernel_fullbeamnice_quantize_to_ring(
+    const half* __restrict__ out,
+    const half* __restrict__ out_bias,
+    const int32_t* __restrict__ action_perm,
+    uint16_t* __restrict__ score_ring,
+    int slot,
+    int b_micro,
+    int fanout,
+    int micro_size,
+    float score_scale,
+    float score_bias
+) {
+    int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    int64_t total = static_cast<int64_t>(micro_size) * fanout;
+    if (lane >= total) return;
+    int row = static_cast<int>(lane / fanout);
+    int action = static_cast<int>(lane - static_cast<int64_t>(row) * fanout);
+    int src_action = action_perm[action];
+    float q = __half2float(out[static_cast<int64_t>(row) * fanout + src_action]) + __half2float(out_bias[src_action]);
+    float y = score_bias - q * score_scale;
+    if (y < 0.0f) y = 0.0f;
+    if (y > 65535.0f) y = 65535.0f;
+    uint16_t packed = static_cast<uint16_t>(y + 0.5f);
+    uint16_t* slot_scores = score_ring + static_cast<int64_t>(slot) * b_micro * fanout;
+    slot_scores[static_cast<int64_t>(action) * b_micro + row] = packed;
 }
 
 extern "C" __global__ void kernel_reset_net_slot(
@@ -721,6 +841,23 @@ extern "C" void launch_dummy_inference(
         beam_current, current_active_flags, score_ring, slot, state_size_bytes, fanout, b_micro, start_state, micro_size);
 }
 
+extern "C" void launch_uniform_inference(
+    const uint8_t* current_active_flags,
+    uint16_t* score_ring,
+    int slot,
+    int b_micro,
+    int fanout,
+    int64_t start_state,
+    int micro_size,
+    uint16_t score_q,
+    cudaStream_t stream
+) {
+    const int threads = 256;
+    const int64_t total = static_cast<int64_t>(micro_size) * fanout;
+    const int blocks = static_cast<int>((total + threads - 1) / threads);
+    beam_engine::kernel_uniform_inference<<<blocks, threads, 0, stream>>>(
+        current_active_flags, score_ring, slot, b_micro, fanout, start_state, micro_size, score_q);
+}
 
 extern "C" void launch_copy_i16_scores_to_ring(
     const int16_t* model_scores,
@@ -754,6 +891,114 @@ extern "C" void launch_quantize_f32_scores_to_ring(
     const int blocks = static_cast<int>((total + threads - 1) / threads);
     beam_engine::kernel_quantize_f32_scores_to_ring<<<blocks, threads, 0, stream>>>(
         model_scores, score_ring, slot, b_micro, fanout, micro_size, scale, bias);
+}
+
+extern "C" void launch_fullbeamnice_embed_relu(
+    const uint8_t* beam_current,
+    const uint8_t* current_active_flags,
+    const half* embed_w_t,
+    const half* embed_bias,
+    half* act1,
+    int b_micro,
+    int state_size,
+    int num_classes,
+    int64_t start_state,
+    int micro_size,
+    cudaStream_t stream
+) {
+    const int threads = 256;
+    const int64_t total = static_cast<int64_t>(micro_size) * 1536;
+    const int blocks = static_cast<int>((total + threads - 1) / threads);
+    beam_engine::kernel_fullbeamnice_embed_relu<<<blocks, threads, 0, stream>>>(
+        beam_current, current_active_flags, embed_w_t, embed_bias, act1,
+        b_micro, state_size, num_classes, start_state, micro_size);
+}
+
+extern "C" void launch_fullbeamnice_cutlass_gemm(
+    const half* a,
+    const half* b,
+    half* c,
+    int m,
+    int k,
+    int n,
+    cudaStream_t stream
+) {
+#if BEAM_HAS_CUTLASS
+    using CutlassGemm = cutlass::gemm::device::Gemm<
+        cutlass::half_t,
+        cutlass::layout::RowMajor,
+        cutlass::half_t,
+        cutlass::layout::RowMajor,
+        cutlass::half_t,
+        cutlass::layout::RowMajor,
+        float,
+        cutlass::arch::OpClassTensorOp,
+        cutlass::arch::Sm75
+    >;
+    CutlassGemm gemm_op;
+    CutlassGemm::Arguments args(
+        {m, n, k},
+        {reinterpret_cast<const cutlass::half_t*>(a), k},
+        {reinterpret_cast<const cutlass::half_t*>(b), n},
+        {reinterpret_cast<const cutlass::half_t*>(c), n},
+        {reinterpret_cast<cutlass::half_t*>(c), n},
+        {1.0f, 0.0f}
+    );
+    cutlass::Status status = gemm_op(args, nullptr, stream);
+    if (status != cutlass::Status::kSuccess) {
+        throw std::runtime_error("CUTLASS GEMM launch failed");
+    }
+#else
+    (void)a; (void)b; (void)c; (void)m; (void)k; (void)n; (void)stream;
+    throw std::runtime_error("CUTLASS headers are required for fullbeamnice_static");
+#endif
+}
+
+extern "C" void launch_fullbeamnice_bias_relu(
+    half* x,
+    const half* bias,
+    int rows,
+    int cols,
+    cudaStream_t stream
+) {
+    const int threads = 256;
+    const int64_t total = static_cast<int64_t>(rows) * cols;
+    const int blocks = static_cast<int>((total + threads - 1) / threads);
+    beam_engine::kernel_fullbeamnice_bias_relu<<<blocks, threads, 0, stream>>>(x, bias, rows, cols);
+}
+
+extern "C" void launch_fullbeamnice_residual_bias_relu(
+    half* x,
+    const half* residual,
+    const half* bias,
+    int rows,
+    int cols,
+    cudaStream_t stream
+) {
+    const int threads = 256;
+    const int64_t total = static_cast<int64_t>(rows) * cols;
+    const int blocks = static_cast<int>((total + threads - 1) / threads);
+    beam_engine::kernel_fullbeamnice_residual_bias_relu<<<blocks, threads, 0, stream>>>(x, residual, bias, rows, cols);
+}
+
+extern "C" void launch_fullbeamnice_quantize_to_ring(
+    const half* out,
+    const half* out_bias,
+    const int32_t* action_perm,
+    uint16_t* score_ring,
+    int slot,
+    int b_micro,
+    int fanout,
+    int micro_size,
+    float score_scale,
+    float score_bias,
+    cudaStream_t stream
+) {
+    const int threads = 256;
+    const int64_t total = static_cast<int64_t>(micro_size) * fanout;
+    const int blocks = static_cast<int>((total + threads - 1) / threads);
+    beam_engine::kernel_fullbeamnice_quantize_to_ring<<<blocks, threads, 0, stream>>>(
+        out, out_bias, action_perm, score_ring, slot, b_micro, fanout, micro_size, score_scale, score_bias);
 }
 
 extern "C" void launch_reset_net_slot(

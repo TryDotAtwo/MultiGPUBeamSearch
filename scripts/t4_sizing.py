@@ -24,6 +24,7 @@ def main() -> None:
     p.add_argument("--state-size-bytes", type=int, default=int(os.getenv("STATE_SIZE_BYTES", "120")))
     p.add_argument("--max-depth", type=int, default=int(os.getenv("MAX_DEPTH", "1")))
     p.add_argument("--history-backend", choices=["gpu", "cpu"], default=os.getenv("HISTORY_BACKEND", "gpu").lower())
+    p.add_argument("--inference-backend", default=os.getenv("INFERENCE_BACKEND", "fullbeamnice_static"))
     p.add_argument("--gamma", type=float, default=float(os.getenv("GAMMA", "1.05")))
     p.add_argument("--beta", type=float, default=float(os.getenv("BETA", "1.15")))
     p.add_argument("--hash-load-factor", type=float, default=float(os.getenv("HASH_LOAD_FACTOR", "0.55")))
@@ -55,17 +56,25 @@ def main() -> None:
         "history_valid": history_depth * n_local,
         "histograms_threshold_counters_status": 65536 * 4 * 2 + 2 * 4 + 8 * 4 + 8 * 4,
     }
+    if args.inference_backend == "fullbeamnice_static":
+        sizes.update({
+            "fullbeamnice_static_weights_fp16": 23_978_008 * 2,
+            "fullbeamnice_static_act1": args.b_micro * 1536 * 2,
+            "fullbeamnice_static_act2": args.b_micro * 512 * 2,
+            "fullbeamnice_static_act3": args.b_micro * 512 * 2,
+            "fullbeamnice_static_out": args.b_micro * 24 * 2,
+        })
     total = sum(sizes.values())
     t4_bytes = 15 * 1024**3
 
     print("entity_id=t4_sizing; type=memory_model; state=calculated")
-    print(f"params: WORLD_SIZE={args.world_size}; GLOBAL_BEAM_WIDTH={args.global_beam_width}; B_MICRO={args.b_micro}; K_EXPAND_TILE={args.k_expand_tile}; FANOUT={args.fanout}; BUCKET_CAP_PER_PEER={args.bucket_cap_per_peer}; INFERENCE_PARALLELISM={args.inference_parallelism}; MAX_DEPTH={args.max_depth}; HISTORY_BACKEND={args.history_backend}")
+    print(f"params: WORLD_SIZE={args.world_size}; GLOBAL_BEAM_WIDTH={args.global_beam_width}; B_MICRO={args.b_micro}; K_EXPAND_TILE={args.k_expand_tile}; FANOUT={args.fanout}; BUCKET_CAP_PER_PEER={args.bucket_cap_per_peer}; INFERENCE_PARALLELISM={args.inference_parallelism}; MAX_DEPTH={args.max_depth}; HISTORY_BACKEND={args.history_backend}; INFERENCE_BACKEND={args.inference_backend}")
     print(f"derived: N_LOCAL={n_local}; K_KEEP={k_keep}; K_WORK={k_work}; HASH_CAPACITY={hash_capacity}")
     for name, size in sizes.items():
         print(f"buffer={name}; bytes={size}; GiB={gib(size):.3f}")
     print(f"total_static_buffers_bytes={total}; total_static_buffers_GiB={gib(total):.3f}")
     print(f"t4_15gb_headroom_GiB={gib(t4_bytes - total):.3f}; memory_ok={total < t4_bytes}")
-    print("note=Kaggle runtime overhead, CUDA context, NCCL internals, TorchScript model weights, inference output tensors, and PyTorch allocator fragmentation are not included")
+    print("note=Kaggle runtime overhead, CUDA context, NCCL internals, extension code, and allocator fragmentation are not included")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,24 @@
 # Project Memory
 
+## 2026-05-14 static_fullbeamnice_cutlass_prepass
+
+- prompt_summary: User requested continuing implementation with a no-inference prepass before neural beam search, then a C++/CUDA FullBeamNice inference backend using static input/output buffers, FP16, Tensor Cores, CUDA Graph compatibility, and no PyTorch allocator inside the hot path; user additionally requested NVIDIA CUTLASS usage.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- model_inspection: current FullBeamNice model is fixed action24 `QMLP2RB` with `state_size=120`, `num_classes=120`, `hd1=1536`, `hd2=512`, `nrd=2`, and `23,978,008` parameters.
+- model_layers: input is `LegacyCompatibleEmbeddingBagLinear` equivalent to summing 120 position-token embeddings from a folded `(14400,1536)` table; then folded BN+Linear `1536->512`; then two residual MLP blocks `512->512->512`; then output `512->24`.
+- optimization_decision: BatchNorm is folded into weights/biases; embedding sum uses a custom CUDA kernel; GEMMs use CUTLASS FP16 Tensor Core GEMM; bias/ReLU/residual/quantization use fixed CUDA kernels; future improvement can fuse vector bias+ReLU into custom CUTLASS epilogues after correctness is stable.
+- source_patch_static_loader: `scripts/static_fullbeamnice_inference.py` loads FullBeamNice weights, folds BN, emits FP16/FP32 static tensors, and validates static scores against the reference scorer.
+- source_patch_engine: `beam_engine.py` allocates static FullBeamNice activation buffers only for `INFERENCE_BACKEND=fullbeamnice_static`, vendors CUTLASS include paths, and loads static FP16 weights into the C++ extension.
+- source_patch_cpp_cuda: `beam_engine.cpp` adds `FullBeamNiceStaticBackend`, fixed tensor validation, no PyTorch forward in hot path, and uniform-score phase switching; `beam_kernels.cu` adds embedding, uniform score, bias/ReLU, residual/ReLU, CUTLASS GEMM, and quantize-to-score-ring launchers.
+- source_patch_prepass: `scripts/solve_testcsv_2gpu.py` defaults to `INFERENCE_BACKEND=fullbeamnice_static`, skips TorchScript export unless explicitly requested, estimates `PREPASS_DEPTH` from `GLOBAL_BEAM_WIDTH` using 24 generators and `PREPASS_DEDUP_FACTOR=0.95`, runs prepass with uniform score before neural scoring, archives every prepass depth in CPU-history mode, and restores CUDA Graphs for the main scorer after prepass.
+- source_patch_sizing: `scripts/t4_sizing.py` and `scripts/h100_sizing.py` include static FullBeamNice FP16 weights and activation buffers in memory estimates.
+- dependency_change: NVIDIA CUTLASS `v3.5.1` vendored under `third_party/cutlass` as a source snapshot; nested `.git` metadata removed.
+- local_verification: `python -m py_compile beam_engine.py scripts\solve_testcsv_2gpu.py scripts\t4_sizing.py scripts\h100_sizing.py scripts\static_fullbeamnice_inference.py` passed.
+- local_verification: static FullBeamNice CPU FP32 compare passed with `max_abs_score_diff=1`; CUDA FP16 compare passed with `max_abs_score_diff=36`.
+- local_compile_status: local PyTorch extension compile remains blocked by missing Windows MSVC `cl.exe`; `ninja` was installed successfully, but CUDA extension compilation still requires MSVC on Windows.
+- sizing_result_2xt4_requested: with `GLOBAL_BEAM_WIDTH=81,000,000`, `WORLD_SIZE=2`, `B_MICRO=8192`, `K_EXPAND_TILE=16384`, `BETA=1.01`, `HASH_LOAD_FACTOR=0.45`, `HISTORY_BACKEND=cpu`, `INFERENCE_BACKEND=fullbeamnice_static`, total modeled static GPU buffers are `14.121 GiB` per rank with `0.879 GiB` modeled T4 headroom before CUDA/NCCL/runtime overhead.
+- remote_verification_status: Kaggle 2xT4 compile/runtime verification pending.
+
 ## 2026-05-14 user_friendly_kaggle_notebook
 
 - prompt_summary: User requested a user-friendly Kaggle notebook with first-cell primary config, second-cell advanced config with comments/examples, metrics histogram cell, submit cell, competition input files from Kaggle competition input, code cloned from GitHub, separate custom scorer documentation cell, and Yandex Cloud TODO cell.

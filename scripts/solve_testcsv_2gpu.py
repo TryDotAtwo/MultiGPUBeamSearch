@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 import subprocess
 import sys
@@ -57,6 +58,8 @@ def load_test_rows() -> list[tuple[int, np.ndarray]]:
 
 
 def export_scorer(cfg: dict) -> None:
+    if str(cfg.get("inference_backend", "")).strip().lower() != "torchscript_ensemble":
+        return
     cmd = [
         sys.executable,
         str(PROJECT_DIR / "scripts" / "export_fullbeamnice_scorer.py"),
@@ -71,6 +74,23 @@ def export_scorer(cfg: dict) -> None:
     if cfg["rank"] == 0 and os.environ.get("QUIET", "1") == "0":
         print("SCORER_EXPORT_OUTPUT")
         print(out, flush=True)
+
+
+def estimate_no_inference_prepass_depth(cfg: dict, max_depth: int) -> int:
+    if os.environ.get("PREPASS_NO_INFERENCE", "1").strip().lower() in {"", "0", "false", "no", "off"}:
+        return 0
+    manual = os.environ.get("PREPASS_DEPTH", "").strip()
+    if manual:
+        return max(0, min(int(manual), max_depth))
+    fanout = int(cfg.get("fanout", 24))
+    target = int(cfg["global_beam_width"])
+    dedup_factor = float(os.environ.get("PREPASS_DEDUP_FACTOR", "0.95"))
+    depth = 0
+    estimated = 1.0
+    while depth < max_depth and estimated < target:
+        depth += 1
+        estimated = (fanout ** depth) * dedup_factor
+    return depth
 
 
 def reconstruct_path_from_archive(archive: cpu_history_archive.CPUHistoryArchive, cfg: dict, found_depth: int, found_rank: int, found_local_index: int):
@@ -110,8 +130,19 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
     final_sums = None
     beam_debug = os.environ.get("BEAM_DEBUG", os.environ.get("ENGINE_DEBUG", "0")).strip().lower() not in {"", "0", "false", "no", "off"}
     depth_log_every = int(os.environ.get("DEPTH_LOG_EVERY", "0")) if beam_debug else 0
+    prepass_depth = estimate_no_inference_prepass_depth(cfg, max_depth) if start_depth == 0 and resume_depth is None else 0
+    uniform_active = False
+    if prepass_depth > 0:
+        engine.begin_uniform_score(1)
+        uniform_active = True
     for depth in range(start_depth, max_depth + 1):
         if depth > start_depth:
+            if uniform_active:
+                if depth <= prepass_depth:
+                    engine.set_uniform_score(max(1, min(depth, 65535)))
+                else:
+                    engine.end_uniform_score()
+                    uniform_active = False
             engine.step(histogram_period_micro=cfg["histogram_period_micro"])
         st = dict(engine.status())
         counters = [int(x) for x in st["counters"]]
@@ -145,6 +176,7 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                         "bucket_overflow": sums[1],
                         "hash_overflow": sums[2],
                         "cuda_graph_captured_sum": sums[3],
+                        "prepass_depth": prepass_depth,
                     },
                     ensure_ascii=False,
                 ),
@@ -158,6 +190,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                 )
             found_depth = depth
             break
+    if uniform_active:
+        engine.end_uniform_score()
 
     local_found = dict(engine.status())
     reports = gather_objects(
@@ -250,7 +284,7 @@ def existing_submission_ids(path: Path) -> set[int]:
 
 def main() -> None:
     os.environ.setdefault("USE_CUDA_GRAPHS", "1")
-    os.environ.setdefault("INFERENCE_BACKEND", "torchscript_ensemble")
+    os.environ.setdefault("INFERENCE_BACKEND", "fullbeamnice_static")
     os.environ.setdefault("INFERENCE_PARALLELISM", "1")
     os.environ.setdefault("K_EXPAND_TILE", "32768")
     os.environ.setdefault("GLOBAL_BEAM_WIDTH", str(2**16))

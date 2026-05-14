@@ -55,6 +55,7 @@ def make_default_config() -> Dict[str, Any]:
         "inference_parallelism": int(os.environ.get("INFERENCE_PARALLELISM", "1")),
         "k_expand_tile": int(os.environ.get("K_EXPAND_TILE", "0")),
         "torchscript_scorer_paths": os.environ.get("TORCHSCRIPT_SCORER_PATHS", ""),
+        "fullbeamnice_dir": os.environ.get("FULLBEAMNICE_DIR", str(PROJECT_DIR / "FullBeamNice")),
         "nn_score_scale": float(os.environ.get("NN_SCORE_SCALE", "1.0")),
         "nn_score_bias": float(os.environ.get("NN_SCORE_BIAS", "0.0")),
         "gamma": float(os.environ.get("GAMMA", "1.05")),
@@ -81,6 +82,13 @@ def build_extension(verbose: bool = True):
     ]
     extra_cflags = ["-O3", "-std=c++17", *macros]
     extra_cuda_cflags = ["-O3", "--use_fast_math", "-lineinfo", "-std=c++17", *macros]
+    cutlass_include = PROJECT_DIR / "third_party" / "cutlass" / "include"
+    cute_include = PROJECT_DIR / "third_party" / "cutlass" / "tools" / "util" / "include"
+    extra_include_paths = []
+    if cutlass_include.exists():
+        extra_include_paths.append(str(cutlass_include))
+    if cute_include.exists():
+        extra_include_paths.append(str(cute_include))
     extra_ldflags = ["-lnccl"]
     if os.name != "nt" and os.path.exists("/kaggle/working") and "TMPDIR" not in os.environ:
         os.environ["TMPDIR"] = "/kaggle/working/.tmp"
@@ -94,6 +102,7 @@ def build_extension(verbose: bool = True):
         extra_cflags=extra_cflags,
         extra_cuda_cflags=extra_cuda_cflags,
         extra_ldflags=extra_ldflags,
+        extra_include_paths=extra_include_paths,
         verbose=verbose,
     )
 
@@ -149,6 +158,14 @@ def allocate_buffers(ext, cfg: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         "history_valid": torch.empty((history_records,), dtype=torch.uint8, device=device),
         "history_depth_cell": torch.empty((1,), dtype=torch.int32, device=device),
     }
+    if str(cfg.get("inference_backend", "")).strip().lower() == "fullbeamnice_static":
+        b_micro = int(cfg["b_micro"])
+        buffers.update({
+            "fb_act1": torch.empty((b_micro, 1536), dtype=torch.float16, device=device),
+            "fb_act2": torch.empty((b_micro, 512), dtype=torch.float16, device=device),
+            "fb_act3": torch.empty((b_micro, 512), dtype=torch.float16, device=device),
+            "fb_out": torch.empty((b_micro, 24), dtype=torch.float16, device=device),
+        })
     for tensor in buffers.values():
         tensor.zero_()
     return buffers
@@ -175,6 +192,31 @@ def configure_engine(ext, cfg: Dict[str, Any], buffers: Dict[str, torch.Tensor])
         if len(paths) > 1:
             print(f"[beam_engine] warning: {len(paths)} TorchScript paths were provided; one path is enough for shared-weight multi-lane inference")
         engine.load_torchscript_ensemble(paths)
+    if cfg["inference_backend"] == "fullbeamnice_static":
+        from scripts.static_fullbeamnice_inference import load_static_weights
+
+        weights = load_static_weights(Path(cfg["fullbeamnice_dir"]), device=buffers["beam_current"].device, dtype=torch.float16)
+        engine.load_fullbeamnice_static({
+            "embed_w_t": weights.embed_w_t,
+            "embed_bias": weights.embed_bias,
+            "hidden_w_t": weights.hidden_w_t,
+            "hidden_bias": weights.hidden_bias,
+            "res0_fc1_w_t": weights.res0_fc1_w_t,
+            "res0_fc1_bias": weights.res0_fc1_bias,
+            "res0_fc2_w_t": weights.res0_fc2_w_t,
+            "res0_fc2_bias": weights.res0_fc2_bias,
+            "res1_fc1_w_t": weights.res1_fc1_w_t,
+            "res1_fc1_bias": weights.res1_fc1_bias,
+            "res1_fc2_w_t": weights.res1_fc2_w_t,
+            "res1_fc2_bias": weights.res1_fc2_bias,
+            "out_w_t": weights.out_w_t,
+            "out_bias": weights.out_bias,
+            "action_perm": weights.action_perm.to(device=buffers["beam_current"].device, dtype=torch.int32),
+            "score_scale": float(weights.score_scale),
+            "score_bias": float(weights.score_bias),
+            "state_size": int(weights.state_size),
+            "num_classes": int(weights.num_classes),
+        })
     if cfg["world_size"] > 1:
         engine.init_nccl(create_nccl_id(ext, cfg))
     engine.enable_cuda_graphs(os.environ.get("USE_CUDA_GRAPHS", "1") != "0")

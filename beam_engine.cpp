@@ -2,6 +2,7 @@
 #include <torch/script.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <cuda_runtime.h>
+#include <cuda_fp16.h>
 #include <nccl.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -50,8 +51,14 @@ struct DebugConfig {
 static DebugConfig debug_config;
 
 extern "C" void launch_dummy_inference(const uint8_t*, const uint8_t*, uint16_t*, int, int, int, int, int64_t, int, cudaStream_t);
+extern "C" void launch_uniform_inference(const uint8_t*, uint16_t*, int, int, int, int64_t, int, uint16_t, cudaStream_t);
 extern "C" void launch_copy_i16_scores_to_ring(const int16_t*, uint16_t*, int, int, int, int, cudaStream_t);
 extern "C" void launch_quantize_f32_scores_to_ring(const float*, uint16_t*, int, int, int, int, float, float, cudaStream_t);
+extern "C" void launch_fullbeamnice_embed_relu(const uint8_t*, const uint8_t*, const half*, const half*, half*, int, int, int, int64_t, int, cudaStream_t);
+extern "C" void launch_fullbeamnice_cutlass_gemm(const half*, const half*, half*, int, int, int, cudaStream_t);
+extern "C" void launch_fullbeamnice_bias_relu(half*, const half*, int, int, cudaStream_t);
+extern "C" void launch_fullbeamnice_residual_bias_relu(half*, const half*, const half*, int, int, cudaStream_t);
+extern "C" void launch_fullbeamnice_quantize_to_ring(const half*, const half*, const int32_t*, uint16_t*, int, int, int, int, float, float, cudaStream_t);
 extern "C" void launch_reset_net_slot(CandidateRecord*, CandidateRecord*, int32_t*, int32_t*, int, int, int, cudaStream_t);
 extern "C" void launch_process_score_slot(const uint8_t*, const uint8_t*, const uint16_t*, uint8_t*, BeamMeta*, HashSlot*, uint8_t*, int32_t*, int32_t*, uint32_t*, int32_t*, int32_t*, CandidateRecord*, int32_t*, const int32_t*, int, int, int, int, int, int, int, int64_t, int, int64_t, int, int, int, int, int, cudaStream_t);
 extern "C" void launch_ingest_recv_slot(const CandidateRecord*, const int32_t*, uint8_t*, BeamMeta*, HashSlot*, uint8_t*, int32_t*, int32_t*, uint32_t*, int32_t*, int32_t*, const int32_t*, int, int, int, int, int, int, int, cudaStream_t);
@@ -138,6 +145,16 @@ static void check_cuda_tensor(const torch::Tensor& t, const char* name) {
     if (!t.is_contiguous()) throw std::runtime_error(std::string(name) + " must be contiguous");
 }
 
+static void check_cuda_half_tensor(const torch::Tensor& t, const char* name) {
+    check_cuda_tensor(t, name);
+    if (t.scalar_type() != at::kHalf) throw std::runtime_error(std::string(name) + " must be torch.float16");
+}
+
+static void check_cuda_i32_tensor(const torch::Tensor& t, const char* name) {
+    check_cuda_tensor(t, name);
+    if (t.scalar_type() != at::kInt) throw std::runtime_error(std::string(name) + " must be torch.int32");
+}
+
 static py::bytes nccl_unique_id_to_bytes(const ncclUniqueId& id) {
     return py::bytes(reinterpret_cast<const char*>(&id), sizeof(ncclUniqueId));
 }
@@ -176,6 +193,26 @@ struct DummyInferenceBackend final : public InferenceBackend {
             reinterpret_cast<const uint8_t*>(current_active_flags.data_ptr<uint8_t>()),
             reinterpret_cast<uint16_t*>(score_ring.data_ptr<int16_t>()),
             slot, cfg.state_size_bytes, cfg.fanout, cfg.b_micro, start_state, micro_size, stream);
+        CUDA_CHECK(cudaGetLastError());
+    }
+};
+
+struct UniformScoreBackend final : public InferenceBackend {
+    uint16_t score_q = 1;
+    explicit UniformScoreBackend(uint16_t score) : score_q(score) {}
+
+    void forward(const torch::Tensor&,
+                 const torch::Tensor& current_active_flags,
+                 torch::Tensor& score_ring,
+                 int slot,
+                 int64_t start_state,
+                 int micro_size,
+                 const EngineConfig& cfg,
+                 cudaStream_t stream) override {
+        launch_uniform_inference(
+            reinterpret_cast<const uint8_t*>(current_active_flags.data_ptr<uint8_t>()),
+            reinterpret_cast<uint16_t*>(score_ring.data_ptr<int16_t>()),
+            slot, cfg.b_micro, cfg.fanout, start_state, micro_size, score_q, stream);
         CUDA_CHECK(cudaGetLastError());
     }
 };
@@ -250,10 +287,118 @@ struct TEInferenceBackend final : public InferenceBackend {
     }
 };
 
+struct FullBeamNiceStaticBackend final : public InferenceBackend {
+    torch::Tensor embed_w_t, embed_bias;
+    torch::Tensor hidden_w_t, hidden_bias;
+    torch::Tensor res0_fc1_w_t, res0_fc1_bias, res0_fc2_w_t, res0_fc2_bias;
+    torch::Tensor res1_fc1_w_t, res1_fc1_bias, res1_fc2_w_t, res1_fc2_bias;
+    torch::Tensor out_w_t, out_bias, action_perm;
+    torch::Tensor act1, act2, act3, out;
+    float score_scale = 1024.0f;
+    float score_bias = 65535.0f;
+    int state_size = STATE_SIZE_BYTES_FIXED;
+    int num_classes = 120;
+
+    explicit FullBeamNiceStaticBackend(py::dict weights, py::dict buffers) {
+        embed_w_t = weights["embed_w_t"].cast<torch::Tensor>();
+        embed_bias = weights["embed_bias"].cast<torch::Tensor>();
+        hidden_w_t = weights["hidden_w_t"].cast<torch::Tensor>();
+        hidden_bias = weights["hidden_bias"].cast<torch::Tensor>();
+        res0_fc1_w_t = weights["res0_fc1_w_t"].cast<torch::Tensor>();
+        res0_fc1_bias = weights["res0_fc1_bias"].cast<torch::Tensor>();
+        res0_fc2_w_t = weights["res0_fc2_w_t"].cast<torch::Tensor>();
+        res0_fc2_bias = weights["res0_fc2_bias"].cast<torch::Tensor>();
+        res1_fc1_w_t = weights["res1_fc1_w_t"].cast<torch::Tensor>();
+        res1_fc1_bias = weights["res1_fc1_bias"].cast<torch::Tensor>();
+        res1_fc2_w_t = weights["res1_fc2_w_t"].cast<torch::Tensor>();
+        res1_fc2_bias = weights["res1_fc2_bias"].cast<torch::Tensor>();
+        out_w_t = weights["out_w_t"].cast<torch::Tensor>();
+        out_bias = weights["out_bias"].cast<torch::Tensor>();
+        action_perm = weights["action_perm"].cast<torch::Tensor>();
+        act1 = buffers["fb_act1"].cast<torch::Tensor>();
+        act2 = buffers["fb_act2"].cast<torch::Tensor>();
+        act3 = buffers["fb_act3"].cast<torch::Tensor>();
+        out = buffers["fb_out"].cast<torch::Tensor>();
+        if (weights.contains("score_scale")) score_scale = weights["score_scale"].cast<float>();
+        if (weights.contains("score_bias")) score_bias = weights["score_bias"].cast<float>();
+        if (weights.contains("state_size")) state_size = weights["state_size"].cast<int>();
+        if (weights.contains("num_classes")) num_classes = weights["num_classes"].cast<int>();
+        validate();
+    }
+
+    void validate() {
+        check_cuda_half_tensor(embed_w_t, "embed_w_t");
+        check_cuda_half_tensor(embed_bias, "embed_bias");
+        check_cuda_half_tensor(hidden_w_t, "hidden_w_t");
+        check_cuda_half_tensor(hidden_bias, "hidden_bias");
+        check_cuda_half_tensor(res0_fc1_w_t, "res0_fc1_w_t");
+        check_cuda_half_tensor(res0_fc1_bias, "res0_fc1_bias");
+        check_cuda_half_tensor(res0_fc2_w_t, "res0_fc2_w_t");
+        check_cuda_half_tensor(res0_fc2_bias, "res0_fc2_bias");
+        check_cuda_half_tensor(res1_fc1_w_t, "res1_fc1_w_t");
+        check_cuda_half_tensor(res1_fc1_bias, "res1_fc1_bias");
+        check_cuda_half_tensor(res1_fc2_w_t, "res1_fc2_w_t");
+        check_cuda_half_tensor(res1_fc2_bias, "res1_fc2_bias");
+        check_cuda_half_tensor(out_w_t, "out_w_t");
+        check_cuda_half_tensor(out_bias, "out_bias");
+        check_cuda_i32_tensor(action_perm, "action_perm");
+        check_cuda_half_tensor(act1, "fb_act1");
+        check_cuda_half_tensor(act2, "fb_act2");
+        check_cuda_half_tensor(act3, "fb_act3");
+        check_cuda_half_tensor(out, "fb_out");
+        if (state_size != STATE_SIZE_BYTES_FIXED || num_classes != 120) throw std::runtime_error("fullbeamnice_static supports state_size=120 and num_classes=120");
+        if (embed_w_t.size(0) != state_size * num_classes || embed_w_t.size(1) != 1536) throw std::runtime_error("bad embed_w_t shape");
+        if (hidden_w_t.size(0) != 1536 || hidden_w_t.size(1) != 512) throw std::runtime_error("bad hidden_w_t shape");
+        if (out_w_t.size(0) != 512 || out_w_t.size(1) != FANOUT_FIXED) throw std::runtime_error("bad out_w_t shape");
+    }
+
+    void forward(const torch::Tensor& beam_current,
+                 const torch::Tensor& current_active_flags,
+                 torch::Tensor& score_ring,
+                 int slot,
+                 int64_t start_state,
+                 int micro_size,
+                 const EngineConfig& cfg,
+                 cudaStream_t stream) override {
+        if (micro_size <= 0) return;
+        auto* act1_ptr = reinterpret_cast<half*>(act1.data_ptr<at::Half>());
+        auto* act2_ptr = reinterpret_cast<half*>(act2.data_ptr<at::Half>());
+        auto* act3_ptr = reinterpret_cast<half*>(act3.data_ptr<at::Half>());
+        auto* out_ptr = reinterpret_cast<half*>(out.data_ptr<at::Half>());
+        launch_fullbeamnice_embed_relu(
+            reinterpret_cast<const uint8_t*>(beam_current.data_ptr<uint8_t>()),
+            reinterpret_cast<const uint8_t*>(current_active_flags.data_ptr<uint8_t>()),
+            reinterpret_cast<const half*>(embed_w_t.data_ptr<at::Half>()),
+            reinterpret_cast<const half*>(embed_bias.data_ptr<at::Half>()),
+            act1_ptr, cfg.b_micro, state_size, num_classes, start_state, micro_size, stream);
+        CUDA_CHECK(cudaGetLastError());
+        launch_fullbeamnice_cutlass_gemm(act1_ptr, reinterpret_cast<const half*>(hidden_w_t.data_ptr<at::Half>()), act2_ptr, micro_size, 1536, 512, stream);
+        launch_fullbeamnice_bias_relu(act2_ptr, reinterpret_cast<const half*>(hidden_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+
+        launch_fullbeamnice_cutlass_gemm(act2_ptr, reinterpret_cast<const half*>(res0_fc1_w_t.data_ptr<at::Half>()), act3_ptr, micro_size, 512, 512, stream);
+        launch_fullbeamnice_bias_relu(act3_ptr, reinterpret_cast<const half*>(res0_fc1_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_cutlass_gemm(act3_ptr, reinterpret_cast<const half*>(res0_fc2_w_t.data_ptr<at::Half>()), act1_ptr, micro_size, 512, 512, stream);
+        launch_fullbeamnice_residual_bias_relu(act1_ptr, act2_ptr, reinterpret_cast<const half*>(res0_fc2_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+
+        launch_fullbeamnice_cutlass_gemm(act1_ptr, reinterpret_cast<const half*>(res1_fc1_w_t.data_ptr<at::Half>()), act2_ptr, micro_size, 512, 512, stream);
+        launch_fullbeamnice_bias_relu(act2_ptr, reinterpret_cast<const half*>(res1_fc1_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+        launch_fullbeamnice_cutlass_gemm(act2_ptr, reinterpret_cast<const half*>(res1_fc2_w_t.data_ptr<at::Half>()), act3_ptr, micro_size, 512, 512, stream);
+        launch_fullbeamnice_residual_bias_relu(act3_ptr, act1_ptr, reinterpret_cast<const half*>(res1_fc2_bias.data_ptr<at::Half>()), micro_size, 512, stream);
+
+        launch_fullbeamnice_cutlass_gemm(act3_ptr, reinterpret_cast<const half*>(out_w_t.data_ptr<at::Half>()), out_ptr, micro_size, 512, FANOUT_FIXED, stream);
+        launch_fullbeamnice_quantize_to_ring(
+            out_ptr, reinterpret_cast<const half*>(out_bias.data_ptr<at::Half>()), action_perm.data_ptr<int32_t>(),
+            reinterpret_cast<uint16_t*>(score_ring.data_ptr<int16_t>()),
+            slot, cfg.b_micro, FANOUT_FIXED, micro_size, score_scale, score_bias, stream);
+        CUDA_CHECK(cudaGetLastError());
+    }
+};
+
 class BeamEngine {
 public:
     explicit BeamEngine(py::dict cfg_dict, py::dict buffers, std::string backend_name)
         : cfg_(config_from_dict(cfg_dict)) {
+        buffers_ = buffers;
         beam_current_ = buffers["beam_current"].cast<torch::Tensor>();
         current_active_flags_ = buffers["current_active_flags"].cast<torch::Tensor>();
         next_state_pool_ = buffers["next_state_pool"].cast<torch::Tensor>();
@@ -279,7 +424,7 @@ public:
         history_depth_cell_ = buffers["history_depth_cell"].cast<torch::Tensor>();
         check_all_buffers();
 
-        if (backend_name == "dummy" || backend_name == "central_hamming" || backend_name == "torchscript_ensemble") inference_ = std::make_unique<DummyInferenceBackend>();
+        if (backend_name == "dummy" || backend_name == "central_hamming" || backend_name == "torchscript_ensemble" || backend_name == "fullbeamnice_static") inference_ = std::make_unique<DummyInferenceBackend>();
         else if (backend_name == "te") inference_ = std::make_unique<TEInferenceBackend>();
         else throw std::runtime_error("unknown inference backend: " + backend_name);
 
@@ -342,6 +487,36 @@ public:
     void load_torchscript_ensemble(const std::vector<std::string>& module_paths) {
         invalidate_graph();
         inference_ = std::make_unique<TorchScriptEnsembleBackend>(module_paths, beam_current_.device());
+        inference_warmed_ = false;
+    }
+
+    void load_fullbeamnice_static(py::dict weights) {
+        invalidate_graph();
+        inference_ = std::make_unique<FullBeamNiceStaticBackend>(weights, buffers_);
+        inference_warmed_ = false;
+    }
+
+    void begin_uniform_score(uint16_t score_q) {
+        invalidate_graph();
+        if (saved_inference_) throw std::runtime_error("uniform score phase already active");
+        saved_inference_ = std::move(inference_);
+        saved_use_cuda_graphs_ = use_cuda_graphs_;
+        use_cuda_graphs_ = false;
+        inference_ = std::make_unique<UniformScoreBackend>(score_q);
+        inference_warmed_ = false;
+    }
+
+    void set_uniform_score(uint16_t score_q) {
+        auto* uniform = dynamic_cast<UniformScoreBackend*>(inference_.get());
+        if (!uniform) throw std::runtime_error("uniform score phase is not active");
+        uniform->score_q = score_q;
+    }
+
+    void end_uniform_score() {
+        invalidate_graph();
+        if (!saved_inference_) throw std::runtime_error("uniform score phase is not active");
+        inference_ = std::move(saved_inference_);
+        use_cuda_graphs_ = saved_use_cuda_graphs_;
         inference_warmed_ = false;
     }
 
@@ -544,6 +719,7 @@ public:
 private:
     EngineConfig cfg_;
     std::unique_ptr<InferenceBackend> inference_;
+    std::unique_ptr<InferenceBackend> saved_inference_;
 
     torch::Tensor beam_current_;
     torch::Tensor current_active_flags_;
@@ -568,6 +744,7 @@ private:
     torch::Tensor history_action_;
     torch::Tensor history_valid_;
     torch::Tensor history_depth_cell_;
+    py::dict buffers_;
 
     cudaStream_t stream_infer_ = nullptr;
     cudaStream_t stream_ingest_ = nullptr;
@@ -589,6 +766,7 @@ private:
     bool nccl_inited_ = false;
     int current_history_depth_ = 0;
     bool use_cuda_graphs_ = true;
+    bool saved_use_cuda_graphs_ = true;
     bool cuda_graph_captured_ = false;
     bool central_loaded_ = false;
     bool inference_warmed_ = false;
@@ -962,6 +1140,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .def(py::init<py::dict, py::dict, std::string>(), py::arg("cfg"), py::arg("buffers"), py::arg("backend") = "dummy")
         .def("init_nccl", &BeamEngine::init_nccl, py::arg("unique_id_bytes"))
         .def("load_torchscript_ensemble", &BeamEngine::load_torchscript_ensemble, py::arg("module_paths"))
+        .def("load_fullbeamnice_static", &BeamEngine::load_fullbeamnice_static, py::arg("weights"))
+        .def("begin_uniform_score", &BeamEngine::begin_uniform_score, py::arg("score_q"))
+        .def("set_uniform_score", &BeamEngine::set_uniform_score, py::arg("score_q"))
+        .def("end_uniform_score", &BeamEngine::end_uniform_score)
         .def("warmup_inference", &BeamEngine::warmup_inference, py::arg("repeats") = 2)
         .def("set_action_permutation_table", &BeamEngine::set_action_permutation_table, py::arg("table_bytes"))
         .def("set_central_state", &BeamEngine::set_central_state, py::arg("state_bytes"))
