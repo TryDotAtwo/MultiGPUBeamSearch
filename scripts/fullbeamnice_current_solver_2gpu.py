@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -117,7 +116,7 @@ def reconstruct_path(engine, cfg: dict, found_depth: int, found_rank: int, found
 
 def main() -> None:
     os.environ.setdefault("USE_CUDA_GRAPHS", "0")
-    os.environ.setdefault("INFERENCE_BACKEND", "torchscript_ensemble")
+    os.environ.setdefault("INFERENCE_BACKEND", "fullbeamnice_static")
     os.environ.setdefault("INFERENCE_PARALLELISM", "1")
     os.environ.setdefault("K_EXPAND_TILE", "32768")
     os.environ.setdefault("GLOBAL_BEAM_WIDTH", str(2**23))
@@ -140,21 +139,6 @@ def main() -> None:
     local_rank = int(os.environ.get("LOCAL_RANK", "0"))
     torch.cuda.set_device(local_rank)
     device = torch.device("cuda", local_rank)
-
-    export_cmd = [
-        sys.executable,
-        str(PROJECT_DIR / "scripts" / "export_fullbeamnice_scorer.py"),
-        "--copies",
-        str(cfg["inference_parallelism"]),
-        "--out-dir",
-        str(PROJECT_DIR / "runtime" / "fullbeamnice_scorers" / f"rank{cfg['rank']}"),
-    ]
-    out = subprocess.check_output(export_cmd, cwd=str(PROJECT_DIR), text=True)
-    if cfg["rank"] == 0:
-        print("SCORER_EXPORT_OUTPUT")
-        print(out, flush=True)
-    cfg["torchscript_scorer_paths"] = [line for line in out.splitlines() if line.startswith("TORCHSCRIPT_SCORER_PATHS=")][0].split("=", 1)[1]
-    cfg["inference_backend"] = "torchscript_ensemble"
 
     data_loader.validate_inverse_pairs()
     central = data_loader.get_central_state_u8()

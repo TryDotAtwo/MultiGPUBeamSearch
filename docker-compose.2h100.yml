@@ -20,7 +20,7 @@ services:
       K_EXPAND_TILE: "32768"
       INFERENCE_PARALLELISM: "1"
       USE_CUDA_GRAPHS: "1"
-      INFERENCE_BACKEND: "torchscript_ensemble"
+      INFERENCE_BACKEND: "fullbeamnice_static"
       BETA: "1.20"
       HASH_LOAD_FACTOR: "0.45"
       PROBE_LIMIT: "256"

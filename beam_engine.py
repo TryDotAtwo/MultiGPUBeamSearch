@@ -61,7 +61,7 @@ def make_default_config() -> Dict[str, Any]:
         "gamma": float(os.environ.get("GAMMA", "1.05")),
         "beta": float(os.environ.get("BETA", "1.15")),
         "hash_load_factor": float(os.environ.get("HASH_LOAD_FACTOR", "0.55")),
-        "inference_backend": os.environ.get("INFERENCE_BACKEND", "central_hamming"),
+        "inference_backend": os.environ.get("INFERENCE_BACKEND", "fullbeamnice_static"),
         "max_depth": int(os.environ.get("MAX_DEPTH", "4")),
         "histogram_period_micro": int(os.environ.get("HISTOGRAM_PERIOD_MICRO", "4")),
         "history_backend": history_backend(),
@@ -183,17 +183,24 @@ def create_nccl_id(ext, cfg: Dict[str, Any]) -> bytes:
 
 
 def configure_engine(ext, cfg: Dict[str, Any], buffers: Dict[str, torch.Tensor]):
+    backend = str(cfg.get("inference_backend", "")).strip().lower()
+    allow_ts = os.environ.get("ALLOW_TORCHSCRIPT_SCORER", "").strip().lower() in {"1", "true", "yes", "on"}
+    if backend == "torchscript_ensemble" and not allow_ts:
+        raise ValueError(
+            "INFERENCE_BACKEND=torchscript_ensemble is disabled by default (no accidental TorchScript hot path). "
+            "Use INFERENCE_BACKEND=fullbeamnice_static for CUTLASS static scorer, or set ALLOW_TORCHSCRIPT_SCORER=1 to load TorchScript."
+        )
     engine = ext.BeamEngine(cfg, buffers, cfg["inference_backend"])
     engine.set_action_permutation_table(data_loader.get_action_table_u8())
     engine.set_central_state(data_loader.get_central_state_u8().tobytes())
-    if cfg["inference_backend"] == "torchscript_ensemble":
+    if backend == "torchscript_ensemble":
         paths = [p for p in str(cfg.get("torchscript_scorer_paths", "")).split(os.pathsep) if p]
         if not paths:
             raise ValueError("INFERENCE_BACKEND=torchscript_ensemble requires TORCHSCRIPT_SCORER_PATHS")
         if len(paths) > 1:
             print(f"[beam_engine] warning: {len(paths)} TorchScript paths were provided; one path is enough for shared-weight multi-lane inference")
         engine.load_torchscript_ensemble(paths)
-    if cfg["inference_backend"] == "fullbeamnice_static":
+    if backend == "fullbeamnice_static":
         from scripts.static_fullbeamnice_inference import load_static_weights
 
         weights = load_static_weights(Path(cfg["fullbeamnice_dir"]), device=buffers["beam_current"].device, dtype=torch.float16)

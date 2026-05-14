@@ -60,6 +60,11 @@ def load_test_rows() -> list[tuple[int, np.ndarray]]:
 def export_scorer(cfg: dict) -> None:
     if str(cfg.get("inference_backend", "")).strip().lower() != "torchscript_ensemble":
         return
+    if os.environ.get("ALLOW_TORCHSCRIPT_SCORER", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        raise ValueError(
+            "export_scorer: INFERENCE_BACKEND=torchscript_ensemble requires ALLOW_TORCHSCRIPT_SCORER=1 "
+            "(TorchScript is opt-in; use fullbeamnice_static on Kaggle for CUTLASS)."
+        )
     cmd = [
         sys.executable,
         str(PROJECT_DIR / "scripts" / "export_fullbeamnice_scorer.py"),
@@ -76,6 +81,61 @@ def export_scorer(cfg: dict) -> None:
         print(out, flush=True)
 
 
+COUNTER_LABELS = (
+    "next_pool_size",
+    "local_inserted",
+    "local_duplicate",
+    "remote_packed",
+    "bucket_overflow",
+    "hash_overflow",
+    "pruned",
+    "local_updated",
+)
+
+
+def _depth_tuning_log_enabled() -> bool:
+    return os.environ.get("DEPTH_TUNING_LOG", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _tuning_snapshot(cfg: dict) -> dict:
+    return {
+        "global_beam_width": int(cfg["global_beam_width"]),
+        "world_size": int(cfg["world_size"]),
+        "b_micro": int(cfg["b_micro"]),
+        "inference_parallelism": int(cfg["inference_parallelism"]),
+        "k_expand_tile": int(cfg["k_expand_tile"]),
+        "histogram_period_micro": int(cfg["histogram_period_micro"]),
+        "bucket_cap_per_peer": int(cfg["bucket_cap_per_peer"]),
+        "score_ring_depth": int(cfg["score_ring_depth"]),
+        "net_ring_depth": int(cfg["net_ring_depth"]),
+        "beta": float(cfg["beta"]),
+        "hash_load_factor": float(cfg["hash_load_factor"]),
+        "probe_limit": int(cfg["probe_limit"]),
+        "inference_backend": str(cfg.get("inference_backend", "")),
+        "use_cuda_graphs": os.environ.get("USE_CUDA_GRAPHS", "1") != "0",
+    }
+
+
+def _count_micro_and_tiles(local_frontier: int, cfg: dict, n_local: int) -> tuple[int, int]:
+    alim = min(max(1, int(local_frontier)), int(n_local))
+    bm = int(cfg["b_micro"])
+    if bm < 1:
+        bm = 1
+    num_micro = (alim + bm - 1) // bm
+    fanout = int(cfg.get("fanout", 24))
+    kt = int(cfg.get("k_expand_tile", 0))
+    total_tiles = 0
+    for mb in range(num_micro):
+        start = mb * bm
+        micro = min(bm, alim - start)
+        total_lanes = micro * fanout
+        tgt = kt if kt > 0 else total_lanes
+        if tgt < 1:
+            tgt = total_lanes
+        total_tiles += (total_lanes + tgt - 1) // tgt
+    return int(num_micro), int(total_tiles)
+
+
 def estimate_no_inference_prepass_depth(cfg: dict, max_depth: int) -> int:
     if os.environ.get("PREPASS_NO_INFERENCE", "1").strip().lower() in {"", "0", "false", "no", "off"}:
         return 0
@@ -90,7 +150,9 @@ def estimate_no_inference_prepass_depth(cfg: dict, max_depth: int) -> int:
     while depth < max_depth and estimated < target:
         depth += 1
         estimated = (fanout ** depth) * dedup_factor
-    return depth
+    # Ensure prepass_depth does not exceed max_depth - 1 to leave at least one depth for full inference
+    prepass_depth = min(depth, max_depth - 1) if max_depth > 0 else 0
+    return max(0, prepass_depth)
 
 
 def reconstruct_path_from_archive(archive: cpu_history_archive.CPUHistoryArchive, cfg: dict, found_depth: int, found_rank: int, found_local_index: int):
@@ -130,20 +192,57 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
     final_sums = None
     beam_debug = os.environ.get("BEAM_DEBUG", os.environ.get("ENGINE_DEBUG", "0")).strip().lower() not in {"", "0", "false", "no", "off"}
     depth_log_every = int(os.environ.get("DEPTH_LOG_EVERY", "0")) if beam_debug else 0
+    depth_tuning_log = _depth_tuning_log_enabled()
+    n_local_buf = int(buffers["beam_current"].shape[0])
     prepass_depth = estimate_no_inference_prepass_depth(cfg, max_depth) if start_depth == 0 and resume_depth is None else 0
+    prepass_hist_micro = int(os.environ.get("PREPASS_HISTOGRAM_PERIOD_MICRO", "1048576"))
+    prepass_stop_at_width = os.environ.get("PREPASS_STOP_AT_WIDTH", "1").strip().lower() not in {"", "0", "false", "no", "off"}
+    prepass_width_frac = float(os.environ.get("PREPASS_STOP_WIDTH_FRAC", "0.98"))
+    target_width_stop = max(1, int(float(cfg["global_beam_width"]) * prepass_width_frac))
     uniform_active = False
     if prepass_depth > 0:
+        engine.set_prepass_light_solved_scan(True)
         engine.begin_uniform_score(1)
         uniform_active = True
+    last_local_frontier: int | None = None
     for depth in range(start_depth, max_depth + 1):
+        phase = (
+            "init"
+            if depth == 0
+            else (
+                "uniform_fill"
+                if (uniform_active and prepass_depth > 0 and depth <= prepass_depth)
+                else "full_solver"
+            )
+        )
+        wall_ms: float | None = None
+        step_hist_micro: int | None = None
+        step_uniform = False
+        num_micro = 0
+        total_tiles = 0
         if depth > start_depth:
+            step_uniform = bool(uniform_active and depth <= prepass_depth)
+            hist_micro = prepass_hist_micro if uniform_active else int(cfg["histogram_period_micro"])
+            step_hist_micro = int(hist_micro)
+            if last_local_frontier is not None:
+                num_micro, total_tiles = _count_micro_and_tiles(last_local_frontier, cfg, n_local_buf)
             if uniform_active:
                 if depth <= prepass_depth:
                     engine.set_uniform_score(max(1, min(depth, 65535)))
                 else:
+                    engine.set_prepass_light_solved_scan(False)
                     engine.end_uniform_score()
                     uniform_active = False
-            engine.step(histogram_period_micro=cfg["histogram_period_micro"])
+            if depth_tuning_log:
+                torch.cuda.synchronize(device=device)
+            t_wall0 = time.perf_counter()
+            if uniform_active:
+                engine.step_current(histogram_period_micro=hist_micro)
+            else:
+                engine.step(histogram_period_micro=int(cfg["histogram_period_micro"]))
+            if depth_tuning_log:
+                torch.cuda.synchronize(device=device)
+            wall_ms = (time.perf_counter() - t_wall0) * 1000.0
         st = dict(engine.status())
         counters = [int(x) for x in st["counters"]]
         sums = allreduce_i64(
@@ -159,6 +258,46 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
             device,
         )
         final_sums = sums
+        max_wall_ms: float | None = None
+        if depth_tuning_log and depth > start_depth and wall_ms is not None:
+            tw = torch.tensor([wall_ms], dtype=torch.float64, device=device)
+            if dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1:
+                dist.all_reduce(tw, op=dist.ReduceOp.MAX)
+            max_wall_ms = float(tw.item())
+        if cfg["rank"] == 0 and depth_tuning_log and depth > start_depth and wall_ms is not None and max_wall_ms is not None:
+            ctr = [int(x) for x in st["counters"]]
+            named = {COUNTER_LABELS[i]: ctr[i] for i in range(min(len(COUNTER_LABELS), len(ctr)))}
+            print(
+                "DEPTH_TUNING "
+                + json.dumps(
+                    {
+                        "depth": depth,
+                        "phase": phase,
+                        "step_uniform": step_uniform,
+                        "histogram_period_micro_used": step_hist_micro,
+                        "wall_ms_local": round(wall_ms, 3),
+                        "wall_ms_max_rank": round(max_wall_ms, 3),
+                        "local_frontier_before_step": last_local_frontier,
+                        "num_micro_batches": num_micro,
+                        "expand_tiles_upper_bound": total_tiles,
+                        "local_current_size_after": int(st["current_size"]),
+                        "local_compacted_after": int(st["compacted_size"]),
+                        "current_size_sum": sums[5],
+                        "compacted_size_sum": sums[6],
+                        "counters": named,
+                        "tuning_params": _tuning_snapshot(cfg),
+                        "notes": (
+                            "wall_ms = host time with cuda.synchronize before/after engine step (all streams idle); "
+                            "Stream1 inference overlaps Stream2/3 in hardware — use max_wall_ms to spot stragglers; "
+                            "expand_tiles_upper_bound counts process_score tiles (Stream2+NCCL work driver); "
+                            "often smaller b_micro with higher inference_parallelism improves GPU utilization vs few large microbatches."
+                        ),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+        last_local_frontier = int(st["current_size"])
         if sums[1] != 0 or sums[2] != 0:
             raise AssertionError(f"overflow at depth={depth}: bucket={sums[1]} hash={sums[2]}")
         if archive is not None and depth > start_depth:
@@ -177,6 +316,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                         "hash_overflow": sums[2],
                         "cuda_graph_captured_sum": sums[3],
                         "prepass_depth": prepass_depth,
+                        "phase": phase,
+                        "histogram_period_micro": (prepass_hist_micro if uniform_active and depth <= prepass_depth else int(cfg["histogram_period_micro"])),
                     },
                     ensure_ascii=False,
                 ),
@@ -190,7 +331,27 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                 )
             found_depth = depth
             break
+        if (
+            uniform_active
+            and prepass_stop_at_width
+            and depth >= start_depth
+            and depth <= prepass_depth
+            and sums[5] >= target_width_stop
+        ):
+            if cfg["rank"] == 0 and depth_log_every > 0:
+                print(
+                    "PREPASS_WIDTH_REACHED "
+                    + json.dumps(
+                        {"depth": depth, "current_size_sum": sums[5], "target_width_stop": target_width_stop},
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
+            engine.set_prepass_light_solved_scan(False)
+            engine.end_uniform_score()
+            uniform_active = False
     if uniform_active:
+        engine.set_prepass_light_solved_scan(False)
         engine.end_uniform_score()
 
     local_found = dict(engine.status())
@@ -388,7 +549,7 @@ def main() -> None:
 
     sys.stdout.flush()
     sys.stderr.flush()
-    os._exit(0)
+    # COMMENTED OUT: os._exit(0)  # Kaggle submission
 
 
 if __name__ == "__main__":

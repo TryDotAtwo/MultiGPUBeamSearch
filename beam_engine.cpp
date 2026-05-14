@@ -292,7 +292,7 @@ struct TorchScriptEnsembleBackend final : public InferenceBackend {
 
 struct TEInferenceBackend final : public InferenceBackend {
     void forward(const torch::Tensor&, const torch::Tensor&, torch::Tensor&, int, int, int64_t, int, const EngineConfig&, cudaStream_t) override {
-        throw std::runtime_error("TEInferenceBackend placeholder: use torchscript_ensemble on Kaggle/T4; wire Transformer Engine backend on H100 build");
+        throw std::runtime_error("TEInferenceBackend placeholder: implement TE FP8 forward; optional TorchScript path requires ALLOW_TORCHSCRIPT_SCORER=1 in Python");
     }
 };
 
@@ -632,6 +632,32 @@ public:
         if (debug_config.verbose && debug_config.print_counters) print_debug_status();
     }
 
+    void step_current(int histogram_period_micro) {
+        if (cfg_.world_size > 1 && !nccl_inited_) throw std::runtime_error("NCCL is not initialized");
+        if (histogram_period_micro <= 0) histogram_period_micro = 8;
+        auto status_cpu = beam_status_.cpu();
+        int64_t current_size = static_cast<int64_t>(status_cpu.data_ptr<int32_t>()[STATUS_CURRENT_SIZE]);
+        if (current_size < 1) current_size = 1;
+        if (current_size > cfg_.n_local) current_size = cfg_.n_local;
+        const int64_t old_limit = active_limit_override_;
+        active_limit_override_ = current_size;
+        enqueue_one_depth(histogram_period_micro);
+        CUDA_CHECK(cudaStreamSynchronize(stream_infer_));
+        active_limit_override_ = old_limit;
+        if (debug_config.verbose && debug_config.print_counters) print_debug_status();
+    }
+
+    void step_prepass_fast(uint16_t score_q) {
+        begin_uniform_score(score_q);
+        step_current(1);
+        end_uniform_score();
+    }
+
+    void set_prepass_light_solved_scan(bool enable) {
+        invalidate_graph();
+        prepass_light_solved_scan_ = enable;
+    }
+
     py::dict search(int max_depth, int histogram_period_micro) {
         py::dict result;
         if (max_depth < 0) max_depth = 0;
@@ -783,6 +809,8 @@ private:
     int current_history_depth_ = 0;
     bool use_cuda_graphs_ = true;
     bool saved_use_cuda_graphs_ = true;
+    int64_t active_limit_override_ = -1;
+    bool prepass_light_solved_scan_ = false;
     bool cuda_graph_captured_ = false;
     bool central_loaded_ = false;
     bool inference_warmed_ = false;
@@ -843,6 +871,14 @@ private:
     }
 
     void do_fixed_all_to_all(int net_slot) {
+        if (cfg_.world_size <= 1) {
+            int32_t* send_counts_base = send_counts_.data_ptr<int32_t>() + static_cast<int64_t>(net_slot) * cfg_.world_size;
+            int32_t* recv_counts_base = recv_counts_.data_ptr<int32_t>() + static_cast<int64_t>(net_slot) * cfg_.world_size;
+            if (recv_counts_base != send_counts_base) {
+                CUDA_CHECK(cudaMemcpyAsync(recv_counts_base, send_counts_base, sizeof(int32_t), cudaMemcpyDeviceToDevice, stream_net_));
+            }
+            return;
+        }
         CandidateRecord* send_base = reinterpret_cast<CandidateRecord*>(send_buckets_.data_ptr<uint8_t>());
         CandidateRecord* recv_base = reinterpret_cast<CandidateRecord*>(recv_buckets_.data_ptr<uint8_t>());
         int32_t* send_counts_base = send_counts_.data_ptr<int32_t>() + static_cast<int64_t>(net_slot) * cfg_.world_size;
@@ -916,8 +952,8 @@ private:
 
     void enqueue_found_allreduce_and_finish() {
         CUDA_CHECK(cudaEventRecord(compact_ready_, stream_ingest_));
+        CUDA_CHECK(cudaStreamWaitEvent(stream_net_, compact_ready_, 0));
         if (cfg_.world_size > 1) {
-            CUDA_CHECK(cudaStreamWaitEvent(stream_net_, compact_ready_, 0));
             NCCL_CHECK(ncclAllReduce(
                 beam_status_.data_ptr<int32_t>() + STATUS_FOUND,
                 beam_status_.data_ptr<int32_t>() + STATUS_FOUND,
@@ -926,27 +962,40 @@ private:
                 ncclMax,
                 comm_,
                 stream_net_));
-            CUDA_CHECK(cudaEventRecord(found_reduce_ready_, stream_net_));
-            CUDA_CHECK(cudaStreamWaitEvent(stream_infer_, found_reduce_ready_, 0));
-        } else {
-            CUDA_CHECK(cudaStreamWaitEvent(stream_infer_, compact_ready_, 0));
         }
+        CUDA_CHECK(cudaEventRecord(found_reduce_ready_, stream_net_));
+        CUDA_CHECK(cudaStreamWaitEvent(stream_infer_, found_reduce_ready_, 0));
     }
 
     void enqueue_one_depth(int histogram_period_micro) {
-        const int64_t num_micro = (cfg_.n_local + cfg_.b_micro - 1) / cfg_.b_micro;
+        const int64_t active_limit = (active_limit_override_ > 0 && active_limit_override_ < cfg_.n_local) ? active_limit_override_ : cfg_.n_local;
+        const int64_t num_micro = (active_limit + cfg_.b_micro - 1) / cfg_.b_micro;
         CUDA_CHECK(cudaEventRecord(start_ready_, stream_infer_));
         CUDA_CHECK(cudaStreamWaitEvent(stream_ingest_, start_ready_, 0));
         for (auto st : stream_infer_lanes_) CUDA_CHECK(cudaStreamWaitEvent(st, start_ready_, 0));
 
         clear_step_state_async(stream_ingest_);
         if (central_loaded_) {
+            int solved_scan_n = static_cast<int>(cfg_.n_local);
+            if (prepass_light_solved_scan_) {
+                int32_t cs = 1;
+                CUDA_CHECK(cudaMemcpyAsync(
+                    &cs,
+                    beam_status_.data_ptr<int32_t>() + STATUS_CURRENT_SIZE,
+                    sizeof(int32_t),
+                    cudaMemcpyDeviceToHost,
+                    stream_ingest_));
+                CUDA_CHECK(cudaStreamSynchronize(stream_ingest_));
+                if (cs < 1) cs = 1;
+                const int64_t cap = std::min<int64_t>(cfg_.n_local, cs);
+                solved_scan_n = static_cast<int>(cap);
+            }
             launch_check_current_solved(
                 reinterpret_cast<const uint8_t*>(beam_current_.data_ptr<uint8_t>()),
                 current_active_flags_.data_ptr<uint8_t>(),
                 beam_status_.data_ptr<int32_t>(),
                 cfg_.state_size_bytes,
-                static_cast<int>(cfg_.n_local),
+                solved_scan_n,
                 stream_ingest_);
             CUDA_CHECK(cudaGetLastError());
         }
@@ -961,7 +1010,7 @@ private:
             cudaStream_t infer_stream = stream_infer_lanes_[infer_lane];
             const int64_t start = mb * cfg_.b_micro;
             int micro_size = cfg_.b_micro;
-            if (start + micro_size > cfg_.n_local) micro_size = static_cast<int>(cfg_.n_local - start);
+            if (start + micro_size > active_limit) micro_size = static_cast<int>(active_limit - start);
 
             if (mb >= cfg_.score_ring_depth) CUDA_CHECK(cudaStreamWaitEvent(infer_stream, score_consumed_[score_slot], 0));
             if (mb >= cfg_.net_ring_depth) CUDA_CHECK(cudaStreamWaitEvent(stream_ingest_, net_consumed_[net_slot], 0));
@@ -1008,30 +1057,28 @@ private:
                 CUDA_CHECK(cudaGetLastError());
                 CUDA_CHECK(cudaEventRecord(send_ready_[net_slot], stream_ingest_));
 
-                if (cfg_.world_size > 1) {
-                    CUDA_CHECK(cudaStreamWaitEvent(stream_net_, send_ready_[net_slot], 0));
-                    do_fixed_all_to_all(net_slot);
-                    CUDA_CHECK(cudaEventRecord(recv_ready_[net_slot], stream_net_));
+                CUDA_CHECK(cudaStreamWaitEvent(stream_net_, send_ready_[net_slot], 0));
+                do_fixed_all_to_all(net_slot);
+                CUDA_CHECK(cudaEventRecord(recv_ready_[net_slot], stream_net_));
 
-                    CUDA_CHECK(cudaStreamWaitEvent(stream_ingest_, recv_ready_[net_slot], 0));
-                    launch_ingest_recv_slot(
-                        reinterpret_cast<const CandidateRecord*>(recv_buckets_.data_ptr<uint8_t>()),
-                        recv_counts_.data_ptr<int32_t>(),
-                        reinterpret_cast<uint8_t*>(next_state_pool_.data_ptr<uint8_t>()),
-                        reinterpret_cast<BeamMeta*>(next_meta_.data_ptr<uint8_t>()),
-                        reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()),
-                        active_flags_.data_ptr<uint8_t>(),
-                        free_indices_.data_ptr<int32_t>(),
-                        free_count_.data_ptr<int32_t>(),
-                        reinterpret_cast<uint32_t*>(local_hist_.data_ptr<int32_t>()),
-                        counters_.data_ptr<int32_t>(),
-                        beam_status_.data_ptr<int32_t>(),
-                        threshold_cell_.data_ptr<int32_t>(),
-                        net_slot, cfg_.world_size, cfg_.state_size_bytes,
-                        cfg_.bucket_cap_per_peer, static_cast<int>(cfg_.hash_capacity),
-                        static_cast<int>(cfg_.k_work), cfg_.probe_limit, stream_ingest_);
-                    CUDA_CHECK(cudaGetLastError());
-                }
+                CUDA_CHECK(cudaStreamWaitEvent(stream_ingest_, recv_ready_[net_slot], 0));
+                launch_ingest_recv_slot(
+                    reinterpret_cast<const CandidateRecord*>(recv_buckets_.data_ptr<uint8_t>()),
+                    recv_counts_.data_ptr<int32_t>(),
+                    reinterpret_cast<uint8_t*>(next_state_pool_.data_ptr<uint8_t>()),
+                    reinterpret_cast<BeamMeta*>(next_meta_.data_ptr<uint8_t>()),
+                    reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()),
+                    active_flags_.data_ptr<uint8_t>(),
+                    free_indices_.data_ptr<int32_t>(),
+                    free_count_.data_ptr<int32_t>(),
+                    reinterpret_cast<uint32_t*>(local_hist_.data_ptr<int32_t>()),
+                    counters_.data_ptr<int32_t>(),
+                    beam_status_.data_ptr<int32_t>(),
+                    threshold_cell_.data_ptr<int32_t>(),
+                    net_slot, cfg_.world_size, cfg_.state_size_bytes,
+                    cfg_.bucket_cap_per_peer, static_cast<int>(cfg_.hash_capacity),
+                    static_cast<int>(cfg_.k_work), cfg_.probe_limit, stream_ingest_);
+                CUDA_CHECK(cudaGetLastError());
 
                 if (cfg_.k_expand_tile > 0 && ((tile_idx + 1) % histogram_period_micro == 0)) enqueue_threshold_update();
             }
@@ -1169,6 +1216,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .def("cuda_graph_captured", &BeamEngine::cuda_graph_captured)
         .def("enable_debug", &BeamEngine::enable_debug, py::arg("verbose") = true, py::arg("print_counters") = true, py::arg("log_period") = 8)
         .def("step", &BeamEngine::step, py::arg("histogram_period_micro") = 8)
+        .def("step_current", &BeamEngine::step_current, py::arg("histogram_period_micro") = 8)
+        .def("step_prepass_fast", &BeamEngine::step_prepass_fast, py::arg("score_q"))
+        .def("set_prepass_light_solved_scan", &BeamEngine::set_prepass_light_solved_scan, py::arg("enable"))
         .def("search", &BeamEngine::search, py::arg("max_depth"), py::arg("histogram_period_micro") = 8)
         .def("status", &BeamEngine::status)
         .def("history_entry", &BeamEngine::history_entry, py::arg("depth"), py::arg("local_index"))

@@ -75,6 +75,12 @@ print(f"NCCL инициализирован на rank {dist.get_rank()}")
 - Убедиться, что все ranks дошли до `init_nccl()`
 - Проверить, что все ranks видят одну и ту же NCCL ID
 
+### Лог тюнинга `DEPTH_TUNING_LOG` (`scripts/solve_testcsv_2gpu.py`)
+
+- `export DEPTH_TUNING_LOG=1`: после каждой глубины с шагом печатается строка `DEPTH_TUNING` (JSON) на rank 0.
+- Поля: `wall_ms_local`, `wall_ms_max_rank` (max по рангам после `cuda.synchronize` вокруг `engine.step` / `step_current`), `num_micro_batches`, `expand_tiles_upper_bound` (оценка числа плиток Stream2/обмена на шаг), именованные `counters`, снимок `tuning_params` (`b_micro`, `inference_parallelism`, `k_expand_tile`, `histogram_period_micro`, `bucket_cap_per_peer`, кольца, `beta`, …).
+- `wall_ms` — время до простоя **всех** потоков GPU на ранге: Stream1/2/3 сливаются в одну метрику; для раздельного профиля нужен Nsight; по `remote_packed` и `expand_tiles_upper_bound` видно нагрузку Stream2/3 относительно ширины луча.
+
 ---
 
 ## Оптимизация памяти

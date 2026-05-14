@@ -90,8 +90,7 @@ def export_torchscript_copies(copies: int, out_dir: Path) -> list[str]:
     return paths
 
 
-def run_torchscript_ensemble_case(ext, cfg: dict, device: torch.device) -> dict:
-    copies = max(1, int(cfg.get("inference_parallelism", 1)))
+    os.environ["ALLOW_TORCHSCRIPT_SCORER"] = "1"
     paths = export_torchscript_copies(copies, PROJECT_DIR / "runtime" / "scorers" / f"rank{cfg['rank']}")
     cfg_ts = dict(cfg)
     cfg_ts["inference_backend"] = "torchscript_ensemble"

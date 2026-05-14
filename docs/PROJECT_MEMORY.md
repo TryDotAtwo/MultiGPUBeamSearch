@@ -1,5 +1,42 @@
 # Project Memory
 
+## 2026-05-14 depth_tuning_log_kaggle_kernel_metadata
+
+- prompt_summary: User requested logs to pick optimal tuning parameters; noted Stream2/3 can dominate time and smaller B_MICRO with higher INFERENCE_PARALLELISM is often more efficient; asked GitHub push and Kaggle kernel test for cayleybeam-user-friendly-cpu-history.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`.
+- source_patch_solver: `scripts/solve_testcsv_2gpu.py` adds `DEPTH_TUNING_LOG=1` path printing `DEPTH_TUNING` JSON per depth after step: `wall_ms_local`, `wall_ms_max_rank` (all_reduce MAX), `num_micro_batches`, `expand_tiles_upper_bound`, named counters, `tuning_params` snapshot; optional `cuda.synchronize` around step when flag on.
+- source_patch_docs: `docs/DEBUG.md` documents `DEPTH_TUNING_LOG`.
+- source_patch_notebooks: `notebooks/kaggle_user_friendly_cpu_history.ipynb` and `kaggle_user_friendly_kernel_stage/kaggle_user_friendly_cpu_history.ipynb` add `DEPTH_TUNING_LOG` and pass into `base_env`.
+- source_patch_kaggle_stage: `kaggle_user_friendly_kernel_stage/kernel-metadata.json` added for `kaggle kernels push` targeting `trydotatwo/cayleybeam-user-friendly-cpu-history`.
+- caveat: `wall_ms` merges Stream1+2+3 completion per rank; separate stream timings need Nsight; tuning log adds sync overhead — disable for final runs.
+- remote_verification_status: git push and `kaggle kernels push` attempted from agent shell; outcome recorded below.
+
+## 2026-05-14 prepass_fill_phase_torchscript_opt_in
+
+- prompt_summary: User requested two-phase search: first cheap beam widening and buffer fill while recording each depth for history compatibility, then full solver path; remove accidental TorchScript fallback so Kaggle uses CUTLASS static scorer by default.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`.
+- source_patch_cpp: `beam_engine.cpp` adds `prepass_light_solved_scan_`, `set_prepass_light_solved_scan(bool)`, and caps `launch_check_current_solved` grid to `min(n_local, STATUS_CURRENT_SIZE)` when enabled (compacted frontier dense at indices `[0, current_size)`).
+- source_patch_python_solver: `scripts/solve_testcsv_2gpu.py` enables light solved-scan during uniform prepass, uses `PREPASS_HISTOGRAM_PERIOD_MICRO` (default `1048576`) to reduce mid-depth histogram/NCCL/hash churn during uniform fill, optional `PREPASS_STOP_AT_WIDTH` / `PREPASS_STOP_WIDTH_FRAC` early exit from uniform when global `current_size` sum reaches target, emits `phase` and `PREPASS_WIDTH_REACHED` in logs, `export_scorer` requires `ALLOW_TORCHSCRIPT_SCORER=1`.
+- source_patch_python_engine: `beam_engine.py` default `INFERENCE_BACKEND=fullbeamnice_static`; `configure_engine` raises on `torchscript_ensemble` unless `ALLOW_TORCHSCRIPT_SCORER=1`.
+- source_patch_scripts: `scripts/run_local_2h100.sh` default backend `fullbeamnice_static`; `scripts/fullbeamnice_current_solver_2gpu.py` uses static scorer (drops export subprocess); `scripts/kaggle_correctness_check.py` sets `ALLOW_TORCHSCRIPT_SCORER=1` for the explicit TorchScript regression case; `kaggle_cpu_history_matrix_kernel_stage/cpu_history_shared_scorer_matrix.py` uses `fullbeamnice_static`; `docker-compose.2h100.yml` and status-submit notebooks use `fullbeamnice_static`.
+- remaining_gap: per-depth cost still includes full `hash_capacity` clear at `clear_step_state_async` start and full `k_work` prune/compact grids; further prepass speed needs CUDA changes beyond solved-scan cap and histogram throttling.
+- local_verification: `python -m py_compile` on edited Python files passed; C++ compile not run on Windows host (MSVC absent).
+- code_change_status: implementation complete for scoped request.
+
+## 2026-05-14 kaggle_silence_depth0_vs_prepass_cost
+
+- prompt_summary: User asked why the run stays silent for tens of seconds after `DEPTH_RESULT` at `depth=0` with `prepass_depth=6`, GPU at 100%, and expected the first six prepass steps to be fast.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`.
+- answer_fact: `DEPTH_RESULT` at `depth=0` is emitted before any `engine.step_current` / `engine.step` call in `scripts/solve_testcsv_2gpu.py` loop; `depth=0` iteration only runs `reset_search` plus `status`/`allreduce`; no beam expansion yet.
+- answer_fact: `step_current` limits microbatches via `active_limit_override_` from `current_size`, so uniform-score forward work scales with the compacted frontier, not `n_local`.
+- answer_fact: `enqueue_one_depth` still calls `launch_check_current_solved` with `cfg_.n_local` grid (`beam_kernels.cu` + `beam_engine.cpp`); each depth pays a full `n_local` scan.
+- answer_fact: prune/final compact path uses kernels sized by `k_work` (`launch_prune_by_threshold`, `launch_rebuild_hash_from_active`, `launch_clear_step_state`); each depth pays full `k_work` passes.
+- answer_fact: `launch_clear_hash_table` clears `hash_capacity` entries every threshold cycle and again after the microbatch loop; cost scales with static hash table size, not active frontier count.
+- answer_fact: Python `engine.status()` synchronizes `stream_infer_`, all inference lane streams, `stream_ingest_`, `stream_net_` before each `DEPTH_RESULT`; host prints only after those syncs complete.
+- answer_fact: if `BEAM_DEBUG=1` but `DEPTH_LOG_EVERY` defaults to `0`, `DEPTH_RESULT` is suppressed after `depth=0`; long `silent_for_sec` then means no periodic stdout, not necessarily a single stuck depth (user log may still use `DEPTH_LOG_EVERY=1`).
+- relation: expected_fast_prepass_assumption → false; dominant_cost_per_depth → hash_clear + k_work_scan + n_local_check + NCCL + histogram path, not neural GEMM during uniform prepass.
+- code_change_status: project memory update only; no algorithm/runtime logic modified.
+
 ## 2026-05-14 static_fullbeamnice_cutlass_prepass
 
 - prompt_summary: User requested continuing implementation with a no-inference prepass before neural beam search, then a C++/CUDA FullBeamNice inference backend using static input/output buffers, FP16, Tensor Cores, CUDA Graph compatibility, and no PyTorch allocator inside the hot path; user additionally requested NVIDIA CUTLASS usage.
@@ -45,6 +82,14 @@
 - remote_verification_status: Kaggle debug and release runs not started because Kaggle API credentials are invalid/expired in the local environment.
 - safety_note: no Kaggle kernel was stopped, canceled, interrupted, or killed.
 - retry_2026_05_14: user requested another attempt; `kaggle kernels list -m` still returned `401 Client Error: Unauthorized`; `kaggle kernels push -p kaggle_user_friendly_kernel_stage --accelerator NvidiaTeslaT4` still returned `Expecting value: line 1 column 1`; no Kaggle run was started.
+
+## 2026-05-14 prepass_runtime_gap_after_kaggle_v7
+
+- prompt_summary: User pointed out that Kaggle v7 solved sample 1 at depth 1 but still took `1105s`, proving the no-inference prepass was not implemented as the intended cheap pre-main expansion.
+- root_cause: prepass was logically using `UniformScoreBackend`, but `BeamEngine.step(...)` still iterated over `cfg.n_local=40,500,000`, cleared full hash table, and scanned full `k_work`, so the no-inference phase still paid huge full-beam static-buffer cost.
+- source_patch_partial: `BeamEngine.step_current(...)` now limits microbatch/inference traversal to current compacted frontier size; `scripts/solve_testcsv_2gpu.py` uses `step_current(...)` during uniform prepass.
+- remaining_gap: current patch reduces `n_local` inference traversal but does not yet remove full hash-table clear and full `k_work` prune/compact scans from prepass; a true fast prepass still needs a separate native no-hash/no-full-clear prepass path or touched-slot static bookkeeping.
+- notebook_patch: Kaggle competition submit cell is commented out for debug runs.
 
 ## 2026-05-14 user_friendly_kaggle_notebook
 
@@ -644,3 +689,11 @@
 - followup_prompt: User asked for a short explanation of the same previous entity.
 - followup_prompt_ru: User asked to explain the same previous entity in Russian.
 - followup_stream3: User asked whether `BUCKET_CAP_PER_PEER` is for stream type 3; answer should clarify that this is likely the per-peer fixed bucket capacity used by that stream path when stream 3 sends/receives peer-partitioned candidates/messages, not the stream id itself.
+
+## 2026-05-14 current_sample_status_question
+
+- prompt_summary: User asked shortly whether current Kaggle run is solving sample 0 or sample 1.
+- observed_config: `kaggle_user_friendly_kernel_stage/kaggle_user_friendly_cpu_history.ipynb` has `SAMPLE_START=1` and `SAMPLE_COUNT=1`.
+- kaggle_status: `kaggle kernels status trydotatwo/cayleybeam-user-friendly-cpu-history` returned `KernelWorkerStatus.RUNNING`.
+- kaggle_logs: `kaggle kernels logs trydotatwo/cayleybeam-user-friendly-cpu-history` returned empty output at check time.
+- answer_basis: current configured sample is sample 1; no completed `SAMPLE_RESULT` was visible in logs at check time.

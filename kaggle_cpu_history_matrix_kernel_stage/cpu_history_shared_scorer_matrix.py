@@ -112,7 +112,7 @@ def base_env():
         'PYTHONUNBUFFERED': '1',
         'CUDA_VISIBLE_DEVICES': '0,1',
         'USE_CUDA_GRAPHS': '1',
-        'INFERENCE_BACKEND': 'torchscript_ensemble',
+        'INFERENCE_BACKEND': 'fullbeamnice_static',
         'INFERENCE_PARALLELISM': '2',
         'HISTORY_BACKEND': 'cpu',
         'CPU_HISTORY_WORKERS': '2',
