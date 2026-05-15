@@ -170,12 +170,17 @@ def prepass_expected_caps() -> list[int]:
     return caps
 
 
-def prepass_cap_for_depth(caps: list[int], depth: int, fallback: int) -> int:
+def prepass_cap_for_depth(caps: list[int], depth: int, fallback: int, fanout: int = 24, dedup_factor: float = 0.95) -> int:
     if depth < 0:
         return 1
     if depth < len(caps):
-        return int(caps[depth])
-    return int(fallback)
+        return min(int(fallback), int(caps[depth]))
+    cap = float(caps[-1])
+    for _ in range(depth - len(caps) + 1):
+        cap *= float(fanout) * float(dedup_factor)
+        if cap >= fallback:
+            return int(fallback)
+    return max(1, min(int(fallback), int(cap)))
 
 
 def reconstruct_path_from_archive(archive: cpu_history_archive.CPUHistoryArchive, cfg: dict, found_depth: int, found_rank: int, found_local_index: int):
@@ -239,6 +244,7 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
     prepass_width_frac = float(os.environ.get("PREPASS_STOP_WIDTH_FRAC", "0.98"))
     target_width_stop = max(1, int(float(cfg["global_beam_width"]) * prepass_width_frac))
     fanout = int(cfg.get("fanout", 24))
+    prepass_dedup_factor = float(os.environ.get("PREPASS_DEDUP_FACTOR", "0.95"))
     dynamic_prepass = os.environ.get("PREPASS_DYNAMIC_WIDTH", "1").strip().lower() not in {"", "0", "false", "no", "off"}
     prepass_caps = prepass_expected_caps()
     next_limit_buf = int(buffers["next_state_pool"].shape[0])
@@ -274,13 +280,33 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
             if uniform_active:
                 if depth <= prepass_depth:
                     engine.set_uniform_score(max(1, min(depth, 65535)))
-                    active_limit = max(1, int(last_local_frontier) if last_local_frontier is not None else prepass_cap_for_depth(prepass_caps, depth - 1, n_local_buf))
-                    next_limit = min(next_limit_buf, prepass_cap_for_depth(prepass_caps, depth, next_limit_buf))
+                    active_limit = max(
+                        1,
+                        int(last_local_frontier)
+                        if last_local_frontier is not None
+                        else prepass_cap_for_depth(prepass_caps, depth - 1, n_local_buf, fanout, prepass_dedup_factor),
+                    )
+                    next_limit = prepass_cap_for_depth(prepass_caps, depth, next_limit_buf, fanout, prepass_dedup_factor)
                     step_active_limit = int(active_limit)
                     step_next_limit = int(next_limit)
                     engine.set_active_limit(active_limit)
                     engine.set_next_limit(next_limit)
                 else:
+                    if cfg["rank"] == 0:
+                        print(
+                            "FULL_BEAM_START "
+                            + json.dumps(
+                                {
+                                    "next_depth": int(depth),
+                                    "reason": "prepass_depth_completed",
+                                    "global_beam_width": int(cfg["global_beam_width"]),
+                                    "allocated_n_local": int(n_local_buf),
+                                    "allocated_next_limit": int(next_limit_buf),
+                                },
+                                ensure_ascii=False,
+                            ),
+                            flush=True,
+                        )
                     engine.set_prepass_light_solved_scan(False)
                     engine.end_uniform_score()
                     engine.clear_logical_limits()
@@ -418,11 +444,42 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                     ),
                     flush=True,
                 )
+                print(
+                    "FULL_BEAM_START "
+                    + json.dumps(
+                        {
+                            "next_depth": int(depth + 1),
+                            "reason": "prepass_width_reached",
+                            "current_size_sum": int(sums[5]),
+                            "candidate_upper": int(candidate_upper),
+                            "global_beam_width": int(cfg["global_beam_width"]),
+                            "allocated_n_local": int(n_local_buf),
+                            "allocated_next_limit": int(next_limit_buf),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
             engine.set_prepass_light_solved_scan(False)
             engine.end_uniform_score()
             engine.clear_logical_limits()
             uniform_active = False
     if uniform_active:
+        if cfg["rank"] == 0:
+            print(
+                "FULL_BEAM_START "
+                + json.dumps(
+                    {
+                        "next_depth": int(max_depth + 1),
+                        "reason": "max_depth_or_prepass_depth_completed",
+                        "global_beam_width": int(cfg["global_beam_width"]),
+                        "allocated_n_local": int(n_local_buf),
+                        "allocated_next_limit": int(next_limit_buf),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         engine.set_prepass_light_solved_scan(False)
         engine.end_uniform_score()
         engine.clear_logical_limits()

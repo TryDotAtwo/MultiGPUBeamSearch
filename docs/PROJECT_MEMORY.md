@@ -8,6 +8,10 @@
 - source_patch_solver: `scripts/solve_testcsv_2gpu.py` enables engine step timers only when `DEPTH_TUNING_LOG=1` and embeds `cuda_step_timing` in each `DEPTH_TUNING` JSON record.
 - source_patch_notebook: user-friendly notebook and Kaggle stage notebook set `SAMPLE_START=1`, `SAMPLE_COUNT=8`, `BEAM_DEBUG=1`, `DEPTH_LOG_EVERY=1`, `DEPTH_TUNING_LOG=1`; final benchmark cell runs `scripts/benchmark_inference_backends_2gpu.py` after metrics and before the commented submit cell.
 - validation_status: local py_compile/JSON validation pending; Kaggle 2xT4 run pending.
+- kaggle_v14_result: failed fast after depth 2 because `DEPTH_TUNING_LOG=1` enabled CUDA event timers, event timers invalidated CUDA Graph capture, and the existing graph-required assertion still expected `cuda_graph_captured_sum == world_size`.
+- source_patch_solver_followup: CUDA Graph required assertion now treats `DEPTH_TUNING_LOG=1` as timer/debug mode and does not require graph capture while event timers are active.
+- user_runtime_log_followup: User supplied active notebook logs showing prepass fast through depth 4 and then long GPU work before reaching full-width frontier; root cause was `PREPASS_EXPECTED_CAPS` ending at the depth-5 empirical cap, causing depth-6 `logical_next_limit` to stay too small for 81M.
+- source_patch_prepass_followup: `prepass_cap_for_depth` now extrapolates missing caps by `fanout * PREPASS_DEDUP_FACTOR` and clamps to allocated static buffers; solver prints `FULL_BEAM_START` exactly at transition from uniform prepass to full beam.
 
 ## 2026-05-15 bottleneck_short_latex_report
 
