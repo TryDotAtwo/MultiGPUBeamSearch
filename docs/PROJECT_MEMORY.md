@@ -135,6 +135,8 @@
 - kaggle_v11_resume_result: version 11 restored checkpoint successfully (`RESUME_BEAMSEARCH_RESTORED depth=1`) and produced valid resumed path output, but subprocess timed out after `SUBMISSION_WRITTEN`; root cause is post-success distributed/process cleanup rather than checkpoint restore failure.
 - source_patch_cleanup: `scripts/solve_testcsv_2gpu.py` now destroys the distributed process group and calls `os._exit(0)` after successful flush to avoid Kaggle torchrun hangs after resume/checkpoint runs.
 - notebook_default_release: user-friendly notebooks default to release execution: `RUN_STREAM1_BENCHMARK=0`, `RUN_RESUME_CHECK=0`, `BEAM_DEBUG=0`, `DEPTH_LOG_EVERY=0`, `DEPTH_TUNING_LOG=0`; benchmark/resume cells remain available as opt-in diagnostics.
+- kaggle_v12_release_result: version 12 completed release run with `81M`, `BEAM_DEBUG=0`, `DEPTH_LOG_EVERY=0`, `DEPTH_TUNING_LOG=0`; sample `id=1` solved at depth `1`, path `BR`, solver subprocess exit `0`, submission command remained commented.
+- kaggle_v13_resume_result: version 13 completed checkpoint/resume smoke after shutdown fix; first run wrote checkpoint at depth `1`; resume run printed `RESUME_BEAMSEARCH_RESTORED depth=1`, continued to depth `3`, produced valid path `BR.BL.-BL`, and exited with returncode `0`; main `81M` release run also completed after the resume smoke.
 
 ## 2026-05-14 user_friendly_kaggle_notebook
 
