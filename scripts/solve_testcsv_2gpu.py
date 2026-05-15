@@ -155,8 +155,22 @@ def estimate_no_inference_prepass_depth(cfg: dict, max_depth: int) -> int:
     return max(0, prepass_depth)
 
 
-def prepass_expected_caps() -> list[int]:
-    raw = os.environ.get("PREPASS_EXPECTED_CAPS", "1,24,469,7779,104720,1334491").strip()
+def prepass_expected_caps(cfg: dict, max_depth: int) -> list[int]:
+    raw = os.environ.get("PREPASS_EXPECTED_CAPS", "auto").strip()
+    if raw.lower() in {"", "auto"}:
+        fanout = int(cfg.get("fanout", 24))
+        target = int(cfg["global_beam_width"])
+        dedup_factor = float(os.environ.get("PREPASS_DEDUP_FACTOR", "0.95"))
+        caps = [1]
+        depth = 1
+        estimated = 1.0
+        while depth <= max_depth and estimated < target:
+            estimated = (float(fanout) ** float(depth)) * dedup_factor
+            caps.append(max(1, int(min(float(target), estimated))))
+            depth += 1
+        if caps[-1] < target and len(caps) <= max_depth:
+            caps.append(target)
+        return caps
     caps: list[int] = []
     for part in raw.split(","):
         token = part.strip()
@@ -246,7 +260,7 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
     fanout = int(cfg.get("fanout", 24))
     prepass_dedup_factor = float(os.environ.get("PREPASS_DEDUP_FACTOR", "0.95"))
     dynamic_prepass = os.environ.get("PREPASS_DYNAMIC_WIDTH", "1").strip().lower() not in {"", "0", "false", "no", "off"}
-    prepass_caps = prepass_expected_caps()
+    prepass_caps = prepass_expected_caps(cfg, max_depth)
     next_limit_buf = int(buffers["next_state_pool"].shape[0])
     uniform_active = False
     if prepass_depth > 0:

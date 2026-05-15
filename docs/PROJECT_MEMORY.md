@@ -46,6 +46,8 @@
 - source_patch_prepass_followup: `prepass_cap_for_depth` now extrapolates missing caps by `fanout * PREPASS_DEDUP_FACTOR` and clamps to allocated static buffers; solver prints `FULL_BEAM_START` exactly at transition from uniform prepass to full beam.
 - source_patch_prepass_logging_followup: Added `PREPASS_STEP_START` before each uniform prepass depth so long depth-5/depth-6 work has explicit active/next/candidate bounds in notebook logs.
 - source_patch_notebook_followup: `PREPASS_EXPECTED_CAPS` now includes explicit depth-6/depth-7 local caps `30426443,42950250` for 81M 2xT4 runs.
+- user_correction_prepass_caps: User rejected static `PREPASS_EXPECTED_CAPS`; requirement is compute caps before solver/compile from current `GLOBAL_BEAM_WIDTH`, `fanout=24`, and duplicate correction.
+- source_patch_prepass_caps_auto: Solver treats `PREPASS_EXPECTED_CAPS=auto` or empty as generated caps `min(GLOBAL_BEAM_WIDTH, int((24**depth)*PREPASS_DEDUP_FACTOR))`; Kaggle notebooks set `PREPASS_DEDUP_FACTOR=0.95` and `PREPASS_EXPECTED_CAPS='auto'`.
 
 ## 2026-05-15 bottleneck_short_latex_report
 
