@@ -103,6 +103,8 @@
 - source_patch_notebook: user-friendly notebook exports `PREPASS_EXPECTED_CAPS`; debug Kaggle config uses `BEAM_DEBUG=1`, `DEPTH_LOG_EVERY=1`; submit command remains commented out.
 - verification_local: `python -m py_compile scripts/solve_testcsv_2gpu.py beam_engine.py scripts/t4_sizing.py scripts/h100_sizing.py scripts/static_fullbeamnice_inference.py` passed; notebook JSON validation passed; `git diff --check` reported only CRLF normalization warning for Kaggle stage notebook.
 - expected_effect: depth1 sample with one active state should no longer clear/scan full `40M`/`81M` buffers before finding one-move solution; allocated static buffers remain unchanged, logical work is reduced during prepass.
+- git_status: local commit `1c3167a Add logical capacity limits for prepass` created after rebase onto remote commit `824295d`; unrelated user notebook edits were stashed during rebase and restored.
+- remote_publication_status: `git push origin master` failed repeatedly with `Could not resolve host: github.com`; Kaggle validation was not started because Kaggle notebook clones GitHub `master` and would not include local commit `1c3167a` until publication succeeds.
 
 ## 2026-05-14 user_friendly_kaggle_notebook
 
