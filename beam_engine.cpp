@@ -588,14 +588,14 @@ public:
                 current_active_flags_.data_ptr<uint8_t>(),
                 beam_status_.data_ptr<int32_t>(),
                 cfg_.state_size_bytes,
-                static_cast<int>(cfg_.n_local),
+                1,
                 stream_ingest_);
         }
         CUDA_CHECK(cudaStreamSynchronize(stream_ingest_));
     }
 
     void clear_runtime_state() {
-        clear_step_state_async(stream_ingest_);
+        clear_step_state_async(stream_ingest_, cfg_.k_work, cfg_.hash_capacity);
         CUDA_CHECK(cudaStreamSynchronize(stream_ingest_));
     }
 
@@ -605,6 +605,34 @@ public:
     }
 
     bool cuda_graph_captured() const { return cuda_graph_captured_; }
+
+    void set_active_limit(uint64_t active_limit) {
+        int64_t limit = static_cast<int64_t>(active_limit);
+        if (limit < 1) limit = 1;
+        if (limit > cfg_.n_local) limit = cfg_.n_local;
+        if (logical_active_limit_ != limit) invalidate_graph();
+        logical_active_limit_ = limit;
+    }
+
+    void set_next_limit(uint64_t next_limit) {
+        int64_t limit = static_cast<int64_t>(next_limit);
+        if (limit < 1) limit = 1;
+        if (limit > cfg_.k_work) limit = cfg_.k_work;
+        const double load_factor = cfg_.hash_load_factor > 0.01f ? static_cast<double>(cfg_.hash_load_factor) : 0.45;
+        int64_t hash_limit = static_cast<int64_t>(static_cast<double>(limit) / load_factor) + 1024;
+        if (hash_limit < 1024) hash_limit = 1024;
+        if (hash_limit > cfg_.hash_capacity) hash_limit = cfg_.hash_capacity;
+        if (logical_next_limit_ != limit || logical_hash_capacity_ != hash_limit) invalidate_graph();
+        logical_next_limit_ = limit;
+        logical_hash_capacity_ = hash_limit;
+    }
+
+    void clear_logical_limits() {
+        if (logical_active_limit_ != -1 || logical_next_limit_ != -1 || logical_hash_capacity_ != -1) invalidate_graph();
+        logical_active_limit_ = -1;
+        logical_next_limit_ = -1;
+        logical_hash_capacity_ = -1;
+    }
 
     void enable_debug(bool verbose, bool print_counters, int log_period) {
 #if BEAM_DEBUG_ON
@@ -639,11 +667,14 @@ public:
         int64_t current_size = static_cast<int64_t>(status_cpu.data_ptr<int32_t>()[STATUS_CURRENT_SIZE]);
         if (current_size < 1) current_size = 1;
         if (current_size > cfg_.n_local) current_size = cfg_.n_local;
-        const int64_t old_limit = active_limit_override_;
+        const int64_t old_override = active_limit_override_;
+        const int64_t old_logical = logical_active_limit_;
         active_limit_override_ = current_size;
+        logical_active_limit_ = current_size;
         enqueue_one_depth(histogram_period_micro);
         CUDA_CHECK(cudaStreamSynchronize(stream_infer_));
-        active_limit_override_ = old_limit;
+        active_limit_override_ = old_override;
+        logical_active_limit_ = old_logical;
         if (debug_config.verbose && debug_config.print_counters) print_debug_status();
     }
 
@@ -810,6 +841,9 @@ private:
     bool use_cuda_graphs_ = true;
     bool saved_use_cuda_graphs_ = true;
     int64_t active_limit_override_ = -1;
+    int64_t logical_active_limit_ = -1;
+    int64_t logical_next_limit_ = -1;
+    int64_t logical_hash_capacity_ = -1;
     bool prepass_light_solved_scan_ = false;
     bool cuda_graph_captured_ = false;
     bool central_loaded_ = false;
@@ -855,8 +889,8 @@ private:
         cuda_graph_captured_ = false;
     }
 
-    void clear_step_state_async(cudaStream_t stream) {
-        launch_clear_hash_table(reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()), static_cast<int>(cfg_.hash_capacity), stream);
+    void clear_step_state_async(cudaStream_t stream, int64_t next_limit, int64_t hash_limit) {
+        launch_clear_hash_table(reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()), static_cast<int>(hash_limit), stream);
         launch_clear_step_state(
             counters_.data_ptr<int32_t>(),
             reinterpret_cast<uint32_t*>(local_hist_.data_ptr<int32_t>()),
@@ -865,7 +899,7 @@ private:
             free_count_.data_ptr<int32_t>(),
             beam_status_.data_ptr<int32_t>(),
             SCORE_BINS,
-            static_cast<int>(cfg_.k_work),
+            static_cast<int>(next_limit),
             stream);
         CUDA_CHECK(cudaGetLastError());
     }
@@ -904,7 +938,7 @@ private:
         NCCL_CHECK(ncclGroupEnd());
     }
 
-    void enqueue_threshold_update() {
+    void enqueue_threshold_update(int64_t next_limit, int64_t hash_limit) {
         CUDA_CHECK(cudaEventRecord(hist_ready_, stream_ingest_));
         CUDA_CHECK(cudaStreamWaitEvent(stream_net_, hist_ready_, 0));
         if (cfg_.world_size > 1) {
@@ -932,19 +966,19 @@ private:
             reinterpret_cast<uint32_t*>(local_hist_.data_ptr<int32_t>()),
             counters_.data_ptr<int32_t>(),
             threshold_cell_.data_ptr<int32_t>(),
-            static_cast<int>(cfg_.k_work),
-            static_cast<int>(cfg_.hash_capacity),
+            static_cast<int>(next_limit),
+            static_cast<int>(hash_limit),
             cfg_.probe_limit,
             stream_ingest_);
         CUDA_CHECK(cudaGetLastError());
-        launch_clear_hash_table(reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()), static_cast<int>(cfg_.hash_capacity), stream_ingest_);
+        launch_clear_hash_table(reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()), static_cast<int>(hash_limit), stream_ingest_);
         launch_rebuild_hash_from_active(
             reinterpret_cast<BeamMeta*>(next_meta_.data_ptr<uint8_t>()),
             reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()),
             active_flags_.data_ptr<uint8_t>(),
             counters_.data_ptr<int32_t>(),
-            static_cast<int>(cfg_.k_work),
-            static_cast<int>(cfg_.hash_capacity),
+            static_cast<int>(next_limit),
+            static_cast<int>(hash_limit),
             cfg_.probe_limit,
             stream_ingest_);
         CUDA_CHECK(cudaGetLastError());
@@ -968,15 +1002,22 @@ private:
     }
 
     void enqueue_one_depth(int histogram_period_micro) {
-        const int64_t active_limit = (active_limit_override_ > 0 && active_limit_override_ < cfg_.n_local) ? active_limit_override_ : cfg_.n_local;
+        int64_t active_limit = cfg_.n_local;
+        if (logical_active_limit_ > 0 && logical_active_limit_ < active_limit) active_limit = logical_active_limit_;
+        if (active_limit_override_ > 0 && active_limit_override_ < active_limit) active_limit = active_limit_override_;
+        int64_t next_limit = (logical_next_limit_ > 0 && logical_next_limit_ < cfg_.k_work) ? logical_next_limit_ : cfg_.k_work;
+        int64_t hash_limit = (logical_hash_capacity_ > 0 && logical_hash_capacity_ < cfg_.hash_capacity) ? logical_hash_capacity_ : cfg_.hash_capacity;
+        if (next_limit < 1) next_limit = 1;
+        if (hash_limit < 1) hash_limit = 1;
+        const int64_t current_output_cap = std::min<int64_t>(cfg_.n_local, next_limit);
         const int64_t num_micro = (active_limit + cfg_.b_micro - 1) / cfg_.b_micro;
         CUDA_CHECK(cudaEventRecord(start_ready_, stream_infer_));
         CUDA_CHECK(cudaStreamWaitEvent(stream_ingest_, start_ready_, 0));
         for (auto st : stream_infer_lanes_) CUDA_CHECK(cudaStreamWaitEvent(st, start_ready_, 0));
 
-        clear_step_state_async(stream_ingest_);
+        clear_step_state_async(stream_ingest_, next_limit, hash_limit);
         if (central_loaded_) {
-            int solved_scan_n = static_cast<int>(cfg_.n_local);
+            int solved_scan_n = static_cast<int>(active_limit);
             if (prepass_light_solved_scan_) {
                 int32_t cs = 1;
                 CUDA_CHECK(cudaMemcpyAsync(
@@ -987,7 +1028,7 @@ private:
                     stream_ingest_));
                 CUDA_CHECK(cudaStreamSynchronize(stream_ingest_));
                 if (cs < 1) cs = 1;
-                const int64_t cap = std::min<int64_t>(cfg_.n_local, cs);
+                const int64_t cap = std::min<int64_t>(active_limit, cs);
                 solved_scan_n = static_cast<int>(cap);
             }
             launch_check_current_solved(
@@ -1052,8 +1093,8 @@ private:
                     score_slot, net_slot, cfg_.world_size, cfg_.rank,
                     cfg_.state_size_bytes, cfg_.fanout, cfg_.b_micro, start, micro_size,
                     candidate_lane_offset, candidate_lanes,
-                    cfg_.bucket_cap_per_peer, static_cast<int>(cfg_.hash_capacity),
-                    static_cast<int>(cfg_.k_work), cfg_.probe_limit, stream_ingest_);
+                    cfg_.bucket_cap_per_peer, static_cast<int>(hash_limit),
+                    static_cast<int>(next_limit), cfg_.probe_limit, stream_ingest_);
                 CUDA_CHECK(cudaGetLastError());
                 CUDA_CHECK(cudaEventRecord(send_ready_[net_slot], stream_ingest_));
 
@@ -1076,19 +1117,19 @@ private:
                     beam_status_.data_ptr<int32_t>(),
                     threshold_cell_.data_ptr<int32_t>(),
                     net_slot, cfg_.world_size, cfg_.state_size_bytes,
-                    cfg_.bucket_cap_per_peer, static_cast<int>(cfg_.hash_capacity),
-                    static_cast<int>(cfg_.k_work), cfg_.probe_limit, stream_ingest_);
+                    cfg_.bucket_cap_per_peer, static_cast<int>(hash_limit),
+                    static_cast<int>(next_limit), cfg_.probe_limit, stream_ingest_);
                 CUDA_CHECK(cudaGetLastError());
 
-                if (cfg_.k_expand_tile > 0 && ((tile_idx + 1) % histogram_period_micro == 0)) enqueue_threshold_update();
+                if (cfg_.k_expand_tile > 0 && ((tile_idx + 1) % histogram_period_micro == 0)) enqueue_threshold_update(next_limit, hash_limit);
             }
             CUDA_CHECK(cudaEventRecord(score_consumed_[score_slot], stream_ingest_));
             CUDA_CHECK(cudaEventRecord(net_consumed_[net_slot], stream_ingest_));
 
-            if (cfg_.k_expand_tile <= 0 && ((mb + 1) % histogram_period_micro == 0)) enqueue_threshold_update();
+            if (cfg_.k_expand_tile <= 0 && ((mb + 1) % histogram_period_micro == 0)) enqueue_threshold_update(next_limit, hash_limit);
         }
 
-        enqueue_threshold_update();
+        enqueue_threshold_update(next_limit, hash_limit);
         launch_prune_by_threshold(
             reinterpret_cast<BeamMeta*>(next_meta_.data_ptr<uint8_t>()),
             reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()),
@@ -1098,24 +1139,28 @@ private:
             reinterpret_cast<uint32_t*>(local_hist_.data_ptr<int32_t>()),
             counters_.data_ptr<int32_t>(),
             threshold_cell_.data_ptr<int32_t>(),
-            static_cast<int>(cfg_.k_work),
-            static_cast<int>(cfg_.hash_capacity),
+            static_cast<int>(next_limit),
+            static_cast<int>(hash_limit),
             cfg_.probe_limit,
             stream_ingest_);
         CUDA_CHECK(cudaGetLastError());
-        launch_clear_hash_table(reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()), static_cast<int>(cfg_.hash_capacity), stream_ingest_);
+        launch_clear_hash_table(reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()), static_cast<int>(hash_limit), stream_ingest_);
         launch_rebuild_hash_from_active(
             reinterpret_cast<BeamMeta*>(next_meta_.data_ptr<uint8_t>()),
             reinterpret_cast<HashSlot*>(hash_table_.data_ptr<uint8_t>()),
             active_flags_.data_ptr<uint8_t>(),
             counters_.data_ptr<int32_t>(),
-            static_cast<int>(cfg_.k_work),
-            static_cast<int>(cfg_.hash_capacity),
+            static_cast<int>(next_limit),
+            static_cast<int>(hash_limit),
             cfg_.probe_limit,
             stream_ingest_);
         CUDA_CHECK(cudaGetLastError());
 
-        CUDA_CHECK(cudaMemsetAsync(current_active_flags_.data_ptr<uint8_t>(), 0, current_active_flags_.numel(), stream_ingest_));
+        int64_t flags_clear = cfg_.n_local;
+        if (logical_next_limit_ > 0 || logical_active_limit_ > 0 || active_limit_override_ > 0) {
+            flags_clear = std::min<int64_t>(cfg_.n_local, std::max<int64_t>(active_limit, current_output_cap));
+        }
+        CUDA_CHECK(cudaMemsetAsync(current_active_flags_.data_ptr<uint8_t>(), 0, static_cast<size_t>(flags_clear), stream_ingest_));
         CUDA_CHECK(cudaMemsetAsync(beam_status_.data_ptr<int32_t>() + STATUS_FOUND, 0, 3 * sizeof(int32_t), stream_ingest_));
         CUDA_CHECK(cudaMemsetAsync(beam_status_.data_ptr<int32_t>() + STATUS_LOCAL_FOUND, 0, sizeof(int32_t), stream_ingest_));
         launch_compact_next_to_current(
@@ -1131,8 +1176,8 @@ private:
             history_depth_cell_.data_ptr<int32_t>(),
             beam_status_.data_ptr<int32_t>(),
             cfg_.state_size_bytes,
-            static_cast<int>(cfg_.k_work),
-            static_cast<int>(cfg_.n_local),
+            static_cast<int>(next_limit),
+            static_cast<int>(current_output_cap),
             stream_ingest_);
         CUDA_CHECK(cudaGetLastError());
         enqueue_found_allreduce_and_finish();
@@ -1214,6 +1259,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .def("clear_runtime_state", &BeamEngine::clear_runtime_state)
         .def("enable_cuda_graphs", &BeamEngine::enable_cuda_graphs, py::arg("enable") = true)
         .def("cuda_graph_captured", &BeamEngine::cuda_graph_captured)
+        .def("set_active_limit", &BeamEngine::set_active_limit, py::arg("active_limit"))
+        .def("set_next_limit", &BeamEngine::set_next_limit, py::arg("next_limit"))
+        .def("clear_logical_limits", &BeamEngine::clear_logical_limits)
         .def("enable_debug", &BeamEngine::enable_debug, py::arg("verbose") = true, py::arg("print_counters") = true, py::arg("log_period") = 8)
         .def("step", &BeamEngine::step, py::arg("histogram_period_micro") = 8)
         .def("step_current", &BeamEngine::step_current, py::arg("histogram_period_micro") = 8)

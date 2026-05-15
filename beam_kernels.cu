@@ -1221,8 +1221,7 @@ extern "C" void launch_compact_next_to_current(
     cudaStream_t stream
 ) {
     const int threads = 256;
-    const int n = k_work > n_local ? k_work : n_local;
-    const int blocks = (n + threads - 1) / threads;
+    const int blocks = (k_work + threads - 1) / threads;
     beam_engine::kernel_compact_next_to_current<<<blocks, threads, 0, stream>>>(
         next_state_pool, next_meta, active_flags, beam_current, current_active_flags,
         history_parent_idx, history_parent_rank, history_action, history_valid, history_depth_cell,

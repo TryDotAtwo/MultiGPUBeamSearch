@@ -155,6 +155,29 @@ def estimate_no_inference_prepass_depth(cfg: dict, max_depth: int) -> int:
     return max(0, prepass_depth)
 
 
+def prepass_expected_caps() -> list[int]:
+    raw = os.environ.get("PREPASS_EXPECTED_CAPS", "1,24,469,7779,104720,1334491").strip()
+    caps: list[int] = []
+    for part in raw.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        caps.append(max(1, int(token)))
+    if not caps:
+        caps = [1]
+    if caps[0] != 1:
+        caps.insert(0, 1)
+    return caps
+
+
+def prepass_cap_for_depth(caps: list[int], depth: int, fallback: int) -> int:
+    if depth < 0:
+        return 1
+    if depth < len(caps):
+        return int(caps[depth])
+    return int(fallback)
+
+
 def reconstruct_path_from_archive(archive: cpu_history_archive.CPUHistoryArchive, cfg: dict, found_depth: int, found_rank: int, found_local_index: int):
     actions: list[int] = []
     owner_rank = int(found_rank)
@@ -201,6 +224,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
     target_width_stop = max(1, int(float(cfg["global_beam_width"]) * prepass_width_frac))
     fanout = int(cfg.get("fanout", 24))
     dynamic_prepass = os.environ.get("PREPASS_DYNAMIC_WIDTH", "1").strip().lower() not in {"", "0", "false", "no", "off"}
+    prepass_caps = prepass_expected_caps()
+    next_limit_buf = int(buffers["next_state_pool"].shape[0])
     uniform_active = False
     if prepass_depth > 0:
         engine.set_prepass_light_solved_scan(True)
@@ -220,6 +245,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
         wall_ms: float | None = None
         step_hist_micro: int | None = None
         step_uniform = False
+        step_active_limit: int | None = None
+        step_next_limit: int | None = None
         num_micro = 0
         total_tiles = 0
         if depth > start_depth:
@@ -231,9 +258,16 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
             if uniform_active:
                 if depth <= prepass_depth:
                     engine.set_uniform_score(max(1, min(depth, 65535)))
+                    active_limit = max(1, int(last_local_frontier) if last_local_frontier is not None else prepass_cap_for_depth(prepass_caps, depth - 1, n_local_buf))
+                    next_limit = min(next_limit_buf, prepass_cap_for_depth(prepass_caps, depth, next_limit_buf))
+                    step_active_limit = int(active_limit)
+                    step_next_limit = int(next_limit)
+                    engine.set_active_limit(active_limit)
+                    engine.set_next_limit(next_limit)
                 else:
                     engine.set_prepass_light_solved_scan(False)
                     engine.end_uniform_score()
+                    engine.clear_logical_limits()
                     uniform_active = False
             if depth_tuning_log:
                 torch.cuda.synchronize(device=device)
@@ -241,6 +275,7 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
             if uniform_active:
                 engine.step_current(histogram_period_micro=hist_micro)
             else:
+                engine.clear_logical_limits()
                 engine.step(histogram_period_micro=int(cfg["histogram_period_micro"]))
             if depth_tuning_log:
                 torch.cuda.synchronize(device=device)
@@ -280,6 +315,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                         "wall_ms_local": round(wall_ms, 3),
                         "wall_ms_max_rank": round(max_wall_ms, 3),
                         "local_frontier_before_step": last_local_frontier,
+                        "logical_active_limit": step_active_limit,
+                        "logical_next_limit": step_next_limit,
                         "num_micro_batches": num_micro,
                         "expand_tiles_upper_bound": total_tiles,
                         "local_current_size_after": int(st["current_size"]),
@@ -320,6 +357,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                         "prepass_depth": prepass_depth,
                         "phase": phase,
                         "histogram_period_micro": (prepass_hist_micro if uniform_active and depth <= prepass_depth else int(cfg["histogram_period_micro"])),
+                        "logical_active_limit": step_active_limit,
+                        "logical_next_limit": step_next_limit,
                     },
                     ensure_ascii=False,
                 ),
@@ -363,10 +402,12 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                 )
             engine.set_prepass_light_solved_scan(False)
             engine.end_uniform_score()
+            engine.clear_logical_limits()
             uniform_active = False
     if uniform_active:
         engine.set_prepass_light_solved_scan(False)
         engine.end_uniform_score()
+        engine.clear_logical_limits()
 
     local_found = dict(engine.status())
     reports = gather_objects(

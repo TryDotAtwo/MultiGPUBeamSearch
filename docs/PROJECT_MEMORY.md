@@ -91,6 +91,19 @@
 - remaining_gap: current patch reduces `n_local` inference traversal but does not yet remove full hash-table clear and full `k_work` prune/compact scans from prepass; a true fast prepass still needs a separate native no-hash/no-full-clear prepass path or touched-slot static bookkeeping.
 - notebook_patch: Kaggle competition submit cell is commented out for debug runs.
 
+## 2026-05-15 logical_capacity_prepass_fix
+
+- prompt_summary: User clarified required design: separate physical allocated static capacity from logical active/next capacity; prepass kernels must launch over current logical frontier and logical next pool, not `n_local` / `k_work` / full `hash_capacity`.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- source_patch_cpp_api: `BeamEngine` now exposes `set_active_limit(uint64_t)`, `set_next_limit(uint64_t)`, and `clear_logical_limits()` through pybind; setters clamp limits to static allocations and invalidate CUDA Graph when capture shape changes.
+- source_patch_cpp_hotpath: `enqueue_one_depth(...)` now computes `active_limit`, `next_limit`, `hash_limit`, and `current_output_cap`; prepass path uses these logical values for microbatch count, solved scan bound, hash clear, step-state clear, hash insert capacity, recv ingest capacity, prune, hash rebuild, current flag clear, and compaction output cap.
+- source_patch_cuda: `launch_compact_next_to_current(...)` now launches `k_work` threads only; previous `max(k_work,n_local)` launch caused unnecessary `n_local` work when logical `k_work` was small.
+- source_patch_reset: initial `reset_search(...)` solved scan now checks slot `0` only, because reset creates at most one active initial state per rank.
+- source_patch_solver: `PREPASS_EXPECTED_CAPS` default added as `1,24,469,7779,104720,1334491`; uniform prepass sets `active_limit=last_local_frontier` and `next_limit=expected_cap_for_output_depth`; full solver clears logical limits before CUDA Graph/full static step.
+- source_patch_notebook: user-friendly notebook exports `PREPASS_EXPECTED_CAPS`; debug Kaggle config uses `BEAM_DEBUG=1`, `DEPTH_LOG_EVERY=1`; submit command remains commented out.
+- verification_local: `python -m py_compile scripts/solve_testcsv_2gpu.py beam_engine.py scripts/t4_sizing.py scripts/h100_sizing.py scripts/static_fullbeamnice_inference.py` passed; notebook JSON validation passed; `git diff --check` reported only CRLF normalization warning for Kaggle stage notebook.
+- expected_effect: depth1 sample with one active state should no longer clear/scan full `40M`/`81M` buffers before finding one-move solution; allocated static buffers remain unchanged, logical work is reduced during prepass.
+
 ## 2026-05-14 user_friendly_kaggle_notebook
 
 - prompt_summary: User requested a user-friendly Kaggle notebook with first-cell primary config, second-cell advanced config with comments/examples, metrics histogram cell, submit cell, competition input files from Kaggle competition input, code cloned from GitHub, separate custom scorer documentation cell, and Yandex Cloud TODO cell.
