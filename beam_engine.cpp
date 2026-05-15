@@ -550,6 +550,54 @@ public:
         inference_warmed_ = true;
     }
 
+    py::list benchmark_inference(int micro_size, int repeats, int warmup) {
+        if (micro_size < 1) micro_size = 1;
+        if (micro_size > cfg_.b_micro) micro_size = cfg_.b_micro;
+        if (micro_size > cfg_.n_local) micro_size = static_cast<int>(cfg_.n_local);
+        if (repeats < 1) repeats = 1;
+        if (warmup < 0) warmup = 0;
+        const int lanes = std::max(1, cfg_.inference_parallelism);
+        std::vector<cudaEvent_t> lane_done(lanes, nullptr);
+        for (int lane = 0; lane < lanes; ++lane) CUDA_CHECK(cudaEventCreateWithFlags(&lane_done[lane], cudaEventDisableTiming));
+        cudaEvent_t bench_start = nullptr;
+        cudaEvent_t bench_stop = nullptr;
+        CUDA_CHECK(cudaEventCreate(&bench_start));
+        CUDA_CHECK(cudaEventCreate(&bench_stop));
+
+        auto run_once = [&](bool timed) -> float {
+            CUDA_CHECK(cudaEventRecord(bench_start, stream_infer_));
+            for (int lane = 0; lane < lanes; ++lane) {
+                cudaStream_t st = stream_infer_lanes_[lane];
+                CUDA_CHECK(cudaStreamWaitEvent(st, bench_start, 0));
+                const int slot = lane % cfg_.score_ring_depth;
+                inference_->forward(beam_current_, current_active_flags_, score_ring_, slot, lane, 0, micro_size, cfg_, st);
+                CUDA_CHECK(cudaEventRecord(lane_done[lane], st));
+            }
+            for (int lane = 0; lane < lanes; ++lane) CUDA_CHECK(cudaStreamWaitEvent(stream_infer_, lane_done[lane], 0));
+            CUDA_CHECK(cudaEventRecord(bench_stop, stream_infer_));
+            CUDA_CHECK(cudaEventSynchronize(bench_stop));
+            if (!timed) return 0.0f;
+            float ms = 0.0f;
+            CUDA_CHECK(cudaEventElapsedTime(&ms, bench_start, bench_stop));
+            return ms;
+        };
+
+        try {
+            for (int i = 0; i < warmup; ++i) (void)run_once(false);
+            py::list timings;
+            for (int i = 0; i < repeats; ++i) timings.append(run_once(true));
+            CUDA_CHECK(cudaEventDestroy(bench_start));
+            CUDA_CHECK(cudaEventDestroy(bench_stop));
+            for (auto e : lane_done) CUDA_CHECK(cudaEventDestroy(e));
+            return timings;
+        } catch (...) {
+            if (bench_start) cudaEventDestroy(bench_start);
+            if (bench_stop) cudaEventDestroy(bench_stop);
+            for (auto e : lane_done) if (e) cudaEventDestroy(e);
+            throw;
+        }
+    }
+
     void set_action_permutation_table(py::bytes table_bytes) {
         std::string table = table_bytes;
         const size_t expected = static_cast<size_t>(cfg_.fanout) * static_cast<size_t>(cfg_.state_size_bytes);
@@ -1253,6 +1301,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .def("set_uniform_score", &BeamEngine::set_uniform_score, py::arg("score_q"))
         .def("end_uniform_score", &BeamEngine::end_uniform_score)
         .def("warmup_inference", &BeamEngine::warmup_inference, py::arg("repeats") = 2)
+        .def("benchmark_inference", &BeamEngine::benchmark_inference, py::arg("micro_size"), py::arg("repeats") = 50, py::arg("warmup") = 10)
         .def("set_action_permutation_table", &BeamEngine::set_action_permutation_table, py::arg("table_bytes"))
         .def("set_central_state", &BeamEngine::set_central_state, py::arg("state_bytes"))
         .def("reset_search", &BeamEngine::reset_search, py::arg("initial_state_bytes"), py::arg("active_on_this_rank") = true)

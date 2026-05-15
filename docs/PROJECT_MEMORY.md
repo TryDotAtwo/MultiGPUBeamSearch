@@ -106,6 +106,18 @@
 - git_status: local commit `1c3167a Add logical capacity limits for prepass` created after rebase onto remote commit `824295d`; unrelated user notebook edits were stashed during rebase and restored.
 - remote_publication_status: `git push origin master` failed repeatedly with `Could not resolve host: github.com`; Kaggle validation was not started because Kaggle notebook clones GitHub `master` and would not include local commit `1c3167a` until publication succeeds.
 
+## 2026-05-15 kaggle_iterative_validation_instrumentation
+
+- prompt_summary: User requested implementation of the Kaggle iterative validation plan: publish local commits, run 2xT4 tests, validate `81M`, add TorchScript vs static CUTLASS Stream1 benchmark, add config tuning diagnostics, verify CPU-history checkpoint/resume, and review whether CUTLASS helps Stream2/Stream3.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- network_diagnosis: environment variables include bad proxy values `HTTP_PROXY=http://127.0.0.1:9`, `HTTPS_PROXY=http://127.0.0.1:9`, `ALL_PROXY=http://127.0.0.1:9`, `GIT_HTTP_PROXY=http://127.0.0.1:9`, `GIT_HTTPS_PROXY=http://127.0.0.1:9`; Kaggle CLI failed with proxy connection refused through `127.0.0.1:9`.
+- source_patch_cpp: `BeamEngine.benchmark_inference(micro_size,repeats,warmup)` added; method uses existing static buffers, concurrent inference lanes, CUDA events, and does not alter beam-search hot path.
+- source_patch_benchmark: `scripts/benchmark_inference_backends_2gpu.py` added; script compares `torchscript_ensemble` and `fullbeamnice_static` on 2xT4 with same `B_MICRO`, `INFERENCE_PARALLELISM`, warmup/iteration counts, and prints `STREAM1_BENCHMARK` JSON with speedup.
+- source_patch_solver: `scripts/solve_testcsv_2gpu.py` prints `RESUME_BEAMSEARCH_RESTORED` when CPU-history checkpoint resume succeeds.
+- source_patch_notebook: user-friendly Kaggle notebook adds `RUN_STREAM1_BENCHMARK`, `BENCH_ITERS`, `BENCH_WARMUP`, and optional `RUN_RESUME_CHECK`; benchmark runs before sizing/solver; resume smoke test can run before main solver; competition submit remains commented.
+- source_patch_review: `docs/CUTLASS_STREAM2_STREAM3_REVIEW.md` records that Stream2/Stream3 are irregular hash/scatter/NCCL workloads where CUTLASS is not applicable; recommended optimization remains logical limits, memory coalescing, histogram cadence, bucket sizing, and hash/probe tuning.
+- local_verification: `python -m py_compile scripts/solve_testcsv_2gpu.py scripts/benchmark_inference_backends_2gpu.py beam_engine.py scripts/t4_sizing.py scripts/h100_sizing.py scripts/static_fullbeamnice_inference.py` passed; both user-friendly notebooks JSON-parse.
+
 ## 2026-05-14 user_friendly_kaggle_notebook
 
 - prompt_summary: User requested a user-friendly Kaggle notebook with first-cell primary config, second-cell advanced config with comments/examples, metrics histogram cell, submit cell, competition input files from Kaggle competition input, code cloned from GitHub, separate custom scorer documentation cell, and Yandex Cloud TODO cell.

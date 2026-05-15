@@ -211,6 +211,20 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
         start_depth = 0
     else:
         start_depth = int(resume_depth)
+        if cfg["rank"] == 0:
+            print(
+                "RESUME_BEAMSEARCH_RESTORED "
+                + json.dumps(
+                    {
+                        "sample_id": int(sample_id),
+                        "depth": int(start_depth),
+                        "history_backend": str(cfg.get("history_backend", "")),
+                        "checkpoint": bool(cfg.get("cpu_history_checkpoint", False)),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
     found_depth = -1
     final_sums = None
     beam_debug = os.environ.get("BEAM_DEBUG", os.environ.get("ENGINE_DEBUG", "0")).strip().lower() not in {"", "0", "false", "no", "off"}
