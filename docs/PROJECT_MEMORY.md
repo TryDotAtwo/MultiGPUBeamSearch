@@ -1,5 +1,14 @@
 # Project Memory
 
+## 2026-05-15 cuda_event_kernel_timers_and_81m_ids_1_8
+
+- prompt_summary: User requested CUDA events plus `DEPTH_TUNING_LOG` plus targeted kernel timers; add final Kaggle notebook cell for CUTLASS/static vs TorchScript benchmark; run Kaggle 2xT4 for `test.csv` ids/index range `1..8` with `GLOBAL_BEAM_WIDTH=81_000_000`.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- source_patch_cpp: `BeamEngine` adds debug-only step timers controlled by `enable_step_timers(bool)` and exposed through `step_timing()`; timing buckets are `clear_and_solved_scan_ms`, `micro_pipeline_ms`, `final_prune_compact_found_ms`, and `total_cuda_event_ms`; enabling timers invalidates CUDA Graph to avoid capture/timing mismatch.
+- source_patch_solver: `scripts/solve_testcsv_2gpu.py` enables engine step timers only when `DEPTH_TUNING_LOG=1` and embeds `cuda_step_timing` in each `DEPTH_TUNING` JSON record.
+- source_patch_notebook: user-friendly notebook and Kaggle stage notebook set `SAMPLE_START=1`, `SAMPLE_COUNT=8`, `BEAM_DEBUG=1`, `DEPTH_LOG_EVERY=1`, `DEPTH_TUNING_LOG=1`; final benchmark cell runs `scripts/benchmark_inference_backends_2gpu.py` after metrics and before the commented submit cell.
+- validation_status: local py_compile/JSON validation pending; Kaggle 2xT4 run pending.
+
 ## 2026-05-15 bottleneck_short_latex_report
 
 - prompt_summary: User requested short Russian code bottleneck analysis with proofs and LaTeX report.

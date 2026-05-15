@@ -230,6 +230,8 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
     beam_debug = os.environ.get("BEAM_DEBUG", os.environ.get("ENGINE_DEBUG", "0")).strip().lower() not in {"", "0", "false", "no", "off"}
     depth_log_every = int(os.environ.get("DEPTH_LOG_EVERY", "0")) if beam_debug else 0
     depth_tuning_log = _depth_tuning_log_enabled()
+    if hasattr(engine, "enable_step_timers"):
+        engine.enable_step_timers(bool(depth_tuning_log))
     n_local_buf = int(buffers["beam_current"].shape[0])
     prepass_depth = estimate_no_inference_prepass_depth(cfg, max_depth) if start_depth == 0 and resume_depth is None else 0
     prepass_hist_micro = int(os.environ.get("PREPASS_HISTOGRAM_PERIOD_MICRO", "1048576"))
@@ -318,6 +320,7 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
         if cfg["rank"] == 0 and depth_tuning_log and depth > start_depth and wall_ms is not None and max_wall_ms is not None:
             ctr = [int(x) for x in st["counters"]]
             named = {COUNTER_LABELS[i]: ctr[i] for i in range(min(len(COUNTER_LABELS), len(ctr)))}
+            cuda_step_timing = dict(engine.step_timing()) if hasattr(engine, "step_timing") else {}
             print(
                 "DEPTH_TUNING "
                 + json.dumps(
@@ -338,6 +341,7 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                         "current_size_sum": sums[5],
                         "compacted_size_sum": sums[6],
                         "counters": named,
+                        "cuda_step_timing": cuda_step_timing,
                         "tuning_params": _tuning_snapshot(cfg),
                         "notes": (
                             "wall_ms = host time with cuda.synchronize before/after engine step (all streams idle); "

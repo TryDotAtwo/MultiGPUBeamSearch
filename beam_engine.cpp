@@ -470,6 +470,10 @@ public:
         CUDA_CHECK(cudaEventCreateWithFlags(&threshold_ready_, cudaEventDisableTiming));
         CUDA_CHECK(cudaEventCreateWithFlags(&compact_ready_, cudaEventDisableTiming));
         CUDA_CHECK(cudaEventCreateWithFlags(&found_reduce_ready_, cudaEventDisableTiming));
+        CUDA_CHECK(cudaEventCreate(&timing_step_start_));
+        CUDA_CHECK(cudaEventCreate(&timing_after_clear_));
+        CUDA_CHECK(cudaEventCreate(&timing_after_micro_));
+        CUDA_CHECK(cudaEventCreate(&timing_after_final_));
     }
 
     ~BeamEngine() {
@@ -487,6 +491,10 @@ public:
         cudaEventDestroy(threshold_ready_);
         cudaEventDestroy(compact_ready_);
         cudaEventDestroy(found_reduce_ready_);
+        cudaEventDestroy(timing_step_start_);
+        cudaEventDestroy(timing_after_clear_);
+        cudaEventDestroy(timing_after_micro_);
+        cudaEventDestroy(timing_after_final_);
         for (auto st : stream_infer_lanes_) cudaStreamDestroy(st);
         cudaStreamDestroy(stream_infer_);
         cudaStreamDestroy(stream_ingest_);
@@ -653,6 +661,35 @@ public:
     }
 
     bool cuda_graph_captured() const { return cuda_graph_captured_; }
+
+    void enable_step_timers(bool enable) {
+        step_timers_enabled_ = enable;
+        if (enable) invalidate_graph();
+    }
+
+    py::dict step_timing() const {
+        py::dict d;
+        if (!step_timers_enabled_ || !step_timing_valid_) {
+            d["enabled"] = step_timers_enabled_;
+            d["valid"] = false;
+            return d;
+        }
+        float clear_ms = 0.0f;
+        float micro_pipeline_ms = 0.0f;
+        float final_prune_compact_ms = 0.0f;
+        float total_ms = 0.0f;
+        CUDA_CHECK(cudaEventElapsedTime(&clear_ms, timing_step_start_, timing_after_clear_));
+        CUDA_CHECK(cudaEventElapsedTime(&micro_pipeline_ms, timing_after_clear_, timing_after_micro_));
+        CUDA_CHECK(cudaEventElapsedTime(&final_prune_compact_ms, timing_after_micro_, timing_after_final_));
+        CUDA_CHECK(cudaEventElapsedTime(&total_ms, timing_step_start_, timing_after_final_));
+        d["enabled"] = true;
+        d["valid"] = true;
+        d["clear_and_solved_scan_ms"] = clear_ms;
+        d["micro_pipeline_ms"] = micro_pipeline_ms;
+        d["final_prune_compact_found_ms"] = final_prune_compact_ms;
+        d["total_cuda_event_ms"] = total_ms;
+        return d;
+    }
 
     void set_active_limit(uint64_t active_limit) {
         int64_t limit = static_cast<int64_t>(active_limit);
@@ -882,6 +919,10 @@ private:
     cudaEvent_t threshold_ready_ = nullptr;
     cudaEvent_t compact_ready_ = nullptr;
     cudaEvent_t found_reduce_ready_ = nullptr;
+    cudaEvent_t timing_step_start_ = nullptr;
+    cudaEvent_t timing_after_clear_ = nullptr;
+    cudaEvent_t timing_after_micro_ = nullptr;
+    cudaEvent_t timing_after_final_ = nullptr;
 
     ncclComm_t comm_{};
     bool nccl_inited_ = false;
@@ -893,6 +934,8 @@ private:
     int64_t logical_next_limit_ = -1;
     int64_t logical_hash_capacity_ = -1;
     bool prepass_light_solved_scan_ = false;
+    bool step_timers_enabled_ = false;
+    bool step_timing_valid_ = false;
     bool cuda_graph_captured_ = false;
     bool central_loaded_ = false;
     bool inference_warmed_ = false;
@@ -1062,6 +1105,10 @@ private:
         CUDA_CHECK(cudaEventRecord(start_ready_, stream_infer_));
         CUDA_CHECK(cudaStreamWaitEvent(stream_ingest_, start_ready_, 0));
         for (auto st : stream_infer_lanes_) CUDA_CHECK(cudaStreamWaitEvent(st, start_ready_, 0));
+        if (step_timers_enabled_) {
+            step_timing_valid_ = false;
+            CUDA_CHECK(cudaEventRecord(timing_step_start_, stream_ingest_));
+        }
 
         clear_step_state_async(stream_ingest_, next_limit, hash_limit);
         if (central_loaded_) {
@@ -1088,6 +1135,7 @@ private:
                 stream_ingest_);
             CUDA_CHECK(cudaGetLastError());
         }
+        if (step_timers_enabled_) CUDA_CHECK(cudaEventRecord(timing_after_clear_, stream_ingest_));
         CUDA_CHECK(cudaEventRecord(clear_ready_, stream_ingest_));
         CUDA_CHECK(cudaStreamWaitEvent(stream_infer_, clear_ready_, 0));
         for (auto st : stream_infer_lanes_) CUDA_CHECK(cudaStreamWaitEvent(st, clear_ready_, 0));
@@ -1176,6 +1224,7 @@ private:
 
             if (cfg_.k_expand_tile <= 0 && ((mb + 1) % histogram_period_micro == 0)) enqueue_threshold_update(next_limit, hash_limit);
         }
+        if (step_timers_enabled_) CUDA_CHECK(cudaEventRecord(timing_after_micro_, stream_ingest_));
 
         enqueue_threshold_update(next_limit, hash_limit);
         launch_prune_by_threshold(
@@ -1229,6 +1278,10 @@ private:
             stream_ingest_);
         CUDA_CHECK(cudaGetLastError());
         enqueue_found_allreduce_and_finish();
+        if (step_timers_enabled_) {
+            CUDA_CHECK(cudaEventRecord(timing_after_final_, stream_net_));
+            step_timing_valid_ = true;
+        }
         current_history_depth_ += 1;
     }
 
@@ -1308,6 +1361,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .def("clear_runtime_state", &BeamEngine::clear_runtime_state)
         .def("enable_cuda_graphs", &BeamEngine::enable_cuda_graphs, py::arg("enable") = true)
         .def("cuda_graph_captured", &BeamEngine::cuda_graph_captured)
+        .def("enable_step_timers", &BeamEngine::enable_step_timers, py::arg("enable"))
+        .def("step_timing", &BeamEngine::step_timing)
         .def("set_active_limit", &BeamEngine::set_active_limit, py::arg("active_limit"))
         .def("set_next_limit", &BeamEngine::set_next_limit, py::arg("next_limit"))
         .def("clear_logical_limits", &BeamEngine::clear_logical_limits)
