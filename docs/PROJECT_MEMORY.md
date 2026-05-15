@@ -1,5 +1,37 @@
 # Project Memory
 
+## 2026-05-15 topk_dedup_short_summary
+
+- prompt_summary: User asked briefly how top-k and deduplication are implemented here.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- source_inspection: `beam_kernels.cu` `make_best_key`, `hash_insert_or_update`, `kernel_compute_threshold`, `kernel_prune_by_threshold`, `kernel_compact_next_to_current`; `beam_engine.cpp` `enqueue_threshold_update`.
+- topk_summary: top-k is implemented as score-bin histogram thresholding, not full sorting; local inserted/updated candidates increment `local_hist[score_q]`; Stream3 sums histograms with NCCL allreduce into `global_hist`; one-thread threshold scan from high score to low finds score cutoff where accumulated count reaches `GLOBAL_BEAM_WIDTH`; Stream2 prunes candidates with `score_q <= threshold`.
+- dedup_summary: dedup uses open-addressed static hash table keyed by state hash plus fingerprint; same state hash/fingerprint updates existing entry only when `make_best_key(score_q,fingerprint)` is better; worse/equal duplicates become no-op; new states allocate from `next_state_pool` or fixed free-list.
+- caveat: threshold pruning by score bin can prune all candidates equal to cutoff because condition is `score_q <= threshold`; exact cardinality at score ties is not an exact sorted top-k implementation.
+- code_change_status: documentation memory only; no algorithm/runtime logic modified.
+
+## 2026-05-15 stream2_improvement_analysis
+
+- prompt_summary: User asked whether Stream2 can be made better than the current implementation.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- source_inspection: `beam_engine.cpp` and `beam_kernels.cu` Stream2 path includes `kernel_process_score_slot`, `hash_insert_or_update`, remote bucket packing, receive ingest, `kernel_prune_by_threshold`, hash clear/rebuild, and `kernel_compact_next_to_current`.
+- analysis_result: Stream2 can likely be improved; current bottlenecks are per-candidate atomics, random hash probing, 120-byte state materialization/copy, global histogram atomics, full active-flag scans for prune/compact/rebuild, and repeated hash clear/rebuild after threshold updates.
+- priority_direction_1: add touched/active index lists as static arrays so prune/compact/rebuild scan active/touched slots instead of whole `next_limit`.
+- priority_direction_2: split local-owner and remote-owner candidate paths or use owner-grouped tiles to reduce branch divergence and remote bucket atomics.
+- priority_direction_3: reduce global histogram atomic pressure via block-local/shared histograms or score bin aggregation before global atomics.
+- priority_direction_4: reduce hash rebuild frequency by adaptive threshold update cadence based on insert pressure/overflow risk, not only fixed `histogram_period_micro`.
+- priority_direction_5: consider state representation compression/incremental move metadata to reduce 120-byte candidate copies, but this has higher correctness risk because central checks, hashing, scoring, and history reconstruction depend on full states.
+- constraint: all viable designs must preserve static arrays, bounded capacities, deterministic correctness, and Stream3 global top-k correctness; implementation is a logic change requiring explicit user approval.
+- code_change_status: documentation memory only; no algorithm/runtime logic modified.
+
+## 2026-05-15 stream_1_2_3_short_explanation
+
+- prompt_summary: User asked in Russian for a short explanation of how stream 1, stream 2, and stream 3 work.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- answer_basis: `beam_engine.cpp` creates `stream_infer_`, `stream_ingest_`, `stream_net_`, and `stream_infer_lanes_`; `enqueue_one_depth` coordinates streams by CUDA events; `do_fixed_all_to_all` and `enqueue_threshold_update` define NCCL/network and global-threshold behavior.
+- stream_mapping: Stream1 is inference/scoring on lane streams; Stream2 is candidate ingest/materialization/hash/dedup/histogram/prune/compact; Stream3 is NCCL/network/global coordination for all-to-all candidate buckets, histogram allreduce, threshold computation, found allreduce.
+- code_change_status: documentation memory only; no algorithm/runtime logic modified.
+
 ## 2026-05-15 cuda_event_kernel_timers_and_81m_ids_1_8
 
 - prompt_summary: User requested CUDA events plus `DEPTH_TUNING_LOG` plus targeted kernel timers; add final Kaggle notebook cell for CUTLASS/static vs TorchScript benchmark; run Kaggle 2xT4 for `test.csv` ids/index range `1..8` with `GLOBAL_BEAM_WIDTH=81_000_000`.
@@ -12,6 +44,8 @@
 - source_patch_solver_followup: CUDA Graph required assertion now treats `DEPTH_TUNING_LOG=1` as timer/debug mode and does not require graph capture while event timers are active.
 - user_runtime_log_followup: User supplied active notebook logs showing prepass fast through depth 4 and then long GPU work before reaching full-width frontier; root cause was `PREPASS_EXPECTED_CAPS` ending at the depth-5 empirical cap, causing depth-6 `logical_next_limit` to stay too small for 81M.
 - source_patch_prepass_followup: `prepass_cap_for_depth` now extrapolates missing caps by `fanout * PREPASS_DEDUP_FACTOR` and clamps to allocated static buffers; solver prints `FULL_BEAM_START` exactly at transition from uniform prepass to full beam.
+- source_patch_prepass_logging_followup: Added `PREPASS_STEP_START` before each uniform prepass depth so long depth-5/depth-6 work has explicit active/next/candidate bounds in notebook logs.
+- source_patch_notebook_followup: `PREPASS_EXPECTED_CAPS` now includes explicit depth-6/depth-7 local caps `30426443,42950250` for 81M 2xT4 runs.
 
 ## 2026-05-15 bottleneck_short_latex_report
 

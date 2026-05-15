@@ -291,6 +291,22 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
                     step_next_limit = int(next_limit)
                     engine.set_active_limit(active_limit)
                     engine.set_next_limit(next_limit)
+                    if cfg["rank"] == 0 and depth_log_every > 0:
+                        print(
+                            "PREPASS_STEP_START "
+                            + json.dumps(
+                                {
+                                    "depth": int(depth),
+                                    "active_limit_local": int(active_limit),
+                                    "next_limit_local": int(next_limit),
+                                    "current_size_sum_before": None if last_local_frontier is None else int(last_local_frontier) * int(cfg["world_size"]),
+                                    "candidate_upper_global": None if last_local_frontier is None else int(last_local_frontier) * int(cfg["world_size"]) * int(fanout),
+                                    "global_beam_width": int(cfg["global_beam_width"]),
+                                },
+                                ensure_ascii=False,
+                            ),
+                            flush=True,
+                        )
                 else:
                     if cfg["rank"] == 0:
                         print(
