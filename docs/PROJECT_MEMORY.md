@@ -1,5 +1,15 @@
 # Project Memory
 
+## 2026-05-15 bottleneck_short_latex_report
+
+- prompt_summary: User requested short Russian code bottleneck analysis with proofs and LaTeX report.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- analysis_result: primary bottleneck is Stream2/Stream3 candidate pipeline: candidate materialization, hash/dedup/probing/atomics, fixed bucket NCCL exchange, histogram threshold, prune, hash clear/rebuild, and compaction; not the CUTLASS Stream1 GEMM scorer.
+- proof_code_refs: `beam_engine.cpp:383-408` static CUTLASS scorer; `beam_engine.cpp:1107-1138` score-slot processing after each microbatch; `beam_kernels.cu:351-488` hash insert/update with probing/atomics; `beam_engine.cpp:972-986` NCCL all-to-all counts/payload; `beam_engine.cpp:989-1032` threshold/prune/clear/rebuild; `beam_engine.cpp:766-790` status waits all streams.
+- proof_memory_refs: existing memory records note Stream2/3 can dominate, `DEPTH_TUNING` measures wall time/counters/tile counts, and prior conclusion says dominant prepass cost is hash clear, `k_work` scans, NCCL, histogram path, not neural GEMM.
+- artifact: `docs/bottleneck_report.tex`.
+- code_change_status: documentation/report only; no algorithm/runtime logic modified.
+
 ## 2026-05-14 depth_tuning_log_kaggle_kernel_metadata
 
 - prompt_summary: User requested logs to pick optimal tuning parameters; noted Stream2/3 can dominate time and smaller B_MICRO with higher INFERENCE_PARALLELISM is often more efficient; asked GitHub push and Kaggle kernel test for cayleybeam-user-friendly-cpu-history.
@@ -121,6 +131,10 @@
 - kaggle_v9_result: Kaggle kernel version 9 failed before benchmark because `/kaggle/input` was empty; root cause was `kaggle_user_friendly_kernel_stage/kernel-metadata.json` having `dataset_sources=[]` and `competition_sources=[]`.
 - source_patch_v10_candidate: kernel metadata restores `competition_sources=["cayley-py-megaminx"]` and `dataset_sources=["trydotatwo/cayleybeam-fullbeamnice-project"]`; benchmark script now forces `GLOBAL_BEAM_WIDTH=BENCH_GLOBAL_BEAM_WIDTH` instead of inheriting the main `81M` beam.
 - local_verification_v10_candidate: py_compile passed for benchmark/solver/engine/sizing/static-loader scripts; kernel metadata and both user-friendly notebooks JSON-parse.
+- kaggle_v10_result: version 10 completed; benchmark printed `speedup_static_vs_torchscript=1.5013`; `81M` debug run solved sample `id=1` at depth `1` with `path=BR`; prepass depth1 step took `wall_ms_max_rank=93.021` and sample elapsed was `0.409s`; submit command remained commented.
+- kaggle_v11_resume_result: version 11 restored checkpoint successfully (`RESUME_BEAMSEARCH_RESTORED depth=1`) and produced valid resumed path output, but subprocess timed out after `SUBMISSION_WRITTEN`; root cause is post-success distributed/process cleanup rather than checkpoint restore failure.
+- source_patch_cleanup: `scripts/solve_testcsv_2gpu.py` now destroys the distributed process group and calls `os._exit(0)` after successful flush to avoid Kaggle torchrun hangs after resume/checkpoint runs.
+- notebook_default_release: user-friendly notebooks default to release execution: `RUN_STREAM1_BENCHMARK=0`, `RUN_RESUME_CHECK=0`, `BEAM_DEBUG=0`, `DEPTH_LOG_EVERY=0`, `DEPTH_TUNING_LOG=0`; benchmark/resume cells remain available as opt-in diagnostics.
 
 ## 2026-05-14 user_friendly_kaggle_notebook
 

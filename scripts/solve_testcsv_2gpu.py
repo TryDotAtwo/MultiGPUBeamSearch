@@ -512,6 +512,14 @@ def existing_submission_ids(path: Path) -> set[int]:
         return {int(row["initial_state_id"]) for row in reader if row.get("initial_state_id", "").strip()}
 
 
+def shutdown_distributed() -> None:
+    if dist.is_available() and dist.is_initialized():
+        try:
+            dist.destroy_process_group()
+        except BaseException:
+            pass
+
+
 def main() -> None:
     os.environ.setdefault("USE_CUDA_GRAPHS", "1")
     os.environ.setdefault("INFERENCE_BACKEND", "fullbeamnice_static")
@@ -622,7 +630,8 @@ def main() -> None:
 
     sys.stdout.flush()
     sys.stderr.flush()
-    # COMMENTED OUT: os._exit(0)  # Kaggle submission
+    shutdown_distributed()
+    os._exit(0)
 
 
 if __name__ == "__main__":
@@ -632,4 +641,5 @@ if __name__ == "__main__":
         print(f"FATAL_EXIT type={type(exc).__name__}; message={exc}", flush=True)
         sys.stdout.flush()
         sys.stderr.flush()
+        shutdown_distributed()
         os._exit(1)
