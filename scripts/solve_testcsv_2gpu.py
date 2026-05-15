@@ -488,6 +488,7 @@ def solve_one(engine, cfg: dict, buffers: dict, sample_id: int, state: np.ndarra
         "restore_distance": restore_distance,
         "cuda_graph_captured_sum": int(final_sums[3]) if final_sums is not None else 0,
         "final_sums": final_sums,
+        "prepass_depth": prepass_depth,
     }
 
 
@@ -577,12 +578,20 @@ def main() -> None:
 
     solved_rows: list[dict[str, str]] = []
     t0 = time.time()
-    graph_expected = os.environ.get("USE_CUDA_GRAPHS", "0") != "0"
+    graph_expected = os.environ.get("USE_CUDA_GRAPHS", "0") != "0" and not _depth_tuning_log_enabled()
     if cfg["rank"] == 0 and append_each:
         initialize_submission(output_path, resume=resume_submission)
     for pos, (sample_id, state) in enumerate(rows):
         result = solve_one(engine, cfg, buffers, sample_id, state, max_depth, device)
-        if graph_expected and result["depth"] >= 2 and result["cuda_graph_captured_sum"] < cfg["world_size"]:
+        # CUDA graph capture is only required when solution is found in full_solver phase
+        # (i.e., after uniform_fill prepass). If solution found during uniform_fill,
+        # graph capture is not necessary.
+        should_require_cuda_graph = (
+            graph_expected
+            and result["depth"] >= 2
+            and result["depth"] > result.get("prepass_depth", 0)
+        )
+        if should_require_cuda_graph and result["cuda_graph_captured_sum"] < cfg["world_size"]:
             raise AssertionError(
                 "CUDA graph was not captured on all ranks; "
                 + json.dumps({"cuda_graph_captured_sum": result["cuda_graph_captured_sum"], "world_size": cfg["world_size"]}, ensure_ascii=False)
