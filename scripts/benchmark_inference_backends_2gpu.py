@@ -25,7 +25,7 @@ def _init_cfg(backend: str) -> dict:
         os.environ["ALLOW_TORCHSCRIPT_SCORER"] = "1"
     cfg = beam_engine.make_default_config()
     cfg["inference_backend"] = backend
-    cfg["global_beam_width"] = max(int(cfg["global_beam_width"]), int(os.environ.get("BENCH_GLOBAL_BEAM_WIDTH", "65536")))
+    cfg["global_beam_width"] = int(os.environ.get("BENCH_GLOBAL_BEAM_WIDTH", "65536"))
     cfg["max_depth"] = 2
     return cfg
 
@@ -95,7 +95,7 @@ def _run_backend(backend: str, ext, device: torch.device, micro_size: int, repea
 
 def main() -> None:
     os.environ.setdefault("USE_CUDA_GRAPHS", "0")
-    os.environ.setdefault("GLOBAL_BEAM_WIDTH", os.environ.get("BENCH_GLOBAL_BEAM_WIDTH", "65536"))
+    os.environ["GLOBAL_BEAM_WIDTH"] = os.environ.get("BENCH_GLOBAL_BEAM_WIDTH", "65536")
     os.environ.setdefault("B_MICRO", os.environ.get("BENCH_B_MICRO", os.environ.get("B_MICRO", "8192")))
     os.environ.setdefault("INFERENCE_PARALLELISM", os.environ.get("BENCH_INFERENCE_PARALLELISM", os.environ.get("INFERENCE_PARALLELISM", "2")))
     os.environ.setdefault("HISTORY_BACKEND", "cpu")

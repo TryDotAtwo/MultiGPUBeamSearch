@@ -117,6 +117,10 @@
 - source_patch_notebook: user-friendly Kaggle notebook adds `RUN_STREAM1_BENCHMARK`, `BENCH_ITERS`, `BENCH_WARMUP`, and optional `RUN_RESUME_CHECK`; benchmark runs before sizing/solver; resume smoke test can run before main solver; competition submit remains commented.
 - source_patch_review: `docs/CUTLASS_STREAM2_STREAM3_REVIEW.md` records that Stream2/Stream3 are irregular hash/scatter/NCCL workloads where CUTLASS is not applicable; recommended optimization remains logical limits, memory coalescing, histogram cadence, bucket sizing, and hash/probe tuning.
 - local_verification: `python -m py_compile scripts/solve_testcsv_2gpu.py scripts/benchmark_inference_backends_2gpu.py beam_engine.py scripts/t4_sizing.py scripts/h100_sizing.py scripts/static_fullbeamnice_inference.py` passed; both user-friendly notebooks JSON-parse.
+- git_publication_status: `git -c http.curloptResolve=github.com:443:140.82.121.4 push origin master` succeeded for commits through `42f0dd4`.
+- kaggle_v9_result: Kaggle kernel version 9 failed before benchmark because `/kaggle/input` was empty; root cause was `kaggle_user_friendly_kernel_stage/kernel-metadata.json` having `dataset_sources=[]` and `competition_sources=[]`.
+- source_patch_v10_candidate: kernel metadata restores `competition_sources=["cayley-py-megaminx"]` and `dataset_sources=["trydotatwo/cayleybeam-fullbeamnice-project"]`; benchmark script now forces `GLOBAL_BEAM_WIDTH=BENCH_GLOBAL_BEAM_WIDTH` instead of inheriting the main `81M` beam.
+- local_verification_v10_candidate: py_compile passed for benchmark/solver/engine/sizing/static-loader scripts; kernel metadata and both user-friendly notebooks JSON-parse.
 
 ## 2026-05-14 user_friendly_kaggle_notebook
 

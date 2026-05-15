@@ -7,8 +7,12 @@
   "is_private": false,
   "enable_gpu": true,
   "enable_internet": true,
-  "dataset_sources": [],
-  "competition_sources": [],
+  "dataset_sources": [
+    "trydotatwo/cayleybeam-fullbeamnice-project"
+  ],
+  "competition_sources": [
+    "cayley-py-megaminx"
+  ],
   "kernel_sources": [],
   "model_sources": []
 }
