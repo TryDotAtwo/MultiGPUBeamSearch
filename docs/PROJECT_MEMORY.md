@@ -1,5 +1,151 @@
 # Project Memory
 
+## 2026-05-16 architecture_v6_implementation_start
+
+- prompt_summary: User approved and requested implementation of Target Architecture Rewrite v6 for CayleyBeam100H100.
+- architecture_v6: Runtime must move to `State128 + Hash128 + CandidateMeta + scratch_pool + dispatcher_outside_graph`.
+- replace_required: Remove production dependence on `BeamMeta`, `HashSlot`, stream-phase `next_state_pool`, full-depth CUDA Graph capture, TorchScript backend, dummy backend, and central_hamming backend.
+- memory_contract: `current_frontier_states`, solved result buffers, and stop flags live outside `scratch_pool`; `layout_streams` and `layout_final` overlay one physical `scratch_pool`; `GLOBAL_BEAM_WIDTH_MAX_SAFE` uses `current_frontier_states + max(layout_streams_bytes, layout_final_bytes) + model_weights_fp16 + read_only_tables + CUDA/NCCL/headroom`.
+- fixed_types: Required public data types are `State128`, `Hash128`, `CandidateMeta`, `FinalRequest`, and `FinalResponse = State128`; `CandidateMeta` must stay 32 bytes and `Hash128` must stay 16 bytes.
+- padding_contract: Persistent frontier states must keep `State128.v[120..127] = 0`; `FinalResponse.v[120..123]` temporarily stores `target_local_idx`; `generators[move][120..127]=120..127`; `central_state[120..127]=0`; `zobrist[120..127][*]=Hash128{0,0}`.
+- solved_contract: Goal candidates use `GOAL_SCORE_KEY=0`; solved results are stored in bounded `solved_meta_list` and `solved_depth_list`; publishing solved results uses list writes before `solved_flag`/`stop_flag`, with `__threadfence_system()` for polling safety.
+- threshold_rule: Add `threshold_initialized`; before initialization and insufficient survivors, `current_threshold=UINT32_MAX`; after sufficient survivors, updates use `current_threshold=min(current_threshold,new_threshold)` and never relax.
+- implementation_order: First add split headers/config/memory layout and tests, then replace buffer allocation, then implement Stream1/2/3/5/4/final dispatcher pieces.
+- verification_plan: Run Python compile/static tests locally; CUDA build verification may require Docker/Kaggle because local Windows CUDA host compiler availability is uncertain.
+- code_change_status: implementation started; architecture deviations require explicit user approval.
+- implementation_update: Added `beam_types.hpp`, `beam_config.hpp/cpp`, `beam_memory.hpp/cpp`, and `tests/test_architecture_v6_static.py`; wired new C++ sources into `setup.py` and runtime JIT build list.
+- allocation_update: `beam_engine.py` now exposes v6 config fields and allocates `current_frontier_states`, `scratch_pool`, `solved_flag`, `stop_flag`, `solved_count`, `solved_overflow`, `solved_meta_list`, and `solved_depth_list` alongside legacy buffers during transition.
+- derive_sizes_update: C++ `derive_sizes()` now reports v6 type sizes, score constants, ring/shard config, effective beam width, scratch overlay bytes, current frontier bytes, and solved buffer bytes.
+- fallback_update: Python production configure path now rejects non-`fullbeamnice_static` inference backends for target v6.
+- verification_result: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py` passed; `python -m pytest tests\test_architecture_v6_static.py -q` passed with 7 tests.
+- cuda_build_status: local CUDA extension build not run because `where.exe cl` did not find MSVC `cl.exe`; Docker/Kaggle build remains required for CUDA compilation verification.
+- next_phase_2026_05_16: User accepted foundation status and specified next order: Stream2 first, Final second, Stream3, Stream4, Stream5+dispatcher, Stream1 CUTLASS/custom last.
+- stream2_phase_scope: Implement Stream2 v6 kernel foundation with `State128` local child state, padded generators/central/zobrist, `hash_ring:Hash128`, and bounded solved list path; add allocation/layout byte-size consistency test before deeper kernels.
+- stream2_update: Added `beam_kernels_stream2.cu` with `kernel_v6_stream2_hash_goal` and launcher; kernel applies padded `generators[24][128]`, computes `Hash128` through `zobrist[128][128]`, writes `hash_ring`, and appends bounded goal results with `GOAL_SCORE_KEY=0`.
+- solved_visibility_update: Stream2 goal path writes `solved_meta_list` and `solved_depth_list`, calls `__threadfence_system()`, then publishes `solved_flag` and `stop_flag`.
+- build_wiring_update: Added `beam_kernels_stream2.cu` to `setup.py` and `beam_engine.py` extension source lists.
+- stream2_static_tests: Extended v6 static tests to verify v6 allocation buffer names, Stream2 kernel symbols, solved visibility order, and scratch overlay max rule.
+- stream2_verification_result: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py` passed; `python -m pytest tests\test_architecture_v6_static.py -q` passed with 10 tests.
+- docker_stage0_result: Docker RTX 3070 CUDA build with `TORCH_CUDA_ARCH_LIST=8.6` and `python setup.py build_ext --inplace` passed after build-only fix `std::max<int64_t>(...)` in `beam_engine.cpp`.
+- docker_stage0_static_tests: Container image initially lacked `pytest`; ephemeral `python -m pip install pytest -q` inside Docker succeeded; `python -m pytest tests/test_architecture_v6_static.py -q` passed with 10 tests.
+- stream2_gpu_reference_test: Added `tests/stream2_reference_smoke.py`; Docker GPU run passed and printed `STREAM2_REFERENCE_SMOKE_OK`.
+- stream2_reference_checks: Verified GPU `hash_ring` equals CPU Zobrist reference, goal writes solved list, `score_key == GOAL_SCORE_KEY`, route packing is preserved, and zero Zobrist padding makes `State128.v[120..127]` hash-neutral.
+- next_required_work: Do not proceed to Stream3/4/5/dispatcher yet; next architecture stage is Final materialization using the same `apply_move` contract.
+- final_stage_update: Added `beam_kernels_final.cu` with `kernel_v6_final_materialize` and `kernel_v6_final_scatter_responses`; added pybind exports `v6_final_materialize` and `v6_final_scatter_responses`.
+- final_smoke_test: Added `tests/final_materialization_smoke.py`; verifies GPU child state equals CPU apply_move, `FinalResponse.v[120..123]` stores `target_local_idx`, scatter writes `next_frontier_states_tmp[target_local_idx]`, and persistent padding `v[120..127]` is zero.
+- final_verification_result: Docker RTX 3070 run passed `python setup.py build_ext --inplace`, `python -m pytest tests/test_architecture_v6_static.py -q` with 11 tests, `python tests/stream2_reference_smoke.py`, and `python tests/final_materialization_smoke.py`.
+- next_required_work_after_final: Stream3 isolated test may start next; Stream4/Stream5/dispatcher/Stream1 still must wait for their own stages.
+- stream3_stage_start: User approved Stage3 Stream3 isolated implementation only: one ring / one `STREAM3_BATCH_CANDIDATES`, no Stream4, no Stream5, no dispatcher, no Stream1 changes.
+- stream3_stage_scope: Implement threshold+compact, CUB sort/reduce by `Hash128`, dedup with `min(stream3_val)`, owner after dedup, local/remote split, remote grouping by owner, and smoke test `tests/stream3_dedup_smoke.py`.
+- stream3_implementation_update: Added `beam_kernels_stream3.cu` with `kernel_v6_stream3_pack_threshold_compact`, CUB `DeviceRadixSort::SortPairs` using `Hash128KeyDecomposer`, sorted segment dedup by `Hash128`, and `kernel_v6_stream3_restore_split`.
+- stream3_test_update: Added `tests/stream3_dedup_smoke.py`; verifies threshold filtering, original `payload_id` preservation, dedup `min(stream3_val)`, score and payload tie behavior, owner computed after dedup, parent/move restoration, local pending output, remote grouping, and send counts/offsets.
+- stream3_build_fix: Initial CUB sort compile failed for custom `Hash128Key` without decomposer; fixed with CUB custom decomposer returning `(hi, lo)` tuple, preserving sort order `hash.hi, hash.lo`.
+- stream3_verification_result: Host `py_compile` passed; host static pytest passed with 12 tests; Docker RTX 3070 run passed `python setup.py build_ext --inplace`, static pytest with 12 tests, Stream2 smoke, Final smoke, and Stream3 smoke.
+- next_required_work_after_stream3: Stream4 isolated shard merge may start next; Stream5/dispatcher/Stream1 remain blocked until their stages.
+- stream4_stage_start: User approved Stage4 Stream4 isolated shard merge only: one shard job, no Stream5, no dispatcher, no Stream1, no global threshold.
+- stream4_stage_scope: Implement threshold+compact, CUB sort by `Hash128`, dedup with best `CandidateMeta` by `min(score_key), min(parent_idx), min(route_packed)`, write clean region, set `dirty_count=0`, update `clean_count`, and clear `processing_flag`.
+- stream4_implementation_update: Added `beam_kernels_stream4.cu` with `kernel_v6_stream4_threshold_compact`, CUB `DeviceRadixSort::SortPairs` using `Stream4HashKeyDecomposer`, sorted segment dedup, and clean-region writeback.
+- stream4_test_update: Added `tests/stream4_shard_smoke.py`; verifies threshold filtering, clean+dirty merge, duplicate hash selection, score tie deterministic parent/route tie-break, dirty reset, clean count update, processing flag reset, and no shard cap behavior.
+- stream4_verification_result: Host `py_compile` passed; host static pytest passed with 13 tests; Docker RTX 3070 run passed `python setup.py build_ext --inplace`, static pytest with 13 tests, Stream2 smoke, Final smoke, Stream3 smoke, and Stream4 smoke.
+- next_required_work_after_stream4: Stream5 isolated CandidateMeta exchange may start next; dispatcher and Stream1 remain blocked until later stages.
+- stream5_stage_start: User approved Stage5 Stream5 isolated CandidateMeta exchange only: no dispatcher, no Stream1, no full depth loop, no Stream3/4 changes.
+
+## 2026-05-16 stage6_dispatcher_skeleton_resume_after_threshold_patch
+
+- prompt_summary: User provided comprehensive Stage6 dispatcher skeleton resumption plan after `pybind int rejects UINT32_MAX` failure.
+- last_failure: pybind binding rejected `UINT32_MAX` literal for `current_threshold`; binding expected signed int instead of uint32_t.
+- last_patch_applied: Changed `dispatcher_skeleton_smoke` test to use `current_threshold=100` instead of `UINT32_MAX`; preserves test intent (`score_key=[5,10,20]` kept, `[1000]` dropped) while working around binding type mismatch.
+- current_action: Rerun host and Docker tests with already-applied patch; verify dispatcher smoke passes without new changes; if failure persists, fix only Stage6 control-plane/smoke/binding issues.
+- hard_constraints_for_fixes: [no_Stream1_changes, no_Stream3_semantics, no_Stream4_semantics, no_Stream5_semantics, no_custom_sort, no_fallback_backend, no_full_depth_loop].
+- allowed_fixes: [python_dispatcher_skeleton_only, test_only_threshold_types, pybind_wrapper_type_mismatch, tensor_shape_stride_layout_mismatch, isolated_function_reordering].
+- host_test_status: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\dispatcher_skeleton_smoke.py` passed with no output; `python -m pytest tests\test_architecture_v6_static.py -q` passed 15/15 tests.
+- docker_build_status: local Windows MSVC not available (`where cl` failed); Docker image `cayley-beam-h100:latest` exists and is ready; pre-compiled `.so` file found at `build/lib.linux-x86_64-cpython-311/beam_engine_ext.cpython-311-x86_64-linux-gnu.so`.
+- continuation_plan: Docker build_ext and all smoke tests via Kaggle Notebook environment due to local Docker mount/path encoding issues on Windows PowerShell terminal.
+- docker_local_gpu_blocker: Docker Desktop on Windows cannot access local NVIDIA GPU; `nvidia-container-cli: device error: 1: unknown device` when trying `docker-compose run --rm beam-2h100 ...`. Host-only RTX3070 CUDA build unavailable; Kaggle 2xT4 GPU remains required for CUDA smoke test verification.
+- stage6_smoke_command_ready: Created `run_stage6_smoke_tests.sh` bash script with full test sequence: build_ext → pytest static → stream2 smoke → final smoke → stream3 smoke → stream4 smoke → stream5 smoke → dispatcher smoke. Ready to paste into Kaggle notebook cell for execution.
+- next_after_green: Execute stage6_smoke_command in Kaggle 2xT4 notebook; if all tests pass (expected output DISPATCHER_SKELETON_SMOKE_OK), update PROJECT_MEMORY with `stage6_dispatcher_skeleton = green_world1`; then proceed to micro-stage pybind uint32_t binding fix; then choose Kaggle 2xT4 Stream5 NCCL continuation or Stream1 CUTLASS.
+- stream5_stage_scope: Implement/test `CandidateMeta` byte-identical exchange with `send_count/send_offset` and `recv_count/recv_offset`; first support `WORLD_SIZE=1`, then `torchrun --standalone --nproc_per_node=2` multi-rank smoke.
+- stream5_implementation_update: Added `BeamEngine.v6_stream5_exchange_candidate_meta(...)`; `WORLD_SIZE=1` path copies `CandidateMeta` records device-to-device; `WORLD_SIZE>1` path exchanges counts and payload bytes through NCCL `ncclSend`/`ncclRecv` using precomputed `send_count/send_offset` and `recv_count/recv_offset`.
+- stream5_test_update: Added `tests/stream5_exchange_smoke.py`; test packs `CandidateMeta` as 32-byte records and checks byte-identical preservation of `hash`, `parent_idx`, `score_key`, and `route_packed`; static test now verifies Stream5 binding contract.
+- stream5_host_verification_result: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\stream5_exchange_smoke.py` passed; `python -m pytest tests\test_architecture_v6_static.py -q` passed with 14 tests.
+- stream5_docker_single_result: Docker RTX 3070 run passed `python setup.py build_ext --inplace`, static pytest with 14 tests, Stream2 smoke, Final smoke, Stream3 smoke, Stream4 smoke, and `WORLD_SIZE=1` Stream5 smoke; output included `STREAM5_EXCHANGE_SMOKE_OK rank=0 world=1`.
+- stream5_multirank_local_limit: `torchrun --standalone --nproc_per_node=2 tests/stream5_exchange_smoke.py` cannot execute NCCL exchange on the local one-visible-GPU RTX 3070 Docker host; raw NCCL failure was `Duplicate GPU detected : rank 0 and rank 1 both on CUDA device 1000`.
+- stream5_multirank_guard: `tests/stream5_exchange_smoke.py` now exits successfully with explicit `STREAM5_EXCHANGE_SMOKE_SKIPPED world=2 visible_cuda_devices=1 reason=NCCL_requires_distinct_visible_GPU_per_rank` when visible CUDA devices are fewer than `WORLD_SIZE`; actual two-GPU NCCL byte exchange remains pending for Kaggle 2xT4 or another host with at least two visible GPUs.
+- next_required_work_after_stream5: Dispatcher skeleton can start only after user accepts the local single-rank Stream5 result and the explicit two-GPU NCCL verification limitation; Stream1 CUTLASS/custom remains blocked until later stage.
+
+## 2026-05-15 tier2b_architecture_revised
+
+- prompt_summary: User clarified TIER 2B architecture: full states should NOT be stored in next_state_pool; only materialized when they become frontier buffer for next depth.
+- key_insight: Current 32GB next_state_pool stores all 2B candidates, but only ~2M become survivors. States should be deferred until finalize_survivors phase.
+- architecture_change: Three-buffer model instead of two:
+  1. **current_state_pool** (immutable, 18GB): Active beam states for current depth
+  2. **compact_metadata** (hot, 4.8GB): K_WORK × 24B (parent_idx, move, score, hash, fingerprint)
+  3. **frontier_buffer** (18GB): Filled ONLY at end of depth with full states, becomes next_state_pool
+- memory_impact: Remove 32GB next_state_pool (full states), replace with 4.8GB compact metadata + 18GB frontier (materialized once/depth). Total: 56GB → 40GB per GPU (~29% savings).
+- pipeline_change: compact metadata flows through dedup/prune/compact → survivors (48MB) → finalize_survivors materializes directly into frontier_buffer. Full states never stored intermediate.
+- risk_mitigation: Stack-local state reconstruction validated in BEAM_DEBUG mode; register pressure profiled with NCU; frontier capacity asserted at finalize.
+- expected_impact: 4.8x memory write reduction (240GB → 50GB per depth).
+- status: TIER 2B proposal revised and ready for approval. Implementation can begin only after user confirms this architecture.
+
+## 2026-05-15 docker_rtx3070_profile_smoke
+
+- prompt_summary: User suggested using Docker for local RTX 3070 testing/profiling instead of installing Windows MSVC toolchain.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- docker_status: Docker Desktop engine reachable with elevated pipe access; `cayley-beam-h100:latest` runs with `--gpus all`; container sees the local RTX 3070 GPU.
+- container_toolchain: container provides Python/Torch/CUDA build environment and Nsight Compute CLI `ncu` version `2025.1.0`; `nsys` is not in PATH in the image, but earlier image path discovery found Nsight Systems binaries under the Nsight Compute install tree.
+- local_run_config: `WORLD_SIZE=1`, `GLOBAL_BEAM_WIDTH=2_000_000`, `TEST_START=8`, `TEST_COUNT=1`, `MAX_DEPTH=5`, `HISTORY_BACKEND=cpu`, `CPU_HISTORY_CHECKPOINT=0`, `INFERENCE_BACKEND=fullbeamnice_static`, `PREPASS_NO_INFERENCE=1`, `PREPASS_DEPTH=5`, `PREPASS_STOP_AT_WIDTH=0`, `PREPASS_DEDUP_FACTOR=1.0`, `TORCH_CUDA_ARCH_LIST=8.6`.
+- local_run_result: Docker smoke run passed; no bucket/hash overflow; prepass used logical capacities and same static arrays; final `FULL_BEAM_START` logged after depth 5.
+- local_timing_result: depth5 uniform prepass on RTX 3070 measured `total_cuda_event_ms=61.139`, `micro_pipeline_ms=36.323`, `final_prune_compact_found_ms=24.051`, `current_size_sum=1_336_269`, `logical_next_limit=2_000_000`.
+- profiler_limitation: Nsight Compute speed-of-light report file was generated earlier but full hardware counters were blocked by `ERR_NVGPUCTRPERM`; Docker Desktop/WSL Nsight Systems report generation did not expose CUDA kernel data in exported stats.
+- code_change_status: documentation memory only; no algorithm/runtime logic modified in this record.
+
+## 2026-05-15 nsight_compute_counters_unlocked
+
+- prompt_summary: User unlocked NVIDIA GPU performance counters and asked how to connect the Nsight Compute GUI for normal analysis.
+- validation_result: `ncu --set basic` inside Docker successfully profiled a PyTorch CUDA kernel; hardware counters are available.
+- project_profile_result: `ncu --set basic --kernel-name regex:kernel_process_score_slot --launch-count 5` successfully profiled the project Stream2 kernel and exported `runtime/nsight/process_score_slot_basic_unlocked.ncu-rep`.
+- key_profile_observation: first profiled launches had small grids (`1`, `3`, `52`, `64`, `64` blocks); Nsight Compute reported low achieved occupancy and launch configuration underutilization for early/small tiles.
+- gui_usage: open existing `.ncu-rep` report from Windows Nsight Compute GUI via `File -> Open File`; direct GUI profiling of Docker requires configuring `Start Activity` target as `docker.exe` with full `docker run ... ncu ...` command, but opening CLI-generated reports is simpler and reproducible.
+- followup_profile_attempt: larger `GLOBAL_BEAM_WIDTH=18_000_000` ncu run failed with driver resource/performance-counter unavailable message while Nsight Compute GUI was open; likely concurrent counter ownership/tool conflict, not project runtime failure; `docker ps` showed no leftover running container.
+- code_change_status: documentation memory only; no algorithm/runtime logic modified in this record.
+
+## 2026-05-15 stream2_ncu_k_expand_tile_ab
+
+- prompt_summary: User closed Nsight Compute GUI and requested running the profile; user also asked to analyze Stream2 behavior and implementation issue.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- sanity_check: `ncu --set basic` on a small PyTorch CUDA workload succeeded after GUI close; performance counters remained unlocked.
+- failed_large_case: plain `GLOBAL_BEAM_WIDTH=18_000_000`, `PREPASS_DEPTH=6`, `PREPASS_DEDUP_FACTOR=1.0` ended with `hash_overflow=598092` at depth 6 because prepass `logical_next_limit` was clamped to `GLOBAL_BEAM_WIDTH`, while inserted candidates exceeded 18M; case is invalid for performance comparison without larger next capacity or shallower depth.
+- baseline_profile: `GLOBAL_BEAM_WIDTH=12_000_000`, `K_EXPAND_TILE=16384`, depth5 profile exported `runtime/nsight/process_score_slot_12m_depth5_basic.ncu-rep`; profiled `kernel_process_score_slot` launches used mostly `grid=64`, `waves_per_sm=0.27`, `achieved_occupancy≈24-26%`, `memory_throughput≈39-41%`, `compute_throughput≈5-8%`, showing small-grid and memory/irregular-work bottleneck.
+- ab_profile: `GLOBAL_BEAM_WIDTH=12_000_000`, `K_EXPAND_TILE=65536`, depth5 profile exported `runtime/nsight/process_score_slot_12m_depth5_k65536_basic.ncu-rep`; profiled launches used mostly `grid=256`, `waves_per_sm=1.07`, `achieved_occupancy≈74-82%`, `memory_throughput≈44-50%`, `compute_throughput≈6-19%`.
+- runtime_ab_result: with `K_EXPAND_TILE=16384`, depth5 `micro_pipeline_ms≈29.56` and `expand_tiles_upper_bound=157`; with `K_EXPAND_TILE=65536`, depth5 `micro_pipeline_ms≈17.46` and `expand_tiles_upper_bound=42`; improvement is about `1.69x` for the Stream2 micro-pipeline on local RTX 3070 single-GPU prepass.
+- analysis_result: primary observed issue is over-tiling into many small `kernel_process_score_slot` launches; small launches underfill SMs and pay launch/sync/event overhead repeatedly; larger tile improves occupancy and reduces launch count, while remaining kernel behavior is still memory/irregular-hash dominated.
+- code_change_status: documentation memory only; no algorithm/runtime logic modified in this record.
+
+## 2026-05-15 full_cuda_graph_profile_sample0_beam14m
+
+- prompt_summary: User requested normal full run on sample/state 0 with profiler only, no debug logging, CUDA Graph enabled, `GLOBAL_BEAM_WIDTH=14_000_000`, `BETA=1.05`, and bottleneck analysis including Tensor Core usage and stream interaction.
+- docs_read_for_startup: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/KAGGLE_T4_DEBUG.md`.
+- config: `WORLD_SIZE=1`, `TEST_START=0`, `TEST_COUNT=1`, `GLOBAL_BEAM_WIDTH=14_000_000`, `BETA=1.05`, `B_MICRO=8192`, `K_EXPAND_TILE=65536`, `INFERENCE_BACKEND=fullbeamnice_static`, `USE_CUDA_GRAPHS=1`, `BEAM_DEBUG=0`, `DEPTH_LOG_EVERY=0`, `DEPTH_TUNING_LOG=0`, `PREPASS_DEPTH=5`, `PREPASS_STOP_AT_WIDTH=1`.
+- nsys_result: bounded Nsight Systems report `runtime/nsight/nsys_full_sample0_beam14m_k65536_cudagraph_120s.nsys-rep` was generated, but exported stats contained CUDA API only and no CUDA GPU trace/kernel data under Docker/WSL.
+- cuda_graph_status: full NCU runs printed `cuda_graph_captured_sum=1`, confirming CUDA Graph was active in the release/no-debug path.
+- cutlass_profile: NCU report `runtime/nsight/cutlass_kernel_regex_full_sample0_beam14m_k65536_cudagraph_basic.ncu-rep` captured generic CUTLASS `Kernel` launches; representative durations were about `204-940 us`, SM throughput about `33-43%`, memory throughput about `17-38%`, occupancy about `15-17%`, registers about `206-224`.
+- tensor_core_metric: NCU report `runtime/nsight/cutlass_tensorcore_metric_sample0_beam14m.ncu-rep` showed Tensor Core HMMA instructions on CUTLASS kernels: `sm__inst_executed_pipe_tensor_op_hmma.sum` values included `6_291_456` and `2_097_152`; Tensor Cores are active.
+- stream2_profile: NCU report `runtime/nsight/process_score_slot_full_sample0_beam14m_k65536_cudagraph_basic.ncu-rep` captured `kernel_process_score_slot` in full CUDA Graph run; representative launches used `grid=256`, `waves_per_sm=1.07`, occupancy about `73-78%`, memory/L2 throughput about `37-49%`, compute throughput about `8-18%`, duration about `437-986 us`.
+- analysis_result: Stream2 `process_score_slot` remains memory/irregular-hash dominated; K_EXPAND_TILE=65536 fixed the small-grid issue but hash/dedup/candidate materialization still has low compute throughput. CUTLASS scorer uses Tensor Cores, but Nsight Systems GPU trace is unavailable in the current Docker/WSL path, so stream overlap cannot be visually proven from timeline yet.
+- code_change_status: documentation memory only; no algorithm/runtime logic modified in this record.
+
+## 2026-05-15 per_stage_ncu_profile_sample0_beam14m
+
+- prompt_summary: User requested per-stage profiling on real run to quantify which actions slow the code and each action contribution.
+- config: `WORLD_SIZE=1`, `TEST_START=0`, `GLOBAL_BEAM_WIDTH=14_000_000`, `BETA=1.05`, `K_EXPAND_TILE=65536`, `USE_CUDA_GRAPHS=1`, `BEAM_DEBUG=0`, `DEPTH_LOG_EVERY=0`, `DEPTH_TUNING_LOG=0`, `PREPASS_DEPTH=5`.
+- artifact_prepass_tail: `runtime/nsight/all_kernels_sample0_beam14m_k65536_cudagraph_basic.ncu-rep`; first 120 captured launches mostly cover prepass/tail before full neural scorer.
+- artifact_full_start: `runtime/nsight/full_solver_kernels_sample0_beam14m_k65536_cudagraph_basic.ncu-rep`; `launch-skip=120`, `launch-count=160`; captured prepass tail plus start of full scorer.
+- prepass_tail_profile: over captured kernels, `kernel_process_score_slot` dominated with `24_062 us` of `29_333 us` (`82.0%`), followed by CUTLASS scorer kernels sampled after full start at `3_550 us` (`12.1%`); this mixed capture is not a clean full-depth percentage.
+- full_solver_start_profile: captured first 20 full neural scorer kernels only; CUTLASS GEMM kernels consumed `3_549.6 us` of `4_444.1 us` (`79.9%`), fill-bias `357.5 us` (`8.1%`), fill-residual-bias `295.5 us` (`6.7%`), final GEMM `204.1 us` (`4.6%`), quantize `24.9 us` (`0.6%`), embed `12.4 us` (`0.3%`).
+- caveat: NCU kernel replay perturbs runtime and launch-skip slicing mixes prepass/full phases; for exact wall-clock per-stage percentages across a whole depth, code-level CUDA event phase timers are still needed because Nsight Systems GPU timeline is unavailable under current Docker/WSL setup.
+- immediate_interpretation: after full scorer starts, Stream1 scorer has nontrivial cost; during prepass/Stream2 processing, `kernel_process_score_slot` remains dominant. The next profiling/code step should add release-safe optional CUDA event timers around scorer, process_score, ingest, threshold, prune, clear, rebuild, compact to get real per-depth wall-clock contribution without NCU replay distortion.
+- code_change_status: documentation memory only; no algorithm/runtime logic modified in this record.
+
 ## 2026-05-15 topk_dedup_short_summary
 
 - prompt_summary: User asked briefly how top-k and deduplication are implemented here.

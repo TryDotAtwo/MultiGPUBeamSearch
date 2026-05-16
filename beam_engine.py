@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import struct
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
@@ -34,26 +35,56 @@ def _flag_enabled(name: str, default: str = "0") -> bool:
     return os.environ.get(name, default).strip().lower() not in {"", "0", "false", "no", "off"}
 
 
+def _pow2_ceil(x: int) -> int:
+    if x <= 1:
+        return 1
+    return 1 << (x - 1).bit_length()
+
+
+def _auto_stream2_params(global_beam_width: int, world_size: int, b_micro: int, fanout: int) -> Dict[str, int]:
+    target_rounds = max(1, int(os.environ.get("TARGET_STREAM2_ROUNDS", "16")))
+    n_local = (global_beam_width + world_size - 1) // world_size
+    k_expand_tile = _pow2_ceil((global_beam_width * fanout + world_size * target_rounds - 1) // (world_size * target_rounds))
+    score_ring_depth = _pow2_ceil((k_expand_tile + b_micro * fanout - 1) // (b_micro * fanout))
+    bucket_cap_fast = _pow2_ceil((k_expand_tile + world_size - 1) // world_size)
+    bucket_cap_safe = _pow2_ceil((k_expand_tile * 3 + 3) // 4)
+    bucket_mode = os.environ.get("AUTO_BUCKET_CAP_MODE", "safe").strip().lower()
+    bucket_cap = bucket_cap_safe if bucket_mode == "safe" else bucket_cap_fast
+    return {
+        "n_local": n_local,
+        "k_expand_tile": k_expand_tile,
+        "score_ring_depth": max(1, score_ring_depth),
+        "bucket_cap_per_peer": max(4096, bucket_cap),
+    }
+
+
+def _env_int_or_auto(name: str, default: str, auto_value: int) -> int:
+    raw = os.environ.get(name, default).strip().lower()
+    if raw in {"", "auto"}:
+        return int(auto_value)
+    return int(raw)
+
+
 def make_default_config() -> Dict[str, Any]:
     world_size = int(os.environ.get("WORLD_SIZE", "1"))
     rank = int(os.environ.get("RANK", "0"))
     b_micro = int(os.environ.get("B_MICRO", "32768"))
+    global_beam_width = int(os.environ.get("GLOBAL_BEAM_WIDTH", str(1 << 16)))
+    fanout = 24
+    auto = _auto_stream2_params(global_beam_width, max(world_size, 1), b_micro, fanout)
     return {
         "world_size": world_size,
         "rank": rank,
-        "global_beam_width": int(os.environ.get("GLOBAL_BEAM_WIDTH", str(1 << 16))),
-        "fanout": 24,
+        "global_beam_width": global_beam_width,
+        "fanout": fanout,
         "state_size_bytes": 120,
         "b_micro": b_micro,
-        "score_ring_depth": int(os.environ.get("SCORE_RING_DEPTH", "16")),
+        "score_ring_depth": _env_int_or_auto("SCORE_RING_DEPTH", "auto", auto["score_ring_depth"]),
         "net_ring_depth": int(os.environ.get("NET_RING_DEPTH", "2")),
         "probe_limit": int(os.environ.get("PROBE_LIMIT", "64")),
-        "bucket_cap_per_peer": int(os.environ.get(
-            "BUCKET_CAP_PER_PEER",
-            str(max(4096, (b_micro * 24 // max(world_size, 1)) * 2)),
-        )),
+        "bucket_cap_per_peer": _env_int_or_auto("BUCKET_CAP_PER_PEER", "auto", auto["bucket_cap_per_peer"]),
         "inference_parallelism": int(os.environ.get("INFERENCE_PARALLELISM", "1")),
-        "k_expand_tile": int(os.environ.get("K_EXPAND_TILE", "0")),
+        "k_expand_tile": _env_int_or_auto("K_EXPAND_TILE", "auto", auto["k_expand_tile"]),
         "torchscript_scorer_paths": os.environ.get("TORCHSCRIPT_SCORER_PATHS", ""),
         "fullbeamnice_dir": os.environ.get("FULLBEAMNICE_DIR", str(PROJECT_DIR / "FullBeamNice")),
         "nn_score_scale": float(os.environ.get("NN_SCORE_SCALE", "1.0")),
@@ -66,11 +97,30 @@ def make_default_config() -> Dict[str, Any]:
         "histogram_period_micro": int(os.environ.get("HISTOGRAM_PERIOD_MICRO", "4")),
         "history_backend": history_backend(),
         "cpu_history_checkpoint": _flag_enabled("CPU_HISTORY_CHECKPOINT"),
+        "stream3_batch_candidates": int(os.environ.get("STREAM3_BATCH_CANDIDATES", "0")),
+        "stream4_batch_candidates": int(os.environ.get("STREAM4_BATCH_CANDIDATES", "0")),
+        "stream4_batch_candidates_per_shard_unit": int(os.environ.get("STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT", "0")),
+        "ring_count": int(os.environ.get("RING_COUNT", "2")),
+        "shard_count": int(os.environ.get("SHARD_COUNT", "1")),
+        "global_spill_capacity": int(os.environ.get("GLOBAL_SPILL_CAPACITY", "0")),
+        "solved_result_capacity": int(os.environ.get("SOLVED_RESULT_CAPACITY", "256")),
+        "global_beam_width_max_safe": int(os.environ.get("GLOBAL_BEAM_WIDTH_MAX_SAFE", "0")),
+        "global_threshold_update_period_shards": int(os.environ.get("GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS", "16")),
     }
 
 
 def build_extension(verbose: bool = True):
-    sources = [str(PROJECT_DIR / "beam_engine.cpp"), str(PROJECT_DIR / "beam_kernels.cu")]
+    sources = [
+        str(PROJECT_DIR / "beam_engine.cpp"),
+        str(PROJECT_DIR / "beam_kernels.cu"),
+        str(PROJECT_DIR / "beam_config.cpp"),
+        str(PROJECT_DIR / "beam_memory.cpp"),
+        str(PROJECT_DIR / "beam_kernels_stream2.cu"),
+        str(PROJECT_DIR / "beam_kernels_final.cu"),
+        str(PROJECT_DIR / "beam_kernels_stream3.cu"),
+        str(PROJECT_DIR / "beam_kernels_stream4.cu"),
+        str(PROJECT_DIR / "beam_dispatcher.cpp"),
+    ]
     hist_cpu = history_backend() == "cpu"
     checkpoint_on = _flag_enabled("CPU_HISTORY_CHECKPOINT")
     debug_on = _flag_enabled("BEAM_DEBUG") or _flag_enabled("ENGINE_DEBUG")
@@ -132,6 +182,10 @@ def allocate_buffers(ext, cfg: Dict[str, Any]) -> Dict[str, torch.Tensor]:
     send_recv_records = int(sizes["send_recv_records"])
     state_size = int(cfg["state_size_bytes"])
     history_records = int(sizes["history_records"])
+    state128_bytes = int(sizes.get("state128_bytes", 128))
+    candidate_meta_bytes = int(sizes.get("candidate_meta_bytes", 32))
+    scratch_pool_bytes = int(sizes.get("scratch_pool_bytes", 0))
+    solved_result_capacity = int(sizes.get("solved_result_capacity", cfg.get("solved_result_capacity", 256)))
 
     buffers = {
         "beam_current": torch.empty((n_local, state_size), dtype=torch.uint8, device=device),
@@ -157,6 +211,14 @@ def allocate_buffers(ext, cfg: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         "history_action": torch.empty((history_records,), dtype=torch.uint8, device=device),
         "history_valid": torch.empty((history_records,), dtype=torch.uint8, device=device),
         "history_depth_cell": torch.empty((1,), dtype=torch.int32, device=device),
+        "current_frontier_states": torch.empty((n_local * state128_bytes,), dtype=torch.uint8, device=device),
+        "scratch_pool": torch.empty((scratch_pool_bytes,), dtype=torch.uint8, device=device),
+        "solved_flag": torch.empty((1,), dtype=torch.int32, device=device),
+        "stop_flag": torch.empty((1,), dtype=torch.int32, device=device),
+        "solved_count": torch.empty((1,), dtype=torch.int32, device=device),
+        "solved_overflow": torch.empty((1,), dtype=torch.int32, device=device),
+        "solved_meta_list": torch.empty((solved_result_capacity * candidate_meta_bytes,), dtype=torch.uint8, device=device),
+        "solved_depth_list": torch.empty((solved_result_capacity,), dtype=torch.int32, device=device),
     }
     if str(cfg.get("inference_backend", "")).strip().lower() == "fullbeamnice_static":
         b_micro = int(cfg["b_micro"])
@@ -172,6 +234,267 @@ def allocate_buffers(ext, cfg: Dict[str, Any]) -> Dict[str, torch.Tensor]:
     return buffers
 
 
+def _v6_pack_meta(lo: int, hi: int, parent_idx: int, score_key: int, route: int) -> bytes:
+    return struct.pack("<QQQII", lo, hi, parent_idx, score_key, route)
+
+
+def _v6_unpack_meta(raw: bytes, idx: int) -> Dict[str, int]:
+    lo, hi, parent_idx, score_key, route = struct.unpack_from("<QQQII", raw, idx * 32)
+    return {
+        "lo": lo,
+        "hi": hi,
+        "parent_idx": parent_idx,
+        "score_key": score_key,
+        "route": route,
+        "source_rank": route >> 16,
+        "owner": (route >> 8) & 0xFF,
+        "move": route & 0xFF,
+    }
+
+
+def _v6_pack_final_request(parent_idx: int, target_local_idx: int, return_rank: int, move: int) -> bytes:
+    return struct.pack("<QIHBB", parent_idx, target_local_idx, return_rank, move, 0)
+
+
+def _v6_make_identity_generators() -> np.ndarray:
+    generators = np.zeros((24, 128), dtype=np.uint8)
+    for move in range(24):
+        generators[move] = np.arange(128, dtype=np.uint8)
+    return generators
+
+
+def _v6_make_zobrist() -> np.ndarray:
+    zobrist = np.zeros((128, 128, 16), dtype=np.uint8)
+    for pos in range(120):
+        for value in range(128):
+            lo = (0x9E3779B97F4A7C15 * (pos + 1) + 0xD1B54A32D192ED03 * (value + 1)) & 0xFFFFFFFFFFFFFFFF
+            hi = (0x94D049BB133111EB * (pos + 3) + 0x2545F4914F6CDD1D * (value + 5)) & 0xFFFFFFFFFFFFFFFF
+            zobrist[pos, value] = np.frombuffer(struct.pack("<QQ", lo, hi), dtype=np.uint8)
+    return zobrist.reshape(-1)
+
+
+def v6_dispatcher_skeleton_single_gpu_smoke(stop_path: bool = False, verbose: bool = False) -> Dict[str, Any]:
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is required for v6 dispatcher skeleton smoke")
+    os.environ.setdefault("INFERENCE_BACKEND", "fullbeamnice_static")
+    ext = build_extension(verbose=verbose)
+    contract = ext.v6_dispatcher_skeleton_single_gpu_smoke()
+    if int(contract["world_size"]) != 1:
+        raise RuntimeError("v6 dispatcher skeleton contract must stay WORLD_SIZE=1")
+
+    device = torch.device("cuda", 0)
+    cfg = make_default_config()
+    cfg.update({
+        "world_size": 1,
+        "rank": 0,
+        "global_beam_width": 64,
+        "b_micro": 2,
+        "score_ring_depth": 1,
+        "net_ring_depth": 1,
+        "bucket_cap_per_peer": 8,
+        "k_expand_tile": 48,
+        "inference_parallelism": 1,
+        "max_depth": 1,
+        "inference_backend": "fullbeamnice_static",
+        "stream3_batch_candidates": 48,
+        "stream4_batch_candidates": 2,
+        "stream4_batch_candidates_per_shard_unit": 2,
+        "shard_count": 1,
+    })
+    buffers = allocate_buffers(ext, cfg)
+    engine = ext.BeamEngine(cfg, buffers, "fullbeamnice_static")
+
+    b_micro = 2
+    move_count = 24
+    stream3_batch_candidates = b_micro * move_count
+    current_threshold = 100
+    parent_base = torch.tensor([0], dtype=torch.int64, device=device)
+    count = torch.tensor([b_micro], dtype=torch.int32, device=device)
+    score = np.full((stream3_batch_candidates,), 1000, dtype=np.int32)
+    score[0] = 10
+    score[1] = 20
+    score[24] = 5
+    score_ring = torch.tensor(score, dtype=torch.int32, device=device)
+
+    states = np.zeros((b_micro, 128), dtype=np.uint8)
+    states[0, :120] = np.arange(120, dtype=np.uint8) % 128
+    states[1, :120] = (np.arange(120, dtype=np.uint8) + 7) % 128
+    current_frontier_states = torch.tensor(states.reshape(-1), dtype=torch.uint8, device=device)
+    generators_np = _v6_make_identity_generators()
+    generators = torch.tensor(generators_np.reshape(-1), dtype=torch.uint8, device=device)
+    central_np = np.zeros((128,), dtype=np.uint8)
+    central_np[:120] = states[0, :120] if stop_path else 127
+    central = torch.tensor(central_np, dtype=torch.uint8, device=device)
+    zobrist = torch.tensor(_v6_make_zobrist(), dtype=torch.uint8, device=device)
+
+    hash_ring = torch.zeros((stream3_batch_candidates * 16,), dtype=torch.uint8, device=device)
+    solved_flag = torch.zeros((1,), dtype=torch.int32, device=device)
+    stop_flag = torch.zeros((1,), dtype=torch.int32, device=device)
+    solved_count = torch.zeros((1,), dtype=torch.int32, device=device)
+    solved_overflow = torch.zeros((1,), dtype=torch.int32, device=device)
+    solved_meta_list = torch.zeros((8 * 32,), dtype=torch.uint8, device=device)
+    solved_depth_list = torch.zeros((8,), dtype=torch.int32, device=device)
+
+    ext.v6_stream2_hash_goal(
+        current_frontier_states,
+        parent_base,
+        count,
+        score_ring,
+        hash_ring,
+        generators,
+        central,
+        zobrist,
+        solved_flag,
+        stop_flag,
+        solved_count,
+        solved_overflow,
+        solved_meta_list,
+        solved_depth_list,
+        8,
+        0,
+        0,
+        0,
+        0,
+        1,
+        b_micro,
+    )
+    torch.cuda.synchronize()
+    if int(solved_flag.cpu()[0]) != 0:
+        solved_raw = solved_meta_list.cpu().numpy().tobytes()
+        first_meta = _v6_unpack_meta(solved_raw, 0) if int(solved_count.cpu()[0]) > 0 else {}
+        return {
+            "path": "stop",
+            "stream2_hash_written": bool(hash_ring[:16].any().item()),
+            "solved_flag": int(solved_flag.cpu()[0]),
+            "stop_flag": int(stop_flag.cpu()[0]),
+            "solved_count": int(solved_count.cpu()[0]),
+            "solved_overflow": int(solved_overflow.cpu()[0]),
+            "first_solved_score_key": int(first_meta.get("score_key", -1)),
+            "stream3_launched": False,
+            "stream4_launched": False,
+            "final_launched": False,
+            "solved_list_copied_to_cpu": True,
+            "stream1_production_called": False,
+            "fallback_backend_called": False,
+        }
+
+    stream3_key_a = torch.zeros((stream3_batch_candidates * 16,), dtype=torch.uint8, device=device)
+    stream3_key_b = torch.zeros_like(stream3_key_a)
+    stream3_val_a = torch.zeros((stream3_batch_candidates,), dtype=torch.int64, device=device)
+    stream3_val_b = torch.zeros_like(stream3_val_a)
+    compact_count = torch.zeros((1,), dtype=torch.int32, device=device)
+    ext.v6_stream3_pack_threshold_compact(
+        score_ring, hash_ring, parent_base, count, stream3_key_a, stream3_val_a, compact_count,
+        current_threshold, 0, 1, b_micro, stream3_batch_candidates,
+    )
+    torch.cuda.synchronize()
+    compact_n = int(compact_count.cpu()[0])
+    temp_storage = torch.empty((int(ext.v6_stream3_sort_temp_bytes(compact_n)),), dtype=torch.uint8, device=device)
+    ext.v6_stream3_sort_pairs(temp_storage, stream3_key_a, stream3_key_b, stream3_val_a, stream3_val_b, compact_n)
+    unique_key = torch.zeros((stream3_batch_candidates * 16,), dtype=torch.uint8, device=device)
+    unique_val = torch.zeros((stream3_batch_candidates,), dtype=torch.int64, device=device)
+    unique_count = torch.zeros((1,), dtype=torch.int32, device=device)
+    ext.v6_stream3_dedup_sorted(stream3_key_b, stream3_val_b, unique_key, unique_val, unique_count, compact_n)
+    torch.cuda.synchronize()
+    unique_n = int(unique_count.cpu()[0])
+
+    local_pending_buffer = torch.zeros((stream3_batch_candidates * 32,), dtype=torch.uint8, device=device)
+    remote_send_buffer = torch.zeros_like(local_pending_buffer)
+    local_count = torch.zeros((1,), dtype=torch.int32, device=device)
+    send_count = torch.zeros((1,), dtype=torch.int32, device=device)
+    send_offset = torch.zeros((2,), dtype=torch.int32, device=device)
+    ext.v6_stream3_restore_split(
+        unique_key, unique_val, parent_base, local_pending_buffer, remote_send_buffer,
+        local_count, send_count, send_offset, unique_n, 0, 1, 0, 1, b_micro,
+    )
+    torch.cuda.synchronize()
+    local_n = int(local_count.cpu()[0])
+
+    remote_recv_buffer = torch.zeros_like(local_pending_buffer)
+    recv_count = torch.empty((1,), dtype=torch.int32, device=device)
+    recv_offset = torch.empty((2,), dtype=torch.int32, device=device)
+    local_bytes = local_pending_buffer[:local_n * 32].clone()
+    send_count_for_copy = torch.tensor([local_n], dtype=torch.int32, device=device)
+    send_offset_for_copy = torch.tensor([0, local_n], dtype=torch.int32, device=device)
+    engine.v6_stream5_exchange_candidate_meta(
+        local_pending_buffer, remote_recv_buffer,
+        send_count_for_copy, send_offset_for_copy,
+        recv_count, recv_offset,
+    )
+    torch.cuda.synchronize()
+    stream5_byte_identical = bool(torch.equal(local_bytes, remote_recv_buffer[:local_n * 32]))
+
+    survivor_shard = torch.zeros((max(2 * local_n, 1) * 32,), dtype=torch.uint8, device=device)
+    if local_n > 0:
+        survivor_shard[:local_n * 32].copy_(local_pending_buffer[:local_n * 32])
+    dirty_count = torch.tensor([local_n], dtype=torch.int32, device=device)
+    clean_count = torch.tensor([0], dtype=torch.int32, device=device)
+    processing_flag = torch.tensor([0], dtype=torch.uint8, device=device)
+
+    input_count = local_n
+    stream4_key_a = torch.zeros((max(input_count, 1) * 16,), dtype=torch.uint8, device=device)
+    stream4_key_b = torch.zeros_like(stream4_key_a)
+    stream4_val_a = torch.zeros((max(input_count, 1) * 32,), dtype=torch.uint8, device=device)
+    stream4_val_b = torch.zeros_like(stream4_val_a)
+    stream4_compact_count = torch.zeros((1,), dtype=torch.int32, device=device)
+    ext.v6_stream4_threshold_compact(survivor_shard, stream4_key_a, stream4_val_a, stream4_compact_count, input_count, current_threshold)
+    torch.cuda.synchronize()
+    stream4_compact_n = int(stream4_compact_count.cpu()[0])
+    stream4_temp = torch.empty((int(ext.v6_stream4_sort_temp_bytes(stream4_compact_n)),), dtype=torch.uint8, device=device)
+    ext.v6_stream4_sort_pairs(stream4_temp, stream4_key_a, stream4_key_b, stream4_val_a, stream4_val_b, stream4_compact_n)
+    clean_tmp = torch.zeros((max(input_count, 1) * 32,), dtype=torch.uint8, device=device)
+    new_clean_count = torch.zeros((1,), dtype=torch.int32, device=device)
+    ext.v6_stream4_dedup_sorted(stream4_key_b, stream4_val_b, clean_tmp, new_clean_count, stream4_compact_n)
+    torch.cuda.synchronize()
+    clean_n = int(new_clean_count.cpu()[0])
+    ext.v6_stream4_write_clean(survivor_shard, clean_tmp, clean_count, dirty_count, processing_flag, clean_n)
+    torch.cuda.synchronize()
+
+    clean_raw = survivor_shard.cpu().numpy().tobytes()
+    final_requests = []
+    clean_metas = []
+    for i in range(clean_n):
+        meta = _v6_unpack_meta(clean_raw, i)
+        clean_metas.append(meta)
+        final_requests.append(_v6_pack_final_request(meta["parent_idx"], i, 0, meta["move"]))
+    final_request_buffer = torch.tensor(np.frombuffer(b"".join(final_requests), dtype=np.uint8).copy(), dtype=torch.uint8, device=device)
+    final_response_buffer = torch.zeros((max(clean_n, 1) * 128,), dtype=torch.uint8, device=device)
+    next_frontier_states_tmp = torch.zeros((max(clean_n, 1) * 128,), dtype=torch.uint8, device=device)
+    ext.v6_final_materialize(current_frontier_states, final_request_buffer, generators, final_response_buffer, clean_n)
+    torch.cuda.synchronize()
+    response_raw_before_scatter = final_response_buffer.cpu().numpy().tobytes()
+    ext.v6_final_scatter_responses(final_response_buffer, next_frontier_states_tmp, clean_n)
+    torch.cuda.synchronize()
+    current_frontier_states[:clean_n * 128].copy_(next_frontier_states_tmp[:clean_n * 128])
+    torch.cuda.synchronize()
+    next_raw = next_frontier_states_tmp.cpu().numpy().tobytes()
+    current_raw = current_frontier_states.cpu().numpy().tobytes()
+
+    return {
+        "path": "normal",
+        "stream2_hash_written": bool(hash_ring[:16].any().item()),
+        "stream3_launched": True,
+        "stream4_launched": True,
+        "final_launched": True,
+        "compact_count": compact_n,
+        "unique_count": unique_n,
+        "local_count": local_n,
+        "stream5_byte_identical": stream5_byte_identical,
+        "collector_dirty_count_initial": local_n,
+        "clean_count": int(clean_count.cpu()[0]),
+        "dirty_count": int(dirty_count.cpu()[0]),
+        "processing_flag": int(processing_flag.cpu()[0]),
+        "final_count": clean_n,
+        "final_response_target0": struct.unpack_from("<I", response_raw_before_scatter, 120)[0] if clean_n else -1,
+        "next_padding_zero": all(b == 0 for b in next_raw[120:128]) if clean_n else True,
+        "current_frontier_updated": current_raw[:clean_n * 128] == next_raw[:clean_n * 128],
+        "first_clean_score_key": clean_metas[0]["score_key"] if clean_metas else -1,
+        "first_clean_move": clean_metas[0]["move"] if clean_metas else -1,
+        "stream1_production_called": False,
+        "fallback_backend_called": False,
+    }
+
+
 def create_nccl_id(ext, cfg: Dict[str, Any]) -> bytes:
     if cfg["world_size"] <= 1:
         return b""
@@ -185,6 +508,8 @@ def create_nccl_id(ext, cfg: Dict[str, Any]) -> bytes:
 def configure_engine(ext, cfg: Dict[str, Any], buffers: Dict[str, torch.Tensor]):
     backend = str(cfg.get("inference_backend", "")).strip().lower()
     allow_ts = os.environ.get("ALLOW_TORCHSCRIPT_SCORER", "").strip().lower() in {"1", "true", "yes", "on"}
+    if backend != "fullbeamnice_static":
+        raise ValueError("Target architecture v6 production path requires INFERENCE_BACKEND=fullbeamnice_static")
     if backend == "torchscript_ensemble" and not allow_ts:
         raise ValueError(
             "INFERENCE_BACKEND=torchscript_ensemble is disabled by default (no accidental TorchScript hot path). "

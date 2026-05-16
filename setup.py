@@ -22,7 +22,7 @@ setup(
     ext_modules=[
         CUDAExtension(
             name="beam_engine_ext",
-            sources=["beam_engine.cpp", "beam_kernels.cu"],
+            sources=["beam_engine.cpp", "beam_kernels.cu", "beam_config.cpp", "beam_memory.cpp", "beam_kernels_stream2.cu", "beam_kernels_final.cu", "beam_kernels_stream3.cu", "beam_kernels_stream4.cu", "beam_dispatcher.cpp"],
             extra_compile_args={
                 "cxx": ["-O3", "-std=c++17"],
                 "nvcc": ["-O3", "--use_fast_math", "-lineinfo", "-std=c++17"],

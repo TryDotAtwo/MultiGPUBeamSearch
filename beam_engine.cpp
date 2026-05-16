@@ -14,6 +14,8 @@
 #include <stdexcept>
 #include <algorithm>
 #include "beam_engine_common.hpp"
+#include "beam_config.hpp"
+#include "beam_memory.hpp"
 #include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDAGuard.h>
 
@@ -73,6 +75,130 @@ extern "C" void launch_clear_step_state(int32_t*, uint32_t*, int32_t*, uint8_t*,
 extern "C" void launch_check_current_solved(const uint8_t*, const uint8_t*, int32_t*, int, int, cudaStream_t);
 extern "C" void upload_action_permutation_table(const uint8_t*, int, int);
 extern "C" void upload_central_state(const uint8_t*, int);
+extern "C" void launch_v6_stream2_hash_goal(
+    const beam_v6::State128*,
+    const uint64_t*,
+    const uint32_t*,
+    const uint32_t*,
+    beam_v6::Hash128*,
+    const uint8_t*,
+    const uint8_t*,
+    const beam_v6::Hash128*,
+    uint32_t*,
+    uint32_t*,
+    uint32_t*,
+    uint32_t*,
+    beam_v6::CandidateMeta*,
+    uint32_t*,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    cudaStream_t);
+extern "C" void launch_v6_final_materialize(
+    const beam_v6::State128*,
+    const beam_v6::FinalRequest*,
+    const uint8_t*,
+    beam_v6::FinalResponse*,
+    uint32_t,
+    cudaStream_t);
+extern "C" void launch_v6_final_scatter_responses(
+    const beam_v6::FinalResponse*,
+    beam_v6::State128*,
+    uint32_t,
+    cudaStream_t);
+namespace beam_v6 { struct Hash128Key; }
+extern "C" void launch_v6_stream3_pack_threshold_compact(
+    const uint32_t*,
+    const beam_v6::Hash128*,
+    const uint64_t*,
+    const uint32_t*,
+    beam_v6::Hash128Key*,
+    uint64_t*,
+    uint32_t*,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    cudaStream_t);
+extern "C" void launch_v6_stream3_sort_pairs(
+    void*,
+    size_t&,
+    const beam_v6::Hash128Key*,
+    beam_v6::Hash128Key*,
+    const uint64_t*,
+    uint64_t*,
+    int,
+    cudaStream_t);
+extern "C" void launch_v6_stream3_dedup_sorted(
+    const beam_v6::Hash128Key*,
+    const uint64_t*,
+    beam_v6::Hash128*,
+    uint64_t*,
+    uint32_t*,
+    uint32_t,
+    cudaStream_t);
+extern "C" void launch_v6_stream3_restore_split(
+    const beam_v6::Hash128*,
+    const uint64_t*,
+    const uint64_t*,
+    beam_v6::CandidateMeta*,
+    beam_v6::CandidateMeta*,
+    uint32_t*,
+    uint32_t*,
+    uint32_t*,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    uint32_t,
+    cudaStream_t);
+namespace beam_v6 { struct Stream4HashKey; }
+extern "C" void launch_v6_stream4_threshold_compact(
+    const beam_v6::CandidateMeta*,
+    beam_v6::Stream4HashKey*,
+    beam_v6::CandidateMeta*,
+    uint32_t*,
+    uint32_t,
+    uint32_t,
+    cudaStream_t);
+extern "C" void launch_v6_stream4_sort_pairs(
+    void*,
+    size_t&,
+    const beam_v6::Stream4HashKey*,
+    beam_v6::Stream4HashKey*,
+    const beam_v6::CandidateMeta*,
+    beam_v6::CandidateMeta*,
+    int,
+    cudaStream_t);
+extern "C" void launch_v6_stream4_dedup_sorted(
+    const beam_v6::Stream4HashKey*,
+    const beam_v6::CandidateMeta*,
+    beam_v6::CandidateMeta*,
+    uint32_t*,
+    uint32_t,
+    cudaStream_t);
+extern "C" void launch_v6_stream4_write_clean(
+    beam_v6::CandidateMeta*,
+    const beam_v6::CandidateMeta*,
+    uint32_t*,
+    uint32_t*,
+    uint8_t*,
+    uint32_t,
+    cudaStream_t);
+
+// Helper: compute smallest power-of-2 >= x
+static inline int64_t pow2_ceil(int64_t x) {
+    if (x <= 1) return 1LL;
+    // bit_position of (x-1): highest set bit position
+    int bit_pos = 63 - __builtin_clzll(x - 1);
+    return 1LL << (bit_pos + 1);
+}
 
 struct EngineConfig {
     int world_size = 1;
@@ -83,7 +209,7 @@ struct EngineConfig {
     int score_ring_depth = 64;
     int net_ring_depth = 3;
     int probe_limit = 32;
-    int bucket_cap_per_peer = 65536;
+    int bucket_cap_per_peer = 0;        // 0 = auto-derive (SAFE)
     int inference_parallelism = 1;
     int k_expand_tile = 0;
     float nn_score_scale = 1.0f;
@@ -93,11 +219,26 @@ struct EngineConfig {
     double beta = 1.10;
     double hash_load_factor = 0.60;
     int max_depth = 1;
+    int64_t stream3_batch_candidates = 0;
+    int64_t stream4_batch_candidates = 0;
+    int64_t stream4_batch_candidates_per_shard_unit = 0;
+    int ring_count = 2;
+    int shard_count = 1;
+    int64_t global_spill_capacity = 0;
+    int64_t solved_result_capacity = 256;
+    int64_t global_beam_width_max_safe = 0;
+    int global_threshold_update_period_shards = 16;
 
     int64_t n_local = 0;
     int64_t k_keep = 0;
     int64_t k_work = 0;
     int64_t hash_capacity = 0;
+    
+    // Derived bucket sizes (for logging)
+    int64_t bucket_cap_per_peer_safe = 0;
+    double send_buckets_gib = 0.0;
+    double recv_buckets_gib = 0.0;
+    double total_bucket_gib = 0.0;
 
     void derive() {
         n_local = (global_beam_width + world_size - 1) / world_size;
@@ -108,6 +249,68 @@ struct EngineConfig {
         if (k_work < k_keep) k_work = k_keep;
         hash_capacity = static_cast<int64_t>(static_cast<double>(k_work) / hash_load_factor + 0.5);
         if (hash_capacity < 1024) hash_capacity = 1024;
+
+        // Formula: K_EXPAND_TILE = pow2_ceil(
+        //     ceil(GLOBAL_BEAM_WIDTH * FANOUT / (WORLD_SIZE * TARGET_STREAM2_ROUNDS))
+        // )
+        // Auto-derive K_EXPAND_TILE if not explicitly set (0 = auto)
+        if (k_expand_tile == 0) {
+            const int TARGET_STREAM2_ROUNDS = 16;
+            int64_t numerator = global_beam_width * static_cast<int64_t>(fanout);
+            int64_t denominator = static_cast<int64_t>(world_size) * TARGET_STREAM2_ROUNDS;
+            int64_t target_k_expand = (numerator + denominator - 1) / denominator;
+            k_expand_tile = static_cast<int>(pow2_ceil(target_k_expand));
+        }
+
+        // Formula: SCORE_RING_DEPTH = pow2_ceil(
+        //     ceil(K_EXPAND_TILE / (B_MICRO * FANOUT))
+        // )
+        // Auto-derive SCORE_RING_DEPTH if not explicitly set (0 = auto)
+        if (score_ring_depth == 0) {
+            int64_t numerator = static_cast<int64_t>(k_expand_tile);
+            int64_t denominator = static_cast<int64_t>(b_micro) * static_cast<int64_t>(fanout);
+            int64_t target_depth = (numerator + denominator - 1) / denominator;
+            score_ring_depth = static_cast<int>(pow2_ceil(target_depth));
+            if (score_ring_depth < 1) score_ring_depth = 1;
+        }
+
+        // Formula: BUCKET_CAP_PER_PEER = min(
+        //     pow2_ceil(max(65536, K_EXPAND_TILE / 16)),
+        //     2^20
+        // )
+        // BUCKET_CAP_PER_PEER_SAFE = min(
+        //     pow2_ceil(max(131072, K_EXPAND_TILE / 8)),
+        //     2^20
+        // )
+        const int64_t MAX_BUCKET_CAPACITY = 1LL << 20;  // 2^20 = 1M
+        
+        // Default (SAFE) derivation if bucket_cap_per_peer not explicitly set (0 = auto)
+        if (bucket_cap_per_peer == 0) {
+            int64_t base_safe = std::max<int64_t>(131072, static_cast<int64_t>(k_expand_tile) / 8);
+            bucket_cap_per_peer_safe = static_cast<int64_t>(pow2_ceil(base_safe));
+            if (bucket_cap_per_peer_safe > MAX_BUCKET_CAPACITY) {
+                bucket_cap_per_peer_safe = MAX_BUCKET_CAPACITY;
+            }
+            bucket_cap_per_peer = static_cast<int>(bucket_cap_per_peer_safe);
+        } else {
+            // User-provided explicit value, compute SAFE variant for logging
+            int64_t base_safe = std::max<int64_t>(131072, static_cast<int64_t>(k_expand_tile) / 8);
+            bucket_cap_per_peer_safe = static_cast<int64_t>(pow2_ceil(base_safe));
+            if (bucket_cap_per_peer_safe > MAX_BUCKET_CAPACITY) {
+                bucket_cap_per_peer_safe = MAX_BUCKET_CAPACITY;
+            }
+        }
+
+        // Compute bucket memory sizes for logging
+        // Each peer has bucket_cap_per_peer slots, each slot is CandidateRecord (160 bytes)
+        int64_t bytes_per_candidate = 160;  // CandidateRecord size
+        int64_t send_buckets_bytes = static_cast<int64_t>(bucket_cap_per_peer) * bytes_per_candidate * static_cast<int64_t>(world_size - 1);
+        int64_t recv_buckets_bytes = static_cast<int64_t>(bucket_cap_per_peer) * bytes_per_candidate * static_cast<int64_t>(world_size - 1);
+        int64_t total_bucket_bytes = send_buckets_bytes + recv_buckets_bytes;
+        
+        send_buckets_gib = static_cast<double>(send_buckets_bytes) / (1024.0 * 1024.0 * 1024.0);
+        recv_buckets_gib = static_cast<double>(recv_buckets_bytes) / (1024.0 * 1024.0 * 1024.0);
+        total_bucket_gib = static_cast<double>(total_bucket_bytes) / (1024.0 * 1024.0 * 1024.0);
     }
 };
 
@@ -131,6 +334,15 @@ static EngineConfig config_from_dict(const py::dict& d) {
     if (d.contains("beta")) c.beta = d["beta"].cast<double>();
     if (d.contains("hash_load_factor")) c.hash_load_factor = d["hash_load_factor"].cast<double>();
     if (d.contains("max_depth")) c.max_depth = d["max_depth"].cast<int>();
+    if (d.contains("stream3_batch_candidates")) c.stream3_batch_candidates = d["stream3_batch_candidates"].cast<int64_t>();
+    if (d.contains("stream4_batch_candidates")) c.stream4_batch_candidates = d["stream4_batch_candidates"].cast<int64_t>();
+    if (d.contains("stream4_batch_candidates_per_shard_unit")) c.stream4_batch_candidates_per_shard_unit = d["stream4_batch_candidates_per_shard_unit"].cast<int64_t>();
+    if (d.contains("ring_count")) c.ring_count = d["ring_count"].cast<int>();
+    if (d.contains("shard_count")) c.shard_count = d["shard_count"].cast<int>();
+    if (d.contains("global_spill_capacity")) c.global_spill_capacity = d["global_spill_capacity"].cast<int64_t>();
+    if (d.contains("solved_result_capacity")) c.solved_result_capacity = d["solved_result_capacity"].cast<int64_t>();
+    if (d.contains("global_beam_width_max_safe")) c.global_beam_width_max_safe = d["global_beam_width_max_safe"].cast<int64_t>();
+    if (d.contains("global_threshold_update_period_shards")) c.global_threshold_update_period_shards = d["global_threshold_update_period_shards"].cast<int>();
     if (c.max_depth < 1) c.max_depth = 1;
     if (c.inference_parallelism < 1) c.inference_parallelism = 1;
     if (c.inference_parallelism > c.score_ring_depth) c.inference_parallelism = c.score_ring_depth;
@@ -140,6 +352,33 @@ static EngineConfig config_from_dict(const py::dict& d) {
     }
     c.derive();
     return c;
+}
+
+static beam_v6::TargetConfig target_config_from_engine(const EngineConfig& cfg) {
+    beam_v6::TargetConfig target;
+    target.b_micro = cfg.b_micro;
+    target.inference_parallelism = cfg.inference_parallelism;
+    target.stream3_batch_candidates = cfg.stream3_batch_candidates > 0
+        ? cfg.stream3_batch_candidates
+        : static_cast<int64_t>(cfg.score_ring_depth) * cfg.b_micro * cfg.fanout;
+    target.stream4_batch_candidates = cfg.stream4_batch_candidates > 0
+        ? cfg.stream4_batch_candidates
+        : target.stream3_batch_candidates;
+    target.stream4_batch_candidates_per_shard_unit = cfg.stream4_batch_candidates_per_shard_unit > 0
+        ? cfg.stream4_batch_candidates_per_shard_unit
+        : target.stream4_batch_candidates;
+    target.ring_count = cfg.ring_count;
+    target.world_size = cfg.world_size;
+    target.local_rank = cfg.rank;
+    target.shard_count = cfg.shard_count;
+    target.global_spill_capacity = cfg.global_spill_capacity > 0
+        ? cfg.global_spill_capacity
+        : target.stream4_batch_candidates;
+    target.solved_result_capacity = cfg.solved_result_capacity;
+    target.user_global_beam_width = cfg.global_beam_width;
+    target.global_beam_width_max_safe = cfg.global_beam_width_max_safe;
+    target.global_threshold_update_period_shards = cfg.global_threshold_update_period_shards;
+    return beam_v6::derive_target_config(target);
 }
 
 static void check_cuda_tensor(const torch::Tensor& t, const char* name) {
@@ -155,6 +394,11 @@ static void check_cuda_half_tensor(const torch::Tensor& t, const char* name) {
 static void check_cuda_i32_tensor(const torch::Tensor& t, const char* name) {
     check_cuda_tensor(t, name);
     if (t.scalar_type() != at::kInt) throw std::runtime_error(std::string(name) + " must be torch.int32");
+}
+
+static void check_cuda_i64_tensor(const torch::Tensor& t, const char* name) {
+    check_cuda_tensor(t, name);
+    if (t.scalar_type() != at::kLong) throw std::runtime_error(std::string(name) + " must be torch.int64");
 }
 
 static py::bytes nccl_unique_id_to_bytes(const ncclUniqueId& id) {
@@ -474,6 +718,26 @@ public:
         CUDA_CHECK(cudaEventCreate(&timing_after_clear_));
         CUDA_CHECK(cudaEventCreate(&timing_after_micro_));
         CUDA_CHECK(cudaEventCreate(&timing_after_final_));
+        
+        // Log bucket configuration
+        if (cfg_.rank == 0) {
+            const beam_v6::TargetConfig target_cfg = target_config_from_engine(cfg_);
+            std::cerr << "[BeamEngine] Config Summary:" << std::endl
+                      << "  K_EXPAND_TILE: " << cfg_.k_expand_tile << std::endl
+                      << "  SCORE_RING_DEPTH: " << cfg_.score_ring_depth << std::endl
+                      << "  BUCKET_CAP_PER_PEER: " << cfg_.bucket_cap_per_peer << std::endl
+                      << "  BUCKET_CAP_PER_PEER_SAFE: " << cfg_.bucket_cap_per_peer_safe << std::endl
+                      << "  USER_GLOBAL_BEAM_WIDTH: " << target_cfg.user_global_beam_width << std::endl
+                      << "  GLOBAL_BEAM_WIDTH_EFFECTIVE: " << target_cfg.global_beam_width_effective << std::endl
+                      << "  GLOBAL_BEAM_WIDTH_MAX_SAFE: " << target_cfg.global_beam_width_max_safe << std::endl
+                      << "  BEAM_WIDTH_ALIGNMENT: " << target_cfg.beam_width_alignment << std::endl
+                      << "  SCORE_SCALE: " << target_cfg.score_scale << std::endl
+                      << "  SCORE_MAX_KEY: " << target_cfg.score_max_key << std::endl
+                      << "  SCORE_BIN_COUNT: " << target_cfg.score_bin_count << std::endl
+                      << "  send_buckets: " << cfg_.send_buckets_gib << " GiB" << std::endl
+                      << "  recv_buckets: " << cfg_.recv_buckets_gib << " GiB" << std::endl
+                      << "  total_buckets: " << cfg_.total_bucket_gib << " GiB" << std::endl;
+        }
     }
 
     ~BeamEngine() {
@@ -506,6 +770,98 @@ public:
         ncclUniqueId id = nccl_unique_id_from_bytes(unique_id_bytes);
         NCCL_CHECK(ncclCommInitRank(&comm_, cfg_.world_size, id, cfg_.rank));
         nccl_inited_ = true;
+    }
+
+    void v6_stream5_exchange_candidate_meta(
+        torch::Tensor remote_send_buffer,
+        torch::Tensor remote_recv_buffer,
+        torch::Tensor send_count,
+        torch::Tensor send_offset,
+        torch::Tensor recv_count,
+        torch::Tensor recv_offset) {
+        check_cuda_tensor(remote_send_buffer, "remote_send_buffer");
+        check_cuda_tensor(remote_recv_buffer, "remote_recv_buffer");
+        check_cuda_i32_tensor(send_count, "send_count");
+        check_cuda_i32_tensor(send_offset, "send_offset");
+        check_cuda_i32_tensor(recv_count, "recv_count");
+        check_cuda_i32_tensor(recv_offset, "recv_offset");
+
+        cudaStream_t stream = stream_net_;
+        beam_v6::CandidateMeta* send_base = reinterpret_cast<beam_v6::CandidateMeta*>(remote_send_buffer.data_ptr<uint8_t>());
+        beam_v6::CandidateMeta* recv_base = reinterpret_cast<beam_v6::CandidateMeta*>(remote_recv_buffer.data_ptr<uint8_t>());
+        int32_t* send_count_base = send_count.data_ptr<int32_t>();
+        int32_t* recv_count_base = recv_count.data_ptr<int32_t>();
+        int32_t* send_offset_base = send_offset.data_ptr<int32_t>();
+        int32_t* recv_offset_base = recv_offset.data_ptr<int32_t>();
+
+        if (cfg_.world_size <= 1) {
+            CUDA_CHECK(cudaMemcpyAsync(recv_count_base, send_count_base, sizeof(int32_t), cudaMemcpyDeviceToDevice, stream));
+            CUDA_CHECK(cudaMemcpyAsync(recv_offset_base, send_offset_base, 2 * sizeof(int32_t), cudaMemcpyDeviceToDevice, stream));
+            int32_t host_count = 0;
+            int32_t host_send_offset = 0;
+            int32_t host_recv_offset = 0;
+            CUDA_CHECK(cudaMemcpyAsync(&host_count, send_count_base, sizeof(int32_t), cudaMemcpyDeviceToHost, stream));
+            CUDA_CHECK(cudaMemcpyAsync(&host_send_offset, send_offset_base, sizeof(int32_t), cudaMemcpyDeviceToHost, stream));
+            CUDA_CHECK(cudaMemcpyAsync(&host_recv_offset, recv_offset_base, sizeof(int32_t), cudaMemcpyDeviceToHost, stream));
+            CUDA_CHECK(cudaStreamSynchronize(stream));
+            if (host_count > 0) {
+                CUDA_CHECK(cudaMemcpyAsync(
+                    recv_base + host_recv_offset,
+                    send_base + host_send_offset,
+                    static_cast<size_t>(host_count) * sizeof(beam_v6::CandidateMeta),
+                    cudaMemcpyDeviceToDevice,
+                    stream));
+            }
+            CUDA_CHECK(cudaStreamSynchronize(stream));
+            return;
+        }
+
+        if (!nccl_inited_) {
+            throw std::runtime_error("v6 Stream5 exchange requires initialized NCCL for WORLD_SIZE > 1");
+        }
+
+        NCCL_CHECK(ncclGroupStart());
+        for (int peer = 0; peer < cfg_.world_size; ++peer) {
+            if (peer == cfg_.rank) continue;
+            NCCL_CHECK(ncclSend(send_count_base + peer, 1, ncclInt32, peer, comm_, stream));
+            NCCL_CHECK(ncclRecv(recv_count_base + peer, 1, ncclInt32, peer, comm_, stream));
+        }
+        NCCL_CHECK(ncclGroupEnd());
+        CUDA_CHECK(cudaStreamSynchronize(stream));
+
+        auto send_count_cpu = send_count.cpu();
+        auto recv_count_cpu = recv_count.cpu();
+        auto send_offset_cpu = send_offset.cpu();
+        auto recv_offset_cpu = recv_offset.cpu();
+        const int32_t* sc = send_count_cpu.data_ptr<int32_t>();
+        const int32_t* rc = recv_count_cpu.data_ptr<int32_t>();
+        const int32_t* so = send_offset_cpu.data_ptr<int32_t>();
+        const int32_t* ro = recv_offset_cpu.data_ptr<int32_t>();
+
+        NCCL_CHECK(ncclGroupStart());
+        for (int peer = 0; peer < cfg_.world_size; ++peer) {
+            if (peer == cfg_.rank) continue;
+            if (sc[peer] > 0) {
+                NCCL_CHECK(ncclSend(
+                    send_base + so[peer],
+                    static_cast<size_t>(sc[peer]) * sizeof(beam_v6::CandidateMeta),
+                    ncclUint8,
+                    peer,
+                    comm_,
+                    stream));
+            }
+            if (rc[peer] > 0) {
+                NCCL_CHECK(ncclRecv(
+                    recv_base + ro[peer],
+                    static_cast<size_t>(rc[peer]) * sizeof(beam_v6::CandidateMeta),
+                    ncclUint8,
+                    peer,
+                    comm_,
+                    stream));
+            }
+        }
+        NCCL_CHECK(ncclGroupEnd());
+        CUDA_CHECK(cudaStreamSynchronize(stream));
     }
 
     void load_torchscript_ensemble(const std::vector<std::string>& module_paths) {
@@ -1317,13 +1673,24 @@ py::bytes get_nccl_unique_id() {
     return nccl_unique_id_to_bytes(id);
 }
 
+py::dict v6_dispatcher_skeleton_single_gpu_smoke_contract();
+
 py::dict derive_sizes(py::dict cfg_dict) {
     EngineConfig cfg = config_from_dict(cfg_dict);
+    beam_v6::TargetConfig target_cfg = target_config_from_engine(cfg);
+    beam_v6::ScratchLayouts target_layouts = beam_v6::derive_scratch_layouts(target_cfg);
     py::dict d;
     d["n_local"] = cfg.n_local;
     d["k_keep"] = cfg.k_keep;
     d["k_work"] = cfg.k_work;
     d["hash_capacity"] = cfg.hash_capacity;
+    d["k_expand_tile"] = cfg.k_expand_tile;
+    d["score_ring_depth"] = cfg.score_ring_depth;
+    d["bucket_cap_per_peer"] = cfg.bucket_cap_per_peer;
+    d["bucket_cap_per_peer_safe"] = cfg.bucket_cap_per_peer_safe;
+    d["send_buckets_gib"] = cfg.send_buckets_gib;
+    d["recv_buckets_gib"] = cfg.recv_buckets_gib;
+    d["total_bucket_gib"] = cfg.total_bucket_gib;
     d["score_ring_elements"] = static_cast<int64_t>(cfg.score_ring_depth) * cfg.b_micro * cfg.fanout;
     d["candidate_record_bytes"] = static_cast<int>(sizeof(CandidateRecord));
     d["beam_meta_bytes"] = static_cast<int>(sizeof(BeamMeta));
@@ -1337,17 +1704,400 @@ py::dict derive_sizes(py::dict cfg_dict) {
     d["history_backend_cpu"] = 0;
 #endif
     d["inference_parallelism"] = cfg.inference_parallelism;
-    d["k_expand_tile"] = cfg.k_expand_tile;
+    d["state128_bytes"] = static_cast<int>(sizeof(beam_v6::State128));
+    d["hash128_bytes"] = static_cast<int>(sizeof(beam_v6::Hash128));
+    d["candidate_meta_bytes"] = static_cast<int>(sizeof(beam_v6::CandidateMeta));
+    d["final_request_bytes"] = static_cast<int>(sizeof(beam_v6::FinalRequest));
+    d["final_response_bytes"] = static_cast<int>(sizeof(beam_v6::FinalResponse));
+    d["goal_score_key"] = beam_v6::GOAL_SCORE_KEY;
+    d["score_scale_v6"] = beam_v6::SCORE_SCALE;
+    d["score_max_key"] = beam_v6::SCORE_MAX_KEY;
+    d["score_bin_count_v6"] = beam_v6::SCORE_BIN_COUNT;
+    d["stream3_batch_candidates"] = target_cfg.stream3_batch_candidates;
+    d["stream4_batch_candidates"] = target_cfg.stream4_batch_candidates;
+    d["stream4_batch_candidates_per_shard_unit"] = target_cfg.stream4_batch_candidates_per_shard_unit;
+    d["ring_count"] = target_cfg.ring_count;
+    d["ring_slot_count"] = target_cfg.ring_slot_count;
+    d["shard_count"] = target_cfg.shard_count;
+    d["global_spill_capacity"] = target_cfg.global_spill_capacity;
+    d["solved_result_capacity"] = target_cfg.solved_result_capacity;
+    d["user_global_beam_width"] = target_cfg.user_global_beam_width;
+    d["global_beam_width_effective"] = target_cfg.global_beam_width_effective;
+    d["global_beam_width_max_safe"] = target_cfg.global_beam_width_max_safe;
+    d["beam_width_alignment"] = target_cfg.beam_width_alignment;
+    d["layout_streams_bytes"] = static_cast<int64_t>(target_layouts.streams.bytes);
+    d["layout_final_bytes"] = static_cast<int64_t>(target_layouts.final.bytes);
+    d["scratch_pool_bytes"] = static_cast<int64_t>(target_layouts.scratch_pool_bytes);
+    d["current_frontier_state128_bytes"] = static_cast<int64_t>(target_layouts.current_frontier_bytes);
+    d["solved_buffers_bytes"] = static_cast<int64_t>(target_layouts.solved_buffers_bytes);
     return d;
+}
+
+void v6_stream2_hash_goal_py(
+    torch::Tensor current_frontier_states,
+    torch::Tensor parent_base,
+    torch::Tensor count,
+    torch::Tensor score_ring,
+    torch::Tensor hash_ring,
+    torch::Tensor generators,
+    torch::Tensor central_state,
+    torch::Tensor zobrist,
+    torch::Tensor solved_flag,
+    torch::Tensor stop_flag,
+    torch::Tensor solved_count,
+    torch::Tensor solved_overflow,
+    torch::Tensor solved_meta_list,
+    torch::Tensor solved_depth_list,
+    int solved_result_capacity,
+    int depth,
+    int local_rank,
+    int ring,
+    int ring_slot,
+    int ring_slot_count,
+    int b_micro) {
+    check_cuda_tensor(current_frontier_states, "current_frontier_states");
+    check_cuda_i64_tensor(parent_base, "parent_base");
+    check_cuda_i32_tensor(count, "count");
+    check_cuda_i32_tensor(score_ring, "score_ring");
+    check_cuda_tensor(hash_ring, "hash_ring");
+    check_cuda_tensor(generators, "generators");
+    check_cuda_tensor(central_state, "central_state");
+    check_cuda_tensor(zobrist, "zobrist");
+    check_cuda_i32_tensor(solved_flag, "solved_flag");
+    check_cuda_i32_tensor(stop_flag, "stop_flag");
+    check_cuda_i32_tensor(solved_count, "solved_count");
+    check_cuda_i32_tensor(solved_overflow, "solved_overflow");
+    check_cuda_tensor(solved_meta_list, "solved_meta_list");
+    check_cuda_i32_tensor(solved_depth_list, "solved_depth_list");
+
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream2_hash_goal(
+        reinterpret_cast<const beam_v6::State128*>(current_frontier_states.data_ptr<uint8_t>()),
+        reinterpret_cast<const uint64_t*>(parent_base.data_ptr<int64_t>()),
+        reinterpret_cast<const uint32_t*>(count.data_ptr<int32_t>()),
+        reinterpret_cast<const uint32_t*>(score_ring.data_ptr<int32_t>()),
+        reinterpret_cast<beam_v6::Hash128*>(hash_ring.data_ptr<uint8_t>()),
+        generators.data_ptr<uint8_t>(),
+        central_state.data_ptr<uint8_t>(),
+        reinterpret_cast<const beam_v6::Hash128*>(zobrist.data_ptr<uint8_t>()),
+        reinterpret_cast<uint32_t*>(solved_flag.data_ptr<int32_t>()),
+        reinterpret_cast<uint32_t*>(stop_flag.data_ptr<int32_t>()),
+        reinterpret_cast<uint32_t*>(solved_count.data_ptr<int32_t>()),
+        reinterpret_cast<uint32_t*>(solved_overflow.data_ptr<int32_t>()),
+        reinterpret_cast<beam_v6::CandidateMeta*>(solved_meta_list.data_ptr<uint8_t>()),
+        reinterpret_cast<uint32_t*>(solved_depth_list.data_ptr<int32_t>()),
+        static_cast<uint32_t>(solved_result_capacity),
+        static_cast<uint32_t>(depth),
+        static_cast<uint32_t>(local_rank),
+        static_cast<uint32_t>(ring),
+        static_cast<uint32_t>(ring_slot),
+        static_cast<uint32_t>(ring_slot_count),
+        static_cast<uint32_t>(b_micro),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void v6_final_materialize_py(
+    torch::Tensor current_frontier_states,
+    torch::Tensor final_request_buffer,
+    torch::Tensor generators,
+    torch::Tensor final_response_buffer,
+    int request_count) {
+    check_cuda_tensor(current_frontier_states, "current_frontier_states");
+    check_cuda_tensor(final_request_buffer, "final_request_buffer");
+    check_cuda_tensor(generators, "generators");
+    check_cuda_tensor(final_response_buffer, "final_response_buffer");
+
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_final_materialize(
+        reinterpret_cast<const beam_v6::State128*>(current_frontier_states.data_ptr<uint8_t>()),
+        reinterpret_cast<const beam_v6::FinalRequest*>(final_request_buffer.data_ptr<uint8_t>()),
+        generators.data_ptr<uint8_t>(),
+        reinterpret_cast<beam_v6::FinalResponse*>(final_response_buffer.data_ptr<uint8_t>()),
+        static_cast<uint32_t>(request_count),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void v6_final_scatter_responses_py(
+    torch::Tensor final_response_buffer,
+    torch::Tensor next_frontier_states_tmp,
+    int response_count) {
+    check_cuda_tensor(final_response_buffer, "final_response_buffer");
+    check_cuda_tensor(next_frontier_states_tmp, "next_frontier_states_tmp");
+
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_final_scatter_responses(
+        reinterpret_cast<const beam_v6::FinalResponse*>(final_response_buffer.data_ptr<uint8_t>()),
+        reinterpret_cast<beam_v6::State128*>(next_frontier_states_tmp.data_ptr<uint8_t>()),
+        static_cast<uint32_t>(response_count),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void v6_stream3_pack_threshold_compact_py(
+    torch::Tensor score_ring,
+    torch::Tensor hash_ring,
+    torch::Tensor parent_base,
+    torch::Tensor count,
+    torch::Tensor stream3_key_a,
+    torch::Tensor stream3_val_a,
+    torch::Tensor compact_count,
+    int current_threshold,
+    int ring,
+    int ring_slot_count,
+    int b_micro,
+    int stream3_batch_candidates) {
+    check_cuda_i32_tensor(score_ring, "score_ring");
+    check_cuda_tensor(hash_ring, "hash_ring");
+    check_cuda_i64_tensor(parent_base, "parent_base");
+    check_cuda_i32_tensor(count, "count");
+    check_cuda_tensor(stream3_key_a, "stream3_key_a");
+    check_cuda_i64_tensor(stream3_val_a, "stream3_val_a");
+    check_cuda_i32_tensor(compact_count, "compact_count");
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream3_pack_threshold_compact(
+        reinterpret_cast<const uint32_t*>(score_ring.data_ptr<int32_t>()),
+        reinterpret_cast<const beam_v6::Hash128*>(hash_ring.data_ptr<uint8_t>()),
+        reinterpret_cast<const uint64_t*>(parent_base.data_ptr<int64_t>()),
+        reinterpret_cast<const uint32_t*>(count.data_ptr<int32_t>()),
+        reinterpret_cast<beam_v6::Hash128Key*>(stream3_key_a.data_ptr<uint8_t>()),
+        reinterpret_cast<uint64_t*>(stream3_val_a.data_ptr<int64_t>()),
+        reinterpret_cast<uint32_t*>(compact_count.data_ptr<int32_t>()),
+        static_cast<uint32_t>(current_threshold),
+        static_cast<uint32_t>(ring),
+        static_cast<uint32_t>(ring_slot_count),
+        static_cast<uint32_t>(b_micro),
+        static_cast<uint32_t>(stream3_batch_candidates),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+size_t v6_stream3_sort_temp_bytes_py(int item_count) {
+    size_t temp_storage_bytes = 0;
+    launch_v6_stream3_sort_pairs(nullptr, temp_storage_bytes, nullptr, nullptr, nullptr, nullptr, item_count, nullptr);
+    return temp_storage_bytes;
+}
+
+void v6_stream3_sort_pairs_py(
+    torch::Tensor temp_storage,
+    torch::Tensor key_in,
+    torch::Tensor key_out,
+    torch::Tensor val_in,
+    torch::Tensor val_out,
+    int item_count) {
+    check_cuda_tensor(temp_storage, "temp_storage");
+    check_cuda_tensor(key_in, "key_in");
+    check_cuda_tensor(key_out, "key_out");
+    check_cuda_i64_tensor(val_in, "val_in");
+    check_cuda_i64_tensor(val_out, "val_out");
+    size_t temp_storage_bytes = static_cast<size_t>(temp_storage.numel());
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream3_sort_pairs(
+        temp_storage.data_ptr<uint8_t>(),
+        temp_storage_bytes,
+        reinterpret_cast<const beam_v6::Hash128Key*>(key_in.data_ptr<uint8_t>()),
+        reinterpret_cast<beam_v6::Hash128Key*>(key_out.data_ptr<uint8_t>()),
+        reinterpret_cast<const uint64_t*>(val_in.data_ptr<int64_t>()),
+        reinterpret_cast<uint64_t*>(val_out.data_ptr<int64_t>()),
+        item_count,
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void v6_stream3_dedup_sorted_py(
+    torch::Tensor sorted_key,
+    torch::Tensor sorted_val,
+    torch::Tensor unique_key,
+    torch::Tensor unique_val,
+    torch::Tensor unique_count,
+    int compact_count) {
+    check_cuda_tensor(sorted_key, "sorted_key");
+    check_cuda_i64_tensor(sorted_val, "sorted_val");
+    check_cuda_tensor(unique_key, "unique_key");
+    check_cuda_i64_tensor(unique_val, "unique_val");
+    check_cuda_i32_tensor(unique_count, "unique_count");
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream3_dedup_sorted(
+        reinterpret_cast<const beam_v6::Hash128Key*>(sorted_key.data_ptr<uint8_t>()),
+        reinterpret_cast<const uint64_t*>(sorted_val.data_ptr<int64_t>()),
+        reinterpret_cast<beam_v6::Hash128*>(unique_key.data_ptr<uint8_t>()),
+        reinterpret_cast<uint64_t*>(unique_val.data_ptr<int64_t>()),
+        reinterpret_cast<uint32_t*>(unique_count.data_ptr<int32_t>()),
+        static_cast<uint32_t>(compact_count),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void v6_stream3_restore_split_py(
+    torch::Tensor unique_key,
+    torch::Tensor unique_val,
+    torch::Tensor parent_base,
+    torch::Tensor local_pending_buffer,
+    torch::Tensor remote_send_buffer,
+    torch::Tensor local_count,
+    torch::Tensor send_count,
+    torch::Tensor send_offset,
+    int unique_count,
+    int local_rank,
+    int world_size,
+    int ring,
+    int ring_slot_count,
+    int b_micro) {
+    check_cuda_tensor(unique_key, "unique_key");
+    check_cuda_i64_tensor(unique_val, "unique_val");
+    check_cuda_i64_tensor(parent_base, "parent_base");
+    check_cuda_tensor(local_pending_buffer, "local_pending_buffer");
+    check_cuda_tensor(remote_send_buffer, "remote_send_buffer");
+    check_cuda_i32_tensor(local_count, "local_count");
+    check_cuda_i32_tensor(send_count, "send_count");
+    check_cuda_i32_tensor(send_offset, "send_offset");
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream3_restore_split(
+        reinterpret_cast<const beam_v6::Hash128*>(unique_key.data_ptr<uint8_t>()),
+        reinterpret_cast<const uint64_t*>(unique_val.data_ptr<int64_t>()),
+        reinterpret_cast<const uint64_t*>(parent_base.data_ptr<int64_t>()),
+        reinterpret_cast<beam_v6::CandidateMeta*>(local_pending_buffer.data_ptr<uint8_t>()),
+        reinterpret_cast<beam_v6::CandidateMeta*>(remote_send_buffer.data_ptr<uint8_t>()),
+        reinterpret_cast<uint32_t*>(local_count.data_ptr<int32_t>()),
+        reinterpret_cast<uint32_t*>(send_count.data_ptr<int32_t>()),
+        reinterpret_cast<uint32_t*>(send_offset.data_ptr<int32_t>()),
+        static_cast<uint32_t>(unique_count),
+        static_cast<uint32_t>(local_rank),
+        static_cast<uint32_t>(world_size),
+        static_cast<uint32_t>(ring),
+        static_cast<uint32_t>(ring_slot_count),
+        static_cast<uint32_t>(b_micro),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void v6_stream4_threshold_compact_py(
+    torch::Tensor survivor_shard,
+    torch::Tensor stream4_key_a,
+    torch::Tensor stream4_val_a,
+    torch::Tensor compact_count,
+    int input_count,
+    int stream4_job_threshold) {
+    check_cuda_tensor(survivor_shard, "survivor_shard");
+    check_cuda_tensor(stream4_key_a, "stream4_key_a");
+    check_cuda_tensor(stream4_val_a, "stream4_val_a");
+    check_cuda_i32_tensor(compact_count, "compact_count");
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream4_threshold_compact(
+        reinterpret_cast<const beam_v6::CandidateMeta*>(survivor_shard.data_ptr<uint8_t>()),
+        reinterpret_cast<beam_v6::Stream4HashKey*>(stream4_key_a.data_ptr<uint8_t>()),
+        reinterpret_cast<beam_v6::CandidateMeta*>(stream4_val_a.data_ptr<uint8_t>()),
+        reinterpret_cast<uint32_t*>(compact_count.data_ptr<int32_t>()),
+        static_cast<uint32_t>(input_count),
+        static_cast<uint32_t>(stream4_job_threshold),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+size_t v6_stream4_sort_temp_bytes_py(int item_count) {
+    size_t temp_storage_bytes = 0;
+    launch_v6_stream4_sort_pairs(nullptr, temp_storage_bytes, nullptr, nullptr, nullptr, nullptr, item_count, nullptr);
+    return temp_storage_bytes;
+}
+
+void v6_stream4_sort_pairs_py(
+    torch::Tensor temp_storage,
+    torch::Tensor key_in,
+    torch::Tensor key_out,
+    torch::Tensor val_in,
+    torch::Tensor val_out,
+    int item_count) {
+    check_cuda_tensor(temp_storage, "temp_storage");
+    check_cuda_tensor(key_in, "key_in");
+    check_cuda_tensor(key_out, "key_out");
+    check_cuda_tensor(val_in, "val_in");
+    check_cuda_tensor(val_out, "val_out");
+    size_t temp_storage_bytes = static_cast<size_t>(temp_storage.numel());
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream4_sort_pairs(
+        temp_storage.data_ptr<uint8_t>(),
+        temp_storage_bytes,
+        reinterpret_cast<const beam_v6::Stream4HashKey*>(key_in.data_ptr<uint8_t>()),
+        reinterpret_cast<beam_v6::Stream4HashKey*>(key_out.data_ptr<uint8_t>()),
+        reinterpret_cast<const beam_v6::CandidateMeta*>(val_in.data_ptr<uint8_t>()),
+        reinterpret_cast<beam_v6::CandidateMeta*>(val_out.data_ptr<uint8_t>()),
+        item_count,
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void v6_stream4_dedup_sorted_py(
+    torch::Tensor sorted_key,
+    torch::Tensor sorted_val,
+    torch::Tensor clean_tmp,
+    torch::Tensor new_clean_count,
+    int compact_count) {
+    check_cuda_tensor(sorted_key, "sorted_key");
+    check_cuda_tensor(sorted_val, "sorted_val");
+    check_cuda_tensor(clean_tmp, "clean_tmp");
+    check_cuda_i32_tensor(new_clean_count, "new_clean_count");
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream4_dedup_sorted(
+        reinterpret_cast<const beam_v6::Stream4HashKey*>(sorted_key.data_ptr<uint8_t>()),
+        reinterpret_cast<const beam_v6::CandidateMeta*>(sorted_val.data_ptr<uint8_t>()),
+        reinterpret_cast<beam_v6::CandidateMeta*>(clean_tmp.data_ptr<uint8_t>()),
+        reinterpret_cast<uint32_t*>(new_clean_count.data_ptr<int32_t>()),
+        static_cast<uint32_t>(compact_count),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void v6_stream4_write_clean_py(
+    torch::Tensor survivor_shard,
+    torch::Tensor clean_tmp,
+    torch::Tensor clean_count,
+    torch::Tensor dirty_count,
+    torch::Tensor processing_flag,
+    int new_clean_count) {
+    check_cuda_tensor(survivor_shard, "survivor_shard");
+    check_cuda_tensor(clean_tmp, "clean_tmp");
+    check_cuda_i32_tensor(clean_count, "clean_count");
+    check_cuda_i32_tensor(dirty_count, "dirty_count");
+    check_cuda_tensor(processing_flag, "processing_flag");
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+    launch_v6_stream4_write_clean(
+        reinterpret_cast<beam_v6::CandidateMeta*>(survivor_shard.data_ptr<uint8_t>()),
+        reinterpret_cast<const beam_v6::CandidateMeta*>(clean_tmp.data_ptr<uint8_t>()),
+        reinterpret_cast<uint32_t*>(clean_count.data_ptr<int32_t>()),
+        reinterpret_cast<uint32_t*>(dirty_count.data_ptr<int32_t>()),
+        processing_flag.data_ptr<uint8_t>(),
+        static_cast<uint32_t>(new_clean_count),
+        stream);
+    CUDA_CHECK(cudaGetLastError());
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "GPU-resident distributed beam search engine: CUDA Graph + streams + NCCL";
     m.def("get_nccl_unique_id", &get_nccl_unique_id, "Create ncclUniqueId");
     m.def("derive_sizes", &derive_sizes, "Derive static buffer sizes");
+    m.def("v6_stream2_hash_goal", &v6_stream2_hash_goal_py, "Run v6 Stream2 hash/goal kernel");
+    m.def("v6_final_materialize", &v6_final_materialize_py, "Run v6 final materialize kernel");
+    m.def("v6_final_scatter_responses", &v6_final_scatter_responses_py, "Run v6 final scatter responses kernel");
+    m.def("v6_stream3_pack_threshold_compact", &v6_stream3_pack_threshold_compact_py, "Run v6 Stream3 threshold/compact/pack kernel");
+    m.def("v6_stream3_sort_temp_bytes", &v6_stream3_sort_temp_bytes_py, "Get v6 Stream3 CUB sort temp bytes");
+    m.def("v6_stream3_sort_pairs", &v6_stream3_sort_pairs_py, "Run v6 Stream3 CUB sort pairs");
+    m.def("v6_stream3_dedup_sorted", &v6_stream3_dedup_sorted_py, "Run v6 Stream3 sorted-key dedup");
+    m.def("v6_stream3_restore_split", &v6_stream3_restore_split_py, "Run v6 Stream3 restore/split");
+    m.def("v6_stream4_threshold_compact", &v6_stream4_threshold_compact_py, "Run v6 Stream4 threshold/compact");
+    m.def("v6_stream4_sort_temp_bytes", &v6_stream4_sort_temp_bytes_py, "Get v6 Stream4 CUB sort temp bytes");
+    m.def("v6_stream4_sort_pairs", &v6_stream4_sort_pairs_py, "Run v6 Stream4 CUB sort pairs");
+    m.def("v6_stream4_dedup_sorted", &v6_stream4_dedup_sorted_py, "Run v6 Stream4 sorted-key dedup");
+    m.def("v6_stream4_write_clean", &v6_stream4_write_clean_py, "Run v6 Stream4 clean writeback");
+    m.def("v6_dispatcher_skeleton_single_gpu_smoke", &v6_dispatcher_skeleton_single_gpu_smoke_contract,
+          "Return v6 dispatcher skeleton single-GPU smoke contract metadata");
     py::class_<BeamEngine>(m, "BeamEngine")
         .def(py::init<py::dict, py::dict, std::string>(), py::arg("cfg"), py::arg("buffers"), py::arg("backend") = "dummy")
         .def("init_nccl", &BeamEngine::init_nccl, py::arg("unique_id_bytes"))
+        .def("v6_stream5_exchange_candidate_meta", &BeamEngine::v6_stream5_exchange_candidate_meta,
+             py::arg("remote_send_buffer"), py::arg("remote_recv_buffer"),
+             py::arg("send_count"), py::arg("send_offset"),
+             py::arg("recv_count"), py::arg("recv_offset"))
         .def("load_torchscript_ensemble", &BeamEngine::load_torchscript_ensemble, py::arg("module_paths"))
         .def("load_fullbeamnice_static", &BeamEngine::load_fullbeamnice_static, py::arg("weights"))
         .def("begin_uniform_score", &BeamEngine::begin_uniform_score, py::arg("score_q"))

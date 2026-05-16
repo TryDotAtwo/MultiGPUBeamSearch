@@ -10,15 +10,42 @@ def gib(x: int) -> float:
     return x / 1024 / 1024 / 1024
 
 
+def pow2_ceil(x: int) -> int:
+    if x <= 1:
+        return 1
+    return 1 << (x - 1).bit_length()
+
+
+def auto_stream2_params(global_beam_width: int, world_size: int, b_micro: int, fanout: int) -> dict[str, int]:
+    target_rounds = max(1, int(os.getenv("TARGET_STREAM2_ROUNDS", "16")))
+    k_expand_tile = pow2_ceil(math.ceil(global_beam_width * fanout / (world_size * target_rounds)))
+    score_ring_depth = pow2_ceil(math.ceil(k_expand_tile / (b_micro * fanout)))
+    bucket_cap_fast = pow2_ceil(math.ceil(k_expand_tile / world_size))
+    bucket_cap_safe = pow2_ceil(math.ceil(k_expand_tile * 0.75))
+    bucket_mode = os.getenv("AUTO_BUCKET_CAP_MODE", "safe").strip().lower()
+    return {
+        "k_expand_tile": k_expand_tile,
+        "score_ring_depth": max(1, score_ring_depth),
+        "bucket_cap_per_peer": max(4096, bucket_cap_safe if bucket_mode == "safe" else bucket_cap_fast),
+    }
+
+
+def int_or_auto(value: str, auto_value: int) -> int:
+    token = str(value).strip().lower()
+    if token in {"", "auto"}:
+        return int(auto_value)
+    return int(token)
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--world-size", type=int, default=int(os.getenv("WORLD_SIZE", "2")))
     p.add_argument("--global-beam-width", type=int, default=int(os.getenv("GLOBAL_BEAM_WIDTH", "4194304")))
-    p.add_argument("--bucket-cap-per-peer", type=int, default=int(os.getenv("BUCKET_CAP_PER_PEER", "524288")))
+    p.add_argument("--bucket-cap-per-peer", default=os.getenv("BUCKET_CAP_PER_PEER", "auto"))
     p.add_argument("--b-micro", type=int, default=int(os.getenv("B_MICRO", "32768")))
-    p.add_argument("--k-expand-tile", type=int, default=int(os.getenv("K_EXPAND_TILE", "0")))
+    p.add_argument("--k-expand-tile", default=os.getenv("K_EXPAND_TILE", "auto"))
     p.add_argument("--fanout", type=int, default=int(os.getenv("FANOUT", "24")))
-    p.add_argument("--score-ring-depth", type=int, default=int(os.getenv("SCORE_RING_DEPTH", "16")))
+    p.add_argument("--score-ring-depth", default=os.getenv("SCORE_RING_DEPTH", "auto"))
     p.add_argument("--inference-parallelism", type=int, default=int(os.getenv("INFERENCE_PARALLELISM", "1")))
     p.add_argument("--net-ring-depth", type=int, default=int(os.getenv("NET_RING_DEPTH", "2")))
     p.add_argument("--state-size-bytes", type=int, default=int(os.getenv("STATE_SIZE_BYTES", "120")))
@@ -29,6 +56,10 @@ def main() -> None:
     p.add_argument("--beta", type=float, default=float(os.getenv("BETA", "1.15")))
     p.add_argument("--hash-load-factor", type=float, default=float(os.getenv("HASH_LOAD_FACTOR", "0.55")))
     args = p.parse_args()
+    auto = auto_stream2_params(args.global_beam_width, args.world_size, args.b_micro, args.fanout)
+    args.k_expand_tile = int_or_auto(args.k_expand_tile, auto["k_expand_tile"])
+    args.score_ring_depth = int_or_auto(args.score_ring_depth, auto["score_ring_depth"])
+    args.bucket_cap_per_peer = int_or_auto(args.bucket_cap_per_peer, auto["bucket_cap_per_peer"])
 
     n_local = math.ceil(args.global_beam_width / args.world_size)
     k_keep = int(args.gamma * n_local + 0.5)

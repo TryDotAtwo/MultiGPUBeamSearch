@@ -1,0 +1,122 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=18mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{Arial}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\begin{document}
+
+\section*{Короткий вывод}
+
+\[
+B=\texttt{Stream2+Stream3}:
+\quad
+\text{expand/hash/dedup/NCCL/prune/rebuild/compact}
+\]
+
+Главный bottleneck не \(\texttt{CUTLASS GEMM}\), а нерегулярный candidate path:
+\[
+N_{\text{cand}}=N_{\text{active}}\cdot F,\qquad F=24
+\]
+\[
+T_{\text{depth}}\approx
+\max(T_{\text{infer}},T_{\text{cand}}+T_{\text{net}})+T_{\text{prune}}+T_{\text{rebuild}}+T_{\text{compact}}
+\]
+\[
+T_{\text{cand}}\sim N_{\text{cand}}\cdot(120\text{B apply}+120\text{B hash}+\alpha_{\text{atomic}}P),
+\qquad
+T_{\text{net}}\sim N_{\text{tiles}}\cdot W\cdot C_{\text{bucket}}
+\]
+
+\section*{Пруфы по коду}
+
+\[
+\text{Stream1: }\texttt{beam\_engine.cpp:383--408}
+\]
+Статический scorer уже делает embedding + CUTLASS GEMM + quantize:
+\[
+\texttt{embed}\rightarrow
+\texttt{GEMM}_{1536\times512}\rightarrow
+4\cdot\texttt{GEMM}_{512\times512}\rightarrow
+\texttt{GEMM}_{512\times24}
+\]
+
+\[
+\text{Stream2: }\texttt{beam\_engine.cpp:1107--1138}
+\]
+После каждого microbatch Stream2 обязан обработать
+\[
+L_{\text{tile}}\le K_{\text{expand\_tile}},\qquad
+L_{\text{total}}=\texttt{micro\_size}\cdot24
+\]
+через \(\texttt{launch\_process\_score\_slot}\): state materialization, hash table, histogram, remote bucket packing.
+
+\[
+\text{Hash hot path: }\texttt{beam\_kernels.cu:351--488}
+\]
+Hash insert/update использует probing и atomics:
+\[
+P\le\texttt{PROBE\_LIMIT},\qquad
+\text{cost}\propto N_{\text{cand}}\cdot E[P]+\texttt{atomicAdd/CAS}
+\]
+
+\[
+\text{Stream3 all-to-all: }\texttt{beam\_engine.cpp:972--986}
+\]
+Каждый tile делает grouped NCCL counts + payload exchange:
+\[
+V_{\text{tile}}=\texttt{world\_size}\cdot\texttt{bucket\_cap\_per\_peer}\cdot sizeof(\texttt{CandidateRecord})
+\]
+
+\[
+\text{Threshold/prune/rebuild: }\texttt{beam\_engine.cpp:989--1032}
+\]
+Каждый threshold update делает histogram allreduce, prune, clear hash, rebuild:
+\[
+T_{\text{threshold}}\approx T_{\text{allreduce}}(65536)+T_{\text{prune}}(K_{\text{work}})+T_{\text{clear}}(H)+T_{\text{rebuild}}(K_{\text{work}})
+\]
+
+\[
+\text{status sync: }\texttt{beam\_engine.cpp:766--790}
+\]
+Логирование ждёт все streams:
+\[
+\texttt{status()}=\texttt{synchronize(Stream1, lanes, Stream2, Stream3)}
+\]
+
+\section*{Пруфы по истории измерений}
+
+\[
+\texttt{docs/PROJECT\_MEMORY.md:5--11}
+\]
+Добавлен \(\texttt{DEPTH\_TUNING}\): \(wall\_ms\), \(num\_micro\), \(expand\_tiles\), counters. Прямой смысл: искать задержку через tile/counter нагрузку Stream2/3.
+
+\[
+\texttt{docs/PROJECT\_MEMORY.md:37}
+\]
+Зафиксировано:
+\[
+\text{dominant\_cost}=\text{hash\_clear}+K_{\text{work}}\text{-scan}+N_{\text{local}}\text{-check}+\text{NCCL}+\text{histogram}
+\ne \text{neural GEMM}
+\]
+
+\[
+\texttt{docs/CUTLASS\_STREAM2\_STREAM3\_REVIEW.md:7--15}
+\]
+CUTLASS применим к Stream1; Stream2/3 = irregular memory/hash/NCCL, не GEMM.
+
+\section*{Итог}
+
+\[
+\boxed{
+\text{bottleneck}=\texttt{Stream2/Stream3 candidate pipeline}
+}
+\]
+\[
+\boxed{
+\text{первый рычаг}=
+\text{уменьшить }N_{\text{cand}},E[P],V_{\text{tile}},K_{\text{work}}\text{-passes}
+}
+\]
+
+\end{document}
