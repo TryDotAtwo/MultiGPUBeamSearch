@@ -273,7 +273,7 @@ class ProductionV6Dispatcher:
         torch.cuda.synchronize()
         compact_n = int(compact_count.cpu()[0])
         if compact_n == 0:
-            return {"unique_count": 0, "local_count": 0, "remote_count": 0}
+            return {"compact_count": 0, "unique_count": 0, "local_count": 0, "remote_count": 0}
         temp = torch.empty((int(self.ext.v6_stream3_sort_temp_bytes(compact_n)),), dtype=torch.uint8, device=self.device)
         self.ext.v6_stream3_sort_pairs(temp, key_a, key_b, val_a, val_b, compact_n)
         unique_key = torch.zeros((batch_candidates * 16,), dtype=torch.uint8, device=self.device)
@@ -309,6 +309,7 @@ class ProductionV6Dispatcher:
         )
         torch.cuda.synchronize()
         return {
+            "compact_count": compact_n,
             "unique_count": unique_n,
             "local_pending": local_pending,
             "remote_send": remote_send,
@@ -343,7 +344,7 @@ class ProductionV6Dispatcher:
         remote_n = int(stream5.get("remote_recv_count", 0))
         input_n = local_n + remote_n
         if input_n == 0:
-            return {"clean": [], "clean_count": 0, "dirty_count": 0}
+            return {"clean": [], "clean_count": 0, "dirty_count": 0, "input_count": 0}
         survivor = torch.zeros((max(input_n, 1) * 32,), dtype=torch.uint8, device=self.device)
         if local_n:
             survivor[: local_n * 32].copy_(stream3["local_pending"][: local_n * 32])
@@ -382,6 +383,7 @@ class ProductionV6Dispatcher:
             "clean_count": clean_n,
             "dirty_count": int(dirty_count.cpu()[0]),
             "processing_flag": int(processing_flag.cpu()[0]),
+            "input_count": input_n,
         }
 
     def _final_materialize(
@@ -511,7 +513,29 @@ class ProductionV6Dispatcher:
                         path_failure_reason = "parent_chain_broken"
                 else:
                     path_failure_reason = "solved_state_but_no_parent_chain"
-                depth_rows.append(self._depth_row(task_id, depth, len(current), threshold_initialized, current_threshold, 0, 0, 0, int(stream12["solved_count"]), 1, start))
+                depth_rows.append(
+                    self._depth_row(
+                        task_id,
+                        depth,
+                        len(current),
+                        threshold_initialized,
+                        current_threshold,
+                        0,
+                        0,
+                        0,
+                        int(stream12["solved_count"]),
+                        1,
+                        start,
+                        expanded_parent_count=int(stream12.get("frontier_count", 0)),
+                        stream1_scored_parent_count=int(stream12.get("frontier_count", 0)),
+                        stream2_generated_candidate_count=int(stream12.get("frontier_count", 0)) * MOVE_COUNT,
+                        stream3_after_threshold_count=0,
+                        stream3_unique_count=0,
+                        stream4_input_count=0,
+                        stream4_clean_count=0,
+                        next_frontier_size_after=0,
+                    )
+                )
                 break
             stream3 = self._run_stream3(stream12, current_threshold)
             stream5 = self._run_stream5(stream3) if int(stream3.get("unique_count", 0)) else {"remote_recv_count": 0, "remote_recv": torch.empty((0,), dtype=torch.uint8, device=self.device)}
@@ -546,6 +570,14 @@ class ProductionV6Dispatcher:
                     int(stream12["solved_count"]),
                     int(stream12["stop_flag"]),
                     start,
+                    expanded_parent_count=int(stream12.get("frontier_count", 0)),
+                    stream1_scored_parent_count=int(stream12.get("frontier_count", 0)),
+                    stream2_generated_candidate_count=int(stream12.get("frontier_count", 0)) * MOVE_COUNT,
+                    stream3_after_threshold_count=int(stream3.get("compact_count", 0)),
+                    stream3_unique_count=int(stream3.get("unique_count", 0)),
+                    stream4_input_count=int(stream4.get("input_count", 0)),
+                    stream4_clean_count=int(stream4.get("clean_count", 0)),
+                    next_frontier_size_after=len(next_current),
                 )
             )
             current = next_current
@@ -580,11 +612,29 @@ class ProductionV6Dispatcher:
         solved_count: int,
         stop_flag: int,
         start: float,
+        *,
+        expanded_parent_count: int = 0,
+        stream1_scored_parent_count: int = 0,
+        stream2_generated_candidate_count: int = 0,
+        stream3_after_threshold_count: int = 0,
+        stream3_unique_count: int = 0,
+        stream4_input_count: int = 0,
+        stream4_clean_count: int = 0,
+        next_frontier_size_after: int = 0,
     ) -> dict[str, Any]:
         return {
             "task_id": int(task_id),
             "depth": int(depth),
             "frontier_size": int(frontier_size),
+            "current_frontier_size_before": int(frontier_size),
+            "expanded_parent_count": int(expanded_parent_count),
+            "stream1_scored_parent_count": int(stream1_scored_parent_count),
+            "stream2_generated_candidate_count": int(stream2_generated_candidate_count),
+            "stream3_after_threshold_count": int(stream3_after_threshold_count),
+            "stream3_unique_count": int(stream3_unique_count),
+            "stream4_input_count": int(stream4_input_count),
+            "stream4_clean_count": int(stream4_clean_count),
+            "next_frontier_size_after": int(next_frontier_size_after),
             "threshold_initialized": bool(threshold_initialized),
             "current_threshold": int(current_threshold),
             "clean_count_total": int(clean_count_total),
@@ -982,4 +1032,159 @@ def validate_output_paths(
         "validated_rows": validated_rows,
         "errors": errors,
         "path_replay_valid": solved_rows == validated_rows and not errors,
+    }
+
+
+def validate_known_paths(
+    *,
+    task_count: int,
+) -> dict[str, Any]:
+    puzzles = dict(data_loader.load_test_puzzles(max_puzzles=task_count))
+    rows = data_loader.load_sample_submission()
+    checked = 0
+    failures: list[str] = []
+    for row in rows:
+        task_id = int(row["initial_state_id"])
+        if task_id not in puzzles:
+            continue
+        path = row.get("path", "")
+        ok, path_len, note = replay_path_to_central(puzzles[task_id], path)
+        checked += 1
+        if not ok:
+            failures.append(f"task_id={task_id}:path_len={path_len}:{note}")
+        if checked >= int(task_count):
+            break
+    return {
+        "known_path_checked": checked,
+        "known_path_failures": failures,
+        "known_path_replay_valid": checked == int(task_count) and not failures,
+    }
+
+
+def run_frontier_coverage_audit_world2(
+    *,
+    task_count: int,
+    max_depth: int,
+    beam_width: int,
+    output_path: Path,
+    audit_path: Path,
+    b_micro: int = 4,
+) -> dict[str, Any]:
+    known_path_result = validate_known_paths(task_count=min(task_count, 10))
+    if not known_path_result["known_path_replay_valid"]:
+        raise AssertionError(f"known path replay failed: {known_path_result}")
+    rank, world_size, device = require_world2_t4_runtime()
+    dispatcher = ProductionV6Dispatcher(rank, world_size, device, beam_width=beam_width, b_micro=b_micro)
+    puzzles = data_loader.load_test_puzzles(max_puzzles=task_count)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "task_idx",
+        "initial_state_id",
+        "rank",
+        "depth",
+        "status",
+        "current_frontier_size_before",
+        "expanded_parent_count",
+        "stream1_scored_parent_count",
+        "stream2_generated_candidate_count",
+        "stream3_after_threshold_count",
+        "stream3_unique_count",
+        "stream4_input_count",
+        "stream4_clean_count",
+        "next_frontier_size_after",
+        "current_threshold",
+        "solved_count",
+        "coverage_ok",
+        "coverage_failure_reason",
+    ]
+    if rank == 0:
+        with output_path.open("w", newline="", encoding="utf-8") as f:
+            csv.DictWriter(f, fieldnames=fieldnames).writeheader()
+        audit_path.write_text("", encoding="utf-8")
+    dist.barrier()
+    coverage_failures: list[str] = []
+    status_counts = {"solved": 0, "unsolved": 0, "max_depth_reached": 0, "error": 0}
+    row_count = 0
+    for task_idx, (task_id, state) in enumerate(puzzles):
+        try:
+            result = dispatcher.run_task(int(task_id), state, max_depth, int(beam_width))
+            status = result.status
+            status_counts[status] += 1
+            depth_rows = result.depth_rows
+        except Exception as exc:  # noqa: BLE001 - diagnostic runner records per-task failure.
+            status = "error"
+            status_counts["error"] += 1
+            depth_rows = []
+            coverage_failures.append(f"task_id={task_id}:exception={type(exc).__name__}:{exc}")
+        for depth_row in depth_rows:
+            expected_generated = int(depth_row["expanded_parent_count"]) * MOVE_COUNT
+            coverage_ok = (
+                int(depth_row["expanded_parent_count"]) == int(depth_row["current_frontier_size_before"])
+                and int(depth_row["stream1_scored_parent_count"]) == int(depth_row["expanded_parent_count"])
+                and int(depth_row["stream2_generated_candidate_count"]) == expected_generated
+            )
+            failure_reason = "ok"
+            if not coverage_ok:
+                failure_reason = (
+                    f"frontier_not_fully_processed:"
+                    f"frontier={depth_row['current_frontier_size_before']}:expanded={depth_row['expanded_parent_count']}:"
+                    f"generated={depth_row['stream2_generated_candidate_count']}:expected_generated={expected_generated}"
+                )
+                coverage_failures.append(f"task_id={task_id}:depth={depth_row['depth']}:{failure_reason}")
+            out_row = {
+                "task_idx": int(task_idx),
+                "initial_state_id": int(task_id),
+                "rank": int(rank),
+                "depth": int(depth_row["depth"]),
+                "status": status,
+                "current_frontier_size_before": int(depth_row["current_frontier_size_before"]),
+                "expanded_parent_count": int(depth_row["expanded_parent_count"]),
+                "stream1_scored_parent_count": int(depth_row["stream1_scored_parent_count"]),
+                "stream2_generated_candidate_count": int(depth_row["stream2_generated_candidate_count"]),
+                "stream3_after_threshold_count": int(depth_row["stream3_after_threshold_count"]),
+                "stream3_unique_count": int(depth_row["stream3_unique_count"]),
+                "stream4_input_count": int(depth_row["stream4_input_count"]),
+                "stream4_clean_count": int(depth_row["stream4_clean_count"]),
+                "next_frontier_size_after": int(depth_row["next_frontier_size_after"]),
+                "current_threshold": int(depth_row["current_threshold"]),
+                "solved_count": int(depth_row["solved_count"]),
+                "coverage_ok": int(coverage_ok),
+                "coverage_failure_reason": failure_reason,
+            }
+            row_count += 1
+            if rank == 0:
+                with output_path.open("a", newline="", encoding="utf-8") as f:
+                    csv.DictWriter(f, fieldnames=fieldnames).writerow(out_row)
+            with audit_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(out_row, sort_keys=True) + "\n")
+            print(
+                "FRONTIER_COVERAGE_AUDIT_PROGRESS "
+                f"task_idx={task_idx} depth={out_row['depth']} rank={rank} "
+                f"frontier={out_row['current_frontier_size_before']} expanded={out_row['expanded_parent_count']} "
+                f"generated={out_row['stream2_generated_candidate_count']} stream3_unique={out_row['stream3_unique_count']} "
+                f"stream4_clean={out_row['stream4_clean_count']} next={out_row['next_frontier_size_after']} "
+                f"coverage_ok={out_row['coverage_ok']}"
+            )
+    local_counts = torch.tensor([row_count, len(coverage_failures), status_counts["solved"], status_counts["error"]], dtype=torch.int64, device=device)
+    gathered = [torch.zeros_like(local_counts) for _ in range(world_size)]
+    dist.all_gather(gathered, local_counts)
+    dist.barrier()
+    return {
+        "rank": rank,
+        "world_size": world_size,
+        "task_count": len(puzzles),
+        "row_count": row_count,
+        "status_counts": status_counts,
+        "coverage_failures": coverage_failures,
+        "coverage_failure_count": len(coverage_failures),
+        "known_path_result": known_path_result,
+        "gathered_counts": [[int(x) for x in item.cpu().tolist()] for item in gathered],
+        "output_path": str(output_path),
+        "audit_path": str(audit_path),
+        "production_v6_dispatcher_path": True,
+        "legacy_next_state_pool_path": False,
+        "prefilled_score_ring_fake_path": False,
+        "runtime_120_slice": False,
+        "fallback_backend": False,
     }

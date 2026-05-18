@@ -1156,3 +1156,52 @@ def test_real_data_100samples_depth300_beam65536_path_audit_world2_contract():
         assert needle in dispatcher_text
     for needle in forbidden:
         assert needle not in test_text
+
+
+def test_frontier_coverage_audit_world2_contract():
+    test_text = (ROOT / "tests" / "frontier_coverage_audit_world2.py").read_text(encoding="utf-8")
+    dispatcher_text = (ROOT / "production_v6_dispatcher.py").read_text(encoding="utf-8")
+    required_test = [
+        "run_frontier_coverage_audit_world2",
+        "FRONTIER_COVERAGE_TASK_COUNT",
+        "FRONTIER_COVERAGE_MAX_DEPTH",
+        "GLOBAL_BEAM_WIDTH",
+        "task_count=10",
+        "max_depth=12",
+        "beam_width=65536",
+        "FRONTIER_COVERAGE_AUDIT_WORLD2_OK",
+        "FRONTIER_COVERAGE_AUDIT_WORLD2_TEST_COMPLETE",
+        "coverage_failure_count",
+        "known_path_replay_valid",
+        "no_quality_claim",
+        "no_leaderboard_claim",
+        "no_performance_claim",
+    ]
+    required_dispatcher = [
+        "run_frontier_coverage_audit_world2",
+        "validate_known_paths",
+        "current_frontier_size_before",
+        "expanded_parent_count",
+        "stream1_scored_parent_count",
+        "stream2_generated_candidate_count",
+        "stream3_after_threshold_count",
+        "stream3_unique_count",
+        "stream4_input_count",
+        "stream4_clean_count",
+        "next_frontier_size_after",
+        "frontier_not_fully_processed",
+    ]
+    forbidden = [
+        "engine.search",
+        "reset_search",
+        'buffers["next_state_pool"]',
+        "torchscript_ensemble",
+        "central_hamming",
+        "nn_input",
+    ]
+    for needle in required_test:
+        assert needle in test_text
+    for needle in required_dispatcher:
+        assert needle in dispatcher_text
+    for needle in forbidden:
+        assert needle not in test_text
