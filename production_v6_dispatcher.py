@@ -109,6 +109,20 @@ def append_move_to_path(path: str, move: int) -> str:
     return move_name if not path else f"{path}.{move_name}"
 
 
+def meta_sort_key(candidate: dict[str, int]) -> tuple[int, int, int, int]:
+    return (int(candidate["score_key"]), int(candidate["parent_idx"]), int(candidate["route"]), int(candidate["lo"]))
+
+
+def merge_clean_candidates(existing: list[dict[str, int]], incoming: list[dict[str, int]]) -> list[dict[str, int]]:
+    by_hash: dict[tuple[int, int], dict[str, int]] = {}
+    for candidate in [*existing, *incoming]:
+        key = (int(candidate["hi"]), int(candidate["lo"]))
+        current = by_hash.get(key)
+        if current is None or meta_sort_key(candidate) < meta_sort_key(current):
+            by_hash[key] = dict(candidate)
+    return sorted(by_hash.values(), key=meta_sort_key)
+
+
 def histogram_threshold(scores: list[int], keep_count: int) -> int:
     if not scores:
         return UINT32_MAX
@@ -181,12 +195,15 @@ class ProductionV6Dispatcher:
         self.central_t = torch.tensor(self.central_np, dtype=torch.uint8, device=device)
         self.zobrist_t = torch.tensor(self.zobrist_np.reshape(-1).view(np.uint8), dtype=torch.uint8, device=device)
 
-    def _run_ring_streams(self, current_frontier: np.ndarray, depth: int) -> dict[str, Any]:
-        frontier_count = int(min(len(current_frontier), self.b_micro))
+    def _run_ring_streams(self, current_frontier: np.ndarray, depth: int, parent_offset: int = 0) -> dict[str, Any]:
+        parent_offset = int(parent_offset)
+        if parent_offset < 0 or parent_offset >= max(len(current_frontier), 1):
+            raise ValueError(f"bad V6_PARENT_OFFSET={parent_offset} for frontier size {len(current_frontier)}")
+        frontier_count = int(min(self.b_micro, len(current_frontier) - parent_offset))
         if frontier_count <= 0:
             return {"frontier_count": 0, "solved_count": 0, "stop_flag": 0, "candidates": []}
         states_storage = np.zeros((self.b_micro, STATE_STORAGE_LEN), dtype=np.uint8)
-        states_storage[:frontier_count] = current_frontier[:frontier_count]
+        states_storage[:frontier_count] = current_frontier[parent_offset : parent_offset + frontier_count]
         states_storage[:, STATE_LEN:] = 0
         self.buffers["beam_current"][: self.b_micro, :STATE_STORAGE_LEN].copy_(torch.tensor(states_storage, dtype=torch.uint8, device=self.device))
         self.buffers["current_active_flags"][: self.b_micro].zero_()
@@ -196,7 +213,7 @@ class ProductionV6Dispatcher:
         torch.cuda.synchronize()
 
         current_frontier_states = torch.tensor(states_storage.reshape(-1), dtype=torch.uint8, device=self.device)
-        parent_base = torch.tensor([0], dtype=torch.int64, device=self.device)
+        parent_base = torch.tensor([parent_offset], dtype=torch.int64, device=self.device)
         count = torch.tensor([frontier_count], dtype=torch.int32, device=self.device)
         hash_ring = torch.zeros((self.b_micro * MOVE_COUNT * 16,), dtype=torch.uint8, device=self.device)
         solved_capacity = 16
@@ -236,6 +253,7 @@ class ProductionV6Dispatcher:
             solved_meta = unpack_meta(solved_meta_list.cpu().numpy().tobytes(), 0)
         return {
             "frontier_count": frontier_count,
+            "parent_offset": parent_offset,
             "states_storage": states_storage,
             "current_frontier_states": current_frontier_states,
             "parent_base": parent_base,
@@ -495,10 +513,37 @@ class ProductionV6Dispatcher:
         path_failure_reason = "no_solved_state"
         for depth in range(int(max_depth)):
             start = time.time()
-            stream12 = self._run_ring_streams(current, depth)
-            if int(stream12["solved_count"]) > 0:
+            expanded_parent_count = 0
+            stream1_scored_parent_count = 0
+            stream2_generated_candidate_count = 0
+            stream3_after_threshold_count = 0
+            stream3_unique_count = 0
+            stream4_input_count = 0
+            stream4_clean_count = 0
+            depth_clean: list[dict[str, int]] = []
+            depth_current_frontier_states = torch.tensor(current.reshape(-1), dtype=torch.uint8, device=self.device)
+            solved_stream12: dict[str, Any] | None = None
+            parent_offset = 0
+            while parent_offset < len(current):
+                stream12 = self._run_ring_streams(current, depth, parent_offset)
+                expanded_parent_count += int(stream12.get("frontier_count", 0))
+                stream1_scored_parent_count += int(stream12.get("frontier_count", 0))
+                stream2_generated_candidate_count += int(stream12.get("frontier_count", 0)) * MOVE_COUNT
+                if int(stream12["solved_count"]) > 0:
+                    solved_stream12 = stream12
+                    break
+                stream3 = self._run_stream3(stream12, current_threshold)
+                stream3_after_threshold_count += int(stream3.get("compact_count", 0))
+                stream3_unique_count += int(stream3.get("unique_count", 0))
+                stream5 = self._run_stream5(stream3) if int(stream3.get("unique_count", 0)) else {"remote_recv_count": 0, "remote_recv": torch.empty((0,), dtype=torch.uint8, device=self.device)}
+                stream4 = self._collector_to_stream4(stream3, stream5, current_threshold) if int(stream3.get("unique_count", 0)) else {"clean": [], "clean_count": 0, "dirty_count": 0, "input_count": 0}
+                stream4_input_count += int(stream4.get("input_count", 0))
+                stream4_clean_count += int(stream4.get("clean_count", 0))
+                depth_clean = merge_clean_candidates(depth_clean, list(stream4["clean"]))
+                parent_offset += int(stream12.get("frontier_count", 0))
+            if solved_stream12 is not None:
                 status = "solved"
-                solved_meta = stream12.get("solved_meta")
+                solved_meta = solved_stream12.get("solved_meta")
                 solved_depth = int(depth)
                 raw_solved_record_exists = solved_meta is not None
                 if solved_meta is not None:
@@ -526,21 +571,18 @@ class ProductionV6Dispatcher:
                         int(stream12["solved_count"]),
                         1,
                         start,
-                        expanded_parent_count=int(stream12.get("frontier_count", 0)),
-                        stream1_scored_parent_count=int(stream12.get("frontier_count", 0)),
-                        stream2_generated_candidate_count=int(stream12.get("frontier_count", 0)) * MOVE_COUNT,
-                        stream3_after_threshold_count=0,
-                        stream3_unique_count=0,
-                        stream4_input_count=0,
-                        stream4_clean_count=0,
+                        expanded_parent_count=expanded_parent_count,
+                        stream1_scored_parent_count=stream1_scored_parent_count,
+                        stream2_generated_candidate_count=stream2_generated_candidate_count,
+                        stream3_after_threshold_count=stream3_after_threshold_count,
+                        stream3_unique_count=stream3_unique_count,
+                        stream4_input_count=stream4_input_count,
+                        stream4_clean_count=stream4_clean_count,
                         next_frontier_size_after=0,
                     )
                 )
                 break
-            stream3 = self._run_stream3(stream12, current_threshold)
-            stream5 = self._run_stream5(stream3) if int(stream3.get("unique_count", 0)) else {"remote_recv_count": 0, "remote_recv": torch.empty((0,), dtype=torch.uint8, device=self.device)}
-            stream4 = self._collector_to_stream4(stream3, stream5, current_threshold) if int(stream3.get("unique_count", 0)) else {"clean": [], "clean_count": 0, "dirty_count": 0}
-            local_scores = [int(c["score_key"]) for c in stream4["clean"]]
+            local_scores = [int(c["score_key"]) for c in depth_clean]
             current_threshold, threshold_initialized, total_survivors = allreduce_score_threshold(
                 local_scores,
                 current_threshold,
@@ -549,8 +591,8 @@ class ProductionV6Dispatcher:
                 self.device,
             )
             next_current, next_paths = self._final_materialize(
-                stream12["current_frontier_states"],
-                list(stream4["clean"]),
+                depth_current_frontier_states,
+                depth_clean,
                 current_threshold,
                 current_paths,
             )
@@ -564,19 +606,19 @@ class ProductionV6Dispatcher:
                     len(current),
                     threshold_initialized,
                     current_threshold,
-                    int(stream4["clean_count"]),
-                    int(stream4["dirty_count"]),
+                    stream4_clean_count,
+                    0,
                     global_keep,
-                    int(stream12["solved_count"]),
-                    int(stream12["stop_flag"]),
+                    0,
+                    0,
                     start,
-                    expanded_parent_count=int(stream12.get("frontier_count", 0)),
-                    stream1_scored_parent_count=int(stream12.get("frontier_count", 0)),
-                    stream2_generated_candidate_count=int(stream12.get("frontier_count", 0)) * MOVE_COUNT,
-                    stream3_after_threshold_count=int(stream3.get("compact_count", 0)),
-                    stream3_unique_count=int(stream3.get("unique_count", 0)),
-                    stream4_input_count=int(stream4.get("input_count", 0)),
-                    stream4_clean_count=int(stream4.get("clean_count", 0)),
+                    expanded_parent_count=expanded_parent_count,
+                    stream1_scored_parent_count=stream1_scored_parent_count,
+                    stream2_generated_candidate_count=stream2_generated_candidate_count,
+                    stream3_after_threshold_count=stream3_after_threshold_count,
+                    stream3_unique_count=stream3_unique_count,
+                    stream4_input_count=stream4_input_count,
+                    stream4_clean_count=stream4_clean_count,
                     next_frontier_size_after=len(next_current),
                 )
             )
