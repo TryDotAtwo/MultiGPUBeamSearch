@@ -51,6 +51,11 @@ def _write_row(path: Path, row: dict[str, Any], fieldnames: list[str]) -> None:
         csv.DictWriter(f, fieldnames=fieldnames).writerow(row)
 
 
+def _short_note(note: str, limit: int = 500) -> str:
+    note = " ".join(str(note).split())
+    return note[:limit]
+
+
 def main() -> None:
     os.environ["INFERENCE_BACKEND"] = "fullbeamnice_static"
     os.environ["USE_CUDA_GRAPHS"] = "1"
@@ -151,6 +156,13 @@ def main() -> None:
             _write_row(output_path, row, fieldnames)
             with stats_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(row, sort_keys=True) + "\n")
+            if status == "error":
+                print(
+                    "TASK_ERROR "
+                    f"task_idx={task_idx} depth_used={depth_used} elapsed_sec={elapsed:.3f} "
+                    f"note={_short_note(note)}",
+                    flush=True,
+                )
             if found:
                 print(
                     "TASK_SOLVED "
@@ -165,6 +177,16 @@ def main() -> None:
             )
 
         completed += 1
+        error_flag = torch.tensor([1 if status == "error" else 0], dtype=torch.int32, device=device)
+        dist.all_reduce(error_flag, op=dist.ReduceOp.SUM)
+        if int(error_flag.cpu()[0]) > 0:
+            if rank == 0:
+                print(
+                    "RUN_ABORT "
+                    f"reason=task_error task_idx={task_idx} error_ranks={int(error_flag.cpu()[0])}",
+                    flush=True,
+                )
+            break
         now = time.perf_counter()
         if rank == 0 and (
             completed % HEARTBEAT_TASK_INTERVAL == 0

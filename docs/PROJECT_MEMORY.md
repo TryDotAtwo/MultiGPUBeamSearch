@@ -4,7 +4,7 @@
 
 - entity_id: `architecture_v6_real_solve_100_depth300_load_world2`
 - type: `production_load_validation`
-- state: `host_green_kaggle_pending`
+- state: `failed_actionable_patch_pending`
 - source_of_truth: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/ARCHITECTURE_NEED.md`
 - prompt_summary: User requested production-load validation on Kaggle 2xT4 for `data/test.csv`, `task_count=100`, `max_depth=300`, `beam_width=65536`, with hard invariants `B_MICRO=8192`, `K_EXPAND_TILE=196608`, `BUCKET_CAP_PER_PEER=262144`, CUDA Graphs enabled, live stdout, sparse task-level logs, no per-depth progress spam, and no quality/leaderboard claim.
 - code_change: `production_v6_dispatcher.py` no longer forces `USE_CUDA_GRAPHS=0`; it preserves caller config with default `USE_CUDA_GRAPHS=1` and prints `CONFIG_GUARD_OK` with `cuda_graphs=1`.
@@ -14,7 +14,10 @@
 - test_change: `tests/test_architecture_v6_static.py::test_real_solve_100_depth300_load_world2_contract` added.
 - host_verification: `python -m py_compile production_v6_dispatcher.py tests\real_solve_100_depth300_load_world2.py tests\test_architecture_v6_static.py` passed.
 - host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `48 passed`.
-- kaggle_validation_status: pending.
+- kaggle_validation_status: version_1_failed_not_green.
+- kaggle_v1_evidence: Runtime config reached production path: `RUN_START ... B_MICRO=8192 K_EXPAND_TILE=196608 BUCKET_CAP_PER_PEER=262144 cuda_graphs=1`, `CUDA_GRAPHS_ENABLED true`, `CONFIG_GUARD_OK` on both ranks, and `BeamEngine Config Summary` showed `K_EXPAND_TILE: 196608`, `BUCKET_CAP_PER_PEER: 262144`, `BUCKET_CAP_PER_PEER_SAFE: 262144`.
+- kaggle_v1_failure: Runner produced `TASK_DONE` rows for 100 tasks, but 99 tasks per rank became `status=error`; rank0 asserted `error_count=198`; `RUN_SUMMARY` absent; green claim forbidden.
+- corrective_change_pending: Runner now prints `TASK_ERROR task_idx=<i> ... note=<exception>` and performs rank-uniform `RUN_ABORT` on first error so next Kaggle run gives specific task exception without full output download.
 - green_claim: false until Kaggle status COMPLETE, torchrun returncode 0, runtime invariants, CUDA Graphs enabled log, no NCCL timeout, output rows 100, and error count 0 are confirmed.
 
 ## 2026-05-18 architecture_v6_depth_loop_frontier_drain_fix
