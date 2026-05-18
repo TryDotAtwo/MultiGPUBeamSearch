@@ -26,6 +26,11 @@ SCORE_BIN_COUNT = 76801
 UINT32_MAX = 0xFFFFFFFF
 
 
+def pow2_ceil(value: int) -> int:
+    value = max(int(value), 1)
+    return 1 << (value - 1).bit_length()
+
+
 @dataclass
 class ProductionV6Result:
     task_id: int
@@ -166,6 +171,8 @@ class ProductionV6Dispatcher:
         self.b_micro = int(b_micro)
         self.ext = beam_engine.build_extension(verbose=False)
         cfg = beam_engine.make_default_config()
+        required_candidate_capacity = self.b_micro * MOVE_COUNT
+        bucket_cap_per_peer = pow2_ceil(max(131072, required_candidate_capacity))
         cfg.update(
             {
                 "world_size": self.world_size,
@@ -174,11 +181,11 @@ class ProductionV6Dispatcher:
                 "b_micro": self.b_micro,
                 "score_ring_depth": 1,
                 "net_ring_depth": 1,
-                "bucket_cap_per_peer": max(4096, self.b_micro * MOVE_COUNT),
-                "k_expand_tile": self.b_micro * MOVE_COUNT,
+                "bucket_cap_per_peer": bucket_cap_per_peer,
+                "k_expand_tile": required_candidate_capacity,
                 "inference_parallelism": 1,
-                "stream3_batch_candidates": self.b_micro * MOVE_COUNT,
-                "stream4_batch_candidates": max(2, min(self.b_micro * MOVE_COUNT, 256)),
+                "stream3_batch_candidates": required_candidate_capacity,
+                "stream4_batch_candidates": max(2, min(required_candidate_capacity, 256)),
                 "stream4_batch_candidates_per_shard_unit": 2,
                 "shard_count": 1,
                 "max_depth": int(os.environ.get("MAX_DEPTH", "20")),

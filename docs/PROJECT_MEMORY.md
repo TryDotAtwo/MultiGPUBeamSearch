@@ -1,5 +1,24 @@
 # Project Memory
 
+## 2026-05-18 architecture_v6_depth_loop_frontier_drain_fix
+
+- entity_id: `architecture_v6_depth_loop_frontier_drain_fix`
+- type: `patch_stage`
+- state: `host_green_kaggle_pending`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested cleanup and verification of current frontier-drain plus Stream5 receive-capacity fix against architecture_v6, without architecture expansion, performance tuning, legacy solver substitution, path reconstruction changes, action convention changes, or logical120/State128 boundary changes.
+- constraints_preserved: no fallback backend, no runtime 120-slice, no separate `nn_input_120_buffer`, no legacy/staged solver substitution, no performance tuning, no Stream3/Stream4 semantic change, no path reconstruction change, no solver-quality claim.
+- code_change: `production_v6_dispatcher.py::_run_stream5` remains cleaned to derive `remote_capacity` only from `self.cfg["bucket_cap_per_peer"]`, allocate `remote_recv` by capacity, create `recv_count` and `recv_offset` before `torch.cuda.synchronize()`, call `self.engine.v6_stream5_exchange_candidate_meta(...)` before synchronization, assert `remote_recv_count <= remote_capacity`, and return exactly `remote_recv`, `recv_count`, `recv_offset`, `remote_recv_count`, `remote_capacity`.
+- code_change: `production_v6_dispatcher.py` now derives dispatcher `bucket_cap_per_peer` with `pow2_ceil(max(131072, b_micro * MOVE_COUNT))`; for `B_MICRO=8192`, `MOVE_COUNT=24`, `K_EXPAND_TILE=196608`, dispatcher capacity becomes `262144`.
+- code_change: `tests/frontier_coverage_audit_world2.py` now defaults `FRONTIER_COVERAGE_B_MICRO` to `8192` for the requested Kaggle frontier coverage audit target.
+- test_change: `tests/test_architecture_v6_static.py` adds static guards for Stream5 capacity source, absence of `stream3["unique_count"]` receive-capacity use, no duplicate `remote_recv_count` return key, exchange-before-synchronize ordering, dispatcher capacity derivation, `B_MICRO=8192` pow2 result `262144`, frontier drain loop, parent offset increment, depth row counters, and C++ capacity derivation.
+- host_verification: `python -m py_compile production_v6_dispatcher.py beam_engine.py tests\frontier_coverage_audit_world2.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `46 passed`.
+- static_audit: searched for quick-patch Stream5 capacity artifact and verified no remaining `remote_capacity = max(int(stream3...` match in edited dispatcher.
+- kaggle_validation_status: pending; required target is frontier coverage audit on Kaggle 2xT4 with `task_count=10`, `max_depth=12`, `beam_width=65536`, `b_micro=8192`.
+- green_claim: false until Kaggle 2xT4 frontier coverage audit passes with runtime markers, output CSV, JSONL, and coverage invariants.
+- test_result_file: `test_results/architecture_v6_depth_loop_frontier_drain_fix_2026-05-18.md`
+
 ## 2026-05-18 architecture_v6_stream1_state128_input_fix
 
 - entity_id: `architecture_v6_stream1_state128_input_fix`

@@ -34,7 +34,7 @@ def main() -> None:
         beam_width=beam_width,
         output_path=Path("/kaggle/working/frontier_coverage_audit_world2.csv"),
         audit_path=Path("/kaggle/working/frontier_coverage_audit_world2.jsonl"),
-        b_micro=int(os.environ.get("FRONTIER_COVERAGE_B_MICRO", "4")),
+        b_micro=int(os.environ.get("FRONTIER_COVERAGE_B_MICRO", "8192")),
     )
     if result["legacy_next_state_pool_path"] or result["prefilled_score_ring_fake_path"] or result["runtime_120_slice"] or result["fallback_backend"]:
         raise AssertionError(f"forbidden path flag true: {result}")

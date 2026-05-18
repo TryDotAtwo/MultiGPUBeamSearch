@@ -1169,6 +1169,7 @@ def test_frontier_coverage_audit_world2_contract():
         "task_count=10",
         "max_depth=12",
         "beam_width=65536",
+        '"8192"',
         "FRONTIER_COVERAGE_AUDIT_WORLD2_OK",
         "FRONTIER_COVERAGE_AUDIT_WORLD2_TEST_COMPLETE",
         "coverage_failure_count",
@@ -1205,3 +1206,84 @@ def test_frontier_coverage_audit_world2_contract():
         assert needle in dispatcher_text
     for needle in forbidden:
         assert needle not in test_text
+
+
+def test_architecture_v6_frontier_drain_and_stream5_capacity_static_guards():
+    import ast
+
+    dispatcher_path = ROOT / "production_v6_dispatcher.py"
+    dispatcher_text = dispatcher_path.read_text(encoding="utf-8")
+    tree = ast.parse(dispatcher_text)
+
+    stream5_fn = next(
+        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "_run_stream5"
+    )
+    stream5_text = ast.get_source_segment(dispatcher_text, stream5_fn)
+    assert 'remote_capacity = max(int(self.cfg["bucket_cap_per_peer"]), 1)' in stream5_text
+    assert 'stream3.get("unique_count"' not in stream5_text
+    assert 'stream3["unique_count"]' not in stream5_text
+    assert "v6_stream5_exchange_candidate_meta" in stream5_text
+    assert stream5_text.index("recv_count = torch.zeros") < stream5_text.index("torch.cuda.synchronize()")
+    assert stream5_text.index("recv_offset = torch.zeros") < stream5_text.index("torch.cuda.synchronize()")
+    assert stream5_text.index("v6_stream5_exchange_candidate_meta") < stream5_text.index("torch.cuda.synchronize()")
+
+    return_dicts = [
+        node for node in ast.walk(stream5_fn) if isinstance(node, ast.Dict)
+    ]
+    stream5_return = return_dicts[-1]
+    return_keys = [key.value for key in stream5_return.keys if isinstance(key, ast.Constant)]
+    assert return_keys == [
+        "remote_recv",
+        "recv_count",
+        "recv_offset",
+        "remote_recv_count",
+        "remote_capacity",
+    ]
+    assert len(return_keys) == len(set(return_keys))
+
+    init_fn = next(
+        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "__init__"
+    )
+    init_text = ast.get_source_segment(dispatcher_text, init_fn)
+    assert "required_candidate_capacity = self.b_micro * MOVE_COUNT" in init_text
+    assert "bucket_cap_per_peer = pow2_ceil(max(131072, required_candidate_capacity))" in init_text
+    assert '"bucket_cap_per_peer": bucket_cap_per_peer' in init_text
+    assert '"k_expand_tile": required_candidate_capacity' in init_text
+    assert '"stream3_batch_candidates": required_candidate_capacity' in init_text
+    assert "pow2_ceil(max(131072, required_candidate_capacity))" in init_text
+    assert (1 << ((8192 * 24) - 1).bit_length()) == 262144
+
+    run_task_fn = next(
+        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "run_task"
+    )
+    run_task_text = ast.get_source_segment(dispatcher_text, run_task_fn)
+    assert "parent_offset = 0" in run_task_text
+    assert "while parent_offset < len(current):" in run_task_text
+    assert 'parent_offset += int(stream12.get("frontier_count", 0))' in run_task_text
+    assert run_task_text.index("while parent_offset < len(current):") < run_task_text.index("allreduce_score_threshold")
+
+    required_depth_counters = [
+        "current_frontier_size_before",
+        "expanded_parent_count",
+        "stream1_scored_parent_count",
+        "stream2_generated_candidate_count",
+        "stream3_unique_count",
+        "stream4_clean_count",
+        "next_frontier_size_after",
+    ]
+    for counter in required_depth_counters:
+        assert counter in dispatcher_text
+
+
+def test_beam_engine_capacity_derivation_covers_expand_tile_static_guard():
+    cpp_text = (ROOT / "beam_engine.cpp").read_text(encoding="utf-8")
+    required = [
+        "required_candidate_capacity = std::max<int64_t>(1, static_cast<int64_t>(k_expand_tile))",
+        "base_safe = std::max<int64_t>(131072, required_candidate_capacity)",
+        "bucket_cap_per_peer_safe = static_cast<int64_t>(pow2_ceil(base_safe))",
+        'throw std::runtime_error("bucket_cap_per_peer_safe is smaller than K_EXPAND_TILE")',
+        "bucket_cap_per_peer = static_cast<int>(bucket_cap_per_peer_safe)",
+        "K_EXPAND_TILE=196608 -> bucket_cap_per_peer_safe=262144",
+    ]
+    for needle in required:
+        assert needle in cpp_text
