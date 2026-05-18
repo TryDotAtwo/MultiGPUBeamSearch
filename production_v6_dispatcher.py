@@ -49,6 +49,8 @@ def require_production_microbatch(b_micro: int) -> int:
 
 
 def collective_seq_debug(rank: int, task_idx: int, depth: int, seq_tag: str, op: str, local_flag: int, local_next_count: int) -> None:
+    if os.environ.get("COLLECTIVE_SEQ_DEBUG", "0").strip().lower() in {"", "0", "false", "no", "off"}:
+        return
     print(
         "COLLECTIVE_SEQ_TAG "
         f"rank={int(rank)} task_idx={int(task_idx)} depth={int(depth)} "
@@ -193,7 +195,7 @@ def allreduce_score_threshold(
 class ProductionV6Dispatcher:
     def __init__(self, rank: int, world_size: int, device: torch.device, *, beam_width: int, b_micro: int) -> None:
         os.environ["INFERENCE_BACKEND"] = "fullbeamnice_static"
-        os.environ["USE_CUDA_GRAPHS"] = "0"
+        os.environ.setdefault("USE_CUDA_GRAPHS", "1")
         os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "7.5")
         self.rank = int(rank)
         self.world_size = int(world_size)
@@ -231,9 +233,10 @@ class ProductionV6Dispatcher:
         if int(cfg["bucket_cap_per_peer"]) != 262144:
             raise RuntimeError(f"invalid_config: BeamEngine BUCKET_CAP_PER_PEER must be 262144, got {cfg['bucket_cap_per_peer']}")
         print(
-            "PRODUCTION_V6_CONFIG_GUARD "
+            "CONFIG_GUARD_OK "
             f"rank={self.rank} B_MICRO={cfg['b_micro']} K_EXPAND_TILE={cfg['k_expand_tile']} "
-            f"BUCKET_CAP_PER_PEER={cfg['bucket_cap_per_peer']}",
+            f"BUCKET_CAP_PER_PEER={cfg['bucket_cap_per_peer']} "
+            f"cuda_graphs={int(os.environ.get('USE_CUDA_GRAPHS', '1') != '0')}",
             flush=True,
         )
         self.cfg = cfg

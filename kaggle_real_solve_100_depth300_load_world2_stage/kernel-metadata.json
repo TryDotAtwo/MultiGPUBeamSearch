@@ -1,0 +1,13 @@
+{
+  "id": "trydotatwo/real-solve-100-depth300-load-w2",
+  "title": "real solve 100 depth300 load w2",
+  "code_file": "real_solve_100_depth300_load_world2.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

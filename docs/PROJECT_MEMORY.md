@@ -1,5 +1,22 @@
 # Project Memory
 
+## 2026-05-18 architecture_v6_real_solve_100_depth300_load_world2
+
+- entity_id: `architecture_v6_real_solve_100_depth300_load_world2`
+- type: `production_load_validation`
+- state: `host_green_kaggle_pending`
+- source_of_truth: `AGENTS.md`, `docs/PROJECT_MEMORY.md`, `docs/ARCHITECTURE_NEED.md`
+- prompt_summary: User requested production-load validation on Kaggle 2xT4 for `data/test.csv`, `task_count=100`, `max_depth=300`, `beam_width=65536`, with hard invariants `B_MICRO=8192`, `K_EXPAND_TILE=196608`, `BUCKET_CAP_PER_PEER=262144`, CUDA Graphs enabled, live stdout, sparse task-level logs, no per-depth progress spam, and no quality/leaderboard claim.
+- code_change: `production_v6_dispatcher.py` no longer forces `USE_CUDA_GRAPHS=0`; it preserves caller config with default `USE_CUDA_GRAPHS=1` and prints `CONFIG_GUARD_OK` with `cuda_graphs=1`.
+- code_change: `production_v6_dispatcher.py` gates `COLLECTIVE_SEQ_TAG` debug logs behind `COLLECTIVE_SEQ_DEBUG=1`, so production-load stage avoids depth-level collective spam.
+- runner_added: `tests/real_solve_100_depth300_load_world2.py` runs `100` tasks at `max_depth=300`, writes `/kaggle/working/real_solve_100_depth300_load_world2.csv`, logs `RUN_START`, `CUDA_GRAPHS_ENABLED true`, `TASK_SOLVED`, `TASK_DONE`, `HEARTBEAT`, `RUN_SUMMARY`, and rejects errors / wrong output row count.
+- kaggle_stage_added: `kaggle_real_solve_100_depth300_load_world2_stage` uses live `subprocess.Popen` stdout streaming, `PYTHONUNBUFFERED=1`, `torchrun --standalone --nnodes=1 --nproc_per_node=2`, `USE_CUDA_GRAPHS=1`, and hard invariant env values.
+- test_change: `tests/test_architecture_v6_static.py::test_real_solve_100_depth300_load_world2_contract` added.
+- host_verification: `python -m py_compile production_v6_dispatcher.py tests\real_solve_100_depth300_load_world2.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `48 passed`.
+- kaggle_validation_status: pending.
+- green_claim: false until Kaggle status COMPLETE, torchrun returncode 0, runtime invariants, CUDA Graphs enabled log, no NCCL timeout, output rows 100, and error count 0 are confirmed.
+
 ## 2026-05-18 architecture_v6_depth_loop_frontier_drain_fix
 
 - entity_id: `architecture_v6_depth_loop_frontier_drain_fix`

@@ -1110,6 +1110,65 @@ def test_full_test_csv_depth300_beam65536_world2_contract():
         assert needle not in test_text
 
 
+def test_real_solve_100_depth300_load_world2_contract():
+    runner_text = (ROOT / "tests" / "real_solve_100_depth300_load_world2.py").read_text(encoding="utf-8")
+    notebook_text = (ROOT / "kaggle_real_solve_100_depth300_load_world2_stage" / "real_solve_100_depth300_load_world2.ipynb").read_text(encoding="utf-8")
+    metadata_text = (ROOT / "kaggle_real_solve_100_depth300_load_world2_stage" / "kernel-metadata.json").read_text(encoding="utf-8")
+    dispatcher_text = (ROOT / "production_v6_dispatcher.py").read_text(encoding="utf-8")
+    required_runner = [
+        "TASK_COUNT = 100",
+        "MAX_DEPTH = 300",
+        "BEAM_WIDTH = 65536",
+        "BUCKET_CAP_PER_PEER = 262144",
+        "assert PRODUCTION_B_MICRO == 8192",
+        "assert PRODUCTION_K_EXPAND_TILE == 196608",
+        "RUN_START",
+        "CUDA_GRAPHS_ENABLED true",
+        "TASK_SOLVED",
+        "TASK_DONE",
+        "HEARTBEAT",
+        "RUN_SUMMARY",
+        "REAL_SOLVE_100_DEPTH300_LOAD_WORLD2_OK",
+        "unsolved_empty_frontier",
+        "unsolved_pruned",
+        "error_count",
+    ]
+    required_notebook = [
+        "subprocess.Popen",
+        "PYTHONUNBUFFERED",
+        "USE_CUDA_GRAPHS",
+        "\\\"1\\\"",
+        "B_MICRO",
+        "8192",
+        "K_EXPAND_TILE",
+        "196608",
+        "BUCKET_CAP_PER_PEER",
+        "262144",
+        "--nproc_per_node=2",
+        "returncode {returncode}",
+        "REAL_SOLVE_100_DEPTH300_LOAD_WORLD2_TEST_COMPLETE",
+    ]
+    forbidden = [
+        "FRONTIER_COVERAGE_AUDIT_PROGRESS",
+        "LOG_EACH_DEPTH\", \"1\"",
+        "capture_output=True",
+        "central_hamming",
+        "torchscript_ensemble",
+        "nn_input",
+    ]
+    for needle in required_runner:
+        assert needle in runner_text
+    for needle in required_notebook:
+        assert needle in notebook_text
+    assert '"id": "trydotatwo/real-solve-100-depth300-load-w2"' in metadata_text
+    assert '"enable_gpu": true' in metadata_text
+    assert "CONFIG_GUARD_OK" in dispatcher_text
+    assert "os.environ.setdefault(\"USE_CUDA_GRAPHS\", \"1\")" in dispatcher_text
+    for needle in forbidden:
+        assert needle not in runner_text
+        assert needle not in notebook_text
+
+
 def test_real_data_100samples_depth300_beam65536_path_audit_world2_contract():
     test_text = (ROOT / "tests" / "real_data_100samples_depth300_beam65536_path_audit_world2.py").read_text(encoding="utf-8")
     dispatcher_text = (ROOT / "production_v6_dispatcher.py").read_text(encoding="utf-8")
