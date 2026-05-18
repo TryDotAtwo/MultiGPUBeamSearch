@@ -33,7 +33,7 @@ def main() -> None:
         beam_width=beam_width,
         output_path=Path("/kaggle/working/full_test_csv_depth300_beam65536_world2.csv"),
         stats_path=Path("/kaggle/working/full_test_csv_depth300_beam65536_world2_stats.jsonl"),
-        b_micro=int(os.environ.get("FULL_TEST_B_MICRO", "4")),
+        b_micro=int(os.environ.get("FULL_TEST_B_MICRO", "8192")),
     )
     if result["legacy_next_state_pool_path"] or result["prefilled_score_ring_fake_path"] or result["runtime_120_slice"] or result["fallback_backend"]:
         raise AssertionError(f"forbidden path flag true: {result}")

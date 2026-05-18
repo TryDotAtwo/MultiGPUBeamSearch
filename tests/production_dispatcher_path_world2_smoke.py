@@ -34,7 +34,7 @@ def main() -> None:
         beam_width=beam_width,
         output_path=Path(os.environ.get("PRODUCTION_V6_OUTPUT_PATH", "/kaggle/working/production_v6_dispatcher_path_world2.csv")),
         stats_path=Path(os.environ.get("PRODUCTION_V6_STATS_PATH", "/kaggle/working/production_v6_dispatcher_path_world2_stats.jsonl")),
-        b_micro=int(os.environ.get("PRODUCTION_V6_B_MICRO", "4")),
+        b_micro=int(os.environ.get("PRODUCTION_V6_B_MICRO", "8192")),
     )
     allowed_statuses = {"solved", "unsolved", "max_depth_reached"}
     if set(result["status_counts"]) != allowed_statuses:

@@ -21,6 +21,19 @@ entity_id=architecture_v6_depth_loop_frontier_drain_fix; type=test_result_record
 - command=`python -m py_compile production_v6_dispatcher.py beam_engine.py tests\frontier_coverage_audit_world2.py tests\test_architecture_v6_static.py`; result=pass
 - command=`python -m pytest tests\test_architecture_v6_static.py -q`; result=pass; summary=`46 passed in 0.34s`
 
+## Hard Invariant Update
+
+- invariant=`B_MICRO = 8192`
+- invariant=`K_EXPAND_TILE = 8192 * 24 = 196608`
+- forbidden=[B_MICRO_less_than_8192,B_MICRO_4,K_EXPAND_TILE_not_196608,tiny_microbatch_frontier_dispatcher_stream5_test,green_claim_after_tiny_path]
+- code_guard=`production_v6_dispatcher.py::require_production_microbatch`
+- code_guard_behavior=`invalid_config` raised when `B_MICRO != 8192` or `K_EXPAND_TILE != 196608`
+- test_guard=`tests/test_architecture_v6_static.py::test_architecture_v6_production_microbatch_hard_invariant`
+- touched_paths=[production_v6_dispatcher.py,tests/frontier_coverage_audit_world2.py,tests/production_dispatcher_path_world2_smoke.py,tests/real_data_100samples_depth300_beam65536_world2.py,tests/real_data_100samples_depth300_beam65536_path_audit_world2.py,tests/full_test_csv_depth300_beam65536_world2.py,tests/stream5_exchange_smoke.py,tests/stream5_2gpu_nccl_explicit_smoke.py,kaggle_frontier_coverage_audit_world2_stage/frontier_coverage_audit_world2.ipynb]
+- command=`python -m py_compile production_v6_dispatcher.py tests\frontier_coverage_audit_world2.py tests\production_dispatcher_path_world2_smoke.py tests\real_data_100samples_depth300_beam65536_world2.py tests\real_data_100samples_depth300_beam65536_path_audit_world2.py tests\full_test_csv_depth300_beam65536_world2.py tests\stream5_exchange_smoke.py tests\stream5_2gpu_nccl_explicit_smoke.py tests\test_architecture_v6_static.py`; result=pass
+- command=`python -m pytest tests\test_architecture_v6_static.py -q`; result=pass; summary=`47 passed in 0.23s`
+- kaggle_retry_status=not_run_after_hard_invariant_update
+
 ## Pending External Validation
 
 - target=Kaggle_2xT4_frontier_coverage_audit

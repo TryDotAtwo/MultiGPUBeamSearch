@@ -1208,6 +1208,45 @@ def test_frontier_coverage_audit_world2_contract():
         assert needle not in test_text
 
 
+def test_architecture_v6_production_microbatch_hard_invariant():
+    dispatcher_text = (ROOT / "production_v6_dispatcher.py").read_text(encoding="utf-8")
+    kaggle_text = (ROOT / "kaggle_frontier_coverage_audit_world2_stage" / "frontier_coverage_audit_world2.ipynb").read_text(encoding="utf-8")
+    production_test_paths = [
+        ROOT / "tests" / "frontier_coverage_audit_world2.py",
+        ROOT / "tests" / "production_dispatcher_path_world2_smoke.py",
+        ROOT / "tests" / "real_data_100samples_depth300_beam65536_world2.py",
+        ROOT / "tests" / "real_data_100samples_depth300_beam65536_path_audit_world2.py",
+        ROOT / "tests" / "full_test_csv_depth300_beam65536_world2.py",
+        ROOT / "tests" / "stream5_exchange_smoke.py",
+        ROOT / "tests" / "stream5_2gpu_nccl_explicit_smoke.py",
+    ]
+    required_driver = [
+        "PRODUCTION_B_MICRO = 8192",
+        "PRODUCTION_K_EXPAND_TILE = PRODUCTION_B_MICRO * MOVE_COUNT",
+        "assert PRODUCTION_B_MICRO == 8192",
+        "assert PRODUCTION_K_EXPAND_TILE == 196608",
+        "def require_production_microbatch",
+        "invalid_config: B_MICRO must be",
+        "invalid_config: K_EXPAND_TILE must be",
+        "self.b_micro = require_production_microbatch(b_micro)",
+        "assert required_candidate_capacity == PRODUCTION_K_EXPAND_TILE",
+    ]
+    for needle in required_driver:
+        assert needle in dispatcher_text
+    for path in production_test_paths:
+        text = path.read_text(encoding="utf-8")
+        assert '"8192"' in text or "PRODUCTION_B_MICRO" in text
+        assert '_B_MICRO", "4"' not in text
+        assert 'FRONTIER_COVERAGE_B_MICRO"] = "4"' not in text
+        assert '"k_expand_tile": 96' not in text
+        assert 'cfg["k_expand_tile"] = 48' not in text
+        assert 'cfg["b_micro"] = 2' not in text
+        assert 'cfg["b_micro"] = 4' not in text
+    assert 'FRONTIER_COVERAGE_B_MICRO' in kaggle_text
+    assert '8192' in kaggle_text
+    assert 'FRONTIER_COVERAGE_B_MICRO\\"] = \\"4\\"' not in kaggle_text
+
+
 def test_architecture_v6_frontier_drain_and_stream5_capacity_static_guards():
     import ast
 

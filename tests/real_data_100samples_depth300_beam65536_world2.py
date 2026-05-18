@@ -34,7 +34,7 @@ def main() -> None:
         beam_width=beam_width,
         output_path=Path("/kaggle/working/real_data_100samples_depth300_beam65536_world2.csv"),
         stats_path=Path("/kaggle/working/real_data_100samples_depth300_beam65536_world2_stats.jsonl"),
-        b_micro=int(os.environ.get("REAL_DATA_100_B_MICRO", "4")),
+        b_micro=int(os.environ.get("REAL_DATA_100_B_MICRO", "8192")),
     )
     if int(result["task_count"]) != task_count:
         raise AssertionError(f"task_count mismatch: {result}")

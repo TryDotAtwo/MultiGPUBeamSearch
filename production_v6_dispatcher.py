@@ -24,11 +24,28 @@ STATE_VALUE_PAD = 128
 MOVE_COUNT = 24
 SCORE_BIN_COUNT = 76801
 UINT32_MAX = 0xFFFFFFFF
+PRODUCTION_B_MICRO = 8192
+PRODUCTION_K_EXPAND_TILE = PRODUCTION_B_MICRO * MOVE_COUNT
+
+assert PRODUCTION_B_MICRO == 8192
+assert PRODUCTION_K_EXPAND_TILE == 196608
 
 
 def pow2_ceil(value: int) -> int:
     value = max(int(value), 1)
     return 1 << (value - 1).bit_length()
+
+
+def require_production_microbatch(b_micro: int) -> int:
+    b_micro = int(b_micro)
+    k_expand_tile = b_micro * MOVE_COUNT
+    if b_micro != PRODUCTION_B_MICRO:
+        raise RuntimeError(f"invalid_config: B_MICRO must be {PRODUCTION_B_MICRO}, got {b_micro}")
+    if k_expand_tile != PRODUCTION_K_EXPAND_TILE:
+        raise RuntimeError(f"invalid_config: K_EXPAND_TILE must be {PRODUCTION_K_EXPAND_TILE}, got {k_expand_tile}")
+    assert b_micro == 8192
+    assert k_expand_tile == 196608
+    return b_micro
 
 
 @dataclass
@@ -168,10 +185,11 @@ class ProductionV6Dispatcher:
         self.world_size = int(world_size)
         self.device = device
         self.beam_width = int(beam_width)
-        self.b_micro = int(b_micro)
+        self.b_micro = require_production_microbatch(b_micro)
         self.ext = beam_engine.build_extension(verbose=False)
         cfg = beam_engine.make_default_config()
         required_candidate_capacity = self.b_micro * MOVE_COUNT
+        assert required_candidate_capacity == PRODUCTION_K_EXPAND_TILE
         bucket_cap_per_peer = pow2_ceil(max(131072, required_candidate_capacity))
         cfg.update(
             {
@@ -708,7 +726,7 @@ def run_real_data_production_v6_world2(
     beam_width: int,
     output_path: Path,
     stats_path: Path,
-    b_micro: int = 4,
+    b_micro: int = PRODUCTION_B_MICRO,
 ) -> dict[str, Any]:
     rank, world_size, device = require_world2_t4_runtime()
     dispatcher = ProductionV6Dispatcher(rank, world_size, device, beam_width=beam_width, b_micro=b_micro)
@@ -781,7 +799,7 @@ def run_real_data_production_v6_world2_detailed(
     beam_width: int,
     output_path: Path,
     stats_path: Path,
-    b_micro: int = 4,
+    b_micro: int = PRODUCTION_B_MICRO,
 ) -> dict[str, Any]:
     rank, world_size, device = require_world2_t4_runtime()
     dispatcher = ProductionV6Dispatcher(rank, world_size, device, beam_width=beam_width, b_micro=b_micro)
@@ -891,7 +909,7 @@ def run_real_data_path_audit_world2(
     beam_width: int,
     output_path: Path,
     audit_path: Path,
-    b_micro: int = 4,
+    b_micro: int = PRODUCTION_B_MICRO,
 ) -> dict[str, Any]:
     rank, world_size, device = require_world2_t4_runtime()
     dispatcher = ProductionV6Dispatcher(rank, world_size, device, beam_width=beam_width, b_micro=b_micro)
@@ -1121,8 +1139,9 @@ def run_frontier_coverage_audit_world2(
     beam_width: int,
     output_path: Path,
     audit_path: Path,
-    b_micro: int = 4,
+    b_micro: int = PRODUCTION_B_MICRO,
 ) -> dict[str, Any]:
+    b_micro = require_production_microbatch(b_micro)
     known_path_result = validate_known_paths(task_count=min(task_count, 10))
     if not known_path_result["known_path_replay_valid"]:
         raise AssertionError(f"known path replay failed: {known_path_result}")

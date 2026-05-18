@@ -16,6 +16,12 @@
 - host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `46 passed`.
 - static_audit: searched for quick-patch Stream5 capacity artifact and verified no remaining `remote_capacity = max(int(stream3...` match in edited dispatcher.
 - kaggle_validation_status: pending; required target is frontier coverage audit on Kaggle 2xT4 with `task_count=10`, `max_depth=12`, `beam_width=65536`, `b_micro=8192`.
+- hard_invariant_update: User fixed `B_MICRO=8192` and `K_EXPAND_TILE=196608` as mandatory production frontier/dispatcher/Stream5 invariants; `B_MICRO < 8192`, `B_MICRO=4`, and `K_EXPAND_TILE != 196608` are invalid for architecture_v6 frontier/dispatcher/Stream5 validation.
+- hard_invariant_code_change: `production_v6_dispatcher.py` now declares `PRODUCTION_B_MICRO=8192`, `PRODUCTION_K_EXPAND_TILE=196608`, module asserts for both values, and `require_production_microbatch()` raising `invalid_config` for mismatched `B_MICRO` or `K_EXPAND_TILE`.
+- hard_invariant_code_change: production dispatcher, real-data runner, path-audit runner, frontier coverage audit runner, full-test runner, Stream5 exchange smoke, explicit Stream5 2GPU smoke, and Kaggle frontier coverage notebook now default to production-scale `B_MICRO=8192` / `K_EXPAND_TILE=196608` where applicable.
+- hard_invariant_test_change: `tests/test_architecture_v6_static.py::test_architecture_v6_production_microbatch_hard_invariant` added to reject tiny production frontier/dispatcher/Stream5 defaults and require the explicit hard invariant.
+- host_verification_after_hard_invariant: `python -m py_compile production_v6_dispatcher.py tests\frontier_coverage_audit_world2.py tests\production_dispatcher_path_world2_smoke.py tests\real_data_100samples_depth300_beam65536_world2.py tests\real_data_100samples_depth300_beam65536_path_audit_world2.py tests\full_test_csv_depth300_beam65536_world2.py tests\stream5_exchange_smoke.py tests\stream5_2gpu_nccl_explicit_smoke.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest_after_hard_invariant: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `47 passed`.
 - green_claim: false until Kaggle 2xT4 frontier coverage audit passes with runtime markers, output CSV, JSONL, and coverage invariants.
 - test_result_file: `test_results/architecture_v6_depth_loop_frontier_drain_fix_2026-05-18.md`
 

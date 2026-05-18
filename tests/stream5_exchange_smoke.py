@@ -13,6 +13,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import beam_engine
 
+PRODUCTION_B_MICRO = 8192
+PRODUCTION_K_EXPAND_TILE = PRODUCTION_B_MICRO * 24
+
+assert PRODUCTION_B_MICRO == 8192
+assert PRODUCTION_K_EXPAND_TILE == 196608
+
 
 def pack_meta(lo: int, hi: int, parent_idx: int, score_key: int, route: int) -> bytes:
     return struct.pack("<QQQII", lo, hi, parent_idx, score_key, route)
@@ -22,12 +28,12 @@ def make_cfg() -> dict:
     cfg = beam_engine.make_default_config()
     cfg["world_size"] = int(os.environ.get("WORLD_SIZE", "1"))
     cfg["rank"] = int(os.environ.get("RANK", "0"))
-    cfg["global_beam_width"] = 64
-    cfg["b_micro"] = 2
+    cfg["global_beam_width"] = 65536
+    cfg["b_micro"] = PRODUCTION_B_MICRO
     cfg["score_ring_depth"] = 1
     cfg["net_ring_depth"] = 1
-    cfg["bucket_cap_per_peer"] = 8
-    cfg["k_expand_tile"] = 48
+    cfg["bucket_cap_per_peer"] = 262144
+    cfg["k_expand_tile"] = PRODUCTION_K_EXPAND_TILE
     cfg["inference_parallelism"] = 1
     cfg["max_depth"] = 1
     cfg["inference_backend"] = "fullbeamnice_static"
@@ -71,7 +77,7 @@ def main() -> None:
 
     world = cfg["world_size"]
     rank = cfg["rank"]
-    max_records = max(4, world * 2)
+    max_records = int(cfg["bucket_cap_per_peer"])
     send_count_host = np.zeros((world,), dtype=np.int32)
     send_offset_host = np.zeros((world + 1,), dtype=np.int32)
     send_records: list[bytes] = []
