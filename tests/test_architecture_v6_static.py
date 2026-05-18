@@ -1065,3 +1065,94 @@ def test_real_data_100samples_depth300_beam65536_world2_contract():
     for needle in forbidden:
         assert needle not in test_text
     assert "first validation max_depth must be 10..20" in smoke_text
+
+
+def test_full_test_csv_depth300_beam65536_world2_contract():
+    test_text = (ROOT / "tests" / "full_test_csv_depth300_beam65536_world2.py").read_text(encoding="utf-8")
+    dispatcher_text = (ROOT / "production_v6_dispatcher.py").read_text(encoding="utf-8")
+    required_test = [
+        "run_real_data_production_v6_world2_detailed",
+        "validate_output_paths",
+        "load_test_puzzles(max_puzzles=None)",
+        "FULL_TEST_MAX_DEPTH",
+        "GLOBAL_BEAM_WIDTH",
+        "max_depth=300",
+        "beam_width=65536",
+        "FULL_TEST_CSV_DEPTH300_BEAM65536_WORLD2_OK",
+        "FULL_TEST_CSV_DEPTH300_BEAM65536_WORLD2_TEST_COMPLETE",
+        "path_replay_valid",
+        "no_quality_claim",
+        "no_leaderboard_claim",
+        "no_performance_claim",
+    ]
+    required_dispatcher = [
+        "append_move_to_path",
+        "solved_meta",
+        "current_paths",
+        "validate_output_paths",
+        "replay_path_to_central",
+        "apply_actions_cpu",
+        "solution_len",
+    ]
+    forbidden = [
+        "engine.search",
+        "reset_search",
+        'buffers["next_state_pool"]',
+        "torchscript_ensemble",
+        "central_hamming",
+        "nn_input",
+    ]
+    for needle in required_test:
+        assert needle in test_text
+    for needle in required_dispatcher:
+        assert needle in dispatcher_text
+    for needle in forbidden:
+        assert needle not in test_text
+
+
+def test_real_data_100samples_depth300_beam65536_path_audit_world2_contract():
+    test_text = (ROOT / "tests" / "real_data_100samples_depth300_beam65536_path_audit_world2.py").read_text(encoding="utf-8")
+    dispatcher_text = (ROOT / "production_v6_dispatcher.py").read_text(encoding="utf-8")
+    required_test = [
+        "run_real_data_path_audit_world2",
+        "REAL_DATA_PATH_AUDIT_TASK_COUNT",
+        "REAL_DATA_PATH_AUDIT_MAX_DEPTH",
+        "GLOBAL_BEAM_WIDTH",
+        "task_count=100",
+        "max_depth=300",
+        "beam_width=65536",
+        "REAL_DATA_100SAMPLES_DEPTH300_BEAM65536_PATH_AUDIT_WORLD2_OK",
+        "REAL_DATA_100SAMPLES_DEPTH300_BEAM65536_PATH_AUDIT_WORLD2_TEST_COMPLETE",
+        "failure_counts",
+        "no_quality_claim",
+        "no_leaderboard_claim",
+        "no_performance_claim",
+    ]
+    required_dispatcher = [
+        "run_real_data_path_audit_world2",
+        "raw_solved_record_exists",
+        "solved_parent_idx",
+        "solved_move",
+        "reconstructed_path_exists",
+        "path_replay_valid",
+        "failure_reason",
+        "no_solved_state",
+        "solved_state_but_no_parent_chain",
+        "parent_chain_broken",
+        "replay_failed",
+        "output_writer_empty_path",
+    ]
+    forbidden = [
+        "engine.search",
+        "reset_search",
+        'buffers["next_state_pool"]',
+        "torchscript_ensemble",
+        "central_hamming",
+        "nn_input",
+    ]
+    for needle in required_test:
+        assert needle in test_text
+    for needle in required_dispatcher:
+        assert needle in dispatcher_text
+    for needle in forbidden:
+        assert needle not in test_text

@@ -32,6 +32,13 @@ class ProductionV6Result:
     status: str
     path: str
     depth_rows: list[dict[str, Any]]
+    solved_depth: int = -1
+    solved_rank: int = -1
+    solved_parent_idx: int = -1
+    solved_move: int = -1
+    raw_solved_record_exists: bool = False
+    path_replay_valid: bool = False
+    path_failure_reason: str = ""
 
 
 def require_world2_t4_runtime() -> tuple[int, int, torch.device]:
@@ -95,6 +102,11 @@ def unpack_meta(raw: bytes, idx: int) -> dict[str, int]:
 
 def pack_final_request(parent_idx: int, target_local_idx: int, return_rank: int, move: int) -> bytes:
     return struct.pack("<QIHBB", int(parent_idx), int(target_local_idx), int(return_rank), int(move), 0)
+
+
+def append_move_to_path(path: str, move: int) -> str:
+    move_name = data_loader.ACTION_NAMES[int(move)]
+    return move_name if not path else f"{path}.{move_name}"
 
 
 def histogram_threshold(scores: list[int], keep_count: int) -> int:
@@ -219,6 +231,9 @@ class ProductionV6Dispatcher:
             self.b_micro,
         )
         torch.cuda.synchronize()
+        solved_meta = None
+        if int(solved_count.cpu()[0]) > 0:
+            solved_meta = unpack_meta(solved_meta_list.cpu().numpy().tobytes(), 0)
         return {
             "frontier_count": frontier_count,
             "states_storage": states_storage,
@@ -231,6 +246,7 @@ class ProductionV6Dispatcher:
             "stop_flag": int(stop_flag.cpu()[0]),
             "solved_count": int(solved_count.cpu()[0]),
             "solved_overflow": int(solved_overflow.cpu()[0]),
+            "solved_meta": solved_meta,
         }
 
     def _run_stream3(self, stream12: dict[str, Any], current_threshold: int) -> dict[str, Any]:
@@ -368,7 +384,13 @@ class ProductionV6Dispatcher:
             "processing_flag": int(processing_flag.cpu()[0]),
         }
 
-    def _final_materialize(self, current_frontier_states: torch.Tensor, clean: list[dict[str, int]], current_threshold: int) -> np.ndarray:
+    def _final_materialize(
+        self,
+        current_frontier_states: torch.Tensor,
+        clean: list[dict[str, int]],
+        current_threshold: int,
+        current_paths: list[str] | None = None,
+    ) -> np.ndarray | tuple[np.ndarray, list[str]]:
         keep = [c for c in clean if int(c["score_key"]) <= int(current_threshold)]
         keep_counts = [None for _ in range(self.world_size)]
         dist.all_gather_object(keep_counts, len(keep))
@@ -376,8 +398,14 @@ class ProductionV6Dispatcher:
         prefix = [0, counts[0]]
         global_keep = sum(counts)
         if global_keep == 0:
-            return np.zeros((0, STATE_STORAGE_LEN), dtype=np.uint8)
+            empty = np.zeros((0, STATE_STORAGE_LEN), dtype=np.uint8)
+            return (empty, []) if current_paths is not None else empty
+        gathered_paths: list[list[str] | None] | None = None
+        if current_paths is not None:
+            gathered_paths = [None for _ in range(self.world_size)]
+            dist.all_gather_object(gathered_paths, list(current_paths))
         request_by_peer = [[] for _ in range(self.world_size)]
+        path_by_target_local_idx: dict[int, str] = {}
         expected_local = 0
         for local_idx, candidate in enumerate(keep):
             global_idx = prefix[self.rank] + local_idx
@@ -388,6 +416,11 @@ class ProductionV6Dispatcher:
             source_rank = int(candidate["source_rank"])
             move = int(candidate["move"])
             request_by_peer[source_rank].append(pack_final_request(candidate["parent_idx"], target_local_idx, target_rank, move))
+            if gathered_paths is not None and target_rank == self.rank:
+                source_paths = gathered_paths[source_rank] or []
+                parent_idx = int(candidate["parent_idx"])
+                parent_path = source_paths[parent_idx] if 0 <= parent_idx < len(source_paths) else ""
+                path_by_target_local_idx[target_local_idx] = append_move_to_path(parent_path, move)
         send_request_counts = [len(x) for x in request_by_peer]
         recv_request_counts = [0 for _ in range(self.world_size)]
         send_count_t = torch.tensor(send_request_counts, dtype=torch.int64, device=self.device)
@@ -437,20 +470,47 @@ class ProductionV6Dispatcher:
         if recv_response_total:
             self.ext.v6_final_scatter_responses(recv_response_t, next_frontier, recv_response_total)
             torch.cuda.synchronize()
-        return next_frontier.cpu().numpy().reshape((-1, STATE_STORAGE_LEN))[:recv_response_total].copy()
+        next_states = next_frontier.cpu().numpy().reshape((-1, STATE_STORAGE_LEN))[:recv_response_total].copy()
+        if current_paths is None:
+            return next_states
+        next_paths = [path_by_target_local_idx.get(i, "") for i in range(recv_response_total)]
+        return next_states, next_paths
 
     def run_task(self, task_id: int, state: np.ndarray, max_depth: int, global_beam_width_effective: int) -> ProductionV6Result:
         current = np.zeros((1, STATE_STORAGE_LEN), dtype=np.uint8)
         current[0] = data_loader.pad_state128_u8(state)
+        current_paths = [""]
         current_threshold = UINT32_MAX
         threshold_initialized = False
         depth_rows: list[dict[str, Any]] = []
         status = "max_depth_reached"
+        solved_path = ""
+        solved_depth = -1
+        solved_parent_idx = -1
+        solved_move = -1
+        raw_solved_record_exists = False
+        path_replay_valid = False
+        path_failure_reason = "no_solved_state"
         for depth in range(int(max_depth)):
             start = time.time()
             stream12 = self._run_ring_streams(current, depth)
             if int(stream12["solved_count"]) > 0:
                 status = "solved"
+                solved_meta = stream12.get("solved_meta")
+                solved_depth = int(depth)
+                raw_solved_record_exists = solved_meta is not None
+                if solved_meta is not None:
+                    parent_idx = int(solved_meta["parent_idx"])
+                    solved_parent_idx = parent_idx
+                    solved_move = int(solved_meta["move"])
+                    parent_path = current_paths[parent_idx] if 0 <= parent_idx < len(current_paths) else ""
+                    if 0 <= parent_idx < len(current_paths):
+                        solved_path = append_move_to_path(parent_path, int(solved_meta["move"]))
+                        path_replay_valid, _path_len, path_failure_reason = replay_path_to_central(state, solved_path)
+                    else:
+                        path_failure_reason = "parent_chain_broken"
+                else:
+                    path_failure_reason = "solved_state_but_no_parent_chain"
                 depth_rows.append(self._depth_row(task_id, depth, len(current), threshold_initialized, current_threshold, 0, 0, 0, int(stream12["solved_count"]), 1, start))
                 break
             stream3 = self._run_stream3(stream12, current_threshold)
@@ -464,7 +524,12 @@ class ProductionV6Dispatcher:
                 global_beam_width_effective,
                 self.device,
             )
-            next_current = self._final_materialize(stream12["current_frontier_states"], list(stream4["clean"]), current_threshold)
+            next_current, next_paths = self._final_materialize(
+                stream12["current_frontier_states"],
+                list(stream4["clean"]),
+                current_threshold,
+                current_paths,
+            )
             global_keep_tensor = torch.tensor([len(next_current)], dtype=torch.int64, device=self.device)
             dist.all_reduce(global_keep_tensor, op=dist.ReduceOp.SUM)
             global_keep = int(global_keep_tensor.cpu()[0])
@@ -484,10 +549,23 @@ class ProductionV6Dispatcher:
                 )
             )
             current = next_current
+            current_paths = next_paths
             if global_keep == 0 or len(current) == 0:
                 status = "unsolved"
                 break
-        return ProductionV6Result(task_id=int(task_id), status=status, path="", depth_rows=depth_rows)
+        return ProductionV6Result(
+            task_id=int(task_id),
+            status=status,
+            path=solved_path,
+            depth_rows=depth_rows,
+            solved_depth=solved_depth,
+            solved_rank=self.rank if raw_solved_record_exists else -1,
+            solved_parent_idx=solved_parent_idx,
+            solved_move=solved_move,
+            raw_solved_record_exists=raw_solved_record_exists,
+            path_replay_valid=path_replay_valid,
+            path_failure_reason=path_failure_reason,
+        )
 
     def _depth_row(
         self,
@@ -700,4 +778,208 @@ def run_real_data_production_v6_world2_detailed(
         "prefilled_score_ring_fake_path": False,
         "runtime_120_slice": False,
         "fallback_backend": False,
+    }
+
+
+def run_real_data_path_audit_world2(
+    *,
+    task_count: int,
+    max_depth: int,
+    beam_width: int,
+    output_path: Path,
+    audit_path: Path,
+    b_micro: int = 4,
+) -> dict[str, Any]:
+    rank, world_size, device = require_world2_t4_runtime()
+    dispatcher = ProductionV6Dispatcher(rank, world_size, device, beam_width=beam_width, b_micro=b_micro)
+    puzzles = data_loader.load_test_puzzles(max_puzzles=task_count)
+    if len(puzzles) != int(task_count):
+        raise RuntimeError(f"expected task_count={task_count}, got {len(puzzles)}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "row_id",
+        "initial_state_id",
+        "status",
+        "found_flag",
+        "solved_depth",
+        "solved_rank",
+        "solved_parent_idx",
+        "solved_move",
+        "raw_solved_record_exists",
+        "reconstructed_path_exists",
+        "path_replay_valid",
+        "solution_len",
+        "path",
+        "failure_reason",
+        "rank",
+    ]
+    if rank == 0:
+        with output_path.open("w", newline="", encoding="utf-8") as f:
+            csv.DictWriter(f, fieldnames=fieldnames).writeheader()
+        audit_path.write_text("", encoding="utf-8")
+    dist.barrier()
+    status_counts = {"solved": 0, "unsolved": 0, "max_depth_reached": 0, "error": 0}
+    failure_counts: dict[str, int] = {}
+    local_rows: list[dict[str, Any]] = []
+    for row_id, (task_id, state) in enumerate(puzzles):
+        task_start = time.time()
+        try:
+            result = dispatcher.run_task(int(task_id), state, max_depth, int(beam_width))
+            status = result.status
+            found = status == "solved"
+            solution_len = len(result.path.split(".")) if result.path else 0
+            failure_reason = ""
+            if found and not result.raw_solved_record_exists:
+                failure_reason = "solved_state_but_no_parent_chain"
+            elif found and not result.path:
+                failure_reason = "output_writer_empty_path"
+            elif found and not result.path_replay_valid:
+                failure_reason = result.path_failure_reason or "replay_failed"
+            elif not found:
+                failure_reason = "no_solved_state"
+            else:
+                ok, replay_len, note = replay_path_to_central(state, result.path)
+                if replay_len != solution_len:
+                    failure_reason = "solution_len_mismatch"
+                elif not ok:
+                    failure_reason = note or "replay_failed"
+                else:
+                    failure_reason = "ok"
+            status_counts[status] += 1
+        except Exception as exc:  # noqa: BLE001 - diagnostic runner records per-task failure.
+            result = ProductionV6Result(
+                task_id=int(task_id),
+                status="error",
+                path="",
+                depth_rows=[],
+                path_failure_reason=f"{type(exc).__name__}: {exc}",
+            )
+            status = "error"
+            found = False
+            solution_len = 0
+            failure_reason = result.path_failure_reason
+            status_counts["error"] += 1
+        failure_counts[failure_reason] = failure_counts.get(failure_reason, 0) + 1
+        row = {
+            "row_id": int(row_id),
+            "initial_state_id": int(task_id),
+            "status": status,
+            "found_flag": int(found),
+            "solved_depth": int(result.solved_depth),
+            "solved_rank": int(result.solved_rank),
+            "solved_parent_idx": int(result.solved_parent_idx),
+            "solved_move": int(result.solved_move),
+            "raw_solved_record_exists": int(result.raw_solved_record_exists),
+            "reconstructed_path_exists": int(bool(result.path)),
+            "path_replay_valid": int(bool(result.path_replay_valid)),
+            "solution_len": int(solution_len),
+            "path": result.path,
+            "failure_reason": failure_reason,
+            "rank": int(rank),
+        }
+        local_rows.append(row)
+        if rank == 0:
+            with output_path.open("a", newline="", encoding="utf-8") as f:
+                csv.DictWriter(f, fieldnames=fieldnames).writerow(row)
+        with audit_path.open("a", encoding="utf-8") as f:
+            audit_record = dict(row)
+            audit_record["elapsed_sec"] = float(time.time() - task_start)
+            audit_record["gpu_memory_allocated"] = int(torch.cuda.memory_allocated(device))
+            audit_record["gpu_memory_reserved"] = int(torch.cuda.memory_reserved(device))
+            f.write(json.dumps(audit_record, sort_keys=True) + "\n")
+        print(
+            "REAL_DATA_PATH_AUDIT_PROGRESS "
+            f"task_idx={row_id} rank={rank} status={status} found={int(found)} "
+            f"raw_solved_record_exists={int(result.raw_solved_record_exists)} "
+            f"path_replay_valid={int(result.path_replay_valid)} failure_reason={failure_reason} "
+            f"elapsed_sec={time.time() - task_start:.6f}"
+        )
+    local_counts = torch.tensor(
+        [
+            len(local_rows),
+            status_counts["solved"],
+            status_counts["unsolved"],
+            status_counts["max_depth_reached"],
+            status_counts["error"],
+        ],
+        dtype=torch.int64,
+        device=device,
+    )
+    gathered = [torch.zeros_like(local_counts) for _ in range(world_size)]
+    dist.all_gather(gathered, local_counts)
+    dist.barrier()
+    if rank == 0:
+        with output_path.open("r", encoding="utf-8") as f:
+            output_rows = max(sum(1 for _ in f) - 1, 0)
+        if output_rows != int(task_count):
+            raise AssertionError(f"path audit output row count mismatch: {output_rows} != {task_count}")
+        if not audit_path.exists() or audit_path.stat().st_size <= 0:
+            raise AssertionError("path audit JSONL missing")
+    return {
+        "rank": rank,
+        "world_size": world_size,
+        "task_count": len(local_rows),
+        "status_counts": status_counts,
+        "failure_counts": failure_counts,
+        "gathered_counts": [[int(x) for x in item.cpu().tolist()] for item in gathered],
+        "output_path": str(output_path),
+        "audit_path": str(audit_path),
+        "production_v6_dispatcher_path": True,
+        "legacy_next_state_pool_path": False,
+        "prefilled_score_ring_fake_path": False,
+        "runtime_120_slice": False,
+        "fallback_backend": False,
+    }
+
+
+def replay_path_to_central(state: np.ndarray, path: str) -> tuple[bool, int, str]:
+    if not path:
+        return False, 0, "empty_path"
+    moves = path.split(".")
+    action_set = set(data_loader.ACTION_NAMES)
+    invalid = [move for move in moves if move not in action_set]
+    if invalid:
+        return False, len(moves), f"invalid_moves={invalid[:4]}"
+    replayed = data_loader.apply_actions_cpu(np.asarray(state, dtype=np.uint8), moves)
+    central = data_loader.get_central_state_u8()
+    if not np.array_equal(replayed, central):
+        return False, len(moves), "replay_not_central"
+    return True, len(moves), ""
+
+
+def validate_output_paths(
+    *,
+    output_path: Path,
+    task_count: int,
+) -> dict[str, Any]:
+    puzzles = dict(data_loader.load_test_puzzles(max_puzzles=task_count))
+    solved_rows = 0
+    validated_rows = 0
+    errors: list[str] = []
+    with output_path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("status") != "solved":
+                continue
+            solved_rows += 1
+            task_id = int(row["initial_state_id"])
+            path = row.get("path", "")
+            solution_len = int(row.get("solution_len", "0") or 0)
+            if task_id not in puzzles:
+                errors.append(f"task_id_missing={task_id}")
+                continue
+            ok, replay_len, note = replay_path_to_central(puzzles[task_id], path)
+            if solution_len != replay_len:
+                errors.append(f"task_id={task_id}:solution_len_mismatch:{solution_len}!={replay_len}")
+                continue
+            if not ok:
+                errors.append(f"task_id={task_id}:{note}")
+                continue
+            validated_rows += 1
+    return {
+        "solved_rows": solved_rows,
+        "validated_rows": validated_rows,
+        "errors": errors,
+        "path_replay_valid": solved_rows == validated_rows and not errors,
     }
