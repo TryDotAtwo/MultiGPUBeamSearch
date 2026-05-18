@@ -337,7 +337,7 @@ class ProductionV6Dispatcher:
         }
 
     def _run_stream5(self, stream3: dict[str, Any]) -> dict[str, Any]:
-        remote_capacity = max(int(stream3.get("unique_count", 0)), 1)
+        remote_capacity = max(int(self.cfg["bucket_cap_per_peer"]), 1)
         remote_recv = torch.zeros((remote_capacity * 32,), dtype=torch.uint8, device=self.device)
         recv_count = torch.zeros((self.world_size,), dtype=torch.int32, device=self.device)
         recv_offset = torch.zeros((self.world_size + 1,), dtype=torch.int32, device=self.device)
@@ -350,11 +350,15 @@ class ProductionV6Dispatcher:
             recv_offset,
         )
         torch.cuda.synchronize()
+        remote_recv_count = int(recv_count.cpu().numpy().sum())
+        if remote_recv_count > remote_capacity:
+            raise RuntimeError(f"remote_recv overflow: {remote_recv_count} > {remote_capacity}")
         return {
             "remote_recv": remote_recv,
             "recv_count": recv_count,
             "recv_offset": recv_offset,
-            "remote_recv_count": int(recv_count.cpu().numpy().sum()),
+            "remote_recv_count": remote_recv_count,
+            "remote_capacity": remote_capacity,
         }
 
     def _collector_to_stream4(self, stream3: dict[str, Any], stream5: dict[str, Any], current_threshold: int) -> dict[str, Any]:
