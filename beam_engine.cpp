@@ -285,22 +285,28 @@ struct EngineConfig {
         // )
         const int64_t MAX_BUCKET_CAPACITY = 1LL << 20;  // 2^20 = 1M
         
-        // Default (SAFE) derivation if bucket_cap_per_peer not explicitly set (0 = auto)
-        if (bucket_cap_per_peer == 0) {
-            int64_t base_safe = std::max<int64_t>(131072, static_cast<int64_t>(k_expand_tile) / 8);
-            bucket_cap_per_peer_safe = static_cast<int64_t>(pow2_ceil(base_safe));
-            if (bucket_cap_per_peer_safe > MAX_BUCKET_CAPACITY) {
-                bucket_cap_per_peer_safe = MAX_BUCKET_CAPACITY;
-            }
-            bucket_cap_per_peer = static_cast<int>(bucket_cap_per_peer_safe);
-        } else {
-            // User-provided explicit value, compute SAFE variant for logging
-            int64_t base_safe = std::max<int64_t>(131072, static_cast<int64_t>(k_expand_tile) / 8);
-            bucket_cap_per_peer_safe = static_cast<int64_t>(pow2_ceil(base_safe));
-            if (bucket_cap_per_peer_safe > MAX_BUCKET_CAPACITY) {
-                bucket_cap_per_peer_safe = MAX_BUCKET_CAPACITY;
-            }
+        // Capacity invariant:
+        //   bucket_cap_per_peer must be a power-of-two safe capacity.
+        //   It must cover at least one full Stream2/Stream3 microbatch:
+        //       required_candidate_capacity = B_MICRO * FANOUT = K_EXPAND_TILE.
+        // For B_MICRO=8192 and FANOUT=24:
+        //       K_EXPAND_TILE=196608 -> bucket_cap_per_peer_safe=262144.
+        int64_t required_candidate_capacity = std::max<int64_t>(1, static_cast<int64_t>(k_expand_tile));
+        int64_t explicit_bucket_cap = static_cast<int64_t>(bucket_cap_per_peer);
+        int64_t base_safe = std::max<int64_t>(131072, required_candidate_capacity);
+        if (explicit_bucket_cap > 0) {
+            base_safe = std::max<int64_t>(base_safe, explicit_bucket_cap);
         }
+
+        bucket_cap_per_peer_safe = static_cast<int64_t>(pow2_ceil(base_safe));
+        if (bucket_cap_per_peer_safe > MAX_BUCKET_CAPACITY) {
+            bucket_cap_per_peer_safe = MAX_BUCKET_CAPACITY;
+        }
+        if (bucket_cap_per_peer_safe < required_candidate_capacity) {
+            throw std::runtime_error("bucket_cap_per_peer_safe is smaller than K_EXPAND_TILE");
+        }
+
+        bucket_cap_per_peer = static_cast<int>(bucket_cap_per_peer_safe);
 
         // Compute bucket memory sizes for logging
         // Each peer has bucket_cap_per_peer slots, each slot is CandidateRecord (160 bytes)

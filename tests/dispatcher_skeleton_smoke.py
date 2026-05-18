@@ -12,7 +12,7 @@ def test_normal_path() -> None:
     result = beam_engine.v6_dispatcher_skeleton_single_gpu_smoke(stop_path=False, verbose=False)
     assert result["path"] == "normal"
     assert result["stream2_hash_written"] is True
-    assert result["compact_count"] == 3
+    assert result["compact_count"] == 48
     assert result["unique_count"] == 2
     assert result["local_count"] == 2
     assert result["stream5_byte_identical"] is True

@@ -1,5 +1,178 @@
 # Project Memory
 
+## 2026-05-18 architecture_v6_stream1_state128_input_fix
+
+- entity_id: `architecture_v6_stream1_state128_input_fix`
+- type: `patch_before_retry`
+- state: `host_green_kaggle_blocked`
+- prompt_summary: User required Stream1 contract change from physical 120-wide FullBeamNice input to physical `State128`/128-byte input with effective semantic bytes `0..119`, zero padding bytes `120..127`, and zero first-layer weights for padding columns.
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- previous_failure_class: `architecture_v6_stream1_stream2_ring_batch_world2` failed because smoke mixed `State128` storage with 120-wide model input.
+- constraints_preserved: no runtime `State128 -> 120` slice buffer, no separate `nn_input[:,120]` runtime buffer, no `STATE_STORAGE_LEN` change, no Stream2/hash/goal semantic change, no Stream3/4/5 change, no real puzzle solve claim, no performance tuning.
+- code_change: `scripts/static_fullbeamnice_inference.py` now expands old FullBeamNice embedding table from logical `120*120` tokens to physical `128*128` tokens; copied region is positions `0..119` and values `0..119`; padding positions `120..127` and extra values remain zero.
+- code_change: `scripts/static_fullbeamnice_inference.py` keeps 120-state reference compatibility by padding 120-wide reference tensors to `State128` only inside validation/reference code.
+- code_change: `beam_engine.cpp` validates `fullbeamnice_static` with physical `state_size=128` and `num_classes=128`; runtime config accepts `state_size_bytes=128` for architecture v6 Stream1.
+- code_change: `beam_engine.py` default config now uses `state_size_bytes=128`.
+- test_change: `tests/stream1_cutlass_score_key_smoke.py` now uses synthetic `embed_w_t` shape `128*128 x 1536`, `state_size=128`, `num_classes=128`, and `State128` input storage.
+- test_change: `tests/stream1_real_weights_smoke.py` validates zero padding token weights and validates `FullBeamNice120` versus `FullBeamNice128` padded output equivalence.
+- test_change: `tests/stream1_stream2_ring_batch_world2_smoke.py` validates physical `State128` weights, zero padding token weights, 120-vs-128 padded output equivalence, Stream1 `score_ring`, Stream2 `hash_ring`, and goal solved metadata.
+- host_verification: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\stream1_cutlass_score_key_smoke.py tests\stream1_real_weights_smoke.py tests\stream1_stream2_ring_batch_world2_smoke.py scripts\static_fullbeamnice_inference.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `33 passed`.
+- kaggle_dataset_update: `kaggle datasets version -p kaggle_stream1_stream2_ring_batch_world2_payload_dataset -m "architecture_v6_stream1_state128_input_fix" --dir-mode zip` succeeded.
+- kaggle_kernel_push_status: blocked by escalation policy review because `kaggle kernels push` uploads staged project source/test files to external Kaggle service.
+- kaggle_green_claim: false.
+- next_required_action: user must provide explicit post-risk approval for `kaggle kernels push -p kaggle_stream1_stream2_ring_batch_world2_stage --accelerator NvidiaTeslaT4`, or request manual upload instructions.
+- final_state_update: `architecture_v6_stream1_stream2_ring_batch_world2` is green after user post-risk approval and Kaggle kernel retry.
+- kaggle_kernel: `trydotatwo/stream1-stream2-ring-batch-world2`
+- kaggle_kernel_version: `2`
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA 12.8 runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `STREAM1_STREAM2_RING_BATCH_WORLD2_SMOKE_OK rank=0 world_size=2 score_max_abs_diff=8 score_unique=40 hash_unique=96 solved_count=1 input_dim=128 padding_weight_max=0`
+- pass_marker_rank1: `STREAM1_STREAM2_RING_BATCH_WORLD2_SMOKE_OK rank=1 world_size=2 score_max_abs_diff=8 score_unique=48 hash_unique=96 solved_count=1 input_dim=128 padding_weight_max=0`
+- pass_marker_completion: `=== STREAM1_STREAM2_RING_BATCH_WORLD2_TEST_COMPLETE ===`
+- validated_stream1_state128: Stream1 uses physical `State128` input with `input_dim=128`; FullBeamNice semantic input remains bytes `0..119`; padding token weights are zero.
+- validated_stream1_scores: real FullBeamNice Stream1 wrote `score_ring` with `score_max_abs_diff=8` versus FP16 static reference on both ranks.
+- validated_stream2_after_stream1: Stream2 consumed the prepared State128 parent batch, wrote `hash_ring`, and published goal metadata with `solved_count=1` on both ranks.
+- green_claim: true.
+
+## 2026-05-18 architecture_v6_synthetic_full_depth_with_stream1_batch_world2
+
+- entity_id: `architecture_v6_synthetic_full_depth_with_stream1_batch_world2`
+- type: `batch_stage`
+- state: `green`
+- prompt_summary: User requested first full synthetic depth iteration with real Stream1 score source, connecting real FullBeamNice Stream1 score_ring and Stream2 hash/goal path to already-green synthetic downstream depth loop semantics.
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- constraints_preserved: no performance tuning, no real solver claim, no architecture deviation, no runtime 128-to-120 slice, no separate `nn_input_120_buffer`, no fallback backend, no new Stream3/4/5 logic.
+- test_added: `tests/synthetic_full_depth_with_stream1_batch_world2_smoke.py`
+- static_guard_added: `tests/test_architecture_v6_static.py::test_synthetic_full_depth_with_stream1_batch_world2_smoke_contract`
+- included_smoke_1: `one_depth_unsolved_real_stream1_to_final_materialization_world2`
+- included_smoke_2: `one_depth_remote_exchange_real_stream1_scores_world2`
+- included_smoke_3: `one_depth_stream4_threshold_from_real_score_ring_world2`
+- included_smoke_4: `one_depth_solved_goal_stops_before_final_world2`
+- included_smoke_5: `one_depth_drain_order_with_active_stream4_world2`
+- included_smoke_6: `one_depth_padding_contract_after_materialization_world2`
+- host_verification: `python -m py_compile tests\synthetic_full_depth_with_stream1_batch_world2_smoke.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `34 passed`.
+- kaggle_stage_added: `kaggle_synthetic_full_depth_with_stream1_batch_world2_stage`
+- kaggle_payload_update_status: `kaggle datasets version -p kaggle_stream1_stream2_ring_batch_world2_payload_dataset -m "architecture_v6_synthetic_full_depth_with_stream1_batch_world2" --dir-mode zip` succeeded after explicit user approval.
+- kaggle_kernel: `trydotatwo/synthetic-full-depth-with-stream1-batch-world2`
+- kaggle_kernel_version: `1`
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`, `GPU 0: Tesla T4`, `GPU 1: Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `SYNTHETIC_FULL_DEPTH_WITH_STREAM1_BATCH_WORLD2_SMOKE_OK rank=0 tests=6 score_max_abs_diff=8 score_unique=34 hash_unique=90 remote_send=56 remote_recv=50 clean=83 keep=9`
+- pass_marker_rank1: `SYNTHETIC_FULL_DEPTH_WITH_STREAM1_BATCH_WORLD2_SMOKE_OK rank=1 tests=6 score_max_abs_diff=8 score_unique=46 hash_unique=90 remote_send=50 remote_recv=56 clean=97 keep=8`
+- pass_marker_completion: `=== SYNTHETIC_FULL_DEPTH_WITH_STREAM1_BATCH_WORLD2_TEST_COMPLETE ===`
+- validated_path: `Stream1 real weights -> score_ring -> Stream2 hash/goal -> synthetic Stream3 split -> synthetic Stream5 exchange -> collector -> Stream4 -> threshold/final/materialization`.
+- green_claim: true.
+
+## 2026-05-18 architecture_v6_external_upload_policy
+
+- entity_id: `architecture_v6_external_upload_policy`
+- type: `standing_user_approval`
+- state: `active`
+- prompt_summary: User provided global project policy approving external Kaggle uploads for architecture_v6 when staged upload follows architecture_v6 exactly and does not deviate from `ARCHITECTURE_NEED.md` or `PlanRefact.md`.
+- allowed_external_actions: `kaggle datasets create/version`, `kaggle kernels push`, staged source/test/notebook payload upload, FullBeamNice validation payload upload, third-party CUTLASS header upload.
+- hard_constraints: no architecture deviation, `ARCHITECTURE_NEED.md` source of truth, `PlanRefact.md` implementation plan source of truth, no fallback backend, no TorchScript/dummy/central_hamming fallback, no runtime 120-slice, no separate `nn_input_120_buffer`, no unplanned Stream3/4/5 logic changes, no real solver claim before real validation, no performance tuning before functional green path.
+- workflow_rule: use larger batch stages when components share risk class; avoid tiny approval/micro-stage loops when architecture constraints are unchanged.
+- before_upload_required: verify staged file list, verify no secret filenames or obvious credentials, verify stage matches current batch scope, verify no architecture deviation.
+- before_green_required: actual Kaggle pass, runtime gate, rank markers, completion marker, update `docs/PROJECT_MEMORY.md` only after pass.
+
+## 2026-05-18 architecture_v6_multi_depth_dispatcher_loop_batch_world2
+
+- entity_id: `architecture_v6_multi_depth_dispatcher_loop_batch_world2`
+- type: `batch_stage`
+- state: `green`
+- prompt_summary: User accepted single synthetic full-depth iteration with real Stream1 and requested next risk class: multiple depth-iteration lifecycle between depths.
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- constraints_preserved: no performance tuning, no real solver claim, no architecture deviation, no runtime 128-to-120 slice, no separate `nn_input_120_buffer`, no fallback backend, no new Stream3/4/5 logic.
+- test_added: `tests/multi_depth_dispatcher_loop_batch_world2_smoke.py`
+- static_guard_added: `tests/test_architecture_v6_static.py::test_multi_depth_dispatcher_loop_batch_world2_smoke_contract`
+- included_smoke_1: `multi_depth_two_iterations_real_stream1_world2_smoke`
+- included_smoke_2: `layout_streams_layout_final_switching_world2_smoke`
+- included_smoke_3: `current_frontier_copy_between_depths_world2_smoke`
+- included_smoke_4: `threshold_initialized_persists_across_depths_world2_smoke`
+- included_smoke_5: `stop_solved_early_exit_across_depths_world2_smoke`
+- included_smoke_6: `multi_depth_padding_contract_world2_smoke`
+- host_verification: `python -m py_compile tests\multi_depth_dispatcher_loop_batch_world2_smoke.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `35 passed`.
+- kaggle_stage_added: `kaggle_multi_depth_dispatcher_loop_batch_world2_stage`
+- kaggle_payload_updated_local: `kaggle_stream1_stream2_ring_batch_world2_payload_dataset/tests/multi_depth_dispatcher_loop_batch_world2_smoke.py`
+- kaggle_payload_update_status: `kaggle datasets version -p kaggle_stream1_stream2_ring_batch_world2_payload_dataset -m "architecture_v6_multi_depth_dispatcher_loop_batch_world2" --dir-mode zip` succeeded.
+- kaggle_kernel: `trydotatwo/multi-depth-dispatcher-loop-batch-world2`
+- kaggle_kernel_version: `1`
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`, `GPU 0: Tesla T4`, `GPU 1: Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `MULTI_DEPTH_DISPATCHER_LOOP_BATCH_WORLD2_SMOKE_OK rank=0 tests=6 depth_count=2 threshold_initialized=1 threshold=15640 depth0_clean=83 depth1_clean=9 global_stop=1`
+- pass_marker_rank1: `MULTI_DEPTH_DISPATCHER_LOOP_BATCH_WORLD2_SMOKE_OK rank=1 tests=6 depth_count=2 threshold_initialized=1 threshold=15640 depth0_clean=97 depth1_clean=8 global_stop=1`
+- pass_marker_completion: `=== MULTI_DEPTH_DISPATCHER_LOOP_BATCH_WORLD2_TEST_COMPLETE ===`
+- validated_multi_depth_lifecycle: two depth iterations completed with real Stream1 score source, threshold initialization persisted into depth1, next-frontier copy preserved padding zero, and solved/stop flag propagated across depths.
+- green_claim: true.
+
+## 2026-05-18 architecture_v6_real_data_functional_validation_world2
+
+- entity_id: `architecture_v6_real_data_functional_validation_world2`
+- type: `batch_stage`
+- state: `green`
+- prompt_summary: User requested small real-data functional validation on Kaggle 2xT4 using real `test.csv` rows, real `puzzle_info.json`, real FullBeamNice Stream1, small task count, small max depth, submission-like output, and detailed per-task logs.
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- constraints_preserved: no performance tuning, no real solver quality claim, no leaderboard claim, no architecture deviation, no runtime 128-to-120 slice, no separate `nn_input_120_buffer`, no fallback backend, no new Stream3/4/5 logic.
+- code_change: `tests/synthetic_full_depth_with_stream1_batch_world2_smoke.py` helper `run_stream1_stream2` accepts optional real State128-compatible state/generator/central inputs while preserving existing synthetic defaults.
+- test_added: `tests/real_data_functional_validation_world2.py`
+- static_guard_added: `tests/test_architecture_v6_static.py::test_real_data_functional_validation_world2_contract`
+- kaggle_stage_added: `kaggle_real_data_functional_validation_world2_stage`
+- kaggle_payload_updated_local: copied `tests/real_data_functional_validation_world2.py`, updated helper test file, and copied real `data/` directory into `kaggle_stream1_stream2_ring_batch_world2_payload_dataset`.
+- host_verification: `python -m py_compile tests\real_data_functional_validation_world2.py tests\synthetic_full_depth_with_stream1_batch_world2_smoke.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `36 passed`.
+- kaggle_payload_update_status: `kaggle datasets version -p kaggle_stream1_stream2_ring_batch_world2_payload_dataset -m "architecture_v6_real_data_functional_validation_world2" --dir-mode zip` succeeded.
+- kaggle_kernel: `trydotatwo/real-data-functional-validation-world2`
+- kaggle_kernel_version: `1`
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`, `GPU 0: Tesla T4`, `GPU 1: Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- per_task_status_rank0_task0: `REAL_DATA_TASK_STATUS rank=0 task_id=0 status=functional_checked depths=2 final_keep=8 threshold_initialized=1`
+- per_task_status_rank1_task0: `REAL_DATA_TASK_STATUS rank=1 task_id=0 status=functional_checked depths=2 final_keep=9 threshold_initialized=1`
+- per_task_status_rank0_task1: `REAL_DATA_TASK_STATUS rank=0 task_id=1 status=functional_checked depths=2 final_keep=12 threshold_initialized=1`
+- per_task_status_rank1_task1: `REAL_DATA_TASK_STATUS rank=1 task_id=1 status=functional_checked depths=2 final_keep=7 threshold_initialized=1`
+- output_file: `REAL_DATA_OUTPUT_FILE path=/kaggle/working/real_data_functional_validation_world2.csv rows=2`
+- pass_marker_rank0: `REAL_DATA_FUNCTIONAL_VALIDATION_WORLD2_SMOKE_OK rank=0 tasks=2 max_depth=2 gathered_task_counts=[2, 2] no_leaderboard_claim=1 no_real_solver_quality_claim=1 no_performance_tuning_claim=1`
+- pass_marker_rank1: `REAL_DATA_FUNCTIONAL_VALIDATION_WORLD2_SMOKE_OK rank=1 tasks=2 max_depth=2 gathered_task_counts=[2, 2] no_leaderboard_claim=1 no_real_solver_quality_claim=1 no_performance_tuning_claim=1`
+- pass_marker_completion: `=== REAL_DATA_FUNCTIONAL_VALIDATION_WORLD2_TEST_COMPLETE ===`
+- validated_real_data_functional_path: real `data/test.csv` rows and real `data/puzzle_info.json` action tables fed real FullBeamNice Stream1 and architecture_v6 functional validation path with small task count and max depth.
+- green_claim: true.
+
+## 2026-05-18 architecture_v6_real_data_larger_batch_correctness_world2
+
+- entity_id: `architecture_v6_real_data_larger_batch_correctness_world2`
+- type: `batch_stage`
+- state: `green`
+- prompt_summary: User accepted small real-data functional validation and requested larger real-data functional/correctness stability batch with modest task count/depth and without performance, leaderboard, or solver-quality claims.
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- constraints_preserved: no performance tuning, no real solver quality claim, no leaderboard claim, no architecture deviation, no runtime 128-to-120 slice, no separate `nn_input_120_buffer`, no fallback backend, no new Stream3/4/5 logic, no large beam, no full test.csv.
+- test_added: `tests/real_data_larger_batch_correctness_world2.py`
+- static_guard_added: `tests/test_architecture_v6_static.py::test_real_data_larger_batch_correctness_world2_contract`
+- kaggle_stage_added: `kaggle_real_data_larger_batch_correctness_world2_stage`
+- limits: `task_count=20`, `max_depth=5`, `beam=modest`.
+- host_verification: `python -m py_compile tests\real_data_larger_batch_correctness_world2.py tests\real_data_functional_validation_world2.py tests\synthetic_full_depth_with_stream1_batch_world2_smoke.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `37 passed`.
+- kaggle_payload_update_status: `kaggle datasets version -p kaggle_stream1_stream2_ring_batch_world2_payload_dataset -m "architecture_v6_real_data_larger_batch_correctness_world2" --dir-mode zip` succeeded.
+- kaggle_kernel: `trydotatwo/real-data-larger-batch-correctness-world2`
+- kaggle_kernel_version: `1`
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`, `GPU 0: Tesla T4`, `GPU 1: Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- per_task_status_count: at least `40` `REAL_DATA_LARGER_TASK_STATUS` records logged across rank0/rank1 for `20` tasks.
+- output_file: `REAL_DATA_LARGER_OUTPUT_FILE path=/kaggle/working/real_data_larger_batch_correctness_world2.csv rows=20`
+- accounting_rank0: `tasks=20`, `max_depth=5`, `solved=0`, `unsolved=20`, `total_depth_rows=100`, `gathered_counts=[[20,0,20,100],[20,0,20,100]]`.
+- accounting_rank1: `tasks=20`, `max_depth=5`, `solved=0`, `unsolved=20`, `total_depth_rows=100`, `gathered_counts=[[20,0,20,100],[20,0,20,100]]`.
+- pass_marker_rank0: `REAL_DATA_LARGER_BATCH_CORRECTNESS_WORLD2_SMOKE_OK rank=0 tasks=20 max_depth=5 solved=0 unsolved=20 total_depth_rows=100 gathered_counts=[[20, 0, 20, 100], [20, 0, 20, 100]] no_leaderboard_claim=1 no_real_solver_quality_claim=1 no_performance_tuning_claim=1 no_large_beam=1 no_full_test_csv=1`
+- pass_marker_rank1: `REAL_DATA_LARGER_BATCH_CORRECTNESS_WORLD2_SMOKE_OK rank=1 tasks=20 max_depth=5 solved=0 unsolved=20 total_depth_rows=100 gathered_counts=[[20, 0, 20, 100], [20, 0, 20, 100]] no_leaderboard_claim=1 no_real_solver_quality_claim=1 no_performance_tuning_claim=1 no_large_beam=1 no_full_test_csv=1`
+- pass_marker_completion: `=== REAL_DATA_LARGER_BATCH_CORRECTNESS_WORLD2_TEST_COMPLETE ===`
+- validated_larger_real_data_stability: real `data/test.csv` rows `0..19` completed `max_depth=5` on both ranks with output CSV, per-task statuses, and solved/unsolved accounting; no crash/deadlock/OOM observed.
+- green_claim: true.
+
 ## 2026-05-16 architecture_v6_implementation_start
 
 - prompt_summary: User approved and requested implementation of Target Architecture Rewrite v6 for CayleyBeam100H100.
@@ -72,6 +245,49 @@
 - stream5_multirank_local_limit: `torchrun --standalone --nproc_per_node=2 tests/stream5_exchange_smoke.py` cannot execute NCCL exchange on the local one-visible-GPU RTX 3070 Docker host; raw NCCL failure was `Duplicate GPU detected : rank 0 and rank 1 both on CUDA device 1000`.
 - stream5_multirank_guard: `tests/stream5_exchange_smoke.py` now exits successfully with explicit `STREAM5_EXCHANGE_SMOKE_SKIPPED world=2 visible_cuda_devices=1 reason=NCCL_requires_distinct_visible_GPU_per_rank` when visible CUDA devices are fewer than `WORLD_SIZE`; actual two-GPU NCCL byte exchange remains pending for Kaggle 2xT4 or another host with at least two visible GPUs.
 - next_required_work_after_stream5: Dispatcher skeleton can start only after user accepts the local single-rank Stream5 result and the explicit two-GPU NCCL verification limitation; Stream1 CUTLASS/custom remains blocked until later stage.
+- stage6_dispatcher_skeleton_result: User confirmed Stage6 dispatcher skeleton as `green_world1` from Kaggle CUDA log with `15 passed`, `STREAM2_REFERENCE_SMOKE_OK`, `FINAL_MATERIALIZATION_SMOKE_OK`, `STREAM3_DEDUP_SMOKE_OK`, `STREAM4_SHARD_SMOKE_OK`, `STREAM5_EXCHANGE_SMOKE_OK rank=0 world=1`, `DISPATCHER_SKELETON_SMOKE_OK`, and `returncode=0`.
+- threshold_binding_fix_scope: User required micro-stage `architecture_v6_threshold_binding_fix` before Stream5 2GPU NCCL and before Stream1 CUTLASS; scope limited to pybind/Python compatibility for `current_threshold = UINT32_MAX = 0xffffffff`.
+- threshold_binding_fix_update: Changed Stream3 and Stream4 pybind threshold parameters from signed `int` to `uint64_t` with explicit `<= 0xffffffff` range checks, restored dispatcher skeleton `current_threshold=0xffffffff`, and added Python `_v6_validate_u32(...)` validation.
+- threshold_binding_fix_test_update: Static test now asserts uint32 threshold binding contract; dispatcher skeleton smoke expectation now matches `UINT32_MAX` behavior where Stream3 compact keeps all `B_MICRO * MOVE_COUNT = 48` candidates before dedup.
+- threshold_binding_fix_verification_result: Host `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\stream2_reference_smoke.py tests\final_materialization_smoke.py tests\stream3_dedup_smoke.py tests\stream4_shard_smoke.py tests\stream5_exchange_smoke.py tests\dispatcher_skeleton_smoke.py` passed; host `python -m pytest tests\test_architecture_v6_static.py -q` passed with 16 tests.
+- threshold_binding_fix_docker_result: Docker RTX 3070 run passed `python setup.py build_ext --inplace`, static pytest with 16 tests, Stream2 smoke, Final smoke, Stream3 smoke, Stream4 smoke, Stream5 WORLD_SIZE=1 smoke, and dispatcher skeleton smoke with `DISPATCHER_SKELETON_SMOKE_OK`.
+- next_required_work_after_threshold_fix: Stream5 2GPU NCCL explicit `torchrun` test on Kaggle 2xT4 is the next architecture validation candidate; Stream1 CUTLASS/custom remains blocked until user decision after the 2GPU NCCL step.
+- stream5_2gpu_nccl_explicit_stage: `architecture_v6_stream5_2gpu_nccl_explicit_test` is green on Kaggle 2xT4.
+- stream5_2gpu_nccl_explicit_runner: Kaggle notebook kernel `trydotatwo/stream5-2gpu-nccl-explicit-notebook` ran `python -m torch.distributed.run --standalone --nnodes=1 --nproc_per_node=2 tests/stream5_2gpu_nccl_explicit_smoke.py`.
+- stream5_2gpu_nccl_explicit_runtime: log confirmed `cuda_device_count=2`, `GPU 0: Tesla T4`, and `GPU 1: Tesla T4`; notebook runtime gate rejected non-2xT4 hardware.
+- stream5_2gpu_nccl_explicit_result: both ranks printed success markers: `STREAM5_2GPU_NCCL_EXPLICIT_SMOKE_OK rank=0 sent=1 received=3` and `STREAM5_2GPU_NCCL_EXPLICIT_SMOKE_OK rank=1 sent=3 received=1`; notebook printed `=== STREAM5_2GPU_NCCL_EXPLICIT_TEST_COMPLETE ===`.
+- stream5_2gpu_nccl_explicit_validated: validated `CandidateMeta` byte identity, `hash`, `parent_idx`, `score_key`, `route_packed`, `send_count`, `send_offset`, `recv_count`, and `recv_offset` for asymmetric rank0->rank1 count 1 and rank1->rank0 count 3.
+- stream5_2gpu_nccl_explicit_method: successful path used notebook kernel staging with `kernel_type=notebook`, notebook metadata `kaggle.accelerator=nvidiaTeslaT4`, Kaggle CLI push `kaggle kernels push -p kaggle_stream5_2gpu_nccl_notebook_stage --accelerator NvidiaTeslaT4`, and Kaggle-safe NCCL env `NCCL_IB_DISABLE=1`, `NCCL_P2P_DISABLE=1`, `NCCL_SOCKET_IFNAME=lo`, `GLOO_SOCKET_IFNAME=lo`.
+- stream5_2gpu_nccl_cli_note: local Kaggle CLI log/status calls may require clearing proxy env variables before `kaggle kernels logs/status` when VPN/proxy interferes.
+- stream5_2gpu_nccl_scope_preserved: no Stream1 integration, no dispatcher expansion, no Stream3 collector integration, no Stream4 scheduler integration, and no final materialization expansion were performed during the explicit 2GPU Stream5 validation.
+- next_required_work_after_stream5_2gpu_nccl_green: next allowed stage is `architecture_v6_stream5_dispatcher_binding_world2` or separate user-approved Stream1 CUTLASS planning; architecture_v6 production Stream1 remains unstarted.
+- dispatcher_stream5_world2_stage: `architecture_v6_stream5_dispatcher_binding_world2` is green on Kaggle 2xT4.
+- dispatcher_stream5_world2_code_update: Added dispatcher-level Python binding `v6_dispatcher_skeleton_world2_stream5_smoke(...)` that launches existing `BeamEngine.v6_stream5_exchange_candidate_meta(...)` with `WORLD_SIZE=2`, existing `CandidateMeta` buffers, existing `send_count/send_offset/recv_count/recv_offset`, and no Stream1/model backend work.
+- dispatcher_stream5_world2_test_update: Added `tests/dispatcher_stream5_world2_smoke.py`; test requires exactly two visible Tesla T4 devices, runs under `torch.distributed.run --standalone --nproc_per_node=2`, checks dispatcher-launched Stream5 exchange, validates asymmetric rank0->rank1 count 2 and rank1->rank0 count 4, validates byte-identical `CandidateMeta` payloads, and asserts no Stream1/fallback/Stream3 collector/Stream4 scheduler/final expansion flags.
+- dispatcher_stream5_world2_static_result: Host `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\dispatcher_stream5_world2_smoke.py` passed; host `python -m pytest tests\test_architecture_v6_static.py -q` passed with 18 tests.
+- dispatcher_stream5_world2_kaggle_method: Successful path used notebook kernel stage `kaggle_dispatcher_stream5_world2_notebook_stage`, metadata `kernel_type=notebook`, notebook metadata `kaggle.accelerator=nvidiaTeslaT4`, CLI push `kaggle kernels push -p kaggle_dispatcher_stream5_world2_notebook_stage --accelerator NvidiaTeslaT4`, and proxy env cleared for Kaggle CLI calls.
+- dispatcher_stream5_world2_kaggle_result: Kernel `trydotatwo/dispatcher-stream5-world2-smoke` completed; log confirmed `cuda_device_count 2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`, build_ext passed, and torchrun executed `tests/dispatcher_stream5_world2_smoke.py`.
+- dispatcher_stream5_world2_pass_markers: log contained `DISPATCHER_STREAM5_WORLD2_SMOKE_OK rank=0 sent=2 received=4`, `DISPATCHER_STREAM5_WORLD2_SMOKE_OK rank=1 sent=4 received=2`, and `=== DISPATCHER_STREAM5_WORLD2_TEST_COMPLETE ===`.
+- dispatcher_stream5_world2_scope_preserved: no Stream1 integration, no model backend work, no Stream3 collector complexity expansion, no Stream4 scheduler expansion, no final materialization expansion, and no threshold logic change were performed.
+- next_required_work_after_dispatcher_stream5_world2_green: architecture_v6 can proceed only after user selects next micro-stage; likely candidates are Stream1 CUTLASS/custom planning or a separate larger-count Stream5/dispatcher stress smoke.
+- dispatcher_stream3_stream5_collector_world2_stage: `architecture_v6_dispatcher_stream3_stream5_collector_world2_smoke` is green on Kaggle 2xT4.
+- dispatcher_stream3_stream5_collector_world2_code_update: Added `v6_dispatcher_stream3_stream5_collector_world2_smoke(...)` in `beam_engine.py`; function builds synthetic `CandidateMeta` records, performs deterministic local/remote owner split for `WORLD_SIZE=2`, launches existing `BeamEngine.v6_stream5_exchange_candidate_meta(...)`, and ingests `local_pending_buffer + remote_recv_buffer` into a synthetic survivor dirty region.
+- dispatcher_stream3_stream5_collector_world2_test_update: Added `tests/dispatcher_stream3_stream5_collector_world2_smoke.py`; test requires exactly two visible Tesla T4 devices, runs under `torch.distributed.run --standalone --nproc_per_node=2`, checks remote payload byte identity, collector source order, dirty count, and scope flags.
+- dispatcher_stream3_stream5_collector_world2_static_result: Host `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\dispatcher_stream3_stream5_collector_world2_smoke.py` passed; host `python -m pytest tests\test_architecture_v6_static.py -q` passed with 19 tests.
+- dispatcher_stream3_stream5_collector_world2_kaggle_method: Successful path used notebook kernel stage `kaggle_dispatcher_stream3_stream5_collector_world2_stage`, metadata `kernel_type=notebook`, notebook metadata `kaggle.accelerator=nvidiaTeslaT4`, CLI push `kaggle kernels push -p kaggle_dispatcher_stream3_stream5_collector_world2_stage --accelerator NvidiaTeslaT4`, and proxy env cleared for Kaggle CLI calls.
+- dispatcher_stream3_stream5_collector_world2_kaggle_result: Kernel `trydotatwo/dispatcher-stream3-stream5-collector-world2` completed; log confirmed `cuda_device_count 2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`, build_ext passed, and torchrun executed `tests/dispatcher_stream3_stream5_collector_world2_smoke.py`.
+- dispatcher_stream3_stream5_collector_world2_pass_markers: log contained `DISPATCHER_STREAM3_STREAM5_COLLECTOR_WORLD2_SMOKE_OK rank=0 local=2 sent=3 dirty=6`, `DISPATCHER_STREAM3_STREAM5_COLLECTOR_WORLD2_SMOKE_OK rank=1 local=3 sent=4 dirty=6`, and `=== DISPATCHER_STREAM3_STREAM5_COLLECTOR_WORLD2_TEST_COMPLETE ===`.
+- dispatcher_stream3_stream5_collector_world2_scope_preserved: no Stream1 integration, no model backend work, no full dispatcher loop, no Stream4 scheduler expansion, no shard dirty/clean lifecycle expansion, no threshold logic change, and no final materialization expansion were performed.
+- next_required_work_after_dispatcher_stream3_stream5_collector_world2_green: architecture_v6 can proceed only after user selects next micro-stage; likely candidates are minimal Stream4 scheduler binding after collector dirty region, larger-count Stream5/collector stress smoke, or Stream1 CUTLASS/custom planning.
+- collector_shard_dirty_spill_world2_stage: `architecture_v6_collector_shard_dirty_spill_world2_smoke` is green on Kaggle 2xT4.
+- collector_shard_dirty_spill_world2_code_update: Added `v6_collector_shard_dirty_spill_world2_smoke(...)` in `beam_engine.py`; function builds synthetic `CandidateMeta` inputs, performs deterministic `WORLD_SIZE=2` owner split, launches existing `BeamEngine.v6_stream5_exchange_candidate_meta(...)`, writes shard-free candidates into `survivor_shard` dirty region, and writes candidates whose shard has `processing_flag[shard] == true` into `global_spill_buffer`.
+- collector_shard_dirty_spill_world2_test_update: Added `tests/collector_shard_dirty_spill_world2_smoke.py`; test requires exactly two visible Tesla T4 devices, runs under `torch.distributed.run --standalone --nproc_per_node=2`, checks remote payload byte identity, dirty-region write, global-spill write, and scope flags.
+- collector_shard_dirty_spill_world2_static_result: Host `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\collector_shard_dirty_spill_world2_smoke.py` passed; host `python -m pytest tests\test_architecture_v6_static.py -q` passed with 20 tests.
+- collector_shard_dirty_spill_world2_kaggle_method: Successful path used notebook kernel stage `kaggle_collector_shard_dirty_spill_world2_stage`, metadata `kernel_type=notebook`, notebook metadata `kaggle.accelerator=nvidiaTeslaT4`, CLI push `kaggle kernels push -p kaggle_collector_shard_dirty_spill_world2_stage --accelerator NvidiaTeslaT4`, and proxy env cleared for Kaggle CLI calls.
+- collector_shard_dirty_spill_world2_kaggle_result: Kernel `trydotatwo/collector-shard-dirty-spill-world2` completed; log confirmed `cuda_device_count 2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`, build_ext passed, and torchrun executed `tests/collector_shard_dirty_spill_world2_smoke.py`.
+- collector_shard_dirty_spill_world2_pass_markers: log contained `COLLECTOR_SHARD_DIRTY_SPILL_WORLD2_SMOKE_OK rank=0 dirty=4 spill=4`, `COLLECTOR_SHARD_DIRTY_SPILL_WORLD2_SMOKE_OK rank=1 dirty=4 spill=4`, and `=== COLLECTOR_SHARD_DIRTY_SPILL_WORLD2_TEST_COMPLETE ===`.
+- collector_shard_dirty_spill_world2_scope_preserved: no Stream1 integration, no model backend work, no full dispatcher loop, no Stream4 kernel launch, no Stream4 scheduler expansion, no clean/dirty lifecycle after Stream4, no threshold logic change, and no final materialization expansion were performed.
+- next_required_work_after_collector_shard_dirty_spill_world2_green: architecture_v6 can proceed only after user selects next micro-stage; likely candidates are minimal Stream4 scheduler binding after collector dirty region, Stream4 flush integration, or Stream1 CUTLASS/custom planning.
 
 ## 2026-05-15 tier2b_architecture_revised
 
@@ -939,3 +1155,487 @@
 - kaggle_status: `kaggle kernels status trydotatwo/cayleybeam-user-friendly-cpu-history` returned `KernelWorkerStatus.RUNNING`.
 - kaggle_logs: `kaggle kernels logs trydotatwo/cayleybeam-user-friendly-cpu-history` returned empty output at check time.
 - answer_basis: current configured sample is sample 1; no completed `SAMPLE_RESULT` was visible in logs at check time.
+
+## 2026-05-17 architecture_v6_collector_stream4_shard_launch_world2_smoke
+
+- entity_id: `architecture_v6_collector_stream4_shard_launch_world2_smoke`
+- state: `green`
+- hardware: `Kaggle_2xT4`
+- runner: `torchrun --standalone --nproc_per_node=2`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested minimal collector-driven Stream4 shard launch smoke after green Stream5 NCCL, dispatcher Stream5 WORLD2, Stream3-to-Stream5-to-collector WORLD2, and collector dirty/spill WORLD2 stages.
+- constraints_preserved: no Stream1, no model backend work, no full dispatcher loop, no threshold update logic, no histogram AllReduce, no final materialization expansion.
+- code_change: `beam_engine.py` adds `v6_collector_stream4_shard_launch_world2_smoke(verbose=False)`.
+- implementation_scope: synthetic `CandidateMeta` inputs, existing `v6_stream5_exchange_candidate_meta`, collector-filled dirty shard, fixed `stream4_job_threshold=100`, existing Stream4 isolated kernels, clean/dirty/processing flag lifecycle validation.
+- test_added: `tests/collector_stream4_shard_launch_world2_smoke.py`
+- static_guard_added: `tests/test_architecture_v6_static.py` includes `collector_stream4_shard_launch_world2_smoke` discovery/contract guard.
+- host_verification: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\collector_stream4_shard_launch_world2_smoke.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `21 passed`.
+- kaggle_stage: `kaggle_collector_stream4_shard_launch_world2_stage`
+- kaggle_kernel: `trydotatwo/collector-stream4-shard-launch-world2`
+- kaggle_push: `kaggle kernels push -p kaggle_collector_stream4_shard_launch_world2_stage --accelerator NvidiaTeslaT4`
+- kaggle_network_note: proxy variables were cleared for Kaggle CLI calls.
+- kaggle_result: kernel completed successfully; notebook runtime confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`; extension build passed.
+- pass_marker_rank0: `COLLECTOR_STREAM4_SHARD_LAUNCH_WORLD2_SMOKE_OK rank=0 clean=3 dirty=0`
+- pass_marker_rank1: `COLLECTOR_STREAM4_SHARD_LAUNCH_WORLD2_SMOKE_OK rank=1 clean=3 dirty=0`
+- pass_marker_completion: `=== COLLECTOR_STREAM4_SHARD_LAUNCH_WORLD2_TEST_COMPLETE ===`
+- validated: collector-filled dirty shard launch condition, Stream4 threshold compact count, Stream4 dedup best candidate, clean_count update, dirty_count reset, processing_flag reset, no shard cap/top-k behavior, CandidateMeta path through Stream5 before collector/Stream4.
+- failure_history_v1: remote received payload byte identity assertion failed because synthetic remote expected payload did not match sent payload.
+- failure_history_v2: `stream4_compact_count` expected `3` but actual correct value was `4`; all dirty inputs passed threshold before dedup.
+- final_fix: synthetic remote payloads aligned with expected payloads; smoke assertion changed to `stream4_compact_count == 4` and `stream4_clean_count == 3`.
+- next_allowed_stage: continue architecture v6 incremental dispatcher work without Stream1 unless user explicitly starts Stream1 CUTLASS/custom stage.
+
+## 2026-05-17 architecture_v6_collector_stream4_batch_world2
+
+- entity_id: `architecture_v6_collector_stream4_batch_world2`
+- type: `batch_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4`
+- kernel: `trydotatwo/collector-stream4-batch-world2`
+- kernel_version: `6`
+- runner: `torchrun --standalone --nproc_per_node=2`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested stopping one-Kaggle-upload-per-tiny-smoke and creating one batch stage covering related collector/Stream4 WORLD_SIZE=2 lifecycle smokes.
+- constraints_preserved: no Stream1, no model backend, no full dispatcher loop, no threshold update, no histogram AllReduce, no final materialization expansion.
+- code_change: `beam_engine.py` adds `v6_collector_stream4_batch_world2_smoke(verbose=False)` and keeps the existing separate `v6_spill_drain_then_stream4_relaunch_world2_smoke(verbose=False)`.
+- test_added: `tests/collector_stream4_batch_world2_smoke.py`
+- staging_added: `kaggle_collector_stream4_batch_world2_stage`
+- test_result_file: `test_results/architecture_v6_collector_stream4_batch_world2_2026-05-17.md`
+- included_smoke_1: `spill_drain_then_stream4_relaunch_world2_smoke`
+- included_smoke_2: `multi_shard_ready_same_tick_world2_smoke`
+- included_smoke_3: `busy_shard_spill_then_drain_after_processing_flag_false_world2_smoke`
+- included_smoke_4: `stream4_dedup_best_score_survives_world2_smoke`
+- included_smoke_5: `stream4_uint32max_threshold_keeps_all_world2_smoke`
+- included_smoke_6: `two_round_clean_dirty_processing_lifecycle_world2_smoke`
+- host_verification: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\collector_stream4_batch_world2_smoke.py tests\spill_drain_then_stream4_relaunch_world2_smoke.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `23 passed`.
+- kaggle_method: notebook kernel stage with embedded minimal project payload, metadata accelerator `nvidiaTeslaT4`, push command `kaggle kernels push -p kaggle_collector_stream4_batch_world2_stage --accelerator NvidiaTeslaT4`, proxy variables cleared for Kaggle CLI calls.
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `COLLECTOR_STREAM4_BATCH_WORLD2_SMOKE_OK rank=0 tests=6`
+- pass_marker_rank1: `COLLECTOR_STREAM4_BATCH_WORLD2_SMOKE_OK rank=1 tests=6`
+- pass_marker_completion: `=== COLLECTOR_STREAM4_BATCH_WORLD2_TEST_COMPLETE ===`
+- failure_history_v1: notebook cwd did not expose `setup.py`; fixed by embedding a minimal project zip payload in the notebook.
+- failure_history_v2: PowerShell zip created a flattened/backslash test path; fixed by Python `zipfile` with arcname `tests/collector_stream4_batch_world2_smoke.py`.
+- failure_history_v4_v5: busy-spill relaunch assertion was corrected from guessed clean counts to the actual architecture-consistent dedup result `relaunch_clean_count == 4`.
+- next_allowed_stage: continue architecture v6 incremental dispatcher/collector work as a batch where possible; Stream1 CUTLASS/custom remains unstarted unless user starts that stage explicitly.
+
+## 2026-05-17 architecture_v6_threshold_histogram_batch_world2
+
+- entity_id: `architecture_v6_threshold_histogram_batch_world2`
+- type: `batch_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4`
+- kernel: `trydotatwo/threshold-histogram-batch-world2`
+- kernel_version: `1`
+- runner: `torchrun --standalone --nproc_per_node=2`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested one batch stage for threshold, histogram, and AllReduce semantics under WORLD_SIZE=2.
+- constraints_preserved: no Stream1, no model backend, no full dispatcher loop, no final materialization expansion, no load balancing, no layout_final.
+- code_change: `beam_engine.py` adds `v6_threshold_histogram_batch_world2_smoke(verbose=False)`.
+- test_added: `tests/threshold_histogram_batch_world2_smoke.py`
+- staging_added: `kaggle_threshold_histogram_batch_world2_stage`
+- test_result_file: `test_results/architecture_v6_threshold_histogram_batch_world2_2026-05-17.md`
+- included_smoke_1: `threshold_uninitialized_uint32max_until_enough_survivors_world2_smoke`
+- included_smoke_2: `threshold_initialized_when_total_survivors_reaches_GLOBAL_BEAM_WIDTH_EFFECTIVE_world2_smoke`
+- included_smoke_3: `threshold_monotonic_never_relaxes_world2_smoke`
+- included_smoke_4: `local_score_hist_to_global_score_hist_allreduce_world2_smoke`
+- included_smoke_5: `GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS_triggers_update_world2_smoke`
+- included_smoke_6: `stream4_jobs_use_snapshot_threshold_not_later_threshold_world2_smoke`
+- host_verification: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\threshold_histogram_batch_world2_smoke.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `24 passed`.
+- kaggle_method: notebook kernel stage with embedded minimal project payload, metadata accelerator `nvidiaTeslaT4`, push command `kaggle kernels push -p kaggle_threshold_histogram_batch_world2_stage --accelerator NvidiaTeslaT4`, proxy variables cleared for Kaggle CLI calls.
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `THRESHOLD_HISTOGRAM_BATCH_WORLD2_SMOKE_OK rank=0 tests=6`
+- pass_marker_rank1: `THRESHOLD_HISTOGRAM_BATCH_WORLD2_SMOKE_OK rank=1 tests=6`
+- pass_marker_completion: `=== THRESHOLD_HISTOGRAM_BATCH_WORLD2_TEST_COMPLETE ===`
+- validated_threshold_uninitialized: `current_threshold=UINT32_MAX` while `threshold_initialized=false` and `total_survivors < GLOBAL_BEAM_WIDTH_EFFECTIVE`.
+- validated_threshold_initialization: `threshold_initialized=true` when `total_survivors >= GLOBAL_BEAM_WIDTH_EFFECTIVE`.
+- validated_threshold_monotonicity: update rule uses `current_threshold=min(current_threshold,new_threshold)` and does not relax after initialization.
+- validated_histogram_allreduce: local score histograms reduce into expected global score histogram by SUM across two ranks.
+- validated_periodic_update: `GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS` triggers updates after configured shard-job periods.
+- validated_snapshot_threshold: Stream4 job uses the threshold snapshot captured at launch, not later `current_threshold`.
+- next_allowed_stage: continue architecture v6 incremental dispatcher work; likely next batch is final threshold/local cut or Stream4 threshold integration with real survivor_shard histograms; Stream1 CUTLASS/custom remains unstarted unless user starts that stage explicitly.
+
+## 2026-05-17 architecture_v6_final_threshold_balance_batch_world2
+
+- entity_id: `architecture_v6_final_threshold_balance_batch_world2`
+- type: `batch_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4`
+- kernel: `trydotatwo/final-threshold-balance-batch-world2`
+- kernel_version: `1`
+- runner: `torchrun --standalone --nproc_per_node=2`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested one batch stage for final global threshold and load-balance index assignment under `WORLD_SIZE=2`, without layout_final materialization.
+- constraints_preserved: no Stream1, no model backend, no full dispatcher loop, no layout_final, no FinalRequest, no FinalResponse, no state materialization.
+- code_change: `beam_engine.py` adds `v6_final_threshold_balance_batch_world2_smoke(verbose=False)`.
+- test_added: `tests/final_threshold_balance_batch_world2_smoke.py`
+- staging_added: `kaggle_final_threshold_balance_batch_world2_stage`
+- test_result_file: `test_results/architecture_v6_final_threshold_balance_batch_world2_2026-05-17.md`
+- included_smoke_1: `final_flush_all_dirty_shards_before_threshold_world2_smoke`
+- included_smoke_2: `final_global_threshold_after_local_final_dedup_world2_smoke`
+- included_smoke_3: `final_cutoff_score_key_le_current_threshold_world2_smoke`
+- included_smoke_4: `allgather_local_keep_count_world2_smoke`
+- included_smoke_5: `prefix_counts_target_rank_target_local_idx_world2_smoke`
+- included_smoke_6: `tie_at_final_threshold_allowed_count_may_exceed_beam_width_world2_smoke`
+- host_verification: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\final_threshold_balance_batch_world2_smoke.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `25 passed`.
+- kaggle_method: notebook kernel stage with embedded minimal project payload, metadata accelerator `nvidiaTeslaT4`, push command `kaggle kernels push -p kaggle_final_threshold_balance_batch_world2_stage --accelerator NvidiaTeslaT4`, proxy variables cleared for Kaggle CLI calls.
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `FINAL_THRESHOLD_BALANCE_BATCH_WORLD2_SMOKE_OK rank=0 tests=6`
+- pass_marker_rank1: `FINAL_THRESHOLD_BALANCE_BATCH_WORLD2_SMOKE_OK rank=1 tests=6`
+- pass_marker_completion: `=== FINAL_THRESHOLD_BALANCE_BATCH_WORLD2_TEST_COMPLETE ===`
+- validated_final_flush: all dirty shards are flushed before final global threshold; `dirty_count=0` before final threshold.
+- validated_final_threshold_order: final global threshold is computed after local final dedup.
+- validated_final_cutoff: local final cutoff keeps only `score_key <= current_threshold`.
+- validated_allgather: local keep counts are gathered across `WORLD_SIZE=2`.
+- validated_balance_assignment: prefix counts produce deterministic `target_rank` and `target_local_idx`.
+- validated_tie_behavior: tie at final threshold is allowed; final count may exceed or equal `GLOBAL_BEAM_WIDTH_EFFECTIVE`.
+- forbidden_paths_validated: Stream1 production path, fallback backend, full dispatcher loop, layout_final, FinalRequest, FinalResponse, and state materialization were not used.
+- next_allowed_stage: continue architecture v6 incremental final/load-balance or dispatcher integration work while preserving constraints; Stream1 CUTLASS/custom remains unstarted unless user starts that stage explicitly.
+
+## 2026-05-17 architecture_v6_final_materialization_batch_world2
+
+- entity_id: `architecture_v6_final_materialization_batch_world2`
+- type: `batch_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4`
+- kernel: `trydotatwo/final-materialization-batch-world2`
+- kernel_version: `1`
+- runner: `torchrun --standalone --nproc_per_node=2`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested one batch stage for `layout_final` materialization under `WORLD_SIZE=2`, validating `FinalRequest`, `FinalResponse=State128`, and `next_frontier_states_tmp` write path without Stream1/model backend/full depth loop.
+- constraints_preserved: no Stream1, no model backend, no full dispatcher loop, no solved path expansion, no new threshold logic, no new load-balancing logic.
+- code_change: `beam_engine.py` adds `v6_final_materialization_batch_world2_smoke(verbose=False)`.
+- test_added: `tests/final_materialization_batch_world2_smoke.py`
+- staging_added: `kaggle_final_materialization_batch_world2_stage`
+- test_result_file: `test_results/architecture_v6_final_materialization_batch_world2_2026-05-17.md`
+- included_smoke_1: `final_request_group_by_source_rank_world2_smoke`
+- included_smoke_2: `final_response_target_local_idx_pack_unpack_world2_smoke`
+- included_smoke_3: `cross_rank_final_request_response_world2_smoke`
+- included_smoke_4: `apply_move_matches_cpu_reference_world2_smoke`
+- included_smoke_5: `padding_clear_before_next_frontier_write_world2_smoke`
+- included_smoke_6: `next_frontier_states_tmp_write_by_target_local_idx_world2_smoke`
+- included_smoke_7: `optional_next_frontier_tmp_to_current_frontier_copy_world2_smoke`
+- host_verification: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\final_materialization_batch_world2_smoke.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `26 passed`.
+- kaggle_method: notebook kernel stage with embedded minimal project payload, metadata accelerator `nvidiaTeslaT4`, push command `kaggle kernels push -p kaggle_final_materialization_batch_world2_stage --accelerator NvidiaTeslaT4`, proxy variables cleared for Kaggle CLI calls.
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `FINAL_MATERIALIZATION_BATCH_WORLD2_SMOKE_OK rank=0 tests=7`
+- pass_marker_rank1: `FINAL_MATERIALIZATION_BATCH_WORLD2_SMOKE_OK rank=1 tests=7`
+- pass_marker_completion: `=== FINAL_MATERIALIZATION_BATCH_WORLD2_TEST_COMPLETE ===`
+- validated_final_request_grouping: `FinalRequest` records grouped by `source_rank`; per-rank `send_request_counts=[1,1]`.
+- validated_final_response_pack_unpack: `FinalResponse.v[120..123]` stores `target_local_idx` little-endian and unpacks correctly.
+- validated_cross_rank_final_path: cross-rank `FinalRequest` and `FinalResponse=State128` path completed under `WORLD_SIZE=2`.
+- validated_apply_move_reference: materialized child logical state matches CPU reference `apply_move(parent_state, move)`.
+- validated_padding_clear: `response.v[120..127]` cleared before persistent `next_frontier_states_tmp` write.
+- validated_target_write: `next_frontier_states_tmp[target_local_idx]` receives expected `State128`.
+- validated_optional_copy: optional `next_frontier_states_tmp -> current_frontier_states` copy semantics validated.
+- forbidden_paths_validated: Stream1 production path, fallback backend, full dispatcher loop, solved path expansion, new threshold logic, and new load-balancing logic were not used.
+- next_allowed_stage: architecture v6 incremental integration that combines final threshold/load-balance assignments with final materialization; Stream1 CUTLASS/custom remains unstarted unless user starts that stage explicitly.
+
+## 2026-05-17 architecture_v6_solved_stop_batch_world2
+
+- entity_id: `architecture_v6_solved_stop_batch_world2`
+- type: `batch_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4`
+- kernel: `trydotatwo/solved-stop-batch-world2`
+- kernel_version: `1`
+- runner: `torchrun --standalone --nproc_per_node=2`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested one batch stage for solved/stop path under `WORLD_SIZE=2`, validating goal candidate publication, solved buffers, stop flags, overflow behavior, and dispatcher readback without Stream1/model backend/full production loop.
+- constraints_preserved: no Stream1, no model backend, no full production depth loop, no performance tuning, no new threshold logic, no new final materialization logic.
+- code_change: `beam_engine.py` adds `v6_solved_stop_batch_world2_smoke(verbose=False)`.
+- test_added: `tests/solved_stop_batch_world2_smoke.py`
+- staging_added: `kaggle_solved_stop_batch_world2_stage`
+- test_result_file: `test_results/architecture_v6_solved_stop_batch_world2_2026-05-17.md`
+- included_smoke_1: `stream2_goal_candidate_writes_GOAL_SCORE_KEY_world2_smoke`
+- included_smoke_2: `solved_count_and_solved_depth_list_world2_smoke`
+- included_smoke_3: `solved_flag_stop_flag_publication_order_world2_smoke`
+- included_smoke_4: `solved_overflow_when_capacity_exceeded_world2_smoke`
+- included_smoke_5: `dispatcher_stop_propagation_world2_smoke`
+- included_smoke_6: `active_jobs_safe_completion_after_stop_world2_smoke`
+- included_smoke_7: `cpu_solved_list_readback_world2_smoke`
+- host_verification: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\solved_stop_batch_world2_smoke.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `27 passed`.
+- kaggle_method: notebook kernel stage with embedded minimal project payload, metadata accelerator `nvidiaTeslaT4`, push command `kaggle kernels push -p kaggle_solved_stop_batch_world2_stage --accelerator NvidiaTeslaT4`, proxy variables cleared for Kaggle CLI calls.
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `SOLVED_STOP_BATCH_WORLD2_SMOKE_OK rank=0 tests=7`
+- pass_marker_rank1: `SOLVED_STOP_BATCH_WORLD2_SMOKE_OK rank=1 tests=7`
+- pass_marker_completion: `=== SOLVED_STOP_BATCH_WORLD2_TEST_COMPLETE ===`
+- validated_goal_score: solved `CandidateMeta.score_key == GOAL_SCORE_KEY == 0`.
+- validated_solved_count_depth: `solved_count` increments and stored `solved_depth_list` entries match per-rank depth.
+- validated_publication_order: solved list entries are visible after `solved_flag`; kernel contract includes `__threadfence_system()` before `solved_flag` publication.
+- validated_overflow: `solved_overflow=1` when goal count exceeds `SOLVED_RESULT_CAPACITY`.
+- validated_stop_propagation: stop flag propagates across ranks with NCCL AllReduce MAX; Stream3/Stream4/Final launch flags remain false after stop.
+- validated_active_completion: active Stream2 job completes safely and can record additional goal candidates before completion.
+- validated_cpu_readback: CPU reads `min(solved_count, SOLVED_RESULT_CAPACITY)` solved metas and depth entries.
+- forbidden_paths_validated: Stream1 production path, fallback backend, full production depth loop, performance tuning, new threshold logic, and new final materialization logic were not used.
+- next_allowed_stage: architecture v6 incremental dispatcher stop integration or full dispatcher skeleton extension; Stream1 CUTLASS/custom remains unstarted unless user starts that stage explicitly.
+
+## 2026-05-17 architecture_v6_synthetic_depth_loop_batch_world2
+
+- entity_id: `architecture_v6_synthetic_depth_loop_batch_world2`
+- type: `batch_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4`
+- kernel: `trydotatwo/synthetic-depth-loop-batch-world2`
+- kernel_version: `1`
+- runner: `torchrun --standalone --nproc_per_node=2`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested synthetic full depth-iteration batch under `WORLD_SIZE=2` without Stream1/model backend, using prepared synthetic score/hash rings or synthetic CandidateMeta sources to exercise dispatcher depth lifecycle end-to-end.
+- constraints_preserved: no Stream1, no model backend, no real inference, no real puzzle solve claim, no performance tuning.
+- code_change: `beam_engine.py` adds `v6_synthetic_depth_loop_batch_world2_smoke(verbose=False)`.
+- test_added: `tests/synthetic_depth_loop_batch_world2_smoke.py`
+- staging_added: `kaggle_synthetic_depth_loop_batch_world2_stage`
+- test_result_file: `test_results/architecture_v6_synthetic_depth_loop_batch_world2_2026-05-17.md`
+- included_smoke_1: `synthetic_unsolved_depth_full_path_world2_smoke`
+- included_smoke_2: `synthetic_depth_with_remote_exchange_and_multi_shard_stream4_world2_smoke`
+- included_smoke_3: `synthetic_depth_with_periodic_threshold_update_world2_smoke`
+- included_smoke_4: `synthetic_depth_final_balance_materialization_world2_smoke`
+- included_smoke_5: `synthetic_depth_solved_early_stop_world2_smoke`
+- included_smoke_6: `synthetic_depth_no_work_left_drain_order_world2_smoke`
+- host_verification: `python -m py_compile beam_engine.py tests\test_architecture_v6_static.py tests\synthetic_depth_loop_batch_world2_smoke.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `28 passed`.
+- kaggle_method: notebook kernel stage with embedded minimal project payload, metadata accelerator `nvidiaTeslaT4`, push command `kaggle kernels push -p kaggle_synthetic_depth_loop_batch_world2_stage --accelerator NvidiaTeslaT4`, proxy variables cleared for Kaggle CLI calls.
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `SYNTHETIC_DEPTH_LOOP_BATCH_WORLD2_SMOKE_OK rank=0 tests=6`
+- pass_marker_rank1: `SYNTHETIC_DEPTH_LOOP_BATCH_WORLD2_SMOKE_OK rank=1 tests=6`
+- pass_marker_completion: `=== SYNTHETIC_DEPTH_LOOP_BATCH_WORLD2_TEST_COMPLETE ===`
+- validated_unsolved_depth: synthetic unsolved depth path completed Stream3-style split, Stream5 exchange, collector, Stream4 clean, final threshold/balance/materialization without Stream1.
+- validated_remote_multi_shard: synthetic remote exchange and multi-shard Stream4 lifecycle completed under `WORLD_SIZE=2`.
+- validated_periodic_threshold: synthetic periodic threshold update used histogram/AllReduce semantics and monotonic threshold rule.
+- validated_final_path: synthetic final balance and materialization path produced target assignment and next frontier updates.
+- validated_solved_stop: synthetic early stop path set solved/stop state and skipped downstream launch flags.
+- validated_drain_order: synthetic no-work-left drain order reached final after stream work and dirty shards drained.
+- forbidden_paths_validated: Stream1 production path, model backend, real inference, real puzzle solve claim, and performance tuning were not used.
+- next_allowed_stage: architecture v6 incremental dispatcher work can proceed toward production depth-loop integration or Stream1 CUTLASS/custom planning only after explicit user stage selection.
+
+## 2026-05-17 architecture_v6_stream1_cutlass_score_key
+
+- entity_id: `architecture_v6_stream1_cutlass_score_key`
+- type: `micro_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4_visible_single_rank_cuda0`
+- kernel: `trydotatwo/stream1-cutlass-score-key`
+- kernel_version: `6`
+- dataset_payload: `trydotatwo/stream1-cutlass-score-key-payload`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested Stream1 work after synthetic depth-loop green stage, preserving architecture v6 and using existing CUTLASS/custom path.
+- constraints_preserved: no TorchScript fallback, no dummy backend, no central_hamming backend, no Stream3/4/5/dispatcher expansion, no real puzzle solve claim, no performance tuning.
+- code_change: `beam_kernels.cu` adds `launch_fullbeamnice_q_to_score_key_ring` that clamps q to `[0, SCORE_MAX_Q]`, multiplies by `SCORE_SCALE`, rounds to nearest, and writes `uint32_t score_key`.
+- code_change: `beam_engine.cpp` routes `FullBeamNiceStaticBackend` final output through `launch_fullbeamnice_q_to_score_key_ring`.
+- code_change: `beam_engine.cpp` uses `FullBeamNiceRequiredBackend` for `fullbeamnice_static` before weights are loaded, preventing silent fallback inference.
+- code_change: `beam_engine.py` allocates `score_ring` as `torch.int32`.
+- code_change: `setup.py` adds CUTLASS include directories when `third_party/cutlass` exists.
+- test_added: `tests/stream1_cutlass_score_key_smoke.py`
+- staging_added: `kaggle_stream1_cutlass_score_key_small_stage`
+- dataset_stage_added: `kaggle_stream1_cutlass_score_key_dataset`
+- test_result_file: `test_results/architecture_v6_stream1_cutlass_score_key_2026-05-17.md`
+- host_verification: `python -m py_compile setup.py beam_engine.py tests\test_architecture_v6_static.py tests\stream1_cutlass_score_key_smoke.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `30 passed`.
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA 12.8 runtime.
+- kaggle_result: notebook completed with return code `0`.
+- pass_marker: `STREAM1_CUTLASS_SCORE_KEY_SMOKE_OK dtype=int32 synthetic_weights=1 count=96 max_abs_diff=0 min=0 max=76800`
+- validated_backend: Stream1 used `fullbeamnice_static` CUTLASS/custom GEMM path with synthetic static weights.
+- validated_score_ring_dtype: `score_ring` is `torch.int32`.
+- validated_score_key_range: `score_key` values are clamped to `[0, SCORE_MAX_KEY]`, with `SCORE_MAX_KEY=76800`.
+- validated_score_key_rounding: CPU reference matched GPU output with `max_abs_diff=0`.
+- validated_required_logs: config log includes `USER_GLOBAL_BEAM_WIDTH`, `GLOBAL_BEAM_WIDTH_EFFECTIVE`, `GLOBAL_BEAM_WIDTH_MAX_SAFE`, `BEAM_WIDTH_ALIGNMENT`, `SCORE_SCALE`, `SCORE_MAX_KEY`, `SCORE_BIN_COUNT`.
+- failure_history_1: kernel version `3` failed because CUTLASS headers were absent from Kaggle build input.
+- failure_history_2: kernel version `4` failed because direct notebook auxiliary files were unavailable in Kaggle runtime.
+- failure_history_3: kernel version `5` failed because dataset directories were not copied from `/kaggle/input`.
+- final_delivery_method: Kaggle dataset payload supplies project files plus CUTLASS headers; notebook copies dataset directories to `/kaggle/working/CayleyBeam100H100_stream1_cutlass_score_key`.
+- next_allowed_stage: integrate Stream1 score_key production path into architecture v6 dispatcher ring-slot path after explicit user stage selection.
+
+## 2026-05-17 architecture_v6_stream1_real_weights_smoke
+
+- entity_id: `architecture_v6_stream1_real_weights_smoke`
+- type: `micro_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4_visible_single_rank_cuda0`
+- kernel: `trydotatwo/stream1-real-weights-smoke`
+- kernel_version: `3`
+- dataset_payload: `trydotatwo/stream1-real-weights-payload`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User accepted synthetic Stream1 CUTLASS score_key green stage and requested the next risk reduction stage: real FullBeamNice weights through the same Stream1 CUTLASS/custom score_key path.
+- constraints_preserved: no dispatcher loop, no real puzzle solve claim, no performance tuning, no TorchScript fallback, no dummy backend, no central_hamming backend.
+- code_change: `tests/stream1_real_weights_smoke.py` added real FullBeamNice weights smoke using `load_static_weights`, `static_forward_q`, `fullbeamnice_static`, and `warmup_inference`.
+- code_change: `tests/test_architecture_v6_static.py` adds `test_stream1_real_weights_smoke_contract`.
+- staging_added: `kaggle_stream1_real_weights_stage`
+- dataset_stage_added: `kaggle_stream1_real_weights_payload_dataset`
+- test_result_file: `test_results/architecture_v6_stream1_real_weights_smoke_2026-05-17.md`
+- host_verification: `python -m py_compile tests\stream1_real_weights_smoke.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `31 passed`.
+- kaggle_runtime: log confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA 12.8 runtime.
+- kaggle_result: notebook completed with return code `0`.
+- pass_marker: `STREAM1_REAL_WEIGHTS_SMOKE_OK dtype=int32 real_weights=1 count=96 max_abs_diff=8 min=285 max=16184 unique=62`
+- validated_real_weights: real file `FullBeamNice/weights/p900-t000-q-sym_1777988767_best.pth` loaded into static `fullbeamnice_static` tensors.
+- validated_backend: Stream1 used CUTLASS/custom `fullbeamnice_static` path with real weights.
+- validated_score_ring_dtype: `score_ring` is `torch.int32` storage with `uint32_t score_key` semantics.
+- validated_score_key_range: all observed real score keys were in `[0, SCORE_MAX_KEY]`, with observed min `285` and max `16184`.
+- validated_reference_match: GPU CUTLASS score keys matched FP16 static reference within `max_abs_diff=8`.
+- validated_nonconstant_output: real weights output had `unique=62` values across `96` score keys.
+- validated_required_logs: config log includes `USER_GLOBAL_BEAM_WIDTH`, `GLOBAL_BEAM_WIDTH_EFFECTIVE`, `GLOBAL_BEAM_WIDTH_MAX_SAFE`, `BEAM_WIDTH_ALIGNMENT`, `SCORE_SCALE`, `SCORE_MAX_KEY`, `SCORE_BIN_COUNT`.
+- failure_history_1: kernel version `1` failed because dataset path was unavailable immediately after dataset creation.
+- failure_history_2: kernel version `2` failed because Kaggle mounted dataset under nested `/kaggle/input/datasets/...` path.
+- final_delivery_method: notebook recursively discovers the mounted payload under `/kaggle/input`, copies the dataset into `/kaggle/working/CayleyBeam100H100_stream1_real_weights`, builds the extension, and runs the real weights smoke.
+- not_claimed: real puzzle solve, full dispatcher loop, performance characteristics.
+- next_allowed_stage: integrate Stream1 real score_key path into architecture v6 dispatcher ring-slot skeleton after user stage selection.
+
+## 2026-05-18 architecture_v6_real_data_depth300_beam65536_world2
+
+- entity_id: `architecture_v6_real_data_depth300_beam65536_world2`
+- type: `batch_stage`
+- state: `blocked_by_missing_production_v6_dispatcher_path`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested stress-functional validation on Kaggle 2xT4 with `GLOBAL_BEAM_WIDTH=65536`, `MAX_DEPTH=300`, `TASK_COUNT=1001`, real `test.csv`, real `puzzle_info.json`, real FullBeamNice, output CSV, and per-depth JSONL logs.
+- requested_output: `/kaggle/working/real_data_depth300_beam65536_world2.csv`
+- requested_stats: `/kaggle/working/real_data_depth300_beam65536_world2_stats.jsonl`
+- constraints_required: no performance tuning, no leaderboard claim, no real solver quality claim, no architecture deviation, no runtime 120-slice, no separate `nn_input_120_buffer`, no fallback backend, no new Stream3/4/5 logic.
+- feasibility_result: blocked before Kaggle upload because the repository currently exposes staged architecture v6 smoke/helper paths and a legacy solver path, but no complete production architecture v6 dispatcher path matching the request.
+- evidence_1: `beam_dispatcher.cpp` contains `v6_dispatcher_skeleton_single_gpu_smoke_contract` with `stream1_production_path=false` and `uses_prefilled_score_ring=true`.
+- evidence_2: `beam_engine.py` staged helpers record `full_dispatcher_loop_used=false` or `full_production_depth_loop_used=false` across prior synthetic/real-data harnesses.
+- evidence_3: `scripts/solve_testcsv_2gpu.py` uses legacy `BeamEngine`/`reset_search`/prepass/`next_state_pool` path and therefore cannot be substituted for architecture v6 production dispatcher without violating the user constraints.
+- decision: no Kaggle upload, no stress run, no green claim.
+- reason: running the legacy solver would violate architecture v6; running the staged helper would not satisfy the requested `production architecture_v6 dispatcher path`.
+- required_user_decision: either implement the missing production architecture v6 dispatcher path first, or explicitly approve a non-production staged stress-functional harness for the same numeric parameters with a clear non-production label.
+- test_result_file: `test_results/architecture_v6_real_data_depth300_beam65536_world2_2026-05-18.md`
+
+## 2026-05-18 architecture_v6_logical120_state128_boundary_fix
+
+- entity_id: `architecture_v6_logical120_state128_boundary_fix`
+- type: `patch_stage`
+- state: `green`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User identified boundary regression between logical 120-byte puzzle data API and runtime `State128` storage API after quick patches changed 120-wide helpers into 128-wide helpers.
+- constraints_preserved: no architecture deviation, no runtime hot-path 120 slice, no separate `nn_input_120_buffer`, no fallback backend, no Stream3/4/5 semantic changes, no real solver quality claim, no performance tuning claim.
+- code_change: `data_loader.get_central_state_u8()` restored as logical `np.ndarray shape=(120,)`.
+- code_change: `data_loader.get_action_table_u8()` restored as logical `bytes length=24*120`.
+- code_change: `data_loader.pad_state128_u8(state120)` added with `out[0:120]=state120` and `out[120:128]=0`.
+- code_change: `data_loader.pad_states128_u8(states120)` added with `out[:,0:120]=states120` and `out[:,120:128]=0`.
+- code_change: `data_loader.get_central_state128_u8()` added for runtime `State128` central state.
+- code_change: `data_loader.get_action_table128_u8()` added for runtime `generators[24][128]`, with padding columns equal to identity positions `120..127`.
+- code_change: `beam_engine.configure_engine()` now uses `data_loader.get_action_table128_u8()` and `data_loader.get_central_state128_u8()`.
+- code_change: `production_v6_dispatcher.py` now uses `get_action_table128_u8()`, `get_central_state128_u8()`, and `pad_state128_u8()` instead of ad-hoc 120/128 mixing.
+- test_added: `tests/test_architecture_v6_static.py::test_data_loader_logical120_and_state128_runtime_boundary`.
+- test_added: `tests/test_architecture_v6_static.py::test_configure_engine_uses_state128_runtime_tables`.
+- host_verification: `python -m py_compile data_loader.py beam_engine.py production_v6_dispatcher.py tests\production_dispatcher_path_world2_smoke.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `40 passed`.
+- quick_shape_check: `python -c "import data_loader; print(len(data_loader.get_action_table_u8()), len(data_loader.get_action_table128_u8()), len(data_loader.get_central_state_u8()), len(data_loader.get_central_state128_u8()))"` printed `2880 3072 120 128`.
+- kaggle_payload_update: `kaggle datasets version -p kaggle_stream1_stream2_ring_batch_world2_payload_dataset -m architecture_v6_production_dispatcher_path_world2_sys_path_fix --dir-mode zip` succeeded.
+
+## 2026-05-18 architecture_v6_production_dispatcher_path_world2
+
+- entity_id: `architecture_v6_production_dispatcher_path_world2`
+- type: `batch_stage`
+- state: `green`
+- hardware: `Kaggle_2xT4`
+- kernel: `trydotatwo/prod-dispatcher-world2`
+- kernel_version: `6`
+- runner: `torchrun --standalone --nnodes=1 --nproc_per_node=2`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested implementation of real production architecture v6 dispatcher path replacing staged/prefilled helpers and first validation on small real data.
+- constraints_preserved: no legacy `next_state_pool` path, no prefilled score ring fake path, no staged helper production claim, no architecture deviation, no fallback backend, no runtime 120 slice, no separate `nn_input_120_buffer`, no false production v6 claim.
+- code_added: `production_v6_dispatcher.py` implements a production v6 driver that connects real Stream1 FullBeamNice scores, Stream2 hash/goal, Stream3 CUB compact/sort/dedup/split, Stream5 CandidateMeta NCCL exchange, collector into shard input, Stream4 CUB threshold/sort/dedup/write clean, threshold AllReduce semantics, final threshold/balance, FinalRequest/FinalResponse materialization, and current-frontier replacement across depths.
+- test_added: `tests/production_dispatcher_path_world2_smoke.py`.
+- static_guard_added: `tests/test_architecture_v6_static.py::test_production_dispatcher_path_world2_contract`.
+- kaggle_stage_added: `kaggle_production_dispatcher_path_world2_stage`.
+- kaggle_failure_history_1: kernel version `5` failed with `ModuleNotFoundError: No module named 'production_v6_dispatcher'` because torchrun entrypoint from `tests/` lacked project root in `sys.path`.
+- fix_after_failure_1: `tests/production_dispatcher_path_world2_smoke.py` now inserts project root into `sys.path`.
+- kaggle_runtime: logs confirmed `cuda_device_count 2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- kaggle_build: `setup.py build_ext --inplace` passed on Kaggle CUDA 12.8 runtime.
+- kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `PRODUCTION_V6_DISPATCHER_PATH_WORLD2_SMOKE_OK rank=0 world_size=2 tasks=2 beam=4096 max_depth=12 statuses={'solved': 1, 'unsolved': 0, 'max_depth_reached': 1} legacy_next_state_pool_path=0 prefilled_score_ring_fake_path=0 runtime_120_slice=0 fallback_backend=0`
+- pass_marker_rank1: `PRODUCTION_V6_DISPATCHER_PATH_WORLD2_SMOKE_OK rank=1 world_size=2 tasks=2 beam=4096 max_depth=12 statuses={'solved': 1, 'unsolved': 0, 'max_depth_reached': 1} legacy_next_state_pool_path=0 prefilled_score_ring_fake_path=0 runtime_120_slice=0 fallback_backend=0`
+- completion_marker: `=== PRODUCTION_V6_DISPATCHER_PATH_WORLD2_TEST_COMPLETE ===`
+- validated_real_data_small: `task_count=2`, `max_depth=12`, `beam=4096`, statuses were `solved=1`, `max_depth_reached=1`, `unsolved=0`.
+- green_claim: true for small real-data production dispatcher path validation only.
+- not_claimed: real solver quality, leaderboard quality, performance tuning, full production solver quality.
+- test_result_file: `test_results/architecture_v6_production_dispatcher_path_world2_2026-05-18.md`
+
+## 2026-05-18 architecture_v6_real_data_100samples_depth300_beam65536_world2
+
+- entity_id: `architecture_v6_real_data_100samples_depth300_beam65536_world2`
+- type: `batch_stage`
+- state: `green`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User requested separate real-data validation runner with `task_count=100`, `max_depth=300`, `beam_width=65536`, `WORLD_SIZE=2`, real `test.csv`, real `puzzle_info.json`, real FullBeamNice Stream1, production architecture v6 dispatcher path, and no quality/leaderboard/performance claim.
+- delivery_change: User requested GitHub-based source delivery instead of Kaggle dataset payload delivery.
+- code_added: `tests/real_data_100samples_depth300_beam65536_world2.py` runs `run_real_data_production_v6_world2_detailed` with exact parameters `task_count=100`, `max_depth=300`, `beam_width=65536`.
+- code_added: `production_v6_dispatcher.py::run_real_data_production_v6_world2_detailed` writes `/kaggle/working/real_data_100samples_depth300_beam65536_world2.csv` and `/kaggle/working/real_data_100samples_depth300_beam65536_world2_stats.jsonl`.
+- static_guard_added: `tests/test_architecture_v6_static.py::test_real_data_100samples_depth300_beam65536_world2_contract`.
+- kaggle_stage_changed: `kaggle_real_data_100samples_depth300_beam65536_world2_stage` now has `dataset_sources=[]` and notebook source uses `git clone --depth 1 --branch codex-architecture-v6-real-data-100-d300-b65536 https://github.com/TryDotAtwo/MultiGPUBeamSearch.git`.
+- host_verification: `python -m py_compile data_loader.py beam_engine.py production_v6_dispatcher.py tests\real_data_100samples_depth300_beam65536_world2.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `41 passed`.
+- quick_shape_check: `python -c "import data_loader; print(len(data_loader.get_action_table_u8()), len(data_loader.get_action_table128_u8()), len(data_loader.get_central_state_u8()), len(data_loader.get_central_state128_u8()))"` printed `2880 3072 120 128`.
+- local_git_branch: `codex-architecture-v6-real-data-100-d300-b65536`
+- local_git_commit: `202ad22 Add architecture v6 real-data validation runner`
+- GitHub_push_attempt: `git push -u origin codex-architecture-v6-real-data-100-d300-b65536`
+- GitHub_push_result: succeeded after explicit user approval `APPROVE_GITHUB_PUSH origin codex-architecture-v6-real-data-100-d300-b65536`.
+- Kaggle_delivery: GitHub clone from branch `codex-architecture-v6-real-data-100-d300-b65536`, not Kaggle dataset payload.
+- Kaggle_kernel: `trydotatwo/real-data-100-d300-b65536-w2`
+- Kaggle_version: `2`
+- Kaggle_status: `KernelWorkerStatus.COMPLETE`
+- Kaggle_runtime: logs confirmed `cuda_device_count=2`, `cuda_device_0=Tesla T4`, `cuda_device_1=Tesla T4`.
+- Kaggle_build: `setup.py build_ext --inplace` passed.
+- Kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `REAL_DATA_100SAMPLES_DEPTH300_BEAM65536_WORLD2_OK rank=0 world_size=2 total_tasks=100 solved_count=1 unsolved_count=0 max_depth_reached_count=99 error_count=0 no_quality_claim=1 no_leaderboard_claim=1 no_performance_claim=1`
+- pass_marker_rank1: `REAL_DATA_100SAMPLES_DEPTH300_BEAM65536_WORLD2_OK rank=1 world_size=2 total_tasks=100 solved_count=1 unsolved_count=0 max_depth_reached_count=99 error_count=0 no_quality_claim=1 no_leaderboard_claim=1 no_performance_claim=1`
+- completion_marker: `=== REAL_DATA_100SAMPLES_DEPTH300_BEAM65536_WORLD2_TEST_COMPLETE ===`
+- output_rows: `100`
+- output_csv: `/kaggle/working/real_data_100samples_depth300_beam65536_world2.csv`
+- stats_jsonl: `/kaggle/working/real_data_100samples_depth300_beam65536_world2_stats.jsonl`
+- final_accounting: `total_tasks=100`, `solved_count=1`, `unsolved_count=0`, `max_depth_reached_count=99`, `error_count=0`.
+- green_claim: true for real-data stress-functional validation at `task_count=100`, `max_depth=300`, `beam_width=65536`, `WORLD_SIZE=2`.
+- not_claimed: real solver quality, leaderboard quality, performance tuning, full production solver quality.
+- test_result_file: `test_results/architecture_v6_real_data_100samples_depth300_beam65536_world2_2026-05-18.md`
+
+## 2026-05-18 architecture_v6_frontier_coverage_audit_world2
+
+- entity_id: `architecture_v6_frontier_coverage_audit_world2`
+- type: `diagnostic_stage`
+- state: `green_diagnostic_failed_coverage`
+- source_of_truth: `docs/ARCHITECTURE_NEED.md`, `docs/PlanRefact.md`, `docs/PROJECT_MEMORY.md`, `AGENTS.md`
+- prompt_summary: User identified that `solved_count=1/100` at `beam=65536`, `max_depth=300` is suspicious and requested a diagnostic proving whether production dispatcher processes entire frontier or only one microbatch/tile per depth.
+- preceding_audit_result_from_user: path reconstruction was valid for the one solved row; the other `99` rows had `failure_reason=no_solved_state`.
+- code_added: `production_v6_dispatcher.py` now records per-depth counters `current_frontier_size_before`, `expanded_parent_count`, `stream1_scored_parent_count`, `stream2_generated_candidate_count`, `stream3_after_threshold_count`, `stream3_unique_count`, `stream4_input_count`, `stream4_clean_count`, `next_frontier_size_after`.
+- code_added: `production_v6_dispatcher.py::validate_known_paths` validates `sample_submission.csv` known paths against CPU replay.
+- code_added: `production_v6_dispatcher.py::run_frontier_coverage_audit_world2`.
+- test_added: `tests/frontier_coverage_audit_world2.py`.
+- static_guard_added: `tests/test_architecture_v6_static.py::test_frontier_coverage_audit_world2_contract`.
+- host_verification: `python -m py_compile data_loader.py beam_engine.py production_v6_dispatcher.py tests\frontier_coverage_audit_world2.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `44 passed`.
+- GitHub_branch: `codex-architecture-v6-real-data-100-d300-b65536`.
+- GitHub_commit: `27c783d Add v6 frontier coverage audit`.
+- Kaggle_kernel: `trydotatwo/frontier-coverage-audit-w2`.
+- Kaggle_status: `KernelWorkerStatus.COMPLETE`.
+- Kaggle_runtime: 2x Tesla T4.
+- Kaggle_result: `torchrun` returned `0`.
+- pass_marker_rank0: `FRONTIER_COVERAGE_AUDIT_WORLD2_OK rank=0 world_size=2 task_count=10 row_count=109 coverage_failure_count=99 known_path_replay_valid=1 status_counts={'solved': 1, 'unsolved': 0, 'max_depth_reached': 9, 'error': 0} no_quality_claim=1 no_leaderboard_claim=1 no_performance_claim=1`
+- pass_marker_rank1: `FRONTIER_COVERAGE_AUDIT_WORLD2_OK rank=1 world_size=2 task_count=10 row_count=109 coverage_failure_count=99 known_path_replay_valid=1 status_counts={'solved': 1, 'unsolved': 0, 'max_depth_reached': 9, 'error': 0} no_quality_claim=1 no_leaderboard_claim=1 no_performance_claim=1`
+- completion_marker: `=== FRONTIER_COVERAGE_AUDIT_WORLD2_TEST_COMPLETE ===`
+- diagnostic_result: `known_path_replay_valid=1`, `coverage_failure_count=99`, `coverage_ok rows=10`, `coverage_fail rows=99`.
+- root_cause_confirmed: production dispatcher processes only `b_micro=4` parents per depth after depth 0, not full `current_frontier`.
+- evidence_depth1: `current_frontier_size_before=12`, `expanded_parent_count=4`, `stream2_generated_candidate_count=96`, `next_frontier_size_after=85`, `coverage_failure_reason=frontier_not_fully_processed`.
+- evidence_depth2: `current_frontier_size_before=85`, `expanded_parent_count=4`, `stream2_generated_candidate_count=96`, `next_frontier_size_after=94`.
+- architectural_implication: current production dispatcher is not yet a full architecture_v6 depth loop because frontier draining over all ring slots/microbatches is missing.
+- green_claim: true only for diagnostic execution, false for solver quality and false for full production frontier coverage.
+- not_claimed: real solver quality, leaderboard quality, performance tuning, full production solver correctness.
+- required_next_action: implement architecture_v6 depth loop frontier draining so `expanded_parent_count == current_frontier_size_before` across all non-stop depths.
+- test_result_file: `test_results/architecture_v6_frontier_coverage_audit_world2_2026-05-18.md`

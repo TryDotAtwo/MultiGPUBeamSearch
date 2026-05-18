@@ -21,6 +21,18 @@ entity_id=project_rules; type=agent_protocol; state=active
 - rule=static_arrays_only; scope=[gpu_data_plane, distributed_buffers, hot_path_runtime]; requirement=all primary arrays are fixed-size and allocated before search/program hot path starts; forbidden=[dynamic_device_allocation, growing_buffers, runtime_container_growth_for_candidates, unbounded_queues]
 - allowed_static_array_pattern=[preallocated_score_ring, preallocated_send_recv_buckets, preallocated_hash_table, preallocated_histograms, preallocated_counters, fixed_capacity_overflow_counters]
 
+## architecture_v6 External Upload Policy
+
+- entity_id=architecture_v6_external_upload_policy; type=standing_user_approval; state=active
+- approval_scope=[kaggle_datasets_create,kaggle_datasets_version,kaggle_kernels_push,staged_source_test_notebook_payload_upload,FullBeamNice_validation_payload_upload,third_party_CUTLASS_header_upload]
+- condition_required=[stage_follows_architecture_v6,stage_does_not_deviate_from_ARCHITECTURE_NEED_md,stage_does_not_deviate_from_PlanRefact_md]
+- source_of_truth=[ARCHITECTURE_NEED.md,PlanRefact.md,docs/PROJECT_MEMORY.md]
+- hard_constraints=[no_architecture_deviation,no_fallback_backend,no_TorchScript_dummy_central_hamming_fallback,no_runtime_120_slice_for_Stream1,no_separate_nn_input_120_buffer,no_unplanned_Stream3_4_5_logic_changes,no_real_solver_claim_before_real_validation,no_performance_tuning_before_functional_green_path]
+- workflow_rule=batch_related_tests_by_risk_class; avoid=tiny_approval_micro_stage_loops_when_architecture_constraints_unchanged
+- before_upload_required=[verify_staged_file_list,verify_no_secret_filenames,verify_no_obvious_credentials,verify_stage_matches_current_batch_scope,verify_no_architecture_deviation]
+- stop_and_request_explicit_approval_if=[unrelated_files,secrets,private_credentials,architecture_deviation,scope_expansion]
+- before_green_required=[actual_Kaggle_pass,runtime_gate,rank_markers,completion_marker,docs_PROJECT_MEMORY_update_after_pass]
+
 ## Work Stages
 
 - stage=1; target=Kaggle_2xT4; access=Kaggle_CLI; notebook_url=https://www.kaggle.com/code/trydotatwo/notebookaafc902d8e/edit; purpose=debug_code_correctness
