@@ -323,6 +323,29 @@ extern "C" __global__ void kernel_fullbeamnice_quantize_to_ring(
     slot_scores[static_cast<int64_t>(action) * b_micro + row] = packed;
 }
 
+extern "C" __global__ void kernel_fullbeamnice_q_to_score_key_ring(
+    const half* __restrict__ out,
+    const int32_t* __restrict__ action_perm,
+    uint32_t* __restrict__ score_ring,
+    int slot,
+    int b_micro,
+    int fanout,
+    int micro_size
+) {
+    int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    int64_t total = static_cast<int64_t>(micro_size) * fanout;
+    if (lane >= total) return;
+    int row = static_cast<int>(lane / fanout);
+    int action = static_cast<int>(lane - static_cast<int64_t>(row) * fanout);
+    int src_action = action_perm[action];
+    float q = __half2float(out[static_cast<int64_t>(row) * fanout + src_action]);
+    if (q < 0.0f) q = 0.0f;
+    if (q > 300.0f) q = 300.0f;
+    uint32_t score_key = static_cast<uint32_t>(q * 256.0f + 0.5f);
+    uint32_t* slot_scores = score_ring + static_cast<int64_t>(slot) * b_micro * fanout;
+    slot_scores[static_cast<int64_t>(action) * b_micro + row] = score_key;
+}
+
 extern "C" __global__ void kernel_reset_net_slot(
     CandidateRecord* __restrict__ send_buckets,
     CandidateRecord* __restrict__ recv_buckets,
@@ -1086,6 +1109,23 @@ extern "C" void launch_fullbeamnice_quantize_to_ring(
     const int blocks = static_cast<int>((total + threads - 1) / threads);
     beam_engine::kernel_fullbeamnice_quantize_to_ring<<<blocks, threads, 0, stream>>>(
         out, out_bias, action_perm, score_ring, slot, b_micro, fanout, micro_size, score_scale, score_bias);
+}
+
+extern "C" void launch_fullbeamnice_q_to_score_key_ring(
+    const half* out,
+    const int32_t* action_perm,
+    uint32_t* score_ring,
+    int slot,
+    int b_micro,
+    int fanout,
+    int micro_size,
+    cudaStream_t stream
+) {
+    const int threads = 256;
+    const int64_t total = static_cast<int64_t>(micro_size) * fanout;
+    const int blocks = static_cast<int>((total + threads - 1) / threads);
+    beam_engine::kernel_fullbeamnice_q_to_score_key_ring<<<blocks, threads, 0, stream>>>(
+        out, action_perm, score_ring, slot, b_micro, fanout, micro_size);
 }
 
 extern "C" void launch_reset_net_slot(

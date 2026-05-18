@@ -17,12 +17,18 @@ else:
     # Local environment - используем default
     build_temp = None
 
+include_dirs = []
+for rel_include in ("third_party/cutlass/include", "third_party/cutlass/tools/util/include"):
+    if Path(rel_include).exists():
+        include_dirs.append(rel_include)
+
 setup(
     name="beam_engine_ext",
     ext_modules=[
         CUDAExtension(
             name="beam_engine_ext",
             sources=["beam_engine.cpp", "beam_kernels.cu", "beam_config.cpp", "beam_memory.cpp", "beam_kernels_stream2.cu", "beam_kernels_final.cu", "beam_kernels_stream3.cu", "beam_kernels_stream4.cu", "beam_dispatcher.cpp"],
+            include_dirs=include_dirs,
             extra_compile_args={
                 "cxx": ["-O3", "-std=c++17"],
                 "nvcc": ["-O3", "--use_fast_math", "-lineinfo", "-std=c++17"],

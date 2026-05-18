@@ -20,6 +20,10 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_DIR))
 sys.path.insert(0, str(PROJECT_DIR / "scripts"))
 
+STATE_LEN = 120
+STATE_STORAGE_LEN = 128
+STATE_VALUE_PAD = 128
+
 from export_fullbeamnice_scorer import (  # noqa: E402
     FullBeamNiceCurrentOrderScorer,
     Pilgrim,
@@ -84,12 +88,25 @@ def load_static_weights(
     info = load_info(metadata_path)
     sd = torch.load(weights_path, map_location="cpu", weights_only=False)
     target = torch.load(target_path, map_location="cpu", weights_only=True)
-    state_size = int(target.numel())
-    num_classes = int(torch.unique(target).numel())
+    logical_state_size = int(target.numel())
+    logical_num_classes = int(torch.unique(target).numel())
 
     embed_w = sd["input_layer.weight"].float()
     if embed_w.shape[0] == int(info["hd1"]):
         embed_w = embed_w.t().contiguous()
+    if logical_state_size == STATE_LEN and logical_num_classes <= STATE_VALUE_PAD:
+        expanded_embed_w = torch.zeros(
+            (STATE_STORAGE_LEN * STATE_VALUE_PAD, embed_w.shape[1]),
+            dtype=embed_w.dtype,
+            device=embed_w.device,
+        )
+        for pos in range(STATE_LEN):
+            old_start = pos * logical_num_classes
+            new_start = pos * STATE_VALUE_PAD
+            expanded_embed_w[new_start:new_start + logical_num_classes].copy_(
+                embed_w[old_start:old_start + logical_num_classes]
+            )
+        embed_w = expanded_embed_w.contiguous()
     embed_bias = sd["input_layer.bias"].float()
     bn1_scale = sd["bn1.weight"].float() / torch.sqrt(sd["bn1.running_var"].float() + 1e-5)
     embed_w = embed_w * bn1_scale.unsqueeze(0)
@@ -138,14 +155,18 @@ def load_static_weights(
         out_w_t=sd["output_layer.weight"].float().t().contiguous().to(device=d, dtype=weight_dtype),
         out_bias=sd["output_layer.bias"].float().contiguous().to(device=d, dtype=weight_dtype),
         action_perm=action_perm.to(d),
-        state_size=state_size,
-        num_classes=num_classes,
+        state_size=STATE_STORAGE_LEN,
+        num_classes=STATE_VALUE_PAD,
         score_scale=float(score_scale),
         score_bias=float(score_bias),
     )
 
 
 def static_forward_q(states_u8: torch.Tensor, w: StaticFullBeamNiceWeights) -> torch.Tensor:
+    if states_u8.dim() == 2 and states_u8.size(1) == STATE_LEN and int(w.state_size) == STATE_STORAGE_LEN:
+        padded = torch.zeros((states_u8.size(0), STATE_STORAGE_LEN), dtype=states_u8.dtype, device=states_u8.device)
+        padded[:, :STATE_LEN].copy_(states_u8)
+        states_u8 = padded
     states = states_u8.to(device=w.embed_w_t.device, dtype=torch.long)
     offsets = torch.arange(w.state_size, device=states.device, dtype=torch.long) * int(w.num_classes)
     token_ids = states + offsets.unsqueeze(0)
@@ -194,7 +215,7 @@ def compare_static_to_reference(fullbeamnice_dir: Path, batch: int, device: str,
     torch_dtype = torch.float16 if dtype == "fp16" else torch.float32
     w = load_static_weights(fullbeamnice_dir, device=d, dtype=torch_dtype)
     ref = build_reference_scorer(fullbeamnice_dir, device=d)
-    states = torch.randint(0, int(w.num_classes), (batch, int(w.state_size)), dtype=torch.uint8, device=d)
+    states = torch.randint(0, STATE_LEN, (batch, STATE_LEN), dtype=torch.uint8, device=d)
     with torch.no_grad():
         static_scores = static_forward_scores(states, w)
         ref_scores = ref(states)

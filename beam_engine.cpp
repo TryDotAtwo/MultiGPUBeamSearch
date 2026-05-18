@@ -63,6 +63,7 @@ extern "C" void launch_fullbeamnice_fill_residual_bias(half*, const half*, const
 extern "C" void launch_fullbeamnice_bias_relu(half*, const half*, int, int, cudaStream_t);
 extern "C" void launch_fullbeamnice_residual_bias_relu(half*, const half*, const half*, int, int, cudaStream_t);
 extern "C" void launch_fullbeamnice_quantize_to_ring(const half*, const half*, const int32_t*, uint16_t*, int, int, int, int, float, float, cudaStream_t);
+extern "C" void launch_fullbeamnice_q_to_score_key_ring(const half*, const int32_t*, uint32_t*, int, int, int, int, cudaStream_t);
 extern "C" void launch_reset_net_slot(CandidateRecord*, CandidateRecord*, int32_t*, int32_t*, int, int, int, cudaStream_t);
 extern "C" void launch_process_score_slot(const uint8_t*, const uint8_t*, const uint16_t*, uint8_t*, BeamMeta*, HashSlot*, uint8_t*, int32_t*, int32_t*, uint32_t*, int32_t*, int32_t*, CandidateRecord*, int32_t*, const int32_t*, int, int, int, int, int, int, int, int64_t, int, int64_t, int, int, int, int, int, cudaStream_t);
 extern "C" void launch_ingest_recv_slot(const CandidateRecord*, const int32_t*, uint8_t*, BeamMeta*, HashSlot*, uint8_t*, int32_t*, int32_t*, uint32_t*, int32_t*, int32_t*, const int32_t*, int, int, int, int, int, int, int, cudaStream_t);
@@ -347,8 +348,8 @@ static EngineConfig config_from_dict(const py::dict& d) {
     if (c.inference_parallelism < 1) c.inference_parallelism = 1;
     if (c.inference_parallelism > c.score_ring_depth) c.inference_parallelism = c.score_ring_depth;
     if (c.k_expand_tile < 0) c.k_expand_tile = 0;
-    if (c.fanout != FANOUT_FIXED || c.state_size_bytes != STATE_SIZE_BYTES_FIXED) {
-        throw std::runtime_error("v1 supports fanout=24 and state_size_bytes=120 only");
+    if (c.fanout != FANOUT_FIXED || (c.state_size_bytes != STATE_SIZE_BYTES_FIXED && c.state_size_bytes != 128)) {
+        throw std::runtime_error("runtime supports fanout=24 and state_size_bytes in {120,128}; architecture_v6 Stream1 uses State128/128");
     }
     c.derive();
     return c;
@@ -540,6 +541,12 @@ struct TEInferenceBackend final : public InferenceBackend {
     }
 };
 
+struct FullBeamNiceRequiredBackend final : public InferenceBackend {
+    void forward(const torch::Tensor&, const torch::Tensor&, torch::Tensor&, int, int, int64_t, int, const EngineConfig&, cudaStream_t) override {
+        throw std::runtime_error("fullbeamnice_static weights must be loaded before Stream1 inference; fallback inference is forbidden in architecture_v6");
+    }
+};
+
 struct FullBeamNiceStaticBackend final : public InferenceBackend {
     torch::Tensor embed_w_t, embed_bias;
     torch::Tensor hidden_w_t, hidden_bias;
@@ -599,7 +606,7 @@ struct FullBeamNiceStaticBackend final : public InferenceBackend {
         check_cuda_half_tensor(act2, "fb_act2");
         check_cuda_half_tensor(act3, "fb_act3");
         check_cuda_half_tensor(out, "fb_out");
-        if (state_size != STATE_SIZE_BYTES_FIXED || num_classes != 120) throw std::runtime_error("fullbeamnice_static supports state_size=120 and num_classes=120");
+        if (state_size != 128 || num_classes != 128) throw std::runtime_error("fullbeamnice_static supports State128 input: state_size=128 and num_classes=128");
         if (embed_w_t.size(0) != state_size * num_classes || embed_w_t.size(1) != 1536) throw std::runtime_error("bad embed_w_t shape");
         if (hidden_w_t.size(0) != 1536 || hidden_w_t.size(1) != 512) throw std::runtime_error("bad hidden_w_t shape");
         if (out_w_t.size(0) != 512 || out_w_t.size(1) != FANOUT_FIXED) throw std::runtime_error("bad out_w_t shape");
@@ -646,10 +653,10 @@ struct FullBeamNiceStaticBackend final : public InferenceBackend {
 
         launch_fullbeamnice_fill_bias(out_ptr, reinterpret_cast<const half*>(out_bias.data_ptr<at::Half>()), micro_size, FANOUT_FIXED, stream);
         launch_fullbeamnice_cutlass_gemm(act3_ptr, reinterpret_cast<const half*>(out_w_t.data_ptr<at::Half>()), out_ptr, micro_size, 512, FANOUT_FIXED, 0, stream);
-        launch_fullbeamnice_quantize_to_ring(
-            out_ptr, nullptr, action_perm.data_ptr<int32_t>(),
-            reinterpret_cast<uint16_t*>(score_ring.data_ptr<int16_t>()),
-            slot, cfg.b_micro, FANOUT_FIXED, micro_size, score_scale, score_bias, stream);
+        launch_fullbeamnice_q_to_score_key_ring(
+            out_ptr, action_perm.data_ptr<int32_t>(),
+            reinterpret_cast<uint32_t*>(score_ring.data_ptr<int32_t>()),
+            slot, cfg.b_micro, FANOUT_FIXED, micro_size, stream);
         CUDA_CHECK(cudaGetLastError());
     }
 };
@@ -684,7 +691,8 @@ public:
         history_depth_cell_ = buffers["history_depth_cell"].cast<torch::Tensor>();
         check_all_buffers();
 
-        if (backend_name == "dummy" || backend_name == "central_hamming" || backend_name == "torchscript_ensemble" || backend_name == "fullbeamnice_static") inference_ = std::make_unique<DummyInferenceBackend>();
+        if (backend_name == "fullbeamnice_static") inference_ = std::make_unique<FullBeamNiceRequiredBackend>();
+        else if (backend_name == "dummy" || backend_name == "central_hamming" || backend_name == "torchscript_ensemble") inference_ = std::make_unique<DummyInferenceBackend>();
         else if (backend_name == "te") inference_ = std::make_unique<TEInferenceBackend>();
         else throw std::runtime_error("unknown inference backend: " + backend_name);
 
@@ -1843,7 +1851,7 @@ void v6_stream3_pack_threshold_compact_py(
     torch::Tensor stream3_key_a,
     torch::Tensor stream3_val_a,
     torch::Tensor compact_count,
-    int current_threshold,
+    uint64_t current_threshold,
     int ring,
     int ring_slot_count,
     int b_micro,
@@ -1855,6 +1863,9 @@ void v6_stream3_pack_threshold_compact_py(
     check_cuda_tensor(stream3_key_a, "stream3_key_a");
     check_cuda_i64_tensor(stream3_val_a, "stream3_val_a");
     check_cuda_i32_tensor(compact_count, "compact_count");
+    if (current_threshold > 0xffffffffULL) {
+        throw std::runtime_error("current_threshold must be in uint32 range");
+    }
     cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
     launch_v6_stream3_pack_threshold_compact(
         reinterpret_cast<const uint32_t*>(score_ring.data_ptr<int32_t>()),
@@ -1978,11 +1989,14 @@ void v6_stream4_threshold_compact_py(
     torch::Tensor stream4_val_a,
     torch::Tensor compact_count,
     int input_count,
-    int stream4_job_threshold) {
+    uint64_t stream4_job_threshold) {
     check_cuda_tensor(survivor_shard, "survivor_shard");
     check_cuda_tensor(stream4_key_a, "stream4_key_a");
     check_cuda_tensor(stream4_val_a, "stream4_val_a");
     check_cuda_i32_tensor(compact_count, "compact_count");
+    if (stream4_job_threshold > 0xffffffffULL) {
+        throw std::runtime_error("stream4_job_threshold must be in uint32 range");
+    }
     cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
     launch_v6_stream4_threshold_compact(
         reinterpret_cast<const beam_v6::CandidateMeta*>(survivor_shard.data_ptr<uint8_t>()),

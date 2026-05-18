@@ -21,6 +21,7 @@ ACTION_NAMES: List[str] = [
     "F", "FL", "FR", "L", "R", "U",
 ]
 STATE_SIZE = 120
+STATE_STORAGE_SIZE = 128
 FANOUT = 24
 HASH_EMPTY = 0
 HASH_BUSY = 1
@@ -83,6 +84,28 @@ def get_central_state_u8() -> np.ndarray:
     return get_central_state().astype(np.uint8)
 
 
+def pad_state128_u8(state120: np.ndarray) -> np.ndarray:
+    state = np.asarray(state120, dtype=np.uint8)
+    if state.shape != (STATE_SIZE,):
+        raise ValueError(f"state120 shape must be ({STATE_SIZE},), got {state.shape}")
+    out = np.zeros((STATE_STORAGE_SIZE,), dtype=np.uint8)
+    out[:STATE_SIZE] = state
+    return out
+
+
+def pad_states128_u8(states120: np.ndarray) -> np.ndarray:
+    states = np.asarray(states120, dtype=np.uint8)
+    if states.ndim != 2 or states.shape[1] != STATE_SIZE:
+        raise ValueError(f"states120 shape must be (N,{STATE_SIZE}), got {states.shape}")
+    out = np.zeros((states.shape[0], STATE_STORAGE_SIZE), dtype=np.uint8)
+    out[:, :STATE_SIZE] = states
+    return out
+
+
+def get_central_state128_u8() -> np.ndarray:
+    return pad_state128_u8(get_central_state_u8())
+
+
 def get_generators() -> Dict[str, np.ndarray]:
     info = load_puzzle_info()
     return {name: validate_permutation(info["generators"][name], name=name) for name in ACTION_NAMES}
@@ -94,6 +117,17 @@ def get_action_table_u8() -> bytes:
     if table.shape != (FANOUT, STATE_SIZE):
         raise AssertionError(f"bad action table shape: {table.shape}")
     return table.tobytes(order="C")
+
+
+def get_action_table128_u8() -> bytes:
+    generators = get_generators()
+    table120 = np.stack([generators[name] for name in ACTION_NAMES], axis=0).astype(np.uint8)
+    if table120.shape != (FANOUT, STATE_SIZE):
+        raise AssertionError(f"bad action table shape: {table120.shape}")
+    table128 = np.empty((FANOUT, STATE_STORAGE_SIZE), dtype=np.uint8)
+    table128[:, :STATE_SIZE] = table120
+    table128[:, STATE_SIZE:STATE_STORAGE_SIZE] = np.arange(STATE_SIZE, STATE_STORAGE_SIZE, dtype=np.uint8)
+    return table128.tobytes(order="C")
 
 
 def action_index(name: str) -> int:
