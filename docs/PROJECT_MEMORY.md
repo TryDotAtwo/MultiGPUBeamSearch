@@ -1,5 +1,22 @@
 # Project Memory
 
+## 2026-05-19 architecture_v6_real_solve_100_depth300_load_world2_score_ring_fix
+
+- entity_id: `architecture_v6_real_solve_100_depth300_load_world2`
+- type: `production_load_validation_patch`
+- state: `host_green_kaggle_retry_pending`
+- prompt_summary: User identified architecture violation in Kaggle v2 log: `SCORE_RING_DEPTH: 1`; required architecture invariant is `SCORE_RING_DEPTH >= 2`. Same log exposed first actionable task exception: `TASK_ERROR task_idx=0 ... NameError: name 'send_request_total' is not defined`.
+- runtime_evidence_from_user_log: `B_MICRO=8192`, `K_EXPAND_TILE=196608`, `BUCKET_CAP_PER_PEER=262144`, `BUCKET_CAP_PER_PEER_SAFE=262144`, `CUDA_GRAPHS_ENABLED true`, `CONFIG_GUARD_OK` on both ranks, `SCORE_RING_DEPTH=1` invalid, `TASK_ERROR` captured, `RUN_ABORT` captured, `output_rows=1` after abort.
+- code_change: `production_v6_dispatcher.py` now sets BeamEngine `score_ring_depth` to `2` for production dispatcher config.
+- code_change: `beam_engine.cpp` auto-derived `score_ring_depth` now clamps minimum to `2`, not `1`.
+- code_change: `beam_engine.py` auto config now clamps `score_ring_depth` minimum to `2`, not `1`.
+- code_change: `production_v6_dispatcher.py::_final_materialize` removed undefined `send_request_total` in collective debug call and uses `send_request_t.numel()`.
+- code_change: `tests/real_solve_100_depth300_load_world2.py` no longer prints rank OK marker after abort and raises `error_count` before output-row assertion for actionable failed run classification.
+- test_change: `tests/test_architecture_v6_static.py::test_real_solve_100_depth300_load_world2_contract` now guards `score_ring_depth=2`, C++/Python min clamp to 2, absence of `send_request_total`, and abort OK-marker suppression.
+- host_verification: `python -m py_compile production_v6_dispatcher.py beam_engine.py tests\real_solve_100_depth300_load_world2.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `48 passed`.
+- green_claim: false until Kaggle retry confirms `SCORE_RING_DEPTH: 2`, no `TASK_ERROR`, `RUN_SUMMARY`, `returncode 0`, `output_rows=100`, and `error=0`.
+
 ## 2026-05-18 architecture_v6_real_solve_100_depth300_load_world2
 
 - entity_id: `architecture_v6_real_solve_100_depth300_load_world2`

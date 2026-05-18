@@ -272,7 +272,7 @@ struct EngineConfig {
             int64_t denominator = static_cast<int64_t>(b_micro) * static_cast<int64_t>(fanout);
             int64_t target_depth = (numerator + denominator - 1) / denominator;
             score_ring_depth = static_cast<int>(pow2_ceil(target_depth));
-            if (score_ring_depth < 1) score_ring_depth = 1;
+            if (score_ring_depth < 2) score_ring_depth = 2;
         }
 
         // Formula: BUCKET_CAP_PER_PEER = min(

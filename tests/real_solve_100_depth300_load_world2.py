@@ -115,6 +115,7 @@ def main() -> None:
 
     status_counts = {"solved": 0, "max_depth_reached": 0, "unsolved_empty_frontier": 0, "unsolved_pruned": 0, "error": 0}
     completed = 0
+    aborted = False
     run_start = time.perf_counter()
     last_heartbeat = run_start
 
@@ -180,6 +181,7 @@ def main() -> None:
         error_flag = torch.tensor([1 if status == "error" else 0], dtype=torch.int32, device=device)
         dist.all_reduce(error_flag, op=dist.ReduceOp.SUM)
         if int(error_flag.cpu()[0]) > 0:
+            aborted = True
             if rank == 0:
                 print(
                     "RUN_ABORT "
@@ -223,10 +225,10 @@ def main() -> None:
     if rank == 0:
         global_errors = sum(int(item[5].cpu().item()) for item in gathered)
         output_rows = max(sum(1 for _ in output_path.open("r", encoding="utf-8")) - 1, 0)
-        if output_rows != task_count:
-            raise AssertionError(f"output_rows={output_rows}, expected={task_count}")
         if global_errors != 0:
             raise AssertionError(f"error_count={global_errors}")
+        if output_rows != task_count:
+            raise AssertionError(f"output_rows={output_rows}, expected={task_count}")
         print(
             "RUN_SUMMARY "
             f"elapsed_sec={elapsed_total:.3f} tasks_per_sec={task_count / max(elapsed_total, 1e-9):.6f} "
@@ -236,7 +238,7 @@ def main() -> None:
             flush=True,
         )
         print("REAL_SOLVE_100_DEPTH300_LOAD_WORLD2_OK rank=0", flush=True)
-    else:
+    elif not aborted:
         print("REAL_SOLVE_100_DEPTH300_LOAD_WORLD2_OK rank=1", flush=True)
 
     if dist.is_initialized():

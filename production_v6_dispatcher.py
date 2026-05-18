@@ -213,7 +213,7 @@ class ProductionV6Dispatcher:
                 "rank": self.rank,
                 "global_beam_width": self.beam_width,
                 "b_micro": self.b_micro,
-                "score_ring_depth": 1,
+                "score_ring_depth": 2,
                 "net_ring_depth": 1,
                 "bucket_cap_per_peer": bucket_cap_per_peer,
                 "k_expand_tile": required_candidate_capacity,
@@ -518,7 +518,7 @@ class ProductionV6Dispatcher:
         if send_request_t.numel() == 0:
             send_request_t = torch.empty((0,), dtype=torch.uint8, device=self.device)
         recv_request_t = torch.empty((recv_request_total * 16,), dtype=torch.uint8, device=self.device)
-        collective_seq_debug(self.rank, task_idx, depth, "final_request_payload", "all_to_all_single", int(bool(send_request_total)), send_request_t.numel())
+        collective_seq_debug(self.rank, task_idx, depth, "final_request_payload", "all_to_all_single", int(send_request_t.numel() > 0), send_request_t.numel())
         dist.all_to_all_single(
             recv_request_t,
             send_request_t,

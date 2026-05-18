@@ -53,7 +53,7 @@ def _auto_stream2_params(global_beam_width: int, world_size: int, b_micro: int, 
     return {
         "n_local": n_local,
         "k_expand_tile": k_expand_tile,
-        "score_ring_depth": max(1, score_ring_depth),
+        "score_ring_depth": max(2, score_ring_depth),
         "bucket_cap_per_peer": max(4096, bucket_cap),
     }
 

@@ -1024,6 +1024,8 @@ def test_production_dispatcher_path_world2_contract():
 def test_real_data_100samples_depth300_beam65536_world2_contract():
     test_text = (ROOT / "tests" / "real_data_100samples_depth300_beam65536_world2.py").read_text(encoding="utf-8")
     dispatcher_text = (ROOT / "production_v6_dispatcher.py").read_text(encoding="utf-8")
+    beam_engine_text = (ROOT / "beam_engine.cpp").read_text(encoding="utf-8")
+    beam_engine_py_text = (ROOT / "beam_engine.py").read_text(encoding="utf-8")
     smoke_text = (ROOT / "tests" / "production_dispatcher_path_world2_smoke.py").read_text(encoding="utf-8")
     required_test = [
         "run_real_data_production_v6_world2_detailed",
@@ -1115,6 +1117,8 @@ def test_real_solve_100_depth300_load_world2_contract():
     notebook_text = (ROOT / "kaggle_real_solve_100_depth300_load_world2_stage" / "real_solve_100_depth300_load_world2.ipynb").read_text(encoding="utf-8")
     metadata_text = (ROOT / "kaggle_real_solve_100_depth300_load_world2_stage" / "kernel-metadata.json").read_text(encoding="utf-8")
     dispatcher_text = (ROOT / "production_v6_dispatcher.py").read_text(encoding="utf-8")
+    beam_engine_text = (ROOT / "beam_engine.cpp").read_text(encoding="utf-8")
+    beam_engine_py_text = (ROOT / "beam_engine.py").read_text(encoding="utf-8")
     required_runner = [
         "TASK_COUNT = 100",
         "MAX_DEPTH = 300",
@@ -1166,6 +1170,12 @@ def test_real_solve_100_depth300_load_world2_contract():
     assert '"enable_gpu": true' in metadata_text
     assert "CONFIG_GUARD_OK" in dispatcher_text
     assert "os.environ.setdefault(\"USE_CUDA_GRAPHS\", \"1\")" in dispatcher_text
+    assert '"score_ring_depth": 2' in dispatcher_text
+    assert "send_request_total" not in dispatcher_text
+    assert "if (score_ring_depth < 2) score_ring_depth = 2;" in beam_engine_text
+    assert '"score_ring_depth": max(2, score_ring_depth)' in beam_engine_py_text
+    assert "elif not aborted:" in runner_text
+    assert "raise AssertionError(f\"error_count={global_errors}\")" in runner_text
     for needle in forbidden:
         assert needle not in runner_text
         assert needle not in notebook_text
