@@ -29,6 +29,10 @@
 - correction_patch_after_cc41b40_failure: frontier coverage runner now performs a rank-uniform task barrier after every task, including globally empty next-frontier tasks, before advancing to the next task.
 - host_verification_after_correction_patch: `python -m py_compile production_v6_dispatcher.py tests\frontier_coverage_audit_world2.py tests\test_architecture_v6_static.py` passed.
 - host_static_pytest_after_correction_patch: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `47 passed`.
+- git_commit_after_correction_patch: `5c2e723 Guard v6 config and rank-uniform frontier exits`.
+- github_push_after_correction_patch: branch `codex-architecture-v6-real-data-100-d300-b65536` pushed to origin with commit `5c2e723`.
+- kaggle_retry_after_correction_patch: Kaggle kernel `trydotatwo/frontier-coverage-audit-w2` version `6` pushed and reached `KernelWorkerStatus.COMPLETE`.
+- kaggle_retry_after_correction_patch_log_status: required UI log excerpt not yet captured locally because full `kaggle kernels output` download is forbidden; still need visible log lines for `K_EXPAND_TILE=196608`, `BUCKET_CAP_PER_PEER=262144`, `returncode 0`, rank markers, completion marker, and no NCCL ALLGATHER timeout.
 - green_claim: false until Kaggle 2xT4 frontier coverage audit passes with runtime markers, output CSV, JSONL, and coverage invariants.
 - test_result_file: `test_results/architecture_v6_depth_loop_frontier_drain_fix_2026-05-18.md`
 

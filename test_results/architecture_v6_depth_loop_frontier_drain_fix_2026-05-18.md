@@ -55,7 +55,11 @@ entity_id=architecture_v6_depth_loop_frontier_drain_fix; type=test_result_record
 - uniform_exit_patch=rank_uniform_task_barrier_after_each_frontier_audit_task
 - command=`python -m py_compile production_v6_dispatcher.py tests\frontier_coverage_audit_world2.py tests\test_architecture_v6_static.py`; result=pass
 - command=`python -m pytest tests\test_architecture_v6_static.py -q`; result=pass; summary=`47 passed in 0.35s`
-- kaggle_retry_status=not_run_after_correction_patch
+- git_commit=`5c2e723 Guard v6 config and rank-uniform frontier exits`
+- github_push=success
+- kaggle_retry_after_correction_patch={kernel=trydotatwo/frontier-coverage-audit-w2,version=6,status=KernelWorkerStatus.COMPLETE}
+- kaggle_log_status=required_UI_log_excerpt_pending
+- kaggle_log_required=[K_EXPAND_TILE_196608,BUCKET_CAP_PER_PEER_262144,returncode_0,rank0_marker,rank1_marker,completion_marker,no_NCCL_ALLGATHER_timeout]
 
 ## Pending External Validation
 
