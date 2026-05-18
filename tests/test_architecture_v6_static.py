@@ -1169,7 +1169,7 @@ def test_frontier_coverage_audit_world2_contract():
         "task_count=10",
         "max_depth=12",
         "beam_width=65536",
-        '"8192"',
+        "REQUIRED_B_MICRO = 8192",
         "FRONTIER_COVERAGE_AUDIT_WORLD2_OK",
         "FRONTIER_COVERAGE_AUDIT_WORLD2_TEST_COMPLETE",
         "coverage_failure_count",
@@ -1235,7 +1235,7 @@ def test_architecture_v6_production_microbatch_hard_invariant():
         assert needle in dispatcher_text
     for path in production_test_paths:
         text = path.read_text(encoding="utf-8")
-        assert '"8192"' in text or "PRODUCTION_B_MICRO" in text
+        assert '"8192"' in text or "PRODUCTION_B_MICRO" in text or "REQUIRED_B_MICRO = 8192" in text
         assert '_B_MICRO", "4"' not in text
         assert 'FRONTIER_COVERAGE_B_MICRO"] = "4"' not in text
         assert '"k_expand_tile": 96' not in text

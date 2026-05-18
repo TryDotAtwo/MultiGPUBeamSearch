@@ -48,6 +48,15 @@ def require_production_microbatch(b_micro: int) -> int:
     return b_micro
 
 
+def collective_seq_debug(rank: int, task_idx: int, depth: int, seq_tag: str, op: str, local_flag: int, local_next_count: int) -> None:
+    print(
+        "COLLECTIVE_SEQ_TAG "
+        f"rank={int(rank)} task_idx={int(task_idx)} depth={int(depth)} "
+        f"seq_tag={seq_tag} op={op} local_flag={int(local_flag)} local_next_count={int(local_next_count)}",
+        flush=True,
+    )
+
+
 @dataclass
 class ProductionV6Result:
     task_id: int
@@ -163,8 +172,13 @@ def allreduce_score_threshold(
     threshold_initialized: bool,
     global_beam_width_effective: int,
     device: torch.device,
+    *,
+    rank: int = -1,
+    task_idx: int = -1,
+    depth: int = -1,
 ) -> tuple[int, bool, int]:
     gathered_scores: list[list[int] | None] = [None for _ in range(dist.get_world_size())]
+    collective_seq_debug(rank, task_idx, depth, "threshold_scores", "all_gather_object", int(bool(local_scores)), len(local_scores))
     dist.all_gather_object(gathered_scores, [int(x) for x in local_scores])
     global_scores = [score for scores in gathered_scores for score in (scores or [])]
     total_survivors = len(global_scores)
@@ -209,6 +223,18 @@ class ProductionV6Dispatcher:
                 "max_depth": int(os.environ.get("MAX_DEPTH", "20")),
                 "inference_backend": "fullbeamnice_static",
             }
+        )
+        if int(cfg["b_micro"]) != PRODUCTION_B_MICRO:
+            raise RuntimeError(f"invalid_config: BeamEngine B_MICRO must be {PRODUCTION_B_MICRO}, got {cfg['b_micro']}")
+        if int(cfg["k_expand_tile"]) != PRODUCTION_K_EXPAND_TILE:
+            raise RuntimeError(f"invalid_config: BeamEngine K_EXPAND_TILE must be {PRODUCTION_K_EXPAND_TILE}, got {cfg['k_expand_tile']}")
+        if int(cfg["bucket_cap_per_peer"]) != 262144:
+            raise RuntimeError(f"invalid_config: BeamEngine BUCKET_CAP_PER_PEER must be 262144, got {cfg['bucket_cap_per_peer']}")
+        print(
+            "PRODUCTION_V6_CONFIG_GUARD "
+            f"rank={self.rank} B_MICRO={cfg['b_micro']} K_EXPAND_TILE={cfg['k_expand_tile']} "
+            f"BUCKET_CAP_PER_PEER={cfg['bucket_cap_per_peer']}",
+            flush=True,
         )
         self.cfg = cfg
         self.buffers = beam_engine.allocate_buffers(self.ext, cfg)
@@ -439,19 +465,25 @@ class ProductionV6Dispatcher:
         clean: list[dict[str, int]],
         current_threshold: int,
         current_paths: list[str] | None = None,
+        *,
+        task_idx: int = -1,
+        depth: int = -1,
     ) -> np.ndarray | tuple[np.ndarray, list[str]]:
         keep = [c for c in clean if int(c["score_key"]) <= int(current_threshold)]
         keep_counts = [None for _ in range(self.world_size)]
+        collective_seq_debug(self.rank, task_idx, depth, "final_keep_counts", "all_gather_object", int(bool(keep)), len(keep))
         dist.all_gather_object(keep_counts, len(keep))
         counts = [int(x or 0) for x in keep_counts]
         prefix = [0, counts[0]]
         global_keep = sum(counts)
         if global_keep == 0:
+            collective_seq_debug(self.rank, task_idx, depth, "final_global_empty_next", "uniform_exit", 1, 0)
             empty = np.zeros((0, STATE_STORAGE_LEN), dtype=np.uint8)
             return (empty, []) if current_paths is not None else empty
         gathered_paths: list[list[str] | None] | None = None
         if current_paths is not None:
             gathered_paths = [None for _ in range(self.world_size)]
+            collective_seq_debug(self.rank, task_idx, depth, "final_paths", "all_gather_object", int(bool(current_paths)), len(current_paths))
             dist.all_gather_object(gathered_paths, list(current_paths))
         request_by_peer = [[] for _ in range(self.world_size)]
         path_by_target_local_idx: dict[int, str] = {}
@@ -474,6 +506,7 @@ class ProductionV6Dispatcher:
         recv_request_counts = [0 for _ in range(self.world_size)]
         send_count_t = torch.tensor(send_request_counts, dtype=torch.int64, device=self.device)
         recv_count_t = torch.empty_like(send_count_t)
+        collective_seq_debug(self.rank, task_idx, depth, "final_request_counts", "all_to_all_single", int(bool(send_request_counts)), sum(send_request_counts))
         dist.all_to_all_single(recv_count_t, send_count_t)
         recv_request_counts = [int(x) for x in recv_count_t.cpu().tolist()]
         send_request_bytes = b"".join(b"".join(items) for items in request_by_peer)
@@ -482,6 +515,7 @@ class ProductionV6Dispatcher:
         if send_request_t.numel() == 0:
             send_request_t = torch.empty((0,), dtype=torch.uint8, device=self.device)
         recv_request_t = torch.empty((recv_request_total * 16,), dtype=torch.uint8, device=self.device)
+        collective_seq_debug(self.rank, task_idx, depth, "final_request_payload", "all_to_all_single", int(bool(send_request_total)), send_request_t.numel())
         dist.all_to_all_single(
             recv_request_t,
             send_request_t,
@@ -501,6 +535,7 @@ class ProductionV6Dispatcher:
         send_response_counts = [len(x) for x in response_by_peer]
         send_response_count_t = torch.tensor(send_response_counts, dtype=torch.int64, device=self.device)
         recv_response_count_t = torch.empty_like(send_response_count_t)
+        collective_seq_debug(self.rank, task_idx, depth, "final_response_counts", "all_to_all_single", int(bool(send_response_counts)), sum(send_response_counts))
         dist.all_to_all_single(recv_response_count_t, send_response_count_t)
         recv_response_counts = [int(x) for x in recv_response_count_t.cpu().tolist()]
         send_response_bytes = b"".join(b"".join(items) for items in response_by_peer)
@@ -509,6 +544,7 @@ class ProductionV6Dispatcher:
             send_response_t = torch.empty((0,), dtype=torch.uint8, device=self.device)
         recv_response_total = sum(recv_response_counts)
         recv_response_t = torch.empty((recv_response_total * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device)
+        collective_seq_debug(self.rank, task_idx, depth, "final_response_payload", "all_to_all_single", int(bool(send_response_t.numel())), send_response_t.numel())
         dist.all_to_all_single(
             recv_response_t,
             send_response_t,
@@ -618,14 +654,20 @@ class ProductionV6Dispatcher:
                 threshold_initialized,
                 global_beam_width_effective,
                 self.device,
+                rank=self.rank,
+                task_idx=task_id,
+                depth=depth,
             )
             next_current, next_paths = self._final_materialize(
                 depth_current_frontier_states,
                 depth_clean,
                 current_threshold,
                 current_paths,
+                task_idx=task_id,
+                depth=depth,
             )
             global_keep_tensor = torch.tensor([len(next_current)], dtype=torch.int64, device=self.device)
+            collective_seq_debug(self.rank, task_id, depth, "depth_global_keep", "all_reduce", int(len(next_current) > 0), len(next_current))
             dist.all_reduce(global_keep_tensor, op=dist.ReduceOp.SUM)
             global_keep = int(global_keep_tensor.cpu()[0])
             depth_rows.append(
@@ -654,6 +696,7 @@ class ProductionV6Dispatcher:
             current = next_current
             current_paths = next_paths
             if global_keep == 0 or len(current) == 0:
+                collective_seq_debug(self.rank, task_id, depth, "depth_uniform_empty_exit", "local_break_after_all_reduce", int(global_keep == 0), len(current))
                 status = "unsolved"
                 break
         return ProductionV6Result(
@@ -1238,9 +1281,13 @@ def run_frontier_coverage_audit_world2(
                 f"stream4_clean={out_row['stream4_clean_count']} next={out_row['next_frontier_size_after']} "
                 f"coverage_ok={out_row['coverage_ok']}"
             )
+        collective_seq_debug(rank, int(task_id), -1, "frontier_task_done", "barrier", int(status != "error"), len(depth_rows))
+        dist.barrier()
     local_counts = torch.tensor([row_count, len(coverage_failures), status_counts["solved"], status_counts["error"]], dtype=torch.int64, device=device)
     gathered = [torch.zeros_like(local_counts) for _ in range(world_size)]
+    collective_seq_debug(rank, -1, -1, "frontier_summary_counts", "all_gather", len(coverage_failures), row_count)
     dist.all_gather(gathered, local_counts)
+    collective_seq_debug(rank, -1, -1, "frontier_summary_done", "barrier", len(coverage_failures), row_count)
     dist.barrier()
     return {
         "rank": rank,

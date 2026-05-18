@@ -22,6 +22,13 @@
 - hard_invariant_test_change: `tests/test_architecture_v6_static.py::test_architecture_v6_production_microbatch_hard_invariant` added to reject tiny production frontier/dispatcher/Stream5 defaults and require the explicit hard invariant.
 - host_verification_after_hard_invariant: `python -m py_compile production_v6_dispatcher.py tests\frontier_coverage_audit_world2.py tests\production_dispatcher_path_world2_smoke.py tests\real_data_100samples_depth300_beam65536_world2.py tests\real_data_100samples_depth300_beam65536_path_audit_world2.py tests\full_test_csv_depth300_beam65536_world2.py tests\stream5_exchange_smoke.py tests\stream5_2gpu_nccl_explicit_smoke.py tests\test_architecture_v6_static.py` passed.
 - host_static_pytest_after_hard_invariant: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `47 passed`.
+- kaggle_retry_cc41b40_result: failed_invalid_config_and_collective_mismatch; user-provided log showed `K_EXPAND_TILE=96`, `BUCKET_CAP_PER_PEER=131072`, `returncode=1`, and NCCL `ALLGATHER` timeout after globally empty next frontier at `task_idx=1 depth=0`; green claim remains forbidden.
+- correction_patch_after_cc41b40_failure: `production_v6_dispatcher.py` now prints and enforces `PRODUCTION_V6_CONFIG_GUARD` immediately before `beam_engine.allocate_buffers()` / `configure_engine()`, rejecting BeamEngine config unless `B_MICRO=8192`, `K_EXPAND_TILE=196608`, and `BUCKET_CAP_PER_PEER=262144`.
+- correction_patch_after_cc41b40_failure: `tests/frontier_coverage_audit_world2.py` and Kaggle stage notebook print `FRONTIER_COVERAGE_PRE_TORCHRUN_CONFIG` and fail before torchrun if `B_MICRO`, `K_EXPAND_TILE`, or `BUCKET_CAP_PER_PEER` deviates from required production values.
+- correction_patch_after_cc41b40_failure: distributed debug prints `COLLECTIVE_SEQ_TAG rank task_idx depth seq_tag op local_flag local_next_count` before threshold score all-gather, final materialization collectives, depth global keep all-reduce, task-done barrier, and summary collectives.
+- correction_patch_after_cc41b40_failure: frontier coverage runner now performs a rank-uniform task barrier after every task, including globally empty next-frontier tasks, before advancing to the next task.
+- host_verification_after_correction_patch: `python -m py_compile production_v6_dispatcher.py tests\frontier_coverage_audit_world2.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest_after_correction_patch: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `47 passed`.
 - green_claim: false until Kaggle 2xT4 frontier coverage audit passes with runtime markers, output CSV, JSONL, and coverage invariants.
 - test_result_file: `test_results/architecture_v6_depth_loop_frontier_drain_fix_2026-05-18.md`
 

@@ -34,6 +34,29 @@ entity_id=architecture_v6_depth_loop_frontier_drain_fix; type=test_result_record
 - command=`python -m pytest tests\test_architecture_v6_static.py -q`; result=pass; summary=`47 passed in 0.23s`
 - kaggle_retry_status=not_run_after_hard_invariant_update
 
+## Kaggle Retry cc41b40 Failure Parse
+
+- entity_id=kaggle_retry_cc41b40_result
+- state=failed_invalid_config_and_collective_mismatch
+- green_claim=forbidden
+- observed_config={K_EXPAND_TILE=96,BUCKET_CAP_PER_PEER=131072,BUCKET_CAP_PER_PEER_SAFE=131072}
+- required_config={K_EXPAND_TILE=196608,BUCKET_CAP_PER_PEER=262144,BUCKET_CAP_PER_PEER_SAFE=262144}
+- observed_runtime={returncode=1,NCCL_ALLGATHER_timeout=true}
+- root_cause_1=BeamEngine_config_guard_missing_or_not_used_by_Kaggle_runner
+- root_cause_2=non_uniform_rank_exit_after_empty_next_frontier
+
+## Correction Patch After cc41b40 Failure
+
+- code_guard=production_v6_dispatcher.py::PRODUCTION_V6_CONFIG_GUARD
+- code_guard_behavior=fail_before_BeamEngine_buffers_when_B_MICRO_or_K_EXPAND_TILE_or_BUCKET_CAP_PER_PEER_invalid
+- runner_guard=tests/frontier_coverage_audit_world2.py::FRONTIER_COVERAGE_PRE_TORCHRUN_CONFIG
+- kaggle_guard=kaggle_frontier_coverage_audit_world2_stage/frontier_coverage_audit_world2.ipynb::FRONTIER_COVERAGE_PRE_TORCHRUN_CONFIG
+- distributed_debug=COLLECTIVE_SEQ_TAG_before_collectives
+- uniform_exit_patch=rank_uniform_task_barrier_after_each_frontier_audit_task
+- command=`python -m py_compile production_v6_dispatcher.py tests\frontier_coverage_audit_world2.py tests\test_architecture_v6_static.py`; result=pass
+- command=`python -m pytest tests\test_architecture_v6_static.py -q`; result=pass; summary=`47 passed in 0.35s`
+- kaggle_retry_status=not_run_after_correction_patch
+
 ## Pending External Validation
 
 - target=Kaggle_2xT4_frontier_coverage_audit
