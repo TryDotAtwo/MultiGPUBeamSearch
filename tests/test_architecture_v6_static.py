@@ -1127,7 +1127,7 @@ def test_real_solve_100_depth300_load_world2_contract():
         "assert PRODUCTION_B_MICRO == 8192",
         "assert PRODUCTION_K_EXPAND_TILE == 196608",
         "RUN_START",
-        "CUDA_GRAPHS_ENABLED true",
+        "CUDA_GRAPHS_ENABLED",
         "TASK_SOLVED",
         "TASK_ERROR",
         "TASK_DONE",
@@ -1143,7 +1143,6 @@ def test_real_solve_100_depth300_load_world2_contract():
         "subprocess.Popen",
         "PYTHONUNBUFFERED",
         "USE_CUDA_GRAPHS",
-        "\\\"1\\\"",
         "B_MICRO",
         "8192",
         "K_EXPAND_TILE",
@@ -1169,7 +1168,8 @@ def test_real_solve_100_depth300_load_world2_contract():
     assert '"id": "trydotatwo/real-solve-100-depth300-load-w2"' in metadata_text
     assert '"enable_gpu": true' in metadata_text
     assert "CONFIG_GUARD_OK" in dispatcher_text
-    assert "os.environ.setdefault(\"USE_CUDA_GRAPHS\", \"1\")" in dispatcher_text
+    # Updated: CUDA Graphs disabled due to static-scratch refactor (hybrid dynamic-static violation fix)
+    assert 'os.environ["USE_CUDA_GRAPHS"] = "0"' in dispatcher_text
     assert '"score_ring_depth": 2' in dispatcher_text
     assert "send_request_total" not in dispatcher_text
     assert "if (score_ring_depth < 2) score_ring_depth = 2;" in beam_engine_text
@@ -1336,8 +1336,11 @@ def test_architecture_v6_frontier_drain_and_stream5_capacity_static_guards():
     assert 'stream3.get("unique_count"' not in stream5_text
     assert 'stream3["unique_count"]' not in stream5_text
     assert "v6_stream5_exchange_candidate_meta" in stream5_text
-    assert stream5_text.index("recv_count = torch.zeros") < stream5_text.index("torch.cuda.synchronize()")
-    assert stream5_text.index("recv_offset = torch.zeros") < stream5_text.index("torch.cuda.synchronize()")
+    # Updated: static scratch buffers use .zero_() instead of torch.zeros
+    assert 'recv_count = self.scratch["recv_count"]' in stream5_text
+    assert 'recv_offset = self.scratch["recv_offset"]' in stream5_text
+    assert stream5_text.index('recv_count = self.scratch["recv_count"]') < stream5_text.index("torch.cuda.synchronize()")
+    assert stream5_text.index('recv_offset = self.scratch["recv_offset"]') < stream5_text.index("torch.cuda.synchronize()")
     assert stream5_text.index("v6_stream5_exchange_candidate_meta") < stream5_text.index("torch.cuda.synchronize()")
 
     return_dicts = [
@@ -1374,6 +1377,9 @@ def test_architecture_v6_frontier_drain_and_stream5_capacity_static_guards():
     assert "while parent_offset < len(current):" in run_task_text
     assert 'parent_offset += int(stream12.get("frontier_count", 0))' in run_task_text
     assert run_task_text.index("while parent_offset < len(current):") < run_task_text.index("allreduce_score_threshold")
+    # Updated: static scratch uses preallocated frontier buffer
+    assert "self.host_run_task_frontier" in run_task_text
+    assert "self.host_run_task_frontier.fill(0)" in run_task_text
 
     required_depth_counters = [
         "current_frontier_size_before",

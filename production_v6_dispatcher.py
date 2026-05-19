@@ -195,7 +195,7 @@ def allreduce_score_threshold(
 class ProductionV6Dispatcher:
     def __init__(self, rank: int, world_size: int, device: torch.device, *, beam_width: int, b_micro: int) -> None:
         os.environ["INFERENCE_BACKEND"] = "fullbeamnice_static"
-        os.environ.setdefault("USE_CUDA_GRAPHS", "1")
+        os.environ["USE_CUDA_GRAPHS"] = "0"
         os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "7.5")
         self.rank = int(rank)
         self.world_size = int(world_size)
@@ -248,6 +248,76 @@ class ProductionV6Dispatcher:
         self.generators_t = torch.tensor(self.generators_np.reshape(-1), dtype=torch.uint8, device=device)
         self.central_t = torch.tensor(self.central_np, dtype=torch.uint8, device=device)
         self.zobrist_t = torch.tensor(self.zobrist_np.reshape(-1).view(np.uint8), dtype=torch.uint8, device=device)
+        self.stream3_capacity = PRODUCTION_K_EXPAND_TILE
+        self.remote_capacity = int(self.cfg["bucket_cap_per_peer"])
+        self.stream4_capacity = self.stream3_capacity + self.remote_capacity
+        self.final_capacity = int(self.ext.derive_sizes(self.cfg)["n_local"])
+        self.host_state_stage = np.zeros((self.b_micro, STATE_STORAGE_LEN), dtype=np.uint8)
+        self.host_state_stage_t = torch.from_numpy(self.host_state_stage.reshape(-1))
+        self.host_send_offset = np.zeros((self.world_size + 1,), dtype=np.int32)
+        self.host_send_offset_t = torch.empty((self.world_size + 1,), dtype=torch.int32)
+        self.host_final_request = np.zeros((self.final_capacity * 16,), dtype=np.uint8)
+        self.host_final_response_send = np.zeros((self.final_capacity * STATE_STORAGE_LEN,), dtype=np.uint8)
+        self.host_final_request_t = torch.from_numpy(self.host_final_request)
+        self.host_final_response_send_t = torch.from_numpy(self.host_final_response_send)
+        self.host_final_count = np.zeros((self.world_size,), dtype=np.int64)
+        self.host_final_count_t = torch.from_numpy(self.host_final_count)
+        self.host_current_frontier = np.zeros((self.final_capacity, STATE_STORAGE_LEN), dtype=np.uint8)
+        self.host_current_frontier_t = torch.from_numpy(self.host_current_frontier.reshape(-1))
+        self.host_run_task_frontier = np.zeros((self.final_capacity, STATE_STORAGE_LEN), dtype=np.uint8)
+        self.scratch = {
+            "current_frontier_states": torch.empty((self.b_micro * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device),
+            "current_frontier_all": torch.empty((self.final_capacity * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device),
+            "parent_base_i64": torch.empty((1,), dtype=torch.int64, device=self.device),
+            "count_i32": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "hash_ring": torch.empty((self.stream3_capacity * 16,), dtype=torch.uint8, device=self.device),
+            "solved_flag": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "stop_flag": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "solved_count": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "solved_overflow": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "solved_meta_list": torch.empty((16 * 32,), dtype=torch.uint8, device=self.device),
+            "solved_depth_list": torch.empty((16,), dtype=torch.int32, device=self.device),
+            "stream3_key_a": torch.empty((self.stream3_capacity * 16,), dtype=torch.uint8, device=self.device),
+            "stream3_key_b": torch.empty((self.stream3_capacity * 16,), dtype=torch.uint8, device=self.device),
+            "stream3_val_a": torch.empty((self.stream3_capacity,), dtype=torch.int64, device=self.device),
+            "stream3_val_b": torch.empty((self.stream3_capacity,), dtype=torch.int64, device=self.device),
+            "stream3_compact_count": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "stream3_unique_key": torch.empty((self.stream3_capacity * 16,), dtype=torch.uint8, device=self.device),
+            "stream3_unique_val": torch.empty((self.stream3_capacity,), dtype=torch.int64, device=self.device),
+            "stream3_unique_count": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "local_pending": torch.empty((self.stream3_capacity * 32,), dtype=torch.uint8, device=self.device),
+            "remote_send": torch.empty((self.stream3_capacity * 32,), dtype=torch.uint8, device=self.device),
+            "local_count": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "send_count": torch.empty((self.world_size,), dtype=torch.int32, device=self.device),
+            "send_offset": torch.empty((self.world_size + 1,), dtype=torch.int32, device=self.device),
+            "remote_recv": torch.empty((self.remote_capacity * 32,), dtype=torch.uint8, device=self.device),
+            "recv_count": torch.empty((self.world_size,), dtype=torch.int32, device=self.device),
+            "recv_offset": torch.empty((self.world_size + 1,), dtype=torch.int32, device=self.device),
+            "survivor": torch.empty((self.stream4_capacity * 32,), dtype=torch.uint8, device=self.device),
+            "stream4_key_a": torch.empty((self.stream4_capacity * 16,), dtype=torch.uint8, device=self.device),
+            "stream4_key_b": torch.empty((self.stream4_capacity * 16,), dtype=torch.uint8, device=self.device),
+            "stream4_val_a": torch.empty((self.stream4_capacity * 32,), dtype=torch.uint8, device=self.device),
+            "stream4_val_b": torch.empty((self.stream4_capacity * 32,), dtype=torch.uint8, device=self.device),
+            "stream4_compact_count": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "clean_tmp": torch.empty((self.stream4_capacity * 32,), dtype=torch.uint8, device=self.device),
+            "stream4_new_clean_count": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "clean_count": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "dirty_count": torch.empty((1,), dtype=torch.int32, device=self.device),
+            "processing_flag": torch.empty((1,), dtype=torch.uint8, device=self.device),
+            "final_send_count": torch.empty((self.world_size,), dtype=torch.int64, device=self.device),
+            "final_recv_count": torch.empty((self.world_size,), dtype=torch.int64, device=self.device),
+            "final_request": torch.empty((self.final_capacity * 16,), dtype=torch.uint8, device=self.device),
+            "final_request_recv": torch.empty((self.final_capacity * 16,), dtype=torch.uint8, device=self.device),
+            "final_response": torch.empty((self.final_capacity * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device),
+            "final_response_send": torch.empty((self.final_capacity * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device),
+            "final_response_recv": torch.empty((self.final_capacity * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device),
+            "next_frontier": torch.empty((self.final_capacity * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device),
+            "global_keep_tensor": torch.empty((1,), dtype=torch.int64, device=self.device),
+        }
+        self.scratch["stream3_sort_temp"] = torch.empty((int(self.ext.v6_stream3_sort_temp_bytes(self.stream3_capacity)),), dtype=torch.uint8, device=self.device)
+        self.scratch["stream4_sort_temp"] = torch.empty((int(self.ext.v6_stream4_sort_temp_bytes(self.stream4_capacity)),), dtype=torch.uint8, device=self.device)
+        for tensor in self.scratch.values():
+            tensor.zero_()
 
     def _run_ring_streams(self, current_frontier: np.ndarray, depth: int, parent_offset: int = 0) -> dict[str, Any]:
         parent_offset = int(parent_offset)
@@ -256,27 +326,31 @@ class ProductionV6Dispatcher:
         frontier_count = int(min(self.b_micro, len(current_frontier) - parent_offset))
         if frontier_count <= 0:
             return {"frontier_count": 0, "solved_count": 0, "stop_flag": 0, "candidates": []}
-        states_storage = np.zeros((self.b_micro, STATE_STORAGE_LEN), dtype=np.uint8)
+        states_storage = self.host_state_stage
+        states_storage.fill(0)
         states_storage[:frontier_count] = current_frontier[parent_offset : parent_offset + frontier_count]
-        states_storage[:, STATE_LEN:] = 0
-        self.buffers["beam_current"][: self.b_micro, :STATE_STORAGE_LEN].copy_(torch.tensor(states_storage, dtype=torch.uint8, device=self.device))
+        self.buffers["beam_current"][: self.b_micro, :STATE_STORAGE_LEN].reshape(-1).copy_(self.host_state_stage_t, non_blocking=False)
         self.buffers["current_active_flags"][: self.b_micro].zero_()
         self.buffers["current_active_flags"][:frontier_count].fill_(1)
         self.buffers["score_ring"][: self.b_micro * MOVE_COUNT].fill_(-1)
         self.engine.warmup_inference(1)
         torch.cuda.synchronize()
 
-        current_frontier_states = torch.tensor(states_storage.reshape(-1), dtype=torch.uint8, device=self.device)
-        parent_base = torch.tensor([parent_offset], dtype=torch.int64, device=self.device)
-        count = torch.tensor([frontier_count], dtype=torch.int32, device=self.device)
-        hash_ring = torch.zeros((self.b_micro * MOVE_COUNT * 16,), dtype=torch.uint8, device=self.device)
+        current_frontier_states = self.scratch["current_frontier_states"]
+        current_frontier_states.copy_(self.buffers["beam_current"][: self.b_micro, :STATE_STORAGE_LEN].reshape(-1))
+        parent_base = self.scratch["parent_base_i64"]
+        parent_base.fill_(parent_offset)
+        count = self.scratch["count_i32"]
+        count.fill_(frontier_count)
+        hash_ring = self.scratch["hash_ring"][: self.b_micro * MOVE_COUNT * 16]
+        hash_ring.zero_()
         solved_capacity = 16
-        solved_flag = torch.zeros((1,), dtype=torch.int32, device=self.device)
-        stop_flag = torch.zeros((1,), dtype=torch.int32, device=self.device)
-        solved_count = torch.zeros((1,), dtype=torch.int32, device=self.device)
-        solved_overflow = torch.zeros((1,), dtype=torch.int32, device=self.device)
-        solved_meta_list = torch.zeros((solved_capacity * 32,), dtype=torch.uint8, device=self.device)
-        solved_depth_list = torch.zeros((solved_capacity,), dtype=torch.int32, device=self.device)
+        solved_flag = self.scratch["solved_flag"]; solved_flag.zero_()
+        stop_flag = self.scratch["stop_flag"]; stop_flag.zero_()
+        solved_count = self.scratch["solved_count"]; solved_count.zero_()
+        solved_overflow = self.scratch["solved_overflow"]; solved_overflow.zero_()
+        solved_meta_list = self.scratch["solved_meta_list"][: solved_capacity * 32]; solved_meta_list.zero_()
+        solved_depth_list = self.scratch["solved_depth_list"][:solved_capacity]; solved_depth_list.zero_()
         score_ring = self.buffers["score_ring"][: self.b_micro * MOVE_COUNT]
         self.ext.v6_stream2_hash_goal(
             current_frontier_states,
@@ -323,11 +397,11 @@ class ProductionV6Dispatcher:
 
     def _run_stream3(self, stream12: dict[str, Any], current_threshold: int) -> dict[str, Any]:
         batch_candidates = self.b_micro * MOVE_COUNT
-        key_a = torch.zeros((batch_candidates * 16,), dtype=torch.uint8, device=self.device)
-        key_b = torch.zeros_like(key_a)
-        val_a = torch.zeros((batch_candidates,), dtype=torch.int64, device=self.device)
-        val_b = torch.zeros_like(val_a)
-        compact_count = torch.zeros((1,), dtype=torch.int32, device=self.device)
+        key_a = self.scratch["stream3_key_a"][: batch_candidates * 16]; key_a.zero_()
+        key_b = self.scratch["stream3_key_b"][: batch_candidates * 16]; key_b.zero_()
+        val_a = self.scratch["stream3_val_a"][:batch_candidates]; val_a.zero_()
+        val_b = self.scratch["stream3_val_b"][:batch_candidates]; val_b.zero_()
+        compact_count = self.scratch["stream3_compact_count"]; compact_count.zero_()
         self.ext.v6_stream3_pack_threshold_compact(
             stream12["score_ring"],
             stream12["hash_ring"],
@@ -346,23 +420,29 @@ class ProductionV6Dispatcher:
         compact_n = int(compact_count.cpu()[0])
         if compact_n == 0:
             return {"compact_count": 0, "unique_count": 0, "local_count": 0, "remote_count": 0}
-        temp = torch.empty((int(self.ext.v6_stream3_sort_temp_bytes(compact_n)),), dtype=torch.uint8, device=self.device)
+        if compact_n > self.stream3_capacity:
+            raise RuntimeError(f"stream3 compact overflow: {compact_n} > {self.stream3_capacity}")
+        temp = self.scratch["stream3_sort_temp"]
         self.ext.v6_stream3_sort_pairs(temp, key_a, key_b, val_a, val_b, compact_n)
-        unique_key = torch.zeros((batch_candidates * 16,), dtype=torch.uint8, device=self.device)
-        unique_val = torch.zeros((batch_candidates,), dtype=torch.int64, device=self.device)
-        unique_count = torch.zeros((1,), dtype=torch.int32, device=self.device)
+        unique_key = self.scratch["stream3_unique_key"][: batch_candidates * 16]; unique_key.zero_()
+        unique_val = self.scratch["stream3_unique_val"][:batch_candidates]; unique_val.zero_()
+        unique_count = self.scratch["stream3_unique_count"]; unique_count.zero_()
         self.ext.v6_stream3_dedup_sorted(key_b, val_b, unique_key, unique_val, unique_count, compact_n)
         torch.cuda.synchronize()
         unique_n = int(unique_count.cpu()[0])
-        local_pending = torch.zeros((max(unique_n, 1) * 32,), dtype=torch.uint8, device=self.device)
-        remote_send = torch.zeros((max(unique_n, 1) * 32,), dtype=torch.uint8, device=self.device)
-        local_count = torch.zeros((1,), dtype=torch.int32, device=self.device)
-        send_count = torch.zeros((self.world_size,), dtype=torch.int32, device=self.device)
+        if unique_n > self.stream3_capacity:
+            raise RuntimeError(f"stream3 unique overflow: {unique_n} > {self.stream3_capacity}")
+        local_pending = self.scratch["local_pending"]; local_pending.zero_()
+        remote_send = self.scratch["remote_send"]; remote_send.zero_()
+        local_count = self.scratch["local_count"]; local_count.zero_()
+        send_count = self.scratch["send_count"]; send_count.zero_()
         if self.rank == 0:
             send_offset_values = [0, 0, unique_n]
         else:
             send_offset_values = [0, unique_n, unique_n]
-        send_offset = torch.tensor(send_offset_values, dtype=torch.int32, device=self.device)
+        self.host_send_offset[: self.world_size + 1] = send_offset_values
+        self.host_send_offset_t.numpy()[: self.world_size + 1] = self.host_send_offset[: self.world_size + 1]
+        send_offset = self.scratch["send_offset"]; send_offset.copy_(self.host_send_offset_t, non_blocking=False)
         self.ext.v6_stream3_restore_split(
             unique_key,
             unique_val,
@@ -392,9 +472,9 @@ class ProductionV6Dispatcher:
 
     def _run_stream5(self, stream3: dict[str, Any]) -> dict[str, Any]:
         remote_capacity = max(int(self.cfg["bucket_cap_per_peer"]), 1)
-        remote_recv = torch.zeros((remote_capacity * 32,), dtype=torch.uint8, device=self.device)
-        recv_count = torch.zeros((self.world_size,), dtype=torch.int32, device=self.device)
-        recv_offset = torch.zeros((self.world_size + 1,), dtype=torch.int32, device=self.device)
+        remote_recv = self.scratch["remote_recv"][: remote_capacity * 32]; remote_recv.zero_()
+        recv_count = self.scratch["recv_count"]; recv_count.zero_()
+        recv_offset = self.scratch["recv_offset"]; recv_offset.zero_()
         self.engine.v6_stream5_exchange_candidate_meta(
             stream3["remote_send"],
             remote_recv,
@@ -421,34 +501,38 @@ class ProductionV6Dispatcher:
         input_n = local_n + remote_n
         if input_n == 0:
             return {"clean": [], "clean_count": 0, "dirty_count": 0, "input_count": 0}
-        survivor = torch.zeros((max(input_n, 1) * 32,), dtype=torch.uint8, device=self.device)
+        if input_n > self.stream4_capacity:
+            raise RuntimeError(f"stream4 input overflow: {input_n} > {self.stream4_capacity}")
+        survivor = self.scratch["survivor"][: input_n * 32]; survivor.zero_()
         if local_n:
             survivor[: local_n * 32].copy_(stream3["local_pending"][: local_n * 32])
         if remote_n:
             survivor[local_n * 32 : (local_n + remote_n) * 32].copy_(stream5["remote_recv"][: remote_n * 32])
-        key_a = torch.zeros((input_n * 16,), dtype=torch.uint8, device=self.device)
-        key_b = torch.zeros_like(key_a)
-        val_a = torch.zeros((input_n * 32,), dtype=torch.uint8, device=self.device)
-        val_b = torch.zeros_like(val_a)
-        compact_count = torch.zeros((1,), dtype=torch.int32, device=self.device)
+        key_a = self.scratch["stream4_key_a"][: input_n * 16]; key_a.zero_()
+        key_b = self.scratch["stream4_key_b"][: input_n * 16]; key_b.zero_()
+        val_a = self.scratch["stream4_val_a"][: input_n * 32]; val_a.zero_()
+        val_b = self.scratch["stream4_val_b"][: input_n * 32]; val_b.zero_()
+        compact_count = self.scratch["stream4_compact_count"]; compact_count.zero_()
         self.ext.v6_stream4_threshold_compact(survivor, key_a, val_a, compact_count, input_n, current_threshold)
         torch.cuda.synchronize()
         compact_n = int(compact_count.cpu()[0])
         if compact_n:
-            temp = torch.empty((int(self.ext.v6_stream4_sort_temp_bytes(compact_n)),), dtype=torch.uint8, device=self.device)
+            if compact_n > self.stream4_capacity:
+                raise RuntimeError(f"stream4 compact overflow: {compact_n} > {self.stream4_capacity}")
+            temp = self.scratch["stream4_sort_temp"]
             self.ext.v6_stream4_sort_pairs(temp, key_a, key_b, val_a, val_b, compact_n)
-            clean_tmp = torch.zeros((input_n * 32,), dtype=torch.uint8, device=self.device)
-            new_clean_count = torch.zeros((1,), dtype=torch.int32, device=self.device)
+            clean_tmp = self.scratch["clean_tmp"][: input_n * 32]; clean_tmp.zero_()
+            new_clean_count = self.scratch["stream4_new_clean_count"]; new_clean_count.zero_()
             self.ext.v6_stream4_dedup_sorted(key_b, val_b, clean_tmp, new_clean_count, compact_n)
             torch.cuda.synchronize()
             clean_n = int(new_clean_count.cpu()[0])
         else:
-            clean_tmp = torch.zeros((input_n * 32,), dtype=torch.uint8, device=self.device)
-            new_clean_count = torch.zeros((1,), dtype=torch.int32, device=self.device)
+            clean_tmp = self.scratch["clean_tmp"][: input_n * 32]; clean_tmp.zero_()
+            new_clean_count = self.scratch["stream4_new_clean_count"]; new_clean_count.zero_()
             clean_n = 0
-        clean_count = torch.tensor([0], dtype=torch.int32, device=self.device)
-        dirty_count = torch.tensor([input_n], dtype=torch.int32, device=self.device)
-        processing_flag = torch.tensor([1], dtype=torch.uint8, device=self.device)
+        clean_count = self.scratch["clean_count"]; clean_count.zero_()
+        dirty_count = self.scratch["dirty_count"]; dirty_count.fill_(input_n)
+        processing_flag = self.scratch["processing_flag"]; processing_flag.fill_(1)
         self.ext.v6_stream4_write_clean(survivor, clean_tmp, clean_count, dirty_count, processing_flag, clean_n)
         torch.cuda.synchronize()
         raw = survivor.cpu().numpy().tobytes()
@@ -481,7 +565,7 @@ class ProductionV6Dispatcher:
         global_keep = sum(counts)
         if global_keep == 0:
             collective_seq_debug(self.rank, task_idx, depth, "final_global_empty_next", "uniform_exit", 1, 0)
-            empty = np.zeros((0, STATE_STORAGE_LEN), dtype=np.uint8)
+            empty = self.host_current_frontier[:0]
             return (empty, []) if current_paths is not None else empty
         gathered_paths: list[list[str] | None] | None = None
         if current_paths is not None:
@@ -489,15 +573,19 @@ class ProductionV6Dispatcher:
             collective_seq_debug(self.rank, task_idx, depth, "final_paths", "all_gather_object", int(bool(current_paths)), len(current_paths))
             dist.all_gather_object(gathered_paths, list(current_paths))
         source_frontier_sizes = [len(paths or []) for paths in gathered_paths] if gathered_paths is not None else [int(current_frontier_states.numel() // STATE_STORAGE_LEN)] * self.world_size
-        request_by_peer = [[] for _ in range(self.world_size)]
+        
+        # SOLUTION A: Fixed-buffer model (no Python list growth)
+        # Pre-allocate request buffer and track per-peer write positions
+        self.host_final_request.fill(0)
+        request_write_ptr = 0
+        request_count_per_peer = [0] * self.world_size
         path_by_target_local_idx: dict[int, str] = {}
-        expected_local = 0
+        
         for local_idx, candidate in enumerate(keep):
             global_idx = prefix[self.rank] + local_idx
             target_rank = min(global_idx * self.world_size // max(global_keep, 1), self.world_size - 1)
             target_start = (global_keep * target_rank + self.world_size - 1) // self.world_size
             target_local_idx = int(global_idx - target_start)
-            expected_local += 1 if target_rank == self.rank else 0
             source_rank = int(candidate["source_rank"])
             move = int(candidate["move"])
             parent_idx = int(candidate["parent_idx"])
@@ -514,61 +602,100 @@ class ProductionV6Dispatcher:
                 raise RuntimeError(f"invalid_final_request: move={move} MOVE_COUNT={MOVE_COUNT}")
             if target_local_idx < 0:
                 raise RuntimeError(f"invalid_final_request: target_local_idx={target_local_idx}")
-            request_by_peer[source_rank].append(pack_final_request(parent_idx, target_local_idx, target_rank, move))
+            
+            # Write request to fixed buffer (no list.append)
+            request_bytes = pack_final_request(parent_idx, target_local_idx, target_rank, move)
+            self.host_final_request[request_write_ptr:request_write_ptr+16] = np.frombuffer(request_bytes, dtype=np.uint8)
+            request_write_ptr += 16
+            request_count_per_peer[source_rank] += 1
+            
             if gathered_paths is not None and target_rank == self.rank:
                 source_paths = gathered_paths[source_rank] or []
                 parent_path = source_paths[parent_idx] if 0 <= parent_idx < len(source_paths) else ""
                 path_by_target_local_idx[target_local_idx] = append_move_to_path(parent_path, move)
-        send_request_counts = [len(x) for x in request_by_peer]
-        recv_request_counts = [0 for _ in range(self.world_size)]
-        send_count_t = torch.tensor(send_request_counts, dtype=torch.int64, device=self.device)
-        recv_count_t = torch.empty_like(send_count_t)
-        collective_seq_debug(self.rank, task_idx, depth, "final_request_counts", "all_to_all_single", int(bool(send_request_counts)), sum(send_request_counts))
+        
+        # SOLUTION B: Hard capacity contracts (asserts before critical operations)
+        send_request_count_total = sum(request_count_per_peer)
+        if send_request_count_total > self.final_capacity:
+            raise RuntimeError(f"final request send overflow: {send_request_count_total} > {self.final_capacity}")
+        
+        send_count_t = self.scratch["final_send_count"]; send_count_t.zero_()
+        recv_count_t = self.scratch["final_recv_count"]; recv_count_t.zero_()
+        self.host_final_count[: self.world_size] = request_count_per_peer
+        send_count_t.copy_(self.host_final_count_t, non_blocking=False)
+        collective_seq_debug(self.rank, task_idx, depth, "final_request_counts", "all_to_all_single", int(bool(request_count_per_peer)), send_request_count_total)
         dist.all_to_all_single(recv_count_t, send_count_t)
         recv_request_counts = [int(x) for x in recv_count_t.cpu().tolist()]
-        send_request_bytes = b"".join(b"".join(items) for items in request_by_peer)
         recv_request_total = sum(recv_request_counts)
-        send_request_t = torch.tensor(np.frombuffer(send_request_bytes, dtype=np.uint8).copy(), dtype=torch.uint8, device=self.device)
-        if send_request_t.numel() == 0:
-            send_request_t = torch.empty((0,), dtype=torch.uint8, device=self.device)
-        recv_request_t = torch.empty((recv_request_total * 16,), dtype=torch.uint8, device=self.device)
+        
+        # SOLUTION B: Hard capacity contract (before NCCL)
+        if recv_request_total > self.final_capacity:
+            raise RuntimeError(f"final request recv overflow: {recv_request_total} > {self.final_capacity}")
+        
+        send_request_t = self.scratch["final_request"][: send_request_count_total * 16]
+        send_request_t.copy_(self.host_final_request_t[: send_request_count_total * 16], non_blocking=False)
+        recv_request_t = self.scratch["final_request_recv"][: recv_request_total * 16]
+        recv_request_t.zero_()
         collective_seq_debug(self.rank, task_idx, depth, "final_request_payload", "all_to_all_single", int(send_request_t.numel() > 0), send_request_t.numel())
         dist.all_to_all_single(
             recv_request_t,
             send_request_t,
             output_split_sizes=[c * 16 for c in recv_request_counts],
-            input_split_sizes=[c * 16 for c in send_request_counts],
+            input_split_sizes=[c * 16 for c in request_count_per_peer],
         )
-        final_response_t = torch.zeros((max(recv_request_total, 1) * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device)
+        final_response_t = self.scratch["final_response"][: max(recv_request_total, 1) * STATE_STORAGE_LEN]
+        final_response_t.zero_()
         if recv_request_total:
             self.ext.v6_final_materialize(current_frontier_states, recv_request_t, self.generators_t, final_response_t, recv_request_total)
             torch.cuda.synchronize()
+        
+        # SOLUTION A: Fixed-buffer model for responses (no list growth)
         recv_request_raw = recv_request_t.cpu().numpy().tobytes()
         responses = final_response_t.cpu().numpy().reshape((-1, STATE_STORAGE_LEN))[:recv_request_total].copy()
-        response_by_peer = [[] for _ in range(self.world_size)]
+        self.host_final_response_send.fill(0)
+        response_write_ptr = 0
+        response_count_per_peer = [0] * self.world_size
+        response_offsets = [0] * (self.world_size + 1)
+        
         for idx in range(recv_request_total):
             _parent_idx, _target_local_idx, return_rank, _move, _pad = struct.unpack_from("<QIHBB", recv_request_raw, idx * 16)
-            response_by_peer[int(return_rank)].append(responses[idx].tobytes())
-        send_response_counts = [len(x) for x in response_by_peer]
-        send_response_count_t = torch.tensor(send_response_counts, dtype=torch.int64, device=self.device)
-        recv_response_count_t = torch.empty_like(send_response_count_t)
-        collective_seq_debug(self.rank, task_idx, depth, "final_response_counts", "all_to_all_single", int(bool(send_response_counts)), sum(send_response_counts))
+            return_rank = int(return_rank)
+            response_bytes = responses[idx].tobytes()
+            self.host_final_response_send[response_write_ptr:response_write_ptr+STATE_STORAGE_LEN] = np.frombuffer(response_bytes, dtype=np.uint8)
+            response_write_ptr += STATE_STORAGE_LEN
+            response_count_per_peer[return_rank] += 1
+        
+        # SOLUTION B: Hard capacity contract
+        send_response_count_total = sum(response_count_per_peer)
+        if send_response_count_total > self.final_capacity:
+            raise RuntimeError(f"final response send overflow: {send_response_count_total} > {self.final_capacity}")
+        
+        send_response_count_t = self.scratch["final_send_count"]; send_response_count_t.zero_()
+        recv_response_count_t = self.scratch["final_recv_count"]; recv_response_count_t.zero_()
+        self.host_final_count[: self.world_size] = response_count_per_peer
+        send_response_count_t.copy_(self.host_final_count_t, non_blocking=False)
+        collective_seq_debug(self.rank, task_idx, depth, "final_response_counts", "all_to_all_single", int(bool(response_count_per_peer)), send_response_count_total)
         dist.all_to_all_single(recv_response_count_t, send_response_count_t)
         recv_response_counts = [int(x) for x in recv_response_count_t.cpu().tolist()]
-        send_response_bytes = b"".join(b"".join(items) for items in response_by_peer)
-        send_response_t = torch.tensor(np.frombuffer(send_response_bytes, dtype=np.uint8).copy(), dtype=torch.uint8, device=self.device)
-        if send_response_t.numel() == 0:
-            send_response_t = torch.empty((0,), dtype=torch.uint8, device=self.device)
         recv_response_total = sum(recv_response_counts)
-        recv_response_t = torch.empty((recv_response_total * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device)
+        
+        # SOLUTION B: Hard capacity contract (before NCCL)
+        if recv_response_total > self.final_capacity:
+            raise RuntimeError(f"final response recv overflow: {recv_response_total} > {self.final_capacity}")
+        
+        send_response_t = self.scratch["final_response_send"][: send_response_count_total * STATE_STORAGE_LEN]
+        send_response_t.copy_(self.host_final_response_send_t[: send_response_count_total * STATE_STORAGE_LEN], non_blocking=False)
+        recv_response_t = self.scratch["final_response_recv"][: recv_response_total * STATE_STORAGE_LEN]
+        recv_response_t.zero_()
         collective_seq_debug(self.rank, task_idx, depth, "final_response_payload", "all_to_all_single", int(bool(send_response_t.numel())), send_response_t.numel())
         dist.all_to_all_single(
             recv_response_t,
             send_response_t,
             output_split_sizes=[c * STATE_STORAGE_LEN for c in recv_response_counts],
-            input_split_sizes=[c * STATE_STORAGE_LEN for c in send_response_counts],
+            input_split_sizes=[c * STATE_STORAGE_LEN for c in response_count_per_peer],
         )
-        next_frontier = torch.zeros((max(recv_response_total, 1) * STATE_STORAGE_LEN,), dtype=torch.uint8, device=self.device)
+        next_frontier = self.scratch["next_frontier"][: max(recv_response_total, 1) * STATE_STORAGE_LEN]
+        next_frontier.zero_()
         if recv_response_total:
             self.ext.v6_final_scatter_responses(recv_response_t, next_frontier, recv_response_total)
             torch.cuda.synchronize()
@@ -579,8 +706,9 @@ class ProductionV6Dispatcher:
         return next_states, next_paths
 
     def run_task(self, task_id: int, state: np.ndarray, max_depth: int, global_beam_width_effective: int) -> ProductionV6Result:
-        current = np.zeros((1, STATE_STORAGE_LEN), dtype=np.uint8)
-        current[0] = data_loader.pad_state128_u8(state)
+        self.host_run_task_frontier.fill(0)
+        self.host_run_task_frontier[0] = data_loader.pad_state128_u8(state)
+        current = self.host_run_task_frontier[:1]
         current_paths = [""]
         current_threshold = UINT32_MAX
         threshold_initialized = False
@@ -603,7 +731,15 @@ class ProductionV6Dispatcher:
             stream4_input_count = 0
             stream4_clean_count = 0
             depth_clean: list[dict[str, int]] = []
-            depth_current_frontier_states = torch.tensor(current.reshape(-1), dtype=torch.uint8, device=self.device)
+            # SOLUTION B: Hard capacity contract for current frontier
+            if len(current) > self.final_capacity:
+                raise RuntimeError(f"current frontier overflow: {len(current)} > {self.final_capacity}")
+            if len(current) < 1:
+                raise RuntimeError(f"current frontier underflow: {len(current)} < 1")
+            self.host_current_frontier.fill(0)
+            self.host_current_frontier[: len(current)] = current
+            depth_current_frontier_states = self.scratch["current_frontier_all"][: max(len(current), 1) * STATE_STORAGE_LEN]
+            depth_current_frontier_states.copy_(self.host_current_frontier_t[: max(len(current), 1) * STATE_STORAGE_LEN], non_blocking=False)
             solved_stream12: dict[str, Any] | None = None
             parent_offset = 0
             while parent_offset < len(current):
@@ -617,7 +753,7 @@ class ProductionV6Dispatcher:
                 stream3 = self._run_stream3(stream12, current_threshold)
                 stream3_after_threshold_count += int(stream3.get("compact_count", 0))
                 stream3_unique_count += int(stream3.get("unique_count", 0))
-                stream5 = self._run_stream5(stream3) if int(stream3.get("unique_count", 0)) else {"remote_recv_count": 0, "remote_recv": torch.empty((0,), dtype=torch.uint8, device=self.device)}
+                stream5 = self._run_stream5(stream3) if int(stream3.get("unique_count", 0)) else {"remote_recv_count": 0, "remote_recv": self.scratch["remote_recv"][:1]}
                 stream4 = self._collector_to_stream4(stream3, stream5, current_threshold) if int(stream3.get("unique_count", 0)) else {"clean": [], "clean_count": 0, "dirty_count": 0, "input_count": 0}
                 stream4_input_count += int(stream4.get("input_count", 0))
                 stream4_clean_count += int(stream4.get("clean_count", 0))
@@ -683,7 +819,8 @@ class ProductionV6Dispatcher:
                 task_idx=task_id,
                 depth=depth,
             )
-            global_keep_tensor = torch.tensor([len(next_current)], dtype=torch.int64, device=self.device)
+            global_keep_tensor = self.scratch["global_keep_tensor"]
+            global_keep_tensor.fill_(len(next_current))
             collective_seq_debug(self.rank, task_id, depth, "depth_global_keep", "all_reduce", int(len(next_current) > 0), len(next_current))
             dist.all_reduce(global_keep_tensor, op=dist.ReduceOp.SUM)
             global_keep = int(global_keep_tensor.cpu()[0])

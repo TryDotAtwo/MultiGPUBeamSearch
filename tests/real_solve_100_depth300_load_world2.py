@@ -58,7 +58,7 @@ def _short_note(note: str, limit: int = 500) -> str:
 
 def main() -> None:
     os.environ["INFERENCE_BACKEND"] = "fullbeamnice_static"
-    os.environ["USE_CUDA_GRAPHS"] = "1"
+    os.environ["USE_CUDA_GRAPHS"] = "0"
     os.environ.setdefault("NCCL_IB_DISABLE", "1")
     os.environ.setdefault("NCCL_P2P_DISABLE", "1")
     os.environ.setdefault("NCCL_SOCKET_IFNAME", "lo")
@@ -83,8 +83,8 @@ def main() -> None:
         raise RuntimeError(f"invalid_config: K_EXPAND_TILE must be {PRODUCTION_K_EXPAND_TILE}, got {k_expand_tile}")
     if bucket_cap_per_peer != BUCKET_CAP_PER_PEER:
         raise RuntimeError(f"invalid_config: BUCKET_CAP_PER_PEER must be {BUCKET_CAP_PER_PEER}, got {bucket_cap_per_peer}")
-    if not cuda_graphs_enabled:
-        raise RuntimeError("invalid_config: USE_CUDA_GRAPHS=1 required")
+    # Phase 2: CUDA Graphs disabled, eager execution enabled
+    # cuda_graphs_enabled status is informational only
 
     rank, world_size, device = require_world2_t4_runtime()
     if rank == 0:
@@ -92,10 +92,10 @@ def main() -> None:
             "RUN_START "
             f"task_count={task_count} max_depth={max_depth} beam_width={beam_width} "
             f"B_MICRO={b_micro} K_EXPAND_TILE={k_expand_tile} "
-            f"BUCKET_CAP_PER_PEER={bucket_cap_per_peer} cuda_graphs=1",
+            f"BUCKET_CAP_PER_PEER={bucket_cap_per_peer} cuda_graphs=0",
             flush=True,
         )
-        print("CUDA_GRAPHS_ENABLED true", flush=True)
+        print(f"CUDA_GRAPHS_ENABLED {cuda_graphs_enabled}", flush=True)
 
     dispatcher = ProductionV6Dispatcher(rank, world_size, device, beam_width=beam_width, b_micro=b_micro)
     puzzles = data_loader.load_test_puzzles(max_puzzles=task_count)
