@@ -43,5 +43,10 @@ entity_id=architecture_v6_real_solve_100_depth300_load_world2; type=production_l
 - patch_v4={final_request_host_guard=true,guard_fields=[source_rank,parent_idx,source_frontier_size,move,target_local_idx],cuda_fault_immediate_raise=true}
 - host_check_v4=`python -m py_compile production_v6_dispatcher.py beam_engine.py tests\real_solve_100_depth300_load_world2.py tests\test_architecture_v6_static.py`; result=pass
 - host_static_pytest_v4=`python -m pytest tests\test_architecture_v6_static.py -q`; result=pass; summary=`48 passed in 0.54s`
+- kaggle_status_v4=KernelWorkerStatus.ERROR
+- kaggle_log_v4=missing_due_no_full_output_download_policy
+- next_required=UI_log_excerpt_from_Kaggle_version_4
+- required_ui_excerpt_v4=[CONFIG_GUARD_OK,CUDA_GRAPHS_ENABLED,BeamEngine_Config_Summary,TASK_ERROR_or_RUN_SUMMARY,returncode,traceback_root,first_CUDA_or_NCCL_exception_block]
+- conditional_diagnostic_patch_if_v4_illegal_memory_access={CUDA_LAUNCH_BLOCKING=1,TASK_COUNT=1,MAX_DEPTH=8,CUDA_CHECKPOINT_OK_after_stream_stages=true,compare_graphs_on_vs_graphs_off=true}
 - required=[Kaggle_status_COMPLETE,torchrun_returncode_0,runtime_B_MICRO_8192,runtime_K_EXPAND_TILE_196608,runtime_BUCKET_CAP_PER_PEER_262144,CUDA_GRAPHS_ENABLED_true,no_NCCL_timeout,output_rows_100,error_count_0,RUN_SUMMARY_present]
 - green_claim=false
