@@ -1794,3 +1794,20 @@
 - not_claimed: real solver quality, leaderboard quality, performance tuning, full production solver correctness.
 - required_next_action: implement architecture_v6 depth loop frontier draining so `expanded_parent_count == current_frontier_size_before` across all non-stop depths.
 - test_result_file: `test_results/architecture_v6_frontier_coverage_audit_world2_2026-05-18.md`
+
+## 2026-05-19 repository_structure_cleanup
+
+- entity_id: `repository_structure_cleanup_2026_05_19`
+- type: `repo_hygiene`
+- state: `local_changes_staged_pending_commit`
+- prompt_summary: User required repository cleanup: keep core repository files, keep Kaggle notebooks only under `notebooks/`, remove generated Kaggle stage clutter, and normalize local branches to a single `main` branch.
+- branch_change: current local branch renamed from `codex-architecture-v6-real-data-100-d300-b65536` to `main`.
+- branch_change: local `master` branch deleted.
+- remote_refs_pending: `origin/master` and `origin/codex-architecture-v6-real-data-100-d300-b65536` still exist until explicit remote push/delete approval.
+- notebook_move: `kaggle_frontier_coverage_audit_world2_stage/frontier_coverage_audit_world2.ipynb` -> `notebooks/frontier_coverage_audit_world2.ipynb`.
+- notebook_move: `kaggle_real_solve_100_depth300_load_world2_stage/real_solve_100_depth300_load_world2.ipynb` -> `notebooks/real_solve_100_depth300_load_world2.ipynb`.
+- notebook_move: `scripts/Untitled-1.ipynb` -> `notebooks/Untitled-1.ipynb`.
+- cleanup_delete: tracked Kaggle stage files removed from repository index.
+- cleanup_delete: untracked `kaggle_outputs/` nested-repo artifact removed from workspace.
+- gitignore_update: added ignore patterns `[kaggle_*_stage/, kaggle_*_dataset/, kaggle_*_output/]`.
+- green_claim: false.

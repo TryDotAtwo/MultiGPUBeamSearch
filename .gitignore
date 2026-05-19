@@ -2,6 +2,9 @@ kaggle.json
 kernel-metadata.json
 notebookaafc902d8e.ipynb
 kaggle_outputs/
+kaggle_*_stage/
+kaggle_*_dataset/
+kaggle_*_output/
 kaggle_push_stage/
 kaggle_push_stage_slug/
 kaggle_push_stage_new/
