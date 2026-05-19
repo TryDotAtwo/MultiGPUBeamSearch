@@ -176,6 +176,8 @@ def main() -> None:
                 f"task_idx={task_idx} status={status} depth_used={depth_used} elapsed_sec={elapsed:.3f}",
                 flush=True,
             )
+            if status == "error" and ("CUDA error" in note or "AcceleratorError" in note):
+                raise RuntimeError(f"task_error_cuda_fault task_idx={task_idx} note={_short_note(note)}")
 
         completed += 1
         error_flag = torch.tensor([1 if status == "error" else 0], dtype=torch.int32, device=device)

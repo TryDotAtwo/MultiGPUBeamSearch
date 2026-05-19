@@ -15,6 +15,11 @@
 - test_change: `tests/test_architecture_v6_static.py::test_real_solve_100_depth300_load_world2_contract` now guards `score_ring_depth=2`, C++/Python min clamp to 2, absence of `send_request_total`, and abort OK-marker suppression.
 - host_verification: `python -m py_compile production_v6_dispatcher.py beam_engine.py tests\real_solve_100_depth300_load_world2.py tests\test_architecture_v6_static.py` passed.
 - host_static_pytest: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `48 passed`.
+- kaggle_v3_result: failed_not_green; runtime config reached `SCORE_RING_DEPTH: 2`, `K_EXPAND_TILE: 196608`, `BUCKET_CAP_PER_PEER: 262144`, `BUCKET_CAP_PER_PEER_SAFE: 262144`, and `CUDA_GRAPHS_ENABLED true`; first task failed with CUDA illegal memory access after final-materialization path.
+- corrective_change_after_v3: `production_v6_dispatcher.py::_final_materialize` now validates final requests on host before `v6_final_materialize`, including `source_rank`, `parent_idx < source_frontier_size`, `move < MOVE_COUNT`, and non-negative `target_local_idx`, so corrupted final request metadata becomes a task-indexed Python error instead of a CUDA illegal address.
+- corrective_change_after_v3: `tests/real_solve_100_depth300_load_world2.py` raises immediately after `TASK_ERROR` for CUDA faults to avoid secondary CUDA allocation/all-reduce masking the original fault.
+- host_verification_after_v3_patch: `python -m py_compile production_v6_dispatcher.py beam_engine.py tests\real_solve_100_depth300_load_world2.py tests\test_architecture_v6_static.py` passed.
+- host_static_pytest_after_v3_patch: `python -m pytest tests\test_architecture_v6_static.py -q` passed with `48 passed`.
 - green_claim: false until Kaggle retry confirms `SCORE_RING_DEPTH: 2`, no `TASK_ERROR`, `RUN_SUMMARY`, `returncode 0`, `output_rows=100`, and `error=0`.
 
 ## 2026-05-18 architecture_v6_real_solve_100_depth300_load_world2

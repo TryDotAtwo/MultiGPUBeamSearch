@@ -488,6 +488,7 @@ class ProductionV6Dispatcher:
             gathered_paths = [None for _ in range(self.world_size)]
             collective_seq_debug(self.rank, task_idx, depth, "final_paths", "all_gather_object", int(bool(current_paths)), len(current_paths))
             dist.all_gather_object(gathered_paths, list(current_paths))
+        source_frontier_sizes = [len(paths or []) for paths in gathered_paths] if gathered_paths is not None else [int(current_frontier_states.numel() // STATE_STORAGE_LEN)] * self.world_size
         request_by_peer = [[] for _ in range(self.world_size)]
         path_by_target_local_idx: dict[int, str] = {}
         expected_local = 0
@@ -499,10 +500,23 @@ class ProductionV6Dispatcher:
             expected_local += 1 if target_rank == self.rank else 0
             source_rank = int(candidate["source_rank"])
             move = int(candidate["move"])
-            request_by_peer[source_rank].append(pack_final_request(candidate["parent_idx"], target_local_idx, target_rank, move))
+            parent_idx = int(candidate["parent_idx"])
+            if not (0 <= source_rank < self.world_size):
+                raise RuntimeError(f"invalid_final_request: source_rank={source_rank} world_size={self.world_size}")
+            if not (0 <= parent_idx < source_frontier_sizes[source_rank]):
+                raise RuntimeError(
+                    "invalid_final_request: "
+                    f"source_rank={source_rank} parent_idx={parent_idx} "
+                    f"source_frontier_size={source_frontier_sizes[source_rank]} "
+                    f"task_idx={task_idx} depth={depth}"
+                )
+            if not (0 <= move < MOVE_COUNT):
+                raise RuntimeError(f"invalid_final_request: move={move} MOVE_COUNT={MOVE_COUNT}")
+            if target_local_idx < 0:
+                raise RuntimeError(f"invalid_final_request: target_local_idx={target_local_idx}")
+            request_by_peer[source_rank].append(pack_final_request(parent_idx, target_local_idx, target_rank, move))
             if gathered_paths is not None and target_rank == self.rank:
                 source_paths = gathered_paths[source_rank] or []
-                parent_idx = int(candidate["parent_idx"])
                 parent_path = source_paths[parent_idx] if 0 <= parent_idx < len(source_paths) else ""
                 path_by_target_local_idx[target_local_idx] = append_move_to_path(parent_path, move)
         send_request_counts = [len(x) for x in request_by_peer]

@@ -1176,6 +1176,9 @@ def test_real_solve_100_depth300_load_world2_contract():
     assert '"score_ring_depth": max(2, score_ring_depth)' in beam_engine_py_text
     assert "elif not aborted:" in runner_text
     assert "raise AssertionError(f\"error_count={global_errors}\")" in runner_text
+    assert "invalid_final_request" in dispatcher_text
+    assert "source_frontier_sizes" in dispatcher_text
+    assert "task_error_cuda_fault" in runner_text
     for needle in forbidden:
         assert needle not in runner_text
         assert needle not in notebook_text
