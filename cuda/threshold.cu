@@ -145,7 +145,9 @@ __global__ void final_scan_block_counts_kernel(
     const std::uint32_t* block_counts,
     std::uint32_t* block_offsets,
     std::uint32_t* final_candidate_count,
-    std::uint32_t block_count) {
+    std::uint32_t block_count,
+    std::uint64_t global_prefix_for_rank,
+    std::uint64_t global_keep_count) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
         return;
     }
@@ -154,7 +156,16 @@ __global__ void final_scan_block_counts_kernel(
         block_offsets[block] = running;
         running += block_counts[block];
     }
-    *final_candidate_count = running;
+    if (global_keep_count == 0ULL || global_prefix_for_rank >= global_keep_count) {
+        *final_candidate_count = 0;
+        return;
+    }
+    const std::uint64_t remaining_global_keep = global_keep_count - global_prefix_for_rank;
+    const std::uint64_t capped =
+        static_cast<std::uint64_t>(running) < remaining_global_keep
+            ? static_cast<std::uint64_t>(running)
+            : remaining_global_keep;
+    *final_candidate_count = static_cast<std::uint32_t>(capped);
 }
 
 __global__ void final_init_send_ranges_kernel(
@@ -235,6 +246,9 @@ __global__ void final_scatter_load_balance_kernel(
         return;
     }
     const std::uint32_t local_out = block_offsets[blockIdx.x] + scan[tid] - 1U;
+    if (local_out >= *final_candidate_count) {
+        return;
+    }
     const std::uint64_t global_idx = global_prefix_for_rank + local_out;
     std::uint32_t target_rank = static_cast<std::uint32_t>((global_idx * world_size) / balance_keep_count);
     if (target_rank >= world_size) {
@@ -379,7 +393,9 @@ void final_filter_load_balance_cuda(
         block_counts,
         block_offsets,
         final_candidate_count,
-        block_count);
+        block_count,
+        global_prefix_for_rank,
+        global_keep_count);
     final_init_send_ranges_kernel<<<1, 1, 0, stream>>>(
         final_candidate_count,
         final_request_count,

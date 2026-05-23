@@ -1233,10 +1233,14 @@ Stream 3 collector сначала раскидывает global_spill_buffer
    score_key <= current_threshold
 ```
 
-Хвост одинакового `score_key` разрешён:
+Хвост одинакового `score_key` до финального этапа разрешён.
+
+Финальный этап отрезает хвост после `final_threshold`:
 
 ```text
-final count may exceed GLOBAL_BEAM_WIDTH_EFFECTIVE
+raw_final_count may exceed GLOBAL_BEAM_WIDTH_EFFECTIVE
+final count is capped to GLOBAL_BEAM_WIDTH_EFFECTIVE
+per-rank next_frontier target count is GLOBAL_BEAM_WIDTH_EFFECTIVE / WORLD_SIZE
 ```
 
 ## Балансировка по картам
