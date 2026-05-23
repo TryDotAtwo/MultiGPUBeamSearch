@@ -10,9 +10,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <deque>
+#include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace beam {
 
@@ -22,6 +25,136 @@ void check_cuda(cudaError_t status, const char* op) {
     if (status != cudaSuccess) {
         throw std::runtime_error(std::string(op) + ": " + cudaGetErrorString(status));
     }
+}
+
+std::uint32_t host_shard_from_hash128(Hash128 hash, std::uint32_t shard_count) {
+    return static_cast<std::uint32_t>((hash.hi ^ (hash.lo >> 32)) % shard_count);
+}
+
+void dump_final_spill_debug(
+    const StaticMemoryPlan& plan,
+    StaticDeviceMemory& memory,
+    const std::uint32_t spill_counts[2],
+    std::uint32_t spill_active,
+    std::uint32_t current_threshold) {
+    const std::uint32_t shard_count = plan.config.shard_count;
+    const std::uint32_t shard_capacity = 2U * plan.config.stream4_batch_candidates;
+    const std::uint32_t active_index = spill_active & 1U;
+    const std::uint32_t active_spill_count = spill_counts[active_index];
+    std::vector<std::uint32_t> clean(shard_count);
+    std::vector<std::uint32_t> dirty(shard_count);
+    std::vector<std::uint32_t> processing(shard_count);
+    std::vector<std::uint32_t> ready(shard_count);
+    std::vector<std::uint32_t> last_write(shard_count);
+    std::vector<std::uint32_t> last_write_offset(shard_count);
+    std::vector<std::uint32_t> last_spill(shard_count);
+    std::vector<std::uint32_t> last_spill_offset(shard_count);
+    check_cuda(cudaMemcpy(clean.data(), memory.streams.clean_count, static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy debug clean_count");
+    check_cuda(cudaMemcpy(dirty.data(), memory.streams.dirty_count, static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy debug dirty_count");
+    check_cuda(cudaMemcpy(processing.data(), memory.streams.processing_flag, static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy debug processing_flag");
+    check_cuda(cudaMemcpy(ready.data(), memory.streams.stream3_ready_flag, static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy debug stream3_ready_flag");
+    check_cuda(cudaMemcpy(last_write.data(), memory.streams.stream3_shard_counts, static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy debug stream3_shard_counts");
+    check_cuda(cudaMemcpy(last_write_offset.data(), memory.streams.stream3_shard_offsets, static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy debug stream3_shard_offsets");
+    check_cuda(cudaMemcpy(last_spill.data(), memory.streams.stream3_spill_counts, static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy debug stream3_spill_counts");
+    check_cuda(cudaMemcpy(last_spill_offset.data(), memory.streams.stream3_spill_offsets, static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy debug stream3_spill_offsets");
+
+    std::vector<std::uint64_t> spill_by_shard(shard_count, 0);
+    std::vector<std::uint64_t> spill_score_sum(shard_count, 0);
+    std::vector<std::uint64_t> spill_score_pass(shard_count, 0);
+    std::vector<std::uint64_t> spill_score_reject(shard_count, 0);
+    std::vector<std::uint32_t> spill_min_score(shard_count, std::numeric_limits<std::uint32_t>::max());
+    std::vector<std::uint32_t> spill_max_score(shard_count, 0);
+    if (active_spill_count != 0U) {
+        std::vector<CandidateMeta> spill(active_spill_count);
+        CandidateMeta* active_buffer =
+            active_index == 0U ? memory.streams.global_spill_buffer_a : memory.streams.global_spill_buffer_b;
+        check_cuda(cudaMemcpy(
+            spill.data(),
+            active_buffer,
+            static_cast<std::uint64_t>(active_spill_count) * sizeof(CandidateMeta),
+            cudaMemcpyDeviceToHost), "cudaMemcpy debug active spill buffer");
+        for (const CandidateMeta& candidate : spill) {
+            const std::uint32_t shard = host_shard_from_hash128(candidate.hash, shard_count);
+            ++spill_by_shard[shard];
+            spill_score_sum[shard] += candidate.score_key;
+            spill_min_score[shard] = std::min(spill_min_score[shard], candidate.score_key);
+            spill_max_score[shard] = std::max(spill_max_score[shard], candidate.score_key);
+            if (candidate.score_key <= current_threshold) {
+                ++spill_score_pass[shard];
+            } else {
+                ++spill_score_reject[shard];
+            }
+        }
+    }
+
+    std::uint64_t total_clean = 0;
+    std::uint64_t total_dirty = 0;
+    std::uint64_t total_spill_by_shard = 0;
+    std::uint32_t full_shards = 0;
+    std::uint32_t spill_shards = 0;
+    std::uint32_t processing_shards = 0;
+    for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
+        total_clean += clean[shard];
+        total_dirty += dirty[shard];
+        total_spill_by_shard += spill_by_shard[shard];
+        full_shards += clean[shard] + dirty[shard] >= shard_capacity ? 1U : 0U;
+        spill_shards += spill_by_shard[shard] != 0U ? 1U : 0U;
+        processing_shards += processing[shard] != 0U ? 1U : 0U;
+    }
+    std::cerr
+        << "final_spill_debug"
+        << " active_index=" << active_index
+        << " active_spill_count=" << active_spill_count
+        << " inactive_spill_count=" << spill_counts[active_index ^ 1U]
+        << " threshold=" << current_threshold
+        << " shard_count=" << shard_count
+        << " shard_capacity=" << shard_capacity
+        << " total_clean=" << total_clean
+        << " total_dirty=" << total_dirty
+        << " total_spill_by_shard=" << total_spill_by_shard
+        << " full_shards=" << full_shards
+        << " spill_shards=" << spill_shards
+        << " processing_shards=" << processing_shards
+        << '\n';
+    for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
+        const bool interesting =
+            clean[shard] != 0U ||
+            dirty[shard] != 0U ||
+            processing[shard] != 0U ||
+            ready[shard] != 0U ||
+            last_write[shard] != 0U ||
+            last_spill[shard] != 0U ||
+            spill_by_shard[shard] != 0U;
+        if (!interesting) {
+            continue;
+        }
+        const std::uint32_t occupied = clean[shard] + dirty[shard];
+        const std::uint32_t free_slots = occupied < shard_capacity ? shard_capacity - occupied : 0U;
+        const std::uint64_t avg_score =
+            spill_by_shard[shard] == 0U ? 0U : spill_score_sum[shard] / spill_by_shard[shard];
+        const std::uint32_t min_score =
+            spill_by_shard[shard] == 0U ? 0U : spill_min_score[shard];
+        std::cerr
+            << "shard_debug"
+            << " shard=" << shard
+            << " clean=" << clean[shard]
+            << " dirty=" << dirty[shard]
+            << " processing=" << processing[shard]
+            << " ready=" << ready[shard]
+            << " free=" << free_slots
+            << " last_write=" << last_write[shard]
+            << " last_write_offset=" << last_write_offset[shard]
+            << " last_spill=" << last_spill[shard]
+            << " last_spill_offset=" << last_spill_offset[shard]
+            << " active_spill=" << spill_by_shard[shard]
+            << " spill_score_pass=" << spill_score_pass[shard]
+            << " spill_score_reject=" << spill_score_reject[shard]
+            << " spill_min_score=" << min_score
+            << " spill_max_score=" << spill_max_score[shard]
+            << " spill_avg_score=" << avg_score
+            << '\n';
+    }
+    std::cerr.flush();
 }
 
 void instantiate_captured_graph(cudaStream_t stream, cudaGraph_t& graph, cudaGraphExec_t& exec) {
@@ -265,6 +398,7 @@ void instantiate_cuda_graph_job_templates(
             memory.streams.stream3_partition_unique_count,
             memory.streams.stream3_cub_temp,
             memory.streams.stream3_cub_temp_bytes,
+            memory.streams.current_threshold,
             plan.config.shard_count,
             plan.config.global_spill_capacity,
             plan.config.stream4_batch_candidates,
@@ -956,6 +1090,7 @@ DepthDispatchState run_depth_cuda_graphs(
             memory.streams.stream3_partition_unique_count,
             memory.streams.stream3_cub_temp,
             memory.streams.stream3_cub_temp_bytes,
+            memory.streams.current_threshold,
             plan.config.shard_count,
             plan.config.global_spill_capacity,
             plan.config.stream4_batch_candidates,
@@ -1010,6 +1145,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 memory.streams.current_threshold,
                 sizeof(debug_threshold),
                 cudaMemcpyDeviceToHost), "cudaMemcpy current threshold final flush failure");
+            dump_final_spill_debug(plan, memory, spill_counts, spill_active, debug_threshold);
             throw std::runtime_error(
                 "final stream3 spill flush did not converge: active_spill_count=" +
                 std::to_string(spill_counts[spill_active & 1U]) +

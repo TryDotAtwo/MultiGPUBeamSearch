@@ -68,3 +68,5 @@
 - User requested trying puzzle 0 with beam `2**24=16777216`, depth=200, and per-depth logs enabled.
 - User identified that current config sizing was not consistently derived from `USER_GLOBAL_BEAM_WIDTH` and requested internal static buffers to be determined through `USER_GLOBAL_BEAM_WIDTH`, `WORLD_SIZE`, VRAM budget, and `B_MICRO`.
 - User approved removing `reserved_width = GLOBAL_BEAM_WIDTH_EFFECTIVE - spill_reserve`; all periodic and final threshold computations must count strictly by `GLOBAL_BEAM_WIDTH_EFFECTIVE`.
+- User requested diagnosing the final spill convergence failure by running with per-shard information, so the exact Stream3-to-Stream4 handoff failure location can be identified.
+- User requested using Kaggle T4 testing while a local shared CUDA/Nsight/CUTLASS Docker image rebuild runs in parallel after the local Docker image cache was found empty.

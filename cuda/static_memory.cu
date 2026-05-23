@@ -335,7 +335,9 @@ std::size_t bytes_final(const RuntimeConfig& config, const DerivedConfig& derive
     total += sizeof(std::uint32_t);
     total += requests * sizeof(FinalRequest);
     total += sizeof(std::uint32_t);
-    total += requests * sizeof(FinalResponse);
+    if (config.world_size > 1U) {
+        total += requests * sizeof(FinalResponse);
+    }
     total += 2ULL * config.world_size * sizeof(std::uint32_t);
     total += 2ULL * (static_cast<std::uint64_t>(config.world_size) + 1ULL) * sizeof(std::uint32_t);
     return align_up_size(total, 256);
@@ -505,7 +507,9 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.final.final_candidate_count = final.take<std::uint32_t>(1);
     memory.final.final_request_buffer = final.take<FinalRequest>(plan.frontier_states);
     memory.final.final_request_count = final.take<std::uint32_t>(1);
-    memory.final.final_response_buffer = final.take<FinalResponse>(plan.frontier_states);
+    if (plan.config.world_size > 1U) {
+        memory.final.final_response_buffer = final.take<FinalResponse>(plan.frontier_states);
+    }
     memory.final.final_send_count = final.take<std::uint32_t>(plan.config.world_size);
     memory.final.final_send_offset = final.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
     memory.final.final_recv_count = final.take<std::uint32_t>(plan.config.world_size);

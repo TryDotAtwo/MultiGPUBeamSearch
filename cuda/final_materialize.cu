@@ -46,7 +46,9 @@ __global__ void final_materialize_kernel(
         response.v[p] = parent.v[source];
     }
     final_response_set_target_local_idx_device(response, request.target_local_idx);
-    responses[i] = response;
+    if (responses != nullptr) {
+        responses[i] = response;
+    }
 
     const std::uint32_t target_local_idx = final_response_get_target_local_idx_device(response);
     clear_state_padding_device(response);

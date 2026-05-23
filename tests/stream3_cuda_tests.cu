@@ -318,6 +318,7 @@ int main() {
         d_partition_unique_count,
         d_cub_temp,
         cub_temp_bytes,
+        nullptr,
         2,
         total,
         2,
