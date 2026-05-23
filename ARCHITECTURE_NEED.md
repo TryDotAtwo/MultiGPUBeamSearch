@@ -927,6 +927,13 @@ Owner после dedup:
 owner = owner_from_hash128(unique_key.hi, unique_key.lo, WORLD_SIZE);
 ```
 
+Owner distribution:
+
+```text
+owner_from_hash128 uses deterministic avalanche mixing over Hash128 before modulo WORLD_SIZE.
+Dedup key remains raw Hash128.
+```
+
 ```cpp
 route_packed =
     (uint32_t(LOCAL_RANK) << 16) |
@@ -985,6 +992,14 @@ remote_send_buffer[
 
 ```text
 shard = shard_from_hash128(candidate.hash)
+```
+
+Shard distribution:
+
+```text
+shard_from_hash128 uses deterministic avalanche mixing over Hash128 before modulo SHARD_COUNT.
+Shard routing key is separate from owner routing key by domain salt.
+Dedup key remains raw Hash128.
 ```
 
 Если shard свободен:

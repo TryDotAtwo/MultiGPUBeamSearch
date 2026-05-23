@@ -1,6 +1,7 @@
 #include "stream3.hpp"
 
 #include "config.hpp"
+#include "hash.hpp"
 #include "nvtx_ranges.hpp"
 
 #include <cub/device/device_radix_sort.cuh>
@@ -18,7 +19,7 @@ namespace beam {
 namespace {
 
 __device__ std::uint8_t owner_from_hash128_stream3_device(Hash128 hash, std::uint32_t world_size) {
-    return static_cast<std::uint8_t>((hash.hi ^ hash.lo) % world_size);
+    return static_cast<std::uint8_t>(hash128_owner_distribution_key(hash) % world_size);
 }
 
 __device__ std::uint32_t pack_route_stream3_device(
@@ -31,7 +32,7 @@ __device__ std::uint32_t pack_route_stream3_device(
 }
 
 __device__ std::uint32_t shard_from_hash128_stream3_device(Hash128 hash, std::uint32_t shard_count) {
-    return static_cast<std::uint32_t>((hash.hi ^ (hash.lo >> 32)) % shard_count);
+    return static_cast<std::uint32_t>(hash128_shard_distribution_key(hash) % shard_count);
 }
 
 struct Stream3HashLess {
