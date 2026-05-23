@@ -1,0 +1,12 @@
+{
+  "state_len": 120,
+  "num_classes": 120,
+  "hd1": 1536,
+  "hd2": 512,
+  "nrd": 2,
+  "output_dim": 24,
+  "dtype": "fp16",
+  "layout": "row-major input activations times weight_hxk",
+  "batchnorm": "folded into preceding linear weights",
+  "embeddingbag": "removed from runtime; input layer exported as position-class table"
+}

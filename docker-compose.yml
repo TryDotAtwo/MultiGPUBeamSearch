@@ -1,0 +1,26 @@
+services:
+  beam-tests:
+    image: gpu-dev-nsight-cutlass-cu128:2026-05-22
+    build: .
+    working_dir: /work
+    volumes:
+      - .:/work
+    gpus: all
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    command: >
+      bash -lc "cmake -S . -B build-docker -G Ninja -DCMAKE_BUILD_TYPE=Release
+      && cmake --build build-docker
+      && ctest --test-dir build-docker --output-on-failure"
+  nsight-profile:
+    image: gpu-dev-nsight-cutlass-cu128:2026-05-22
+    working_dir: /work
+    volumes:
+      - .:/work
+    gpus: all
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      PYTHONUNBUFFERED: "1"
+    command: bash -lc "command -v nsys && cmake --build build-docker --target dispatcher_cuda_tests && nsys profile --trace=cuda,nvtx,cublas,cudnn,osrt --sample=none --cpuctxsw=none --stats=true --force-overwrite=true --output=/work/test_results/nsys_pipeline_stream1_2_3_4_5_2026-05-22 /work/build-docker/dispatcher_cuda_tests"

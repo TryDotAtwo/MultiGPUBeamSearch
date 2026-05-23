@@ -1,0 +1,1153 @@
+#include "cuda_check.hpp"
+#include "../cuda/dispatcher.hpp"
+#include "../src/hash.hpp"
+#include "../src/state.hpp"
+
+#include <cuda_fp16.h>
+#include <cuda_runtime.h>
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <future>
+#include <iomanip>
+#include <iostream>
+#include <limits>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+using namespace beam;
+
+#ifndef BEAM_ENABLE_DEPTH_LOGS
+#define BEAM_ENABLE_DEPTH_LOGS 0
+#endif
+
+#ifndef BEAM_ENABLE_DEBUG_LOGS
+#define BEAM_ENABLE_DEBUG_LOGS 0
+#endif
+
+namespace {
+
+inline constexpr std::uint32_t STREAM1_MODEL_CLASSES = 120;
+inline constexpr std::uint32_t STREAM1_HIDDEN1 = 1536;
+inline constexpr std::uint32_t STREAM1_HIDDEN2 = 512;
+inline constexpr std::uint32_t STREAM1_RESIDUAL_COUNT = 2;
+
+std::uint64_t parse_u64(const char* text, const char* name) {
+    char* end = nullptr;
+    const unsigned long long value = std::strtoull(text, &end, 10);
+    if (end == text || *end != '\0') {
+        throw std::invalid_argument(std::string("invalid numeric argument: ") + name);
+    }
+    return static_cast<std::uint64_t>(value);
+}
+
+std::uint32_t env_u32(const char* name, std::uint32_t default_value) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || value[0] == '\0') {
+        return default_value;
+    }
+    const std::uint64_t parsed = parse_u64(value, name);
+    if (parsed > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::invalid_argument(std::string("env value exceeds uint32: ") + name);
+    }
+    return static_cast<std::uint32_t>(parsed);
+}
+
+std::filesystem::path env_path(const char* name, const char* default_value) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || value[0] == '\0') {
+        return std::filesystem::path(default_value);
+    }
+    return std::filesystem::path(value);
+}
+
+std::uint32_t parse_next_u32(const std::string& text, std::size_t& pos, const char* context) {
+    while (pos < text.size() && (text[pos] < '0' || text[pos] > '9')) {
+        ++pos;
+    }
+    if (pos >= text.size()) {
+        throw std::runtime_error(std::string("missing integer in ") + context);
+    }
+    std::uint64_t value = 0;
+    while (pos < text.size() && text[pos] >= '0' && text[pos] <= '9') {
+        value = value * 10ULL + static_cast<std::uint64_t>(text[pos] - '0');
+        if (value > std::numeric_limits<std::uint8_t>::max()) {
+            throw std::runtime_error(std::string("integer out of uint8 range in ") + context);
+        }
+        ++pos;
+    }
+    return static_cast<std::uint32_t>(value);
+}
+
+std::string read_text_file(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("cannot open required text file: " + path.string());
+    }
+    return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+}
+
+std::vector<std::byte> read_binary_exact(const std::filesystem::path& path, std::size_t expected_bytes) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("cannot open required binary file: " + path.string());
+    }
+    std::vector<std::byte> bytes(expected_bytes);
+    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    const std::size_t actual = static_cast<std::size_t>(file.gcount());
+    file.peek();
+    if (bytes.size() != expected_bytes) {
+        throw std::runtime_error(
+            "binary file size mismatch: " + path.string() +
+            " expected=" + std::to_string(expected_bytes) +
+            " actual=" + std::to_string(bytes.size()));
+    }
+    if (actual != expected_bytes || !file.eof()) {
+        throw std::runtime_error(
+            "binary file size mismatch: " + path.string() +
+            " expected=" + std::to_string(expected_bytes) +
+            " actual_read=" + std::to_string(actual));
+    }
+    return bytes;
+}
+
+std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path) {
+    const std::string text = read_text_file(path);
+    std::size_t pos = text.find("\"actions\"");
+    if (pos == std::string::npos) {
+        throw std::runtime_error("p900 generator json missing actions");
+    }
+    pos = text.find('[', pos);
+    if (pos == std::string::npos) {
+        throw std::runtime_error("p900 generator json malformed actions");
+    }
+    std::vector<std::uint8_t> generators(MOVE_COUNT * STATE_STORAGE_LEN);
+    for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
+        pos = text.find('[', pos + 1);
+        if (pos == std::string::npos) {
+            throw std::runtime_error("p900 generator json missing move array");
+        }
+        for (std::uint32_t p = 0; p < STATE_LEN; ++p) {
+            generators[move * STATE_STORAGE_LEN + p] =
+                static_cast<std::uint8_t>(parse_next_u32(text, pos, "p900 generator"));
+        }
+        for (std::uint32_t p = STATE_LEN; p < STATE_STORAGE_LEN; ++p) {
+            generators[move * STATE_STORAGE_LEN + p] = static_cast<std::uint8_t>(p);
+        }
+    }
+    return generators;
+}
+
+std::vector<std::string> load_p900_move_names(const std::filesystem::path& path) {
+    const std::string text = read_text_file(path);
+    std::size_t pos = text.find("\"names\"");
+    if (pos == std::string::npos) {
+        throw std::runtime_error("p900 generator json missing names");
+    }
+    pos = text.find('[', pos);
+    if (pos == std::string::npos) {
+        throw std::runtime_error("p900 generator json malformed names");
+    }
+    std::vector<std::string> names;
+    while (names.size() < MOVE_COUNT) {
+        const std::size_t begin = text.find('"', pos + 1);
+        if (begin == std::string::npos) {
+            throw std::runtime_error("p900 generator json missing move name");
+        }
+        const std::size_t end = text.find('"', begin + 1);
+        if (end == std::string::npos) {
+            throw std::runtime_error("p900 generator json malformed move name");
+        }
+        names.push_back(text.substr(begin + 1, end - begin - 1));
+        pos = end;
+    }
+    return names;
+}
+
+State128 load_central_state(const std::filesystem::path& path) {
+    const std::string text = read_text_file(path);
+    std::size_t pos = text.find("\"central_state\"");
+    if (pos == std::string::npos) {
+        throw std::runtime_error("puzzle info json missing central_state");
+    }
+    pos = text.find('[', pos);
+    if (pos == std::string::npos) {
+        throw std::runtime_error("puzzle info json malformed central_state");
+    }
+    State128 state{};
+    for (std::uint32_t p = 0; p < STATE_LEN; ++p) {
+        state.v[p] = static_cast<std::uint8_t>(parse_next_u32(text, pos, "central_state"));
+    }
+    for (std::uint32_t p = STATE_LEN; p < STATE_STORAGE_LEN; ++p) {
+        state.v[p] = 0;
+    }
+    return state;
+}
+
+State128 load_initial_state_from_test_csv(const std::filesystem::path& path, std::uint64_t puzzle_id) {
+    std::ifstream file(path);
+    if (!file) {
+        throw std::runtime_error("cannot open required csv file: " + path.string());
+    }
+    std::string line;
+    std::getline(file, line);
+    while (std::getline(file, line)) {
+        const std::size_t comma = line.find(',');
+        if (comma == std::string::npos) {
+            continue;
+        }
+        const std::uint64_t row_id = parse_u64(line.substr(0, comma).c_str(), "initial_state_id");
+        if (row_id != puzzle_id) {
+            continue;
+        }
+        const std::size_t first_quote = line.find('"', comma);
+        const std::size_t last_quote = line.rfind('"');
+        if (first_quote == std::string::npos || last_quote == std::string::npos || last_quote <= first_quote) {
+            throw std::runtime_error("test csv malformed initial_state row");
+        }
+        const std::string state_text = line.substr(first_quote + 1, last_quote - first_quote - 1);
+        std::size_t pos = 0;
+        State128 state{};
+        for (std::uint32_t p = 0; p < STATE_LEN; ++p) {
+            state.v[p] = static_cast<std::uint8_t>(parse_next_u32(state_text, pos, "initial_state"));
+        }
+        for (std::uint32_t p = STATE_LEN; p < STATE_STORAGE_LEN; ++p) {
+            state.v[p] = 0;
+        }
+        return state;
+    }
+    throw std::runtime_error("requested puzzle_id not found in test csv");
+}
+
+std::string timestamp_id() {
+    const auto now = std::chrono::system_clock::now();
+    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+    return std::to_string(seconds);
+}
+
+std::filesystem::path make_history_dir(std::uint64_t puzzle_id, std::uint32_t depth_limit, std::uint64_t beam) {
+    std::filesystem::path dir = "test_results";
+    dir /= "candidate_history_p" + std::to_string(puzzle_id) +
+        "_d" + std::to_string(depth_limit) +
+        "_b" + std::to_string(beam) +
+        "_" + timestamp_id();
+    std::filesystem::create_directories(dir);
+    return dir;
+}
+
+std::string state120_to_text(const State128& state) {
+    std::ostringstream out;
+    for (std::uint32_t i = 0; i < STATE_LEN; ++i) {
+        if (i != 0U) {
+            out << ',';
+        }
+        out << static_cast<std::uint32_t>(state.v[i]);
+    }
+    return out.str();
+}
+
+std::string submit_move_name(const std::string& raw_name) {
+    if (!raw_name.empty() && raw_name.back() == '\'') {
+        return "-" + raw_name.substr(0, raw_name.size() - 1U);
+    }
+    return raw_name;
+}
+
+std::string moves_to_path_text(const std::vector<std::uint8_t>& moves, const std::vector<std::string>& names) {
+    std::ostringstream out;
+    for (std::size_t i = 0; i < moves.size(); ++i) {
+        if (i != 0U) {
+            out << '.';
+        }
+        const std::uint32_t move = moves[i];
+        if (move >= names.size()) {
+            throw std::runtime_error("solution move index exceeds names table");
+        }
+        out << submit_move_name(names[move]);
+    }
+    return out.str();
+}
+
+State128 apply_move_flat_host(const State128& parent, const std::vector<std::uint8_t>& generators, std::uint8_t move) {
+    if (move >= MOVE_COUNT) {
+        throw std::runtime_error("solution move exceeds MOVE_COUNT");
+    }
+    State128 child{};
+    const std::uint64_t base = static_cast<std::uint64_t>(move) * STATE_STORAGE_LEN;
+    for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+        child.v[p] = parent.v[generators[base + p]];
+    }
+    clear_state_padding(child);
+    return child;
+}
+
+bool states_equal_storage(const State128& a, const State128& b) {
+    for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+        if (a.v[p] != b.v[p]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+enum class CandidateHistoryMode : std::uint8_t {
+    Ram,
+    Disk
+};
+
+CandidateHistoryMode parse_history_mode() {
+    const char* value = std::getenv("BEAM_HISTORY_MODE");
+    if (value == nullptr || value[0] == '\0' || std::strcmp(value, "ram") == 0) {
+        return CandidateHistoryMode::Ram;
+    }
+    if (std::strcmp(value, "disk") == 0) {
+        return CandidateHistoryMode::Disk;
+    }
+    throw std::runtime_error("BEAM_HISTORY_MODE must be ram or disk");
+}
+
+const char* history_mode_name(CandidateHistoryMode mode) {
+    return mode == CandidateHistoryMode::Ram ? "ram" : "disk";
+}
+
+struct CpuCandidateHistory {
+    struct Slot {
+        CandidateMeta* host = nullptr;
+        std::uint32_t capacity = 0;
+        std::uint32_t count = 0;
+        std::uint32_t depth_index = 0;
+        std::filesystem::path path;
+        cudaEvent_t copy_done = nullptr;
+        bool copy_pending = false;
+        bool free = true;
+        std::future<std::vector<CandidateMeta>> writer;
+    };
+
+    CandidateHistoryMode mode = CandidateHistoryMode::Ram;
+    std::filesystem::path dir;
+    std::vector<std::filesystem::path> depth_files;
+    std::vector<std::uint32_t> depth_counts;
+    std::vector<std::vector<CandidateMeta>> ram_depths;
+    std::uint64_t bytes_received = 0;
+    std::vector<Slot> slots;
+    cudaStream_t copy_stream = nullptr;
+
+    void initialize(CandidateHistoryMode selected_mode, std::uint32_t capacity, std::uint32_t slot_count) {
+        if (copy_stream != nullptr) {
+            throw std::runtime_error("candidate history already initialized");
+        }
+        if (capacity == 0U || slot_count == 0U) {
+            throw std::runtime_error("candidate history capacity and slot count must be nonzero");
+        }
+        mode = selected_mode;
+        BEAM_CUDA_CHECK(cudaStreamCreateWithFlags(&copy_stream, cudaStreamNonBlocking));
+        slots.resize(slot_count);
+        for (Slot& slot : slots) {
+            slot.capacity = capacity;
+            BEAM_CUDA_CHECK(cudaHostAlloc(
+                reinterpret_cast<void**>(&slot.host),
+                static_cast<std::uint64_t>(capacity) * sizeof(CandidateMeta),
+                cudaHostAllocPortable));
+            BEAM_CUDA_CHECK(cudaEventCreateWithFlags(&slot.copy_done, cudaEventDisableTiming));
+        }
+    }
+
+    static std::vector<CandidateMeta> materialize_depth(
+        CandidateHistoryMode mode,
+        const std::filesystem::path& path,
+        const CandidateMeta* host,
+        std::uint32_t count) {
+        if (mode == CandidateHistoryMode::Ram) {
+            std::vector<CandidateMeta> data(static_cast<std::size_t>(count));
+            if (count != 0U) {
+                std::memcpy(data.data(), host, static_cast<std::uint64_t>(count) * sizeof(CandidateMeta));
+            }
+            return data;
+        }
+        std::ofstream file(path, std::ios::binary);
+        if (!file) {
+            throw std::runtime_error("cannot open candidate history file for write: " + path.string());
+        }
+        if (count != 0U) {
+            file.write(
+                reinterpret_cast<const char*>(host),
+                static_cast<std::streamsize>(static_cast<std::uint64_t>(count) * sizeof(CandidateMeta)));
+        }
+        if (!file) {
+            throw std::runtime_error("candidate history write failed: " + path.string());
+        }
+        return {};
+    }
+
+    void pump_completed(bool wait_all) {
+        bool progressed = true;
+        while (progressed) {
+            progressed = false;
+            for (Slot& slot : slots) {
+                if (slot.copy_pending) {
+                    const cudaError_t status = wait_all ? cudaEventSynchronize(slot.copy_done) : cudaEventQuery(slot.copy_done);
+                    if (status == cudaSuccess) {
+                        slot.copy_pending = false;
+                        slot.writer = std::async(
+                            std::launch::async,
+                            &CpuCandidateHistory::materialize_depth,
+                            mode,
+                            slot.path,
+                            slot.host,
+                            slot.count);
+                        progressed = true;
+                    } else if (status != cudaErrorNotReady) {
+                        BEAM_CUDA_CHECK(status);
+                    }
+                }
+                if (!slot.copy_pending && !slot.free && slot.writer.valid()) {
+                    const bool ready = wait_all ||
+                        slot.writer.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+                    if (ready) {
+                        std::vector<CandidateMeta> ram_data = slot.writer.get();
+                        if (mode == CandidateHistoryMode::Ram) {
+                            if (slot.depth_index >= ram_depths.size()) {
+                                throw std::runtime_error("candidate history RAM depth index missing");
+                            }
+                            ram_depths[slot.depth_index] = std::move(ram_data);
+                        }
+                        slot.free = true;
+                        progressed = true;
+                    }
+                }
+            }
+            if (!wait_all) {
+                break;
+            }
+        }
+    }
+
+    Slot& acquire_slot() {
+        pump_completed(false);
+        for (Slot& slot : slots) {
+            if (slot.free) {
+                slot.free = false;
+                return slot;
+            }
+        }
+        pump_completed(true);
+        for (Slot& slot : slots) {
+            if (slot.free) {
+                slot.free = false;
+                return slot;
+            }
+        }
+        throw std::runtime_error("candidate history slot acquisition failed");
+    }
+
+    void commit_slot(Slot& slot, std::uint32_t depth_index, std::uint32_t count) {
+        if (count > slot.capacity) {
+            throw std::runtime_error("candidate history count exceeds slot capacity");
+        }
+        slot.count = count;
+        slot.depth_index = depth_index;
+        slot.path = dir / ("depth_" + std::to_string(depth_index) + ".candidate_meta.bin");
+        slot.copy_pending = true;
+        slot.free = false;
+        if (depth_index != depth_counts.size()) {
+            throw std::runtime_error("candidate history commits must be depth-ordered");
+        }
+        depth_files.push_back(mode == CandidateHistoryMode::Disk ? slot.path : std::filesystem::path{});
+        depth_counts.push_back(count);
+        if (mode == CandidateHistoryMode::Ram) {
+            ram_depths.emplace_back();
+        }
+        bytes_received += static_cast<std::uint64_t>(count) * sizeof(CandidateMeta);
+    }
+
+    void finish_all() {
+        pump_completed(true);
+    }
+
+    void destroy() {
+        finish_all();
+        for (Slot& slot : slots) {
+            if (slot.copy_done != nullptr) {
+                cudaEventDestroy(slot.copy_done);
+                slot.copy_done = nullptr;
+            }
+            if (slot.host != nullptr) {
+                cudaFreeHost(slot.host);
+                slot.host = nullptr;
+            }
+        }
+        slots.clear();
+        if (copy_stream != nullptr) {
+            cudaStreamDestroy(copy_stream);
+            copy_stream = nullptr;
+        }
+    }
+
+    CandidateMeta read_candidate(std::uint32_t depth_index, std::uint64_t index) const {
+        if (depth_index >= depth_counts.size()) {
+            throw std::out_of_range("candidate history depth index out of range");
+        }
+        if (index >= depth_counts[depth_index]) {
+            throw std::out_of_range("candidate history parent index out of range");
+        }
+        if (mode == CandidateHistoryMode::Ram) {
+            if (depth_index >= ram_depths.size() || ram_depths[depth_index].empty()) {
+                throw std::runtime_error("candidate history RAM depth not materialized");
+            }
+            return ram_depths[depth_index][static_cast<std::size_t>(index)];
+        }
+        std::ifstream file(depth_files[depth_index], std::ios::binary);
+        if (!file) {
+            throw std::runtime_error("cannot open candidate history file for read: " + depth_files[depth_index].string());
+        }
+        const std::uint64_t offset = index * sizeof(CandidateMeta);
+        file.seekg(static_cast<std::streamoff>(offset), std::ios::beg);
+        CandidateMeta candidate{};
+        file.read(reinterpret_cast<char*>(&candidate), sizeof(candidate));
+        if (!file) {
+            throw std::runtime_error("candidate history read failed: " + depth_files[depth_index].string());
+        }
+        return candidate;
+    }
+};
+
+struct ReconstructedSolution {
+    std::vector<std::uint8_t> moves;
+    std::vector<std::uint64_t> parent_indices;
+};
+
+ReconstructedSolution reconstruct_solution_from_history(
+    const CpuCandidateHistory& history,
+    const CandidateMeta& solved_meta,
+    std::uint32_t solved_depth) {
+    if (solved_depth == 0U) {
+        throw std::runtime_error("solved depth must be positive");
+    }
+    if (solved_depth > history.depth_files.size() + 1U) {
+        throw std::runtime_error("solved depth exceeds stored candidate history");
+    }
+    ReconstructedSolution solution;
+    solution.moves.resize(solved_depth);
+    solution.parent_indices.resize(solved_depth);
+
+    CandidateMeta cursor = solved_meta;
+    std::uint64_t parent_idx = cursor.parent_idx;
+    for (std::uint32_t depth = solved_depth; depth > 0; --depth) {
+        const std::uint32_t out = depth - 1U;
+        solution.moves[out] = unpack_move(cursor.route_packed);
+        solution.parent_indices[out] = parent_idx;
+        if (out == 0U) {
+            break;
+        }
+        cursor = history.read_candidate(out - 1U, parent_idx);
+        parent_idx = cursor.parent_idx;
+    }
+    return solution;
+}
+
+State128 apply_solution_moves(
+    const State128& initial,
+    const std::vector<std::uint8_t>& moves,
+    const std::vector<std::uint8_t>& generators) {
+    State128 state = initial;
+    clear_state_padding(state);
+    for (std::uint8_t move : moves) {
+        state = apply_move_flat_host(state, generators, move);
+    }
+    return state;
+}
+
+struct SolvedSnapshot {
+    bool found = false;
+    std::uint32_t count = 0;
+    std::uint32_t overflow = 0;
+    std::vector<CandidateMeta> meta;
+    std::vector<std::uint32_t> depth;
+};
+
+SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint32_t capacity) {
+    SolvedSnapshot snapshot;
+    std::uint32_t flag = 0;
+    BEAM_CUDA_CHECK(cudaMemcpy(&flag, memory.solved_flag, sizeof(flag), cudaMemcpyDeviceToHost));
+    snapshot.found = flag != 0U;
+    if (!snapshot.found) {
+        return snapshot;
+    }
+    BEAM_CUDA_CHECK(cudaMemcpy(&snapshot.count, memory.solved_count, sizeof(snapshot.count), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(&snapshot.overflow, memory.solved_overflow, sizeof(snapshot.overflow), cudaMemcpyDeviceToHost));
+    const std::uint32_t stored = std::min(snapshot.count, capacity);
+    snapshot.meta.resize(stored);
+    snapshot.depth.resize(stored);
+    if (stored != 0U) {
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            snapshot.meta.data(),
+            memory.solved_meta_list,
+            static_cast<std::uint64_t>(stored) * sizeof(CandidateMeta),
+            cudaMemcpyDeviceToHost));
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            snapshot.depth.data(),
+            memory.solved_depth_list,
+            static_cast<std::uint64_t>(stored) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost));
+    }
+    return snapshot;
+}
+
+void write_solution_artifacts(
+    std::uint64_t puzzle_id,
+    std::uint32_t depth_limit,
+    std::uint64_t beam,
+    const ReconstructedSolution& solution,
+    const std::vector<std::string>& move_names,
+    const State128& final_state,
+    bool valid,
+    const CpuCandidateHistory& history,
+    const SolvedSnapshot& solved) {
+    const std::string path_text = moves_to_path_text(solution.moves, move_names);
+    const std::string state_text = state120_to_text(final_state);
+    const std::filesystem::path solution_log =
+        std::filesystem::path("test_results") /
+        ("solution_p" + std::to_string(puzzle_id) +
+         "_d" + std::to_string(depth_limit) +
+         "_b" + std::to_string(beam) +
+         "_" + timestamp_id() + ".log");
+    std::ofstream log(solution_log);
+    if (!log) {
+        throw std::runtime_error("cannot open solution log for write: " + solution_log.string());
+    }
+    log << "solution_found=1\n";
+    log << "solution_valid=" << (valid ? 1 : 0) << "\n";
+    log << "solution_depth=" << solution.moves.size() << "\n";
+    log << "solution_path=" << path_text << "\n";
+    log << "solution_state120=\"" << state_text << "\"\n";
+    log << "history_mode=" << history_mode_name(history.mode) << "\n";
+    log << "history_dir=" << history.dir.string() << "\n";
+    log << "history_depth_count=" << history.depth_counts.size() << "\n";
+    log << "history_bytes_received=" << history.bytes_received << "\n";
+    log << "solved_count=" << solved.count << "\n";
+    log << "solved_overflow=" << solved.overflow << "\n";
+
+    std::ofstream submit("submit.csv");
+    if (!submit) {
+        throw std::runtime_error("cannot open submit.csv for write");
+    }
+    submit << "initial_state_id,path\n";
+    submit << puzzle_id << "," << path_text << "\n";
+
+    const std::filesystem::path submit_copy =
+        std::filesystem::path("test_results") /
+        ("submit_p" + std::to_string(puzzle_id) +
+         "_d" + std::to_string(depth_limit) +
+         "_b" + std::to_string(beam) + ".csv");
+    std::ofstream submit_copy_stream(submit_copy);
+    if (!submit_copy_stream) {
+        throw std::runtime_error("cannot open test_results submit copy for write: " + submit_copy.string());
+    }
+    submit_copy_stream << "initial_state_id,path\n";
+    submit_copy_stream << puzzle_id << "," << path_text << "\n";
+
+    const std::filesystem::path path_copy =
+        std::filesystem::path("test_results") /
+        ("solution_path_p" + std::to_string(puzzle_id) +
+         "_d" + std::to_string(depth_limit) +
+         "_b" + std::to_string(beam) + ".csv");
+    std::ofstream submit_path_copy(path_copy);
+    if (!submit_path_copy) {
+        throw std::runtime_error("cannot open solution path copy for write: " + path_copy.string());
+    }
+    submit_path_copy << "initial_state_id,path\n";
+    submit_path_copy << puzzle_id << "," << path_text << "\n";
+
+#if BEAM_ENABLE_DEBUG_LOGS
+    std::cout << "solution_log=" << solution_log.string() << "\n";
+    std::cout << "submit_csv=submit.csv\n";
+    std::cout << "submit_path_copy=" << submit_copy.string() << "\n";
+    std::cout << "solution_path_copy=" << path_copy.string() << "\n";
+    std::cout << "solution_found=1\n";
+    std::cout << "solution_valid=" << (valid ? 1 : 0) << "\n";
+    std::cout << "solution_depth=" << solution.moves.size() << "\n";
+    std::cout << "solution_path=" << path_text << "\n";
+    std::cout << "solution_state120=\"" << state_text << "\"\n";
+#endif
+}
+
+struct HostWeightBytes {
+    std::vector<std::byte> input_weight;
+    std::vector<std::byte> input_bias;
+    std::vector<std::byte> hidden_weight;
+    std::vector<std::byte> hidden_bias;
+    std::vector<std::byte> residual0_fc1_weight;
+    std::vector<std::byte> residual0_fc1_bias;
+    std::vector<std::byte> residual0_fc2_weight;
+    std::vector<std::byte> residual0_fc2_bias;
+    std::vector<std::byte> residual1_fc1_weight;
+    std::vector<std::byte> residual1_fc1_bias;
+    std::vector<std::byte> residual1_fc2_weight;
+    std::vector<std::byte> residual1_fc2_bias;
+    std::vector<std::byte> output_weight;
+    std::vector<std::byte> output_bias;
+};
+
+HostWeightBytes load_stream1_weights(const std::filesystem::path& dir) {
+    constexpr std::size_t fp16 = sizeof(std::uint16_t);
+    HostWeightBytes weights;
+    weights.input_weight = read_binary_exact(dir / "input_weight_hxk.fp16", STATE_LEN * STREAM1_MODEL_CLASSES * STREAM1_HIDDEN1 * fp16);
+    weights.input_bias = read_binary_exact(dir / "input_bias.fp16", STREAM1_HIDDEN1 * fp16);
+    weights.hidden_weight = read_binary_exact(dir / "hidden_weight_hxk.fp16", STREAM1_HIDDEN1 * STREAM1_HIDDEN2 * fp16);
+    weights.hidden_bias = read_binary_exact(dir / "hidden_bias.fp16", STREAM1_HIDDEN2 * fp16);
+    weights.residual0_fc1_weight = read_binary_exact(dir / "residual0_fc1_weight_hxk.fp16", STREAM1_HIDDEN2 * STREAM1_HIDDEN2 * fp16);
+    weights.residual0_fc1_bias = read_binary_exact(dir / "residual0_fc1_bias.fp16", STREAM1_HIDDEN2 * fp16);
+    weights.residual0_fc2_weight = read_binary_exact(dir / "residual0_fc2_weight_hxk.fp16", STREAM1_HIDDEN2 * STREAM1_HIDDEN2 * fp16);
+    weights.residual0_fc2_bias = read_binary_exact(dir / "residual0_fc2_bias.fp16", STREAM1_HIDDEN2 * fp16);
+    weights.residual1_fc1_weight = read_binary_exact(dir / "residual1_fc1_weight_hxk.fp16", STREAM1_HIDDEN2 * STREAM1_HIDDEN2 * fp16);
+    weights.residual1_fc1_bias = read_binary_exact(dir / "residual1_fc1_bias.fp16", STREAM1_HIDDEN2 * fp16);
+    weights.residual1_fc2_weight = read_binary_exact(dir / "residual1_fc2_weight_hxk.fp16", STREAM1_HIDDEN2 * STREAM1_HIDDEN2 * fp16);
+    weights.residual1_fc2_bias = read_binary_exact(dir / "residual1_fc2_bias.fp16", STREAM1_HIDDEN2 * fp16);
+    weights.output_weight = read_binary_exact(dir / "output_weight_hxk.fp16", STREAM1_HIDDEN2 * MOVE_COUNT * fp16);
+    weights.output_bias = read_binary_exact(dir / "output_bias.fp16", MOVE_COUNT * fp16);
+    return weights;
+}
+
+void copy_bytes_to_device(void* dst, const std::vector<std::byte>& bytes, const char* name) {
+    if (dst == nullptr || bytes.empty()) {
+        throw std::runtime_error(std::string("invalid device copy input: ") + name);
+    }
+    BEAM_CUDA_CHECK(cudaMemcpy(dst, bytes.data(), bytes.size(), cudaMemcpyHostToDevice));
+}
+
+void require_aligned(const void* ptr, std::uintptr_t alignment, const char* name) {
+    if (reinterpret_cast<std::uintptr_t>(ptr) % alignment != 0) {
+        throw std::runtime_error(std::string("device pointer alignment failed: ") + name);
+    }
+}
+
+} // namespace
+
+int main(int argc, char** argv) {
+    if (argc != 4 && argc != 6) {
+        std::cerr << "usage: production_runner <puzzle_id> <depth> <beam> [world_size] [local_rank]\n";
+        return 2;
+    }
+    const std::uint64_t puzzle_id = parse_u64(argv[1], "puzzle_id");
+    const std::uint32_t depth_limit = static_cast<std::uint32_t>(parse_u64(argv[2], "depth"));
+    const std::uint64_t beam = parse_u64(argv[3], "beam");
+    const std::uint32_t world_size = argc == 6 ? static_cast<std::uint32_t>(parse_u64(argv[4], "world_size")) : 1U;
+    const std::uint32_t local_rank = argc == 6 ? static_cast<std::uint32_t>(parse_u64(argv[5], "local_rank")) : 0U;
+    if (world_size == 0 || world_size > 255 || local_rank >= world_size) {
+        throw std::invalid_argument("world_size must be in [1,255] and local_rank must be less than world_size");
+    }
+    std::cout << std::unitbuf;
+
+    BEAM_CUDA_CHECK(cudaSetDevice(0));
+    std::size_t free_before = 0;
+    std::size_t total_before = 0;
+    BEAM_CUDA_CHECK(cudaMemGetInfo(&free_before, &total_before));
+
+    RuntimeConfig config;
+    config.user_global_beam_width = beam;
+    config.world_size = world_size;
+    config.local_rank = local_rank;
+    config.b_micro = env_u32("BEAM_B_MICRO", 8192);
+    const std::uint32_t stream3_ring_slots = env_u32("BEAM_STREAM3_RING_SLOTS", 32);
+    config.stream3_batch_candidates =
+        config.b_micro * static_cast<std::uint32_t>(MOVE_COUNT) * stream3_ring_slots;
+    config.ring_count = env_u32("BEAM_RING_COUNT", 4);
+    config.shard_count = env_u32("BEAM_SHARD_COUNT", 64);
+    config.stream4_active_sort_slots = env_u32("BEAM_STREAM4_ACTIVE_SORT_SLOTS", 4);
+    config.stream4_batch_candidates = env_u32("BEAM_STREAM4_BATCH_CANDIDATES", 65536);
+    config.global_threshold_update_period_shards = env_u32("BEAM_GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS", 64);
+    config.global_spill_capacity = env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 1 << 20);
+    config.solved_result_capacity = env_u32("BEAM_SOLVED_RESULT_CAPACITY", 1024);
+    const std::uint64_t local_survivor_capacity =
+        static_cast<std::uint64_t>(config.shard_count) * 2ULL * config.stream4_batch_candidates;
+    const std::uint64_t global_tail_safe_capacity =
+        local_survivor_capacity * static_cast<std::uint64_t>(config.world_size);
+    const std::uint64_t max_safe_alignment =
+        static_cast<std::uint64_t>(config.world_size) *
+        static_cast<std::uint64_t>(config.shard_count) *
+        static_cast<std::uint64_t>(config.stream4_batch_candidates_per_shard_unit);
+    config.global_beam_width_max_safe =
+        round_up(std::max(beam, global_tail_safe_capacity), max_safe_alignment);
+
+    const StaticMemoryPlan plan = make_static_memory_plan(config);
+#if BEAM_ENABLE_DEBUG_LOGS
+    std::cout << "puzzle_id=" << puzzle_id << "\n";
+    std::cout << "depth_limit=" << depth_limit << "\n";
+    std::cout << "USER_GLOBAL_BEAM_WIDTH=" << beam << "\n";
+    std::cout << "WORLD_SIZE=" << config.world_size << "\n";
+    std::cout << "LOCAL_RANK=" << config.local_rank << "\n";
+    std::cout << "B_MICRO=" << config.b_micro << "\n";
+    std::cout << "STREAM3_RING_SLOTS=" << stream3_ring_slots << "\n";
+    std::cout << "RING_COUNT=" << config.ring_count << "\n";
+    std::cout << "RING_SLOT_COUNT=" << plan.derived.ring_slot_count << "\n";
+    std::cout << "STREAM3_BATCH_CANDIDATES=" << config.stream3_batch_candidates << "\n";
+    std::cout << "STREAM4_BATCH_CANDIDATES=" << config.stream4_batch_candidates << "\n";
+    std::cout << "STREAM4_ACTIVE_SORT_SLOTS=" << config.stream4_active_sort_slots << "\n";
+    std::cout << "GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS=" << config.global_threshold_update_period_shards << "\n";
+    std::cout << "GLOBAL_BEAM_WIDTH_EFFECTIVE=" << plan.derived.global_beam_width_effective << "\n";
+    std::cout << "GLOBAL_BEAM_WIDTH_MAX_SAFE=" << config.global_beam_width_max_safe << "\n";
+    std::cout << "BEAM_WIDTH_ALIGNMENT=" << plan.derived.beam_width_alignment << "\n";
+    std::cout << "SCORE_SCALE=" << SCORE_SCALE << "\n";
+    std::cout << "SCORE_MAX_KEY=" << SCORE_MAX_KEY << "\n";
+    std::cout << "SCORE_BIN_COUNT=" << SCORE_BIN_COUNT << "\n";
+    std::cout << "SOLVED_RESULT_CAPACITY=" << config.solved_result_capacity << "\n";
+    std::cout << "gpu_total_bytes=" << total_before << "\n";
+    std::cout << "gpu_free_before_bytes=" << free_before << "\n";
+    std::cout << "static_allocation_bytes=" << plan.total_device_bytes << "\n";
+    std::cout << "current_frontier_bytes=" << plan.current_frontier_bytes << "\n";
+    std::cout << "solved_bytes=" << plan.solved_bytes << "\n";
+    std::cout << "scratch_pool_bytes=" << plan.scratch_pool_bytes << "\n";
+    std::cout << "layout_streams_bytes=" << plan.layout_streams_bytes << "\n";
+    std::cout << "layout_final_bytes=" << plan.layout_final_bytes << "\n";
+    std::cout << "frontier_state_capacity=" << plan.frontier_states << "\n";
+#endif
+
+    const std::filesystem::path generator_path = "FullBeamNice/generators/p900.json";
+    const std::filesystem::path puzzle_info_path = "data/puzzle_info.json";
+    const std::filesystem::path test_csv_path = "data/test.csv";
+    const std::filesystem::path weight_dir = env_path("BEAM_WEIGHT_DIR", "stream1_weights");
+    const std::vector<std::uint8_t> host_generators = load_p900_generators(generator_path);
+    const std::vector<std::string> host_move_names = load_p900_move_names(generator_path);
+    const State128 host_central = load_central_state(puzzle_info_path);
+    const State128 host_initial = load_initial_state_from_test_csv(test_csv_path, puzzle_id);
+    const ZobristTable host_zobrist = make_deterministic_zobrist(0xC0DEC0DEULL);
+    const HostWeightBytes host_weights = load_stream1_weights(weight_dir);
+#if BEAM_ENABLE_DEBUG_LOGS
+    std::cout << "real_assets=enabled\n";
+    std::cout << "generator_path=" << generator_path.string() << "\n";
+    std::cout << "puzzle_info_path=" << puzzle_info_path.string() << "\n";
+    std::cout << "test_csv_path=" << test_csv_path.string() << "\n";
+    std::cout << "weight_dir=" << weight_dir.string() << "\n";
+#endif
+
+    StaticDeviceMemory memory;
+    allocate_static_device_memory(plan, memory);
+    BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
+    BEAM_CUDA_CHECK(cudaMemset(memory.current_frontier_states, 0, plan.current_frontier_bytes));
+    BEAM_CUDA_CHECK(cudaMemcpy(memory.current_frontier_states, &host_initial, sizeof(State128), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemset(memory.streams.current_threshold, 0xff, sizeof(std::uint32_t)));
+
+    std::size_t free_after = 0;
+    std::size_t total_after = 0;
+    BEAM_CUDA_CHECK(cudaMemGetInfo(&free_after, &total_after));
+#if BEAM_ENABLE_DEBUG_LOGS
+    std::cout << "gpu_free_after_static_alloc_bytes=" << free_after << "\n";
+    std::cout << "runner_phase=allocations_done\n";
+#endif
+
+    std::uint8_t* generators = nullptr;
+    State128* central_state = nullptr;
+    Hash128* zobrist = nullptr;
+    half* input_weight = nullptr;
+    half* input_bias = nullptr;
+    half* hidden_weight = nullptr;
+    half* hidden_bias = nullptr;
+    half* residual0_fc1_weight = nullptr;
+    half* residual0_fc1_bias = nullptr;
+    half* residual0_fc2_weight = nullptr;
+    half* residual0_fc2_bias = nullptr;
+    half* residual1_fc1_weight = nullptr;
+    half* residual1_fc1_bias = nullptr;
+    half* residual1_fc2_weight = nullptr;
+    half* residual1_fc2_bias = nullptr;
+    half* output_weight = nullptr;
+    half* output_bias = nullptr;
+    half* hidden1 = nullptr;
+    half* hidden2 = nullptr;
+    half* residual = nullptr;
+    half* output = nullptr;
+    constexpr std::uint32_t hidden1_cols = STREAM1_HIDDEN1;
+    constexpr std::uint32_t hidden2_cols = STREAM1_HIDDEN2;
+    constexpr std::uint32_t residual_count = STREAM1_RESIDUAL_COUNT;
+    BEAM_CUDA_CHECK(cudaMalloc(&generators, host_generators.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&central_state, sizeof(State128)));
+    BEAM_CUDA_CHECK(cudaMalloc(&zobrist, STATE_STORAGE_LEN * STATE_VALUE_PAD * sizeof(Hash128)));
+    BEAM_CUDA_CHECK(cudaMalloc(&input_weight, host_weights.input_weight.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&input_bias, host_weights.input_bias.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&hidden_weight, host_weights.hidden_weight.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&hidden_bias, host_weights.hidden_bias.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual0_fc1_weight, host_weights.residual0_fc1_weight.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual0_fc1_bias, host_weights.residual0_fc1_bias.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual0_fc2_weight, host_weights.residual0_fc2_weight.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual0_fc2_bias, host_weights.residual0_fc2_bias.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual1_fc1_weight, host_weights.residual1_fc1_weight.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual1_fc1_bias, host_weights.residual1_fc1_bias.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual1_fc2_weight, host_weights.residual1_fc2_weight.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual1_fc2_bias, host_weights.residual1_fc2_bias.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&output_weight, host_weights.output_weight.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&output_bias, host_weights.output_bias.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&hidden1, config.b_micro * hidden1_cols * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&hidden2, config.b_micro * hidden2_cols * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual, config.b_micro * hidden2_cols * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&output, config.b_micro * MOVE_COUNT * sizeof(half)));
+    require_aligned(generators, 16, "generators");
+    require_aligned(central_state, alignof(State128), "central_state");
+    require_aligned(zobrist, alignof(Hash128), "zobrist");
+    require_aligned(input_weight, 16, "input_weight");
+    require_aligned(hidden_weight, 16, "hidden_weight");
+    require_aligned(output_weight, 16, "output_weight");
+    BEAM_CUDA_CHECK(cudaMemcpy(generators, host_generators.data(), host_generators.size(), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(central_state, &host_central, sizeof(State128), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(zobrist, &host_zobrist[0][0], STATE_STORAGE_LEN * STATE_VALUE_PAD * sizeof(Hash128), cudaMemcpyHostToDevice));
+    copy_bytes_to_device(input_weight, host_weights.input_weight, "input_weight");
+    copy_bytes_to_device(input_bias, host_weights.input_bias, "input_bias");
+    copy_bytes_to_device(hidden_weight, host_weights.hidden_weight, "hidden_weight");
+    copy_bytes_to_device(hidden_bias, host_weights.hidden_bias, "hidden_bias");
+    copy_bytes_to_device(residual0_fc1_weight, host_weights.residual0_fc1_weight, "residual0_fc1_weight");
+    copy_bytes_to_device(residual0_fc1_bias, host_weights.residual0_fc1_bias, "residual0_fc1_bias");
+    copy_bytes_to_device(residual0_fc2_weight, host_weights.residual0_fc2_weight, "residual0_fc2_weight");
+    copy_bytes_to_device(residual0_fc2_bias, host_weights.residual0_fc2_bias, "residual0_fc2_bias");
+    copy_bytes_to_device(residual1_fc1_weight, host_weights.residual1_fc1_weight, "residual1_fc1_weight");
+    copy_bytes_to_device(residual1_fc1_bias, host_weights.residual1_fc1_bias, "residual1_fc1_bias");
+    copy_bytes_to_device(residual1_fc2_weight, host_weights.residual1_fc2_weight, "residual1_fc2_weight");
+    copy_bytes_to_device(residual1_fc2_bias, host_weights.residual1_fc2_bias, "residual1_fc2_bias");
+    copy_bytes_to_device(output_weight, host_weights.output_weight, "output_weight");
+    copy_bytes_to_device(output_bias, host_weights.output_bias, "output_bias");
+
+    DispatcherStreams streams;
+    DispatcherEvents events;
+    CudaGraphJobTemplates graphs;
+    create_dispatcher_streams(streams);
+    create_dispatcher_events(events);
+    const std::array<const half*, residual_count> residual_fc1_weight{residual0_fc1_weight, residual1_fc1_weight};
+    const std::array<const half*, residual_count> residual_fc1_bias{residual0_fc1_bias, residual1_fc1_bias};
+    const std::array<const half*, residual_count> residual_fc2_weight{residual0_fc2_weight, residual1_fc2_weight};
+    const std::array<const half*, residual_count> residual_fc2_bias{residual0_fc2_bias, residual1_fc2_bias};
+    Stream1NetworkDims dims{STATE_LEN, STREAM1_MODEL_CLASSES, hidden1_cols, hidden2_cols, residual_count};
+    DispatcherNetwork network{
+        Stream1NetworkView{
+            input_weight,
+            input_bias,
+            hidden_weight,
+            hidden_bias,
+            residual_fc1_weight.data(),
+            residual_fc1_bias.data(),
+            residual_fc2_weight.data(),
+            residual_fc2_bias.data(),
+            output_weight,
+            output_bias,
+            dims},
+        Stream1CutlassScratch{hidden1, hidden2, residual, output}};
+    DispatcherDeviceTables tables{generators, central_state, zobrist};
+    Stream2SolvedBuffers solved{
+        memory.solved_flag,
+        memory.stop_flag,
+        memory.solved_count,
+        memory.solved_overflow,
+        memory.solved_meta_list,
+        memory.solved_depth_list,
+        config.solved_result_capacity,
+        memory.current_depth};
+    instantiate_cuda_graph_job_templates(plan, memory, tables, network, solved, streams, events, graphs);
+#if BEAM_ENABLE_DEBUG_LOGS
+    std::cout << "runner_phase=graphs_instantiated\n";
+#endif
+
+    const auto start = std::chrono::steady_clock::now();
+    CpuCandidateHistory history;
+    const CandidateHistoryMode history_mode = parse_history_mode();
+    const std::uint32_t history_slot_count = env_u32("BEAM_HISTORY_SLOT_COUNT", 3);
+    const std::uint32_t depth_log_every = env_u32("BEAM_DEPTH_LOG_EVERY", 1);
+    history.dir = make_history_dir(puzzle_id, depth_limit, beam);
+    history.initialize(history_mode, static_cast<std::uint32_t>(plan.frontier_states), history_slot_count);
+#if BEAM_ENABLE_DEBUG_LOGS
+    std::cout << "candidate_history_dir=" << history.dir.string() << "\n";
+    std::cout << "candidate_history_mode=" << history_mode_name(history.mode) << "\n";
+    std::cout << "candidate_history_slots=" << history_slot_count << "\n";
+#endif
+    std::uint64_t frontier_size = 1;
+    [[maybe_unused]] std::uint64_t last_final_frontier_size = frontier_size;
+    [[maybe_unused]] std::uint32_t last_final_threshold = UINT32_THRESHOLD_MAX;
+    std::uint32_t total_threshold_updates = 0;
+    std::uint32_t completed_depths = 0;
+    bool solution_found = false;
+    for (std::uint32_t depth = 0; depth < depth_limit; ++depth) {
+        const std::uint32_t current_solution_depth = depth + 1U;
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            memory.current_depth,
+            &current_solution_depth,
+            sizeof(current_solution_depth),
+            cudaMemcpyHostToDevice));
+        const auto depth_start = std::chrono::steady_clock::now();
+        history.pump_completed(false);
+        [[maybe_unused]] const bool emit_depth_log = (depth_log_every != 0U) && ((depth % depth_log_every) == 0U);
+#if BEAM_ENABLE_DEPTH_LOGS
+        if (emit_depth_log) {
+        std::cout << "depth_start=" << depth
+                  << " frontier_size=" << frontier_size
+                  << " depth_limit=" << depth_limit << "\n";
+        }
+#endif
+        const DepthDispatchState state = run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size);
+        if (!state.depth_drained) {
+            throw std::runtime_error("depth did not drain");
+        }
+        total_threshold_updates += state.threshold_updates;
+        ++completed_depths;
+
+        const SolvedSnapshot solved_snapshot = read_solved_snapshot(memory, config.solved_result_capacity);
+        if (solved_snapshot.found) {
+            if (solved_snapshot.meta.empty() || solved_snapshot.depth.empty()) {
+                throw std::runtime_error("solved flag set but solved metadata list is empty");
+            }
+            const CandidateMeta solved_meta = solved_snapshot.meta.front();
+            const std::uint32_t solved_depth = solved_snapshot.depth.front();
+            history.finish_all();
+            const ReconstructedSolution solution =
+                reconstruct_solution_from_history(history, solved_meta, solved_depth);
+            const State128 final_state = apply_solution_moves(host_initial, solution.moves, host_generators);
+            const bool valid = states_equal_storage(final_state, host_central);
+            const double solved_elapsed_sec =
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            write_solution_artifacts(
+                puzzle_id,
+                depth_limit,
+                beam,
+                solution,
+                host_move_names,
+                final_state,
+                valid,
+                history,
+                solved_snapshot);
+            if (!valid) {
+                throw std::runtime_error("CPU solution validation failed: generated state is not central_state");
+            }
+            std::cout << "puzzle_solved=1"
+                      << " puzzle_id=" << puzzle_id
+                      << " seconds=" << solved_elapsed_sec
+                      << " solution_length=" << solution.moves.size()
+                      << " solution=" << moves_to_path_text(solution.moves, host_move_names)
+                      << "\n";
+            solution_found = true;
+            const auto depth_end = std::chrono::steady_clock::now();
+            const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
+#if BEAM_ENABLE_DEPTH_LOGS
+            if (emit_depth_log) {
+            std::cout << "depth_solved=" << depth
+                      << " depth_sec=" << depth_sec
+                      << " solved_depth=" << solved_depth
+                      << " solved_count=" << solved_snapshot.count
+                      << " solved_overflow=" << solved_snapshot.overflow
+                      << " stop_requested=" << (state.stop_requested ? 1 : 0) << "\n";
+            }
+#endif
+            break;
+        }
+
+        CpuCandidateHistory::Slot& history_slot = history.acquire_slot();
+        const FinalizeDepthState final_state = finalize_depth_single_gpu(
+            plan,
+            memory,
+            tables,
+            streams,
+            history_slot.host,
+            history_slot.capacity,
+            history.copy_stream,
+            history_slot.copy_done);
+        history.commit_slot(history_slot, depth, final_state.final_candidate_count);
+        history.pump_completed(false);
+        frontier_size = final_state.next_frontier_size;
+        last_final_frontier_size = frontier_size;
+        last_final_threshold = final_state.final_threshold;
+        const auto depth_end = std::chrono::steady_clock::now();
+        const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
+#if BEAM_ENABLE_DEPTH_LOGS
+        if (emit_depth_log) {
+        std::cout << "depth_done=" << depth
+                  << " depth_sec=" << depth_sec
+                  << " ring_slot_jobs=" << state.ring_slot_jobs_launched
+                  << " stream3_jobs=" << state.stream3_jobs_launched
+                  << " stream4_jobs=" << state.stream4_jobs_launched
+                  << " stream4_slots_used=" << state.stream4_active_sort_slots_used
+                  << " threshold_updates_depth=" << state.threshold_updates
+                  << " final_threshold=" << final_state.final_threshold
+                  << " final_candidate_count=" << final_state.final_candidate_count
+                  << " final_request_count=" << final_state.final_request_count
+                  << " next_frontier_size=" << frontier_size
+                  << " history_bytes_received=" << history.bytes_received << "\n";
+        }
+#endif
+        if (frontier_size == 0) {
+            break;
+        }
+    }
+    const auto end = std::chrono::steady_clock::now();
+    const double elapsed_sec = std::chrono::duration<double>(end - start).count();
+    const auto history_flush_start = std::chrono::steady_clock::now();
+    history.finish_all();
+    const auto history_flush_end = std::chrono::steady_clock::now();
+    const double history_flush_sec = std::chrono::duration<double>(history_flush_end - history_flush_start).count();
+    const double avg_depth_sec = completed_depths == 0 ? 0.0 : elapsed_sec / static_cast<double>(completed_depths);
+#if BEAM_ENABLE_DEBUG_LOGS
+    std::cout << "elapsed_sec=" << elapsed_sec << "\n";
+    std::cout << "avg_depth_sec=" << avg_depth_sec << "\n";
+    std::cout << "completed_depths=" << completed_depths << "\n";
+    std::cout << "last_final_frontier_size=" << last_final_frontier_size << "\n";
+    std::cout << "last_final_threshold=" << last_final_threshold << "\n";
+    std::cout << "threshold_updates=" << total_threshold_updates << "\n";
+    std::cout << "solution_found=" << (solution_found ? 1 : 0) << "\n";
+    std::cout << "history_mode=" << history_mode_name(history.mode) << "\n";
+    std::cout << "history_depth_count=" << history.depth_counts.size() << "\n";
+    std::cout << "history_bytes_received=" << history.bytes_received << "\n";
+    std::cout << "history_flush_sec=" << history_flush_sec << "\n";
+#endif
+    if (!solution_found) {
+        const std::filesystem::path no_solution_log =
+            std::filesystem::path("test_results") /
+            ("no_solution_p" + std::to_string(puzzle_id) +
+             "_d" + std::to_string(depth_limit) +
+             "_b" + std::to_string(beam) + ".log");
+        std::ofstream no_solution(no_solution_log);
+        no_solution << "solution_found=0\n";
+        no_solution << "completed_depths=" << completed_depths << "\n";
+        no_solution << "history_mode=" << history_mode_name(history.mode) << "\n";
+        no_solution << "history_dir=" << history.dir.string() << "\n";
+        no_solution << "history_depth_count=" << history.depth_counts.size() << "\n";
+        no_solution << "history_bytes_received=" << history.bytes_received << "\n";
+        std::cout << "puzzle_solved=0"
+                  << " puzzle_id=" << puzzle_id
+                  << " seconds=" << elapsed_sec
+                  << " solution_length=-1"
+                  << " solution="
+                  << "\n";
+#if BEAM_ENABLE_DEBUG_LOGS
+        std::cout << "no_solution_log=" << no_solution_log.string() << "\n";
+#endif
+    }
+
+    history.destroy();
+    destroy_cuda_graph_job_templates(graphs);
+    destroy_dispatcher_events(events);
+    destroy_dispatcher_streams(streams);
+    free_static_device_memory(memory);
+    cudaFree(generators);
+    cudaFree(central_state);
+    cudaFree(zobrist);
+    cudaFree(input_weight);
+    cudaFree(input_bias);
+    cudaFree(hidden_weight);
+    cudaFree(hidden_bias);
+    cudaFree(residual0_fc1_weight);
+    cudaFree(residual0_fc1_bias);
+    cudaFree(residual0_fc2_weight);
+    cudaFree(residual0_fc2_bias);
+    cudaFree(residual1_fc1_weight);
+    cudaFree(residual1_fc1_bias);
+    cudaFree(residual1_fc2_weight);
+    cudaFree(residual1_fc2_bias);
+    cudaFree(output_weight);
+    cudaFree(output_bias);
+    cudaFree(hidden1);
+    cudaFree(hidden2);
+    cudaFree(residual);
+    cudaFree(output);
+    return 0;
+}

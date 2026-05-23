@@ -1,0 +1,15 @@
+/.vs/
+/.idea/
+/build/
+/build-docker/
+/test_results/
+/external/
+/submit.csv
+*.nsys-rep
+*.sqlite
+*.tmp
+*.log
+__pycache__/
+.ipynb_checkpoints/
+FullBeamNice/weights/
+FullBeamNice/generators.zip
