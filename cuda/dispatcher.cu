@@ -590,6 +590,7 @@ DepthDispatchState run_depth_cuda_graphs(
     DepthDispatchState state;
     state.frontier_size = frontier_size;
     std::vector<std::uint32_t> host_dirty(plan.config.shard_count);
+    std::vector<std::uint32_t> host_clean(plan.config.shard_count);
     std::vector<std::uint32_t> host_ready_shards(plan.config.shard_count);
     std::vector<std::uint32_t> pending_stream4_shards;
     pending_stream4_shards.reserve(plan.config.shard_count * plan.config.ring_count);
@@ -1123,6 +1124,11 @@ DepthDispatchState run_depth_cuda_graphs(
             sizeof(spill_active),
             cudaMemcpyDeviceToHost), "cudaMemcpy global spill active final flush");
         check_cuda(cudaMemcpy(
+            host_clean.data(),
+            memory.streams.clean_count,
+            static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy clean_count final flush");
+        check_cuda(cudaMemcpy(
             host_dirty.data(),
             memory.streams.dirty_count,
             static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
@@ -1131,12 +1137,17 @@ DepthDispatchState run_depth_cuda_graphs(
         for (std::uint32_t dirty : host_dirty) {
             any_dirty = any_dirty || dirty != 0U;
         }
+        std::uint64_t total_clean = 0;
+        for (std::uint32_t clean : host_clean) {
+            total_clean += clean;
+        }
         const bool spill_remaining = spill_counts[spill_active & 1U] != 0U || any_dirty;
         if (stream4_jobs_since_threshold_update != 0U &&
             (periodic_threshold_due() || spill_remaining)) {
             force_periodic_threshold_update();
         }
-        if (!spill_remaining) {
+        if (!spill_remaining ||
+            (!any_dirty && total_clean >= plan.derived.global_beam_width_effective)) {
             break;
         }
         if (flush_round + 1U == plan.config.shard_count + 2U) {

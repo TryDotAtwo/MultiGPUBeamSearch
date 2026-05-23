@@ -1516,6 +1516,12 @@ after local final dedup:
     Stream 5 exchanges candidate-count / histogram metadata
     final global threshold is computed
     final cut and load balance are applied
+
+single-rank final completion:
+    if dirty_count is zero
+    and clean deduped candidate count >= GLOBAL_BEAM_WIDTH_EFFECTIVE
+    residual spill may remain outside survivor_shard
+    final threshold/cut uses clean deduped survivor set
 ```
 
 Normal pipeline mode:
