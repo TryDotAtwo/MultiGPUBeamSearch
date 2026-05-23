@@ -481,6 +481,7 @@ void instantiate_cuda_graph_job_templates(
             plan.config.shard_count,
             plan.config.stream4_batch_candidates,
             false,
+            false,
             streams.stream3);
         instantiate_captured_graph(streams.stream3, graphs.stream3_ring_graphs[ring], graphs.stream3_ring_execs[ring]);
     }
@@ -1103,6 +1104,7 @@ DepthDispatchState run_depth_cuda_graphs(
             memory.streams.stream3_ready_count,
             plan.config.shard_count,
             plan.config.stream4_batch_candidates,
+            true,
             true,
             streams.stream3);
         check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final spill drain");

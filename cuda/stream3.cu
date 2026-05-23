@@ -624,7 +624,8 @@ __global__ void stream3_build_ready_shard_queue_kernel(
     std::uint32_t* ready_count,
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
-    std::uint32_t force_dirty_flush) {
+    std::uint32_t force_dirty_flush,
+    std::uint32_t force_clean_flush) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
         return;
     }
@@ -636,10 +637,10 @@ __global__ void stream3_build_ready_shard_queue_kernel(
         const std::uint32_t dirty = dirty_count[shard];
         const std::uint32_t total = clean + dirty;
         const bool dirty_ready = dirty != 0U && (force_dirty_flush != 0U || total >= stream4_batch_candidates);
-        const bool full_clean_flush = dirty == 0U && clean >= shard_capacity;
+        const bool clean_ready = dirty == 0U && clean != 0U && (force_clean_flush != 0U || clean >= shard_capacity);
         const bool ready =
             processing_flag[shard] == 0U &&
-            (dirty_ready || full_clean_flush);
+            (dirty_ready || clean_ready);
         if (ready) {
             processing_flag[shard] = 1;
             ready_flag[shard] = 1;
@@ -1337,6 +1338,7 @@ void stream3_build_ready_shard_queue_cuda(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     bool force_dirty_flush,
+    bool force_clean_flush,
     cudaStream_t stream) {
     NvtxRange range("Stream3_build_ready_shard_queue_launch");
     stream3_build_ready_shard_queue_kernel<<<1, 1, 0, stream>>>(
@@ -1348,7 +1350,8 @@ void stream3_build_ready_shard_queue_cuda(
         ready_count,
         shard_count,
         stream4_batch_candidates,
-        force_dirty_flush ? 1U : 0U);
+        force_dirty_flush ? 1U : 0U,
+        force_clean_flush ? 1U : 0U);
 }
 
 } // namespace beam

@@ -1500,6 +1500,30 @@ GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS задаёт частоту периоди
 
 После финального threshold выполняется балансировка нагрузки по картам.
 
+Final phase pipeline switch:
+
+```text
+after Stream 1 and Stream 2 are drained on a card:
+    card may use final-local mode
+
+final-local mode:
+    residual spill is sorted/partitioned by Stream 3
+    clean-only shard regions may be submitted to Stream 4
+    Stream 4 applies current_threshold + dedup + compact
+    purpose is local final dedup before global threshold
+
+after local final dedup:
+    Stream 5 exchanges candidate-count / histogram metadata
+    final global threshold is computed
+    final cut and load balance are applied
+```
+
+Normal pipeline mode:
+
+```text
+clean-only shard jobs are not launched before final-local mode
+```
+
 solved_flag / stop_flag / solved_count / solved_meta_list живут вне scratch_pool.
 GOAL_SCORE_KEY = 0.
 Goal-кандидат пишет score_key = GOAL_SCORE_KEY.

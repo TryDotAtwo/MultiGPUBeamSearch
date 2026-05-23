@@ -203,6 +203,7 @@ void stream3_build_ready_shard_queue_cuda(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     bool force_dirty_flush,
+    bool force_clean_flush,
     cudaStream_t stream);
 
 } // namespace beam
