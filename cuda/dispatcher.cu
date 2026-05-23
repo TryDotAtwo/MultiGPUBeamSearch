@@ -55,10 +55,8 @@ void update_threshold_single_gpu(
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
     cudaStream_t stream,
-    bool periodic,
-    std::uint64_t beam_width_override = 0) {
-    const std::uint64_t threshold_width =
-        beam_width_override == 0 ? plan.derived.global_beam_width_effective : beam_width_override;
+    bool periodic) {
+    const std::uint64_t threshold_width = plan.derived.global_beam_width_effective;
     threshold_build_local_histogram_cuda(
         memory.streams.shard_score_hist_a,
         memory.streams.shard_score_hist_b,
@@ -684,12 +682,12 @@ DepthDispatchState run_depth_cuda_graphs(
             stream4_jobs_since_threshold_update >= plan.config.global_threshold_update_period_shards;
     };
 
-    const auto force_periodic_threshold_update = [&](std::uint64_t beam_width_override = 0) {
+    const auto force_periodic_threshold_update = [&]() {
         if (stream3_active) {
             throw std::runtime_error("periodic threshold update requested while stream3 is active");
         }
         wait_all_stream4_slots();
-        update_threshold_single_gpu(plan, memory, streams.stream5, true, beam_width_override);
+        update_threshold_single_gpu(plan, memory, streams.stream5, true);
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 periodic threshold update");
         ++state.threshold_updates;
         stream4_jobs_since_threshold_update = 0;
@@ -998,15 +996,7 @@ DepthDispatchState run_depth_cuda_graphs(
             any_dirty = any_dirty || dirty != 0U;
         }
         const bool spill_remaining = spill_counts[spill_active & 1U] != 0U || any_dirty;
-        if (spill_counts[spill_active & 1U] != 0U) {
-            const std::uint64_t spill_count = spill_counts[spill_active & 1U];
-            const std::uint64_t spill_reserve = std::min<std::uint64_t>(
-                plan.derived.global_beam_width_effective - 1ULL,
-                spill_count * 16ULL);
-            const std::uint64_t reserved_width =
-                plan.derived.global_beam_width_effective - spill_reserve;
-            force_periodic_threshold_update(reserved_width);
-        } else if (stream4_jobs_since_threshold_update != 0U &&
+        if (stream4_jobs_since_threshold_update != 0U &&
             (periodic_threshold_due() || spill_remaining)) {
             force_periodic_threshold_update();
         }

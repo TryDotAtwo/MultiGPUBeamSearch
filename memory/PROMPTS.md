@@ -62,3 +62,9 @@
 - User required production logs to be compile-time controlled: per-depth logs only when the corresponding flag is compiled/enabled; debug logs only when the corresponding flag is compiled/enabled; fast base build logs only puzzle solved status, elapsed seconds, solution length, and solution path.
 - User required configurable log frequency by depth and by puzzle.
 - User required Kaggle interaction through Kaggle CLI with local proxy bypass.
+- User requested retrying the puzzle 7 production run with beam `2**23=8388608` after diagnosing that beam `2**22` likely pruned the known solution prefix.
+- User requested running puzzle 0 with beam `2**23=8388608`; current production-run context implies depth=200.
+- User requested enabling production-run logging after every completed depth.
+- User requested trying puzzle 0 with beam `2**24=16777216`, depth=200, and per-depth logs enabled.
+- User identified that current config sizing was not consistently derived from `USER_GLOBAL_BEAM_WIDTH` and requested internal static buffers to be determined through `USER_GLOBAL_BEAM_WIDTH`, `WORLD_SIZE`, VRAM budget, and `B_MICRO`.
+- User approved removing `reserved_width = GLOBAL_BEAM_WIDTH_EFFECTIVE - spill_reserve`; all periodic and final threshold computations must count strictly by `GLOBAL_BEAM_WIDTH_EFFECTIVE`.
