@@ -224,3 +224,4 @@
 - Verification after Kaggle packaging/log contract changes: Docker CUDA/CUTLASS/NCCL `ctest` passed 12/12; short `production_runner 0 1 1024` emitted only `puzzle_solved=0 puzzle_id=0 ...` in default fast-log mode.
 - Resolved GitHub source URL for Kaggle from the existing Kaggle notebook: `https://github.com/TryDotAtwo/MultiGPUBeamSearch.git`; local `origin` and Kaggle notebook `GITHUB_REPO_URL` now point to this repository.
 - Fixed first Kaggle run failure candidate by moving transient GitHub checkout, CUTLASS checkout, and CMake build tree from `/kaggle/working` to `/tmp`; `/kaggle/working` now stores only run logs, result CSV, submission CSV, and histogram PNG.
+- Fixed Kaggle machine selection: `kaggle/kernel-metadata.json` now sets `machine_shape=NvidiaTeslaT4`; notebook cells now have explicit ids to remove nbformat MissingID warnings.
