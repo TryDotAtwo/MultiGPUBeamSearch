@@ -2,7 +2,6 @@
 
 #include "config.hpp"
 #include "final_materialize.hpp"
-#include "hash.hpp"
 #include "nvtx_ranges.hpp"
 #include "stream3.hpp"
 #include "stream4.hpp"
@@ -29,7 +28,7 @@ void check_cuda(cudaError_t status, const char* op) {
 }
 
 std::uint32_t host_shard_from_hash128(Hash128 hash, std::uint32_t shard_count) {
-    return static_cast<std::uint32_t>(hash128_distribution_key(hash) % shard_count);
+    return static_cast<std::uint32_t>((hash.hi ^ (hash.lo >> 32)) % shard_count);
 }
 
 void dump_final_spill_debug(
@@ -399,7 +398,6 @@ void instantiate_cuda_graph_job_templates(
             memory.streams.stream3_partition_unique_count,
             memory.streams.stream3_cub_temp,
             memory.streams.stream3_cub_temp_bytes,
-            memory.streams.current_threshold,
             plan.config.shard_count,
             plan.config.global_spill_capacity,
             plan.config.stream4_batch_candidates,
@@ -1091,7 +1089,6 @@ DepthDispatchState run_depth_cuda_graphs(
             memory.streams.stream3_partition_unique_count,
             memory.streams.stream3_cub_temp,
             memory.streams.stream3_cub_temp_bytes,
-            memory.streams.current_threshold,
             plan.config.shard_count,
             plan.config.global_spill_capacity,
             plan.config.stream4_batch_candidates,

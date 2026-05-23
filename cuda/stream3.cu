@@ -1,7 +1,6 @@
 #include "stream3.hpp"
 
 #include "config.hpp"
-#include "hash.hpp"
 #include "nvtx_ranges.hpp"
 
 #include <cub/device/device_radix_sort.cuh>
@@ -19,7 +18,7 @@ namespace beam {
 namespace {
 
 __device__ std::uint8_t owner_from_hash128_stream3_device(Hash128 hash, std::uint32_t world_size) {
-    return static_cast<std::uint8_t>(hash128_distribution_key(hash) % world_size);
+    return static_cast<std::uint8_t>((hash.hi ^ hash.lo) % world_size);
 }
 
 __device__ std::uint32_t pack_route_stream3_device(
@@ -32,7 +31,7 @@ __device__ std::uint32_t pack_route_stream3_device(
 }
 
 __device__ std::uint32_t shard_from_hash128_stream3_device(Hash128 hash, std::uint32_t shard_count) {
-    return static_cast<std::uint32_t>(hash128_distribution_key(hash) % shard_count);
+    return static_cast<std::uint32_t>((hash.hi ^ (hash.lo >> 32)) % shard_count);
 }
 
 struct Stream3HashLess {
@@ -476,7 +475,6 @@ __global__ void stream3_partition_fill_active_spill_kernel(
     const CandidateMeta* global_spill_buffer_b,
     const std::uint32_t* global_spill_count,
     const std::uint32_t* global_spill_active_index,
-    const std::uint32_t* current_threshold,
     std::uint32_t* partition_key,
     CandidateMeta* partition_val,
     std::uint32_t max_candidates,
@@ -490,14 +488,8 @@ __global__ void stream3_partition_fill_active_spill_kernel(
     const std::uint32_t count = global_spill_count[active];
     if (i < count) {
         const CandidateMeta candidate = input[i];
-        const std::uint32_t threshold = current_threshold == nullptr ? UINT32_THRESHOLD_MAX : *current_threshold;
-        if (candidate.score_key <= threshold) {
-            partition_key[i] = shard_from_hash128_stream3_device(candidate.hash, shard_count);
-            partition_val[i] = candidate;
-        } else {
-            partition_key[i] = shard_count;
-            partition_val[i] = CandidateMeta{};
-        }
+        partition_key[i] = shard_from_hash128_stream3_device(candidate.hash, shard_count);
+        partition_val[i] = candidate;
     } else {
         partition_key[i] = shard_count;
         partition_val[i] = CandidateMeta{};
@@ -1213,7 +1205,6 @@ void stream3_drain_global_spill_cuda(
     std::uint32_t* partition_unique_count,
     void* cub_temp_storage,
     std::size_t cub_temp_storage_bytes,
-    const std::uint32_t* current_threshold,
     std::uint32_t shard_count,
     std::uint32_t global_spill_capacity,
     std::uint32_t stream4_batch_candidates,
@@ -1226,7 +1217,6 @@ void stream3_drain_global_spill_cuda(
         global_spill_buffer_b,
         global_spill_count,
         global_spill_active_index,
-        current_threshold,
         partition_key_a,
         partition_val_a,
         global_spill_capacity,

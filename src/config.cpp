@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace beam {
 
@@ -15,7 +16,11 @@ std::uint64_t round_up(std::uint64_t value, std::uint64_t alignment) {
 
 DerivedConfig derive_config(const RuntimeConfig& config) {
     DerivedConfig derived;
-    derived.ring_slot_count = config.stream3_batch_candidates / (config.b_micro * static_cast<std::uint32_t>(MOVE_COUNT));
+    const std::uint32_t candidates_per_slot = config.b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+    if (candidates_per_slot == 0U || config.stream3_batch_candidates % candidates_per_slot != 0U) {
+        throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be divisible by B_MICRO * MOVE_COUNT");
+    }
+    derived.ring_slot_count = config.stream3_batch_candidates / candidates_per_slot;
     derived.beam_width_alignment =
         static_cast<std::uint64_t>(config.world_size) *
         static_cast<std::uint64_t>(config.shard_count) *
@@ -32,4 +37,3 @@ std::uint32_t q_to_score_key(float q) {
 }
 
 } // namespace beam
-

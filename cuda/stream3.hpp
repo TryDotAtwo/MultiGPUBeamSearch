@@ -156,7 +156,6 @@ void stream3_drain_global_spill_cuda(
     std::uint32_t* partition_unique_count,
     void* cub_temp_storage,
     std::size_t cub_temp_storage_bytes,
-    const std::uint32_t* current_threshold,
     std::uint32_t shard_count,
     std::uint32_t global_spill_capacity,
     std::uint32_t stream4_batch_candidates,

@@ -60,14 +60,14 @@ std::uint8_t owner_from_hash128(const Hash128& hash, std::uint32_t world_size) {
     if (world_size == 0 || world_size > 256) {
         throw std::invalid_argument("world_size must be in [1, 256]");
     }
-    return static_cast<std::uint8_t>(hash128_distribution_key(hash) % world_size);
+    return static_cast<std::uint8_t>((hash.hi ^ hash.lo) % world_size);
 }
 
 std::uint32_t shard_from_hash128(const Hash128& hash, std::uint32_t shard_count) {
     if (shard_count == 0) {
         throw std::invalid_argument("shard_count must be positive");
     }
-    return static_cast<std::uint32_t>(hash128_distribution_key(hash) % shard_count);
+    return static_cast<std::uint32_t>((hash.hi ^ (hash.lo >> 32)) % shard_count);
 }
 
 } // namespace beam
