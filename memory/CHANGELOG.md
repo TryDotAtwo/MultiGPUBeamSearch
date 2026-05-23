@@ -236,3 +236,4 @@
 - Reduced single-GPU final layout memory by skipping the full `FinalResponse` buffer when `WORLD_SIZE=1`; `final_materialize` writes responses only when the response buffer is present, while still writing `next_frontier_states_tmp`.
 - Added threshold filtering to Stream3 active-spill drain so spill entries above `current_threshold` do not recirculate during final spill convergence.
 - Started local background rebuild of shared Docker image tags `gpu-dev-nsight-cutlass-cu128:2026-05-23` and `gpu-dev-nsight-cutlass-cu128:2026-05-22`; build logs are `test_results/docker_build_gpu_dev_2026-05-23.out.log` and `.err.log`.
+- Replaced weak owner/shard modulo inputs with `hash128_distribution_key(Hash128)`, a deterministic SplitMix64-style finalizer over both halves of `Hash128`. Stream 3 device routing, host routing, and final-spill debug shard attribution now use the same distribution key; `Hash128` itself and dedup semantics are unchanged.

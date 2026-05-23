@@ -70,3 +70,4 @@
 - User approved removing `reserved_width = GLOBAL_BEAM_WIDTH_EFFECTIVE - spill_reserve`; all periodic and final threshold computations must count strictly by `GLOBAL_BEAM_WIDTH_EFFECTIVE`.
 - User requested diagnosing the final spill convergence failure by running with per-shard information, so the exact Stream3-to-Stream4 handoff failure location can be identified.
 - User requested using Kaggle T4 testing while a local shared CUDA/Nsight/CUTLASS Docker image rebuild runs in parallel after the local Docker image cache was found empty.
+- User confirmed that shard distribution skew should be fixed by replacing the distribution function with a more uniform deterministic mixer.
