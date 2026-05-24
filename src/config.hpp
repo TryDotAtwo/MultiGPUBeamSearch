@@ -12,7 +12,7 @@ inline constexpr std::size_t STATE_VALUE_PAD = 128;
 inline constexpr std::size_t MOVE_COUNT = 24;
 
 inline constexpr float SCORE_MAX_Q = 300.0f;
-inline constexpr std::uint32_t SCORE_SCALE = 128;
+inline constexpr std::uint32_t SCORE_SCALE = 512;
 inline constexpr std::uint32_t SCORE_MAX_KEY = static_cast<std::uint32_t>(SCORE_MAX_Q) * SCORE_SCALE;
 inline constexpr std::uint32_t SCORE_BIN_COUNT = SCORE_MAX_KEY + 1;
 inline constexpr std::uint32_t GOAL_SCORE_KEY = 0;

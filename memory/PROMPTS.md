@@ -76,3 +76,8 @@
 - User clarified final tail policy: pre-final streams may produce equal-score tails, but the final stage must cut the tail and leave exactly the aligned beam target per load-balanced frontier, effectively `GLOBAL_BEAM_WIDTH_EFFECTIVE / WORLD_SIZE` states per card when enough candidates exist.
 - User clarified that uniform distribution across GPU cards and across local shards is foundational for the whole solver and approved making `owner` and `shard` routing more uniform with deterministic mixing before modulo.
 - User clarified final phase architecture: after Stream1/2 finish on all cards, the pipeline switches from throughput mode to final-local mode; each card locally dedups all pending candidates/spill first, then Stream5 coordinates candidate counts/global histogram, then global threshold and final load balance happen.
+- User requested Kaggle diagnostics for the slow run: enable detailed logs and per-depth logs, keep config changes on Kaggle/notebook only without GitHub code push, and set beam width to `2**24`.
+- User requested a Kaggle batch run for puzzles 1 through 20 with beam width `2**24`.
+- User asked why the Kaggle run stopped around depth 48; diagnosis found no internal timeout, Kaggle host memory OOM, and `return_code=-9` because RAM history reached about `29.96GB`.
+- User clarified dead-branch history must be cleaned: if a branch dies, its candidate history record is no longer needed.
+- User requested three follow-up changes: discuss and raise neural-network output rounding precision, make CPU history cleanup independent from the main GPU loop, and add a configurable worker count.

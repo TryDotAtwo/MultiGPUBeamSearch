@@ -47,7 +47,7 @@ STATE_VALUE_PAD = 128
 MOVE_COUNT = 24
 
 SCORE_MAX_Q = 300.0
-SCORE_SCALE = 128
+SCORE_SCALE = 512
 SCORE_MAX_KEY = SCORE_MAX_Q * SCORE_SCALE
 SCORE_BIN_COUNT = SCORE_MAX_KEY + 1
 GOAL_SCORE_KEY = 0
@@ -1293,8 +1293,13 @@ final CandidateMeta со всех карт -> CPU
 Назначение:
 
 ```text
-CPU хранит историю
-CPU восстанавливает путь решения по CandidateMeta
+CPU хранит историю в сжатом формате восстановления:
+    parent_idx
+    route_packed
+CPU может асинхронно чистить dead-branch history:
+    live previous entries = parent_idx, используемые следующим history layer
+    после compact previous layer CPU remap-ит parent_idx следующего layer
+CPU восстанавливает путь решения по parent_idx + route_packed
 ```
 
 ## FinalRequest

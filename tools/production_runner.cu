@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -367,6 +368,15 @@ const char* history_mode_name(CandidateHistoryMode mode) {
     return mode == CandidateHistoryMode::Ram ? "ram" : "disk";
 }
 
+struct HistoryEntry {
+    std::uint64_t parent_idx = 0;
+    std::uint32_t route_packed = 0;
+    std::uint32_t pad = 0;
+};
+
+static_assert(sizeof(HistoryEntry) == 16);
+static_assert(alignof(HistoryEntry) == 8);
+
 struct CpuCandidateHistory {
     struct Slot {
         CandidateMeta* host = nullptr;
@@ -377,26 +387,50 @@ struct CpuCandidateHistory {
         cudaEvent_t copy_done = nullptr;
         bool copy_pending = false;
         bool free = true;
-        std::future<std::vector<CandidateMeta>> writer;
+        std::future<std::vector<HistoryEntry>> writer;
+    };
+
+    struct PruneResult {
+        std::uint32_t depth_index = 0;
+        std::vector<HistoryEntry> previous;
+        std::vector<HistoryEntry> current;
+        std::uint64_t bytes_before = 0;
+        std::uint64_t bytes_after = 0;
+    };
+
+    struct PruneJob {
+        std::uint32_t depth_index = 0;
+        std::future<PruneResult> worker;
     };
 
     CandidateHistoryMode mode = CandidateHistoryMode::Ram;
     std::filesystem::path dir;
     std::vector<std::filesystem::path> depth_files;
     std::vector<std::uint32_t> depth_counts;
-    std::vector<std::vector<CandidateMeta>> ram_depths;
+    std::vector<std::vector<HistoryEntry>> ram_depths;
+    std::vector<bool> ram_ready;
+    std::vector<bool> prune_dirty;
+    std::vector<PruneJob> prune_jobs;
     std::uint64_t bytes_received = 0;
+    std::uint64_t bytes_stored = 0;
+    std::uint64_t bytes_pruned = 0;
+    std::uint32_t worker_count = 1;
     std::vector<Slot> slots;
     cudaStream_t copy_stream = nullptr;
 
-    void initialize(CandidateHistoryMode selected_mode, std::uint32_t capacity, std::uint32_t slot_count) {
+    void initialize(
+        CandidateHistoryMode selected_mode,
+        std::uint32_t capacity,
+        std::uint32_t slot_count,
+        std::uint32_t selected_worker_count) {
         if (copy_stream != nullptr) {
             throw std::runtime_error("candidate history already initialized");
         }
-        if (capacity == 0U || slot_count == 0U) {
-            throw std::runtime_error("candidate history capacity and slot count must be nonzero");
+        if (capacity == 0U || slot_count == 0U || selected_worker_count == 0U) {
+            throw std::runtime_error("candidate history capacity, slot count, and worker count must be nonzero");
         }
         mode = selected_mode;
+        worker_count = selected_worker_count;
         BEAM_CUDA_CHECK(cudaStreamCreateWithFlags(&copy_stream, cudaStreamNonBlocking));
         slots.resize(slot_count);
         for (Slot& slot : slots) {
@@ -409,17 +443,21 @@ struct CpuCandidateHistory {
         }
     }
 
-    static std::vector<CandidateMeta> materialize_depth(
+    static HistoryEntry compress_candidate(const CandidateMeta& candidate) {
+        return HistoryEntry{candidate.parent_idx, candidate.route_packed, 0U};
+    }
+
+    static std::vector<HistoryEntry> materialize_depth(
         CandidateHistoryMode mode,
         const std::filesystem::path& path,
         const CandidateMeta* host,
         std::uint32_t count) {
+        std::vector<HistoryEntry> entries(static_cast<std::size_t>(count));
+        for (std::uint32_t i = 0; i < count; ++i) {
+            entries[static_cast<std::size_t>(i)] = compress_candidate(host[i]);
+        }
         if (mode == CandidateHistoryMode::Ram) {
-            std::vector<CandidateMeta> data(static_cast<std::size_t>(count));
-            if (count != 0U) {
-                std::memcpy(data.data(), host, static_cast<std::uint64_t>(count) * sizeof(CandidateMeta));
-            }
-            return data;
+            return entries;
         }
         std::ofstream file(path, std::ios::binary);
         if (!file) {
@@ -427,13 +465,137 @@ struct CpuCandidateHistory {
         }
         if (count != 0U) {
             file.write(
-                reinterpret_cast<const char*>(host),
-                static_cast<std::streamsize>(static_cast<std::uint64_t>(count) * sizeof(CandidateMeta)));
+                reinterpret_cast<const char*>(entries.data()),
+                static_cast<std::streamsize>(static_cast<std::uint64_t>(count) * sizeof(HistoryEntry)));
         }
         if (!file) {
             throw std::runtime_error("candidate history write failed: " + path.string());
         }
         return {};
+    }
+
+    static PruneResult prune_adjacent_depths(
+        std::uint32_t depth_index,
+        std::vector<HistoryEntry> previous,
+        std::vector<HistoryEntry> current) {
+        constexpr std::uint32_t invalid = std::numeric_limits<std::uint32_t>::max();
+        const std::uint64_t bytes_before =
+            (static_cast<std::uint64_t>(previous.size()) + static_cast<std::uint64_t>(current.size())) *
+            sizeof(HistoryEntry);
+        std::vector<std::uint32_t> remap(previous.size(), invalid);
+        for (const HistoryEntry& entry : current) {
+            if (entry.parent_idx >= previous.size()) {
+                throw std::runtime_error("candidate history prune parent index out of range");
+            }
+            remap[static_cast<std::size_t>(entry.parent_idx)] = 1U;
+        }
+
+        std::vector<HistoryEntry> compact_previous;
+        compact_previous.reserve(previous.size());
+        for (std::size_t i = 0; i < previous.size(); ++i) {
+            if (remap[i] != invalid) {
+                remap[i] = static_cast<std::uint32_t>(compact_previous.size());
+                compact_previous.push_back(previous[i]);
+            }
+        }
+        for (HistoryEntry& entry : current) {
+            entry.parent_idx = remap[static_cast<std::size_t>(entry.parent_idx)];
+        }
+        const std::uint64_t bytes_after =
+            (static_cast<std::uint64_t>(compact_previous.size()) + static_cast<std::uint64_t>(current.size())) *
+            sizeof(HistoryEntry);
+        return PruneResult{depth_index, std::move(compact_previous), std::move(current), bytes_before, bytes_after};
+    }
+
+    bool prune_job_uses_depth(const PruneJob& job, std::uint32_t depth_index) const {
+        return job.depth_index == depth_index || job.depth_index + 1U == depth_index;
+    }
+
+    bool any_prune_job_uses_pair(std::uint32_t depth_index) const {
+        for (const PruneJob& job : prune_jobs) {
+            if (prune_job_uses_depth(job, depth_index) || prune_job_uses_depth(job, depth_index + 1U)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void pump_prune_jobs(bool wait_all) {
+        bool progressed = true;
+        while (progressed) {
+            progressed = false;
+            for (std::size_t i = 0; i < prune_jobs.size();) {
+                PruneJob& job = prune_jobs[i];
+                const bool ready = wait_all ||
+                    job.worker.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+                if (!ready) {
+                    ++i;
+                    continue;
+                }
+                PruneResult result = job.worker.get();
+                if (result.depth_index + 1U >= ram_depths.size()) {
+                    throw std::runtime_error("candidate history prune result depth index out of range");
+                }
+                ram_depths[result.depth_index] = std::move(result.previous);
+                ram_depths[result.depth_index + 1U] = std::move(result.current);
+                depth_counts[result.depth_index] =
+                    static_cast<std::uint32_t>(ram_depths[result.depth_index].size());
+                depth_counts[result.depth_index + 1U] =
+                    static_cast<std::uint32_t>(ram_depths[result.depth_index + 1U].size());
+                ram_ready[result.depth_index] = true;
+                ram_ready[result.depth_index + 1U] = true;
+                prune_dirty[result.depth_index] = false;
+                if (result.bytes_before > result.bytes_after) {
+                    bytes_stored -= (result.bytes_before - result.bytes_after);
+                    bytes_pruned += (result.bytes_before - result.bytes_after);
+                }
+                if (result.depth_index > 0U) {
+                    prune_dirty[result.depth_index - 1U] = true;
+                }
+                prune_jobs.erase(prune_jobs.begin() + static_cast<std::ptrdiff_t>(i));
+                progressed = true;
+            }
+
+            while (mode == CandidateHistoryMode::Ram && prune_jobs.size() < worker_count) {
+                bool launched = false;
+                if (ram_depths.size() >= 2U) {
+                    for (std::uint32_t depth = static_cast<std::uint32_t>(ram_depths.size() - 2U);
+                         depth != std::numeric_limits<std::uint32_t>::max();
+                         --depth) {
+                        if (depth + 1U < ram_depths.size() &&
+                            prune_dirty[depth] &&
+                            ram_ready[depth] &&
+                            ram_ready[depth + 1U] &&
+                            !any_prune_job_uses_pair(depth)) {
+                            std::vector<HistoryEntry> previous = std::move(ram_depths[depth]);
+                            std::vector<HistoryEntry> current = std::move(ram_depths[depth + 1U]);
+                            ram_ready[depth] = false;
+                            ram_ready[depth + 1U] = false;
+                            prune_jobs.push_back(PruneJob{
+                                depth,
+                                std::async(
+                                    std::launch::async,
+                                    &CpuCandidateHistory::prune_adjacent_depths,
+                                    depth,
+                                    std::move(previous),
+                                    std::move(current))});
+                            launched = true;
+                            progressed = true;
+                            break;
+                        }
+                        if (depth == 0U) {
+                            break;
+                        }
+                    }
+                }
+                if (!launched) {
+                    break;
+                }
+            }
+            if (!wait_all) {
+                break;
+            }
+        }
     }
 
     void pump_completed(bool wait_all) {
@@ -461,12 +623,16 @@ struct CpuCandidateHistory {
                     const bool ready = wait_all ||
                         slot.writer.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
                     if (ready) {
-                        std::vector<CandidateMeta> ram_data = slot.writer.get();
+                        std::vector<HistoryEntry> ram_data = slot.writer.get();
                         if (mode == CandidateHistoryMode::Ram) {
                             if (slot.depth_index >= ram_depths.size()) {
                                 throw std::runtime_error("candidate history RAM depth index missing");
                             }
                             ram_depths[slot.depth_index] = std::move(ram_data);
+                            ram_ready[slot.depth_index] = true;
+                            if (slot.depth_index > 0U) {
+                                prune_dirty[slot.depth_index - 1U] = true;
+                            }
                         }
                         slot.free = true;
                         progressed = true;
@@ -477,6 +643,7 @@ struct CpuCandidateHistory {
                 break;
             }
         }
+        pump_prune_jobs(wait_all);
     }
 
     Slot& acquire_slot() {
@@ -513,12 +680,16 @@ struct CpuCandidateHistory {
         depth_counts.push_back(count);
         if (mode == CandidateHistoryMode::Ram) {
             ram_depths.emplace_back();
+            ram_ready.push_back(false);
+            prune_dirty.push_back(false);
         }
         bytes_received += static_cast<std::uint64_t>(count) * sizeof(CandidateMeta);
+        bytes_stored += static_cast<std::uint64_t>(count) * sizeof(HistoryEntry);
     }
 
     void finish_all() {
         pump_completed(true);
+        pump_prune_jobs(true);
     }
 
     void destroy() {
@@ -540,7 +711,7 @@ struct CpuCandidateHistory {
         }
     }
 
-    CandidateMeta read_candidate(std::uint32_t depth_index, std::uint64_t index) const {
+    HistoryEntry read_entry(std::uint32_t depth_index, std::uint64_t index) const {
         if (depth_index >= depth_counts.size()) {
             throw std::out_of_range("candidate history depth index out of range");
         }
@@ -548,7 +719,7 @@ struct CpuCandidateHistory {
             throw std::out_of_range("candidate history parent index out of range");
         }
         if (mode == CandidateHistoryMode::Ram) {
-            if (depth_index >= ram_depths.size() || ram_depths[depth_index].empty()) {
+            if (depth_index >= ram_depths.size() || !ram_ready[depth_index]) {
                 throw std::runtime_error("candidate history RAM depth not materialized");
             }
             return ram_depths[depth_index][static_cast<std::size_t>(index)];
@@ -557,14 +728,14 @@ struct CpuCandidateHistory {
         if (!file) {
             throw std::runtime_error("cannot open candidate history file for read: " + depth_files[depth_index].string());
         }
-        const std::uint64_t offset = index * sizeof(CandidateMeta);
+        const std::uint64_t offset = index * sizeof(HistoryEntry);
         file.seekg(static_cast<std::streamoff>(offset), std::ios::beg);
-        CandidateMeta candidate{};
-        file.read(reinterpret_cast<char*>(&candidate), sizeof(candidate));
+        HistoryEntry entry{};
+        file.read(reinterpret_cast<char*>(&entry), sizeof(entry));
         if (!file) {
             throw std::runtime_error("candidate history read failed: " + depth_files[depth_index].string());
         }
-        return candidate;
+        return entry;
     }
 };
 
@@ -587,7 +758,7 @@ ReconstructedSolution reconstruct_solution_from_history(
     solution.moves.resize(solved_depth);
     solution.parent_indices.resize(solved_depth);
 
-    CandidateMeta cursor = solved_meta;
+    HistoryEntry cursor{solved_meta.parent_idx, solved_meta.route_packed, 0U};
     std::uint64_t parent_idx = cursor.parent_idx;
     for (std::uint32_t depth = solved_depth; depth > 0; --depth) {
         const std::uint32_t out = depth - 1U;
@@ -596,7 +767,7 @@ ReconstructedSolution reconstruct_solution_from_history(
         if (out == 0U) {
             break;
         }
-        cursor = history.read_candidate(out - 1U, parent_idx);
+        cursor = history.read_entry(out - 1U, parent_idx);
         parent_idx = cursor.parent_idx;
     }
     return solution;
@@ -681,6 +852,8 @@ void write_solution_artifacts(
     log << "history_dir=" << history.dir.string() << "\n";
     log << "history_depth_count=" << history.depth_counts.size() << "\n";
     log << "history_bytes_received=" << history.bytes_received << "\n";
+    log << "history_bytes_stored=" << history.bytes_stored << "\n";
+    log << "history_bytes_pruned=" << history.bytes_pruned << "\n";
     log << "solved_count=" << solved.count << "\n";
     log << "solved_overflow=" << solved.overflow << "\n";
 
@@ -1219,13 +1392,19 @@ int main(int argc, char** argv) {
     CpuCandidateHistory history;
     const CandidateHistoryMode history_mode = parse_history_mode();
     const std::uint32_t history_slot_count = env_u32("BEAM_HISTORY_SLOT_COUNT", 3);
+    const std::uint32_t history_worker_count = env_u32("BEAM_HISTORY_WORKERS", 1);
     const std::uint32_t depth_log_every = env_u32("BEAM_DEPTH_LOG_EVERY", 1);
     history.dir = make_history_dir(puzzle_id, depth_limit, beam);
-    history.initialize(history_mode, static_cast<std::uint32_t>(plan.frontier_states), history_slot_count);
+    history.initialize(
+        history_mode,
+        static_cast<std::uint32_t>(plan.frontier_states),
+        history_slot_count,
+        history_worker_count);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "candidate_history_dir=" << history.dir.string() << "\n";
     std::cout << "candidate_history_mode=" << history_mode_name(history.mode) << "\n";
     std::cout << "candidate_history_slots=" << history_slot_count << "\n";
+    std::cout << "candidate_history_workers=" << history_worker_count << "\n";
 #endif
     std::uint64_t frontier_size = 1;
     [[maybe_unused]] std::uint64_t last_final_frontier_size = frontier_size;
@@ -1336,7 +1515,9 @@ int main(int argc, char** argv) {
                   << " final_candidate_count=" << final_state.final_candidate_count
                   << " final_request_count=" << final_state.final_request_count
                   << " next_frontier_size=" << frontier_size
-                  << " history_bytes_received=" << history.bytes_received << "\n";
+                  << " history_bytes_received=" << history.bytes_received
+                  << " history_bytes_stored=" << history.bytes_stored
+                  << " history_bytes_pruned=" << history.bytes_pruned << "\n";
         }
 #endif
         if (frontier_size == 0) {
@@ -1361,6 +1542,8 @@ int main(int argc, char** argv) {
     std::cout << "history_mode=" << history_mode_name(history.mode) << "\n";
     std::cout << "history_depth_count=" << history.depth_counts.size() << "\n";
     std::cout << "history_bytes_received=" << history.bytes_received << "\n";
+    std::cout << "history_bytes_stored=" << history.bytes_stored << "\n";
+    std::cout << "history_bytes_pruned=" << history.bytes_pruned << "\n";
     std::cout << "history_flush_sec=" << history_flush_sec << "\n";
 #endif
     if (!solution_found) {
@@ -1376,6 +1559,8 @@ int main(int argc, char** argv) {
         no_solution << "history_dir=" << history.dir.string() << "\n";
         no_solution << "history_depth_count=" << history.depth_counts.size() << "\n";
         no_solution << "history_bytes_received=" << history.bytes_received << "\n";
+        no_solution << "history_bytes_stored=" << history.bytes_stored << "\n";
+        no_solution << "history_bytes_pruned=" << history.bytes_pruned << "\n";
         std::cout << "puzzle_solved=0"
                   << " puzzle_id=" << puzzle_id
                   << " seconds=" << elapsed_sec
