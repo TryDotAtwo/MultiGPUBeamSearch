@@ -529,6 +529,48 @@ struct TrackedSolutionPrefix {
                   << "\n";
     }
 
+    void log_stream3(
+        std::uint64_t puzzle_id,
+        std::uint32_t depth,
+        const Stream3TrackResult& result,
+        const std::vector<std::string>& move_names) const {
+        if (!enabled || depth >= moves.size() || !result.enabled) {
+            return;
+        }
+        std::cout << "track_solution_stream3_path"
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << depth + 1U
+                  << " expected_move=" << move_names[moves[depth]]
+                  << " scanned=" << (result.scanned ? 1 : 0)
+                  << " unique_found=" << (result.unique_found ? 1 : 0)
+                  << " unique_local=" << result.unique_local
+                  << " unique_count=" << result.unique_count
+                  << " unique_score_key=" << result.unique_score_key
+                  << " unique_payload_id=" << result.unique_payload_id
+                  << " unique_parent_idx=" << result.unique_parent_idx
+                  << " unique_move=" << static_cast<std::uint32_t>(result.unique_move)
+                  << " partition_found=" << (result.partition_found ? 1 : 0)
+                  << " partition_local=" << result.partition_local
+                  << " local_pending_count=" << result.local_pending_count
+                  << " partition_unique_count=" << result.partition_unique_count
+                  << " group_offset=" << result.group_offset
+                  << " group_raw_count=" << result.group_raw_count
+                  << " local_in_group=" << result.local_in_group
+                  << " shard_write_count=" << result.shard_write_count
+                  << " shard_spill_count=" << result.shard_spill_count
+                  << " shard_spill_offset=" << result.shard_spill_offset
+                  << " spill_idx=" << result.spill_idx
+                  << " spill_capacity=" << result.spill_capacity
+                  << " spill_capacity_drop=" << (result.spill_capacity_drop ? 1 : 0)
+                  << " clean_count=" << result.clean_count
+                  << " dirty_count=" << result.dirty_count
+                  << " processing_flag=" << result.processing_flag
+                  << " active_spill_count=" << result.active_spill_count
+                  << " inactive_spill_count=" << result.inactive_spill_count
+                  << "\n";
+    }
+
     void log_stream4(
         std::uint64_t puzzle_id,
         std::uint32_t depth,
@@ -2052,6 +2094,11 @@ int main(int argc, char** argv) {
             puzzle_id,
             depth,
             state.tracked_generated,
+            host_move_names);
+        tracked_solution.log_stream3(
+            puzzle_id,
+            depth,
+            state.tracked_stream3,
             host_move_names);
         log_stream1_move_score_comparison(
             puzzle_id,

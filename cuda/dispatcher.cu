@@ -764,6 +764,7 @@ DepthDispatchState run_depth_cuda_graphs(
     state.tracked_generated.enabled = track_request.enabled;
     state.tracked_generated.request_parent_idx = track_request.parent_idx;
     state.tracked_generated.request_move = track_request.move;
+    state.tracked_stream3.enabled = track_request.enabled;
     state.tracked_stream4.enabled = track_request.enabled;
     std::vector<std::uint32_t> host_dirty(plan.config.shard_count);
     std::vector<std::uint32_t> host_clean(plan.config.shard_count);
@@ -1080,6 +1081,176 @@ DepthDispatchState run_depth_cuda_graphs(
         event.active_spill_count = active_count;
         event.inactive_spill_count = inactive_count;
         state.tracked_stream4_events.push_back(event);
+    };
+
+    const auto scan_tracked_stream3_path = [&](std::uint32_t ring) {
+        if (!state.tracked_generated.found ||
+            state.tracked_generated.ring != ring ||
+            state.tracked_stream3.scanned) {
+            return;
+        }
+        state.tracked_stream3.scanned = true;
+        std::uint32_t unique_count = 0;
+        check_cuda(cudaMemcpy(
+            &unique_count,
+            memory.streams.unique_count,
+            sizeof(unique_count),
+            cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 unique count");
+        unique_count = std::min(unique_count, plan.config.stream3_batch_candidates);
+        state.tracked_stream3.unique_count = unique_count;
+        if (unique_count != 0U) {
+            std::vector<Hash128> unique_key(unique_count);
+            std::vector<std::uint64_t> unique_val(unique_count);
+            check_cuda(cudaMemcpy(
+                unique_key.data(),
+                memory.streams.unique_key,
+                static_cast<std::uint64_t>(unique_count) * sizeof(Hash128),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 unique keys");
+            check_cuda(cudaMemcpy(
+                unique_val.data(),
+                memory.streams.unique_val,
+                static_cast<std::uint64_t>(unique_count) * sizeof(std::uint64_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 unique values");
+            for (std::uint32_t i = 0; i < unique_count; ++i) {
+                if (unique_key[i] == state.tracked_generated.hash) {
+                    const std::uint64_t value = unique_val[i];
+                    const std::uint32_t payload_id = static_cast<std::uint32_t>(value & 0xffffffffULL);
+                    const std::uint32_t ring_slot = payload_id / static_cast<std::uint32_t>(candidates_per_slot);
+                    const std::uint32_t local_i = payload_id % static_cast<std::uint32_t>(candidates_per_slot);
+                    const std::uint32_t parent_local = local_i / static_cast<std::uint32_t>(MOVE_COUNT);
+                    const std::uint32_t job = ring * plan.derived.ring_slot_count + ring_slot;
+                    state.tracked_stream3.unique_found = true;
+                    state.tracked_stream3.unique_local = i;
+                    state.tracked_stream3.unique_score_key = static_cast<std::uint32_t>(value >> 32);
+                    state.tracked_stream3.unique_payload_id = payload_id;
+                    state.tracked_stream3.unique_parent_idx = host_parent_base[job] + parent_local;
+                    state.tracked_stream3.unique_move =
+                        static_cast<std::uint8_t>(local_i % static_cast<std::uint32_t>(MOVE_COUNT));
+                    break;
+                }
+            }
+        }
+
+        std::uint32_t local_pending_count = 0;
+        check_cuda(cudaMemcpy(
+            &local_pending_count,
+            memory.streams.local_pending_count,
+            sizeof(local_pending_count),
+            cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 local pending count");
+        local_pending_count = std::min(local_pending_count, plan.config.stream3_batch_candidates);
+        state.tracked_stream3.local_pending_count = local_pending_count;
+        if (local_pending_count != 0U) {
+            std::vector<CandidateMeta> partition(local_pending_count);
+            check_cuda(cudaMemcpy(
+                partition.data(),
+                memory.streams.stream3_partition_val_b,
+                static_cast<std::uint64_t>(local_pending_count) * sizeof(CandidateMeta),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 partition values");
+            for (std::uint32_t i = 0; i < local_pending_count; ++i) {
+                if (partition[i].hash == state.tracked_generated.hash) {
+                    state.tracked_stream3.partition_found = true;
+                    state.tracked_stream3.partition_local = i;
+                    break;
+                }
+            }
+        }
+
+        std::uint32_t partition_unique_count = 0;
+        check_cuda(cudaMemcpy(
+            &partition_unique_count,
+            memory.streams.stream3_partition_unique_count,
+            sizeof(partition_unique_count),
+            cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 partition unique count");
+        partition_unique_count = std::min(partition_unique_count, plan.config.shard_count + 1U);
+        state.tracked_stream3.partition_unique_count = partition_unique_count;
+        if (partition_unique_count != 0U) {
+            std::vector<std::uint32_t> unique_shard(partition_unique_count);
+            std::vector<std::uint32_t> unique_counts(partition_unique_count);
+            check_cuda(cudaMemcpy(
+                unique_shard.data(),
+                memory.streams.stream3_partition_unique_shard,
+                static_cast<std::uint64_t>(partition_unique_count) * sizeof(std::uint32_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 partition unique shards");
+            check_cuda(cudaMemcpy(
+                unique_counts.data(),
+                memory.streams.stream3_partition_unique_counts,
+                static_cast<std::uint64_t>(partition_unique_count) * sizeof(std::uint32_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 partition unique counts");
+            for (std::uint32_t group = 0; group < partition_unique_count; ++group) {
+                if (unique_shard[group] == state.tracked_generated.shard) {
+                    state.tracked_stream3.group_raw_count = unique_counts[group];
+                    break;
+                }
+            }
+        }
+
+        const std::uint32_t shard = state.tracked_generated.shard;
+        if (shard < plan.config.shard_count) {
+            check_cuda(cudaMemcpy(
+                &state.tracked_stream3.group_offset,
+                memory.streams.stream3_shard_offsets + shard,
+                sizeof(state.tracked_stream3.group_offset),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 shard offset");
+            check_cuda(cudaMemcpy(
+                &state.tracked_stream3.shard_write_count,
+                memory.streams.stream3_shard_counts + shard,
+                sizeof(state.tracked_stream3.shard_write_count),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 shard write count");
+            check_cuda(cudaMemcpy(
+                &state.tracked_stream3.shard_spill_count,
+                memory.streams.stream3_spill_counts + shard,
+                sizeof(state.tracked_stream3.shard_spill_count),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 shard spill count");
+            check_cuda(cudaMemcpy(
+                &state.tracked_stream3.shard_spill_offset,
+                memory.streams.stream3_spill_offsets + shard,
+                sizeof(state.tracked_stream3.shard_spill_offset),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 shard spill offset");
+            check_cuda(cudaMemcpy(
+                &state.tracked_stream3.clean_count,
+                memory.streams.clean_count + shard,
+                sizeof(state.tracked_stream3.clean_count),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 clean count");
+            check_cuda(cudaMemcpy(
+                &state.tracked_stream3.dirty_count,
+                memory.streams.dirty_count + shard,
+                sizeof(state.tracked_stream3.dirty_count),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 dirty count");
+            check_cuda(cudaMemcpy(
+                &state.tracked_stream3.processing_flag,
+                memory.streams.processing_flag + shard,
+                sizeof(state.tracked_stream3.processing_flag),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 processing flag");
+        }
+        std::uint32_t spill_counts[2]{};
+        std::uint32_t spill_active = 0;
+        check_cuda(cudaMemcpy(
+            spill_counts,
+            memory.streams.global_spill_count,
+            sizeof(spill_counts),
+            cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 spill counts");
+        check_cuda(cudaMemcpy(
+            &spill_active,
+            memory.streams.global_spill_active_index,
+            sizeof(spill_active),
+            cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream3 spill active");
+        spill_active &= 1U;
+        state.tracked_stream3.active_spill_count = spill_counts[spill_active];
+        state.tracked_stream3.inactive_spill_count = spill_counts[spill_active ^ 1U];
+        state.tracked_stream3.spill_capacity = plan.config.global_spill_capacity;
+        if (state.tracked_stream3.partition_found &&
+            state.tracked_stream3.partition_local >= state.tracked_stream3.group_offset) {
+            state.tracked_stream3.local_in_group =
+                state.tracked_stream3.partition_local - state.tracked_stream3.group_offset;
+            if (state.tracked_stream3.local_in_group >= state.tracked_stream3.shard_write_count) {
+                state.tracked_stream3.spill_idx =
+                    state.tracked_stream3.shard_spill_offset +
+                    state.tracked_stream3.local_in_group -
+                    state.tracked_stream3.shard_write_count;
+                state.tracked_stream3.spill_capacity_drop =
+                    state.tracked_stream3.spill_idx >= plan.config.global_spill_capacity;
+            }
+        }
     };
 
     const auto scan_tracked_stream4_input = [&](std::uint32_t shard, std::uint32_t slot, std::uint64_t graph_idx) {
@@ -1513,6 +1684,7 @@ DepthDispatchState run_depth_cuda_graphs(
         if (!state.stop_requested) {
             append_stream3_ready_queue();
         }
+        scan_tracked_stream3_path(ring);
         scan_tracked_after_stream3(ring);
     };
 

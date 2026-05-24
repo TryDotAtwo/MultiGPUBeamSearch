@@ -130,6 +130,38 @@ struct Stream4TrackEvent {
     std::uint32_t score_key = UINT32_MAX;
 };
 
+struct Stream3TrackResult {
+    bool enabled = false;
+    bool scanned = false;
+    bool unique_found = false;
+    std::uint32_t unique_local = UINT32_MAX;
+    std::uint32_t unique_count = 0;
+    std::uint32_t unique_score_key = UINT32_MAX;
+    std::uint32_t unique_payload_id = UINT32_MAX;
+    std::uint64_t unique_parent_idx = UINT64_MAX;
+    std::uint8_t unique_move = UINT8_MAX;
+
+    bool partition_found = false;
+    std::uint32_t partition_local = UINT32_MAX;
+    std::uint32_t local_pending_count = 0;
+    std::uint32_t partition_unique_count = 0;
+    std::uint32_t group_offset = UINT32_MAX;
+    std::uint32_t group_raw_count = 0;
+    std::uint32_t local_in_group = UINT32_MAX;
+    std::uint32_t shard_write_count = 0;
+    std::uint32_t shard_spill_count = 0;
+    std::uint32_t shard_spill_offset = UINT32_MAX;
+    std::uint32_t spill_idx = UINT32_MAX;
+    std::uint32_t spill_capacity = 0;
+    bool spill_capacity_drop = false;
+
+    std::uint32_t clean_count = 0;
+    std::uint32_t dirty_count = 0;
+    std::uint32_t processing_flag = 0;
+    std::uint32_t active_spill_count = 0;
+    std::uint32_t inactive_spill_count = 0;
+};
+
 struct DepthDispatchState {
     std::uint64_t frontier_cursor = 0;
     std::uint64_t frontier_size = 0;
@@ -141,6 +173,7 @@ struct DepthDispatchState {
     bool depth_drained = false;
     bool stop_requested = false;
     GeneratedTrackResult tracked_generated;
+    Stream3TrackResult tracked_stream3;
     Stream4TrackResult tracked_stream4;
     std::vector<Stream4TrackEvent> tracked_stream4_events;
 };
