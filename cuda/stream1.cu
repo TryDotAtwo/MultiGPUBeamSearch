@@ -323,42 +323,42 @@ void stream1_inference_cutlass_cuda(
         network.dims.hidden2);
 
     half* residual_in = scratch.hidden2;
-    half* residual_tmp = scratch.residual_tmp;
+    half* residual_fc1 = scratch.residual_tmp;
+    half* residual_fc2 = scratch.hidden1;
     for (std::uint32_t block = 0; block < network.dims.residual_count; ++block) {
         stream1_cutlass_linear_cuda(
             residual_in,
             network.residual_fc1_weight[block],
-            residual_tmp,
+            residual_fc1,
             b_micro,
             network.dims.hidden2,
             network.dims.hidden2,
             stream);
 
         stream1_bias_relu_kernel<<<(hidden2_total + 255U) / 256U, 256, 0, stream>>>(
-            residual_tmp,
+            residual_fc1,
             network.residual_fc1_bias[block],
             b_micro,
             network.dims.hidden2);
 
         stream1_cutlass_linear_cuda(
-            residual_tmp,
+            residual_fc1,
             network.residual_fc2_weight[block],
-            residual_tmp,
+            residual_fc2,
             b_micro,
             network.dims.hidden2,
             network.dims.hidden2,
             stream);
 
         stream1_residual_add_bias_relu_kernel<<<(hidden2_total + 255U) / 256U, 256, 0, stream>>>(
-            residual_tmp,
+            residual_fc2,
             residual_in,
             network.residual_fc2_bias[block],
             b_micro,
             network.dims.hidden2);
 
-        half* swap = residual_in;
-        residual_in = residual_tmp;
-        residual_tmp = swap;
+        residual_in = residual_fc2;
+        residual_fc2 = residual_in == scratch.hidden1 ? scratch.hidden2 : scratch.hidden1;
     }
 
     stream1_cutlass_linear_cuda(

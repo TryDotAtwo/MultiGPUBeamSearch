@@ -88,3 +88,4 @@
 - User approved adding Stream4-level tracking after `track_solution_generated` showed puzzle 9 depth 6 child was generated with `score_key=251278` but disappeared before prefinal with `final_threshold=113806`.
 - User identified the main risk as output-index mapping: neural-network outputs `[0..23]` may be interpreted as moves `[0..23]` while the model order may differ from `p900.json`; user requested comparing CUDA and reference-forward on the problematic tracked parent for all 24 moves, including `q`, rank, and `move_name`.
 - User requested detailed candidate path tracing on puzzle 0 using path `DL.BL.U.L.U.F.U.R.FR.U.BR.U.R.-BR.FL.FR.DR.-U.FR.F.R.-F.-BL.U.-DL.BR.B.-L.U.BR.U.L.BL.DL.BL.U.L.-BL.-L.-FR.U.F.U.U.D.-R.-U.-F.-FR.-DR.BR.DR.FR.R.-BR.-R.-FR.-BR`, with stopping two depths after the candidate first becomes missing.
+- User requested fixing the Stream1 CUTLASS residual in-place GEMM issue without adding extra runtime checks, then verifying the fix.
