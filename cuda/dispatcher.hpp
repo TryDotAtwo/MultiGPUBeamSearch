@@ -73,6 +73,42 @@ struct GeneratedTrackResult {
     std::uint32_t current_threshold = UINT32_MAX;
 };
 
+struct Stream4TrackResult {
+    bool enabled = false;
+    Hash128 hash{UINT64_MAX, UINT64_MAX};
+    std::uint32_t score_key = UINT32_MAX;
+    std::uint32_t shard = UINT32_MAX;
+
+    bool after_stream3_scanned = false;
+    bool after_stream3_found = false;
+    std::uint32_t after_stream3_location = UINT32_MAX;
+    std::uint32_t after_stream3_local = UINT32_MAX;
+    std::uint32_t after_stream3_clean_count = 0;
+    std::uint32_t after_stream3_dirty_count = 0;
+    std::uint32_t after_stream3_active_spill_count = 0;
+    std::uint32_t after_stream3_inactive_spill_count = 0;
+    std::uint32_t after_stream3_threshold = UINT32_MAX;
+
+    std::uint32_t input_scan_count = 0;
+    bool input_found = false;
+    std::uint32_t input_slot = UINT32_MAX;
+    std::uint32_t input_job = UINT32_MAX;
+    std::uint32_t input_location = UINT32_MAX;
+    std::uint32_t input_local = UINT32_MAX;
+    std::uint32_t input_clean_count = 0;
+    std::uint32_t input_dirty_count = 0;
+    std::uint32_t input_threshold = UINT32_MAX;
+
+    std::uint32_t output_scan_count = 0;
+    bool output_found = false;
+    std::uint32_t output_slot = UINT32_MAX;
+    std::uint32_t output_job = UINT32_MAX;
+    std::uint32_t output_local = UINT32_MAX;
+    std::uint32_t output_clean_count = 0;
+    std::uint32_t output_dirty_count = 0;
+    std::uint32_t output_threshold = UINT32_MAX;
+};
+
 struct DepthDispatchState {
     std::uint64_t frontier_cursor = 0;
     std::uint64_t frontier_size = 0;
@@ -84,6 +120,7 @@ struct DepthDispatchState {
     bool depth_drained = false;
     bool stop_requested = false;
     GeneratedTrackResult tracked_generated;
+    Stream4TrackResult tracked_stream4;
 };
 
 struct FinalizeDepthState {

@@ -386,6 +386,23 @@ bool states_equal_storage(const State128& a, const State128& b) {
     return true;
 }
 
+const char* track_location_name(std::uint32_t location) {
+    switch (location) {
+        case 1U:
+            return "clean";
+        case 2U:
+            return "dirty";
+        case 3U:
+            return "active_spill";
+        case 4U:
+            return "inactive_spill";
+        case 0U:
+            return "none";
+        default:
+            return "unknown";
+    }
+}
+
 struct TrackedSolutionPrefix {
     std::vector<std::uint8_t> moves;
     std::vector<Hash128> prefix_hashes;
@@ -488,6 +505,59 @@ struct TrackedSolutionPrefix {
                   << " hash_hi=" << (result.found ? result.hash.hi : UINT64_MAX)
                   << " owner=" << static_cast<std::uint32_t>(result.owner)
                   << " shard=" << result.shard
+                  << "\n";
+    }
+
+    void log_stream4(
+        std::uint64_t puzzle_id,
+        std::uint32_t depth,
+        const Stream4TrackResult& result,
+        const std::vector<std::string>& move_names) const {
+        if (!enabled || depth >= moves.size() || !result.enabled) {
+            return;
+        }
+        const std::int64_t input_threshold_margin =
+            result.input_found && result.input_threshold != UINT32_THRESHOLD_MAX
+                ? static_cast<std::int64_t>(result.score_key) - static_cast<std::int64_t>(result.input_threshold)
+                : 0;
+        std::cout << "track_solution_stream4"
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << depth + 1U
+                  << " expected_move=" << move_names[moves[depth]]
+                  << " score_key=" << result.score_key
+                  << " shard=" << result.shard
+                  << " hash_lo=" << result.hash.lo
+                  << " hash_hi=" << result.hash.hi
+                  << " after_stream3_scanned=" << (result.after_stream3_scanned ? 1 : 0)
+                  << " after_stream3_found=" << (result.after_stream3_found ? 1 : 0)
+                  << " after_stream3_location=" << track_location_name(result.after_stream3_location)
+                  << " after_stream3_local=" << result.after_stream3_local
+                  << " after_stream3_clean_count=" << result.after_stream3_clean_count
+                  << " after_stream3_dirty_count=" << result.after_stream3_dirty_count
+                  << " after_stream3_active_spill_count=" << result.after_stream3_active_spill_count
+                  << " after_stream3_inactive_spill_count=" << result.after_stream3_inactive_spill_count
+                  << " after_stream3_threshold=" << result.after_stream3_threshold
+                  << " input_scan_count=" << result.input_scan_count
+                  << " input_found=" << (result.input_found ? 1 : 0)
+                  << " input_slot=" << result.input_slot
+                  << " input_job=" << result.input_job
+                  << " input_location=" << track_location_name(result.input_location)
+                  << " input_local=" << result.input_local
+                  << " input_clean_count=" << result.input_clean_count
+                  << " input_dirty_count=" << result.input_dirty_count
+                  << " input_threshold=" << result.input_threshold
+                  << " input_threshold_pass="
+                  << (result.input_found && result.score_key <= result.input_threshold ? 1 : 0)
+                  << " input_threshold_margin=" << input_threshold_margin
+                  << " output_scan_count=" << result.output_scan_count
+                  << " output_found=" << (result.output_found ? 1 : 0)
+                  << " output_slot=" << result.output_slot
+                  << " output_job=" << result.output_job
+                  << " output_local=" << result.output_local
+                  << " output_clean_count=" << result.output_clean_count
+                  << " output_dirty_count=" << result.output_dirty_count
+                  << " output_threshold=" << result.output_threshold
                   << "\n";
     }
 
@@ -1722,6 +1792,11 @@ int main(int argc, char** argv) {
             puzzle_id,
             depth,
             state.tracked_generated,
+            host_move_names);
+        tracked_solution.log_stream4(
+            puzzle_id,
+            depth,
+            state.tracked_stream4,
             host_move_names);
         total_threshold_updates += state.threshold_updates;
         ++completed_depths;
