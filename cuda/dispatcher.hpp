@@ -6,6 +6,7 @@
 
 #include <cuda_runtime.h>
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -71,6 +72,10 @@ struct GeneratedTrackResult {
     std::uint8_t owner = UINT8_MAX;
     std::uint32_t shard = UINT32_MAX;
     std::uint32_t current_threshold = UINT32_MAX;
+    bool parent_state_copied = false;
+    State128 parent_state{};
+    bool all_move_scores_copied = false;
+    std::array<std::uint32_t, MOVE_COUNT> move_score_keys{};
 };
 
 struct Stream4TrackResult {
@@ -109,6 +114,22 @@ struct Stream4TrackResult {
     std::uint32_t output_threshold = UINT32_MAX;
 };
 
+struct Stream4TrackEvent {
+    std::uint32_t phase = 0;
+    bool found = false;
+    std::uint32_t shard = UINT32_MAX;
+    std::uint32_t slot = UINT32_MAX;
+    std::uint32_t job = UINT32_MAX;
+    std::uint32_t location = UINT32_MAX;
+    std::uint32_t local = UINT32_MAX;
+    std::uint32_t clean_count = 0;
+    std::uint32_t dirty_count = 0;
+    std::uint32_t active_spill_count = 0;
+    std::uint32_t inactive_spill_count = 0;
+    std::uint32_t threshold = UINT32_MAX;
+    std::uint32_t score_key = UINT32_MAX;
+};
+
 struct DepthDispatchState {
     std::uint64_t frontier_cursor = 0;
     std::uint64_t frontier_size = 0;
@@ -121,6 +142,7 @@ struct DepthDispatchState {
     bool stop_requested = false;
     GeneratedTrackResult tracked_generated;
     Stream4TrackResult tracked_stream4;
+    std::vector<Stream4TrackEvent> tracked_stream4_events;
 };
 
 struct FinalizeDepthState {

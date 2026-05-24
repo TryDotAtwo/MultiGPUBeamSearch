@@ -65,6 +65,12 @@ enum TrackLocation : std::uint32_t {
     TrackLocationInactiveSpill = 4
 };
 
+enum TrackStream4Phase : std::uint32_t {
+    TrackStream4PhaseAfterStream3 = 1,
+    TrackStream4PhaseInput = 2,
+    TrackStream4PhaseOutput = 3
+};
+
 __global__ void track_clean_survivor_hash_kernel(
     const CandidateMeta* survivor_shard,
     const std::uint32_t* clean_count,
@@ -1036,75 +1042,133 @@ DepthDispatchState run_depth_cuda_graphs(
         std::uint32_t local = UINT32_MAX;
         std::uint32_t clean = 0;
         std::uint32_t dirty = 0;
+        Stream4TrackEvent event{};
+        event.phase = TrackStream4PhaseAfterStream3;
+        event.shard = state.tracked_stream4.shard;
+        event.threshold = state.tracked_stream4.after_stream3_threshold;
+        event.score_key = state.tracked_stream4.score_key;
         if (scan_tracked_shard(state.tracked_stream4.shard, true, clean, dirty, location, local, candidate)) {
             state.tracked_stream4.after_stream3_found = true;
             state.tracked_stream4.after_stream3_location = location;
             state.tracked_stream4.after_stream3_local = local;
             state.tracked_stream4.after_stream3_clean_count = clean;
             state.tracked_stream4.after_stream3_dirty_count = dirty;
+            event.found = true;
+            event.location = location;
+            event.local = local;
+            event.clean_count = clean;
+            event.dirty_count = dirty;
+            state.tracked_stream4_events.push_back(event);
             return;
         }
         state.tracked_stream4.after_stream3_clean_count = clean;
         state.tracked_stream4.after_stream3_dirty_count = dirty;
+        event.clean_count = clean;
+        event.dirty_count = dirty;
         std::uint32_t active_count = 0;
         std::uint32_t inactive_count = 0;
         if (scan_tracked_spill(location, local, active_count, inactive_count, candidate)) {
             state.tracked_stream4.after_stream3_found = true;
             state.tracked_stream4.after_stream3_location = location;
             state.tracked_stream4.after_stream3_local = local;
+            event.found = true;
+            event.location = location;
+            event.local = local;
         }
         state.tracked_stream4.after_stream3_active_spill_count = active_count;
         state.tracked_stream4.after_stream3_inactive_spill_count = inactive_count;
+        event.active_spill_count = active_count;
+        event.inactive_spill_count = inactive_count;
+        state.tracked_stream4_events.push_back(event);
     };
 
     const auto scan_tracked_stream4_input = [&](std::uint32_t shard, std::uint32_t slot, std::uint64_t graph_idx) {
         if (!state.tracked_generated.found ||
-            shard != state.tracked_stream4.shard ||
-            state.tracked_stream4.input_found) {
+            shard != state.tracked_stream4.shard) {
             return;
         }
         ++state.tracked_stream4.input_scan_count;
-        state.tracked_stream4.input_slot = slot;
-        state.tracked_stream4.input_job = static_cast<std::uint32_t>(graph_idx);
-        state.tracked_stream4.input_threshold = read_current_threshold_host();
+        const std::uint32_t threshold = read_current_threshold_host();
         CandidateMeta candidate{};
         std::uint32_t location = TrackLocationNone;
         std::uint32_t local = UINT32_MAX;
         std::uint32_t clean = 0;
         std::uint32_t dirty = 0;
         const bool found = scan_tracked_shard(shard, true, clean, dirty, location, local, candidate);
-        state.tracked_stream4.input_clean_count = clean;
-        state.tracked_stream4.input_dirty_count = dirty;
-        if (found) {
+        Stream4TrackEvent event{};
+        event.phase = TrackStream4PhaseInput;
+        event.found = found;
+        event.shard = shard;
+        event.slot = slot;
+        event.job = static_cast<std::uint32_t>(graph_idx);
+        event.location = found ? location : TrackLocationNone;
+        event.local = found ? local : UINT32_MAX;
+        event.clean_count = clean;
+        event.dirty_count = dirty;
+        event.threshold = threshold;
+        event.score_key = state.tracked_stream4.score_key;
+        state.tracked_stream4_events.push_back(event);
+        if (found && !state.tracked_stream4.input_found) {
+            state.tracked_stream4.input_slot = slot;
+            state.tracked_stream4.input_job = static_cast<std::uint32_t>(graph_idx);
+            state.tracked_stream4.input_threshold = threshold;
+            state.tracked_stream4.input_clean_count = clean;
+            state.tracked_stream4.input_dirty_count = dirty;
             state.tracked_stream4.input_found = true;
             state.tracked_stream4.input_location = location;
             state.tracked_stream4.input_local = local;
+        } else if (!state.tracked_stream4.input_found) {
+            state.tracked_stream4.input_slot = slot;
+            state.tracked_stream4.input_job = static_cast<std::uint32_t>(graph_idx);
+            state.tracked_stream4.input_threshold = threshold;
+            state.tracked_stream4.input_clean_count = clean;
+            state.tracked_stream4.input_dirty_count = dirty;
         }
     };
 
     scan_tracked_stream4_output = [&](std::uint32_t slot) {
         const std::uint32_t shard = stream4_slot_shard[slot];
         if (!state.tracked_generated.found ||
-            shard != state.tracked_stream4.shard ||
-            state.tracked_stream4.output_found) {
+            shard != state.tracked_stream4.shard) {
             return;
         }
         ++state.tracked_stream4.output_scan_count;
-        state.tracked_stream4.output_slot = slot;
-        state.tracked_stream4.output_job =
+        const std::uint32_t job =
             static_cast<std::uint32_t>(static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot);
-        state.tracked_stream4.output_threshold = read_current_threshold_host();
+        const std::uint32_t threshold = read_current_threshold_host();
         CandidateMeta candidate{};
         std::uint32_t location = TrackLocationNone;
         std::uint32_t local = UINT32_MAX;
         std::uint32_t clean = 0;
         std::uint32_t dirty = 0;
         const bool found = scan_tracked_shard(shard, false, clean, dirty, location, local, candidate);
-        state.tracked_stream4.output_clean_count = clean;
-        state.tracked_stream4.output_dirty_count = dirty;
-        if (found) {
+        Stream4TrackEvent event{};
+        event.phase = TrackStream4PhaseOutput;
+        event.found = found;
+        event.shard = shard;
+        event.slot = slot;
+        event.job = job;
+        event.location = found ? location : TrackLocationNone;
+        event.local = found ? local : UINT32_MAX;
+        event.clean_count = clean;
+        event.dirty_count = dirty;
+        event.threshold = threshold;
+        event.score_key = state.tracked_stream4.score_key;
+        state.tracked_stream4_events.push_back(event);
+        if (found && !state.tracked_stream4.output_found) {
+            state.tracked_stream4.output_slot = slot;
+            state.tracked_stream4.output_job = job;
+            state.tracked_stream4.output_threshold = threshold;
+            state.tracked_stream4.output_clean_count = clean;
+            state.tracked_stream4.output_dirty_count = dirty;
             state.tracked_stream4.output_found = true;
             state.tracked_stream4.output_local = local;
+        } else if (!state.tracked_stream4.output_found) {
+            state.tracked_stream4.output_slot = slot;
+            state.tracked_stream4.output_job = job;
+            state.tracked_stream4.output_threshold = threshold;
+            state.tracked_stream4.output_clean_count = clean;
+            state.tracked_stream4.output_dirty_count = dirty;
         }
     };
 
@@ -1339,6 +1403,18 @@ DepthDispatchState run_depth_cuda_graphs(
                 memory.streams.current_threshold,
                 sizeof(threshold),
                 cudaMemcpyDeviceToHost), "cudaMemcpy tracked generated threshold");
+            State128 parent_state{};
+            check_cuda(cudaMemcpy(
+                &parent_state,
+                memory.current_frontier_states + track_request.parent_idx,
+                sizeof(parent_state),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked generated parent state");
+            std::array<std::uint32_t, MOVE_COUNT> move_score_keys{};
+            check_cuda(cudaMemcpy(
+                move_score_keys.data(),
+                memory.streams.score_ring + global_offset - track_request.move,
+                MOVE_COUNT * sizeof(std::uint32_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked generated all move scores");
             state.tracked_generated.found = true;
             state.tracked_generated.ring = ring;
             state.tracked_generated.ring_slot = slot;
@@ -1353,6 +1429,10 @@ DepthDispatchState run_depth_cuda_graphs(
             state.tracked_generated.owner = owner_from_hash128(hash, plan.config.world_size);
             state.tracked_generated.shard = shard_from_hash128(hash, plan.config.shard_count);
             state.tracked_generated.current_threshold = threshold;
+            state.tracked_generated.parent_state_copied = true;
+            state.tracked_generated.parent_state = parent_state;
+            state.tracked_generated.all_move_scores_copied = true;
+            state.tracked_generated.move_score_keys = move_score_keys;
             state.tracked_stream4.hash = hash;
             state.tracked_stream4.score_key = score_key;
             state.tracked_stream4.shard = state.tracked_generated.shard;

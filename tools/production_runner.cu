@@ -403,6 +403,19 @@ const char* track_location_name(std::uint32_t location) {
     }
 }
 
+const char* track_stream4_phase_name(std::uint32_t phase) {
+    switch (phase) {
+        case 1U:
+            return "after_stream3";
+        case 2U:
+            return "stream4_input";
+        case 3U:
+            return "stream4_output";
+        default:
+            return "unknown";
+    }
+}
+
 struct TrackedSolutionPrefix {
     std::vector<std::uint8_t> moves;
     std::vector<Hash128> prefix_hashes;
@@ -410,6 +423,9 @@ struct TrackedSolutionPrefix {
     std::vector<std::uint64_t> final_indices;
     bool enabled = false;
     bool stop_after_path = false;
+    std::uint32_t missing_stop_extra_depths = UINT32_MAX;
+    bool has_first_missing_depth = false;
+    std::uint32_t first_missing_depth = UINT32_MAX;
 
     void initialize(
         std::uint64_t puzzle_id,
@@ -423,6 +439,10 @@ struct TrackedSolutionPrefix {
         }
         enabled = true;
         stop_after_path = env_bool("BEAM_STOP_AFTER_TRACKED_PATH", false);
+        if (env_present("BEAM_STOP_AFTER_TRACKED_MISSING_EXTRA_DEPTHS")) {
+            missing_stop_extra_depths =
+                env_u32("BEAM_STOP_AFTER_TRACKED_MISSING_EXTRA_DEPTHS", UINT32_MAX);
+        }
         moves = parse_solution_path_text(path_env, move_names);
         prefix_hashes.reserve(moves.size());
         survived.assign(moves.size(), false);
@@ -436,6 +456,7 @@ struct TrackedSolutionPrefix {
                   << " puzzle_id=" << puzzle_id
                   << " path_len=" << moves.size()
                   << " stop_after_path=" << (stop_after_path ? 1 : 0)
+                  << " missing_extra_depths=" << missing_stop_extra_depths
                   << " path=" << path_env << "\n";
     }
 
@@ -512,6 +533,7 @@ struct TrackedSolutionPrefix {
         std::uint64_t puzzle_id,
         std::uint32_t depth,
         const Stream4TrackResult& result,
+        const std::vector<Stream4TrackEvent>& events,
         const std::vector<std::string>& move_names) const {
         if (!enabled || depth >= moves.size() || !result.enabled) {
             return;
@@ -559,6 +581,34 @@ struct TrackedSolutionPrefix {
                   << " output_dirty_count=" << result.output_dirty_count
                   << " output_threshold=" << result.output_threshold
                   << "\n";
+        for (std::uint32_t event_index = 0; event_index < events.size(); ++event_index) {
+            const Stream4TrackEvent& event = events[event_index];
+            const std::int64_t threshold_margin =
+                event.found && event.threshold != UINT32_THRESHOLD_MAX
+                    ? static_cast<std::int64_t>(event.score_key) - static_cast<std::int64_t>(event.threshold)
+                    : 0;
+            std::cout << "track_solution_stream4_event"
+                      << " puzzle_id=" << puzzle_id
+                      << " depth=" << depth
+                      << " prefix_len=" << depth + 1U
+                      << " event_index=" << event_index
+                      << " phase=" << track_stream4_phase_name(event.phase)
+                      << " found=" << (event.found ? 1 : 0)
+                      << " shard=" << event.shard
+                      << " slot=" << event.slot
+                      << " job=" << event.job
+                      << " location=" << track_location_name(event.location)
+                      << " local=" << event.local
+                      << " clean_count=" << event.clean_count
+                      << " dirty_count=" << event.dirty_count
+                      << " active_spill_count=" << event.active_spill_count
+                      << " inactive_spill_count=" << event.inactive_spill_count
+                      << " threshold=" << event.threshold
+                      << " score_key=" << event.score_key
+                      << " threshold_pass=" << (event.found && event.score_key <= event.threshold ? 1 : 0)
+                      << " threshold_margin=" << threshold_margin
+                      << "\n";
+        }
     }
 
     void log_candidate_fields(
@@ -678,6 +728,19 @@ struct TrackedSolutionPrefix {
         }
         survived[depth] = match_count != 0U;
         final_indices[depth] = survived[depth] ? best_index : UINT64_MAX;
+        if (!survived[depth] && !has_first_missing_depth) {
+            has_first_missing_depth = true;
+            first_missing_depth = depth;
+            std::cout << "track_solution_first_missing"
+                      << " puzzle_id=" << puzzle_id
+                      << " depth=" << depth
+                      << " prefix_len=" << depth + 1U
+                      << " stop_after_depth="
+                      << (missing_stop_extra_depths == UINT32_MAX
+                              ? UINT32_MAX
+                              : first_missing_depth + missing_stop_extra_depths)
+                      << "\n";
+        }
         log_candidate_fields(
             "track_solution_prefix",
             puzzle_id,
@@ -695,6 +758,13 @@ struct TrackedSolutionPrefix {
             UINT32_MAX,
             count,
             move_names);
+    }
+
+    bool should_stop_after_missing(std::uint32_t depth) const {
+        return enabled &&
+            has_first_missing_depth &&
+            missing_stop_extra_depths != UINT32_MAX &&
+            depth >= first_missing_depth + missing_stop_extra_depths;
     }
 };
 
@@ -1288,6 +1358,196 @@ HostWeightBytes load_stream1_weights(const std::filesystem::path& dir) {
     return weights;
 }
 
+const half* weight_half_data(const std::vector<std::byte>& bytes) {
+    return reinterpret_cast<const half*>(bytes.data());
+}
+
+std::vector<half> stream1_reference_linear(
+    const std::vector<half>& input,
+    const half* weight,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols) {
+    std::vector<half> output(output_cols);
+    for (std::uint32_t out = 0; out < output_cols; ++out) {
+        float acc = 0.0f;
+        for (std::uint32_t in = 0; in < input_cols; ++in) {
+            acc += __half2float(input[in]) * __half2float(weight[in * output_cols + out]);
+        }
+        output[out] = __float2half(acc);
+    }
+    return output;
+}
+
+void stream1_reference_bias_relu(std::vector<half>& values, const half* bias) {
+    for (std::uint32_t i = 0; i < values.size(); ++i) {
+        const float x = __half2float(values[i]) + __half2float(bias[i]);
+        values[i] = __float2half(x > 0.0f ? x : 0.0f);
+    }
+}
+
+void stream1_reference_residual_add_bias_relu(
+    std::vector<half>& values,
+    const std::vector<half>& residual,
+    const half* bias) {
+    for (std::uint32_t i = 0; i < values.size(); ++i) {
+        const float x = __half2float(values[i]) + __half2float(residual[i]) + __half2float(bias[i]);
+        values[i] = __float2half(x > 0.0f ? x : 0.0f);
+    }
+}
+
+std::array<std::uint32_t, MOVE_COUNT> stream1_reference_score_keys(
+    const State128& state,
+    const HostWeightBytes& weights) {
+    const half* input_weight = weight_half_data(weights.input_weight);
+    const half* input_bias = weight_half_data(weights.input_bias);
+    const half* hidden_weight = weight_half_data(weights.hidden_weight);
+    const half* hidden_bias = weight_half_data(weights.hidden_bias);
+    const half* residual_fc1_weight[STREAM1_RESIDUAL_COUNT] = {
+        weight_half_data(weights.residual0_fc1_weight),
+        weight_half_data(weights.residual1_fc1_weight)};
+    const half* residual_fc1_bias[STREAM1_RESIDUAL_COUNT] = {
+        weight_half_data(weights.residual0_fc1_bias),
+        weight_half_data(weights.residual1_fc1_bias)};
+    const half* residual_fc2_weight[STREAM1_RESIDUAL_COUNT] = {
+        weight_half_data(weights.residual0_fc2_weight),
+        weight_half_data(weights.residual1_fc2_weight)};
+    const half* residual_fc2_bias[STREAM1_RESIDUAL_COUNT] = {
+        weight_half_data(weights.residual0_fc2_bias),
+        weight_half_data(weights.residual1_fc2_bias)};
+    const half* output_weight = weight_half_data(weights.output_weight);
+    const half* output_bias = weight_half_data(weights.output_bias);
+
+    std::vector<half> hidden1(STREAM1_HIDDEN1);
+    for (std::uint32_t h = 0; h < STREAM1_HIDDEN1; ++h) {
+        float acc = __half2float(input_bias[h]);
+        for (std::uint32_t p = 0; p < STATE_LEN; ++p) {
+            const std::uint32_t value = static_cast<std::uint32_t>(state.v[p]);
+            const std::uint32_t idx = (p * STREAM1_MODEL_CLASSES + value) * STREAM1_HIDDEN1 + h;
+            acc += __half2float(input_weight[idx]);
+        }
+        hidden1[h] = __float2half(acc > 0.0f ? acc : 0.0f);
+    }
+
+    std::vector<half> hidden2 =
+        stream1_reference_linear(hidden1, hidden_weight, STREAM1_HIDDEN1, STREAM1_HIDDEN2);
+    stream1_reference_bias_relu(hidden2, hidden_bias);
+
+    std::vector<half> residual = hidden2;
+    for (std::uint32_t block = 0; block < STREAM1_RESIDUAL_COUNT; ++block) {
+        std::vector<half> tmp =
+            stream1_reference_linear(residual, residual_fc1_weight[block], STREAM1_HIDDEN2, STREAM1_HIDDEN2);
+        stream1_reference_bias_relu(tmp, residual_fc1_bias[block]);
+        tmp = stream1_reference_linear(tmp, residual_fc2_weight[block], STREAM1_HIDDEN2, STREAM1_HIDDEN2);
+        stream1_reference_residual_add_bias_relu(tmp, residual, residual_fc2_bias[block]);
+        residual = std::move(tmp);
+    }
+
+    const std::vector<half> output =
+        stream1_reference_linear(residual, output_weight, STREAM1_HIDDEN2, MOVE_COUNT);
+    std::array<std::uint32_t, MOVE_COUNT> score_keys{};
+    for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
+        const float q = __half2float(output[move]) + __half2float(output_bias[move]);
+        score_keys[move] = q_to_score_key(q);
+    }
+    return score_keys;
+}
+
+std::array<std::uint32_t, MOVE_COUNT> score_ranks(const std::array<std::uint32_t, MOVE_COUNT>& score_keys) {
+    std::array<std::uint32_t, MOVE_COUNT> order{};
+    std::array<std::uint32_t, MOVE_COUNT> ranks{};
+    for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
+        order[move] = move;
+    }
+    std::sort(order.begin(), order.end(), [&](std::uint32_t a, std::uint32_t b) {
+        if (score_keys[a] != score_keys[b]) {
+            return score_keys[a] < score_keys[b];
+        }
+        return a < b;
+    });
+    for (std::uint32_t rank = 0; rank < MOVE_COUNT; ++rank) {
+        ranks[order[rank]] = rank + 1U;
+    }
+    return ranks;
+}
+
+void log_stream1_move_score_comparison(
+    std::uint64_t puzzle_id,
+    std::uint32_t depth,
+    const TrackedSolutionPrefix& tracked,
+    const GeneratedTrackResult& generated,
+    const HostWeightBytes& weights,
+    const std::vector<std::string>& move_names) {
+    if (!tracked.enabled || depth >= tracked.moves.size()) {
+        return;
+    }
+    if (!generated.found || !generated.parent_state_copied || !generated.all_move_scores_copied) {
+        std::cout << "track_solution_move_score_summary"
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << depth + 1U
+                  << " expected_move=" << move_names[tracked.moves[depth]]
+                  << " available=0\n";
+        return;
+    }
+    const std::array<std::uint32_t, MOVE_COUNT> ref_scores =
+        stream1_reference_score_keys(generated.parent_state, weights);
+    const std::array<std::uint32_t, MOVE_COUNT> cuda_ranks =
+        score_ranks(generated.move_score_keys);
+    const std::array<std::uint32_t, MOVE_COUNT> ref_ranks = score_ranks(ref_scores);
+    const std::uint32_t expected_move = tracked.moves[depth];
+    std::uint32_t best_cuda_move = 0;
+    std::uint32_t best_ref_move = 0;
+    for (std::uint32_t move = 1; move < MOVE_COUNT; ++move) {
+        if (generated.move_score_keys[move] < generated.move_score_keys[best_cuda_move]) {
+            best_cuda_move = move;
+        }
+        if (ref_scores[move] < ref_scores[best_ref_move]) {
+            best_ref_move = move;
+        }
+    }
+    std::cout << "track_solution_move_score_summary"
+              << " puzzle_id=" << puzzle_id
+              << " depth=" << depth
+              << " prefix_len=" << depth + 1U
+              << " expected_move=" << move_names[expected_move]
+              << " expected_move_idx=" << expected_move
+              << " cuda_expected_rank=" << cuda_ranks[expected_move]
+              << " ref_expected_rank=" << ref_ranks[expected_move]
+              << " cuda_expected_score_key=" << generated.move_score_keys[expected_move]
+              << " ref_expected_score_key=" << ref_scores[expected_move]
+              << " best_cuda_move=" << move_names[best_cuda_move]
+              << " best_cuda_move_idx=" << best_cuda_move
+              << " best_cuda_score_key=" << generated.move_score_keys[best_cuda_move]
+              << " best_ref_move=" << move_names[best_ref_move]
+              << " best_ref_move_idx=" << best_ref_move
+              << " best_ref_score_key=" << ref_scores[best_ref_move]
+              << "\n";
+    for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
+        const std::int64_t score_delta =
+            static_cast<std::int64_t>(generated.move_score_keys[move]) -
+            static_cast<std::int64_t>(ref_scores[move]);
+        const std::int64_t rank_delta =
+            static_cast<std::int64_t>(cuda_ranks[move]) -
+            static_cast<std::int64_t>(ref_ranks[move]);
+        std::cout << "track_solution_move_score"
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << depth + 1U
+                  << " move=" << move
+                  << " move_name=" << move_names[move]
+                  << " expected=" << (move == expected_move ? 1 : 0)
+                  << " cuda_score_key=" << generated.move_score_keys[move]
+                  << " cuda_q=" << (static_cast<double>(generated.move_score_keys[move]) / SCORE_SCALE)
+                  << " cuda_rank=" << cuda_ranks[move]
+                  << " ref_score_key=" << ref_scores[move]
+                  << " ref_q=" << (static_cast<double>(ref_scores[move]) / SCORE_SCALE)
+                  << " ref_rank=" << ref_ranks[move]
+                  << " score_delta=" << score_delta
+                  << " rank_delta=" << rank_delta
+                  << "\n";
+    }
+}
+
 void copy_bytes_to_device(void* dst, const std::vector<std::byte>& bytes, const char* name) {
     if (dst == nullptr || bytes.empty()) {
         throw std::runtime_error(std::string("invalid device copy input: ") + name);
@@ -1793,10 +2053,18 @@ int main(int argc, char** argv) {
             depth,
             state.tracked_generated,
             host_move_names);
+        log_stream1_move_score_comparison(
+            puzzle_id,
+            depth,
+            tracked_solution,
+            state.tracked_generated,
+            host_weights,
+            host_move_names);
         tracked_solution.log_stream4(
             puzzle_id,
             depth,
             state.tracked_stream4,
+            state.tracked_stream4_events,
             host_move_names);
         total_threshold_updates += state.threshold_updates;
         ++completed_depths;
@@ -1902,6 +2170,16 @@ int main(int argc, char** argv) {
         }
 #endif
         if (frontier_size == 0) {
+            break;
+        }
+        if (tracked_solution.should_stop_after_missing(depth)) {
+            std::cout << "track_solution_stop=1"
+                      << " puzzle_id=" << puzzle_id
+                      << " depth=" << depth
+                      << " reason=tracked_path_missing_extra_depths_elapsed"
+                      << " first_missing_depth=" << tracked_solution.first_missing_depth
+                      << " extra_depths=" << tracked_solution.missing_stop_extra_depths
+                      << "\n";
             break;
         }
         if (tracked_solution.enabled &&
