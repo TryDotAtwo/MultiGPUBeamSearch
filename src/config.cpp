@@ -24,7 +24,7 @@ DerivedConfig derive_config(const RuntimeConfig& config) {
     derived.beam_width_alignment =
         static_cast<std::uint64_t>(config.world_size) *
         static_cast<std::uint64_t>(config.shard_count) *
-        static_cast<std::uint64_t>(config.stream4_batch_candidates_per_shard_unit);
+        static_cast<std::uint64_t>(config.stream4_batch_alignment);
     derived.global_beam_width_effective = round_up(config.user_global_beam_width, derived.beam_width_alignment);
     return derived;
 }

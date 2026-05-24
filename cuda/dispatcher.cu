@@ -54,6 +54,7 @@ std::string stream_fatal_error_message(
         " clean_count=" + std::to_string(trace[FatalTraceCleanCount]) +
         " dirty_count=" + std::to_string(trace[FatalTraceDirtyCount]) +
         " processing_flag=" + std::to_string(trace[FatalTraceProcessingFlag]) +
+        " shard_capacity_candidates=" + std::to_string(trace[FatalTraceShardCapacity]) +
         " stream4_batch_candidates=" + std::to_string(trace[FatalTraceStream4Batch]) +
         " append_to_active_spill=" + std::to_string(trace[FatalTraceAppendToActiveSpill]);
 }
@@ -106,6 +107,7 @@ __global__ void track_clean_survivor_hash_kernel(
     CandidateMeta* block_best_candidate,
     Hash128 target_hash,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates) {
     __shared__ std::uint32_t match_count[256];
     __shared__ std::uint32_t best_score[256];
@@ -113,7 +115,7 @@ __global__ void track_clean_survivor_hash_kernel(
     __shared__ std::uint64_t best_index[256];
     __shared__ CandidateMeta best_candidate[256];
     const std::uint32_t tid = threadIdx.x;
-    const std::uint64_t shard_capacity = 2ULL * stream4_batch_candidates;
+    const std::uint64_t shard_capacity = shard_capacity_candidates;
     const std::uint64_t total = static_cast<std::uint64_t>(shard_count) * shard_capacity;
     const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + tid;
     bool match = false;
@@ -179,6 +181,7 @@ void scan_tracked_prefinal_hash(
         memory.final.final_candidate_buffer,
         target_hash,
         plan.config.shard_count,
+        plan.config.shard_capacity_candidates,
         plan.config.stream4_batch_candidates);
     check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize tracked prefinal hash scan");
 
@@ -215,7 +218,7 @@ void scan_tracked_prefinal_hash(
         }
     }
     if (state.tracked_prefinal_matches != 0U) {
-        const std::uint64_t shard_capacity = 2ULL * plan.config.stream4_batch_candidates;
+        const std::uint64_t shard_capacity = plan.config.shard_capacity_candidates;
         state.tracked_prefinal_best_score_key = best.score_key;
         state.tracked_prefinal_best_shard = static_cast<std::uint32_t>(state.tracked_prefinal_best_index / shard_capacity);
         state.tracked_prefinal_best_local = static_cast<std::uint32_t>(state.tracked_prefinal_best_index % shard_capacity);
@@ -231,7 +234,7 @@ void dump_final_spill_debug(
     std::uint32_t spill_active,
     std::uint32_t current_threshold) {
     const std::uint32_t shard_count = plan.config.shard_count;
-    const std::uint32_t shard_capacity = 2U * plan.config.stream4_batch_candidates;
+    const std::uint32_t shard_capacity = plan.config.shard_capacity_candidates;
     const std::uint32_t active_index = spill_active & 1U;
     const std::uint32_t active_spill_count = spill_counts[active_index];
     std::vector<std::uint32_t> clean(shard_count);
@@ -593,6 +596,7 @@ void instantiate_cuda_graph_job_templates(
             memory.streams.stream3_cub_temp_bytes,
             plan.config.shard_count,
             plan.config.global_spill_capacity,
+            plan.config.shard_capacity_candidates,
             plan.config.stream4_batch_candidates,
             streams.stream3,
             memory.streams.fatal_error_flag,
@@ -631,6 +635,7 @@ void instantiate_cuda_graph_job_templates(
                 plan.config.b_micro,
                 plan.config.stream3_batch_candidates,
                 plan.config.shard_count,
+                plan.config.shard_capacity_candidates,
                 plan.config.stream4_batch_candidates,
                 plan.config.global_spill_capacity,
                 streams.stream3,
@@ -663,6 +668,7 @@ void instantiate_cuda_graph_job_templates(
                 memory.streams.stream3_cub_temp_bytes,
                 plan.config.stream3_batch_candidates,
                 plan.config.shard_count,
+                plan.config.shard_capacity_candidates,
                 plan.config.stream4_batch_candidates,
                 plan.config.global_spill_capacity,
                 streams.stream3,
@@ -677,6 +683,7 @@ void instantiate_cuda_graph_job_templates(
             memory.streams.stream3_ready_shard_list,
             memory.streams.stream3_ready_count,
             plan.config.shard_count,
+            plan.config.shard_capacity_candidates,
             plan.config.stream4_batch_candidates,
             false,
             false,
@@ -691,7 +698,7 @@ void instantiate_cuda_graph_job_templates(
     graphs.stream4_shard_execs.resize(
         static_cast<std::uint64_t>(plan.config.shard_count) * stream4_slot_count,
         nullptr);
-    const std::uint32_t stream4_capacity = 2U * plan.config.stream4_batch_candidates;
+    const std::uint32_t stream4_capacity = plan.config.shard_capacity_candidates;
     const std::uint32_t stream4_block_count = (stream4_capacity + 255U) / 256U;
     for (std::uint32_t shard = 0; shard < plan.config.shard_count; ++shard) {
         const std::uint64_t shard_candidate_offset = static_cast<std::uint64_t>(shard) * stream4_capacity;
@@ -1016,7 +1023,7 @@ DepthDispatchState run_depth_cuda_graphs(
             memory.streams.dirty_count + shard,
             sizeof(dirty),
             cudaMemcpyDeviceToHost), "cudaMemcpy tracked shard dirty count");
-        const std::uint32_t shard_capacity = 2U * plan.config.stream4_batch_candidates;
+        const std::uint32_t shard_capacity = plan.config.shard_capacity_candidates;
         const std::uint32_t scan_count = std::min<std::uint32_t>(
             include_dirty ? clean + dirty : clean,
             shard_capacity);
@@ -1852,6 +1859,7 @@ DepthDispatchState run_depth_cuda_graphs(
             memory.streams.stream3_cub_temp_bytes,
             plan.config.shard_count,
             plan.config.global_spill_capacity,
+            plan.config.shard_capacity_candidates,
             plan.config.stream4_batch_candidates,
             streams.stream3,
             memory.streams.fatal_error_flag,
@@ -1864,6 +1872,7 @@ DepthDispatchState run_depth_cuda_graphs(
             memory.streams.stream3_ready_shard_list,
             memory.streams.stream3_ready_count,
             plan.config.shard_count,
+            plan.config.shard_capacity_candidates,
             plan.config.stream4_batch_candidates,
             true,
             true,
@@ -1987,6 +1996,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         plan.derived.global_beam_width_effective,
         static_cast<std::uint32_t>(plan.frontier_states),
         plan.config.shard_count,
+        plan.config.shard_capacity_candidates,
         plan.config.stream4_batch_candidates,
         streams.stream3);
     check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final filter load balance");

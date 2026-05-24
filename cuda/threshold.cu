@@ -120,10 +120,11 @@ __global__ void final_mark_counts_kernel(
     std::uint32_t final_threshold,
     std::uint32_t score_phase,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates) {
     __shared__ std::uint32_t flags[256];
     const std::uint32_t tid = threadIdx.x;
-    const std::uint64_t shard_capacity = 2ULL * stream4_batch_candidates;
+    const std::uint64_t shard_capacity = shard_capacity_candidates;
     const std::uint64_t total = static_cast<std::uint64_t>(shard_count) * shard_capacity;
     const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + tid;
     std::uint32_t keep = 0;
@@ -249,10 +250,11 @@ __global__ void final_scatter_load_balance_kernel(
     std::uint64_t global_keep_count,
     std::uint32_t final_capacity,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates) {
     __shared__ std::uint32_t scan[256];
     const std::uint32_t tid = threadIdx.x;
-    const std::uint64_t shard_capacity = 2ULL * stream4_batch_candidates;
+    const std::uint64_t shard_capacity = shard_capacity_candidates;
     const std::uint64_t total = static_cast<std::uint64_t>(shard_count) * shard_capacity;
     const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + tid;
     const std::uint32_t keep = i < total ? keep_flags[i] : 0U;
@@ -397,10 +399,11 @@ void final_filter_load_balance_cuda(
     std::uint64_t global_keep_count,
     std::uint32_t final_capacity,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     cudaStream_t stream) {
     NvtxRange range("Final_filter_load_balance_launch");
-    const std::uint64_t item_count = static_cast<std::uint64_t>(shard_count) * 2ULL * stream4_batch_candidates;
+    const std::uint64_t item_count = static_cast<std::uint64_t>(shard_count) * shard_capacity_candidates;
     const std::uint32_t block_size = 256;
     const std::uint32_t block_count = static_cast<std::uint32_t>((item_count + block_size - 1ULL) / block_size);
     const dim3 block(block_size);
@@ -415,6 +418,7 @@ void final_filter_load_balance_cuda(
         final_threshold,
         0,
         shard_count,
+        shard_capacity_candidates,
         stream4_batch_candidates);
     final_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
         block_counts,
@@ -439,6 +443,7 @@ void final_filter_load_balance_cuda(
         global_keep_count,
         final_capacity,
         shard_count,
+        shard_capacity_candidates,
         stream4_batch_candidates);
 
     // Phase 1 fills remaining beam slots with candidates exactly on final_threshold.
@@ -451,6 +456,7 @@ void final_filter_load_balance_cuda(
         final_threshold,
         1,
         shard_count,
+        shard_capacity_candidates,
         stream4_batch_candidates);
     final_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
         block_counts,
@@ -474,6 +480,7 @@ void final_filter_load_balance_cuda(
         global_keep_count,
         final_capacity,
         shard_count,
+        shard_capacity_candidates,
         stream4_batch_candidates);
 
     final_init_send_ranges_kernel<<<1, 1, 0, stream>>>(

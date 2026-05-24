@@ -6,7 +6,7 @@
 
 namespace beam {
 
-constexpr std::uint32_t STREAM_FATAL_TRACE_WORDS = 16;
+constexpr std::uint32_t STREAM_FATAL_TRACE_WORDS = 17;
 constexpr std::uint32_t STREAM_FATAL_STREAM3_SPILL_OVERFLOW = 3001;
 
 enum StreamFatalTraceSlot : std::uint32_t {
@@ -24,8 +24,9 @@ enum StreamFatalTraceSlot : std::uint32_t {
     FatalTraceCleanCount = 11,
     FatalTraceDirtyCount = 12,
     FatalTraceProcessingFlag = 13,
-    FatalTraceStream4Batch = 14,
-    FatalTraceAppendToActiveSpill = 15
+    FatalTraceShardCapacity = 14,
+    FatalTraceStream4Batch = 15,
+    FatalTraceAppendToActiveSpill = 16
 };
 
 void stream3_pack_threshold_cuda(
@@ -115,6 +116,7 @@ void stream3_collect_local_pending_cuda(
     std::size_t cub_temp_storage_bytes,
     std::uint32_t max_candidates,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
     cudaStream_t stream,
@@ -154,6 +156,7 @@ void stream3_restore_collect_single_owner_cuda(
     std::uint32_t b_micro,
     std::uint32_t max_candidates,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
     cudaStream_t stream,
@@ -184,6 +187,7 @@ void stream3_drain_global_spill_cuda(
     std::size_t cub_temp_storage_bytes,
     std::uint32_t shard_count,
     std::uint32_t global_spill_capacity,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     cudaStream_t stream,
     std::uint32_t* fatal_error_flag = nullptr,
@@ -217,6 +221,7 @@ void stream3_collect_remote_recv_cuda(
     std::uint32_t max_candidates,
     std::uint32_t world_size,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
     cudaStream_t stream,
@@ -231,6 +236,7 @@ void stream3_build_ready_shard_queue_cuda(
     std::uint32_t* ready_shard_list,
     std::uint32_t* ready_count,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     bool force_dirty_flush,
     bool force_clean_flush,

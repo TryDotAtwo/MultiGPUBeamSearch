@@ -1650,7 +1650,7 @@ struct RuntimeConfigBuild {
 std::uint64_t beam_alignment_for(const RuntimeConfig& config) {
     return static_cast<std::uint64_t>(config.world_size) *
            static_cast<std::uint64_t>(config.shard_count) *
-           static_cast<std::uint64_t>(config.stream4_batch_candidates_per_shard_unit);
+           static_cast<std::uint64_t>(config.stream4_batch_alignment);
 }
 
 std::uint64_t ring_slot_candidate_count(const RuntimeConfig& config) {
@@ -1690,22 +1690,39 @@ std::uint64_t logical_shard_size_for(const RuntimeConfig& config) {
     return ceil_div_u64(local_frontier_capacity(config), config.shard_count);
 }
 
+void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
+    const std::uint64_t logical_shard_size = logical_shard_size_for(config);
+    const std::uint64_t scaled_capacity =
+        std::max<std::uint64_t>(
+            logical_shard_size,
+            scaled_round_up(logical_shard_size, config.shard_capacity_scale_ppm));
+    if (env_present("BEAM_SHARD_CAPACITY_CANDIDATES")) {
+        config.shard_capacity_candidates = env_u32("BEAM_SHARD_CAPACITY_CANDIDATES", 1);
+        if (static_cast<std::uint64_t>(config.shard_capacity_candidates) < logical_shard_size) {
+            throw std::invalid_argument("BEAM_SHARD_CAPACITY_CANDIDATES must be at least LOGICAL_SHARD_SIZE");
+        }
+    } else {
+        config.shard_capacity_candidates = round_up_u32(
+            checked_u32(scaled_capacity, "shard_capacity_candidates"),
+            config.stream4_batch_alignment);
+    }
+}
+
 void set_global_spill_capacity(RuntimeConfig& config) {
     const std::uint64_t stream3_batch = static_cast<std::uint64_t>(config.stream3_batch_candidates);
-    const std::uint64_t concurrent_shard_backlog =
-        static_cast<std::uint64_t>(config.stream4_active_sort_slots) * logical_shard_size_for(config);
-    const std::uint64_t minimum_spill = std::max<std::uint64_t>(
-        2ULL * stream3_batch,
-        concurrent_shard_backlog);
+    const std::uint64_t worker_spill =
+        static_cast<std::uint64_t>(config.stream4_active_sort_slots) * stream3_batch;
+    const std::uint64_t minimum_spill =
+        std::max<std::uint64_t>(stream3_batch, scaled_round_up(worker_spill, config.global_spill_scale_ppm));
     if (env_present("BEAM_GLOBAL_SPILL_CAPACITY")) {
         config.global_spill_capacity = env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 1U << 20);
         if (config.global_spill_capacity < minimum_spill) {
-            throw std::invalid_argument("BEAM_GLOBAL_SPILL_CAPACITY is below the architecture spill backlog bound");
+            throw std::invalid_argument("BEAM_GLOBAL_SPILL_CAPACITY is below STREAM4 worker spill backlog bound");
         }
     } else {
         config.global_spill_capacity = round_up_u32(
             checked_u32(minimum_spill, "global_spill_capacity"),
-            config.stream4_batch_candidates_per_shard_unit);
+            config.stream4_batch_alignment);
     }
 }
 
@@ -1766,8 +1783,8 @@ std::vector<std::uint32_t> stream4_batch_candidates(
         if (batch == 0U) {
             throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be nonzero");
         }
-        if (batch % base.stream4_batch_candidates_per_shard_unit != 0U) {
-            throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be aligned to STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT");
+        if (batch % base.stream4_batch_alignment != 0U) {
+            throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be aligned to STREAM4_BATCH_ALIGNMENT");
         }
         if (static_cast<std::uint64_t>(batch) < stream3_batch) {
             throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be at least STREAM3_BATCH_CANDIDATES");
@@ -1786,12 +1803,12 @@ std::vector<std::uint32_t> stream4_batch_candidates(
     }
 
     std::vector<std::uint32_t> batches;
-    add_unique_batch(batches, min_batch, base.stream4_batch_candidates_per_shard_unit);
+    add_unique_batch(batches, min_batch, base.stream4_batch_alignment);
     for (std::uint32_t div : {1U, 2U, 3U, 4U, 6U, 8U, 12U, 16U, 24U, 32U}) {
-        add_unique_batch(batches, ceil_div_u64(logical_shard_size, div), base.stream4_batch_candidates_per_shard_unit);
+        add_unique_batch(batches, ceil_div_u64(logical_shard_size, div), base.stream4_batch_alignment);
     }
     for (std::uint64_t batch = min_batch; batch <= max_batch / 2ULL; batch *= 2ULL) {
-        add_unique_batch(batches, batch, base.stream4_batch_candidates_per_shard_unit);
+        add_unique_batch(batches, batch, base.stream4_batch_alignment);
     }
     std::sort(batches.begin(), batches.end());
     batches.erase(std::remove_if(
@@ -1820,6 +1837,7 @@ bool try_make_candidate(
     config.stream4_batch_candidates = stream4_batch;
     set_stream3_batch_from_ring_slots(config, ring_slot_count);
     set_ring_count_from_logical_shard(config);
+    set_shard_capacity_from_logical_shard(config);
     set_global_spill_capacity(config);
 
     const StaticMemoryPlan plan = make_static_memory_plan(config);
@@ -1888,18 +1906,23 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     config.world_size = world_size;
     config.local_rank = local_rank;
     config.b_micro = env_u32("BEAM_B_MICRO", 8192);
-    config.stream4_batch_candidates_per_shard_unit =
-        env_u32("BEAM_STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT", 1024);
+    config.stream4_batch_alignment =
+        env_present("BEAM_STREAM4_BATCH_ALIGNMENT")
+            ? env_u32("BEAM_STREAM4_BATCH_ALIGNMENT", 1024)
+            : env_u32("BEAM_STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT", 1024);
     config.stream4_active_sort_slots = env_u32("BEAM_STREAM4_ACTIVE_SORT_SLOTS", 4);
+    config.shard_capacity_scale_ppm = env_u32("BEAM_SHARD_CAPACITY_SCALE_PPM", 1'250'000);
+    config.global_spill_scale_ppm = env_u32("BEAM_GLOBAL_SPILL_SCALE_PPM", 2'000'000);
     config.global_threshold_update_period_shards =
         env_u32("BEAM_GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS", 64);
     config.solved_result_capacity = env_u32("BEAM_SOLVED_RESULT_CAPACITY", 1024);
     build.gpu_headroom_bytes = env_u64("BEAM_GPU_HEADROOM_BYTES", 768ULL * 1024ULL * 1024ULL);
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;
-    if (config.b_micro == 0U || config.stream4_batch_candidates_per_shard_unit == 0U ||
-        config.stream4_active_sort_slots == 0U) {
-        throw std::invalid_argument("B_MICRO, STREAM4_ACTIVE_SORT_SLOTS, and STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT must be nonzero");
+    if (config.b_micro == 0U || config.stream4_batch_alignment == 0U ||
+        config.stream4_active_sort_slots == 0U || config.shard_capacity_scale_ppm == 0U ||
+        config.global_spill_scale_ppm == 0U) {
+        throw std::invalid_argument("B_MICRO, STREAM4_ACTIVE_SORT_SLOTS, STREAM4_BATCH_ALIGNMENT, and capacity/spill scale values must be nonzero");
     }
 
     const std::uint32_t requested_ring_slot_count = env_u32("BEAM_STREAM3_RING_SLOTS", 1);
@@ -2014,9 +2037,12 @@ int main(int argc, char** argv) {
     std::cout << "STREAM5_BATCH_CANDIDATES=" << config.stream3_batch_candidates << "\n";
     std::cout << "SHARD_COUNT=" << config.shard_count << "\n";
     std::cout << "STREAM4_BATCH_CANDIDATES=" << config.stream4_batch_candidates << "\n";
-    std::cout << "STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT=" << config.stream4_batch_candidates_per_shard_unit << "\n";
+    std::cout << "STREAM4_BATCH_ALIGNMENT=" << config.stream4_batch_alignment << "\n";
     std::cout << "STREAM4_ACTIVE_SORT_SLOTS=" << config.stream4_active_sort_slots << "\n";
+    std::cout << "SHARD_CAPACITY_CANDIDATES=" << config.shard_capacity_candidates << "\n";
+    std::cout << "SHARD_CAPACITY_SCALE_PPM=" << config.shard_capacity_scale_ppm << "\n";
     std::cout << "GLOBAL_SPILL_CAPACITY=" << config.global_spill_capacity << "\n";
+    std::cout << "GLOBAL_SPILL_SCALE_PPM=" << config.global_spill_scale_ppm << "\n";
     std::cout << "N_LOCAL=" << local_frontier_capacity(config) << "\n";
     std::cout << "LOGICAL_SHARD_SIZE=" << logical_shard_size_for(config) << "\n";
     std::cout << "STREAM4_JOBS_PER_SHARD=" << ceil_div_u64(logical_shard_size_for(config), config.stream4_batch_candidates) << "\n";

@@ -651,6 +651,7 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
                 b_micro,
                 candidate_count,
                 config.shard_count,
+                config.shard_capacity_candidates,
                 config.stream4_batch_candidates,
                 config.global_spill_capacity,
                 streams[0]);
@@ -678,6 +679,7 @@ std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
         config.stream4_active_sort_slots = 1;
         config.ring_count = 1;
         config.shard_count = 1;
+        config.shard_capacity_candidates = 2U * batch;
         config.global_spill_capacity = 1024;
         config.user_global_beam_width = batch;
         StaticMemoryPlan plan = make_static_memory_plan(config);

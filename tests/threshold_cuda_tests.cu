@@ -44,8 +44,9 @@ int main() {
     config.stream4_active_sort_slots = 1;
     config.ring_count = 2;
     config.shard_count = shard_count;
+    config.shard_capacity_candidates = shard_capacity;
     config.global_spill_capacity = 16;
-    config.stream4_batch_candidates_per_shard_unit = 1;
+    config.stream4_batch_alignment = 1;
     config.user_global_beam_width = 4;
     config.solved_result_capacity = 4;
     const StaticMemoryPlan plan = make_static_memory_plan(config);
@@ -114,6 +115,7 @@ int main() {
         3,
         static_cast<std::uint32_t>(survivor.size()),
         shard_count,
+        shard_capacity,
         stream4_batch,
         0);
     final_allgather_counts_nccl_cuda(memory.final.final_candidate_count, d_all_counts, comm, 0);
@@ -178,6 +180,7 @@ int main() {
         2,
         static_cast<std::uint32_t>(survivor.size()),
         shard_count,
+        shard_capacity,
         stream4_batch,
         0);
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());

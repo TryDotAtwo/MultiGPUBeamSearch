@@ -33,8 +33,9 @@ int main() {
     config.stream4_active_sort_slots = 2;
     config.ring_count = 2;
     config.shard_count = 2;
+    config.shard_capacity_candidates = 128;
     config.global_spill_capacity = 128;
-    config.stream4_batch_candidates_per_shard_unit = 1;
+    config.stream4_batch_alignment = 1;
     config.user_global_beam_width = 128;
     config.solved_result_capacity = 8;
     const StaticMemoryPlan plan = make_static_memory_plan(config);

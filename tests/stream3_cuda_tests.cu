@@ -207,6 +207,7 @@ int main() {
         cub_temp_bytes,
         total,
         2,
+        4,
         2,
         total,
         0);
@@ -293,6 +294,7 @@ int main() {
         cub_temp_bytes,
         total,
         2,
+        4,
         2,
         total,
         0);
@@ -327,6 +329,7 @@ int main() {
         cub_temp_bytes,
         2,
         total,
+        4,
         2,
         0);
     BEAM_CUDA_CHECK(cudaGetLastError());
@@ -371,6 +374,7 @@ int main() {
         cub_temp_bytes,
         total,
         2,
+        4,
         2,
         1,
         0,
@@ -398,6 +402,7 @@ int main() {
         d_ready_shard_list,
         d_ready_count,
         2,
+        4,
         2,
         false,
         0);
@@ -446,6 +451,7 @@ int main() {
         total,
         3,
         2,
+        4,
         2,
         total,
         0);

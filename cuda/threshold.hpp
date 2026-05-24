@@ -61,6 +61,7 @@ void final_filter_load_balance_cuda(
     std::uint64_t global_keep_count,
     std::uint32_t final_capacity,
     std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     cudaStream_t stream);
 

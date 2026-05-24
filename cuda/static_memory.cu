@@ -267,8 +267,9 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     const std::uint64_t ring_candidates = ring_slots * config.b_micro * MOVE_COUNT;
     const std::uint64_t stream3 = config.stream3_batch_candidates;
     const std::uint64_t stream3_partition = std::max<std::uint64_t>(stream3, config.global_spill_capacity);
-    const std::uint64_t survivors = static_cast<std::uint64_t>(config.shard_count) * 2ULL * config.stream4_batch_candidates;
-    const std::uint64_t stream4_capacity = 2ULL * config.stream4_batch_candidates;
+    const std::uint64_t survivors =
+        static_cast<std::uint64_t>(config.shard_count) * config.shard_capacity_candidates;
+    const std::uint64_t stream4_capacity = config.shard_capacity_candidates;
     const std::uint64_t stream4_slots = config.stream4_active_sort_slots;
     const std::uint64_t spill = config.global_spill_capacity;
     std::size_t total = 0;
@@ -326,7 +327,8 @@ std::size_t bytes_final(const RuntimeConfig& config, const DerivedConfig& derive
         (derived.global_beam_width_effective + static_cast<std::uint64_t>(config.world_size) - 1ULL) /
         static_cast<std::uint64_t>(config.world_size);
     const std::uint64_t requests = frontier;
-    const std::uint64_t survivors = static_cast<std::uint64_t>(config.shard_count) * 2ULL * config.stream4_batch_candidates;
+    const std::uint64_t survivors =
+        static_cast<std::uint64_t>(config.shard_count) * config.shard_capacity_candidates;
     const std::uint64_t survivor_blocks = (survivors + 255ULL) / 256ULL;
     std::size_t total = 0;
     total += frontier * sizeof(State128);
@@ -355,7 +357,7 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     const DerivedConfig derived = derive_config(config);
     if (config.b_micro == 0 || config.ring_count == 0 || derived.ring_slot_count == 0 ||
         config.world_size == 0 || config.shard_count == 0 || config.stream4_active_sort_slots == 0 ||
-        derived.global_beam_width_effective == 0) {
+        config.shard_capacity_candidates == 0 || derived.global_beam_width_effective == 0) {
         throw std::invalid_argument("static memory config contains zero-sized architecture dimension");
     }
     StaticMemoryPlan plan;
@@ -373,14 +375,15 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     plan.parent_base_count = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
     plan.ring_count_count = plan.parent_base_count;
     plan.stream3_count = config.stream3_batch_candidates;
-    plan.survivor_count = static_cast<std::uint64_t>(config.shard_count) * 2ULL * config.stream4_batch_candidates;
+    plan.survivor_count =
+        static_cast<std::uint64_t>(config.shard_count) * config.shard_capacity_candidates;
     plan.final_state_count = plan.frontier_states;
     const std::uint32_t stream3_partition_count = static_cast<std::uint32_t>(
         std::max<std::uint64_t>(plan.stream3_count, config.global_spill_capacity));
     plan.stream3_cub_temp_bytes = std::max(
         stream3_cub_temp_bytes(config.stream3_batch_candidates),
         stream3_partition_cub_temp_bytes(stream3_partition_count, config.shard_count));
-    plan.stream4_cub_temp_bytes = stream4_cub_temp_bytes(2U * config.stream4_batch_candidates);
+    plan.stream4_cub_temp_bytes = stream4_cub_temp_bytes(config.shard_capacity_candidates);
     plan.current_frontier_bytes = static_cast<std::size_t>(plan.frontier_states) * sizeof(State128);
     plan.solved_bytes =
         5ULL * sizeof(std::uint32_t) +
@@ -466,7 +469,7 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.recv_count = streams.take<std::uint32_t>(plan.config.world_size);
     memory.streams.recv_offset = streams.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
     memory.streams.survivor_shard = streams.take<CandidateMeta>(plan.survivor_count);
-    const std::uint64_t stream4_capacity = 2ULL * plan.config.stream4_batch_candidates;
+    const std::uint64_t stream4_capacity = plan.config.shard_capacity_candidates;
     const std::uint64_t stream4_slots = plan.config.stream4_active_sort_slots;
     const std::uint64_t stream4_slot_items = stream4_slots * stream4_capacity;
     const std::uint64_t stream4_blocks_per_slot = (stream4_capacity + 255ULL) / 256ULL;

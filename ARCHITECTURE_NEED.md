@@ -11,7 +11,7 @@ INFERENCE_PARALLELISM
 
 STREAM3_BATCH_CANDIDATES
 STREAM4_BATCH_CANDIDATES
-STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT
+STREAM4_BATCH_ALIGNMENT
 
 RING_COUNT
 RING_SLOT_COUNT
@@ -20,7 +20,10 @@ WORLD_SIZE
 LOCAL_RANK
 
 SHARD_COUNT
+SHARD_CAPACITY_CANDIDATES
+SHARD_CAPACITY_SCALE_PPM
 GLOBAL_SPILL_CAPACITY
+GLOBAL_SPILL_SCALE_PPM
 
 USER_GLOBAL_BEAM_WIDTH
 GLOBAL_BEAM_WIDTH_EFFECTIVE
@@ -58,7 +61,7 @@ STREAM3_BATCH_CANDIDATES =
     RING_SLOT_COUNT * B_MICRO * MOVE_COUNT
 
 BEAM_WIDTH_ALIGNMENT =
-    WORLD_SIZE * SHARD_COUNT * STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT
+    WORLD_SIZE * SHARD_COUNT * STREAM4_BATCH_ALIGNMENT
 
 GLOBAL_BEAM_WIDTH_EFFECTIVE =
     round_up(USER_GLOBAL_BEAM_WIDTH, BEAM_WIDTH_ALIGNMENT)
@@ -69,15 +72,20 @@ N_LOCAL =
 LOGICAL_SHARD_SIZE =
     ceil(N_LOCAL / SHARD_COUNT)
 
+SHARD_CAPACITY_CANDIDATES =
+    round_up(ceil(LOGICAL_SHARD_SIZE * SHARD_CAPACITY_SCALE_PPM / 1_000_000),
+             STREAM4_BATCH_ALIGNMENT)
+
 RING_COUNT =
     ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))
 
 GLOBAL_SPILL_CAPACITY >=
-    max(2 * STREAM3_BATCH_CANDIDATES,
-        STREAM4_ACTIVE_SORT_SLOTS * LOGICAL_SHARD_SIZE)
+    ceil(STREAM4_ACTIVE_SORT_SLOTS * STREAM3_BATCH_CANDIDATES *
+         GLOBAL_SPILL_SCALE_PPM / 1_000_000)
 
 Config search:
     choose SHARD_COUNT and STREAM4_BATCH_CANDIDATES under memory budget
+    allocate all SHARD_COUNT resident shard buffers with SHARD_CAPACITY_CANDIDATES slots each
     reject default candidates with too few Stream4 jobs per logical shard
     score candidates by Stream4 waves, Stream4 jobs, batch size, shard count
 ```
@@ -416,7 +424,7 @@ recv_offset[WORLD_SIZE + 1] : uint32_t
 ```
 
 ```text
-survivor_shard[SHARD_COUNT][2 * STREAM4_BATCH_CANDIDATES] : CandidateMeta
+survivor_shard[SHARD_COUNT][SHARD_CAPACITY_CANDIDATES] : CandidateMeta
 
 clean_count[SHARD_COUNT]     : uint32_t
 dirty_count[SHARD_COUNT]     : uint32_t
@@ -1587,7 +1595,7 @@ Specialization:
     key   = Hash128
     value = CandidateMeta
     input = survivor_shard[shard][0 : clean_count[shard] + dirty_count[shard]]
-    capacity = 2 * STREAM4_BATCH_CANDIDATES
+    capacity = SHARD_CAPACITY_CANDIDATES
     sort scratch slots = STREAM4_ACTIVE_SORT_SLOTS
 
 Hard requirements:
@@ -1595,7 +1603,7 @@ Hard requirements:
     no Python data-plane
     no dynamic hot-path allocation
     no top-k shard cap
-    no semantic shard cap beyond fixed buffer capacity
+    fixed buffer capacity = SHARD_CAPACITY_CANDIDATES
     keep best CandidateMeta by score_key
     tie-break deterministic by parent_idx then route_packed
     fixed pre-start CUB temp storage
@@ -1611,4 +1619,38 @@ Output contract remains:
 
 This clarification changes implementation mechanics only.
 Stream semantics remain threshold + dedup by Hash128 + best CandidateMeta.
+```
+
+---
+
+# Superseding clarification: resident shard capacity is independent from Stream4 batch
+
+```text
+approval_id = resident_shard_capacity_decoupled_from_stream4_batch_2026_05_24
+
+All SHARD_COUNT shard buffers are resident GPU memory for the full depth.
+SHARD_CAPACITY_CANDIDATES is the physical capacity of each resident shard buffer.
+STREAM4_BATCH_CANDIDATES is the dirty-count launch threshold and tuning knob, not the shard capacity.
+
+SHARD_CAPACITY_CANDIDATES derives from:
+    LOGICAL_SHARD_SIZE = ceil(N_LOCAL / SHARD_COUNT)
+    SHARD_CAPACITY_SCALE_PPM reserve multiplier
+    STREAM4_BATCH_ALIGNMENT alignment
+
+Stream 3 writes into:
+    survivor_shard[shard][clean_count[shard] + dirty_count[shard]]
+when processing_flag[shard] == false and shard capacity has free slots.
+
+Stream 3 writes into global spill when:
+    processing_flag[shard] == true
+    or shard free slots are exhausted.
+
+GLOBAL_SPILL_CAPACITY derives from:
+    STREAM4_ACTIVE_SORT_SLOTS
+    STREAM3_BATCH_CANDIDATES
+    GLOBAL_SPILL_SCALE_PPM
+
+The old capacity equation:
+    survivor_shard[SHARD_COUNT][2 * STREAM4_BATCH_CANDIDATES]
+is invalid for production config search.
 ```
