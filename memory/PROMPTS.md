@@ -111,3 +111,4 @@
 - User requested replacing the shared global spill with per-shard resident double buffers: `survivor_shard_A[shard_capacity]` and `survivor_shard_B[shard_capacity]` for each logical shard, so Stream3 always has a shard-local write target and Stream4 alternates between A/B buffers.
 - User specified the Stream4 scheduling split: choose `STREAM4_BATCH_CANDIDATES` by Stream4 job time, then use a separate `STREAM4_TRIGGER_CANDIDATES` so `stream4_job_time * stream4_job_count / active_sort_slots` stays well below Stream1/2 time.
 - User requested a `beam=2**24`, `depth_limit=60` local Docker run without Nsight and without extra debug instrumentation, keeping only per-depth logs.
+- User requested publishing the working solver to Kaggle so other people can use the notebook.
