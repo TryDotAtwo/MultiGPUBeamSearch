@@ -420,12 +420,99 @@ struct TrackedSolutionPrefix {
                   << " path=" << path_env << "\n";
     }
 
+    const Hash128* hash_for_depth(std::uint32_t depth) const {
+        if (!enabled || depth >= prefix_hashes.size()) {
+            return nullptr;
+        }
+        return &prefix_hashes[depth];
+    }
+
+    void log_candidate_fields(
+        const char* prefix,
+        std::uint64_t puzzle_id,
+        std::uint32_t depth,
+        std::uint32_t prefix_len,
+        bool found,
+        std::uint32_t matches,
+        std::uint64_t first_index,
+        std::uint64_t best_index,
+        std::uint32_t best_score_key,
+        std::uint32_t final_threshold,
+        std::uint64_t parent_idx,
+        std::uint32_t route_packed,
+        std::uint32_t shard,
+        std::uint32_t local,
+        std::uint32_t final_candidate_count,
+        const std::vector<std::string>& move_names) {
+        const std::uint8_t move = found ? unpack_move(route_packed) : 0U;
+        const std::uint16_t source_rank = found ? unpack_source_rank(route_packed) : 0U;
+        const std::uint8_t owner = found ? unpack_owner(route_packed) : 0U;
+        const std::int64_t threshold_margin =
+            found && final_threshold != UINT32_THRESHOLD_MAX
+                ? static_cast<std::int64_t>(best_score_key) - static_cast<std::int64_t>(final_threshold)
+                : 0;
+        std::cout << prefix
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << prefix_len
+                  << " expected_move="
+                  << (depth < moves.size() ? move_names[moves[depth]] : "")
+                  << " found=" << (found ? 1 : 0)
+                  << " matches=" << matches
+                  << " first_index=" << first_index
+                  << " best_index=" << best_index
+                  << " best_score_key=" << (found ? best_score_key : UINT32_THRESHOLD_MAX)
+                  << " final_threshold=" << final_threshold
+                  << " threshold_pass="
+                  << (found && best_score_key <= final_threshold ? 1 : 0)
+                  << " threshold_margin=" << threshold_margin
+                  << " parent_idx=" << (found ? parent_idx : UINT64_MAX)
+                  << " route_packed=" << (found ? route_packed : UINT32_MAX)
+                  << " source_rank=" << static_cast<std::uint32_t>(source_rank)
+                  << " owner=" << static_cast<std::uint32_t>(owner)
+                  << " move=" << static_cast<std::uint32_t>(move)
+                  << " move_name=" << (found ? move_names[move] : "")
+                  << " shard=" << shard
+                  << " local=" << local
+                  << " final_candidate_count=" << final_candidate_count
+                  << "\n";
+    }
+
+    void log_prefinal(
+        std::uint64_t puzzle_id,
+        std::uint32_t depth,
+        const FinalizeDepthState& final_state,
+        const std::vector<std::string>& move_names) {
+        if (!enabled || depth >= prefix_hashes.size() || !final_state.tracked_prefinal_enabled) {
+            return;
+        }
+        const bool found = final_state.tracked_prefinal_matches != 0U;
+        log_candidate_fields(
+            "track_solution_prefinal",
+            puzzle_id,
+            depth,
+            depth + 1U,
+            found,
+            final_state.tracked_prefinal_matches,
+            final_state.tracked_prefinal_first_index,
+            final_state.tracked_prefinal_best_index,
+            final_state.tracked_prefinal_best_score_key,
+            final_state.final_threshold,
+            final_state.tracked_prefinal_best_parent_idx,
+            final_state.tracked_prefinal_best_route_packed,
+            final_state.tracked_prefinal_best_shard,
+            final_state.tracked_prefinal_best_local,
+            final_state.final_candidate_count,
+            move_names);
+    }
+
     void scan_depth(
         std::uint64_t puzzle_id,
         std::uint32_t depth,
         const CandidateMeta* candidates,
         std::uint32_t count,
-        std::uint32_t final_threshold) {
+        std::uint32_t final_threshold,
+        const std::vector<std::string>& move_names) {
         if (!enabled || depth >= prefix_hashes.size()) {
             return;
         }
@@ -433,27 +520,46 @@ struct TrackedSolutionPrefix {
         std::uint32_t match_count = 0;
         std::uint32_t best_score = UINT32_THRESHOLD_MAX;
         std::uint64_t first_index = 0;
+        std::uint64_t best_index = 0;
+        CandidateMeta best_candidate{};
         for (std::uint32_t i = 0; i < count; ++i) {
             const CandidateMeta& candidate = candidates[i];
             if (candidate.hash == target) {
                 if (match_count == 0U) {
                     first_index = i;
+                    best_index = i;
+                    best_candidate = candidate;
+                    best_score = candidate.score_key;
+                } else if (
+                    candidate.score_key < best_score ||
+                    (candidate.score_key == best_score && candidate.parent_idx < best_candidate.parent_idx) ||
+                    (candidate.score_key == best_score && candidate.parent_idx == best_candidate.parent_idx &&
+                        candidate.route_packed < best_candidate.route_packed)) {
+                    best_index = i;
+                    best_candidate = candidate;
+                    best_score = candidate.score_key;
                 }
                 ++match_count;
-                best_score = std::min(best_score, candidate.score_key);
             }
         }
         survived[depth] = match_count != 0U;
-        std::cout << "track_solution_prefix"
-                  << " puzzle_id=" << puzzle_id
-                  << " depth=" << depth
-                  << " prefix_len=" << (depth + 1U)
-                  << " survived=" << (survived[depth] ? 1 : 0)
-                  << " matches=" << match_count
-                  << " first_index=" << first_index
-                  << " best_score_key=" << (match_count == 0U ? UINT32_THRESHOLD_MAX : best_score)
-                  << " final_threshold=" << final_threshold
-                  << " final_candidate_count=" << count << "\n";
+        log_candidate_fields(
+            "track_solution_prefix",
+            puzzle_id,
+            depth,
+            depth + 1U,
+            survived[depth],
+            match_count,
+            first_index,
+            best_index,
+            best_score,
+            final_threshold,
+            best_candidate.parent_idx,
+            best_candidate.route_packed,
+            UINT32_MAX,
+            UINT32_MAX,
+            count,
+            move_names);
     }
 };
 
@@ -1605,15 +1711,22 @@ int main(int argc, char** argv) {
             history_slot.host,
             history_slot.capacity,
             history.copy_stream,
-            history_slot.copy_done);
+            history_slot.copy_done,
+            tracked_solution.hash_for_depth(depth));
         if (tracked_solution.enabled) {
             BEAM_CUDA_CHECK(cudaEventSynchronize(history_slot.copy_done));
+            tracked_solution.log_prefinal(
+                puzzle_id,
+                depth,
+                final_state,
+                host_move_names);
             tracked_solution.scan_depth(
                 puzzle_id,
                 depth,
                 history_slot.host,
                 final_state.final_candidate_count,
-                final_state.final_threshold);
+                final_state.final_threshold,
+                host_move_names);
         }
         history.commit_slot(history_slot, depth, final_state.final_candidate_count);
         history.pump_completed(false);

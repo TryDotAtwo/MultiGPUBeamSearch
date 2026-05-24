@@ -32,6 +32,158 @@ std::uint32_t host_shard_from_hash128(Hash128 hash, std::uint32_t shard_count) {
     return static_cast<std::uint32_t>(hash128_shard_distribution_key(hash) % shard_count);
 }
 
+__device__ CandidateMeta invalid_track_candidate_device() {
+    return CandidateMeta{Hash128{UINT64_MAX, UINT64_MAX}, UINT64_MAX, UINT32_MAX, UINT32_MAX};
+}
+
+__device__ bool track_candidate_less_device(CandidateMeta a, CandidateMeta b) {
+    if (a.score_key != b.score_key) {
+        return a.score_key < b.score_key;
+    }
+    if (a.parent_idx != b.parent_idx) {
+        return a.parent_idx < b.parent_idx;
+    }
+    return a.route_packed < b.route_packed;
+}
+
+bool track_candidate_less_host(CandidateMeta a, CandidateMeta b) {
+    if (a.score_key != b.score_key) {
+        return a.score_key < b.score_key;
+    }
+    if (a.parent_idx != b.parent_idx) {
+        return a.parent_idx < b.parent_idx;
+    }
+    return a.route_packed < b.route_packed;
+}
+
+__global__ void track_clean_survivor_hash_kernel(
+    const CandidateMeta* survivor_shard,
+    const std::uint32_t* clean_count,
+    std::uint32_t* block_matches,
+    std::uint32_t* block_best_score,
+    std::uint64_t* block_first_index,
+    std::uint64_t* block_best_index,
+    CandidateMeta* block_best_candidate,
+    Hash128 target_hash,
+    std::uint32_t shard_count,
+    std::uint32_t stream4_batch_candidates) {
+    __shared__ std::uint32_t match_count[256];
+    __shared__ std::uint32_t best_score[256];
+    __shared__ std::uint64_t first_index[256];
+    __shared__ std::uint64_t best_index[256];
+    __shared__ CandidateMeta best_candidate[256];
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint64_t shard_capacity = 2ULL * stream4_batch_candidates;
+    const std::uint64_t total = static_cast<std::uint64_t>(shard_count) * shard_capacity;
+    const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + tid;
+    bool match = false;
+    std::uint32_t score = UINT32_MAX;
+    CandidateMeta candidate = invalid_track_candidate_device();
+    if (i < total) {
+        const std::uint32_t shard = static_cast<std::uint32_t>(i / shard_capacity);
+        const std::uint32_t local = static_cast<std::uint32_t>(i - static_cast<std::uint64_t>(shard) * shard_capacity);
+        candidate = survivor_shard[i];
+        match = local < clean_count[shard] && candidate.hash == target_hash;
+        score = match ? candidate.score_key : UINT32_MAX;
+    }
+    match_count[tid] = match ? 1U : 0U;
+    best_score[tid] = score;
+    first_index[tid] = match ? i : UINT64_MAX;
+    best_index[tid] = match ? i : UINT64_MAX;
+    best_candidate[tid] = match ? candidate : invalid_track_candidate_device();
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2U; stride > 0; stride >>= 1U) {
+        if (tid < stride) {
+            match_count[tid] += match_count[tid + stride];
+            if (best_score[tid + stride] < best_score[tid]) {
+                best_score[tid] = best_score[tid + stride];
+            }
+            if (first_index[tid + stride] < first_index[tid]) {
+                first_index[tid] = first_index[tid + stride];
+            }
+            if (track_candidate_less_device(best_candidate[tid + stride], best_candidate[tid])) {
+                best_candidate[tid] = best_candidate[tid + stride];
+                best_index[tid] = best_index[tid + stride];
+            }
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        block_matches[blockIdx.x] = match_count[0];
+        block_best_score[blockIdx.x] = best_score[0];
+        block_first_index[blockIdx.x] = first_index[0];
+        block_best_index[blockIdx.x] = best_index[0];
+        block_best_candidate[blockIdx.x] = best_candidate[0];
+    }
+}
+
+void scan_tracked_prefinal_hash(
+    const StaticMemoryPlan& plan,
+    StaticDeviceMemory& memory,
+    DispatcherStreams& streams,
+    Hash128 target_hash,
+    FinalizeDepthState& state) {
+    NvtxRange range("Dispatcher_track_clean_survivor_hash");
+    const std::uint32_t block_size = 256;
+    const std::uint64_t item_count = plan.survivor_count;
+    const std::uint32_t block_count = static_cast<std::uint32_t>((item_count + block_size - 1ULL) / block_size);
+    auto* block_first_index = reinterpret_cast<std::uint64_t*>(memory.final.final_request_buffer);
+    auto* block_best_index = block_first_index + block_count;
+    track_clean_survivor_hash_kernel<<<block_count, block_size, 0, streams.stream3>>>(
+        memory.streams.survivor_shard,
+        memory.streams.clean_count,
+        memory.final.final_block_counts,
+        memory.final.final_block_offsets,
+        block_first_index,
+        block_best_index,
+        memory.final.final_candidate_buffer,
+        target_hash,
+        plan.config.shard_count,
+        plan.config.stream4_batch_candidates);
+    check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize tracked prefinal hash scan");
+
+    std::vector<std::uint32_t> matches(block_count);
+    std::vector<std::uint32_t> best_score(block_count);
+    std::vector<std::uint64_t> first_index(block_count);
+    std::vector<std::uint64_t> best_index(block_count);
+    std::vector<CandidateMeta> best_candidate(block_count);
+    check_cuda(cudaMemcpy(matches.data(), memory.final.final_block_counts, static_cast<std::uint64_t>(block_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy tracked prefinal matches");
+    check_cuda(cudaMemcpy(best_score.data(), memory.final.final_block_offsets, static_cast<std::uint64_t>(block_count) * sizeof(std::uint32_t), cudaMemcpyDeviceToHost), "cudaMemcpy tracked prefinal best score");
+    check_cuda(cudaMemcpy(first_index.data(), block_first_index, static_cast<std::uint64_t>(block_count) * sizeof(std::uint64_t), cudaMemcpyDeviceToHost), "cudaMemcpy tracked prefinal first index");
+    check_cuda(cudaMemcpy(best_index.data(), block_best_index, static_cast<std::uint64_t>(block_count) * sizeof(std::uint64_t), cudaMemcpyDeviceToHost), "cudaMemcpy tracked prefinal best index");
+    check_cuda(cudaMemcpy(best_candidate.data(), memory.final.final_candidate_buffer, static_cast<std::uint64_t>(block_count) * sizeof(CandidateMeta), cudaMemcpyDeviceToHost), "cudaMemcpy tracked prefinal best candidate");
+
+    state.tracked_prefinal_enabled = true;
+    state.tracked_prefinal_matches = 0;
+    state.tracked_prefinal_best_score_key = UINT32_MAX;
+    state.tracked_prefinal_first_index = 0;
+    CandidateMeta best = invalid_track_candidate_device();
+    for (std::uint32_t block = 0; block < block_count; ++block) {
+        if (matches[block] == 0U) {
+            continue;
+        }
+        if (state.tracked_prefinal_matches == 0U) {
+            state.tracked_prefinal_first_index = first_index[block];
+        } else {
+            state.tracked_prefinal_first_index = std::min(state.tracked_prefinal_first_index, first_index[block]);
+        }
+        state.tracked_prefinal_matches += matches[block];
+        state.tracked_prefinal_best_score_key = std::min(state.tracked_prefinal_best_score_key, best_score[block]);
+        if (track_candidate_less_host(best_candidate[block], best)) {
+            best = best_candidate[block];
+            state.tracked_prefinal_best_index = best_index[block];
+        }
+    }
+    if (state.tracked_prefinal_matches != 0U) {
+        const std::uint64_t shard_capacity = 2ULL * plan.config.stream4_batch_candidates;
+        state.tracked_prefinal_best_score_key = best.score_key;
+        state.tracked_prefinal_best_shard = static_cast<std::uint32_t>(state.tracked_prefinal_best_index / shard_capacity);
+        state.tracked_prefinal_best_local = static_cast<std::uint32_t>(state.tracked_prefinal_best_index % shard_capacity);
+        state.tracked_prefinal_best_parent_idx = best.parent_idx;
+        state.tracked_prefinal_best_route_packed = best.route_packed;
+    }
+}
+
 void dump_final_spill_debug(
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
@@ -1182,7 +1334,8 @@ FinalizeDepthState finalize_depth_single_gpu(
     CandidateMeta* history_host_buffer,
     std::uint32_t history_host_capacity,
     cudaStream_t history_stream,
-    cudaEvent_t history_copy_done) {
+    cudaEvent_t history_copy_done,
+    const Hash128* tracked_prefinal_hash) {
     NvtxRange range("Dispatcher_finalize_depth_single_gpu");
     if (plan.config.world_size != 1 || plan.config.local_rank != 0) {
         throw std::invalid_argument("single gpu finalization requires WORLD_SIZE=1 and LOCAL_RANK=0");
@@ -1199,6 +1352,12 @@ FinalizeDepthState finalize_depth_single_gpu(
         memory.streams.current_threshold,
         sizeof(final_threshold),
         cudaMemcpyDeviceToHost), "cudaMemcpy final threshold");
+
+    FinalizeDepthState result{};
+    result.final_threshold = final_threshold;
+    if (tracked_prefinal_hash != nullptr) {
+        scan_tracked_prefinal_hash(plan, memory, streams, *tracked_prefinal_hash, result);
+    }
 
     final_filter_load_balance_cuda(
         memory.streams.survivor_shard,
@@ -1338,11 +1497,11 @@ FinalizeDepthState finalize_depth_single_gpu(
         "cudaMemsetAsync reset threshold initialized");
     check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize threshold reset");
 
-    return FinalizeDepthState{
-        final_request_count,
-        final_threshold,
-        final_candidate_count,
-        final_request_count};
+    result.next_frontier_size = final_request_count;
+    result.final_threshold = final_threshold;
+    result.final_candidate_count = final_candidate_count;
+    result.final_request_count = final_request_count;
+    return result;
 }
 
 } // namespace beam

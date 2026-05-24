@@ -64,6 +64,15 @@ struct FinalizeDepthState {
     std::uint32_t final_threshold = 0;
     std::uint32_t final_candidate_count = 0;
     std::uint32_t final_request_count = 0;
+    bool tracked_prefinal_enabled = false;
+    std::uint32_t tracked_prefinal_matches = 0;
+    std::uint32_t tracked_prefinal_best_score_key = UINT32_MAX;
+    std::uint64_t tracked_prefinal_first_index = 0;
+    std::uint64_t tracked_prefinal_best_index = 0;
+    std::uint32_t tracked_prefinal_best_shard = UINT32_MAX;
+    std::uint32_t tracked_prefinal_best_local = UINT32_MAX;
+    std::uint64_t tracked_prefinal_best_parent_idx = UINT64_MAX;
+    std::uint32_t tracked_prefinal_best_route_packed = UINT32_MAX;
 };
 
 void create_dispatcher_streams(DispatcherStreams& streams);
@@ -98,6 +107,7 @@ FinalizeDepthState finalize_depth_single_gpu(
     CandidateMeta* history_host_buffer = nullptr,
     std::uint32_t history_host_capacity = 0,
     cudaStream_t history_stream = nullptr,
-    cudaEvent_t history_copy_done = nullptr);
+    cudaEvent_t history_copy_done = nullptr,
+    const Hash128* tracked_prefinal_hash = nullptr);
 
 } // namespace beam
