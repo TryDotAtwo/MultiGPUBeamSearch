@@ -2389,12 +2389,31 @@ int main(int argc, char** argv) {
         const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
 #if BEAM_ENABLE_DEPTH_LOGS
         if (emit_depth_log) {
+        const double stream4_avg_ms =
+            state.stream4_jobs_launched == 0U ? 0.0 :
+            state.stream4_ms_total / static_cast<double>(state.stream4_jobs_launched);
+        const double stream5_ms_total = state.stream5_ms_total + final_state.stream5_threshold_ms;
         std::cout << "depth_done=" << depth
                   << " depth_sec=" << depth_sec
                   << " ring_slot_jobs=" << state.ring_slot_jobs_launched
                   << " stream3_jobs=" << state.stream3_jobs_launched
                   << " stream4_jobs=" << state.stream4_jobs_launched
                   << " stream4_slots_used=" << state.stream4_active_sort_slots_used
+                  << " stream12_ms=" << state.stream12_ms_total
+                  << " stream12_max_ms=" << state.stream12_ms_max
+                  << " stream3_ring_ms=" << state.stream3_ring_ms_total
+                  << " stream3_ring_max_ms=" << state.stream3_ring_ms_max
+                  << " stream3_spill_drain_ms=" << state.stream3_spill_drain_ms_total
+                  << " stream3_final_filter_ms=" << final_state.stream3_final_filter_ms
+                  << " stream3_final_materialize_ms=" << final_state.stream3_final_materialize_ms
+                  << " stream3_reset_ms=" << final_state.stream3_reset_ms
+                  << " stream4_ms=" << state.stream4_ms_total
+                  << " stream4_max_ms=" << state.stream4_ms_max
+                  << " stream4_avg_ms=" << stream4_avg_ms
+                  << " stream5_ms=" << stream5_ms_total
+                  << " stream4_pending_max=" << state.stream4_pending_shards_max
+                  << " stream4_busy_max=" << state.stream4_busy_slots_max
+                  << " global_spill_peak=" << state.global_spill_peak
                   << " threshold_updates_depth=" << state.threshold_updates
                   << " final_threshold=" << final_state.final_threshold
                   << " final_candidate_count=" << final_state.final_candidate_count

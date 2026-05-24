@@ -30,6 +30,20 @@ void check_cuda(cudaError_t status, const char* op) {
     }
 }
 
+void accumulate_elapsed_ms(
+    cudaEvent_t start,
+    cudaEvent_t stop,
+    double& total_ms,
+    double* max_ms,
+    const char* op) {
+    float elapsed_ms = 0.0f;
+    check_cuda(cudaEventElapsedTime(&elapsed_ms, start, stop), op);
+    total_ms += static_cast<double>(elapsed_ms);
+    if (max_ms != nullptr) {
+        *max_ms = std::max(*max_ms, static_cast<double>(elapsed_ms));
+    }
+}
+
 std::uint32_t host_shard_from_hash128(Hash128 hash, std::uint32_t shard_count) {
     return static_cast<std::uint32_t>(hash128_shard_distribution_key(hash) % shard_count);
 }
@@ -823,26 +837,58 @@ DepthDispatchState run_depth_cuda_graphs(
 
     std::vector<cudaEvent_t> ring_done(plan.config.ring_count, nullptr);
     std::vector<cudaEvent_t> stream3_done(plan.config.ring_count, nullptr);
+    std::vector<cudaEvent_t> ring_timing_start(plan.config.ring_count, nullptr);
+    std::vector<cudaEvent_t> ring_timing_stop(plan.config.ring_count, nullptr);
+    std::vector<cudaEvent_t> stream3_timing_start(plan.config.ring_count, nullptr);
+    std::vector<cudaEvent_t> stream3_timing_stop(plan.config.ring_count, nullptr);
+    std::vector<cudaEvent_t> stream4_timing_start(plan.config.stream4_active_sort_slots, nullptr);
+    std::vector<cudaEvent_t> stream4_timing_stop(plan.config.stream4_active_sort_slots, nullptr);
+    std::vector<cudaEvent_t> stream5_timing_start(1, nullptr);
+    std::vector<cudaEvent_t> stream5_timing_stop(1, nullptr);
+    std::vector<cudaEvent_t> stream3_spill_drain_timing_start(1, nullptr);
+    std::vector<cudaEvent_t> stream3_spill_drain_timing_stop(1, nullptr);
     for (std::uint32_t ring = 0; ring < plan.config.ring_count; ++ring) {
         check_cuda(cudaEventCreateWithFlags(&ring_done[ring], cudaEventDisableTiming), "cudaEventCreate ring done");
         check_cuda(cudaEventCreateWithFlags(&stream3_done[ring], cudaEventDisableTiming), "cudaEventCreate stream3 done");
+        check_cuda(cudaEventCreate(&ring_timing_start[ring]), "cudaEventCreate ring timing start");
+        check_cuda(cudaEventCreate(&ring_timing_stop[ring]), "cudaEventCreate ring timing stop");
+        check_cuda(cudaEventCreate(&stream3_timing_start[ring]), "cudaEventCreate stream3 timing start");
+        check_cuda(cudaEventCreate(&stream3_timing_stop[ring]), "cudaEventCreate stream3 timing stop");
     }
+    for (std::uint32_t slot = 0; slot < plan.config.stream4_active_sort_slots; ++slot) {
+        check_cuda(cudaEventCreate(&stream4_timing_start[slot]), "cudaEventCreate stream4 timing start");
+        check_cuda(cudaEventCreate(&stream4_timing_stop[slot]), "cudaEventCreate stream4 timing stop");
+    }
+    check_cuda(cudaEventCreate(&stream5_timing_start[0]), "cudaEventCreate stream5 timing start");
+    check_cuda(cudaEventCreate(&stream5_timing_stop[0]), "cudaEventCreate stream5 timing stop");
+    check_cuda(cudaEventCreate(&stream3_spill_drain_timing_start[0]), "cudaEventCreate stream3 spill drain timing start");
+    check_cuda(cudaEventCreate(&stream3_spill_drain_timing_stop[0]), "cudaEventCreate stream3 spill drain timing stop");
     struct EventCleanup {
-        std::vector<cudaEvent_t>& a;
-        std::vector<cudaEvent_t>& b;
+        std::vector<std::vector<cudaEvent_t>*>& groups;
         ~EventCleanup() {
-            for (cudaEvent_t event : a) {
-                if (event) {
-                    cudaEventDestroy(event);
-                }
-            }
-            for (cudaEvent_t event : b) {
-                if (event) {
-                    cudaEventDestroy(event);
+            for (std::vector<cudaEvent_t>* group : groups) {
+                for (cudaEvent_t event : *group) {
+                    if (event) {
+                        cudaEventDestroy(event);
+                    }
                 }
             }
         }
-    } event_cleanup{ring_done, stream3_done};
+    };
+    std::vector<std::vector<cudaEvent_t>*> event_groups{
+        &ring_done,
+        &stream3_done,
+        &ring_timing_start,
+        &ring_timing_stop,
+        &stream3_timing_start,
+        &stream3_timing_stop,
+        &stream4_timing_start,
+        &stream4_timing_stop,
+        &stream5_timing_start,
+        &stream5_timing_stop,
+        &stream3_spill_drain_timing_start,
+        &stream3_spill_drain_timing_stop};
+    EventCleanup event_cleanup{event_groups};
 
     const auto refresh_stop_requested = [&]() -> bool {
         if (state.stop_requested) {
@@ -890,7 +936,37 @@ DepthDispatchState run_depth_cuda_graphs(
     std::uint32_t stream3_active_ring = plan.config.ring_count;
     std::function<void(std::uint32_t)> scan_tracked_stream4_output;
 
+    const auto pending_stream4_count = [&]() -> std::uint32_t {
+        return static_cast<std::uint32_t>(pending_stream4_shards.size() - pending_stream4_head);
+    };
+
+    const auto update_stream4_queue_peaks = [&]() {
+        state.stream4_pending_shards_max =
+            std::max(state.stream4_pending_shards_max, pending_stream4_count());
+        state.stream4_busy_slots_max =
+            std::max<std::uint32_t>(
+                state.stream4_busy_slots_max,
+                static_cast<std::uint32_t>(stream4_busy_slots.size()));
+    };
+
+    const auto update_global_spill_peak = [&]() {
+        std::uint32_t spill_counts[2]{};
+        check_cuda(cudaMemcpy(
+            spill_counts,
+            memory.streams.global_spill_count,
+            sizeof(spill_counts),
+            cudaMemcpyDeviceToHost), "cudaMemcpy global spill counts timing");
+        state.global_spill_peak = std::max(state.global_spill_peak, spill_counts[0]);
+        state.global_spill_peak = std::max(state.global_spill_peak, spill_counts[1]);
+    };
+
     const auto mark_stream4_slot_complete = [&](std::uint32_t slot) {
+        accumulate_elapsed_ms(
+            stream4_timing_start[slot],
+            stream4_timing_stop[slot],
+            state.stream4_ms_total,
+            &state.stream4_ms_max,
+            "cudaEventElapsedTime stream4 job");
         if (scan_tracked_stream4_output) {
             scan_tracked_stream4_output(slot);
         }
@@ -898,6 +974,7 @@ DepthDispatchState run_depth_cuda_graphs(
         stream4_slot_shard[slot] = plan.config.shard_count;
         stream4_free_slots.push_back(slot);
         ++stream4_jobs_since_threshold_update;
+        update_stream4_queue_peaks();
     };
 
     const auto release_completed_stream4_slots_nonblocking = [&]() -> bool {
@@ -1410,6 +1487,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 continue;
             }
             ring_state[ring] = RingState::Stream1Running;
+            check_cuda(cudaEventRecord(ring_timing_start[ring], streams.stream1), "cudaEventRecord stream12 timing start");
             for (std::uint32_t slot = 0; slot < plan.derived.ring_slot_count; ++slot) {
                 const std::uint32_t job = ring * plan.derived.ring_slot_count + slot;
                 std::uint64_t parent_base_value = 0;
@@ -1440,6 +1518,7 @@ DepthDispatchState run_depth_cuda_graphs(
                     ++state.ring_slot_jobs_launched;
                 }
             }
+            check_cuda(cudaEventRecord(ring_timing_stop[ring], streams.stream1), "cudaEventRecord stream12 timing stop");
             check_cuda(cudaEventRecord(ring_done[ring], streams.stream1), "cudaEventRecord ring score hash done");
             stream1_running_rings.push_back(ring);
             launched_any = true;
@@ -1489,6 +1568,7 @@ DepthDispatchState run_depth_cuda_graphs(
             }
             pending_stream4_shards.push_back(shard);
         }
+        update_stream4_queue_peaks();
         return ready_count;
     };
 
@@ -1502,8 +1582,16 @@ DepthDispatchState run_depth_cuda_graphs(
             throw std::runtime_error("periodic threshold update requested while stream3 is active");
         }
         wait_all_stream4_slots();
+        check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 timing start");
         update_threshold_single_gpu(plan, memory, streams.stream5, true);
+        check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 timing stop");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 periodic threshold update");
+        accumulate_elapsed_ms(
+            stream5_timing_start[0],
+            stream5_timing_stop[0],
+            state.stream5_ms_total,
+            nullptr,
+            "cudaEventElapsedTime stream5 threshold");
         ++state.threshold_updates;
         stream4_jobs_since_threshold_update = 0;
     };
@@ -1522,14 +1610,21 @@ DepthDispatchState run_depth_cuda_graphs(
                 static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
             scan_tracked_stream4_input(shard, slot, graph_idx);
             check_cuda(
+                cudaEventRecord(stream4_timing_start[slot], streams.stream4_slot_streams[slot]),
+                "cudaEventRecord stream4 timing start");
+            check_cuda(
                 cudaGraphLaunch(graphs.stream4_shard_execs[graph_idx], streams.stream4_slot_streams[slot]),
                 "cudaGraphLaunch stream4");
+            check_cuda(
+                cudaEventRecord(stream4_timing_stop[slot], streams.stream4_slot_streams[slot]),
+                "cudaEventRecord stream4 timing stop");
             check_cuda(
                 cudaEventRecord(streams.stream4_slot_done[slot], streams.stream4_slot_streams[slot]),
                 "cudaEventRecord stream4 slot done");
             stream4_slot_busy[slot] = true;
             stream4_slot_shard[slot] = shard;
             stream4_busy_slots.push_back(slot);
+            update_stream4_queue_peaks();
             ++launched;
             ++state.stream4_jobs_launched;
             state.stream4_active_sort_slots_used = std::max(state.stream4_active_sort_slots_used, slot + 1U);
@@ -1550,14 +1645,21 @@ DepthDispatchState run_depth_cuda_graphs(
                     static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
                 scan_tracked_stream4_input(shard, slot, graph_idx);
                 check_cuda(
+                    cudaEventRecord(stream4_timing_start[slot], streams.stream4_slot_streams[slot]),
+                    "cudaEventRecord stream4 timing start");
+                check_cuda(
                     cudaGraphLaunch(graphs.stream4_shard_execs[graph_idx], streams.stream4_slot_streams[slot]),
                     "cudaGraphLaunch stream4");
+                check_cuda(
+                    cudaEventRecord(stream4_timing_stop[slot], streams.stream4_slot_streams[slot]),
+                    "cudaEventRecord stream4 timing stop");
                 check_cuda(
                     cudaEventRecord(streams.stream4_slot_done[slot], streams.stream4_slot_streams[slot]),
                     "cudaEventRecord stream4 slot done");
                 stream4_slot_busy[slot] = true;
                 stream4_slot_shard[slot] = shard;
                 stream4_busy_slots.push_back(slot);
+                update_stream4_queue_peaks();
                 ++launched;
                 ++state.stream4_jobs_launched;
                 state.stream4_active_sort_slots_used = std::max(state.stream4_active_sort_slots_used, slot + 1U);
@@ -1679,7 +1781,9 @@ DepthDispatchState run_depth_cuda_graphs(
             throw std::runtime_error("stream3 ready queue contains a non-ready ring");
         }
         scan_tracked_generated_candidate(ring);
+        check_cuda(cudaEventRecord(stream3_timing_start[ring], streams.stream3), "cudaEventRecord stream3 timing start");
         check_cuda(cudaGraphLaunch(graphs.stream3_ring_execs[ring], streams.stream3), "cudaGraphLaunch stream3");
+        check_cuda(cudaEventRecord(stream3_timing_stop[ring], streams.stream3), "cudaEventRecord stream3 timing stop");
         check_cuda(cudaEventRecord(stream3_done[ring], streams.stream3), "cudaEventRecord stream3 ring done");
         ring_state[ring] = RingState::Stream3Running;
         stream3_active = true;
@@ -1704,6 +1808,12 @@ DepthDispatchState run_depth_cuda_graphs(
             const cudaError_t status = cudaEventQuery(ring_done[ring]);
             if (status == cudaSuccess) {
                 stream1_running_rings.pop_front();
+                accumulate_elapsed_ms(
+                    ring_timing_start[ring],
+                    ring_timing_stop[ring],
+                    state.stream12_ms_total,
+                    &state.stream12_ms_max,
+                    "cudaEventElapsedTime stream12 ring");
                 ring_state[ring] = RingState::ReadyForStream3;
                 stream3_ready_rings.push_back(ring);
                 progressed = true;
@@ -1723,6 +1833,12 @@ DepthDispatchState run_depth_cuda_graphs(
         const std::uint32_t ring = stream1_running_rings.front();
         check_cuda(cudaEventSynchronize(ring_done[ring]), "cudaEventSynchronize ring done");
         stream1_running_rings.pop_front();
+        accumulate_elapsed_ms(
+            ring_timing_start[ring],
+            ring_timing_stop[ring],
+            state.stream12_ms_total,
+            &state.stream12_ms_max,
+            "cudaEventElapsedTime stream12 ring");
         ring_state[ring] = RingState::ReadyForStream3;
         stream3_ready_rings.push_back(ring);
         release_completed_rings_nonblocking();
@@ -1736,6 +1852,13 @@ DepthDispatchState run_depth_cuda_graphs(
         }
         const std::uint32_t ring = stream3_active_ring;
         throw_if_stream_fatal_error("stream3_ring_complete");
+        accumulate_elapsed_ms(
+            stream3_timing_start[ring],
+            stream3_timing_stop[ring],
+            state.stream3_ring_ms_total,
+            &state.stream3_ring_ms_max,
+            "cudaEventElapsedTime stream3 ring");
+        update_global_spill_peak();
         stream3_active = false;
         stream3_active_ring = plan.config.ring_count;
         ring_state[ring] = RingState::Free;
@@ -1835,6 +1958,9 @@ DepthDispatchState run_depth_cuda_graphs(
     force_periodic_threshold_update();
 
     for (std::uint32_t flush_round = 0; flush_round < plan.config.shard_count + 2U; ++flush_round) {
+        check_cuda(
+            cudaEventRecord(stream3_spill_drain_timing_start[0], streams.stream3),
+            "cudaEventRecord stream3 spill drain timing start");
         stream3_drain_global_spill_cuda(
             memory.streams.global_spill_buffer_a,
             memory.streams.global_spill_buffer_b,
@@ -1877,8 +2003,18 @@ DepthDispatchState run_depth_cuda_graphs(
             true,
             true,
             streams.stream3);
+        check_cuda(
+            cudaEventRecord(stream3_spill_drain_timing_stop[0], streams.stream3),
+            "cudaEventRecord stream3 spill drain timing stop");
         check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final spill drain");
+        accumulate_elapsed_ms(
+            stream3_spill_drain_timing_start[0],
+            stream3_spill_drain_timing_stop[0],
+            state.stream3_spill_drain_ms_total,
+            nullptr,
+            "cudaEventElapsedTime stream3 spill drain");
         throw_if_stream_fatal_error("final_spill_drain");
+        update_global_spill_peak();
         append_stream3_ready_queue();
         drain_pending_stream4_shards();
         std::uint32_t spill_counts[2]{};
@@ -1962,8 +2098,41 @@ FinalizeDepthState finalize_depth_single_gpu(
         throw std::invalid_argument("finalization requires generators");
     }
 
+    cudaEvent_t timing_start = nullptr;
+    cudaEvent_t timing_stop = nullptr;
+    check_cuda(cudaEventCreate(&timing_start), "cudaEventCreate finalize timing start");
+    check_cuda(cudaEventCreate(&timing_stop), "cudaEventCreate finalize timing stop");
+    struct FinalizeTimingCleanup {
+        cudaEvent_t& start;
+        cudaEvent_t& stop;
+        ~FinalizeTimingCleanup() {
+            if (start) {
+                cudaEventDestroy(start);
+            }
+            if (stop) {
+                cudaEventDestroy(stop);
+            }
+        }
+    } finalize_timing_cleanup{timing_start, timing_stop};
+
+    auto record_timing_start = [&](cudaStream_t stream, const char* op) {
+        check_cuda(cudaEventRecord(timing_start, stream), op);
+    };
+    auto record_timing_stop_and_sync = [&](cudaStream_t stream, double& output_ms, const char* record_op, const char* sync_op, const char* elapsed_op) {
+        check_cuda(cudaEventRecord(timing_stop, stream), record_op);
+        check_cuda(cudaStreamSynchronize(stream), sync_op);
+        accumulate_elapsed_ms(timing_start, timing_stop, output_ms, nullptr, elapsed_op);
+    };
+
+    FinalizeDepthState result{};
+    record_timing_start(streams.stream5, "cudaEventRecord final threshold timing start");
     update_threshold_single_gpu(plan, memory, streams.stream5, false);
-    check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 final threshold");
+    record_timing_stop_and_sync(
+        streams.stream5,
+        result.stream5_threshold_ms,
+        "cudaEventRecord final threshold timing stop",
+        "cudaStreamSynchronize stream5 final threshold",
+        "cudaEventElapsedTime stream5 final threshold");
     std::uint32_t final_threshold = UINT32_THRESHOLD_MAX;
     check_cuda(cudaMemcpy(
         &final_threshold,
@@ -1971,12 +2140,12 @@ FinalizeDepthState finalize_depth_single_gpu(
         sizeof(final_threshold),
         cudaMemcpyDeviceToHost), "cudaMemcpy final threshold");
 
-    FinalizeDepthState result{};
     result.final_threshold = final_threshold;
     if (tracked_prefinal_hash != nullptr) {
         scan_tracked_prefinal_hash(plan, memory, streams, *tracked_prefinal_hash, result);
     }
 
+    record_timing_start(streams.stream3, "cudaEventRecord final filter timing start");
     final_filter_load_balance_cuda(
         memory.streams.survivor_shard,
         memory.streams.clean_count,
@@ -1999,7 +2168,12 @@ FinalizeDepthState finalize_depth_single_gpu(
         plan.config.shard_capacity_candidates,
         plan.config.stream4_batch_candidates,
         streams.stream3);
-    check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final filter load balance");
+    record_timing_stop_and_sync(
+        streams.stream3,
+        result.stream3_final_filter_ms,
+        "cudaEventRecord final filter timing stop",
+        "cudaStreamSynchronize final filter load balance",
+        "cudaEventElapsedTime stream3 final filter");
 
     std::uint32_t final_candidate_count = 0;
     std::uint32_t final_request_count = 0;
@@ -2038,6 +2212,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         check_cuda(cudaEventRecord(history_copy_done, history_stream), "cudaEventRecord history copy done");
     }
 
+    record_timing_start(streams.stream3, "cudaEventRecord final materialize timing start");
     if (final_request_count != 0) {
         final_materialize_cuda(
             memory.current_frontier_states,
@@ -2054,7 +2229,13 @@ FinalizeDepthState finalize_depth_single_gpu(
             cudaMemcpyDeviceToDevice,
             streams.stream3), "cudaMemcpyAsync next frontier to current");
     }
-    check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final materialize");
+    record_timing_stop_and_sync(
+        streams.stream3,
+        result.stream3_final_materialize_ms,
+        "cudaEventRecord final materialize timing stop",
+        "cudaStreamSynchronize final materialize",
+        "cudaEventElapsedTime stream3 final materialize");
+    record_timing_start(streams.stream3, "cudaEventRecord final reset timing start");
     check_cuda(cudaMemsetAsync(
         memory.streams.clean_count,
         0,
@@ -2114,7 +2295,12 @@ FinalizeDepthState finalize_depth_single_gpu(
         "cudaMemsetAsync reset current threshold");
     check_cuda(cudaMemsetAsync(memory.streams.threshold_initialized, 0, sizeof(std::uint32_t), streams.stream3),
         "cudaMemsetAsync reset threshold initialized");
-    check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize threshold reset");
+    record_timing_stop_and_sync(
+        streams.stream3,
+        result.stream3_reset_ms,
+        "cudaEventRecord final reset timing stop",
+        "cudaStreamSynchronize threshold reset",
+        "cudaEventElapsedTime stream3 final reset");
 
     result.next_frontier_size = final_request_count;
     result.final_threshold = final_threshold;

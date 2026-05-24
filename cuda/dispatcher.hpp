@@ -170,6 +170,17 @@ struct DepthDispatchState {
     std::uint32_t stream4_jobs_launched = 0;
     std::uint32_t stream4_active_sort_slots_used = 0;
     std::uint32_t threshold_updates = 0;
+    double stream12_ms_total = 0.0;
+    double stream12_ms_max = 0.0;
+    double stream3_ring_ms_total = 0.0;
+    double stream3_ring_ms_max = 0.0;
+    double stream3_spill_drain_ms_total = 0.0;
+    double stream4_ms_total = 0.0;
+    double stream4_ms_max = 0.0;
+    double stream5_ms_total = 0.0;
+    std::uint32_t stream4_pending_shards_max = 0;
+    std::uint32_t stream4_busy_slots_max = 0;
+    std::uint32_t global_spill_peak = 0;
     bool depth_drained = false;
     bool stop_requested = false;
     GeneratedTrackResult tracked_generated;
@@ -192,6 +203,10 @@ struct FinalizeDepthState {
     std::uint32_t tracked_prefinal_best_local = UINT32_MAX;
     std::uint64_t tracked_prefinal_best_parent_idx = UINT64_MAX;
     std::uint32_t tracked_prefinal_best_route_packed = UINT32_MAX;
+    double stream5_threshold_ms = 0.0;
+    double stream3_final_filter_ms = 0.0;
+    double stream3_final_materialize_ms = 0.0;
+    double stream3_reset_ms = 0.0;
 };
 
 void create_dispatcher_streams(DispatcherStreams& streams);
