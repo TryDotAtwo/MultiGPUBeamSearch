@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <array>
 #include <vector>
 
 using namespace beam;
@@ -67,6 +68,8 @@ int main() {
     CandidateMeta* d_global_spill_b = nullptr;
     std::uint32_t* d_global_spill_count = nullptr;
     std::uint32_t* d_global_spill_active_index = nullptr;
+    std::uint32_t* d_fatal_error_flag = nullptr;
+    std::uint64_t* d_fatal_error_trace = nullptr;
     std::uint32_t* d_shard_counts = nullptr;
     std::uint32_t* d_shard_offsets = nullptr;
     std::uint32_t* d_spill_counts = nullptr;
@@ -112,6 +115,8 @@ int main() {
     BEAM_CUDA_CHECK(cudaMalloc(&d_global_spill_b, hash.size() * sizeof(CandidateMeta)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_global_spill_count, 2 * sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_global_spill_active_index, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_fatal_error_flag, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_fatal_error_trace, STREAM_FATAL_TRACE_WORDS * sizeof(std::uint64_t)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_shard_counts, 2 * sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_shard_offsets, 2 * sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_spill_counts, 2 * sizeof(std::uint32_t)));
@@ -136,6 +141,8 @@ int main() {
     BEAM_CUDA_CHECK(cudaMemset(d_processing_flag, 0, 2 * sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMemset(d_global_spill_count, 0, 2 * sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMemset(d_global_spill_active_index, 0, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_fatal_error_flag, 0, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_fatal_error_trace, 0, STREAM_FATAL_TRACE_WORDS * sizeof(std::uint64_t)));
 
     stream3_pack_threshold_cuda(
         d_score,
@@ -332,6 +339,57 @@ int main() {
     require(dirty_count[1] == 2, "stream3 global spill drain dirty count failed");
     require(survivor_shard[5].hash == Hash128{1, 1} && survivor_shard[5].score_key == 7, "stream3 global spill drain write failed");
 
+    BEAM_CUDA_CHECK(cudaMemcpy(d_processing_flag, processing_busy, sizeof(processing_busy), cudaMemcpyHostToDevice));
+    const std::uint32_t full_spill_count[2]{1, 0};
+    BEAM_CUDA_CHECK(cudaMemcpy(d_global_spill_count, full_spill_count, sizeof(full_spill_count), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemset(d_global_spill_active_index, 0, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_fatal_error_flag, 0, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_fatal_error_trace, 0, STREAM_FATAL_TRACE_WORDS * sizeof(std::uint64_t)));
+    stream3_collect_local_pending_cuda(
+        d_local_pending,
+        d_local_pending_count,
+        d_survivor_shard,
+        d_clean_count,
+        d_dirty_count,
+        d_processing_flag,
+        d_global_spill_a,
+        d_global_spill_b,
+        d_global_spill_count,
+        d_global_spill_active_index,
+        d_shard_counts,
+        d_shard_offsets,
+        d_spill_counts,
+        d_spill_offsets,
+        d_partition_key_a,
+        d_partition_key_b,
+        d_partition_val_a,
+        d_partition_val_b,
+        d_partition_unique_shard,
+        d_partition_unique_counts,
+        d_partition_unique_count,
+        d_cub_temp,
+        cub_temp_bytes,
+        total,
+        2,
+        2,
+        1,
+        0,
+        d_fatal_error_flag,
+        d_fatal_error_trace);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    std::uint32_t fatal_error_flag = 0;
+    std::array<std::uint64_t, STREAM_FATAL_TRACE_WORDS> fatal_error_trace{};
+    BEAM_CUDA_CHECK(cudaMemcpy(&fatal_error_flag, d_fatal_error_flag, sizeof(fatal_error_flag), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(fatal_error_trace.data(), d_fatal_error_trace, fatal_error_trace.size() * sizeof(std::uint64_t), cudaMemcpyDeviceToHost));
+    require(fatal_error_flag == STREAM_FATAL_STREAM3_SPILL_OVERFLOW, "stream3 spill overflow fatal flag failed");
+    require(fatal_error_trace[FatalTraceSpillEnd] > fatal_error_trace[FatalTraceSpillCapacity],
+            "stream3 spill overflow fatal trace failed");
+    BEAM_CUDA_CHECK(cudaMemcpy(d_processing_flag, processing_free, sizeof(processing_free), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemset(d_global_spill_count, 0, 2 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_global_spill_active_index, 0, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_fatal_error_flag, 0, sizeof(std::uint32_t)));
+
     stream3_build_ready_shard_queue_cuda(
         d_clean_count,
         d_dirty_count,
@@ -404,6 +462,7 @@ int main() {
     report << "- local_pending_collector=pass\n";
     report << "- busy_shard_spill=pass\n";
     report << "- global_spill_drain=pass\n";
+    report << "- spill_overflow_fatal_guard=pass\n";
     report << "- ready_shard_queue=pass\n";
     report << "- remote_recv_collector=pass\n";
     report << "\nstatus=pass\n";
@@ -437,6 +496,8 @@ int main() {
     cudaFree(d_global_spill_b);
     cudaFree(d_global_spill_count);
     cudaFree(d_global_spill_active_index);
+    cudaFree(d_fatal_error_flag);
+    cudaFree(d_fatal_error_trace);
     cudaFree(d_shard_counts);
     cudaFree(d_shard_offsets);
     cudaFree(d_spill_counts);

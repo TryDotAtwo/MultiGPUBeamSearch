@@ -93,6 +93,8 @@ struct LayoutStreamsView {
     CandidateMeta* global_spill_buffer_b = nullptr;
     std::uint32_t* global_spill_count = nullptr;
     std::uint32_t* global_spill_active_index = nullptr;
+    std::uint32_t* fatal_error_flag = nullptr;
+    std::uint64_t* fatal_error_trace = nullptr;
     std::uint32_t* shard_score_hist_a = nullptr;
     std::uint32_t* shard_score_hist_b = nullptr;
     std::uint32_t* shard_score_hist_active_index = nullptr;

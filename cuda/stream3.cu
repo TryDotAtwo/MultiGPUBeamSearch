@@ -513,7 +513,9 @@ __global__ void stream3_prepare_partition_counts_kernel(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
-    std::uint32_t append_to_active_spill) {
+    std::uint32_t append_to_active_spill,
+    std::uint32_t* fatal_error_flag,
+    std::uint64_t* fatal_error_trace) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
         return;
     }
@@ -541,9 +543,32 @@ __global__ void stream3_prepare_partition_counts_kernel(
             processing_flag[shard] == 0U && existing < shard_capacity ? shard_capacity - existing : 0U;
         const std::uint32_t write_count = raw_count < available ? raw_count : available;
         shard_counts[shard] = write_count;
-        spill_counts[shard] = raw_count - write_count;
+        const std::uint32_t spill_count = raw_count - write_count;
+        spill_counts[shard] = spill_count;
         spill_offsets[shard] = spill_running;
-        spill_running += raw_count - write_count;
+        const std::uint64_t spill_end =
+            static_cast<std::uint64_t>(spill_running) + static_cast<std::uint64_t>(spill_count);
+        if (fatal_error_flag != nullptr && fatal_error_trace != nullptr &&
+            spill_count != 0U && spill_end > global_spill_capacity && *fatal_error_flag == 0U) {
+            *fatal_error_flag = STREAM_FATAL_STREAM3_SPILL_OVERFLOW;
+            fatal_error_trace[FatalTraceCode] = STREAM_FATAL_STREAM3_SPILL_OVERFLOW;
+            fatal_error_trace[FatalTraceShard] = shard;
+            fatal_error_trace[FatalTraceGroup] = group;
+            fatal_error_trace[FatalTraceExisting] = existing;
+            fatal_error_trace[FatalTraceAvailable] = available;
+            fatal_error_trace[FatalTraceRawCount] = raw_count;
+            fatal_error_trace[FatalTraceWriteCount] = write_count;
+            fatal_error_trace[FatalTraceSpillCount] = spill_count;
+            fatal_error_trace[FatalTraceSpillOffset] = spill_running;
+            fatal_error_trace[FatalTraceSpillEnd] = spill_end;
+            fatal_error_trace[FatalTraceSpillCapacity] = global_spill_capacity;
+            fatal_error_trace[FatalTraceCleanCount] = clean_count[shard];
+            fatal_error_trace[FatalTraceDirtyCount] = dirty_count[shard];
+            fatal_error_trace[FatalTraceProcessingFlag] = processing_flag[shard];
+            fatal_error_trace[FatalTraceStream4Batch] = stream4_batch_candidates;
+            fatal_error_trace[FatalTraceAppendToActiveSpill] = append_to_active_spill;
+        }
+        spill_running = spill_end > static_cast<std::uint64_t>(UINT32_MAX) ? UINT32_MAX : static_cast<std::uint32_t>(spill_end);
         source_running += raw_count;
     }
     global_spill_count[spill_index] = spill_running < global_spill_capacity ? spill_running : global_spill_capacity;
@@ -566,9 +591,13 @@ __global__ void stream3_partition_scatter_kernel(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
-    std::uint32_t append_to_active_spill) {
+    std::uint32_t append_to_active_spill,
+    const std::uint32_t* fatal_error_flag) {
     const std::uint32_t group = blockIdx.x;
     const std::uint32_t groups = *unique_count;
+    if (fatal_error_flag != nullptr && *fatal_error_flag != 0U) {
+        return;
+    }
     if (group >= groups) {
         return;
     }
@@ -961,6 +990,8 @@ void stream3_partition_sort_reduce_scatter(
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
     bool append_to_active_spill,
+    std::uint32_t* fatal_error_flag,
+    std::uint64_t* fatal_error_trace,
     cudaStream_t stream) {
     if (cub_temp_storage == nullptr || cub_temp_storage_bytes == 0) {
         throw std::invalid_argument("stream3 partition CUB fixed temp storage is required");
@@ -1010,7 +1041,9 @@ void stream3_partition_sort_reduce_scatter(
         shard_count,
         stream4_batch_candidates,
         global_spill_capacity,
-        append_to_active_spill ? 1U : 0U);
+        append_to_active_spill ? 1U : 0U,
+        fatal_error_flag,
+        fatal_error_trace);
     stream3_partition_scatter_kernel<<<shard_count + 1U, 256, 0, stream>>>(
         partition_val_b,
         partition_unique_shard,
@@ -1028,7 +1061,8 @@ void stream3_partition_sort_reduce_scatter(
         shard_count,
         stream4_batch_candidates,
         global_spill_capacity,
-        append_to_active_spill ? 1U : 0U);
+        append_to_active_spill ? 1U : 0U,
+        fatal_error_flag);
 }
 
 } // namespace
@@ -1061,7 +1095,9 @@ void stream3_collect_local_pending_cuda(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    std::uint32_t* fatal_error_flag,
+    std::uint64_t* fatal_error_trace) {
     NvtxRange range("Stream3_collect_local_pending_partition_launch");
     const dim3 block(256);
     const dim3 grid((max_candidates + block.x - 1U) / block.x);
@@ -1099,6 +1135,8 @@ void stream3_collect_local_pending_cuda(
         stream4_batch_candidates,
         global_spill_capacity,
         true,
+        fatal_error_flag,
+        fatal_error_trace,
         stream);
 }
 
@@ -1137,7 +1175,9 @@ void stream3_restore_collect_single_owner_cuda(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    std::uint32_t* fatal_error_flag,
+    std::uint64_t* fatal_error_trace) {
     NvtxRange range("Stream3_restore_collect_single_owner_partition_launch");
     const dim3 block(256);
     const dim3 grid((max_candidates + block.x - 1U) / block.x);
@@ -1182,6 +1222,8 @@ void stream3_restore_collect_single_owner_cuda(
         stream4_batch_candidates,
         global_spill_capacity,
         true,
+        fatal_error_flag,
+        fatal_error_trace,
         stream);
 }
 
@@ -1210,7 +1252,9 @@ void stream3_drain_global_spill_cuda(
     std::uint32_t shard_count,
     std::uint32_t global_spill_capacity,
     std::uint32_t stream4_batch_candidates,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    std::uint32_t* fatal_error_flag,
+    std::uint64_t* fatal_error_trace) {
     NvtxRange range("Stream3_drain_global_spill_partition_launch");
     const dim3 block(256);
     const dim3 grid((global_spill_capacity + block.x - 1U) / block.x);
@@ -1250,6 +1294,8 @@ void stream3_drain_global_spill_cuda(
         stream4_batch_candidates,
         global_spill_capacity,
         false,
+        fatal_error_flag,
+        fatal_error_trace,
         stream);
     stream3_finalize_drain_counts_kernel<<<1, 1, 0, stream>>>(
         global_spill_count,
@@ -1286,7 +1332,9 @@ void stream3_collect_remote_recv_cuda(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    std::uint32_t* fatal_error_flag,
+    std::uint64_t* fatal_error_trace) {
     NvtxRange range("Stream3_collect_remote_recv_partition_launch");
     const dim3 block(256);
     const dim3 grid((max_candidates + block.x - 1U) / block.x);
@@ -1324,6 +1372,8 @@ void stream3_collect_remote_recv_cuda(
         stream4_batch_candidates,
         global_spill_capacity,
         true,
+        fatal_error_flag,
+        fatal_error_trace,
         stream);
     (void)recv_count;
 }

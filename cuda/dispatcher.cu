@@ -9,6 +9,7 @@
 #include "threshold.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <deque>
 #include <functional>
@@ -31,6 +32,30 @@ void check_cuda(cudaError_t status, const char* op) {
 
 std::uint32_t host_shard_from_hash128(Hash128 hash, std::uint32_t shard_count) {
     return static_cast<std::uint32_t>(hash128_shard_distribution_key(hash) % shard_count);
+}
+
+std::string stream_fatal_error_message(
+    const char* phase,
+    std::uint32_t flag,
+    const std::array<std::uint64_t, STREAM_FATAL_TRACE_WORDS>& trace) {
+    return std::string("cuda stream fatal error: phase=") + phase +
+        " flag=" + std::to_string(flag) +
+        " code=" + std::to_string(trace[FatalTraceCode]) +
+        " shard=" + std::to_string(trace[FatalTraceShard]) +
+        " group=" + std::to_string(trace[FatalTraceGroup]) +
+        " existing=" + std::to_string(trace[FatalTraceExisting]) +
+        " available=" + std::to_string(trace[FatalTraceAvailable]) +
+        " raw_count=" + std::to_string(trace[FatalTraceRawCount]) +
+        " write_count=" + std::to_string(trace[FatalTraceWriteCount]) +
+        " spill_count=" + std::to_string(trace[FatalTraceSpillCount]) +
+        " spill_offset=" + std::to_string(trace[FatalTraceSpillOffset]) +
+        " spill_end=" + std::to_string(trace[FatalTraceSpillEnd]) +
+        " spill_capacity=" + std::to_string(trace[FatalTraceSpillCapacity]) +
+        " clean_count=" + std::to_string(trace[FatalTraceCleanCount]) +
+        " dirty_count=" + std::to_string(trace[FatalTraceDirtyCount]) +
+        " processing_flag=" + std::to_string(trace[FatalTraceProcessingFlag]) +
+        " stream4_batch_candidates=" + std::to_string(trace[FatalTraceStream4Batch]) +
+        " append_to_active_spill=" + std::to_string(trace[FatalTraceAppendToActiveSpill]);
 }
 
 __device__ CandidateMeta invalid_track_candidate_device() {
@@ -569,7 +594,9 @@ void instantiate_cuda_graph_job_templates(
             plan.config.shard_count,
             plan.config.global_spill_capacity,
             plan.config.stream4_batch_candidates,
-            streams.stream3);
+            streams.stream3,
+            memory.streams.fatal_error_flag,
+            memory.streams.fatal_error_trace);
         if (plan.config.world_size == 1U) {
             stream3_restore_collect_single_owner_cuda(
                 memory.streams.unique_key,
@@ -606,7 +633,9 @@ void instantiate_cuda_graph_job_templates(
                 plan.config.shard_count,
                 plan.config.stream4_batch_candidates,
                 plan.config.global_spill_capacity,
-                streams.stream3);
+                streams.stream3,
+                memory.streams.fatal_error_flag,
+                memory.streams.fatal_error_trace);
         } else {
             stream3_collect_local_pending_cuda(
                 memory.streams.local_pending_buffer,
@@ -636,7 +665,9 @@ void instantiate_cuda_graph_job_templates(
                 plan.config.shard_count,
                 plan.config.stream4_batch_candidates,
                 plan.config.global_spill_capacity,
-                streams.stream3);
+                streams.stream3,
+                memory.streams.fatal_error_flag,
+                memory.streams.fatal_error_trace);
         }
         stream3_build_ready_shard_queue_cuda(
             memory.streams.clean_count,
@@ -818,6 +849,25 @@ DepthDispatchState run_depth_cuda_graphs(
             cudaMemcpyDeviceToHost), "cudaMemcpy stop flag to host scheduler");
         state.stop_requested = stop_value != 0U;
         return state.stop_requested;
+    };
+
+    const auto throw_if_stream_fatal_error = [&](const char* phase) {
+        std::uint32_t flag = 0;
+        check_cuda(cudaMemcpy(
+            &flag,
+            memory.streams.fatal_error_flag,
+            sizeof(flag),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream fatal flag");
+        if (flag == 0U) {
+            return;
+        }
+        std::array<std::uint64_t, STREAM_FATAL_TRACE_WORDS> trace{};
+        check_cuda(cudaMemcpy(
+            trace.data(),
+            memory.streams.fatal_error_trace,
+            trace.size() * sizeof(std::uint64_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream fatal trace");
+        throw std::runtime_error(stream_fatal_error_message(phase, flag, trace));
     };
 
     enum class RingState : std::uint8_t {
@@ -1678,6 +1728,7 @@ DepthDispatchState run_depth_cuda_graphs(
             throw std::runtime_error("stream3 completion without active ring");
         }
         const std::uint32_t ring = stream3_active_ring;
+        throw_if_stream_fatal_error("stream3_ring_complete");
         stream3_active = false;
         stream3_active_ring = plan.config.ring_count;
         ring_state[ring] = RingState::Free;
@@ -1712,6 +1763,7 @@ DepthDispatchState run_depth_cuda_graphs(
         return true;
     };
 
+    check_cuda(cudaMemset(memory.streams.fatal_error_flag, 0, sizeof(std::uint32_t)), "cudaMemset stream fatal flag");
     launch_free_rings();
     while ((!state.stop_requested && state.frontier_cursor < frontier_size) ||
         any_active_ring() ||
@@ -1801,7 +1853,9 @@ DepthDispatchState run_depth_cuda_graphs(
             plan.config.shard_count,
             plan.config.global_spill_capacity,
             plan.config.stream4_batch_candidates,
-            streams.stream3);
+            streams.stream3,
+            memory.streams.fatal_error_flag,
+            memory.streams.fatal_error_trace);
         stream3_build_ready_shard_queue_cuda(
             memory.streams.clean_count,
             memory.streams.dirty_count,
@@ -1815,6 +1869,7 @@ DepthDispatchState run_depth_cuda_graphs(
             true,
             streams.stream3);
         check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final spill drain");
+        throw_if_stream_fatal_error("final_spill_drain");
         append_stream3_ready_queue();
         drain_pending_stream4_shards();
         std::uint32_t spill_counts[2]{};

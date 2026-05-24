@@ -1,4 +1,5 @@
 #include "static_memory.hpp"
+#include "stream3.hpp"
 
 #include <cub/device/device_merge_sort.cuh>
 #include <cub/device/device_radix_sort.cuh>
@@ -311,6 +312,8 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     total += 2ULL * spill * sizeof(CandidateMeta);
     total += 2ULL * sizeof(std::uint32_t);
     total += sizeof(std::uint32_t);
+    total += sizeof(std::uint32_t);
+    total += STREAM_FATAL_TRACE_WORDS * sizeof(std::uint64_t);
     total += 2ULL * static_cast<std::uint64_t>(config.shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t);
     total += 2ULL * config.shard_count * sizeof(std::uint32_t);
     total += 2ULL * SCORE_BIN_COUNT * sizeof(std::uint64_t);
@@ -485,6 +488,8 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.global_spill_buffer_b = streams.take<CandidateMeta>(plan.config.global_spill_capacity);
     memory.streams.global_spill_count = streams.take<std::uint32_t>(2);
     memory.streams.global_spill_active_index = streams.take<std::uint32_t>(1);
+    memory.streams.fatal_error_flag = streams.take<std::uint32_t>(1);
+    memory.streams.fatal_error_trace = streams.take<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
     const std::uint64_t shard_hist_items =
         static_cast<std::uint64_t>(plan.config.shard_count) * SCORE_BIN_COUNT;
     memory.streams.shard_score_hist_a = streams.take<std::uint32_t>(shard_hist_items);

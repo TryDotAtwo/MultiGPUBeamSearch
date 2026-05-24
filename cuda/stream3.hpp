@@ -6,6 +6,28 @@
 
 namespace beam {
 
+constexpr std::uint32_t STREAM_FATAL_TRACE_WORDS = 16;
+constexpr std::uint32_t STREAM_FATAL_STREAM3_SPILL_OVERFLOW = 3001;
+
+enum StreamFatalTraceSlot : std::uint32_t {
+    FatalTraceCode = 0,
+    FatalTraceShard = 1,
+    FatalTraceGroup = 2,
+    FatalTraceExisting = 3,
+    FatalTraceAvailable = 4,
+    FatalTraceRawCount = 5,
+    FatalTraceWriteCount = 6,
+    FatalTraceSpillCount = 7,
+    FatalTraceSpillOffset = 8,
+    FatalTraceSpillEnd = 9,
+    FatalTraceSpillCapacity = 10,
+    FatalTraceCleanCount = 11,
+    FatalTraceDirtyCount = 12,
+    FatalTraceProcessingFlag = 13,
+    FatalTraceStream4Batch = 14,
+    FatalTraceAppendToActiveSpill = 15
+};
+
 void stream3_pack_threshold_cuda(
     const std::uint32_t* score_ring,
     const Hash128* hash_ring,
@@ -95,7 +117,9 @@ void stream3_collect_local_pending_cuda(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    std::uint32_t* fatal_error_flag = nullptr,
+    std::uint64_t* fatal_error_trace = nullptr);
 
 void stream3_restore_collect_single_owner_cuda(
     const Hash128* unique_key,
@@ -132,7 +156,9 @@ void stream3_restore_collect_single_owner_cuda(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    std::uint32_t* fatal_error_flag = nullptr,
+    std::uint64_t* fatal_error_trace = nullptr);
 
 void stream3_drain_global_spill_cuda(
     CandidateMeta* global_spill_buffer_a,
@@ -159,7 +185,9 @@ void stream3_drain_global_spill_cuda(
     std::uint32_t shard_count,
     std::uint32_t global_spill_capacity,
     std::uint32_t stream4_batch_candidates,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    std::uint32_t* fatal_error_flag = nullptr,
+    std::uint64_t* fatal_error_trace = nullptr);
 
 void stream3_collect_remote_recv_cuda(
     const CandidateMeta* remote_recv_buffer,
@@ -191,7 +219,9 @@ void stream3_collect_remote_recv_cuda(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    std::uint32_t* fatal_error_flag = nullptr,
+    std::uint64_t* fatal_error_trace = nullptr);
 
 void stream3_build_ready_shard_queue_cuda(
     const std::uint32_t* clean_count,
