@@ -6,4 +6,6 @@
 - expanded_log: `track_solution_prefix` now emits the same score/route fields for the final candidate buffer after final filtering.
 - implementation: GPU block scan over `survivor_shard` with no atomics; block summaries are copied to CPU only when `BEAM_TRACK_SOLUTION_PATH` is enabled.
 - local_verification: `git diff --check` passed.
+- kaggle_v20_result: compile failed because host code called `__device__ invalid_track_candidate_device()` in `scan_tracked_prefinal_hash`.
+- fix_after_v20: host code now uses a host-side invalid `CandidateMeta` literal; resubmit required.
 - local_blocker: Docker Desktop remains unavailable, so local CUDA build/tests were not run before Kaggle push.

@@ -157,7 +157,7 @@ void scan_tracked_prefinal_hash(
     state.tracked_prefinal_matches = 0;
     state.tracked_prefinal_best_score_key = UINT32_MAX;
     state.tracked_prefinal_first_index = 0;
-    CandidateMeta best = invalid_track_candidate_device();
+    CandidateMeta best{Hash128{UINT64_MAX, UINT64_MAX}, UINT64_MAX, UINT32_MAX, UINT32_MAX};
     for (std::uint32_t block = 0; block < block_count; ++block) {
         if (matches[block] == 0U) {
             continue;
