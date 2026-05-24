@@ -1694,7 +1694,7 @@ void set_global_spill_capacity(RuntimeConfig& config) {
     const std::uint64_t stream3_batch = static_cast<std::uint64_t>(config.stream3_batch_candidates);
     const std::uint64_t concurrent_shard_backlog =
         static_cast<std::uint64_t>(config.stream4_active_sort_slots) * logical_shard_size_for(config);
-    const std::uint64_t minimum_spill = std::max(
+    const std::uint64_t minimum_spill = std::max<std::uint64_t>(
         2ULL * stream3_batch,
         concurrent_shard_backlog);
     if (env_present("BEAM_GLOBAL_SPILL_CAPACITY")) {
