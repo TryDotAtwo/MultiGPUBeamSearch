@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdlib>
 #include <deque>
 #include <functional>
 #include <iostream>
@@ -208,7 +209,7 @@ void scan_tracked_prefinal_hash(
         block_best_index,
         memory.final.final_candidate_buffer,
         target_hash,
-        plan.config.shard_count,
+        plan.storage_shard_count,
         plan.config.shard_capacity_candidates,
         plan.config.stream4_batch_candidates);
     check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize tracked prefinal hash scan");
@@ -420,7 +421,7 @@ void update_threshold_single_gpu(
         memory.streams.shard_score_hist_active_index,
         memory.streams.threshold_hist_active_snapshot,
         memory.streams.local_score_hist,
-        plan.config.shard_count,
+        plan.storage_shard_count,
         stream);
     check_cuda(cudaMemcpyAsync(
         memory.streams.global_score_hist,
@@ -600,35 +601,37 @@ void instantiate_cuda_graph_job_templates(
                 plan.config.stream3_batch_candidates,
                 streams.stream3);
         }
-        stream3_drain_global_spill_cuda(
-            memory.streams.global_spill_buffer_a,
-            memory.streams.global_spill_buffer_b,
-            memory.streams.global_spill_count,
-            memory.streams.global_spill_active_index,
-            memory.streams.survivor_shard,
-            memory.streams.clean_count,
-            memory.streams.dirty_count,
-            memory.streams.processing_flag,
-            memory.streams.stream3_shard_counts,
-            memory.streams.stream3_shard_offsets,
-            memory.streams.stream3_spill_counts,
-            memory.streams.stream3_spill_offsets,
-            memory.streams.stream3_partition_key_a,
-            memory.streams.stream3_partition_key_b,
-            memory.streams.stream3_partition_val_a,
-            memory.streams.stream3_partition_val_b,
-            memory.streams.stream3_partition_unique_shard,
-            memory.streams.stream3_partition_unique_counts,
-            memory.streams.stream3_partition_unique_count,
-            memory.streams.stream3_cub_temp,
-            memory.streams.stream3_cub_temp_bytes,
-            plan.config.shard_count,
-            plan.config.global_spill_capacity,
-            plan.config.shard_capacity_candidates,
-            plan.config.stream4_batch_candidates,
-            streams.stream3,
-            memory.streams.fatal_error_flag,
-            memory.streams.fatal_error_trace);
+        if (plan.config.shard_buffer_count == 1U) {
+            stream3_drain_global_spill_cuda(
+                memory.streams.global_spill_buffer_a,
+                memory.streams.global_spill_buffer_b,
+                memory.streams.global_spill_count,
+                memory.streams.global_spill_active_index,
+                memory.streams.survivor_shard,
+                memory.streams.clean_count,
+                memory.streams.dirty_count,
+                memory.streams.processing_flag,
+                memory.streams.stream3_shard_counts,
+                memory.streams.stream3_shard_offsets,
+                memory.streams.stream3_spill_counts,
+                memory.streams.stream3_spill_offsets,
+                memory.streams.stream3_partition_key_a,
+                memory.streams.stream3_partition_key_b,
+                memory.streams.stream3_partition_val_a,
+                memory.streams.stream3_partition_val_b,
+                memory.streams.stream3_partition_unique_shard,
+                memory.streams.stream3_partition_unique_counts,
+                memory.streams.stream3_partition_unique_count,
+                memory.streams.stream3_cub_temp,
+                memory.streams.stream3_cub_temp_bytes,
+                plan.config.shard_count,
+                plan.config.global_spill_capacity,
+                plan.config.shard_capacity_candidates,
+                plan.config.stream4_batch_candidates,
+                streams.stream3,
+                memory.streams.fatal_error_flag,
+                memory.streams.fatal_error_trace);
+        }
         if (plan.config.world_size == 1U) {
             stream3_restore_collect_single_owner_cuda(
                 memory.streams.unique_key,
@@ -646,6 +649,7 @@ void instantiate_cuda_graph_job_templates(
                 memory.streams.global_spill_buffer_b,
                 memory.streams.global_spill_count,
                 memory.streams.global_spill_active_index,
+                memory.streams.stream3_write_buffer_index,
                 memory.streams.stream3_shard_counts,
                 memory.streams.stream3_shard_offsets,
                 memory.streams.stream3_spill_counts,
@@ -663,6 +667,7 @@ void instantiate_cuda_graph_job_templates(
                 plan.config.b_micro,
                 plan.config.stream3_batch_candidates,
                 plan.config.shard_count,
+                plan.config.shard_buffer_count,
                 plan.config.shard_capacity_candidates,
                 plan.config.stream4_batch_candidates,
                 plan.config.global_spill_capacity,
@@ -681,6 +686,7 @@ void instantiate_cuda_graph_job_templates(
                 memory.streams.global_spill_buffer_b,
                 memory.streams.global_spill_count,
                 memory.streams.global_spill_active_index,
+                memory.streams.stream3_write_buffer_index,
                 memory.streams.stream3_shard_counts,
                 memory.streams.stream3_shard_offsets,
                 memory.streams.stream3_spill_counts,
@@ -696,6 +702,7 @@ void instantiate_cuda_graph_job_templates(
                 memory.streams.stream3_cub_temp_bytes,
                 plan.config.stream3_batch_candidates,
                 plan.config.shard_count,
+                plan.config.shard_buffer_count,
                 plan.config.shard_capacity_candidates,
                 plan.config.stream4_batch_candidates,
                 plan.config.global_spill_capacity,
@@ -707,12 +714,15 @@ void instantiate_cuda_graph_job_templates(
             memory.streams.clean_count,
             memory.streams.dirty_count,
             memory.streams.processing_flag,
+            memory.streams.stream3_write_buffer_index,
             memory.streams.stream3_ready_flag,
             memory.streams.stream3_ready_shard_list,
             memory.streams.stream3_ready_count,
             plan.config.shard_count,
+            plan.config.shard_buffer_count,
             plan.config.shard_capacity_candidates,
-            plan.config.stream4_batch_candidates,
+            plan.config.stream3_batch_candidates,
+            plan.config.stream4_trigger_candidates,
             false,
             false,
             streams.stream3);
@@ -721,14 +731,14 @@ void instantiate_cuda_graph_job_templates(
 
     const std::uint32_t stream4_slot_count = plan.config.stream4_active_sort_slots;
     graphs.stream4_shard_graphs.resize(
-        static_cast<std::uint64_t>(plan.config.shard_count) * stream4_slot_count,
+        static_cast<std::uint64_t>(plan.storage_shard_count) * stream4_slot_count,
         nullptr);
     graphs.stream4_shard_execs.resize(
-        static_cast<std::uint64_t>(plan.config.shard_count) * stream4_slot_count,
+        static_cast<std::uint64_t>(plan.storage_shard_count) * stream4_slot_count,
         nullptr);
     const std::uint32_t stream4_capacity = plan.config.shard_capacity_candidates;
     const std::uint32_t stream4_block_count = (stream4_capacity + 255U) / 256U;
-    for (std::uint32_t shard = 0; shard < plan.config.shard_count; ++shard) {
+    for (std::uint32_t shard = 0; shard < plan.storage_shard_count; ++shard) {
         const std::uint64_t shard_candidate_offset = static_cast<std::uint64_t>(shard) * stream4_capacity;
         for (std::uint32_t slot = 0; slot < stream4_slot_count; ++slot) {
             const std::uint64_t graph_idx = static_cast<std::uint64_t>(shard) * stream4_slot_count + slot;
@@ -821,7 +831,7 @@ DepthDispatchState run_depth_cuda_graphs(
     if (graphs.ring_slot_execs.size() != ring_slot_job_count ||
         graphs.stream3_ring_execs.size() != plan.config.ring_count ||
         graphs.stream4_shard_execs.size() !=
-            static_cast<std::uint64_t>(plan.config.shard_count) * plan.config.stream4_active_sort_slots) {
+            static_cast<std::uint64_t>(plan.storage_shard_count) * plan.config.stream4_active_sort_slots) {
         throw std::invalid_argument("depth dispatcher graph template counts do not match static memory plan");
     }
     if (track_request.enabled && track_request.move >= MOVE_COUNT) {
@@ -835,22 +845,24 @@ DepthDispatchState run_depth_cuda_graphs(
     state.tracked_generated.request_move = track_request.move;
     state.tracked_stream3.enabled = track_request.enabled;
     state.tracked_stream4.enabled = track_request.enabled;
-    std::vector<std::uint32_t> host_dirty(plan.config.shard_count);
-    std::vector<std::uint32_t> host_clean(plan.config.shard_count);
-    std::vector<std::uint32_t> host_ready_shards(plan.config.shard_count);
+    std::vector<std::uint32_t> host_dirty(plan.storage_shard_count);
+    std::vector<std::uint32_t> host_clean(plan.storage_shard_count);
+    std::vector<std::uint32_t> host_processing(plan.storage_shard_count);
+    std::vector<std::uint32_t> host_ready_shards(plan.storage_shard_count);
     std::vector<std::uint64_t> host_parent_base(ring_slot_job_count, 0);
     std::vector<std::uint32_t> host_count(ring_slot_job_count, 0);
     std::vector<std::uint32_t> pending_stream4_shards;
-    pending_stream4_shards.reserve(plan.config.shard_count * plan.config.ring_count);
+    pending_stream4_shards.reserve(plan.storage_shard_count * plan.config.ring_count);
     std::uint32_t pending_stream4_head = 0;
     std::vector<bool> stream4_slot_busy(plan.config.stream4_active_sort_slots, false);
-    std::vector<std::uint32_t> stream4_slot_shard(plan.config.stream4_active_sort_slots, plan.config.shard_count);
+    std::vector<std::uint32_t> stream4_slot_shard(plan.config.stream4_active_sort_slots, plan.storage_shard_count);
     std::deque<std::uint32_t> stream4_free_slots;
     std::deque<std::uint32_t> stream4_busy_slots;
     for (std::uint32_t slot = 0; slot < plan.config.stream4_active_sort_slots; ++slot) {
         stream4_free_slots.push_back(slot);
     }
     std::uint32_t stream4_jobs_since_threshold_update = 0;
+    const bool pipeline_stats_enabled = std::getenv("BEAM_DEBUG_PIPELINE_STATS") != nullptr;
 
     std::vector<cudaEvent_t> ring_done(plan.config.ring_count, nullptr);
     std::vector<cudaEvent_t> stream3_done(plan.config.ring_count, nullptr);
@@ -967,6 +979,104 @@ DepthDispatchState run_depth_cuda_graphs(
         return static_cast<std::uint32_t>(pending_stream4_shards.size() - pending_stream4_head);
     };
 
+    const auto debug_pipeline_stats = [&](
+        const char* phase,
+        std::uint32_t a = UINT32_MAX,
+        std::uint32_t b = UINT32_MAX) {
+        if (!pipeline_stats_enabled) {
+            return;
+        }
+        std::vector<std::uint32_t> clean(plan.storage_shard_count);
+        std::vector<std::uint32_t> dirty(plan.storage_shard_count);
+        std::vector<std::uint32_t> processing(plan.storage_shard_count);
+        std::vector<std::uint32_t> last_spill(plan.config.shard_count);
+        std::uint32_t spill_counts[2]{};
+        std::uint32_t spill_active = 0;
+        check_cuda(cudaMemcpy(
+            clean.data(),
+            memory.streams.clean_count,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy pipeline clean");
+        check_cuda(cudaMemcpy(
+            dirty.data(),
+            memory.streams.dirty_count,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy pipeline dirty");
+        check_cuda(cudaMemcpy(
+            processing.data(),
+            memory.streams.processing_flag,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy pipeline processing");
+        check_cuda(cudaMemcpy(
+            last_spill.data(),
+            memory.streams.stream3_spill_counts,
+            static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy pipeline last spill");
+        check_cuda(cudaMemcpy(
+            spill_counts,
+            memory.streams.global_spill_count,
+            sizeof(spill_counts),
+            cudaMemcpyDeviceToHost), "cudaMemcpy pipeline spill counts");
+        check_cuda(cudaMemcpy(
+            &spill_active,
+            memory.streams.global_spill_active_index,
+            sizeof(spill_active),
+            cudaMemcpyDeviceToHost), "cudaMemcpy pipeline spill active");
+        spill_active &= 1U;
+        std::uint64_t clean_total = 0;
+        std::uint64_t dirty_total = 0;
+        std::uint64_t last_spill_total = 0;
+        std::uint32_t busy_shards = 0;
+        std::uint32_t dirty_shards = 0;
+        for (std::uint32_t shard = 0; shard < plan.storage_shard_count; ++shard) {
+            clean_total += clean[shard];
+            dirty_total += dirty[shard];
+            busy_shards += processing[shard] != 0U ? 1U : 0U;
+            dirty_shards += dirty[shard] != 0U ? 1U : 0U;
+        }
+        for (std::uint32_t shard = 0; shard < plan.config.shard_count; ++shard) {
+            last_spill_total += last_spill[shard];
+        }
+        std::cout << "pipeline_stats"
+                  << " phase=" << phase
+                  << " a=" << a
+                  << " b=" << b
+                  << " stream3_jobs=" << state.stream3_jobs_launched
+                  << " stream4_jobs=" << state.stream4_jobs_launched
+                  << " pending=" << pending_stream4_count()
+                  << " busy_slots=" << stream4_busy_slots.size()
+                  << " free_slots=" << stream4_free_slots.size()
+                  << " busy_shards=" << busy_shards
+                  << " dirty_shards=" << dirty_shards
+                  << " clean_total=" << clean_total
+                  << " dirty_total=" << dirty_total
+                  << " last_spill_total=" << last_spill_total
+                  << " spill_active_idx=" << spill_active
+                  << " active_spill=" << spill_counts[spill_active]
+                  << " inactive_spill=" << spill_counts[spill_active ^ 1U]
+                  << "\n";
+        if (plan.storage_shard_count <= 32U) {
+            auto print_array = [&](const char* name, const std::vector<std::uint32_t>& values) {
+                std::cout << " " << name << "=";
+                for (std::uint32_t shard = 0; shard < values.size(); ++shard) {
+                    if (shard != 0U) {
+                        std::cout << ",";
+                    }
+                    std::cout << values[shard];
+                }
+            };
+            std::cout << "pipeline_shards"
+                      << " phase=" << phase
+                      << " a=" << a
+                      << " b=" << b;
+            print_array("clean", clean);
+            print_array("dirty", dirty);
+            print_array("processing", processing);
+            print_array("last_spill", last_spill);
+            std::cout << "\n";
+        }
+    };
+
     const auto update_stream4_queue_peaks = [&]() {
         state.stream4_pending_shards_max =
             std::max(state.stream4_pending_shards_max, pending_stream4_count());
@@ -974,6 +1084,57 @@ DepthDispatchState run_depth_cuda_graphs(
             std::max<std::uint32_t>(
                 state.stream4_busy_slots_max,
                 static_cast<std::uint32_t>(stream4_busy_slots.size()));
+    };
+
+    const auto stream3_has_writable_buffer = [&]() -> bool {
+        if (plan.config.shard_buffer_count <= 1U) {
+            return true;
+        }
+        const std::uint32_t average_shard_write =
+            plan.config.shard_count == 0U ? plan.config.stream3_batch_candidates :
+            (plan.config.stream3_batch_candidates + plan.config.shard_count - 1U) / plan.config.shard_count;
+        const std::uint32_t write_margin = (average_shard_write + 3U) / 4U;
+        const std::uint32_t unclamped_write_reserve =
+            average_shard_write > UINT32_MAX - write_margin ? UINT32_MAX : average_shard_write + write_margin;
+        const std::uint32_t write_reserve =
+            unclamped_write_reserve < plan.config.shard_capacity_candidates ?
+            unclamped_write_reserve :
+            plan.config.shard_capacity_candidates;
+        check_cuda(cudaMemcpy(
+            host_clean.data(),
+            memory.streams.clean_count,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream3 writable clean");
+        check_cuda(cudaMemcpy(
+            host_dirty.data(),
+            memory.streams.dirty_count,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream3 writable dirty");
+        check_cuda(cudaMemcpy(
+            host_processing.data(),
+            memory.streams.processing_flag,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream3 writable processing");
+        for (std::uint32_t logical_shard = 0; logical_shard < plan.config.shard_count; ++logical_shard) {
+            bool writable = false;
+            for (std::uint32_t buffer = 0; buffer < plan.config.shard_buffer_count; ++buffer) {
+                const std::uint32_t physical_shard =
+                    logical_shard * plan.config.shard_buffer_count + buffer;
+                const std::uint32_t occupied =
+                    host_clean[physical_shard] + host_dirty[physical_shard];
+                if (host_processing[physical_shard] == 0U &&
+                    occupied < plan.config.shard_capacity_candidates &&
+                    plan.config.shard_capacity_candidates - occupied >= write_reserve) {
+                    writable = true;
+                    break;
+                }
+            }
+            if (!writable) {
+                debug_pipeline_stats("stream3_backpressure", logical_shard, UINT32_MAX);
+                return false;
+            }
+        }
+        return true;
     };
 
 #if BEAM_DEBUG_STREAM_TIMING
@@ -1003,8 +1164,9 @@ DepthDispatchState run_depth_cuda_graphs(
         if (scan_tracked_stream4_output) {
             scan_tracked_stream4_output(slot);
         }
+        debug_pipeline_stats("stream4_complete", stream4_slot_shard[slot], slot);
         stream4_slot_busy[slot] = false;
-        stream4_slot_shard[slot] = plan.config.shard_count;
+        stream4_slot_shard[slot] = plan.storage_shard_count;
         stream4_free_slots.push_back(slot);
         ++stream4_jobs_since_threshold_update;
         update_stream4_queue_peaks();
@@ -1123,27 +1285,35 @@ DepthDispatchState run_depth_cuda_graphs(
         if (!state.tracked_generated.found || shard >= plan.config.shard_count) {
             return false;
         }
-        check_cuda(cudaMemcpy(
-            &clean,
-            memory.streams.clean_count + shard,
-            sizeof(clean),
-            cudaMemcpyDeviceToHost), "cudaMemcpy tracked shard clean count");
-        check_cuda(cudaMemcpy(
-            &dirty,
-            memory.streams.dirty_count + shard,
-            sizeof(dirty),
-            cudaMemcpyDeviceToHost), "cudaMemcpy tracked shard dirty count");
         const std::uint32_t shard_capacity = plan.config.shard_capacity_candidates;
-        const std::uint32_t scan_count = std::min<std::uint32_t>(
-            include_dirty ? clean + dirty : clean,
-            shard_capacity);
-        const CandidateMeta* shard_base =
-            memory.streams.survivor_shard + static_cast<std::uint64_t>(shard) * shard_capacity;
-        if (!scan_candidate_array_for_hash(shard_base, scan_count, state.tracked_generated.hash, local, candidate)) {
-            return false;
+        for (std::uint32_t buffer = 0; buffer < plan.config.shard_buffer_count; ++buffer) {
+            const std::uint32_t physical_shard = shard * plan.config.shard_buffer_count + buffer;
+            std::uint32_t physical_clean = 0;
+            std::uint32_t physical_dirty = 0;
+            check_cuda(cudaMemcpy(
+                &physical_clean,
+                memory.streams.clean_count + physical_shard,
+                sizeof(physical_clean),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked shard clean count");
+            check_cuda(cudaMemcpy(
+                &physical_dirty,
+                memory.streams.dirty_count + physical_shard,
+                sizeof(physical_dirty),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked shard dirty count");
+            clean += physical_clean;
+            dirty += physical_dirty;
+            const std::uint32_t scan_count = std::min<std::uint32_t>(
+                include_dirty ? physical_clean + physical_dirty : physical_clean,
+                shard_capacity);
+            const CandidateMeta* shard_base =
+                memory.streams.survivor_shard + static_cast<std::uint64_t>(physical_shard) * shard_capacity;
+            if (scan_candidate_array_for_hash(shard_base, scan_count, state.tracked_generated.hash, local, candidate)) {
+                location = local < physical_clean ? TrackLocationClean : TrackLocationDirty;
+                local += buffer * shard_capacity;
+                return true;
+            }
         }
-        location = local < clean ? TrackLocationClean : TrackLocationDirty;
-        return true;
+        return false;
     };
 
     const auto scan_tracked_spill = [&](
@@ -1590,8 +1760,8 @@ DepthDispatchState run_depth_cuda_graphs(
         if (ready_count == 0U) {
             return 0;
         }
-        if (ready_count > plan.config.shard_count) {
-            throw std::runtime_error("stream3 ready shard count exceeds shard count");
+        if (ready_count > plan.storage_shard_count) {
+            throw std::runtime_error("stream3 ready shard count exceeds storage shard count");
         }
         check_cuda(cudaMemcpy(
             host_ready_shards.data(),
@@ -1600,12 +1770,13 @@ DepthDispatchState run_depth_cuda_graphs(
             cudaMemcpyDeviceToHost), "cudaMemcpy stream3 ready shard list to host scheduler");
         for (std::uint32_t i = 0; i < ready_count; ++i) {
             const std::uint32_t shard = host_ready_shards[i];
-            if (shard >= plan.config.shard_count) {
-                throw std::runtime_error("stream3 ready shard index exceeds shard count");
+            if (shard >= plan.storage_shard_count) {
+                throw std::runtime_error("stream3 ready shard index exceeds storage shard count");
             }
             pending_stream4_shards.push_back(shard);
         }
         update_stream4_queue_peaks();
+        debug_pipeline_stats("ready_queue_append", ready_count, UINT32_MAX);
         return ready_count;
     };
 
@@ -1652,6 +1823,7 @@ DepthDispatchState run_depth_cuda_graphs(
             const std::uint64_t graph_idx =
                 static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
             scan_tracked_stream4_input(shard, slot, graph_idx);
+            debug_pipeline_stats("stream4_launch", shard, slot);
 #if BEAM_DEBUG_STREAM_TIMING
             check_cuda(
                 cudaEventRecord(stream4_timing_start[slot], streams.stream4_slot_streams[slot]),
@@ -1691,6 +1863,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 const std::uint64_t graph_idx =
                     static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
                 scan_tracked_stream4_input(shard, slot, graph_idx);
+                debug_pipeline_stats("stream4_launch_blocking", shard, slot);
 #if BEAM_DEBUG_STREAM_TIMING
                 check_cuda(
                     cudaEventRecord(stream4_timing_start[slot], streams.stream4_slot_streams[slot]),
@@ -1826,12 +1999,39 @@ DepthDispatchState run_depth_cuda_graphs(
         if (stream3_active || stream3_ready_rings.empty()) {
             return false;
         }
+        if (!stream3_has_writable_buffer()) {
+            stream3_build_ready_shard_queue_cuda(
+                memory.streams.clean_count,
+                memory.streams.dirty_count,
+                memory.streams.processing_flag,
+                memory.streams.stream3_write_buffer_index,
+                memory.streams.stream3_ready_flag,
+                memory.streams.stream3_ready_shard_list,
+                memory.streams.stream3_ready_count,
+                plan.config.shard_count,
+                plan.config.shard_buffer_count,
+                plan.config.shard_capacity_candidates,
+                plan.config.stream3_batch_candidates,
+                plan.config.stream4_trigger_candidates,
+                false,
+                false,
+                streams.stream3);
+            check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize stream3 backpressure ready queue");
+            throw_if_stream_fatal_error("stream3_backpressure_ready_queue");
+            const std::uint32_t queued = append_stream3_ready_queue();
+            const std::uint32_t launched = launch_pending_stream4_shards();
+            if (queued == 0U && launched == 0U && pending_stream4_count() == 0U && stream4_busy_slots.empty()) {
+                throw std::runtime_error("stream3 double-buffer backpressure has no ready stream4 work");
+            }
+            return queued != 0U || launched != 0U;
+        }
         const std::uint32_t ring = stream3_ready_rings.front();
         stream3_ready_rings.pop_front();
         if (ring_state[ring] != RingState::ReadyForStream3) {
             throw std::runtime_error("stream3 ready queue contains a non-ready ring");
         }
         scan_tracked_generated_candidate(ring);
+        debug_pipeline_stats("stream3_launch", ring, UINT32_MAX);
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream3_timing_start[ring], streams.stream3), "cudaEventRecord stream3 timing start");
 #endif
@@ -1928,6 +2128,7 @@ DepthDispatchState run_depth_cuda_graphs(
         }
         scan_tracked_stream3_path(ring);
         scan_tracked_after_stream3(ring);
+        debug_pipeline_stats("stream3_complete", ring, UINT32_MAX);
     };
 
     const auto release_stream3_nonblocking = [&]() -> bool {
@@ -2018,51 +2219,56 @@ DepthDispatchState run_depth_cuda_graphs(
     drain_pending_stream4_shards();
     force_periodic_threshold_update();
 
-    for (std::uint32_t flush_round = 0; flush_round < plan.config.shard_count + 2U; ++flush_round) {
+    for (std::uint32_t flush_round = 0; flush_round < plan.storage_shard_count + 2U; ++flush_round) {
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(
             cudaEventRecord(stream3_spill_drain_timing_start[0], streams.stream3),
             "cudaEventRecord stream3 spill drain timing start");
 #endif
-        stream3_drain_global_spill_cuda(
-            memory.streams.global_spill_buffer_a,
-            memory.streams.global_spill_buffer_b,
-            memory.streams.global_spill_count,
-            memory.streams.global_spill_active_index,
-            memory.streams.survivor_shard,
-            memory.streams.clean_count,
-            memory.streams.dirty_count,
-            memory.streams.processing_flag,
-            memory.streams.stream3_shard_counts,
-            memory.streams.stream3_shard_offsets,
-            memory.streams.stream3_spill_counts,
-            memory.streams.stream3_spill_offsets,
-            memory.streams.stream3_partition_key_a,
-            memory.streams.stream3_partition_key_b,
-            memory.streams.stream3_partition_val_a,
-            memory.streams.stream3_partition_val_b,
-            memory.streams.stream3_partition_unique_shard,
-            memory.streams.stream3_partition_unique_counts,
-            memory.streams.stream3_partition_unique_count,
-            memory.streams.stream3_cub_temp,
-            memory.streams.stream3_cub_temp_bytes,
-            plan.config.shard_count,
-            plan.config.global_spill_capacity,
-            plan.config.shard_capacity_candidates,
-            plan.config.stream4_batch_candidates,
-            streams.stream3,
-            memory.streams.fatal_error_flag,
-            memory.streams.fatal_error_trace);
+        if (plan.config.shard_buffer_count == 1U) {
+            stream3_drain_global_spill_cuda(
+                memory.streams.global_spill_buffer_a,
+                memory.streams.global_spill_buffer_b,
+                memory.streams.global_spill_count,
+                memory.streams.global_spill_active_index,
+                memory.streams.survivor_shard,
+                memory.streams.clean_count,
+                memory.streams.dirty_count,
+                memory.streams.processing_flag,
+                memory.streams.stream3_shard_counts,
+                memory.streams.stream3_shard_offsets,
+                memory.streams.stream3_spill_counts,
+                memory.streams.stream3_spill_offsets,
+                memory.streams.stream3_partition_key_a,
+                memory.streams.stream3_partition_key_b,
+                memory.streams.stream3_partition_val_a,
+                memory.streams.stream3_partition_val_b,
+                memory.streams.stream3_partition_unique_shard,
+                memory.streams.stream3_partition_unique_counts,
+                memory.streams.stream3_partition_unique_count,
+                memory.streams.stream3_cub_temp,
+                memory.streams.stream3_cub_temp_bytes,
+                plan.config.shard_count,
+                plan.config.global_spill_capacity,
+                plan.config.shard_capacity_candidates,
+                plan.config.stream4_batch_candidates,
+                streams.stream3,
+                memory.streams.fatal_error_flag,
+                memory.streams.fatal_error_trace);
+        }
         stream3_build_ready_shard_queue_cuda(
             memory.streams.clean_count,
             memory.streams.dirty_count,
             memory.streams.processing_flag,
+            memory.streams.stream3_write_buffer_index,
             memory.streams.stream3_ready_flag,
             memory.streams.stream3_ready_shard_list,
             memory.streams.stream3_ready_count,
             plan.config.shard_count,
+            plan.config.shard_buffer_count,
             plan.config.shard_capacity_candidates,
-            plan.config.stream4_batch_candidates,
+            plan.config.stream3_batch_candidates,
+            plan.config.stream4_trigger_candidates,
             true,
             true,
             streams.stream3);
@@ -2082,6 +2288,7 @@ DepthDispatchState run_depth_cuda_graphs(
 #endif
         throw_if_stream_fatal_error("final_spill_drain");
         update_global_spill_peak();
+        debug_pipeline_stats("final_spill_drain", flush_round, UINT32_MAX);
         append_stream3_ready_queue();
         drain_pending_stream4_shards();
         std::uint32_t spill_counts[2]{};
@@ -2099,12 +2306,12 @@ DepthDispatchState run_depth_cuda_graphs(
         check_cuda(cudaMemcpy(
             host_clean.data(),
             memory.streams.clean_count,
-            static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
             cudaMemcpyDeviceToHost), "cudaMemcpy clean_count final flush");
         check_cuda(cudaMemcpy(
             host_dirty.data(),
             memory.streams.dirty_count,
-            static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
             cudaMemcpyDeviceToHost), "cudaMemcpy dirty_count final flush");
         bool any_dirty = false;
         for (std::uint32_t dirty : host_dirty) {
@@ -2123,7 +2330,7 @@ DepthDispatchState run_depth_cuda_graphs(
             (!any_dirty && total_clean >= plan.derived.global_beam_width_effective)) {
             break;
         }
-        if (flush_round + 1U == plan.config.shard_count + 2U) {
+        if (flush_round + 1U == plan.storage_shard_count + 2U) {
             std::uint32_t debug_threshold = UINT32_THRESHOLD_MAX;
             check_cuda(cudaMemcpy(
                 &debug_threshold,
@@ -2248,7 +2455,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         0,
         plan.derived.global_beam_width_effective,
         static_cast<std::uint32_t>(plan.frontier_states),
-        plan.config.shard_count,
+        plan.storage_shard_count,
         plan.config.shard_capacity_candidates,
         plan.config.stream4_batch_candidates,
         streams.stream3);
@@ -2343,27 +2550,27 @@ FinalizeDepthState finalize_depth_single_gpu(
     check_cuda(cudaMemsetAsync(
         memory.streams.clean_count,
         0,
-        static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+        static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset clean count");
     check_cuda(cudaMemsetAsync(
         memory.streams.dirty_count,
         0,
-        static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+        static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset dirty count");
     check_cuda(cudaMemsetAsync(
         memory.streams.processing_flag,
         0,
-        static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+        static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset processing flag");
     check_cuda(cudaMemsetAsync(
         memory.streams.stream3_ready_flag,
         0,
-        static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+        static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset stream3 ready flag");
     check_cuda(cudaMemsetAsync(
         memory.streams.stream3_ready_shard_list,
         0,
-        static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+        static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset stream3 ready shard list");
     check_cuda(cudaMemsetAsync(
         memory.streams.stream3_ready_count,
@@ -2381,19 +2588,24 @@ FinalizeDepthState finalize_depth_single_gpu(
         sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset global spill active index");
     check_cuda(cudaMemsetAsync(
+        memory.streams.stream3_write_buffer_index,
+        0,
+        static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+        streams.stream3), "cudaMemsetAsync reset stream3 write buffer index");
+    check_cuda(cudaMemsetAsync(
         memory.streams.shard_score_hist_a,
         0,
-        static_cast<std::uint64_t>(plan.config.shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t),
+        static_cast<std::uint64_t>(plan.storage_shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset shard score hist a");
     check_cuda(cudaMemsetAsync(
         memory.streams.shard_score_hist_b,
         0,
-        static_cast<std::uint64_t>(plan.config.shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t),
+        static_cast<std::uint64_t>(plan.storage_shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset shard score hist b");
     check_cuda(cudaMemsetAsync(
         memory.streams.shard_score_hist_active_index,
         0,
-        static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+        static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset shard score hist active index");
     check_cuda(cudaMemsetAsync(memory.streams.current_threshold, 0xff, sizeof(std::uint32_t), streams.stream3),
         "cudaMemsetAsync reset current threshold");

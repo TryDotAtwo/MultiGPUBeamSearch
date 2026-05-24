@@ -2,6 +2,7 @@
 /.idea/
 /build/
 /build-docker/
+/build-debug-docker/
 /test_results/
 /external/
 /submit.csv

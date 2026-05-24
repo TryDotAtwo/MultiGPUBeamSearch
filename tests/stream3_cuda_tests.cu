@@ -37,6 +37,7 @@ int main() {
     score[17] = 3;
     score[29] = 2;
     hash[5] = Hash128{1, 1};
+    hash[17] = Hash128{5, 205};
     hash[29] = hash[17];
 
     std::uint32_t* d_score = nullptr;
@@ -192,6 +193,7 @@ int main() {
         d_global_spill_b,
         d_global_spill_count,
         d_global_spill_active_index,
+        nullptr,
         d_shard_counts,
         d_shard_offsets,
         d_spill_counts,
@@ -207,6 +209,7 @@ int main() {
         cub_temp_bytes,
         total,
         2,
+        1,
         4,
         2,
         total,
@@ -279,6 +282,7 @@ int main() {
         d_global_spill_b,
         d_global_spill_count,
         d_global_spill_active_index,
+        nullptr,
         d_shard_counts,
         d_shard_offsets,
         d_spill_counts,
@@ -294,6 +298,7 @@ int main() {
         cub_temp_bytes,
         total,
         2,
+        1,
         4,
         2,
         total,
@@ -359,6 +364,7 @@ int main() {
         d_global_spill_b,
         d_global_spill_count,
         d_global_spill_active_index,
+        nullptr,
         d_shard_counts,
         d_shard_offsets,
         d_spill_counts,
@@ -374,6 +380,7 @@ int main() {
         cub_temp_bytes,
         total,
         2,
+        1,
         4,
         2,
         1,
@@ -398,12 +405,16 @@ int main() {
         d_clean_count,
         d_dirty_count,
         d_processing_flag,
+        nullptr,
         d_ready_flag,
         d_ready_shard_list,
         d_ready_count,
         2,
+        1,
+        4,
         4,
         2,
+        false,
         false,
         0);
     BEAM_CUDA_CHECK(cudaGetLastError());
@@ -417,7 +428,7 @@ int main() {
     require(ready_count == 1 && ready_shard_list[0] == 1, "stream3 ready shard queue failed");
     require(processing_after_ready[1] == 1, "stream3 ready shard queue must set processing flag");
 
-    const CandidateMeta remote_candidate{Hash128{0, 0}, 77, 4, pack_route(1, 0, 3)};
+    const CandidateMeta remote_candidate{Hash128{0, 3}, 77, 4, pack_route(1, 0, 3)};
     const std::uint32_t recv_count_host[3]{0, 0, 1};
     const std::uint32_t recv_offset_host[4]{0, 0, 0, 1};
     BEAM_CUDA_CHECK(cudaMemcpy(d_remote_recv, &remote_candidate, sizeof(remote_candidate), cudaMemcpyHostToDevice));
@@ -435,6 +446,7 @@ int main() {
         d_global_spill_b,
         d_global_spill_count,
         d_global_spill_active_index,
+        nullptr,
         d_shard_counts,
         d_shard_offsets,
         d_spill_counts,
@@ -451,6 +463,7 @@ int main() {
         total,
         3,
         2,
+        1,
         4,
         2,
         total,

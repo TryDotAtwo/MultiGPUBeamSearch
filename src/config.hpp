@@ -23,12 +23,14 @@ struct RuntimeConfig {
     std::uint32_t inference_parallelism = 1;
     std::uint32_t stream3_batch_candidates = 256 * static_cast<std::uint32_t>(MOVE_COUNT);
     std::uint32_t stream4_batch_candidates = 65536;
+    std::uint32_t stream4_trigger_candidates = 65536;
     std::uint32_t stream4_batch_alignment = 1024;
     std::uint32_t stream4_active_sort_slots = 1;
     std::uint32_t ring_count = 4;
     std::uint32_t world_size = 1;
     std::uint32_t local_rank = 0;
     std::uint32_t shard_count = 64;
+    std::uint32_t shard_buffer_count = 1;
     std::uint32_t shard_capacity_candidates = 131072;
     std::uint32_t shard_capacity_scale_ppm = 1'250'000;
     std::uint32_t global_spill_capacity = 1 << 20;

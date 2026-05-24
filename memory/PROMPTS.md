@@ -101,3 +101,13 @@
 - User requested per-stream speed measurements to derive a stable spill size and make the pipeline run confidently.
 - User required a two-level debug model: master debug flag first, then independent speed/inference/path-trace debug flags; when master debug is off, subflags must not affect runtime and debug instrumentation must not be compiled into the production binary.
 - User approved adding the required final request validation after a Kaggle path-trace run crashed in `cudaStreamSynchronize final materialize` with illegal memory access, then requested launching Kaggle with the validation enabled: "Окей, добавь нужную валидацию и запускай кагл".
+- User diagnosed the post-validation Kaggle run as too slow without logs: full-beam depths used `stream3_jobs=2049`, `stream4_jobs~4647`, and depth time about `130s`; user asked why current sizing chose such bad `stream4_jobs`.
+- User proposed deriving config from `stream4_jobs` and `stream3_jobs`, clarified that Stream3 receives `N_LOCAL * 24` generated candidates, and required batch execution time to be part of config reasoning, not just job count.
+- User corrected implementation scope: runtime config and auto-detection must live in a separate config file; `production_runner` must not own the config-search implementation.
+- User requested switching debugging from Kaggle to local Docker: use an existing image, create a container, test locally, and use available NVIDIA Nsight tooling inside the container.
+- User requested supplementing the Docker image with CUTLASS and related tooling.
+- User required Docker debug output to appear in Docker Desktop container logs, not only in Codex terminal output or redirected files.
+- User requested disabling automatic config selection for now, setting the whole config manually, testing locally, and adding a short throughput meter for Stream3 batch time, Stream4 batch time, and spill growth before further design discussion.
+- User requested replacing the shared global spill with per-shard resident double buffers: `survivor_shard_A[shard_capacity]` and `survivor_shard_B[shard_capacity]` for each logical shard, so Stream3 always has a shard-local write target and Stream4 alternates between A/B buffers.
+- User specified the Stream4 scheduling split: choose `STREAM4_BATCH_CANDIDATES` by Stream4 job time, then use a separate `STREAM4_TRIGGER_CANDIDATES` so `stream4_job_time * stream4_job_count / active_sort_slots` stays well below Stream1/2 time.
+- User requested a `beam=2**24`, `depth_limit=60` local Docker run without Nsight and without extra debug instrumentation, keeping only per-depth logs.

@@ -173,6 +173,16 @@ std::size_t stream3_partition_cub_temp_bytes(std::uint32_t max_candidates, std::
     return align_up_size(std::max(sort_bytes, reduce_bytes), 256);
 }
 
+std::uint32_t storage_shard_count_for(const RuntimeConfig& config) {
+    const std::uint64_t storage =
+        static_cast<std::uint64_t>(config.shard_count) *
+        static_cast<std::uint64_t>(config.shard_buffer_count);
+    if (storage == 0ULL || storage > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+        throw std::invalid_argument("storage shard count exceeds uint32 range");
+    }
+    return static_cast<std::uint32_t>(storage);
+}
+
 std::size_t stream4_cub_temp_bytes(std::uint32_t stream4_capacity) {
     if (stream4_capacity > static_cast<std::uint32_t>(std::numeric_limits<int>::max())) {
         throw std::invalid_argument("stream4 capacity exceeds CUB int count range");
@@ -262,93 +272,157 @@ struct Cursor {
     }
 };
 
+struct LayoutSizeCursor {
+    std::size_t offset = 0;
+
+    template <typename T>
+    void take(std::uint64_t count, std::size_t alignment = alignof(T)) {
+        offset = align_up_size(offset, alignment);
+        offset += static_cast<std::size_t>(count) * sizeof(T);
+    }
+
+    void take_bytes(std::size_t bytes, std::size_t alignment) {
+        offset = align_up_size(offset, alignment);
+        offset += bytes;
+    }
+};
+
 std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& derived) {
+    const std::uint32_t storage_shard_count = storage_shard_count_for(config);
     const std::uint64_t ring_slots = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
     const std::uint64_t ring_candidates = ring_slots * config.b_micro * MOVE_COUNT;
     const std::uint64_t stream3 = config.stream3_batch_candidates;
     const std::uint64_t stream3_partition = std::max<std::uint64_t>(stream3, config.global_spill_capacity);
     const std::uint64_t survivors =
-        static_cast<std::uint64_t>(config.shard_count) * config.shard_capacity_candidates;
+        static_cast<std::uint64_t>(storage_shard_count) * config.shard_capacity_candidates;
     const std::uint64_t stream4_capacity = config.shard_capacity_candidates;
     const std::uint64_t stream4_slots = config.stream4_active_sort_slots;
     const std::uint64_t spill = config.global_spill_capacity;
-    std::size_t total = 0;
-    total += ring_candidates * sizeof(std::uint32_t);
-    total += ring_candidates * sizeof(Hash128);
-    total += ring_slots * sizeof(std::uint64_t);
-    total += ring_slots * sizeof(std::uint32_t);
-    total += 3ULL * stream3 * sizeof(Hash128);
-    total += 3ULL * stream3 * sizeof(std::uint64_t);
+    LayoutSizeCursor cursor;
+    cursor.take<std::uint32_t>(ring_candidates);
+    cursor.take<Hash128>(ring_candidates);
+    cursor.take<std::uint64_t>(ring_slots);
+    cursor.take<std::uint32_t>(ring_slots);
+    cursor.take<Hash128>(stream3);
+    cursor.take<Hash128>(stream3);
+    cursor.take<std::uint64_t>(stream3);
+    cursor.take<std::uint64_t>(stream3);
     const std::uint64_t stream3_blocks = (stream3 + 255ULL) / 256ULL;
-    total += stream3 * sizeof(std::uint32_t);
-    total += 2ULL * stream3_blocks * sizeof(std::uint32_t);
-    total += stream3 * sizeof(std::uint32_t);
-    total += 4ULL * config.shard_count * sizeof(std::uint32_t);
-    total += 2ULL * config.shard_count * sizeof(std::uint32_t);
-    total += sizeof(std::uint32_t);
-    total += 2ULL * stream3_partition * sizeof(std::uint32_t);
-    total += 2ULL * stream3_partition * sizeof(CandidateMeta);
-    total += 2ULL * (static_cast<std::uint64_t>(config.shard_count) + 1ULL) * sizeof(std::uint32_t);
-    total += sizeof(std::uint32_t);
-    total += std::max(
+    cursor.take<std::uint32_t>(stream3);
+    cursor.take<std::uint32_t>(stream3_blocks);
+    cursor.take<std::uint32_t>(stream3_blocks);
+    cursor.take<std::uint32_t>(stream3);
+    cursor.take<std::uint32_t>(config.shard_count);
+    cursor.take<std::uint32_t>(config.shard_count);
+    cursor.take<std::uint32_t>(config.shard_count);
+    cursor.take<std::uint32_t>(config.shard_count);
+    cursor.take<std::uint32_t>(storage_shard_count);
+    cursor.take<std::uint32_t>(storage_shard_count);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint32_t>(config.shard_count);
+    cursor.take<std::uint32_t>(stream3_partition);
+    cursor.take<std::uint32_t>(stream3_partition);
+    cursor.take<CandidateMeta>(stream3_partition);
+    cursor.take<CandidateMeta>(stream3_partition);
+    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.shard_count) + 1ULL);
+    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.shard_count) + 1ULL);
+    cursor.take<std::uint32_t>(1);
+    cursor.take_bytes(std::max(
         stream3_cub_temp_bytes(config.stream3_batch_candidates),
-        stream3_partition_cub_temp_bytes(static_cast<std::uint32_t>(stream3_partition), config.shard_count));
-    total += sizeof(std::uint32_t);
-    total += 3ULL * stream3 * sizeof(CandidateMeta);
-    total += sizeof(std::uint32_t);
-    total += 2ULL * config.world_size * sizeof(std::uint32_t);
-    total += 2ULL * (static_cast<std::uint64_t>(config.world_size) + 1ULL) * sizeof(std::uint32_t);
-    total += survivors * sizeof(CandidateMeta);
-    total += 2ULL * stream4_slots * stream4_capacity * sizeof(Hash128);
-    total += 2ULL * stream4_slots * stream4_capacity * sizeof(CandidateMeta);
-    total += 2ULL * stream4_slots * stream4_capacity * sizeof(std::uint32_t);
-    total += 2ULL * stream4_slots * stream4_capacity * sizeof(std::uint64_t);
+        stream3_partition_cub_temp_bytes(static_cast<std::uint32_t>(stream3_partition), config.shard_count)),
+        256);
+    cursor.take<Hash128>(stream3);
+    cursor.take<std::uint64_t>(stream3);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<CandidateMeta>(stream3);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<CandidateMeta>(stream3);
+    cursor.take<CandidateMeta>(stream3);
+    cursor.take<std::uint32_t>(config.world_size);
+    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
+    cursor.take<std::uint32_t>(config.world_size);
+    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
+    cursor.take<CandidateMeta>(survivors);
+    const std::uint64_t stream4_slot_items = stream4_slots * stream4_capacity;
+    cursor.take<Hash128>(stream4_slot_items);
+    cursor.take<Hash128>(stream4_slot_items);
+    cursor.take<CandidateMeta>(stream4_slot_items);
+    cursor.take<CandidateMeta>(stream4_slot_items);
+    cursor.take<std::uint32_t>(stream4_slot_items);
+    cursor.take<std::uint32_t>(stream4_slot_items);
+    cursor.take<std::uint64_t>(stream4_slot_items);
+    cursor.take<std::uint64_t>(stream4_slot_items);
     const std::uint64_t stream4_blocks = (stream4_capacity + 255ULL) / 256ULL;
-    total += stream4_slots * stream4_capacity * sizeof(std::uint32_t);
-    total += 2ULL * stream4_slots * stream4_blocks * sizeof(std::uint32_t);
-    total += stream4_slots * sizeof(std::uint32_t);
-    total += stream4_slots * stream4_cub_temp_bytes(static_cast<std::uint32_t>(stream4_capacity));
-    total += config.shard_count * sizeof(std::uint32_t);
-    total += 3ULL * config.shard_count * sizeof(std::uint32_t);
-    total += 2ULL * spill * sizeof(CandidateMeta);
-    total += 2ULL * sizeof(std::uint32_t);
-    total += sizeof(std::uint32_t);
-    total += sizeof(std::uint32_t);
-    total += STREAM_FATAL_TRACE_WORDS * sizeof(std::uint64_t);
-    total += 2ULL * static_cast<std::uint64_t>(config.shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t);
-    total += 2ULL * config.shard_count * sizeof(std::uint32_t);
-    total += 2ULL * SCORE_BIN_COUNT * sizeof(std::uint64_t);
-    total += 2ULL * sizeof(std::uint32_t);
-    return align_up_size(total, 256);
+    cursor.take<std::uint32_t>(stream4_slot_items);
+    cursor.take<std::uint32_t>(stream4_slots * stream4_blocks);
+    cursor.take<std::uint32_t>(stream4_slots * stream4_blocks);
+    cursor.take<std::uint32_t>(stream4_slots);
+    cursor.take_bytes(stream4_slots * stream4_cub_temp_bytes(static_cast<std::uint32_t>(stream4_capacity)), 256);
+    cursor.take<std::uint32_t>(storage_shard_count);
+    cursor.take<std::uint32_t>(storage_shard_count);
+    cursor.take<std::uint32_t>(storage_shard_count);
+    cursor.take<CandidateMeta>(spill);
+    cursor.take<CandidateMeta>(spill);
+    cursor.take<std::uint32_t>(2);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
+    const std::uint64_t shard_hist_items =
+        static_cast<std::uint64_t>(storage_shard_count) * SCORE_BIN_COUNT;
+    cursor.take<std::uint32_t>(shard_hist_items);
+    cursor.take<std::uint32_t>(shard_hist_items);
+    cursor.take<std::uint32_t>(storage_shard_count);
+    cursor.take<std::uint32_t>(storage_shard_count);
+    cursor.take<std::uint64_t>(SCORE_BIN_COUNT);
+    cursor.take<std::uint64_t>(SCORE_BIN_COUNT);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint32_t>(1);
+    return align_up_size(cursor.offset, 256);
 }
 
 std::size_t bytes_final(const RuntimeConfig& config, const DerivedConfig& derived, std::size_t layout_streams_bytes) {
+    const std::uint32_t storage_shard_count = storage_shard_count_for(config);
     const std::uint64_t frontier =
         (derived.global_beam_width_effective + static_cast<std::uint64_t>(config.world_size) - 1ULL) /
         static_cast<std::uint64_t>(config.world_size);
     const std::uint64_t requests = frontier;
     const std::uint64_t survivors =
-        static_cast<std::uint64_t>(config.shard_count) * config.shard_capacity_candidates;
+        static_cast<std::uint64_t>(storage_shard_count) * config.shard_capacity_candidates;
     const std::uint64_t survivor_blocks = (survivors + 255ULL) / 256ULL;
-    std::size_t total = 0;
-    total += frontier * sizeof(State128);
-    total = std::max(total, layout_streams_bytes);
-    total += survivors * sizeof(std::uint32_t);
-    total += 2ULL * survivor_blocks * sizeof(std::uint32_t);
-    total += frontier * sizeof(CandidateMeta);
-    total += sizeof(std::uint32_t);
-    total += requests * sizeof(FinalRequest);
-    total += sizeof(std::uint32_t);
+    LayoutSizeCursor cursor;
+    cursor.take<State128>(frontier);
+    cursor.offset = std::max(cursor.offset, layout_streams_bytes);
+    cursor.take<std::uint32_t>(survivors);
+    cursor.take<std::uint32_t>(survivor_blocks);
+    cursor.take<std::uint32_t>(survivor_blocks);
+    cursor.take<CandidateMeta>(frontier);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<FinalRequest>(requests);
+    cursor.take<std::uint32_t>(1);
     if (config.world_size > 1U) {
-        total += requests * sizeof(FinalResponse);
+        cursor.take<FinalResponse>(requests);
     }
-    total += 2ULL * config.world_size * sizeof(std::uint32_t);
-    total += 2ULL * (static_cast<std::uint64_t>(config.world_size) + 1ULL) * sizeof(std::uint32_t);
-    return align_up_size(total, 256);
+    cursor.take<std::uint32_t>(config.world_size);
+    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
+    cursor.take<std::uint32_t>(config.world_size);
+    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
+    return align_up_size(cursor.offset, 256);
 }
 
 std::size_t bytes_final_budget(const RuntimeConfig& config, const DerivedConfig& derived) {
     return bytes_final(config, derived, 0);
+}
+
+std::size_t bytes_solved(const RuntimeConfig& config) {
+    LayoutSizeCursor cursor;
+    cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<CandidateMeta>(config.solved_result_capacity);
+    cursor.take<std::uint32_t>(config.solved_result_capacity);
+    cursor.take<std::uint32_t>(1);
+    return cursor.offset;
 }
 
 } // namespace
@@ -375,8 +449,9 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     plan.parent_base_count = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
     plan.ring_count_count = plan.parent_base_count;
     plan.stream3_count = config.stream3_batch_candidates;
+    plan.storage_shard_count = storage_shard_count_for(config);
     plan.survivor_count =
-        static_cast<std::uint64_t>(config.shard_count) * config.shard_capacity_candidates;
+        static_cast<std::uint64_t>(plan.storage_shard_count) * config.shard_capacity_candidates;
     plan.final_state_count = plan.frontier_states;
     const std::uint32_t stream3_partition_count = static_cast<std::uint32_t>(
         std::max<std::uint64_t>(plan.stream3_count, config.global_spill_capacity));
@@ -385,10 +460,7 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
         stream3_partition_cub_temp_bytes(stream3_partition_count, config.shard_count));
     plan.stream4_cub_temp_bytes = stream4_cub_temp_bytes(config.shard_capacity_candidates);
     plan.current_frontier_bytes = static_cast<std::size_t>(plan.frontier_states) * sizeof(State128);
-    plan.solved_bytes =
-        5ULL * sizeof(std::uint32_t) +
-        static_cast<std::uint64_t>(config.solved_result_capacity) * sizeof(CandidateMeta) +
-        static_cast<std::uint64_t>(config.solved_result_capacity) * sizeof(std::uint32_t);
+    plan.solved_bytes = bytes_solved(config);
     plan.layout_streams_bytes = bytes_streams(config, derived);
     plan.layout_final_budget_bytes = bytes_final_budget(config, derived);
     plan.layout_final_bytes = bytes_final(config, derived, plan.layout_streams_bytes);
@@ -441,9 +513,10 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.stream3_shard_offsets = streams.take<std::uint32_t>(plan.config.shard_count);
     memory.streams.stream3_spill_counts = streams.take<std::uint32_t>(plan.config.shard_count);
     memory.streams.stream3_spill_offsets = streams.take<std::uint32_t>(plan.config.shard_count);
-    memory.streams.stream3_ready_flag = streams.take<std::uint32_t>(plan.config.shard_count);
-    memory.streams.stream3_ready_shard_list = streams.take<std::uint32_t>(plan.config.shard_count);
+    memory.streams.stream3_ready_flag = streams.take<std::uint32_t>(plan.storage_shard_count);
+    memory.streams.stream3_ready_shard_list = streams.take<std::uint32_t>(plan.storage_shard_count);
     memory.streams.stream3_ready_count = streams.take<std::uint32_t>(1);
+    memory.streams.stream3_write_buffer_index = streams.take<std::uint32_t>(plan.config.shard_count);
     const std::uint64_t stream3_partition_count =
         std::max<std::uint64_t>(plan.stream3_count, plan.config.global_spill_capacity);
     memory.streams.stream3_partition_key_a = streams.take<std::uint32_t>(stream3_partition_count);
@@ -488,9 +561,9 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.stream4_cub_temp =
         streams.take<std::byte>(stream4_slots * plan.stream4_cub_temp_bytes, 256);
     memory.streams.stream4_cub_temp_bytes = plan.stream4_cub_temp_bytes;
-    memory.streams.clean_count = streams.take<std::uint32_t>(plan.config.shard_count);
-    memory.streams.dirty_count = streams.take<std::uint32_t>(plan.config.shard_count);
-    memory.streams.processing_flag = streams.take<std::uint32_t>(plan.config.shard_count);
+    memory.streams.clean_count = streams.take<std::uint32_t>(plan.storage_shard_count);
+    memory.streams.dirty_count = streams.take<std::uint32_t>(plan.storage_shard_count);
+    memory.streams.processing_flag = streams.take<std::uint32_t>(plan.storage_shard_count);
     memory.streams.global_spill_buffer_a = streams.take<CandidateMeta>(plan.config.global_spill_capacity);
     memory.streams.global_spill_buffer_b = streams.take<CandidateMeta>(plan.config.global_spill_capacity);
     memory.streams.global_spill_count = streams.take<std::uint32_t>(2);
@@ -498,11 +571,11 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.fatal_error_flag = streams.take<std::uint32_t>(1);
     memory.streams.fatal_error_trace = streams.take<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
     const std::uint64_t shard_hist_items =
-        static_cast<std::uint64_t>(plan.config.shard_count) * SCORE_BIN_COUNT;
+        static_cast<std::uint64_t>(plan.storage_shard_count) * SCORE_BIN_COUNT;
     memory.streams.shard_score_hist_a = streams.take<std::uint32_t>(shard_hist_items);
     memory.streams.shard_score_hist_b = streams.take<std::uint32_t>(shard_hist_items);
-    memory.streams.shard_score_hist_active_index = streams.take<std::uint32_t>(plan.config.shard_count);
-    memory.streams.threshold_hist_active_snapshot = streams.take<std::uint32_t>(plan.config.shard_count);
+    memory.streams.shard_score_hist_active_index = streams.take<std::uint32_t>(plan.storage_shard_count);
+    memory.streams.threshold_hist_active_snapshot = streams.take<std::uint32_t>(plan.storage_shard_count);
     memory.streams.local_score_hist = streams.take<std::uint64_t>(SCORE_BIN_COUNT);
     memory.streams.global_score_hist = streams.take<std::uint64_t>(SCORE_BIN_COUNT);
     memory.streams.current_threshold = streams.take<std::uint32_t>(1);

@@ -8,6 +8,7 @@ namespace beam {
 
 constexpr std::uint32_t STREAM_FATAL_TRACE_WORDS = 17;
 constexpr std::uint32_t STREAM_FATAL_STREAM3_SPILL_OVERFLOW = 3001;
+constexpr std::uint32_t STREAM_FATAL_STREAM3_DOUBLE_BUFFER_OVERFLOW = 3002;
 
 enum StreamFatalTraceSlot : std::uint32_t {
     FatalTraceCode = 0,
@@ -101,6 +102,7 @@ void stream3_collect_local_pending_cuda(
     CandidateMeta* global_spill_buffer_b,
     std::uint32_t* global_spill_count,
     std::uint32_t* global_spill_active_index,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* shard_counts,
     std::uint32_t* shard_offsets,
     std::uint32_t* spill_counts,
@@ -116,6 +118,7 @@ void stream3_collect_local_pending_cuda(
     std::size_t cub_temp_storage_bytes,
     std::uint32_t max_candidates,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -139,6 +142,7 @@ void stream3_restore_collect_single_owner_cuda(
     CandidateMeta* global_spill_buffer_b,
     std::uint32_t* global_spill_count,
     std::uint32_t* global_spill_active_index,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* shard_counts,
     std::uint32_t* shard_offsets,
     std::uint32_t* spill_counts,
@@ -156,6 +160,7 @@ void stream3_restore_collect_single_owner_cuda(
     std::uint32_t b_micro,
     std::uint32_t max_candidates,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -205,6 +210,7 @@ void stream3_collect_remote_recv_cuda(
     CandidateMeta* global_spill_buffer_b,
     std::uint32_t* global_spill_count,
     std::uint32_t* global_spill_active_index,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* shard_counts,
     std::uint32_t* shard_offsets,
     std::uint32_t* spill_counts,
@@ -221,6 +227,7 @@ void stream3_collect_remote_recv_cuda(
     std::uint32_t max_candidates,
     std::uint32_t world_size,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -232,12 +239,15 @@ void stream3_build_ready_shard_queue_cuda(
     const std::uint32_t* clean_count,
     const std::uint32_t* dirty_count,
     std::uint32_t* processing_flag,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* ready_flag,
     std::uint32_t* ready_shard_list,
     std::uint32_t* ready_count,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
-    std::uint32_t stream4_batch_candidates,
+    std::uint32_t stream3_batch_candidates,
+    std::uint32_t stream4_trigger_candidates,
     bool force_dirty_flush,
     bool force_clean_flush,
     cudaStream_t stream);

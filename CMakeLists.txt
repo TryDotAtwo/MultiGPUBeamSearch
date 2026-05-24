@@ -79,8 +79,9 @@ add_library(beam_cuda
     cuda/final_materialize.cu
     cuda/dispatcher.cu
     cuda/static_memory.cu
+    cuda/runtime_config.cpp
 )
-target_include_directories(beam_cuda PUBLIC src cuda)
+target_include_directories(beam_cuda PUBLIC src cuda ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 if(CUTLASS_DIR AND EXISTS "${CUTLASS_DIR}/include")
     target_include_directories(beam_cuda PUBLIC "${CUTLASS_DIR}/include")
     if(EXISTS "${CUTLASS_DIR}/tools/util/include")

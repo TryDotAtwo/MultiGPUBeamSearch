@@ -19,6 +19,7 @@ struct StaticMemoryPlan {
     std::uint64_t parent_base_count = 0;
     std::uint64_t ring_count_count = 0;
     std::uint64_t stream3_count = 0;
+    std::uint32_t storage_shard_count = 0;
     std::uint64_t survivor_count = 0;
     std::uint64_t final_state_count = 0;
     std::size_t stream3_cub_temp_bytes = 0;
@@ -52,6 +53,7 @@ struct LayoutStreamsView {
     std::uint32_t* stream3_ready_flag = nullptr;
     std::uint32_t* stream3_ready_shard_list = nullptr;
     std::uint32_t* stream3_ready_count = nullptr;
+    std::uint32_t* stream3_write_buffer_index = nullptr;
     std::uint32_t* stream3_partition_key_a = nullptr;
     std::uint32_t* stream3_partition_key_b = nullptr;
     CandidateMeta* stream3_partition_val_a = nullptr;

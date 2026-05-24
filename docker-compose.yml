@@ -1,6 +1,6 @@
 services:
   beam-tests:
-    image: gpu-dev-nsight-cutlass-cu128:2026-05-22
+    image: gpu-dev-cutlass-nsight:2026-05-24
     build: .
     working_dir: /work
     volumes:
@@ -14,7 +14,7 @@ services:
       && cmake --build build-docker
       && ctest --test-dir build-docker --output-on-failure"
   nsight-profile:
-    image: gpu-dev-nsight-cutlass-cu128:2026-05-22
+    image: gpu-dev-cutlass-nsight:2026-05-24
     working_dir: /work
     volumes:
       - .:/work

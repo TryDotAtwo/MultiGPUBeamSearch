@@ -130,8 +130,8 @@ int main() {
     std::uint32_t send_count[2]{};
     std::uint32_t send_offset[3]{};
     std::uint32_t all_counts = 0;
-    std::vector<CandidateMeta> final_candidates(survivor.size());
-    std::vector<FinalRequest> requests(survivor.size());
+    std::vector<CandidateMeta> final_candidates(static_cast<std::size_t>(plan.frontier_states));
+    std::vector<FinalRequest> requests(static_cast<std::size_t>(plan.frontier_states));
     BEAM_CUDA_CHECK(cudaMemcpy(hist.data(), memory.streams.local_score_hist, hist.size() * sizeof(std::uint64_t), cudaMemcpyDeviceToHost));
     BEAM_CUDA_CHECK(cudaMemcpy(&threshold, memory.streams.current_threshold, sizeof(threshold), cudaMemcpyDeviceToHost));
     BEAM_CUDA_CHECK(cudaMemcpy(&final_candidate_count, memory.final.final_candidate_count, sizeof(final_candidate_count), cudaMemcpyDeviceToHost));

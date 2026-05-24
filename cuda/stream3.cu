@@ -510,7 +510,9 @@ __global__ void stream3_prepare_partition_counts_kernel(
     std::uint32_t* spill_offsets,
     std::uint32_t* global_spill_count,
     const std::uint32_t* global_spill_active_index,
+    std::uint32_t* write_buffer_index,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -538,10 +540,49 @@ __global__ void stream3_prepare_partition_counts_kernel(
         if (shard >= shard_count) {
             continue;
         }
+        std::uint32_t physical_shard = shard;
+        std::uint32_t existing = clean_count[physical_shard] + dirty_count[physical_shard];
+        std::uint32_t available =
+            processing_flag[physical_shard] == 0U && existing < shard_capacity ? shard_capacity - existing : 0U;
+        if (shard_buffer_count > 1U && write_buffer_index != nullptr) {
+            const std::uint32_t current_buffer = write_buffer_index[shard] % shard_buffer_count;
+            std::uint32_t best_buffer = current_buffer;
+            std::uint32_t best_physical_shard = shard * shard_buffer_count + current_buffer;
+            std::uint32_t best_existing = clean_count[best_physical_shard] + dirty_count[best_physical_shard];
+            std::uint32_t best_available =
+                processing_flag[best_physical_shard] == 0U && best_existing < shard_capacity ?
+                shard_capacity - best_existing :
+                0U;
+            for (std::uint32_t step = 0; step < shard_buffer_count; ++step) {
+                const std::uint32_t candidate_buffer = (current_buffer + step) % shard_buffer_count;
+                const std::uint32_t candidate_physical_shard =
+                    shard * shard_buffer_count + candidate_buffer;
+                const std::uint32_t candidate_existing =
+                    clean_count[candidate_physical_shard] + dirty_count[candidate_physical_shard];
+                const std::uint32_t candidate_available =
+                    processing_flag[candidate_physical_shard] == 0U && candidate_existing < shard_capacity ?
+                    shard_capacity - candidate_existing :
+                    0U;
+                if (candidate_available >= raw_count) {
+                    best_buffer = candidate_buffer;
+                    best_physical_shard = candidate_physical_shard;
+                    best_existing = candidate_existing;
+                    best_available = candidate_available;
+                    break;
+                }
+                if (candidate_available > best_available) {
+                    best_buffer = candidate_buffer;
+                    best_physical_shard = candidate_physical_shard;
+                    best_existing = candidate_existing;
+                    best_available = candidate_available;
+                }
+            }
+            write_buffer_index[shard] = best_buffer;
+            physical_shard = best_physical_shard;
+            existing = best_existing;
+            available = best_available;
+        }
         shard_offsets[shard] = source_running;
-        const std::uint32_t existing = clean_count[shard] + dirty_count[shard];
-        const std::uint32_t available =
-            processing_flag[shard] == 0U && existing < shard_capacity ? shard_capacity - existing : 0U;
         const std::uint32_t write_count = raw_count < available ? raw_count : available;
         shard_counts[shard] = write_count;
         const std::uint32_t spill_count = raw_count - write_count;
@@ -549,11 +590,16 @@ __global__ void stream3_prepare_partition_counts_kernel(
         spill_offsets[shard] = spill_running;
         const std::uint64_t spill_end =
             static_cast<std::uint64_t>(spill_running) + static_cast<std::uint64_t>(spill_count);
+        const bool double_buffer_overflow = shard_buffer_count > 1U && spill_count != 0U;
+        const bool spill_overflow = shard_buffer_count <= 1U && spill_count != 0U && spill_end > global_spill_capacity;
         if (fatal_error_flag != nullptr && fatal_error_trace != nullptr &&
-            spill_count != 0U && spill_end > global_spill_capacity && *fatal_error_flag == 0U) {
-            *fatal_error_flag = STREAM_FATAL_STREAM3_SPILL_OVERFLOW;
-            fatal_error_trace[FatalTraceCode] = STREAM_FATAL_STREAM3_SPILL_OVERFLOW;
-            fatal_error_trace[FatalTraceShard] = shard;
+            (double_buffer_overflow || spill_overflow) && *fatal_error_flag == 0U) {
+            const std::uint32_t code =
+                double_buffer_overflow ? STREAM_FATAL_STREAM3_DOUBLE_BUFFER_OVERFLOW :
+                STREAM_FATAL_STREAM3_SPILL_OVERFLOW;
+            *fatal_error_flag = code;
+            fatal_error_trace[FatalTraceCode] = code;
+            fatal_error_trace[FatalTraceShard] = physical_shard;
             fatal_error_trace[FatalTraceGroup] = group;
             fatal_error_trace[FatalTraceExisting] = existing;
             fatal_error_trace[FatalTraceAvailable] = available;
@@ -563,9 +609,9 @@ __global__ void stream3_prepare_partition_counts_kernel(
             fatal_error_trace[FatalTraceSpillOffset] = spill_running;
             fatal_error_trace[FatalTraceSpillEnd] = spill_end;
             fatal_error_trace[FatalTraceSpillCapacity] = global_spill_capacity;
-            fatal_error_trace[FatalTraceCleanCount] = clean_count[shard];
-            fatal_error_trace[FatalTraceDirtyCount] = dirty_count[shard];
-            fatal_error_trace[FatalTraceProcessingFlag] = processing_flag[shard];
+            fatal_error_trace[FatalTraceCleanCount] = clean_count[physical_shard];
+            fatal_error_trace[FatalTraceDirtyCount] = dirty_count[physical_shard];
+            fatal_error_trace[FatalTraceProcessingFlag] = processing_flag[physical_shard];
             fatal_error_trace[FatalTraceShardCapacity] = shard_capacity;
             fatal_error_trace[FatalTraceStream4Batch] = stream4_batch_candidates;
             fatal_error_trace[FatalTraceAppendToActiveSpill] = append_to_active_spill;
@@ -573,7 +619,9 @@ __global__ void stream3_prepare_partition_counts_kernel(
         spill_running = spill_end > static_cast<std::uint64_t>(UINT32_MAX) ? UINT32_MAX : static_cast<std::uint32_t>(spill_end);
         source_running += raw_count;
     }
-    global_spill_count[spill_index] = spill_running < global_spill_capacity ? spill_running : global_spill_capacity;
+    if (shard_buffer_count <= 1U) {
+        global_spill_count[spill_index] = spill_running < global_spill_capacity ? spill_running : global_spill_capacity;
+    }
 }
 
 __global__ void stream3_partition_scatter_kernel(
@@ -587,10 +635,12 @@ __global__ void stream3_partition_scatter_kernel(
     CandidateMeta* global_spill_buffer_a,
     CandidateMeta* global_spill_buffer_b,
     const std::uint32_t* global_spill_active_index,
+    const std::uint32_t* write_buffer_index,
     const std::uint32_t* shard_counts,
     const std::uint32_t* shard_offsets,
     const std::uint32_t* spill_offsets,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -608,11 +658,14 @@ __global__ void stream3_partition_scatter_kernel(
     if (shard >= shard_count) {
         return;
     }
+    const std::uint32_t buffer = shard_buffer_count <= 1U ? 0U :
+        (write_buffer_index[shard] % shard_buffer_count);
+    const std::uint32_t physical_shard = shard * shard_buffer_count + buffer;
     const std::uint32_t raw_count = unique_counts[group];
     const std::uint32_t source_base = shard_offsets[shard];
     const std::uint32_t write_limit = shard_counts[shard];
     const std::uint32_t shard_capacity = shard_capacity_candidates;
-    const std::uint32_t dirty_base = clean_count[shard] + dirty_count[shard];
+    const std::uint32_t dirty_base = clean_count[physical_shard] + dirty_count[physical_shard];
     const std::uint32_t spill_base = spill_offsets[shard];
     const std::uint32_t active = *global_spill_active_index & 1U;
     CandidateMeta* global_spill_buffer =
@@ -622,16 +675,16 @@ __global__ void stream3_partition_scatter_kernel(
     for (std::uint32_t local = threadIdx.x; local < raw_count; local += blockDim.x) {
         const CandidateMeta candidate = partition_val_sorted[source_base + local];
         if (local < write_limit) {
-            survivor_shard[static_cast<std::uint64_t>(shard) * shard_capacity + dirty_base + local] = candidate;
+            survivor_shard[static_cast<std::uint64_t>(physical_shard) * shard_capacity + dirty_base + local] = candidate;
         } else {
             const std::uint32_t spill_idx = spill_base + local - write_limit;
-            if (spill_idx < global_spill_capacity) {
+            if (shard_buffer_count <= 1U && spill_idx < global_spill_capacity) {
                 global_spill_buffer[spill_idx] = candidate;
             }
         }
     }
     if (threadIdx.x == 0) {
-        dirty_count[shard] += write_limit;
+        dirty_count[physical_shard] += write_limit;
     }
 }
 
@@ -651,12 +704,15 @@ __global__ void stream3_build_ready_shard_queue_kernel(
     const std::uint32_t* clean_count,
     const std::uint32_t* dirty_count,
     std::uint32_t* processing_flag,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* ready_flag,
     std::uint32_t* ready_shard_list,
     std::uint32_t* ready_count,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
-    std::uint32_t stream4_batch_candidates,
+    std::uint32_t stream3_batch_candidates,
+    std::uint32_t stream4_trigger_candidates,
     std::uint32_t force_dirty_flush,
     std::uint32_t force_clean_flush) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
@@ -664,13 +720,28 @@ __global__ void stream3_build_ready_shard_queue_kernel(
     }
     std::uint32_t out = 0;
     const std::uint32_t shard_capacity = shard_capacity_candidates;
-    for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
+    const std::uint32_t storage_shard_count = shard_count * shard_buffer_count;
+    const std::uint32_t average_shard_write =
+        shard_count == 0U ? stream3_batch_candidates :
+        (stream3_batch_candidates + shard_count - 1U) / shard_count;
+    const std::uint32_t write_margin = (average_shard_write + 3U) / 4U;
+    const std::uint32_t unclamped_write_reserve =
+        average_shard_write > UINT32_MAX - write_margin ? UINT32_MAX : average_shard_write + write_margin;
+    const std::uint32_t write_reserve =
+        unclamped_write_reserve < shard_capacity ? unclamped_write_reserve : shard_capacity;
+    const std::uint32_t clean_ready_threshold =
+        write_reserve < shard_capacity ? shard_capacity - write_reserve : 0U;
+    for (std::uint32_t shard = 0; shard < storage_shard_count; ++shard) {
         ready_flag[shard] = 0;
         const std::uint32_t clean = clean_count[shard];
         const std::uint32_t dirty = dirty_count[shard];
         const std::uint32_t total = clean + dirty;
-        const bool dirty_ready = dirty != 0U && (force_dirty_flush != 0U || total >= stream4_batch_candidates);
-        const bool clean_ready = dirty == 0U && clean != 0U && (force_clean_flush != 0U || clean >= shard_capacity);
+        const bool near_capacity = total >= clean_ready_threshold;
+        const bool dirty_ready =
+            dirty != 0U &&
+            (force_dirty_flush != 0U || dirty >= stream4_trigger_candidates || near_capacity);
+        const bool clean_ready =
+            dirty == 0U && clean != 0U && (force_clean_flush != 0U || clean >= clean_ready_threshold);
         const bool ready =
             processing_flag[shard] == 0U &&
             (dirty_ready || clean_ready);
@@ -679,6 +750,23 @@ __global__ void stream3_build_ready_shard_queue_kernel(
             ready_flag[shard] = 1;
             ready_shard_list[out] = shard;
             ++out;
+            if (shard_buffer_count > 1U) {
+                const std::uint32_t logical_shard = shard / shard_buffer_count;
+                const std::uint32_t current_buffer = write_buffer_index[logical_shard] % shard_buffer_count;
+                if (shard == logical_shard * shard_buffer_count + current_buffer) {
+                    for (std::uint32_t step = 1U; step < shard_buffer_count; ++step) {
+                        const std::uint32_t candidate_buffer = (current_buffer + step) % shard_buffer_count;
+                        const std::uint32_t candidate_shard =
+                            logical_shard * shard_buffer_count + candidate_buffer;
+                        const std::uint32_t candidate_total =
+                            clean_count[candidate_shard] + dirty_count[candidate_shard];
+                        if (processing_flag[candidate_shard] == 0U && candidate_total < shard_capacity) {
+                            write_buffer_index[logical_shard] = candidate_buffer;
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
     *ready_count = out;
@@ -986,11 +1074,13 @@ void stream3_partition_sort_reduce_scatter(
     CandidateMeta* global_spill_buffer_b,
     std::uint32_t* global_spill_count,
     const std::uint32_t* global_spill_active_index,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* shard_counts,
     std::uint32_t* shard_offsets,
     std::uint32_t* spill_counts,
     std::uint32_t* spill_offsets,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -1043,7 +1133,9 @@ void stream3_partition_sort_reduce_scatter(
         spill_offsets,
         global_spill_count,
         global_spill_active_index,
+        write_buffer_index,
         shard_count,
+        shard_buffer_count,
         shard_capacity_candidates,
         stream4_batch_candidates,
         global_spill_capacity,
@@ -1061,10 +1153,12 @@ void stream3_partition_sort_reduce_scatter(
         global_spill_buffer_a,
         global_spill_buffer_b,
         global_spill_active_index,
+        write_buffer_index,
         shard_counts,
         shard_offsets,
         spill_offsets,
         shard_count,
+        shard_buffer_count,
         shard_capacity_candidates,
         stream4_batch_candidates,
         global_spill_capacity,
@@ -1085,6 +1179,7 @@ void stream3_collect_local_pending_cuda(
     CandidateMeta* global_spill_buffer_b,
     std::uint32_t* global_spill_count,
     std::uint32_t* global_spill_active_index,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* shard_counts,
     std::uint32_t* shard_offsets,
     std::uint32_t* spill_counts,
@@ -1100,6 +1195,7 @@ void stream3_collect_local_pending_cuda(
     std::size_t cub_temp_storage_bytes,
     std::uint32_t max_candidates,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -1135,11 +1231,13 @@ void stream3_collect_local_pending_cuda(
         global_spill_buffer_b,
         global_spill_count,
         global_spill_active_index,
+        write_buffer_index,
         shard_counts,
         shard_offsets,
         spill_counts,
         spill_offsets,
         shard_count,
+        shard_buffer_count,
         shard_capacity_candidates,
         stream4_batch_candidates,
         global_spill_capacity,
@@ -1165,6 +1263,7 @@ void stream3_restore_collect_single_owner_cuda(
     CandidateMeta* global_spill_buffer_b,
     std::uint32_t* global_spill_count,
     std::uint32_t* global_spill_active_index,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* shard_counts,
     std::uint32_t* shard_offsets,
     std::uint32_t* spill_counts,
@@ -1182,6 +1281,7 @@ void stream3_restore_collect_single_owner_cuda(
     std::uint32_t b_micro,
     std::uint32_t max_candidates,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -1224,11 +1324,13 @@ void stream3_restore_collect_single_owner_cuda(
         global_spill_buffer_b,
         global_spill_count,
         global_spill_active_index,
+        write_buffer_index,
         shard_counts,
         shard_offsets,
         spill_counts,
         spill_offsets,
         shard_count,
+        shard_buffer_count,
         shard_capacity_candidates,
         stream4_batch_candidates,
         global_spill_capacity,
@@ -1298,11 +1400,13 @@ void stream3_drain_global_spill_cuda(
         global_spill_buffer_b,
         global_spill_count,
         global_spill_active_index,
+        nullptr,
         shard_counts,
         shard_offsets,
         spill_counts,
         spill_offsets,
         shard_count,
+        1U,
         shard_capacity_candidates,
         stream4_batch_candidates,
         global_spill_capacity,
@@ -1327,6 +1431,7 @@ void stream3_collect_remote_recv_cuda(
     CandidateMeta* global_spill_buffer_b,
     std::uint32_t* global_spill_count,
     std::uint32_t* global_spill_active_index,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* shard_counts,
     std::uint32_t* shard_offsets,
     std::uint32_t* spill_counts,
@@ -1343,6 +1448,7 @@ void stream3_collect_remote_recv_cuda(
     std::uint32_t max_candidates,
     std::uint32_t world_size,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
     std::uint32_t stream4_batch_candidates,
     std::uint32_t global_spill_capacity,
@@ -1378,11 +1484,13 @@ void stream3_collect_remote_recv_cuda(
         global_spill_buffer_b,
         global_spill_count,
         global_spill_active_index,
+        write_buffer_index,
         shard_counts,
         shard_offsets,
         spill_counts,
         spill_offsets,
         shard_count,
+        shard_buffer_count,
         shard_capacity_candidates,
         stream4_batch_candidates,
         global_spill_capacity,
@@ -1397,12 +1505,15 @@ void stream3_build_ready_shard_queue_cuda(
     const std::uint32_t* clean_count,
     const std::uint32_t* dirty_count,
     std::uint32_t* processing_flag,
+    std::uint32_t* write_buffer_index,
     std::uint32_t* ready_flag,
     std::uint32_t* ready_shard_list,
     std::uint32_t* ready_count,
     std::uint32_t shard_count,
+    std::uint32_t shard_buffer_count,
     std::uint32_t shard_capacity_candidates,
-    std::uint32_t stream4_batch_candidates,
+    std::uint32_t stream3_batch_candidates,
+    std::uint32_t stream4_trigger_candidates,
     bool force_dirty_flush,
     bool force_clean_flush,
     cudaStream_t stream) {
@@ -1411,12 +1522,15 @@ void stream3_build_ready_shard_queue_cuda(
         clean_count,
         dirty_count,
         processing_flag,
+        write_buffer_index,
         ready_flag,
         ready_shard_list,
         ready_count,
         shard_count,
+        shard_buffer_count,
         shard_capacity_candidates,
-        stream4_batch_candidates,
+        stream3_batch_candidates,
+        stream4_trigger_candidates,
         force_dirty_flush ? 1U : 0U,
         force_clean_flush ? 1U : 0U);
 }

@@ -33,7 +33,8 @@ inline constexpr std::uint32_t STREAM1_HIDDEN2 = 512;
 inline constexpr std::uint32_t STREAM1_RESIDUAL_COUNT = 2;
 inline constexpr std::array<std::uint32_t, 4> B_MICRO_SWEEP{1024, 2048, 4096, 8192};
 inline constexpr std::array<std::uint32_t, 4> STREAM1_CONCURRENCY_SWEEP{1, 2, 3, 4};
-inline constexpr std::array<std::uint32_t, 3> STREAM4_BATCH_SWEEP{32768, 65536, 131072};
+inline constexpr std::array<std::uint32_t, 6> STREAM4_BATCH_SWEEP{196608, 262144, 393216, 524288, 699392, 1048576};
+inline constexpr std::array<std::uint32_t, 4> STREAM4_SHARD_CAPACITY_SWEEP{1048576, 2621440, 5242880, 10485760};
 
 std::uint64_t parse_u64(const char* text, const char* name) {
     char* end = nullptr;
@@ -372,6 +373,24 @@ float time_gpu_ms(const std::vector<cudaStream_t>& streams, std::uint32_t iterat
     return elapsed_ms / static_cast<float>(iterations);
 }
 
+template <typename Fn>
+float time_single_stream_ms(cudaStream_t stream, Fn launch) {
+    cudaEvent_t start = nullptr;
+    cudaEvent_t stop = nullptr;
+    BEAM_CUDA_CHECK(cudaEventCreate(&start));
+    BEAM_CUDA_CHECK(cudaEventCreate(&stop));
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    BEAM_CUDA_CHECK(cudaEventRecord(start, stream));
+    launch();
+    BEAM_CUDA_CHECK(cudaEventRecord(stop, stream));
+    BEAM_CUDA_CHECK(cudaEventSynchronize(stop));
+    float elapsed_ms = 0.0f;
+    BEAM_CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, start, stop));
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    return elapsed_ms;
+}
+
 std::vector<cudaStream_t> create_streams(std::uint32_t count) {
     std::vector<cudaStream_t> streams(count);
     for (cudaStream_t& stream : streams) {
@@ -489,6 +508,13 @@ std::vector<Stream1Result> benchmark_stream1(
                    << "|" << std::fixed << std::setprecision(4) << ms
                    << "|" << std::setprecision(1) << parent_per_sec
                    << "|" << candidate_per_sec << "|\n";
+            std::cout << "stream1_micro"
+                      << " b_micro=" << b_micro
+                      << " concurrent=" << concurrent
+                      << " ms_per_launch_group=" << std::fixed << std::setprecision(4) << ms
+                      << " parents_per_sec=" << std::setprecision(1) << parent_per_sec
+                      << " candidates_per_sec=" << candidate_per_sec
+                      << "\n";
             for (std::uint32_t i = 0; i < concurrent; ++i) {
                 cudaFree(parent_base[i]);
                 cudaFree(count[i]);
@@ -634,6 +660,7 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
                 memory.streams.global_spill_buffer_b,
                 memory.streams.global_spill_count,
                 memory.streams.global_spill_active_index,
+                memory.streams.stream3_write_buffer_index,
                 memory.streams.stream3_shard_counts,
                 memory.streams.stream3_shard_offsets,
                 memory.streams.stream3_spill_counts,
@@ -651,6 +678,7 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
                 b_micro,
                 candidate_count,
                 config.shard_count,
+                config.shard_buffer_count,
                 config.shard_capacity_candidates,
                 config.stream4_batch_candidates,
                 config.global_spill_capacity,
@@ -669,24 +697,9 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
 std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
     std::vector<StreamResult> results;
     report << "## Stream4 Threshold Compact Sort Reduce\n\n";
-    report << "| STREAM4_BATCH_CANDIDATES | sort_capacity | ms_per_job | candidates_per_sec |\n";
-    report << "|---:|---:|---:|---:|\n";
-    for (std::uint32_t batch : STREAM4_BATCH_SWEEP) {
-        RuntimeConfig config;
-        config.b_micro = 1024;
-        config.stream3_batch_candidates = config.b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
-        config.stream4_batch_candidates = batch;
-        config.stream4_active_sort_slots = 1;
-        config.ring_count = 1;
-        config.shard_count = 1;
-        config.shard_capacity_candidates = 2U * batch;
-        config.global_spill_capacity = 1024;
-        config.user_global_beam_width = batch;
-        StaticMemoryPlan plan = make_static_memory_plan(config);
-        StaticDeviceMemory memory;
-        allocate_static_device_memory(plan, memory);
-        BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
-        const std::uint32_t capacity = 2U * batch;
+    report << "| shard_capacity | STREAM4_BATCH_CANDIDATES | input_count | ms_per_job | shard_items_per_sec | batch_candidates_per_sec | allocation_bytes |\n";
+    report << "|---:|---:|---:|---:|---:|---:|---:|\n";
+    for (std::uint32_t capacity : STREAM4_SHARD_CAPACITY_SWEEP) {
         std::vector<CandidateMeta> host(capacity);
         for (std::uint32_t i = 0; i < capacity; ++i) {
             host[i].hash = Hash128{static_cast<std::uint64_t>(i), static_cast<std::uint64_t>(capacity - i)};
@@ -694,45 +707,94 @@ std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
             host[i].score_key = i % SCORE_BIN_COUNT;
             host[i].route_packed = i % MOVE_COUNT;
         }
-        BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.survivor_shard, host.data(), capacity * sizeof(CandidateMeta), cudaMemcpyHostToDevice));
-        std::vector<cudaStream_t> streams = create_streams(1);
-        const std::uint32_t threshold = SCORE_MAX_KEY;
-        const float ms = time_gpu_ms(streams, 1, [&]() {
-            BEAM_CUDA_CHECK(cudaMemcpyAsync(memory.streams.survivor_shard, host.data(), capacity * sizeof(CandidateMeta), cudaMemcpyHostToDevice, streams[0]));
-            BEAM_CUDA_CHECK(cudaMemcpyAsync(memory.streams.clean_count, &batch, sizeof(batch), cudaMemcpyHostToDevice, streams[0]));
-            BEAM_CUDA_CHECK(cudaMemcpyAsync(memory.streams.dirty_count, &batch, sizeof(batch), cudaMemcpyHostToDevice, streams[0]));
-            BEAM_CUDA_CHECK(cudaMemcpyAsync(memory.streams.current_threshold, &threshold, sizeof(threshold), cudaMemcpyHostToDevice, streams[0]));
-            stream4_shard_job_device_threshold_cuda(
-                memory.streams.survivor_shard,
-                memory.streams.clean_count,
-                memory.streams.dirty_count,
-                memory.streams.processing_flag,
-                memory.streams.current_threshold,
-                capacity,
-                memory.streams.stream4_key_a,
-                memory.streams.stream4_key_b,
-                memory.streams.stream4_val_a,
-                memory.streams.stream4_val_b,
-                memory.streams.stream4_score_key_a,
-                memory.streams.stream4_score_key_b,
-                memory.streams.stream4_score_count_a,
-                memory.streams.stream4_score_count_b,
-                memory.streams.stream4_keep_flags,
-                memory.streams.stream4_block_counts,
-                memory.streams.stream4_block_offsets,
-                memory.streams.stream4_count,
-                memory.streams.shard_score_hist_a,
-                memory.streams.shard_score_hist_b,
-                memory.streams.shard_score_hist_active_index,
-                memory.streams.stream4_cub_temp,
-                memory.streams.stream4_cub_temp_bytes,
-                streams[0]);
-        });
-        const double candidate_per_sec = static_cast<double>(capacity) * 1000.0 / static_cast<double>(ms);
-        results.push_back(StreamResult{"Stream4", batch, capacity, ms, candidate_per_sec});
-        report << "|" << batch << "|" << capacity << "|" << std::fixed << std::setprecision(4) << ms << "|" << std::setprecision(1) << candidate_per_sec << "|\n";
-        destroy_streams(streams);
-        free_static_device_memory(memory);
+        for (std::uint32_t batch : STREAM4_BATCH_SWEEP) {
+            if (batch > capacity) {
+                continue;
+            }
+            RuntimeConfig config;
+            config.b_micro = 8192;
+            config.stream3_batch_candidates = config.b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+            config.stream4_batch_candidates = batch;
+            config.stream4_active_sort_slots = 1;
+            config.ring_count = 1;
+            config.shard_count = 1;
+            config.shard_capacity_candidates = capacity;
+            config.global_spill_capacity = config.stream3_batch_candidates;
+            config.user_global_beam_width = batch;
+            StaticMemoryPlan plan = make_static_memory_plan(config);
+            StaticDeviceMemory memory;
+            allocate_static_device_memory(plan, memory);
+            BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
+            std::vector<cudaStream_t> streams = create_streams(1);
+            const std::uint32_t clean_count = 0;
+            const std::uint32_t dirty_count = batch;
+            const std::uint32_t threshold = SCORE_MAX_KEY;
+            const std::uint32_t processing_flag = 0;
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.survivor_shard, host.data(), capacity * sizeof(CandidateMeta), cudaMemcpyHostToDevice));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.clean_count, &clean_count, sizeof(clean_count), cudaMemcpyHostToDevice));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.dirty_count, &dirty_count, sizeof(dirty_count), cudaMemcpyHostToDevice));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.current_threshold, &threshold, sizeof(threshold), cudaMemcpyHostToDevice));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.processing_flag, &processing_flag, sizeof(processing_flag), cudaMemcpyHostToDevice));
+            auto launch_stream4 = [&]() {
+                stream4_shard_job_device_threshold_cuda(
+                    memory.streams.survivor_shard,
+                    memory.streams.clean_count,
+                    memory.streams.dirty_count,
+                    memory.streams.processing_flag,
+                    memory.streams.current_threshold,
+                    capacity,
+                    memory.streams.stream4_key_a,
+                    memory.streams.stream4_key_b,
+                    memory.streams.stream4_val_a,
+                    memory.streams.stream4_val_b,
+                    memory.streams.stream4_score_key_a,
+                    memory.streams.stream4_score_key_b,
+                    memory.streams.stream4_score_count_a,
+                    memory.streams.stream4_score_count_b,
+                    memory.streams.stream4_keep_flags,
+                    memory.streams.stream4_block_counts,
+                    memory.streams.stream4_block_offsets,
+                    memory.streams.stream4_count,
+                    memory.streams.shard_score_hist_a,
+                    memory.streams.shard_score_hist_b,
+                    memory.streams.shard_score_hist_active_index,
+                    memory.streams.stream4_cub_temp,
+                    memory.streams.stream4_cub_temp_bytes,
+                    streams[0]);
+            };
+            launch_stream4();
+            BEAM_CUDA_CHECK(cudaStreamSynchronize(streams[0]));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.survivor_shard, host.data(), capacity * sizeof(CandidateMeta), cudaMemcpyHostToDevice));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.clean_count, &clean_count, sizeof(clean_count), cudaMemcpyHostToDevice));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.dirty_count, &dirty_count, sizeof(dirty_count), cudaMemcpyHostToDevice));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.current_threshold, &threshold, sizeof(threshold), cudaMemcpyHostToDevice));
+            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.processing_flag, &processing_flag, sizeof(processing_flag), cudaMemcpyHostToDevice));
+            const float ms = time_single_stream_ms(streams[0], launch_stream4);
+            const double shard_items_per_sec =
+                static_cast<double>(capacity) * 1000.0 / static_cast<double>(ms);
+            const double batch_candidates_per_sec =
+                static_cast<double>(batch) * 1000.0 / static_cast<double>(ms);
+            results.push_back(StreamResult{"Stream4", batch, capacity, ms, shard_items_per_sec});
+            report << "|" << capacity
+                   << "|" << batch
+                   << "|" << dirty_count
+                   << "|" << std::fixed << std::setprecision(4) << ms
+                   << "|" << std::setprecision(1) << shard_items_per_sec
+                   << "|" << batch_candidates_per_sec
+                   << "|" << plan.total_device_bytes
+                   << "|\n";
+            std::cout << "stream4_micro"
+                      << " shard_capacity=" << capacity
+                      << " stream4_batch=" << batch
+                      << " input_count=" << dirty_count
+                      << " ms_per_job=" << std::fixed << std::setprecision(4) << ms
+                      << " shard_items_per_sec=" << std::setprecision(1) << shard_items_per_sec
+                      << " batch_candidates_per_sec=" << batch_candidates_per_sec
+                      << " allocation_bytes=" << plan.total_device_bytes
+                      << "\n";
+            destroy_streams(streams);
+            free_static_device_memory(memory);
+        }
     }
     report << "\n";
     return results;
@@ -780,7 +842,11 @@ int main(int argc, char** argv) {
     DeviceWeights weights = upload_weights(host_weights);
 
     std::filesystem::create_directories("test_results");
-    std::ofstream report("test_results/per_stream_benchmark_2026-05-22.md");
+    const char* report_env = std::getenv("BEAM_STREAM_BENCH_REPORT");
+    const std::string report_path =
+        report_env != nullptr ? std::string(report_env) : std::string("test_results/per_stream_benchmark_2026-05-24.md");
+    const bool stream_micro_only = std::getenv("BEAM_STREAM_MICRO_ONLY") != nullptr;
+    std::ofstream report(report_path);
     report << "# Per Stream Benchmark 2026-05-22\n\n";
     report << "- puzzle_id=" << puzzle_id << "\n";
     report << "- gpu_total_bytes=" << total_before << "\n";
@@ -794,10 +860,12 @@ int main(int argc, char** argv) {
     std::cout << "stream_benchmark_start=1\n";
     benchmark_stream1(weights, d_states, max_states, report);
     std::cout << "stream1_benchmark_done=1\n";
-    benchmark_stream2(d_states, d_generators, d_central, d_zobrist, report);
-    std::cout << "stream2_benchmark_done=1\n";
-    benchmark_stream3(report);
-    std::cout << "stream3_benchmark_done=1\n";
+    if (!stream_micro_only) {
+        benchmark_stream2(d_states, d_generators, d_central, d_zobrist, report);
+        std::cout << "stream2_benchmark_done=1\n";
+        benchmark_stream3(report);
+        std::cout << "stream3_benchmark_done=1\n";
+    }
     benchmark_stream4(report);
     std::cout << "stream4_benchmark_done=1\n";
 
@@ -811,6 +879,6 @@ int main(int argc, char** argv) {
     cudaFree(d_central);
     cudaFree(d_zobrist);
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
-    std::cout << "stream_benchmark_report=test_results/per_stream_benchmark_2026-05-22.md\n";
+    std::cout << "stream_benchmark_report=" << report_path << "\n";
     return 0;
 }
