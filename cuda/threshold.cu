@@ -27,6 +27,10 @@ __device__ std::uint64_t ceil_div_u64_device(std::uint64_t a, std::uint64_t b) {
     return b == 0ULL ? 0ULL : (a + b - 1ULL) / b;
 }
 
+__device__ std::uint32_t final_phase_base_device(const std::uint32_t* output_base) {
+    return output_base == nullptr ? 0U : *output_base;
+}
+
 __global__ void threshold_snapshot_active_histogram_kernel(
     const std::uint32_t* shard_score_hist_active_index,
     std::uint32_t* threshold_hist_active_snapshot,
@@ -114,6 +118,7 @@ __global__ void final_mark_counts_kernel(
     std::uint32_t* keep_flags,
     std::uint32_t* block_counts,
     std::uint32_t final_threshold,
+    std::uint32_t score_phase,
     std::uint32_t shard_count,
     std::uint32_t stream4_batch_candidates) {
     __shared__ std::uint32_t flags[256];
@@ -125,7 +130,11 @@ __global__ void final_mark_counts_kernel(
     if (i < total) {
         const std::uint32_t shard = static_cast<std::uint32_t>(i / shard_capacity);
         const std::uint32_t local = static_cast<std::uint32_t>(i - static_cast<std::uint64_t>(shard) * shard_capacity);
-        keep = local < clean_count[shard] && survivor_shard[i].score_key <= final_threshold ? 1U : 0U;
+        const bool valid = local < clean_count[shard];
+        const std::uint32_t score_key = valid ? survivor_shard[i].score_key : UINT32_THRESHOLD_MAX;
+        const bool score_match =
+            score_phase == 0U ? score_key < final_threshold : score_key == final_threshold;
+        keep = valid && score_match ? 1U : 0U;
         keep_flags[i] = keep;
     }
     flags[tid] = keep;
@@ -144,6 +153,7 @@ __global__ void final_mark_counts_kernel(
 __global__ void final_scan_block_counts_kernel(
     const std::uint32_t* block_counts,
     std::uint32_t* block_offsets,
+    const std::uint32_t* output_base,
     std::uint32_t* final_candidate_count,
     std::uint32_t block_count,
     std::uint64_t global_prefix_for_rank,
@@ -156,16 +166,29 @@ __global__ void final_scan_block_counts_kernel(
         block_offsets[block] = running;
         running += block_counts[block];
     }
+    const std::uint32_t base = final_phase_base_device(output_base);
     if (global_keep_count == 0ULL || global_prefix_for_rank >= global_keep_count) {
         *final_candidate_count = 0;
         return;
     }
-    const std::uint64_t remaining_global_keep = global_keep_count - global_prefix_for_rank;
+    if (static_cast<std::uint64_t>(base) >= global_keep_count - global_prefix_for_rank) {
+        *final_candidate_count = base;
+        return;
+    }
+    const std::uint64_t remaining_global_keep = global_keep_count - global_prefix_for_rank - base;
     const std::uint64_t capped =
         static_cast<std::uint64_t>(running) < remaining_global_keep
             ? static_cast<std::uint64_t>(running)
             : remaining_global_keep;
-    *final_candidate_count = static_cast<std::uint32_t>(capped);
+    *final_candidate_count = base + static_cast<std::uint32_t>(capped);
+}
+
+__global__ void final_save_count_kernel(
+    const std::uint32_t* final_candidate_count,
+    std::uint32_t* saved_count) {
+    if (blockIdx.x == 0 && threadIdx.x == 0) {
+        *saved_count = *final_candidate_count;
+    }
 }
 
 __global__ void final_init_send_ranges_kernel(
@@ -216,6 +239,7 @@ __global__ void final_scatter_load_balance_kernel(
     const CandidateMeta* survivor_shard,
     const std::uint32_t* keep_flags,
     const std::uint32_t* block_offsets,
+    const std::uint32_t* output_base,
     CandidateMeta* final_candidate_buffer,
     std::uint32_t* final_candidate_count,
     FinalRequest* final_request_buffer,
@@ -245,7 +269,7 @@ __global__ void final_scatter_load_balance_kernel(
     if (keep == 0U || *final_candidate_count > final_capacity || balance_keep_count == 0ULL || world_size == 0U) {
         return;
     }
-    const std::uint32_t local_out = block_offsets[blockIdx.x] + scan[tid] - 1U;
+    const std::uint32_t local_out = final_phase_base_device(output_base) + block_offsets[blockIdx.x] + scan[tid] - 1U;
     if (local_out >= *final_candidate_count) {
         return;
     }
@@ -381,35 +405,31 @@ void final_filter_load_balance_cuda(
     const std::uint32_t block_count = static_cast<std::uint32_t>((item_count + block_size - 1ULL) / block_size);
     const dim3 block(block_size);
     const dim3 grid(block_count);
+
+    // Phase 0 counts candidates with score below final_threshold.
     final_mark_counts_kernel<<<grid, block, 0, stream>>>(
         survivor_shard,
         clean_count,
         keep_flags,
         block_counts,
         final_threshold,
+        0,
         shard_count,
         stream4_batch_candidates);
     final_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
         block_counts,
         block_offsets,
+        nullptr,
         final_candidate_count,
         block_count,
         global_prefix_for_rank,
         global_keep_count);
-    final_init_send_ranges_kernel<<<1, 1, 0, stream>>>(
-        final_candidate_count,
-        final_request_count,
-        final_send_count,
-        final_send_offset,
-        local_rank,
-        world_size,
-        global_prefix_for_rank,
-        global_keep_count,
-        final_capacity);
+
     final_scatter_load_balance_kernel<<<grid, block, 0, stream>>>(
         survivor_shard,
         keep_flags,
         block_offsets,
+        nullptr,
         final_candidate_buffer,
         final_candidate_count,
         final_request_buffer,
@@ -420,6 +440,52 @@ void final_filter_load_balance_cuda(
         final_capacity,
         shard_count,
         stream4_batch_candidates);
+
+    // Phase 1 fills remaining beam slots with candidates exactly on final_threshold.
+    final_save_count_kernel<<<1, 1, 0, stream>>>(final_candidate_count, final_request_count);
+    final_mark_counts_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        clean_count,
+        keep_flags,
+        block_counts,
+        final_threshold,
+        1,
+        shard_count,
+        stream4_batch_candidates);
+    final_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
+        block_counts,
+        block_offsets,
+        final_request_count,
+        final_candidate_count,
+        block_count,
+        global_prefix_for_rank,
+        global_keep_count);
+    final_scatter_load_balance_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        keep_flags,
+        block_offsets,
+        final_request_count,
+        final_candidate_buffer,
+        final_candidate_count,
+        final_request_buffer,
+        local_rank,
+        world_size,
+        global_prefix_for_rank,
+        global_keep_count,
+        final_capacity,
+        shard_count,
+        stream4_batch_candidates);
+
+    final_init_send_ranges_kernel<<<1, 1, 0, stream>>>(
+        final_candidate_count,
+        final_request_count,
+        final_send_count,
+        final_send_offset,
+        local_rank,
+        world_size,
+        global_prefix_for_rank,
+        global_keep_count,
+        final_capacity);
 }
 
 } // namespace beam

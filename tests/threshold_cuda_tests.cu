@@ -150,9 +150,46 @@ int main() {
     require(requests[2].parent_idx == 12 && requests[2].target_local_idx == 2 && requests[2].move == 5, "final request two failed");
     require(all_counts == 3, "final allgather count failed");
 
+    survivor.assign(survivor.size(), CandidateMeta{});
+    survivor[0] = CandidateMeta{Hash128{11, 11}, 20, 7, pack_route(0, 0, 1)};
+    survivor[1] = CandidateMeta{Hash128{12, 12}, 21, 7, pack_route(0, 0, 2)};
+    survivor[2] = CandidateMeta{Hash128{13, 13}, 22, 5, pack_route(0, 0, 3)};
+    survivor[3] = CandidateMeta{Hash128{14, 14}, 23, 9, pack_route(0, 0, 4)};
+    clean_count[0] = 4;
+    clean_count[1] = 0;
+    BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.survivor_shard, survivor.data(), survivor.size() * sizeof(CandidateMeta), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.clean_count, clean_count, sizeof(clean_count), cudaMemcpyHostToDevice));
+    final_filter_load_balance_cuda(
+        memory.streams.survivor_shard,
+        memory.streams.clean_count,
+        memory.final.final_keep_flags,
+        memory.final.final_block_counts,
+        memory.final.final_block_offsets,
+        memory.final.final_candidate_buffer,
+        memory.final.final_candidate_count,
+        memory.final.final_request_buffer,
+        memory.final.final_request_count,
+        memory.final.final_send_count,
+        memory.final.final_send_offset,
+        7,
+        0,
+        1,
+        0,
+        2,
+        static_cast<std::uint32_t>(survivor.size()),
+        shard_count,
+        stream4_batch,
+        0);
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    BEAM_CUDA_CHECK(cudaMemcpy(&final_candidate_count, memory.final.final_candidate_count, sizeof(final_candidate_count), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(final_candidates.data(), memory.final.final_candidate_buffer, final_candidates.size() * sizeof(CandidateMeta), cudaMemcpyDeviceToHost));
+    require(final_candidate_count == 2, "final exact score cap count failed");
+    require(final_candidates[0].score_key == 5 && final_candidates[1].score_key == 7, "final exact score cap order failed");
+
     report << "- local_histogram=pass\n";
     report << "- threshold_select=pass\n";
     report << "- final_filter_load_balance=pass\n";
+    report << "- final_exact_score_cap=pass\n";
     report << "- final_request_build=pass\n";
     report << "- nccl_histogram_allreduce=pass\n";
     report << "- nccl_count_allgather=pass\n";

@@ -226,7 +226,7 @@ std::size_t stream4_cub_temp_bytes(std::uint32_t stream4_capacity) {
         score_counts_out,
         item_count,
         0,
-        16,
+        32,
         0);
     if (status != cudaSuccess) {
         throw std::runtime_error(cudaGetErrorString(status));

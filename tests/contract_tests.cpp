@@ -52,7 +52,7 @@ int main() {
 
     require(q_to_score_key(-5.0f) == 0, "negative score clamp failed");
     require(q_to_score_key(300.5f) == SCORE_MAX_KEY, "max score clamp failed");
-    require(q_to_score_key(1.5f) == 192, "score rounding failed");
+    require(q_to_score_key(1.5f) == 1536, "score rounding failed");
     report << "- score_quantization=pass\n";
 
     State128 state = make_state128(std::vector<std::uint8_t>(STATE_LEN, 7));

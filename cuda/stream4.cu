@@ -305,7 +305,7 @@ void stream4_write_shard_histogram(
             score_count_b,
             static_cast<int>(capacity),
             0,
-            16,
+            32,
             stream),
         "cub::DeviceRadixSort::SortPairs stream4 score histogram");
 

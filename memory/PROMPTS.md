@@ -82,3 +82,4 @@
 - User clarified dead-branch history must be cleaned: if a branch dies, its candidate history record is no longer needed.
 - User requested three follow-up changes: discuss and raise neural-network output rounding precision, make CPU history cleanup independent from the main GPU loop, and add a configurable worker count.
 - User requested setting `SCORE_SCALE=1024` despite alignment/memory concerns, then checking whether known solution paths for puzzles 1 through 20 survive beam pruning.
+- User confirmed the final stage must be fixed after discovering that `final_threshold=UINT32_MAX` plus exact beam count meant final capping was preserving layout-first candidates rather than score-best candidates. User also asked why `final_threshold=UINT32_MAX` persisted at depths where `final_candidate_count=16820224`.
