@@ -5,8 +5,35 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(BEAM_CUDA_ARCHITECTURES 75 86)
-option(BEAM_ENABLE_DEPTH_LOGS "Compile production_runner per-depth logs" OFF)
-option(BEAM_ENABLE_DEBUG_LOGS "Compile production_runner debug/memory logs" OFF)
+option(BEAM_ENABLE_DEBUG "Master switch for all debug instrumentation" OFF)
+option(BEAM_ENABLE_DEPTH_LOGS "Compile production_runner per-depth logs when BEAM_ENABLE_DEBUG is ON" OFF)
+option(BEAM_ENABLE_DEBUG_LOGS "Compile production_runner debug/memory logs when BEAM_ENABLE_DEBUG is ON" OFF)
+option(BEAM_DEBUG_STREAM_TIMING "Compile CUDA stream timing diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
+option(BEAM_DEBUG_INFERENCE_TRACE "Compile Stream1 inference/reference diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
+option(BEAM_DEBUG_PATH_TRACE "Compile tracked solution path diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
+
+set(BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE OFF)
+set(BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE OFF)
+set(BEAM_DEBUG_STREAM_TIMING_EFFECTIVE OFF)
+set(BEAM_DEBUG_INFERENCE_TRACE_EFFECTIVE OFF)
+set(BEAM_DEBUG_PATH_TRACE_EFFECTIVE OFF)
+if(BEAM_ENABLE_DEBUG)
+    if(BEAM_ENABLE_DEPTH_LOGS)
+        set(BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE ON)
+    endif()
+    if(BEAM_ENABLE_DEBUG_LOGS)
+        set(BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE ON)
+    endif()
+    if(BEAM_DEBUG_STREAM_TIMING)
+        set(BEAM_DEBUG_STREAM_TIMING_EFFECTIVE ON)
+    endif()
+    if(BEAM_DEBUG_INFERENCE_TRACE)
+        set(BEAM_DEBUG_INFERENCE_TRACE_EFFECTIVE ON)
+    endif()
+    if(BEAM_DEBUG_PATH_TRACE)
+        set(BEAM_DEBUG_PATH_TRACE_EFFECTIVE ON)
+    endif()
+endif()
 set(CUTLASS_DIR "" CACHE PATH "CUTLASS checkout root")
 if(NOT CUTLASS_DIR AND DEFINED ENV{CUTLASS_DIR})
     set(CUTLASS_DIR "$ENV{CUTLASS_DIR}" CACHE PATH "CUTLASS checkout root" FORCE)
@@ -59,6 +86,12 @@ else()
     message(FATAL_ERROR "CUTLASS_DIR is required. Pass -DCUTLASS_DIR=/path/to/cutlass or set CUTLASS_DIR.")
 endif()
 target_link_libraries(beam_cuda PUBLIC beam_core)
+target_compile_definitions(beam_cuda PUBLIC
+    BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
+    BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
+    BEAM_DEBUG_INFERENCE_TRACE=$<BOOL:${BEAM_DEBUG_INFERENCE_TRACE_EFFECTIVE}>
+    BEAM_DEBUG_PATH_TRACE=$<BOOL:${BEAM_DEBUG_PATH_TRACE_EFFECTIVE}>
+)
 find_path(NCCL_INCLUDE_DIR nccl.h REQUIRED)
 find_library(NCCL_LIBRARY nccl REQUIRED)
 target_include_directories(beam_cuda PUBLIC ${NCCL_INCLUDE_DIR})
@@ -116,8 +149,8 @@ set_target_properties(static_memory_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_
 add_executable(production_runner tools/production_runner.cu)
 target_link_libraries(production_runner PRIVATE beam_cuda)
 target_compile_definitions(production_runner PRIVATE
-    BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS}>
-    BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS}>
+    BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
+    BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>
 )
 set_target_properties(production_runner PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 

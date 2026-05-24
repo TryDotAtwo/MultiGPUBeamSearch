@@ -35,6 +35,18 @@ using namespace beam;
 #define BEAM_ENABLE_DEBUG_LOGS 0
 #endif
 
+#ifndef BEAM_DEBUG_STREAM_TIMING
+#define BEAM_DEBUG_STREAM_TIMING 0
+#endif
+
+#ifndef BEAM_DEBUG_INFERENCE_TRACE
+#define BEAM_DEBUG_INFERENCE_TRACE 0
+#endif
+
+#ifndef BEAM_DEBUG_PATH_TRACE
+#define BEAM_DEBUG_PATH_TRACE 0
+#endif
+
 namespace {
 
 inline constexpr std::uint32_t STREAM1_MODEL_CLASSES = 120;
@@ -416,6 +428,7 @@ const char* track_stream4_phase_name(std::uint32_t phase) {
     }
 }
 
+#if BEAM_DEBUG_PATH_TRACE || BEAM_DEBUG_INFERENCE_TRACE
 struct TrackedSolutionPrefix {
     std::vector<std::uint8_t> moves;
     std::vector<Hash128> prefix_hashes;
@@ -809,6 +822,9 @@ struct TrackedSolutionPrefix {
             depth >= first_missing_depth + missing_stop_extra_depths;
     }
 };
+#else
+struct TrackedSolutionPrefix {};
+#endif
 
 enum class CandidateHistoryMode : std::uint8_t {
     Ram,
@@ -1404,6 +1420,7 @@ const half* weight_half_data(const std::vector<std::byte>& bytes) {
     return reinterpret_cast<const half*>(bytes.data());
 }
 
+#if BEAM_DEBUG_INFERENCE_TRACE
 std::vector<half> stream1_reference_linear(
     const std::vector<half>& input,
     const half* weight,
@@ -1589,6 +1606,7 @@ void log_stream1_move_score_comparison(
                   << "\n";
     }
 }
+#endif
 
 void copy_bytes_to_device(void* dst, const std::vector<std::byte>& bytes, const char* name) {
     if (dst == nullptr || bytes.empty()) {
@@ -2184,7 +2202,9 @@ int main(int argc, char** argv) {
     copy_bytes_to_device(output_weight, host_weights.output_weight, "output_weight");
     copy_bytes_to_device(output_bias, host_weights.output_bias, "output_bias");
     TrackedSolutionPrefix tracked_solution;
+#if BEAM_DEBUG_PATH_TRACE
     tracked_solution.initialize(puzzle_id, host_initial, host_generators, host_zobrist, host_move_names);
+#endif
 #if BEAM_ENABLE_DEBUG_LOGS
     std::size_t free_after_all_allocations = 0;
     std::size_t total_after_all_allocations = 0;
@@ -2272,13 +2292,16 @@ int main(int argc, char** argv) {
                   << " depth_limit=" << depth_limit << "\n";
         }
 #endif
-        const GeneratedTrackRequest generated_track_request =
-            tracked_solution.generated_request_for_depth(depth);
+        GeneratedTrackRequest generated_track_request{};
+#if BEAM_DEBUG_PATH_TRACE
+        generated_track_request = tracked_solution.generated_request_for_depth(depth);
+#endif
         const DepthDispatchState state =
             run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size, generated_track_request);
         if (!state.depth_drained) {
             throw std::runtime_error("depth did not drain");
         }
+#if BEAM_DEBUG_PATH_TRACE
         tracked_solution.log_generated(
             puzzle_id,
             depth,
@@ -2289,6 +2312,7 @@ int main(int argc, char** argv) {
             depth,
             state.tracked_stream3,
             host_move_names);
+#if BEAM_DEBUG_INFERENCE_TRACE
         log_stream1_move_score_comparison(
             puzzle_id,
             depth,
@@ -2296,12 +2320,14 @@ int main(int argc, char** argv) {
             state.tracked_generated,
             host_weights,
             host_move_names);
+#endif
         tracked_solution.log_stream4(
             puzzle_id,
             depth,
             state.tracked_stream4,
             state.tracked_stream4_events,
             host_move_names);
+#endif
         total_threshold_updates += state.threshold_updates;
         ++completed_depths;
 
@@ -2364,7 +2390,12 @@ int main(int argc, char** argv) {
             history_slot.capacity,
             history.copy_stream,
             history_slot.copy_done,
+#if BEAM_DEBUG_PATH_TRACE
             tracked_solution.hash_for_depth(depth));
+#else
+            nullptr);
+#endif
+#if BEAM_DEBUG_PATH_TRACE
         if (tracked_solution.enabled) {
             BEAM_CUDA_CHECK(cudaEventSynchronize(history_slot.copy_done));
             tracked_solution.log_prefinal(
@@ -2380,6 +2411,7 @@ int main(int argc, char** argv) {
                 final_state.final_threshold,
                 host_move_names);
         }
+#endif
         history.commit_slot(history_slot, depth, final_state.final_candidate_count);
         history.pump_completed(false);
         frontier_size = final_state.next_frontier_size;
@@ -2389,16 +2421,19 @@ int main(int argc, char** argv) {
         const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
 #if BEAM_ENABLE_DEPTH_LOGS
         if (emit_depth_log) {
+#if BEAM_DEBUG_STREAM_TIMING
         const double stream4_avg_ms =
             state.stream4_jobs_launched == 0U ? 0.0 :
             state.stream4_ms_total / static_cast<double>(state.stream4_jobs_launched);
         const double stream5_ms_total = state.stream5_ms_total + final_state.stream5_threshold_ms;
+#endif
         std::cout << "depth_done=" << depth
                   << " depth_sec=" << depth_sec
                   << " ring_slot_jobs=" << state.ring_slot_jobs_launched
                   << " stream3_jobs=" << state.stream3_jobs_launched
                   << " stream4_jobs=" << state.stream4_jobs_launched
                   << " stream4_slots_used=" << state.stream4_active_sort_slots_used
+#if BEAM_DEBUG_STREAM_TIMING
                   << " stream12_ms=" << state.stream12_ms_total
                   << " stream12_max_ms=" << state.stream12_ms_max
                   << " stream3_ring_ms=" << state.stream3_ring_ms_total
@@ -2414,6 +2449,7 @@ int main(int argc, char** argv) {
                   << " stream4_pending_max=" << state.stream4_pending_shards_max
                   << " stream4_busy_max=" << state.stream4_busy_slots_max
                   << " global_spill_peak=" << state.global_spill_peak
+#endif
                   << " threshold_updates_depth=" << state.threshold_updates
                   << " final_threshold=" << final_state.final_threshold
                   << " final_candidate_count=" << final_state.final_candidate_count
@@ -2427,6 +2463,7 @@ int main(int argc, char** argv) {
         if (frontier_size == 0) {
             break;
         }
+#if BEAM_DEBUG_PATH_TRACE
         if (tracked_solution.should_stop_after_missing(depth)) {
             std::cout << "track_solution_stop=1"
                       << " puzzle_id=" << puzzle_id
@@ -2446,6 +2483,7 @@ int main(int argc, char** argv) {
                       << " reason=tracked_path_exhausted_without_solution\n";
             break;
         }
+#endif
     }
     const auto end = std::chrono::steady_clock::now();
     const double elapsed_sec = std::chrono::duration<double>(end - start).count();
