@@ -34,8 +34,8 @@ int main() {
     config.ring_count = 2;
     config.shard_count = 2;
     config.global_spill_capacity = 128;
+    config.stream4_batch_candidates_per_shard_unit = 1;
     config.user_global_beam_width = 128;
-    config.global_beam_width_max_safe = 128;
     config.solved_result_capacity = 8;
     const StaticMemoryPlan plan = make_static_memory_plan(config);
     StaticDeviceMemory memory;

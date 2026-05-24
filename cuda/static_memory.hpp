@@ -26,6 +26,7 @@ struct StaticMemoryPlan {
     std::size_t current_frontier_bytes = 0;
     std::size_t solved_bytes = 0;
     std::size_t layout_streams_bytes = 0;
+    std::size_t layout_final_budget_bytes = 0;
     std::size_t layout_final_bytes = 0;
     std::size_t scratch_pool_bytes = 0;
     std::size_t total_device_bytes = 0;

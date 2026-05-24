@@ -24,7 +24,6 @@ GLOBAL_SPILL_CAPACITY
 
 USER_GLOBAL_BEAM_WIDTH
 GLOBAL_BEAM_WIDTH_EFFECTIVE
-GLOBAL_BEAM_WIDTH_MAX_SAFE
 BEAM_WIDTH_ALIGNMENT
 
 SCORE_MAX_Q
@@ -55,14 +54,23 @@ GOAL_SCORE_KEY = 0
 RING_SLOT_COUNT =
     STREAM3_BATCH_CANDIDATES / (B_MICRO * MOVE_COUNT)
 
+STREAM3_BATCH_CANDIDATES =
+    RING_SLOT_COUNT * B_MICRO * MOVE_COUNT
+
 BEAM_WIDTH_ALIGNMENT =
     WORLD_SIZE * SHARD_COUNT * STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT
 
 GLOBAL_BEAM_WIDTH_EFFECTIVE =
     round_up(USER_GLOBAL_BEAM_WIDTH, BEAM_WIDTH_ALIGNMENT)
 
-GLOBAL_BEAM_WIDTH_EFFECTIVE =
-    min(GLOBAL_BEAM_WIDTH_EFFECTIVE, GLOBAL_BEAM_WIDTH_MAX_SAFE)
+N_LOCAL =
+    ceil(GLOBAL_BEAM_WIDTH_EFFECTIVE / WORLD_SIZE)
+
+LOGICAL_SHARD_SIZE =
+    ceil(N_LOCAL / SHARD_COUNT)
+
+RING_COUNT =
+    ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))
 ```
 
 Логи:
@@ -70,7 +78,6 @@ GLOBAL_BEAM_WIDTH_EFFECTIVE =
 ```text
 USER_GLOBAL_BEAM_WIDTH
 GLOBAL_BEAM_WIDTH_EFFECTIVE
-GLOBAL_BEAM_WIDTH_MAX_SAFE
 BEAM_WIDTH_ALIGNMENT
 SCORE_SCALE
 SCORE_MAX_KEY
@@ -435,14 +442,13 @@ current_frontier_states не входит в scratch_pool
 solved_* и stop_flag не входят в scratch_pool
 ```
 
-`GLOBAL_BEAM_WIDTH_MAX_SAFE`:
+Config search memory objective:
 
 ```text
-current_frontier_states
-+ max(layout_streams_bytes, layout_final_bytes)
-+ model_weights_fp16
-+ read_only_tables
-+ CUDA/NCCL/headroom
+layout_final_budget_bytes is computed before stream-layout selection
+layout_streams_bytes must fit within layout_final_budget_bytes
+SHARD_COUNT and STREAM4_BATCH_CANDIDATES are searched under this budget
+GLOBAL_BEAM_WIDTH_EFFECTIVE is only aligned USER_GLOBAL_BEAM_WIDTH, not capped
 ```
 
 ---

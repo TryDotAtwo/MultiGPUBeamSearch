@@ -570,7 +570,6 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
         config.shard_count = 64;
         config.global_spill_capacity = candidate_count;
         config.user_global_beam_width = 4194304;
-        config.global_beam_width_max_safe = 8388608;
         StaticMemoryPlan plan = make_static_memory_plan(config);
         StaticDeviceMemory memory;
         allocate_static_device_memory(plan, memory);
@@ -681,7 +680,6 @@ std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
         config.shard_count = 1;
         config.global_spill_capacity = 1024;
         config.user_global_beam_width = batch;
-        config.global_beam_width_max_safe = 2ULL * batch;
         StaticMemoryPlan plan = make_static_memory_plan(config);
         StaticDeviceMemory memory;
         allocate_static_device_memory(plan, memory);

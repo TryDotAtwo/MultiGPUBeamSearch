@@ -322,9 +322,8 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
 }
 
 std::size_t bytes_final(const RuntimeConfig& config, const DerivedConfig& derived, std::size_t layout_streams_bytes) {
-    (void)derived;
     const std::uint64_t frontier =
-        (config.global_beam_width_max_safe + static_cast<std::uint64_t>(config.world_size) - 1ULL) /
+        (derived.global_beam_width_effective + static_cast<std::uint64_t>(config.world_size) - 1ULL) /
         static_cast<std::uint64_t>(config.world_size);
     const std::uint64_t requests = frontier;
     const std::uint64_t survivors = static_cast<std::uint64_t>(config.shard_count) * 2ULL * config.stream4_batch_candidates;
@@ -346,6 +345,10 @@ std::size_t bytes_final(const RuntimeConfig& config, const DerivedConfig& derive
     return align_up_size(total, 256);
 }
 
+std::size_t bytes_final_budget(const RuntimeConfig& config, const DerivedConfig& derived) {
+    return bytes_final(config, derived, 0);
+}
+
 } // namespace
 
 StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
@@ -359,7 +362,7 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     plan.config = config;
     plan.derived = derived;
     plan.frontier_states =
-        (config.global_beam_width_max_safe + static_cast<std::uint64_t>(config.world_size) - 1ULL) /
+        (derived.global_beam_width_effective + static_cast<std::uint64_t>(config.world_size) - 1ULL) /
         static_cast<std::uint64_t>(config.world_size);
     if (plan.frontier_states > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
         throw std::invalid_argument("local frontier capacity exceeds uint32 final target index range");
@@ -384,6 +387,7 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
         static_cast<std::uint64_t>(config.solved_result_capacity) * sizeof(CandidateMeta) +
         static_cast<std::uint64_t>(config.solved_result_capacity) * sizeof(std::uint32_t);
     plan.layout_streams_bytes = bytes_streams(config, derived);
+    plan.layout_final_budget_bytes = bytes_final_budget(config, derived);
     plan.layout_final_bytes = bytes_final(config, derived, plan.layout_streams_bytes);
     plan.scratch_pool_bytes = std::max(plan.layout_streams_bytes, plan.layout_final_bytes);
     plan.total_device_bytes =

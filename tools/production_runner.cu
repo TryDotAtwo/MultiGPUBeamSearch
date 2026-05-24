@@ -1653,77 +1653,195 @@ std::uint64_t beam_alignment_for(const RuntimeConfig& config) {
            static_cast<std::uint64_t>(config.stream4_batch_candidates_per_shard_unit);
 }
 
-void set_exact_frontier_capacity(RuntimeConfig& config) {
-    const std::uint64_t alignment = beam_alignment_for(config);
-    const std::uint64_t effective = round_up(config.user_global_beam_width, alignment);
-    config.global_beam_width_max_safe = effective;
-    if (env_present("BEAM_GLOBAL_BEAM_WIDTH_MAX_SAFE")) {
-        config.global_beam_width_max_safe = env_u64("BEAM_GLOBAL_BEAM_WIDTH_MAX_SAFE", config.global_beam_width_max_safe);
-        if (config.global_beam_width_max_safe < effective) {
-            throw std::invalid_argument("BEAM_GLOBAL_BEAM_WIDTH_MAX_SAFE is smaller than GLOBAL_BEAM_WIDTH_EFFECTIVE");
-        }
-    }
-}
-
 std::uint64_t ring_slot_candidate_count(const RuntimeConfig& config) {
     return static_cast<std::uint64_t>(config.b_micro) * static_cast<std::uint64_t>(MOVE_COUNT);
 }
 
-std::uint32_t derive_stream4_batch_candidates(const RuntimeConfig& config, std::uint64_t local_frontier_capacity) {
-    if (env_present("BEAM_STREAM4_BATCH_CANDIDATES")) {
-        const std::uint32_t batch = env_u32("BEAM_STREAM4_BATCH_CANDIDATES", 65536);
-        if (batch == 0U) {
-            throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be nonzero");
-        }
-        if (batch % config.stream4_batch_candidates_per_shard_unit != 0U) {
-            throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be aligned to STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT");
-        }
-        return batch;
-    }
-    const std::uint64_t slot_candidates = ring_slot_candidate_count(config);
-    const std::uint64_t min_batch = env_u64("BEAM_MIN_STREAM4_BATCH_CANDIDATES", slot_candidates);
-    const std::uint64_t shard_limit = env_present("BEAM_SHARD_COUNT")
-        ? std::max<std::uint64_t>(config.shard_count, 1ULL)
-        : std::max<std::uint64_t>(env_u32("BEAM_MAX_SHARD_COUNT", 128), 1U);
-    const std::uint64_t batch_by_shard_limit = ceil_div_u64(local_frontier_capacity, shard_limit);
-    const std::uint64_t raw_batch = std::max({slot_candidates, min_batch, batch_by_shard_limit});
-    return round_up_u32(checked_u32(raw_batch, "stream4_batch_candidates"),
-                        config.stream4_batch_candidates_per_shard_unit);
+std::uint64_t aligned_global_beam_width(const RuntimeConfig& config) {
+    return round_up(config.user_global_beam_width, beam_alignment_for(config));
 }
 
-std::uint32_t derive_shard_count_for_stream4_batch(
-    const RuntimeConfig& config,
-    std::uint64_t local_frontier_capacity) {
+std::uint64_t local_frontier_capacity(const RuntimeConfig& config) {
+    return ceil_div_u64(aligned_global_beam_width(config), config.world_size);
+}
+
+std::uint32_t set_stream3_batch_from_ring_slots(RuntimeConfig& config, std::uint32_t ring_slot_count) {
+    const std::uint64_t slot_candidates = ring_slot_candidate_count(config);
+    const std::uint64_t stream3_batch =
+        static_cast<std::uint64_t>(ring_slot_count) * slot_candidates;
+    if (ring_slot_count == 0U || stream3_batch == 0ULL) {
+        throw std::invalid_argument("RING_SLOT_COUNT and STREAM3_BATCH_CANDIDATES must be nonzero");
+    }
+    config.stream3_batch_candidates = checked_u32(stream3_batch, "stream3_batch_candidates");
+    return ring_slot_count;
+}
+
+void set_ring_count_from_logical_shard(RuntimeConfig& config) {
+    const std::uint64_t slot_candidates = ring_slot_candidate_count(config);
+    const std::uint64_t local_capacity = local_frontier_capacity(config);
+    const std::uint64_t logical_shard_size = ceil_div_u64(local_capacity, config.shard_count);
+    config.ring_count = checked_u32(ceil_div_u64(logical_shard_size, slot_candidates), "ring_count");
+    if (config.ring_count == 0U) {
+        throw std::invalid_argument("derived RING_COUNT must be nonzero");
+    }
+}
+
+void set_global_spill_capacity(RuntimeConfig& config) {
+    const std::uint64_t minimum_spill =
+        2ULL * static_cast<std::uint64_t>(config.stream3_batch_candidates);
+    if (env_present("BEAM_GLOBAL_SPILL_CAPACITY")) {
+        config.global_spill_capacity = env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 1U << 20);
+        if (config.global_spill_capacity < minimum_spill) {
+            throw std::invalid_argument("BEAM_GLOBAL_SPILL_CAPACITY must be at least 2 * STREAM3_BATCH_CANDIDATES");
+        }
+    } else {
+        config.global_spill_capacity = round_up_u32(
+            checked_u32(minimum_spill, "global_spill_capacity"),
+            config.stream4_batch_candidates_per_shard_unit);
+    }
+}
+
+struct RuntimeConfigCandidate {
+    RuntimeConfig config;
+    StaticMemoryPlan plan;
+    std::uint32_t ring_slot_count = 0;
+    std::uint64_t local_frontier_capacity = 0;
+    std::uint64_t logical_shard_size = 0;
+    std::uint64_t stream4_jobs_per_depth = 0;
+    std::uint64_t stream4_waves_per_depth = 0;
+    std::uint64_t score = std::numeric_limits<std::uint64_t>::max();
+    std::uint64_t estimated_required_device_bytes = 0;
+};
+
+std::vector<std::uint32_t> shard_count_candidates(std::uint32_t active_sort_slots) {
     if (env_present("BEAM_SHARD_COUNT")) {
         const std::uint32_t shard_count = env_u32("BEAM_SHARD_COUNT", 1);
         if (shard_count == 0U) {
             throw std::invalid_argument("BEAM_SHARD_COUNT must be nonzero");
         }
-        return shard_count;
+        return {shard_count};
     }
-    const std::uint64_t slot_candidates = ring_slot_candidate_count(config);
-    std::uint64_t shard_count = std::max<std::uint64_t>(
-        1ULL,
-        ceil_div_u64(local_frontier_capacity, config.stream4_batch_candidates));
-    while ((shard_count * static_cast<std::uint64_t>(config.stream4_batch_candidates)) % slot_candidates != 0ULL) {
-        ++shard_count;
+    const std::uint32_t max_shards = env_u32("BEAM_MAX_SHARD_COUNT", 128);
+    const std::uint32_t min_shards = env_u32(
+        "BEAM_MIN_SHARD_COUNT",
+        std::max<std::uint32_t>(active_sort_slots, 1U));
+    if (max_shards == 0U || min_shards == 0U || min_shards > max_shards) {
+        throw std::invalid_argument("BEAM_MIN_SHARD_COUNT/BEAM_MAX_SHARD_COUNT invalid");
     }
-    return checked_u32(shard_count, "shard_count");
+    std::vector<std::uint32_t> shards;
+    shards.reserve(max_shards - min_shards + 1U);
+    for (std::uint32_t shard = min_shards; shard <= max_shards; ++shard) {
+        shards.push_back(shard);
+    }
+    return shards;
 }
 
-std::uint32_t set_stream3_batch_from_stream4(RuntimeConfig& config) {
-    const std::uint64_t slot_candidates = ring_slot_candidate_count(config);
+void add_unique_batch(std::vector<std::uint32_t>& batches, std::uint64_t value, std::uint32_t unit) {
+    if (value == 0ULL) {
+        return;
+    }
+    const std::uint32_t batch = round_up_u32(checked_u32(value, "stream4_batch_candidate"), unit);
+    if (std::find(batches.begin(), batches.end(), batch) == batches.end()) {
+        batches.push_back(batch);
+    }
+}
+
+std::vector<std::uint32_t> stream4_batch_candidates(
+    const RuntimeConfig& base,
+    std::uint64_t logical_shard_size,
+    std::uint32_t ring_slot_count) {
     const std::uint64_t stream3_batch =
-        static_cast<std::uint64_t>(config.shard_count) *
-        static_cast<std::uint64_t>(config.stream4_batch_candidates);
-    if (stream3_batch == 0ULL) {
-        throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be nonzero");
+        static_cast<std::uint64_t>(ring_slot_count) * ring_slot_candidate_count(base);
+    if (env_present("BEAM_STREAM4_BATCH_CANDIDATES")) {
+        const std::uint32_t batch = env_u32("BEAM_STREAM4_BATCH_CANDIDATES", 65536);
+        if (batch == 0U) {
+            throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be nonzero");
+        }
+        if (batch % base.stream4_batch_candidates_per_shard_unit != 0U) {
+            throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be aligned to STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT");
+        }
+        if (static_cast<std::uint64_t>(batch) < stream3_batch) {
+            throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be at least STREAM3_BATCH_CANDIDATES");
+        }
+        return {batch};
     }
-    if (stream3_batch % slot_candidates != 0ULL) {
-        throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be divisible by B_MICRO * MOVE_COUNT");
+
+    const std::uint64_t min_batch = std::max<std::uint64_t>(
+        env_u64("BEAM_MIN_STREAM4_BATCH_CANDIDATES", stream3_batch),
+        stream3_batch);
+    const std::uint64_t max_batch = std::min<std::uint64_t>(
+        env_u64("BEAM_MAX_STREAM4_BATCH_CANDIDATES", logical_shard_size),
+        static_cast<std::uint64_t>(std::numeric_limits<int>::max() / 2));
+    if (min_batch > max_batch) {
+        return {};
     }
-    config.stream3_batch_candidates = checked_u32(stream3_batch, "stream3_batch_candidates");
-    return checked_u32(stream3_batch / slot_candidates, "ring_slot_count");
+
+    std::vector<std::uint32_t> batches;
+    add_unique_batch(batches, min_batch, base.stream4_batch_candidates_per_shard_unit);
+    for (std::uint32_t div : {1U, 2U, 3U, 4U, 6U, 8U, 12U, 16U, 24U, 32U}) {
+        add_unique_batch(batches, ceil_div_u64(logical_shard_size, div), base.stream4_batch_candidates_per_shard_unit);
+    }
+    for (std::uint64_t batch = min_batch; batch <= max_batch / 2ULL; batch *= 2ULL) {
+        add_unique_batch(batches, batch, base.stream4_batch_candidates_per_shard_unit);
+    }
+    std::sort(batches.begin(), batches.end());
+    batches.erase(std::remove_if(
+        batches.begin(),
+        batches.end(),
+        [&](std::uint32_t batch) {
+            return static_cast<std::uint64_t>(batch) < min_batch ||
+                   static_cast<std::uint64_t>(batch) > max_batch;
+        }), batches.end());
+    return batches;
+}
+
+bool try_make_candidate(
+    const RuntimeConfig& base,
+    std::uint32_t shard_count,
+    std::uint32_t stream4_batch,
+    std::uint32_t ring_slot_count,
+    std::uint64_t gpu_budget_bytes,
+    std::uint64_t non_static_bytes,
+    RuntimeConfigCandidate& out) {
+    RuntimeConfig config = base;
+    config.shard_count = shard_count;
+    config.stream4_batch_candidates = stream4_batch;
+    set_stream3_batch_from_ring_slots(config, ring_slot_count);
+    set_ring_count_from_logical_shard(config);
+    set_global_spill_capacity(config);
+
+    const StaticMemoryPlan plan = make_static_memory_plan(config);
+    if (plan.layout_streams_bytes > plan.layout_final_budget_bytes) {
+        return false;
+    }
+    const std::uint64_t required =
+        static_cast<std::uint64_t>(plan.total_device_bytes) + non_static_bytes;
+    if (required > gpu_budget_bytes) {
+        return false;
+    }
+
+    const std::uint64_t local_capacity = local_frontier_capacity(config);
+    const std::uint64_t logical_shard = ceil_div_u64(local_capacity, shard_count);
+    const std::uint64_t stream4_jobs =
+        static_cast<std::uint64_t>(shard_count) * ceil_div_u64(logical_shard, stream4_batch);
+    const std::uint64_t stream4_waves = ceil_div_u64(stream4_jobs, config.stream4_active_sort_slots);
+    const std::uint64_t stream3_jobs = ceil_div_u64(local_capacity, config.stream3_batch_candidates);
+    const std::uint64_t score =
+        stream4_waves * 1'000'000'000ULL +
+        stream4_jobs * 1'000'000ULL +
+        stream3_jobs * 1'000ULL +
+        config.ring_count;
+
+    out.config = config;
+    out.plan = plan;
+    out.ring_slot_count = ring_slot_count;
+    out.local_frontier_capacity = local_capacity;
+    out.logical_shard_size = logical_shard;
+    out.stream4_jobs_per_depth = stream4_jobs;
+    out.stream4_waves_per_depth = stream4_waves;
+    out.score = score;
+    out.estimated_required_device_bytes = required;
+    return true;
 }
 
 RuntimeConfigBuild build_runtime_config_from_budget(
@@ -1737,7 +1855,6 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     config.world_size = world_size;
     config.local_rank = local_rank;
     config.b_micro = env_u32("BEAM_B_MICRO", 8192);
-    config.ring_count = env_u32("BEAM_RING_COUNT", 2);
     config.stream4_batch_candidates_per_shard_unit =
         env_u32("BEAM_STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT", 1024);
     config.stream4_active_sort_slots = env_u32("BEAM_STREAM4_ACTIVE_SORT_SLOTS", 4);
@@ -1747,83 +1864,67 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     build.gpu_headroom_bytes = env_u64("BEAM_GPU_HEADROOM_BYTES", 768ULL * 1024ULL * 1024ULL);
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;
-    if (config.b_micro == 0U || config.ring_count == 0U || config.stream4_batch_candidates_per_shard_unit == 0U) {
-        throw std::invalid_argument("B_MICRO, RING_COUNT, and STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT must be nonzero");
+    if (config.b_micro == 0U || config.stream4_batch_candidates_per_shard_unit == 0U ||
+        config.stream4_active_sort_slots == 0U) {
+        throw std::invalid_argument("B_MICRO, STREAM4_ACTIVE_SORT_SLOTS, and STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT must be nonzero");
     }
 
-    if (env_present("BEAM_SHARD_COUNT") && env_present("BEAM_STREAM4_BATCH_CANDIDATES")) {
-        config.shard_count = env_u32("BEAM_SHARD_COUNT", 1);
-        config.stream4_batch_candidates = derive_stream4_batch_candidates(config, ceil_div_u64(beam, world_size));
-        set_exact_frontier_capacity(config);
-        build.stream3_ring_slots = set_stream3_batch_from_stream4(config);
-    } else {
-        config.shard_count = env_present("BEAM_SHARD_COUNT")
-            ? env_u32("BEAM_SHARD_COUNT", 1)
-            : env_u32("BEAM_INITIAL_SHARD_COUNT", 1);
-        for (std::uint32_t iteration = 0; iteration < 16U; ++iteration) {
-            set_exact_frontier_capacity(config);
-            const std::uint64_t local_frontier_capacity =
-                ceil_div_u64(config.global_beam_width_max_safe, world_size);
-            config.stream4_batch_candidates =
-                derive_stream4_batch_candidates(config, local_frontier_capacity);
-            const std::uint32_t next_shard_count =
-                derive_shard_count_for_stream4_batch(config, local_frontier_capacity);
-            if (next_shard_count == config.shard_count) {
-                break;
-            }
-            config.shard_count = next_shard_count;
-            if (iteration == 15U) {
-                throw std::runtime_error("runtime config fixed-point derivation did not converge");
+    const std::uint32_t requested_ring_slot_count = env_u32("BEAM_STREAM3_RING_SLOTS", 1);
+    if (requested_ring_slot_count == 0U) {
+        throw std::invalid_argument("BEAM_STREAM3_RING_SLOTS must be nonzero");
+    }
+    build.estimated_non_static_device_bytes = estimate_non_static_device_bytes(config);
+
+    RuntimeConfigCandidate best;
+    bool found = false;
+    const std::uint32_t requested_sort_slots = config.stream4_active_sort_slots;
+    for (std::uint32_t sort_slots = requested_sort_slots; sort_slots >= 1U;) {
+        RuntimeConfig base = config;
+        base.stream4_active_sort_slots = sort_slots;
+        for (std::uint32_t shard_count : shard_count_candidates(sort_slots)) {
+            base.shard_count = shard_count;
+            const std::uint64_t local_capacity = local_frontier_capacity(base);
+            const std::uint64_t logical_shard = ceil_div_u64(local_capacity, shard_count);
+            for (std::uint32_t batch : stream4_batch_candidates(base, logical_shard, requested_ring_slot_count)) {
+                RuntimeConfigCandidate candidate;
+                if (!try_make_candidate(
+                        base,
+                        shard_count,
+                        batch,
+                        requested_ring_slot_count,
+                        build.gpu_budget_bytes,
+                        build.estimated_non_static_device_bytes,
+                        candidate)) {
+                    continue;
+                }
+                if (!found || candidate.score < best.score ||
+                    (candidate.score == best.score &&
+                     candidate.estimated_required_device_bytes < best.estimated_required_device_bytes)) {
+                    best = candidate;
+                    found = true;
+                }
             }
         }
-        set_exact_frontier_capacity(config);
-        build.stream3_ring_slots = set_stream3_batch_from_stream4(config);
-    }
-    const std::uint64_t local_frontier_capacity =
-        ceil_div_u64(config.global_beam_width_max_safe, world_size);
-    const std::uint64_t stream4_aggregate_batch =
-        static_cast<std::uint64_t>(config.shard_count) *
-        static_cast<std::uint64_t>(config.stream4_batch_candidates);
-    if (stream4_aggregate_batch < local_frontier_capacity) {
-        throw std::invalid_argument("STREAM3/STREAM4 aggregate batch is smaller than local frontier capacity");
-    }
-
-    auto refresh_spill_capacity = [&]() {
-        if (env_present("BEAM_GLOBAL_SPILL_CAPACITY")) {
-            config.global_spill_capacity = env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 1U << 20);
-        } else {
-            config.global_spill_capacity =
-                round_up_u32(config.stream3_batch_candidates, config.stream4_batch_candidates_per_shard_unit);
+        if (found || env_present("BEAM_STREAM4_ACTIVE_SORT_SLOTS")) {
+            break;
         }
-    };
-
-    refresh_spill_capacity();
-
-    auto refresh_plan = [&]() {
-        build.plan = make_static_memory_plan(config);
-        build.estimated_non_static_device_bytes = estimate_non_static_device_bytes(config);
-        build.estimated_required_device_bytes =
-            static_cast<std::uint64_t>(build.plan.total_device_bytes) +
-            build.estimated_non_static_device_bytes;
-    };
-    refresh_plan();
-
-    while (build.estimated_required_device_bytes > build.gpu_budget_bytes &&
-           !env_present("BEAM_STREAM4_ACTIVE_SORT_SLOTS") &&
-           config.stream4_active_sort_slots > 1U) {
-        config.stream4_active_sort_slots = std::max<std::uint32_t>(1U, config.stream4_active_sort_slots / 2U);
-        refresh_spill_capacity();
-        refresh_plan();
+        if (sort_slots == 1U) {
+            break;
+        }
+        sort_slots = std::max<std::uint32_t>(1U, sort_slots / 2U);
     }
 
-    if (build.estimated_required_device_bytes > build.gpu_budget_bytes) {
+    if (!found) {
         throw std::runtime_error(
-            "derived GPU memory budget exceeded: required=" +
-            std::to_string(build.estimated_required_device_bytes) +
-            " budget=" + std::to_string(build.gpu_budget_bytes) +
+            "no runtime config fits GPU/final-layout budget: budget=" +
+            std::to_string(build.gpu_budget_bytes) +
             " free_before=" + std::to_string(free_before_bytes) +
             " headroom=" + std::to_string(build.gpu_headroom_bytes));
     }
+    build.config = best.config;
+    build.plan = best.plan;
+    build.stream3_ring_slots = best.ring_slot_count;
+    build.estimated_required_device_bytes = best.estimated_required_device_bytes;
     return build;
 }
 
@@ -1872,7 +1973,6 @@ int main(int argc, char** argv) {
     std::cout << "GLOBAL_SPILL_CAPACITY=" << config.global_spill_capacity << "\n";
     std::cout << "GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS=" << config.global_threshold_update_period_shards << "\n";
     std::cout << "GLOBAL_BEAM_WIDTH_EFFECTIVE=" << plan.derived.global_beam_width_effective << "\n";
-    std::cout << "GLOBAL_BEAM_WIDTH_MAX_SAFE=" << config.global_beam_width_max_safe << "\n";
     std::cout << "BEAM_WIDTH_ALIGNMENT=" << plan.derived.beam_width_alignment << "\n";
     std::cout << "SCORE_SCALE=" << SCORE_SCALE << "\n";
     std::cout << "SCORE_MAX_KEY=" << SCORE_MAX_KEY << "\n";
@@ -1889,6 +1989,7 @@ int main(int argc, char** argv) {
     std::cout << "solved_bytes=" << plan.solved_bytes << "\n";
     std::cout << "scratch_pool_bytes=" << plan.scratch_pool_bytes << "\n";
     std::cout << "layout_streams_bytes=" << plan.layout_streams_bytes << "\n";
+    std::cout << "layout_final_budget_bytes=" << plan.layout_final_budget_bytes << "\n";
     std::cout << "layout_final_bytes=" << plan.layout_final_bytes << "\n";
     std::cout << "frontier_state_capacity=" << plan.frontier_states << "\n";
 #endif

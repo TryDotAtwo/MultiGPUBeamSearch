@@ -43,7 +43,6 @@ int main() {
     config.world_size = 2;
     config.shard_count = 8;
     config.stream4_batch_candidates_per_shard_unit = 16;
-    config.global_beam_width_max_safe = 4096;
     const DerivedConfig derived = derive_config(config);
     require(derived.ring_slot_count == config.stream3_batch_candidates / (config.b_micro * MOVE_COUNT), "ring_slot_count formula failed");
     require(derived.beam_width_alignment == 256, "beam_width_alignment formula failed");

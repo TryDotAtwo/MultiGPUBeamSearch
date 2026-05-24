@@ -36,8 +36,8 @@ int main() {
     config.ring_count = 2;
     config.shard_count = 4;
     config.global_spill_capacity = 128;
+    config.stream4_batch_candidates_per_shard_unit = 1;
     config.user_global_beam_width = 256;
-    config.global_beam_width_max_safe = 256;
     config.solved_result_capacity = 16;
     const StaticMemoryPlan plan = make_static_memory_plan(config);
     require(plan.derived.ring_slot_count == 2, "ring slot count must follow stream3 batch formula");

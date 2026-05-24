@@ -31,7 +31,6 @@ struct RuntimeConfig {
     std::uint32_t shard_count = 64;
     std::uint32_t global_spill_capacity = 1 << 20;
     std::uint64_t user_global_beam_width = 1'000'000;
-    std::uint64_t global_beam_width_max_safe = 1'000'000;
     std::uint32_t global_threshold_update_period_shards = 64;
     std::uint32_t solved_result_capacity = 1024;
 };
