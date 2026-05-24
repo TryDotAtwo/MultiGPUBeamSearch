@@ -81,3 +81,4 @@
 - User asked why the Kaggle run stopped around depth 48; diagnosis found no internal timeout, Kaggle host memory OOM, and `return_code=-9` because RAM history reached about `29.96GB`.
 - User clarified dead-branch history must be cleaned: if a branch dies, its candidate history record is no longer needed.
 - User requested three follow-up changes: discuss and raise neural-network output rounding precision, make CPU history cleanup independent from the main GPU loop, and add a configurable worker count.
+- User requested setting `SCORE_SCALE=1024` despite alignment/memory concerns, then checking whether known solution paths for puzzles 1 through 20 survive beam pruning.

@@ -22,6 +22,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace beam;
@@ -73,6 +74,18 @@ std::uint64_t env_u64(const char* name, std::uint64_t default_value) {
 bool env_present(const char* name) {
     const char* value = std::getenv(name);
     return value != nullptr && value[0] != '\0';
+}
+
+bool env_bool(const char* name, bool default_value) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || value[0] == '\0') {
+        return default_value;
+    }
+    return std::strcmp(value, "1") == 0 ||
+        std::strcmp(value, "true") == 0 ||
+        std::strcmp(value, "TRUE") == 0 ||
+        std::strcmp(value, "on") == 0 ||
+        std::strcmp(value, "ON") == 0;
 }
 
 std::filesystem::path env_path(const char* name, const char* default_value) {
@@ -326,6 +339,31 @@ std::string moves_to_path_text(const std::vector<std::uint8_t>& moves, const std
     return out.str();
 }
 
+std::vector<std::uint8_t> parse_solution_path_text(
+    const std::string& path_text,
+    const std::vector<std::string>& names) {
+    std::unordered_map<std::string, std::uint8_t> move_by_name;
+    for (std::uint32_t move = 0; move < names.size(); ++move) {
+        move_by_name.emplace(submit_move_name(names[move]), static_cast<std::uint8_t>(move));
+    }
+    std::vector<std::uint8_t> moves;
+    std::size_t begin = 0;
+    while (begin <= path_text.size()) {
+        const std::size_t end = path_text.find('.', begin);
+        const std::string token = path_text.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
+        const auto found = move_by_name.find(token);
+        if (found == move_by_name.end()) {
+            throw std::runtime_error("tracked solution path contains unknown move token: " + token);
+        }
+        moves.push_back(found->second);
+        if (end == std::string::npos) {
+            break;
+        }
+        begin = end + 1U;
+    }
+    return moves;
+}
+
 State128 apply_move_flat_host(const State128& parent, const std::vector<std::uint8_t>& generators, std::uint8_t move) {
     if (move >= MOVE_COUNT) {
         throw std::runtime_error("solution move exceeds MOVE_COUNT");
@@ -347,6 +385,77 @@ bool states_equal_storage(const State128& a, const State128& b) {
     }
     return true;
 }
+
+struct TrackedSolutionPrefix {
+    std::vector<std::uint8_t> moves;
+    std::vector<Hash128> prefix_hashes;
+    std::vector<bool> survived;
+    bool enabled = false;
+    bool stop_after_path = false;
+
+    void initialize(
+        std::uint64_t puzzle_id,
+        const State128& initial,
+        const std::vector<std::uint8_t>& generators,
+        const ZobristTable& zobrist,
+        const std::vector<std::string>& move_names) {
+        const char* path_env = std::getenv("BEAM_TRACK_SOLUTION_PATH");
+        if (path_env == nullptr || path_env[0] == '\0') {
+            return;
+        }
+        enabled = true;
+        stop_after_path = env_bool("BEAM_STOP_AFTER_TRACKED_PATH", false);
+        moves = parse_solution_path_text(path_env, move_names);
+        prefix_hashes.reserve(moves.size());
+        survived.assign(moves.size(), false);
+        State128 state = initial;
+        for (std::uint8_t move : moves) {
+            state = apply_move_flat_host(state, generators, move);
+            prefix_hashes.push_back(hash_state(state, zobrist));
+        }
+        std::cout << "track_solution_start=1"
+                  << " puzzle_id=" << puzzle_id
+                  << " path_len=" << moves.size()
+                  << " stop_after_path=" << (stop_after_path ? 1 : 0)
+                  << " path=" << path_env << "\n";
+    }
+
+    void scan_depth(
+        std::uint64_t puzzle_id,
+        std::uint32_t depth,
+        const CandidateMeta* candidates,
+        std::uint32_t count,
+        std::uint32_t final_threshold) {
+        if (!enabled || depth >= prefix_hashes.size()) {
+            return;
+        }
+        const Hash128 target = prefix_hashes[depth];
+        std::uint32_t match_count = 0;
+        std::uint32_t best_score = UINT32_THRESHOLD_MAX;
+        std::uint64_t first_index = 0;
+        for (std::uint32_t i = 0; i < count; ++i) {
+            const CandidateMeta& candidate = candidates[i];
+            if (candidate.hash == target) {
+                if (match_count == 0U) {
+                    first_index = i;
+                }
+                ++match_count;
+                best_score = std::min(best_score, candidate.score_key);
+            }
+        }
+        survived[depth] = match_count != 0U;
+        std::cout << "track_solution_prefix"
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << (depth + 1U)
+                  << " survived=" << (survived[depth] ? 1 : 0)
+                  << " matches=" << match_count
+                  << " first_index=" << first_index
+                  << " best_score_key=" << (match_count == 0U ? UINT32_THRESHOLD_MAX : best_score)
+                  << " final_threshold=" << final_threshold
+                  << " final_candidate_count=" << count << "\n";
+    }
+};
 
 enum class CandidateHistoryMode : std::uint8_t {
     Ram,
@@ -1342,6 +1451,8 @@ int main(int argc, char** argv) {
     copy_bytes_to_device(residual1_fc2_bias, host_weights.residual1_fc2_bias, "residual1_fc2_bias");
     copy_bytes_to_device(output_weight, host_weights.output_weight, "output_weight");
     copy_bytes_to_device(output_bias, host_weights.output_bias, "output_bias");
+    TrackedSolutionPrefix tracked_solution;
+    tracked_solution.initialize(puzzle_id, host_initial, host_generators, host_zobrist, host_move_names);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::size_t free_after_all_allocations = 0;
     std::size_t total_after_all_allocations = 0;
@@ -1495,6 +1606,15 @@ int main(int argc, char** argv) {
             history_slot.capacity,
             history.copy_stream,
             history_slot.copy_done);
+        if (tracked_solution.enabled) {
+            BEAM_CUDA_CHECK(cudaEventSynchronize(history_slot.copy_done));
+            tracked_solution.scan_depth(
+                puzzle_id,
+                depth,
+                history_slot.host,
+                final_state.final_candidate_count,
+                final_state.final_threshold);
+        }
         history.commit_slot(history_slot, depth, final_state.final_candidate_count);
         history.pump_completed(false);
         frontier_size = final_state.next_frontier_size;
@@ -1521,6 +1641,15 @@ int main(int argc, char** argv) {
         }
 #endif
         if (frontier_size == 0) {
+            break;
+        }
+        if (tracked_solution.enabled &&
+            tracked_solution.stop_after_path &&
+            depth + 1U >= tracked_solution.moves.size()) {
+            std::cout << "track_solution_stop=1"
+                      << " puzzle_id=" << puzzle_id
+                      << " depth=" << depth
+                      << " reason=tracked_path_exhausted_without_solution\n";
             break;
         }
     }
