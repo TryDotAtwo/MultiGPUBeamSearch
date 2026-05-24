@@ -390,6 +390,7 @@ struct TrackedSolutionPrefix {
     std::vector<std::uint8_t> moves;
     std::vector<Hash128> prefix_hashes;
     std::vector<bool> survived;
+    std::vector<std::uint64_t> final_indices;
     bool enabled = false;
     bool stop_after_path = false;
 
@@ -408,6 +409,7 @@ struct TrackedSolutionPrefix {
         moves = parse_solution_path_text(path_env, move_names);
         prefix_hashes.reserve(moves.size());
         survived.assign(moves.size(), false);
+        final_indices.assign(moves.size(), UINT64_MAX);
         State128 state = initial;
         for (std::uint8_t move : moves) {
             state = apply_move_flat_host(state, generators, move);
@@ -425,6 +427,68 @@ struct TrackedSolutionPrefix {
             return nullptr;
         }
         return &prefix_hashes[depth];
+    }
+
+    GeneratedTrackRequest generated_request_for_depth(std::uint32_t depth) const {
+        GeneratedTrackRequest request{};
+        if (!enabled || depth >= moves.size()) {
+            return request;
+        }
+        if (depth == 0U) {
+            request.enabled = true;
+            request.parent_idx = 0;
+            request.move = moves[depth];
+            return request;
+        }
+        const std::uint64_t parent_idx = final_indices[depth - 1U];
+        if (parent_idx == UINT64_MAX) {
+            return request;
+        }
+        request.enabled = true;
+        request.parent_idx = parent_idx;
+        request.move = moves[depth];
+        return request;
+    }
+
+    void log_generated(
+        std::uint64_t puzzle_id,
+        std::uint32_t depth,
+        const GeneratedTrackResult& result,
+        const std::vector<std::string>& move_names) const {
+        if (!enabled || depth >= moves.size()) {
+            return;
+        }
+        const std::int64_t threshold_margin =
+            result.found && result.current_threshold != UINT32_THRESHOLD_MAX
+                ? static_cast<std::int64_t>(result.score_key) - static_cast<std::int64_t>(result.current_threshold)
+                : 0;
+        std::cout << "track_solution_generated"
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << depth + 1U
+                  << " expected_parent_idx="
+                  << (result.enabled ? result.request_parent_idx : UINT64_MAX)
+                  << " expected_move=" << move_names[moves[depth]]
+                  << " request_enabled=" << (result.enabled ? 1 : 0)
+                  << " found=" << (result.found ? 1 : 0)
+                  << " ring=" << result.ring
+                  << " ring_slot=" << result.ring_slot
+                  << " job=" << result.job
+                  << " parent_base=" << result.parent_base
+                  << " parent_local=" << result.parent_local
+                  << " count=" << result.count
+                  << " payload_id=" << result.payload_id
+                  << " score_ring_offset=" << result.score_ring_offset
+                  << " score_key=" << (result.found ? result.score_key : UINT32_THRESHOLD_MAX)
+                  << " current_threshold=" << result.current_threshold
+                  << " threshold_pass="
+                  << (result.found && result.score_key <= result.current_threshold ? 1 : 0)
+                  << " threshold_margin=" << threshold_margin
+                  << " hash_lo=" << (result.found ? result.hash.lo : UINT64_MAX)
+                  << " hash_hi=" << (result.found ? result.hash.hi : UINT64_MAX)
+                  << " owner=" << static_cast<std::uint32_t>(result.owner)
+                  << " shard=" << result.shard
+                  << "\n";
     }
 
     void log_candidate_fields(
@@ -543,6 +607,7 @@ struct TrackedSolutionPrefix {
             }
         }
         survived[depth] = match_count != 0U;
+        final_indices[depth] = survived[depth] ? best_index : UINT64_MAX;
         log_candidate_fields(
             "track_solution_prefix",
             puzzle_id,
@@ -1646,10 +1711,18 @@ int main(int argc, char** argv) {
                   << " depth_limit=" << depth_limit << "\n";
         }
 #endif
-        const DepthDispatchState state = run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size);
+        const GeneratedTrackRequest generated_track_request =
+            tracked_solution.generated_request_for_depth(depth);
+        const DepthDispatchState state =
+            run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size, generated_track_request);
         if (!state.depth_drained) {
             throw std::runtime_error("depth did not drain");
         }
+        tracked_solution.log_generated(
+            puzzle_id,
+            depth,
+            state.tracked_generated,
+            host_move_names);
         total_threshold_updates += state.threshold_updates;
         ++completed_depths;
 

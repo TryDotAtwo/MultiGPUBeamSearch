@@ -47,6 +47,32 @@ struct DispatcherNetwork {
     Stream1CutlassScratch scratch;
 };
 
+struct GeneratedTrackRequest {
+    bool enabled = false;
+    std::uint64_t parent_idx = UINT64_MAX;
+    std::uint8_t move = 0;
+};
+
+struct GeneratedTrackResult {
+    bool enabled = false;
+    bool found = false;
+    std::uint64_t request_parent_idx = UINT64_MAX;
+    std::uint8_t request_move = 0;
+    std::uint32_t ring = UINT32_MAX;
+    std::uint32_t ring_slot = UINT32_MAX;
+    std::uint32_t job = UINT32_MAX;
+    std::uint64_t parent_base = 0;
+    std::uint32_t count = 0;
+    std::uint32_t parent_local = UINT32_MAX;
+    std::uint64_t payload_id = UINT64_MAX;
+    std::uint64_t score_ring_offset = UINT64_MAX;
+    std::uint32_t score_key = UINT32_MAX;
+    Hash128 hash{UINT64_MAX, UINT64_MAX};
+    std::uint8_t owner = UINT8_MAX;
+    std::uint32_t shard = UINT32_MAX;
+    std::uint32_t current_threshold = UINT32_MAX;
+};
+
 struct DepthDispatchState {
     std::uint64_t frontier_cursor = 0;
     std::uint64_t frontier_size = 0;
@@ -57,6 +83,7 @@ struct DepthDispatchState {
     std::uint32_t threshold_updates = 0;
     bool depth_drained = false;
     bool stop_requested = false;
+    GeneratedTrackResult tracked_generated;
 };
 
 struct FinalizeDepthState {
@@ -97,7 +124,8 @@ DepthDispatchState run_depth_cuda_graphs(
     StaticDeviceMemory& memory,
     CudaGraphJobTemplates& graphs,
     DispatcherStreams& streams,
-    std::uint64_t frontier_size);
+    std::uint64_t frontier_size,
+    GeneratedTrackRequest track_request = {});
 
 FinalizeDepthState finalize_depth_single_gpu(
     const StaticMemoryPlan& plan,

@@ -729,21 +729,31 @@ DepthDispatchState run_depth_cuda_graphs(
     StaticDeviceMemory& memory,
     CudaGraphJobTemplates& graphs,
     DispatcherStreams& streams,
-    std::uint64_t frontier_size) {
+    std::uint64_t frontier_size,
+    GeneratedTrackRequest track_request) {
     NvtxRange range("Dispatcher_depth_cuda_graphs");
     const std::uint32_t ring_slot_job_count = plan.config.ring_count * plan.derived.ring_slot_count;
+    const std::uint64_t candidates_per_slot = static_cast<std::uint64_t>(plan.config.b_micro) * MOVE_COUNT;
     if (graphs.ring_slot_execs.size() != ring_slot_job_count ||
         graphs.stream3_ring_execs.size() != plan.config.ring_count ||
         graphs.stream4_shard_execs.size() !=
             static_cast<std::uint64_t>(plan.config.shard_count) * plan.config.stream4_active_sort_slots) {
         throw std::invalid_argument("depth dispatcher graph template counts do not match static memory plan");
     }
+    if (track_request.enabled && track_request.move >= MOVE_COUNT) {
+        throw std::invalid_argument("generated track request move exceeds MOVE_COUNT");
+    }
 
     DepthDispatchState state;
     state.frontier_size = frontier_size;
+    state.tracked_generated.enabled = track_request.enabled;
+    state.tracked_generated.request_parent_idx = track_request.parent_idx;
+    state.tracked_generated.request_move = track_request.move;
     std::vector<std::uint32_t> host_dirty(plan.config.shard_count);
     std::vector<std::uint32_t> host_clean(plan.config.shard_count);
     std::vector<std::uint32_t> host_ready_shards(plan.config.shard_count);
+    std::vector<std::uint64_t> host_parent_base(ring_slot_job_count, 0);
+    std::vector<std::uint32_t> host_count(ring_slot_job_count, 0);
     std::vector<std::uint32_t> pending_stream4_shards;
     pending_stream4_shards.reserve(plan.config.shard_count * plan.config.ring_count);
     std::uint32_t pending_stream4_head = 0;
@@ -896,6 +906,8 @@ DepthDispatchState run_depth_cuda_graphs(
                         std::min<std::uint64_t>(plan.config.b_micro, remaining_for_job));
                     state.frontier_cursor += count_value;
                 }
+                host_parent_base[job] = parent_base_value;
+                host_count[job] = count_value;
                 check_cuda(cudaMemcpyAsync(
                     memory.streams.parent_base + job,
                     &parent_base_value,
@@ -1061,6 +1073,66 @@ DepthDispatchState run_depth_cuda_graphs(
         return progressed;
     };
 
+    const auto scan_tracked_generated_candidate = [&](std::uint32_t ring) -> bool {
+        if (!track_request.enabled || state.tracked_generated.found) {
+            return false;
+        }
+        for (std::uint32_t slot = 0; slot < plan.derived.ring_slot_count; ++slot) {
+            const std::uint32_t job = ring * plan.derived.ring_slot_count + slot;
+            const std::uint64_t base = host_parent_base[job];
+            const std::uint32_t count = host_count[job];
+            if (count == 0U || track_request.parent_idx < base) {
+                continue;
+            }
+            const std::uint64_t parent_delta = track_request.parent_idx - base;
+            if (parent_delta >= count) {
+                continue;
+            }
+            const std::uint64_t payload_id =
+                static_cast<std::uint64_t>(slot) * candidates_per_slot +
+                parent_delta * MOVE_COUNT +
+                track_request.move;
+            const std::uint64_t global_offset =
+                static_cast<std::uint64_t>(job) * candidates_per_slot +
+                parent_delta * MOVE_COUNT +
+                track_request.move;
+            std::uint32_t score_key = UINT32_MAX;
+            Hash128 hash{UINT64_MAX, UINT64_MAX};
+            std::uint32_t threshold = UINT32_THRESHOLD_MAX;
+            check_cuda(cudaMemcpy(
+                &score_key,
+                memory.streams.score_ring + global_offset,
+                sizeof(score_key),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked generated score");
+            check_cuda(cudaMemcpy(
+                &hash,
+                memory.streams.hash_ring + global_offset,
+                sizeof(hash),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked generated hash");
+            check_cuda(cudaMemcpy(
+                &threshold,
+                memory.streams.current_threshold,
+                sizeof(threshold),
+                cudaMemcpyDeviceToHost), "cudaMemcpy tracked generated threshold");
+            state.tracked_generated.found = true;
+            state.tracked_generated.ring = ring;
+            state.tracked_generated.ring_slot = slot;
+            state.tracked_generated.job = job;
+            state.tracked_generated.parent_base = base;
+            state.tracked_generated.count = count;
+            state.tracked_generated.parent_local = static_cast<std::uint32_t>(parent_delta);
+            state.tracked_generated.payload_id = payload_id;
+            state.tracked_generated.score_ring_offset = global_offset;
+            state.tracked_generated.score_key = score_key;
+            state.tracked_generated.hash = hash;
+            state.tracked_generated.owner = owner_from_hash128(hash, plan.config.world_size);
+            state.tracked_generated.shard = shard_from_hash128(hash, plan.config.shard_count);
+            state.tracked_generated.current_threshold = threshold;
+            return true;
+        }
+        return false;
+    };
+
     const auto try_launch_stream3 = [&]() -> bool {
         if (stream3_active || stream3_ready_rings.empty()) {
             return false;
@@ -1070,6 +1142,7 @@ DepthDispatchState run_depth_cuda_graphs(
         if (ring_state[ring] != RingState::ReadyForStream3) {
             throw std::runtime_error("stream3 ready queue contains a non-ready ring");
         }
+        scan_tracked_generated_candidate(ring);
         check_cuda(cudaGraphLaunch(graphs.stream3_ring_execs[ring], streams.stream3), "cudaGraphLaunch stream3");
         check_cuda(cudaEventRecord(stream3_done[ring], streams.stream3), "cudaEventRecord stream3 ring done");
         ring_state[ring] = RingState::Stream3Running;

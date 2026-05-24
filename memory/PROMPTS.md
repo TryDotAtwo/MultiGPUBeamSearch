@@ -84,3 +84,4 @@
 - User requested setting `SCORE_SCALE=1024` despite alignment/memory concerns, then checking whether known solution paths for puzzles 1 through 20 survive beam pruning.
 - User confirmed the final stage must be fixed after discovering that `final_threshold=UINT32_MAX` plus exact beam count meant final capping was preserving layout-first candidates rather than score-best candidates. User also asked why `final_threshold=UINT32_MAX` persisted at depths where `final_candidate_count=16820224`.
 - User requested full tracked solution path information in logs, including score, location, route metadata, and enough detail to determine where and why the known path disappears.
+- User requested continuing the search after diagnostics showed puzzle 9 `prefix_len=6` survived final filtering but `prefix_len=7` was missing before final filtering; next required diagnostic is generated-candidate logging immediately after Stream1/2 and before Stream3 thresholding.
