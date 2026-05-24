@@ -239,6 +239,7 @@ FinalizeDepthState finalize_depth_single_gpu(
     StaticDeviceMemory& memory,
     const DispatcherDeviceTables& tables,
     DispatcherStreams& streams,
+    std::uint64_t current_frontier_size,
     CandidateMeta* history_host_buffer = nullptr,
     std::uint32_t history_host_capacity = 0,
     cudaStream_t history_stream = nullptr,

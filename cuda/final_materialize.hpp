@@ -13,4 +13,11 @@ void final_materialize_cuda(
     std::uint32_t request_count,
     cudaStream_t stream);
 
+void validate_final_requests_cuda(
+    const FinalRequest* requests,
+    std::uint32_t request_count,
+    std::uint64_t current_frontier_size,
+    std::uint32_t target_count,
+    cudaStream_t stream);
+
 } // namespace beam

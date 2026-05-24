@@ -28,6 +28,10 @@
 #define BEAM_DEBUG_PATH_TRACE 0
 #endif
 
+#ifndef BEAM_DEBUG_FINAL_VALIDATE
+#define BEAM_DEBUG_FINAL_VALIDATE 0
+#endif
+
 namespace beam {
 
 namespace {
@@ -2148,6 +2152,7 @@ FinalizeDepthState finalize_depth_single_gpu(
     StaticDeviceMemory& memory,
     const DispatcherDeviceTables& tables,
     DispatcherStreams& streams,
+    std::uint64_t current_frontier_size,
     CandidateMeta* history_host_buffer,
     std::uint32_t history_host_capacity,
     cudaStream_t history_stream,
@@ -2217,6 +2222,13 @@ FinalizeDepthState finalize_depth_single_gpu(
 
 #if BEAM_DEBUG_STREAM_TIMING
     record_timing_start(streams.stream3, "cudaEventRecord final filter timing start");
+#endif
+#if BEAM_DEBUG_FINAL_VALIDATE
+    check_cuda(cudaMemsetAsync(
+        memory.final.final_request_buffer,
+        0xff,
+        static_cast<std::uint64_t>(plan.frontier_states) * sizeof(FinalRequest),
+        streams.stream3), "cudaMemsetAsync debug init final request buffer");
 #endif
     final_filter_load_balance_cuda(
         memory.streams.survivor_shard,
@@ -2292,6 +2304,14 @@ FinalizeDepthState finalize_depth_single_gpu(
     record_timing_start(streams.stream3, "cudaEventRecord final materialize timing start");
 #endif
     if (final_request_count != 0) {
+#if BEAM_DEBUG_FINAL_VALIDATE
+        validate_final_requests_cuda(
+            memory.final.final_request_buffer,
+            final_request_count,
+            current_frontier_size,
+            final_request_count,
+            streams.stream3);
+#endif
         final_materialize_cuda(
             memory.current_frontier_states,
             memory.final.final_request_buffer,

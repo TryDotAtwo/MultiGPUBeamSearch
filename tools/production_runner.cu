@@ -2386,6 +2386,7 @@ int main(int argc, char** argv) {
             memory,
             tables,
             streams,
+            frontier_size,
             history_slot.host,
             history_slot.capacity,
             history.copy_stream,
