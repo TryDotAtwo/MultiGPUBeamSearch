@@ -1710,14 +1710,20 @@ void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
 
 void set_global_spill_capacity(RuntimeConfig& config) {
     const std::uint64_t stream3_batch = static_cast<std::uint64_t>(config.stream3_batch_candidates);
-    const std::uint64_t worker_spill =
-        static_cast<std::uint64_t>(config.stream4_active_sort_slots) * stream3_batch;
+    const std::uint64_t stream4_worker_count =
+        static_cast<std::uint64_t>(config.stream4_active_sort_slots);
+    const std::uint64_t worker_spill = stream4_worker_count * stream3_batch;
+    const std::uint64_t worker_backlog_spill = stream4_worker_count * worker_spill;
+    const std::uint64_t scaled_worker_backlog_spill =
+        scaled_round_up(worker_backlog_spill, config.global_spill_scale_ppm);
     const std::uint64_t minimum_spill =
-        std::max<std::uint64_t>(stream3_batch, scaled_round_up(worker_spill, config.global_spill_scale_ppm));
+        std::max<std::uint64_t>(
+            std::max<std::uint64_t>(stream3_batch, worker_spill),
+            scaled_worker_backlog_spill);
     if (env_present("BEAM_GLOBAL_SPILL_CAPACITY")) {
         config.global_spill_capacity = env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 1U << 20);
         if (config.global_spill_capacity < minimum_spill) {
-            throw std::invalid_argument("BEAM_GLOBAL_SPILL_CAPACITY is below STREAM4 worker spill backlog bound");
+            throw std::invalid_argument("BEAM_GLOBAL_SPILL_CAPACITY is below STREAM4 worker backlog spill bound");
         }
     } else {
         config.global_spill_capacity = round_up_u32(
