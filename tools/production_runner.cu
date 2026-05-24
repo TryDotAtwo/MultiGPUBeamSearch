@@ -1686,13 +1686,19 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config) {
     }
 }
 
+std::uint64_t logical_shard_size_for(const RuntimeConfig& config) {
+    return ceil_div_u64(local_frontier_capacity(config), config.shard_count);
+}
+
 void set_global_spill_capacity(RuntimeConfig& config) {
-    const std::uint64_t minimum_spill =
-        2ULL * static_cast<std::uint64_t>(config.stream3_batch_candidates);
+    const std::uint64_t stream3_batch = static_cast<std::uint64_t>(config.stream3_batch_candidates);
+    const std::uint64_t minimum_spill = std::max(
+        2ULL * stream3_batch,
+        static_cast<std::uint64_t>(config.stream4_active_sort_slots) * logical_shard_size_for(config));
     if (env_present("BEAM_GLOBAL_SPILL_CAPACITY")) {
         config.global_spill_capacity = env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 1U << 20);
         if (config.global_spill_capacity < minimum_spill) {
-            throw std::invalid_argument("BEAM_GLOBAL_SPILL_CAPACITY must be at least 2 * STREAM3_BATCH_CANDIDATES");
+            throw std::invalid_argument("BEAM_GLOBAL_SPILL_CAPACITY is below the architecture spill backlog bound");
         }
     } else {
         config.global_spill_capacity = round_up_u32(
@@ -1707,6 +1713,7 @@ struct RuntimeConfigCandidate {
     std::uint32_t ring_slot_count = 0;
     std::uint64_t local_frontier_capacity = 0;
     std::uint64_t logical_shard_size = 0;
+    std::uint64_t stream4_jobs_per_shard = 0;
     std::uint64_t stream4_jobs_per_depth = 0;
     std::uint64_t stream4_waves_per_depth = 0;
     std::uint64_t score = std::numeric_limits<std::uint64_t>::max();
@@ -1800,6 +1807,9 @@ bool try_make_candidate(
     std::uint32_t shard_count,
     std::uint32_t stream4_batch,
     std::uint32_t ring_slot_count,
+    std::uint32_t min_stream4_jobs_per_shard,
+    std::uint32_t target_stream4_jobs_per_shard,
+    std::uint32_t target_shards_per_sort_slot,
     std::uint64_t gpu_budget_bytes,
     std::uint64_t non_static_bytes,
     RuntimeConfigCandidate& out) {
@@ -1822,14 +1832,34 @@ bool try_make_candidate(
 
     const std::uint64_t local_capacity = local_frontier_capacity(config);
     const std::uint64_t logical_shard = ceil_div_u64(local_capacity, shard_count);
+    const std::uint64_t stream4_jobs_per_shard = ceil_div_u64(logical_shard, stream4_batch);
+    if (stream4_jobs_per_shard < min_stream4_jobs_per_shard &&
+        logical_shard > config.stream3_batch_candidates) {
+        return false;
+    }
     const std::uint64_t stream4_jobs =
-        static_cast<std::uint64_t>(shard_count) * ceil_div_u64(logical_shard, stream4_batch);
+        static_cast<std::uint64_t>(shard_count) * stream4_jobs_per_shard;
     const std::uint64_t stream4_waves = ceil_div_u64(stream4_jobs, config.stream4_active_sort_slots);
     const std::uint64_t stream3_jobs = ceil_div_u64(local_capacity, config.stream3_batch_candidates);
+    const std::uint64_t stream4_batch_units =
+        ceil_div_u64(stream4_batch, config.stream3_batch_candidates);
+    const std::uint64_t job_balance =
+        stream4_jobs_per_shard > target_stream4_jobs_per_shard
+            ? stream4_jobs_per_shard - target_stream4_jobs_per_shard
+            : target_stream4_jobs_per_shard - stream4_jobs_per_shard;
+    const std::uint64_t target_shards =
+        std::max<std::uint64_t>(
+            config.stream4_active_sort_slots,
+            static_cast<std::uint64_t>(target_shards_per_sort_slot) * config.stream4_active_sort_slots);
+    const std::uint64_t shard_balance =
+        shard_count > target_shards ? shard_count - target_shards : target_shards - shard_count;
     const std::uint64_t score =
-        stream4_waves * 1'000'000'000ULL +
-        stream4_jobs * 1'000'000ULL +
-        stream3_jobs * 1'000ULL +
+        stream4_waves * 1'000'000'000'000ULL +
+        stream4_jobs * 1'000'000'000ULL +
+        stream4_batch_units * 1'000'000ULL +
+        stream3_jobs * 10'000ULL +
+        job_balance * 1'000ULL +
+        shard_balance * 10ULL +
         config.ring_count;
 
     out.config = config;
@@ -1837,6 +1867,7 @@ bool try_make_candidate(
     out.ring_slot_count = ring_slot_count;
     out.local_frontier_capacity = local_capacity;
     out.logical_shard_size = logical_shard;
+    out.stream4_jobs_per_shard = stream4_jobs_per_shard;
     out.stream4_jobs_per_depth = stream4_jobs;
     out.stream4_waves_per_depth = stream4_waves;
     out.score = score;
@@ -1873,6 +1904,16 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     if (requested_ring_slot_count == 0U) {
         throw std::invalid_argument("BEAM_STREAM3_RING_SLOTS must be nonzero");
     }
+    const std::uint32_t min_stream4_jobs_per_shard =
+        env_u32("BEAM_MIN_STREAM4_JOBS_PER_SHARD", 3);
+    const std::uint32_t target_stream4_jobs_per_shard =
+        env_u32("BEAM_TARGET_STREAM4_JOBS_PER_SHARD", 4);
+    const std::uint32_t target_shards_per_sort_slot =
+        env_u32("BEAM_TARGET_SHARDS_PER_SORT_SLOT", 4);
+    if (min_stream4_jobs_per_shard == 0U || target_stream4_jobs_per_shard == 0U ||
+        target_shards_per_sort_slot == 0U) {
+        throw std::invalid_argument("BEAM_*STREAM4_JOBS_PER_SHARD and BEAM_TARGET_SHARDS_PER_SORT_SLOT must be nonzero");
+    }
     build.estimated_non_static_device_bytes = estimate_non_static_device_bytes(config);
 
     RuntimeConfigCandidate best;
@@ -1892,6 +1933,9 @@ RuntimeConfigBuild build_runtime_config_from_budget(
                         shard_count,
                         batch,
                         requested_ring_slot_count,
+                        min_stream4_jobs_per_shard,
+                        target_stream4_jobs_per_shard,
+                        target_shards_per_sort_slot,
                         build.gpu_budget_bytes,
                         build.estimated_non_static_device_bytes,
                         candidate)) {
@@ -1971,6 +2015,16 @@ int main(int argc, char** argv) {
     std::cout << "STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT=" << config.stream4_batch_candidates_per_shard_unit << "\n";
     std::cout << "STREAM4_ACTIVE_SORT_SLOTS=" << config.stream4_active_sort_slots << "\n";
     std::cout << "GLOBAL_SPILL_CAPACITY=" << config.global_spill_capacity << "\n";
+    std::cout << "N_LOCAL=" << local_frontier_capacity(config) << "\n";
+    std::cout << "LOGICAL_SHARD_SIZE=" << logical_shard_size_for(config) << "\n";
+    std::cout << "STREAM4_JOBS_PER_SHARD=" << ceil_div_u64(logical_shard_size_for(config), config.stream4_batch_candidates) << "\n";
+    std::cout << "STREAM4_JOBS_PER_DEPTH=" <<
+        static_cast<std::uint64_t>(config.shard_count) *
+        ceil_div_u64(logical_shard_size_for(config), config.stream4_batch_candidates) << "\n";
+    std::cout << "STREAM4_WAVES_PER_DEPTH=" << ceil_div_u64(
+        static_cast<std::uint64_t>(config.shard_count) *
+            ceil_div_u64(logical_shard_size_for(config), config.stream4_batch_candidates),
+        config.stream4_active_sort_slots) << "\n";
     std::cout << "GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS=" << config.global_threshold_update_period_shards << "\n";
     std::cout << "GLOBAL_BEAM_WIDTH_EFFECTIVE=" << plan.derived.global_beam_width_effective << "\n";
     std::cout << "BEAM_WIDTH_ALIGNMENT=" << plan.derived.beam_width_alignment << "\n";

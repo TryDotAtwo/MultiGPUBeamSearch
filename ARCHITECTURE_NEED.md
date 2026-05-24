@@ -71,6 +71,15 @@ LOGICAL_SHARD_SIZE =
 
 RING_COUNT =
     ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))
+
+GLOBAL_SPILL_CAPACITY >=
+    max(2 * STREAM3_BATCH_CANDIDATES,
+        STREAM4_ACTIVE_SORT_SLOTS * LOGICAL_SHARD_SIZE)
+
+Config search:
+    choose SHARD_COUNT and STREAM4_BATCH_CANDIDATES under memory budget
+    reject default candidates with too few Stream4 jobs per logical shard
+    score candidates by Stream4 waves, Stream4 jobs, batch size, shard count
 ```
 
 Логи:
@@ -83,6 +92,11 @@ SCORE_SCALE
 SCORE_MAX_KEY
 SCORE_BIN_COUNT
 SOLVED_RESULT_CAPACITY
+N_LOCAL
+LOGICAL_SHARD_SIZE
+STREAM4_JOBS_PER_SHARD
+STREAM4_JOBS_PER_DEPTH
+STREAM4_WAVES_PER_DEPTH
 ```
 
 ---
