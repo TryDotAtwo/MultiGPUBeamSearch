@@ -103,6 +103,59 @@ void accumulate_elapsed_ms(
 #endif
 
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+void log_threshold_trace(
+    const StaticMemoryPlan& plan,
+    const char* label,
+    const char* phase,
+    bool periodic,
+    bool local_histogram_only,
+    std::uint64_t threshold_width) {
+    std::cout << "threshold_trace"
+              << " rank=" << plan.config.local_rank
+              << " label=" << label
+              << " phase=" << phase
+              << " periodic=" << (periodic ? 1 : 0)
+              << " local_histogram_only=" << (local_histogram_only ? 1 : 0)
+              << " world_size=" << plan.config.world_size
+              << " storage_shard_count=" << plan.storage_shard_count
+              << " threshold_width=" << threshold_width
+              << "\n";
+}
+
+void log_threshold_trace_committed(
+    const StaticMemoryPlan& plan,
+    const StaticDeviceMemory& memory,
+    const char* label,
+    const char* phase) {
+    std::uint32_t active = 0;
+    std::uint32_t threshold = UINT32_THRESHOLD_MAX;
+    std::uint32_t initialized[2]{};
+    check_cuda(cudaMemcpy(
+        &active,
+        memory.streams.current_threshold_active_index,
+        sizeof(active),
+        cudaMemcpyDeviceToHost), "cudaMemcpy threshold trace active index");
+    check_cuda(cudaMemcpy(
+        initialized,
+        memory.streams.threshold_initialized,
+        sizeof(initialized),
+        cudaMemcpyDeviceToHost), "cudaMemcpy threshold trace initialized");
+    check_cuda(cudaMemcpy(
+        &threshold,
+        memory.streams.current_threshold + (active & 1U),
+        sizeof(threshold),
+        cudaMemcpyDeviceToHost), "cudaMemcpy threshold trace value");
+    std::cout << "threshold_trace"
+              << " rank=" << plan.config.local_rank
+              << " label=" << label
+              << " phase=" << phase
+              << " active_index=" << (active & 1U)
+              << " threshold=" << threshold
+              << " initialized0=" << initialized[0]
+              << " initialized1=" << initialized[1]
+              << "\n";
+}
+
 void log_final_exchange_counts(
     const char* label,
     std::uint32_t local_rank,
@@ -502,8 +555,13 @@ void update_threshold_global(
     cudaStream_t stream,
     bool periodic,
     const DispatcherCollective* collective,
-    bool local_histogram_only = false) {
+    bool local_histogram_only = false,
+    const char* debug_label = "threshold_update") {
     const std::uint64_t threshold_width = plan.derived.global_beam_width_effective;
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+    log_threshold_trace(plan, debug_label, "entry", periodic, local_histogram_only, threshold_width);
+    log_threshold_trace(plan, debug_label, "local_histogram_begin", periodic, local_histogram_only, threshold_width);
+#endif
     threshold_build_local_histogram_cuda(
         memory.streams.shard_score_hist_a,
         memory.streams.shard_score_hist_b,
@@ -512,23 +570,47 @@ void update_threshold_global(
         memory.streams.local_score_hist,
         plan.storage_shard_count,
         stream);
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+    log_threshold_trace(plan, debug_label, "local_histogram_enqueued", periodic, local_histogram_only, threshold_width);
+    check_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize threshold trace local histogram");
+    log_threshold_trace(plan, debug_label, "local_histogram_done", periodic, local_histogram_only, threshold_width);
+#endif
     if (plan.config.world_size == 1U || local_histogram_only) {
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+        log_threshold_trace(plan, debug_label, "local_to_global_copy_begin", periodic, local_histogram_only, threshold_width);
+#endif
         check_cuda(cudaMemcpyAsync(
             memory.streams.global_score_hist,
             memory.streams.local_score_hist,
             SCORE_BIN_COUNT * sizeof(std::uint64_t),
             cudaMemcpyDeviceToDevice,
             stream), "cudaMemcpyAsync single gpu histogram");
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+        log_threshold_trace(plan, debug_label, "local_to_global_copy_enqueued", periodic, local_histogram_only, threshold_width);
+        check_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize threshold trace local histogram copy");
+        log_threshold_trace(plan, debug_label, "local_to_global_copy_done", periodic, local_histogram_only, threshold_width);
+#endif
     } else {
         if (collective == nullptr || collective->comm == nullptr) {
             throw std::invalid_argument("multi rank threshold update requires NCCL collective");
         }
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+        log_threshold_trace(plan, debug_label, "nccl_histogram_allreduce_begin", periodic, local_histogram_only, threshold_width);
+#endif
         threshold_allreduce_histogram_nccl_cuda(
             memory.streams.local_score_hist,
             memory.streams.global_score_hist,
             collective->comm,
             stream);
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+        log_threshold_trace(plan, debug_label, "nccl_histogram_allreduce_enqueued", periodic, local_histogram_only, threshold_width);
+        check_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize threshold trace NCCL histogram");
+        log_threshold_trace(plan, debug_label, "nccl_histogram_allreduce_done", periodic, local_histogram_only, threshold_width);
+#endif
     }
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+    log_threshold_trace(plan, debug_label, "threshold_publish_begin", periodic, local_histogram_only, threshold_width);
+#endif
     if (periodic) {
         threshold_update_periodic_cuda(
             memory.streams.global_score_hist,
@@ -546,6 +628,11 @@ void update_threshold_global(
             threshold_width,
             stream);
     }
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+    log_threshold_trace(plan, debug_label, "threshold_publish_enqueued", periodic, local_histogram_only, threshold_width);
+    check_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize threshold trace publish");
+    log_threshold_trace_committed(plan, memory, debug_label, "threshold_publish_done");
+#endif
 }
 
 std::uint32_t read_committed_threshold_host(const StaticDeviceMemory& memory, const char* op) {
@@ -1970,6 +2057,17 @@ DepthDispatchState run_depth_cuda_graphs(
         const std::uint32_t local_request =
             (force_local_request || periodic_threshold_due()) ? 1U : 0U;
         std::uint32_t global_request = 0;
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+        std::cout << "threshold_trace"
+                  << " rank=" << plan.config.local_rank
+                  << " label=stream5_collective_periodic"
+                  << " phase=request_begin"
+                  << " local_request=" << local_request
+                  << " force_local_request=" << (force_local_request ? 1 : 0)
+                  << " stream4_jobs_since_update=" << stream4_jobs_since_threshold_update
+                  << " local_period=" << std::max(1U, plan.storage_shard_count)
+                  << "\n";
+#endif
         check_cuda(cudaMemcpyAsync(
             memory.streams.threshold_request_local,
             &local_request,
@@ -1993,13 +2091,22 @@ DepthDispatchState run_depth_cuda_graphs(
             cudaMemcpyDeviceToHost,
             streams.stream5), "cudaMemcpyAsync stream5 threshold global request");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 threshold request");
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+        std::cout << "threshold_trace"
+                  << " rank=" << plan.config.local_rank
+                  << " label=stream5_collective_periodic"
+                  << " phase=request_done"
+                  << " local_request=" << local_request
+                  << " global_request=" << global_request
+                  << "\n";
+#endif
         if (global_request == 0U) {
             return false;
         }
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 threshold timing start");
 #endif
-        update_threshold_global(plan, memory, streams.stream5, true, collective, false);
+        update_threshold_global(plan, memory, streams.stream5, true, collective, false, "stream5_collective_periodic");
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 threshold timing stop");
 #endif
@@ -2195,7 +2302,7 @@ DepthDispatchState run_depth_cuda_graphs(
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 timing start");
 #endif
-        update_threshold_global(plan, memory, streams.stream5, true, collective, false);
+        update_threshold_global(plan, memory, streams.stream5, true, collective, false, "single_gpu_periodic");
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 timing stop");
 #endif
@@ -2819,7 +2926,16 @@ FinalizeDepthState finalize_depth_single_gpu(
 #if BEAM_DEBUG_STREAM_TIMING
     record_timing_start(streams.stream5, "cudaEventRecord final threshold timing start");
 #endif
-    update_threshold_global(plan, memory, streams.stream5, false, collective);
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+    std::cout << "threshold_trace"
+              << " rank=" << plan.config.local_rank
+              << " label=final_select"
+              << " phase=final_threshold_begin"
+              << " multi_rank=" << (multi_rank ? 1 : 0)
+              << " current_frontier_size=" << current_frontier_size
+              << "\n";
+#endif
+    update_threshold_global(plan, memory, streams.stream5, false, collective, false, "final_select");
 #if BEAM_DEBUG_STREAM_TIMING
     record_timing_stop_and_sync(
         streams.stream5,
@@ -2834,6 +2950,15 @@ FinalizeDepthState finalize_depth_single_gpu(
         read_committed_threshold_host(memory, "cudaMemcpy final threshold");
 
     result.final_threshold = final_threshold;
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+    std::cout << "threshold_trace"
+              << " rank=" << plan.config.local_rank
+              << " label=final_select"
+              << " phase=final_threshold_done"
+              << " final_threshold=" << final_threshold
+              << " stream5_threshold_ms=" << result.stream5_threshold_ms
+              << "\n";
+#endif
     if (tracked_prefinal_hash != nullptr) {
         scan_tracked_prefinal_hash(plan, memory, streams, *tracked_prefinal_hash, result);
     }
