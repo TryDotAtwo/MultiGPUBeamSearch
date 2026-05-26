@@ -148,7 +148,16 @@ std::string stream_fatal_error_message(
         " processing_flag=" + std::to_string(trace[FatalTraceProcessingFlag]) +
         " shard_capacity_candidates=" + std::to_string(trace[FatalTraceShardCapacity]) +
         " stream4_batch_candidates=" + std::to_string(trace[FatalTraceStream4Batch]) +
-        " append_to_active_spill=" + std::to_string(trace[FatalTraceAppendToActiveSpill]);
+        " append_to_active_spill=" + std::to_string(trace[FatalTraceAppendToActiveSpill]) +
+        " logical_shard=" + std::to_string(trace[FatalTraceLogicalShard]) +
+        " selected_buffer=" + std::to_string(trace[FatalTraceSelectedBuffer]) +
+        " sibling_shard=" + std::to_string(trace[FatalTraceSiblingShard]) +
+        " sibling_existing=" + std::to_string(trace[FatalTraceSiblingExisting]) +
+        " sibling_available=" + std::to_string(trace[FatalTraceSiblingAvailable]) +
+        " sibling_clean_count=" + std::to_string(trace[FatalTraceSiblingCleanCount]) +
+        " sibling_dirty_count=" + std::to_string(trace[FatalTraceSiblingDirtyCount]) +
+        " sibling_processing_flag=" + std::to_string(trace[FatalTraceSiblingProcessingFlag]) +
+        " shard_buffer_count=" + std::to_string(trace[FatalTraceShardBufferCount]);
 }
 
 __device__ CandidateMeta invalid_track_candidate_device() {

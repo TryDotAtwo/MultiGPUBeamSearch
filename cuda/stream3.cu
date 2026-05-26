@@ -540,6 +540,14 @@ __global__ void stream3_prepare_partition_counts_kernel(
         if (shard >= shard_count) {
             continue;
         }
+        const std::uint32_t logical_shard = shard;
+        std::uint32_t selected_buffer = 0;
+        std::uint32_t sibling_physical_shard = UINT32_MAX;
+        std::uint32_t sibling_existing = 0;
+        std::uint32_t sibling_available = 0;
+        std::uint32_t sibling_clean = 0;
+        std::uint32_t sibling_dirty = 0;
+        std::uint32_t sibling_processing = 0;
         std::uint32_t physical_shard = shard;
         std::uint32_t existing = clean_count[physical_shard] + dirty_count[physical_shard];
         std::uint32_t available =
@@ -575,6 +583,31 @@ __global__ void stream3_prepare_partition_counts_kernel(
                     best_physical_shard = candidate_physical_shard;
                     best_existing = candidate_existing;
                     best_available = candidate_available;
+                }
+            }
+            selected_buffer = best_buffer;
+            for (std::uint32_t step = 0; step < shard_buffer_count; ++step) {
+                const std::uint32_t candidate_buffer = (current_buffer + step) % shard_buffer_count;
+                if (candidate_buffer == best_buffer) {
+                    continue;
+                }
+                const std::uint32_t candidate_physical_shard =
+                    shard * shard_buffer_count + candidate_buffer;
+                const std::uint32_t candidate_clean = clean_count[candidate_physical_shard];
+                const std::uint32_t candidate_dirty = dirty_count[candidate_physical_shard];
+                const std::uint32_t candidate_processing = processing_flag[candidate_physical_shard];
+                const std::uint32_t candidate_existing = candidate_clean + candidate_dirty;
+                const std::uint32_t candidate_available =
+                    candidate_processing == 0U && candidate_existing < shard_capacity ?
+                    shard_capacity - candidate_existing :
+                    0U;
+                if (sibling_physical_shard == UINT32_MAX || candidate_available > sibling_available) {
+                    sibling_physical_shard = candidate_physical_shard;
+                    sibling_existing = candidate_existing;
+                    sibling_available = candidate_available;
+                    sibling_clean = candidate_clean;
+                    sibling_dirty = candidate_dirty;
+                    sibling_processing = candidate_processing;
                 }
             }
             write_buffer_index[shard] = best_buffer;
@@ -615,6 +648,15 @@ __global__ void stream3_prepare_partition_counts_kernel(
             fatal_error_trace[FatalTraceShardCapacity] = shard_capacity;
             fatal_error_trace[FatalTraceStream4Batch] = stream4_batch_candidates;
             fatal_error_trace[FatalTraceAppendToActiveSpill] = append_to_active_spill;
+            fatal_error_trace[FatalTraceLogicalShard] = logical_shard;
+            fatal_error_trace[FatalTraceSelectedBuffer] = selected_buffer;
+            fatal_error_trace[FatalTraceSiblingShard] = sibling_physical_shard;
+            fatal_error_trace[FatalTraceSiblingExisting] = sibling_existing;
+            fatal_error_trace[FatalTraceSiblingAvailable] = sibling_available;
+            fatal_error_trace[FatalTraceSiblingCleanCount] = sibling_clean;
+            fatal_error_trace[FatalTraceSiblingDirtyCount] = sibling_dirty;
+            fatal_error_trace[FatalTraceSiblingProcessingFlag] = sibling_processing;
+            fatal_error_trace[FatalTraceShardBufferCount] = shard_buffer_count;
         }
         spill_running = spill_end > static_cast<std::uint64_t>(UINT32_MAX) ? UINT32_MAX : static_cast<std::uint32_t>(spill_end);
         source_running += raw_count;

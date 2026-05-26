@@ -6,7 +6,7 @@
 
 namespace beam {
 
-constexpr std::uint32_t STREAM_FATAL_TRACE_WORDS = 17;
+constexpr std::uint32_t STREAM_FATAL_TRACE_WORDS = 26;
 constexpr std::uint32_t STREAM_FATAL_STREAM3_SPILL_OVERFLOW = 3001;
 constexpr std::uint32_t STREAM_FATAL_STREAM3_DOUBLE_BUFFER_OVERFLOW = 3002;
 
@@ -27,7 +27,16 @@ enum StreamFatalTraceSlot : std::uint32_t {
     FatalTraceProcessingFlag = 13,
     FatalTraceShardCapacity = 14,
     FatalTraceStream4Batch = 15,
-    FatalTraceAppendToActiveSpill = 16
+    FatalTraceAppendToActiveSpill = 16,
+    FatalTraceLogicalShard = 17,
+    FatalTraceSelectedBuffer = 18,
+    FatalTraceSiblingShard = 19,
+    FatalTraceSiblingExisting = 20,
+    FatalTraceSiblingAvailable = 21,
+    FatalTraceSiblingCleanCount = 22,
+    FatalTraceSiblingDirtyCount = 23,
+    FatalTraceSiblingProcessingFlag = 24,
+    FatalTraceShardBufferCount = 25
 };
 
 void stream3_pack_threshold_cuda(
