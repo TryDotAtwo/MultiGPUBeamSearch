@@ -2732,8 +2732,11 @@ DepthDispatchState run_depth_cuda_graphs(
     if (multi_rank) {
         release_completed_stream4_slots_nonblocking();
     }
-    if (multi_rank && stream4_jobs_since_threshold_update != 0U) {
-        maybe_run_stream5_threshold_update(true);
+    if (multi_rank) {
+        // Every rank must enter the boundary request collective. A rank with no
+        // local Stream4 work can still receive a global threshold request from
+        // another rank before final spill drain starts.
+        maybe_run_stream5_threshold_update(stream4_jobs_since_threshold_update != 0U);
     }
 
     drain_pending_stream4_shards();
