@@ -11,6 +11,7 @@ INFERENCE_PARALLELISM
 
 STREAM3_BATCH_CANDIDATES
 STREAM4_BATCH_CANDIDATES
+STREAM4_TRIGGER_CANDIDATES
 STREAM4_BATCH_ALIGNMENT
 
 RING_COUNT
@@ -20,6 +21,8 @@ WORLD_SIZE
 LOCAL_RANK
 
 SHARD_COUNT
+SHARD_BUFFER_COUNT
+STORAGE_SHARD_COUNT
 SHARD_CAPACITY_CANDIDATES
 SHARD_CAPACITY_SCALE_PPM
 GLOBAL_SPILL_CAPACITY
@@ -72,6 +75,9 @@ N_LOCAL =
 LOGICAL_SHARD_SIZE =
     ceil(N_LOCAL / SHARD_COUNT)
 
+STORAGE_SHARD_COUNT =
+    SHARD_COUNT * SHARD_BUFFER_COUNT
+
 SHARD_CAPACITY_CANDIDATES =
     round_up(ceil(LOGICAL_SHARD_SIZE * SHARD_CAPACITY_SCALE_PPM / 1_000_000),
              STREAM4_BATCH_ALIGNMENT)
@@ -86,7 +92,7 @@ GLOBAL_SPILL_CAPACITY >=
 
 Config search:
     choose SHARD_COUNT and STREAM4_BATCH_CANDIDATES under memory budget
-    allocate all SHARD_COUNT resident shard buffers with SHARD_CAPACITY_CANDIDATES slots each
+    allocate all STORAGE_SHARD_COUNT resident physical shard buffers with SHARD_CAPACITY_CANDIDATES slots each
     reject default candidates with too few Stream4 jobs per logical shard
     score candidates by Stream4 waves, Stream4 jobs, batch size, shard count
 ```
@@ -103,6 +109,8 @@ SCORE_BIN_COUNT
 SOLVED_RESULT_CAPACITY
 N_LOCAL
 LOGICAL_SHARD_SIZE
+SHARD_BUFFER_COUNT
+STORAGE_SHARD_COUNT
 STREAM4_JOBS_PER_SHARD
 STREAM4_JOBS_PER_DEPTH
 STREAM4_WAVES_PER_DEPTH
@@ -441,11 +449,12 @@ recv_offset[WORLD_SIZE + 1] : uint32_t
 ```
 
 ```text
-survivor_shard[SHARD_COUNT][SHARD_CAPACITY_CANDIDATES] : CandidateMeta
+survivor_shard[STORAGE_SHARD_COUNT][SHARD_CAPACITY_CANDIDATES] : CandidateMeta
 
-clean_count[SHARD_COUNT]     : uint32_t
-dirty_count[SHARD_COUNT]     : uint32_t
-processing_flag[SHARD_COUNT] : bool
+clean_count[STORAGE_SHARD_COUNT]     : uint32_t
+dirty_count[STORAGE_SHARD_COUNT]     : uint32_t
+processing_flag[STORAGE_SHARD_COUNT] : bool
+stream3_write_buffer_index[SHARD_COUNT] : uint32_t
 
 global_spill_buffer[GLOBAL_SPILL_CAPACITY] : CandidateMeta
 ```
@@ -694,16 +703,18 @@ while depth_not_drained and stop_flag == 0:
             ready shard jobs
 
 
-    for each shard:
+    for each logical_shard:
 
         if stop_flag == 0
-        and dirty_count[shard] > 0
-        and processing_flag[shard] == false
-        and clean_count[shard] + dirty_count[shard] >= STREAM4_BATCH_CANDIDATES:
+        and no physical buffer in logical_shard has processing_flag == true
+        and some physical_shard in logical_shard has dirty_count[physical_shard] > 0
+        and clean_count[physical_shard] + dirty_count[physical_shard] >= STREAM4_TRIGGER_CANDIDATES:
 
-            processing_flag[shard] = true
+            choose one physical_shard from logical_shard
+            processing_flag[physical_shard] = true
             stream4_job_threshold = current_threshold
-            launch stream4_shard_graph for shard
+            launch stream4_shard_graph for physical_shard
+            keep sibling physical buffer writable for Stream 3
 ```
 
 ## Осушение глубины
@@ -719,10 +730,11 @@ and all Stream 5 exchange jobs done:
         local_pending_buffer
         all ready remote_recv_buffer
 
-    for each shard with dirty_count[shard] > 0:
-        processing_flag[shard] = true
+    for each logical_shard with dirty physical buffer:
+        choose at most one physical_shard when no sibling is processing
+        processing_flag[physical_shard] = true
         stream4_job_threshold = current_threshold
-        launch stream4_shard_graph for shard
+        launch stream4_shard_graph for physical_shard
 
     wait all Stream 4 shard jobs
 
@@ -1111,7 +1123,7 @@ remote_send_buffer[
 Для каждого кандидата:
 
 ```text
-shard = shard_from_hash128(candidate.hash)
+logical_shard = shard_from_hash128(candidate.hash)
 ```
 
 Shard distribution:
@@ -1122,21 +1134,39 @@ Shard routing key is separate from owner routing key by domain salt.
 Dedup key remains raw Hash128.
 ```
 
-Если shard свободен:
+Physical shard mapping:
 
 ```text
-processing_flag[shard] == false
-
-write:
-    survivor_shard[shard][clean_count[shard] + dirty_count[shard]]
-
-dirty_count[shard]++
+current_buffer = stream3_write_buffer_index[logical_shard] % SHARD_BUFFER_COUNT
+physical_shard = logical_shard * SHARD_BUFFER_COUNT + current_buffer
 ```
 
-Если shard занят:
+Stream 3 collector write target selection:
 
 ```text
-processing_flag[shard] == true
+prefer current_buffer when physical_shard has enough free slots
+otherwise choose a non-processing sibling physical buffer with maximum free slots
+if SHARD_BUFFER_COUNT > 1 and no sibling can accept the candidate group:
+    raise fatal error
+if SHARD_BUFFER_COUNT == 1 and physical_shard cannot accept the candidate group:
+    write remainder to global_spill_buffer
+```
+
+Если physical_shard свободен:
+
+```text
+processing_flag[physical_shard] == false
+
+write:
+    survivor_shard[physical_shard][clean_count[physical_shard] + dirty_count[physical_shard]]
+
+dirty_count[physical_shard]++
+```
+
+Если physical_shard занят:
+
+```text
+processing_flag[physical_shard] == true
 
 write:
     global_spill_buffer
@@ -1145,17 +1175,19 @@ write:
 Условие запуска Stream 4 shard job:
 
 ```text
-dirty_count[shard] > 0
-processing_flag[shard] == false
-clean_count[shard] + dirty_count[shard] >= STREAM4_BATCH_CANDIDATES
+dirty_count[physical_shard] > 0
+processing_flag[physical_shard] == false
+clean_count[physical_shard] + dirty_count[physical_shard] >= STREAM4_TRIGGER_CANDIDATES
+no sibling physical buffer for the same logical_shard has processing_flag != false
 ```
 
 Действие:
 
 ```text
-processing_flag[shard] = true
+processing_flag[physical_shard] = true
 stream4_job_threshold = current_threshold
-launch stream4_shard_graph for shard
+launch stream4_shard_graph for physical_shard
+stream3_write_buffer_index[logical_shard] = non-processing sibling buffer with free capacity
 ```
 
 Ограничения:
@@ -1163,6 +1195,8 @@ launch stream4_shard_graph for shard
 ```text
 Stream 3 — единственный владелец заполнения shard-буферы Stream 4
 Stream 5 не пишет в shard-буферы Stream 4
+Stream 4 may process at most one physical buffer per logical_shard at a time
+The other A/B physical buffer remains the Stream 3 write target when capacity is available
 atomicAdd на каждый кандидат для Stream 4 не используется
 ```
 
@@ -1611,8 +1645,10 @@ Stream 5 только делает exchange и пишет remote_recv_buffer.
 Stream 4 работает по shard-ам.
 Stream 4 не делает top-k/cap shard.
 Stream 4 делает threshold + compact + sort + dedup + merge clean/dirty.
+Stream 4 запускает не больше одного physical shard на logical shard одновременно.
 
-На shard хранится один survivor_shard с clean/dirty регионами.
+На каждый logical shard хранится SHARD_BUFFER_COUNT physical survivor_shard buffers с clean/dirty регионами.
+Stream 3 пишет в non-processing physical survivor_shard.
 
 global_spill_buffer — общий временный буфер для кандидатов, чей shard занят Stream 4.
 
@@ -1720,8 +1756,9 @@ Stream semantics remain threshold + dedup by Hash128 + best CandidateMeta.
 ```text
 approval_id = resident_shard_capacity_decoupled_from_stream4_batch_2026_05_24
 
-All SHARD_COUNT shard buffers are resident GPU memory for the full depth.
-SHARD_CAPACITY_CANDIDATES is the physical capacity of each resident shard buffer.
+All STORAGE_SHARD_COUNT physical shard buffers are resident GPU memory for the full depth.
+STORAGE_SHARD_COUNT = SHARD_COUNT * SHARD_BUFFER_COUNT.
+SHARD_CAPACITY_CANDIDATES is the physical capacity of each resident physical shard buffer.
 STREAM4_BATCH_CANDIDATES is the dirty-count launch threshold and tuning knob, not the shard capacity.
 
 SHARD_CAPACITY_CANDIDATES derives from:
@@ -1730,12 +1767,28 @@ SHARD_CAPACITY_CANDIDATES derives from:
     STREAM4_BATCH_ALIGNMENT alignment
 
 Stream 3 writes into:
-    survivor_shard[shard][clean_count[shard] + dirty_count[shard]]
-when processing_flag[shard] == false and shard capacity has free slots.
+    survivor_shard[physical_shard][clean_count[physical_shard] + dirty_count[physical_shard]]
+when processing_flag[physical_shard] == false and physical shard capacity has free slots.
 
 Stream 3 writes into global spill when:
-    processing_flag[shard] == true
-    or shard free slots are exhausted.
+    SHARD_BUFFER_COUNT == 1
+    and processing_flag[physical_shard] == true or physical shard free slots are exhausted.
+
+Stream 3 raises fatal overflow when:
+    SHARD_BUFFER_COUNT > 1
+    and no non-processing physical shard for logical_shard has enough free slots.
+
+Stream 3 pre-launch writable-buffer backpressure:
+    allowed only when WORLD_SIZE == 1
+    forbidden when WORLD_SIZE > 1
+    multi-rank Stream 3 must launch and expose capacity defects through fatal overflow
+
+Stream 4 ready queue invariant:
+    if any physical shard for logical_shard has processing_flag == true:
+        no other physical shard for logical_shard may be launched
+    otherwise:
+        at most one dirty-ready physical shard for logical_shard may be launched
+        stream3_write_buffer_index[logical_shard] points to a non-processing sibling when possible
 
 GLOBAL_SPILL_CAPACITY derives from:
     STREAM4_ACTIVE_SORT_SLOTS

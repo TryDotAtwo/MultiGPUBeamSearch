@@ -428,6 +428,144 @@ int main() {
     require(ready_count == 1 && ready_shard_list[0] == 1, "stream3 ready shard queue failed");
     require(processing_after_ready[1] == 1, "stream3 ready shard queue must set processing flag");
 
+    std::uint32_t* d_db_clean_count = nullptr;
+    std::uint32_t* d_db_dirty_count = nullptr;
+    std::uint32_t* d_db_processing_flag = nullptr;
+    std::uint32_t* d_db_write_buffer_index = nullptr;
+    std::uint32_t* d_db_ready_flag = nullptr;
+    std::uint32_t* d_db_ready_shard_list = nullptr;
+    std::uint32_t* d_db_ready_count = nullptr;
+    BEAM_CUDA_CHECK(cudaMalloc(&d_db_clean_count, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_db_dirty_count, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_db_processing_flag, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_db_write_buffer_index, 2 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_db_ready_flag, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_db_ready_shard_list, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_db_ready_count, sizeof(std::uint32_t)));
+    const std::uint32_t db_clean_count[4]{0, 0, 0, 0};
+    const std::uint32_t db_dirty_count[4]{3, 3, 3, 0};
+    const std::uint32_t db_processing_free[4]{0, 0, 0, 0};
+    const std::uint32_t db_write_index_start[2]{0, 0};
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_clean_count, db_clean_count, sizeof(db_clean_count), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_dirty_count, db_dirty_count, sizeof(db_dirty_count), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_processing_flag, db_processing_free, sizeof(db_processing_free), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_write_buffer_index, db_write_index_start, sizeof(db_write_index_start), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_flag, 0, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_shard_list, 0, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_count, 0, sizeof(std::uint32_t)));
+    stream3_build_ready_shard_queue_cuda(
+        d_db_clean_count,
+        d_db_dirty_count,
+        d_db_processing_flag,
+        d_db_write_buffer_index,
+        d_db_ready_flag,
+        d_db_ready_shard_list,
+        d_db_ready_count,
+        2,
+        2,
+        8,
+        4,
+        2,
+        false,
+        false,
+        0);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    std::uint32_t db_ready_count = 0;
+    std::uint32_t db_ready_shards[4]{};
+    std::uint32_t db_processing_after[4]{};
+    std::uint32_t db_write_index_after[2]{};
+    BEAM_CUDA_CHECK(cudaMemcpy(&db_ready_count, d_db_ready_count, sizeof(db_ready_count), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(db_ready_shards, d_db_ready_shard_list, sizeof(db_ready_shards), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(db_processing_after, d_db_processing_flag, sizeof(db_processing_after), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(db_write_index_after, d_db_write_buffer_index, sizeof(db_write_index_after), cudaMemcpyDeviceToHost));
+    require(db_ready_count == 2, "double-buffer ready queue must emit at most one physical shard per logical shard");
+    require(db_ready_shards[0] == 1 && db_ready_shards[1] == 2,
+            "double-buffer ready queue must keep one logical sibling writable");
+    require(db_processing_after[0] == 0 && db_processing_after[1] == 1,
+            "double-buffer ready queue must not mark both buffers for logical shard 0");
+    require(db_processing_after[2] == 1 && db_processing_after[3] == 0,
+            "double-buffer ready queue must leave logical shard 1 sibling writable");
+    require(db_write_index_after[0] == 0 && db_write_index_after[1] == 1,
+            "double-buffer ready queue must point writes at non-processing siblings");
+
+    const std::uint32_t db_processing_busy[4]{1, 0, 0, 0};
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_processing_flag, db_processing_busy, sizeof(db_processing_busy), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_write_buffer_index, db_write_index_start, sizeof(db_write_index_start), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_flag, 0, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_shard_list, 0, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_count, 0, sizeof(std::uint32_t)));
+    stream3_build_ready_shard_queue_cuda(
+        d_db_clean_count,
+        d_db_dirty_count,
+        d_db_processing_flag,
+        d_db_write_buffer_index,
+        d_db_ready_flag,
+        d_db_ready_shard_list,
+        d_db_ready_count,
+        2,
+        2,
+        8,
+        4,
+        2,
+        false,
+        false,
+        0);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    BEAM_CUDA_CHECK(cudaMemcpy(&db_ready_count, d_db_ready_count, sizeof(db_ready_count), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(db_ready_shards, d_db_ready_shard_list, sizeof(db_ready_shards), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(db_processing_after, d_db_processing_flag, sizeof(db_processing_after), cudaMemcpyDeviceToHost));
+    require(db_ready_count == 1 && db_ready_shards[0] == 2,
+            "double-buffer ready queue must skip logical shards with active Stream4 processing");
+    require(db_processing_after[0] == 1 && db_processing_after[1] == 0,
+            "double-buffer ready queue must not process sibling while logical shard is busy");
+    require(db_processing_after[2] == 1 && db_processing_after[3] == 0,
+            "double-buffer ready queue must still process independent logical shards");
+
+    const std::uint32_t db_clean_dirty_priority[4]{7, 0, 0, 0};
+    const std::uint32_t db_dirty_dirty_priority[4]{0, 3, 0, 0};
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_clean_count, db_clean_dirty_priority, sizeof(db_clean_dirty_priority), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_dirty_count, db_dirty_dirty_priority, sizeof(db_dirty_dirty_priority), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_processing_flag, db_processing_free, sizeof(db_processing_free), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(d_db_write_buffer_index, db_write_index_start, sizeof(db_write_index_start), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_flag, 0, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_shard_list, 0, 4 * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(d_db_ready_count, 0, sizeof(std::uint32_t)));
+    stream3_build_ready_shard_queue_cuda(
+        d_db_clean_count,
+        d_db_dirty_count,
+        d_db_processing_flag,
+        d_db_write_buffer_index,
+        d_db_ready_flag,
+        d_db_ready_shard_list,
+        d_db_ready_count,
+        2,
+        2,
+        8,
+        4,
+        2,
+        true,
+        true,
+        0);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    BEAM_CUDA_CHECK(cudaMemcpy(&db_ready_count, d_db_ready_count, sizeof(db_ready_count), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(db_ready_shards, d_db_ready_shard_list, sizeof(db_ready_shards), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(db_processing_after, d_db_processing_flag, sizeof(db_processing_after), cudaMemcpyDeviceToHost));
+    require(db_ready_count == 1 && db_ready_shards[0] == 1,
+            "double-buffer ready queue must prioritize dirty sibling over clean-only sibling");
+    require(db_processing_after[0] == 0 && db_processing_after[1] == 1,
+            "double-buffer dirty priority must leave the clean sibling writable");
+
+    cudaFree(d_db_clean_count);
+    cudaFree(d_db_dirty_count);
+    cudaFree(d_db_processing_flag);
+    cudaFree(d_db_write_buffer_index);
+    cudaFree(d_db_ready_flag);
+    cudaFree(d_db_ready_shard_list);
+    cudaFree(d_db_ready_count);
+
     const CandidateMeta remote_candidate{Hash128{0, 3}, 77, 4, pack_route(1, 0, 3)};
     const std::uint32_t recv_count_host[3]{0, 0, 1};
     const std::uint32_t recv_offset_host[4]{0, 0, 0, 1};
@@ -483,6 +621,7 @@ int main() {
     report << "- global_spill_drain=pass\n";
     report << "- spill_overflow_fatal_guard=pass\n";
     report << "- ready_shard_queue=pass\n";
+    report << "- double_buffer_ready_queue_logical_mutex=pass\n";
     report << "- remote_recv_collector=pass\n";
     report << "\nstatus=pass\n";
 

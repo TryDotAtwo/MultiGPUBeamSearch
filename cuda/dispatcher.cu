@@ -2310,7 +2310,7 @@ DepthDispatchState run_depth_cuda_graphs(
         if (stream3_active || stream3_ready_rings.empty()) {
             return false;
         }
-        if (!stream3_has_writable_buffer()) {
+        if (!multi_rank && !stream3_has_writable_buffer()) {
             stream3_build_ready_shard_queue_cuda(
                 memory.streams.clean_count,
                 memory.streams.dirty_count,

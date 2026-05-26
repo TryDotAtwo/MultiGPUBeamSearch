@@ -775,38 +775,100 @@ __global__ void stream3_build_ready_shard_queue_kernel(
         write_reserve < shard_capacity ? shard_capacity - write_reserve : 0U;
     for (std::uint32_t shard = 0; shard < storage_shard_count; ++shard) {
         ready_flag[shard] = 0;
-        const std::uint32_t clean = clean_count[shard];
-        const std::uint32_t dirty = dirty_count[shard];
-        const std::uint32_t total = clean + dirty;
-        const bool near_capacity = total >= clean_ready_threshold;
-        const bool dirty_ready =
-            dirty != 0U &&
-            (force_dirty_flush != 0U || dirty >= stream4_trigger_candidates || near_capacity);
-        const bool clean_ready =
-            dirty == 0U && clean != 0U && (force_clean_flush != 0U || clean >= clean_ready_threshold);
-        const bool ready =
-            processing_flag[shard] == 0U &&
-            (dirty_ready || clean_ready);
-        if (ready) {
-            processing_flag[shard] = 1;
-            ready_flag[shard] = 1;
-            ready_shard_list[out] = shard;
+    }
+    for (std::uint32_t logical_shard = 0; logical_shard < shard_count; ++logical_shard) {
+        const std::uint32_t base = logical_shard * shard_buffer_count;
+        bool logical_processing = false;
+        for (std::uint32_t buffer = 0; buffer < shard_buffer_count; ++buffer) {
+            logical_processing = logical_processing || processing_flag[base + buffer] != 0U;
+        }
+        if (logical_processing) {
+            continue;
+        }
+        const std::uint32_t current_buffer =
+            shard_buffer_count <= 1U || write_buffer_index == nullptr ?
+            0U :
+            write_buffer_index[logical_shard] % shard_buffer_count;
+        std::uint32_t selected_shard = UINT32_MAX;
+        std::uint32_t selected_buffer = 0;
+        std::uint32_t selected_sibling_available = 0;
+        std::uint32_t selected_total = 0;
+        bool selected_dirty_ready = false;
+        for (std::uint32_t step = 0; step < shard_buffer_count; ++step) {
+            const std::uint32_t buffer = (current_buffer + step) % shard_buffer_count;
+            const std::uint32_t shard = base + buffer;
+            const std::uint32_t clean = clean_count[shard];
+            const std::uint32_t dirty = dirty_count[shard];
+            const std::uint32_t total = clean + dirty;
+            const bool near_capacity = total >= clean_ready_threshold;
+            const bool dirty_ready =
+                dirty != 0U &&
+                (force_dirty_flush != 0U || dirty >= stream4_trigger_candidates || near_capacity);
+            const bool clean_ready =
+                dirty == 0U && clean != 0U && (force_clean_flush != 0U || clean >= clean_ready_threshold);
+            if (!dirty_ready && !clean_ready) {
+                continue;
+            }
+            std::uint32_t sibling_available = 0;
+            for (std::uint32_t sibling_buffer = 0; sibling_buffer < shard_buffer_count; ++sibling_buffer) {
+                if (sibling_buffer == buffer) {
+                    continue;
+                }
+                const std::uint32_t sibling_shard = base + sibling_buffer;
+                const std::uint32_t sibling_total =
+                    clean_count[sibling_shard] + dirty_count[sibling_shard];
+                if (processing_flag[sibling_shard] == 0U && sibling_total < shard_capacity) {
+                    const std::uint32_t available = shard_capacity - sibling_total;
+                    sibling_available = available > sibling_available ? available : sibling_available;
+                }
+            }
+            const bool better_candidate =
+                selected_shard == UINT32_MAX ||
+                (dirty_ready && !selected_dirty_ready) ||
+                (dirty_ready == selected_dirty_ready && sibling_available > selected_sibling_available) ||
+                (dirty_ready == selected_dirty_ready &&
+                 sibling_available == selected_sibling_available &&
+                 buffer != current_buffer &&
+                 selected_buffer == current_buffer) ||
+                (dirty_ready == selected_dirty_ready &&
+                 sibling_available == selected_sibling_available &&
+                 buffer == current_buffer &&
+                 selected_buffer != current_buffer &&
+                 selected_total >= shard_capacity);
+            if (better_candidate) {
+                selected_shard = shard;
+                selected_buffer = buffer;
+                selected_sibling_available = sibling_available;
+                selected_total = total;
+                selected_dirty_ready = dirty_ready;
+            }
+        }
+        if (selected_shard != UINT32_MAX) {
+            processing_flag[selected_shard] = 1;
+            ready_flag[selected_shard] = 1;
+            ready_shard_list[out] = selected_shard;
             ++out;
-            if (shard_buffer_count > 1U) {
-                const std::uint32_t logical_shard = shard / shard_buffer_count;
-                const std::uint32_t current_buffer = write_buffer_index[logical_shard] % shard_buffer_count;
-                if (shard == logical_shard * shard_buffer_count + current_buffer) {
-                    for (std::uint32_t step = 1U; step < shard_buffer_count; ++step) {
-                        const std::uint32_t candidate_buffer = (current_buffer + step) % shard_buffer_count;
-                        const std::uint32_t candidate_shard =
-                            logical_shard * shard_buffer_count + candidate_buffer;
-                        const std::uint32_t candidate_total =
-                            clean_count[candidate_shard] + dirty_count[candidate_shard];
-                        if (processing_flag[candidate_shard] == 0U && candidate_total < shard_capacity) {
-                            write_buffer_index[logical_shard] = candidate_buffer;
-                            break;
+            if (shard_buffer_count > 1U && write_buffer_index != nullptr) {
+                std::uint32_t best_write_buffer = UINT32_MAX;
+                std::uint32_t best_write_available = 0;
+                for (std::uint32_t buffer = 0; buffer < shard_buffer_count; ++buffer) {
+                    if (buffer == selected_buffer) {
+                        continue;
+                    }
+                    const std::uint32_t shard = base + buffer;
+                    const std::uint32_t total = clean_count[shard] + dirty_count[shard];
+                    if (processing_flag[shard] == 0U && total < shard_capacity) {
+                        const std::uint32_t available = shard_capacity - total;
+                        if (best_write_buffer == UINT32_MAX ||
+                            available > best_write_available ||
+                            (available == best_write_available && buffer == current_buffer)) {
+                            best_write_buffer = buffer;
+                            best_write_available = available;
                         }
                     }
+                }
+                if (best_write_buffer != UINT32_MAX) {
+                    write_buffer_index[logical_shard] = best_write_buffer;
                 }
             }
         }
