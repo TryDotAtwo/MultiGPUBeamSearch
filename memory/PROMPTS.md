@@ -126,3 +126,7 @@
 - User approved the implementation plan and requested testing on the current Kaggle 2xT4 notebook, where only one GPU had previously been used.
 - User approved pushing the multi-GPU code to GitHub and testing on Kaggle 2xT4.
 - User observed Kaggle version 48 looked hung after build completion because notebook output stayed empty while C++ rank logs were redirected to files. User requested immediate log streaming from selected ranks through a config parameter, while still writing both rank logs to disk.
+- User reported Kaggle version 50 still failed at depth 1 with `rank=1 what(): final request return rank exceeds WORLD_SIZE` and stopped the notebooks because the run was wrong.
+- User rejected local fake `WORLD_SIZE=2` reproduction on one GPU with both ranks using `LOCAL_RANK=0`; future multi-rank validation must use real multi-GPU hardware such as Kaggle 2xT4 unless explicitly approved otherwise.
+- User approved adding detailed final-exchange logging like other stream diagnostics and requested a compile/config flag so production runs do not compile or pay for the diagnostic code.
+- User required no unapproved algorithmic changes while diagnosing the final exchange failure; current approved scope is detailed logging, full-debug Kaggle run, and investigation from produced logs.
