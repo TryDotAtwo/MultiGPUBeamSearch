@@ -124,3 +124,5 @@
 - User required Stream 5 buffer sizes to be explicit in config, Stream 5 buffers to be segmented per card/ring to avoid collisions, and the receive buffer to have multiple parts so a writer always has a free target.
 - User required large Stream 5 transactions because with many ranks most `CandidateMeta` records are remote and small network transactions would become the bottleneck.
 - User approved the implementation plan and requested testing on the current Kaggle 2xT4 notebook, where only one GPU had previously been used.
+- User approved pushing the multi-GPU code to GitHub and testing on Kaggle 2xT4.
+- User observed Kaggle version 48 looked hung after build completion because notebook output stayed empty while C++ rank logs were redirected to files. User requested immediate log streaming from selected ranks through a config parameter, while still writing both rank logs to disk.
