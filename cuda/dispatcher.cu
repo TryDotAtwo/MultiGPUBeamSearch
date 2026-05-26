@@ -2714,6 +2714,8 @@ FinalizeDepthState finalize_depth_single_gpu(
             std::uint32_t words_per_item,
             void* host_recv,
             std::uint32_t& recv_total_out) {
+            const std::vector<std::uint32_t> send_count_snapshot = send_count;
+            const std::vector<std::uint32_t> send_offset_snapshot = send_offset;
             if (send_total > device_send_capacity) {
                 throw std::runtime_error("exchange send total exceeds device capacity");
             }
@@ -2727,13 +2729,13 @@ FinalizeDepthState finalize_depth_single_gpu(
             }
             check_cuda(cudaMemcpyAsync(
                 memory.final.final_send_count,
-                send_count.data(),
+                send_count_snapshot.data(),
                 static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
                 cudaMemcpyHostToDevice,
                 streams.stream5), "cudaMemcpyAsync exchange send counts");
             check_cuda(cudaMemcpyAsync(
                 memory.final.final_send_offset,
-                send_offset.data(),
+                send_offset_snapshot.data(),
                 (static_cast<std::uint64_t>(world_size) + 1ULL) * sizeof(std::uint32_t),
                 cudaMemcpyHostToDevice,
                 streams.stream5), "cudaMemcpyAsync exchange send offsets");
@@ -2762,8 +2764,8 @@ FinalizeDepthState finalize_depth_single_gpu(
             stream5_exchange_u64_payload_nccl_cuda(
                 device_send,
                 device_recv,
-                send_count.data(),
-                send_offset.data(),
+                send_count_snapshot.data(),
+                send_offset_snapshot.data(),
                 recv_counts.data(),
                 recv_offsets.data(),
                 words_per_item,
