@@ -3,6 +3,8 @@
 
 #include <cuda_runtime.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -114,12 +116,84 @@ int main() {
     require(memory.final.final_keep_flags != nullptr, "final keep flags missing");
     require(memory.final.final_block_counts != nullptr, "final block counts missing");
     require(memory.final.final_block_offsets != nullptr, "final block offsets missing");
+    require(memory.final.final_request_buffer != nullptr, "single rank final request buffer missing");
     require(addr(memory.final.final_request_buffer) % alignof(FinalRequest) == 0, "final request alignment failed");
     require(memory.final.final_request_count != nullptr, "final request count missing");
+    require(memory.final.final_validation_error != nullptr, "final validation error storage missing");
+    require(
+        addr(memory.final.final_validation_error) % alignof(FinalRequestValidationError) == 0,
+        "final validation error alignment failed");
     BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
     free_static_device_memory(memory);
     require(memory.allocation == nullptr, "free must reset memory struct");
+
+    RuntimeConfig multi_config = config;
+    multi_config.world_size = 2;
+    multi_config.local_rank = 0;
+    multi_config.user_global_beam_width = 512;
+    const StaticMemoryPlan multi_plan = make_static_memory_plan(multi_config);
+    require(multi_plan.final_materialize_slot_count == 3, "final materialize must use 3 slots");
+    require(multi_plan.final_materialize_chunk_capacity > 0, "final materialize chunk capacity missing");
+    require(
+        multi_plan.final_materialize_exchange_capacity ==
+            multi_plan.final_materialize_chunk_capacity * multi_config.world_size,
+        "final materialize exchange capacity mismatch");
+    require(
+        multi_plan.final_selected_candidate_capacity ==
+            std::min<std::uint64_t>(multi_plan.derived.global_beam_width_effective, multi_plan.survivor_count),
+        "final selected candidate capacity must be min(global beam, survivors)");
+    require(multi_plan.final_materialize_cub_temp_bytes > 0, "final materialize CUB temp missing");
+
+    StaticDeviceMemory multi_memory;
+    allocate_static_device_memory(multi_plan, multi_memory);
+    require(multi_memory.final.final_selected_buffer != nullptr, "layout3 selected buffer missing");
+    require(multi_memory.final.final_request_buffer == nullptr, "multi-rank full final request buffer must be omitted");
+    require(multi_memory.final.final_response_buffer == nullptr, "multi-rank full final response buffer must be omitted");
+    require(multi_memory.final.final_validation_error != nullptr, "layout3 validation error storage missing");
+    require(multi_memory.final.final_mat_key_a != nullptr, "layout3 key a missing");
+    require(multi_memory.final.final_mat_key_b != nullptr, "layout3 key b missing");
+    require(multi_memory.final.final_mat_request_a != nullptr, "layout3 request a missing");
+    require(multi_memory.final.final_mat_request_b != nullptr, "layout3 request b missing");
+    require(multi_memory.final.final_mat_request_recv != nullptr, "layout3 request recv missing");
+    require(multi_memory.final.final_mat_response_send != nullptr, "layout3 response send missing");
+    require(multi_memory.final.final_mat_response_recv != nullptr, "layout3 response recv missing");
+    require(multi_memory.final.final_mat_history_send != nullptr, "layout3 history send missing");
+    require(multi_memory.final.final_mat_history_recv != nullptr, "layout3 history recv missing");
+    require(multi_memory.final.final_mat_cub_temp != nullptr, "layout3 CUB temp missing");
+    require(
+        multi_memory.final.final_mat_cub_temp_bytes == multi_plan.final_materialize_cub_temp_bytes,
+        "layout3 CUB temp size mismatch");
+    require(
+        addr(multi_memory.final.final_selected_buffer) % alignof(CandidateMeta) == 0,
+        "layout3 selected buffer alignment failed");
+    require(
+        addr(multi_memory.final.final_validation_error) % alignof(FinalRequestValidationError) == 0,
+        "layout3 validation error alignment failed");
+    require(addr(multi_memory.final.final_mat_key_a) % alignof(std::uint32_t) == 0, "layout3 key a alignment failed");
+    require(addr(multi_memory.final.final_mat_key_b) % alignof(std::uint32_t) == 0, "layout3 key b alignment failed");
+    require(addr(multi_memory.final.final_mat_request_a) % alignof(FinalRequest) == 0, "layout3 request a alignment failed");
+    require(addr(multi_memory.final.final_mat_request_b) % alignof(FinalRequest) == 0, "layout3 request b alignment failed");
+    require(
+        addr(multi_memory.final.final_mat_request_recv) % alignof(FinalRequest) == 0,
+        "layout3 request recv alignment failed");
+    require(
+        addr(multi_memory.final.final_mat_response_send) % alignof(CandidateMeta) == 0,
+        "layout3 response send alignment failed");
+    require(
+        addr(multi_memory.final.final_mat_response_recv) % alignof(CandidateMeta) == 0,
+        "layout3 response recv alignment failed");
+    require(
+        addr(multi_memory.final.final_mat_history_send) % alignof(FinalHistoryRecord) == 0,
+        "layout3 history send alignment failed");
+    require(
+        addr(multi_memory.final.final_mat_history_recv) % alignof(FinalHistoryRecord) == 0,
+        "layout3 history recv alignment failed");
+    require(addr(multi_memory.final.final_mat_cub_temp) % 256 == 0, "layout3 CUB temp alignment failed");
+    BEAM_CUDA_CHECK(cudaMemset(multi_memory.allocation, 0, multi_memory.allocation_bytes));
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    free_static_device_memory(multi_memory);
+    require(multi_memory.allocation == nullptr, "free must reset multi-rank memory struct");
 
     report << "- pre_start_single_allocation=pass\n";
     report << "- current_frontier_outside_scratch=pass\n";
@@ -138,6 +212,9 @@ int main() {
     report << "- stream4_score_histogram_scratch=pass\n";
     report << "- final_candidate_buffers=pass\n";
     report << "- final_filter_scan_scratch=pass\n";
+    report << "- final_validation_error_static_storage=pass\n";
+    report << "- final_materialize_layout3_slots=pass\n";
+    report << "- final_materialize_layout3_alignment=pass\n";
     report << "\nstatus=pass\n";
     std::cout << "static_memory_cuda_tests=pass\n";
     return 0;

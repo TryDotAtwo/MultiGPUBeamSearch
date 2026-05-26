@@ -189,6 +189,15 @@ struct alignas(16) FinalRequest {
 using FinalResponse = State128;
 ```
 
+```cpp
+struct alignas(32) FinalHistoryRecord {
+    CandidateMeta meta;
+    uint32_t target_local_idx;
+    uint32_t reserved0;
+    uint64_t reserved1[3];
+};
+```
+
 `FinalResponse` layout:
 
 ```text
@@ -278,6 +287,13 @@ static_assert(alignof(FinalRequest) == 16);
 
 static_assert(sizeof(FinalResponse) == 128);
 static_assert(alignof(FinalResponse) == 16);
+
+static_assert(sizeof(FinalHistoryRecord) == 64);
+static_assert(alignof(FinalHistoryRecord) == 32);
+static_assert(sizeof(FinalHistoryRecord) % sizeof(uint64_t) == 0);
+
+static_assert(sizeof(FinalRequestValidationError) == 48);
+static_assert(alignof(FinalRequestValidationError) == 16);
 ```
 
 ---
@@ -441,19 +457,91 @@ global_score_hist[SCORE_BIN_COUNT] : uint64_t
 current_threshold : uint32_t
 ```
 
+## scratch_pool: three overlay layouts
+
+```text
+layout_1_streams:
+    Stream 1/2 score/hash/parent rings
+    Stream 3 threshold/compact/sort/dedup/split scratch
+    Stream 5 CandidateMeta send/recv slots
+    Stream 4 survivor_shard/dirty/clean/sort scratch
+
+layout_2_final_select:
+    final local dedup/filter/threshold/load-balance scratch
+    final_candidate_buffer : CandidateMeta[N_LOCAL]
+    final_selected_buffer  : CandidateMeta[min(GLOBAL_BEAM_WIDTH_EFFECTIVE, survivor_count)] when WORLD_SIZE > 1
+
+layout_3_final_materialize:
+    ring_slots = 3
+    chunk_capacity = min(N_LOCAL, STREAM3_BATCH_CANDIDATES)
+    exchange_capacity = chunk_capacity * WORLD_SIZE
+    key_slot_a[ring_slots][exchange_capacity] : uint32_t
+    key_slot_b[ring_slots][exchange_capacity] : uint32_t
+    request_slot_a[ring_slots][exchange_capacity] : FinalRequest
+    request_slot_b[ring_slots][exchange_capacity] : FinalRequest
+    request_recv_slot[ring_slots][exchange_capacity] : FinalRequest
+    response_send_slot[ring_slots][exchange_capacity] : FinalResponse
+    response_recv_slot[ring_slots][exchange_capacity] : FinalResponse
+    history_send_slot[ring_slots][chunk_capacity] : FinalHistoryRecord
+    history_recv_slot[ring_slots][exchange_capacity] : FinalHistoryRecord
+    fixed CUB temp for request sort by rank key
+```
+
 ## scratch_pool: layout_final
 
 ```text
 next_frontier_states_tmp[N] : State128
 
-final_request_buffer
-final_response_buffer : FinalResponse / State128
+final_request_buffer : FinalRequest[N_LOCAL] only when WORLD_SIZE == 1
+final_validation_error : FinalRequestValidationError
+final_response_buffer : omitted when WORLD_SIZE > 1; chunked response slots replace the full buffer
 
 final_send_count[WORLD_SIZE]      : uint32_t
 final_send_offset[WORLD_SIZE + 1] : uint32_t
 
 final_recv_count[WORLD_SIZE]      : uint32_t
 final_recv_offset[WORLD_SIZE + 1] : uint32_t
+```
+
+Final materialization data-plane:
+
+```text
+CPU participates only in CandidateMeta history transfer after GPU materialization chunk ownership is fixed.
+CPU does not participate in FinalRequest exchange.
+CPU does not participate in FinalResponse exchange.
+GPU builds FinalRequest directly from selected CandidateMeta chunks.
+GPU exchanges FinalRequest / FinalResponse through NCCL only.
+source_rank == local_rank request path is local GPU work, not NCCL traffic.
+return_rank == local_rank response path writes next_frontier_states_tmp directly, not NCCL traffic.
+remote response slots are pre-partitioned by return_rank offsets; no atomic write is required.
+request slots are sorted/grouped by source_rank before NCCL exchange.
+response work slots are sorted/grouped by return_rank before NCCL exchange.
+WORLD_SIZE == 1 final path uses the existing single-GPU request/materialize path.
+WORLD_SIZE > 1 final path does not allocate full final_request_buffer or full final_response_buffer.
+```
+
+Layout 3 chunk lifetime:
+
+```text
+candidate_meta_chunk -> build request/history records on GPU
+candidate_meta_chunk -> async CPU history copy may run independently from GPU-GPU materialization
+after request/history build and CPU history transfer for the chunk are queued, candidate_meta_chunk memory may be reused
+response exchange for a slot may overlap build/sort work for later slots
+slot reuse waits for the previous response_done event before response_recv memory is overwritten
+slot events: build_done, history_done, request_done, response_ready, response_done
+```
+
+Layout 3 alignment:
+
+```text
+CandidateMeta: size=32 align=32
+FinalRequest: size=16 align=16
+FinalResponse: size=128 align>=16 and slot base align>=32
+FinalHistoryRecord: size=64 align=32
+FinalRequestValidationError: size=48 align=16
+uint32_t key slots: align>=4
+CUB temp: align=256
+host exchange control arrays: fixed capacity WORLD_SIZE<=128, no per-chunk dynamic containers
 ```
 
 Overlay invariant:
@@ -463,6 +551,9 @@ layout_streams и layout_final используют одну физическу�
 layout_streams и layout_final не активны одновременно
 current_frontier_states не входит в scratch_pool
 solved_* и stop_flag не входят в scratch_pool
+layout_1_streams, layout_2_final_select, layout_3_final_materialize use one static scratch_pool
+layout_3_final_materialize is the largest final layout and defines the scratch_pool sizing floor for layouts 1/2
+no cudaMalloc/cudaFree is allowed inside depth-loop final materialization
 ```
 
 Config search memory objective:

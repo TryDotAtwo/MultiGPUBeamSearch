@@ -34,6 +34,31 @@ struct alignas(16) FinalRequest {
 };
 
 using FinalResponse = State128;
+
+struct alignas(32) FinalHistoryRecord {
+    CandidateMeta meta;
+    std::uint32_t target_local_idx;
+    std::uint32_t reserved0;
+    std::uint64_t reserved1[3];
+};
+
+inline constexpr std::uint32_t FinalRequestInvalidParent = 1U << 0U;
+inline constexpr std::uint32_t FinalRequestInvalidTarget = 1U << 1U;
+inline constexpr std::uint32_t FinalRequestInvalidMove = 1U << 2U;
+inline constexpr std::uint32_t FinalRequestInvalidSlot = 1U << 3U;
+
+struct alignas(16) FinalRequestValidationError {
+    std::uint32_t invalid_count;
+    std::uint32_t first_index;
+    std::uint64_t parent_idx;
+    std::uint32_t target_local_idx;
+    std::uint32_t request_count;
+    std::uint64_t current_frontier_size;
+    std::uint32_t target_count;
+    std::uint32_t reason_mask;
+    std::uint32_t move;
+};
+
 using Generator = std::array<std::uint8_t, STATE_STORAGE_LEN>;
 using State = std::array<std::uint8_t, STATE_STORAGE_LEN>;
 using ZobristTable = std::array<std::array<Hash128, STATE_VALUE_PAD>, STATE_STORAGE_LEN>;
@@ -54,6 +79,11 @@ static_assert(sizeof(FinalRequest) == 16);
 static_assert(alignof(FinalRequest) == 16);
 static_assert(sizeof(FinalResponse) == 128);
 static_assert(alignof(FinalResponse) == 16);
+static_assert(sizeof(FinalHistoryRecord) == 64);
+static_assert(alignof(FinalHistoryRecord) == 32);
+static_assert(sizeof(FinalHistoryRecord) % sizeof(std::uint64_t) == 0);
+static_assert(sizeof(FinalRequestValidationError) == 48);
+static_assert(alignof(FinalRequestValidationError) == 16);
 
 BEAM_HOST_DEVICE inline bool operator==(Hash128 a, Hash128 b) {
     return a.lo == b.lo && a.hi == b.hi;

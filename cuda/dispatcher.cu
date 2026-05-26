@@ -55,6 +55,37 @@ void check_nccl_dispatcher(ncclResult_t status, const char* op) {
     }
 }
 
+constexpr std::uint32_t kFinalExchangeMaxWorldSize = 128;
+
+struct alignas(64) FinalExchangePlan {
+    std::array<std::uint32_t, kFinalExchangeMaxWorldSize> count{};
+    std::array<std::uint32_t, kFinalExchangeMaxWorldSize + 1U> offset{};
+    std::uint32_t size = 0;
+    std::uint32_t total = 0;
+};
+
+static_assert(alignof(FinalExchangePlan) == 64);
+
+FinalExchangePlan make_final_exchange_plan(const std::uint32_t* counts, std::uint32_t count_size) {
+    if (count_size > kFinalExchangeMaxWorldSize) {
+        throw std::runtime_error("final exchange world size exceeds static control capacity");
+    }
+    FinalExchangePlan plan{};
+    plan.size = count_size;
+    std::uint64_t running = 0;
+    plan.offset[0] = 0;
+    for (std::uint32_t i = 0; i < count_size; ++i) {
+        plan.count[i] = counts[i];
+        running += counts[i];
+        if (running > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+            throw std::runtime_error("exchange item count exceeds uint32 range");
+        }
+        plan.offset[i + 1U] = static_cast<std::uint32_t>(running);
+    }
+    plan.total = static_cast<std::uint32_t>(running);
+    return plan;
+}
+
 #if BEAM_DEBUG_STREAM_TIMING
 void accumulate_elapsed_ms(
     cudaEvent_t start,
@@ -75,90 +106,19 @@ void accumulate_elapsed_ms(
 void log_final_exchange_counts(
     const char* label,
     std::uint32_t local_rank,
-    const std::vector<std::uint32_t>& counts,
-    const std::vector<std::uint32_t>& offsets) {
+    const FinalExchangePlan& plan) {
     std::cout << "final_exchange_trace"
               << " rank=" << local_rank
               << " label=" << label
-              << " count_size=" << counts.size()
-              << " offset_size=" << offsets.size();
-    for (std::uint32_t i = 0; i < counts.size(); ++i) {
-        std::cout << " count" << i << "=" << counts[i];
+              << " count_size=" << plan.size
+              << " offset_size=" << (plan.size + 1U);
+    for (std::uint32_t i = 0; i < plan.size; ++i) {
+        std::cout << " count" << i << "=" << plan.count[i];
     }
-    for (std::uint32_t i = 0; i < offsets.size(); ++i) {
-        std::cout << " offset" << i << "=" << offsets[i];
+    for (std::uint32_t i = 0; i <= plan.size; ++i) {
+        std::cout << " offset" << i << "=" << plan.offset[i];
     }
     std::cout << "\n";
-}
-
-void log_final_exchange_request(
-    const char* label,
-    std::uint32_t local_rank,
-    std::uint32_t index,
-    const FinalRequest& request) {
-    std::cout << "final_exchange_trace_request"
-              << " rank=" << local_rank
-              << " label=" << label
-              << " index=" << index
-              << " parent_idx=" << request.parent_idx
-              << " target_local_idx=" << request.target_local_idx
-              << " return_rank=" << request.return_rank
-              << " move=" << static_cast<std::uint32_t>(request.move)
-              << " pad=" << static_cast<std::uint32_t>(request.pad)
-              << "\n";
-}
-
-void log_final_exchange_requests(
-    const char* label,
-    std::uint32_t local_rank,
-    const std::vector<FinalRequest>& requests) {
-    std::cout << "final_exchange_trace_requests"
-              << " rank=" << local_rank
-              << " label=" << label
-              << " total=" << requests.size()
-              << "\n";
-    constexpr std::uint32_t head_limit = 8;
-    constexpr std::uint32_t tail_limit = 4;
-    const std::uint32_t total = static_cast<std::uint32_t>(requests.size());
-    const std::uint32_t head = std::min<std::uint32_t>(head_limit, total);
-    for (std::uint32_t i = 0; i < head; ++i) {
-        log_final_exchange_request(label, local_rank, i, requests[i]);
-    }
-    if (total > head + tail_limit) {
-        std::cout << "final_exchange_trace_requests_gap"
-                  << " rank=" << local_rank
-                  << " label=" << label
-                  << " skipped=" << (total - head - tail_limit)
-                  << "\n";
-    }
-    const std::uint32_t tail_begin = total > head + tail_limit ? total - tail_limit : head;
-    for (std::uint32_t i = tail_begin; i < total; ++i) {
-        log_final_exchange_request(label, local_rank, i, requests[i]);
-    }
-}
-
-void log_final_exchange_candidate(
-    const char* label,
-    std::uint32_t local_rank,
-    std::uint32_t index,
-    const CandidateMeta& candidate,
-    std::uint32_t target_rank,
-    std::uint64_t global_idx) {
-    std::cout << "final_exchange_trace_candidate"
-              << " rank=" << local_rank
-              << " label=" << label
-              << " index=" << index
-              << " hash_lo=" << candidate.hash.lo
-              << " hash_hi=" << candidate.hash.hi
-              << " parent_idx=" << candidate.parent_idx
-              << " score_key=" << candidate.score_key
-              << " route_packed=" << candidate.route_packed
-              << " source_rank=" << unpack_source_rank(candidate.route_packed)
-              << " owner=" << static_cast<std::uint32_t>(unpack_owner(candidate.route_packed))
-              << " move=" << static_cast<std::uint32_t>(unpack_move(candidate.route_packed))
-              << " target_rank=" << target_rank
-              << " global_idx=" << global_idx
-              << "\n";
 }
 #endif
 
@@ -512,6 +472,21 @@ void ensure_stream4_slot_resources(DispatcherStreams& streams, std::uint32_t slo
     }
 }
 
+void ensure_final_slot_events(DispatcherStreams& streams) {
+    auto create_group = [](std::array<cudaEvent_t, 3>& events, const char* label) {
+        for (std::uint32_t slot = 0; slot < events.size(); ++slot) {
+            if (events[slot] == nullptr) {
+                check_cuda(cudaEventCreateWithFlags(&events[slot], cudaEventDisableTiming), label);
+            }
+        }
+    };
+    create_group(streams.final_build_done, "cudaEventCreate final build done");
+    create_group(streams.final_history_done, "cudaEventCreate final history done");
+    create_group(streams.final_request_done, "cudaEventCreate final request done");
+    create_group(streams.final_response_ready, "cudaEventCreate final response ready");
+    create_group(streams.final_response_done, "cudaEventCreate final response done");
+}
+
 void update_threshold_global(
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
@@ -560,42 +535,6 @@ void update_threshold_global(
     }
 }
 
-struct alignas(32) FinalHistoryRecord {
-    CandidateMeta meta;
-    std::uint32_t target_local_idx;
-    std::uint32_t reserved0;
-    std::uint64_t reserved1[3];
-};
-
-static_assert(sizeof(FinalHistoryRecord) == 64);
-static_assert(alignof(FinalHistoryRecord) == 32);
-static_assert(sizeof(FinalHistoryRecord) % sizeof(std::uint64_t) == 0);
-
-struct alignas(64) FinalExchangePlan {
-    std::vector<std::uint32_t> count;
-    std::vector<std::uint32_t> offset;
-    std::uint32_t total = 0;
-};
-
-static_assert(alignof(FinalExchangePlan) == 64);
-
-FinalExchangePlan make_final_exchange_plan(const std::vector<std::uint32_t>& counts) {
-    FinalExchangePlan plan{};
-    plan.count = counts;
-    plan.offset.resize(static_cast<std::uint64_t>(counts.size()) + 1ULL);
-    std::uint64_t running = 0;
-    plan.offset[0] = 0;
-    for (std::uint32_t i = 0; i < counts.size(); ++i) {
-        running += counts[i];
-        if (running > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
-            throw std::runtime_error("exchange item count exceeds uint32 range");
-        }
-        plan.offset[i + 1U] = static_cast<std::uint32_t>(running);
-    }
-    plan.total = static_cast<std::uint32_t>(running);
-    return plan;
-}
-
 } // namespace
 
 void create_dispatcher_streams(DispatcherStreams& streams) {
@@ -633,6 +572,18 @@ void destroy_dispatcher_streams(DispatcherStreams& streams) {
             cudaEventDestroy(event);
         }
     }
+    auto destroy_group = [](std::array<cudaEvent_t, 3>& events) {
+        for (cudaEvent_t event : events) {
+            if (event) {
+                cudaEventDestroy(event);
+            }
+        }
+    };
+    destroy_group(streams.final_build_done);
+    destroy_group(streams.final_history_done);
+    destroy_group(streams.final_request_done);
+    destroy_group(streams.final_response_ready);
+    destroy_group(streams.final_response_done);
     streams = DispatcherStreams{};
 }
 
@@ -2797,16 +2748,11 @@ FinalizeDepthState finalize_depth_single_gpu(
     if (multi_rank) {
         const std::uint32_t world_size = plan.config.world_size;
         const std::uint32_t local_rank = plan.config.local_rank;
+        if (world_size > kFinalExchangeMaxWorldSize) {
+            throw std::runtime_error("WORLD_SIZE exceeds static final exchange control capacity");
+        }
         const auto ceil_div_local = [](std::uint64_t a, std::uint64_t b) {
             return b == 0ULL ? 0ULL : (a + b - 1ULL) / b;
-        };
-        const auto target_rank_for_global = [&](std::uint64_t global_idx, std::uint64_t global_count) {
-            std::uint32_t target =
-                static_cast<std::uint32_t>((global_idx * static_cast<std::uint64_t>(world_size)) / global_count);
-            if (target >= world_size) {
-                target = world_size - 1U;
-            }
-            return target;
         };
         const auto exchange_u64_items = [&](
             const char* exchange_name,
@@ -2818,6 +2764,7 @@ FinalizeDepthState finalize_depth_single_gpu(
             std::uint32_t device_recv_capacity,
             std::uint32_t words_per_item,
             void* host_recv,
+            cudaEvent_t done_event,
             std::uint32_t& recv_total_out) {
             const FinalExchangePlan send_plan_snapshot = send_plan;
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
@@ -2835,8 +2782,7 @@ FinalizeDepthState finalize_depth_single_gpu(
             log_final_exchange_counts(
                 (std::string(exchange_name) + "_send_snapshot").c_str(),
                 local_rank,
-                send_plan_snapshot.count,
-                send_plan_snapshot.offset);
+                send_plan_snapshot);
 #endif
             if (send_plan_snapshot.total > device_send_capacity) {
                 throw std::runtime_error("exchange send total exceeds device capacity");
@@ -2869,19 +2815,18 @@ FinalizeDepthState finalize_depth_single_gpu(
                 collective->comm,
                 streams.stream5);
             check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize exchange counts");
-            std::vector<std::uint32_t> recv_counts(world_size);
+            std::array<std::uint32_t, kFinalExchangeMaxWorldSize> recv_counts{};
             check_cuda(cudaMemcpy(
                 recv_counts.data(),
                 memory.final.final_recv_count,
                 static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
                 cudaMemcpyDeviceToHost), "cudaMemcpy exchange recv counts");
-            const FinalExchangePlan recv_plan = make_final_exchange_plan(recv_counts);
+            const FinalExchangePlan recv_plan = make_final_exchange_plan(recv_counts.data(), world_size);
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
             log_final_exchange_counts(
                 (std::string(exchange_name) + "_recv").c_str(),
                 local_rank,
-                recv_plan.count,
-                recv_plan.offset);
+                recv_plan);
             std::cout << "final_exchange_trace"
                       << " rank=" << local_rank
                       << " label=" << exchange_name
@@ -2897,6 +2842,7 @@ FinalizeDepthState finalize_depth_single_gpu(
                 recv_plan.offset.data(),
                 world_size,
                 streams.stream5);
+            check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize exchange recv offsets");
             stream5_exchange_u64_payload_nccl_cuda(
                 device_send,
                 device_recv,
@@ -2917,7 +2863,9 @@ FinalizeDepthState finalize_depth_single_gpu(
                     cudaMemcpyDeviceToHost,
                     streams.stream5), "cudaMemcpyAsync exchange device recv to host");
             }
-            check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize exchange payload");
+            if (done_event != nullptr) {
+                check_cuda(cudaEventRecord(done_event, streams.stream5), "cudaEventRecord final exchange payload done");
+            }
             recv_total_out = recv_plan.total;
         };
 
@@ -2941,7 +2889,7 @@ FinalizeDepthState finalize_depth_single_gpu(
             collective->comm,
             streams.stream5);
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize final less allgather");
-        std::vector<std::uint32_t> less_counts(world_size);
+        std::array<std::uint32_t, kFinalExchangeMaxWorldSize> less_counts{};
         check_cuda(cudaMemcpy(
             less_counts.data(),
             memory.final.final_recv_count,
@@ -2968,7 +2916,7 @@ FinalizeDepthState finalize_depth_single_gpu(
             collective->comm,
             streams.stream5);
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize final equal allgather");
-        std::vector<std::uint32_t> equal_counts(world_size);
+        std::array<std::uint32_t, kFinalExchangeMaxWorldSize> equal_counts{};
         check_cuda(cudaMemcpy(
             equal_counts.data(),
             memory.final.final_send_count,
@@ -3003,14 +2951,17 @@ FinalizeDepthState finalize_depth_single_gpu(
                   << " global_keep_count=" << global_keep_count
                   << " global_beam_width_effective=" << plan.derived.global_beam_width_effective
                   << "\n";
-        const FinalExchangePlan trace_less_plan = make_final_exchange_plan(less_counts);
-        const FinalExchangePlan trace_equal_plan = make_final_exchange_plan(equal_counts);
-        log_final_exchange_counts("less_counts", local_rank, trace_less_plan.count, trace_less_plan.offset);
-        log_final_exchange_counts("equal_counts", local_rank, trace_equal_plan.count, trace_equal_plan.offset);
+        const FinalExchangePlan trace_less_plan = make_final_exchange_plan(less_counts.data(), world_size);
+        const FinalExchangePlan trace_equal_plan = make_final_exchange_plan(equal_counts.data(), world_size);
+        log_final_exchange_counts("less_counts", local_rank, trace_less_plan);
+        log_final_exchange_counts("equal_counts", local_rank, trace_equal_plan);
 #endif
-        const std::uint32_t candidate_capacity = static_cast<std::uint32_t>(
-            (plan.frontier_states * sizeof(State128)) / sizeof(CandidateMeta));
-        CandidateMeta* selected_device = reinterpret_cast<CandidateMeta*>(memory.final.next_frontier_states_tmp);
+        const std::uint32_t candidate_capacity =
+            static_cast<std::uint32_t>(plan.final_selected_candidate_capacity);
+        CandidateMeta* selected_device = memory.final.final_selected_buffer;
+        if (selected_device == nullptr) {
+            throw std::runtime_error("multi rank final selected buffer is missing");
+        }
         final_filter_load_balance_exact_cuda(
             memory.streams.survivor_shard,
             memory.streams.clean_count,
@@ -3039,248 +2990,411 @@ FinalizeDepthState finalize_depth_single_gpu(
         if (selected_count > candidate_capacity) {
             throw std::runtime_error("final selected count exceeds candidate capacity");
         }
-        std::vector<CandidateMeta> selected(selected_count);
-        if (selected_count != 0U) {
-            check_cuda(cudaMemcpy(
-                selected.data(),
-                selected_device,
-                static_cast<std::uint64_t>(selected_count) * sizeof(CandidateMeta),
-                cudaMemcpyDeviceToHost), "cudaMemcpy final selected candidates");
+
+        std::uint64_t running_equal_prefix = 0;
+        std::uint32_t max_selected_count = 0;
+        for (std::uint32_t rank = 0; rank < world_size; ++rank) {
+            const std::uint64_t equal_global_begin = global_less + running_equal_prefix;
+            const std::uint64_t equal_room =
+                global_keep_count > equal_global_begin ? global_keep_count - equal_global_begin : 0ULL;
+            const std::uint64_t selected_equal =
+                std::min<std::uint64_t>(equal_counts[rank], equal_room);
+            const std::uint64_t selected_for_rank =
+                static_cast<std::uint64_t>(less_counts[rank]) + selected_equal;
+            if (selected_for_rank > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+                throw std::runtime_error("final selected count exceeds uint32 range");
+            }
+            max_selected_count = std::max(max_selected_count, static_cast<std::uint32_t>(selected_for_rank));
+            running_equal_prefix += equal_counts[rank];
+        }
+        if (selected_count !=
+            less_counts[local_rank] + static_cast<std::uint32_t>(std::min<std::uint64_t>(
+                equal_counts[local_rank],
+                global_keep_count > global_less + equal_prefix
+                    ? global_keep_count - (global_less + equal_prefix)
+                    : 0ULL))) {
+            throw std::runtime_error("final selected count does not match score phase counts");
         }
 
-        std::vector<std::uint32_t> history_count(world_size, 0U);
-        std::vector<std::uint32_t> request_count(world_size, 0U);
-        std::uint64_t less_seen = 0;
-        std::uint64_t equal_seen = 0;
-        for (const CandidateMeta& candidate : selected) {
-            const bool less = candidate.score_key < final_threshold;
-            const std::uint64_t global_idx = less
-                ? less_prefix + less_seen++
-                : global_less + equal_prefix + equal_seen++;
-            if (global_idx >= global_keep_count || global_keep_count == 0ULL) {
-                continue;
-            }
-            const std::uint32_t target_rank = target_rank_for_global(global_idx, global_keep_count);
-            const std::uint32_t source_rank = unpack_source_rank(candidate.route_packed);
-            if (source_rank >= world_size) {
-                throw std::runtime_error("final candidate source rank exceeds WORLD_SIZE");
-            }
-            ++history_count[target_rank];
-            ++request_count[source_rank];
+        const std::uint64_t local_target_begin =
+            ceil_div_local(static_cast<std::uint64_t>(local_rank) * global_keep_count, world_size);
+        const std::uint64_t local_target_end =
+            ceil_div_local(static_cast<std::uint64_t>(local_rank + 1U) * global_keep_count, world_size);
+        const std::uint32_t local_target_count =
+            static_cast<std::uint32_t>(local_target_end - local_target_begin);
+        if (local_target_count > plan.frontier_states) {
+            throw std::runtime_error("final target count exceeds local frontier capacity");
         }
-        const FinalExchangePlan history_plan = make_final_exchange_plan(history_count);
-        const FinalExchangePlan request_plan = make_final_exchange_plan(request_count);
+        if (history_host_buffer != nullptr && local_target_count > history_host_capacity) {
+            throw std::runtime_error("history host buffer capacity is smaller than local final target count");
+        }
+
+        const std::uint32_t chunk_capacity =
+            static_cast<std::uint32_t>(plan.final_materialize_chunk_capacity);
+        const std::uint32_t exchange_capacity =
+            static_cast<std::uint32_t>(plan.final_materialize_exchange_capacity);
+        const std::uint32_t slot_count = plan.final_materialize_slot_count;
+        if (chunk_capacity == 0U || exchange_capacity == 0U || slot_count != 3U) {
+            throw std::runtime_error("final materialize static slot layout is invalid");
+        }
+        ensure_final_slot_events(streams);
+        const std::uint32_t global_chunk_rounds =
+            static_cast<std::uint32_t>((static_cast<std::uint64_t>(max_selected_count) + chunk_capacity - 1ULL) /
+                                       chunk_capacity);
+        std::uint32_t history_recv_total_all = 0;
+        std::uint32_t request_work_total_all = 0;
+        std::uint32_t response_recv_total_all = 0;
+
+        auto fill_target_plan_for_chunk = [&](std::uint32_t chunk_begin, std::uint32_t chunk_count) {
+            std::array<std::uint32_t, kFinalExchangeMaxWorldSize> counts{};
+            auto add_global_range = [&](std::uint64_t begin, std::uint64_t end) {
+                if (end <= begin) {
+                    return;
+                }
+                for (std::uint32_t rank = 0; rank < world_size; ++rank) {
+                    const std::uint64_t rank_begin =
+                        ceil_div_local(static_cast<std::uint64_t>(rank) * global_keep_count, world_size);
+                    const std::uint64_t rank_end =
+                        ceil_div_local(static_cast<std::uint64_t>(rank + 1U) * global_keep_count, world_size);
+                    const std::uint64_t overlap_begin = std::max(begin, rank_begin);
+                    const std::uint64_t overlap_end = std::min(end, rank_end);
+                    if (overlap_end > overlap_begin) {
+                        counts[rank] += static_cast<std::uint32_t>(overlap_end - overlap_begin);
+                    }
+                }
+            };
+            const std::uint32_t chunk_end = chunk_begin + chunk_count;
+            const std::uint32_t local_less_count = less_counts[local_rank];
+            if (chunk_begin < local_less_count) {
+                const std::uint32_t less_end = std::min(chunk_end, local_less_count);
+                add_global_range(less_prefix + chunk_begin, less_prefix + less_end);
+            }
+            if (chunk_end > local_less_count) {
+                const std::uint32_t equal_begin_local = std::max(chunk_begin, local_less_count);
+                const std::uint32_t equal_end_local = chunk_end;
+                add_global_range(
+                    global_less + equal_prefix + static_cast<std::uint64_t>(equal_begin_local - local_less_count),
+                    global_less + equal_prefix + static_cast<std::uint64_t>(equal_end_local - local_less_count));
+            }
+            return make_final_exchange_plan(counts.data(), world_size);
+        };
+
+        auto make_device_count_plan = [&](const char* label, std::uint32_t item_count) {
+            FinalExchangePlan plan_from_device{};
+            plan_from_device.size = world_size;
+            plan_from_device.total = item_count;
+            check_cuda(cudaMemcpy(
+                plan_from_device.count.data(),
+                memory.final.final_send_count,
+                static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy final chunk counts");
+            check_cuda(cudaMemcpy(
+                plan_from_device.offset.data(),
+                memory.final.final_send_offset,
+                (static_cast<std::uint64_t>(world_size) + 1ULL) * sizeof(std::uint32_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy final chunk offsets");
+#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
+            log_final_exchange_counts(label, local_rank, plan_from_device);
+#endif
+            return plan_from_device;
+        };
+
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         std::cout << "final_exchange_trace"
                   << " rank=" << local_rank
                   << " label=selected_summary"
                   << " selected_count=" << selected_count
-                  << " history_send_total=" << history_plan.total
-                  << " request_send_total=" << request_plan.total
+                  << " global_chunk_rounds=" << global_chunk_rounds
+                  << " chunk_capacity=" << chunk_capacity
+                  << " exchange_capacity=" << exchange_capacity
                   << "\n";
-        log_final_exchange_counts("history_send_counts", local_rank, history_plan.count, history_plan.offset);
-        log_final_exchange_counts("request_send_counts", local_rank, request_plan.count, request_plan.offset);
-#endif
-        std::vector<std::uint32_t> history_cursor = history_plan.offset;
-        std::vector<std::uint32_t> request_cursor = request_plan.offset;
-        std::vector<FinalHistoryRecord> history_send(history_plan.total);
-        std::vector<FinalRequest> request_send(request_plan.total);
-        less_seen = 0;
-        equal_seen = 0;
-        for (std::uint32_t selected_index = 0; selected_index < selected_count; ++selected_index) {
-            const CandidateMeta& candidate = selected[selected_index];
-            const bool less = candidate.score_key < final_threshold;
-            const std::uint64_t global_idx = less
-                ? less_prefix + less_seen++
-                : global_less + equal_prefix + equal_seen++;
-            if (global_idx >= global_keep_count || global_keep_count == 0ULL) {
-                continue;
-            }
-            const std::uint32_t target_rank = target_rank_for_global(global_idx, global_keep_count);
-            const std::uint64_t target_begin =
-                ceil_div_local(static_cast<std::uint64_t>(target_rank) * global_keep_count, world_size);
-            const std::uint32_t target_local_idx = static_cast<std::uint32_t>(global_idx - target_begin);
-            const std::uint32_t source_rank = unpack_source_rank(candidate.route_packed);
-#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
-            if (selected_index < 8U || selected_count - selected_index <= 4U) {
-                log_final_exchange_candidate(
-                    "selected",
-                    local_rank,
-                    selected_index,
-                    candidate,
-                    target_rank,
-                    global_idx);
-            } else if (selected_index == 8U) {
-                std::cout << "final_exchange_trace_candidate_gap"
-                          << " rank=" << local_rank
-                          << " label=selected"
-                          << " skipped=" << (selected_count > 12U ? selected_count - 12U : 0U)
-                          << "\n";
-            }
-#endif
-            history_send[history_cursor[target_rank]++] =
-                FinalHistoryRecord{candidate, target_local_idx, 0U, {0ULL, 0ULL, 0ULL}};
-            FinalRequest request{};
-            request.parent_idx = candidate.parent_idx;
-            request.target_local_idx = target_local_idx;
-            request.return_rank = static_cast<std::uint16_t>(target_rank);
-            request.move = unpack_move(candidate.route_packed);
-            request_send[request_cursor[source_rank]++] = request;
-        }
-#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
-        log_final_exchange_requests("request_send", local_rank, request_send);
 #endif
 
-        const std::uint32_t history_record_capacity = static_cast<std::uint32_t>(
-            (plan.frontier_states * sizeof(FinalResponse)) / sizeof(FinalHistoryRecord));
-        std::uint32_t history_recv_total = 0;
-        std::vector<FinalHistoryRecord> history_recv(history_record_capacity);
-        exchange_u64_items(
-            "history",
-            history_send.data(),
-            history_plan,
-            memory.final.final_response_buffer,
-            history_record_capacity,
-            memory.final.next_frontier_states_tmp,
-            history_record_capacity,
-            static_cast<std::uint32_t>(sizeof(FinalHistoryRecord) / sizeof(std::uint64_t)),
-            history_recv.data(),
-            history_recv_total);
-        if (history_recv_total > history_record_capacity) {
-            throw std::runtime_error("history recv total exceeds host capacity");
+        std::array<bool, 3> slot_response_pending{};
+        std::array<std::uint32_t, 3> slot_response_recv_total{};
+        const auto drain_response_slot = [&](std::uint32_t slot) {
+            if (!slot_response_pending[slot]) {
+                return;
+            }
+            const std::uint64_t slot_exchange_offset =
+                static_cast<std::uint64_t>(slot) * exchange_capacity;
+            FinalResponse* response_recv_slot =
+                memory.final.final_mat_response_recv + slot_exchange_offset;
+            check_cuda(
+                cudaStreamWaitEvent(streams.stream3, streams.final_response_done[slot], 0),
+                "cudaStreamWaitEvent final response exchange done");
+            if (slot_response_recv_total[slot] != 0U) {
+                final_scatter_responses_cuda(
+                    response_recv_slot,
+                    memory.final.next_frontier_states_tmp,
+                    slot_response_recv_total[slot],
+                    streams.stream3);
+            }
+            response_recv_total_all += slot_response_recv_total[slot];
+            slot_response_recv_total[slot] = 0U;
+            slot_response_pending[slot] = false;
+        };
+
+        for (std::uint32_t round = 0; round < global_chunk_rounds; ++round) {
+            const std::uint32_t slot = round % slot_count;
+            drain_response_slot(slot);
+            const std::uint32_t chunk_begin = round * chunk_capacity;
+            const std::uint32_t chunk_count =
+                chunk_begin < selected_count ? std::min(chunk_capacity, selected_count - chunk_begin) : 0U;
+            const std::uint64_t slot_exchange_offset =
+                static_cast<std::uint64_t>(slot) * exchange_capacity;
+            const std::uint64_t slot_chunk_offset =
+                static_cast<std::uint64_t>(slot) * chunk_capacity;
+            std::uint32_t* key_a = memory.final.final_mat_key_a + slot_exchange_offset;
+            std::uint32_t* key_b = memory.final.final_mat_key_b + slot_exchange_offset;
+            FinalRequest* request_a = memory.final.final_mat_request_a + slot_exchange_offset;
+            FinalRequest* request_b = memory.final.final_mat_request_b + slot_exchange_offset;
+            FinalRequest* request_recv_slot = memory.final.final_mat_request_recv + slot_exchange_offset;
+            FinalResponse* response_send_slot = memory.final.final_mat_response_send + slot_exchange_offset;
+            FinalResponse* response_recv_slot = memory.final.final_mat_response_recv + slot_exchange_offset;
+            FinalHistoryRecord* history_send_slot = memory.final.final_mat_history_send + slot_chunk_offset;
+            FinalHistoryRecord* history_recv_slot = memory.final.final_mat_history_recv + slot_exchange_offset;
+
+            if (chunk_count != 0U) {
+                final_build_materialize_chunk_cuda(
+                    selected_device,
+                    chunk_begin,
+                    chunk_count,
+                    less_counts[local_rank],
+                    less_prefix,
+                    global_less,
+                    equal_prefix,
+                    global_keep_count,
+                    local_rank,
+                    world_size,
+                    key_a,
+                    request_a,
+                    history_send_slot,
+                    streams.stream3);
+            }
+            check_cuda(
+                cudaEventRecord(streams.final_build_done[slot], streams.stream3),
+                "cudaEventRecord final chunk build done");
+            check_cuda(
+                cudaStreamWaitEvent(streams.stream5, streams.final_build_done[slot], 0),
+                "cudaStreamWaitEvent final chunk build done");
+
+            const FinalExchangePlan history_plan = fill_target_plan_for_chunk(chunk_begin, chunk_count);
+            std::uint32_t history_recv_total = 0;
+            exchange_u64_items(
+                "history_chunk",
+                nullptr,
+                history_plan,
+                history_send_slot,
+                chunk_capacity,
+                history_recv_slot,
+                exchange_capacity,
+                static_cast<std::uint32_t>(sizeof(FinalHistoryRecord) / sizeof(std::uint64_t)),
+                nullptr,
+                streams.final_history_done[slot],
+                history_recv_total);
+            history_recv_total_all += history_recv_total;
+
+            if (chunk_count != 0U) {
+                final_sort_requests_by_key_cuda(
+                    key_a,
+                    key_b,
+                    request_a,
+                    request_b,
+                    chunk_count,
+                    memory.final.final_mat_cub_temp,
+                    memory.final.final_mat_cub_temp_bytes,
+                    streams.stream3);
+                final_count_sorted_rank_keys_cuda(
+                    key_b,
+                    chunk_count,
+                    memory.final.final_send_count,
+                    memory.final.final_send_offset,
+                    world_size,
+                    streams.stream3);
+            } else {
+                check_cuda(cudaMemsetAsync(
+                    memory.final.final_send_count,
+                    0,
+                    static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
+                    streams.stream3), "cudaMemsetAsync zero source counts");
+                check_cuda(cudaMemsetAsync(
+                    memory.final.final_send_offset,
+                    0,
+                    (static_cast<std::uint64_t>(world_size) + 1ULL) * sizeof(std::uint32_t),
+                    streams.stream3), "cudaMemsetAsync zero source offsets");
+            }
+            check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final request grouping");
+
+            FinalExchangePlan request_plan = make_device_count_plan("request_chunk_send_counts", chunk_count);
+            const std::uint32_t local_source_count = request_plan.count[local_rank];
+            const std::uint32_t local_source_offset = request_plan.offset[local_rank];
+            request_plan.count[local_rank] = 0U;
+            std::uint32_t request_recv_total = 0;
+            exchange_u64_items(
+                "request_chunk",
+                nullptr,
+                request_plan,
+                request_b,
+                exchange_capacity,
+                request_recv_slot,
+                exchange_capacity,
+                static_cast<std::uint32_t>(sizeof(FinalRequest) / sizeof(std::uint64_t)),
+                nullptr,
+                streams.final_request_done[slot],
+                request_recv_total);
+            if (static_cast<std::uint64_t>(local_source_count) + request_recv_total > exchange_capacity) {
+                throw std::runtime_error("final response work chunk exceeds static capacity");
+            }
+            check_cuda(
+                cudaStreamWaitEvent(streams.stream3, streams.final_history_done[slot], 0),
+                "cudaStreamWaitEvent final history exchange done");
+            if (history_recv_total != 0U) {
+                final_scatter_history_records_cuda(
+                    history_recv_slot,
+                    memory.final.final_candidate_buffer,
+                    history_recv_total,
+                    streams.stream3);
+            }
+            if (local_source_count != 0U) {
+                check_cuda(cudaMemcpyAsync(
+                    request_a,
+                    request_b + local_source_offset,
+                    static_cast<std::uint64_t>(local_source_count) * sizeof(FinalRequest),
+                    cudaMemcpyDeviceToDevice,
+                    streams.stream3), "cudaMemcpyAsync local source requests to response work");
+            }
+            check_cuda(
+                cudaStreamWaitEvent(streams.stream3, streams.final_request_done[slot], 0),
+                "cudaStreamWaitEvent final request exchange done");
+            if (request_recv_total != 0U) {
+                check_cuda(cudaMemcpyAsync(
+                    request_a + local_source_count,
+                    request_recv_slot,
+                    static_cast<std::uint64_t>(request_recv_total) * sizeof(FinalRequest),
+                    cudaMemcpyDeviceToDevice,
+                    streams.stream3), "cudaMemcpyAsync remote requests to response work");
+            }
+            const std::uint32_t response_work_count = local_source_count + request_recv_total;
+            request_work_total_all += response_work_count;
+            if (response_work_count != 0U) {
+                final_build_return_rank_keys_cuda(request_a, key_a, response_work_count, streams.stream3);
+                final_sort_requests_by_key_cuda(
+                    key_a,
+                    key_b,
+                    request_a,
+                    request_b,
+                    response_work_count,
+                    memory.final.final_mat_cub_temp,
+                    memory.final.final_mat_cub_temp_bytes,
+                    streams.stream3);
+                final_count_sorted_rank_keys_cuda(
+                    key_b,
+                    response_work_count,
+                    memory.final.final_send_count,
+                    memory.final.final_send_offset,
+                    world_size,
+                    streams.stream3);
+            } else {
+                check_cuda(cudaMemsetAsync(
+                    memory.final.final_send_count,
+                    0,
+                    static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
+                    streams.stream3), "cudaMemsetAsync zero response counts");
+                check_cuda(cudaMemsetAsync(
+                    memory.final.final_send_offset,
+                    0,
+                    (static_cast<std::uint64_t>(world_size) + 1ULL) * sizeof(std::uint32_t),
+                    streams.stream3), "cudaMemsetAsync zero response offsets");
+            }
+            check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final response grouping");
+            FinalExchangePlan response_plan = make_device_count_plan("response_chunk_send_counts", response_work_count);
+            const std::uint32_t local_return_count = response_plan.count[local_rank];
+            const std::uint32_t local_return_offset = response_plan.offset[local_rank];
+            if (local_return_count != 0U) {
+                final_materialize_cuda(
+                    memory.current_frontier_states,
+                    request_b + local_return_offset,
+                    tables.generators,
+                    nullptr,
+                    memory.final.next_frontier_states_tmp,
+                    local_return_count,
+                    streams.stream3);
+            }
+            response_recv_total_all += local_return_count;
+            response_plan.count[local_rank] = 0U;
+            for (std::uint32_t peer = 0; peer < world_size; ++peer) {
+                if (peer == local_rank || response_plan.count[peer] == 0U) {
+                    continue;
+                }
+                final_materialize_responses_cuda(
+                    memory.current_frontier_states,
+                    request_b + response_plan.offset[peer],
+                    tables.generators,
+                    response_send_slot + response_plan.offset[peer],
+                    response_plan.count[peer],
+                    streams.stream3);
+            }
+            check_cuda(
+                cudaEventRecord(streams.final_response_ready[slot], streams.stream3),
+                "cudaEventRecord final response ready");
+            check_cuda(
+                cudaStreamWaitEvent(streams.stream5, streams.final_response_ready[slot], 0),
+                "cudaStreamWaitEvent final response ready");
+            std::uint32_t response_recv_total = 0;
+            exchange_u64_items(
+                "response_chunk",
+                nullptr,
+                response_plan,
+                response_send_slot,
+                exchange_capacity,
+                response_recv_slot,
+                exchange_capacity,
+                static_cast<std::uint32_t>(sizeof(FinalResponse) / sizeof(std::uint64_t)),
+                nullptr,
+                streams.final_response_done[slot],
+                response_recv_total);
+            slot_response_recv_total[slot] = response_recv_total;
+            slot_response_pending[slot] = true;
         }
+        for (std::uint32_t slot = 0; slot < slot_count; ++slot) {
+            drain_response_slot(slot);
+        }
+
+        if (history_recv_total_all != local_target_count) {
+            throw std::runtime_error("history recv count does not match local final target count");
+        }
+        if (response_recv_total_all != local_target_count) {
+            throw std::runtime_error("response recv count does not match local final target count");
+        }
+        check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final chunk pipeline before history copy");
         if (history_host_buffer != nullptr) {
             if (history_stream == nullptr || history_copy_done == nullptr) {
                 throw std::invalid_argument("history copy requires history stream and completion event");
             }
-            if (history_recv_total > history_host_capacity) {
-                throw std::runtime_error("history host buffer capacity is smaller than received history count");
-            }
-            for (std::uint32_t i = 0; i < history_recv_total; ++i) {
-                if (history_recv[i].target_local_idx >= history_host_capacity) {
-                    throw std::runtime_error("history target local index exceeds host capacity");
-                }
-                history_host_buffer[history_recv[i].target_local_idx] = history_recv[i].meta;
+            if (local_target_count != 0U) {
+                check_cuda(cudaMemcpyAsync(
+                    history_host_buffer,
+                    memory.final.final_candidate_buffer,
+                    static_cast<std::uint64_t>(local_target_count) * sizeof(CandidateMeta),
+                    cudaMemcpyDeviceToHost,
+                    history_stream), "cudaMemcpyAsync final candidates to host history");
             }
             check_cuda(cudaEventRecord(history_copy_done, history_stream), "cudaEventRecord history copy done");
         }
-
-        const std::uint32_t request_device_capacity =
-            static_cast<std::uint32_t>(plan.frontier_states);
-        std::uint32_t request_recv_total = 0;
-        std::vector<FinalRequest> request_recv(static_cast<std::uint64_t>(plan.frontier_states) * 2ULL);
-        exchange_u64_items(
-            "request",
-            request_send.data(),
-            request_plan,
-            memory.final.next_frontier_states_tmp,
-            static_cast<std::uint32_t>((plan.frontier_states * sizeof(State128)) / sizeof(FinalRequest)),
-            memory.final.final_candidate_buffer,
-            static_cast<std::uint32_t>((plan.frontier_states * sizeof(CandidateMeta)) / sizeof(FinalRequest)),
-            static_cast<std::uint32_t>(sizeof(FinalRequest) / sizeof(std::uint64_t)),
-            request_recv.data(),
-            request_recv_total);
-        if (request_recv_total > request_recv.size()) {
-            throw std::runtime_error("request recv total exceeds host capacity");
-        }
-#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
-        std::vector<FinalRequest> request_recv_view(
-            request_recv.begin(),
-            request_recv.begin() + static_cast<std::ptrdiff_t>(request_recv_total));
-        log_final_exchange_requests("request_recv", local_rank, request_recv_view);
-#endif
-
-        std::vector<std::uint32_t> response_count(world_size, 0U);
-        for (std::uint32_t i = 0; i < request_recv_total; ++i) {
-            if (request_recv[i].return_rank >= world_size) {
-#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
-                std::cout << "final_exchange_trace_invalid_request"
-                          << " rank=" << local_rank
-                          << " index=" << i
-                          << " request_recv_total=" << request_recv_total
-                          << " world_size=" << world_size
-                          << " parent_idx=" << request_recv[i].parent_idx
-                          << " target_local_idx=" << request_recv[i].target_local_idx
-                          << " return_rank=" << request_recv[i].return_rank
-                          << " move=" << static_cast<std::uint32_t>(request_recv[i].move)
-                          << " pad=" << static_cast<std::uint32_t>(request_recv[i].pad)
-                          << "\n";
-#endif
-                throw std::runtime_error("final request return rank exceeds WORLD_SIZE");
-            }
-            ++response_count[request_recv[i].return_rank];
-        }
-        const FinalExchangePlan response_plan = make_final_exchange_plan(response_count);
-#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
-        std::cout << "final_exchange_trace"
-                  << " rank=" << local_rank
-                  << " label=response_summary"
-                  << " request_recv_total=" << request_recv_total
-                  << " response_send_total=" << response_plan.total
-                  << "\n";
-        log_final_exchange_counts("response_send_counts", local_rank, response_plan.count, response_plan.offset);
-#endif
-        if (response_plan.total > request_device_capacity) {
-            throw std::runtime_error("response send request count exceeds device capacity");
-        }
-        std::vector<std::uint32_t> response_cursor = response_plan.offset;
-        std::vector<FinalRequest> response_requests(response_plan.total);
-        for (std::uint32_t i = 0; i < request_recv_total; ++i) {
-            response_requests[response_cursor[request_recv[i].return_rank]++] = request_recv[i];
-        }
-#if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
-        log_final_exchange_requests("response_requests", local_rank, response_requests);
-#endif
-        if (response_plan.total != 0U) {
-            check_cuda(cudaMemcpyAsync(
-                memory.final.final_request_buffer,
-                response_requests.data(),
-                static_cast<std::uint64_t>(response_plan.total) * sizeof(FinalRequest),
-                cudaMemcpyHostToDevice,
-                streams.stream3), "cudaMemcpyAsync response requests to device");
-            final_materialize_responses_cuda(
-                memory.current_frontier_states,
-                memory.final.final_request_buffer,
-                tables.generators,
-                reinterpret_cast<FinalResponse*>(memory.final.next_frontier_states_tmp),
-                response_plan.total,
-                streams.stream3);
-        }
-        check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final response materialize");
-
-        std::uint32_t response_recv_total = 0;
-        exchange_u64_items(
-            "response",
-            nullptr,
-            response_plan,
-            memory.final.next_frontier_states_tmp,
-            request_device_capacity,
-            memory.final.final_response_buffer,
-            request_device_capacity,
-            static_cast<std::uint32_t>(sizeof(FinalResponse) / sizeof(std::uint64_t)),
-            nullptr,
-            response_recv_total);
-        final_scatter_responses_cuda(
-            memory.final.final_response_buffer,
-            memory.final.next_frontier_states_tmp,
-            response_recv_total,
-            streams.stream3);
-        if (history_host_buffer != nullptr && history_recv_total != response_recv_total) {
-            throw std::runtime_error("history recv count does not match response recv count");
-        }
-        if (response_recv_total != 0U) {
+        if (local_target_count != 0U) {
             check_cuda(cudaMemcpyAsync(
                 memory.current_frontier_states,
                 memory.final.next_frontier_states_tmp,
-                static_cast<std::uint64_t>(response_recv_total) * sizeof(State128),
+                static_cast<std::uint64_t>(local_target_count) * sizeof(State128),
                 cudaMemcpyDeviceToDevice,
                 streams.stream3), "cudaMemcpyAsync multi next frontier to current");
         }
         check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize multi final materialize");
 
-        result.final_candidate_count = response_recv_total;
-        result.final_request_count = request_recv_total;
-        result.next_frontier_size = response_recv_total;
+        result.final_candidate_count = local_target_count;
+        result.final_request_count = request_work_total_all;
+        result.next_frontier_size = local_target_count;
 
         check_cuda(cudaMemsetAsync(
             memory.streams.clean_count,
@@ -3411,6 +3525,7 @@ FinalizeDepthState finalize_depth_single_gpu(
             final_request_count,
             current_frontier_size,
             final_request_count,
+            memory.final.final_validation_error,
             streams.stream3);
 #endif
         final_materialize_cuda(

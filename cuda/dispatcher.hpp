@@ -21,6 +21,11 @@ struct DispatcherStreams {
     cudaStream_t stream5 = nullptr;
     std::vector<cudaStream_t> stream4_slot_streams;
     std::vector<cudaEvent_t> stream4_slot_done;
+    std::array<cudaEvent_t, 3> final_build_done{};
+    std::array<cudaEvent_t, 3> final_history_done{};
+    std::array<cudaEvent_t, 3> final_request_done{};
+    std::array<cudaEvent_t, 3> final_response_ready{};
+    std::array<cudaEvent_t, 3> final_response_done{};
 };
 
 struct DispatcherEvents {
