@@ -38,6 +38,7 @@ void stream4_shard_job_device_threshold_cuda(
     std::uint32_t* dirty_count,
     std::uint32_t* processing_flag,
     const std::uint32_t* threshold,
+    const std::uint32_t* threshold_active_index,
     std::uint32_t capacity,
     Hash128* sort_key,
     Hash128* reduce_key,

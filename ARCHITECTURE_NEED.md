@@ -45,6 +45,42 @@ SOLVED_RESULT_CAPACITY
 threshold_initialized
 ```
 
+
+## 2026-05-26 Stream5 threshold update contract
+
+```text
+WORLD_SIZE == 1:
+    threshold scheduling may keep the existing single-GPU host-side periodic path.
+
+WORLD_SIZE > 1:
+    GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS must not drive threshold scheduling.
+    Stream4 remains local and does not call NCCL.
+    Stream4 histogram publication remains per-shard A/B:
+        Stream4 writes inactive shard_score_hist buffer.
+        Stream4 commits shard_score_hist_active_index only after inactive histogram is complete.
+        Stream5 threshold snapshot reads shard_score_hist_active_index, then sums the selected A/B buffers.
+    Stream5 owns threshold collective communication.
+    Each rank publishes threshold_request_local as a service field after enough completed local Stream4 work.
+    Every rank participates in threshold request reduction at Stream5 exchange points.
+    Collective request reduction:
+        threshold_request_global = ncclAllReduceMax(threshold_request_local)
+    If threshold_request_global != 0:
+        every rank builds local_score_hist from committed Stream4 histogram A/B buffers.
+        every rank participates in NCCL SUM local_score_hist -> global_score_hist.
+        every rank computes monotonic current_threshold.
+        every rank resets its local processed-work threshold counter.
+
+current_threshold publication:
+    current_threshold has two slots.
+    threshold_initialized has two slots.
+    current_threshold_active_index selects the committed slot.
+    Stream5 writes inactive current_threshold slot first.
+    Stream5 writes inactive threshold_initialized slot second.
+    Stream5 commits current_threshold_active_index after device memory fence.
+    Stream3 reads current_threshold[current_threshold_active_index & 1].
+    Stream4 reads current_threshold[current_threshold_active_index & 1].
+    No new atomic operations are allowed in threshold publication or request fields.
+```
 ```text
 STATE_LEN = 120
 STATE_STORAGE_LEN = 128

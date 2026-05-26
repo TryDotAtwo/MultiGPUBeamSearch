@@ -36,6 +36,27 @@ inline constexpr std::array<std::uint32_t, 4> STREAM1_CONCURRENCY_SWEEP{1, 2, 3,
 inline constexpr std::array<std::uint32_t, 6> STREAM4_BATCH_SWEEP{196608, 262144, 393216, 524288, 699392, 1048576};
 inline constexpr std::array<std::uint32_t, 4> STREAM4_SHARD_CAPACITY_SWEEP{1048576, 2621440, 5242880, 10485760};
 
+void publish_threshold_for_benchmark(StaticDeviceMemory& memory, std::uint32_t threshold) {
+    const std::uint32_t thresholds[2]{threshold, threshold};
+    const std::uint32_t initialized[2]{1U, 1U};
+    const std::uint32_t active = 0;
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        memory.streams.current_threshold,
+        thresholds,
+        sizeof(thresholds),
+        cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        memory.streams.threshold_initialized,
+        initialized,
+        sizeof(initialized),
+        cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        memory.streams.current_threshold_active_index,
+        &active,
+        sizeof(active),
+        cudaMemcpyHostToDevice));
+}
+
 std::uint64_t parse_u64(const char* text, const char* name) {
     char* end = nullptr;
     const unsigned long long value = std::strtoull(text, &end, 10);
@@ -616,7 +637,7 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
         BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.parent_base, host_parent_base.data(), ring_slot_count * sizeof(std::uint64_t), cudaMemcpyHostToDevice));
         BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.count, host_count.data(), ring_slot_count * sizeof(std::uint32_t), cudaMemcpyHostToDevice));
         const std::uint32_t threshold = SCORE_MAX_KEY;
-        BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.current_threshold, &threshold, sizeof(threshold), cudaMemcpyHostToDevice));
+        publish_threshold_for_benchmark(memory, threshold);
         const float ms = time_gpu_ms(streams, 3, [&]() {
             BEAM_CUDA_CHECK(cudaMemsetAsync(memory.streams.clean_count, 0, config.shard_count * sizeof(std::uint32_t), streams[0]));
             BEAM_CUDA_CHECK(cudaMemsetAsync(memory.streams.dirty_count, 0, config.shard_count * sizeof(std::uint32_t), streams[0]));
@@ -641,6 +662,7 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
                 memory.streams.stream3_cub_temp,
                 memory.streams.stream3_cub_temp_bytes,
                 memory.streams.current_threshold,
+                memory.streams.current_threshold_active_index,
                 b_micro,
                 candidate_count,
                 streams[0]);
@@ -733,7 +755,7 @@ std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
             BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.survivor_shard, host.data(), capacity * sizeof(CandidateMeta), cudaMemcpyHostToDevice));
             BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.clean_count, &clean_count, sizeof(clean_count), cudaMemcpyHostToDevice));
             BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.dirty_count, &dirty_count, sizeof(dirty_count), cudaMemcpyHostToDevice));
-            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.current_threshold, &threshold, sizeof(threshold), cudaMemcpyHostToDevice));
+            publish_threshold_for_benchmark(memory, threshold);
             BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.processing_flag, &processing_flag, sizeof(processing_flag), cudaMemcpyHostToDevice));
             auto launch_stream4 = [&]() {
                 stream4_shard_job_device_threshold_cuda(
@@ -742,6 +764,7 @@ std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
                     memory.streams.dirty_count,
                     memory.streams.processing_flag,
                     memory.streams.current_threshold,
+                    memory.streams.current_threshold_active_index,
                     capacity,
                     memory.streams.stream4_key_a,
                     memory.streams.stream4_key_b,
@@ -767,7 +790,7 @@ std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
             BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.survivor_shard, host.data(), capacity * sizeof(CandidateMeta), cudaMemcpyHostToDevice));
             BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.clean_count, &clean_count, sizeof(clean_count), cudaMemcpyHostToDevice));
             BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.dirty_count, &dirty_count, sizeof(dirty_count), cudaMemcpyHostToDevice));
-            BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.current_threshold, &threshold, sizeof(threshold), cudaMemcpyHostToDevice));
+            publish_threshold_for_benchmark(memory, threshold);
             BEAM_CUDA_CHECK(cudaMemcpy(memory.streams.processing_flag, &processing_flag, sizeof(processing_flag), cudaMemcpyHostToDevice));
             const float ms = time_single_stream_ms(streams[0], launch_stream4);
             const double shard_items_per_sec =

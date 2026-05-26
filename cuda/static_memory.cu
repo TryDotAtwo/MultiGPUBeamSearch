@@ -657,8 +657,11 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.threshold_hist_active_snapshot = streams.take<std::uint32_t>(plan.storage_shard_count);
     memory.streams.local_score_hist = streams.take<std::uint64_t>(SCORE_BIN_COUNT);
     memory.streams.global_score_hist = streams.take<std::uint64_t>(SCORE_BIN_COUNT);
-    memory.streams.current_threshold = streams.take<std::uint32_t>(1);
-    memory.streams.threshold_initialized = streams.take<std::uint32_t>(1);
+    memory.streams.current_threshold = streams.take<std::uint32_t>(2);
+    memory.streams.threshold_initialized = streams.take<std::uint32_t>(2);
+    memory.streams.current_threshold_active_index = streams.take<std::uint32_t>(1);
+    memory.streams.threshold_request_local = streams.take<std::uint32_t>(1);
+    memory.streams.threshold_request_global = streams.take<std::uint32_t>(1);
 
     Cursor final{reinterpret_cast<std::byte*>(memory.scratch_pool), 0};
     memory.final.next_frontier_states_tmp = final.take<State128>(plan.frontier_states, alignof(CandidateMeta));

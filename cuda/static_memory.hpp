@@ -116,6 +116,9 @@ struct LayoutStreamsView {
     std::uint64_t* global_score_hist = nullptr;
     std::uint32_t* current_threshold = nullptr;
     std::uint32_t* threshold_initialized = nullptr;
+    std::uint32_t* current_threshold_active_index = nullptr;
+    std::uint32_t* threshold_request_local = nullptr;
+    std::uint32_t* threshold_request_global = nullptr;
 };
 
 struct LayoutFinalView {

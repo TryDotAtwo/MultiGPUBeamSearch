@@ -534,15 +534,34 @@ void update_threshold_global(
             memory.streams.global_score_hist,
             memory.streams.current_threshold,
             memory.streams.threshold_initialized,
+            memory.streams.current_threshold_active_index,
             threshold_width,
             stream);
     } else {
         threshold_select_cuda(
             memory.streams.global_score_hist,
             memory.streams.current_threshold,
+            memory.streams.threshold_initialized,
+            memory.streams.current_threshold_active_index,
             threshold_width,
             stream);
     }
+}
+
+std::uint32_t read_committed_threshold_host(const StaticDeviceMemory& memory, const char* op) {
+    std::uint32_t active = 0;
+    std::uint32_t threshold = UINT32_THRESHOLD_MAX;
+    check_cuda(cudaMemcpy(
+        &active,
+        memory.streams.current_threshold_active_index,
+        sizeof(active),
+        cudaMemcpyDeviceToHost), op);
+    check_cuda(cudaMemcpy(
+        &threshold,
+        memory.streams.current_threshold + (active & 1U),
+        sizeof(threshold),
+        cudaMemcpyDeviceToHost), op);
+    return threshold;
 }
 
 } // namespace
@@ -696,6 +715,7 @@ void instantiate_cuda_graph_job_templates(
             memory.streams.stream3_cub_temp,
             memory.streams.stream3_cub_temp_bytes,
             memory.streams.current_threshold,
+            memory.streams.current_threshold_active_index,
             plan.config.b_micro,
             plan.config.stream3_batch_candidates,
             streams.stream3);
@@ -870,6 +890,7 @@ void instantiate_cuda_graph_job_templates(
                 memory.streams.dirty_count + shard,
                 memory.streams.processing_flag + shard,
                 memory.streams.current_threshold,
+                memory.streams.current_threshold_active_index,
                 stream4_capacity,
                 memory.streams.stream4_key_a + slot_candidate_offset,
                 memory.streams.stream4_key_b + slot_candidate_offset,
@@ -1396,13 +1417,7 @@ DepthDispatchState run_depth_cuda_graphs(
     };
 
     const auto read_current_threshold_host = [&]() -> std::uint32_t {
-        std::uint32_t threshold = UINT32_THRESHOLD_MAX;
-        check_cuda(cudaMemcpy(
-            &threshold,
-            memory.streams.current_threshold,
-            sizeof(threshold),
-            cudaMemcpyDeviceToHost), "cudaMemcpy tracked stream4 threshold");
-        return threshold;
+        return read_committed_threshold_host(memory, "cudaMemcpy tracked stream4 threshold");
     };
 
     const auto scan_candidate_array_for_hash = [&](
@@ -1941,8 +1956,79 @@ DepthDispatchState run_depth_cuda_graphs(
     };
 
     const auto periodic_threshold_due = [&]() -> bool {
-        return plan.config.global_threshold_update_period_shards != 0 &&
-            stream4_jobs_since_threshold_update >= plan.config.global_threshold_update_period_shards;
+        const std::uint32_t local_period =
+            multi_rank
+                ? std::max(1U, plan.storage_shard_count)
+                : plan.config.global_threshold_update_period_shards;
+        return local_period != 0U && stream4_jobs_since_threshold_update >= local_period;
+    };
+
+    const auto maybe_run_stream5_threshold_update = [&](bool force_local_request) -> bool {
+        if (!multi_rank) {
+            return false;
+        }
+        const std::uint32_t local_request =
+            (force_local_request || periodic_threshold_due()) ? 1U : 0U;
+        std::uint32_t global_request = 0;
+        check_cuda(cudaMemcpyAsync(
+            memory.streams.threshold_request_local,
+            &local_request,
+            sizeof(local_request),
+            cudaMemcpyHostToDevice,
+            streams.stream5), "cudaMemcpyAsync stream5 threshold local request");
+        check_nccl_dispatcher(
+            ncclAllReduce(
+                memory.streams.threshold_request_local,
+                memory.streams.threshold_request_global,
+                1,
+                ncclUint32,
+                ncclMax,
+                collective->comm,
+                streams.stream5),
+            "ncclAllReduce stream5 threshold request");
+        check_cuda(cudaMemcpyAsync(
+            &global_request,
+            memory.streams.threshold_request_global,
+            sizeof(global_request),
+            cudaMemcpyDeviceToHost,
+            streams.stream5), "cudaMemcpyAsync stream5 threshold global request");
+        check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 threshold request");
+        if (global_request == 0U) {
+            return false;
+        }
+#if BEAM_DEBUG_STREAM_TIMING
+        check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 threshold timing start");
+#endif
+        update_threshold_global(plan, memory, streams.stream5, true, collective, false);
+#if BEAM_DEBUG_STREAM_TIMING
+        check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 threshold timing stop");
+#endif
+        check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 threshold update");
+#if BEAM_DEBUG_STREAM_TIMING
+        accumulate_elapsed_ms(
+            stream5_timing_start[0],
+            stream5_timing_stop[0],
+            state.stream5_ms_total,
+            nullptr,
+            "cudaEventElapsedTime stream5 threshold");
+#endif
+        ++state.threshold_updates;
+        stream4_jobs_since_threshold_update = 0;
+        const std::uint32_t zero = 0;
+        check_cuda(cudaMemcpyAsync(
+            memory.streams.threshold_request_local,
+            &zero,
+            sizeof(zero),
+            cudaMemcpyHostToDevice,
+            streams.stream5), "cudaMemcpyAsync clear stream5 threshold local request");
+        check_cuda(cudaMemcpyAsync(
+            memory.streams.threshold_request_global,
+            &zero,
+            sizeof(zero),
+            cudaMemcpyHostToDevice,
+            streams.stream5), "cudaMemcpyAsync clear stream5 threshold global request");
+        check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize clear stream5 threshold request");
+        return true;
     };
 
     std::uint64_t completed_exchange_rounds = 0;
@@ -2051,6 +2137,8 @@ DepthDispatchState run_depth_cuda_graphs(
             nullptr,
             "cudaEventElapsedTime stream5 exchange");
 #endif
+        release_completed_stream4_slots_nonblocking();
+        maybe_run_stream5_threshold_update(false);
         if (recv_total_64 != 0ULL) {
             stream3_collect_remote_recv_cuda(
                 recv_buffer,
@@ -2097,6 +2185,9 @@ DepthDispatchState run_depth_cuda_graphs(
     };
 
     const auto force_periodic_threshold_update = [&]() {
+        if (multi_rank) {
+            return;
+        }
         if (stream3_active) {
             throw std::runtime_error("periodic threshold update requested while stream3 is active");
         }
@@ -2104,7 +2195,7 @@ DepthDispatchState run_depth_cuda_graphs(
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 timing start");
 #endif
-        update_threshold_global(plan, memory, streams.stream5, true, collective, multi_rank);
+        update_threshold_global(plan, memory, streams.stream5, true, collective, false);
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 timing stop");
 #endif
@@ -2263,11 +2354,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 memory.streams.hash_ring + global_offset,
                 sizeof(hash),
                 cudaMemcpyDeviceToHost), "cudaMemcpy tracked generated hash");
-            check_cuda(cudaMemcpy(
-                &threshold,
-                memory.streams.current_threshold,
-                sizeof(threshold),
-                cudaMemcpyDeviceToHost), "cudaMemcpy tracked generated threshold");
+            threshold = read_current_threshold_host();
             State128 parent_state{};
             check_cuda(cudaMemcpy(
                 &parent_state,
@@ -2360,7 +2447,7 @@ DepthDispatchState run_depth_cuda_graphs(
     };
 
     const auto maybe_update_threshold = [&]() -> bool {
-        if (!periodic_threshold_due() || stream3_active) {
+        if (multi_rank || !periodic_threshold_due() || stream3_active) {
             return false;
         }
         drain_pending_stream4_shards();
@@ -2535,6 +2622,12 @@ DepthDispatchState run_depth_cuda_graphs(
         run_stream5_exchange_and_collect(ring, true);
         launch_pending_stream4_shards();
     }
+    if (multi_rank) {
+        release_completed_stream4_slots_nonblocking();
+    }
+    if (multi_rank && stream4_jobs_since_threshold_update != 0U) {
+        maybe_run_stream5_threshold_update(true);
+    }
 
     drain_pending_stream4_shards();
     if (!multi_rank) {
@@ -2653,12 +2746,7 @@ DepthDispatchState run_depth_cuda_graphs(
             break;
         }
         if (flush_round + 1U == plan.storage_shard_count + 2U) {
-            std::uint32_t debug_threshold = UINT32_THRESHOLD_MAX;
-            check_cuda(cudaMemcpy(
-                &debug_threshold,
-                memory.streams.current_threshold,
-                sizeof(debug_threshold),
-                cudaMemcpyDeviceToHost), "cudaMemcpy current threshold final flush failure");
+            const std::uint32_t debug_threshold = read_current_threshold_host();
             dump_final_spill_debug(plan, memory, spill_counts, spill_active, debug_threshold);
             throw std::runtime_error(
                 "final stream3 spill flush did not converge: active_spill_count=" +
@@ -2742,12 +2830,8 @@ FinalizeDepthState finalize_depth_single_gpu(
 #else
     check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 final threshold");
 #endif
-    std::uint32_t final_threshold = UINT32_THRESHOLD_MAX;
-    check_cuda(cudaMemcpy(
-        &final_threshold,
-        memory.streams.current_threshold,
-        sizeof(final_threshold),
-        cudaMemcpyDeviceToHost), "cudaMemcpy final threshold");
+    const std::uint32_t final_threshold =
+        read_committed_threshold_host(memory, "cudaMemcpy final threshold");
 
     result.final_threshold = final_threshold;
     if (tracked_prefinal_hash != nullptr) {
@@ -3433,13 +3517,28 @@ FinalizeDepthState finalize_depth_single_gpu(
         check_cuda(cudaMemsetAsync(
             memory.streams.threshold_initialized,
             0,
-            sizeof(std::uint32_t),
+            2ULL * sizeof(std::uint32_t),
             streams.stream3), "cudaMemsetAsync reset threshold initialized");
         check_cuda(cudaMemsetAsync(
             memory.streams.current_threshold,
             0xff,
-            sizeof(std::uint32_t),
+            2ULL * sizeof(std::uint32_t),
             streams.stream3), "cudaMemsetAsync reset threshold");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.current_threshold_active_index,
+            0,
+            sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset threshold active index");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.threshold_request_local,
+            0,
+            sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset threshold local request");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.threshold_request_global,
+            0,
+            sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset threshold global request");
         check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize multi final reset");
         return result;
     }
@@ -3625,10 +3724,16 @@ FinalizeDepthState finalize_depth_single_gpu(
         0,
         static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
         streams.stream3), "cudaMemsetAsync reset shard score hist active index");
-    check_cuda(cudaMemsetAsync(memory.streams.current_threshold, 0xff, sizeof(std::uint32_t), streams.stream3),
+    check_cuda(cudaMemsetAsync(memory.streams.current_threshold, 0xff, 2ULL * sizeof(std::uint32_t), streams.stream3),
         "cudaMemsetAsync reset current threshold");
-    check_cuda(cudaMemsetAsync(memory.streams.threshold_initialized, 0, sizeof(std::uint32_t), streams.stream3),
+    check_cuda(cudaMemsetAsync(memory.streams.threshold_initialized, 0, 2ULL * sizeof(std::uint32_t), streams.stream3),
         "cudaMemsetAsync reset threshold initialized");
+    check_cuda(cudaMemsetAsync(memory.streams.current_threshold_active_index, 0, sizeof(std::uint32_t), streams.stream3),
+        "cudaMemsetAsync reset current threshold active index");
+    check_cuda(cudaMemsetAsync(memory.streams.threshold_request_local, 0, sizeof(std::uint32_t), streams.stream3),
+        "cudaMemsetAsync reset threshold local request");
+    check_cuda(cudaMemsetAsync(memory.streams.threshold_request_global, 0, sizeof(std::uint32_t), streams.stream3),
+        "cudaMemsetAsync reset threshold global request");
 #if BEAM_DEBUG_STREAM_TIMING
     record_timing_stop_and_sync(
         streams.stream3,

@@ -64,29 +64,42 @@ __global__ void threshold_sum_shard_histograms_kernel(
 __global__ void threshold_select_kernel(
     const std::uint64_t* global_score_hist,
     std::uint32_t* current_threshold,
+    std::uint32_t* threshold_initialized,
+    std::uint32_t* current_threshold_active_index,
     std::uint64_t global_beam_width_effective) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
         return;
     }
+    const std::uint32_t active = *current_threshold_active_index & 1U;
+    const std::uint32_t publish = active ^ 1U;
+    std::uint32_t selected = UINT32_THRESHOLD_MAX;
     std::uint64_t cumulative = 0;
     for (std::uint32_t score = 0; score < SCORE_BIN_COUNT; ++score) {
         cumulative += global_score_hist[score];
         if (cumulative >= global_beam_width_effective) {
-            *current_threshold = score;
-            return;
+            selected = score;
+            break;
         }
     }
-    *current_threshold = UINT32_THRESHOLD_MAX;
+    current_threshold[publish] = selected;
+    threshold_initialized[publish] = 1U;
+    __threadfence();
+    *current_threshold_active_index = publish;
 }
 
 __global__ void threshold_update_periodic_kernel(
     const std::uint64_t* global_score_hist,
     std::uint32_t* current_threshold,
     std::uint32_t* threshold_initialized,
+    std::uint32_t* current_threshold_active_index,
     std::uint64_t global_beam_width_effective) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
         return;
     }
+    const std::uint32_t active = *current_threshold_active_index & 1U;
+    const std::uint32_t publish = active ^ 1U;
+    const std::uint32_t active_initialized = threshold_initialized[active];
+    const std::uint32_t active_threshold = current_threshold[active];
     std::uint64_t total = 0;
     std::uint64_t cumulative = 0;
     std::uint32_t selected = UINT32_THRESHOLD_MAX;
@@ -100,16 +113,19 @@ __global__ void threshold_update_periodic_kernel(
             }
         }
     }
-    if (*threshold_initialized == 0U && total < global_beam_width_effective) {
-        *current_threshold = UINT32_THRESHOLD_MAX;
-        return;
+    std::uint32_t publish_threshold = active_threshold;
+    std::uint32_t publish_initialized = active_initialized;
+    if (active_initialized == 0U && total < global_beam_width_effective) {
+        publish_threshold = UINT32_THRESHOLD_MAX;
+        publish_initialized = 0U;
+    } else if (total >= global_beam_width_effective) {
+        publish_threshold = active_initialized == 0U || selected < active_threshold ? selected : active_threshold;
+        publish_initialized = 1U;
     }
-    if (total >= global_beam_width_effective) {
-        if (*threshold_initialized == 0U || selected < *current_threshold) {
-            *current_threshold = selected;
-        }
-        *threshold_initialized = 1U;
-    }
+    current_threshold[publish] = publish_threshold;
+    threshold_initialized[publish] = publish_initialized;
+    __threadfence();
+    *current_threshold_active_index = publish;
 }
 
 __global__ void final_mark_counts_kernel(
@@ -396,16 +412,24 @@ void threshold_build_local_histogram_cuda(
 void threshold_select_cuda(
     const std::uint64_t* global_score_hist,
     std::uint32_t* current_threshold,
+    std::uint32_t* threshold_initialized,
+    std::uint32_t* current_threshold_active_index,
     std::uint64_t global_beam_width_effective,
     cudaStream_t stream) {
     NvtxRange range("Threshold_select_launch");
-    threshold_select_kernel<<<1, 1, 0, stream>>>(global_score_hist, current_threshold, global_beam_width_effective);
+    threshold_select_kernel<<<1, 1, 0, stream>>>(
+        global_score_hist,
+        current_threshold,
+        threshold_initialized,
+        current_threshold_active_index,
+        global_beam_width_effective);
 }
 
 void threshold_update_periodic_cuda(
     const std::uint64_t* global_score_hist,
     std::uint32_t* current_threshold,
     std::uint32_t* threshold_initialized,
+    std::uint32_t* current_threshold_active_index,
     std::uint64_t global_beam_width_effective,
     cudaStream_t stream) {
     NvtxRange range("Threshold_update_periodic_launch");
@@ -413,6 +437,7 @@ void threshold_update_periodic_cuda(
         global_score_hist,
         current_threshold,
         threshold_initialized,
+        current_threshold_active_index,
         global_beam_width_effective);
 }
 

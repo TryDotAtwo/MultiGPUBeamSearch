@@ -120,13 +120,17 @@ __global__ void stream4_mark_threshold_counts_kernel(
     std::uint32_t* keep_flags,
     std::uint32_t* block_counts,
     const std::uint32_t* threshold_device,
+    const std::uint32_t* threshold_active_index,
     std::uint32_t threshold_value,
     std::uint32_t capacity) {
     __shared__ std::uint32_t flags[256];
     const std::uint32_t tid = threadIdx.x;
     const std::uint32_t i = blockIdx.x * blockDim.x + tid;
     const std::uint32_t input_count = *clean_count + *dirty_count;
-    const std::uint32_t threshold = threshold_device == nullptr ? threshold_value : *threshold_device;
+    const std::uint32_t threshold =
+        threshold_device == nullptr
+            ? threshold_value
+            : threshold_device[threshold_active_index == nullptr ? 0U : (*threshold_active_index & 1U)];
     std::uint32_t keep = 0;
     if (i < capacity) {
         keep = i < input_count && input[i].score_key <= threshold ? 1U : 0U;
@@ -383,6 +387,7 @@ void stream4_shard_job_cuda(
         keep_flags,
         block_counts,
         nullptr,
+        nullptr,
         threshold,
         capacity);
     stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
@@ -470,6 +475,7 @@ void stream4_shard_job_device_threshold_cuda(
     std::uint32_t* dirty_count,
     std::uint32_t* processing_flag,
     const std::uint32_t* threshold,
+    const std::uint32_t* threshold_active_index,
     std::uint32_t capacity,
     Hash128* sort_key,
     Hash128* reduce_key,
@@ -508,6 +514,7 @@ void stream4_shard_job_device_threshold_cuda(
         keep_flags,
         block_counts,
         threshold,
+        threshold_active_index,
         UINT32_MAX,
         capacity);
     stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(

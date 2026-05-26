@@ -79,6 +79,7 @@ void stream3_pack_threshold_device_threshold_cuda(
     void* cub_temp_storage,
     std::size_t cub_temp_storage_bytes,
     const std::uint32_t* current_threshold,
+    const std::uint32_t* current_threshold_active_index,
     std::uint32_t b_micro,
     std::uint32_t stream3_batch_candidates,
     cudaStream_t stream);

@@ -95,7 +95,11 @@ int main() {
     require(memory.streams.shard_score_hist_b != nullptr, "shard score histogram b missing");
     require(memory.streams.shard_score_hist_active_index != nullptr, "shard score histogram active index missing");
     require(memory.streams.threshold_hist_active_snapshot != nullptr, "threshold histogram active snapshot missing");
+    require(memory.streams.current_threshold != nullptr, "current threshold buffer missing");
     require(memory.streams.threshold_initialized != nullptr, "threshold initialized flag missing");
+    require(memory.streams.current_threshold_active_index != nullptr, "current threshold active index missing");
+    require(memory.streams.threshold_request_local != nullptr, "threshold local request missing");
+    require(memory.streams.threshold_request_global != nullptr, "threshold global request missing");
     require(addr(memory.streams.survivor_shard) % alignof(CandidateMeta) == 0, "candidate alignment failed");
     require(addr(memory.streams.stream4_key_a) % alignof(Hash128) == 0, "stream4 sort key alignment failed");
     require(addr(memory.streams.stream4_val_a) % alignof(CandidateMeta) == 0, "stream4 sort value alignment failed");

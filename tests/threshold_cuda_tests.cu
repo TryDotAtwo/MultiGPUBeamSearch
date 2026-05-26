@@ -95,7 +95,13 @@ int main() {
     require_nccl(ncclGetUniqueId(&id), "ncclGetUniqueId failed");
     require_nccl(ncclCommInitRank(&comm, 1, id, 0), "ncclCommInitRank failed");
     threshold_allreduce_histogram_nccl_cuda(memory.streams.local_score_hist, memory.streams.global_score_hist, comm, 0);
-    threshold_select_cuda(memory.streams.local_score_hist, memory.streams.current_threshold, 3, 0);
+    threshold_select_cuda(
+        memory.streams.local_score_hist,
+        memory.streams.current_threshold,
+        memory.streams.threshold_initialized,
+        memory.streams.current_threshold_active_index,
+        3,
+        0);
     final_filter_load_balance_cuda(
         memory.streams.survivor_shard,
         memory.streams.clean_count,
@@ -133,7 +139,17 @@ int main() {
     std::vector<CandidateMeta> final_candidates(static_cast<std::size_t>(plan.frontier_states));
     std::vector<FinalRequest> requests(static_cast<std::size_t>(plan.frontier_states));
     BEAM_CUDA_CHECK(cudaMemcpy(hist.data(), memory.streams.local_score_hist, hist.size() * sizeof(std::uint64_t), cudaMemcpyDeviceToHost));
-    BEAM_CUDA_CHECK(cudaMemcpy(&threshold, memory.streams.current_threshold, sizeof(threshold), cudaMemcpyDeviceToHost));
+    std::uint32_t threshold_active = 0;
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &threshold_active,
+        memory.streams.current_threshold_active_index,
+        sizeof(threshold_active),
+        cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &threshold,
+        memory.streams.current_threshold + (threshold_active & 1U),
+        sizeof(threshold),
+        cudaMemcpyDeviceToHost));
     BEAM_CUDA_CHECK(cudaMemcpy(&final_candidate_count, memory.final.final_candidate_count, sizeof(final_candidate_count), cudaMemcpyDeviceToHost));
     BEAM_CUDA_CHECK(cudaMemcpy(&request_count, memory.final.final_request_count, sizeof(request_count), cudaMemcpyDeviceToHost));
     BEAM_CUDA_CHECK(cudaMemcpy(send_count, memory.final.final_send_count, sizeof(send_count), cudaMemcpyDeviceToHost));

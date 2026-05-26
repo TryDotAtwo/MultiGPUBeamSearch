@@ -20,6 +20,8 @@ void threshold_build_local_histogram_cuda(
 void threshold_select_cuda(
     const std::uint64_t* global_score_hist,
     std::uint32_t* current_threshold,
+    std::uint32_t* threshold_initialized,
+    std::uint32_t* current_threshold_active_index,
     std::uint64_t global_beam_width_effective,
     cudaStream_t stream);
 
@@ -27,6 +29,7 @@ void threshold_update_periodic_cuda(
     const std::uint64_t* global_score_hist,
     std::uint32_t* current_threshold,
     std::uint32_t* threshold_initialized,
+    std::uint32_t* current_threshold_active_index,
     std::uint64_t global_beam_width_effective,
     cudaStream_t stream);
 

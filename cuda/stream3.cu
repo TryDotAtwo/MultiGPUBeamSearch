@@ -73,6 +73,7 @@ __global__ void stream3_mark_counts_kernel(
     std::uint32_t* keep_flags,
     std::uint32_t* block_counts,
     const std::uint32_t* current_threshold_device,
+    const std::uint32_t* current_threshold_active_index,
     std::uint32_t current_threshold_value,
     std::uint32_t b_micro,
     std::uint32_t stream3_batch_candidates) {
@@ -82,7 +83,9 @@ __global__ void stream3_mark_counts_kernel(
     const std::uint32_t candidates_per_slot = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
     std::uint32_t keep = 0;
     const std::uint32_t current_threshold =
-        current_threshold_device == nullptr ? current_threshold_value : *current_threshold_device;
+        current_threshold_device == nullptr
+            ? current_threshold_value
+            : current_threshold_device[current_threshold_active_index == nullptr ? 0U : (*current_threshold_active_index & 1U)];
     if (i < stream3_batch_candidates) {
         const std::uint32_t ring_slot = i / candidates_per_slot;
         const std::uint32_t local_i = i % candidates_per_slot;
@@ -913,6 +916,7 @@ void stream3_pack_threshold_cuda(
         keep_flags,
         block_counts,
         nullptr,
+        nullptr,
         current_threshold,
         b_micro,
         stream3_batch_candidates);
@@ -1004,6 +1008,7 @@ void stream3_pack_threshold_device_threshold_cuda(
     void* cub_temp_storage,
     std::size_t cub_temp_storage_bytes,
     const std::uint32_t* current_threshold,
+    const std::uint32_t* current_threshold_active_index,
     std::uint32_t b_micro,
     std::uint32_t stream3_batch_candidates,
     cudaStream_t stream) {
@@ -1021,6 +1026,7 @@ void stream3_pack_threshold_device_threshold_cuda(
         keep_flags,
         block_counts,
         current_threshold,
+        current_threshold_active_index,
         UINT32_THRESHOLD_MAX,
         b_micro,
         stream3_batch_candidates);

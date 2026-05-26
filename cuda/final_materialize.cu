@@ -30,38 +30,41 @@ __global__ void validate_final_requests_kernel(
     std::uint32_t request_count,
     std::uint64_t current_frontier_size,
     std::uint32_t target_count) {
-    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= request_count) {
+    if (blockIdx.x != 0 || threadIdx.x != 0) {
         return;
     }
-    const FinalRequest request = requests[i];
-    std::uint32_t reason = 0;
-    if (request.parent_idx >= current_frontier_size) {
-        reason |= FinalRequestInvalidParent;
+    std::uint32_t invalid_count = 0;
+    for (std::uint32_t i = 0; i < request_count; ++i) {
+        const FinalRequest request = requests[i];
+        std::uint32_t reason = 0;
+        if (request.parent_idx >= current_frontier_size) {
+            reason |= FinalRequestInvalidParent;
+        }
+        if (request.target_local_idx >= target_count) {
+            reason |= FinalRequestInvalidTarget;
+        }
+        if (static_cast<std::uint32_t>(request.move) >= MOVE_COUNT) {
+            reason |= FinalRequestInvalidMove;
+        }
+        if (request.target_local_idx != i) {
+            reason |= FinalRequestInvalidSlot;
+        }
+        if (reason == 0U) {
+            continue;
+        }
+        if (invalid_count == 0U) {
+            error->first_index = i;
+            error->parent_idx = request.parent_idx;
+            error->target_local_idx = request.target_local_idx;
+            error->request_count = request_count;
+            error->current_frontier_size = current_frontier_size;
+            error->target_count = target_count;
+            error->reason_mask = reason;
+            error->move = static_cast<std::uint32_t>(request.move);
+        }
+        ++invalid_count;
     }
-    if (request.target_local_idx >= target_count) {
-        reason |= FinalRequestInvalidTarget;
-    }
-    if (static_cast<std::uint32_t>(request.move) >= MOVE_COUNT) {
-        reason |= FinalRequestInvalidMove;
-    }
-    if (request.target_local_idx != i) {
-        reason |= FinalRequestInvalidSlot;
-    }
-    if (reason == 0U) {
-        return;
-    }
-
-    atomicAdd(&error->invalid_count, 1U);
-    if (atomicCAS(&error->first_index, UINT32_MAX, i) == UINT32_MAX) {
-        error->parent_idx = request.parent_idx;
-        error->target_local_idx = request.target_local_idx;
-        error->request_count = request_count;
-        error->current_frontier_size = current_frontier_size;
-        error->target_count = target_count;
-        error->reason_mask = reason;
-        error->move = static_cast<std::uint32_t>(request.move);
-    }
+    error->invalid_count = invalid_count;
 }
 #endif
 
@@ -461,9 +464,7 @@ void validate_final_requests_cuda(
             cudaMemcpyHostToDevice,
             stream),
         "cudaMemcpyAsync init final request validation error");
-    const dim3 block(128);
-    const dim3 grid((request_count + block.x - 1U) / block.x);
-    validate_final_requests_kernel<<<grid, block, 0, stream>>>(
+    validate_final_requests_kernel<<<1, 1, 0, stream>>>(
         requests,
         device_error,
         request_count,
