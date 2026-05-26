@@ -501,7 +501,8 @@ void update_threshold_global(
     StaticDeviceMemory& memory,
     cudaStream_t stream,
     bool periodic,
-    const DispatcherCollective* collective) {
+    const DispatcherCollective* collective,
+    bool local_histogram_only = false) {
     const std::uint64_t threshold_width = plan.derived.global_beam_width_effective;
     threshold_build_local_histogram_cuda(
         memory.streams.shard_score_hist_a,
@@ -511,7 +512,7 @@ void update_threshold_global(
         memory.streams.local_score_hist,
         plan.storage_shard_count,
         stream);
-    if (plan.config.world_size == 1U) {
+    if (plan.config.world_size == 1U || local_histogram_only) {
         check_cuda(cudaMemcpyAsync(
             memory.streams.global_score_hist,
             memory.streams.local_score_hist,
@@ -1940,8 +1941,7 @@ DepthDispatchState run_depth_cuda_graphs(
     };
 
     const auto periodic_threshold_due = [&]() -> bool {
-        return !multi_rank &&
-            plan.config.global_threshold_update_period_shards != 0 &&
+        return plan.config.global_threshold_update_period_shards != 0 &&
             stream4_jobs_since_threshold_update >= plan.config.global_threshold_update_period_shards;
     };
 
@@ -2104,7 +2104,7 @@ DepthDispatchState run_depth_cuda_graphs(
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 timing start");
 #endif
-        update_threshold_global(plan, memory, streams.stream5, true, collective);
+        update_threshold_global(plan, memory, streams.stream5, true, collective, multi_rank);
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 timing stop");
 #endif
@@ -2331,10 +2331,11 @@ DepthDispatchState run_depth_cuda_graphs(
             throw_if_stream_fatal_error("stream3_backpressure_ready_queue");
             const std::uint32_t queued = append_stream3_ready_queue();
             const std::uint32_t launched = launch_pending_stream4_shards();
-            if (queued == 0U && launched == 0U && pending_stream4_count() == 0U && stream4_busy_slots.empty()) {
-                throw std::runtime_error("stream3 double-buffer backpressure has no ready stream4 work");
+            if (queued != 0U || launched != 0U ||
+                pending_stream4_count() != 0U || !stream4_busy_slots.empty()) {
+                return queued != 0U || launched != 0U;
             }
-            return queued != 0U || launched != 0U;
+            debug_pipeline_stats("stream3_backpressure_bypass", UINT32_MAX, UINT32_MAX);
         }
         const std::uint32_t ring = stream3_ready_rings.front();
         stream3_ready_rings.pop_front();
@@ -2643,8 +2644,7 @@ DepthDispatchState run_depth_cuda_graphs(
             total_clean += clean;
         }
         const bool spill_remaining = spill_counts[spill_active & 1U] != 0U || any_dirty;
-        if (!multi_rank &&
-            stream4_jobs_since_threshold_update != 0U &&
+        if (stream4_jobs_since_threshold_update != 0U &&
             (periodic_threshold_due() || spill_remaining)) {
             force_periodic_threshold_update();
         }

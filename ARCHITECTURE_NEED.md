@@ -1657,6 +1657,9 @@ current_threshold=UINT32_MAX до threshold initialization.
 После threshold_initialized=true threshold не ослабляется.
 
 GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS задаёт частоту периодического пересчёта current_threshold.
+WORLD_SIZE > 1 periodic threshold update uses local completed shard histograms only.
+WORLD_SIZE > 1 periodic threshold update does not run NCCL AllReduce and does not require a cross-rank barrier.
+WORLD_SIZE > 1 final global threshold still uses NCCL/global counts after local final flush.
 Финальный global threshold считается только после финального flush и локальной финальной дедупликации.
 
 После финального threshold выполняется балансировка нагрузки по картам.
