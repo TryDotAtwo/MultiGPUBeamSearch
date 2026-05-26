@@ -560,13 +560,41 @@ void update_threshold_global(
     }
 }
 
-struct FinalHistoryRecord {
+struct alignas(32) FinalHistoryRecord {
     CandidateMeta meta;
     std::uint32_t target_local_idx;
-    std::uint32_t reserved;
+    std::uint32_t reserved0;
+    std::uint64_t reserved1[3];
 };
 
+static_assert(sizeof(FinalHistoryRecord) == 64);
+static_assert(alignof(FinalHistoryRecord) == 32);
 static_assert(sizeof(FinalHistoryRecord) % sizeof(std::uint64_t) == 0);
+
+struct alignas(64) FinalExchangePlan {
+    std::vector<std::uint32_t> count;
+    std::vector<std::uint32_t> offset;
+    std::uint32_t total = 0;
+};
+
+static_assert(alignof(FinalExchangePlan) == 64);
+
+FinalExchangePlan make_final_exchange_plan(const std::vector<std::uint32_t>& counts) {
+    FinalExchangePlan plan{};
+    plan.count = counts;
+    plan.offset.resize(static_cast<std::uint64_t>(counts.size()) + 1ULL);
+    std::uint64_t running = 0;
+    plan.offset[0] = 0;
+    for (std::uint32_t i = 0; i < counts.size(); ++i) {
+        running += counts[i];
+        if (running > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+            throw std::runtime_error("exchange item count exceeds uint32 range");
+        }
+        plan.offset[i + 1U] = static_cast<std::uint32_t>(running);
+    }
+    plan.total = static_cast<std::uint32_t>(running);
+    return plan;
+}
 
 } // namespace
 
@@ -2769,23 +2797,6 @@ FinalizeDepthState finalize_depth_single_gpu(
     if (multi_rank) {
         const std::uint32_t world_size = plan.config.world_size;
         const std::uint32_t local_rank = plan.config.local_rank;
-        std::vector<std::uint32_t> host_counts(world_size);
-        std::vector<std::uint32_t> host_offsets(static_cast<std::uint64_t>(world_size) + 1ULL);
-        std::vector<std::uint32_t> recv_counts(world_size);
-        std::vector<std::uint32_t> recv_offsets(static_cast<std::uint64_t>(world_size) + 1ULL);
-
-        const auto make_offsets = [](const std::vector<std::uint32_t>& counts, std::vector<std::uint32_t>& offsets) {
-            std::uint64_t running = 0;
-            offsets[0] = 0;
-            for (std::uint32_t i = 0; i < counts.size(); ++i) {
-                running += counts[i];
-                if (running > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
-                    throw std::runtime_error("exchange item count exceeds uint32 range");
-                }
-                offsets[i + 1U] = static_cast<std::uint32_t>(running);
-            }
-            return static_cast<std::uint32_t>(running);
-        };
         const auto ceil_div_local = [](std::uint64_t a, std::uint64_t b) {
             return b == 0ULL ? 0ULL : (a + b - 1ULL) / b;
         };
@@ -2800,9 +2811,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         const auto exchange_u64_items = [&](
             const char* exchange_name,
             const void* host_send,
-            std::uint32_t send_total,
-            const std::vector<std::uint32_t>& send_count,
-            const std::vector<std::uint32_t>& send_offset,
+            const FinalExchangePlan& send_plan,
             void* device_send,
             std::uint32_t device_send_capacity,
             void* device_recv,
@@ -2810,14 +2819,13 @@ FinalizeDepthState finalize_depth_single_gpu(
             std::uint32_t words_per_item,
             void* host_recv,
             std::uint32_t& recv_total_out) {
-            const std::vector<std::uint32_t> send_count_snapshot = send_count;
-            const std::vector<std::uint32_t> send_offset_snapshot = send_offset;
+            const FinalExchangePlan send_plan_snapshot = send_plan;
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
             std::cout << "final_exchange_trace"
                       << " rank=" << local_rank
                       << " label=" << exchange_name
                       << " phase=entry"
-                      << " send_total=" << send_total
+                      << " send_total=" << send_plan_snapshot.total
                       << " device_send_capacity=" << device_send_capacity
                       << " device_recv_capacity=" << device_recv_capacity
                       << " words_per_item=" << words_per_item
@@ -2827,29 +2835,29 @@ FinalizeDepthState finalize_depth_single_gpu(
             log_final_exchange_counts(
                 (std::string(exchange_name) + "_send_snapshot").c_str(),
                 local_rank,
-                send_count_snapshot,
-                send_offset_snapshot);
+                send_plan_snapshot.count,
+                send_plan_snapshot.offset);
 #endif
-            if (send_total > device_send_capacity) {
+            if (send_plan_snapshot.total > device_send_capacity) {
                 throw std::runtime_error("exchange send total exceeds device capacity");
             }
-            if (send_total != 0U && host_send != nullptr) {
+            if (send_plan_snapshot.total != 0U && host_send != nullptr) {
                 check_cuda(cudaMemcpyAsync(
                     device_send,
                     host_send,
-                    static_cast<std::uint64_t>(send_total) * words_per_item * sizeof(std::uint64_t),
+                    static_cast<std::uint64_t>(send_plan_snapshot.total) * words_per_item * sizeof(std::uint64_t),
                     cudaMemcpyHostToDevice,
                     streams.stream5), "cudaMemcpyAsync exchange host send to device");
             }
             check_cuda(cudaMemcpyAsync(
                 memory.final.final_send_count,
-                send_count_snapshot.data(),
+                send_plan_snapshot.count.data(),
                 static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
                 cudaMemcpyHostToDevice,
                 streams.stream5), "cudaMemcpyAsync exchange send counts");
             check_cuda(cudaMemcpyAsync(
                 memory.final.final_send_offset,
-                send_offset_snapshot.data(),
+                send_plan_snapshot.offset.data(),
                 (static_cast<std::uint64_t>(world_size) + 1ULL) * sizeof(std::uint32_t),
                 cudaMemcpyHostToDevice,
                 streams.stream5), "cudaMemcpyAsync exchange send offsets");
@@ -2861,55 +2869,56 @@ FinalizeDepthState finalize_depth_single_gpu(
                 collective->comm,
                 streams.stream5);
             check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize exchange counts");
+            std::vector<std::uint32_t> recv_counts(world_size);
             check_cuda(cudaMemcpy(
                 recv_counts.data(),
                 memory.final.final_recv_count,
                 static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
                 cudaMemcpyDeviceToHost), "cudaMemcpy exchange recv counts");
-            const std::uint32_t recv_total = make_offsets(recv_counts, recv_offsets);
+            const FinalExchangePlan recv_plan = make_final_exchange_plan(recv_counts);
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
             log_final_exchange_counts(
                 (std::string(exchange_name) + "_recv").c_str(),
                 local_rank,
-                recv_counts,
-                recv_offsets);
+                recv_plan.count,
+                recv_plan.offset);
             std::cout << "final_exchange_trace"
                       << " rank=" << local_rank
                       << " label=" << exchange_name
                       << " phase=recv_ready"
-                      << " recv_total=" << recv_total
+                      << " recv_total=" << recv_plan.total
                       << "\n";
 #endif
-            if (recv_total > device_recv_capacity) {
+            if (recv_plan.total > device_recv_capacity) {
                 throw std::runtime_error("exchange recv total exceeds device capacity");
             }
             stream5_write_recv_offsets_cuda(
                 memory.final.final_recv_offset,
-                recv_offsets.data(),
+                recv_plan.offset.data(),
                 world_size,
                 streams.stream5);
             stream5_exchange_u64_payload_nccl_cuda(
                 device_send,
                 device_recv,
-                send_count_snapshot.data(),
-                send_offset_snapshot.data(),
-                recv_counts.data(),
-                recv_offsets.data(),
+                send_plan_snapshot.count.data(),
+                send_plan_snapshot.offset.data(),
+                recv_plan.count.data(),
+                recv_plan.offset.data(),
                 words_per_item,
                 local_rank,
                 world_size,
                 collective->comm,
                 streams.stream5);
-            if (recv_total != 0U && host_recv != nullptr) {
+            if (recv_plan.total != 0U && host_recv != nullptr) {
                 check_cuda(cudaMemcpyAsync(
                     host_recv,
                     device_recv,
-                    static_cast<std::uint64_t>(recv_total) * words_per_item * sizeof(std::uint64_t),
+                    static_cast<std::uint64_t>(recv_plan.total) * words_per_item * sizeof(std::uint64_t),
                     cudaMemcpyDeviceToHost,
                     streams.stream5), "cudaMemcpyAsync exchange device recv to host");
             }
             check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize exchange payload");
-            recv_total_out = recv_total;
+            recv_total_out = recv_plan.total;
         };
 
         final_count_score_phase_cuda(
@@ -2994,12 +3003,10 @@ FinalizeDepthState finalize_depth_single_gpu(
                   << " global_keep_count=" << global_keep_count
                   << " global_beam_width_effective=" << plan.derived.global_beam_width_effective
                   << "\n";
-        std::vector<std::uint32_t> trace_less_offsets(static_cast<std::uint64_t>(world_size) + 1ULL);
-        std::vector<std::uint32_t> trace_equal_offsets(static_cast<std::uint64_t>(world_size) + 1ULL);
-        make_offsets(less_counts, trace_less_offsets);
-        make_offsets(equal_counts, trace_equal_offsets);
-        log_final_exchange_counts("less_counts", local_rank, less_counts, trace_less_offsets);
-        log_final_exchange_counts("equal_counts", local_rank, equal_counts, trace_equal_offsets);
+        const FinalExchangePlan trace_less_plan = make_final_exchange_plan(less_counts);
+        const FinalExchangePlan trace_equal_plan = make_final_exchange_plan(equal_counts);
+        log_final_exchange_counts("less_counts", local_rank, trace_less_plan.count, trace_less_plan.offset);
+        log_final_exchange_counts("equal_counts", local_rank, trace_equal_plan.count, trace_equal_plan.offset);
 #endif
         const std::uint32_t candidate_capacity = static_cast<std::uint32_t>(
             (plan.frontier_states * sizeof(State128)) / sizeof(CandidateMeta));
@@ -3061,23 +3068,23 @@ FinalizeDepthState finalize_depth_single_gpu(
             ++history_count[target_rank];
             ++request_count[source_rank];
         }
-        const std::uint32_t history_send_total = make_offsets(history_count, host_offsets);
-        const std::uint32_t request_send_total = make_offsets(request_count, recv_offsets);
+        const FinalExchangePlan history_plan = make_final_exchange_plan(history_count);
+        const FinalExchangePlan request_plan = make_final_exchange_plan(request_count);
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         std::cout << "final_exchange_trace"
                   << " rank=" << local_rank
                   << " label=selected_summary"
                   << " selected_count=" << selected_count
-                  << " history_send_total=" << history_send_total
-                  << " request_send_total=" << request_send_total
+                  << " history_send_total=" << history_plan.total
+                  << " request_send_total=" << request_plan.total
                   << "\n";
-        log_final_exchange_counts("history_send_counts", local_rank, history_count, host_offsets);
-        log_final_exchange_counts("request_send_counts", local_rank, request_count, recv_offsets);
+        log_final_exchange_counts("history_send_counts", local_rank, history_plan.count, history_plan.offset);
+        log_final_exchange_counts("request_send_counts", local_rank, request_plan.count, request_plan.offset);
 #endif
-        std::vector<std::uint32_t> history_cursor = host_offsets;
-        std::vector<std::uint32_t> request_cursor = recv_offsets;
-        std::vector<FinalHistoryRecord> history_send(history_send_total);
-        std::vector<FinalRequest> request_send(request_send_total);
+        std::vector<std::uint32_t> history_cursor = history_plan.offset;
+        std::vector<std::uint32_t> request_cursor = request_plan.offset;
+        std::vector<FinalHistoryRecord> history_send(history_plan.total);
+        std::vector<FinalRequest> request_send(request_plan.total);
         less_seen = 0;
         equal_seen = 0;
         for (std::uint32_t selected_index = 0; selected_index < selected_count; ++selected_index) {
@@ -3111,7 +3118,8 @@ FinalizeDepthState finalize_depth_single_gpu(
                           << "\n";
             }
 #endif
-            history_send[history_cursor[target_rank]++] = FinalHistoryRecord{candidate, target_local_idx, 0U};
+            history_send[history_cursor[target_rank]++] =
+                FinalHistoryRecord{candidate, target_local_idx, 0U, {0ULL, 0ULL, 0ULL}};
             FinalRequest request{};
             request.parent_idx = candidate.parent_idx;
             request.target_local_idx = target_local_idx;
@@ -3130,9 +3138,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         exchange_u64_items(
             "history",
             history_send.data(),
-            history_send_total,
-            history_count,
-            host_offsets,
+            history_plan,
             memory.final.final_response_buffer,
             history_record_capacity,
             memory.final.next_frontier_states_tmp,
@@ -3166,9 +3172,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         exchange_u64_items(
             "request",
             request_send.data(),
-            request_send_total,
-            request_count,
-            recv_offsets,
+            request_plan,
             memory.final.next_frontier_states_tmp,
             static_cast<std::uint32_t>((plan.frontier_states * sizeof(State128)) / sizeof(FinalRequest)),
             memory.final.final_candidate_buffer,
@@ -3206,32 +3210,32 @@ FinalizeDepthState finalize_depth_single_gpu(
             }
             ++response_count[request_recv[i].return_rank];
         }
-        const std::uint32_t response_send_total = make_offsets(response_count, host_offsets);
+        const FinalExchangePlan response_plan = make_final_exchange_plan(response_count);
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         std::cout << "final_exchange_trace"
                   << " rank=" << local_rank
                   << " label=response_summary"
                   << " request_recv_total=" << request_recv_total
-                  << " response_send_total=" << response_send_total
+                  << " response_send_total=" << response_plan.total
                   << "\n";
-        log_final_exchange_counts("response_send_counts", local_rank, response_count, host_offsets);
+        log_final_exchange_counts("response_send_counts", local_rank, response_plan.count, response_plan.offset);
 #endif
-        if (response_send_total > request_device_capacity) {
+        if (response_plan.total > request_device_capacity) {
             throw std::runtime_error("response send request count exceeds device capacity");
         }
-        std::vector<std::uint32_t> response_cursor = host_offsets;
-        std::vector<FinalRequest> response_requests(response_send_total);
+        std::vector<std::uint32_t> response_cursor = response_plan.offset;
+        std::vector<FinalRequest> response_requests(response_plan.total);
         for (std::uint32_t i = 0; i < request_recv_total; ++i) {
             response_requests[response_cursor[request_recv[i].return_rank]++] = request_recv[i];
         }
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         log_final_exchange_requests("response_requests", local_rank, response_requests);
 #endif
-        if (response_send_total != 0U) {
+        if (response_plan.total != 0U) {
             check_cuda(cudaMemcpyAsync(
                 memory.final.final_request_buffer,
                 response_requests.data(),
-                static_cast<std::uint64_t>(response_send_total) * sizeof(FinalRequest),
+                static_cast<std::uint64_t>(response_plan.total) * sizeof(FinalRequest),
                 cudaMemcpyHostToDevice,
                 streams.stream3), "cudaMemcpyAsync response requests to device");
             final_materialize_responses_cuda(
@@ -3239,7 +3243,7 @@ FinalizeDepthState finalize_depth_single_gpu(
                 memory.final.final_request_buffer,
                 tables.generators,
                 reinterpret_cast<FinalResponse*>(memory.final.next_frontier_states_tmp),
-                response_send_total,
+                response_plan.total,
                 streams.stream3);
         }
         check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final response materialize");
@@ -3248,9 +3252,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         exchange_u64_items(
             "response",
             nullptr,
-            response_send_total,
-            response_count,
-            host_offsets,
+            response_plan,
             memory.final.next_frontier_states_tmp,
             request_device_capacity,
             memory.final.final_response_buffer,

@@ -130,3 +130,4 @@
 - User rejected local fake `WORLD_SIZE=2` reproduction on one GPU with both ranks using `LOCAL_RANK=0`; future multi-rank validation must use real multi-GPU hardware such as Kaggle 2xT4 unless explicitly approved otherwise.
 - User approved adding detailed final-exchange logging like other stream diagnostics and requested a compile/config flag so production runs do not compile or pay for the diagnostic code.
 - User required no unapproved algorithmic changes while diagnosing the final exchange failure; current approved scope is detailed logging, full-debug Kaggle run, and investigation from produced logs.
+- User approved the final exchange fix after reviewing the offset corruption: final exchange phases must have independent buffer layout plans, `FinalHistoryRecord` must be `align=32` and size multiple of `32/64`, and alignment must be respected for service buffers and any `ExchangePlan`-style helper.

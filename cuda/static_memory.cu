@@ -398,7 +398,7 @@ std::size_t bytes_final(const RuntimeConfig& config, const DerivedConfig& derive
         static_cast<std::uint64_t>(storage_shard_count) * config.shard_capacity_candidates;
     const std::uint64_t survivor_blocks = (survivors + 255ULL) / 256ULL;
     LayoutSizeCursor cursor;
-    cursor.take<State128>(frontier);
+    cursor.take<State128>(frontier, alignof(CandidateMeta));
     cursor.offset = std::max(cursor.offset, layout_streams_bytes);
     cursor.take<std::uint32_t>(survivors);
     cursor.take<std::uint32_t>(survivor_blocks);
@@ -408,12 +408,12 @@ std::size_t bytes_final(const RuntimeConfig& config, const DerivedConfig& derive
     cursor.take<FinalRequest>(requests);
     cursor.take<std::uint32_t>(1);
     if (config.world_size > 1U) {
-        cursor.take<FinalResponse>(requests);
+        cursor.take<FinalResponse>(requests, alignof(CandidateMeta));
     }
-    cursor.take<std::uint32_t>(config.world_size);
-    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
-    cursor.take<std::uint32_t>(config.world_size);
-    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
+    cursor.take<std::uint32_t>(config.world_size, 256);
+    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL, 256);
+    cursor.take<std::uint32_t>(config.world_size, 256);
+    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL, 256);
     return align_up_size(cursor.offset, 256);
 }
 
@@ -602,7 +602,7 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.threshold_initialized = streams.take<std::uint32_t>(1);
 
     Cursor final{reinterpret_cast<std::byte*>(memory.scratch_pool), 0};
-    memory.final.next_frontier_states_tmp = final.take<State128>(plan.frontier_states);
+    memory.final.next_frontier_states_tmp = final.take<State128>(plan.frontier_states, alignof(CandidateMeta));
     final.offset = std::max(final.offset, plan.layout_streams_bytes);
     const std::uint64_t final_survivor_blocks = (plan.survivor_count + 255ULL) / 256ULL;
     memory.final.final_keep_flags = final.take<std::uint32_t>(plan.survivor_count);
@@ -613,12 +613,14 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.final.final_request_buffer = final.take<FinalRequest>(plan.frontier_states);
     memory.final.final_request_count = final.take<std::uint32_t>(1);
     if (plan.config.world_size > 1U) {
-        memory.final.final_response_buffer = final.take<FinalResponse>(plan.frontier_states);
+        memory.final.final_response_buffer = final.take<FinalResponse>(plan.frontier_states, alignof(CandidateMeta));
     }
-    memory.final.final_send_count = final.take<std::uint32_t>(plan.config.world_size);
-    memory.final.final_send_offset = final.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
-    memory.final.final_recv_count = final.take<std::uint32_t>(plan.config.world_size);
-    memory.final.final_recv_offset = final.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
+    memory.final.final_send_count = final.take<std::uint32_t>(plan.config.world_size, 256);
+    memory.final.final_send_offset =
+        final.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL, 256);
+    memory.final.final_recv_count = final.take<std::uint32_t>(plan.config.world_size, 256);
+    memory.final.final_recv_offset =
+        final.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL, 256);
 }
 
 void free_static_device_memory(StaticDeviceMemory& memory) {
