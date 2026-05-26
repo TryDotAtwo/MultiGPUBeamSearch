@@ -13,6 +13,20 @@ void final_materialize_cuda(
     std::uint32_t request_count,
     cudaStream_t stream);
 
+void final_materialize_responses_cuda(
+    const State128* current_frontier_states,
+    const FinalRequest* requests,
+    const std::uint8_t* generators,
+    FinalResponse* responses,
+    std::uint32_t request_count,
+    cudaStream_t stream);
+
+void final_scatter_responses_cuda(
+    const FinalResponse* responses,
+    State128* next_frontier_states_tmp,
+    std::uint32_t response_count,
+    cudaStream_t stream);
+
 void validate_final_requests_cuda(
     const FinalRequest* requests,
     std::uint32_t request_count,

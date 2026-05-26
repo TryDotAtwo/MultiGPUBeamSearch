@@ -292,6 +292,12 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     const std::uint64_t ring_slots = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
     const std::uint64_t ring_candidates = ring_slots * config.b_micro * MOVE_COUNT;
     const std::uint64_t stream3 = config.stream3_batch_candidates;
+    const std::uint64_t stream5_slots = config.world_size > 1U ? config.ring_count : 1U;
+    const std::uint64_t stream5_send = stream3 * stream5_slots;
+    const std::uint64_t stream5_recv_slot = std::max<std::uint64_t>(
+        stream3,
+        (stream3 * static_cast<std::uint64_t>(config.stream5_recv_capacity_scale_ppm) + 999'999ULL) / 1'000'000ULL);
+    const std::uint64_t stream5_recv = stream5_recv_slot * stream5_slots;
     const std::uint64_t stream3_partition = std::max<std::uint64_t>(stream3, config.global_spill_capacity);
     const std::uint64_t survivors =
         static_cast<std::uint64_t>(storage_shard_count) * config.shard_capacity_candidates;
@@ -336,12 +342,14 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take<std::uint32_t>(1);
     cursor.take<CandidateMeta>(stream3);
     cursor.take<std::uint32_t>(1);
-    cursor.take<CandidateMeta>(stream3);
-    cursor.take<CandidateMeta>(stream3);
+    cursor.take<CandidateMeta>(stream5_send);
+    cursor.take<CandidateMeta>(stream5_recv);
     cursor.take<std::uint32_t>(config.world_size);
     cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
     cursor.take<std::uint32_t>(config.world_size);
     cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
+    cursor.take<std::uint64_t>(1);
+    cursor.take<std::uint64_t>(1);
     cursor.take<CandidateMeta>(survivors);
     const std::uint64_t stream4_slot_items = stream4_slots * stream4_capacity;
     cursor.take<Hash128>(stream4_slot_items);
@@ -419,6 +427,7 @@ std::size_t bytes_solved(const RuntimeConfig& config) {
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint32_t>(1);
     cursor.take<CandidateMeta>(config.solved_result_capacity);
     cursor.take<std::uint32_t>(config.solved_result_capacity);
     cursor.take<std::uint32_t>(1);
@@ -449,6 +458,12 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     plan.parent_base_count = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
     plan.ring_count_count = plan.parent_base_count;
     plan.stream3_count = config.stream3_batch_candidates;
+    plan.stream5_slot_count = config.world_size > 1U ? config.ring_count : 1U;
+    plan.stream5_send_slot_capacity = plan.stream3_count;
+    plan.stream5_recv_slot_capacity = std::max<std::uint64_t>(
+        plan.stream3_count,
+        (plan.stream3_count * static_cast<std::uint64_t>(config.stream5_recv_capacity_scale_ppm) + 999'999ULL) /
+            1'000'000ULL);
     plan.storage_shard_count = storage_shard_count_for(config);
     plan.survivor_count =
         static_cast<std::uint64_t>(plan.storage_shard_count) * config.shard_capacity_candidates;
@@ -488,6 +503,7 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.stop_flag = root.take<std::uint32_t>(1);
     memory.solved_count = root.take<std::uint32_t>(1);
     memory.solved_overflow = root.take<std::uint32_t>(1);
+    memory.global_stop_flag = root.take<std::uint32_t>(1);
     memory.solved_meta_list = root.take<CandidateMeta>(plan.config.solved_result_capacity);
     memory.solved_depth_list = root.take<std::uint32_t>(plan.config.solved_result_capacity);
     memory.current_depth = root.take<std::uint32_t>(1);
@@ -535,12 +551,16 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.unique_count = streams.take<std::uint32_t>(1);
     memory.streams.local_pending_buffer = streams.take<CandidateMeta>(plan.stream3_count);
     memory.streams.local_pending_count = streams.take<std::uint32_t>(1);
-    memory.streams.remote_send_buffer = streams.take<CandidateMeta>(plan.stream3_count);
-    memory.streams.remote_recv_buffer = streams.take<CandidateMeta>(plan.stream3_count);
+    memory.streams.remote_send_buffer =
+        streams.take<CandidateMeta>(plan.stream5_slot_count * plan.stream5_send_slot_capacity);
+    memory.streams.remote_recv_buffer =
+        streams.take<CandidateMeta>(plan.stream5_slot_count * plan.stream5_recv_slot_capacity);
     memory.streams.send_count = streams.take<std::uint32_t>(plan.config.world_size);
     memory.streams.send_offset = streams.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
     memory.streams.recv_count = streams.take<std::uint32_t>(plan.config.world_size);
     memory.streams.recv_offset = streams.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
+    memory.streams.stream5_local_round_count = streams.take<std::uint64_t>(1);
+    memory.streams.stream5_global_round_count = streams.take<std::uint64_t>(1);
     memory.streams.survivor_shard = streams.take<CandidateMeta>(plan.survivor_count);
     const std::uint64_t stream4_capacity = plan.config.shard_capacity_candidates;
     const std::uint64_t stream4_slots = plan.config.stream4_active_sort_slots;

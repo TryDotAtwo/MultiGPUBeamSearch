@@ -35,6 +35,7 @@ struct RuntimeConfig {
     std::uint32_t shard_capacity_scale_ppm = 1'250'000;
     std::uint32_t global_spill_capacity = 1 << 20;
     std::uint32_t global_spill_scale_ppm = 2'000'000;
+    std::uint32_t stream5_recv_capacity_scale_ppm = 2'000'000;
     std::uint64_t user_global_beam_width = 1'000'000;
     std::uint32_t global_threshold_update_period_shards = 64;
     std::uint32_t solved_result_capacity = 1024;

@@ -6,12 +6,14 @@
 #include "nvtx_ranges.hpp"
 #include "stream3.hpp"
 #include "stream4.hpp"
+#include "stream5.hpp"
 #include "threshold.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdlib>
+#include <cstring>
 #include <deque>
 #include <functional>
 #include <iostream>
@@ -40,6 +42,12 @@ namespace {
 void check_cuda(cudaError_t status, const char* op) {
     if (status != cudaSuccess) {
         throw std::runtime_error(std::string(op) + ": " + cudaGetErrorString(status));
+    }
+}
+
+void check_nccl_dispatcher(ncclResult_t status, const char* op) {
+    if (status != ncclSuccess) {
+        throw std::runtime_error(std::string(op) + ": " + ncclGetErrorString(status));
     }
 }
 
@@ -409,11 +417,12 @@ void ensure_stream4_slot_resources(DispatcherStreams& streams, std::uint32_t slo
     }
 }
 
-void update_threshold_single_gpu(
+void update_threshold_global(
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
     cudaStream_t stream,
-    bool periodic) {
+    bool periodic,
+    const DispatcherCollective* collective) {
     const std::uint64_t threshold_width = plan.derived.global_beam_width_effective;
     threshold_build_local_histogram_cuda(
         memory.streams.shard_score_hist_a,
@@ -423,12 +432,23 @@ void update_threshold_single_gpu(
         memory.streams.local_score_hist,
         plan.storage_shard_count,
         stream);
-    check_cuda(cudaMemcpyAsync(
-        memory.streams.global_score_hist,
-        memory.streams.local_score_hist,
-        SCORE_BIN_COUNT * sizeof(std::uint64_t),
-        cudaMemcpyDeviceToDevice,
-        stream), "cudaMemcpyAsync single gpu histogram");
+    if (plan.config.world_size == 1U) {
+        check_cuda(cudaMemcpyAsync(
+            memory.streams.global_score_hist,
+            memory.streams.local_score_hist,
+            SCORE_BIN_COUNT * sizeof(std::uint64_t),
+            cudaMemcpyDeviceToDevice,
+            stream), "cudaMemcpyAsync single gpu histogram");
+    } else {
+        if (collective == nullptr || collective->comm == nullptr) {
+            throw std::invalid_argument("multi rank threshold update requires NCCL collective");
+        }
+        threshold_allreduce_histogram_nccl_cuda(
+            memory.streams.local_score_hist,
+            memory.streams.global_score_hist,
+            collective->comm,
+            stream);
+    }
     if (periodic) {
         threshold_update_periodic_cuda(
             memory.streams.global_score_hist,
@@ -444,6 +464,14 @@ void update_threshold_single_gpu(
             stream);
     }
 }
+
+struct FinalHistoryRecord {
+    CandidateMeta meta;
+    std::uint32_t target_local_idx;
+    std::uint32_t reserved;
+};
+
+static_assert(sizeof(FinalHistoryRecord) % sizeof(std::uint64_t) == 0);
 
 } // namespace
 
@@ -561,6 +589,10 @@ void instantiate_cuda_graph_job_templates(
     graphs.stream3_ring_execs.resize(plan.config.ring_count, nullptr);
     for (std::uint32_t ring = 0; ring < plan.config.ring_count; ++ring) {
         const std::uint64_t ring_candidate_offset = static_cast<std::uint64_t>(ring) * plan.config.stream3_batch_candidates;
+        const std::uint64_t stream5_send_slot =
+            plan.config.world_size > 1U ? static_cast<std::uint64_t>(ring) : 0ULL;
+        CandidateMeta* ring_remote_send_buffer =
+            memory.streams.remote_send_buffer + stream5_send_slot * plan.stream5_send_slot_capacity;
         check_cuda(cudaStreamBeginCapture(streams.stream3, cudaStreamCaptureModeGlobal), "cudaStreamBeginCapture stream3_ring_graph");
         stream3_pack_threshold_device_threshold_cuda(
             memory.streams.score_ring + ring_candidate_offset,
@@ -591,7 +623,7 @@ void instantiate_cuda_graph_job_templates(
                 memory.streams.parent_base + static_cast<std::uint64_t>(ring) * plan.derived.ring_slot_count,
                 memory.streams.local_pending_buffer,
                 memory.streams.local_pending_count,
-                memory.streams.remote_send_buffer,
+                ring_remote_send_buffer,
                 memory.streams.send_count,
                 memory.streams.send_offset,
                 memory.streams.stream3_owner,
@@ -821,7 +853,8 @@ DepthDispatchState run_depth_cuda_graphs(
     CudaGraphJobTemplates& graphs,
     DispatcherStreams& streams,
     std::uint64_t frontier_size,
-    GeneratedTrackRequest track_request) {
+    GeneratedTrackRequest track_request,
+    const DispatcherCollective* collective) {
     NvtxRange range("Dispatcher_depth_cuda_graphs");
 #if !BEAM_DEBUG_PATH_TRACE
     track_request = {};
@@ -837,6 +870,42 @@ DepthDispatchState run_depth_cuda_graphs(
     if (track_request.enabled && track_request.move >= MOVE_COUNT) {
         throw std::invalid_argument("generated track request move exceeds MOVE_COUNT");
     }
+    const bool multi_rank = plan.config.world_size > 1U;
+    if (multi_rank && (collective == nullptr || collective->comm == nullptr)) {
+        throw std::invalid_argument("multi rank depth dispatch requires NCCL collective");
+    }
+    const std::uint64_t parents_per_stream3_round =
+        static_cast<std::uint64_t>(plan.derived.ring_slot_count) * plan.config.b_micro;
+    const std::uint64_t local_exchange_rounds =
+        frontier_size == 0U
+            ? 0U
+            : (frontier_size + parents_per_stream3_round - 1ULL) / parents_per_stream3_round;
+    std::uint64_t global_exchange_rounds = local_exchange_rounds;
+    if (multi_rank) {
+        check_cuda(cudaMemcpyAsync(
+            memory.streams.stream5_local_round_count,
+            &local_exchange_rounds,
+            sizeof(local_exchange_rounds),
+            cudaMemcpyHostToDevice,
+            streams.stream5), "cudaMemcpyAsync local stream5 round count");
+        check_nccl_dispatcher(
+            ncclAllReduce(
+                memory.streams.stream5_local_round_count,
+                memory.streams.stream5_global_round_count,
+                1,
+                ncclUint64,
+                ncclMax,
+                collective->comm,
+                streams.stream5),
+            "ncclAllReduce stream5 round count");
+        check_cuda(cudaMemcpyAsync(
+            &global_exchange_rounds,
+            memory.streams.stream5_global_round_count,
+            sizeof(global_exchange_rounds),
+            cudaMemcpyDeviceToHost,
+            streams.stream5), "cudaMemcpyAsync global stream5 round count");
+        check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 round count");
+    }
 
     DepthDispatchState state;
     state.frontier_size = frontier_size;
@@ -849,6 +918,10 @@ DepthDispatchState run_depth_cuda_graphs(
     std::vector<std::uint32_t> host_clean(plan.storage_shard_count);
     std::vector<std::uint32_t> host_processing(plan.storage_shard_count);
     std::vector<std::uint32_t> host_ready_shards(plan.storage_shard_count);
+    std::vector<std::uint32_t> host_send_count(plan.config.world_size);
+    std::vector<std::uint32_t> host_send_offset(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
+    std::vector<std::uint32_t> host_recv_count(plan.config.world_size);
+    std::vector<std::uint32_t> host_recv_offset(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
     std::vector<std::uint64_t> host_parent_base(ring_slot_job_count, 0);
     std::vector<std::uint32_t> host_count(ring_slot_job_count, 0);
     std::vector<std::uint32_t> pending_stream4_shards;
@@ -930,6 +1003,9 @@ DepthDispatchState run_depth_cuda_graphs(
     EventCleanup event_cleanup{event_groups};
 
     const auto refresh_stop_requested = [&]() -> bool {
+        if (multi_rank) {
+            return false;
+        }
         if (state.stop_requested) {
             return true;
         }
@@ -1781,8 +1857,160 @@ DepthDispatchState run_depth_cuda_graphs(
     };
 
     const auto periodic_threshold_due = [&]() -> bool {
-        return plan.config.global_threshold_update_period_shards != 0 &&
+        return !multi_rank &&
+            plan.config.global_threshold_update_period_shards != 0 &&
             stream4_jobs_since_threshold_update >= plan.config.global_threshold_update_period_shards;
+    };
+
+    std::uint64_t completed_exchange_rounds = 0;
+    const auto run_stream5_exchange_and_collect = [&](std::uint32_t ring, bool zero_send) {
+        if (!multi_rank) {
+            return;
+        }
+        if (ring >= plan.stream5_slot_count) {
+            throw std::runtime_error("stream5 exchange ring exceeds slot count");
+        }
+        CandidateMeta* send_buffer =
+            memory.streams.remote_send_buffer + static_cast<std::uint64_t>(ring) * plan.stream5_send_slot_capacity;
+        CandidateMeta* recv_buffer =
+            memory.streams.remote_recv_buffer + static_cast<std::uint64_t>(ring) * plan.stream5_recv_slot_capacity;
+        if (zero_send) {
+            std::fill(host_send_count.begin(), host_send_count.end(), 0U);
+            std::fill(host_send_offset.begin(), host_send_offset.end(), 0U);
+            check_cuda(cudaMemcpyAsync(
+                memory.streams.send_count,
+                host_send_count.data(),
+                static_cast<std::uint64_t>(plan.config.world_size) * sizeof(std::uint32_t),
+                cudaMemcpyHostToDevice,
+                streams.stream5), "cudaMemcpyAsync zero stream5 send counts");
+            check_cuda(cudaMemcpyAsync(
+                memory.streams.send_offset,
+                host_send_offset.data(),
+                (static_cast<std::uint64_t>(plan.config.world_size) + 1ULL) * sizeof(std::uint32_t),
+                cudaMemcpyHostToDevice,
+                streams.stream5), "cudaMemcpyAsync zero stream5 send offsets");
+        } else {
+            check_cuda(cudaMemcpy(
+                host_send_count.data(),
+                memory.streams.send_count,
+                static_cast<std::uint64_t>(plan.config.world_size) * sizeof(std::uint32_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy stream5 send counts");
+            check_cuda(cudaMemcpy(
+                host_send_offset.data(),
+                memory.streams.send_offset,
+                (static_cast<std::uint64_t>(plan.config.world_size) + 1ULL) * sizeof(std::uint32_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy stream5 send offsets");
+            if (host_send_offset[plan.config.world_size] > plan.stream5_send_slot_capacity) {
+                throw std::runtime_error("stream5 send count exceeds slot capacity");
+            }
+        }
+
+#if BEAM_DEBUG_STREAM_TIMING
+        check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 exchange timing start");
+#endif
+        stream5_exchange_counts_nccl_cuda(
+            memory.streams.send_count,
+            memory.streams.recv_count,
+            plan.config.local_rank,
+            plan.config.world_size,
+            collective->comm,
+            streams.stream5);
+        check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 count exchange");
+        check_cuda(cudaMemcpy(
+            host_recv_count.data(),
+            memory.streams.recv_count,
+            static_cast<std::uint64_t>(plan.config.world_size) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream5 recv counts");
+        std::uint64_t recv_total_64 = 0;
+        host_recv_offset[0] = 0;
+        for (std::uint32_t peer = 0; peer < plan.config.world_size; ++peer) {
+            recv_total_64 += host_recv_count[peer];
+            if (recv_total_64 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+                throw std::runtime_error("stream5 recv count exceeds uint32 range");
+            }
+            host_recv_offset[peer + 1U] = static_cast<std::uint32_t>(recv_total_64);
+        }
+        if (recv_total_64 > plan.stream5_recv_slot_capacity) {
+            throw std::runtime_error(
+                "stream5 recv count exceeds slot capacity: recv=" +
+                std::to_string(recv_total_64) +
+                " capacity=" + std::to_string(plan.stream5_recv_slot_capacity) +
+                " scale_ppm=" + std::to_string(plan.config.stream5_recv_capacity_scale_ppm));
+        }
+        stream5_write_recv_offsets_cuda(
+            memory.streams.recv_offset,
+            host_recv_offset.data(),
+            plan.config.world_size,
+            streams.stream5);
+        stream5_exchange_payload_nccl_cuda(
+            send_buffer,
+            memory.streams.send_count,
+            memory.streams.send_offset,
+            recv_buffer,
+            memory.streams.recv_offset,
+            host_send_count.data(),
+            host_send_offset.data(),
+            host_recv_count.data(),
+            host_recv_offset.data(),
+            plan.config.local_rank,
+            plan.config.world_size,
+            collective->comm,
+            streams.stream5);
+#if BEAM_DEBUG_STREAM_TIMING
+        check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 exchange timing stop");
+#endif
+        check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 payload exchange");
+#if BEAM_DEBUG_STREAM_TIMING
+        accumulate_elapsed_ms(
+            stream5_timing_start[0],
+            stream5_timing_stop[0],
+            state.stream5_ms_total,
+            nullptr,
+            "cudaEventElapsedTime stream5 exchange");
+#endif
+        if (recv_total_64 != 0ULL) {
+            stream3_collect_remote_recv_cuda(
+                recv_buffer,
+                memory.streams.recv_count,
+                memory.streams.recv_offset,
+                memory.streams.survivor_shard,
+                memory.streams.clean_count,
+                memory.streams.dirty_count,
+                memory.streams.processing_flag,
+                memory.streams.global_spill_buffer_a,
+                memory.streams.global_spill_buffer_b,
+                memory.streams.global_spill_count,
+                memory.streams.global_spill_active_index,
+                memory.streams.stream3_write_buffer_index,
+                memory.streams.stream3_shard_counts,
+                memory.streams.stream3_shard_offsets,
+                memory.streams.stream3_spill_counts,
+                memory.streams.stream3_spill_offsets,
+                memory.streams.stream3_partition_key_a,
+                memory.streams.stream3_partition_key_b,
+                memory.streams.stream3_partition_val_a,
+                memory.streams.stream3_partition_val_b,
+                memory.streams.stream3_partition_unique_shard,
+                memory.streams.stream3_partition_unique_counts,
+                memory.streams.stream3_partition_unique_count,
+                memory.streams.stream3_cub_temp,
+                memory.streams.stream3_cub_temp_bytes,
+                static_cast<std::uint32_t>(recv_total_64),
+                plan.config.world_size,
+                plan.config.shard_count,
+                plan.config.shard_buffer_count,
+                plan.config.shard_capacity_candidates,
+                plan.config.stream4_batch_candidates,
+                plan.config.global_spill_capacity,
+                streams.stream3,
+                memory.streams.fatal_error_flag,
+                memory.streams.fatal_error_trace);
+            check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize stream3 remote recv collect");
+            throw_if_stream_fatal_error("stream3_remote_recv_collect");
+            update_global_spill_peak();
+            append_stream3_ready_queue();
+        }
+        ++completed_exchange_rounds;
     };
 
     const auto force_periodic_threshold_update = [&]() {
@@ -1793,7 +2021,7 @@ DepthDispatchState run_depth_cuda_graphs(
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 timing start");
 #endif
-        update_threshold_single_gpu(plan, memory, streams.stream5, true);
+        update_threshold_global(plan, memory, streams.stream5, true, collective);
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 timing stop");
 #endif
@@ -2122,6 +2350,7 @@ DepthDispatchState run_depth_cuda_graphs(
         update_global_spill_peak();
         stream3_active = false;
         stream3_active_ring = plan.config.ring_count;
+        run_stream5_exchange_and_collect(ring, false);
         ring_state[ring] = RingState::Free;
         if (!state.stop_requested) {
             append_stream3_ready_queue();
@@ -2216,8 +2445,17 @@ DepthDispatchState run_depth_cuda_graphs(
         return state;
     }
 
+    while (multi_rank && completed_exchange_rounds < global_exchange_rounds) {
+        const std::uint32_t ring =
+            static_cast<std::uint32_t>(completed_exchange_rounds % plan.stream5_slot_count);
+        run_stream5_exchange_and_collect(ring, true);
+        launch_pending_stream4_shards();
+    }
+
     drain_pending_stream4_shards();
-    force_periodic_threshold_update();
+    if (!multi_rank) {
+        force_periodic_threshold_update();
+    }
 
     for (std::uint32_t flush_round = 0; flush_round < plan.storage_shard_count + 2U; ++flush_round) {
 #if BEAM_DEBUG_STREAM_TIMING
@@ -2322,7 +2560,8 @@ DepthDispatchState run_depth_cuda_graphs(
             total_clean += clean;
         }
         const bool spill_remaining = spill_counts[spill_active & 1U] != 0U || any_dirty;
-        if (stream4_jobs_since_threshold_update != 0U &&
+        if (!multi_rank &&
+            stream4_jobs_since_threshold_update != 0U &&
             (periodic_threshold_due() || spill_remaining)) {
             force_periodic_threshold_update();
         }
@@ -2364,10 +2603,15 @@ FinalizeDepthState finalize_depth_single_gpu(
     std::uint32_t history_host_capacity,
     cudaStream_t history_stream,
     cudaEvent_t history_copy_done,
-    const Hash128* tracked_prefinal_hash) {
+    const Hash128* tracked_prefinal_hash,
+    const DispatcherCollective* collective) {
     NvtxRange range("Dispatcher_finalize_depth_single_gpu");
-    if (plan.config.world_size != 1 || plan.config.local_rank != 0) {
+    const bool multi_rank = plan.config.world_size > 1U;
+    if (!multi_rank && plan.config.local_rank != 0) {
         throw std::invalid_argument("single gpu finalization requires WORLD_SIZE=1 and LOCAL_RANK=0");
+    }
+    if (multi_rank && (collective == nullptr || collective->comm == nullptr)) {
+        throw std::invalid_argument("multi rank finalization requires NCCL collective");
     }
     if (tables.generators == nullptr) {
         throw std::invalid_argument("finalization requires generators");
@@ -2404,7 +2648,7 @@ FinalizeDepthState finalize_depth_single_gpu(
 #if BEAM_DEBUG_STREAM_TIMING
     record_timing_start(streams.stream5, "cudaEventRecord final threshold timing start");
 #endif
-    update_threshold_single_gpu(plan, memory, streams.stream5, false);
+    update_threshold_global(plan, memory, streams.stream5, false, collective);
 #if BEAM_DEBUG_STREAM_TIMING
     record_timing_stop_and_sync(
         streams.stream5,
@@ -2425,6 +2669,439 @@ FinalizeDepthState finalize_depth_single_gpu(
     result.final_threshold = final_threshold;
     if (tracked_prefinal_hash != nullptr) {
         scan_tracked_prefinal_hash(plan, memory, streams, *tracked_prefinal_hash, result);
+    }
+
+    if (multi_rank) {
+        const std::uint32_t world_size = plan.config.world_size;
+        const std::uint32_t local_rank = plan.config.local_rank;
+        std::vector<std::uint32_t> host_counts(world_size);
+        std::vector<std::uint32_t> host_offsets(static_cast<std::uint64_t>(world_size) + 1ULL);
+        std::vector<std::uint32_t> recv_counts(world_size);
+        std::vector<std::uint32_t> recv_offsets(static_cast<std::uint64_t>(world_size) + 1ULL);
+
+        const auto make_offsets = [](const std::vector<std::uint32_t>& counts, std::vector<std::uint32_t>& offsets) {
+            std::uint64_t running = 0;
+            offsets[0] = 0;
+            for (std::uint32_t i = 0; i < counts.size(); ++i) {
+                running += counts[i];
+                if (running > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+                    throw std::runtime_error("exchange item count exceeds uint32 range");
+                }
+                offsets[i + 1U] = static_cast<std::uint32_t>(running);
+            }
+            return static_cast<std::uint32_t>(running);
+        };
+        const auto ceil_div_local = [](std::uint64_t a, std::uint64_t b) {
+            return b == 0ULL ? 0ULL : (a + b - 1ULL) / b;
+        };
+        const auto target_rank_for_global = [&](std::uint64_t global_idx, std::uint64_t global_count) {
+            std::uint32_t target =
+                static_cast<std::uint32_t>((global_idx * static_cast<std::uint64_t>(world_size)) / global_count);
+            if (target >= world_size) {
+                target = world_size - 1U;
+            }
+            return target;
+        };
+        const auto exchange_u64_items = [&](
+            const void* host_send,
+            std::uint32_t send_total,
+            const std::vector<std::uint32_t>& send_count,
+            const std::vector<std::uint32_t>& send_offset,
+            void* device_send,
+            std::uint32_t device_send_capacity,
+            void* device_recv,
+            std::uint32_t device_recv_capacity,
+            std::uint32_t words_per_item,
+            void* host_recv,
+            std::uint32_t& recv_total_out) {
+            if (send_total > device_send_capacity) {
+                throw std::runtime_error("exchange send total exceeds device capacity");
+            }
+            if (send_total != 0U && host_send != nullptr) {
+                check_cuda(cudaMemcpyAsync(
+                    device_send,
+                    host_send,
+                    static_cast<std::uint64_t>(send_total) * words_per_item * sizeof(std::uint64_t),
+                    cudaMemcpyHostToDevice,
+                    streams.stream5), "cudaMemcpyAsync exchange host send to device");
+            }
+            check_cuda(cudaMemcpyAsync(
+                memory.final.final_send_count,
+                send_count.data(),
+                static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
+                cudaMemcpyHostToDevice,
+                streams.stream5), "cudaMemcpyAsync exchange send counts");
+            check_cuda(cudaMemcpyAsync(
+                memory.final.final_send_offset,
+                send_offset.data(),
+                (static_cast<std::uint64_t>(world_size) + 1ULL) * sizeof(std::uint32_t),
+                cudaMemcpyHostToDevice,
+                streams.stream5), "cudaMemcpyAsync exchange send offsets");
+            stream5_exchange_counts_nccl_cuda(
+                memory.final.final_send_count,
+                memory.final.final_recv_count,
+                local_rank,
+                world_size,
+                collective->comm,
+                streams.stream5);
+            check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize exchange counts");
+            check_cuda(cudaMemcpy(
+                recv_counts.data(),
+                memory.final.final_recv_count,
+                static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
+                cudaMemcpyDeviceToHost), "cudaMemcpy exchange recv counts");
+            const std::uint32_t recv_total = make_offsets(recv_counts, recv_offsets);
+            if (recv_total > device_recv_capacity) {
+                throw std::runtime_error("exchange recv total exceeds device capacity");
+            }
+            stream5_write_recv_offsets_cuda(
+                memory.final.final_recv_offset,
+                recv_offsets.data(),
+                world_size,
+                streams.stream5);
+            stream5_exchange_u64_payload_nccl_cuda(
+                device_send,
+                device_recv,
+                send_count.data(),
+                send_offset.data(),
+                recv_counts.data(),
+                recv_offsets.data(),
+                words_per_item,
+                local_rank,
+                world_size,
+                collective->comm,
+                streams.stream5);
+            if (recv_total != 0U && host_recv != nullptr) {
+                check_cuda(cudaMemcpyAsync(
+                    host_recv,
+                    device_recv,
+                    static_cast<std::uint64_t>(recv_total) * words_per_item * sizeof(std::uint64_t),
+                    cudaMemcpyDeviceToHost,
+                    streams.stream5), "cudaMemcpyAsync exchange device recv to host");
+            }
+            check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize exchange payload");
+            recv_total_out = recv_total;
+        };
+
+        final_count_score_phase_cuda(
+            memory.streams.survivor_shard,
+            memory.streams.clean_count,
+            memory.final.final_keep_flags,
+            memory.final.final_block_counts,
+            memory.final.final_block_offsets,
+            memory.final.final_candidate_count,
+            final_threshold,
+            0,
+            plan.storage_shard_count,
+            plan.config.shard_capacity_candidates,
+            plan.config.stream4_batch_candidates,
+            streams.stream3);
+        check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final less count");
+        final_allgather_counts_nccl_cuda(
+            memory.final.final_candidate_count,
+            memory.final.final_recv_count,
+            collective->comm,
+            streams.stream5);
+        check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize final less allgather");
+        std::vector<std::uint32_t> less_counts(world_size);
+        check_cuda(cudaMemcpy(
+            less_counts.data(),
+            memory.final.final_recv_count,
+            static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy final less counts");
+
+        final_count_score_phase_cuda(
+            memory.streams.survivor_shard,
+            memory.streams.clean_count,
+            memory.final.final_keep_flags,
+            memory.final.final_block_counts,
+            memory.final.final_block_offsets,
+            memory.final.final_request_count,
+            final_threshold,
+            1,
+            plan.storage_shard_count,
+            plan.config.shard_capacity_candidates,
+            plan.config.stream4_batch_candidates,
+            streams.stream3);
+        check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final equal count");
+        final_allgather_counts_nccl_cuda(
+            memory.final.final_request_count,
+            memory.final.final_send_count,
+            collective->comm,
+            streams.stream5);
+        check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize final equal allgather");
+        std::vector<std::uint32_t> equal_counts(world_size);
+        check_cuda(cudaMemcpy(
+            equal_counts.data(),
+            memory.final.final_send_count,
+            static_cast<std::uint64_t>(world_size) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy final equal counts");
+
+        std::uint64_t less_prefix = 0;
+        std::uint64_t equal_prefix = 0;
+        std::uint64_t global_less = 0;
+        std::uint64_t global_equal = 0;
+        for (std::uint32_t rank = 0; rank < world_size; ++rank) {
+            if (rank < local_rank) {
+                less_prefix += less_counts[rank];
+                equal_prefix += equal_counts[rank];
+            }
+            global_less += less_counts[rank];
+            global_equal += equal_counts[rank];
+        }
+        const std::uint64_t total_available = global_less + global_equal;
+        const std::uint64_t global_keep_count =
+            std::min<std::uint64_t>(plan.derived.global_beam_width_effective, total_available);
+        const std::uint32_t candidate_capacity = static_cast<std::uint32_t>(
+            (plan.frontier_states * sizeof(State128)) / sizeof(CandidateMeta));
+        CandidateMeta* selected_device = reinterpret_cast<CandidateMeta*>(memory.final.next_frontier_states_tmp);
+        final_filter_load_balance_exact_cuda(
+            memory.streams.survivor_shard,
+            memory.streams.clean_count,
+            memory.final.final_keep_flags,
+            memory.final.final_block_counts,
+            memory.final.final_block_offsets,
+            selected_device,
+            memory.final.final_candidate_count,
+            memory.final.final_request_count,
+            final_threshold,
+            less_prefix,
+            global_less + equal_prefix,
+            global_keep_count,
+            candidate_capacity,
+            plan.storage_shard_count,
+            plan.config.shard_capacity_candidates,
+            plan.config.stream4_batch_candidates,
+            streams.stream3);
+        check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final exact filter");
+        std::uint32_t selected_count = 0;
+        check_cuda(cudaMemcpy(
+            &selected_count,
+            memory.final.final_candidate_count,
+            sizeof(selected_count),
+            cudaMemcpyDeviceToHost), "cudaMemcpy final selected count");
+        if (selected_count > candidate_capacity) {
+            throw std::runtime_error("final selected count exceeds candidate capacity");
+        }
+        std::vector<CandidateMeta> selected(selected_count);
+        if (selected_count != 0U) {
+            check_cuda(cudaMemcpy(
+                selected.data(),
+                selected_device,
+                static_cast<std::uint64_t>(selected_count) * sizeof(CandidateMeta),
+                cudaMemcpyDeviceToHost), "cudaMemcpy final selected candidates");
+        }
+
+        std::vector<std::uint32_t> history_count(world_size, 0U);
+        std::vector<std::uint32_t> request_count(world_size, 0U);
+        std::uint64_t less_seen = 0;
+        std::uint64_t equal_seen = 0;
+        for (const CandidateMeta& candidate : selected) {
+            const bool less = candidate.score_key < final_threshold;
+            const std::uint64_t global_idx = less
+                ? less_prefix + less_seen++
+                : global_less + equal_prefix + equal_seen++;
+            if (global_idx >= global_keep_count || global_keep_count == 0ULL) {
+                continue;
+            }
+            const std::uint32_t target_rank = target_rank_for_global(global_idx, global_keep_count);
+            const std::uint32_t source_rank = unpack_source_rank(candidate.route_packed);
+            if (source_rank >= world_size) {
+                throw std::runtime_error("final candidate source rank exceeds WORLD_SIZE");
+            }
+            ++history_count[target_rank];
+            ++request_count[source_rank];
+        }
+        const std::uint32_t history_send_total = make_offsets(history_count, host_offsets);
+        const std::uint32_t request_send_total = make_offsets(request_count, recv_offsets);
+        std::vector<std::uint32_t> history_cursor = host_offsets;
+        std::vector<std::uint32_t> request_cursor = recv_offsets;
+        std::vector<FinalHistoryRecord> history_send(history_send_total);
+        std::vector<FinalRequest> request_send(request_send_total);
+        less_seen = 0;
+        equal_seen = 0;
+        for (const CandidateMeta& candidate : selected) {
+            const bool less = candidate.score_key < final_threshold;
+            const std::uint64_t global_idx = less
+                ? less_prefix + less_seen++
+                : global_less + equal_prefix + equal_seen++;
+            if (global_idx >= global_keep_count || global_keep_count == 0ULL) {
+                continue;
+            }
+            const std::uint32_t target_rank = target_rank_for_global(global_idx, global_keep_count);
+            const std::uint64_t target_begin =
+                ceil_div_local(static_cast<std::uint64_t>(target_rank) * global_keep_count, world_size);
+            const std::uint32_t target_local_idx = static_cast<std::uint32_t>(global_idx - target_begin);
+            const std::uint32_t source_rank = unpack_source_rank(candidate.route_packed);
+            history_send[history_cursor[target_rank]++] = FinalHistoryRecord{candidate, target_local_idx, 0U};
+            FinalRequest request{};
+            request.parent_idx = candidate.parent_idx;
+            request.target_local_idx = target_local_idx;
+            request.return_rank = static_cast<std::uint16_t>(target_rank);
+            request.move = unpack_move(candidate.route_packed);
+            request_send[request_cursor[source_rank]++] = request;
+        }
+
+        const std::uint32_t history_record_capacity = static_cast<std::uint32_t>(
+            (plan.frontier_states * sizeof(FinalResponse)) / sizeof(FinalHistoryRecord));
+        std::uint32_t history_recv_total = 0;
+        std::vector<FinalHistoryRecord> history_recv(history_record_capacity);
+        exchange_u64_items(
+            history_send.data(),
+            history_send_total,
+            history_count,
+            host_offsets,
+            memory.final.final_response_buffer,
+            history_record_capacity,
+            memory.final.next_frontier_states_tmp,
+            history_record_capacity,
+            static_cast<std::uint32_t>(sizeof(FinalHistoryRecord) / sizeof(std::uint64_t)),
+            history_recv.data(),
+            history_recv_total);
+        if (history_recv_total > history_record_capacity) {
+            throw std::runtime_error("history recv total exceeds host capacity");
+        }
+        if (history_host_buffer != nullptr) {
+            if (history_stream == nullptr || history_copy_done == nullptr) {
+                throw std::invalid_argument("history copy requires history stream and completion event");
+            }
+            if (history_recv_total > history_host_capacity) {
+                throw std::runtime_error("history host buffer capacity is smaller than received history count");
+            }
+            for (std::uint32_t i = 0; i < history_recv_total; ++i) {
+                if (history_recv[i].target_local_idx >= history_host_capacity) {
+                    throw std::runtime_error("history target local index exceeds host capacity");
+                }
+                history_host_buffer[history_recv[i].target_local_idx] = history_recv[i].meta;
+            }
+            check_cuda(cudaEventRecord(history_copy_done, history_stream), "cudaEventRecord history copy done");
+        }
+
+        const std::uint32_t request_device_capacity =
+            static_cast<std::uint32_t>(plan.frontier_states);
+        std::uint32_t request_recv_total = 0;
+        std::vector<FinalRequest> request_recv(static_cast<std::uint64_t>(plan.frontier_states) * 2ULL);
+        exchange_u64_items(
+            request_send.data(),
+            request_send_total,
+            request_count,
+            recv_offsets,
+            memory.final.next_frontier_states_tmp,
+            static_cast<std::uint32_t>((plan.frontier_states * sizeof(State128)) / sizeof(FinalRequest)),
+            memory.final.final_candidate_buffer,
+            static_cast<std::uint32_t>((plan.frontier_states * sizeof(CandidateMeta)) / sizeof(FinalRequest)),
+            static_cast<std::uint32_t>(sizeof(FinalRequest) / sizeof(std::uint64_t)),
+            request_recv.data(),
+            request_recv_total);
+        if (request_recv_total > request_recv.size()) {
+            throw std::runtime_error("request recv total exceeds host capacity");
+        }
+
+        std::vector<std::uint32_t> response_count(world_size, 0U);
+        for (std::uint32_t i = 0; i < request_recv_total; ++i) {
+            if (request_recv[i].return_rank >= world_size) {
+                throw std::runtime_error("final request return rank exceeds WORLD_SIZE");
+            }
+            ++response_count[request_recv[i].return_rank];
+        }
+        const std::uint32_t response_send_total = make_offsets(response_count, host_offsets);
+        if (response_send_total > request_device_capacity) {
+            throw std::runtime_error("response send request count exceeds device capacity");
+        }
+        std::vector<std::uint32_t> response_cursor = host_offsets;
+        std::vector<FinalRequest> response_requests(response_send_total);
+        for (std::uint32_t i = 0; i < request_recv_total; ++i) {
+            response_requests[response_cursor[request_recv[i].return_rank]++] = request_recv[i];
+        }
+        if (response_send_total != 0U) {
+            check_cuda(cudaMemcpyAsync(
+                memory.final.final_request_buffer,
+                response_requests.data(),
+                static_cast<std::uint64_t>(response_send_total) * sizeof(FinalRequest),
+                cudaMemcpyHostToDevice,
+                streams.stream3), "cudaMemcpyAsync response requests to device");
+            final_materialize_responses_cuda(
+                memory.current_frontier_states,
+                memory.final.final_request_buffer,
+                tables.generators,
+                reinterpret_cast<FinalResponse*>(memory.final.next_frontier_states_tmp),
+                response_send_total,
+                streams.stream3);
+        }
+        check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize final response materialize");
+
+        std::uint32_t response_recv_total = 0;
+        exchange_u64_items(
+            nullptr,
+            response_send_total,
+            response_count,
+            host_offsets,
+            memory.final.next_frontier_states_tmp,
+            request_device_capacity,
+            memory.final.final_response_buffer,
+            request_device_capacity,
+            static_cast<std::uint32_t>(sizeof(FinalResponse) / sizeof(std::uint64_t)),
+            nullptr,
+            response_recv_total);
+        final_scatter_responses_cuda(
+            memory.final.final_response_buffer,
+            memory.final.next_frontier_states_tmp,
+            response_recv_total,
+            streams.stream3);
+        if (history_host_buffer != nullptr && history_recv_total != response_recv_total) {
+            throw std::runtime_error("history recv count does not match response recv count");
+        }
+        if (response_recv_total != 0U) {
+            check_cuda(cudaMemcpyAsync(
+                memory.current_frontier_states,
+                memory.final.next_frontier_states_tmp,
+                static_cast<std::uint64_t>(response_recv_total) * sizeof(State128),
+                cudaMemcpyDeviceToDevice,
+                streams.stream3), "cudaMemcpyAsync multi next frontier to current");
+        }
+        check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize multi final materialize");
+
+        result.final_candidate_count = response_recv_total;
+        result.final_request_count = request_recv_total;
+        result.next_frontier_size = response_recv_total;
+
+        check_cuda(cudaMemsetAsync(
+            memory.streams.clean_count,
+            0,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset clean count");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.dirty_count,
+            0,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset dirty count");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.processing_flag,
+            0,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset processing flag");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.global_spill_count,
+            0,
+            2ULL * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset global spill counts");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.global_spill_active_index,
+            0,
+            sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset global spill active index");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.threshold_initialized,
+            0,
+            sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset threshold initialized");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.current_threshold,
+            0xff,
+            sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset threshold");
+        check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize multi final reset");
+        return result;
     }
 
 #if BEAM_DEBUG_STREAM_TIMING

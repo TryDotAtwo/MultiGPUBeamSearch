@@ -131,6 +131,41 @@ __global__ void final_materialize_kernel(
     next_frontier_states_tmp[target_local_idx] = response;
 }
 
+__global__ void final_materialize_responses_kernel(
+    const State128* current_frontier_states,
+    const FinalRequest* requests,
+    const std::uint8_t* generators,
+    FinalResponse* responses,
+    std::uint32_t request_count) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= request_count) {
+        return;
+    }
+    const FinalRequest request = requests[i];
+    const State128 parent = current_frontier_states[request.parent_idx];
+    FinalResponse response{};
+    for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+        const std::uint8_t source = generators[static_cast<std::uint32_t>(request.move) * STATE_STORAGE_LEN + p];
+        response.v[p] = parent.v[source];
+    }
+    final_response_set_target_local_idx_device(response, request.target_local_idx);
+    responses[i] = response;
+}
+
+__global__ void final_scatter_responses_kernel(
+    const FinalResponse* responses,
+    State128* next_frontier_states_tmp,
+    std::uint32_t response_count) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= response_count) {
+        return;
+    }
+    State128 state = responses[i];
+    const std::uint32_t target_local_idx = final_response_get_target_local_idx_device(state);
+    clear_state_padding_device(state);
+    next_frontier_states_tmp[target_local_idx] = state;
+}
+
 void final_materialize_cuda(
     const State128* current_frontier_states,
     const FinalRequest* requests,
@@ -149,6 +184,42 @@ void final_materialize_cuda(
         responses,
         next_frontier_states_tmp,
         request_count);
+}
+
+void final_materialize_responses_cuda(
+    const State128* current_frontier_states,
+    const FinalRequest* requests,
+    const std::uint8_t* generators,
+    FinalResponse* responses,
+    std::uint32_t request_count,
+    cudaStream_t stream) {
+    NvtxRange range("Final_materialize_responses_launch");
+    const dim3 block(128);
+    const dim3 grid((request_count + block.x - 1) / block.x);
+    if (grid.x != 0U) {
+        final_materialize_responses_kernel<<<grid, block, 0, stream>>>(
+            current_frontier_states,
+            requests,
+            generators,
+            responses,
+            request_count);
+    }
+}
+
+void final_scatter_responses_cuda(
+    const FinalResponse* responses,
+    State128* next_frontier_states_tmp,
+    std::uint32_t response_count,
+    cudaStream_t stream) {
+    NvtxRange range("Final_scatter_responses_launch");
+    const dim3 block(128);
+    const dim3 grid((response_count + block.x - 1) / block.x);
+    if (grid.x != 0U) {
+        final_scatter_responses_kernel<<<grid, block, 0, stream>>>(
+            responses,
+            next_frontier_states_tmp,
+            response_count);
+    }
 }
 
 void validate_final_requests_cuda(

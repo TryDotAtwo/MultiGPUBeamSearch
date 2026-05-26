@@ -19,6 +19,9 @@ struct StaticMemoryPlan {
     std::uint64_t parent_base_count = 0;
     std::uint64_t ring_count_count = 0;
     std::uint64_t stream3_count = 0;
+    std::uint64_t stream5_slot_count = 0;
+    std::uint64_t stream5_send_slot_capacity = 0;
+    std::uint64_t stream5_recv_slot_capacity = 0;
     std::uint32_t storage_shard_count = 0;
     std::uint64_t survivor_count = 0;
     std::uint64_t final_state_count = 0;
@@ -74,6 +77,8 @@ struct LayoutStreamsView {
     std::uint32_t* send_offset = nullptr;
     std::uint32_t* recv_count = nullptr;
     std::uint32_t* recv_offset = nullptr;
+    std::uint64_t* stream5_local_round_count = nullptr;
+    std::uint64_t* stream5_global_round_count = nullptr;
     CandidateMeta* survivor_shard = nullptr;
     Hash128* stream4_key_a = nullptr;
     Hash128* stream4_key_b = nullptr;
@@ -132,6 +137,7 @@ struct StaticDeviceMemory {
     std::uint32_t* stop_flag = nullptr;
     std::uint32_t* solved_count = nullptr;
     std::uint32_t* solved_overflow = nullptr;
+    std::uint32_t* global_stop_flag = nullptr;
     CandidateMeta* solved_meta_list = nullptr;
     std::uint32_t* solved_depth_list = nullptr;
     std::uint32_t* current_depth = nullptr;

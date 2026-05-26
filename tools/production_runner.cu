@@ -23,6 +23,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -79,6 +80,10 @@ std::uint32_t env_u32(const char* name, std::uint32_t default_value) {
 bool env_present(const char* name) {
     const char* value = std::getenv(name);
     return value != nullptr && value[0] != '\0';
+}
+
+std::uint32_t env_or_default_u32(const char* name, std::uint32_t default_value) {
+    return env_present(name) ? env_u32(name, default_value) : default_value;
 }
 
 bool env_bool(const char* name, bool default_value) {
@@ -265,12 +270,21 @@ std::string timestamp_id() {
     return std::to_string(seconds);
 }
 
-std::filesystem::path make_history_dir(std::uint64_t puzzle_id, std::uint32_t depth_limit, std::uint64_t beam) {
+std::filesystem::path make_history_dir(
+    std::uint64_t puzzle_id,
+    std::uint32_t depth_limit,
+    std::uint64_t beam,
+    std::uint32_t rank,
+    std::uint32_t world_size) {
     std::filesystem::path dir = "test_results";
-    dir /= "candidate_history_p" + std::to_string(puzzle_id) +
+    std::string name = "candidate_history_p" + std::to_string(puzzle_id) +
         "_d" + std::to_string(depth_limit) +
-        "_b" + std::to_string(beam) +
-        "_" + timestamp_id();
+        "_b" + std::to_string(beam);
+    if (world_size > 1U) {
+        name += "_r" + std::to_string(rank);
+    }
+    name += "_" + timestamp_id();
+    dir /= name;
     std::filesystem::create_directories(dir);
     return dir;
 }
@@ -850,6 +864,7 @@ struct CpuCandidateHistory {
     std::uint64_t bytes_stored = 0;
     std::uint64_t bytes_pruned = 0;
     std::uint32_t worker_count = 1;
+    bool prune_enabled = true;
     std::vector<Slot> slots;
     cudaStream_t copy_stream = nullptr;
 
@@ -956,6 +971,9 @@ struct CpuCandidateHistory {
     }
 
     void pump_prune_jobs(bool wait_all) {
+        if (!prune_enabled) {
+            return;
+        }
         bool progressed = true;
         while (progressed) {
             progressed = false;
@@ -1065,7 +1083,7 @@ struct CpuCandidateHistory {
                             }
                             ram_depths[slot.depth_index] = std::move(ram_data);
                             ram_ready[slot.depth_index] = true;
-                            if (slot.depth_index > 0U) {
+                            if (prune_enabled && slot.depth_index > 0U) {
                                 prune_dirty[slot.depth_index - 1U] = true;
                             }
                         }
@@ -1228,6 +1246,8 @@ struct SolvedSnapshot {
     std::vector<std::uint32_t> depth;
 };
 
+void require_nccl(ncclResult_t status, const char* op);
+
 SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint32_t capacity) {
     SolvedSnapshot snapshot;
     std::uint32_t flag = 0;
@@ -1254,6 +1274,190 @@ SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint3
             cudaMemcpyDeviceToHost));
     }
     return snapshot;
+}
+
+struct DistributedReconstructionResult {
+    bool has_solution = false;
+    bool controller_rank = false;
+    std::uint32_t controller = 0;
+    CandidateMeta solved_meta{};
+    std::uint32_t solved_depth = 0;
+    ReconstructedSolution solution;
+};
+
+DistributedReconstructionResult reconstruct_solution_distributed(
+    const CpuCandidateHistory& history,
+    const SolvedSnapshot& local_solved,
+    const StaticMemoryPlan& plan,
+    StaticDeviceMemory& memory,
+    const DispatcherStreams& streams,
+    ncclComm_t comm,
+    std::uint32_t world_size,
+    std::uint32_t rank) {
+    if (world_size <= 1U) {
+        throw std::invalid_argument("distributed reconstruction requires WORLD_SIZE > 1");
+    }
+    if (comm == nullptr) {
+        throw std::invalid_argument("distributed reconstruction requires NCCL communicator");
+    }
+    constexpr std::uint32_t packet_words = 5;
+    constexpr std::uint32_t query_words = 4;
+    constexpr std::uint32_t response_words = 2;
+    const std::uint64_t scratch_words =
+        (plan.frontier_states * sizeof(State128)) / sizeof(std::uint64_t);
+    const std::uint64_t required_words =
+        static_cast<std::uint64_t>(packet_words) * (static_cast<std::uint64_t>(world_size) + 1ULL) +
+        query_words + response_words;
+    if (scratch_words < required_words || memory.final.next_frontier_states_tmp == nullptr) {
+        throw std::runtime_error("distributed reconstruction scratch buffer is too small");
+    }
+
+    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.final.next_frontier_states_tmp);
+    std::uint64_t* packet_send_device = scratch;
+    std::uint64_t* packet_recv_device = scratch + packet_words;
+    std::uint64_t* query_device =
+        packet_recv_device + static_cast<std::uint64_t>(packet_words) * world_size;
+    std::uint64_t* response_device = query_device + query_words;
+
+    const bool local_found = local_solved.found && !local_solved.meta.empty() && !local_solved.depth.empty();
+    std::array<std::uint64_t, packet_words> local_packet{
+        local_found ? 1ULL : 0ULL,
+        static_cast<std::uint64_t>(rank),
+        local_found ? static_cast<std::uint64_t>(local_solved.depth.front()) : 0ULL,
+        local_found ? local_solved.meta.front().parent_idx : 0ULL,
+        local_found ? static_cast<std::uint64_t>(local_solved.meta.front().route_packed) : 0ULL};
+    BEAM_CUDA_CHECK(cudaMemcpyAsync(
+        packet_send_device,
+        local_packet.data(),
+        packet_words * sizeof(std::uint64_t),
+        cudaMemcpyHostToDevice,
+        streams.stream5));
+    require_nccl(ncclAllGather(
+        packet_send_device,
+        packet_recv_device,
+        packet_words,
+        ncclUint64,
+        comm,
+        streams.stream5), "ncclAllGather solved packet");
+    std::vector<std::uint64_t> packets(static_cast<std::uint64_t>(packet_words) * world_size);
+    BEAM_CUDA_CHECK(cudaMemcpyAsync(
+        packets.data(),
+        packet_recv_device,
+        packets.size() * sizeof(std::uint64_t),
+        cudaMemcpyDeviceToHost,
+        streams.stream5));
+    BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+
+    DistributedReconstructionResult result;
+    for (std::uint32_t peer = 0; peer < world_size; ++peer) {
+        const std::uint64_t* packet = packets.data() + static_cast<std::uint64_t>(peer) * packet_words;
+        if (packet[0] == 0ULL) {
+            continue;
+        }
+        result.has_solution = true;
+        result.controller = peer;
+        result.solved_depth = static_cast<std::uint32_t>(packet[2]);
+        result.solved_meta.parent_idx = packet[3];
+        result.solved_meta.route_packed = static_cast<std::uint32_t>(packet[4]);
+        if (local_found && rank == peer) {
+            result.solved_meta.hash = local_solved.meta.front().hash;
+            result.solved_meta.score_key = local_solved.meta.front().score_key;
+        }
+        break;
+    }
+    if (!result.has_solution) {
+        return result;
+    }
+    if (result.solved_depth == 0U) {
+        throw std::runtime_error("distributed solved depth must be positive");
+    }
+    result.controller_rank = rank == result.controller;
+    if (result.controller_rank) {
+        result.solution.moves.resize(result.solved_depth);
+        result.solution.parent_indices.resize(result.solved_depth);
+    }
+
+    HistoryEntry cursor{result.solved_meta.parent_idx, result.solved_meta.route_packed, 0U};
+    for (std::uint32_t depth = result.solved_depth; depth > 0; --depth) {
+        const std::uint32_t out = depth - 1U;
+        if (result.controller_rank) {
+            result.solution.moves[out] = unpack_move(cursor.route_packed);
+            result.solution.parent_indices[out] = cursor.parent_idx;
+        }
+        if (out == 0U) {
+            break;
+        }
+
+        const std::uint32_t target_rank = unpack_source_rank(cursor.route_packed);
+        if (target_rank >= world_size) {
+            throw std::runtime_error("distributed history source rank exceeds WORLD_SIZE");
+        }
+        std::array<std::uint64_t, query_words> query{
+            1ULL,
+            static_cast<std::uint64_t>(target_rank),
+            static_cast<std::uint64_t>(out - 1U),
+            cursor.parent_idx};
+        if (result.controller_rank) {
+            BEAM_CUDA_CHECK(cudaMemcpyAsync(
+                query_device,
+                query.data(),
+                query_words * sizeof(std::uint64_t),
+                cudaMemcpyHostToDevice,
+                streams.stream5));
+        }
+        require_nccl(ncclBroadcast(
+            query_device,
+            query_device,
+            query_words,
+            ncclUint64,
+            static_cast<int>(result.controller),
+            comm,
+            streams.stream5), "ncclBroadcast history query");
+        BEAM_CUDA_CHECK(cudaMemcpyAsync(
+            query.data(),
+            query_device,
+            query_words * sizeof(std::uint64_t),
+            cudaMemcpyDeviceToHost,
+            streams.stream5));
+        BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+
+        const std::uint32_t query_target = static_cast<std::uint32_t>(query[1]);
+        if (query_target >= world_size) {
+            throw std::runtime_error("distributed history query rank exceeds WORLD_SIZE");
+        }
+        if (rank == query_target) {
+            const HistoryEntry entry =
+                history.read_entry(static_cast<std::uint32_t>(query[2]), query[3]);
+            const std::array<std::uint64_t, response_words> response{
+                entry.parent_idx,
+                static_cast<std::uint64_t>(entry.route_packed)};
+            BEAM_CUDA_CHECK(cudaMemcpyAsync(
+                response_device,
+                response.data(),
+                response_words * sizeof(std::uint64_t),
+                cudaMemcpyHostToDevice,
+                streams.stream5));
+        }
+        require_nccl(ncclBroadcast(
+            response_device,
+            response_device,
+            response_words,
+            ncclUint64,
+            static_cast<int>(query_target),
+            comm,
+            streams.stream5), "ncclBroadcast history response");
+        std::array<std::uint64_t, response_words> response{};
+        BEAM_CUDA_CHECK(cudaMemcpyAsync(
+            response.data(),
+            response_device,
+            response_words * sizeof(std::uint64_t),
+            cudaMemcpyDeviceToHost,
+            streams.stream5));
+        BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+        cursor.parent_idx = response[0];
+        cursor.route_packed = static_cast<std::uint32_t>(response[1]);
+    }
+    return result;
 }
 
 void write_solution_artifacts(
@@ -1578,6 +1782,115 @@ void require_aligned(const void* ptr, std::uintptr_t alignment, const char* name
     }
 }
 
+void require_nccl(ncclResult_t status, const char* op) {
+    if (status != ncclSuccess) {
+        throw std::runtime_error(std::string(op) + ": " + ncclGetErrorString(status));
+    }
+}
+
+struct NcclRuntime {
+    ncclComm_t comm = nullptr;
+
+    NcclRuntime() = default;
+    NcclRuntime(const NcclRuntime&) = delete;
+    NcclRuntime& operator=(const NcclRuntime&) = delete;
+
+    NcclRuntime(NcclRuntime&& other) noexcept : comm(other.comm) {
+        other.comm = nullptr;
+    }
+
+    NcclRuntime& operator=(NcclRuntime&& other) noexcept {
+        if (this != &other) {
+            if (comm != nullptr) {
+                ncclCommDestroy(comm);
+            }
+            comm = other.comm;
+            other.comm = nullptr;
+        }
+        return *this;
+    }
+
+    ~NcclRuntime() {
+        if (comm != nullptr) {
+            ncclCommDestroy(comm);
+        }
+    }
+};
+
+ncclUniqueId read_nccl_id_file(const std::filesystem::path& path) {
+    ncclUniqueId id{};
+    for (std::uint32_t attempt = 0; attempt < 600U; ++attempt) {
+        std::ifstream in(path, std::ios::binary);
+        if (in) {
+            in.read(reinterpret_cast<char*>(&id), sizeof(id));
+            if (in.gcount() == static_cast<std::streamsize>(sizeof(id))) {
+                return id;
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    throw std::runtime_error("timed out waiting for NCCL rendezvous file: " + path.string());
+}
+
+NcclRuntime create_nccl_runtime(std::uint32_t world_size, std::uint32_t rank) {
+    NcclRuntime runtime;
+    if (world_size == 1U) {
+        return runtime;
+    }
+    const std::filesystem::path id_path = env_path("BEAM_NCCL_ID_FILE", "/tmp/beam_solver_nccl_id.bin");
+    ncclUniqueId id{};
+    if (rank == 0U) {
+        require_nccl(ncclGetUniqueId(&id), "ncclGetUniqueId");
+        const std::filesystem::path tmp_path = id_path.string() + ".tmp";
+        {
+            std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
+            if (!out) {
+                throw std::runtime_error("failed to open NCCL rendezvous temp file: " + tmp_path.string());
+            }
+            out.write(reinterpret_cast<const char*>(&id), sizeof(id));
+        }
+        std::filesystem::rename(tmp_path, id_path);
+    } else {
+        id = read_nccl_id_file(id_path);
+    }
+    require_nccl(
+        ncclCommInitRank(&runtime.comm, static_cast<int>(world_size), id, static_cast<int>(rank)),
+        "ncclCommInitRank");
+    return runtime;
+}
+
+std::uint32_t propagate_stop_flag(
+    StaticDeviceMemory& memory,
+    DispatcherStreams& streams,
+    ncclComm_t comm,
+    std::uint32_t world_size) {
+    if (world_size == 1U) {
+        std::uint32_t stop_value = 0;
+        BEAM_CUDA_CHECK(cudaMemcpy(&stop_value, memory.stop_flag, sizeof(stop_value), cudaMemcpyDeviceToHost));
+        return stop_value;
+    }
+    require_nccl(
+        ncclAllReduce(
+            memory.stop_flag,
+            memory.global_stop_flag,
+            1,
+            ncclUint32,
+            ncclMax,
+            comm,
+            streams.stream5),
+        "ncclAllReduce stop flag");
+    BEAM_CUDA_CHECK(cudaMemcpyAsync(
+        memory.stop_flag,
+        memory.global_stop_flag,
+        sizeof(std::uint32_t),
+        cudaMemcpyDeviceToDevice,
+        streams.stream5));
+    BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+    std::uint32_t stop_value = 0;
+    BEAM_CUDA_CHECK(cudaMemcpy(&stop_value, memory.stop_flag, sizeof(stop_value), cudaMemcpyDeviceToHost));
+    return stop_value;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1588,20 +1901,26 @@ int main(int argc, char** argv) {
     const std::uint64_t puzzle_id = parse_u64(argv[1], "puzzle_id");
     const std::uint32_t depth_limit = static_cast<std::uint32_t>(parse_u64(argv[2], "depth"));
     const std::uint64_t beam = parse_u64(argv[3], "beam");
-    const std::uint32_t world_size = argc == 6 ? static_cast<std::uint32_t>(parse_u64(argv[4], "world_size")) : 1U;
-    const std::uint32_t local_rank = argc == 6 ? static_cast<std::uint32_t>(parse_u64(argv[5], "local_rank")) : 0U;
-    if (world_size == 0 || world_size > 255 || local_rank >= world_size) {
-        throw std::invalid_argument("world_size must be in [1,255] and local_rank must be less than world_size");
+    const std::uint32_t world_size_arg = argc == 6 ? static_cast<std::uint32_t>(parse_u64(argv[4], "world_size")) : 1U;
+    const std::uint32_t rank_arg = argc == 6 ? static_cast<std::uint32_t>(parse_u64(argv[5], "local_rank")) : 0U;
+    const std::uint32_t world_size = env_or_default_u32("WORLD_SIZE", world_size_arg);
+    const std::uint32_t rank = env_or_default_u32("RANK", rank_arg);
+    const std::uint32_t device_local_rank = env_or_default_u32("LOCAL_RANK", rank);
+    if (world_size == 0 || world_size > 255 || rank >= world_size) {
+        throw std::invalid_argument("world_size must be in [1,255] and rank must be less than world_size");
     }
     std::cout << std::unitbuf;
 
-    BEAM_CUDA_CHECK(cudaSetDevice(0));
+    BEAM_CUDA_CHECK(cudaSetDevice(static_cast<int>(device_local_rank)));
+    NcclRuntime nccl_runtime = create_nccl_runtime(world_size, rank);
+    DispatcherCollective collective{nccl_runtime.comm};
+    const DispatcherCollective* collective_ptr = world_size > 1U ? &collective : nullptr;
     std::size_t free_before = 0;
     std::size_t total_before = 0;
     BEAM_CUDA_CHECK(cudaMemGetInfo(&free_before, &total_before));
 
     const RuntimeConfigBuild config_build =
-        build_runtime_config_from_budget(beam, world_size, local_rank, free_before);
+        build_runtime_config_from_budget(beam, world_size, rank, free_before);
     const RuntimeConfig config = config_build.config;
     const StaticMemoryPlan plan = config_build.plan;
 #if BEAM_ENABLE_DEBUG_LOGS
@@ -1611,6 +1930,7 @@ int main(int argc, char** argv) {
     std::cout << "USER_GLOBAL_BEAM_WIDTH=" << beam << "\n";
     std::cout << "WORLD_SIZE=" << config.world_size << "\n";
     std::cout << "LOCAL_RANK=" << config.local_rank << "\n";
+    std::cout << "CUDA_DEVICE_LOCAL_RANK=" << device_local_rank << "\n";
     std::cout << "B_MICRO=" << config.b_micro << "\n";
     std::cout << "STREAM3_RING_SLOTS=" << config_build.stream3_ring_slots << "\n";
     std::cout << "RING_COUNT=" << config.ring_count << "\n";
@@ -1628,6 +1948,10 @@ int main(int argc, char** argv) {
     std::cout << "SHARD_CAPACITY_SCALE_PPM=" << config.shard_capacity_scale_ppm << "\n";
     std::cout << "GLOBAL_SPILL_CAPACITY=" << config.global_spill_capacity << "\n";
     std::cout << "GLOBAL_SPILL_SCALE_PPM=" << config.global_spill_scale_ppm << "\n";
+    std::cout << "STREAM5_RECV_CAPACITY_SCALE_PPM=" << config.stream5_recv_capacity_scale_ppm << "\n";
+    std::cout << "STREAM5_SLOT_COUNT=" << plan.stream5_slot_count << "\n";
+    std::cout << "STREAM5_SEND_SLOT_CANDIDATES=" << plan.stream5_send_slot_capacity << "\n";
+    std::cout << "STREAM5_RECV_SLOT_CANDIDATES=" << plan.stream5_recv_slot_capacity << "\n";
     std::cout << "N_LOCAL=" << local_frontier_capacity(config) << "\n";
     std::cout << "LOGICAL_SHARD_SIZE=" << logical_shard_size_for(config) << "\n";
     std::cout << "GROSS_CANDIDATES_PER_DEPTH_EST=" << config_build.gross_candidates_per_depth_est << "\n";
@@ -1684,7 +2008,9 @@ int main(int argc, char** argv) {
     allocate_static_device_memory(plan, memory);
     BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
     BEAM_CUDA_CHECK(cudaMemset(memory.current_frontier_states, 0, plan.current_frontier_bytes));
-    BEAM_CUDA_CHECK(cudaMemcpy(memory.current_frontier_states, &host_initial, sizeof(State128), cudaMemcpyHostToDevice));
+    if (rank == 0U) {
+        BEAM_CUDA_CHECK(cudaMemcpy(memory.current_frontier_states, &host_initial, sizeof(State128), cudaMemcpyHostToDevice));
+    }
     BEAM_CUDA_CHECK(cudaMemset(memory.streams.current_threshold, 0xff, sizeof(std::uint32_t)));
 
     std::size_t free_after = 0;
@@ -1819,19 +2145,23 @@ int main(int argc, char** argv) {
     const std::uint32_t history_slot_count = env_u32("BEAM_HISTORY_SLOT_COUNT", 3);
     const std::uint32_t history_worker_count = env_u32("BEAM_HISTORY_WORKERS", 1);
     const std::uint32_t depth_log_every = env_u32("BEAM_DEPTH_LOG_EVERY", 1);
-    history.dir = make_history_dir(puzzle_id, depth_limit, beam);
+    history.dir = make_history_dir(puzzle_id, depth_limit, beam, rank, world_size);
     history.initialize(
         history_mode,
         static_cast<std::uint32_t>(plan.frontier_states),
         history_slot_count,
         history_worker_count);
+    if (world_size > 1U) {
+        history.prune_enabled = false;
+    }
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "candidate_history_dir=" << history.dir.string() << "\n";
     std::cout << "candidate_history_mode=" << history_mode_name(history.mode) << "\n";
+    std::cout << "candidate_history_prune_enabled=" << (history.prune_enabled ? 1 : 0) << "\n";
     std::cout << "candidate_history_slots=" << history_slot_count << "\n";
     std::cout << "candidate_history_workers=" << history_worker_count << "\n";
 #endif
-    std::uint64_t frontier_size = 1;
+    std::uint64_t frontier_size = rank == 0U ? 1ULL : 0ULL;
     [[maybe_unused]] std::uint64_t last_final_frontier_size = frontier_size;
     [[maybe_unused]] std::uint32_t last_final_threshold = UINT32_THRESHOLD_MAX;
     std::uint32_t total_threshold_updates = 0;
@@ -1859,7 +2189,7 @@ int main(int argc, char** argv) {
         generated_track_request = tracked_solution.generated_request_for_depth(depth);
 #endif
         const DepthDispatchState state =
-            run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size, generated_track_request);
+            run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size, generated_track_request, collective_ptr);
         if (!state.depth_drained) {
             throw std::runtime_error("depth did not drain");
         }
@@ -1893,7 +2223,74 @@ int main(int argc, char** argv) {
         total_threshold_updates += state.threshold_updates;
         ++completed_depths;
 
+        const std::uint32_t global_stop_value =
+            propagate_stop_flag(memory, streams, nccl_runtime.comm, world_size);
         const SolvedSnapshot solved_snapshot = read_solved_snapshot(memory, config.solved_result_capacity);
+        if (world_size > 1U && global_stop_value != 0U) {
+            history.finish_all();
+            const DistributedReconstructionResult distributed_solution =
+                reconstruct_solution_distributed(
+                    history,
+                    solved_snapshot,
+                    plan,
+                    memory,
+                    streams,
+                    nccl_runtime.comm,
+                    world_size,
+                    rank);
+            if (!distributed_solution.has_solution) {
+                throw std::runtime_error("global stop set but no solved rank reported metadata");
+            }
+            if (distributed_solution.controller_rank) {
+                const State128 final_state =
+                    apply_solution_moves(host_initial, distributed_solution.solution.moves, host_generators);
+                const bool valid = states_equal_storage(final_state, host_central);
+                const double solved_elapsed_sec =
+                    std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+                SolvedSnapshot global_solved = solved_snapshot;
+                global_solved.found = true;
+                global_solved.count = std::max<std::uint32_t>(global_solved.count, 1U);
+                if (global_solved.meta.empty()) {
+                    global_solved.meta.push_back(distributed_solution.solved_meta);
+                }
+                if (global_solved.depth.empty()) {
+                    global_solved.depth.push_back(distributed_solution.solved_depth);
+                }
+                write_solution_artifacts(
+                    puzzle_id,
+                    depth_limit,
+                    beam,
+                    distributed_solution.solution,
+                    host_move_names,
+                    final_state,
+                    valid,
+                    history,
+                    global_solved);
+                if (!valid) {
+                    throw std::runtime_error("CPU solution validation failed: generated state is not central_state");
+                }
+                std::cout << "puzzle_solved=1"
+                          << " puzzle_id=" << puzzle_id
+                          << " seconds=" << solved_elapsed_sec
+                          << " solution_length=" << distributed_solution.solution.moves.size()
+                          << " solution=" << moves_to_path_text(distributed_solution.solution.moves, host_move_names)
+                          << "\n";
+            }
+            solution_found = true;
+            const auto depth_end = std::chrono::steady_clock::now();
+            const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
+#if BEAM_ENABLE_DEPTH_LOGS
+            if (emit_depth_log) {
+            std::cout << "depth_global_solved=" << depth
+                      << " depth_sec=" << depth_sec
+                      << " controller_rank=" << distributed_solution.controller
+                      << " local_rank=" << rank
+                      << " solved_depth=" << distributed_solution.solved_depth
+                      << " stop_requested=" << global_stop_value << "\n";
+            }
+#endif
+            break;
+        }
         if (solved_snapshot.found) {
             if (solved_snapshot.meta.empty() || solved_snapshot.depth.empty()) {
                 throw std::runtime_error("solved flag set but solved metadata list is empty");
@@ -1941,6 +2338,18 @@ int main(int argc, char** argv) {
 #endif
             break;
         }
+        if (global_stop_value != 0U) {
+            history.finish_all();
+#if BEAM_ENABLE_DEPTH_LOGS
+            if (emit_depth_log) {
+            std::cout << "depth_global_stop_without_local_solution=" << depth
+                      << " rank=" << rank
+                      << " stop_requested=" << global_stop_value << "\n";
+            }
+#endif
+            solution_found = true;
+            break;
+        }
 
         CpuCandidateHistory::Slot& history_slot = history.acquire_slot();
         const FinalizeDepthState final_state = finalize_depth_single_gpu(
@@ -1954,9 +2363,11 @@ int main(int argc, char** argv) {
             history.copy_stream,
             history_slot.copy_done,
 #if BEAM_DEBUG_PATH_TRACE
-            tracked_solution.hash_for_depth(depth));
+            tracked_solution.hash_for_depth(depth),
+            collective_ptr);
 #else
-            nullptr);
+            nullptr,
+            collective_ptr);
 #endif
 #if BEAM_DEBUG_PATH_TRACE
         if (tracked_solution.enabled) {

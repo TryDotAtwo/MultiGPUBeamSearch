@@ -112,3 +112,15 @@
 - User specified the Stream4 scheduling split: choose `STREAM4_BATCH_CANDIDATES` by Stream4 job time, then use a separate `STREAM4_TRIGGER_CANDIDATES` so `stream4_job_time * stream4_job_count / active_sort_slots` stays well below Stream1/2 time.
 - User requested a `beam=2**24`, `depth_limit=60` local Docker run without Nsight and without extra debug instrumentation, keeping only per-depth logs.
 - User requested publishing the working solver to Kaggle so other people can use the notebook.
+
+## 2026-05-26
+- User required reverting all same-day experimental changes and restoring the repository to the state after commit `6d0ab88` (`Record Kaggle public release`).
+- User confirmed the repository was restored and then requested a proper multi-GPU implementation with no new branch and with `WORLD_SIZE=1` continuing to use the current working single-GPU code path.
+- User required `torchrun` or a Python launcher to only start multiple C++ processes. C++ must read `RANK`, `LOCAL_RANK`, and `WORLD_SIZE`, call `cudaSetDevice(LOCAL_RANK)`, and create the NCCL communicator itself.
+- User required Stream 3 after dedup to split candidates by `owner = hash % WORLD_SIZE`: local candidates go to local shard buffers, remote candidates go to Stream 5 send buffers.
+- User required Stream 5 to exchange `CandidateMeta` between ranks, then collect received remote candidates into local shard buffers.
+- User required finalization to perform local dedup, NCCL AllReduce histogram, global threshold selection, rank load balancing, `FinalRequest`/`FinalResponse` exchange, and construction of the next local frontier.
+- User rejected forced disk history and shared `BEAM_HISTORY_RUN_ID` behavior. Multi-rank history must not invent mandatory disk persistence without approval.
+- User required Stream 5 buffer sizes to be explicit in config, Stream 5 buffers to be segmented per card/ring to avoid collisions, and the receive buffer to have multiple parts so a writer always has a free target.
+- User required large Stream 5 transactions because with many ranks most `CandidateMeta` records are remote and small network transactions would become the bottleneck.
+- User approved the implementation plan and requested testing on the current Kaggle 2xT4 notebook, where only one GPU had previously been used.

@@ -184,12 +184,83 @@ __global__ void final_scan_block_counts_kernel(
     *final_candidate_count = base + static_cast<std::uint32_t>(capped);
 }
 
+__global__ void final_scan_block_counts_phase_kernel(
+    const std::uint32_t* block_counts,
+    std::uint32_t* block_offsets,
+    const std::uint32_t* output_base,
+    std::uint32_t* final_candidate_count,
+    std::uint32_t block_count,
+    std::uint64_t phase_global_prefix,
+    std::uint64_t global_keep_count) {
+    if (blockIdx.x != 0 || threadIdx.x != 0) {
+        return;
+    }
+    std::uint32_t running = 0;
+    for (std::uint32_t block = 0; block < block_count; ++block) {
+        block_offsets[block] = running;
+        running += block_counts[block];
+    }
+    const std::uint32_t base = final_phase_base_device(output_base);
+    if (global_keep_count == 0ULL || phase_global_prefix >= global_keep_count) {
+        *final_candidate_count = base;
+        return;
+    }
+    const std::uint64_t remaining_global_keep = global_keep_count - phase_global_prefix;
+    const std::uint64_t capped =
+        static_cast<std::uint64_t>(running) < remaining_global_keep
+            ? static_cast<std::uint64_t>(running)
+            : remaining_global_keep;
+    *final_candidate_count = base + static_cast<std::uint32_t>(capped);
+}
+
 __global__ void final_save_count_kernel(
     const std::uint32_t* final_candidate_count,
     std::uint32_t* saved_count) {
     if (blockIdx.x == 0 && threadIdx.x == 0) {
         *saved_count = *final_candidate_count;
     }
+}
+
+__global__ void final_scatter_exact_phase_kernel(
+    const CandidateMeta* survivor_shard,
+    const std::uint32_t* keep_flags,
+    const std::uint32_t* block_offsets,
+    const std::uint32_t* output_base,
+    CandidateMeta* final_candidate_buffer,
+    const std::uint32_t* final_candidate_count,
+    std::uint64_t phase_global_prefix,
+    std::uint64_t global_keep_count,
+    std::uint32_t final_capacity,
+    std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates) {
+    __shared__ std::uint32_t scan[256];
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint64_t shard_capacity = shard_capacity_candidates;
+    const std::uint64_t total = static_cast<std::uint64_t>(shard_count) * shard_capacity;
+    const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + tid;
+    const std::uint32_t keep = i < total ? keep_flags[i] : 0U;
+    scan[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t offset = 1U; offset < blockDim.x; offset <<= 1U) {
+        const std::uint32_t add = tid >= offset ? scan[tid - offset] : 0U;
+        __syncthreads();
+        scan[tid] += add;
+        __syncthreads();
+    }
+    if (keep == 0U || *final_candidate_count > final_capacity || global_keep_count == 0ULL) {
+        return;
+    }
+    const std::uint32_t base = final_phase_base_device(output_base);
+    const std::uint32_t phase_local = block_offsets[blockIdx.x] + scan[tid] - 1U;
+    const std::uint32_t local_out = base + phase_local;
+    if (local_out >= *final_candidate_count) {
+        return;
+    }
+    const std::uint64_t global_idx = phase_global_prefix + phase_local;
+    if (global_idx >= global_keep_count) {
+        return;
+    }
+    final_candidate_buffer[local_out] = survivor_shard[i];
 }
 
 __global__ void final_init_send_ranges_kernel(
@@ -380,6 +451,45 @@ void final_allgather_counts_nccl_cuda(
         "ncclAllGather counts");
 }
 
+void final_count_score_phase_cuda(
+    const CandidateMeta* survivor_shard,
+    const std::uint32_t* clean_count,
+    std::uint32_t* keep_flags,
+    std::uint32_t* block_counts,
+    std::uint32_t* block_offsets,
+    std::uint32_t* phase_count,
+    std::uint32_t final_threshold,
+    std::uint32_t score_phase,
+    std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
+    std::uint32_t stream4_batch_candidates,
+    cudaStream_t stream) {
+    NvtxRange range("Final_count_score_phase_launch");
+    const std::uint64_t item_count = static_cast<std::uint64_t>(shard_count) * shard_capacity_candidates;
+    const std::uint32_t block_size = 256;
+    const std::uint32_t block_count = static_cast<std::uint32_t>((item_count + block_size - 1ULL) / block_size);
+    const dim3 block(block_size);
+    const dim3 grid(block_count);
+    final_mark_counts_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        clean_count,
+        keep_flags,
+        block_counts,
+        final_threshold,
+        score_phase,
+        shard_count,
+        shard_capacity_candidates,
+        stream4_batch_candidates);
+    final_scan_block_counts_phase_kernel<<<1, 1, 0, stream>>>(
+        block_counts,
+        block_offsets,
+        nullptr,
+        phase_count,
+        block_count,
+        0ULL,
+        UINT64_MAX);
+}
+
 void final_filter_load_balance_cuda(
     const CandidateMeta* survivor_shard,
     const std::uint32_t* clean_count,
@@ -493,6 +603,95 @@ void final_filter_load_balance_cuda(
         global_prefix_for_rank,
         global_keep_count,
         final_capacity);
+}
+
+void final_filter_load_balance_exact_cuda(
+    const CandidateMeta* survivor_shard,
+    const std::uint32_t* clean_count,
+    std::uint32_t* keep_flags,
+    std::uint32_t* block_counts,
+    std::uint32_t* block_offsets,
+    CandidateMeta* final_candidate_buffer,
+    std::uint32_t* final_candidate_count,
+    std::uint32_t* phase_base_count,
+    std::uint32_t final_threshold,
+    std::uint64_t less_prefix_for_rank,
+    std::uint64_t equal_prefix_adjusted_for_rank,
+    std::uint64_t global_keep_count,
+    std::uint32_t final_capacity,
+    std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
+    std::uint32_t stream4_batch_candidates,
+    cudaStream_t stream) {
+    NvtxRange range("Final_filter_load_balance_exact_launch");
+    const std::uint64_t item_count = static_cast<std::uint64_t>(shard_count) * shard_capacity_candidates;
+    const std::uint32_t block_size = 256;
+    const std::uint32_t block_count = static_cast<std::uint32_t>((item_count + block_size - 1ULL) / block_size);
+    const dim3 block(block_size);
+    const dim3 grid(block_count);
+
+    final_mark_counts_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        clean_count,
+        keep_flags,
+        block_counts,
+        final_threshold,
+        0,
+        shard_count,
+        shard_capacity_candidates,
+        stream4_batch_candidates);
+    final_scan_block_counts_phase_kernel<<<1, 1, 0, stream>>>(
+        block_counts,
+        block_offsets,
+        nullptr,
+        final_candidate_count,
+        block_count,
+        less_prefix_for_rank,
+        global_keep_count);
+    final_scatter_exact_phase_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        keep_flags,
+        block_offsets,
+        nullptr,
+        final_candidate_buffer,
+        final_candidate_count,
+        less_prefix_for_rank,
+        global_keep_count,
+        final_capacity,
+        shard_count,
+        shard_capacity_candidates);
+
+    final_save_count_kernel<<<1, 1, 0, stream>>>(final_candidate_count, phase_base_count);
+    final_mark_counts_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        clean_count,
+        keep_flags,
+        block_counts,
+        final_threshold,
+        1,
+        shard_count,
+        shard_capacity_candidates,
+        stream4_batch_candidates);
+    final_scan_block_counts_phase_kernel<<<1, 1, 0, stream>>>(
+        block_counts,
+        block_offsets,
+        phase_base_count,
+        final_candidate_count,
+        block_count,
+        equal_prefix_adjusted_for_rank,
+        global_keep_count);
+    final_scatter_exact_phase_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        keep_flags,
+        block_offsets,
+        phase_base_count,
+        final_candidate_buffer,
+        final_candidate_count,
+        equal_prefix_adjusted_for_rank,
+        global_keep_count,
+        final_capacity,
+        shard_count,
+        shard_capacity_candidates);
 }
 
 } // namespace beam

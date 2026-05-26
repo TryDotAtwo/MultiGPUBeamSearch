@@ -5,6 +5,7 @@
 #include "stream2.hpp"
 
 #include <cuda_runtime.h>
+#include <nccl.h>
 
 #include <array>
 #include <cstdint>
@@ -46,6 +47,10 @@ struct DispatcherDeviceTables {
 struct DispatcherNetwork {
     Stream1NetworkView view;
     Stream1CutlassScratch scratch;
+};
+
+struct DispatcherCollective {
+    ncclComm_t comm = nullptr;
 };
 
 struct GeneratedTrackRequest {
@@ -232,7 +237,8 @@ DepthDispatchState run_depth_cuda_graphs(
     CudaGraphJobTemplates& graphs,
     DispatcherStreams& streams,
     std::uint64_t frontier_size,
-    GeneratedTrackRequest track_request = {});
+    GeneratedTrackRequest track_request = {},
+    const DispatcherCollective* collective = nullptr);
 
 FinalizeDepthState finalize_depth_single_gpu(
     const StaticMemoryPlan& plan,
@@ -244,6 +250,7 @@ FinalizeDepthState finalize_depth_single_gpu(
     std::uint32_t history_host_capacity = 0,
     cudaStream_t history_stream = nullptr,
     cudaEvent_t history_copy_done = nullptr,
-    const Hash128* tracked_prefinal_hash = nullptr);
+    const Hash128* tracked_prefinal_hash = nullptr,
+    const DispatcherCollective* collective = nullptr);
 
 } // namespace beam

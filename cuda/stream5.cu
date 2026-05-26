@@ -41,6 +41,22 @@ __global__ void stream5_self_copy_kernel(
     remote_recv_buffer[recv_offset[local_rank] + i] = remote_send_buffer[send_offset[local_rank] + i];
 }
 
+__global__ void stream5_self_copy_words_kernel(
+    const std::uint64_t* send_buffer,
+    std::uint64_t* recv_buffer,
+    std::uint32_t send_offset_items,
+    std::uint32_t recv_offset_items,
+    std::uint32_t item_count,
+    std::uint32_t words_per_item) {
+    const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::uint64_t word_count = static_cast<std::uint64_t>(item_count) * words_per_item;
+    if (i >= word_count) {
+        return;
+    }
+    recv_buffer[static_cast<std::uint64_t>(recv_offset_items) * words_per_item + i] =
+        send_buffer[static_cast<std::uint64_t>(send_offset_items) * words_per_item + i];
+}
+
 } // namespace
 
 void stream5_exchange_counts_nccl_cuda(
@@ -74,12 +90,15 @@ void stream5_write_recv_offsets_cuda(
     std::uint32_t world_size,
     cudaStream_t stream) {
     NvtxRange range("Stream5_write_recv_offsets_launch");
-    cudaMemcpyAsync(
+    cudaError_t status = cudaMemcpyAsync(
         device_recv_offset,
         host_recv_offset,
         (static_cast<std::size_t>(world_size) + 1U) * sizeof(std::uint32_t),
         cudaMemcpyHostToDevice,
         stream);
+    if (status != cudaSuccess) {
+        throw std::runtime_error(std::string("cudaMemcpyAsync stream5 recv offsets: ") + cudaGetErrorString(status));
+    }
 }
 
 void stream5_exchange_payload_nccl_cuda(
@@ -135,6 +154,64 @@ void stream5_exchange_payload_nccl_cuda(
             remote_recv_buffer,
             device_recv_offset,
             local_rank);
+    }
+}
+
+void stream5_exchange_u64_payload_nccl_cuda(
+    const void* send_buffer,
+    void* recv_buffer,
+    const std::uint32_t* host_send_count,
+    const std::uint32_t* host_send_offset,
+    const std::uint32_t* host_recv_count,
+    const std::uint32_t* host_recv_offset,
+    std::uint32_t words_per_item,
+    std::uint32_t local_rank,
+    std::uint32_t world_size,
+    ncclComm_t comm,
+    cudaStream_t stream) {
+    NvtxRange range("Stream5_NCCL_u64_payload_exchange_launch");
+    if (world_size == 0 || local_rank >= world_size || words_per_item == 0U) {
+        throw std::invalid_argument("stream5 generic NCCL payload exchange parameters are invalid");
+    }
+
+    const auto* send_words = reinterpret_cast<const std::uint64_t*>(send_buffer);
+    auto* recv_words = reinterpret_cast<std::uint64_t*>(recv_buffer);
+    check_nccl(ncclGroupStart(), "ncclGroupStart generic payload exchange");
+    for (std::uint32_t peer = 0; peer < world_size; ++peer) {
+        if (peer == local_rank) {
+            continue;
+        }
+        check_nccl(ncclSend(
+                       send_words + static_cast<std::uint64_t>(host_send_offset[peer]) * words_per_item,
+                       static_cast<std::size_t>(host_send_count[peer]) * words_per_item,
+                       ncclUint64,
+                       static_cast<int>(peer),
+                       comm,
+                       stream),
+                   "ncclSend generic payload");
+        check_nccl(ncclRecv(
+                       recv_words + static_cast<std::uint64_t>(host_recv_offset[peer]) * words_per_item,
+                       static_cast<std::size_t>(host_recv_count[peer]) * words_per_item,
+                       ncclUint64,
+                       static_cast<int>(peer),
+                       comm,
+                       stream),
+                   "ncclRecv generic payload");
+    }
+    check_nccl(ncclGroupEnd(), "ncclGroupEnd generic payload exchange");
+
+    const std::uint32_t self_count = host_send_count[local_rank];
+    const std::uint64_t self_words = static_cast<std::uint64_t>(self_count) * words_per_item;
+    const std::uint32_t block = 128;
+    const std::uint32_t grid = static_cast<std::uint32_t>((self_words + block - 1ULL) / block);
+    if (grid != 0) {
+        stream5_self_copy_words_kernel<<<grid, block, 0, stream>>>(
+            send_words,
+            recv_words,
+            host_send_offset[local_rank],
+            host_recv_offset[local_rank],
+            self_count,
+            words_per_item);
     }
 }
 

@@ -42,6 +42,20 @@ void final_allgather_counts_nccl_cuda(
     ncclComm_t comm,
     cudaStream_t stream);
 
+void final_count_score_phase_cuda(
+    const CandidateMeta* survivor_shard,
+    const std::uint32_t* clean_count,
+    std::uint32_t* keep_flags,
+    std::uint32_t* block_counts,
+    std::uint32_t* block_offsets,
+    std::uint32_t* phase_count,
+    std::uint32_t final_threshold,
+    std::uint32_t score_phase,
+    std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
+    std::uint32_t stream4_batch_candidates,
+    cudaStream_t stream);
+
 void final_filter_load_balance_cuda(
     const CandidateMeta* survivor_shard,
     const std::uint32_t* clean_count,
@@ -58,6 +72,25 @@ void final_filter_load_balance_cuda(
     std::uint32_t local_rank,
     std::uint32_t world_size,
     std::uint64_t global_prefix_for_rank,
+    std::uint64_t global_keep_count,
+    std::uint32_t final_capacity,
+    std::uint32_t shard_count,
+    std::uint32_t shard_capacity_candidates,
+    std::uint32_t stream4_batch_candidates,
+    cudaStream_t stream);
+
+void final_filter_load_balance_exact_cuda(
+    const CandidateMeta* survivor_shard,
+    const std::uint32_t* clean_count,
+    std::uint32_t* keep_flags,
+    std::uint32_t* block_counts,
+    std::uint32_t* block_offsets,
+    CandidateMeta* final_candidate_buffer,
+    std::uint32_t* final_candidate_count,
+    std::uint32_t* phase_base_count,
+    std::uint32_t final_threshold,
+    std::uint64_t less_prefix_for_rank,
+    std::uint64_t equal_prefix_adjusted_for_rank,
     std::uint64_t global_keep_count,
     std::uint32_t final_capacity,
     std::uint32_t shard_count,
