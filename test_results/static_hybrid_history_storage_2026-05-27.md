@@ -22,7 +22,7 @@
 - `HISTORY_SLOT_COUNT=2`
 - `HISTORY_RAM_BYTES=28 * 1000**3`
 - `HISTORY_DISK_BYTES=49 * 1000**3`
-- `HISTORY_DISK_PATH=/kaggle/working/history_arena`
+- `HISTORY_DISK_PATH=/tmp/beam_history_arena`
 
 ## Local Verification
 
@@ -36,3 +36,11 @@
 - Push to GitHub `main`.
 - Launch Kaggle T4x2 validation.
 - Inspect logs for `candidate_history_*` budget lines and `history_bytes_stored_ram/history_bytes_stored_disk`.
+
+## Kaggle v82 Observation
+
+- Version 82 completed with expected `return_code=-200` from `RUN_TIMEOUT_SEC=300`.
+- No fatal patterns were found in rank logs.
+- Rank 0 reached depth 10 with `next_frontier_size=33554432`.
+- `history_bytes_stored_ram=0` and `history_bytes_stored_disk>0` showed disk-first `static_hybrid` writes were active.
+- The first notebook config used `/kaggle/working/history_arena`; full output download hung on sparse disk arena files. The config was changed to `/tmp/beam_history_arena` before the next push so history arena files are not packaged as Kaggle outputs.
