@@ -421,6 +421,34 @@ solved_meta_list [SOLVED_RESULT_CAPACITY] : CandidateMeta
 solved_depth_list[SOLVED_RESULT_CAPACITY] : uint32_t
 ```
 
+Solved neighborhood lookup:
+
+```text
+BEAM_SOLVED_NEIGHBORHOOD_RADIUS = K1
+
+K1 == 0:
+    Stream 2 uses the existing exact central_state comparison.
+
+K1 > 0:
+    CPU builds the inverse-move solved neighborhood before depth processing:
+        all states that can reach central_state in <= K1 moves
+        Hash128 -> packed suffix moves, stored on CPU
+
+    GPU stores a readonly bucket table:
+        fingerprint_slots[bucket_count][4] : uint32_t
+        hash_slots[bucket_count][4]        : Hash128
+
+    Stream 2 computes Hash128(parent + move) as before.
+    Stream 2 checks only two fixed buckets by fingerprint, then confirms full Hash128.
+    Stream 2 does not store states or suffixes in VRAM.
+    CPU appends the suffix from Hash128 -> suffix after history prefix reconstruction.
+
+Future K2 candidate-suffix expansion:
+    Stream 2 may later expand generated candidate descendants by a separate radius K2.
+    K2 suffix generators should be precomputed before the run, not generated dynamically in the kernel.
+    K2 is not part of the current implementation.
+```
+
 Смысл:
 
 ```text

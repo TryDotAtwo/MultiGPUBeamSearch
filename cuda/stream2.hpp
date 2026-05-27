@@ -6,6 +6,15 @@
 
 namespace beam {
 
+inline constexpr std::uint32_t SOLVED_NEIGHBORHOOD_BUCKET_SIZE = 4;
+
+struct SolvedNeighborhoodDeviceTable {
+    const std::uint32_t* fingerprint_slots = nullptr;
+    const Hash128* hash_slots = nullptr;
+    std::uint32_t bucket_mask = 0;
+    std::uint32_t enabled = 0;
+};
+
 struct Stream2SolvedBuffers {
     std::uint32_t* solved_flag = nullptr;
     std::uint32_t* stop_flag = nullptr;
@@ -15,6 +24,7 @@ struct Stream2SolvedBuffers {
     std::uint32_t* solved_depth_list = nullptr;
     std::uint32_t solved_result_capacity = 0;
     const std::uint32_t* current_depth = nullptr;
+    SolvedNeighborhoodDeviceTable solved_neighborhood;
 };
 
 void stream2_hash_goal_cuda(

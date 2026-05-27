@@ -383,6 +383,231 @@ bool states_equal_storage(const State128& a, const State128& b) {
     return true;
 }
 
+struct Hash128Hasher {
+    std::size_t operator()(Hash128 hash) const noexcept {
+        return static_cast<std::size_t>(hash128_distribution_key(hash, 0x7f4a7c159e3779b9ULL));
+    }
+};
+
+struct PackedSuffix {
+    std::uint64_t moves = 0;
+    std::uint8_t len = 0;
+};
+
+State128 apply_inverse_move_flat_host(
+    const State128& child,
+    const std::vector<std::uint8_t>& generators,
+    std::uint8_t move) {
+    if (move >= MOVE_COUNT) {
+        throw std::runtime_error("inverse move exceeds MOVE_COUNT");
+    }
+    State128 parent{};
+    const std::uint64_t base = static_cast<std::uint64_t>(move) * STATE_STORAGE_LEN;
+    for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+        parent.v[generators[base + p]] = child.v[p];
+    }
+    clear_state_padding(parent);
+    return parent;
+}
+
+PackedSuffix prepend_suffix_move(PackedSuffix suffix, std::uint8_t move) {
+    if (move >= MOVE_COUNT) {
+        throw std::runtime_error("suffix move exceeds MOVE_COUNT");
+    }
+    if (suffix.len >= 12U) {
+        throw std::runtime_error("solved neighborhood suffix packing supports radius <= 12");
+    }
+    suffix.moves = (suffix.moves << 5U) | static_cast<std::uint64_t>(move);
+    ++suffix.len;
+    return suffix;
+}
+
+void append_packed_suffix(std::vector<std::uint8_t>& moves, PackedSuffix suffix) {
+    for (std::uint32_t i = 0; i < suffix.len; ++i) {
+        moves.push_back(static_cast<std::uint8_t>((suffix.moves >> (5U * i)) & 31ULL));
+    }
+}
+
+std::uint64_t next_power_of_two_u64(std::uint64_t value) {
+    if (value <= 1ULL) {
+        return 1ULL;
+    }
+    --value;
+    for (std::uint32_t shift = 1U; shift < 64U; shift <<= 1U) {
+        value |= value >> shift;
+    }
+    return value + 1ULL;
+}
+
+struct SolvedNeighborhoodRuntime {
+    std::uint32_t radius = 0;
+    std::uint32_t bucket_count = 0;
+    std::uint64_t entry_count = 0;
+    std::uint64_t slot_count = 0;
+    std::uint64_t device_bytes = 0;
+    std::uint32_t* device_fingerprints = nullptr;
+    Hash128* device_hashes = nullptr;
+    std::unordered_map<Hash128, PackedSuffix, Hash128Hasher> suffix_by_hash;
+
+    bool enabled() const {
+        return radius != 0U && device_fingerprints != nullptr && device_hashes != nullptr;
+    }
+
+    SolvedNeighborhoodDeviceTable device_table() const {
+        SolvedNeighborhoodDeviceTable table{};
+        table.fingerprint_slots = device_fingerprints;
+        table.hash_slots = device_hashes;
+        table.bucket_mask = bucket_count == 0U ? 0U : bucket_count - 1U;
+        table.enabled = enabled() ? 1U : 0U;
+        return table;
+    }
+
+    PackedSuffix suffix_for(Hash128 hash) const {
+        if (!enabled()) {
+            return PackedSuffix{};
+        }
+        const auto found = suffix_by_hash.find(hash);
+        if (found == suffix_by_hash.end()) {
+            throw std::runtime_error("solved neighborhood hit is missing CPU suffix");
+        }
+        return found->second;
+    }
+
+    void destroy() {
+        if (device_fingerprints != nullptr) {
+            cudaFree(device_fingerprints);
+        }
+        if (device_hashes != nullptr) {
+            cudaFree(device_hashes);
+        }
+        device_fingerprints = nullptr;
+        device_hashes = nullptr;
+        device_bytes = 0;
+        slot_count = 0;
+        bucket_count = 0;
+        entry_count = 0;
+        suffix_by_hash.clear();
+    }
+};
+
+struct SolvedNeighborhoodNode {
+    State128 state{};
+    Hash128 hash{};
+    PackedSuffix suffix{};
+};
+
+bool place_solved_neighborhood_entry(
+    Hash128 hash,
+    std::vector<std::uint32_t>& fingerprints,
+    std::vector<Hash128>& hashes,
+    std::uint32_t bucket_count) {
+    const std::uint32_t mask = bucket_count - 1U;
+    const std::uint32_t fingerprint = hash128_fingerprint32(hash);
+    const std::uint32_t buckets[2]{
+        static_cast<std::uint32_t>(hash128_bucket_key_0(hash)) & mask,
+        static_cast<std::uint32_t>(hash128_bucket_key_1(hash)) & mask,
+    };
+    for (std::uint32_t b = 0; b < 2U; ++b) {
+        const std::uint32_t base = buckets[b] * SOLVED_NEIGHBORHOOD_BUCKET_SIZE;
+        for (std::uint32_t i = 0; i < SOLVED_NEIGHBORHOOD_BUCKET_SIZE; ++i) {
+            const std::uint32_t index = base + i;
+            if (fingerprints[index] == 0U) {
+                fingerprints[index] = fingerprint;
+                hashes[index] = hash;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
+    const State128& central_state,
+    const std::vector<std::uint8_t>& generators,
+    const ZobristTable& zobrist) {
+    SolvedNeighborhoodRuntime runtime;
+    runtime.radius = env_u32("BEAM_SOLVED_NEIGHBORHOOD_RADIUS", 0);
+    if (runtime.radius == 0U) {
+        return runtime;
+    }
+    if (runtime.radius > 12U) {
+        throw std::runtime_error("BEAM_SOLVED_NEIGHBORHOOD_RADIUS must be <= 12");
+    }
+    if (generators.size() != MOVE_COUNT * STATE_STORAGE_LEN) {
+        throw std::runtime_error("solved neighborhood builder requires flat p900 generators");
+    }
+    const std::uint64_t max_entries = env_u64("BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES", 0);
+    std::vector<SolvedNeighborhoodNode> all_nodes;
+    std::vector<SolvedNeighborhoodNode> frontier;
+    const Hash128 central_hash = hash_state(central_state, zobrist);
+    all_nodes.push_back(SolvedNeighborhoodNode{central_state, central_hash, PackedSuffix{}});
+    frontier.push_back(all_nodes.front());
+    runtime.suffix_by_hash.emplace(central_hash, PackedSuffix{});
+
+    for (std::uint32_t depth = 0; depth < runtime.radius && !frontier.empty(); ++depth) {
+        std::vector<SolvedNeighborhoodNode> next;
+        next.reserve(frontier.size() * MOVE_COUNT);
+        for (const SolvedNeighborhoodNode& node : frontier) {
+            for (std::uint8_t move = 0; move < MOVE_COUNT; ++move) {
+                State128 predecessor = apply_inverse_move_flat_host(node.state, generators, move);
+                const Hash128 hash = hash_state(predecessor, zobrist);
+                if (runtime.suffix_by_hash.find(hash) != runtime.suffix_by_hash.end()) {
+                    continue;
+                }
+                const PackedSuffix suffix = prepend_suffix_move(node.suffix, move);
+                if (max_entries != 0ULL && runtime.suffix_by_hash.size() >= max_entries) {
+                    throw std::runtime_error("solved neighborhood exceeded BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES");
+                }
+                runtime.suffix_by_hash.emplace(hash, suffix);
+                next.push_back(SolvedNeighborhoodNode{predecessor, hash, suffix});
+            }
+        }
+        all_nodes.insert(all_nodes.end(), next.begin(), next.end());
+        frontier = std::move(next);
+    }
+
+    runtime.entry_count = all_nodes.size();
+    std::uint64_t bucket_count64 = next_power_of_two_u64(std::max<std::uint64_t>(1ULL, runtime.entry_count));
+    while (true) {
+        if (bucket_count64 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+            throw std::runtime_error("solved neighborhood bucket count exceeds uint32 range");
+        }
+        const std::uint32_t bucket_count = static_cast<std::uint32_t>(bucket_count64);
+        std::vector<std::uint32_t> fingerprints(
+            bucket_count64 * SOLVED_NEIGHBORHOOD_BUCKET_SIZE,
+            0U);
+        std::vector<Hash128> hashes(bucket_count64 * SOLVED_NEIGHBORHOOD_BUCKET_SIZE);
+        bool packed = true;
+        for (const SolvedNeighborhoodNode& node : all_nodes) {
+            if (!place_solved_neighborhood_entry(node.hash, fingerprints, hashes, bucket_count)) {
+                packed = false;
+                break;
+            }
+        }
+        if (!packed) {
+            bucket_count64 *= 2ULL;
+            continue;
+        }
+        runtime.bucket_count = bucket_count;
+        runtime.slot_count = fingerprints.size();
+        runtime.device_bytes =
+            runtime.slot_count * (sizeof(std::uint32_t) + sizeof(Hash128));
+        BEAM_CUDA_CHECK(cudaMalloc(&runtime.device_fingerprints, fingerprints.size() * sizeof(std::uint32_t)));
+        BEAM_CUDA_CHECK(cudaMalloc(&runtime.device_hashes, hashes.size() * sizeof(Hash128)));
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            runtime.device_fingerprints,
+            fingerprints.data(),
+            fingerprints.size() * sizeof(std::uint32_t),
+            cudaMemcpyHostToDevice));
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            runtime.device_hashes,
+            hashes.data(),
+            hashes.size() * sizeof(Hash128),
+            cudaMemcpyHostToDevice));
+        return runtime;
+    }
+}
+
 const char* track_location_name(std::uint32_t location) {
     switch (location) {
         case 1U:
@@ -1606,6 +1831,63 @@ struct SolvedSnapshot {
     std::vector<std::uint32_t> depth;
 };
 
+std::uint32_t solved_total_depth(
+    const SolvedNeighborhoodRuntime& solved_neighborhood,
+    const CandidateMeta& meta,
+    std::uint32_t prefix_depth) {
+    const PackedSuffix suffix = solved_neighborhood.suffix_for(meta.hash);
+    return prefix_depth + static_cast<std::uint32_t>(suffix.len);
+}
+
+SolvedSnapshot select_best_solved_snapshot(
+    const SolvedSnapshot& snapshot,
+    const SolvedNeighborhoodRuntime& solved_neighborhood) {
+    if (!snapshot.found || snapshot.meta.empty() || snapshot.depth.empty()) {
+        return snapshot;
+    }
+    std::uint32_t best = 0;
+    std::uint32_t best_total_depth = solved_neighborhood.enabled()
+        ? solved_total_depth(solved_neighborhood, snapshot.meta[0], snapshot.depth[0])
+        : snapshot.depth[0];
+    for (std::uint32_t i = 1U; i < snapshot.meta.size() && i < snapshot.depth.size(); ++i) {
+        const std::uint32_t total_depth = solved_neighborhood.enabled()
+            ? solved_total_depth(solved_neighborhood, snapshot.meta[i], snapshot.depth[i])
+            : snapshot.depth[i];
+        const CandidateMeta& candidate = snapshot.meta[i];
+        const CandidateMeta& incumbent = snapshot.meta[best];
+        const bool better =
+            total_depth < best_total_depth ||
+            (total_depth == best_total_depth && candidate.parent_idx < incumbent.parent_idx) ||
+            (total_depth == best_total_depth && candidate.parent_idx == incumbent.parent_idx &&
+             candidate.route_packed < incumbent.route_packed) ||
+            (total_depth == best_total_depth && candidate.parent_idx == incumbent.parent_idx &&
+             candidate.route_packed == incumbent.route_packed &&
+             hash_less(candidate.hash, incumbent.hash));
+        if (better) {
+            best = i;
+            best_total_depth = total_depth;
+        }
+    }
+    SolvedSnapshot selected;
+    selected.found = true;
+    selected.count = snapshot.count;
+    selected.overflow = snapshot.overflow;
+    selected.meta.push_back(snapshot.meta[best]);
+    selected.depth.push_back(snapshot.depth[best]);
+    return selected;
+}
+
+void append_solved_suffix(
+    ReconstructedSolution& solution,
+    const SolvedNeighborhoodRuntime& solved_neighborhood,
+    Hash128 hash) {
+    if (!solved_neighborhood.enabled()) {
+        return;
+    }
+    const PackedSuffix suffix = solved_neighborhood.suffix_for(hash);
+    append_packed_suffix(solution.moves, suffix);
+}
+
 void require_nccl(ncclResult_t status, const char* op);
 
 SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint32_t capacity) {
@@ -1648,6 +1930,7 @@ struct DistributedReconstructionResult {
 DistributedReconstructionResult reconstruct_solution_distributed(
     const CpuCandidateHistory& history,
     const SolvedSnapshot& local_solved,
+    const SolvedNeighborhoodRuntime& solved_neighborhood,
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
     const DispatcherStreams& streams,
@@ -1660,7 +1943,7 @@ DistributedReconstructionResult reconstruct_solution_distributed(
     if (comm == nullptr) {
         throw std::invalid_argument("distributed reconstruction requires NCCL communicator");
     }
-    constexpr std::uint32_t packet_words = 5;
+    constexpr std::uint32_t packet_words = 7;
     constexpr std::uint32_t query_words = 4;
     constexpr std::uint32_t response_words = 2;
     const std::uint64_t scratch_words =
@@ -1685,7 +1968,9 @@ DistributedReconstructionResult reconstruct_solution_distributed(
         static_cast<std::uint64_t>(rank),
         local_found ? static_cast<std::uint64_t>(local_solved.depth.front()) : 0ULL,
         local_found ? local_solved.meta.front().parent_idx : 0ULL,
-        local_found ? static_cast<std::uint64_t>(local_solved.meta.front().route_packed) : 0ULL};
+        local_found ? static_cast<std::uint64_t>(local_solved.meta.front().route_packed) : 0ULL,
+        local_found ? local_solved.meta.front().hash.lo : 0ULL,
+        local_found ? local_solved.meta.front().hash.hi : 0ULL};
     BEAM_CUDA_CHECK(cudaMemcpyAsync(
         packet_send_device,
         local_packet.data(),
@@ -1709,21 +1994,43 @@ DistributedReconstructionResult reconstruct_solution_distributed(
     BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
 
     DistributedReconstructionResult result;
+    bool best_found = false;
+    std::uint32_t best_total_depth = 0;
     for (std::uint32_t peer = 0; peer < world_size; ++peer) {
         const std::uint64_t* packet = packets.data() + static_cast<std::uint64_t>(peer) * packet_words;
         if (packet[0] == 0ULL) {
             continue;
         }
-        result.has_solution = true;
-        result.controller = peer;
-        result.solved_depth = static_cast<std::uint32_t>(packet[2]);
-        result.solved_meta.parent_idx = packet[3];
-        result.solved_meta.route_packed = static_cast<std::uint32_t>(packet[4]);
-        if (local_found && rank == peer) {
-            result.solved_meta.hash = local_solved.meta.front().hash;
-            result.solved_meta.score_key = local_solved.meta.front().score_key;
+        CandidateMeta candidate{};
+        candidate.parent_idx = packet[3];
+        candidate.route_packed = static_cast<std::uint32_t>(packet[4]);
+        candidate.hash = Hash128{packet[5], packet[6]};
+        candidate.score_key = GOAL_SCORE_KEY;
+        const std::uint32_t candidate_depth = static_cast<std::uint32_t>(packet[2]);
+        const std::uint32_t candidate_total_depth = solved_neighborhood.enabled()
+            ? solved_total_depth(solved_neighborhood, candidate, candidate_depth)
+            : candidate_depth;
+        const bool better =
+            !best_found ||
+            candidate_total_depth < best_total_depth ||
+            (candidate_total_depth == best_total_depth && candidate.parent_idx < result.solved_meta.parent_idx) ||
+            (candidate_total_depth == best_total_depth && candidate.parent_idx == result.solved_meta.parent_idx &&
+             candidate.route_packed < result.solved_meta.route_packed) ||
+            (candidate_total_depth == best_total_depth && candidate.parent_idx == result.solved_meta.parent_idx &&
+             candidate.route_packed == result.solved_meta.route_packed &&
+             hash_less(candidate.hash, result.solved_meta.hash)) ||
+            (candidate_total_depth == best_total_depth && candidate.parent_idx == result.solved_meta.parent_idx &&
+             candidate.route_packed == result.solved_meta.route_packed &&
+             candidate.hash == result.solved_meta.hash &&
+             peer < result.controller);
+        if (better) {
+            best_found = true;
+            best_total_depth = candidate_total_depth;
+            result.has_solution = true;
+            result.controller = peer;
+            result.solved_depth = candidate_depth;
+            result.solved_meta = candidate;
         }
-        break;
     }
     if (!result.has_solution) {
         return result;
@@ -1816,6 +2123,9 @@ DistributedReconstructionResult reconstruct_solution_distributed(
         BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
         cursor.parent_idx = response[0];
         cursor.route_packed = static_cast<std::uint32_t>(response[1]);
+    }
+    if (result.controller_rank) {
+        append_solved_suffix(result.solution, solved_neighborhood, result.solved_meta.hash);
     }
     return result;
 }
@@ -2361,12 +2671,18 @@ int main(int argc, char** argv) {
     const State128 host_initial = load_initial_state_from_test_csv(test_csv_path, puzzle_id);
     const ZobristTable host_zobrist = make_deterministic_zobrist(0xC0DEC0DEULL);
     const HostWeightBytes host_weights = load_stream1_weights(weight_dir);
+    SolvedNeighborhoodRuntime solved_neighborhood =
+        build_solved_neighborhood_runtime(host_central, host_generators, host_zobrist);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "real_assets=enabled\n";
     std::cout << "generator_path=" << generator_path.string() << "\n";
     std::cout << "puzzle_info_path=" << puzzle_info_path.string() << "\n";
     std::cout << "test_csv_path=" << test_csv_path.string() << "\n";
     std::cout << "weight_dir=" << weight_dir.string() << "\n";
+    std::cout << "solved_neighborhood_radius=" << solved_neighborhood.radius << "\n";
+    std::cout << "solved_neighborhood_entries=" << solved_neighborhood.entry_count << "\n";
+    std::cout << "solved_neighborhood_bucket_count=" << solved_neighborhood.bucket_count << "\n";
+    std::cout << "solved_neighborhood_device_bytes=" << solved_neighborhood.device_bytes << "\n";
 #endif
 
     StaticDeviceMemory memory;
@@ -2502,7 +2818,8 @@ int main(int argc, char** argv) {
         memory.solved_meta_list,
         memory.solved_depth_list,
         config.solved_result_capacity,
-        memory.current_depth};
+        memory.current_depth,
+        solved_neighborhood.device_table()};
     instantiate_cuda_graph_job_templates(plan, memory, tables, network, solved, streams, events, graphs);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "runner_phase=graphs_instantiated\n";
@@ -2625,12 +2942,15 @@ int main(int argc, char** argv) {
         const std::uint32_t global_stop_value =
             propagate_stop_flag(memory, streams, nccl_runtime.comm, world_size);
         const SolvedSnapshot solved_snapshot = read_solved_snapshot(memory, config.solved_result_capacity);
+        const SolvedSnapshot selected_solved_snapshot =
+            select_best_solved_snapshot(solved_snapshot, solved_neighborhood);
         if (world_size > 1U && global_stop_value != 0U) {
             history.finish_all();
             const DistributedReconstructionResult distributed_solution =
                 reconstruct_solution_distributed(
                     history,
-                    solved_snapshot,
+                    selected_solved_snapshot,
+                    solved_neighborhood,
                     plan,
                     memory,
                     streams,
@@ -2646,7 +2966,7 @@ int main(int argc, char** argv) {
                 const bool valid = states_equal_storage(final_state, host_central);
                 const double solved_elapsed_sec =
                     std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-                SolvedSnapshot global_solved = solved_snapshot;
+                SolvedSnapshot global_solved = selected_solved_snapshot;
                 global_solved.found = true;
                 global_solved.count = std::max<std::uint32_t>(global_solved.count, 1U);
                 if (global_solved.meta.empty()) {
@@ -2690,15 +3010,16 @@ int main(int argc, char** argv) {
 #endif
             break;
         }
-        if (solved_snapshot.found) {
-            if (solved_snapshot.meta.empty() || solved_snapshot.depth.empty()) {
+        if (selected_solved_snapshot.found) {
+            if (selected_solved_snapshot.meta.empty() || selected_solved_snapshot.depth.empty()) {
                 throw std::runtime_error("solved flag set but solved metadata list is empty");
             }
-            const CandidateMeta solved_meta = solved_snapshot.meta.front();
-            const std::uint32_t solved_depth = solved_snapshot.depth.front();
+            const CandidateMeta solved_meta = selected_solved_snapshot.meta.front();
+            const std::uint32_t solved_depth = selected_solved_snapshot.depth.front();
             history.finish_all();
-            const ReconstructedSolution solution =
+            ReconstructedSolution solution =
                 reconstruct_solution_from_history(history, solved_meta, solved_depth);
+            append_solved_suffix(solution, solved_neighborhood, solved_meta.hash);
             const State128 final_state = apply_solution_moves(host_initial, solution.moves, host_generators);
             const bool valid = states_equal_storage(final_state, host_central);
             const double solved_elapsed_sec =
@@ -2712,7 +3033,7 @@ int main(int argc, char** argv) {
                 final_state,
                 valid,
                 history,
-                solved_snapshot);
+                selected_solved_snapshot);
             if (!valid) {
                 throw std::runtime_error("CPU solution validation failed: generated state is not central_state");
             }
@@ -2730,8 +3051,8 @@ int main(int argc, char** argv) {
             std::cout << "depth_solved=" << depth
                       << " depth_sec=" << depth_sec
                       << " solved_depth=" << solved_depth
-                      << " solved_count=" << solved_snapshot.count
-                      << " solved_overflow=" << solved_snapshot.overflow
+                      << " solved_count=" << selected_solved_snapshot.count
+                      << " solved_overflow=" << selected_solved_snapshot.overflow
                       << " stop_requested=" << (state.stop_requested ? 1 : 0) << "\n";
             }
 #endif
@@ -2978,6 +3299,7 @@ int main(int argc, char** argv) {
     destroy_dispatcher_events(events);
     destroy_dispatcher_streams(streams);
     free_static_device_memory(memory);
+    solved_neighborhood.destroy();
     cudaFree(generators);
     cudaFree(central_state);
     cudaFree(zobrist);

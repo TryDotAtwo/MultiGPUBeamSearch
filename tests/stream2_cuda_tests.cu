@@ -150,8 +150,84 @@ int main() {
     require(solved_depth == 7, "stream2 solved depth failed");
     report << "- hash_matches_cpu=pass\n";
     report << "- goal_sets_flags=pass\n";
+
+    BEAM_CUDA_CHECK(cudaMemset(d_flags, 0, 4 * sizeof(std::uint32_t)));
+    std::vector<Generator> identity_generators(MOVE_COUNT, swap01_generator());
+    identity_generators[0] = identity_generator();
+    std::vector<std::uint8_t> flat_identity_generators(MOVE_COUNT * STATE_STORAGE_LEN);
+    for (std::size_t move = 0; move < MOVE_COUNT; ++move) {
+        for (std::size_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+            flat_identity_generators[move * STATE_STORAGE_LEN + p] = identity_generators[move][p];
+        }
+    }
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        d_generators,
+        flat_identity_generators.data(),
+        flat_identity_generators.size(),
+        cudaMemcpyHostToDevice));
+
+    const Hash128 neighborhood_hash = hash_state(start, zobrist);
+    constexpr std::uint32_t bucket_count = 4;
+    std::vector<std::uint32_t> neighborhood_fingerprints(
+        bucket_count * SOLVED_NEIGHBORHOOD_BUCKET_SIZE,
+        0U);
+    std::vector<Hash128> neighborhood_hashes(
+        bucket_count * SOLVED_NEIGHBORHOOD_BUCKET_SIZE);
+    const std::uint32_t bucket =
+        static_cast<std::uint32_t>(hash128_bucket_key_0(neighborhood_hash)) & (bucket_count - 1U);
+    const std::uint32_t slot = bucket * SOLVED_NEIGHBORHOOD_BUCKET_SIZE;
+    neighborhood_fingerprints[slot] = hash128_fingerprint32(neighborhood_hash);
+    neighborhood_hashes[slot] = neighborhood_hash;
+    std::uint32_t* d_neighborhood_fingerprints = nullptr;
+    Hash128* d_neighborhood_hashes = nullptr;
+    BEAM_CUDA_CHECK(cudaMalloc(
+        &d_neighborhood_fingerprints,
+        neighborhood_fingerprints.size() * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(
+        &d_neighborhood_hashes,
+        neighborhood_hashes.size() * sizeof(Hash128)));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        d_neighborhood_fingerprints,
+        neighborhood_fingerprints.data(),
+        neighborhood_fingerprints.size() * sizeof(std::uint32_t),
+        cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        d_neighborhood_hashes,
+        neighborhood_hashes.data(),
+        neighborhood_hashes.size() * sizeof(Hash128),
+        cudaMemcpyHostToDevice));
+    solved.solved_neighborhood = SolvedNeighborhoodDeviceTable{
+        d_neighborhood_fingerprints,
+        d_neighborhood_hashes,
+        bucket_count - 1U,
+        1U};
+    stream2_hash_goal_cuda(
+        d_frontier,
+        d_parent_base,
+        d_count,
+        d_generators,
+        d_central,
+        d_zobrist,
+        d_hash_ring,
+        0,
+        0,
+        1,
+        9,
+        0,
+        solved,
+        0);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    BEAM_CUDA_CHECK(cudaMemcpy(flags, d_flags, sizeof(flags), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(&solved_meta, d_solved_meta, sizeof(CandidateMeta), cudaMemcpyDeviceToHost));
+    require(flags[0] == 1 && flags[1] == 1 && flags[2] != 0 && flags[3] == 0, "stream2 neighborhood flags failed");
+    require(solved_meta.hash == neighborhood_hash, "stream2 neighborhood hash failed");
+    report << "- solved_neighborhood_lookup=pass\n";
+
     report << "\nstatus=pass\n";
 
+    cudaFree(d_neighborhood_fingerprints);
+    cudaFree(d_neighborhood_hashes);
     cudaFree(d_frontier);
     cudaFree(d_central);
     cudaFree(d_generators);

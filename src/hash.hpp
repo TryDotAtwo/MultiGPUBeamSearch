@@ -38,4 +38,18 @@ BEAM_HOST_DEVICE inline std::uint64_t hash128_shard_distribution_key(Hash128 has
     return hash128_distribution_key(hash, 0x13198a2e03707344ULL);
 }
 
+BEAM_HOST_DEVICE inline std::uint32_t hash128_fingerprint32(Hash128 hash) {
+    const std::uint64_t mixed = hash128_distribution_key(hash, 0xa4093822299f31d0ULL);
+    std::uint32_t fingerprint = static_cast<std::uint32_t>(mixed ^ (mixed >> 32U));
+    return fingerprint == 0U ? 1U : fingerprint;
+}
+
+BEAM_HOST_DEVICE inline std::uint64_t hash128_bucket_key_0(Hash128 hash) {
+    return hash128_distribution_key(hash, 0x082efa98ec4e6c89ULL);
+}
+
+BEAM_HOST_DEVICE inline std::uint64_t hash128_bucket_key_1(Hash128 hash) {
+    return hash128_distribution_key(hash, 0x452821e638d01377ULL);
+}
+
 } // namespace beam
