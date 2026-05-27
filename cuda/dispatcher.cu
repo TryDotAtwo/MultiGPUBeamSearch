@@ -229,6 +229,22 @@ HistogramSummary summarize_histogram(
 #endif
 
 #if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
+struct FinalShardExactDebug {
+    std::uint64_t total = 0;
+    std::uint64_t less = 0;
+    std::uint64_t equal = 0;
+    std::uint64_t invalid_score = 0;
+    std::uint32_t min_score = UINT32_THRESHOLD_MAX;
+    std::uint32_t max_score = 0;
+};
+
+struct FinalBinDiffDebug {
+    std::uint32_t score = 0;
+    std::uint64_t hist = 0;
+    std::uint64_t exact = 0;
+    std::uint64_t abs_diff = 0;
+};
+
 void log_final_histogram_trace(
     const StaticMemoryPlan& plan,
     const StaticDeviceMemory& memory,
@@ -249,6 +265,8 @@ void log_final_histogram_trace(
     std::vector<std::uint32_t> hist_b(shard_hist_items);
     std::vector<std::uint32_t> active_snapshot(shard_count);
     std::vector<std::uint32_t> clean_count(shard_count);
+    std::vector<std::uint64_t> exact_hist(SCORE_BIN_COUNT);
+    std::vector<FinalShardExactDebug> exact_shard(shard_count);
 
     check_cuda(cudaMemcpy(
         global_hist.data(),
@@ -281,10 +299,49 @@ void log_final_histogram_trace(
         static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t),
         cudaMemcpyDeviceToHost), "cudaMemcpy final histogram trace clean count");
 
+    std::vector<CandidateMeta> shard_candidates;
+    std::uint32_t max_clean_count = 0;
+    for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
+        max_clean_count = std::max(max_clean_count, clean_count[shard]);
+    }
+    shard_candidates.resize(max_clean_count);
+    for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
+        const std::uint32_t count = clean_count[shard];
+        if (count == 0U) {
+            continue;
+        }
+        const std::uint64_t shard_offset =
+            static_cast<std::uint64_t>(shard) * plan.config.shard_capacity_candidates;
+        check_cuda(cudaMemcpy(
+            shard_candidates.data(),
+            memory.streams.survivor_shard + shard_offset,
+            static_cast<std::uint64_t>(count) * sizeof(CandidateMeta),
+            cudaMemcpyDeviceToHost), "cudaMemcpy final histogram trace survivor shard");
+        FinalShardExactDebug& exact = exact_shard[shard];
+        for (std::uint32_t i = 0; i < count; ++i) {
+            const std::uint32_t score = shard_candidates[i].score_key;
+            ++exact.total;
+            exact.min_score = std::min(exact.min_score, score);
+            exact.max_score = std::max(exact.max_score, score);
+            if (score < final_threshold) {
+                ++exact.less;
+            } else if (score == final_threshold) {
+                ++exact.equal;
+            }
+            if (score < SCORE_BIN_COUNT) {
+                ++exact_hist[score];
+            } else {
+                ++exact.invalid_score;
+            }
+        }
+    }
+
     const HistogramSummary global_summary =
         summarize_histogram(global_hist.data(), final_threshold, global_keep_count);
     const HistogramSummary local_summary =
         summarize_histogram(local_hist.data(), final_threshold, global_keep_count);
+    const HistogramSummary exact_local_summary =
+        summarize_histogram(exact_hist.data(), final_threshold, global_keep_count);
     const bool hist_invariant_ok =
         global_summary.less <= global_keep_count &&
         global_summary.less + global_summary.equal >= global_keep_count;
@@ -294,6 +351,8 @@ void log_final_histogram_trace(
 
     std::uint64_t shard_active_total_sum = 0;
     std::uint64_t shard_clean_total_sum = 0;
+    std::uint64_t exact_total_sum = 0;
+    std::uint64_t exact_invalid_score_sum = 0;
     std::uint32_t total_mismatch_shards = 0;
     for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
         const std::uint64_t offset = static_cast<std::uint64_t>(shard) * SCORE_BIN_COUNT;
@@ -303,10 +362,38 @@ void log_final_histogram_trace(
             summarize_histogram(active_hist, final_threshold, global_keep_count);
         shard_active_total_sum += shard_summary.total;
         shard_clean_total_sum += clean_count[shard];
+        exact_total_sum += exact_shard[shard].total;
+        exact_invalid_score_sum += exact_shard[shard].invalid_score;
         if (shard_summary.total != clean_count[shard]) {
             ++total_mismatch_shards;
         }
     }
+
+    std::vector<FinalBinDiffDebug> top_bin_diff;
+    top_bin_diff.reserve(SCORE_BIN_COUNT);
+    for (std::uint32_t score = 0; score < SCORE_BIN_COUNT; ++score) {
+        const std::uint64_t hist_value = local_hist[score];
+        const std::uint64_t exact_value = exact_hist[score];
+        if (hist_value == exact_value) {
+            continue;
+        }
+        FinalBinDiffDebug diff{};
+        diff.score = score;
+        diff.hist = hist_value;
+        diff.exact = exact_value;
+        diff.abs_diff =
+            hist_value > exact_value ? hist_value - exact_value : exact_value - hist_value;
+        top_bin_diff.push_back(diff);
+    }
+    std::sort(
+        top_bin_diff.begin(),
+        top_bin_diff.end(),
+        [](const FinalBinDiffDebug& a, const FinalBinDiffDebug& b) {
+            if (a.abs_diff != b.abs_diff) {
+                return a.abs_diff > b.abs_diff;
+            }
+            return a.score < b.score;
+        });
 
     std::cout << "final_histogram_trace"
               << " rank=" << local_rank
@@ -322,17 +409,25 @@ void log_final_histogram_trace(
               << " local_hist_total=" << local_summary.total
               << " local_hist_less=" << local_summary.less
               << " local_hist_equal=" << local_summary.equal
+              << " exact_host_total=" << exact_local_summary.total
+              << " exact_host_less=" << exact_local_summary.less
+              << " exact_host_equal=" << exact_local_summary.equal
               << " exact_local_less=" << exact_local_less
               << " exact_local_equal=" << exact_local_equal
               << " diff_global_less=" << delta_u64_string(exact_global_less, global_summary.less)
               << " diff_global_equal=" << delta_u64_string(exact_global_equal, global_summary.equal)
               << " diff_local_less=" << delta_u64_string(exact_local_less, local_summary.less)
               << " diff_local_equal=" << delta_u64_string(exact_local_equal, local_summary.equal)
+              << " diff_host_less=" << delta_u64_string(exact_local_summary.less, local_summary.less)
+              << " diff_host_equal=" << delta_u64_string(exact_local_summary.equal, local_summary.equal)
               << " hist_invariant_ok=" << (hist_invariant_ok ? 1 : 0)
               << " exact_invariant_ok=" << (exact_invariant_ok ? 1 : 0)
               << " shard_active_total_sum=" << shard_active_total_sum
               << " shard_clean_total_sum=" << shard_clean_total_sum
+              << " exact_total_sum=" << exact_total_sum
+              << " exact_invalid_score_sum=" << exact_invalid_score_sum
               << " total_mismatch_shards=" << total_mismatch_shards
+              << " diff_bin_count=" << top_bin_diff.size()
               << "\n";
 
     for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
@@ -356,7 +451,51 @@ void log_final_histogram_trace(
                   << " active_equal=" << active_summary.equal
                   << " inactive_less=" << inactive_summary.less
                   << " inactive_equal=" << inactive_summary.equal
+                  << " exact_total=" << exact_shard[shard].total
+                  << " exact_less=" << exact_shard[shard].less
+                  << " exact_equal=" << exact_shard[shard].equal
+                  << " diff_less=" << delta_u64_string(exact_shard[shard].less, active_summary.less)
+                  << " diff_equal=" << delta_u64_string(exact_shard[shard].equal, active_summary.equal)
+                  << " invalid_score=" << exact_shard[shard].invalid_score
+                  << " min_score="
+                  << (exact_shard[shard].total == 0U ? 0U : exact_shard[shard].min_score)
+                  << " max_score="
+                  << (exact_shard[shard].total == 0U ? 0U : exact_shard[shard].max_score)
                   << " total_delta=" << delta_u64_string(active_summary.total, clean_count[shard])
+                  << "\n";
+    }
+
+    if (final_threshold < SCORE_BIN_COUNT) {
+        const std::uint32_t window_begin = final_threshold > 8U ? final_threshold - 8U : 0U;
+        const std::uint32_t window_end =
+            std::min<std::uint32_t>(SCORE_BIN_COUNT - 1U, final_threshold + 8U);
+        for (std::uint32_t score = window_begin; score <= window_end; ++score) {
+            std::cout << "final_histogram_trace"
+                      << " rank=" << local_rank
+                      << " label=threshold_window"
+                      << " score=" << score
+                      << " local_hist=" << local_hist[score]
+                      << " exact_host=" << exact_hist[score]
+                      << " global_hist=" << global_hist[score]
+                      << " diff=" << delta_u64_string(exact_hist[score], local_hist[score])
+                      << "\n";
+        }
+    }
+
+    const std::uint32_t top_count =
+        static_cast<std::uint32_t>(std::min<std::size_t>(top_bin_diff.size(), 32U));
+    for (std::uint32_t i = 0; i < top_count; ++i) {
+        const FinalBinDiffDebug& diff = top_bin_diff[i];
+        std::cout << "final_histogram_trace"
+                  << " rank=" << local_rank
+                  << " label=top_bin_diff"
+                  << " index=" << i
+                  << " score=" << diff.score
+                  << " local_hist=" << diff.hist
+                  << " exact_host=" << diff.exact
+                  << " global_hist=" << global_hist[diff.score]
+                  << " abs_diff=" << diff.abs_diff
+                  << " signed_diff=" << delta_u64_string(diff.exact, diff.hist)
                   << "\n";
     }
 }

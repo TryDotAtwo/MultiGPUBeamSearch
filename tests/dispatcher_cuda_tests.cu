@@ -114,7 +114,7 @@ int main() {
         require(graphs.stream3_ring_graphs[ring] != nullptr, "stream3 graph template missing");
         require(graphs.stream3_ring_execs[ring] != nullptr, "stream3 graph executable missing");
     }
-    const std::uint32_t stream4_graph_count = config.shard_count * config.stream4_active_sort_slots;
+    const std::uint32_t stream4_graph_count = plan.storage_shard_count * config.stream4_active_sort_slots;
     require(graphs.stream4_shard_graphs.size() == stream4_graph_count, "stream4 graph count failed");
     require(graphs.stream4_shard_execs.size() == stream4_graph_count, "stream4 graph exec count failed");
     for (std::uint32_t graph = 0; graph < stream4_graph_count; ++graph) {

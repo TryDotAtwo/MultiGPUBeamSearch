@@ -157,3 +157,4 @@
 - User clarified that final phases 1, 2, and 3 must have separate layouts over one static scratch pool, not one monolithic final layout; requested implementing `scratch_pool_bytes = max(phase1, phase2, phase3)`.
 - User asked why `global_spill_capacity` exists. Clarified project intent: `global_spill_capacity` is legacy overflow storage for single-buffer Stream4 mode; target A/B mode uses `SHARD_BUFFER_COUNT=2`, keeps one physical shard writable, and should use `GLOBAL_SPILL_CAPACITY=0` for multi-GPU.
 - User clarified that resident Stream4 shard storage must always be A/B; `SHARD_BUFFER_COUNT=1` must not remain a valid runtime configuration. User requested launching Kaggle T4x2 validation for `beam=2**26`.
+- User approved adding the missing diagnostics needed to determine the final histogram mismatch cause, with architecture changes explicitly forbidden. Required next action: add debug only, then test on Kaggle T4x2.
