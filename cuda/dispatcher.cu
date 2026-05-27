@@ -1306,6 +1306,11 @@ DepthDispatchState run_depth_cuda_graphs(
     std::vector<std::uint32_t> pending_stream4_shards;
     pending_stream4_shards.reserve(plan.storage_shard_count * plan.config.ring_count);
     std::uint32_t pending_stream4_head = 0;
+    std::vector<std::uint8_t> stream4_pending_shard_queued(plan.storage_shard_count, 0);
+    std::vector<std::uint8_t> stream4_logical_running(plan.config.shard_count, 0);
+    std::vector<std::uint32_t> stream4_logical_running_shard(
+        plan.config.shard_count,
+        plan.storage_shard_count);
     std::vector<bool> stream4_slot_busy(plan.config.stream4_active_sort_slots, false);
     std::vector<std::uint32_t> stream4_slot_shard(plan.config.stream4_active_sort_slots, plan.storage_shard_count);
     std::deque<std::uint32_t> stream4_free_slots;
@@ -1432,6 +1437,48 @@ DepthDispatchState run_depth_cuda_graphs(
 
     const auto pending_stream4_count = [&]() -> std::uint32_t {
         return static_cast<std::uint32_t>(pending_stream4_shards.size() - pending_stream4_head);
+    };
+
+    const auto stream4_logical_shard = [&](std::uint32_t shard) -> std::uint32_t {
+        const std::uint32_t shard_buffer_count = std::max(1U, plan.config.shard_buffer_count);
+        return shard / shard_buffer_count;
+    };
+
+    const auto debug_stream4_pending_skip = [&](
+        const char* phase,
+        const char* reason,
+        std::uint32_t shard,
+        std::uint32_t logical_shard) {
+#if BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE
+        std::uint32_t pending = 0;
+        std::uint32_t running = 0;
+        std::uint32_t running_shard = plan.storage_shard_count;
+        if (shard < plan.storage_shard_count) {
+            pending = stream4_pending_shard_queued[shard];
+        }
+        if (logical_shard < plan.config.shard_count) {
+            running = stream4_logical_running[logical_shard];
+            running_shard = stream4_logical_running_shard[logical_shard];
+        }
+        std::cout << "stream4_pending_skip"
+                  << " rank=" << plan.config.local_rank
+                  << " phase=" << phase
+                  << " reason=" << reason
+                  << " shard=" << shard
+                  << " logical_shard=" << logical_shard
+                  << " pending_queued=" << pending
+                  << " running=" << running
+                  << " running_shard=" << running_shard
+                  << " pending_count=" << pending_stream4_count()
+                  << " busy_slots=" << stream4_busy_slots.size()
+                  << " free_slots=" << stream4_free_slots.size()
+                  << "\n";
+#else
+        (void)phase;
+        (void)reason;
+        (void)shard;
+        (void)logical_shard;
+#endif
     };
 
     const auto debug_pipeline_stats = [&](
@@ -1710,6 +1757,19 @@ DepthDispatchState run_depth_cuda_graphs(
             cudaMemcpyDeviceToHost), "cudaMemcpy stream3 writable processing");
         for (std::uint32_t logical_shard = 0; logical_shard < plan.config.shard_count; ++logical_shard) {
             bool writable = false;
+            bool logical_processing = false;
+            for (std::uint32_t buffer = 0; buffer < plan.config.shard_buffer_count; ++buffer) {
+                const std::uint32_t physical_shard =
+                    logical_shard * plan.config.shard_buffer_count + buffer;
+                logical_processing =
+                    logical_processing || host_processing[physical_shard] != 0U;
+            }
+            const std::uint32_t required_available =
+                logical_processing
+                    ? std::min(
+                          plan.config.stream3_batch_candidates,
+                          plan.config.shard_capacity_candidates)
+                    : write_reserve;
             for (std::uint32_t buffer = 0; buffer < plan.config.shard_buffer_count; ++buffer) {
                 const std::uint32_t physical_shard =
                     logical_shard * plan.config.shard_buffer_count + buffer;
@@ -1717,7 +1777,7 @@ DepthDispatchState run_depth_cuda_graphs(
                     host_clean[physical_shard] + host_dirty[physical_shard];
                 if (host_processing[physical_shard] == 0U &&
                     occupied < plan.config.shard_capacity_candidates &&
-                    plan.config.shard_capacity_candidates - occupied >= write_reserve) {
+                    plan.config.shard_capacity_candidates - occupied >= required_available) {
                     writable = true;
                     break;
                 }
@@ -1757,8 +1817,21 @@ DepthDispatchState run_depth_cuda_graphs(
         if (scan_tracked_stream4_output) {
             scan_tracked_stream4_output(slot);
         }
-        debug_stream4_histogram_trace("stream4_complete_post", stream4_slot_shard[slot], slot);
-        debug_pipeline_stats("stream4_complete", stream4_slot_shard[slot], slot);
+        const std::uint32_t completed_shard = stream4_slot_shard[slot];
+        debug_stream4_histogram_trace("stream4_complete_post", completed_shard, slot);
+        debug_pipeline_stats("stream4_complete", completed_shard, slot);
+        if (completed_shard < plan.storage_shard_count) {
+            const std::uint32_t logical_shard = stream4_logical_shard(completed_shard);
+            if (logical_shard >= plan.config.shard_count) {
+                throw std::runtime_error("stream4 completed shard logical index exceeds shard count");
+            }
+            if (stream4_logical_running_shard[logical_shard] != completed_shard ||
+                stream4_logical_running[logical_shard] == 0U) {
+                throw std::runtime_error("stream4 completed shard has no matching logical running state");
+            }
+            stream4_logical_running[logical_shard] = 0U;
+            stream4_logical_running_shard[logical_shard] = plan.storage_shard_count;
+        }
         stream4_slot_busy[slot] = false;
         stream4_slot_shard[slot] = plan.storage_shard_count;
         stream4_free_slots.push_back(slot);
@@ -2356,16 +2429,37 @@ DepthDispatchState run_depth_cuda_graphs(
             memory.streams.stream3_ready_shard_list,
             static_cast<std::uint64_t>(ready_count) * sizeof(std::uint32_t),
             cudaMemcpyDeviceToHost), "cudaMemcpy stream3 ready shard list to host scheduler");
+        const std::uint32_t zero_ready_count = 0;
+        check_cuda(cudaMemcpy(
+            memory.streams.stream3_ready_count,
+            &zero_ready_count,
+            sizeof(zero_ready_count),
+            cudaMemcpyHostToDevice), "cudaMemcpy consume stream3 ready count");
+        std::uint32_t accepted_count = 0;
         for (std::uint32_t i = 0; i < ready_count; ++i) {
             const std::uint32_t shard = host_ready_shards[i];
             if (shard >= plan.storage_shard_count) {
                 throw std::runtime_error("stream3 ready shard index exceeds storage shard count");
             }
+            const std::uint32_t logical_shard = stream4_logical_shard(shard);
+            if (logical_shard >= plan.config.shard_count) {
+                throw std::runtime_error("stream3 ready shard logical index exceeds shard count");
+            }
+            if (stream4_pending_shard_queued[shard] != 0U) {
+                debug_stream4_pending_skip(
+                    "ready_queue_append",
+                    "duplicate_pending_physical",
+                    shard,
+                    logical_shard);
+                continue;
+            }
+            stream4_pending_shard_queued[shard] = 1U;
             pending_stream4_shards.push_back(shard);
+            ++accepted_count;
         }
         update_stream4_queue_peaks();
-        debug_pipeline_stats("ready_queue_append", ready_count, UINT32_MAX);
-        return ready_count;
+        debug_pipeline_stats("ready_queue_append", accepted_count, ready_count);
+        return accepted_count;
     };
 
     const auto periodic_threshold_due = [&]() -> bool {
@@ -2645,44 +2739,113 @@ DepthDispatchState run_depth_cuda_graphs(
         stream4_jobs_since_threshold_update = 0;
     };
 
+    const auto pending_stream4_entry_launch_state = [&](
+        std::uint32_t shard,
+        const char* phase,
+        bool emit_blocked_log) -> std::uint32_t {
+        if (shard >= plan.storage_shard_count) {
+            throw std::runtime_error("pending stream4 shard index exceeds storage shard count");
+        }
+        const std::uint32_t logical_shard = stream4_logical_shard(shard);
+        if (logical_shard >= plan.config.shard_count) {
+            throw std::runtime_error("pending stream4 shard logical index exceeds shard count");
+        }
+        if (stream4_pending_shard_queued[shard] == 0U) {
+            debug_stream4_pending_skip(
+                phase,
+                "stale_or_consumed_physical",
+                shard,
+                logical_shard);
+            return 0U;
+        }
+        if (stream4_logical_running[logical_shard] != 0U) {
+            if (emit_blocked_log) {
+                debug_stream4_pending_skip(
+                    phase,
+                    "logical_already_running",
+                    shard,
+                    logical_shard);
+            }
+            return 1U;
+        }
+        return 2U;
+    };
+
+    const auto take_launchable_pending_stream4_shard = [&](const char* phase) -> std::uint32_t {
+        for (std::uint32_t index = pending_stream4_head;
+             index < pending_stream4_shards.size();) {
+            const std::uint32_t shard = pending_stream4_shards[index];
+            const std::uint32_t state =
+                pending_stream4_entry_launch_state(shard, phase, false);
+            if (state == 0U) {
+                pending_stream4_shards.erase(
+                    pending_stream4_shards.begin() + static_cast<std::ptrdiff_t>(index));
+                continue;
+            }
+            if (state == 1U) {
+                ++index;
+                continue;
+            }
+            stream4_pending_shard_queued[shard] = 0U;
+            pending_stream4_shards.erase(
+                pending_stream4_shards.begin() + static_cast<std::ptrdiff_t>(index));
+            return shard;
+        }
+        return plan.storage_shard_count;
+    };
+
+    const auto launch_stream4_shard_on_slot = [&](
+        std::uint32_t shard,
+        std::uint32_t slot,
+        const char* stats_phase) {
+        const std::uint32_t logical_shard = stream4_logical_shard(shard);
+        if (stream4_logical_running[logical_shard] != 0U) {
+            throw std::runtime_error("stream4 launch violates logical shard running guard");
+        }
+        stream4_logical_running[logical_shard] = 1U;
+        stream4_logical_running_shard[logical_shard] = shard;
+        const std::uint64_t graph_idx =
+            static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
+        scan_tracked_stream4_input(shard, slot, graph_idx);
+        debug_stream4_histogram_trace("stream4_launch_pre", shard, slot);
+        debug_pipeline_stats(stats_phase, shard, slot);
+#if BEAM_DEBUG_STREAM_TIMING
+        check_cuda(
+            cudaEventRecord(stream4_timing_start[slot], streams.stream4_slot_streams[slot]),
+            "cudaEventRecord stream4 timing start");
+#endif
+        check_cuda(
+            cudaGraphLaunch(graphs.stream4_shard_execs[graph_idx], streams.stream4_slot_streams[slot]),
+            "cudaGraphLaunch stream4");
+#if BEAM_DEBUG_STREAM_TIMING
+        check_cuda(
+            cudaEventRecord(stream4_timing_stop[slot], streams.stream4_slot_streams[slot]),
+            "cudaEventRecord stream4 timing stop");
+#endif
+        check_cuda(
+            cudaEventRecord(streams.stream4_slot_done[slot], streams.stream4_slot_streams[slot]),
+            "cudaEventRecord stream4 slot done");
+        stream4_slot_busy[slot] = true;
+        stream4_slot_shard[slot] = shard;
+        stream4_busy_slots.push_back(slot);
+        update_stream4_queue_peaks();
+        ++state.stream4_jobs_launched;
+        state.stream4_active_sort_slots_used = std::max(state.stream4_active_sort_slots_used, slot + 1U);
+    };
+
     const auto launch_pending_stream4_shards = [&]() -> std::uint32_t {
         release_completed_stream4_slots_nonblocking();
         std::uint32_t launched = 0;
-        while (pending_stream4_head < pending_stream4_shards.size()) {
-            const std::uint32_t slot = acquire_stream4_slot_nonblocking();
-            if (slot >= plan.config.stream4_active_sort_slots) {
+        while (!stream4_free_slots.empty()) {
+            const std::uint32_t shard =
+                take_launchable_pending_stream4_shard("stream4_launch_nonblocking");
+            if (shard >= plan.storage_shard_count) {
                 break;
             }
-            const std::uint32_t shard = pending_stream4_shards[pending_stream4_head];
-            ++pending_stream4_head;
-            const std::uint64_t graph_idx =
-                static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
-            scan_tracked_stream4_input(shard, slot, graph_idx);
-            debug_stream4_histogram_trace("stream4_launch_pre", shard, slot);
-            debug_pipeline_stats("stream4_launch", shard, slot);
-#if BEAM_DEBUG_STREAM_TIMING
-            check_cuda(
-                cudaEventRecord(stream4_timing_start[slot], streams.stream4_slot_streams[slot]),
-                "cudaEventRecord stream4 timing start");
-#endif
-            check_cuda(
-                cudaGraphLaunch(graphs.stream4_shard_execs[graph_idx], streams.stream4_slot_streams[slot]),
-                "cudaGraphLaunch stream4");
-#if BEAM_DEBUG_STREAM_TIMING
-            check_cuda(
-                cudaEventRecord(stream4_timing_stop[slot], streams.stream4_slot_streams[slot]),
-                "cudaEventRecord stream4 timing stop");
-#endif
-            check_cuda(
-                cudaEventRecord(streams.stream4_slot_done[slot], streams.stream4_slot_streams[slot]),
-                "cudaEventRecord stream4 slot done");
-            stream4_slot_busy[slot] = true;
-            stream4_slot_shard[slot] = shard;
-            stream4_busy_slots.push_back(slot);
-            update_stream4_queue_peaks();
+            const std::uint32_t slot = stream4_free_slots.front();
+            stream4_free_slots.pop_front();
+            launch_stream4_shard_on_slot(shard, slot, "stream4_launch");
             ++launched;
-            ++state.stream4_jobs_launched;
-            state.stream4_active_sort_slots_used = std::max(state.stream4_active_sort_slots_used, slot + 1U);
         }
         compact_pending_stream4_queue();
         return launched;
@@ -2693,37 +2856,19 @@ DepthDispatchState run_depth_cuda_graphs(
         while (pending_stream4_head < pending_stream4_shards.size()) {
             launched += launch_pending_stream4_shards();
             if (pending_stream4_head < pending_stream4_shards.size()) {
+                if (stream4_busy_slots.empty()) {
+                    throw std::runtime_error("stream4 pending queue has no launchable shard and no running slot");
+                }
                 const std::uint32_t slot = acquire_stream4_slot_blocking();
-                const std::uint32_t shard = pending_stream4_shards[pending_stream4_head];
-                ++pending_stream4_head;
-                const std::uint64_t graph_idx =
-                    static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
-                scan_tracked_stream4_input(shard, slot, graph_idx);
-                debug_stream4_histogram_trace("stream4_launch_pre", shard, slot);
-                debug_pipeline_stats("stream4_launch_blocking", shard, slot);
-#if BEAM_DEBUG_STREAM_TIMING
-                check_cuda(
-                    cudaEventRecord(stream4_timing_start[slot], streams.stream4_slot_streams[slot]),
-                    "cudaEventRecord stream4 timing start");
-#endif
-                check_cuda(
-                    cudaGraphLaunch(graphs.stream4_shard_execs[graph_idx], streams.stream4_slot_streams[slot]),
-                    "cudaGraphLaunch stream4");
-#if BEAM_DEBUG_STREAM_TIMING
-                check_cuda(
-                    cudaEventRecord(stream4_timing_stop[slot], streams.stream4_slot_streams[slot]),
-                    "cudaEventRecord stream4 timing stop");
-#endif
-                check_cuda(
-                    cudaEventRecord(streams.stream4_slot_done[slot], streams.stream4_slot_streams[slot]),
-                    "cudaEventRecord stream4 slot done");
-                stream4_slot_busy[slot] = true;
-                stream4_slot_shard[slot] = shard;
-                stream4_busy_slots.push_back(slot);
-                update_stream4_queue_peaks();
+                const std::uint32_t shard =
+                    take_launchable_pending_stream4_shard("stream4_launch_blocking");
+                if (shard >= plan.storage_shard_count) {
+                    stream4_free_slots.push_front(slot);
+                    compact_pending_stream4_queue();
+                    continue;
+                }
+                launch_stream4_shard_on_slot(shard, slot, "stream4_launch_blocking");
                 ++launched;
-                ++state.stream4_jobs_launched;
-                state.stream4_active_sort_slots_used = std::max(state.stream4_active_sort_slots_used, slot + 1U);
             }
             compact_pending_stream4_queue();
         }
@@ -3072,7 +3217,9 @@ DepthDispatchState run_depth_cuda_graphs(
         force_periodic_threshold_update();
     }
 
-    for (std::uint32_t flush_round = 0; flush_round < plan.storage_shard_count + 2U; ++flush_round) {
+    const std::uint32_t max_final_flush_rounds =
+        plan.storage_shard_count * 4U + 8U;
+    for (std::uint32_t flush_round = 0; flush_round < max_final_flush_rounds; ++flush_round) {
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(
             cudaEventRecord(stream3_spill_drain_timing_start[0], streams.stream3),
@@ -3183,7 +3330,7 @@ DepthDispatchState run_depth_cuda_graphs(
             (!any_dirty && total_clean >= plan.derived.global_beam_width_effective)) {
             break;
         }
-        if (flush_round + 1U == plan.storage_shard_count + 2U) {
+        if (flush_round + 1U == max_final_flush_rounds) {
             const std::uint32_t debug_threshold = read_current_threshold_host();
             dump_final_spill_debug(plan, memory, spill_counts, spill_active, debug_threshold);
             throw std::runtime_error(

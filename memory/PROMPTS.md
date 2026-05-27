@@ -151,3 +151,4 @@
 - User approved adding a separate debug flag to determine why final threshold histogram counts diverge from actual `survivor_shard + clean_count` final-selection counts.
 - User approved adding a separate debug flag around Stream4 histogram A/B state after `results.zip` showed active histogram totals diverging from `clean_count` while inactive buffers often matched `clean_count`.
 - User requested launching the Kaggle diagnostic run with auto-stop after 200 seconds.
+- User approved fixing the Stream4 A/B scheduler invariant after v71 diagnostics confirmed duplicate physical-shard launches. User clarified that Stream4 must use the existing physical-shard `processing_flag`: if one physical A/B buffer of a logical shard is busy, Stream4 must not start the other physical buffer concurrently.
