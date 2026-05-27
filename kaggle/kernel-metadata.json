@@ -1,7 +1,7 @@
 {
   "id": "trydotatwo/cayley-beam-gpu-runner",
   "title": "Cayley Beam GPU Runner",
-  "code_file": "beam_kernel.ipynb",
+  "code_file": "cayley-beam-gpu-runner.ipynb",
   "language": "python",
   "kernel_type": "notebook",
   "is_private": false,

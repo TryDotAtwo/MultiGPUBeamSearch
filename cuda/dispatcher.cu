@@ -43,6 +43,10 @@
 #define BEAM_DEBUG_FINAL_HISTOGRAM_TRACE 0
 #endif
 
+#ifndef BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE
+#define BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE 0
+#endif
+
 namespace beam {
 
 namespace {
@@ -179,7 +183,7 @@ void log_final_exchange_counts(
 }
 #endif
 
-#if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
+#if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE || BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE
 struct HistogramSummary {
     std::uint64_t total = 0;
     std::uint64_t less = 0;
@@ -222,7 +226,9 @@ HistogramSummary summarize_histogram(
     }
     return summary;
 }
+#endif
 
+#if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
 void log_final_histogram_trace(
     const StaticMemoryPlan& plan,
     const StaticDeviceMemory& memory,
@@ -1526,6 +1532,144 @@ DepthDispatchState run_depth_cuda_graphs(
         }
     };
 
+#if BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE
+    std::vector<std::uint32_t> stream4_trace_hist_a(SCORE_BIN_COUNT);
+    std::vector<std::uint32_t> stream4_trace_hist_b(SCORE_BIN_COUNT);
+    const auto debug_stream4_histogram_trace = [&](
+        const char* phase,
+        std::uint32_t shard,
+        std::uint32_t slot) {
+        if (shard >= plan.storage_shard_count) {
+            return;
+        }
+        const std::uint64_t shard_hist_offset =
+            static_cast<std::uint64_t>(shard) * SCORE_BIN_COUNT;
+        std::uint32_t active = 0;
+        std::uint32_t clean = 0;
+        std::uint32_t dirty = 0;
+        std::uint32_t processing = 0;
+        std::uint32_t scratch_count = 0;
+        std::uint32_t threshold_active = 0;
+        std::uint32_t threshold = UINT32_THRESHOLD_MAX;
+        std::uint32_t threshold_initialized[2]{};
+        check_cuda(cudaMemcpy(
+            &active,
+            memory.streams.shard_score_hist_active_index + shard,
+            sizeof(active),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace active index");
+        check_cuda(cudaMemcpy(
+            &clean,
+            memory.streams.clean_count + shard,
+            sizeof(clean),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace clean count");
+        check_cuda(cudaMemcpy(
+            &dirty,
+            memory.streams.dirty_count + shard,
+            sizeof(dirty),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace dirty count");
+        check_cuda(cudaMemcpy(
+            &processing,
+            memory.streams.processing_flag + shard,
+            sizeof(processing),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace processing flag");
+        check_cuda(cudaMemcpy(
+            stream4_trace_hist_a.data(),
+            memory.streams.shard_score_hist_a + shard_hist_offset,
+            SCORE_BIN_COUNT * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace hist a");
+        check_cuda(cudaMemcpy(
+            stream4_trace_hist_b.data(),
+            memory.streams.shard_score_hist_b + shard_hist_offset,
+            SCORE_BIN_COUNT * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace hist b");
+        if (slot < plan.config.stream4_active_sort_slots) {
+            check_cuda(cudaMemcpy(
+                &scratch_count,
+                memory.streams.stream4_count + slot,
+                sizeof(scratch_count),
+                cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace scratch count");
+        }
+        check_cuda(cudaMemcpy(
+            &threshold_active,
+            memory.streams.current_threshold_active_index,
+            sizeof(threshold_active),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace threshold active");
+        check_cuda(cudaMemcpy(
+            threshold_initialized,
+            memory.streams.threshold_initialized,
+            sizeof(threshold_initialized),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace threshold initialized");
+        check_cuda(cudaMemcpy(
+            &threshold,
+            memory.streams.current_threshold + (threshold_active & 1U),
+            sizeof(threshold),
+            cudaMemcpyDeviceToHost), "cudaMemcpy stream4 histogram trace threshold");
+
+        active &= 1U;
+        const std::uint32_t inactive = active ^ 1U;
+        const std::uint32_t* active_hist =
+            active == 0U ? stream4_trace_hist_a.data() : stream4_trace_hist_b.data();
+        const std::uint32_t* inactive_hist =
+            active == 0U ? stream4_trace_hist_b.data() : stream4_trace_hist_a.data();
+        const HistogramSummary a_summary =
+            summarize_histogram(stream4_trace_hist_a.data(), threshold, plan.derived.global_beam_width_effective);
+        const HistogramSummary b_summary =
+            summarize_histogram(stream4_trace_hist_b.data(), threshold, plan.derived.global_beam_width_effective);
+        const HistogramSummary active_summary =
+            summarize_histogram(active_hist, threshold, plan.derived.global_beam_width_effective);
+        const HistogramSummary inactive_summary =
+            summarize_histogram(inactive_hist, threshold, plan.derived.global_beam_width_effective);
+        const std::uint32_t shard_buffer_count = std::max(1U, plan.config.shard_buffer_count);
+        const std::uint32_t logical_shard = shard / shard_buffer_count;
+        const std::uint32_t physical_buffer = shard % shard_buffer_count;
+        const std::uint64_t clean_dirty_total =
+            static_cast<std::uint64_t>(clean) + static_cast<std::uint64_t>(dirty);
+
+        std::cout << "stream4_histogram_trace"
+                  << " rank=" << plan.config.local_rank
+                  << " phase=" << phase
+                  << " shard=" << shard
+                  << " logical_shard=" << logical_shard
+                  << " physical_buffer=" << physical_buffer
+                  << " slot=" << slot
+                  << " active_index=" << active
+                  << " inactive_index=" << inactive
+                  << " clean_count=" << clean
+                  << " dirty_count=" << dirty
+                  << " clean_dirty_total=" << clean_dirty_total
+                  << " processing=" << processing
+                  << " threshold_active_index=" << (threshold_active & 1U)
+                  << " threshold=" << threshold
+                  << " threshold_initialized0=" << threshold_initialized[0]
+                  << " threshold_initialized1=" << threshold_initialized[1]
+                  << " a_total=" << a_summary.total
+                  << " b_total=" << b_summary.total
+                  << " active_total=" << active_summary.total
+                  << " inactive_total=" << inactive_summary.total
+                  << " active_less=" << active_summary.less
+                  << " active_equal=" << active_summary.equal
+                  << " inactive_less=" << inactive_summary.less
+                  << " inactive_equal=" << inactive_summary.equal
+                  << " active_total_delta=" << delta_u64_string(active_summary.total, clean)
+                  << " inactive_total_delta=" << delta_u64_string(inactive_summary.total, clean)
+                  << " active_matches_clean=" << (active_summary.total == clean ? 1 : 0)
+                  << " inactive_matches_clean=" << (inactive_summary.total == clean ? 1 : 0)
+                  << " scratch_count=" << scratch_count
+                  << " stream3_jobs=" << state.stream3_jobs_launched
+                  << " stream4_jobs=" << state.stream4_jobs_launched
+                  << " jobs_since_threshold=" << stream4_jobs_since_threshold_update
+                  << " pending=" << pending_stream4_count()
+                  << " busy_slots=" << stream4_busy_slots.size()
+                  << " free_slots=" << stream4_free_slots.size()
+                  << "\n";
+    };
+#else
+    const auto debug_stream4_histogram_trace = [](
+        const char*,
+        std::uint32_t,
+        std::uint32_t) {};
+#endif
+
     const auto update_stream4_queue_peaks = [&]() {
         state.stream4_pending_shards_max =
             std::max(state.stream4_pending_shards_max, pending_stream4_count());
@@ -1613,6 +1757,7 @@ DepthDispatchState run_depth_cuda_graphs(
         if (scan_tracked_stream4_output) {
             scan_tracked_stream4_output(slot);
         }
+        debug_stream4_histogram_trace("stream4_complete_post", stream4_slot_shard[slot], slot);
         debug_pipeline_stats("stream4_complete", stream4_slot_shard[slot], slot);
         stream4_slot_busy[slot] = false;
         stream4_slot_shard[slot] = plan.storage_shard_count;
@@ -2513,6 +2658,7 @@ DepthDispatchState run_depth_cuda_graphs(
             const std::uint64_t graph_idx =
                 static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
             scan_tracked_stream4_input(shard, slot, graph_idx);
+            debug_stream4_histogram_trace("stream4_launch_pre", shard, slot);
             debug_pipeline_stats("stream4_launch", shard, slot);
 #if BEAM_DEBUG_STREAM_TIMING
             check_cuda(
@@ -2553,6 +2699,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 const std::uint64_t graph_idx =
                     static_cast<std::uint64_t>(shard) * plan.config.stream4_active_sort_slots + slot;
                 scan_tracked_stream4_input(shard, slot, graph_idx);
+                debug_stream4_histogram_trace("stream4_launch_pre", shard, slot);
                 debug_pipeline_stats("stream4_launch_blocking", shard, slot);
 #if BEAM_DEBUG_STREAM_TIMING
                 check_cuda(

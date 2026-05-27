@@ -149,3 +149,5 @@
 - User stopped Kaggle version 59 after another stall/failure around 137 seconds and requested diagnosis from downloaded logs. The required focus is collective threshold ordering and pipeline state, not adding multi-rank Stream3 backpressure.
 - User set a strict diagnostic operating rule: if a Kaggle run emits no logs for 120 seconds, stop the run and inspect downloaded logs. User forbids architecture/code changes without explicit approval; only config changes are allowed without approval when useful.
 - User approved adding a separate debug flag to determine why final threshold histogram counts diverge from actual `survivor_shard + clean_count` final-selection counts.
+- User approved adding a separate debug flag around Stream4 histogram A/B state after `results.zip` showed active histogram totals diverging from `clean_count` while inactive buffers often matched `clean_count`.
+- User requested launching the Kaggle diagnostic run with auto-stop after 200 seconds.
