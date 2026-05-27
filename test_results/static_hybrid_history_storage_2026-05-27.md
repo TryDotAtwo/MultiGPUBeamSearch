@@ -31,11 +31,11 @@
 - Docker ctest: `history_tests`: passed.
 - Local production smoke with `static_hybrid` did not reach history initialization because the current local Docker GPU budget rejected all runtime configs before history setup: `no runtime config fits GPU/final-layout budget`.
 
-## Pending
+## Verification Status
 
-- Push to GitHub `main`.
-- Launch Kaggle T4x2 validation.
-- Inspect logs for `candidate_history_*` budget lines and `history_bytes_stored_ram/history_bytes_stored_disk`.
+- Pushed to GitHub `main`: done.
+- Kaggle T4x2 validation: v82 and v83 completed via expected timeout without fatal patterns.
+- Output-safe config: v83 confirmed `/tmp/beam_history_arena` avoids packaging sparse history arena files.
 
 ## Kaggle v82 Observation
 
