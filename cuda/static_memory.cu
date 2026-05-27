@@ -316,6 +316,8 @@ struct LayoutSizeCursor {
     }
 };
 
+std::size_t bytes_final_select(const RuntimeConfig& config, const DerivedConfig& derived);
+
 std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& derived) {
     const std::uint32_t storage_shard_count = storage_shard_count_for(config);
     const std::uint64_t ring_slots = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
@@ -379,7 +381,6 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL);
     cursor.take<std::uint64_t>(1);
     cursor.take<std::uint64_t>(1);
-    cursor.take<CandidateMeta>(survivors);
     const std::uint64_t stream4_slot_items = stream4_slots * stream4_capacity;
     cursor.take<Hash128>(stream4_slot_items);
     cursor.take<Hash128>(stream4_slot_items);
@@ -397,13 +398,15 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take_bytes(stream4_slots * stream4_cub_temp_bytes(static_cast<std::uint32_t>(stream4_capacity)), 256);
     cursor.take<std::uint32_t>(storage_shard_count);
     cursor.take<std::uint32_t>(storage_shard_count);
-    cursor.take<std::uint32_t>(storage_shard_count);
     cursor.take<CandidateMeta>(spill);
     cursor.take<CandidateMeta>(spill);
     cursor.take<std::uint32_t>(2);
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
+    cursor.offset = std::max(cursor.offset, bytes_final_select(config, derived));
+    cursor.take<CandidateMeta>(survivors);
+    cursor.take<std::uint32_t>(storage_shard_count);
     const std::uint64_t shard_hist_items =
         static_cast<std::uint64_t>(storage_shard_count) * SCORE_BIN_COUNT;
     cursor.take<std::uint32_t>(shard_hist_items);
@@ -655,7 +658,6 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.recv_offset = streams.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL);
     memory.streams.stream5_local_round_count = streams.take<std::uint64_t>(1);
     memory.streams.stream5_global_round_count = streams.take<std::uint64_t>(1);
-    memory.streams.survivor_shard = streams.take<CandidateMeta>(plan.survivor_count);
     const std::uint64_t stream4_capacity = plan.config.shard_capacity_candidates;
     const std::uint64_t stream4_slots = plan.config.stream4_active_sort_slots;
     const std::uint64_t stream4_slot_items = stream4_slots * stream4_capacity;
@@ -675,7 +677,6 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.stream4_cub_temp =
         streams.take<std::byte>(stream4_slots * plan.stream4_cub_temp_bytes, 256);
     memory.streams.stream4_cub_temp_bytes = plan.stream4_cub_temp_bytes;
-    memory.streams.clean_count = streams.take<std::uint32_t>(plan.storage_shard_count);
     memory.streams.dirty_count = streams.take<std::uint32_t>(plan.storage_shard_count);
     memory.streams.processing_flag = streams.take<std::uint32_t>(plan.storage_shard_count);
     memory.streams.global_spill_buffer_a = streams.take<CandidateMeta>(plan.config.global_spill_capacity);
@@ -684,6 +685,9 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.global_spill_active_index = streams.take<std::uint32_t>(1);
     memory.streams.fatal_error_flag = streams.take<std::uint32_t>(1);
     memory.streams.fatal_error_trace = streams.take<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
+    streams.offset = std::max(streams.offset, plan.layout_phase2_select_bytes);
+    memory.streams.survivor_shard = streams.take<CandidateMeta>(plan.survivor_count);
+    memory.streams.clean_count = streams.take<std::uint32_t>(plan.storage_shard_count);
     const std::uint64_t shard_hist_items =
         static_cast<std::uint64_t>(plan.storage_shard_count) * SCORE_BIN_COUNT;
     memory.streams.shard_score_hist_a = streams.take<std::uint32_t>(shard_hist_items);
