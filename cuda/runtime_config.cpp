@@ -345,11 +345,12 @@ bool try_make_candidate(
     set_ring_count_from_logical_shard(config);
     set_shard_capacity_from_logical_shard(config);
     set_global_spill_capacity(config);
-
-    const StaticMemoryPlan plan = make_static_memory_plan(config);
-    if (plan.layout_streams_bytes > plan.layout_final_budget_bytes) {
+    if (config.stream4_batch_candidates > config.shard_capacity_candidates ||
+        config.stream4_trigger_candidates > config.shard_capacity_candidates) {
         return false;
     }
+
+    const StaticMemoryPlan plan = make_static_memory_plan(config);
     const std::uint64_t required =
         static_cast<std::uint64_t>(plan.total_device_bytes) + non_static_bytes;
     if (required > gpu_budget_bytes) {
@@ -464,7 +465,7 @@ RuntimeConfigBuild build_manual_runtime_config(
     build.estimated_non_static_device_bytes = estimate_non_static_device_bytes(build.config);
     build.stream3_ring_slots = required_env_u32("BEAM_STREAM3_RING_SLOTS");
     build.config.shard_count = required_env_u32("BEAM_SHARD_COUNT");
-    build.config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 1);
+    build.config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 2);
     build.config.stream4_batch_candidates = required_env_u32("BEAM_STREAM4_BATCH_CANDIDATES");
     build.config.stream4_trigger_candidates =
         env_u32("BEAM_STREAM4_TRIGGER_CANDIDATES", build.config.stream4_batch_candidates);
@@ -490,12 +491,17 @@ RuntimeConfigBuild build_manual_runtime_config(
     if (build.config.shard_capacity_candidates < logical_shard_size_for(build.config)) {
         throw std::invalid_argument("manual BEAM_SHARD_CAPACITY_CANDIDATES must be at least LOGICAL_SHARD_SIZE");
     }
-    if (build.config.shard_buffer_count == 0U || build.config.shard_buffer_count > 2U) {
-        throw std::invalid_argument("manual BEAM_SHARD_BUFFER_COUNT must be 1 or 2");
+    if (build.config.stream4_batch_candidates > build.config.shard_capacity_candidates) {
+        throw std::invalid_argument("manual BEAM_STREAM4_BATCH_CANDIDATES must not exceed BEAM_SHARD_CAPACITY_CANDIDATES");
     }
-    if (build.config.ring_count == 0U ||
-        (build.config.shard_buffer_count == 1U && build.config.global_spill_capacity == 0U)) {
-        throw std::invalid_argument("manual RING_COUNT and single-buffer GLOBAL_SPILL_CAPACITY must be nonzero");
+    if (build.config.stream4_trigger_candidates > build.config.shard_capacity_candidates) {
+        throw std::invalid_argument("manual BEAM_STREAM4_TRIGGER_CANDIDATES must not exceed BEAM_SHARD_CAPACITY_CANDIDATES");
+    }
+    if (build.config.shard_buffer_count != 2U) {
+        throw std::invalid_argument("manual BEAM_SHARD_BUFFER_COUNT must be 2");
+    }
+    if (build.config.ring_count == 0U) {
+        throw std::invalid_argument("manual RING_COUNT must be nonzero");
     }
     fill_runtime_config_build_estimates(build, stream4_flow_scale_ppm, free_before_bytes);
     return build;
@@ -572,7 +578,7 @@ RuntimeConfigBuild build_runtime_config_from_budget(
             ? env_u32("BEAM_STREAM4_BATCH_ALIGNMENT", 1024)
             : env_u32("BEAM_STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT", 1024);
     config.stream4_active_sort_slots = env_u32("BEAM_STREAM4_ACTIVE_SORT_SLOTS", 4);
-    config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 1);
+    config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 2);
     config.shard_capacity_scale_ppm = env_u32("BEAM_SHARD_CAPACITY_SCALE_PPM", 1'250'000);
     config.global_spill_scale_ppm = env_u32("BEAM_GLOBAL_SPILL_SCALE_PPM", 2'000'000);
     config.stream5_recv_capacity_scale_ppm = env_u32("BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM", 2'000'000);
@@ -583,8 +589,8 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;
     if (config.b_micro == 0U || config.stream4_batch_alignment == 0U ||
-        config.stream4_active_sort_slots == 0U || config.shard_buffer_count == 0U ||
-        config.shard_buffer_count > 2U || config.shard_capacity_scale_ppm == 0U ||
+        config.stream4_active_sort_slots == 0U || config.shard_buffer_count != 2U ||
+        config.shard_capacity_scale_ppm == 0U ||
         config.global_spill_scale_ppm == 0U || config.stream5_recv_capacity_scale_ppm == 0U) {
         throw std::invalid_argument("B_MICRO, STREAM4_ACTIVE_SORT_SLOTS, STREAM4_BATCH_ALIGNMENT, SHARD_BUFFER_COUNT, and capacity/spill scale values must be valid");
     }

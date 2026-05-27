@@ -152,3 +152,8 @@
 - User approved adding a separate debug flag around Stream4 histogram A/B state after `results.zip` showed active histogram totals diverging from `clean_count` while inactive buffers often matched `clean_count`.
 - User requested launching the Kaggle diagnostic run with auto-stop after 200 seconds.
 - User approved fixing the Stream4 A/B scheduler invariant after v71 diagnostics confirmed duplicate physical-shard launches. User clarified that Stream4 must use the existing physical-shard `processing_flag`: if one physical A/B buffer of a logical shard is busy, Stream4 must not start the other physical buffer concurrently.
+- User requested the next Kaggle T4x2 validation run to depth 16 after Kaggle version 72 completed depth 8 successfully.
+- User identified that `beam=2**26` should fit on Kaggle T4x2 and requested fixing the manual Kaggle config because shard capacity was incorrectly derived from global beam width instead of per-rank local beam width. User then requested building/pushing the corrected config.
+- User clarified that final phases 1, 2, and 3 must have separate layouts over one static scratch pool, not one monolithic final layout; requested implementing `scratch_pool_bytes = max(phase1, phase2, phase3)`.
+- User asked why `global_spill_capacity` exists. Clarified project intent: `global_spill_capacity` is legacy overflow storage for single-buffer Stream4 mode; target A/B mode uses `SHARD_BUFFER_COUNT=2`, keeps one physical shard writable, and should use `GLOBAL_SPILL_CAPACITY=0` for multi-GPU.
+- User clarified that resident Stream4 shard storage must always be A/B; `SHARD_BUFFER_COUNT=1` must not remain a valid runtime configuration. User requested launching Kaggle T4x2 validation for `beam=2**26`.

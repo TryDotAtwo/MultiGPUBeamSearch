@@ -34,6 +34,9 @@ struct StaticMemoryPlan {
     std::size_t final_materialize_cub_temp_bytes = 0;
     std::size_t current_frontier_bytes = 0;
     std::size_t solved_bytes = 0;
+    std::size_t layout_phase1_streams_bytes = 0;
+    std::size_t layout_phase2_select_bytes = 0;
+    std::size_t layout_phase3_materialize_bytes = 0;
     std::size_t layout_streams_bytes = 0;
     std::size_t layout_final_budget_bytes = 0;
     std::size_t layout_final_bytes = 0;

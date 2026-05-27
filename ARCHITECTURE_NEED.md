@@ -114,6 +114,11 @@ LOGICAL_SHARD_SIZE =
 STORAGE_SHARD_COUNT =
     SHARD_COUNT * SHARD_BUFFER_COUNT
 
+SHARD_BUFFER_COUNT =
+    2
+
+Each logical shard always has two resident physical shard buffers: A/B.
+
 SHARD_CAPACITY_CANDIDATES =
     round_up(ceil(LOGICAL_SHARD_SIZE * SHARD_CAPACITY_SCALE_PPM / 1_000_000),
              STREAM4_BATCH_ALIGNMENT)
@@ -121,10 +126,8 @@ SHARD_CAPACITY_CANDIDATES =
 RING_COUNT =
     ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))
 
-GLOBAL_SPILL_CAPACITY >=
-    ceil(STREAM4_ACTIVE_SORT_SLOTS * STREAM4_ACTIVE_SORT_SLOTS *
-         STREAM3_BATCH_CANDIDATES *
-         GLOBAL_SPILL_SCALE_PPM / 1_000_000)
+GLOBAL_SPILL_CAPACITY =
+    0
 
 Config search:
     choose SHARD_COUNT and STREAM4_BATCH_CANDIDATES under memory budget
@@ -596,17 +599,19 @@ layout_streams и layout_final используют одну физическу�
 layout_streams и layout_final не активны одновременно
 current_frontier_states не входит в scratch_pool
 solved_* и stop_flag не входят в scratch_pool
-layout_1_streams, layout_2_final_select, layout_3_final_materialize use one static scratch_pool
-layout_3_final_materialize is the largest final layout and defines the scratch_pool sizing floor for layouts 1/2
+layout_phase1_streams, layout_phase2_select, layout_phase3_materialize use one static scratch_pool
+layout_phase2_select output buffers consumed by layout_phase3_materialize stay in a common prefix
+layout_phase2_select temporary filter buffers and layout_phase3_materialize temporary exchange buffers overlay after the common prefix
+scratch_pool_bytes = max(layout_phase1_streams_bytes, layout_phase2_select_bytes, layout_phase3_materialize_bytes)
 no cudaMalloc/cudaFree is allowed inside depth-loop final materialization
 ```
 
 Config search memory objective:
 
 ```text
-layout_final_budget_bytes is computed before stream-layout selection
-layout_streams_bytes must fit within layout_final_budget_bytes
-SHARD_COUNT and STREAM4_BATCH_CANDIDATES are searched under this budget
+layout_final_budget_bytes = max(layout_phase2_select_bytes, layout_phase3_materialize_bytes)
+layout_streams_bytes does not need to fit inside layout_final_budget_bytes
+SHARD_COUNT and STREAM4_BATCH_CANDIDATES are searched under total device memory budget
 GLOBAL_BEAM_WIDTH_EFFECTIVE is only aligned USER_GLOBAL_BEAM_WIDTH, not capped
 ```
 
@@ -1182,10 +1187,9 @@ Stream 3 collector write target selection:
 ```text
 prefer current_buffer when physical_shard has enough free slots
 otherwise choose a non-processing sibling physical buffer with maximum free slots
-if SHARD_BUFFER_COUNT > 1 and no sibling can accept the candidate group:
+if no A/B physical buffer can accept the candidate group:
     raise fatal error
-if SHARD_BUFFER_COUNT == 1 and physical_shard cannot accept the candidate group:
-    write remainder to global_spill_buffer
+single-buffer global_spill path is legacy/unreachable under SHARD_BUFFER_COUNT == 2 contract
 ```
 
 Если physical_shard свободен:
@@ -1797,6 +1801,7 @@ approval_id = resident_shard_capacity_decoupled_from_stream4_batch_2026_05_24
 
 All STORAGE_SHARD_COUNT physical shard buffers are resident GPU memory for the full depth.
 STORAGE_SHARD_COUNT = SHARD_COUNT * SHARD_BUFFER_COUNT.
+SHARD_BUFFER_COUNT is always 2; every logical shard always has resident A/B physical shard buffers.
 SHARD_CAPACITY_CANDIDATES is the physical capacity of each resident physical shard buffer.
 STREAM4_BATCH_CANDIDATES is the dirty-count launch threshold and tuning knob, not the shard capacity.
 
@@ -1809,13 +1814,8 @@ Stream 3 writes into:
     survivor_shard[physical_shard][clean_count[physical_shard] + dirty_count[physical_shard]]
 when processing_flag[physical_shard] == false and physical shard capacity has free slots.
 
-Stream 3 writes into global spill when:
-    SHARD_BUFFER_COUNT == 1
-    and processing_flag[physical_shard] == true or physical shard free slots are exhausted.
-
 Stream 3 raises fatal overflow when:
-    SHARD_BUFFER_COUNT > 1
-    and no non-processing physical shard for logical_shard has enough free slots.
+    no non-processing A/B physical shard for logical_shard has enough free slots.
 
 Stream 3 pre-launch writable-buffer backpressure:
     allowed only when WORLD_SIZE == 1
@@ -1829,10 +1829,10 @@ Stream 4 ready queue invariant:
         at most one dirty-ready physical shard for logical_shard may be launched
         stream3_write_buffer_index[logical_shard] points to a non-processing sibling when possible
 
-GLOBAL_SPILL_CAPACITY derives from:
-    STREAM4_ACTIVE_SORT_SLOTS
-    STREAM3_BATCH_CANDIDATES
-    GLOBAL_SPILL_SCALE_PPM
+GLOBAL_SPILL_CAPACITY:
+    legacy single-buffer overflow capacity
+    unreachable under required SHARD_BUFFER_COUNT == 2 contract
+    expected production value is 0
 
 The old capacity equation:
     survivor_shard[SHARD_COUNT][2 * STREAM4_BATCH_CANDIDATES]

@@ -44,7 +44,15 @@ int main() {
     config.solved_result_capacity = 16;
     const StaticMemoryPlan plan = make_static_memory_plan(config);
     require(plan.derived.ring_slot_count == 2, "ring slot count must follow stream3 batch formula");
+    require(plan.layout_phase1_streams_bytes == plan.layout_streams_bytes, "phase1 layout must alias streams layout");
+    require(
+        plan.layout_final_bytes == std::max(plan.layout_phase2_select_bytes, plan.layout_phase3_materialize_bytes),
+        "final layout must be max of phase2 and phase3 layouts");
     require(plan.scratch_pool_bytes >= plan.layout_streams_bytes, "scratch pool must fit streams layout");
+    require(plan.scratch_pool_bytes >= plan.layout_phase2_select_bytes, "scratch pool must fit final select layout");
+    require(
+        plan.scratch_pool_bytes >= plan.layout_phase3_materialize_bytes,
+        "scratch pool must fit final materialize layout");
     require(plan.scratch_pool_bytes >= plan.layout_final_bytes, "scratch pool must fit final layout");
 
     StaticDeviceMemory memory;
@@ -52,7 +60,6 @@ int main() {
     require(memory.allocation != nullptr, "static allocation must exist");
     require(memory.current_frontier_states != nullptr, "current frontier must exist outside scratch");
     require(memory.scratch_pool != nullptr, "scratch pool must exist");
-    require(memory.final.next_frontier_states_tmp == memory.scratch_pool, "final layout must overlay scratch pool start");
     require(addr(memory.current_frontier_states) < addr(memory.scratch_pool), "current frontier must be before scratch pool");
     require(addr(memory.solved_flag) < addr(memory.scratch_pool), "solved buffers must be outside scratch pool");
     require(memory.current_depth != nullptr && addr(memory.current_depth) < addr(memory.scratch_pool), "current depth must be outside scratch pool");
@@ -125,6 +132,9 @@ int main() {
     require(memory.final.final_request_count != nullptr, "final request count missing");
     require(memory.final.final_validation_error != nullptr, "final validation error storage missing");
     require(
+        addr(memory.final.next_frontier_states_tmp) == addr(memory.final.final_keep_flags),
+        "single rank phase2 and phase3 temp layouts must overlay after common final outputs");
+    require(
         addr(memory.final.final_validation_error) % alignof(FinalRequestValidationError) == 0,
         "final validation error alignment failed");
     BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
@@ -151,6 +161,9 @@ int main() {
 
     StaticDeviceMemory multi_memory;
     allocate_static_device_memory(multi_plan, multi_memory);
+    require(
+        addr(multi_memory.final.final_candidate_buffer) == addr(multi_memory.final.final_keep_flags),
+        "multi rank phase2 and phase3 temp layouts must overlay after selected buffer");
     require(multi_memory.final.final_selected_buffer != nullptr, "layout3 selected buffer missing");
     require(multi_memory.final.final_request_buffer == nullptr, "multi-rank full final request buffer must be omitted");
     require(multi_memory.final.final_response_buffer == nullptr, "multi-rank full final response buffer must be omitted");

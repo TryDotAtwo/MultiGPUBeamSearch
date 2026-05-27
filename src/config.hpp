@@ -30,7 +30,7 @@ struct RuntimeConfig {
     std::uint32_t world_size = 1;
     std::uint32_t local_rank = 0;
     std::uint32_t shard_count = 64;
-    std::uint32_t shard_buffer_count = 1;
+    std::uint32_t shard_buffer_count = 2;
     std::uint32_t shard_capacity_candidates = 131072;
     std::uint32_t shard_capacity_scale_ppm = 1'250'000;
     std::uint32_t global_spill_capacity = 1 << 20;

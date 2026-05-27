@@ -417,58 +417,86 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     return align_up_size(cursor.offset, 256);
 }
 
-std::size_t bytes_final(const RuntimeConfig& config, const DerivedConfig& derived, std::size_t layout_streams_bytes) {
+struct FinalLayoutShape {
+    std::uint64_t frontier = 0;
+    std::uint64_t requests = 0;
+    std::uint64_t final_chunk = 0;
+    std::uint64_t final_exchange = 0;
+    std::uint64_t final_slots = 0;
+    std::uint64_t survivors = 0;
+    std::uint64_t selected_capacity = 0;
+    std::uint64_t survivor_blocks = 0;
+};
+
+FinalLayoutShape make_final_layout_shape(const RuntimeConfig& config, const DerivedConfig& derived) {
     const std::uint32_t storage_shard_count = storage_shard_count_for(config);
-    const std::uint64_t frontier =
+    FinalLayoutShape shape;
+    shape.frontier =
         (derived.global_beam_width_effective + static_cast<std::uint64_t>(config.world_size) - 1ULL) /
         static_cast<std::uint64_t>(config.world_size);
-    const std::uint64_t requests = frontier;
-    const std::uint64_t final_chunk = std::max<std::uint64_t>(
+    shape.requests = shape.frontier;
+    shape.final_chunk = std::max<std::uint64_t>(
         1ULL,
-        std::min<std::uint64_t>(frontier, config.stream3_batch_candidates));
-    const std::uint64_t final_exchange = final_chunk * static_cast<std::uint64_t>(config.world_size);
-    const std::uint64_t final_slots = FINAL_MATERIALIZE_SLOT_COUNT;
-    const std::uint64_t survivors =
+        std::min<std::uint64_t>(shape.frontier, config.stream3_batch_candidates));
+    shape.final_exchange = shape.final_chunk * static_cast<std::uint64_t>(config.world_size);
+    shape.final_slots = FINAL_MATERIALIZE_SLOT_COUNT;
+    shape.survivors =
         static_cast<std::uint64_t>(storage_shard_count) * config.shard_capacity_candidates;
-    const std::uint64_t selected_capacity = std::min<std::uint64_t>(derived.global_beam_width_effective, survivors);
-    const std::uint64_t survivor_blocks = (survivors + 255ULL) / 256ULL;
+    shape.selected_capacity = std::min<std::uint64_t>(derived.global_beam_width_effective, shape.survivors);
+    shape.survivor_blocks = (shape.survivors + 255ULL) / 256ULL;
+    return shape;
+}
+
+template <typename CursorT>
+void take_final_common(CursorT& cursor, const RuntimeConfig& config, const FinalLayoutShape& shape) {
+    if (config.world_size > 1U) {
+        cursor.template take<CandidateMeta>(shape.selected_capacity, alignof(CandidateMeta));
+    } else {
+        cursor.template take<CandidateMeta>(shape.frontier);
+        cursor.template take<FinalRequest>(shape.requests);
+    }
+    cursor.template take<std::uint32_t>(1);
+    cursor.template take<std::uint32_t>(1);
+    cursor.template take<FinalRequestValidationError>(1, alignof(FinalRequestValidationError));
+    cursor.template take<std::uint32_t>(config.world_size, 256);
+    cursor.template take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL, 256);
+    cursor.template take<std::uint32_t>(config.world_size, 256);
+    cursor.template take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL, 256);
+}
+
+std::size_t bytes_final_select(const RuntimeConfig& config, const DerivedConfig& derived) {
+    const FinalLayoutShape shape = make_final_layout_shape(config, derived);
     LayoutSizeCursor cursor;
-    cursor.take<State128>(frontier, alignof(CandidateMeta));
-    cursor.offset = std::max(cursor.offset, layout_streams_bytes);
-    cursor.take<std::uint32_t>(survivors);
-    cursor.take<std::uint32_t>(survivor_blocks);
-    cursor.take<std::uint32_t>(survivor_blocks);
-    if (config.world_size > 1U) {
-        cursor.take<CandidateMeta>(selected_capacity, alignof(CandidateMeta));
-    }
-    cursor.take<CandidateMeta>(frontier);
-    cursor.take<std::uint32_t>(1);
-    if (config.world_size == 1U) {
-        cursor.take<FinalRequest>(requests);
-    }
-    cursor.take<std::uint32_t>(1);
-    cursor.take<FinalRequestValidationError>(1, alignof(FinalRequestValidationError));
-    if (config.world_size > 1U) {
-        cursor.take<std::uint32_t>(final_slots * final_exchange, 256);
-        cursor.take<std::uint32_t>(final_slots * final_exchange, 256);
-        cursor.take<FinalRequest>(final_slots * final_exchange, alignof(FinalRequest));
-        cursor.take<FinalRequest>(final_slots * final_exchange, alignof(FinalRequest));
-        cursor.take<FinalRequest>(final_slots * final_exchange, alignof(FinalRequest));
-        cursor.take<FinalResponse>(final_slots * final_exchange, alignof(CandidateMeta));
-        cursor.take<FinalResponse>(final_slots * final_exchange, alignof(CandidateMeta));
-        cursor.take<FinalHistoryRecord>(final_slots * final_chunk, alignof(FinalHistoryRecord));
-        cursor.take<FinalHistoryRecord>(final_slots * final_exchange, alignof(FinalHistoryRecord));
-        cursor.take_bytes(final_materialize_cub_temp_bytes(static_cast<std::uint32_t>(final_exchange)), 256);
-    }
-    cursor.take<std::uint32_t>(config.world_size, 256);
-    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL, 256);
-    cursor.take<std::uint32_t>(config.world_size, 256);
-    cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.world_size) + 1ULL, 256);
+    take_final_common(cursor, config, shape);
+    cursor.offset = align_up_size(cursor.offset, 256);
+    cursor.take<std::uint32_t>(shape.survivors);
+    cursor.take<std::uint32_t>(shape.survivor_blocks);
+    cursor.take<std::uint32_t>(shape.survivor_blocks);
     return align_up_size(cursor.offset, 256);
 }
 
-std::size_t bytes_final_budget(const RuntimeConfig& config, const DerivedConfig& derived) {
-    return bytes_final(config, derived, 0);
+std::size_t bytes_final_materialize(const RuntimeConfig& config, const DerivedConfig& derived) {
+    const FinalLayoutShape shape = make_final_layout_shape(config, derived);
+    LayoutSizeCursor cursor;
+    take_final_common(cursor, config, shape);
+    cursor.offset = align_up_size(cursor.offset, 256);
+    if (config.world_size > 1U) {
+        cursor.take<CandidateMeta>(shape.frontier);
+    }
+    cursor.take<State128>(shape.frontier, alignof(CandidateMeta));
+    if (config.world_size > 1U) {
+        cursor.take<std::uint32_t>(shape.final_slots * shape.final_exchange, 256);
+        cursor.take<std::uint32_t>(shape.final_slots * shape.final_exchange, 256);
+        cursor.take<FinalRequest>(shape.final_slots * shape.final_exchange, alignof(FinalRequest));
+        cursor.take<FinalRequest>(shape.final_slots * shape.final_exchange, alignof(FinalRequest));
+        cursor.take<FinalRequest>(shape.final_slots * shape.final_exchange, alignof(FinalRequest));
+        cursor.take<FinalResponse>(shape.final_slots * shape.final_exchange, alignof(CandidateMeta));
+        cursor.take<FinalResponse>(shape.final_slots * shape.final_exchange, alignof(CandidateMeta));
+        cursor.take<FinalHistoryRecord>(shape.final_slots * shape.final_chunk, alignof(FinalHistoryRecord));
+        cursor.take<FinalHistoryRecord>(shape.final_slots * shape.final_exchange, alignof(FinalHistoryRecord));
+        cursor.take_bytes(final_materialize_cub_temp_bytes(static_cast<std::uint32_t>(shape.final_exchange)), 256);
+    }
+    return align_up_size(cursor.offset, 256);
 }
 
 std::size_t bytes_solved(const RuntimeConfig& config) {
@@ -535,10 +563,17 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
         static_cast<std::uint32_t>(plan.final_materialize_exchange_capacity));
     plan.current_frontier_bytes = static_cast<std::size_t>(plan.frontier_states) * sizeof(State128);
     plan.solved_bytes = bytes_solved(config);
-    plan.layout_streams_bytes = bytes_streams(config, derived);
-    plan.layout_final_budget_bytes = bytes_final_budget(config, derived);
-    plan.layout_final_bytes = bytes_final(config, derived, plan.layout_streams_bytes);
-    plan.scratch_pool_bytes = std::max(plan.layout_streams_bytes, plan.layout_final_bytes);
+    plan.layout_phase1_streams_bytes = bytes_streams(config, derived);
+    plan.layout_phase2_select_bytes = bytes_final_select(config, derived);
+    plan.layout_phase3_materialize_bytes = bytes_final_materialize(config, derived);
+    plan.layout_streams_bytes = plan.layout_phase1_streams_bytes;
+    plan.layout_final_budget_bytes = std::max(plan.layout_phase2_select_bytes, plan.layout_phase3_materialize_bytes);
+    plan.layout_final_bytes = plan.layout_final_budget_bytes;
+    plan.scratch_pool_bytes = std::max({
+        plan.layout_phase1_streams_bytes,
+        plan.layout_phase2_select_bytes,
+        plan.layout_phase3_materialize_bytes,
+    });
     plan.total_device_bytes =
         align_up_size(plan.current_frontier_bytes, 256) +
         align_up_size(plan.solved_bytes, 256) +
@@ -663,25 +698,39 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.threshold_request_local = streams.take<std::uint32_t>(1);
     memory.streams.threshold_request_global = streams.take<std::uint32_t>(1);
 
-    Cursor final{reinterpret_cast<std::byte*>(memory.scratch_pool), 0};
-    memory.final.next_frontier_states_tmp = final.take<State128>(plan.frontier_states, alignof(CandidateMeta));
-    final.offset = std::max(final.offset, plan.layout_streams_bytes);
-    const std::uint64_t final_survivor_blocks = (plan.survivor_count + 255ULL) / 256ULL;
-    memory.final.final_keep_flags = final.take<std::uint32_t>(plan.survivor_count);
-    memory.final.final_block_counts = final.take<std::uint32_t>(final_survivor_blocks);
-    memory.final.final_block_offsets = final.take<std::uint32_t>(final_survivor_blocks);
+    Cursor final_common{reinterpret_cast<std::byte*>(memory.scratch_pool), 0};
     if (plan.config.world_size > 1U) {
-        memory.final.final_selected_buffer =
-            final.take<CandidateMeta>(plan.final_selected_candidate_capacity, alignof(CandidateMeta));
+        memory.final.final_selected_buffer = final_common.take<CandidateMeta>(
+            plan.final_selected_candidate_capacity,
+            alignof(CandidateMeta));
+    } else {
+        memory.final.final_candidate_buffer = final_common.take<CandidateMeta>(plan.frontier_states);
+        memory.final.final_request_buffer = final_common.take<FinalRequest>(plan.frontier_states);
     }
-    memory.final.final_candidate_buffer = final.take<CandidateMeta>(plan.frontier_states);
-    memory.final.final_candidate_count = final.take<std::uint32_t>(1);
-    if (plan.config.world_size == 1U) {
-        memory.final.final_request_buffer = final.take<FinalRequest>(plan.frontier_states);
-    }
-    memory.final.final_request_count = final.take<std::uint32_t>(1);
+    memory.final.final_candidate_count = final_common.take<std::uint32_t>(1);
+    memory.final.final_request_count = final_common.take<std::uint32_t>(1);
     memory.final.final_validation_error =
-        final.take<FinalRequestValidationError>(1, alignof(FinalRequestValidationError));
+        final_common.take<FinalRequestValidationError>(1, alignof(FinalRequestValidationError));
+    memory.final.final_send_count = final_common.take<std::uint32_t>(plan.config.world_size, 256);
+    memory.final.final_send_offset =
+        final_common.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL, 256);
+    memory.final.final_recv_count = final_common.take<std::uint32_t>(plan.config.world_size, 256);
+    memory.final.final_recv_offset =
+        final_common.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL, 256);
+
+    const std::size_t final_common_bytes = align_up_size(final_common.offset, 256);
+    Cursor final_select{reinterpret_cast<std::byte*>(memory.scratch_pool), final_common_bytes};
+    const std::uint64_t final_survivor_blocks = (plan.survivor_count + 255ULL) / 256ULL;
+    memory.final.final_keep_flags = final_select.take<std::uint32_t>(plan.survivor_count);
+    memory.final.final_block_counts = final_select.take<std::uint32_t>(final_survivor_blocks);
+    memory.final.final_block_offsets = final_select.take<std::uint32_t>(final_survivor_blocks);
+
+    Cursor final_materialize{reinterpret_cast<std::byte*>(memory.scratch_pool), final_common_bytes};
+    if (plan.config.world_size > 1U) {
+        memory.final.final_candidate_buffer = final_materialize.take<CandidateMeta>(plan.frontier_states);
+    }
+    memory.final.next_frontier_states_tmp =
+        final_materialize.take<State128>(plan.frontier_states, alignof(CandidateMeta));
     if (plan.config.world_size > 1U) {
         const std::uint64_t final_slot_items =
             static_cast<std::uint64_t>(plan.final_materialize_slot_count) *
@@ -689,26 +738,26 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
         const std::uint64_t final_history_send_items =
             static_cast<std::uint64_t>(plan.final_materialize_slot_count) *
             plan.final_materialize_chunk_capacity;
-        memory.final.final_mat_key_a = final.take<std::uint32_t>(final_slot_items, 256);
-        memory.final.final_mat_key_b = final.take<std::uint32_t>(final_slot_items, 256);
-        memory.final.final_mat_request_a = final.take<FinalRequest>(final_slot_items, alignof(FinalRequest));
-        memory.final.final_mat_request_b = final.take<FinalRequest>(final_slot_items, alignof(FinalRequest));
-        memory.final.final_mat_request_recv = final.take<FinalRequest>(final_slot_items, alignof(FinalRequest));
-        memory.final.final_mat_response_send = final.take<FinalResponse>(final_slot_items, alignof(CandidateMeta));
-        memory.final.final_mat_response_recv = final.take<FinalResponse>(final_slot_items, alignof(CandidateMeta));
+        memory.final.final_mat_key_a = final_materialize.take<std::uint32_t>(final_slot_items, 256);
+        memory.final.final_mat_key_b = final_materialize.take<std::uint32_t>(final_slot_items, 256);
+        memory.final.final_mat_request_a =
+            final_materialize.take<FinalRequest>(final_slot_items, alignof(FinalRequest));
+        memory.final.final_mat_request_b =
+            final_materialize.take<FinalRequest>(final_slot_items, alignof(FinalRequest));
+        memory.final.final_mat_request_recv =
+            final_materialize.take<FinalRequest>(final_slot_items, alignof(FinalRequest));
+        memory.final.final_mat_response_send =
+            final_materialize.take<FinalResponse>(final_slot_items, alignof(CandidateMeta));
+        memory.final.final_mat_response_recv =
+            final_materialize.take<FinalResponse>(final_slot_items, alignof(CandidateMeta));
         memory.final.final_mat_history_send =
-            final.take<FinalHistoryRecord>(final_history_send_items, alignof(FinalHistoryRecord));
+            final_materialize.take<FinalHistoryRecord>(final_history_send_items, alignof(FinalHistoryRecord));
         memory.final.final_mat_history_recv =
-            final.take<FinalHistoryRecord>(final_slot_items, alignof(FinalHistoryRecord));
-        memory.final.final_mat_cub_temp = final.take<std::byte>(plan.final_materialize_cub_temp_bytes, 256);
+            final_materialize.take<FinalHistoryRecord>(final_slot_items, alignof(FinalHistoryRecord));
+        memory.final.final_mat_cub_temp =
+            final_materialize.take<std::byte>(plan.final_materialize_cub_temp_bytes, 256);
         memory.final.final_mat_cub_temp_bytes = plan.final_materialize_cub_temp_bytes;
     }
-    memory.final.final_send_count = final.take<std::uint32_t>(plan.config.world_size, 256);
-    memory.final.final_send_offset =
-        final.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL, 256);
-    memory.final.final_recv_count = final.take<std::uint32_t>(plan.config.world_size, 256);
-    memory.final.final_recv_offset =
-        final.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.world_size) + 1ULL, 256);
 }
 
 void free_static_device_memory(StaticDeviceMemory& memory) {

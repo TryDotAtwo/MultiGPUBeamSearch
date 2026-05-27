@@ -1980,6 +1980,9 @@ int main(int argc, char** argv) {
     std::cout << "current_frontier_bytes=" << plan.current_frontier_bytes << "\n";
     std::cout << "solved_bytes=" << plan.solved_bytes << "\n";
     std::cout << "scratch_pool_bytes=" << plan.scratch_pool_bytes << "\n";
+    std::cout << "layout_phase1_streams_bytes=" << plan.layout_phase1_streams_bytes << "\n";
+    std::cout << "layout_phase2_select_bytes=" << plan.layout_phase2_select_bytes << "\n";
+    std::cout << "layout_phase3_materialize_bytes=" << plan.layout_phase3_materialize_bytes << "\n";
     std::cout << "layout_streams_bytes=" << plan.layout_streams_bytes << "\n";
     std::cout << "layout_final_budget_bytes=" << plan.layout_final_budget_bytes << "\n";
     std::cout << "layout_final_bytes=" << plan.layout_final_bytes << "\n";
