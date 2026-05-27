@@ -164,3 +164,4 @@
 - User clarified that depth-only logs should not materially slow the code because heavy debug trace flags are compiled off, then requested config-only speed tuning for Kaggle T4x2 through notebook parameters rather than architecture changes.
 - User rejected the assumption that the full/small frontier alternation is normal, stated that the pattern is likely a bug, and requested adding debug only to determine the cause. Architecture changes are forbidden; code additions are allowed only for diagnostics.
 - User stopped Kaggle version 79 manually and requested setting `RUN_TIMEOUT_SEC=300` in the Kaggle config.
+- User approved fixing the Kaggle v80 diagnosis by adding the missing multi-rank final-reset cleanup for stale Stream4 histograms: "Аааа, вон оно че. Такс, тогда давай добавлять очистку, конечно".

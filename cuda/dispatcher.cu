@@ -4452,6 +4452,21 @@ FinalizeDepthState finalize_depth_single_gpu(
             static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
             streams.stream3), "cudaMemsetAsync reset processing flag");
         check_cuda(cudaMemsetAsync(
+            memory.streams.stream3_ready_flag,
+            0,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset stream3 ready flag");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.stream3_ready_shard_list,
+            0,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset stream3 ready shard list");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.stream3_ready_count,
+            0,
+            sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset stream3 ready count");
+        check_cuda(cudaMemsetAsync(
             memory.streams.global_spill_count,
             0,
             2ULL * sizeof(std::uint32_t),
@@ -4461,6 +4476,26 @@ FinalizeDepthState finalize_depth_single_gpu(
             0,
             sizeof(std::uint32_t),
             streams.stream3), "cudaMemsetAsync reset global spill active index");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.stream3_write_buffer_index,
+            0,
+            static_cast<std::uint64_t>(plan.config.shard_count) * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset stream3 write buffer index");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.shard_score_hist_a,
+            0,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset shard score hist a");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.shard_score_hist_b,
+            0,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset shard score hist b");
+        check_cuda(cudaMemsetAsync(
+            memory.streams.shard_score_hist_active_index,
+            0,
+            static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
+            streams.stream3), "cudaMemsetAsync reset shard score hist active index");
         check_cuda(cudaMemsetAsync(
             memory.streams.threshold_initialized,
             0,
