@@ -59,7 +59,10 @@ void stream3_pack_threshold_cuda(
     std::uint32_t current_threshold,
     std::uint32_t b_micro,
     std::uint32_t stream3_batch_candidates,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    std::uint32_t* debug_threshold_pass_count_by_ring = nullptr,
+    std::uint32_t* debug_unique_count_by_ring = nullptr,
+    std::uint32_t debug_ring = 0);
 
 void stream3_pack_threshold_device_threshold_cuda(
     const std::uint32_t* score_ring,
@@ -82,7 +85,10 @@ void stream3_pack_threshold_device_threshold_cuda(
     const std::uint32_t* current_threshold_active_index,
     std::uint32_t b_micro,
     std::uint32_t stream3_batch_candidates,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    std::uint32_t* debug_threshold_pass_count_by_ring = nullptr,
+    std::uint32_t* debug_unique_count_by_ring = nullptr,
+    std::uint32_t debug_ring = 0);
 
 void stream3_restore_owner_split_cuda(
     const Hash128* unique_key,

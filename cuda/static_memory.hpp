@@ -8,6 +8,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#ifndef BEAM_DEBUG_DEPTH_FLOW_TRACE
+#define BEAM_DEBUG_DEPTH_FLOW_TRACE 0
+#endif
+
 namespace beam {
 
 struct StaticMemoryPlan {
@@ -77,6 +81,10 @@ struct LayoutStreamsView {
     Hash128* unique_key = nullptr;
     std::uint64_t* unique_val = nullptr;
     std::uint32_t* unique_count = nullptr;
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    std::uint32_t* stream3_threshold_pass_count_by_ring = nullptr;
+    std::uint32_t* stream3_unique_count_by_ring = nullptr;
+#endif
     CandidateMeta* local_pending_buffer = nullptr;
     std::uint32_t* local_pending_count = nullptr;
     CandidateMeta* remote_send_buffer = nullptr;

@@ -646,6 +646,12 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.unique_key = streams.take<Hash128>(plan.stream3_count);
     memory.streams.unique_val = streams.take<std::uint64_t>(plan.stream3_count);
     memory.streams.unique_count = streams.take<std::uint32_t>(1);
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    memory.streams.stream3_threshold_pass_count_by_ring =
+        streams.take<std::uint32_t>(plan.config.ring_count);
+    memory.streams.stream3_unique_count_by_ring =
+        streams.take<std::uint32_t>(plan.config.ring_count);
+#endif
     memory.streams.local_pending_buffer = streams.take<CandidateMeta>(plan.stream3_count);
     memory.streams.local_pending_count = streams.take<std::uint32_t>(1);
     memory.streams.remote_send_buffer =

@@ -11,6 +11,10 @@
 #include <cstdint>
 #include <vector>
 
+#ifndef BEAM_DEBUG_DEPTH_FLOW_TRACE
+#define BEAM_DEBUG_DEPTH_FLOW_TRACE 0
+#endif
+
 namespace beam {
 
 struct DispatcherStreams {
@@ -191,6 +195,25 @@ struct DepthDispatchState {
     std::uint32_t stream4_pending_shards_max = 0;
     std::uint32_t stream4_busy_slots_max = 0;
     std::uint32_t global_spill_peak = 0;
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    std::uint32_t depth_for_log = UINT32_MAX;
+    std::uint32_t threshold_start = UINT32_MAX;
+    std::uint32_t threshold_start_initialized = 0;
+    std::uint32_t threshold_end = UINT32_MAX;
+    std::uint32_t threshold_end_initialized = 0;
+    std::uint64_t generated_candidates_total = 0;
+    std::uint64_t stream3_threshold_pass_total = 0;
+    std::uint64_t stream3_unique_total = 0;
+    std::uint64_t stream3_local_pending_total = 0;
+    std::uint64_t stream3_remote_send_total = 0;
+    std::uint64_t stream5_recv_total = 0;
+    std::uint64_t stream3_local_write_total = 0;
+    std::uint64_t stream3_local_spill_total = 0;
+    std::uint64_t stream3_remote_write_total = 0;
+    std::uint64_t stream3_remote_spill_total = 0;
+    std::uint64_t stream4_clean_after_drain_total = 0;
+    std::uint64_t stream4_dirty_after_drain_total = 0;
+#endif
     bool depth_drained = false;
     bool stop_requested = false;
     GeneratedTrackResult tracked_generated;
@@ -213,6 +236,13 @@ struct FinalizeDepthState {
     std::uint32_t tracked_prefinal_best_local = UINT32_MAX;
     std::uint64_t tracked_prefinal_best_parent_idx = UINT64_MAX;
     std::uint32_t tracked_prefinal_best_route_packed = UINT32_MAX;
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    std::uint64_t local_clean_before_final = 0;
+    std::uint64_t final_global_less = 0;
+    std::uint64_t final_global_equal = 0;
+    std::uint64_t final_total_available = 0;
+    std::uint64_t final_global_keep_count = 0;
+#endif
     double stream5_threshold_ms = 0.0;
     double stream3_final_filter_ms = 0.0;
     double stream3_final_materialize_ms = 0.0;

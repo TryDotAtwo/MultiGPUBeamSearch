@@ -47,6 +47,10 @@
 #define BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE 0
 #endif
 
+#ifndef BEAM_DEBUG_DEPTH_FLOW_TRACE
+#define BEAM_DEBUG_DEPTH_FLOW_TRACE 0
+#endif
+
 namespace beam {
 
 namespace {
@@ -977,6 +981,66 @@ std::uint32_t read_committed_threshold_host(const StaticDeviceMemory& memory, co
     return threshold;
 }
 
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+struct ThresholdSnapshot {
+    std::uint32_t threshold = UINT32_THRESHOLD_MAX;
+    std::uint32_t initialized = 0;
+};
+
+ThresholdSnapshot read_threshold_snapshot_host(const StaticDeviceMemory& memory, const char* op) {
+    std::uint32_t active = 0;
+    std::uint32_t initialized[2]{};
+    ThresholdSnapshot snapshot{};
+    check_cuda(cudaMemcpy(
+        &active,
+        memory.streams.current_threshold_active_index,
+        sizeof(active),
+        cudaMemcpyDeviceToHost), op);
+    check_cuda(cudaMemcpy(
+        initialized,
+        memory.streams.threshold_initialized,
+        sizeof(initialized),
+        cudaMemcpyDeviceToHost), op);
+    check_cuda(cudaMemcpy(
+        &snapshot.threshold,
+        memory.streams.current_threshold + (active & 1U),
+        sizeof(snapshot.threshold),
+        cudaMemcpyDeviceToHost), op);
+    snapshot.initialized = initialized[active & 1U];
+    return snapshot;
+}
+
+std::uint32_t read_depth_index_host(const StaticDeviceMemory& memory) {
+    std::uint32_t current_depth = 0;
+    check_cuda(cudaMemcpy(
+        &current_depth,
+        memory.current_depth,
+        sizeof(current_depth),
+        cudaMemcpyDeviceToHost), "cudaMemcpy depth flow current depth");
+    return current_depth == 0U ? UINT32_MAX : current_depth - 1U;
+}
+
+std::uint64_t sum_u32_device_array_host(
+    const std::uint32_t* device,
+    std::uint32_t count,
+    const char* op) {
+    if (count == 0U) {
+        return 0;
+    }
+    std::vector<std::uint32_t> host(count);
+    check_cuda(cudaMemcpy(
+        host.data(),
+        device,
+        static_cast<std::uint64_t>(count) * sizeof(std::uint32_t),
+        cudaMemcpyDeviceToHost), op);
+    std::uint64_t total = 0;
+    for (std::uint32_t value : host) {
+        total += value;
+    }
+    return total;
+}
+#endif
+
 } // namespace
 
 void create_dispatcher_streams(DispatcherStreams& streams) {
@@ -1131,7 +1195,15 @@ void instantiate_cuda_graph_job_templates(
             memory.streams.current_threshold_active_index,
             plan.config.b_micro,
             plan.config.stream3_batch_candidates,
-            streams.stream3);
+            streams.stream3,
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+            memory.streams.stream3_threshold_pass_count_by_ring,
+            memory.streams.stream3_unique_count_by_ring,
+#else
+            nullptr,
+            nullptr,
+#endif
+            ring);
         if (plan.config.world_size != 1U) {
             stream3_restore_owner_split_cuda(
                 memory.streams.unique_key,
@@ -1427,6 +1499,14 @@ DepthDispatchState run_depth_cuda_graphs(
 
     DepthDispatchState state;
     state.frontier_size = frontier_size;
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    state.depth_for_log = read_depth_index_host(memory);
+    const ThresholdSnapshot threshold_start = read_threshold_snapshot_host(
+        memory,
+        "cudaMemcpy depth flow threshold start");
+    state.threshold_start = threshold_start.threshold;
+    state.threshold_start_initialized = threshold_start.initialized;
+#endif
     state.tracked_generated.enabled = track_request.enabled;
     state.tracked_generated.request_parent_idx = track_request.parent_idx;
     state.tracked_generated.request_move = track_request.move;
@@ -1717,6 +1797,79 @@ DepthDispatchState run_depth_cuda_graphs(
             std::cout << "\n";
         }
     };
+
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    const auto sum_stream3_partition_counts = [&](const std::uint32_t* device_counts) -> std::uint64_t {
+        return sum_u32_device_array_host(
+            device_counts,
+            plan.config.shard_count,
+            "cudaMemcpy depth flow stream3 partition counts");
+    };
+
+    const auto accumulate_stream3_local_flow = [&](std::uint32_t ring) {
+        std::uint32_t threshold_pass = 0;
+        std::uint32_t unique_count = 0;
+        std::uint32_t local_pending_count = 0;
+        std::uint64_t ring_generated = 0;
+        for (std::uint32_t slot = 0; slot < plan.derived.ring_slot_count; ++slot) {
+            const std::uint32_t job = ring * plan.derived.ring_slot_count + slot;
+            ring_generated += static_cast<std::uint64_t>(host_count[job]) * MOVE_COUNT;
+        }
+        check_cuda(cudaMemcpy(
+            &threshold_pass,
+            memory.streams.stream3_threshold_pass_count_by_ring + ring,
+            sizeof(threshold_pass),
+            cudaMemcpyDeviceToHost), "cudaMemcpy depth flow stream3 threshold pass");
+        check_cuda(cudaMemcpy(
+            &unique_count,
+            memory.streams.stream3_unique_count_by_ring + ring,
+            sizeof(unique_count),
+            cudaMemcpyDeviceToHost), "cudaMemcpy depth flow stream3 unique");
+        check_cuda(cudaMemcpy(
+            &local_pending_count,
+            memory.streams.local_pending_count,
+            sizeof(local_pending_count),
+            cudaMemcpyDeviceToHost), "cudaMemcpy depth flow local pending");
+        check_cuda(cudaMemcpy(
+            host_send_count.data(),
+            memory.streams.send_count,
+            static_cast<std::uint64_t>(plan.config.world_size) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost), "cudaMemcpy depth flow send counts");
+        std::uint64_t send_total = 0;
+        for (std::uint32_t count : host_send_count) {
+            send_total += count;
+        }
+        state.stream3_threshold_pass_total += threshold_pass;
+        state.stream3_unique_total += unique_count;
+        state.stream3_local_pending_total += local_pending_count;
+        state.stream3_remote_send_total += send_total;
+        state.stream3_local_write_total += sum_stream3_partition_counts(memory.streams.stream3_shard_counts);
+        state.stream3_local_spill_total += sum_stream3_partition_counts(memory.streams.stream3_spill_counts);
+        const bool trace_ring =
+            ring < 2U ||
+            ring + 2U >= plan.config.ring_count ||
+            static_cast<std::uint64_t>(threshold_pass) != ring_generated;
+        if (trace_ring) {
+            std::cout << "depth_flow_trace"
+                      << " rank=" << plan.config.local_rank
+                      << " depth=" << state.depth_for_log
+                      << " phase=stream3_ring"
+                      << " ring=" << ring
+                      << " generated=" << ring_generated
+                      << " threshold_pass=" << threshold_pass
+                      << " unique_count=" << unique_count
+                      << " local_pending=" << local_pending_count
+                      << " remote_send=" << send_total
+                      << "\n";
+        }
+    };
+
+    const auto accumulate_stream3_remote_flow = [&](std::uint64_t recv_total) {
+        state.stream5_recv_total += recv_total;
+        state.stream3_remote_write_total += sum_stream3_partition_counts(memory.streams.stream3_shard_counts);
+        state.stream3_remote_spill_total += sum_stream3_partition_counts(memory.streams.stream3_spill_counts);
+    };
+#endif
 
 #if BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE
     std::vector<std::uint32_t> stream4_trace_hist_a(SCORE_BIN_COUNT);
@@ -2506,6 +2659,10 @@ DepthDispatchState run_depth_cuda_graphs(
                 }
                 host_parent_base[job] = parent_base_value;
                 host_count[job] = count_value;
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+                state.generated_candidates_total +=
+                    static_cast<std::uint64_t>(count_value) * MOVE_COUNT;
+#endif
                 check_cuda(cudaMemcpyAsync(
                     memory.streams.parent_base + job,
                     &parent_base_value,
@@ -2845,6 +3002,9 @@ DepthDispatchState run_depth_cuda_graphs(
             check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize stream3 remote recv collect");
             throw_if_stream_fatal_error("stream3_remote_recv_collect");
             update_global_spill_peak();
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+            accumulate_stream3_remote_flow(recv_total_64);
+#endif
             append_stream3_ready_queue();
         }
         ++completed_exchange_rounds;
@@ -3240,6 +3400,9 @@ DepthDispatchState run_depth_cuda_graphs(
         update_global_spill_peak();
         stream3_active = false;
         stream3_active_ring = plan.config.ring_count;
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+        accumulate_stream3_local_flow(ring);
+#endif
         run_stream5_exchange_and_collect(ring, false);
         ring_state[ring] = RingState::Free;
         if (!state.stop_requested) {
@@ -3453,13 +3616,19 @@ DepthDispatchState run_depth_cuda_graphs(
             static_cast<std::uint64_t>(plan.storage_shard_count) * sizeof(std::uint32_t),
             cudaMemcpyDeviceToHost), "cudaMemcpy dirty_count final flush");
         bool any_dirty = false;
+        std::uint64_t total_dirty = 0;
         for (std::uint32_t dirty : host_dirty) {
             any_dirty = any_dirty || dirty != 0U;
+            total_dirty += dirty;
         }
         std::uint64_t total_clean = 0;
         for (std::uint32_t clean : host_clean) {
             total_clean += clean;
         }
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+        state.stream4_clean_after_drain_total = total_clean;
+        state.stream4_dirty_after_drain_total = total_dirty;
+#endif
         const bool spill_remaining = spill_counts[spill_active & 1U] != 0U || any_dirty;
         if (stream4_jobs_since_threshold_update != 0U &&
             (periodic_threshold_due() || spill_remaining)) {
@@ -3484,6 +3653,15 @@ DepthDispatchState run_depth_cuda_graphs(
                 " stream4_jobs_launched=" + std::to_string(state.stream4_jobs_launched));
         }
     }
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    {
+        const ThresholdSnapshot threshold_end = read_threshold_snapshot_host(
+            memory,
+            "cudaMemcpy depth flow threshold end");
+        state.threshold_end = threshold_end.threshold;
+        state.threshold_end_initialized = threshold_end.initialized;
+    }
+#endif
     state.depth_drained = true;
     return state;
 }
@@ -3567,6 +3745,12 @@ FinalizeDepthState finalize_depth_single_gpu(
         read_committed_threshold_host(memory, "cudaMemcpy final threshold");
 
     result.final_threshold = final_threshold;
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    result.local_clean_before_final = sum_u32_device_array_host(
+        memory.streams.clean_count,
+        plan.storage_shard_count,
+        "cudaMemcpy depth flow final local clean count");
+#endif
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
     std::cout << "threshold_trace"
               << " rank=" << plan.config.local_rank
@@ -3773,6 +3957,16 @@ FinalizeDepthState finalize_depth_single_gpu(
         const std::uint64_t total_available = global_less + global_equal;
         const std::uint64_t global_keep_count =
             std::min<std::uint64_t>(plan.derived.global_beam_width_effective, total_available);
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+        result.local_clean_before_final = sum_u32_device_array_host(
+            memory.streams.clean_count,
+            plan.storage_shard_count,
+            "cudaMemcpy depth flow final clean count");
+        result.final_global_less = global_less;
+        result.final_global_equal = global_equal;
+        result.final_total_available = total_available;
+        result.final_global_keep_count = global_keep_count;
+#endif
 #if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
         log_final_histogram_trace(
             plan,

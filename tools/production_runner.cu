@@ -49,6 +49,10 @@ using namespace beam;
 #define BEAM_DEBUG_PATH_TRACE 0
 #endif
 
+#ifndef BEAM_DEBUG_DEPTH_FLOW_TRACE
+#define BEAM_DEBUG_DEPTH_FLOW_TRACE 0
+#endif
+
 namespace {
 
 inline constexpr std::uint32_t STREAM1_MODEL_CLASSES = 120;
@@ -2398,6 +2402,39 @@ int main(int argc, char** argv) {
         frontier_size = final_state.next_frontier_size;
         last_final_frontier_size = frontier_size;
         last_final_threshold = final_state.final_threshold;
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+        std::cout << "depth_flow_trace"
+                  << " rank=" << rank
+                  << " depth=" << depth
+                  << " phase=summary"
+                  << " frontier_size=" << state.frontier_size
+                  << " generated=" << state.generated_candidates_total
+                  << " threshold_start=" << state.threshold_start
+                  << " threshold_start_initialized=" << state.threshold_start_initialized
+                  << " threshold_end=" << state.threshold_end
+                  << " threshold_end_initialized=" << state.threshold_end_initialized
+                  << " stream3_threshold_pass=" << state.stream3_threshold_pass_total
+                  << " stream3_unique=" << state.stream3_unique_total
+                  << " stream3_local_pending=" << state.stream3_local_pending_total
+                  << " stream3_remote_send=" << state.stream3_remote_send_total
+                  << " stream5_recv=" << state.stream5_recv_total
+                  << " stream3_local_write=" << state.stream3_local_write_total
+                  << " stream3_local_spill=" << state.stream3_local_spill_total
+                  << " stream3_remote_write=" << state.stream3_remote_write_total
+                  << " stream3_remote_spill=" << state.stream3_remote_spill_total
+                  << " stream4_clean_after_drain=" << state.stream4_clean_after_drain_total
+                  << " stream4_dirty_after_drain=" << state.stream4_dirty_after_drain_total
+                  << " final_local_clean=" << final_state.local_clean_before_final
+                  << " final_global_less=" << final_state.final_global_less
+                  << " final_global_equal=" << final_state.final_global_equal
+                  << " final_total_available=" << final_state.final_total_available
+                  << " final_global_keep=" << final_state.final_global_keep_count
+                  << " final_threshold=" << final_state.final_threshold
+                  << " final_candidate_count=" << final_state.final_candidate_count
+                  << " final_request_count=" << final_state.final_request_count
+                  << " next_frontier_size=" << final_state.next_frontier_size
+                  << "\n";
+#endif
         const auto depth_end = std::chrono::steady_clock::now();
         const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
 #if BEAM_ENABLE_DEPTH_LOGS

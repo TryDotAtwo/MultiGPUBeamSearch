@@ -120,6 +120,15 @@ __global__ void stream3_finalize_block_scan_kernel(
     *compact_count = block_offsets[last] + block_counts[last];
 }
 
+__global__ void stream3_debug_store_count_kernel(
+    const std::uint32_t* source,
+    std::uint32_t* destination_by_ring,
+    std::uint32_t ring) {
+    if (blockIdx.x == 0 && threadIdx.x == 0 && destination_by_ring != nullptr) {
+        destination_by_ring[ring] = *source;
+    }
+}
+
 void stream3_scan_block_counts(
     const std::uint32_t* block_counts,
     std::uint32_t* block_offsets,
@@ -901,7 +910,10 @@ void stream3_pack_threshold_cuda(
     std::uint32_t current_threshold,
     std::uint32_t b_micro,
     std::uint32_t stream3_batch_candidates,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    std::uint32_t* debug_threshold_pass_count_by_ring,
+    std::uint32_t* debug_unique_count_by_ring,
+    std::uint32_t debug_ring) {
     NvtxRange range("Stream3_threshold_compact_cub_sort_reduce_launch");
     if (cub_temp_storage == nullptr || cub_temp_storage_bytes == 0) {
         throw std::invalid_argument("stream3 CUB fixed temp storage is required");
@@ -928,6 +940,14 @@ void stream3_pack_threshold_cuda(
         cub_temp_storage,
         cub_temp_storage_bytes,
         stream);
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    stream3_debug_store_count_kernel<<<1, 1, 0, stream>>>(
+        unique_count,
+        debug_threshold_pass_count_by_ring,
+        debug_ring);
+#else
+    (void)debug_threshold_pass_count_by_ring;
+#endif
     stream3_compact_kernel<<<grid, block, 0, stream>>>(
         score_ring,
         hash_ring,
@@ -980,6 +1000,15 @@ void stream3_pack_threshold_cuda(
         cub_temp_storage,
         cub_temp_storage_bytes,
         stream);
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    stream3_debug_store_count_kernel<<<1, 1, 0, stream>>>(
+        unique_count,
+        debug_unique_count_by_ring,
+        debug_ring);
+#else
+    (void)debug_unique_count_by_ring;
+    (void)debug_ring;
+#endif
     stream3_compact_valid_unique_kernel<<<grid, block, 0, stream>>>(
         reduce_key_scratch,
         reduce_val_scratch,
@@ -1011,7 +1040,10 @@ void stream3_pack_threshold_device_threshold_cuda(
     const std::uint32_t* current_threshold_active_index,
     std::uint32_t b_micro,
     std::uint32_t stream3_batch_candidates,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    std::uint32_t* debug_threshold_pass_count_by_ring,
+    std::uint32_t* debug_unique_count_by_ring,
+    std::uint32_t debug_ring) {
     NvtxRange range("Stream3_threshold_compact_cub_sort_reduce_device_threshold_launch");
     if (cub_temp_storage == nullptr || cub_temp_storage_bytes == 0) {
         throw std::invalid_argument("stream3 CUB fixed temp storage is required");
@@ -1038,6 +1070,14 @@ void stream3_pack_threshold_device_threshold_cuda(
         cub_temp_storage,
         cub_temp_storage_bytes,
         stream);
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    stream3_debug_store_count_kernel<<<1, 1, 0, stream>>>(
+        unique_count,
+        debug_threshold_pass_count_by_ring,
+        debug_ring);
+#else
+    (void)debug_threshold_pass_count_by_ring;
+#endif
     stream3_compact_kernel<<<grid, block, 0, stream>>>(
         score_ring,
         hash_ring,
@@ -1090,6 +1130,15 @@ void stream3_pack_threshold_device_threshold_cuda(
         cub_temp_storage,
         cub_temp_storage_bytes,
         stream);
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    stream3_debug_store_count_kernel<<<1, 1, 0, stream>>>(
+        unique_count,
+        debug_unique_count_by_ring,
+        debug_ring);
+#else
+    (void)debug_unique_count_by_ring;
+    (void)debug_ring;
+#endif
     stream3_compact_valid_unique_kernel<<<grid, block, 0, stream>>>(
         reduce_key_scratch,
         reduce_val_scratch,
