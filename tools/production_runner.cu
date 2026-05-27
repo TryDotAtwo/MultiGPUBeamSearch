@@ -19,6 +19,8 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <mutex>
+#include <new>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
@@ -79,6 +81,14 @@ std::uint32_t env_u32(const char* name, std::uint32_t default_value) {
         throw std::invalid_argument(std::string("env value exceeds uint32: ") + name);
     }
     return static_cast<std::uint32_t>(parsed);
+}
+
+std::uint64_t env_u64(const char* name, std::uint64_t default_value) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || value[0] == '\0') {
+        return default_value;
+    }
+    return parse_u64(value, name);
 }
 
 bool env_present(const char* name) {
@@ -803,6 +813,13 @@ struct TrackedSolutionPrefix {};
 
 enum class CandidateHistoryMode : std::uint8_t {
     Ram,
+    Disk,
+    StaticHybrid
+};
+
+enum class HistoryStorageLocation : std::uint8_t {
+    None,
+    Ram,
     Disk
 };
 
@@ -814,11 +831,22 @@ CandidateHistoryMode parse_history_mode() {
     if (std::strcmp(value, "disk") == 0) {
         return CandidateHistoryMode::Disk;
     }
-    throw std::runtime_error("BEAM_HISTORY_MODE must be ram or disk");
+    if (std::strcmp(value, "static_hybrid") == 0 || std::strcmp(value, "hybrid") == 0) {
+        return CandidateHistoryMode::StaticHybrid;
+    }
+    throw std::runtime_error("BEAM_HISTORY_MODE must be ram, disk, static_hybrid, or hybrid");
 }
 
 const char* history_mode_name(CandidateHistoryMode mode) {
-    return mode == CandidateHistoryMode::Ram ? "ram" : "disk";
+    switch (mode) {
+    case CandidateHistoryMode::Ram:
+        return "ram";
+    case CandidateHistoryMode::Disk:
+        return "disk";
+    case CandidateHistoryMode::StaticHybrid:
+        return "static_hybrid";
+    }
+    return "unknown";
 }
 
 struct HistoryEntry {
@@ -831,16 +859,33 @@ static_assert(sizeof(HistoryEntry) == 16);
 static_assert(alignof(HistoryEntry) == 8);
 
 struct CpuCandidateHistory {
+    static constexpr std::uint32_t kWriteChunkEntries = 1U << 20U;
+
+    struct DepthLocation {
+        HistoryStorageLocation location = HistoryStorageLocation::None;
+        std::uint64_t offset_entries = 0;
+    };
+
+    struct MaterializeResult {
+        std::uint32_t depth_index = 0;
+        HistoryStorageLocation location = HistoryStorageLocation::None;
+        std::uint64_t offset_entries = 0;
+        std::vector<HistoryEntry> ram_data;
+    };
+
     struct Slot {
         CandidateMeta* host = nullptr;
+        std::vector<HistoryEntry> staging;
         std::uint32_t capacity = 0;
         std::uint32_t count = 0;
         std::uint32_t depth_index = 0;
         std::filesystem::path path;
+        HistoryStorageLocation location = HistoryStorageLocation::None;
+        std::uint64_t offset_entries = 0;
         cudaEvent_t copy_done = nullptr;
         bool copy_pending = false;
         bool free = true;
-        std::future<std::vector<HistoryEntry>> writer;
+        std::future<MaterializeResult> writer;
     };
 
     struct PruneResult {
@@ -860,23 +905,44 @@ struct CpuCandidateHistory {
     std::filesystem::path dir;
     std::vector<std::filesystem::path> depth_files;
     std::vector<std::uint32_t> depth_counts;
+    std::vector<DepthLocation> depth_locations;
     std::vector<std::vector<HistoryEntry>> ram_depths;
     std::vector<bool> ram_ready;
     std::vector<bool> prune_dirty;
     std::vector<PruneJob> prune_jobs;
     std::uint64_t bytes_received = 0;
     std::uint64_t bytes_stored = 0;
+    std::uint64_t bytes_stored_ram = 0;
+    std::uint64_t bytes_stored_disk = 0;
     std::uint64_t bytes_pruned = 0;
+    std::uint64_t bytes_pinned_slots = 0;
+    std::uint64_t bytes_slot_staging = 0;
+    std::uint64_t bytes_static_ram_arena = 0;
+    std::uint64_t bytes_static_disk_arena = 0;
+    std::uint64_t history_required_bytes = 0;
     std::uint32_t worker_count = 1;
     bool prune_enabled = true;
     std::vector<Slot> slots;
     cudaStream_t copy_stream = nullptr;
+    HistoryEntry* ram_arena = nullptr;
+    std::uint64_t ram_arena_entries = 0;
+    std::uint64_t ram_entries_used = 0;
+    std::uint64_t disk_arena_entries = 0;
+    std::uint64_t disk_entries_used = 0;
+    std::filesystem::path static_disk_path;
+    mutable std::mutex static_disk_mutex;
+    mutable std::mutex storage_mutex;
+    bool disk_write_failed = false;
 
     void initialize(
         CandidateHistoryMode selected_mode,
         std::uint32_t capacity,
         std::uint32_t slot_count,
-        std::uint32_t selected_worker_count) {
+        std::uint32_t selected_worker_count,
+        std::uint32_t depth_limit,
+        std::uint64_t history_ram_budget_bytes = 0,
+        std::uint64_t history_disk_budget_bytes = 0,
+        const std::filesystem::path& history_disk_path = {}) {
         if (copy_stream != nullptr) {
             throw std::runtime_error("candidate history already initialized");
         }
@@ -885,10 +951,81 @@ struct CpuCandidateHistory {
         }
         mode = selected_mode;
         worker_count = selected_worker_count;
+        std::filesystem::create_directories(dir);
+
+        const std::uint64_t capacity_entries = static_cast<std::uint64_t>(capacity);
+        const std::uint64_t slot_entries = static_cast<std::uint64_t>(slot_count);
+        if (slot_entries > std::numeric_limits<std::uint64_t>::max() / capacity_entries ||
+            slot_entries * capacity_entries > std::numeric_limits<std::uint64_t>::max() / sizeof(CandidateMeta)) {
+            throw std::overflow_error("candidate history pinned slot bytes overflow");
+        }
+        bytes_pinned_slots = slot_entries * capacity_entries * sizeof(CandidateMeta);
+        const std::uint64_t staging_entries_per_slot =
+            std::min<std::uint64_t>(capacity_entries, kWriteChunkEntries);
+        if (slot_entries > std::numeric_limits<std::uint64_t>::max() / staging_entries_per_slot ||
+            slot_entries * staging_entries_per_slot > std::numeric_limits<std::uint64_t>::max() / sizeof(HistoryEntry)) {
+            throw std::overflow_error("candidate history staging bytes overflow");
+        }
+        bytes_slot_staging = slot_entries * staging_entries_per_slot * sizeof(HistoryEntry);
+
+        if (selected_mode == CandidateHistoryMode::StaticHybrid) {
+            if (history_ram_budget_bytes <= bytes_pinned_slots + bytes_slot_staging) {
+                throw std::runtime_error(
+                    "static hybrid history RAM budget cannot fit pinned slots and staging: ram_budget=" +
+                    std::to_string(history_ram_budget_bytes) +
+                    " pinned_slots=" + std::to_string(bytes_pinned_slots) +
+                    " staging=" + std::to_string(bytes_slot_staging));
+            }
+            if (static_cast<std::uint64_t>(depth_limit) >
+                std::numeric_limits<std::uint64_t>::max() / capacity_entries ||
+                static_cast<std::uint64_t>(depth_limit) * capacity_entries >
+                    std::numeric_limits<std::uint64_t>::max() / sizeof(HistoryEntry)) {
+                throw std::overflow_error("static hybrid history required bytes overflow");
+            }
+            history_required_bytes =
+                static_cast<std::uint64_t>(depth_limit) * capacity_entries * sizeof(HistoryEntry);
+            bytes_static_ram_arena = history_ram_budget_bytes - bytes_pinned_slots - bytes_slot_staging;
+            ram_arena_entries = bytes_static_ram_arena / sizeof(HistoryEntry);
+            bytes_static_ram_arena = ram_arena_entries * sizeof(HistoryEntry);
+            disk_arena_entries = history_disk_budget_bytes / sizeof(HistoryEntry);
+            bytes_static_disk_arena = disk_arena_entries * sizeof(HistoryEntry);
+            if (history_required_bytes > bytes_static_ram_arena + bytes_static_disk_arena) {
+                throw std::runtime_error(
+                    "static hybrid history budget too small: required=" +
+                    std::to_string(history_required_bytes) +
+                    " ram_entries=" + std::to_string(bytes_static_ram_arena) +
+                    " disk_entries=" + std::to_string(bytes_static_disk_arena) +
+                    " pinned_slots=" + std::to_string(bytes_pinned_slots) +
+                    " staging=" + std::to_string(bytes_slot_staging));
+            }
+            if (ram_arena_entries != 0ULL) {
+                ram_arena = static_cast<HistoryEntry*>(std::malloc(bytes_static_ram_arena));
+                if (ram_arena == nullptr) {
+                    throw std::bad_alloc();
+                }
+            }
+            if (bytes_static_disk_arena != 0ULL) {
+                static_disk_path = history_disk_path.empty() ? dir / "history_static_arena.bin" : history_disk_path;
+                const std::filesystem::path parent = static_disk_path.parent_path();
+                if (!parent.empty()) {
+                    std::filesystem::create_directories(parent);
+                }
+                {
+                    std::ofstream create_file(static_disk_path, std::ios::binary | std::ios::trunc);
+                    if (!create_file) {
+                        throw std::runtime_error("cannot create static history disk arena: " + static_disk_path.string());
+                    }
+                }
+                std::filesystem::resize_file(static_disk_path, bytes_static_disk_arena);
+            }
+            prune_enabled = false;
+        }
+
         BEAM_CUDA_CHECK(cudaStreamCreateWithFlags(&copy_stream, cudaStreamNonBlocking));
         slots.resize(slot_count);
         for (Slot& slot : slots) {
             slot.capacity = capacity;
+            slot.staging.resize(static_cast<std::size_t>(staging_entries_per_slot));
             BEAM_CUDA_CHECK(cudaHostAlloc(
                 reinterpret_cast<void**>(&slot.host),
                 static_cast<std::uint64_t>(capacity) * sizeof(CandidateMeta),
@@ -901,31 +1038,156 @@ struct CpuCandidateHistory {
         return HistoryEntry{candidate.parent_idx, candidate.route_packed, 0U};
     }
 
-    static std::vector<HistoryEntry> materialize_depth(
-        CandidateHistoryMode mode,
-        const std::filesystem::path& path,
+    static std::vector<HistoryEntry> materialize_depth_ram_vector(
         const CandidateMeta* host,
         std::uint32_t count) {
         std::vector<HistoryEntry> entries(static_cast<std::size_t>(count));
         for (std::uint32_t i = 0; i < count; ++i) {
             entries[static_cast<std::size_t>(i)] = compress_candidate(host[i]);
         }
-        if (mode == CandidateHistoryMode::Ram) {
-            return entries;
+        return entries;
+    }
+
+    static void fill_history_staging(
+        HistoryEntry* staging,
+        const CandidateMeta* host,
+        std::uint64_t begin,
+        std::uint32_t count) {
+        for (std::uint32_t i = 0; i < count; ++i) {
+            staging[i] = compress_candidate(host[begin + i]);
         }
+    }
+
+    static void write_depth_file(
+        const std::filesystem::path& path,
+        const CandidateMeta* host,
+        std::uint32_t count,
+        HistoryEntry* staging,
+        std::uint32_t staging_capacity) {
         std::ofstream file(path, std::ios::binary);
         if (!file) {
             throw std::runtime_error("cannot open candidate history file for write: " + path.string());
         }
-        if (count != 0U) {
+        for (std::uint64_t begin = 0; begin < count; begin += staging_capacity) {
+            const std::uint32_t chunk =
+                static_cast<std::uint32_t>(std::min<std::uint64_t>(staging_capacity, count - begin));
+            fill_history_staging(staging, host, begin, chunk);
             file.write(
-                reinterpret_cast<const char*>(entries.data()),
-                static_cast<std::streamsize>(static_cast<std::uint64_t>(count) * sizeof(HistoryEntry)));
+                reinterpret_cast<const char*>(staging),
+                static_cast<std::streamsize>(static_cast<std::uint64_t>(chunk) * sizeof(HistoryEntry)));
         }
         if (!file) {
             throw std::runtime_error("candidate history write failed: " + path.string());
         }
-        return {};
+    }
+
+    void write_static_disk(
+        std::uint64_t offset_entries,
+        const CandidateMeta* host,
+        std::uint32_t count,
+        HistoryEntry* staging,
+        std::uint32_t staging_capacity) {
+        std::lock_guard<std::mutex> lock(static_disk_mutex);
+        std::fstream file(static_disk_path, std::ios::binary | std::ios::in | std::ios::out);
+        if (!file) {
+            throw std::runtime_error("cannot open static history disk arena: " + static_disk_path.string());
+        }
+        file.seekp(static_cast<std::streamoff>(offset_entries * sizeof(HistoryEntry)), std::ios::beg);
+        for (std::uint64_t begin = 0; begin < count; begin += staging_capacity) {
+            const std::uint32_t chunk =
+                static_cast<std::uint32_t>(std::min<std::uint64_t>(staging_capacity, count - begin));
+            fill_history_staging(staging, host, begin, chunk);
+            file.write(
+                reinterpret_cast<const char*>(staging),
+                static_cast<std::streamsize>(static_cast<std::uint64_t>(chunk) * sizeof(HistoryEntry)));
+        }
+        if (!file) {
+            throw std::runtime_error("static history disk arena write failed: " + static_disk_path.string());
+        }
+    }
+
+    void write_static_ram(std::uint64_t offset_entries, const CandidateMeta* host, std::uint32_t count) {
+        if (ram_arena == nullptr || offset_entries + count > ram_arena_entries) {
+            throw std::runtime_error("static history RAM arena write exceeds capacity");
+        }
+        HistoryEntry* out = ram_arena + offset_entries;
+        for (std::uint32_t i = 0; i < count; ++i) {
+            out[i] = compress_candidate(host[i]);
+        }
+    }
+
+    DepthLocation reserve_static_location(std::uint32_t count) {
+        const std::uint64_t count_entries = static_cast<std::uint64_t>(count);
+        std::lock_guard<std::mutex> lock(storage_mutex);
+        if (!disk_write_failed && disk_entries_used + count_entries <= disk_arena_entries) {
+            const std::uint64_t offset = disk_entries_used;
+            disk_entries_used += count_entries;
+            return DepthLocation{HistoryStorageLocation::Disk, offset};
+        }
+        if (ram_entries_used + count_entries <= ram_arena_entries) {
+            const std::uint64_t offset = ram_entries_used;
+            ram_entries_used += count_entries;
+            return DepthLocation{HistoryStorageLocation::Ram, offset};
+        }
+        throw std::runtime_error(
+            "static hybrid history arena exhausted: count=" + std::to_string(count) +
+            " ram_used=" + std::to_string(ram_entries_used * sizeof(HistoryEntry)) +
+            " ram_capacity=" + std::to_string(bytes_static_ram_arena) +
+            " disk_used=" + std::to_string(disk_entries_used * sizeof(HistoryEntry)) +
+            " disk_capacity=" + std::to_string(bytes_static_disk_arena));
+    }
+
+    DepthLocation reserve_static_ram_fallback(std::uint32_t count, const std::string& disk_error) {
+        const std::uint64_t count_entries = static_cast<std::uint64_t>(count);
+        std::lock_guard<std::mutex> lock(storage_mutex);
+        disk_write_failed = true;
+        if (ram_entries_used + count_entries <= ram_arena_entries) {
+            const std::uint64_t offset = ram_entries_used;
+            ram_entries_used += count_entries;
+            return DepthLocation{HistoryStorageLocation::Ram, offset};
+        }
+        throw std::runtime_error(
+            "static hybrid history disk write failed and RAM fallback is exhausted: disk_error=" + disk_error +
+            " count=" + std::to_string(count) +
+            " ram_used=" + std::to_string(ram_entries_used * sizeof(HistoryEntry)) +
+            " ram_capacity=" + std::to_string(bytes_static_ram_arena));
+    }
+
+    MaterializeResult materialize_depth(
+        CandidateHistoryMode selected_mode,
+        const std::filesystem::path& path,
+        const CandidateMeta* host,
+        std::uint32_t count,
+        std::uint32_t depth_index,
+        HistoryStorageLocation location,
+        std::uint64_t offset_entries,
+        HistoryEntry* staging,
+        std::uint32_t staging_capacity) {
+        MaterializeResult result{depth_index, location, offset_entries, {}};
+        if (selected_mode == CandidateHistoryMode::Ram) {
+            result.ram_data = materialize_depth_ram_vector(host, count);
+            return result;
+        }
+        if (selected_mode == CandidateHistoryMode::Disk) {
+            write_depth_file(path, host, count, staging, staging_capacity);
+            return result;
+        }
+        if (location == HistoryStorageLocation::Disk) {
+            try {
+                write_static_disk(offset_entries, host, count, staging, staging_capacity);
+            } catch (const std::exception& ex) {
+                const DepthLocation fallback = reserve_static_ram_fallback(count, ex.what());
+                write_static_ram(fallback.offset_entries, host, count);
+                result.location = fallback.location;
+                result.offset_entries = fallback.offset_entries;
+            }
+            return result;
+        }
+        if (location == HistoryStorageLocation::Ram) {
+            write_static_ram(offset_entries, host, count);
+            return result;
+        }
+        throw std::runtime_error("static hybrid history materialize missing storage location");
     }
 
     static PruneResult prune_adjacent_depths(
@@ -1064,13 +1326,39 @@ struct CpuCandidateHistory {
                     const cudaError_t status = wait_all ? cudaEventSynchronize(slot.copy_done) : cudaEventQuery(slot.copy_done);
                     if (status == cudaSuccess) {
                         slot.copy_pending = false;
+                        const CandidateHistoryMode selected_mode = mode;
+                        const std::filesystem::path path = slot.path;
+                        const CandidateMeta* host = slot.host;
+                        const std::uint32_t count = slot.count;
+                        const std::uint32_t depth_index = slot.depth_index;
+                        const HistoryStorageLocation location = slot.location;
+                        const std::uint64_t offset_entries = slot.offset_entries;
+                        HistoryEntry* staging = slot.staging.data();
+                        const std::uint32_t staging_capacity =
+                            static_cast<std::uint32_t>(slot.staging.size());
                         slot.writer = std::async(
                             std::launch::async,
-                            &CpuCandidateHistory::materialize_depth,
-                            mode,
-                            slot.path,
-                            slot.host,
-                            slot.count);
+                            [this,
+                             selected_mode,
+                             path,
+                             host,
+                             count,
+                             depth_index,
+                             location,
+                             offset_entries,
+                             staging,
+                             staging_capacity]() {
+                                return materialize_depth(
+                                    selected_mode,
+                                    path,
+                                    host,
+                                    count,
+                                    depth_index,
+                                    location,
+                                    offset_entries,
+                                    staging,
+                                    staging_capacity);
+                             });
                         progressed = true;
                     } else if (status != cudaErrorNotReady) {
                         BEAM_CUDA_CHECK(status);
@@ -1080,16 +1368,35 @@ struct CpuCandidateHistory {
                     const bool ready = wait_all ||
                         slot.writer.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
                     if (ready) {
-                        std::vector<HistoryEntry> ram_data = slot.writer.get();
+                        MaterializeResult result = slot.writer.get();
                         if (mode == CandidateHistoryMode::Ram) {
                             if (slot.depth_index >= ram_depths.size()) {
                                 throw std::runtime_error("candidate history RAM depth index missing");
                             }
-                            ram_depths[slot.depth_index] = std::move(ram_data);
+                            ram_depths[slot.depth_index] = std::move(result.ram_data);
                             ram_ready[slot.depth_index] = true;
                             if (prune_enabled && slot.depth_index > 0U) {
                                 prune_dirty[slot.depth_index - 1U] = true;
                             }
+                        } else if (mode == CandidateHistoryMode::StaticHybrid) {
+                            if (slot.depth_index >= ram_ready.size()) {
+                                throw std::runtime_error("static history depth index missing");
+                            }
+                            if (result.depth_index >= depth_locations.size()) {
+                                throw std::runtime_error("static history result depth index missing");
+                            }
+                            depth_locations[result.depth_index] =
+                                DepthLocation{result.location, result.offset_entries};
+                            depth_files[result.depth_index] =
+                                result.location == HistoryStorageLocation::Disk ? static_disk_path : std::filesystem::path{};
+                            const std::uint64_t stored_bytes =
+                                static_cast<std::uint64_t>(slot.count) * sizeof(HistoryEntry);
+                            if (result.location == HistoryStorageLocation::Disk) {
+                                bytes_stored_disk += stored_bytes;
+                            } else if (result.location == HistoryStorageLocation::Ram) {
+                                bytes_stored_ram += stored_bytes;
+                            }
+                            ram_ready[slot.depth_index] = true;
                         }
                         slot.free = true;
                         progressed = true;
@@ -1128,20 +1435,38 @@ struct CpuCandidateHistory {
         slot.count = count;
         slot.depth_index = depth_index;
         slot.path = dir / ("depth_" + std::to_string(depth_index) + ".candidate_meta.bin");
+        slot.location = HistoryStorageLocation::None;
+        slot.offset_entries = 0;
         slot.copy_pending = true;
         slot.free = false;
         if (depth_index != depth_counts.size()) {
             throw std::runtime_error("candidate history commits must be depth-ordered");
         }
-        depth_files.push_back(mode == CandidateHistoryMode::Disk ? slot.path : std::filesystem::path{});
+        if (mode == CandidateHistoryMode::StaticHybrid) {
+            const DepthLocation location = reserve_static_location(count);
+            slot.location = location.location;
+            slot.offset_entries = location.offset_entries;
+            depth_locations.push_back(DepthLocation{slot.location, slot.offset_entries});
+            depth_files.push_back(slot.location == HistoryStorageLocation::Disk ? static_disk_path : std::filesystem::path{});
+        } else {
+            depth_files.push_back(mode == CandidateHistoryMode::Disk ? slot.path : std::filesystem::path{});
+        }
         depth_counts.push_back(count);
         if (mode == CandidateHistoryMode::Ram) {
             ram_depths.emplace_back();
             ram_ready.push_back(false);
             prune_dirty.push_back(false);
+        } else if (mode == CandidateHistoryMode::StaticHybrid) {
+            ram_ready.push_back(false);
+            prune_dirty.push_back(false);
         }
         bytes_received += static_cast<std::uint64_t>(count) * sizeof(CandidateMeta);
         bytes_stored += static_cast<std::uint64_t>(count) * sizeof(HistoryEntry);
+        if (mode == CandidateHistoryMode::Ram) {
+            bytes_stored_ram += static_cast<std::uint64_t>(count) * sizeof(HistoryEntry);
+        } else if (mode == CandidateHistoryMode::Disk) {
+            bytes_stored_disk += static_cast<std::uint64_t>(count) * sizeof(HistoryEntry);
+        }
     }
 
     void finish_all() {
@@ -1162,6 +1487,10 @@ struct CpuCandidateHistory {
             }
         }
         slots.clear();
+        if (ram_arena != nullptr) {
+            std::free(ram_arena);
+            ram_arena = nullptr;
+        }
         if (copy_stream != nullptr) {
             cudaStreamDestroy(copy_stream);
             copy_stream = nullptr;
@@ -1180,6 +1509,33 @@ struct CpuCandidateHistory {
                 throw std::runtime_error("candidate history RAM depth not materialized");
             }
             return ram_depths[depth_index][static_cast<std::size_t>(index)];
+        }
+        if (mode == CandidateHistoryMode::StaticHybrid) {
+            if (depth_index >= depth_locations.size() || depth_index >= ram_ready.size() || !ram_ready[depth_index]) {
+                throw std::runtime_error("static hybrid history depth not materialized");
+            }
+            const DepthLocation location = depth_locations[depth_index];
+            if (location.location == HistoryStorageLocation::Ram) {
+                if (ram_arena == nullptr || location.offset_entries + index >= ram_arena_entries) {
+                    throw std::runtime_error("static hybrid history RAM read exceeds capacity");
+                }
+                return ram_arena[location.offset_entries + index];
+            }
+            if (location.location == HistoryStorageLocation::Disk) {
+                std::ifstream file(static_disk_path, std::ios::binary);
+                if (!file) {
+                    throw std::runtime_error("cannot open static history disk arena for read: " + static_disk_path.string());
+                }
+                const std::uint64_t offset = (location.offset_entries + index) * sizeof(HistoryEntry);
+                file.seekg(static_cast<std::streamoff>(offset), std::ios::beg);
+                HistoryEntry entry{};
+                file.read(reinterpret_cast<char*>(&entry), sizeof(entry));
+                if (!file) {
+                    throw std::runtime_error("static history disk arena read failed: " + static_disk_path.string());
+                }
+                return entry;
+            }
+            throw std::runtime_error("static hybrid history read missing storage location");
         }
         std::ifstream file(depth_files[depth_index], std::ios::binary);
         if (!file) {
@@ -1496,6 +1852,8 @@ void write_solution_artifacts(
     log << "history_depth_count=" << history.depth_counts.size() << "\n";
     log << "history_bytes_received=" << history.bytes_received << "\n";
     log << "history_bytes_stored=" << history.bytes_stored << "\n";
+    log << "history_bytes_stored_ram=" << history.bytes_stored_ram << "\n";
+    log << "history_bytes_stored_disk=" << history.bytes_stored_disk << "\n";
     log << "history_bytes_pruned=" << history.bytes_pruned << "\n";
     log << "solved_count=" << solved.count << "\n";
     log << "solved_overflow=" << solved.overflow << "\n";
@@ -2155,13 +2513,31 @@ int main(int argc, char** argv) {
     const CandidateHistoryMode history_mode = parse_history_mode();
     const std::uint32_t history_slot_count = env_u32("BEAM_HISTORY_SLOT_COUNT", 3);
     const std::uint32_t history_worker_count = env_u32("BEAM_HISTORY_WORKERS", 1);
+    const std::uint64_t history_ram_budget_total = env_u64("BEAM_HISTORY_RAM_BYTES", 0);
+    const std::uint64_t history_disk_budget_total = env_u64("BEAM_HISTORY_DISK_BYTES", 0);
+    const std::uint64_t history_ram_budget_per_rank =
+        history_ram_budget_total == 0ULL ? 0ULL : history_ram_budget_total / static_cast<std::uint64_t>(world_size);
+    const std::uint64_t history_disk_budget_per_rank =
+        history_disk_budget_total == 0ULL ? 0ULL : history_disk_budget_total / static_cast<std::uint64_t>(world_size);
+    const std::filesystem::path history_disk_root =
+        env_path("BEAM_HISTORY_DISK_PATH", "").empty()
+            ? std::filesystem::path{}
+            : env_path("BEAM_HISTORY_DISK_PATH", "");
     const std::uint32_t depth_log_every = env_u32("BEAM_DEPTH_LOG_EVERY", 1);
     history.dir = make_history_dir(puzzle_id, depth_limit, beam, rank, world_size);
+    const std::filesystem::path history_disk_path =
+        history_disk_root.empty()
+            ? std::filesystem::path{}
+            : history_disk_root / ("rank_" + std::to_string(rank) + "_history_static_arena.bin");
     history.initialize(
         history_mode,
         static_cast<std::uint32_t>(plan.frontier_states),
         history_slot_count,
-        history_worker_count);
+        history_worker_count,
+        depth_limit,
+        history_ram_budget_per_rank,
+        history_disk_budget_per_rank,
+        history_disk_path);
     if (world_size > 1U) {
         history.prune_enabled = false;
     }
@@ -2171,6 +2547,18 @@ int main(int argc, char** argv) {
     std::cout << "candidate_history_prune_enabled=" << (history.prune_enabled ? 1 : 0) << "\n";
     std::cout << "candidate_history_slots=" << history_slot_count << "\n";
     std::cout << "candidate_history_workers=" << history_worker_count << "\n";
+    std::cout << "candidate_history_ram_budget_total=" << history_ram_budget_total << "\n";
+    std::cout << "candidate_history_disk_budget_total=" << history_disk_budget_total << "\n";
+    std::cout << "candidate_history_ram_budget_per_rank=" << history_ram_budget_per_rank << "\n";
+    std::cout << "candidate_history_disk_budget_per_rank=" << history_disk_budget_per_rank << "\n";
+    std::cout << "candidate_history_pinned_slot_bytes=" << history.bytes_pinned_slots << "\n";
+    std::cout << "candidate_history_slot_staging_bytes=" << history.bytes_slot_staging << "\n";
+    std::cout << "candidate_history_static_ram_arena_bytes=" << history.bytes_static_ram_arena << "\n";
+    std::cout << "candidate_history_static_disk_arena_bytes=" << history.bytes_static_disk_arena << "\n";
+    std::cout << "candidate_history_required_bytes=" << history.history_required_bytes << "\n";
+    if (!history.static_disk_path.empty()) {
+        std::cout << "candidate_history_static_disk_path=" << history.static_disk_path.string() << "\n";
+    }
 #endif
     std::uint64_t frontier_size = rank == 0U ? 1ULL : 0ULL;
     [[maybe_unused]] std::uint64_t last_final_frontier_size = frontier_size;
@@ -2492,6 +2880,8 @@ int main(int argc, char** argv) {
                   << " next_frontier_size=" << frontier_size
                   << " history_bytes_received=" << history.bytes_received
                   << " history_bytes_stored=" << history.bytes_stored
+                  << " history_bytes_stored_ram=" << history.bytes_stored_ram
+                  << " history_bytes_stored_disk=" << history.bytes_stored_disk
                   << " history_bytes_pruned=" << history.bytes_pruned << "\n";
 #if BEAM_DEBUG_STREAM_TIMING
         std::cout << "throughput_probe"
@@ -2550,6 +2940,8 @@ int main(int argc, char** argv) {
     std::cout << "history_depth_count=" << history.depth_counts.size() << "\n";
     std::cout << "history_bytes_received=" << history.bytes_received << "\n";
     std::cout << "history_bytes_stored=" << history.bytes_stored << "\n";
+    std::cout << "history_bytes_stored_ram=" << history.bytes_stored_ram << "\n";
+    std::cout << "history_bytes_stored_disk=" << history.bytes_stored_disk << "\n";
     std::cout << "history_bytes_pruned=" << history.bytes_pruned << "\n";
     std::cout << "history_flush_sec=" << history_flush_sec << "\n";
 #endif
@@ -2567,6 +2959,8 @@ int main(int argc, char** argv) {
         no_solution << "history_depth_count=" << history.depth_counts.size() << "\n";
         no_solution << "history_bytes_received=" << history.bytes_received << "\n";
         no_solution << "history_bytes_stored=" << history.bytes_stored << "\n";
+        no_solution << "history_bytes_stored_ram=" << history.bytes_stored_ram << "\n";
+        no_solution << "history_bytes_stored_disk=" << history.bytes_stored_disk << "\n";
         no_solution << "history_bytes_pruned=" << history.bytes_pruned << "\n";
         std::cout << "puzzle_solved=0"
                   << " puzzle_id=" << puzzle_id
