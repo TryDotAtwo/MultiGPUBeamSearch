@@ -39,6 +39,10 @@
 #define BEAM_DEBUG_FINAL_EXCHANGE_TRACE 0
 #endif
 
+#ifndef BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
+#define BEAM_DEBUG_FINAL_HISTOGRAM_TRACE 0
+#endif
+
 namespace beam {
 
 namespace {
@@ -172,6 +176,183 @@ void log_final_exchange_counts(
         std::cout << " offset" << i << "=" << plan.offset[i];
     }
     std::cout << "\n";
+}
+#endif
+
+#if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
+struct HistogramSummary {
+    std::uint64_t total = 0;
+    std::uint64_t less = 0;
+    std::uint64_t equal = 0;
+    std::uint32_t selected_threshold = UINT32_THRESHOLD_MAX;
+};
+
+std::string delta_u64_string(std::uint64_t observed, std::uint64_t expected) {
+    if (observed >= expected) {
+        return "+" + std::to_string(observed - expected);
+    }
+    return "-" + std::to_string(expected - observed);
+}
+
+template <typename Value>
+HistogramSummary summarize_histogram(
+    const Value* hist,
+    std::uint32_t threshold,
+    std::uint64_t keep_count) {
+    HistogramSummary summary{};
+    std::uint64_t cumulative = 0;
+    for (std::uint32_t score = 0; score < SCORE_BIN_COUNT; ++score) {
+        const std::uint64_t value = static_cast<std::uint64_t>(hist[score]);
+        summary.total += value;
+        if (score < threshold) {
+            summary.less += value;
+        } else if (score == threshold) {
+            summary.equal = value;
+        }
+        if (summary.selected_threshold == UINT32_THRESHOLD_MAX) {
+            cumulative += value;
+            if (cumulative >= keep_count) {
+                summary.selected_threshold = score;
+            }
+        }
+    }
+    if (threshold >= SCORE_BIN_COUNT) {
+        summary.less = summary.total;
+        summary.equal = 0;
+    }
+    return summary;
+}
+
+void log_final_histogram_trace(
+    const StaticMemoryPlan& plan,
+    const StaticDeviceMemory& memory,
+    std::uint32_t final_threshold,
+    std::uint64_t global_keep_count,
+    std::uint64_t exact_global_less,
+    std::uint64_t exact_global_equal,
+    std::uint32_t exact_local_less,
+    std::uint32_t exact_local_equal) {
+    const std::uint32_t local_rank = plan.config.local_rank;
+    const std::uint32_t shard_count = plan.storage_shard_count;
+    const std::uint64_t shard_hist_items =
+        static_cast<std::uint64_t>(shard_count) * SCORE_BIN_COUNT;
+
+    std::vector<std::uint64_t> global_hist(SCORE_BIN_COUNT);
+    std::vector<std::uint64_t> local_hist(SCORE_BIN_COUNT);
+    std::vector<std::uint32_t> hist_a(shard_hist_items);
+    std::vector<std::uint32_t> hist_b(shard_hist_items);
+    std::vector<std::uint32_t> active_snapshot(shard_count);
+    std::vector<std::uint32_t> clean_count(shard_count);
+
+    check_cuda(cudaMemcpy(
+        global_hist.data(),
+        memory.streams.global_score_hist,
+        SCORE_BIN_COUNT * sizeof(std::uint64_t),
+        cudaMemcpyDeviceToHost), "cudaMemcpy final histogram trace global hist");
+    check_cuda(cudaMemcpy(
+        local_hist.data(),
+        memory.streams.local_score_hist,
+        SCORE_BIN_COUNT * sizeof(std::uint64_t),
+        cudaMemcpyDeviceToHost), "cudaMemcpy final histogram trace local hist");
+    check_cuda(cudaMemcpy(
+        hist_a.data(),
+        memory.streams.shard_score_hist_a,
+        shard_hist_items * sizeof(std::uint32_t),
+        cudaMemcpyDeviceToHost), "cudaMemcpy final histogram trace hist a");
+    check_cuda(cudaMemcpy(
+        hist_b.data(),
+        memory.streams.shard_score_hist_b,
+        shard_hist_items * sizeof(std::uint32_t),
+        cudaMemcpyDeviceToHost), "cudaMemcpy final histogram trace hist b");
+    check_cuda(cudaMemcpy(
+        active_snapshot.data(),
+        memory.streams.threshold_hist_active_snapshot,
+        static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t),
+        cudaMemcpyDeviceToHost), "cudaMemcpy final histogram trace active snapshot");
+    check_cuda(cudaMemcpy(
+        clean_count.data(),
+        memory.streams.clean_count,
+        static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t),
+        cudaMemcpyDeviceToHost), "cudaMemcpy final histogram trace clean count");
+
+    const HistogramSummary global_summary =
+        summarize_histogram(global_hist.data(), final_threshold, global_keep_count);
+    const HistogramSummary local_summary =
+        summarize_histogram(local_hist.data(), final_threshold, global_keep_count);
+    const bool hist_invariant_ok =
+        global_summary.less <= global_keep_count &&
+        global_summary.less + global_summary.equal >= global_keep_count;
+    const bool exact_invariant_ok =
+        exact_global_less <= global_keep_count &&
+        exact_global_less + exact_global_equal >= global_keep_count;
+
+    std::uint64_t shard_active_total_sum = 0;
+    std::uint64_t shard_clean_total_sum = 0;
+    std::uint32_t total_mismatch_shards = 0;
+    for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
+        const std::uint64_t offset = static_cast<std::uint64_t>(shard) * SCORE_BIN_COUNT;
+        const std::uint32_t* active_hist =
+            (active_snapshot[shard] & 1U) == 0U ? hist_a.data() + offset : hist_b.data() + offset;
+        const HistogramSummary shard_summary =
+            summarize_histogram(active_hist, final_threshold, global_keep_count);
+        shard_active_total_sum += shard_summary.total;
+        shard_clean_total_sum += clean_count[shard];
+        if (shard_summary.total != clean_count[shard]) {
+            ++total_mismatch_shards;
+        }
+    }
+
+    std::cout << "final_histogram_trace"
+              << " rank=" << local_rank
+              << " label=summary"
+              << " final_threshold=" << final_threshold
+              << " global_keep_count=" << global_keep_count
+              << " hist_selected_threshold=" << global_summary.selected_threshold
+              << " hist_total=" << global_summary.total
+              << " hist_less=" << global_summary.less
+              << " hist_equal=" << global_summary.equal
+              << " exact_global_less=" << exact_global_less
+              << " exact_global_equal=" << exact_global_equal
+              << " local_hist_total=" << local_summary.total
+              << " local_hist_less=" << local_summary.less
+              << " local_hist_equal=" << local_summary.equal
+              << " exact_local_less=" << exact_local_less
+              << " exact_local_equal=" << exact_local_equal
+              << " diff_global_less=" << delta_u64_string(exact_global_less, global_summary.less)
+              << " diff_global_equal=" << delta_u64_string(exact_global_equal, global_summary.equal)
+              << " diff_local_less=" << delta_u64_string(exact_local_less, local_summary.less)
+              << " diff_local_equal=" << delta_u64_string(exact_local_equal, local_summary.equal)
+              << " hist_invariant_ok=" << (hist_invariant_ok ? 1 : 0)
+              << " exact_invariant_ok=" << (exact_invariant_ok ? 1 : 0)
+              << " shard_active_total_sum=" << shard_active_total_sum
+              << " shard_clean_total_sum=" << shard_clean_total_sum
+              << " total_mismatch_shards=" << total_mismatch_shards
+              << "\n";
+
+    for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
+        const std::uint64_t offset = static_cast<std::uint64_t>(shard) * SCORE_BIN_COUNT;
+        const std::uint32_t active = active_snapshot[shard] & 1U;
+        const std::uint32_t* active_hist = active == 0U ? hist_a.data() + offset : hist_b.data() + offset;
+        const std::uint32_t* inactive_hist = active == 0U ? hist_b.data() + offset : hist_a.data() + offset;
+        const HistogramSummary active_summary =
+            summarize_histogram(active_hist, final_threshold, global_keep_count);
+        const HistogramSummary inactive_summary =
+            summarize_histogram(inactive_hist, final_threshold, global_keep_count);
+        std::cout << "final_histogram_trace"
+                  << " rank=" << local_rank
+                  << " label=shard"
+                  << " shard=" << shard
+                  << " active=" << active
+                  << " clean_count=" << clean_count[shard]
+                  << " active_total=" << active_summary.total
+                  << " inactive_total=" << inactive_summary.total
+                  << " active_less=" << active_summary.less
+                  << " active_equal=" << active_summary.equal
+                  << " inactive_less=" << inactive_summary.less
+                  << " inactive_equal=" << inactive_summary.equal
+                  << " total_delta=" << delta_u64_string(active_summary.total, clean_count[shard])
+                  << "\n";
+    }
 }
 #endif
 
@@ -3159,6 +3340,17 @@ FinalizeDepthState finalize_depth_single_gpu(
         const std::uint64_t total_available = global_less + global_equal;
         const std::uint64_t global_keep_count =
             std::min<std::uint64_t>(plan.derived.global_beam_width_effective, total_available);
+#if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
+        log_final_histogram_trace(
+            plan,
+            memory,
+            final_threshold,
+            global_keep_count,
+            global_less,
+            global_equal,
+            less_counts[local_rank],
+            equal_counts[local_rank]);
+#endif
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         std::cout << "final_exchange_trace"
                   << " rank=" << local_rank
