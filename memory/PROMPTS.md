@@ -175,3 +175,4 @@
 - User requested preserving the current K2 discussion without implementing K2 yet. Future K2 means Stream2 descendant/suffix expansion from each generated candidate; K2 suffix generators should be precomputed and stored, not generated on the fly inside CUDA kernels.
 - User requested testing the new Stream2 solved-neighborhood behavior on Kaggle T4x2 for puzzle IDs 1 through 10.
 - User requested disabling unnecessary `depth_flow_trace` diagnostics because the trace pollutes Kaggle logs and slows runtime, then requested discussing the rational value for `BEAM_SOLVED_NEIGHBORHOOD_RADIUS`.
+- User decided that `BEAM_SOLVED_NEIGHBORHOOD_RADIUS=4` should be reasonable and requested testing radius 4 on the same Kaggle T4x2 puzzle IDs `1..10`, then testing radius 5 on the same puzzle IDs.
