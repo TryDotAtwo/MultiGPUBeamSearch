@@ -511,6 +511,7 @@ std::size_t bytes_solved(const RuntimeConfig& config) {
     cursor.take<std::uint32_t>(1);
     cursor.take<CandidateMeta>(config.solved_result_capacity);
     cursor.take<std::uint32_t>(config.solved_result_capacity);
+    cursor.take<std::uint32_t>(config.solved_result_capacity);
     cursor.take<std::uint32_t>(1);
     return cursor.offset;
 }
@@ -603,6 +604,7 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.global_stop_flag = root.take<std::uint32_t>(1);
     memory.solved_meta_list = root.take<CandidateMeta>(plan.config.solved_result_capacity);
     memory.solved_depth_list = root.take<std::uint32_t>(plan.config.solved_result_capacity);
+    memory.solved_suffix_list = root.take<std::uint32_t>(plan.config.solved_result_capacity);
     memory.current_depth = root.take<std::uint32_t>(1);
     root.offset = align_up_size(root.offset, 256);
     memory.scratch_pool = root.base + root.offset;

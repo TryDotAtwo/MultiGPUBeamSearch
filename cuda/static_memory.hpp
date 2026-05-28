@@ -172,6 +172,7 @@ struct StaticDeviceMemory {
     std::uint32_t* global_stop_flag = nullptr;
     CandidateMeta* solved_meta_list = nullptr;
     std::uint32_t* solved_depth_list = nullptr;
+    std::uint32_t* solved_suffix_list = nullptr;
     std::uint32_t* current_depth = nullptr;
     void* scratch_pool = nullptr;
     std::size_t scratch_pool_bytes = 0;

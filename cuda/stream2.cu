@@ -45,6 +45,75 @@ __device__ bool solved_neighborhood_contains(
     return false;
 }
 
+__device__ std::uint8_t packed_suffix_move(std::uint64_t packed, std::uint32_t index) {
+    return static_cast<std::uint8_t>((packed >> (5U * index)) & 31ULL);
+}
+
+__device__ std::uint32_t stream2_suffix_source_index(
+    const Stream2SuffixDeviceTable& table,
+    const std::uint8_t* generators,
+    std::uint32_t suffix_id,
+    std::uint32_t position) {
+    if (table.backend == STREAM2_SUFFIX_BACKEND_COMPOSED_PERMUTATIONS &&
+        table.composed_permutations != nullptr) {
+        return table.composed_permutations[
+            static_cast<std::uint64_t>(suffix_id) * STATE_STORAGE_LEN + position];
+    }
+    std::uint32_t source = position;
+    const std::uint8_t len = table.lengths[suffix_id];
+    const std::uint64_t packed = table.packed_moves[suffix_id];
+    for (std::uint32_t step = len; step > 0U; --step) {
+        const std::uint8_t suffix_move = packed_suffix_move(packed, step - 1U);
+        source = generators[
+            static_cast<std::uint64_t>(suffix_move) * STATE_STORAGE_LEN + source];
+    }
+    return source;
+}
+
+__device__ bool stream2_suffix_find_hit(
+    const Stream2SuffixDeviceTable& table,
+    const std::uint8_t* generators,
+    const State128& parent,
+    std::uint32_t immediate_move,
+    const State128* central_state,
+    const Hash128* zobrist,
+    const SolvedNeighborhoodDeviceTable& solved_neighborhood,
+    bool use_neighborhood,
+    Hash128* hit_hash,
+    std::uint32_t* hit_suffix_id) {
+    if (table.enabled == 0U ||
+        table.packed_moves == nullptr ||
+        table.lengths == nullptr ||
+        table.suffix_count <= 1U) {
+        return false;
+    }
+    const std::uint64_t immediate_base =
+        static_cast<std::uint64_t>(immediate_move) * STATE_STORAGE_LEN;
+    for (std::uint32_t suffix_id = 1U; suffix_id < table.suffix_count; ++suffix_id) {
+        Hash128 suffix_hash{0, 0};
+        bool exact_match = !use_neighborhood;
+        for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+            const std::uint32_t child_source =
+                stream2_suffix_source_index(table, generators, suffix_id, p);
+            const std::uint8_t parent_source = generators[immediate_base + child_source];
+            const std::uint8_t value = parent.v[parent_source];
+            if (!use_neighborhood && value != central_state->v[p]) {
+                exact_match = false;
+            }
+            suffix_hash = hash_xor(suffix_hash, zobrist[p * STATE_VALUE_PAD + value]);
+        }
+        const bool found = use_neighborhood
+            ? solved_neighborhood_contains(solved_neighborhood, suffix_hash)
+            : exact_match;
+        if (found) {
+            *hit_hash = suffix_hash;
+            *hit_suffix_id = suffix_id;
+            return true;
+        }
+    }
+    return false;
+}
+
 __global__ void stream2_hash_goal_kernel(
     const State128* current_frontier_states,
     const std::uint64_t* parent_base,
@@ -94,6 +163,21 @@ __global__ void stream2_hash_goal_kernel(
     if (use_neighborhood) {
         found = solved_neighborhood_contains(solved.solved_neighborhood, hash);
     }
+    Hash128 found_hash = hash;
+    std::uint32_t found_suffix_id = 0;
+    if (!found && solved.stream2_suffix.enabled != 0U) {
+        found = stream2_suffix_find_hit(
+            solved.stream2_suffix,
+            generators,
+            parent,
+            move,
+            central_state,
+            zobrist,
+            solved.solved_neighborhood,
+            use_neighborhood,
+            &found_hash,
+            &found_suffix_id);
+    }
 
     if (found && solved.solved_count != nullptr) {
         const std::uint32_t idx = atomicAdd(solved.solved_count, 1U);
@@ -101,7 +185,7 @@ __global__ void stream2_hash_goal_kernel(
             const std::uint32_t solved_depth =
                 solved.current_depth == nullptr ? depth : *solved.current_depth;
             CandidateMeta meta{};
-            meta.hash = hash;
+            meta.hash = found_hash;
             meta.parent_idx = parent_idx;
             meta.score_key = GOAL_SCORE_KEY;
             meta.route_packed =
@@ -110,6 +194,9 @@ __global__ void stream2_hash_goal_kernel(
                 move;
             solved.solved_meta_list[idx] = meta;
             solved.solved_depth_list[idx] = solved_depth;
+            if (solved.solved_suffix_list != nullptr) {
+                solved.solved_suffix_list[idx] = found_suffix_id;
+            }
         } else {
             atomicExch(solved.solved_overflow, 1U);
         }

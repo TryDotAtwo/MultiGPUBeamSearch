@@ -422,10 +422,26 @@ PackedSuffix prepend_suffix_move(PackedSuffix suffix, std::uint8_t move) {
     return suffix;
 }
 
+PackedSuffix append_suffix_move(PackedSuffix suffix, std::uint8_t move) {
+    if (move >= MOVE_COUNT) {
+        throw std::runtime_error("suffix move exceeds MOVE_COUNT");
+    }
+    if (suffix.len >= 12U) {
+        throw std::runtime_error("stream2 suffix packing supports radius <= 12");
+    }
+    suffix.moves |= static_cast<std::uint64_t>(move) << (5U * suffix.len);
+    ++suffix.len;
+    return suffix;
+}
+
 void append_packed_suffix(std::vector<std::uint8_t>& moves, PackedSuffix suffix) {
     for (std::uint32_t i = 0; i < suffix.len; ++i) {
         moves.push_back(static_cast<std::uint8_t>((suffix.moves >> (5U * i)) & 31ULL));
     }
+}
+
+std::uint8_t packed_suffix_move_host(PackedSuffix suffix, std::uint32_t index) {
+    return static_cast<std::uint8_t>((suffix.moves >> (5U * index)) & 31ULL);
 }
 
 std::uint64_t next_power_of_two_u64(std::uint64_t value) {
@@ -606,6 +622,192 @@ SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
             cudaMemcpyHostToDevice));
         return runtime;
     }
+}
+
+struct Stream2SuffixRuntime {
+    std::uint32_t radius = 0;
+    std::uint32_t backend = STREAM2_SUFFIX_BACKEND_BASE_GENERATORS;
+    std::string backend_name = "base_generators";
+    std::uint64_t entry_count = 0;
+    std::uint64_t device_bytes = 0;
+    std::vector<PackedSuffix> suffixes;
+    std::uint64_t* device_packed_moves = nullptr;
+    std::uint8_t* device_lengths = nullptr;
+    std::uint8_t* device_composed_permutations = nullptr;
+
+    bool enabled() const {
+        return radius != 0U &&
+            device_packed_moves != nullptr &&
+            device_lengths != nullptr &&
+            !suffixes.empty();
+    }
+
+    Stream2SuffixDeviceTable device_table() const {
+        Stream2SuffixDeviceTable table{};
+        table.packed_moves = device_packed_moves;
+        table.lengths = device_lengths;
+        table.composed_permutations = device_composed_permutations;
+        table.suffix_count = static_cast<std::uint32_t>(suffixes.size());
+        table.backend = backend;
+        table.enabled = enabled() ? 1U : 0U;
+        return table;
+    }
+
+    PackedSuffix suffix_for(std::uint32_t suffix_id) const {
+        if (suffix_id >= suffixes.size()) {
+            throw std::runtime_error("stream2 suffix id exceeds suffix table");
+        }
+        return suffixes[suffix_id];
+    }
+
+    std::uint8_t suffix_len(std::uint32_t suffix_id) const {
+        if (suffix_id == 0U && suffixes.empty()) {
+            return 0U;
+        }
+        return suffix_for(suffix_id).len;
+    }
+
+    void destroy() {
+        if (device_packed_moves != nullptr) {
+            cudaFree(device_packed_moves);
+        }
+        if (device_lengths != nullptr) {
+            cudaFree(device_lengths);
+        }
+        if (device_composed_permutations != nullptr) {
+            cudaFree(device_composed_permutations);
+        }
+        device_packed_moves = nullptr;
+        device_lengths = nullptr;
+        device_composed_permutations = nullptr;
+        device_bytes = 0;
+        entry_count = 0;
+        suffixes.clear();
+    }
+};
+
+std::uint32_t parse_stream2_suffix_backend(const std::string& backend) {
+    if (backend == "base_generators") {
+        return STREAM2_SUFFIX_BACKEND_BASE_GENERATORS;
+    }
+    if (backend == "composed_permutations") {
+        return STREAM2_SUFFIX_BACKEND_COMPOSED_PERMUTATIONS;
+    }
+    throw std::runtime_error(
+        "BEAM_STREAM2_SUFFIX_BACKEND must be base_generators or composed_permutations");
+}
+
+std::vector<PackedSuffix> build_stream2_suffix_list(std::uint32_t radius, std::uint64_t max_count) {
+    std::vector<PackedSuffix> suffixes;
+    std::vector<PackedSuffix> frontier;
+    suffixes.push_back(PackedSuffix{});
+    frontier.push_back(PackedSuffix{});
+    for (std::uint32_t depth = 0; depth < radius; ++depth) {
+        std::vector<PackedSuffix> next;
+        next.reserve(frontier.size() * MOVE_COUNT);
+        for (const PackedSuffix& suffix : frontier) {
+            for (std::uint8_t move = 0; move < MOVE_COUNT; ++move) {
+                const PackedSuffix child = append_suffix_move(suffix, move);
+                if (max_count != 0ULL && suffixes.size() >= max_count) {
+                    throw std::runtime_error("stream2 suffix table exceeded BEAM_STREAM2_SUFFIX_MAX_COUNT");
+                }
+                suffixes.push_back(child);
+                next.push_back(child);
+            }
+        }
+        frontier = std::move(next);
+    }
+    return suffixes;
+}
+
+std::vector<std::uint8_t> build_stream2_composed_permutations(
+    const std::vector<PackedSuffix>& suffixes,
+    const std::vector<std::uint8_t>& generators) {
+    std::vector<std::uint8_t> permutations(
+        static_cast<std::uint64_t>(suffixes.size()) * STATE_STORAGE_LEN);
+    for (std::size_t suffix_id = 0; suffix_id < suffixes.size(); ++suffix_id) {
+        std::uint8_t perm[STATE_STORAGE_LEN]{};
+        for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+            perm[p] = static_cast<std::uint8_t>(p);
+        }
+        const PackedSuffix suffix = suffixes[suffix_id];
+        for (std::uint32_t step = 0; step < suffix.len; ++step) {
+            const std::uint8_t move = packed_suffix_move_host(suffix, step);
+            std::uint8_t next_perm[STATE_STORAGE_LEN]{};
+            const std::uint64_t base = static_cast<std::uint64_t>(move) * STATE_STORAGE_LEN;
+            for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+                next_perm[p] = perm[generators[base + p]];
+            }
+            for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+                perm[p] = next_perm[p];
+            }
+        }
+        for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+            permutations[static_cast<std::uint64_t>(suffix_id) * STATE_STORAGE_LEN + p] = perm[p];
+        }
+    }
+    return permutations;
+}
+
+Stream2SuffixRuntime build_stream2_suffix_runtime(const std::vector<std::uint8_t>& generators) {
+    Stream2SuffixRuntime runtime;
+    runtime.radius = env_u32("BEAM_STREAM2_SUFFIX_RADIUS", 0);
+    const char* backend_env = std::getenv("BEAM_STREAM2_SUFFIX_BACKEND");
+    runtime.backend_name =
+        (backend_env == nullptr || backend_env[0] == '\0') ? "base_generators" : backend_env;
+    runtime.backend = parse_stream2_suffix_backend(runtime.backend_name);
+    if (runtime.radius == 0U) {
+        return runtime;
+    }
+    if (runtime.radius > 3U) {
+        throw std::runtime_error("BEAM_STREAM2_SUFFIX_RADIUS must be <= 3 for direct Stream2 suffix scan");
+    }
+    if (generators.size() != MOVE_COUNT * STATE_STORAGE_LEN) {
+        throw std::runtime_error("stream2 suffix builder requires flat p900 generators");
+    }
+    const std::uint64_t max_count = env_u64("BEAM_STREAM2_SUFFIX_MAX_COUNT", 0);
+    runtime.suffixes = build_stream2_suffix_list(runtime.radius, max_count);
+    runtime.entry_count = runtime.suffixes.size();
+    if (runtime.entry_count > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+        throw std::runtime_error("stream2 suffix table exceeds uint32 range");
+    }
+    std::vector<std::uint64_t> packed_moves(runtime.suffixes.size());
+    std::vector<std::uint8_t> lengths(runtime.suffixes.size());
+    for (std::size_t i = 0; i < runtime.suffixes.size(); ++i) {
+        packed_moves[i] = runtime.suffixes[i].moves;
+        lengths[i] = runtime.suffixes[i].len;
+    }
+    BEAM_CUDA_CHECK(cudaMalloc(
+        &runtime.device_packed_moves,
+        packed_moves.size() * sizeof(std::uint64_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&runtime.device_lengths, lengths.size() * sizeof(std::uint8_t)));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        runtime.device_packed_moves,
+        packed_moves.data(),
+        packed_moves.size() * sizeof(std::uint64_t),
+        cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        runtime.device_lengths,
+        lengths.data(),
+        lengths.size() * sizeof(std::uint8_t),
+        cudaMemcpyHostToDevice));
+    runtime.device_bytes =
+        packed_moves.size() * sizeof(std::uint64_t) +
+        lengths.size() * sizeof(std::uint8_t);
+    if (runtime.backend == STREAM2_SUFFIX_BACKEND_COMPOSED_PERMUTATIONS) {
+        const std::vector<std::uint8_t> permutations =
+            build_stream2_composed_permutations(runtime.suffixes, generators);
+        BEAM_CUDA_CHECK(cudaMalloc(
+            &runtime.device_composed_permutations,
+            permutations.size() * sizeof(std::uint8_t)));
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            runtime.device_composed_permutations,
+            permutations.data(),
+            permutations.size() * sizeof(std::uint8_t),
+            cudaMemcpyHostToDevice));
+        runtime.device_bytes += permutations.size() * sizeof(std::uint8_t);
+    }
+    return runtime;
 }
 
 const char* track_location_name(std::uint32_t location) {
@@ -1829,32 +2031,52 @@ struct SolvedSnapshot {
     std::uint32_t overflow = 0;
     std::vector<CandidateMeta> meta;
     std::vector<std::uint32_t> depth;
+    std::vector<std::uint32_t> suffix;
 };
 
 std::uint32_t solved_total_depth(
     const SolvedNeighborhoodRuntime& solved_neighborhood,
+    const Stream2SuffixRuntime& stream2_suffix,
     const CandidateMeta& meta,
-    std::uint32_t prefix_depth) {
+    std::uint32_t prefix_depth,
+    std::uint32_t suffix_id) {
+    const std::uint32_t stream2_suffix_depth =
+        static_cast<std::uint32_t>(stream2_suffix.suffix_len(suffix_id));
     const PackedSuffix suffix = solved_neighborhood.suffix_for(meta.hash);
-    return prefix_depth + static_cast<std::uint32_t>(suffix.len);
+    return prefix_depth + stream2_suffix_depth + static_cast<std::uint32_t>(suffix.len);
 }
 
 SolvedSnapshot select_best_solved_snapshot(
     const SolvedSnapshot& snapshot,
-    const SolvedNeighborhoodRuntime& solved_neighborhood) {
+    const SolvedNeighborhoodRuntime& solved_neighborhood,
+    const Stream2SuffixRuntime& stream2_suffix) {
     if (!snapshot.found || snapshot.meta.empty() || snapshot.depth.empty()) {
         return snapshot;
     }
     std::uint32_t best = 0;
-    std::uint32_t best_total_depth = solved_neighborhood.enabled()
-        ? solved_total_depth(solved_neighborhood, snapshot.meta[0], snapshot.depth[0])
-        : snapshot.depth[0];
+    const std::uint32_t first_suffix_id =
+        snapshot.suffix.empty() ? 0U : snapshot.suffix[0];
+    std::uint32_t best_total_depth =
+        solved_total_depth(
+            solved_neighborhood,
+            stream2_suffix,
+            snapshot.meta[0],
+            snapshot.depth[0],
+            first_suffix_id);
     for (std::uint32_t i = 1U; i < snapshot.meta.size() && i < snapshot.depth.size(); ++i) {
-        const std::uint32_t total_depth = solved_neighborhood.enabled()
-            ? solved_total_depth(solved_neighborhood, snapshot.meta[i], snapshot.depth[i])
-            : snapshot.depth[i];
+        const std::uint32_t suffix_id =
+            i < snapshot.suffix.size() ? snapshot.suffix[i] : 0U;
+        const std::uint32_t total_depth =
+            solved_total_depth(
+                solved_neighborhood,
+                stream2_suffix,
+                snapshot.meta[i],
+                snapshot.depth[i],
+                suffix_id);
         const CandidateMeta& candidate = snapshot.meta[i];
         const CandidateMeta& incumbent = snapshot.meta[best];
+        const std::uint32_t incumbent_suffix_id =
+            best < snapshot.suffix.size() ? snapshot.suffix[best] : 0U;
         const bool better =
             total_depth < best_total_depth ||
             (total_depth == best_total_depth && candidate.parent_idx < incumbent.parent_idx) ||
@@ -1862,7 +2084,11 @@ SolvedSnapshot select_best_solved_snapshot(
              candidate.route_packed < incumbent.route_packed) ||
             (total_depth == best_total_depth && candidate.parent_idx == incumbent.parent_idx &&
              candidate.route_packed == incumbent.route_packed &&
-             hash_less(candidate.hash, incumbent.hash));
+             hash_less(candidate.hash, incumbent.hash)) ||
+            (total_depth == best_total_depth && candidate.parent_idx == incumbent.parent_idx &&
+             candidate.route_packed == incumbent.route_packed &&
+             candidate.hash == incumbent.hash &&
+             suffix_id < incumbent_suffix_id);
         if (better) {
             best = i;
             best_total_depth = total_depth;
@@ -1874,13 +2100,19 @@ SolvedSnapshot select_best_solved_snapshot(
     selected.overflow = snapshot.overflow;
     selected.meta.push_back(snapshot.meta[best]);
     selected.depth.push_back(snapshot.depth[best]);
+    selected.suffix.push_back(best < snapshot.suffix.size() ? snapshot.suffix[best] : 0U);
     return selected;
 }
 
-void append_solved_suffix(
+void append_solution_suffixes(
     ReconstructedSolution& solution,
+    const Stream2SuffixRuntime& stream2_suffix,
+    std::uint32_t suffix_id,
     const SolvedNeighborhoodRuntime& solved_neighborhood,
     Hash128 hash) {
+    if (suffix_id != 0U) {
+        append_packed_suffix(solution.moves, stream2_suffix.suffix_for(suffix_id));
+    }
     if (!solved_neighborhood.enabled()) {
         return;
     }
@@ -1903,6 +2135,7 @@ SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint3
     const std::uint32_t stored = std::min(snapshot.count, capacity);
     snapshot.meta.resize(stored);
     snapshot.depth.resize(stored);
+    snapshot.suffix.resize(stored);
     if (stored != 0U) {
         BEAM_CUDA_CHECK(cudaMemcpy(
             snapshot.meta.data(),
@@ -1912,6 +2145,11 @@ SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint3
         BEAM_CUDA_CHECK(cudaMemcpy(
             snapshot.depth.data(),
             memory.solved_depth_list,
+            static_cast<std::uint64_t>(stored) * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost));
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            snapshot.suffix.data(),
+            memory.solved_suffix_list,
             static_cast<std::uint64_t>(stored) * sizeof(std::uint32_t),
             cudaMemcpyDeviceToHost));
     }
@@ -1924,6 +2162,7 @@ struct DistributedReconstructionResult {
     std::uint32_t controller = 0;
     CandidateMeta solved_meta{};
     std::uint32_t solved_depth = 0;
+    std::uint32_t solved_suffix_id = 0;
     ReconstructedSolution solution;
 };
 
@@ -1931,6 +2170,7 @@ DistributedReconstructionResult reconstruct_solution_distributed(
     const CpuCandidateHistory& history,
     const SolvedSnapshot& local_solved,
     const SolvedNeighborhoodRuntime& solved_neighborhood,
+    const Stream2SuffixRuntime& stream2_suffix,
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
     const DispatcherStreams& streams,
@@ -1943,7 +2183,7 @@ DistributedReconstructionResult reconstruct_solution_distributed(
     if (comm == nullptr) {
         throw std::invalid_argument("distributed reconstruction requires NCCL communicator");
     }
-    constexpr std::uint32_t packet_words = 7;
+    constexpr std::uint32_t packet_words = 8;
     constexpr std::uint32_t query_words = 4;
     constexpr std::uint32_t response_words = 2;
     const std::uint64_t scratch_words =
@@ -1963,6 +2203,8 @@ DistributedReconstructionResult reconstruct_solution_distributed(
     std::uint64_t* response_device = query_device + query_words;
 
     const bool local_found = local_solved.found && !local_solved.meta.empty() && !local_solved.depth.empty();
+    const std::uint32_t local_suffix_id =
+        local_found && !local_solved.suffix.empty() ? local_solved.suffix.front() : 0U;
     std::array<std::uint64_t, packet_words> local_packet{
         local_found ? 1ULL : 0ULL,
         static_cast<std::uint64_t>(rank),
@@ -1970,7 +2212,8 @@ DistributedReconstructionResult reconstruct_solution_distributed(
         local_found ? local_solved.meta.front().parent_idx : 0ULL,
         local_found ? static_cast<std::uint64_t>(local_solved.meta.front().route_packed) : 0ULL,
         local_found ? local_solved.meta.front().hash.lo : 0ULL,
-        local_found ? local_solved.meta.front().hash.hi : 0ULL};
+        local_found ? local_solved.meta.front().hash.hi : 0ULL,
+        local_found ? static_cast<std::uint64_t>(local_suffix_id) : 0ULL};
     BEAM_CUDA_CHECK(cudaMemcpyAsync(
         packet_send_device,
         local_packet.data(),
@@ -2007,9 +2250,14 @@ DistributedReconstructionResult reconstruct_solution_distributed(
         candidate.hash = Hash128{packet[5], packet[6]};
         candidate.score_key = GOAL_SCORE_KEY;
         const std::uint32_t candidate_depth = static_cast<std::uint32_t>(packet[2]);
-        const std::uint32_t candidate_total_depth = solved_neighborhood.enabled()
-            ? solved_total_depth(solved_neighborhood, candidate, candidate_depth)
-            : candidate_depth;
+        const std::uint32_t candidate_suffix_id = static_cast<std::uint32_t>(packet[7]);
+        const std::uint32_t candidate_total_depth =
+            solved_total_depth(
+                solved_neighborhood,
+                stream2_suffix,
+                candidate,
+                candidate_depth,
+                candidate_suffix_id);
         const bool better =
             !best_found ||
             candidate_total_depth < best_total_depth ||
@@ -2022,6 +2270,11 @@ DistributedReconstructionResult reconstruct_solution_distributed(
             (candidate_total_depth == best_total_depth && candidate.parent_idx == result.solved_meta.parent_idx &&
              candidate.route_packed == result.solved_meta.route_packed &&
              candidate.hash == result.solved_meta.hash &&
+             candidate_suffix_id < result.solved_suffix_id) ||
+            (candidate_total_depth == best_total_depth && candidate.parent_idx == result.solved_meta.parent_idx &&
+             candidate.route_packed == result.solved_meta.route_packed &&
+             candidate.hash == result.solved_meta.hash &&
+             candidate_suffix_id == result.solved_suffix_id &&
              peer < result.controller);
         if (better) {
             best_found = true;
@@ -2029,6 +2282,7 @@ DistributedReconstructionResult reconstruct_solution_distributed(
             result.has_solution = true;
             result.controller = peer;
             result.solved_depth = candidate_depth;
+            result.solved_suffix_id = candidate_suffix_id;
             result.solved_meta = candidate;
         }
     }
@@ -2125,7 +2379,12 @@ DistributedReconstructionResult reconstruct_solution_distributed(
         cursor.route_packed = static_cast<std::uint32_t>(response[1]);
     }
     if (result.controller_rank) {
-        append_solved_suffix(result.solution, solved_neighborhood, result.solved_meta.hash);
+        append_solution_suffixes(
+            result.solution,
+            stream2_suffix,
+            result.solved_suffix_id,
+            solved_neighborhood,
+            result.solved_meta.hash);
     }
     return result;
 }
@@ -2673,6 +2932,7 @@ int main(int argc, char** argv) {
     const HostWeightBytes host_weights = load_stream1_weights(weight_dir);
     SolvedNeighborhoodRuntime solved_neighborhood =
         build_solved_neighborhood_runtime(host_central, host_generators, host_zobrist);
+    Stream2SuffixRuntime stream2_suffix = build_stream2_suffix_runtime(host_generators);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "real_assets=enabled\n";
     std::cout << "generator_path=" << generator_path.string() << "\n";
@@ -2683,6 +2943,10 @@ int main(int argc, char** argv) {
     std::cout << "solved_neighborhood_entries=" << solved_neighborhood.entry_count << "\n";
     std::cout << "solved_neighborhood_bucket_count=" << solved_neighborhood.bucket_count << "\n";
     std::cout << "solved_neighborhood_device_bytes=" << solved_neighborhood.device_bytes << "\n";
+    std::cout << "stream2_suffix_radius=" << stream2_suffix.radius << "\n";
+    std::cout << "stream2_suffix_backend=" << stream2_suffix.backend_name << "\n";
+    std::cout << "stream2_suffix_entries=" << stream2_suffix.entry_count << "\n";
+    std::cout << "stream2_suffix_device_bytes=" << stream2_suffix.device_bytes << "\n";
 #endif
 
     StaticDeviceMemory memory;
@@ -2819,7 +3083,9 @@ int main(int argc, char** argv) {
         memory.solved_depth_list,
         config.solved_result_capacity,
         memory.current_depth,
-        solved_neighborhood.device_table()};
+        solved_neighborhood.device_table(),
+        stream2_suffix.device_table(),
+        memory.solved_suffix_list};
     instantiate_cuda_graph_job_templates(plan, memory, tables, network, solved, streams, events, graphs);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "runner_phase=graphs_instantiated\n";
@@ -2943,7 +3209,7 @@ int main(int argc, char** argv) {
             propagate_stop_flag(memory, streams, nccl_runtime.comm, world_size);
         const SolvedSnapshot solved_snapshot = read_solved_snapshot(memory, config.solved_result_capacity);
         const SolvedSnapshot selected_solved_snapshot =
-            select_best_solved_snapshot(solved_snapshot, solved_neighborhood);
+            select_best_solved_snapshot(solved_snapshot, solved_neighborhood, stream2_suffix);
         if (world_size > 1U && global_stop_value != 0U) {
             history.finish_all();
             const DistributedReconstructionResult distributed_solution =
@@ -2951,6 +3217,7 @@ int main(int argc, char** argv) {
                     history,
                     selected_solved_snapshot,
                     solved_neighborhood,
+                    stream2_suffix,
                     plan,
                     memory,
                     streams,
@@ -2974,6 +3241,9 @@ int main(int argc, char** argv) {
                 }
                 if (global_solved.depth.empty()) {
                     global_solved.depth.push_back(distributed_solution.solved_depth);
+                }
+                if (global_solved.suffix.empty()) {
+                    global_solved.suffix.push_back(distributed_solution.solved_suffix_id);
                 }
                 write_solution_artifacts(
                     puzzle_id,
@@ -3016,10 +3286,17 @@ int main(int argc, char** argv) {
             }
             const CandidateMeta solved_meta = selected_solved_snapshot.meta.front();
             const std::uint32_t solved_depth = selected_solved_snapshot.depth.front();
+            const std::uint32_t solved_suffix_id =
+                selected_solved_snapshot.suffix.empty() ? 0U : selected_solved_snapshot.suffix.front();
             history.finish_all();
             ReconstructedSolution solution =
                 reconstruct_solution_from_history(history, solved_meta, solved_depth);
-            append_solved_suffix(solution, solved_neighborhood, solved_meta.hash);
+            append_solution_suffixes(
+                solution,
+                stream2_suffix,
+                solved_suffix_id,
+                solved_neighborhood,
+                solved_meta.hash);
             const State128 final_state = apply_solution_moves(host_initial, solution.moves, host_generators);
             const bool valid = states_equal_storage(final_state, host_central);
             const double solved_elapsed_sec =
@@ -3300,6 +3577,7 @@ int main(int argc, char** argv) {
     destroy_dispatcher_streams(streams);
     free_static_device_memory(memory);
     solved_neighborhood.destroy();
+    stream2_suffix.destroy();
     cudaFree(generators);
     cudaFree(central_state);
     cudaFree(zobrist);

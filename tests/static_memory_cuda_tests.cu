@@ -164,6 +164,7 @@ int main() {
     require(memory.scratch_pool != nullptr, "scratch pool must exist");
     require(addr(memory.current_frontier_states) < addr(memory.scratch_pool), "current frontier must be before scratch pool");
     require(addr(memory.solved_flag) < addr(memory.scratch_pool), "solved buffers must be outside scratch pool");
+    require(memory.solved_suffix_list != nullptr && addr(memory.solved_suffix_list) < addr(memory.scratch_pool), "solved suffix list must be outside scratch pool");
     require(memory.current_depth != nullptr && addr(memory.current_depth) < addr(memory.scratch_pool), "current depth must be outside scratch pool");
     require(addr(memory.streams.score_ring) == addr(memory.scratch_pool), "streams layout must start at scratch pool");
     require(addr(memory.streams.hash_ring) % alignof(Hash128) == 0, "hash ring alignment failed");

@@ -419,6 +419,7 @@ solved_overflow  : uint32_t
 
 solved_meta_list [SOLVED_RESULT_CAPACITY] : CandidateMeta
 solved_depth_list[SOLVED_RESULT_CAPACITY] : uint32_t
+solved_suffix_list[SOLVED_RESULT_CAPACITY] : uint32_t
 ```
 
 Solved neighborhood lookup:
@@ -443,10 +444,24 @@ K1 > 0:
     Stream 2 does not store states or suffixes in VRAM.
     CPU appends the suffix from Hash128 -> suffix after history prefix reconstruction.
 
-Future K2 candidate-suffix expansion:
-    Stream 2 may later expand generated candidate descendants by a separate radius K2.
-    K2 suffix generators should be precomputed before the run, not generated dynamically in the kernel.
-    K2 is not part of the current implementation.
+Stream2 generated-candidate suffix expansion:
+    BEAM_STREAM2_SUFFIX_RADIUS = K2
+    BEAM_STREAM2_SUFFIX_BACKEND in {base_generators, composed_permutations}
+    BEAM_STREAM2_SUFFIX_MAX_COUNT is an optional startup guard.
+
+K2 == 0:
+    Stream 2 behavior matches K1-only behavior.
+    solved_suffix_list[idx] is 0 for direct/K1 hits.
+
+K2 > 0:
+    CPU builds all suffix move chains with length <= K2 before depth processing.
+    GPU stores suffix packed_moves[] and lengths[] in readonly VRAM.
+    Backend base_generators stores only suffix move chains; Stream 2 uses the base generator table per suffix move.
+    Backend composed_permutations additionally stores composed perm[STATE_STORAGE_LEN] per suffix for one-permutation state projection.
+    Stream 2 first computes and writes Hash128(parent + move) to hash_ring exactly as before.
+    Stream 2 then checks parent + move + suffix_id for suffix_id >= 1 against K1 table or exact central_state.
+    Stream 2 records solved_suffix_list[idx] = suffix_id on hit.
+    CPU reconstructs history prefix, appends K2 suffix by suffix_id, then appends K1 suffix by Hash128 -> suffix.
 ```
 
 Смысл:
@@ -976,6 +991,7 @@ if (found) {
 
         solved_meta_list[idx] = meta;
         solved_depth_list[idx] = depth;
+        solved_suffix_list[idx] = suffix_id; // 0 means no Stream2 suffix
     } else {
         atomicExch(&solved_overflow, 1);
     }

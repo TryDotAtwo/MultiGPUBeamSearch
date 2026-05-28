@@ -7,11 +7,22 @@
 namespace beam {
 
 inline constexpr std::uint32_t SOLVED_NEIGHBORHOOD_BUCKET_SIZE = 4;
+inline constexpr std::uint32_t STREAM2_SUFFIX_BACKEND_BASE_GENERATORS = 1;
+inline constexpr std::uint32_t STREAM2_SUFFIX_BACKEND_COMPOSED_PERMUTATIONS = 2;
 
 struct SolvedNeighborhoodDeviceTable {
     const std::uint32_t* fingerprint_slots = nullptr;
     const Hash128* hash_slots = nullptr;
     std::uint32_t bucket_mask = 0;
+    std::uint32_t enabled = 0;
+};
+
+struct Stream2SuffixDeviceTable {
+    const std::uint64_t* packed_moves = nullptr;
+    const std::uint8_t* lengths = nullptr;
+    const std::uint8_t* composed_permutations = nullptr;
+    std::uint32_t suffix_count = 0;
+    std::uint32_t backend = 0;
     std::uint32_t enabled = 0;
 };
 
@@ -25,6 +36,8 @@ struct Stream2SolvedBuffers {
     std::uint32_t solved_result_capacity = 0;
     const std::uint32_t* current_depth = nullptr;
     SolvedNeighborhoodDeviceTable solved_neighborhood;
+    Stream2SuffixDeviceTable stream2_suffix;
+    std::uint32_t* solved_suffix_list = nullptr;
 };
 
 void stream2_hash_goal_cuda(
