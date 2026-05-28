@@ -21,6 +21,10 @@ DerivedConfig derive_config(const RuntimeConfig& config) {
         throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be divisible by B_MICRO * MOVE_COUNT");
     }
     derived.ring_slot_count = config.stream3_batch_candidates / candidates_per_slot;
+    if (config.inference_parallelism == 0U ||
+        config.inference_parallelism > derived.ring_slot_count) {
+        throw std::invalid_argument("STREAM1_CONCURRENCY must be in [1, RING_SLOT_COUNT]");
+    }
     derived.beam_width_alignment =
         static_cast<std::uint64_t>(config.world_size) *
         static_cast<std::uint64_t>(config.shard_count) *

@@ -89,7 +89,7 @@ int main() {
     Stream1NetworkDims dims{STATE_LEN, STATE_VALUE_PAD, hidden1_cols, hidden2_cols, 0};
     DispatcherNetwork network{
         Stream1NetworkView{input_weight, input_bias, hidden_weight, hidden_bias, nullptr, nullptr, nullptr, nullptr, output_weight, output_bias, dims},
-        Stream1CutlassScratch{hidden1, hidden2, residual, output}};
+        std::vector<Stream1CutlassScratch>{Stream1CutlassScratch{hidden1, hidden2, residual, output}}};
     DispatcherDeviceTables tables{generators, central_state, zobrist};
     Stream2SolvedBuffers solved{
         memory.solved_flag,

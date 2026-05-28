@@ -122,7 +122,8 @@ std::uint64_t estimate_stream1_scratch_bytes(std::uint32_t b_micro) {
 std::uint64_t estimate_non_static_device_bytes(const RuntimeConfig& config) {
     return estimate_read_only_table_bytes() +
            estimate_stream1_weight_bytes() +
-           estimate_stream1_scratch_bytes(config.b_micro);
+           static_cast<std::uint64_t>(config.inference_parallelism) *
+               estimate_stream1_scratch_bytes(config.b_micro);
 }
 
 std::uint64_t beam_alignment_for(const RuntimeConfig& config) {
@@ -342,6 +343,9 @@ bool try_make_candidate(
         throw std::invalid_argument("BEAM_STREAM4_TRIGGER_CANDIDATES must be nonzero");
     }
     set_stream3_batch_from_ring_slots(config, ring_slot_count);
+    if (config.inference_parallelism > ring_slot_count) {
+        return false;
+    }
     set_ring_count_from_logical_shard(config);
     set_shard_capacity_from_logical_shard(config);
     set_global_spill_capacity(config);
@@ -474,6 +478,9 @@ RuntimeConfigBuild build_manual_runtime_config(
         build.config.shard_buffer_count > 1U ? env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 0) :
         required_env_u32("BEAM_GLOBAL_SPILL_CAPACITY");
     set_stream3_batch_from_ring_slots(build.config, build.stream3_ring_slots);
+    if (build.config.inference_parallelism > build.stream3_ring_slots) {
+        throw std::invalid_argument("manual BEAM_STREAM1_CONCURRENCY must be <= BEAM_STREAM3_RING_SLOTS");
+    }
     if (env_present("BEAM_RING_COUNT")) {
         build.config.ring_count = env_u32("BEAM_RING_COUNT", 1);
     } else {
@@ -578,6 +585,7 @@ RuntimeConfigBuild build_runtime_config_from_budget(
             ? env_u32("BEAM_STREAM4_BATCH_ALIGNMENT", 1024)
             : env_u32("BEAM_STREAM4_BATCH_CANDIDATES_PER_SHARD_UNIT", 1024);
     config.stream4_active_sort_slots = env_u32("BEAM_STREAM4_ACTIVE_SORT_SLOTS", 4);
+    config.inference_parallelism = env_u32("BEAM_STREAM1_CONCURRENCY", 1);
     config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 2);
     config.shard_capacity_scale_ppm = env_u32("BEAM_SHARD_CAPACITY_SCALE_PPM", 1'250'000);
     config.global_spill_scale_ppm = env_u32("BEAM_GLOBAL_SPILL_SCALE_PPM", 2'000'000);
@@ -588,11 +596,12 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     build.gpu_headroom_bytes = env_u64("BEAM_GPU_HEADROOM_BYTES", 768ULL * 1024ULL * 1024ULL);
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;
-    if (config.b_micro == 0U || config.stream4_batch_alignment == 0U ||
+    if (config.b_micro == 0U || config.inference_parallelism == 0U ||
+        config.stream4_batch_alignment == 0U ||
         config.stream4_active_sort_slots == 0U || config.shard_buffer_count != 2U ||
         config.shard_capacity_scale_ppm == 0U ||
         config.global_spill_scale_ppm == 0U || config.stream5_recv_capacity_scale_ppm == 0U) {
-        throw std::invalid_argument("B_MICRO, STREAM4_ACTIVE_SORT_SLOTS, STREAM4_BATCH_ALIGNMENT, SHARD_BUFFER_COUNT, and capacity/spill scale values must be valid");
+        throw std::invalid_argument("B_MICRO, STREAM1_CONCURRENCY, STREAM4_ACTIVE_SORT_SLOTS, STREAM4_BATCH_ALIGNMENT, SHARD_BUFFER_COUNT, and capacity/spill scale values must be valid");
     }
 
     const std::uint32_t min_stream4_jobs_per_shard =

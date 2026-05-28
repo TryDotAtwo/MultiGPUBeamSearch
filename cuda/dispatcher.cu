@@ -864,6 +864,53 @@ void ensure_stream4_slot_resources(DispatcherStreams& streams, std::uint32_t slo
     }
 }
 
+void ensure_stream12_lane_resources(DispatcherStreams& streams, DispatcherEvents& events, std::uint32_t lane_count) {
+    if (lane_count == 0U) {
+        throw std::invalid_argument("Stream1 lane count must be nonzero");
+    }
+    if (streams.stream1_lanes.size() == lane_count &&
+        streams.stream2_lanes.size() == lane_count &&
+        events.stream1_lane_done.size() == lane_count &&
+        events.stream2_lane_done.size() == lane_count) {
+        return;
+    }
+    for (std::size_t lane = 1; lane < streams.stream1_lanes.size(); ++lane) {
+        if (streams.stream1_lanes[lane]) {
+            cudaStreamDestroy(streams.stream1_lanes[lane]);
+        }
+    }
+    for (std::size_t lane = 1; lane < streams.stream2_lanes.size(); ++lane) {
+        if (streams.stream2_lanes[lane]) {
+            cudaStreamDestroy(streams.stream2_lanes[lane]);
+        }
+    }
+    for (std::size_t lane = 1; lane < events.stream1_lane_done.size(); ++lane) {
+        if (events.stream1_lane_done[lane]) {
+            cudaEventDestroy(events.stream1_lane_done[lane]);
+        }
+    }
+    for (std::size_t lane = 1; lane < events.stream2_lane_done.size(); ++lane) {
+        if (events.stream2_lane_done[lane]) {
+            cudaEventDestroy(events.stream2_lane_done[lane]);
+        }
+    }
+
+    streams.stream1_lanes.assign(lane_count, nullptr);
+    streams.stream2_lanes.assign(lane_count, nullptr);
+    events.stream1_lane_done.assign(lane_count, nullptr);
+    events.stream2_lane_done.assign(lane_count, nullptr);
+    streams.stream1_lanes[0] = streams.stream1;
+    streams.stream2_lanes[0] = streams.stream2;
+    events.stream1_lane_done[0] = events.stream1_done;
+    events.stream2_lane_done[0] = events.stream2_done;
+    for (std::uint32_t lane = 1; lane < lane_count; ++lane) {
+        check_cuda(cudaStreamCreateWithFlags(&streams.stream1_lanes[lane], cudaStreamNonBlocking), "cudaStreamCreate stream1 lane");
+        check_cuda(cudaStreamCreateWithFlags(&streams.stream2_lanes[lane], cudaStreamNonBlocking), "cudaStreamCreate stream2 lane");
+        check_cuda(cudaEventCreateWithFlags(&events.stream1_lane_done[lane], cudaEventDisableTiming), "cudaEventCreate stream1 lane done");
+        check_cuda(cudaEventCreateWithFlags(&events.stream2_lane_done[lane], cudaEventDisableTiming), "cudaEventCreate stream2 lane done");
+    }
+}
+
 void ensure_final_slot_events(DispatcherStreams& streams) {
     auto create_group = [](std::array<cudaEvent_t, 3>& events, const char* label) {
         for (std::uint32_t slot = 0; slot < events.size(); ++slot) {
@@ -1053,6 +1100,18 @@ void create_dispatcher_streams(DispatcherStreams& streams) {
 }
 
 void destroy_dispatcher_streams(DispatcherStreams& streams) {
+    for (std::size_t lane = 1; lane < streams.stream1_lanes.size(); ++lane) {
+        if (streams.stream1_lanes[lane]) {
+            cudaStreamDestroy(streams.stream1_lanes[lane]);
+        }
+    }
+    for (std::size_t lane = 1; lane < streams.stream2_lanes.size(); ++lane) {
+        if (streams.stream2_lanes[lane]) {
+            cudaStreamDestroy(streams.stream2_lanes[lane]);
+        }
+    }
+    streams.stream1_lanes.clear();
+    streams.stream2_lanes.clear();
     if (streams.stream1) {
         cudaStreamDestroy(streams.stream1);
     }
@@ -1100,6 +1159,18 @@ void create_dispatcher_events(DispatcherEvents& events) {
 }
 
 void destroy_dispatcher_events(DispatcherEvents& events) {
+    for (std::size_t lane = 1; lane < events.stream1_lane_done.size(); ++lane) {
+        if (events.stream1_lane_done[lane]) {
+            cudaEventDestroy(events.stream1_lane_done[lane]);
+        }
+    }
+    for (std::size_t lane = 1; lane < events.stream2_lane_done.size(); ++lane) {
+        if (events.stream2_lane_done[lane]) {
+            cudaEventDestroy(events.stream2_lane_done[lane]);
+        }
+    }
+    events.stream1_lane_done.clear();
+    events.stream2_lane_done.clear();
     if (events.stream1_done) {
         cudaEventDestroy(events.stream1_done);
     }
@@ -1125,6 +1196,14 @@ void instantiate_cuda_graph_job_templates(
     if (!memory.current_frontier_states || !memory.scratch_pool || !tables.generators || !tables.central_state || !tables.zobrist) {
         throw std::invalid_argument("dispatcher graph templates require preallocated architecture memory and read-only tables");
     }
+    if (plan.config.inference_parallelism == 0U ||
+        plan.config.inference_parallelism > plan.derived.ring_slot_count) {
+        throw std::invalid_argument("Stream1 concurrency must be in [1, RING_SLOT_COUNT]");
+    }
+    if (network.scratch_lanes.size() < plan.config.inference_parallelism) {
+        throw std::invalid_argument("Stream1 scratch lane count is smaller than Stream1 concurrency");
+    }
+    ensure_stream12_lane_resources(streams, events, plan.config.inference_parallelism);
     ensure_stream4_slot_resources(streams, plan.config.stream4_active_sort_slots);
 
     const std::uint32_t ring_slot_job_count = plan.config.ring_count * plan.derived.ring_slot_count;
@@ -1132,19 +1211,25 @@ void instantiate_cuda_graph_job_templates(
     graphs.ring_slot_execs.resize(ring_slot_job_count, nullptr);
     const std::uint64_t candidates_per_slot = static_cast<std::uint64_t>(plan.config.b_micro) * MOVE_COUNT;
     for (std::uint32_t job = 0; job < ring_slot_job_count; ++job) {
+        const std::uint32_t ring_slot = job % plan.derived.ring_slot_count;
+        const std::uint32_t lane = ring_slot % plan.config.inference_parallelism;
+        cudaStream_t stream1_lane = streams.stream1_lanes[lane];
+        cudaStream_t stream2_lane = streams.stream2_lanes[lane];
+        cudaEvent_t stream1_done = events.stream1_lane_done[lane];
+        cudaEvent_t stream2_done = events.stream2_lane_done[lane];
         const std::uint64_t candidate_offset = static_cast<std::uint64_t>(job) * candidates_per_slot;
-        check_cuda(cudaStreamBeginCapture(streams.stream1, cudaStreamCaptureModeGlobal), "cudaStreamBeginCapture ring_slot_graph");
-        check_cuda(cudaEventRecord(events.stream1_done, streams.stream1), "cudaEventRecord ring_slot_fork");
-        check_cuda(cudaStreamWaitEvent(streams.stream2, events.stream1_done, 0), "cudaStreamWaitEvent stream2_fork");
+        check_cuda(cudaStreamBeginCapture(stream1_lane, cudaStreamCaptureModeGlobal), "cudaStreamBeginCapture ring_slot_graph");
+        check_cuda(cudaEventRecord(stream1_done, stream1_lane), "cudaEventRecord ring_slot_fork");
+        check_cuda(cudaStreamWaitEvent(stream2_lane, stream1_done, 0), "cudaStreamWaitEvent stream2_fork");
         stream1_inference_cutlass_cuda(
             memory.current_frontier_states,
             memory.streams.parent_base + job,
             memory.streams.count + job,
             network.view,
-            network.scratch,
+            network.scratch_lanes[lane],
             memory.streams.score_ring + candidate_offset,
             plan.config.b_micro,
-            streams.stream1);
+            stream1_lane);
         stream2_hash_goal_cuda(
             memory.current_frontier_states,
             memory.streams.parent_base + job,
@@ -1159,10 +1244,10 @@ void instantiate_cuda_graph_job_templates(
             0,
             plan.config.local_rank,
             solved,
-            streams.stream2);
-        check_cuda(cudaEventRecord(events.stream2_done, streams.stream2), "cudaEventRecord ring_slot_join");
-        check_cuda(cudaStreamWaitEvent(streams.stream1, events.stream2_done, 0), "cudaStreamWaitEvent stream1_join");
-        instantiate_captured_graph(streams.stream1, graphs.ring_slot_graphs[job], graphs.ring_slot_execs[job]);
+            stream2_lane);
+        check_cuda(cudaEventRecord(stream2_done, stream2_lane), "cudaEventRecord ring_slot_join");
+        check_cuda(cudaStreamWaitEvent(stream1_lane, stream2_done, 0), "cudaStreamWaitEvent stream1_join");
+        instantiate_captured_graph(stream1_lane, graphs.ring_slot_graphs[job], graphs.ring_slot_execs[job]);
     }
 
     graphs.stream3_ring_graphs.resize(plan.config.ring_count, nullptr);
@@ -1464,6 +1549,12 @@ DepthDispatchState run_depth_cuda_graphs(
     if (multi_rank && (collective == nullptr || collective->comm == nullptr)) {
         throw std::invalid_argument("multi rank depth dispatch requires NCCL collective");
     }
+    if (plan.config.inference_parallelism == 0U ||
+        plan.config.inference_parallelism > plan.derived.ring_slot_count ||
+        streams.stream1_lanes.size() < plan.config.inference_parallelism ||
+        streams.stream2_lanes.size() < plan.config.inference_parallelism) {
+        throw std::invalid_argument("Stream1 concurrency resources do not match runtime config");
+    }
     const std::uint64_t parents_per_stream3_round =
         static_cast<std::uint64_t>(plan.derived.ring_slot_count) * plan.config.b_micro;
     const std::uint64_t local_exchange_rounds =
@@ -1541,6 +1632,9 @@ DepthDispatchState run_depth_cuda_graphs(
     const bool pipeline_stats_enabled = std::getenv("BEAM_DEBUG_PIPELINE_STATS") != nullptr;
 
     std::vector<cudaEvent_t> ring_done(plan.config.ring_count, nullptr);
+    std::vector<cudaEvent_t> ring_lane_done(
+        static_cast<std::uint64_t>(plan.config.ring_count) * plan.config.inference_parallelism,
+        nullptr);
     std::vector<cudaEvent_t> stream3_done(plan.config.ring_count, nullptr);
 #if BEAM_DEBUG_STREAM_TIMING
     std::vector<cudaEvent_t> ring_timing_start(plan.config.ring_count, nullptr);
@@ -1557,6 +1651,14 @@ DepthDispatchState run_depth_cuda_graphs(
     for (std::uint32_t ring = 0; ring < plan.config.ring_count; ++ring) {
         check_cuda(cudaEventCreateWithFlags(&ring_done[ring], cudaEventDisableTiming), "cudaEventCreate ring done");
         check_cuda(cudaEventCreateWithFlags(&stream3_done[ring], cudaEventDisableTiming), "cudaEventCreate stream3 done");
+        for (std::uint32_t lane = 0; lane < plan.config.inference_parallelism; ++lane) {
+            check_cuda(
+                cudaEventCreateWithFlags(
+                    &ring_lane_done[
+                        static_cast<std::uint64_t>(ring) * plan.config.inference_parallelism + lane],
+                    cudaEventDisableTiming),
+                "cudaEventCreate stream1 ring lane done");
+        }
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventCreate(&ring_timing_start[ring]), "cudaEventCreate ring timing start");
         check_cuda(cudaEventCreate(&ring_timing_stop[ring]), "cudaEventCreate ring timing stop");
@@ -1588,6 +1690,7 @@ DepthDispatchState run_depth_cuda_graphs(
     };
     std::vector<std::vector<cudaEvent_t>*> event_groups{
         &ring_done,
+        &ring_lane_done,
         &stream3_done
 #if BEAM_DEBUG_STREAM_TIMING
         ,
@@ -2648,6 +2751,8 @@ DepthDispatchState run_depth_cuda_graphs(
 #endif
             for (std::uint32_t slot = 0; slot < plan.derived.ring_slot_count; ++slot) {
                 const std::uint32_t job = ring * plan.derived.ring_slot_count + slot;
+                const std::uint32_t lane = slot % plan.config.inference_parallelism;
+                cudaStream_t lane_stream = streams.stream1_lanes[lane];
                 std::uint64_t parent_base_value = 0;
                 std::uint32_t count_value = 0;
                 if (state.frontier_cursor < frontier_size) {
@@ -2668,17 +2773,24 @@ DepthDispatchState run_depth_cuda_graphs(
                     &parent_base_value,
                     sizeof(parent_base_value),
                     cudaMemcpyHostToDevice,
-                    streams.stream1), "cudaMemcpyAsync parent_base");
+                    lane_stream), "cudaMemcpyAsync parent_base");
                 check_cuda(cudaMemcpyAsync(
                     memory.streams.count + job,
                     &count_value,
                     sizeof(count_value),
                     cudaMemcpyHostToDevice,
-                    streams.stream1), "cudaMemcpyAsync count");
+                    lane_stream), "cudaMemcpyAsync count");
                 if (count_value != 0U) {
-                    check_cuda(cudaGraphLaunch(graphs.ring_slot_execs[job], streams.stream1), "cudaGraphLaunch ring_slot");
+                    check_cuda(cudaGraphLaunch(graphs.ring_slot_execs[job], lane_stream), "cudaGraphLaunch ring_slot");
                     ++state.ring_slot_jobs_launched;
                 }
+            }
+            for (std::uint32_t lane = 0; lane < plan.config.inference_parallelism; ++lane) {
+                cudaEvent_t lane_done =
+                    ring_lane_done[
+                        static_cast<std::uint64_t>(ring) * plan.config.inference_parallelism + lane];
+                check_cuda(cudaEventRecord(lane_done, streams.stream1_lanes[lane]), "cudaEventRecord stream1 lane ring done");
+                check_cuda(cudaStreamWaitEvent(streams.stream1, lane_done, 0), "cudaStreamWaitEvent stream1 control lane done");
             }
 #if BEAM_DEBUG_STREAM_TIMING
             check_cuda(cudaEventRecord(ring_timing_stop[ring], streams.stream1), "cudaEventRecord stream12 timing stop");

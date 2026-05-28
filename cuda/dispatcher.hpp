@@ -23,6 +23,8 @@ struct DispatcherStreams {
     cudaStream_t stream3 = nullptr;
     cudaStream_t stream4 = nullptr;
     cudaStream_t stream5 = nullptr;
+    std::vector<cudaStream_t> stream1_lanes;
+    std::vector<cudaStream_t> stream2_lanes;
     std::vector<cudaStream_t> stream4_slot_streams;
     std::vector<cudaEvent_t> stream4_slot_done;
     std::array<cudaEvent_t, 3> final_build_done{};
@@ -36,6 +38,8 @@ struct DispatcherEvents {
     cudaEvent_t stream1_done = nullptr;
     cudaEvent_t stream2_done = nullptr;
     cudaEvent_t stream3_done = nullptr;
+    std::vector<cudaEvent_t> stream1_lane_done;
+    std::vector<cudaEvent_t> stream2_lane_done;
 };
 
 struct CudaGraphJobTemplates {
@@ -55,7 +59,7 @@ struct DispatcherDeviceTables {
 
 struct DispatcherNetwork {
     Stream1NetworkView view;
-    Stream1CutlassScratch scratch;
+    std::vector<Stream1CutlassScratch> scratch_lanes;
 };
 
 struct DispatcherCollective {

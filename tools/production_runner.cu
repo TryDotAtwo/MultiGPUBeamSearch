@@ -2929,6 +2929,7 @@ int main(int argc, char** argv) {
     std::cout << "LOCAL_RANK=" << config.local_rank << "\n";
     std::cout << "CUDA_DEVICE_LOCAL_RANK=" << device_local_rank << "\n";
     std::cout << "B_MICRO=" << config.b_micro << "\n";
+    std::cout << "STREAM1_CONCURRENCY=" << config.inference_parallelism << "\n";
     std::cout << "STREAM3_RING_SLOTS=" << config_build.stream3_ring_slots << "\n";
     std::cout << "RING_COUNT=" << config.ring_count << "\n";
     std::cout << "RING_SLOT_COUNT=" << plan.derived.ring_slot_count << "\n";
@@ -3077,10 +3078,11 @@ int main(int argc, char** argv) {
     BEAM_CUDA_CHECK(cudaMalloc(&residual1_fc2_bias, host_weights.residual1_fc2_bias.size()));
     BEAM_CUDA_CHECK(cudaMalloc(&output_weight, host_weights.output_weight.size()));
     BEAM_CUDA_CHECK(cudaMalloc(&output_bias, host_weights.output_bias.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&hidden1, config.b_micro * hidden1_cols * sizeof(half)));
-    BEAM_CUDA_CHECK(cudaMalloc(&hidden2, config.b_micro * hidden2_cols * sizeof(half)));
-    BEAM_CUDA_CHECK(cudaMalloc(&residual, config.b_micro * hidden2_cols * sizeof(half)));
-    BEAM_CUDA_CHECK(cudaMalloc(&output, config.b_micro * MOVE_COUNT * sizeof(half)));
+    const std::uint64_t stream1_lane_count = config.inference_parallelism;
+    BEAM_CUDA_CHECK(cudaMalloc(&hidden1, stream1_lane_count * config.b_micro * hidden1_cols * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&hidden2, stream1_lane_count * config.b_micro * hidden2_cols * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&residual, stream1_lane_count * config.b_micro * hidden2_cols * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&output, stream1_lane_count * config.b_micro * MOVE_COUNT * sizeof(half)));
     require_aligned(generators, 16, "generators");
     require_aligned(central_state, alignof(State128), "central_state");
     require_aligned(zobrist, alignof(Hash128), "zobrist");
@@ -3125,6 +3127,15 @@ int main(int argc, char** argv) {
     const std::array<const half*, residual_count> residual_fc2_weight{residual0_fc2_weight, residual1_fc2_weight};
     const std::array<const half*, residual_count> residual_fc2_bias{residual0_fc2_bias, residual1_fc2_bias};
     Stream1NetworkDims dims{STATE_LEN, STREAM1_MODEL_CLASSES, hidden1_cols, hidden2_cols, residual_count};
+    std::vector<Stream1CutlassScratch> stream1_scratch_lanes;
+    stream1_scratch_lanes.reserve(config.inference_parallelism);
+    for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
+        stream1_scratch_lanes.push_back(Stream1CutlassScratch{
+            hidden1 + static_cast<std::uint64_t>(lane) * config.b_micro * hidden1_cols,
+            hidden2 + static_cast<std::uint64_t>(lane) * config.b_micro * hidden2_cols,
+            residual + static_cast<std::uint64_t>(lane) * config.b_micro * hidden2_cols,
+            output + static_cast<std::uint64_t>(lane) * config.b_micro * MOVE_COUNT});
+    }
     DispatcherNetwork network{
         Stream1NetworkView{
             input_weight,
@@ -3138,7 +3149,7 @@ int main(int argc, char** argv) {
             output_weight,
             output_bias,
             dims},
-        Stream1CutlassScratch{hidden1, hidden2, residual, output}};
+        stream1_scratch_lanes};
     DispatcherDeviceTables tables{generators, central_state, zobrist};
     Stream2SolvedBuffers solved{
         memory.solved_flag,
