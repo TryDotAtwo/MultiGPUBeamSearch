@@ -1285,6 +1285,63 @@ struct HistoryEntry {
 static_assert(sizeof(HistoryEntry) == 16);
 static_assert(alignof(HistoryEntry) == 8);
 
+struct HistoryBudgetEstimate {
+    std::uint32_t effective_depth = 0;
+    std::uint32_t target_beam_depth = 0;
+    std::uint64_t states_before_target_beam = 0;
+    std::uint64_t required_entries = 0;
+};
+
+HistoryBudgetEstimate estimate_history_budget_entries(
+    std::uint32_t depth_limit,
+    std::uint32_t solved_neighborhood_radius,
+    std::uint32_t stream2_suffix_radius,
+    std::uint64_t beam_entries) {
+    HistoryBudgetEstimate estimate{};
+    const std::uint32_t suffix_radius =
+        solved_neighborhood_radius > std::numeric_limits<std::uint32_t>::max() - stream2_suffix_radius
+            ? std::numeric_limits<std::uint32_t>::max()
+            : solved_neighborhood_radius + stream2_suffix_radius;
+    estimate.effective_depth = depth_limit > suffix_radius ? depth_limit - suffix_radius : 0U;
+    if (estimate.effective_depth == 0U || beam_entries == 0ULL) {
+        return estimate;
+    }
+
+    std::uint64_t frontier_bound = 1ULL;
+    for (std::uint32_t depth = 0; depth < estimate.effective_depth; ++depth) {
+        if (frontier_bound < beam_entries) {
+            if (frontier_bound > std::numeric_limits<std::uint64_t>::max() / MOVE_COUNT) {
+                frontier_bound = beam_entries;
+            } else {
+                frontier_bound = std::min<std::uint64_t>(
+                    beam_entries,
+                    frontier_bound * static_cast<std::uint64_t>(MOVE_COUNT));
+            }
+        }
+
+        if (frontier_bound >= beam_entries) {
+            estimate.target_beam_depth = depth;
+            const std::uint64_t full_depths =
+                static_cast<std::uint64_t>(estimate.effective_depth - depth);
+            if (full_depths > std::numeric_limits<std::uint64_t>::max() / beam_entries) {
+                throw std::overflow_error("static hybrid history required entries overflow");
+            }
+            estimate.required_entries = estimate.states_before_target_beam + full_depths * beam_entries;
+            return estimate;
+        }
+
+        if (estimate.states_before_target_beam >
+            std::numeric_limits<std::uint64_t>::max() - frontier_bound) {
+            throw std::overflow_error("static hybrid history prefull entries overflow");
+        }
+        estimate.states_before_target_beam += frontier_bound;
+    }
+
+    estimate.target_beam_depth = estimate.effective_depth;
+    estimate.required_entries = estimate.states_before_target_beam;
+    return estimate;
+}
+
 struct CpuCandidateHistory {
     static constexpr std::uint32_t kWriteChunkEntries = 1U << 20U;
 
@@ -1347,6 +1404,7 @@ struct CpuCandidateHistory {
     std::uint64_t bytes_static_ram_arena = 0;
     std::uint64_t bytes_static_disk_arena = 0;
     std::uint64_t history_required_bytes = 0;
+    HistoryBudgetEstimate budget_estimate{};
     std::uint32_t worker_count = 1;
     bool prune_enabled = true;
     std::vector<Slot> slots;
@@ -1367,6 +1425,8 @@ struct CpuCandidateHistory {
         std::uint32_t slot_count,
         std::uint32_t selected_worker_count,
         std::uint32_t depth_limit,
+        std::uint32_t solved_neighborhood_radius,
+        std::uint32_t stream2_suffix_radius,
         std::uint64_t history_ram_budget_bytes = 0,
         std::uint64_t history_disk_budget_bytes = 0,
         const std::filesystem::path& history_disk_path = {}) {
@@ -1403,14 +1463,16 @@ struct CpuCandidateHistory {
                     " pinned_slots=" + std::to_string(bytes_pinned_slots) +
                     " staging=" + std::to_string(bytes_slot_staging));
             }
-            if (static_cast<std::uint64_t>(depth_limit) >
-                std::numeric_limits<std::uint64_t>::max() / capacity_entries ||
-                static_cast<std::uint64_t>(depth_limit) * capacity_entries >
-                    std::numeric_limits<std::uint64_t>::max() / sizeof(HistoryEntry)) {
+            budget_estimate = estimate_history_budget_entries(
+                depth_limit,
+                solved_neighborhood_radius,
+                stream2_suffix_radius,
+                capacity_entries);
+            if (budget_estimate.required_entries >
+                std::numeric_limits<std::uint64_t>::max() / sizeof(HistoryEntry)) {
                 throw std::overflow_error("static hybrid history required bytes overflow");
             }
-            history_required_bytes =
-                static_cast<std::uint64_t>(depth_limit) * capacity_entries * sizeof(HistoryEntry);
+            history_required_bytes = budget_estimate.required_entries * sizeof(HistoryEntry);
             bytes_static_ram_arena = history_ram_budget_bytes - bytes_pinned_slots - bytes_slot_staging;
             ram_arena_entries = bytes_static_ram_arena / sizeof(HistoryEntry);
             bytes_static_ram_arena = ram_arena_entries * sizeof(HistoryEntry);
@@ -1423,7 +1485,11 @@ struct CpuCandidateHistory {
                     " ram_entries=" + std::to_string(bytes_static_ram_arena) +
                     " disk_entries=" + std::to_string(bytes_static_disk_arena) +
                     " pinned_slots=" + std::to_string(bytes_pinned_slots) +
-                    " staging=" + std::to_string(bytes_slot_staging));
+                    " staging=" + std::to_string(bytes_slot_staging) +
+                    " effective_depth=" + std::to_string(budget_estimate.effective_depth) +
+                    " target_beam_depth=" + std::to_string(budget_estimate.target_beam_depth) +
+                    " states_before_target_beam=" +
+                    std::to_string(budget_estimate.states_before_target_beam));
             }
             if (ram_arena_entries != 0ULL) {
                 ram_arena = static_cast<HistoryEntry*>(std::malloc(bytes_static_ram_arena));
@@ -3118,6 +3184,8 @@ int main(int argc, char** argv) {
         history_slot_count,
         history_worker_count,
         depth_limit,
+        solved_neighborhood.radius,
+        stream2_suffix.radius,
         history_ram_budget_per_rank,
         history_disk_budget_per_rank,
         history_disk_path);
@@ -3138,6 +3206,15 @@ int main(int argc, char** argv) {
     std::cout << "candidate_history_slot_staging_bytes=" << history.bytes_slot_staging << "\n";
     std::cout << "candidate_history_static_ram_arena_bytes=" << history.bytes_static_ram_arena << "\n";
     std::cout << "candidate_history_static_disk_arena_bytes=" << history.bytes_static_disk_arena << "\n";
+    std::cout << "candidate_history_budget_formula=effective_depth_minus_prefull_target\n";
+    std::cout << "candidate_history_prefull_estimator=move_count_upper_bound\n";
+    std::cout << "candidate_history_effective_depth=" << history.budget_estimate.effective_depth << "\n";
+    std::cout << "candidate_history_target_beam_depth="
+              << history.budget_estimate.target_beam_depth << "\n";
+    std::cout << "candidate_history_states_before_target_beam="
+              << history.budget_estimate.states_before_target_beam << "\n";
+    std::cout << "candidate_history_required_entries="
+              << history.budget_estimate.required_entries << "\n";
     std::cout << "candidate_history_required_bytes=" << history.history_required_bytes << "\n";
     if (!history.static_disk_path.empty()) {
         std::cout << "candidate_history_static_disk_path=" << history.static_disk_path.string() << "\n";
