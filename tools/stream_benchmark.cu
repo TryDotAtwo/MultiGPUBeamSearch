@@ -28,8 +28,8 @@ using namespace beam;
 
 namespace {
 
-inline constexpr std::array<std::uint32_t, 4> B_MICRO_SWEEP{1024, 2048, 4096, 8192};
-inline constexpr std::array<std::uint32_t, 4> STREAM1_CONCURRENCY_SWEEP{1, 2, 3, 4};
+inline constexpr std::array<std::uint32_t, 4> B_MICRO_SWEEP{2048, 4096, 8192, 16384};
+inline constexpr std::array<std::uint32_t, 4> STREAM1_CONCURRENCY_SWEEP{1, 2, 4, 8};
 inline constexpr std::array<std::uint32_t, 6> STREAM4_BATCH_SWEEP{196608, 262144, 393216, 524288, 699392, 1048576};
 inline constexpr std::array<std::uint32_t, 4> STREAM4_SHARD_CAPACITY_SWEEP{1048576, 2621440, 5242880, 10485760};
 
@@ -453,7 +453,7 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
     report << "| B_MICRO | ring_slot_count | candidates | ms_per_job | candidates_per_sec |\n";
     report << "|---:|---:|---:|---:|---:|\n";
     for (std::uint32_t b_micro : B_MICRO_SWEEP) {
-        constexpr std::uint32_t ring_slot_count = 8;
+        constexpr std::uint32_t ring_slot_count = 4;
         const std::uint32_t candidate_count = b_micro * static_cast<std::uint32_t>(MOVE_COUNT) * ring_slot_count;
         std::vector<cudaStream_t> streams = create_streams(1);
         RuntimeConfig config;

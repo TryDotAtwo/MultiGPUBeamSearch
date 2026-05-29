@@ -192,3 +192,4 @@
 - User requested running the new model on Kaggle for puzzle ID `0` with the current large-beam parameters, approximately `2**26 + 16M` and specifically the notebook's current `BEAM_WIDTH=2**26+15_506_660`.
 - User observed new-model puzzle-0 depth `7..8` runtimes around `108..111s` with `stream4_jobs≈959..1021`, compared those metrics against previous runs, and requested a Kaggle run with timing debug enabled to identify the bottleneck.
 - User interrupted the attempted dispatcher timing-code investigation and explicitly required no dispatcher/source-code changes; requested only reducing the Kaggle diagnostic beam by `1,000,000`.
+- User requested measuring Stream1 inference speed and Stream3 speed under the current T4x2 parameters, because Stream3 should not dominate the pipeline. Required Stream1 benchmark table: `B_MICRO=[2048,4096,8192,16384]` and concurrent inference count `[1,2,4,8]`.
