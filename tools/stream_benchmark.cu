@@ -54,6 +54,33 @@ void publish_threshold_for_benchmark(StaticDeviceMemory& memory, std::uint32_t t
         cudaMemcpyHostToDevice));
 }
 
+struct BenchmarkThresholdBuffers {
+    std::uint32_t* current_threshold = nullptr;
+    std::uint32_t* threshold_initialized = nullptr;
+    std::uint32_t* active_index = nullptr;
+};
+
+BenchmarkThresholdBuffers alloc_benchmark_threshold_buffers() {
+    BenchmarkThresholdBuffers buffers;
+    BEAM_CUDA_CHECK(cudaMalloc(&buffers.current_threshold, 2ULL * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&buffers.threshold_initialized, 2ULL * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&buffers.active_index, sizeof(std::uint32_t)));
+    return buffers;
+}
+
+void attach_benchmark_threshold_buffers(StaticDeviceMemory& memory, const BenchmarkThresholdBuffers& buffers) {
+    memory.streams.current_threshold = buffers.current_threshold;
+    memory.streams.threshold_initialized = buffers.threshold_initialized;
+    memory.streams.current_threshold_active_index = buffers.active_index;
+}
+
+void free_benchmark_threshold_buffers(BenchmarkThresholdBuffers& buffers) {
+    cudaFree(buffers.current_threshold);
+    cudaFree(buffers.threshold_initialized);
+    cudaFree(buffers.active_index);
+    buffers = {};
+}
+
 std::uint64_t parse_u64(const char* text, const char* name) {
     char* end = nullptr;
     const unsigned long long value = std::strtoull(text, &end, 10);
@@ -468,6 +495,8 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
         StaticMemoryPlan plan = make_static_memory_plan(config);
         StaticDeviceMemory memory;
         allocate_static_device_memory(plan, memory);
+        BenchmarkThresholdBuffers threshold_buffers = alloc_benchmark_threshold_buffers();
+        attach_benchmark_threshold_buffers(memory, threshold_buffers);
         BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
         std::vector<std::uint32_t> host_score(candidate_count);
         std::vector<Hash128> host_hash(candidate_count);
@@ -557,6 +586,7 @@ std::vector<StreamResult> benchmark_stream3(std::ofstream& report) {
         const double candidate_per_sec = static_cast<double>(candidate_count) * 1000.0 / static_cast<double>(ms);
         results.push_back(StreamResult{"Stream3", b_micro, ring_slot_count, ms, candidate_per_sec});
         report << "|" << b_micro << "|" << ring_slot_count << "|" << candidate_count << "|" << std::fixed << std::setprecision(4) << ms << "|" << std::setprecision(1) << candidate_per_sec << "|\n";
+        free_benchmark_threshold_buffers(threshold_buffers);
         free_static_device_memory(memory);
         destroy_streams(streams);
     }
@@ -594,6 +624,8 @@ std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
             StaticMemoryPlan plan = make_static_memory_plan(config);
             StaticDeviceMemory memory;
             allocate_static_device_memory(plan, memory);
+            BenchmarkThresholdBuffers threshold_buffers = alloc_benchmark_threshold_buffers();
+            attach_benchmark_threshold_buffers(memory, threshold_buffers);
             BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
             std::vector<cudaStream_t> streams = create_streams(1);
             const std::uint32_t clean_count = 0;
@@ -664,6 +696,7 @@ std::vector<StreamResult> benchmark_stream4(std::ofstream& report) {
                       << " allocation_bytes=" << plan.total_device_bytes
                       << "\n";
             destroy_streams(streams);
+            free_benchmark_threshold_buffers(threshold_buffers);
             free_static_device_memory(memory);
         }
     }
