@@ -12,10 +12,6 @@ namespace beam {
 
 namespace {
 
-inline constexpr std::uint32_t STREAM1_MODEL_CLASSES = 120;
-inline constexpr std::uint32_t STREAM1_HIDDEN1 = 1536;
-inline constexpr std::uint32_t STREAM1_HIDDEN2 = 512;
-
 std::uint64_t parse_u64(const char* text, const char* name) {
     char* end = nullptr;
     const unsigned long long value = std::strtoull(text, &end, 10);
@@ -91,19 +87,17 @@ std::uint64_t ceil_log2_u64(std::uint64_t value) {
     return bits;
 }
 
-std::uint64_t estimate_stream1_weight_bytes() {
+std::uint64_t estimate_stream1_weight_bytes(const Stream1ModelConfig& model) {
     constexpr std::uint64_t fp16 = sizeof(std::uint16_t);
     std::uint64_t total = 0;
-    total += static_cast<std::uint64_t>(STATE_LEN) * STREAM1_MODEL_CLASSES * STREAM1_HIDDEN1 * fp16;
-    total += static_cast<std::uint64_t>(STREAM1_HIDDEN1) * fp16;
-    total += static_cast<std::uint64_t>(STREAM1_HIDDEN1) * STREAM1_HIDDEN2 * fp16;
-    total += static_cast<std::uint64_t>(STREAM1_HIDDEN2) * fp16;
-    total += 2ULL * static_cast<std::uint64_t>(STREAM1_HIDDEN2) * STREAM1_HIDDEN2 * fp16;
-    total += 2ULL * static_cast<std::uint64_t>(STREAM1_HIDDEN2) * fp16;
-    total += 2ULL * static_cast<std::uint64_t>(STREAM1_HIDDEN2) * STREAM1_HIDDEN2 * fp16;
-    total += 2ULL * static_cast<std::uint64_t>(STREAM1_HIDDEN2) * fp16;
-    total += static_cast<std::uint64_t>(STREAM1_HIDDEN2) * MOVE_COUNT * fp16;
-    total += static_cast<std::uint64_t>(MOVE_COUNT) * fp16;
+    total += static_cast<std::uint64_t>(model.state_len) * model.num_classes * model.hidden1 * fp16;
+    total += static_cast<std::uint64_t>(model.hidden1) * fp16;
+    total += static_cast<std::uint64_t>(model.hidden1) * model.hidden2 * fp16;
+    total += static_cast<std::uint64_t>(model.hidden2) * fp16;
+    total += 2ULL * static_cast<std::uint64_t>(model.residual_count) * model.hidden2 * model.hidden2 * fp16;
+    total += 2ULL * static_cast<std::uint64_t>(model.residual_count) * model.hidden2 * fp16;
+    total += static_cast<std::uint64_t>(model.hidden2) * model.output_dim * fp16;
+    total += static_cast<std::uint64_t>(model.output_dim) * fp16;
     return total;
 }
 
@@ -113,17 +107,19 @@ std::uint64_t estimate_read_only_table_bytes() {
            static_cast<std::uint64_t>(STATE_STORAGE_LEN) * STATE_VALUE_PAD * sizeof(Hash128);
 }
 
-std::uint64_t estimate_stream1_scratch_bytes(std::uint32_t b_micro) {
+std::uint64_t estimate_stream1_scratch_bytes(std::uint32_t b_micro, const Stream1ModelConfig& model) {
     return static_cast<std::uint64_t>(b_micro) *
-           (STREAM1_HIDDEN1 + 2ULL * STREAM1_HIDDEN2 + MOVE_COUNT) *
+           (static_cast<std::uint64_t>(model.hidden1) + 2ULL * model.hidden2 + model.output_dim) *
            sizeof(std::uint16_t);
 }
 
-std::uint64_t estimate_non_static_device_bytes(const RuntimeConfig& config) {
+std::uint64_t estimate_non_static_device_bytes(
+    const RuntimeConfig& config,
+    const Stream1ModelConfig& stream1_model) {
     return estimate_read_only_table_bytes() +
-           estimate_stream1_weight_bytes() +
+           estimate_stream1_weight_bytes(stream1_model) +
            static_cast<std::uint64_t>(config.inference_parallelism) *
-               estimate_stream1_scratch_bytes(config.b_micro);
+               estimate_stream1_scratch_bytes(config.b_micro, stream1_model);
 }
 
 std::uint64_t beam_alignment_for(const RuntimeConfig& config) {
@@ -422,6 +418,7 @@ bool try_make_candidate(
 
 void fill_runtime_config_build_estimates(
     RuntimeConfigBuild& build,
+    const Stream1ModelConfig& stream1_model,
     std::uint32_t stream4_flow_scale_ppm,
     std::uint64_t free_before_bytes) {
     build.plan = make_static_memory_plan(build.config);
@@ -442,6 +439,8 @@ void fill_runtime_config_build_estimates(
         estimated_sort_work_units(
             build.stream4_input_candidates_per_depth_est,
             build.config.stream4_batch_candidates);
+    build.estimated_non_static_device_bytes =
+        estimate_non_static_device_bytes(build.config, stream1_model);
     build.estimated_required_device_bytes =
         static_cast<std::uint64_t>(build.plan.total_device_bytes) +
         build.estimated_non_static_device_bytes;
@@ -457,6 +456,7 @@ void fill_runtime_config_build_estimates(
 
 RuntimeConfigBuild build_manual_runtime_config(
     RuntimeConfig base,
+    const Stream1ModelConfig& stream1_model,
     std::uint64_t free_before_bytes,
     std::uint64_t gpu_headroom_bytes,
     std::uint32_t stream4_flow_scale_ppm) {
@@ -466,7 +466,6 @@ RuntimeConfigBuild build_manual_runtime_config(
     build.gpu_headroom_bytes = gpu_headroom_bytes;
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;
-    build.estimated_non_static_device_bytes = estimate_non_static_device_bytes(build.config);
     build.stream3_ring_slots = required_env_u32("BEAM_STREAM3_RING_SLOTS");
     build.config.shard_count = required_env_u32("BEAM_SHARD_COUNT");
     build.config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 2);
@@ -510,7 +509,7 @@ RuntimeConfigBuild build_manual_runtime_config(
     if (build.config.ring_count == 0U) {
         throw std::invalid_argument("manual RING_COUNT must be nonzero");
     }
-    fill_runtime_config_build_estimates(build, stream4_flow_scale_ppm, free_before_bytes);
+    fill_runtime_config_build_estimates(build, stream1_model, stream4_flow_scale_ppm, free_before_bytes);
     return build;
 }
 
@@ -573,6 +572,7 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     std::uint64_t beam,
     std::uint32_t world_size,
     std::uint32_t local_rank,
+    const Stream1ModelConfig& stream1_model,
     std::uint64_t free_before_bytes) {
     RuntimeConfigBuild build;
     RuntimeConfig& config = build.config;
@@ -619,11 +619,12 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     if (env_equals("BEAM_RUNTIME_CONFIG_MODE", "manual") || env_present("BEAM_MANUAL_CONFIG")) {
         return build_manual_runtime_config(
             config,
+            stream1_model,
             free_before_bytes,
             build.gpu_headroom_bytes,
             stream4_flow_scale_ppm);
     }
-    build.estimated_non_static_device_bytes = estimate_non_static_device_bytes(config);
+    build.estimated_non_static_device_bytes = estimate_non_static_device_bytes(config, stream1_model);
     const std::vector<std::uint32_t> ring_slots_options = ring_slot_count_candidates();
 
     RuntimeConfigCandidate best;
@@ -692,6 +693,19 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     build.stream4_waves_per_depth_est = best.stream4_waves_per_depth;
     build.stream4_sort_work_units_est = best.stream4_sort_work_units;
     return build;
+}
+
+RuntimeConfigBuild build_runtime_config_from_budget(
+    std::uint64_t beam,
+    std::uint32_t world_size,
+    std::uint32_t local_rank,
+    std::uint64_t free_before_bytes) {
+    return build_runtime_config_from_budget(
+        beam,
+        world_size,
+        local_rank,
+        Stream1ModelConfig{},
+        free_before_bytes);
 }
 
 } // namespace beam

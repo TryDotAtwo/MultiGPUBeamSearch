@@ -18,6 +18,15 @@ inline constexpr std::uint32_t SCORE_BIN_COUNT = SCORE_MAX_KEY + 1;
 inline constexpr std::uint32_t GOAL_SCORE_KEY = 0;
 inline constexpr std::uint32_t UINT32_THRESHOLD_MAX = std::numeric_limits<std::uint32_t>::max();
 
+struct Stream1ModelConfig {
+    std::uint32_t state_len = static_cast<std::uint32_t>(STATE_LEN);
+    std::uint32_t num_classes = 120;
+    std::uint32_t hidden1 = 1536;
+    std::uint32_t hidden2 = 512;
+    std::uint32_t residual_count = 2;
+    std::uint32_t output_dim = static_cast<std::uint32_t>(MOVE_COUNT);
+};
+
 struct RuntimeConfig {
     std::uint32_t b_micro = 256;
     std::uint32_t inference_parallelism = 1;

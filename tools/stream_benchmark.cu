@@ -1,4 +1,5 @@
 #include "cuda_check.hpp"
+#include "stream1_weight_io.hpp"
 #include "../cuda/stream1.hpp"
 #include "../cuda/stream2.hpp"
 #include "../cuda/stream3.hpp"
@@ -27,10 +28,6 @@ using namespace beam;
 
 namespace {
 
-inline constexpr std::uint32_t STREAM1_MODEL_CLASSES = 120;
-inline constexpr std::uint32_t STREAM1_HIDDEN1 = 1536;
-inline constexpr std::uint32_t STREAM1_HIDDEN2 = 512;
-inline constexpr std::uint32_t STREAM1_RESIDUAL_COUNT = 2;
 inline constexpr std::array<std::uint32_t, 4> B_MICRO_SWEEP{1024, 2048, 4096, 8192};
 inline constexpr std::array<std::uint32_t, 4> STREAM1_CONCURRENCY_SWEEP{1, 2, 3, 4};
 inline constexpr std::array<std::uint32_t, 6> STREAM4_BATCH_SWEEP{196608, 262144, 393216, 524288, 699392, 1048576};
@@ -90,24 +87,6 @@ std::string read_text_file(const std::filesystem::path& path) {
         throw std::runtime_error("cannot open required text file: " + path.string());
     }
     return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-}
-
-std::vector<std::byte> read_binary_exact(const std::filesystem::path& path, std::size_t expected_bytes) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        throw std::runtime_error("cannot open required binary file: " + path.string());
-    }
-    std::vector<std::byte> bytes(expected_bytes);
-    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    const std::size_t actual = static_cast<std::size_t>(file.gcount());
-    file.peek();
-    if (actual != expected_bytes || !file.eof()) {
-        throw std::runtime_error(
-            "binary file size mismatch: " + path.string() +
-            " expected=" + std::to_string(expected_bytes) +
-            " actual_read=" + std::to_string(actual));
-    }
-    return bytes;
 }
 
 std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path) {
@@ -192,50 +171,6 @@ State128 load_initial_state_from_test_csv(const std::filesystem::path& path, std
     throw std::runtime_error("requested puzzle_id not found in test csv");
 }
 
-struct HostWeightBytes {
-    std::vector<std::byte> input_weight;
-    std::vector<std::byte> input_bias;
-    std::vector<std::byte> hidden_weight;
-    std::vector<std::byte> hidden_bias;
-    std::vector<std::byte> residual0_fc1_weight;
-    std::vector<std::byte> residual0_fc1_bias;
-    std::vector<std::byte> residual0_fc2_weight;
-    std::vector<std::byte> residual0_fc2_bias;
-    std::vector<std::byte> residual1_fc1_weight;
-    std::vector<std::byte> residual1_fc1_bias;
-    std::vector<std::byte> residual1_fc2_weight;
-    std::vector<std::byte> residual1_fc2_bias;
-    std::vector<std::byte> output_weight;
-    std::vector<std::byte> output_bias;
-};
-
-HostWeightBytes load_stream1_weights(const std::filesystem::path& dir) {
-    constexpr std::size_t fp16 = sizeof(std::uint16_t);
-    HostWeightBytes weights;
-    weights.input_weight = read_binary_exact(dir / "input_weight_hxk.fp16", STATE_LEN * STREAM1_MODEL_CLASSES * STREAM1_HIDDEN1 * fp16);
-    weights.input_bias = read_binary_exact(dir / "input_bias.fp16", STREAM1_HIDDEN1 * fp16);
-    weights.hidden_weight = read_binary_exact(dir / "hidden_weight_hxk.fp16", STREAM1_HIDDEN1 * STREAM1_HIDDEN2 * fp16);
-    weights.hidden_bias = read_binary_exact(dir / "hidden_bias.fp16", STREAM1_HIDDEN2 * fp16);
-    weights.residual0_fc1_weight = read_binary_exact(dir / "residual0_fc1_weight_hxk.fp16", STREAM1_HIDDEN2 * STREAM1_HIDDEN2 * fp16);
-    weights.residual0_fc1_bias = read_binary_exact(dir / "residual0_fc1_bias.fp16", STREAM1_HIDDEN2 * fp16);
-    weights.residual0_fc2_weight = read_binary_exact(dir / "residual0_fc2_weight_hxk.fp16", STREAM1_HIDDEN2 * STREAM1_HIDDEN2 * fp16);
-    weights.residual0_fc2_bias = read_binary_exact(dir / "residual0_fc2_bias.fp16", STREAM1_HIDDEN2 * fp16);
-    weights.residual1_fc1_weight = read_binary_exact(dir / "residual1_fc1_weight_hxk.fp16", STREAM1_HIDDEN2 * STREAM1_HIDDEN2 * fp16);
-    weights.residual1_fc1_bias = read_binary_exact(dir / "residual1_fc1_bias.fp16", STREAM1_HIDDEN2 * fp16);
-    weights.residual1_fc2_weight = read_binary_exact(dir / "residual1_fc2_weight_hxk.fp16", STREAM1_HIDDEN2 * STREAM1_HIDDEN2 * fp16);
-    weights.residual1_fc2_bias = read_binary_exact(dir / "residual1_fc2_bias.fp16", STREAM1_HIDDEN2 * fp16);
-    weights.output_weight = read_binary_exact(dir / "output_weight_hxk.fp16", STREAM1_HIDDEN2 * MOVE_COUNT * fp16);
-    weights.output_bias = read_binary_exact(dir / "output_bias.fp16", MOVE_COUNT * fp16);
-    return weights;
-}
-
-void copy_bytes_to_device(void* dst, const std::vector<std::byte>& bytes, const char* name) {
-    if (dst == nullptr || bytes.empty()) {
-        throw std::runtime_error(std::string("invalid device copy input: ") + name);
-    }
-    BEAM_CUDA_CHECK(cudaMemcpy(dst, bytes.data(), bytes.size(), cudaMemcpyHostToDevice));
-}
-
 void require_aligned(const void* ptr, std::uintptr_t alignment, const char* name) {
     if (reinterpret_cast<std::uintptr_t>(ptr) % alignment != 0) {
         throw std::runtime_error(std::string("device pointer alignment failed: ") + name);
@@ -247,101 +182,6 @@ T* device_alloc(std::uint64_t count) {
     T* ptr = nullptr;
     BEAM_CUDA_CHECK(cudaMalloc(&ptr, count * sizeof(T)));
     return ptr;
-}
-
-struct DeviceWeights {
-    half* input_weight = nullptr;
-    half* input_bias = nullptr;
-    half* hidden_weight = nullptr;
-    half* hidden_bias = nullptr;
-    half* residual0_fc1_weight = nullptr;
-    half* residual0_fc1_bias = nullptr;
-    half* residual0_fc2_weight = nullptr;
-    half* residual0_fc2_bias = nullptr;
-    half* residual1_fc1_weight = nullptr;
-    half* residual1_fc1_bias = nullptr;
-    half* residual1_fc2_weight = nullptr;
-    half* residual1_fc2_bias = nullptr;
-    half* output_weight = nullptr;
-    half* output_bias = nullptr;
-};
-
-DeviceWeights upload_weights(const HostWeightBytes& host) {
-    DeviceWeights d{};
-    BEAM_CUDA_CHECK(cudaMalloc(&d.input_weight, host.input_weight.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.input_bias, host.input_bias.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.hidden_weight, host.hidden_weight.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.hidden_bias, host.hidden_bias.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.residual0_fc1_weight, host.residual0_fc1_weight.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.residual0_fc1_bias, host.residual0_fc1_bias.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.residual0_fc2_weight, host.residual0_fc2_weight.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.residual0_fc2_bias, host.residual0_fc2_bias.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.residual1_fc1_weight, host.residual1_fc1_weight.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.residual1_fc1_bias, host.residual1_fc1_bias.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.residual1_fc2_weight, host.residual1_fc2_weight.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.residual1_fc2_bias, host.residual1_fc2_bias.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.output_weight, host.output_weight.size()));
-    BEAM_CUDA_CHECK(cudaMalloc(&d.output_bias, host.output_bias.size()));
-    copy_bytes_to_device(d.input_weight, host.input_weight, "input_weight");
-    copy_bytes_to_device(d.input_bias, host.input_bias, "input_bias");
-    copy_bytes_to_device(d.hidden_weight, host.hidden_weight, "hidden_weight");
-    copy_bytes_to_device(d.hidden_bias, host.hidden_bias, "hidden_bias");
-    copy_bytes_to_device(d.residual0_fc1_weight, host.residual0_fc1_weight, "residual0_fc1_weight");
-    copy_bytes_to_device(d.residual0_fc1_bias, host.residual0_fc1_bias, "residual0_fc1_bias");
-    copy_bytes_to_device(d.residual0_fc2_weight, host.residual0_fc2_weight, "residual0_fc2_weight");
-    copy_bytes_to_device(d.residual0_fc2_bias, host.residual0_fc2_bias, "residual0_fc2_bias");
-    copy_bytes_to_device(d.residual1_fc1_weight, host.residual1_fc1_weight, "residual1_fc1_weight");
-    copy_bytes_to_device(d.residual1_fc1_bias, host.residual1_fc1_bias, "residual1_fc1_bias");
-    copy_bytes_to_device(d.residual1_fc2_weight, host.residual1_fc2_weight, "residual1_fc2_weight");
-    copy_bytes_to_device(d.residual1_fc2_bias, host.residual1_fc2_bias, "residual1_fc2_bias");
-    copy_bytes_to_device(d.output_weight, host.output_weight, "output_weight");
-    copy_bytes_to_device(d.output_bias, host.output_bias, "output_bias");
-    require_aligned(d.input_weight, 16, "input_weight");
-    require_aligned(d.hidden_weight, 16, "hidden_weight");
-    require_aligned(d.output_weight, 16, "output_weight");
-    return d;
-}
-
-void free_weights(DeviceWeights& d) {
-    cudaFree(d.input_weight);
-    cudaFree(d.input_bias);
-    cudaFree(d.hidden_weight);
-    cudaFree(d.hidden_bias);
-    cudaFree(d.residual0_fc1_weight);
-    cudaFree(d.residual0_fc1_bias);
-    cudaFree(d.residual0_fc2_weight);
-    cudaFree(d.residual0_fc2_bias);
-    cudaFree(d.residual1_fc1_weight);
-    cudaFree(d.residual1_fc1_bias);
-    cudaFree(d.residual1_fc2_weight);
-    cudaFree(d.residual1_fc2_bias);
-    cudaFree(d.output_weight);
-    cudaFree(d.output_bias);
-    d = DeviceWeights{};
-}
-
-struct Stream1ScratchSet {
-    half* hidden1 = nullptr;
-    half* hidden2 = nullptr;
-    half* residual = nullptr;
-    half* output = nullptr;
-};
-
-Stream1ScratchSet alloc_stream1_scratch(std::uint32_t b_micro) {
-    Stream1ScratchSet scratch{};
-    scratch.hidden1 = device_alloc<half>(static_cast<std::uint64_t>(b_micro) * STREAM1_HIDDEN1);
-    scratch.hidden2 = device_alloc<half>(static_cast<std::uint64_t>(b_micro) * STREAM1_HIDDEN2);
-    scratch.residual = device_alloc<half>(static_cast<std::uint64_t>(b_micro) * STREAM1_HIDDEN2);
-    scratch.output = device_alloc<half>(static_cast<std::uint64_t>(b_micro) * MOVE_COUNT);
-    return scratch;
-}
-
-void free_stream1_scratch(Stream1ScratchSet& scratch) {
-    cudaFree(scratch.hidden1);
-    cudaFree(scratch.hidden2);
-    cudaFree(scratch.residual);
-    cudaFree(scratch.output);
-    scratch = Stream1ScratchSet{};
 }
 
 struct Timer {
@@ -443,26 +283,34 @@ struct StreamResult {
     double candidate_per_sec = 0.0;
 };
 
-std::vector<State128> make_state_batch(State128 seed, std::uint32_t count) {
+std::vector<State128> make_state_batch(
+    State128 seed,
+    std::uint32_t count,
+    std::uint32_t num_classes) {
     std::vector<State128> states(count, seed);
     for (std::uint32_t i = 0; i < count; ++i) {
-        states[i].v[0] = static_cast<std::uint8_t>((states[i].v[0] + i) % STREAM1_MODEL_CLASSES);
+        states[i].v[0] = static_cast<std::uint8_t>((states[i].v[0] + i) % num_classes);
         states[i].v[STATE_LEN] = 0;
     }
     return states;
 }
 
 std::vector<Stream1Result> benchmark_stream1(
-    const DeviceWeights& weights,
+    const stream1_weights::DeviceWeights& weights,
+    const Stream1ModelConfig& model,
     const State128* states,
     std::uint32_t max_states,
     std::ofstream& report) {
     std::vector<Stream1Result> results;
-    Stream1NetworkDims dims{STATE_LEN, STREAM1_MODEL_CLASSES, STREAM1_HIDDEN1, STREAM1_HIDDEN2, STREAM1_RESIDUAL_COUNT};
-    const std::array<const half*, STREAM1_RESIDUAL_COUNT> residual_fc1_weight{weights.residual0_fc1_weight, weights.residual1_fc1_weight};
-    const std::array<const half*, STREAM1_RESIDUAL_COUNT> residual_fc1_bias{weights.residual0_fc1_bias, weights.residual1_fc1_bias};
-    const std::array<const half*, STREAM1_RESIDUAL_COUNT> residual_fc2_weight{weights.residual0_fc2_weight, weights.residual1_fc2_weight};
-    const std::array<const half*, STREAM1_RESIDUAL_COUNT> residual_fc2_bias{weights.residual0_fc2_bias, weights.residual1_fc2_bias};
+    const Stream1NetworkDims dims = stream1_weights::network_dims(model);
+    const std::vector<const half*> residual_fc1_weight =
+        stream1_weights::const_pointer_vector(weights.residual_fc1_weight);
+    const std::vector<const half*> residual_fc1_bias =
+        stream1_weights::const_pointer_vector(weights.residual_fc1_bias);
+    const std::vector<const half*> residual_fc2_weight =
+        stream1_weights::const_pointer_vector(weights.residual_fc2_weight);
+    const std::vector<const half*> residual_fc2_bias =
+        stream1_weights::const_pointer_vector(weights.residual_fc2_bias);
     Stream1NetworkView network{
         weights.input_weight,
         weights.input_bias,
@@ -485,7 +333,7 @@ std::vector<Stream1Result> benchmark_stream1(
                 continue;
             }
             std::vector<cudaStream_t> streams = create_streams(concurrent);
-            std::vector<Stream1ScratchSet> scratch_sets;
+            std::vector<stream1_weights::ScratchAllocation> scratch_sets;
             std::vector<Stream1CutlassScratch> scratch_views;
             std::vector<std::uint64_t*> parent_base(concurrent, nullptr);
             std::vector<std::uint32_t*> count(concurrent, nullptr);
@@ -493,7 +341,7 @@ std::vector<Stream1Result> benchmark_stream1(
             scratch_sets.reserve(concurrent);
             scratch_views.reserve(concurrent);
             for (std::uint32_t i = 0; i < concurrent; ++i) {
-                scratch_sets.push_back(alloc_stream1_scratch(b_micro));
+                scratch_sets.push_back(stream1_weights::alloc_stream1_scratch(model, b_micro, 1));
                 scratch_views.push_back(Stream1CutlassScratch{
                     scratch_sets.back().hidden1,
                     scratch_sets.back().hidden2,
@@ -540,7 +388,7 @@ std::vector<Stream1Result> benchmark_stream1(
                 cudaFree(parent_base[i]);
                 cudaFree(count[i]);
                 cudaFree(score[i]);
-                free_stream1_scratch(scratch_sets[i]);
+                stream1_weights::free_stream1_scratch(scratch_sets[i]);
             }
             destroy_streams(streams);
         }
@@ -841,15 +689,21 @@ int main(int argc, char** argv) {
     const std::filesystem::path generator_path = "FullBeamNice/generators/p900.json";
     const std::filesystem::path puzzle_info_path = "data/puzzle_info.json";
     const std::filesystem::path test_csv_path = "data/test.csv";
-    const std::filesystem::path weight_dir = "build-docker/stream1_weights";
+    const char* weight_dir_env = std::getenv("BEAM_WEIGHT_DIR");
+    const std::filesystem::path weight_dir =
+        weight_dir_env != nullptr && weight_dir_env[0] != '\0'
+            ? std::filesystem::path(weight_dir_env)
+            : std::filesystem::path("build-docker/stream1_weights");
     const std::vector<std::uint8_t> host_generators = load_p900_generators(generator_path);
     const State128 host_central = load_central_state(puzzle_info_path);
     const State128 host_initial = load_initial_state_from_test_csv(test_csv_path, puzzle_id);
     const ZobristTable host_zobrist = make_deterministic_zobrist(0xC0DEC0DEULL);
-    const HostWeightBytes host_weights = load_stream1_weights(weight_dir);
+    const stream1_weights::HostWeightBytes host_weights =
+        stream1_weights::load_stream1_weights(weight_dir);
+    const Stream1ModelConfig& stream1_model = host_weights.model;
 
     const std::uint32_t max_states = B_MICRO_SWEEP.back() * STREAM1_CONCURRENCY_SWEEP.back();
-    const std::vector<State128> host_states = make_state_batch(host_initial, max_states);
+    const std::vector<State128> host_states = make_state_batch(host_initial, max_states, stream1_model.num_classes);
     State128* d_states = device_alloc<State128>(max_states);
     std::uint8_t* d_generators = device_alloc<std::uint8_t>(MOVE_COUNT * STATE_STORAGE_LEN);
     State128* d_central = device_alloc<State128>(1);
@@ -862,7 +716,7 @@ int main(int argc, char** argv) {
     require_aligned(d_generators, 16, "generators");
     require_aligned(d_central, alignof(State128), "central");
     require_aligned(d_zobrist, alignof(Hash128), "zobrist");
-    DeviceWeights weights = upload_weights(host_weights);
+    stream1_weights::DeviceWeights weights = stream1_weights::upload_weights(host_weights);
 
     std::filesystem::create_directories("test_results");
     const char* report_env = std::getenv("BEAM_STREAM_BENCH_REPORT");
@@ -878,10 +732,14 @@ int main(int argc, char** argv) {
     report << "- puzzle_info_path=" << puzzle_info_path.string() << "\n";
     report << "- test_csv_path=" << test_csv_path.string() << "\n";
     report << "- weight_dir=" << weight_dir.string() << "\n";
+    report << "- stream1_model_hidden1=" << stream1_model.hidden1 << "\n";
+    report << "- stream1_model_hidden2=" << stream1_model.hidden2 << "\n";
+    report << "- stream1_model_residual_count=" << stream1_model.residual_count << "\n";
+    report << "- stream1_model_weight_bytes=" << stream1_weights::total_host_weight_bytes(host_weights) << "\n";
     report << "- cuda_architectures=75,86\n";
     report << "- stream1_gemm=TensorOp_Sm75_common_for_T4_and_RTX3070\n\n";
     std::cout << "stream_benchmark_start=1\n";
-    benchmark_stream1(weights, d_states, max_states, report);
+    benchmark_stream1(weights, stream1_model, d_states, max_states, report);
     std::cout << "stream1_benchmark_done=1\n";
     if (!stream_micro_only) {
         benchmark_stream2(d_states, d_generators, d_central, d_zobrist, report);
@@ -896,7 +754,7 @@ int main(int argc, char** argv) {
     report << "- status=pass\n";
     report.close();
 
-    free_weights(weights);
+    stream1_weights::free_weights(weights);
     cudaFree(d_states);
     cudaFree(d_generators);
     cudaFree(d_central);

@@ -46,6 +46,13 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     std::uint64_t beam,
     std::uint32_t world_size,
     std::uint32_t local_rank,
+    const Stream1ModelConfig& stream1_model,
+    std::uint64_t free_before_bytes);
+
+RuntimeConfigBuild build_runtime_config_from_budget(
+    std::uint64_t beam,
+    std::uint32_t world_size,
+    std::uint32_t local_rank,
     std::uint64_t free_before_bytes);
 
 } // namespace beam
