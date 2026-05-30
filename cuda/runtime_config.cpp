@@ -284,15 +284,11 @@ std::vector<std::uint32_t> stream4_batch_candidates(
         if (batch % base.stream4_batch_alignment != 0U) {
             throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be aligned to STREAM4_BATCH_ALIGNMENT");
         }
-        if (static_cast<std::uint64_t>(batch) < stream3_batch) {
-            throw std::invalid_argument("BEAM_STREAM4_BATCH_CANDIDATES must be at least STREAM3_BATCH_CANDIDATES");
-        }
         return {batch};
     }
 
-    const std::uint64_t min_batch = std::max<std::uint64_t>(
-        env_u64("BEAM_MIN_STREAM4_BATCH_CANDIDATES", stream3_batch),
-        stream3_batch);
+    const std::uint64_t min_batch =
+        env_u64("BEAM_MIN_STREAM4_BATCH_CANDIDATES", base.stream4_batch_alignment);
     const std::uint64_t max_batch = std::min<std::uint64_t>(
         env_u64("BEAM_MAX_STREAM4_BATCH_CANDIDATES", std::max(logical_shard_size, stream3_batch)),
         static_cast<std::uint64_t>(std::numeric_limits<int>::max() / 2));
@@ -347,6 +343,9 @@ bool try_make_candidate(
     set_global_spill_capacity(config);
     if (config.stream4_batch_candidates > config.shard_capacity_candidates ||
         config.stream4_trigger_candidates > config.shard_capacity_candidates) {
+        return false;
+    }
+    if (config.stream3_batch_candidates > config.shard_capacity_candidates) {
         return false;
     }
 
@@ -488,9 +487,6 @@ RuntimeConfigBuild build_manual_runtime_config(
     if (build.config.stream4_batch_candidates % build.config.stream4_batch_alignment != 0U) {
         throw std::invalid_argument("manual BEAM_STREAM4_BATCH_CANDIDATES must be aligned to BEAM_STREAM4_BATCH_ALIGNMENT");
     }
-    if (build.config.stream4_batch_candidates < build.config.stream3_batch_candidates) {
-        throw std::invalid_argument("manual BEAM_STREAM4_BATCH_CANDIDATES must be at least STREAM3_BATCH_CANDIDATES");
-    }
     if (build.config.stream4_trigger_candidates == 0U) {
         throw std::invalid_argument("manual BEAM_STREAM4_TRIGGER_CANDIDATES must be nonzero");
     }
@@ -502,6 +498,9 @@ RuntimeConfigBuild build_manual_runtime_config(
     }
     if (build.config.stream4_trigger_candidates > build.config.shard_capacity_candidates) {
         throw std::invalid_argument("manual BEAM_STREAM4_TRIGGER_CANDIDATES must not exceed BEAM_SHARD_CAPACITY_CANDIDATES");
+    }
+    if (build.config.stream3_batch_candidates > build.config.shard_capacity_candidates) {
+        throw std::invalid_argument("manual STREAM3_BATCH_CANDIDATES must not exceed BEAM_SHARD_CAPACITY_CANDIDATES");
     }
     if (build.config.shard_buffer_count != 2U) {
         throw std::invalid_argument("manual BEAM_SHARD_BUFFER_COUNT must be 2");
