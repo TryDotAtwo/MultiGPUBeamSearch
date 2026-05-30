@@ -6,6 +6,26 @@
 
 namespace beam {
 
+bool stream1_uses_child_rows(const Stream1ModelConfig& model) {
+    return model.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM;
+}
+
+std::uint32_t stream1_rows_per_parent(const Stream1ModelConfig& model) {
+    return stream1_uses_child_rows(model) ? static_cast<std::uint32_t>(MOVE_COUNT) : 1U;
+}
+
+std::uint32_t stream1_parent_batch_from_row_budget(std::uint32_t row_budget, const Stream1ModelConfig& model) {
+    const std::uint32_t rows_per_parent = stream1_rows_per_parent(model);
+    if (row_budget < rows_per_parent) {
+        throw std::invalid_argument("BEAM_B_MICRO row budget is smaller than one Stream1 parent expansion");
+    }
+    return row_budget / rows_per_parent;
+}
+
+std::uint64_t stream1_inference_rows(std::uint32_t parent_batch, const Stream1ModelConfig& model) {
+    return static_cast<std::uint64_t>(parent_batch) * stream1_rows_per_parent(model);
+}
+
 std::uint64_t round_up(std::uint64_t value, std::uint64_t alignment) {
     if (alignment == 0) {
         return value;

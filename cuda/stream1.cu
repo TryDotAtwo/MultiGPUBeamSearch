@@ -12,6 +12,8 @@
 #include <cutlass/layout/matrix.h>
 #endif
 
+#include <stdexcept>
+
 namespace beam {
 
 __global__ void stream1_score_contract_kernel(
@@ -131,6 +133,7 @@ __global__ void stream1_folded_input_half4_tiled_kernel(
     const State128* __restrict__ current_frontier_states,
     const std::uint64_t* __restrict__ parent_base,
     const std::uint32_t* __restrict__ count,
+    const std::uint8_t* __restrict__ generators,
     const half* __restrict__ input_weight,
     const half* __restrict__ input_bias,
     half* __restrict__ hidden1,
@@ -139,10 +142,14 @@ __global__ void stream1_folded_input_half4_tiled_kernel(
     const std::uint32_t row = blockIdx.x;
     const std::uint32_t h = (blockIdx.y * blockDim.x + threadIdx.x) * 4U;
     const std::uint32_t count_value = *count;
-    const bool row_valid = row < b_micro && row < count_value;
+    const bool child_rows = dims.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM;
+    const std::uint32_t parent_local = child_rows ? row / static_cast<std::uint32_t>(MOVE_COUNT) : row;
+    const std::uint32_t move = child_rows ? row % static_cast<std::uint32_t>(MOVE_COUNT) : 0U;
+    const std::uint32_t row_count = b_micro * (child_rows ? static_cast<std::uint32_t>(MOVE_COUNT) : 1U);
+    const bool row_valid = row < row_count && parent_local < count_value;
     __shared__ std::uint8_t state_shared[STATE_STORAGE_LEN];
     if (row_valid && threadIdx.x < STATE_STORAGE_LEN) {
-        const std::uint64_t parent_idx = *parent_base + row;
+        const std::uint64_t parent_idx = *parent_base + parent_local;
         state_shared[threadIdx.x] = current_frontier_states[parent_idx].v[threadIdx.x];
     }
     __syncthreads();
@@ -173,7 +180,11 @@ __global__ void stream1_folded_input_half4_tiled_kernel(
     }
 
     for (std::uint32_t p = 0; p < dims.state_len; ++p) {
-        const std::uint32_t value = static_cast<std::uint32_t>(state_shared[p]);
+        const std::uint32_t source =
+            child_rows
+                ? static_cast<std::uint32_t>(generators[move * STATE_STORAGE_LEN + p])
+                : p;
+        const std::uint32_t value = static_cast<std::uint32_t>(state_shared[source]);
         const std::uint32_t idx = (p * dims.num_classes + value) * dims.hidden1 + h;
         if (has01) {
             const float2 w = __half22float2(*reinterpret_cast<const half2*>(input_weight + idx));
@@ -259,6 +270,31 @@ __global__ void stream1_score_epilogue_quantize_kernel(
     score_ring[i] = score_key_from_float_device(q);
 }
 
+__global__ void stream1_single_output_quantize_kernel(
+    const half* residual,
+    const half* output_weight,
+    const half* output_bias,
+    const std::uint32_t* count,
+    std::uint32_t* score_ring,
+    std::uint32_t b_micro,
+    std::uint32_t hidden2) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t total = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t parent_local = i / static_cast<std::uint32_t>(MOVE_COUNT);
+    if (parent_local >= *count) {
+        return;
+    }
+    float q = __half2float(output_bias[0]);
+    const half* row = residual + static_cast<std::uint64_t>(i) * hidden2;
+    for (std::uint32_t h = 0; h < hidden2; ++h) {
+        q += __half2float(row[h]) * __half2float(output_weight[h]);
+    }
+    score_ring[i] = score_key_from_float_device(q);
+}
+
 void stream1_inference_custom_cuda(
     const State128* current_frontier_states,
     const std::uint64_t* parent_base,
@@ -287,6 +323,7 @@ void stream1_inference_cutlass_cuda(
     const State128* current_frontier_states,
     const std::uint64_t* parent_base,
     const std::uint32_t* count,
+    const std::uint8_t* generators,
     const Stream1NetworkView& network,
     const Stream1CutlassScratch& scratch,
     std::uint32_t* score_ring,
@@ -294,12 +331,24 @@ void stream1_inference_cutlass_cuda(
     cudaStream_t stream) {
     NvtxRange range("Stream1_CUTLASS_inference_launch");
 #if BEAM_HAS_CUTLASS
+    if (network.dims.output_dim != MOVE_COUNT &&
+        network.dims.output_dim != STREAM1_SINGLE_SCORE_OUTPUT_DIM) {
+        throw std::invalid_argument("Stream1 output_dim must be 1 or MOVE_COUNT");
+    }
+    if (network.dims.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM && generators == nullptr) {
+        throw std::invalid_argument("Stream1 output_dim=1 requires generator table");
+    }
+    const std::uint32_t inference_rows =
+        b_micro * (network.dims.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM
+            ? static_cast<std::uint32_t>(MOVE_COUNT)
+            : 1U);
     const dim3 input_block(128);
-    const dim3 input_grid(b_micro, (network.dims.hidden1 + input_block.x * 4U - 1U) / (input_block.x * 4U));
+    const dim3 input_grid(inference_rows, (network.dims.hidden1 + input_block.x * 4U - 1U) / (input_block.x * 4U));
     stream1_folded_input_half4_tiled_kernel<<<input_grid, input_block, 0, stream>>>(
         current_frontier_states,
         parent_base,
         count,
+        generators,
         network.input_weight,
         network.input_bias,
         scratch.hidden1,
@@ -310,16 +359,16 @@ void stream1_inference_cutlass_cuda(
         scratch.hidden1,
         network.hidden_weight,
         scratch.hidden2,
-        b_micro,
+        inference_rows,
         network.dims.hidden1,
         network.dims.hidden2,
         stream);
 
-    const std::uint32_t hidden2_total = b_micro * network.dims.hidden2;
+    const std::uint32_t hidden2_total = inference_rows * network.dims.hidden2;
     stream1_bias_relu_kernel<<<(hidden2_total + 255U) / 256U, 256, 0, stream>>>(
         scratch.hidden2,
         network.hidden_bias,
-        b_micro,
+        inference_rows,
         network.dims.hidden2);
 
     half* residual_in = scratch.hidden2;
@@ -330,7 +379,7 @@ void stream1_inference_cutlass_cuda(
             residual_in,
             network.residual_fc1_weight[block],
             residual_fc1,
-            b_micro,
+            inference_rows,
             network.dims.hidden2,
             network.dims.hidden2,
             stream);
@@ -338,14 +387,14 @@ void stream1_inference_cutlass_cuda(
         stream1_bias_relu_kernel<<<(hidden2_total + 255U) / 256U, 256, 0, stream>>>(
             residual_fc1,
             network.residual_fc1_bias[block],
-            b_micro,
+            inference_rows,
             network.dims.hidden2);
 
         stream1_cutlass_linear_cuda(
             residual_fc1,
             network.residual_fc2_weight[block],
             residual_fc2,
-            b_micro,
+            inference_rows,
             network.dims.hidden2,
             network.dims.hidden2,
             stream);
@@ -354,33 +403,45 @@ void stream1_inference_cutlass_cuda(
             residual_fc2,
             residual_in,
             network.residual_fc2_bias[block],
-            b_micro,
+            inference_rows,
             network.dims.hidden2);
 
         residual_in = residual_fc2;
         residual_fc2 = residual_in == scratch.hidden1 ? scratch.hidden2 : scratch.hidden1;
     }
 
-    stream1_cutlass_linear_cuda(
-        residual_in,
-        network.output_weight,
-        scratch.output,
-        b_micro,
-        network.dims.hidden2,
-        static_cast<std::uint32_t>(MOVE_COUNT),
-        stream);
-
     const std::uint32_t output_total = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
-    stream1_score_epilogue_quantize_kernel<<<(output_total + 255U) / 256U, 256, 0, stream>>>(
-        scratch.output,
-        network.output_bias,
-        count,
-        score_ring,
-        b_micro);
+    if (network.dims.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM) {
+        stream1_single_output_quantize_kernel<<<(output_total + 255U) / 256U, 256, 0, stream>>>(
+            residual_in,
+            network.output_weight,
+            network.output_bias,
+            count,
+            score_ring,
+            b_micro,
+            network.dims.hidden2);
+    } else {
+        stream1_cutlass_linear_cuda(
+            residual_in,
+            network.output_weight,
+            scratch.output,
+            inference_rows,
+            network.dims.hidden2,
+            network.dims.output_dim,
+            stream);
+
+        stream1_score_epilogue_quantize_kernel<<<(output_total + 255U) / 256U, 256, 0, stream>>>(
+            scratch.output,
+            network.output_bias,
+            count,
+            score_ring,
+            b_micro);
+    }
 #else
     (void)current_frontier_states;
     (void)parent_base;
     (void)count;
+    (void)generators;
     (void)network;
     (void)scratch;
     (void)score_ring;

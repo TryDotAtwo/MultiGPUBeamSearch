@@ -151,7 +151,8 @@ inline void validate_model_config(const Stream1ModelConfig& model, const std::st
     if (model.state_len != STATE_LEN) {
         throw std::runtime_error(context + ": stream1 state_len must match State128 logical length");
     }
-    if (model.num_classes < STATE_LEN || model.output_dim != MOVE_COUNT) {
+    if (model.num_classes < STATE_LEN ||
+        (model.output_dim != MOVE_COUNT && model.output_dim != STREAM1_SINGLE_SCORE_OUTPUT_DIM)) {
         throw std::runtime_error(context + ": stream1 num_classes/output_dim incompatible with current puzzle");
     }
     if (model.hidden1 == 0U || model.hidden2 == 0U || model.residual_count == 0U) {
@@ -306,7 +307,7 @@ inline ScratchAllocation alloc_stream1_scratch(
     std::uint32_t b_micro,
     std::uint32_t lane_count) {
     ScratchAllocation scratch;
-    const std::uint64_t rows = static_cast<std::uint64_t>(b_micro) * lane_count;
+    const std::uint64_t rows = stream1_inference_rows(b_micro, model) * lane_count;
     BEAM_CUDA_CHECK(cudaMalloc(&scratch.hidden1, rows * model.hidden1 * sizeof(half)));
     BEAM_CUDA_CHECK(cudaMalloc(&scratch.hidden2, rows * model.hidden2 * sizeof(half)));
     BEAM_CUDA_CHECK(cudaMalloc(&scratch.residual, rows * model.hidden2 * sizeof(half)));
@@ -328,7 +329,8 @@ inline Stream1NetworkDims network_dims(const Stream1ModelConfig& model) {
         model.num_classes,
         model.hidden1,
         model.hidden2,
-        model.residual_count};
+        model.residual_count,
+        model.output_dim};
 }
 
 inline std::vector<const half*> const_pointer_vector(const std::vector<half*>& ptrs) {

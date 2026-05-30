@@ -326,6 +326,7 @@ std::vector<Stream1Result> benchmark_stream1(
     const stream1_weights::DeviceWeights& weights,
     const Stream1ModelConfig& model,
     const State128* states,
+    const std::uint8_t* generators,
     std::uint32_t max_states,
     std::ofstream& report) {
     std::vector<Stream1Result> results;
@@ -355,8 +356,9 @@ std::vector<Stream1Result> benchmark_stream1(
     report << "| B_MICRO | concurrent_inference | ms_per_launch_group | parents_per_sec | candidates_per_sec |\n";
     report << "|---:|---:|---:|---:|---:|\n";
     for (std::uint32_t b_micro : B_MICRO_SWEEP) {
+        const std::uint32_t parent_batch = stream1_parent_batch_from_row_budget(b_micro, model);
         for (std::uint32_t concurrent : STREAM1_CONCURRENCY_SWEEP) {
-            if (b_micro * concurrent > max_states) {
+            if (parent_batch * concurrent > max_states) {
                 continue;
             }
             std::vector<cudaStream_t> streams = create_streams(concurrent);
@@ -368,7 +370,7 @@ std::vector<Stream1Result> benchmark_stream1(
             scratch_sets.reserve(concurrent);
             scratch_views.reserve(concurrent);
             for (std::uint32_t i = 0; i < concurrent; ++i) {
-                scratch_sets.push_back(stream1_weights::alloc_stream1_scratch(model, b_micro, 1));
+                scratch_sets.push_back(stream1_weights::alloc_stream1_scratch(model, parent_batch, 1));
                 scratch_views.push_back(Stream1CutlassScratch{
                     scratch_sets.back().hidden1,
                     scratch_sets.back().hidden2,
@@ -376,10 +378,10 @@ std::vector<Stream1Result> benchmark_stream1(
                     scratch_sets.back().output});
                 parent_base[i] = device_alloc<std::uint64_t>(1);
                 count[i] = device_alloc<std::uint32_t>(1);
-                score[i] = device_alloc<std::uint32_t>(static_cast<std::uint64_t>(b_micro) * MOVE_COUNT);
-                const std::uint64_t base = static_cast<std::uint64_t>(i) * b_micro;
+                score[i] = device_alloc<std::uint32_t>(static_cast<std::uint64_t>(parent_batch) * MOVE_COUNT);
+                const std::uint64_t base = static_cast<std::uint64_t>(i) * parent_batch;
                 BEAM_CUDA_CHECK(cudaMemcpy(parent_base[i], &base, sizeof(base), cudaMemcpyHostToDevice));
-                BEAM_CUDA_CHECK(cudaMemcpy(count[i], &b_micro, sizeof(b_micro), cudaMemcpyHostToDevice));
+                BEAM_CUDA_CHECK(cudaMemcpy(count[i], &parent_batch, sizeof(parent_batch), cudaMemcpyHostToDevice));
             }
             const std::uint32_t iterations = b_micro >= 4096 ? 6U : 10U;
             const float ms = time_gpu_ms(streams, iterations, [&]() {
@@ -388,14 +390,15 @@ std::vector<Stream1Result> benchmark_stream1(
                         states,
                         parent_base[i],
                         count[i],
+                        generators,
                         network,
                         scratch_views[i],
                         score[i],
-                        b_micro,
+                        parent_batch,
                         streams[i]);
                 }
             });
-            const double parents = static_cast<double>(b_micro) * concurrent;
+            const double parents = static_cast<double>(parent_batch) * concurrent;
             const double parent_per_sec = parents * 1000.0 / static_cast<double>(ms);
             const double candidate_per_sec = parents * static_cast<double>(MOVE_COUNT) * 1000.0 / static_cast<double>(ms);
             results.push_back(Stream1Result{b_micro, concurrent, ms, parent_per_sec, candidate_per_sec});
@@ -735,7 +738,9 @@ int main(int argc, char** argv) {
         stream1_weights::load_stream1_weights(weight_dir);
     const Stream1ModelConfig& stream1_model = host_weights.model;
 
-    const std::uint32_t max_states = B_MICRO_SWEEP.back() * STREAM1_CONCURRENCY_SWEEP.back();
+    const std::uint32_t max_states =
+        stream1_parent_batch_from_row_budget(B_MICRO_SWEEP.back(), stream1_model) *
+        STREAM1_CONCURRENCY_SWEEP.back();
     const std::vector<State128> host_states = make_state_batch(host_initial, max_states, stream1_model.num_classes);
     State128* d_states = device_alloc<State128>(max_states);
     std::uint8_t* d_generators = device_alloc<std::uint8_t>(MOVE_COUNT * STATE_STORAGE_LEN);
@@ -768,11 +773,12 @@ int main(int argc, char** argv) {
     report << "- stream1_model_hidden1=" << stream1_model.hidden1 << "\n";
     report << "- stream1_model_hidden2=" << stream1_model.hidden2 << "\n";
     report << "- stream1_model_residual_count=" << stream1_model.residual_count << "\n";
+    report << "- stream1_model_output_dim=" << stream1_model.output_dim << "\n";
     report << "- stream1_model_weight_bytes=" << stream1_weights::total_host_weight_bytes(host_weights) << "\n";
     report << "- cuda_architectures=75,86\n";
     report << "- stream1_gemm=TensorOp_Sm75_common_for_T4_and_RTX3070\n\n";
     std::cout << "stream_benchmark_start=1\n";
-    benchmark_stream1(weights, stream1_model, d_states, max_states, report);
+    benchmark_stream1(weights, stream1_model, d_states, d_generators, max_states, report);
     std::cout << "stream1_benchmark_done=1\n";
     if (!stream_micro_only) {
         benchmark_stream2(d_states, d_generators, d_central, d_zobrist, report);

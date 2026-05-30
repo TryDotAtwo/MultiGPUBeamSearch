@@ -1225,6 +1225,7 @@ void instantiate_cuda_graph_job_templates(
             memory.current_frontier_states,
             memory.streams.parent_base + job,
             memory.streams.count + job,
+            tables.generators,
             network.view,
             network.scratch_lanes[lane],
             memory.streams.score_ring + candidate_offset,

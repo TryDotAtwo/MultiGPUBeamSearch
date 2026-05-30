@@ -37,6 +37,7 @@ int main() {
     std::uint64_t* d_parent_base = nullptr;
     std::uint32_t* d_count = nullptr;
     std::uint32_t* d_score = nullptr;
+    std::uint8_t* d_generators = nullptr;
     half* d_input_weight = nullptr;
     half* d_input_bias = nullptr;
     half* d_hidden_weight = nullptr;
@@ -58,7 +59,17 @@ int main() {
     BEAM_CUDA_CHECK(cudaMalloc(&d_parent_base, sizeof(std::uint64_t)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_count, sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_score, cutlass_b_micro * MOVE_COUNT * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_generators, MOVE_COUNT * STATE_STORAGE_LEN));
+    std::vector<std::uint8_t> generators(MOVE_COUNT * STATE_STORAGE_LEN);
+    for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
+        for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+            generators[move * STATE_STORAGE_LEN + p] = static_cast<std::uint8_t>(p);
+        }
+    }
+    generators[1U * STATE_STORAGE_LEN + 0U] = 1U;
+    generators[1U * STATE_STORAGE_LEN + 1U] = 0U;
     BEAM_CUDA_CHECK(cudaMemcpy(d_frontier, frontier.data(), frontier.size() * sizeof(State128), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(d_generators, generators.data(), generators.size(), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(d_parent_base, &parent_base, sizeof(parent_base), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(d_count, &count, sizeof(count), cudaMemcpyHostToDevice));
 
@@ -71,7 +82,7 @@ int main() {
     require(score[0] <= SCORE_MAX_KEY, "stream1 score key range failed");
     require(score[1] != score[0], "stream1 move-dependent score failed");
 
-    const Stream1NetworkDims dims{STATE_LEN, STATE_VALUE_PAD, 16, 8, 1};
+    const Stream1NetworkDims dims{STATE_LEN, STATE_VALUE_PAD, 16, 8, 1, static_cast<std::uint32_t>(MOVE_COUNT)};
     std::vector<half> input_weight(static_cast<std::size_t>(dims.state_len) * dims.num_classes * dims.hidden1, __float2half(0.0f));
     std::vector<half> input_bias(dims.hidden1, __float2half(0.0f));
     std::vector<half> hidden_weight(static_cast<std::size_t>(dims.hidden1) * dims.hidden2, __float2half(0.0f));
@@ -146,12 +157,60 @@ int main() {
     Stream1CutlassScratch scratch{d_cutlass_hidden1, d_cutlass_hidden2, d_cutlass_residual_tmp, d_cutlass_output};
     BEAM_CUDA_CHECK(cudaMemcpy(d_count, &cutlass_b_micro, sizeof(cutlass_b_micro), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemset(d_score, 0, cutlass_b_micro * MOVE_COUNT * sizeof(std::uint32_t)));
-    stream1_inference_cutlass_cuda(d_frontier, d_parent_base, d_count, network, scratch, d_score, cutlass_b_micro, 0);
+    stream1_inference_cutlass_cuda(d_frontier, d_parent_base, d_count, nullptr, network, scratch, d_score, cutlass_b_micro, 0);
     BEAM_CUDA_CHECK(cudaGetLastError());
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
     BEAM_CUDA_CHECK(cudaMemcpy(score.data(), d_score, score.size() * sizeof(std::uint32_t), cudaMemcpyDeviceToHost));
     require(score[0] > 0, "stream1 CUTLASS inference score must be positive");
     require(score[1] > score[0], "stream1 CUTLASS inference must produce move-specific scores");
+
+    half* d_child_hidden1 = nullptr;
+    half* d_child_hidden2 = nullptr;
+    half* d_child_residual_tmp = nullptr;
+    half* d_child_output = nullptr;
+    Stream1NetworkDims child_dims{
+        STATE_LEN,
+        STATE_VALUE_PAD,
+        dims.hidden1,
+        dims.hidden2,
+        dims.residual_count,
+        STREAM1_SINGLE_SCORE_OUTPUT_DIM};
+    Stream1NetworkView child_network{
+        d_input_weight,
+        d_input_bias,
+        d_hidden_weight,
+        d_hidden_bias,
+        residual_fc1_weight_ptrs,
+        residual_fc1_bias_ptrs,
+        residual_fc2_weight_ptrs,
+        residual_fc2_bias_ptrs,
+        d_output_weight,
+        d_output_bias,
+        child_dims};
+    const std::uint32_t child_parent_count = 1;
+    const std::uint32_t child_rows = static_cast<std::uint32_t>(MOVE_COUNT);
+    BEAM_CUDA_CHECK(cudaMalloc(&d_child_hidden1, child_rows * child_dims.hidden1 * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_child_hidden2, child_rows * child_dims.hidden2 * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_child_residual_tmp, child_rows * child_dims.hidden2 * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_child_output, child_rows * child_dims.output_dim * sizeof(half)));
+    Stream1CutlassScratch child_scratch{d_child_hidden1, d_child_hidden2, d_child_residual_tmp, d_child_output};
+    BEAM_CUDA_CHECK(cudaMemcpy(d_count, &child_parent_count, sizeof(child_parent_count), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemset(d_score, 0, MOVE_COUNT * sizeof(std::uint32_t)));
+    stream1_inference_cutlass_cuda(
+        d_frontier,
+        d_parent_base,
+        d_count,
+        d_generators,
+        child_network,
+        child_scratch,
+        d_score,
+        child_parent_count,
+        0);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    BEAM_CUDA_CHECK(cudaMemcpy(score.data(), d_score, score.size() * sizeof(std::uint32_t), cudaMemcpyDeviceToHost));
+    require(score[0] > 0, "stream1 single-output CUTLASS score must be positive");
+    require(score[1] != score[0], "stream1 single-output CUTLASS must use generated child features");
 
     half* d_cutlass_in = nullptr;
     half* d_cutlass_w = nullptr;
@@ -177,12 +236,14 @@ int main() {
     report << "- custom_inference_no_embeddingbag_kernel=pass\n";
     report << "- cutlass_linear_contract=pass\n";
     report << "- cutlass_inference_contract=pass\n";
+    report << "- single_output_child_feature_contract=pass\n";
     report << "\nstatus=pass\n";
 
     cudaFree(d_frontier);
     cudaFree(d_parent_base);
     cudaFree(d_count);
     cudaFree(d_score);
+    cudaFree(d_generators);
     cudaFree(d_input_weight);
     cudaFree(d_input_bias);
     cudaFree(d_hidden_weight);
@@ -193,6 +254,10 @@ int main() {
     cudaFree(d_cutlass_hidden2);
     cudaFree(d_cutlass_residual_tmp);
     cudaFree(d_cutlass_output);
+    cudaFree(d_child_hidden1);
+    cudaFree(d_child_hidden2);
+    cudaFree(d_child_residual_tmp);
+    cudaFree(d_child_output);
     cudaFree(d_residual_fc1_weight);
     cudaFree(d_residual_fc1_bias);
     cudaFree(d_residual_fc2_weight);

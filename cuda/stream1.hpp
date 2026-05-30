@@ -12,6 +12,7 @@ struct Stream1NetworkDims {
     std::uint32_t hidden1;
     std::uint32_t hidden2;
     std::uint32_t residual_count;
+    std::uint32_t output_dim;
 };
 
 struct Stream1NetworkView {
@@ -60,6 +61,7 @@ void stream1_inference_cutlass_cuda(
     const State128* current_frontier_states,
     const std::uint64_t* parent_base,
     const std::uint32_t* count,
+    const std::uint8_t* generators,
     const Stream1NetworkView& network,
     const Stream1CutlassScratch& scratch,
     std::uint32_t* score_ring,

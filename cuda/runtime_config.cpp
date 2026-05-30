@@ -108,7 +108,7 @@ std::uint64_t estimate_read_only_table_bytes() {
 }
 
 std::uint64_t estimate_stream1_scratch_bytes(std::uint32_t b_micro, const Stream1ModelConfig& model) {
-    return static_cast<std::uint64_t>(b_micro) *
+    return stream1_inference_rows(b_micro, model) *
            (static_cast<std::uint64_t>(model.hidden1) + 2ULL * model.hidden2 + model.output_dim) *
            sizeof(std::uint16_t);
 }
@@ -579,7 +579,8 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     config.user_global_beam_width = beam;
     config.world_size = world_size;
     config.local_rank = local_rank;
-    config.b_micro = env_u32("BEAM_B_MICRO", 8192);
+    const std::uint32_t stream1_row_budget = env_u32("BEAM_B_MICRO", 8192);
+    config.b_micro = stream1_parent_batch_from_row_budget(stream1_row_budget, stream1_model);
     config.stream4_batch_alignment =
         env_present("BEAM_STREAM4_BATCH_ALIGNMENT")
             ? env_u32("BEAM_STREAM4_BATCH_ALIGNMENT", 1024)

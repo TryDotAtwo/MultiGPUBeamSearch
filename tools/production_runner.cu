@@ -2621,6 +2621,15 @@ void log_stream1_move_score_comparison(
     if (!tracked.enabled || depth >= tracked.moves.size()) {
         return;
     }
+    if (weights.model.output_dim != MOVE_COUNT) {
+        std::cout << "track_solution_move_score_summary"
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << depth + 1U
+                  << " available=0"
+                  << " reason=stream1_reference_requires_output_dim_24\n";
+        return;
+    }
     if (!generated.found || !generated.parent_state_copied || !generated.all_move_scores_copied) {
         std::cout << "track_solution_move_score_summary"
                   << " puzzle_id=" << puzzle_id
@@ -2850,6 +2859,7 @@ int main(int argc, char** argv) {
     std::cout << "LOCAL_RANK=" << config.local_rank << "\n";
     std::cout << "CUDA_DEVICE_LOCAL_RANK=" << device_local_rank << "\n";
     std::cout << "B_MICRO=" << config.b_micro << "\n";
+    std::cout << "STREAM1_ROWS_PER_JOB=" << stream1_inference_rows(config.b_micro, stream1_model) << "\n";
     std::cout << "STREAM1_CONCURRENCY=" << config.inference_parallelism << "\n";
     std::cout << "STREAM3_RING_SLOTS=" << config_build.stream3_ring_slots << "\n";
     std::cout << "RING_COUNT=" << config.ring_count << "\n";
@@ -3005,12 +3015,13 @@ int main(int argc, char** argv) {
     const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
     std::vector<Stream1CutlassScratch> stream1_scratch_lanes;
     stream1_scratch_lanes.reserve(config.inference_parallelism);
+    const std::uint64_t stream1_rows_per_lane = stream1_inference_rows(config.b_micro, stream1_model);
     for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
         stream1_scratch_lanes.push_back(Stream1CutlassScratch{
-            stream1_scratch.hidden1 + static_cast<std::uint64_t>(lane) * config.b_micro * stream1_model.hidden1,
-            stream1_scratch.hidden2 + static_cast<std::uint64_t>(lane) * config.b_micro * stream1_model.hidden2,
-            stream1_scratch.residual + static_cast<std::uint64_t>(lane) * config.b_micro * stream1_model.hidden2,
-            stream1_scratch.output + static_cast<std::uint64_t>(lane) * config.b_micro * stream1_model.output_dim});
+            stream1_scratch.hidden1 + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden1,
+            stream1_scratch.hidden2 + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden2,
+            stream1_scratch.residual + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden2,
+            stream1_scratch.output + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.output_dim});
     }
     DispatcherNetwork network{
         Stream1NetworkView{

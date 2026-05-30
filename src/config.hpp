@@ -10,6 +10,7 @@ inline constexpr std::size_t STATE_LEN = 120;
 inline constexpr std::size_t STATE_STORAGE_LEN = 128;
 inline constexpr std::size_t STATE_VALUE_PAD = 128;
 inline constexpr std::size_t MOVE_COUNT = 24;
+inline constexpr std::uint32_t STREAM1_SINGLE_SCORE_OUTPUT_DIM = 1;
 
 inline constexpr float SCORE_MAX_Q = 300.0f;
 inline constexpr std::uint32_t SCORE_SCALE = 1024;
@@ -56,6 +57,10 @@ struct DerivedConfig {
     std::uint64_t global_beam_width_effective = 0;
 };
 
+bool stream1_uses_child_rows(const Stream1ModelConfig& model);
+std::uint32_t stream1_rows_per_parent(const Stream1ModelConfig& model);
+std::uint32_t stream1_parent_batch_from_row_budget(std::uint32_t row_budget, const Stream1ModelConfig& model);
+std::uint64_t stream1_inference_rows(std::uint32_t parent_batch, const Stream1ModelConfig& model);
 std::uint64_t round_up(std::uint64_t value, std::uint64_t alignment);
 DerivedConfig derive_config(const RuntimeConfig& config);
 std::uint32_t q_to_score_key(float q);
