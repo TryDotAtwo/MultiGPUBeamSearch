@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=beam8a100
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=8
-#SBATCH --gres=gpu:a100:8
+#SBATCH --ntasks=1
+#SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
 
@@ -12,8 +12,6 @@ JOB_DIR="${SLURM_SUBMIT_DIR:-/mnt/pool/6/vokirova/beam8a100}"
 REPO_DIR="${JOB_DIR}/repo"
 BUILD_DIR="${JOB_DIR}/build-a100"
 CUTLASS_DIR="${CUTLASS_DIR:-/mnt/pool/3/vokirova/cutlass}"
-GITHUB_REPO_URL="${GITHUB_REPO_URL:-https://github.com/TryDotAtwo/MultiGPUBeamSearch.git}"
-GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 HISTORY_DIR="${JOB_DIR}/history"
 LOG_DIR="${JOB_DIR}/logs"
 PREDICT_STATS_PATH="${JOB_DIR}/predict_stats_p992_b260m_d12.jsonl"
@@ -27,7 +25,7 @@ safe_remove_job_child_dir() {
   resolved_job="$(realpath -m "${JOB_DIR}")"
   resolved_target="$(realpath -m "${target}")"
   case "${resolved_target}" in
-    "${resolved_job}/build-a100"|"${resolved_job}/history"|"${resolved_job}/repo")
+    "${resolved_job}/build-a100"|"${resolved_job}/history")
       if [ -d "${resolved_target}" ]; then
         echo "cleanup_remove_${label}=${resolved_target}"
         rm -rf --one-file-system "${resolved_target}"
@@ -55,17 +53,17 @@ trap cleanup EXIT
 
 mkdir -p "${JOB_DIR}" "${BUILD_DIR}" "${HISTORY_DIR}" "${LOG_DIR}"
 if [ ! -d "${REPO_DIR}/.git" ]; then
-  safe_remove_job_child_dir "${REPO_DIR}" "repo"
-  git clone --branch "${GITHUB_BRANCH}" --depth 1 "${GITHUB_REPO_URL}" "${REPO_DIR}"
+  echo "missing_repo=${REPO_DIR}"
+  exit 2
+fi
+if [ ! -d "${CUTLASS_DIR}/include" ]; then
+  echo "missing_cutlass=${CUTLASS_DIR}"
+  exit 2
 fi
 cd "${REPO_DIR}"
-git fetch origin "${GITHUB_BRANCH}" --depth 1
-git reset --hard "origin/${GITHUB_BRANCH}"
 
 echo "job_dir=${JOB_DIR}"
 echo "repo_dir=${REPO_DIR}"
-echo "github_repo_url=${GITHUB_REPO_URL}"
-echo "github_branch=${GITHUB_BRANCH}"
 git rev-parse HEAD
 echo "started_at=$(date -Is)"
 nvidia-smi
