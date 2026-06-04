@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 source "${SCRIPT_DIR}/mephi_8xa100_common.sh"
 
 beam_setup_paths
@@ -36,7 +36,7 @@ BEST_LINE="$(awk '
   }
 ' "${LOG}" | sort -nr | head -n 1 | cut -f2- || true)"
 if [ -n "${BEST_LINE}" ]; then
-  BEST_B_MICRO="$(echo "${BEST_LINE}" | sed -n 's/.*B_MICRO=\([0-9]*\).*/\1/p')"
+  BEST_B_MICRO="$(echo "${BEST_LINE}" | sed -n 's/.*b_micro=\([0-9]*\).*/\1/p')"
   BEST_CONCURRENCY="$(echo "${BEST_LINE}" | sed -n 's/.*concurrent=\([0-9]*\).*/\1/p')"
   BEST_CAND_PER_SEC="$(echo "${BEST_LINE}" | sed -n 's/.*candidates_per_sec=\([0-9.]*\).*/\1/p')"
   {
