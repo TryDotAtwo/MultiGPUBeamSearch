@@ -204,10 +204,14 @@ export BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM=1200000
 export BEAM_GPU_HEADROOM_BYTES=$((3 * 1024 * 1024 * 1024))
 
 RUN_LOG="${LOG_DIR}/production_runner_p${PUZZLE_ID}_d${DEPTH_LIMIT}_b${BEAM_WIDTH}_${SLURM_JOB_ID:-manual}.log"
+RANK_LOG_DIR="${LOG_DIR}/ranks_${SLURM_JOB_ID:-manual}"
+mkdir -p "${RANK_LOG_DIR}"
 NCCL_ID_FILE="${JOB_DIR}/beam_solver_nccl_${SLURM_JOB_ID:-manual}.bin"
 rm -f "${NCCL_ID_FILE}"
 export BEAM_NCCL_ID_FILE="${NCCL_ID_FILE}"
+export BEAM_RANK_LOG_DIR="${RANK_LOG_DIR}"
 echo "run_log=${RUN_LOG}"
+echo "rank_log_dir=${BEAM_RANK_LOG_DIR}"
 echo "beam_nccl_id_file=${BEAM_NCCL_ID_FILE}"
 
 "${NINJA_VENV_DIR}/bin/python" -m torch.distributed.run \
@@ -218,6 +222,7 @@ echo "beam_nccl_id_file=${BEAM_NCCL_ID_FILE}"
   --rdzv-endpoint="${TORCHRUN_RDZV_ENDPOINT}" \
   --rdzv-id="beam8a100_${SLURM_JOB_ID:-manual}" \
   --no-python \
-  "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}" 2>&1 | tee "${RUN_LOG}"
+  /bin/bash -lc 'if [ "${RANK:-0}" = "0" ]; then exec "$@"; else exec "$@" > "${BEAM_RANK_LOG_DIR}/rank${RANK}.log" 2>&1; fi' \
+  bash "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}" 2>&1 | tee "${RUN_LOG}"
 
 echo "finished_at=$(date -Is)"
