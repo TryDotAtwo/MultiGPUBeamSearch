@@ -12,6 +12,7 @@ JOB_DIR="${SLURM_SUBMIT_DIR:-/mnt/pool/6/vokirova/beam8a100}"
 REPO_DIR="${JOB_DIR}/repo"
 BUILD_DIR="${JOB_DIR}/build-a100"
 CUTLASS_DIR="${CUTLASS_DIR:-/mnt/pool/3/vokirova/cutlass}"
+NINJA_VENV_DIR="${NINJA_VENV_DIR:-/mnt/pool/3/vokirova/ninja-venv}"
 HISTORY_DIR="${JOB_DIR}/history"
 LOG_DIR="${JOB_DIR}/logs"
 PREDICT_STATS_PATH="${JOB_DIR}/predict_stats_p992_b260m_d12.jsonl"
@@ -52,6 +53,12 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "${JOB_DIR}" "${BUILD_DIR}" "${HISTORY_DIR}" "${LOG_DIR}"
+if [ -x "${NINJA_VENV_DIR}/bin/ninja" ]; then
+  export PATH="${NINJA_VENV_DIR}/bin:${PATH}"
+else
+  echo "missing_ninja=${NINJA_VENV_DIR}/bin/ninja"
+  exit 2
+fi
 if [ ! -d "${REPO_DIR}/.git" ]; then
   echo "missing_repo=${REPO_DIR}"
   exit 2
@@ -66,6 +73,7 @@ echo "job_dir=${JOB_DIR}"
 echo "repo_dir=${REPO_DIR}"
 git rev-parse HEAD
 echo "started_at=$(date -Is)"
+ninja --version
 nvidia-smi
 
 cmake -S "${REPO_DIR}" -B "${BUILD_DIR}" -G Ninja \
