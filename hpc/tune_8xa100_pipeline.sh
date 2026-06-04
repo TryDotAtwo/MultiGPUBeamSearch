@@ -64,7 +64,7 @@ for shard in ${SHARD_COUNT_SWEEP}; do
           continue
         fi
 
-        rm -rf --one-file-system "${HISTORY_DIR:?}/"*
+        beam_safe_clear_history_contents
         export BEAM_B_MICRO
         export BEAM_STREAM1_CONCURRENCY
         export BEAM_STREAM3_RING_SLOTS
