@@ -1,11 +1,11 @@
 #include "static_memory.hpp"
+#include "cub_compat.hpp"
 #include "stream3.hpp"
 
 #include <cub/device/device_merge_sort.cuh>
 #include <cub/device/device_radix_sort.cuh>
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_scan.cuh>
-#include <cub/iterator/constant_input_iterator.cuh>
 
 #include <algorithm>
 #include <limits>
@@ -86,9 +86,16 @@ std::size_t stream3_cub_temp_bytes(std::uint32_t stream3_batch_candidates) {
     std::uint32_t* unique_count = nullptr;
     std::uint32_t* block_counts = nullptr;
     std::uint32_t* block_offsets = nullptr;
+    std::uint32_t* score_key_in = nullptr;
+    std::uint32_t* score_key_out = nullptr;
+    std::uint64_t* score_count_in = nullptr;
+    std::uint64_t* score_count_out = nullptr;
+    std::uint32_t* score_unique_count = nullptr;
     std::size_t sort_bytes = 0;
     std::size_t reduce_bytes = 0;
     std::size_t scan_bytes = 0;
+    std::size_t score_sort_bytes = 0;
+    std::size_t score_reduce_bytes = 0;
     const int item_count = static_cast<int>(stream3_batch_candidates);
     const int block_count = static_cast<int>((stream3_batch_candidates + 255U) / 256U);
     cudaError_t status = cub::DeviceMergeSort::SortPairs(
@@ -126,7 +133,39 @@ std::size_t stream3_cub_temp_bytes(std::uint32_t stream3_batch_candidates) {
     if (status != cudaSuccess) {
         throw std::runtime_error(cudaGetErrorString(status));
     }
-    return align_up_size(std::max(std::max(sort_bytes, reduce_bytes), scan_bytes), 256);
+    status = cub::DeviceRadixSort::SortPairs(
+        nullptr,
+        score_sort_bytes,
+        score_key_in,
+        score_key_out,
+        score_count_in,
+        score_count_out,
+        item_count,
+        0,
+        32,
+        0);
+    if (status != cudaSuccess) {
+        throw std::runtime_error(cudaGetErrorString(status));
+    }
+    status = cub::DeviceReduce::ReduceByKey(
+        nullptr,
+        score_reduce_bytes,
+        score_key_out,
+        score_key_in,
+        score_count_out,
+        score_count_in,
+        score_unique_count,
+        ScoreCountSumForCubTemp{},
+        item_count,
+        0);
+    if (status != cudaSuccess) {
+        throw std::runtime_error(cudaGetErrorString(status));
+    }
+    return align_up_size(
+        std::max(
+            std::max(std::max(sort_bytes, reduce_bytes), scan_bytes),
+            std::max(score_sort_bytes, score_reduce_bytes)),
+        256);
 }
 
 std::size_t stream3_partition_cub_temp_bytes(std::uint32_t max_candidates, std::uint32_t shard_count) {
@@ -140,7 +179,7 @@ std::size_t stream3_partition_cub_temp_bytes(std::uint32_t max_candidates, std::
     std::uint32_t* unique_keys = nullptr;
     std::uint32_t* unique_counts = nullptr;
     std::uint32_t* unique_count = nullptr;
-    cub::ConstantInputIterator<std::uint32_t> ones(1U);
+    CubConstantInputIterator<std::uint32_t> ones(1U);
     std::size_t sort_bytes = 0;
     std::size_t reduce_bytes = 0;
     const int item_count = static_cast<int>(max_candidates);
@@ -166,7 +205,7 @@ std::size_t stream3_partition_cub_temp_bytes(std::uint32_t max_candidates, std::
         ones,
         unique_counts,
         unique_count,
-        cub::Sum{},
+        CubSum{},
         item_count,
         0);
     if (status != cudaSuccess) {
@@ -317,6 +356,7 @@ struct LayoutSizeCursor {
 };
 
 std::size_t bytes_final_select(const RuntimeConfig& config, const DerivedConfig& derived);
+std::size_t bytes_final_materialize(const RuntimeConfig& config, const DerivedConfig& derived);
 
 std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& derived) {
     const std::uint32_t storage_shard_count = storage_shard_count_for(config);
@@ -364,6 +404,12 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.shard_count) + 1ULL);
     cursor.take<std::uint32_t>(static_cast<std::uint64_t>(config.shard_count) + 1ULL);
     cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint32_t>(stream3);
+    cursor.take<std::uint32_t>(stream3);
+    cursor.take<std::uint64_t>(stream3);
+    cursor.take<std::uint64_t>(stream3);
+    cursor.take<std::uint32_t>(1);
+    cursor.take<std::uint64_t>(SCORE_BIN_COUNT);
     cursor.take_bytes(std::max(
         stream3_cub_temp_bytes(config.stream3_batch_candidates),
         stream3_partition_cub_temp_bytes(static_cast<std::uint32_t>(stream3_partition), config.shard_count)),
@@ -404,7 +450,9 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
-    cursor.offset = std::max(cursor.offset, bytes_final_select(config, derived));
+    const std::size_t final_layout_budget =
+        std::max(bytes_final_select(config, derived), bytes_final_materialize(config, derived));
+    cursor.offset = std::max(cursor.offset, final_layout_budget);
     cursor.take<CandidateMeta>(survivors);
     cursor.take<std::uint32_t>(storage_shard_count);
     const std::uint64_t shard_hist_items =
@@ -438,9 +486,11 @@ FinalLayoutShape make_final_layout_shape(const RuntimeConfig& config, const Deri
         (derived.global_beam_width_effective + static_cast<std::uint64_t>(config.world_size) - 1ULL) /
         static_cast<std::uint64_t>(config.world_size);
     shape.requests = shape.frontier;
-    shape.final_chunk = std::max<std::uint64_t>(
-        1ULL,
-        std::min<std::uint64_t>(shape.frontier, config.stream3_batch_candidates));
+    const std::uint64_t requested_final_chunk =
+        config.final_materialize_chunk_candidates == 0U
+            ? static_cast<std::uint64_t>(config.stream3_batch_candidates)
+            : static_cast<std::uint64_t>(config.final_materialize_chunk_candidates);
+    shape.final_chunk = std::max<std::uint64_t>(1ULL, std::min<std::uint64_t>(shape.frontier, requested_final_chunk));
     shape.final_exchange = shape.final_chunk * static_cast<std::uint64_t>(config.world_size);
     shape.final_slots = FINAL_MATERIALIZE_SLOT_COUNT;
     shape.survivors =
@@ -547,8 +597,12 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
         (plan.stream3_count * static_cast<std::uint64_t>(config.stream5_recv_capacity_scale_ppm) + 999'999ULL) /
             1'000'000ULL);
     plan.final_materialize_slot_count = FINAL_MATERIALIZE_SLOT_COUNT;
+    const std::uint64_t requested_final_chunk =
+        config.final_materialize_chunk_candidates == 0U
+            ? plan.stream3_count
+            : static_cast<std::uint64_t>(config.final_materialize_chunk_candidates);
     plan.final_materialize_chunk_capacity =
-        std::max<std::uint64_t>(1ULL, std::min<std::uint64_t>(plan.frontier_states, plan.stream3_count));
+        std::max<std::uint64_t>(1ULL, std::min<std::uint64_t>(plan.frontier_states, requested_final_chunk));
     plan.final_materialize_exchange_capacity =
         plan.final_materialize_chunk_capacity * static_cast<std::uint64_t>(config.world_size);
     plan.storage_shard_count = storage_shard_count_for(config);
@@ -643,6 +697,12 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.stream3_partition_unique_counts =
         streams.take<std::uint32_t>(static_cast<std::uint64_t>(plan.config.shard_count) + 1ULL);
     memory.streams.stream3_partition_unique_count = streams.take<std::uint32_t>(1);
+    memory.streams.stream3_score_key_a = streams.take<std::uint32_t>(plan.stream3_count);
+    memory.streams.stream3_score_key_b = streams.take<std::uint32_t>(plan.stream3_count);
+    memory.streams.stream3_score_count_a = streams.take<std::uint64_t>(plan.stream3_count);
+    memory.streams.stream3_score_count_b = streams.take<std::uint64_t>(plan.stream3_count);
+    memory.streams.stream3_score_unique_count = streams.take<std::uint32_t>(1);
+    memory.streams.stream3_score_hist = streams.take<std::uint64_t>(SCORE_BIN_COUNT);
     memory.streams.stream3_cub_temp = streams.take<std::byte>(plan.stream3_cub_temp_bytes, 256);
     memory.streams.stream3_cub_temp_bytes = plan.stream3_cub_temp_bytes;
     memory.streams.unique_key = streams.take<Hash128>(plan.stream3_count);
@@ -693,7 +753,7 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.global_spill_active_index = streams.take<std::uint32_t>(1);
     memory.streams.fatal_error_flag = streams.take<std::uint32_t>(1);
     memory.streams.fatal_error_trace = streams.take<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
-    streams.offset = std::max(streams.offset, plan.layout_phase2_select_bytes);
+    streams.offset = std::max(streams.offset, plan.layout_final_budget_bytes);
     memory.streams.survivor_shard = streams.take<CandidateMeta>(plan.survivor_count);
     memory.streams.clean_count = streams.take<std::uint32_t>(plan.storage_shard_count);
     const std::uint64_t shard_hist_items =

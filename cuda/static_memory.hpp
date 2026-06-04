@@ -76,6 +76,12 @@ struct LayoutStreamsView {
     std::uint32_t* stream3_partition_unique_shard = nullptr;
     std::uint32_t* stream3_partition_unique_counts = nullptr;
     std::uint32_t* stream3_partition_unique_count = nullptr;
+    std::uint32_t* stream3_score_key_a = nullptr;
+    std::uint32_t* stream3_score_key_b = nullptr;
+    std::uint64_t* stream3_score_count_a = nullptr;
+    std::uint64_t* stream3_score_count_b = nullptr;
+    std::uint32_t* stream3_score_unique_count = nullptr;
+    std::uint64_t* stream3_score_hist = nullptr;
     void* stream3_cub_temp = nullptr;
     std::size_t stream3_cub_temp_bytes = 0;
     Hash128* unique_key = nullptr;

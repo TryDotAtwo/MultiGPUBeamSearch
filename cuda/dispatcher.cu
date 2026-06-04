@@ -55,6 +55,11 @@ namespace beam {
 
 namespace {
 
+bool predict_stats_enabled_from_env() {
+    const char* value = std::getenv("BEAM_PREDICT_STATS_VERBOSE");
+    return value != nullptr && value[0] != '\0' && std::strtoull(value, nullptr, 10) != 0ULL;
+}
+
 void check_cuda(cudaError_t status, const char* op) {
     if (status != cudaSuccess) {
         throw std::runtime_error(std::string(op) + ": " + cudaGetErrorString(status));
@@ -110,6 +115,91 @@ void accumulate_elapsed_ms(
     total_ms += static_cast<double>(elapsed_ms);
     if (max_ms != nullptr) {
         *max_ms = std::max(*max_ms, static_cast<double>(elapsed_ms));
+    }
+}
+#endif
+
+#if BEAM_DEBUG_FINAL_VALIDATE
+void validate_prefinal_survivors_host(
+    const StaticMemoryPlan& plan,
+    StaticDeviceMemory& memory,
+    std::uint64_t current_frontier_size,
+    std::uint32_t final_threshold,
+    cudaStream_t stream) {
+    check_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize prefinal survivor validation input");
+    const std::uint32_t shard_count = plan.storage_shard_count;
+    const std::uint32_t shard_capacity = plan.config.shard_capacity_candidates;
+    std::vector<std::uint32_t> clean_count(shard_count);
+    check_cuda(cudaMemcpy(
+        clean_count.data(),
+        memory.streams.clean_count,
+        static_cast<std::uint64_t>(shard_count) * sizeof(std::uint32_t),
+        cudaMemcpyDeviceToHost), "cudaMemcpy prefinal survivor clean_count");
+
+    std::vector<CandidateMeta> candidates;
+    std::uint32_t invalid_selected_count = 0;
+    std::uint64_t selected_scanned = 0;
+    std::uint32_t first_shard = UINT32_MAX;
+    std::uint32_t first_local = UINT32_MAX;
+    CandidateMeta first_candidate{Hash128{0ULL, 0ULL}, 0ULL, 0U, 0U};
+
+    for (std::uint32_t shard = 0; shard < shard_count; ++shard) {
+        const std::uint32_t count = clean_count[shard];
+        if (count > shard_capacity) {
+            throw std::runtime_error(
+                "prefinal survivor validation failed: clean_count exceeds shard capacity shard=" +
+                std::to_string(shard) +
+                " clean_count=" + std::to_string(count) +
+                " shard_capacity=" + std::to_string(shard_capacity));
+        }
+        if (count == 0U) {
+            continue;
+        }
+        candidates.resize(count);
+        const std::uint64_t shard_offset = static_cast<std::uint64_t>(shard) * shard_capacity;
+        check_cuda(cudaMemcpy(
+            candidates.data(),
+            memory.streams.survivor_shard + shard_offset,
+            static_cast<std::uint64_t>(count) * sizeof(CandidateMeta),
+            cudaMemcpyDeviceToHost), "cudaMemcpy prefinal survivor shard");
+        for (std::uint32_t local = 0; local < count; ++local) {
+            const CandidateMeta& candidate = candidates[local];
+            if (candidate.score_key > final_threshold) {
+                continue;
+            }
+            ++selected_scanned;
+            if (candidate.parent_idx < current_frontier_size) {
+                continue;
+            }
+            if (invalid_selected_count == 0U) {
+                first_shard = shard;
+                first_local = local;
+                first_candidate = candidate;
+            }
+            ++invalid_selected_count;
+        }
+    }
+
+    if (invalid_selected_count != 0U) {
+        const std::uint32_t source_rank = first_candidate.route_packed >> 16U;
+        const std::uint32_t owner = (first_candidate.route_packed >> 8U) & 0xffU;
+        const std::uint32_t move = first_candidate.route_packed & 0xffU;
+        throw std::runtime_error(
+            "prefinal survivor validation failed: invalid_selected_count=" +
+            std::to_string(invalid_selected_count) +
+            " selected_scanned=" + std::to_string(selected_scanned) +
+            " first_shard=" + std::to_string(first_shard) +
+            " first_local=" + std::to_string(first_local) +
+            " parent_idx=" + std::to_string(first_candidate.parent_idx) +
+            " current_frontier_size=" + std::to_string(current_frontier_size) +
+            " score_key=" + std::to_string(first_candidate.score_key) +
+            " final_threshold=" + std::to_string(final_threshold) +
+            " hash_lo=" + std::to_string(first_candidate.hash.lo) +
+            " hash_hi=" + std::to_string(first_candidate.hash.hi) +
+            " route_packed=" + std::to_string(first_candidate.route_packed) +
+            " source_rank=" + std::to_string(source_rank) +
+            " owner=" + std::to_string(owner) +
+            " move=" + std::to_string(move));
     }
 }
 #endif
@@ -1205,6 +1295,7 @@ void instantiate_cuda_graph_job_templates(
     }
     ensure_stream12_lane_resources(streams, events, plan.config.inference_parallelism);
     ensure_stream4_slot_resources(streams, plan.config.stream4_active_sort_slots);
+    const bool predict_stats_enabled = predict_stats_enabled_from_env();
 
     const std::uint32_t ring_slot_job_count = plan.config.ring_count * plan.derived.ring_slot_count;
     graphs.ring_slot_graphs.resize(ring_slot_job_count, nullptr);
@@ -1260,6 +1351,22 @@ void instantiate_cuda_graph_job_templates(
         CandidateMeta* ring_remote_send_buffer =
             memory.streams.remote_send_buffer + stream5_send_slot * plan.stream5_send_slot_capacity;
         check_cuda(cudaStreamBeginCapture(streams.stream3, cudaStreamCaptureModeGlobal), "cudaStreamBeginCapture stream3_ring_graph");
+        if (predict_stats_enabled) {
+            stream3_accumulate_score_hist_cuda(
+                memory.streams.score_ring + ring_candidate_offset,
+                memory.streams.count + static_cast<std::uint64_t>(ring) * plan.derived.ring_slot_count,
+                memory.streams.stream3_score_key_a,
+                memory.streams.stream3_score_key_b,
+                memory.streams.stream3_score_count_a,
+                memory.streams.stream3_score_count_b,
+                memory.streams.stream3_score_unique_count,
+                memory.streams.stream3_score_hist,
+                memory.streams.stream3_cub_temp,
+                memory.streams.stream3_cub_temp_bytes,
+                plan.config.b_micro,
+                plan.config.stream3_batch_candidates,
+                streams.stream3);
+        }
         stream3_pack_threshold_device_threshold_cuda(
             memory.streams.score_ring + ring_candidate_offset,
             memory.streams.hash_ring + ring_candidate_offset,
@@ -1591,6 +1698,13 @@ DepthDispatchState run_depth_cuda_graphs(
 
     DepthDispatchState state;
     state.frontier_size = frontier_size;
+    if (predict_stats_enabled_from_env()) {
+        check_cuda(cudaMemsetAsync(
+            memory.streams.stream3_score_hist,
+            0,
+            SCORE_BIN_COUNT * sizeof(std::uint64_t),
+            streams.stream3), "cudaMemsetAsync stream3 score hist");
+    }
 #if BEAM_DEBUG_DEPTH_FLOW_TRACE
     state.depth_for_log = read_depth_index_host(memory);
     const ThresholdSnapshot threshold_start = read_threshold_snapshot_host(
@@ -3876,6 +3990,9 @@ FinalizeDepthState finalize_depth_single_gpu(
     if (tracked_prefinal_hash != nullptr) {
         scan_tracked_prefinal_hash(plan, memory, streams, *tracked_prefinal_hash, result);
     }
+#if BEAM_DEBUG_FINAL_VALIDATE
+    validate_prefinal_survivors_host(plan, memory, current_frontier_size, final_threshold, streams.stream3);
+#endif
 
     if (multi_rank) {
         const std::uint32_t world_size = plan.config.world_size;

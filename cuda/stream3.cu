@@ -1,6 +1,7 @@
 #include "stream3.hpp"
 
 #include "config.hpp"
+#include "cub_compat.hpp"
 #include "hash.hpp"
 #include "nvtx_ranges.hpp"
 
@@ -8,7 +9,6 @@
 #include <cub/device/device_merge_sort.cuh>
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_scan.cuh>
-#include <cub/iterator/constant_input_iterator.cuh>
 #include <cuda_runtime.h>
 
 #include <stdexcept>
@@ -47,6 +47,12 @@ struct Stream3HashLess {
 struct Stream3MinValue {
     __host__ __device__ std::uint64_t operator()(std::uint64_t a, std::uint64_t b) const {
         return a < b ? a : b;
+    }
+};
+
+struct Stream3ScoreCountSum {
+    __host__ __device__ std::uint64_t operator()(std::uint64_t a, std::uint64_t b) const {
+        return a + b;
     }
 };
 
@@ -126,6 +132,45 @@ __global__ void stream3_debug_store_count_kernel(
     std::uint32_t ring) {
     if (blockIdx.x == 0 && threadIdx.x == 0 && destination_by_ring != nullptr) {
         destination_by_ring[ring] = *source;
+    }
+}
+
+__global__ void stream3_score_hist_fill_input_kernel(
+    const std::uint32_t* score_ring,
+    const std::uint32_t* count,
+    std::uint32_t* score_key,
+    std::uint64_t* score_count,
+    std::uint32_t b_micro,
+    std::uint32_t stream3_batch_candidates) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= stream3_batch_candidates) {
+        return;
+    }
+    const std::uint32_t candidates_per_slot = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+    const std::uint32_t ring_slot = i / candidates_per_slot;
+    const std::uint32_t local_i = i % candidates_per_slot;
+    const std::uint32_t parent_local = local_i / static_cast<std::uint32_t>(MOVE_COUNT);
+    const std::uint32_t parent_count = count == nullptr ? b_micro : count[ring_slot];
+    const std::uint32_t score = score_ring[i];
+    const bool valid = parent_local < parent_count && score < SCORE_BIN_COUNT;
+    score_key[i] = valid ? score : SCORE_BIN_COUNT;
+    score_count[i] = valid ? 1ULL : 0ULL;
+}
+
+__global__ void stream3_score_hist_accumulate_kernel(
+    const std::uint32_t* score_key,
+    const std::uint64_t* score_count,
+    const std::uint32_t* unique_count,
+    std::uint64_t* score_hist,
+    std::uint32_t max_items) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t count = *unique_count;
+    if (i >= count || i >= max_items) {
+        return;
+    }
+    const std::uint32_t key = score_key[i];
+    if (key < SCORE_BIN_COUNT) {
+        score_hist[key] += score_count[i];
     }
 }
 
@@ -1150,6 +1195,72 @@ void stream3_pack_threshold_device_threshold_cuda(
     (void)parent_base;
 }
 
+void stream3_accumulate_score_hist_cuda(
+    const std::uint32_t* score_ring,
+    const std::uint32_t* count,
+    std::uint32_t* score_key_a,
+    std::uint32_t* score_key_b,
+    std::uint64_t* score_count_a,
+    std::uint64_t* score_count_b,
+    std::uint32_t* score_unique_count,
+    std::uint64_t* score_hist,
+    void* cub_temp_storage,
+    std::size_t cub_temp_storage_bytes,
+    std::uint32_t b_micro,
+    std::uint32_t stream3_batch_candidates,
+    cudaStream_t stream) {
+    if (score_hist == nullptr) {
+        return;
+    }
+    if (cub_temp_storage == nullptr || cub_temp_storage_bytes == 0) {
+        throw std::invalid_argument("stream3 score hist CUB fixed temp storage is required");
+    }
+    const std::uint32_t block_size = 256;
+    const dim3 block(block_size);
+    const dim3 grid((stream3_batch_candidates + block_size - 1U) / block_size);
+    stream3_score_hist_fill_input_kernel<<<grid, block, 0, stream>>>(
+        score_ring,
+        count,
+        score_key_a,
+        score_count_a,
+        b_micro,
+        stream3_batch_candidates);
+    std::size_t sort_temp_bytes = cub_temp_storage_bytes;
+    check_cub(
+        cub::DeviceRadixSort::SortPairs(
+            cub_temp_storage,
+            sort_temp_bytes,
+            score_key_a,
+            score_key_b,
+            score_count_a,
+            score_count_b,
+            static_cast<int>(stream3_batch_candidates),
+            0,
+            32,
+            stream),
+        "cub::DeviceRadixSort::SortPairs stream3 score hist");
+    std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
+    check_cub(
+        cub::DeviceReduce::ReduceByKey(
+            cub_temp_storage,
+            reduce_temp_bytes,
+            score_key_b,
+            score_key_a,
+            score_count_b,
+            score_count_a,
+            score_unique_count,
+            Stream3ScoreCountSum{},
+            static_cast<int>(stream3_batch_candidates),
+            stream),
+        "cub::DeviceReduce::ReduceByKey stream3 score hist");
+    stream3_score_hist_accumulate_kernel<<<grid, block, 0, stream>>>(
+        score_key_a,
+        score_count_a,
+        score_unique_count,
+        score_hist,
+        stream3_batch_candidates);
+}
+
 void stream3_restore_owner_split_cuda(
     const Hash128* unique_key,
     const std::uint64_t* unique_val,
@@ -1264,7 +1375,7 @@ void stream3_partition_sort_reduce_scatter(
             static_cast<int>(stream3_shard_key_bits(shard_count)),
             stream),
         "cub::DeviceRadixSort::SortPairs stream3 partition");
-    cub::ConstantInputIterator<std::uint32_t> ones(1U);
+    CubConstantInputIterator<std::uint32_t> ones(1U);
     std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
     check_cub(
         cub::DeviceReduce::ReduceByKey(
@@ -1275,7 +1386,7 @@ void stream3_partition_sort_reduce_scatter(
             ones,
             partition_unique_counts,
             partition_unique_count,
-            cub::Sum{},
+            CubSum{},
             static_cast<int>(max_candidates),
             stream),
         "cub::DeviceReduce::ReduceByKey stream3 partition");

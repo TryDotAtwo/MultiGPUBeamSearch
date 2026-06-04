@@ -90,6 +90,21 @@ void stream3_pack_threshold_device_threshold_cuda(
     std::uint32_t* debug_unique_count_by_ring = nullptr,
     std::uint32_t debug_ring = 0);
 
+void stream3_accumulate_score_hist_cuda(
+    const std::uint32_t* score_ring,
+    const std::uint32_t* count,
+    std::uint32_t* score_key_a,
+    std::uint32_t* score_key_b,
+    std::uint64_t* score_count_a,
+    std::uint64_t* score_count_b,
+    std::uint32_t* score_unique_count,
+    std::uint64_t* score_hist,
+    void* cub_temp_storage,
+    std::size_t cub_temp_storage_bytes,
+    std::uint32_t b_micro,
+    std::uint32_t stream3_batch_candidates,
+    cudaStream_t stream);
+
 void stream3_restore_owner_split_cuda(
     const Hash128* unique_key,
     const std::uint64_t* unique_val,

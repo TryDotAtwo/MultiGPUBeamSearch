@@ -116,6 +116,200 @@ std::filesystem::path env_path(const char* name, const char* default_value) {
     return std::filesystem::path(value);
 }
 
+struct PredictStatsConfig {
+    std::uint32_t verbose = 0;
+    std::filesystem::path jsonl_path;
+};
+
+struct PredictStatsSummary {
+    std::uint64_t count = 0;
+    std::uint32_t min_key = 0;
+    std::uint32_t p01_key = 0;
+    std::uint32_t p05_key = 0;
+    std::uint32_t p50_key = 0;
+    std::uint32_t p95_key = 0;
+    std::uint32_t p99_key = 0;
+    std::uint32_t max_key = 0;
+    double mean_key = 0.0;
+};
+
+PredictStatsConfig predict_stats_config_from_env() {
+    PredictStatsConfig config{};
+    config.verbose = env_u32("BEAM_PREDICT_STATS_VERBOSE", 0);
+    config.jsonl_path = env_path("BEAM_PREDICT_STATS_PATH", "");
+    return config;
+}
+
+double score_key_to_score(std::uint32_t key) {
+    return static_cast<double>(key) / static_cast<double>(SCORE_SCALE);
+}
+
+double score_key_to_score(double key) {
+    return key / static_cast<double>(SCORE_SCALE);
+}
+
+std::uint32_t percentile_from_hist(
+    const std::vector<std::uint64_t>& hist,
+    std::uint64_t count,
+    std::uint32_t percentile) {
+    if (count == 0U) {
+        return 0;
+    }
+    const std::uint64_t target =
+        (count * static_cast<std::uint64_t>(percentile) + 99ULL) / 100ULL;
+    std::uint64_t cumulative = 0;
+    for (std::uint32_t score = 0; score < hist.size(); ++score) {
+        cumulative += hist[score];
+        if (cumulative >= std::max<std::uint64_t>(target, 1ULL)) {
+            return score;
+        }
+    }
+    return static_cast<std::uint32_t>(hist.size() - 1U);
+}
+
+PredictStatsSummary summarize_score_hist(const std::vector<std::uint64_t>& hist) {
+    PredictStatsSummary summary{};
+    long double weighted_sum = 0.0L;
+    bool seen = false;
+    for (std::uint32_t score = 0; score < hist.size(); ++score) {
+        const std::uint64_t value = hist[score];
+        if (value == 0U) {
+            continue;
+        }
+        if (!seen) {
+            summary.min_key = score;
+            seen = true;
+        }
+        summary.max_key = score;
+        summary.count += value;
+        weighted_sum += static_cast<long double>(score) * static_cast<long double>(value);
+    }
+    if (summary.count == 0U) {
+        return summary;
+    }
+    summary.mean_key = static_cast<double>(weighted_sum / static_cast<long double>(summary.count));
+    summary.p01_key = percentile_from_hist(hist, summary.count, 1);
+    summary.p05_key = percentile_from_hist(hist, summary.count, 5);
+    summary.p50_key = percentile_from_hist(hist, summary.count, 50);
+    summary.p95_key = percentile_from_hist(hist, summary.count, 95);
+    summary.p99_key = percentile_from_hist(hist, summary.count, 99);
+    return summary;
+}
+
+PredictStatsSummary summarize_frontier_scores(
+    const CandidateMeta* candidates,
+    std::uint32_t count) {
+    PredictStatsSummary summary{};
+    if (candidates == nullptr || count == 0U) {
+        return summary;
+    }
+    std::vector<std::uint64_t> hist(SCORE_BIN_COUNT);
+    std::uint64_t overflow = 0;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const std::uint32_t score = candidates[i].score_key;
+        if (score < SCORE_BIN_COUNT) {
+            ++hist[score];
+        } else {
+            ++overflow;
+        }
+    }
+    summary = summarize_score_hist(hist);
+    summary.count += overflow;
+    return summary;
+}
+
+void write_predict_stats_jsonl(
+    const std::filesystem::path& path,
+    std::uint32_t depth,
+    const PredictStatsSummary& score,
+    const PredictStatsSummary& frontier,
+    std::uint32_t threshold,
+    std::uint32_t final_candidate_count,
+    std::uint64_t generated_candidates) {
+    if (path.empty()) {
+        return;
+    }
+    std::ofstream out(path, std::ios::app);
+    if (!out) {
+        throw std::runtime_error("cannot open BEAM_PREDICT_STATS_PATH for append: " + path.string());
+    }
+    out << std::setprecision(10)
+        << "{\"depth\":" << depth
+        << ",\"generated_count\":" << generated_candidates
+        << ",\"hist_count\":" << score.count
+        << ",\"score_min\":" << score_key_to_score(score.min_key)
+        << ",\"score_p01\":" << score_key_to_score(score.p01_key)
+        << ",\"score_p05\":" << score_key_to_score(score.p05_key)
+        << ",\"score_mean\":" << score_key_to_score(score.mean_key)
+        << ",\"score_p50\":" << score_key_to_score(score.p50_key)
+        << ",\"score_p95\":" << score_key_to_score(score.p95_key)
+        << ",\"score_p99\":" << score_key_to_score(score.p99_key)
+        << ",\"score_max\":" << score_key_to_score(score.max_key)
+        << ",\"best_frontier_min\":" << score_key_to_score(frontier.min_key)
+        << ",\"best_frontier_mean\":" << score_key_to_score(frontier.mean_key)
+        << ",\"frontier_p50\":" << score_key_to_score(frontier.p50_key)
+        << ",\"frontier_p99\":" << score_key_to_score(frontier.p99_key)
+        << ",\"threshold\":" << score_key_to_score(threshold)
+        << ",\"final_candidate_count\":" << final_candidate_count
+        << "}\n";
+}
+
+void log_predict_stats(
+    const PredictStatsConfig& config,
+    std::uint32_t depth,
+    const std::vector<std::uint64_t>& score_hist,
+    const CandidateMeta* final_candidates,
+    const FinalizeDepthState& final_state,
+    std::uint64_t generated_candidates) {
+    if (config.verbose == 0U) {
+        return;
+    }
+    const PredictStatsSummary score = summarize_score_hist(score_hist);
+    const PredictStatsSummary frontier =
+        summarize_frontier_scores(final_candidates, final_state.final_candidate_count);
+    std::cout << std::setprecision(6)
+              << "predict_stats"
+              << " depth=" << depth
+              << " generated_count=" << generated_candidates
+              << " hist_count=" << score.count
+              << " score_min=" << score_key_to_score(score.min_key)
+              << " score_p01=" << score_key_to_score(score.p01_key)
+              << " score_p05=" << score_key_to_score(score.p05_key)
+              << " score_mean=" << score_key_to_score(score.mean_key)
+              << " score_p50=" << score_key_to_score(score.p50_key)
+              << " score_p95=" << score_key_to_score(score.p95_key)
+              << " score_p99=" << score_key_to_score(score.p99_key)
+              << " score_max=" << score_key_to_score(score.max_key)
+              << " best_frontier_min=" << score_key_to_score(frontier.min_key)
+              << " best_frontier_mean=" << score_key_to_score(frontier.mean_key)
+              << " threshold=" << score_key_to_score(final_state.final_threshold)
+              << "\n";
+    if (config.verbose >= 10U) {
+        std::cout << "predict_stats_detail"
+                  << " depth=" << depth
+                  << " frontier_p01=" << score_key_to_score(frontier.p01_key)
+                  << " frontier_p05=" << score_key_to_score(frontier.p05_key)
+                  << " frontier_p50=" << score_key_to_score(frontier.p50_key)
+                  << " frontier_p95=" << score_key_to_score(frontier.p95_key)
+                  << " frontier_p99=" << score_key_to_score(frontier.p99_key)
+                  << " frontier_max=" << score_key_to_score(frontier.max_key)
+                  << " selected_ratio="
+                  << (generated_candidates == 0U
+                          ? 0.0
+                          : static_cast<double>(final_state.final_candidate_count) /
+                                static_cast<double>(generated_candidates))
+                  << "\n";
+    }
+    write_predict_stats_jsonl(
+        config.jsonl_path,
+        depth,
+        score,
+        frontier,
+        final_state.final_threshold,
+        final_state.final_candidate_count,
+        generated_candidates);
+}
+
 std::uint32_t parse_next_u32(const std::string& text, std::size_t& pos, const char* context) {
     while (pos < text.size() && (text[pos] < '0' || text[pos] > '9')) {
         ++pos;
@@ -2878,6 +3072,7 @@ int main(int argc, char** argv) {
     std::cout << "GLOBAL_SPILL_CAPACITY=" << config.global_spill_capacity << "\n";
     std::cout << "GLOBAL_SPILL_SCALE_PPM=" << config.global_spill_scale_ppm << "\n";
     std::cout << "STREAM5_RECV_CAPACITY_SCALE_PPM=" << config.stream5_recv_capacity_scale_ppm << "\n";
+    std::cout << "FINAL_MATERIALIZE_CHUNK_CANDIDATES=" << config.final_materialize_chunk_candidates << "\n";
     std::cout << "STREAM5_SLOT_COUNT=" << plan.stream5_slot_count << "\n";
     std::cout << "STREAM5_SEND_SLOT_CANDIDATES=" << plan.stream5_send_slot_capacity << "\n";
     std::cout << "STREAM5_RECV_SLOT_CANDIDATES=" << plan.stream5_recv_slot_capacity << "\n";
@@ -3057,6 +3252,7 @@ int main(int argc, char** argv) {
 
     const auto start = std::chrono::steady_clock::now();
     CpuCandidateHistory history;
+    const PredictStatsConfig predict_stats = predict_stats_config_from_env();
     const CandidateHistoryMode history_mode = parse_history_mode();
     const std::uint32_t history_slot_count = env_u32("BEAM_HISTORY_SLOT_COUNT", 3);
     const std::uint32_t history_worker_count = env_u32("BEAM_HISTORY_WORKERS", 1);
@@ -3076,7 +3272,7 @@ int main(int argc, char** argv) {
         history_disk_root.empty()
             ? std::filesystem::path{}
             : history_disk_root / ("rank_" + std::to_string(rank) + "_history_static_arena.bin");
-    history.initialize(
+        history.initialize(
         history_mode,
         static_cast<std::uint32_t>(plan.frontier_states),
         history_slot_count,
@@ -3118,6 +3314,14 @@ int main(int argc, char** argv) {
         std::cout << "candidate_history_static_disk_path=" << history.static_disk_path.string() << "\n";
     }
 #endif
+    if (predict_stats.verbose != 0U) {
+        std::cout << "predict_stats_enabled=1"
+                  << " verbose=" << predict_stats.verbose
+                  << " source=stream3_score_ring"
+                  << " jsonl_path="
+                  << (predict_stats.jsonl_path.empty() ? "" : predict_stats.jsonl_path.string())
+                  << "\n";
+    }
     std::uint64_t frontier_size = rank == 0U ? 1ULL : 0ULL;
     [[maybe_unused]] std::uint64_t last_final_frontier_size = frontier_size;
     [[maybe_unused]] std::uint32_t last_final_threshold = UINT32_THRESHOLD_MAX;
@@ -3149,6 +3353,15 @@ int main(int argc, char** argv) {
             run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size, generated_track_request, collective_ptr);
         if (!state.depth_drained) {
             throw std::runtime_error("depth did not drain");
+        }
+        std::vector<std::uint64_t> predict_score_hist;
+        if (predict_stats.verbose != 0U) {
+            predict_score_hist.resize(SCORE_BIN_COUNT);
+            BEAM_CUDA_CHECK(cudaMemcpy(
+                predict_score_hist.data(),
+                memory.streams.stream3_score_hist,
+                SCORE_BIN_COUNT * sizeof(std::uint64_t),
+                cudaMemcpyDeviceToHost));
         }
 #if BEAM_DEBUG_PATH_TRACE
         tracked_solution.log_generated(
@@ -3358,6 +3571,16 @@ int main(int argc, char** argv) {
                 host_move_names);
         }
 #endif
+        if (predict_stats.verbose != 0U) {
+            BEAM_CUDA_CHECK(cudaEventSynchronize(history_slot.copy_done));
+            log_predict_stats(
+                predict_stats,
+                depth,
+                predict_score_hist,
+                history_slot.host,
+                final_state,
+                state.frontier_size * static_cast<std::uint64_t>(MOVE_COUNT));
+        }
         history.commit_slot(history_slot, depth, final_state.final_candidate_count);
         history.pump_completed(false);
         frontier_size = final_state.next_frontier_size;
