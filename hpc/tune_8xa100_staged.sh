@@ -35,6 +35,21 @@ STREAM4_TRIGGER_CANDIDATES="${STREAM4_TRIGGER_CANDIDATES:-$((STREAM4_BATCH_CANDI
 BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-262144}"
 BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-1200000}"
 
+cleanup_done=0
+cleanup() {
+  local rc=$?
+  if [ "${cleanup_done}" -ne 0 ]; then
+    exit "${rc}"
+  fi
+  cleanup_done=1
+  echo "cleanup_start rc=${rc} at $(date -Is)"
+  beam_safe_clean_child "${BUILD_DIR}" "build"
+  beam_safe_clean_child "${HISTORY_DIR}" "history"
+  echo "cleanup_done rc=${rc} at $(date -Is)"
+  exit "${rc}"
+}
+trap cleanup EXIT TERM INT
+
 beam_preflight
 beam_configure_build production_runner
 beam_export_common_runtime
