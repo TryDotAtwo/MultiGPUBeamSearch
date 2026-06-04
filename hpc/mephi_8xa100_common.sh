@@ -222,3 +222,16 @@ beam_safe_clean_child() {
       ;;
   esac
 }
+
+beam_safe_clear_history_contents() {
+  local resolved_job
+  local resolved_history
+  resolved_job="$(realpath -m "${JOB_DIR}")"
+  resolved_history="$(realpath -m "${HISTORY_DIR}")"
+  if [ "${resolved_history}" != "${resolved_job}/history" ]; then
+    echo "history_clear_skip=unsafe_path:${resolved_history}"
+    return 2
+  fi
+  mkdir -p "${resolved_history}"
+  find "${resolved_history}" -mindepth 1 -maxdepth 1 -xdev -exec rm -rf -- {} +
+}
