@@ -18,6 +18,18 @@ NCCL_LIBRARY="${NCCL_LIBRARY:-${NINJA_VENV_DIR}/lib/python3.13/site-packages/nvi
 HISTORY_DIR="${JOB_DIR}/history"
 LOG_DIR="${JOB_DIR}/logs"
 PREDICT_STATS_PATH="${JOB_DIR}/predict_stats_p992_b260m_d12.jsonl"
+PUZZLE_ID="${PUZZLE_ID:-992}"
+DEPTH_LIMIT="${DEPTH_LIMIT:-12}"
+BEAM_WIDTH="${BEAM_WIDTH:-260000000}"
+TORCHRUN_NNODES="${TORCHRUN_NNODES:-1}"
+TORCHRUN_NPROC_PER_NODE="${TORCHRUN_NPROC_PER_NODE:-8}"
+TORCHRUN_NODE_RANK="${TORCHRUN_NODE_RANK:-${SLURM_NODEID:-0}}"
+TORCHRUN_RDZV_ENDPOINT="${TORCHRUN_RDZV_ENDPOINT:-127.0.0.1:29500}"
+SHARD_COUNT="${SHARD_COUNT:-64}"
+STREAM4_BATCH_ALIGNMENT="${STREAM4_BATCH_ALIGNMENT:-1024}"
+SHARD_CAPACITY_SCALE_PPM="${SHARD_CAPACITY_SCALE_PPM:-1050000}"
+STREAM4_BATCH_CANDIDATES="${STREAM4_BATCH_CANDIDATES:-524288}"
+STREAM4_TRIGGER_CANDIDATES="${STREAM4_TRIGGER_CANDIDATES:-524288}"
 
 safe_remove_job_child_dir() {
   local target="$1"
@@ -54,6 +66,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+round_up() {
+  local value="$1"
+  local alignment="$2"
+  echo $(( ((value + alignment - 1) / alignment) * alignment ))
+}
+
 mkdir -p "${JOB_DIR}" "${BUILD_DIR}" "${HISTORY_DIR}" "${LOG_DIR}"
 if [ -x "${NINJA_VENV_DIR}/bin/ninja" ]; then
   export PATH="${NINJA_VENV_DIR}/bin:${PATH}"
@@ -83,10 +101,43 @@ if [ ! -d "${CUTLASS_DIR}/include" ]; then
 fi
 cd "${REPO_DIR}"
 
+WORLD_SIZE_EFFECTIVE=$((TORCHRUN_NNODES * TORCHRUN_NPROC_PER_NODE))
+BEAM_ALIGNMENT=$((WORLD_SIZE_EFFECTIVE * SHARD_COUNT * STREAM4_BATCH_ALIGNMENT))
+GLOBAL_BEAM_WIDTH_EFFECTIVE="$(round_up "${BEAM_WIDTH}" "${BEAM_ALIGNMENT}")"
+LOCAL_BEAM_WIDTH=$((GLOBAL_BEAM_WIDTH_EFFECTIVE / WORLD_SIZE_EFFECTIVE))
+LOGICAL_SHARD_SIZE=$(( (LOCAL_BEAM_WIDTH + SHARD_COUNT - 1) / SHARD_COUNT ))
+SHARD_CAPACITY_RAW=$(( (LOGICAL_SHARD_SIZE * SHARD_CAPACITY_SCALE_PPM + 999999) / 1000000 ))
+SHARD_CAPACITY_CANDIDATES="$(round_up "${SHARD_CAPACITY_RAW}" "${STREAM4_BATCH_ALIGNMENT}")"
+if [ "${STREAM4_BATCH_CANDIDATES}" -gt "${SHARD_CAPACITY_CANDIDATES}" ]; then
+  echo "invalid_stream4_batch=${STREAM4_BATCH_CANDIDATES} shard_capacity=${SHARD_CAPACITY_CANDIDATES}"
+  exit 2
+fi
+if [ "${STREAM4_TRIGGER_CANDIDATES}" -lt "${STREAM4_BATCH_CANDIDATES}" ]; then
+  echo "invalid_stream4_trigger=${STREAM4_TRIGGER_CANDIDATES} stream4_batch=${STREAM4_BATCH_CANDIDATES}"
+  exit 2
+fi
+if [ "${STREAM4_TRIGGER_CANDIDATES}" -gt "${SHARD_CAPACITY_CANDIDATES}" ]; then
+  echo "invalid_stream4_trigger=${STREAM4_TRIGGER_CANDIDATES} shard_capacity=${SHARD_CAPACITY_CANDIDATES}"
+  exit 2
+fi
+
 echo "job_dir=${JOB_DIR}"
 echo "repo_dir=${REPO_DIR}"
 git rev-parse HEAD
 echo "started_at=$(date -Is)"
+echo "beam_width=${BEAM_WIDTH}"
+echo "torchrun_nnodes=${TORCHRUN_NNODES}"
+echo "torchrun_nproc_per_node=${TORCHRUN_NPROC_PER_NODE}"
+echo "torchrun_node_rank=${TORCHRUN_NODE_RANK}"
+echo "torchrun_rdzv_endpoint=${TORCHRUN_RDZV_ENDPOINT}"
+echo "world_size_effective=${WORLD_SIZE_EFFECTIVE}"
+echo "beam_alignment=${BEAM_ALIGNMENT}"
+echo "global_beam_width_effective=${GLOBAL_BEAM_WIDTH_EFFECTIVE}"
+echo "local_beam_width=${LOCAL_BEAM_WIDTH}"
+echo "logical_shard_size=${LOGICAL_SHARD_SIZE}"
+echo "shard_capacity_candidates=${SHARD_CAPACITY_CANDIDATES}"
+echo "stream4_batch_candidates=${STREAM4_BATCH_CANDIDATES}"
+echo "stream4_trigger_candidates=${STREAM4_TRIGGER_CANDIDATES}"
 ninja --version
 "${NINJA_VENV_DIR}/bin/python" - <<'PY'
 import torch
@@ -142,25 +193,27 @@ export BEAM_B_MICRO=4096
 export BEAM_STREAM1_CONCURRENCY=2
 export BEAM_STREAM3_RING_SLOTS=4
 export BEAM_SHARD_BUFFER_COUNT=2
-export BEAM_SHARD_COUNT=64
-export BEAM_STREAM4_BATCH_CANDIDATES=524288
-export BEAM_STREAM4_TRIGGER_CANDIDATES=1048576
-export BEAM_SHARD_CAPACITY_CANDIDATES=1052672
+export BEAM_SHARD_COUNT="${SHARD_COUNT}"
+export BEAM_STREAM4_BATCH_CANDIDATES="${STREAM4_BATCH_CANDIDATES}"
+export BEAM_STREAM4_TRIGGER_CANDIDATES="${STREAM4_TRIGGER_CANDIDATES}"
+export BEAM_SHARD_CAPACITY_CANDIDATES="${SHARD_CAPACITY_CANDIDATES}"
+export BEAM_SHARD_CAPACITY_SCALE_PPM="${SHARD_CAPACITY_SCALE_PPM}"
 export BEAM_STREAM4_ACTIVE_SORT_SLOTS=4
 export BEAM_GLOBAL_SPILL_CAPACITY=0
 export BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM=1200000
 export BEAM_GPU_HEADROOM_BYTES=$((3 * 1024 * 1024 * 1024))
 
-RUN_LOG="${LOG_DIR}/production_runner_p992_d12_b260m_${SLURM_JOB_ID:-manual}.log"
+RUN_LOG="${LOG_DIR}/production_runner_p${PUZZLE_ID}_d${DEPTH_LIMIT}_b${BEAM_WIDTH}_${SLURM_JOB_ID:-manual}.log"
 echo "run_log=${RUN_LOG}"
 
 "${NINJA_VENV_DIR}/bin/python" -m torch.distributed.run \
-  --nnodes=1 \
-  --nproc-per-node=8 \
+  --nnodes="${TORCHRUN_NNODES}" \
+  --nproc-per-node="${TORCHRUN_NPROC_PER_NODE}" \
+  --node-rank="${TORCHRUN_NODE_RANK}" \
   --rdzv-backend=c10d \
-  --rdzv-endpoint=127.0.0.1:29500 \
+  --rdzv-endpoint="${TORCHRUN_RDZV_ENDPOINT}" \
   --rdzv-id="beam8a100_${SLURM_JOB_ID:-manual}" \
   --no-python \
-  "${BUILD_DIR}/production_runner" 992 12 260000000 2>&1 | tee "${RUN_LOG}"
+  "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}" 2>&1 | tee "${RUN_LOG}"
 
 echo "finished_at=$(date -Is)"
