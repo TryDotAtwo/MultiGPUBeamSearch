@@ -14,7 +14,31 @@ JOB=/mnt/pool/6/vokirova/beam8a100
 mkdir -p "$JOB"
 cd "$JOB"
 
-# Put start.sh in this directory. The script clones/updates GitHub repo itself.
+git clone --branch main --depth 1 https://github.com/TryDotAtwo/MultiGPUBeamSearch.git repo
+
+if [ ! -d /mnt/pool/3/vokirova/cutlass/include ]; then
+  mkdir -p /mnt/pool/3/vokirova
+  git clone --depth 1 https://github.com/NVIDIA/cutlass.git /mnt/pool/3/vokirova/cutlass
+fi
+
+cp repo/hpc/start_8xa100_beamsearch.sh start.sh
+sed -i 's/\r$//' start.sh
+bash -n start.sh
+chmod +x start.sh
+sbatch -p kaf12 start.sh
+```
+
+To update an existing checkout before resubmitting:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100/repo
+git fetch origin main --depth 1
+git reset --hard origin/main
+
+cd /mnt/pool/6/vokirova/beam8a100
+cp repo/hpc/start_8xa100_beamsearch.sh start.sh
+sed -i 's/\r$//' start.sh
+bash -n start.sh
 chmod +x start.sh
 sbatch -p kaf12 start.sh
 ```
@@ -38,13 +62,17 @@ Run parameters:
 - history mode: `static_hybrid`
 - Stream3 prediction stats: enabled at `predict_stats_p992_b260m_d12.jsonl`
 
-Cleanup/refresh behavior:
+Cleanup behavior:
 
 - Always removes only `/mnt/pool/6/vokirova/beam8a100/build-a100`.
 - Removes only `/mnt/pool/6/vokirova/beam8a100/history` after a successful
   run.
 - Keeps `history` after a failed run for diagnostics.
-- If `repo/` exists but is not a Git checkout, removes only the exact
-  `/mnt/pool/6/vokirova/beam8a100/repo` path before recloning.
 - Never removes `repo`, `logs`, `slurm-*.out`, `predict_stats`, or
   `/mnt/pool/3/vokirova/cutlass` during normal job cleanup.
+
+Network rule:
+
+- `start.sh` does not run `git clone`, `git fetch`, or `git reset` inside the
+  compute job. Prepare `repo/` and `/mnt/pool/3/vokirova/cutlass` from the
+  visible `basis` shell before `sbatch`.
