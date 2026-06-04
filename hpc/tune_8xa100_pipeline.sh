@@ -89,7 +89,7 @@ for shard in ${SHARD_COUNT_SWEEP}; do
             if ($i ~ /^depth_sec=/) { split($i,a,"="); sec=a[2]; }
           }
           if (depth >= 7 && sec != "") { sum += sec; n += 1; }
-        } END { if (n > 0) printf "%.6f"; else printf "NA"; }' "${log}")"
+        } END { if (n > 0) printf "%.6f", sum / n; else printf "NA"; }' "${log}")"
         echo -e "${tag}\t${status}\t${avg}\t${SHARD_COUNT}\t${BEAM_B_MICRO}\t${BEAM_STREAM1_CONCURRENCY}\t${BEAM_STREAM3_RING_SLOTS}\t${STREAM3_BATCH_CANDIDATES}\t${STREAM4_BATCH_CANDIDATES}\t${STREAM4_TRIGGER_CANDIDATES}\t${SHARD_CAPACITY_CANDIDATES}\t${LOGICAL_SHARD_SIZE}\t${log}" >> "${SUMMARY}"
 
         if [ "${status}" = "OK" ] && [ "${avg}" != "NA" ]; then
