@@ -204,7 +204,11 @@ export BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM=1200000
 export BEAM_GPU_HEADROOM_BYTES=$((3 * 1024 * 1024 * 1024))
 
 RUN_LOG="${LOG_DIR}/production_runner_p${PUZZLE_ID}_d${DEPTH_LIMIT}_b${BEAM_WIDTH}_${SLURM_JOB_ID:-manual}.log"
+NCCL_ID_FILE="${JOB_DIR}/beam_solver_nccl_${SLURM_JOB_ID:-manual}.bin"
+rm -f "${NCCL_ID_FILE}"
+export BEAM_NCCL_ID_FILE="${NCCL_ID_FILE}"
 echo "run_log=${RUN_LOG}"
+echo "beam_nccl_id_file=${BEAM_NCCL_ID_FILE}"
 
 "${NINJA_VENV_DIR}/bin/python" -m torch.distributed.run \
   --nnodes="${TORCHRUN_NNODES}" \
