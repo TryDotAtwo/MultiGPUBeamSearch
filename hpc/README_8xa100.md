@@ -22,9 +22,10 @@ if [ ! -d /mnt/pool/3/vokirova/cutlass/include ]; then
 fi
 
 cp repo/hpc/start_8xa100_beamsearch.sh start.sh
-sed -i 's/\r$//' start.sh
-bash -n start.sh
-chmod +x start.sh
+cp repo/hpc/mephi_8xa100_common.sh .
+sed -i 's/\r$//' start.sh mephi_8xa100_common.sh
+bash -n start.sh mephi_8xa100_common.sh
+chmod +x start.sh mephi_8xa100_common.sh
 sbatch -p kaf12 start.sh
 ```
 
@@ -37,11 +38,49 @@ git reset --hard origin/main
 
 cd /mnt/pool/6/vokirova/beam8a100
 cp repo/hpc/start_8xa100_beamsearch.sh start.sh
-sed -i 's/\r$//' start.sh
-bash -n start.sh
-chmod +x start.sh
+cp repo/hpc/mephi_8xa100_common.sh .
+sed -i 's/\r$//' start.sh mephi_8xa100_common.sh
+bash -n start.sh mephi_8xa100_common.sh
+chmod +x start.sh mephi_8xa100_common.sh
 sbatch -p kaf12 start.sh
 ```
+
+For the 8xA100 tuning workflow, use the three dedicated launchers instead:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100
+cp repo/hpc/mephi_8xa100_common.sh .
+cp repo/hpc/tune_8xa100_stream1.sh .
+cp repo/hpc/tune_8xa100_pipeline.sh .
+cp repo/hpc/start_8xa100_best.sh .
+sed -i 's/\r$//' mephi_8xa100_common.sh tune_8xa100_stream1.sh tune_8xa100_pipeline.sh start_8xa100_best.sh
+bash -n mephi_8xa100_common.sh tune_8xa100_stream1.sh tune_8xa100_pipeline.sh start_8xa100_best.sh
+chmod +x mephi_8xa100_common.sh tune_8xa100_stream1.sh tune_8xa100_pipeline.sh start_8xa100_best.sh
+
+sbatch -p kaf12 tune_8xa100_stream1.sh
+```
+
+After the Stream1 job finishes, launch the production pipeline sweep:
+
+```bash
+sbatch -p kaf12 tune_8xa100_pipeline.sh
+```
+
+After the pipeline sweep writes `logs/best_pipeline.env`, launch the selected
+configuration:
+
+```bash
+sbatch -p kaf12 start_8xa100_best.sh
+```
+
+The sweep scripts write:
+
+- `logs/best_stream1.env`: best isolated `BEAM_B_MICRO` and
+  `BEAM_STREAM1_CONCURRENCY`.
+- `logs/tuning_<job_id>/pipeline_sweep_<job_id>.tsv`: per-config pass/fail and
+  average full-depth runtime through depth `12`.
+- `logs/best_pipeline.env`: fastest passing production config found by the
+  pipeline sweep.
 
 Check the job:
 
