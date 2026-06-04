@@ -13,6 +13,8 @@ REPO_DIR="${JOB_DIR}/repo"
 BUILD_DIR="${JOB_DIR}/build-a100"
 CUTLASS_DIR="${CUTLASS_DIR:-/mnt/pool/3/vokirova/cutlass}"
 NINJA_VENV_DIR="${NINJA_VENV_DIR:-/mnt/pool/3/vokirova/ninja-venv}"
+NCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR:-${NINJA_VENV_DIR}/lib/python3.13/site-packages/nvidia/nccl/include}"
+NCCL_LIBRARY="${NCCL_LIBRARY:-${NINJA_VENV_DIR}/lib/python3.13/site-packages/nvidia/nccl/lib/libnccl.so.2}"
 HISTORY_DIR="${JOB_DIR}/history"
 LOG_DIR="${JOB_DIR}/logs"
 PREDICT_STATS_PATH="${JOB_DIR}/predict_stats_p992_b260m_d12.jsonl"
@@ -59,6 +61,18 @@ else
   echo "missing_ninja=${NINJA_VENV_DIR}/bin/ninja"
   exit 2
 fi
+if [ ! -x "${NINJA_VENV_DIR}/bin/python" ]; then
+  echo "missing_python=${NINJA_VENV_DIR}/bin/python"
+  exit 2
+fi
+if [ ! -f "${NCCL_INCLUDE_DIR}/nccl.h" ]; then
+  echo "missing_nccl_header=${NCCL_INCLUDE_DIR}/nccl.h"
+  exit 2
+fi
+if [ ! -f "${NCCL_LIBRARY}" ]; then
+  echo "missing_nccl_library=${NCCL_LIBRARY}"
+  exit 2
+fi
 if [ ! -d "${REPO_DIR}/.git" ]; then
   echo "missing_repo=${REPO_DIR}"
   exit 2
@@ -74,11 +88,19 @@ echo "repo_dir=${REPO_DIR}"
 git rev-parse HEAD
 echo "started_at=$(date -Is)"
 ninja --version
+"${NINJA_VENV_DIR}/bin/python" - <<'PY'
+import torch
+print("torch", torch.__version__)
+PY
 nvidia-smi
+
+export LD_LIBRARY_PATH="$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
 
 cmake -S "${REPO_DIR}" -B "${BUILD_DIR}" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCUTLASS_DIR="${CUTLASS_DIR}" \
+  -DNCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR}" \
+  -DNCCL_LIBRARY="${NCCL_LIBRARY}" \
   -DBEAM_CUDA_ARCHITECTURES=80 \
   -DBEAM_ENABLE_DEBUG=ON \
   -DBEAM_ENABLE_DEPTH_LOGS=ON \
@@ -132,7 +154,7 @@ export BEAM_GPU_HEADROOM_BYTES=$((3 * 1024 * 1024 * 1024))
 RUN_LOG="${LOG_DIR}/production_runner_p992_d12_b260m_${SLURM_JOB_ID:-manual}.log"
 echo "run_log=${RUN_LOG}"
 
-python3 -m torch.distributed.run \
+"${NINJA_VENV_DIR}/bin/python" -m torch.distributed.run \
   --nnodes=1 \
   --nproc-per-node=8 \
   --rdzv-backend=c10d \
