@@ -57,3 +57,20 @@ Local verification:
   - `logical=2031616`
   - `cap=2539520`
   - `stream3_batch=393216`
+
+Cluster follow-up:
+
+- Job `31079` failed because SLURM copied the submitted script to
+  `/var/lib/slurm/slurmd/job31079/slurm_script`, making `BASH_SOURCE[0]`
+  resolve beside the spool script rather than the submit directory. The tuning
+  launchers now use `${SLURM_SUBMIT_DIR:-$(pwd)}` for `SCRIPT_DIR`.
+- Job `31080` completed the Stream1 benchmark and exposed a parser bug:
+  `stream_benchmark` logs `b_micro=...`, while the first launcher parsed
+  `B_MICRO=...`. The parser now reads lowercase `b_micro=`.
+- Job `31081` completed the first pipeline config through depth 12, then the
+  sweep script failed while summarizing because the average-depth `awk` used
+  `printf "%.6f"` without passing `sum / n`. The pipeline summary parser now
+  uses `printf "%.6f", sum / n`.
+- Added automatic per-config GPU monitoring around torchrun. Each config writes
+  `logs/tuning_<job>/nvidia_smi_<run_tag>.log` with a timestamped `nvidia-smi`
+  CSV sample every 5 seconds.
