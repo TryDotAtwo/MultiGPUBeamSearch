@@ -20,6 +20,10 @@ beam_setup_paths() {
 
 beam_preflight() {
   mkdir -p "${JOB_DIR}" "${BUILD_DIR}" "${HISTORY_DIR}" "${LOG_DIR}" "${TUNING_DIR}"
+  if [ -f "${NINJA_VENV_DIR}/bin/activate" ]; then
+    # MEPhI jobs need the prepared venv active before CMake/torchrun checks.
+    source "${NINJA_VENV_DIR}/bin/activate"
+  fi
   if [ -x "${NINJA_VENV_DIR}/bin/ninja" ]; then
     export PATH="${NINJA_VENV_DIR}/bin:${PATH}"
   else
@@ -154,6 +158,7 @@ beam_export_manual_config() {
   export BEAM_GLOBAL_SPILL_CAPACITY="${BEAM_GLOBAL_SPILL_CAPACITY:-0}"
   export BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM="${BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM:-1200000}"
   export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-0}"
+  export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-1200000}"
   export BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-$((3 * 1024 * 1024 * 1024))}"
 }
 

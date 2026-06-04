@@ -3073,9 +3073,11 @@ int main(int argc, char** argv) {
     std::cout << "GLOBAL_SPILL_SCALE_PPM=" << config.global_spill_scale_ppm << "\n";
     std::cout << "STREAM5_RECV_CAPACITY_SCALE_PPM=" << config.stream5_recv_capacity_scale_ppm << "\n";
     std::cout << "FINAL_MATERIALIZE_CHUNK_CANDIDATES=" << config.final_materialize_chunk_candidates << "\n";
+    std::cout << "FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=" << config.final_materialize_exchange_scale_ppm << "\n";
     std::cout << "STREAM5_SLOT_COUNT=" << plan.stream5_slot_count << "\n";
     std::cout << "STREAM5_SEND_SLOT_CANDIDATES=" << plan.stream5_send_slot_capacity << "\n";
     std::cout << "STREAM5_RECV_SLOT_CANDIDATES=" << plan.stream5_recv_slot_capacity << "\n";
+    std::cout << "FINAL_MATERIALIZE_EXCHANGE_CANDIDATES=" << plan.final_materialize_exchange_capacity << "\n";
     std::cout << "N_LOCAL=" << local_frontier_capacity(config) << "\n";
     std::cout << "LOGICAL_SHARD_SIZE=" << logical_shard_size_for(config) << "\n";
     std::cout << "GROSS_CANDIDATES_PER_DEPTH_EST=" << config_build.gross_candidates_per_depth_est << "\n";

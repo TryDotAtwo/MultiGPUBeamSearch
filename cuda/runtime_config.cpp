@@ -591,6 +591,8 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     config.global_spill_scale_ppm = env_u32("BEAM_GLOBAL_SPILL_SCALE_PPM", 2'000'000);
     config.stream5_recv_capacity_scale_ppm = env_u32("BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM", 2'000'000);
     config.final_materialize_chunk_candidates = env_u32("BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES", 0);
+    config.final_materialize_exchange_scale_ppm =
+        env_u32("BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM", 2'000'000);
     config.global_threshold_update_period_shards =
         env_u32("BEAM_GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS", 64);
     config.solved_result_capacity = env_u32("BEAM_SOLVED_RESULT_CAPACITY", 1024);
@@ -601,7 +603,8 @@ RuntimeConfigBuild build_runtime_config_from_budget(
         config.stream4_batch_alignment == 0U ||
         config.stream4_active_sort_slots == 0U || config.shard_buffer_count != 2U ||
         config.shard_capacity_scale_ppm == 0U ||
-        config.global_spill_scale_ppm == 0U || config.stream5_recv_capacity_scale_ppm == 0U) {
+        config.global_spill_scale_ppm == 0U || config.stream5_recv_capacity_scale_ppm == 0U ||
+        config.final_materialize_exchange_scale_ppm == 0U) {
         throw std::invalid_argument("B_MICRO, STREAM1_CONCURRENCY, STREAM4_ACTIVE_SORT_SLOTS, STREAM4_BATCH_ALIGNMENT, SHARD_BUFFER_COUNT, and capacity/spill scale values must be valid");
     }
 

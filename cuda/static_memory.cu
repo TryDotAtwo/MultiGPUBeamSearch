@@ -491,7 +491,11 @@ FinalLayoutShape make_final_layout_shape(const RuntimeConfig& config, const Deri
             ? static_cast<std::uint64_t>(config.stream3_batch_candidates)
             : static_cast<std::uint64_t>(config.final_materialize_chunk_candidates);
     shape.final_chunk = std::max<std::uint64_t>(1ULL, std::min<std::uint64_t>(shape.frontier, requested_final_chunk));
-    shape.final_exchange = shape.final_chunk * static_cast<std::uint64_t>(config.world_size);
+    shape.final_exchange = std::max<std::uint64_t>(
+        shape.final_chunk,
+        (shape.final_chunk * static_cast<std::uint64_t>(config.final_materialize_exchange_scale_ppm) +
+         999'999ULL) /
+            1'000'000ULL);
     shape.final_slots = FINAL_MATERIALIZE_SLOT_COUNT;
     shape.survivors =
         static_cast<std::uint64_t>(storage_shard_count) * config.shard_capacity_candidates;
@@ -603,8 +607,12 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
             : static_cast<std::uint64_t>(config.final_materialize_chunk_candidates);
     plan.final_materialize_chunk_capacity =
         std::max<std::uint64_t>(1ULL, std::min<std::uint64_t>(plan.frontier_states, requested_final_chunk));
-    plan.final_materialize_exchange_capacity =
-        plan.final_materialize_chunk_capacity * static_cast<std::uint64_t>(config.world_size);
+    plan.final_materialize_exchange_capacity = std::max<std::uint64_t>(
+        plan.final_materialize_chunk_capacity,
+        (plan.final_materialize_chunk_capacity *
+             static_cast<std::uint64_t>(config.final_materialize_exchange_scale_ppm) +
+         999'999ULL) /
+            1'000'000ULL);
     plan.storage_shard_count = storage_shard_count_for(config);
     plan.survivor_count =
         static_cast<std::uint64_t>(plan.storage_shard_count) * config.shard_capacity_candidates;

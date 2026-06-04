@@ -20,6 +20,7 @@ SHARD_CAPACITY_SCALE_PPM="${SHARD_CAPACITY_SCALE_PPM:-1250000}"
 BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}"
 BEAM_SHARD_BUFFER_COUNT="${BEAM_SHARD_BUFFER_COUNT:-2}"
 BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-0}"
+BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-1200000}"
 
 STREAM1_CONFIG_ENV="${STREAM1_CONFIG_ENV:-${LOG_DIR}/best_stream1.env}"
 if [ -f "${STREAM1_CONFIG_ENV}" ]; then
@@ -35,13 +36,14 @@ beam_export_common_runtime
 
 SUMMARY="${TUNING_DIR}/pipeline_sweep_${SLURM_JOB_ID:-manual}.tsv"
 BEST_ENV="${TUNING_DIR}/best_pipeline.env"
-echo -e "tag\tstatus\tavg_full_depth_sec\tshard_count\tb_micro\tstream1_concurrency\tstream3_ring_slots\tstream3_batch\tstream4_batch\tstream4_trigger\tfinal_chunk\tshard_capacity\tlogical_shard\tlog" > "${SUMMARY}"
+echo -e "tag\tstatus\tavg_full_depth_sec\tshard_count\tb_micro\tstream1_concurrency\tstream3_ring_slots\tstream3_batch\tstream4_batch\tstream4_trigger\tfinal_chunk\tfinal_exchange_scale_ppm\tshard_capacity\tlogical_shard\tlog" > "${SUMMARY}"
 
 SHARD_COUNT_SWEEP="${SHARD_COUNT_SWEEP:-8 12 16 24 32}"
 STREAM3_RING_SLOTS_SWEEP="${STREAM3_RING_SLOTS_SWEEP:-2 4}"
 STREAM4_BATCH_SWEEP="${STREAM4_BATCH_SWEEP:-262144 393216 524288 786432 1048576}"
 STREAM4_TRIGGER_MULT_SWEEP="${STREAM4_TRIGGER_MULT_SWEEP:-1 2}"
-FINAL_MATERIALIZE_CHUNK_SWEEP="${FINAL_MATERIALIZE_CHUNK_SWEEP:-0}"
+FINAL_MATERIALIZE_CHUNK_SWEEP="${FINAL_MATERIALIZE_CHUNK_SWEEP:-65536 131072 262144 524288}"
+FINAL_MATERIALIZE_EXCHANGE_SCALE_SWEEP="${FINAL_MATERIALIZE_EXCHANGE_SCALE_SWEEP:-1200000}"
 
 best_avg=""
 best_status=""
@@ -51,20 +53,22 @@ for shard in ${SHARD_COUNT_SWEEP}; do
     for batch in ${STREAM4_BATCH_SWEEP}; do
       for trigger_mult in ${STREAM4_TRIGGER_MULT_SWEEP}; do
         for final_chunk in ${FINAL_MATERIALIZE_CHUNK_SWEEP}; do
+          for final_exchange_scale in ${FINAL_MATERIALIZE_EXCHANGE_SCALE_SWEEP}; do
         SHARD_COUNT="${shard}"
         BEAM_STREAM3_RING_SLOTS="${ring_slots}"
         STREAM4_BATCH_CANDIDATES="${batch}"
         STREAM4_TRIGGER_CANDIDATES=$((batch * trigger_mult))
         BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${final_chunk}"
+        BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${final_exchange_scale}"
         beam_derive_shard_capacity
-        tag="sh${SHARD_COUNT}_r${BEAM_STREAM3_RING_SLOTS}_b${STREAM4_BATCH_CANDIDATES}_t${STREAM4_TRIGGER_CANDIDATES}_fc${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}"
+        tag="sh${SHARD_COUNT}_r${BEAM_STREAM3_RING_SLOTS}_b${STREAM4_BATCH_CANDIDATES}_t${STREAM4_TRIGGER_CANDIDATES}_fc${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}_fs${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM}"
         log="${TUNING_DIR}/${tag}.log"
 
         if ! beam_validate_manual_config > "${TUNING_DIR}/${tag}.preflight" 2>&1; then
           status="INVALID"
           avg="NA"
           cat "${TUNING_DIR}/${tag}.preflight" | tee "${log}"
-          echo -e "${tag}\t${status}\t${avg}\t${SHARD_COUNT}\t${BEAM_B_MICRO}\t${BEAM_STREAM1_CONCURRENCY}\t${BEAM_STREAM3_RING_SLOTS}\t${STREAM3_BATCH_CANDIDATES}\t${STREAM4_BATCH_CANDIDATES}\t${STREAM4_TRIGGER_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}\t${SHARD_CAPACITY_CANDIDATES}\t${LOGICAL_SHARD_SIZE}\t${log}" >> "${SUMMARY}"
+          echo -e "${tag}\t${status}\t${avg}\t${SHARD_COUNT}\t${BEAM_B_MICRO}\t${BEAM_STREAM1_CONCURRENCY}\t${BEAM_STREAM3_RING_SLOTS}\t${STREAM3_BATCH_CANDIDATES}\t${STREAM4_BATCH_CANDIDATES}\t${STREAM4_TRIGGER_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM}\t${SHARD_CAPACITY_CANDIDATES}\t${LOGICAL_SHARD_SIZE}\t${log}" >> "${SUMMARY}"
           continue
         fi
 
@@ -73,6 +77,7 @@ for shard in ${SHARD_COUNT_SWEEP}; do
         export BEAM_STREAM1_CONCURRENCY
         export BEAM_STREAM3_RING_SLOTS
         export BEAM_SHARD_BUFFER_COUNT
+        export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM
         beam_export_manual_config
         beam_prepare_nccl_file "${tag}"
 
@@ -94,7 +99,7 @@ for shard in ${SHARD_COUNT_SWEEP}; do
           }
           if (depth >= 7 && sec != "") { sum += sec; n += 1; }
         } END { if (n > 0) printf "%.6f", sum / n; else printf "NA"; }' "${log}")"
-        echo -e "${tag}\t${status}\t${avg}\t${SHARD_COUNT}\t${BEAM_B_MICRO}\t${BEAM_STREAM1_CONCURRENCY}\t${BEAM_STREAM3_RING_SLOTS}\t${STREAM3_BATCH_CANDIDATES}\t${STREAM4_BATCH_CANDIDATES}\t${STREAM4_TRIGGER_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}\t${SHARD_CAPACITY_CANDIDATES}\t${LOGICAL_SHARD_SIZE}\t${log}" >> "${SUMMARY}"
+        echo -e "${tag}\t${status}\t${avg}\t${SHARD_COUNT}\t${BEAM_B_MICRO}\t${BEAM_STREAM1_CONCURRENCY}\t${BEAM_STREAM3_RING_SLOTS}\t${STREAM3_BATCH_CANDIDATES}\t${STREAM4_BATCH_CANDIDATES}\t${STREAM4_TRIGGER_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM}\t${SHARD_CAPACITY_CANDIDATES}\t${LOGICAL_SHARD_SIZE}\t${log}" >> "${SUMMARY}"
 
         if [ "${status}" = "OK" ] && [ "${avg}" != "NA" ]; then
           if [ -z "${best_avg}" ] || awk "BEGIN { exit !(${avg} < ${best_avg}) }"; then
@@ -112,11 +117,13 @@ for shard in ${SHARD_COUNT_SWEEP}; do
               echo "export BEAM_STREAM4_ACTIVE_SORT_SLOTS=${BEAM_STREAM4_ACTIVE_SORT_SLOTS}"
               echo "export BEAM_SHARD_BUFFER_COUNT=${BEAM_SHARD_BUFFER_COUNT}"
               echo "export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES=${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}"
+              echo "export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM}"
               echo "export BEST_PIPELINE_AVG_FULL_DEPTH_SEC=${best_avg}"
             } > "${BEST_ENV}"
             cp "${BEST_ENV}" "${LOG_DIR}/best_pipeline.env"
           fi
         fi
+          done
         done
       done
     done
