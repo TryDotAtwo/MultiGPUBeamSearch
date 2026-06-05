@@ -1,5 +1,10 @@
 # Prompt History
 
+## 2026-06-05
+- User asked to inspect current uncommitted local work, analyze GitHub and the
+  local project, then requested pushing all of the current uncommitted work to
+  GitHub.
+
 ## 2026-06-04
 - User requested replacing the full parameter-combination tuning approach with
   separate staged parameter searches, finding the best value for one parameter

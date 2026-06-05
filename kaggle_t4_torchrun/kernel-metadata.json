@@ -1,0 +1,15 @@
+{
+  "id": "trydotatwo/cayley-beam-gpu-t4-torchrun",
+  "title": "Cayley Beam GPU T4 Torchrun",
+  "code_file": "t4-torchrun-p0-depth10.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

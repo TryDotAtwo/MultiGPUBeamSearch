@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.fp16 binary
+*.pt binary
+*.pth binary
+*.zip binary
+*.png binary
+*.nsys-rep binary
+*.sqlite binary

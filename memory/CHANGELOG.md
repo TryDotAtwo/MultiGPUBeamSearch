@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-06-05
+- Prepared Kaggle and Molab experiment artifacts for GitHub publication:
+  updated the main Kaggle notebooks for multi-model Stream1 test selection,
+  added torchrun Kaggle package variants, added Molab probe scripts, and
+  preserved local push snapshot folders for reproducibility.
 - Updated MEPhI 8xA100 launch/tuning defaults to use the cluster-measured
   Stream1 winner: `BEAM_B_MICRO=8192`, `BEAM_STREAM1_CONCURRENCY=8`, and
   `BEAM_STREAM3_RING_SLOTS=8`. The staged and Cartesian tuners now default the
