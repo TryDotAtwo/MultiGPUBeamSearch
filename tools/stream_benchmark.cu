@@ -28,8 +28,8 @@ using namespace beam;
 
 namespace {
 
-inline constexpr std::array<std::uint32_t, 4> B_MICRO_SWEEP{2048, 4096, 8192, 16384};
-inline constexpr std::array<std::uint32_t, 4> STREAM1_CONCURRENCY_SWEEP{1, 2, 4, 8};
+inline constexpr std::array<std::uint32_t, 6> B_MICRO_SWEEP{2048, 4096, 8192, 16384, 32768, 65536};
+inline constexpr std::array<std::uint32_t, 6> STREAM1_CONCURRENCY_SWEEP{1, 2, 4, 8, 16, 32};
 inline constexpr std::array<std::uint32_t, 6> STREAM4_BATCH_SWEEP{196608, 262144, 393216, 524288, 699392, 1048576};
 inline constexpr std::array<std::uint32_t, 4> STREAM4_SHARD_CAPACITY_SWEEP{1048576, 2621440, 5242880, 10485760};
 

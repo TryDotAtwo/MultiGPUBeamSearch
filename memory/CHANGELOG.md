@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-05
+- Updated MEPhI 8xA100 launch/tuning defaults to use the cluster-measured
+  Stream1 winner: `BEAM_B_MICRO=8192`, `BEAM_STREAM1_CONCURRENCY=8`, and
+  `BEAM_STREAM3_RING_SLOTS=8`. The staged and Cartesian tuners now default the
+  Stream3 ring-slot sweep to `8`, and tuner launchers clamp ring slots upward
+  when a sourced `best_stream1.env` requests higher Stream1 concurrency.
+- Reduced MEPhI tuning SLURM time limits in the repository to `02:00:00` for
+  `tune_8xa100_staged.sh` and `tune_8xa100_pipeline.sh`.
+
 ## 2026-06-04
 - Added `hpc/tune_8xa100_staged.sh`, a staged MEPhI tuner that optimizes one
   parameter family at a time instead of running the full Cartesian pipeline

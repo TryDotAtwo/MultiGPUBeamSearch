@@ -36,93 +36,93 @@ void require_no_overlap(
     require(!ranges_overlap(a, a_bytes, addr(b), b_bytes), message);
 }
 
-void require_phase2_select_preserves_live_stream_inputs(
+void require_final_layout_preserves_persistent_stream_storage(
     const StaticMemoryPlan& plan,
     const StaticDeviceMemory& memory) {
-    const std::uintptr_t phase2_begin = addr(memory.scratch_pool);
-    const std::size_t phase2_bytes = plan.layout_phase2_select_bytes;
+    const std::uintptr_t final_begin = addr(memory.scratch_pool);
+    const std::size_t final_bytes = plan.layout_final_bytes;
     const std::size_t shard_hist_bytes =
         static_cast<std::size_t>(plan.storage_shard_count) * SCORE_BIN_COUNT * sizeof(std::uint32_t);
     const std::size_t storage_shard_u32_bytes =
         static_cast<std::size_t>(plan.storage_shard_count) * sizeof(std::uint32_t);
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.survivor_shard,
         static_cast<std::size_t>(plan.survivor_count) * sizeof(CandidateMeta),
-        "phase2 select layout must not overlap live survivor shard input");
+        "final layout must not overlap persistent survivor shard storage");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.clean_count,
         storage_shard_u32_bytes,
-        "phase2 select layout must not overlap live clean count input");
+        "final layout must not overlap persistent clean count storage");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.shard_score_hist_a,
         shard_hist_bytes,
-        "phase2 select layout must not overlap live shard histogram a input");
+        "final layout must not overlap persistent shard histogram a storage");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.shard_score_hist_b,
         shard_hist_bytes,
-        "phase2 select layout must not overlap live shard histogram b input");
+        "final layout must not overlap persistent shard histogram b storage");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.shard_score_hist_active_index,
         storage_shard_u32_bytes,
-        "phase2 select layout must not overlap live shard histogram active index");
+        "final layout must not overlap persistent shard histogram active index");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.threshold_hist_active_snapshot,
         storage_shard_u32_bytes,
-        "phase2 select layout must not overlap live threshold histogram snapshot");
+        "final layout must not overlap persistent threshold histogram snapshot");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.local_score_hist,
         SCORE_BIN_COUNT * sizeof(std::uint64_t),
-        "phase2 select layout must not overlap live local score histogram");
+        "final layout must not overlap persistent local score histogram");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.global_score_hist,
         SCORE_BIN_COUNT * sizeof(std::uint64_t),
-        "phase2 select layout must not overlap live global score histogram");
+        "final layout must not overlap persistent global score histogram");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.current_threshold,
         2 * sizeof(std::uint32_t),
-        "phase2 select layout must not overlap live current threshold");
+        "final layout must not overlap persistent current threshold");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.threshold_initialized,
         2 * sizeof(std::uint32_t),
-        "phase2 select layout must not overlap live threshold initialized");
+        "final layout must not overlap persistent threshold initialized");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.current_threshold_active_index,
         sizeof(std::uint32_t),
-        "phase2 select layout must not overlap live threshold active index");
+        "final layout must not overlap persistent threshold active index");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.threshold_request_local,
         sizeof(std::uint32_t),
-        "phase2 select layout must not overlap live threshold request local");
+        "final layout must not overlap persistent threshold request local");
     require_no_overlap(
-        phase2_begin,
-        phase2_bytes,
+        final_begin,
+        final_bytes,
         memory.streams.threshold_request_global,
         sizeof(std::uint32_t),
-        "phase2 select layout must not overlap live threshold request global");
+        "final layout must not overlap persistent threshold request global");
 }
 } // namespace
 
@@ -237,7 +237,7 @@ int main() {
     require(
         addr(memory.final.next_frontier_states_tmp) == addr(memory.final.final_keep_flags),
         "single rank phase2 and phase3 temp layouts must overlay after common final outputs");
-    require_phase2_select_preserves_live_stream_inputs(plan, memory);
+    require_final_layout_preserves_persistent_stream_storage(plan, memory);
     require(
         addr(memory.final.final_validation_error) % alignof(FinalRequestValidationError) == 0,
         "final validation error alignment failed");
@@ -268,7 +268,7 @@ int main() {
     require(
         addr(multi_memory.final.final_candidate_buffer) == addr(multi_memory.final.final_keep_flags),
         "multi rank phase2 and phase3 temp layouts must overlay after selected buffer");
-    require_phase2_select_preserves_live_stream_inputs(multi_plan, multi_memory);
+    require_final_layout_preserves_persistent_stream_storage(multi_plan, multi_memory);
     require(multi_memory.final.final_selected_buffer != nullptr, "layout3 selected buffer missing");
     require(multi_memory.final.final_request_buffer == nullptr, "multi-rank full final request buffer must be omitted");
     require(multi_memory.final.final_response_buffer == nullptr, "multi-rank full final response buffer must be omitted");
@@ -334,7 +334,7 @@ int main() {
     report << "- stream4_score_histogram_scratch=pass\n";
     report << "- final_candidate_buffers=pass\n";
     report << "- final_filter_scan_scratch=pass\n";
-    report << "- phase2_select_preserves_live_stream_inputs=pass\n";
+    report << "- final_layout_preserves_persistent_stream_storage=pass\n";
     report << "- final_validation_error_static_storage=pass\n";
     report << "- final_materialize_layout3_slots=pass\n";
     report << "- final_materialize_layout3_alignment=pass\n";

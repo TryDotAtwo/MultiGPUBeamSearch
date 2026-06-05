@@ -645,6 +645,7 @@ solved_* и stop_flag не входят в scratch_pool
 layout_phase1_streams, layout_phase2_select, layout_phase3_materialize use one static scratch_pool
 layout_phase2_select output buffers consumed by layout_phase3_materialize stay in a common prefix
 layout_phase2_select temporary filter buffers and layout_phase3_materialize temporary exchange buffers overlay after the common prefix
+layout_final_budget_bytes is a reserved scratch_pool prefix; persistent stream storage such as survivor_shard, clean_count, and shard histograms starts after this prefix
 scratch_pool_bytes = max(layout_phase1_streams_bytes, layout_phase2_select_bytes, layout_phase3_materialize_bytes)
 no cudaMalloc/cudaFree is allowed inside depth-loop final materialization
 ```
