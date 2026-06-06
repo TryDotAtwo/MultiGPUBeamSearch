@@ -271,3 +271,8 @@
   `B_MICRO=8192`, `STREAM1_CONCURRENCY=8`, and `STREAM3_RING_SLOTS=8`; the
   ring-slot value should not be left at `4` because it invalidates the selected
   Stream1 concurrency.
+- User requested a repeatable MEPhI script that first solves a puzzle from
+  `data/test.csv`, then applies the found solution to the central solved state
+  to create a reflected synthetic puzzle, solves that synthetic puzzle, and
+  prints both solutions plus the inverted reflected solution as a candidate for
+  the original puzzle.
