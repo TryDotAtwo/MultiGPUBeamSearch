@@ -285,3 +285,7 @@
 - User requested downloading the Artgor value-only model, exporting it for
   Stream1, pushing the exported weights to GitHub, and using that model for a
   MEPhI cluster run on puzzle `991`.
+- User clarified that for one-output models `BEAM_B_MICRO` should be treated as
+  a Stream1 row budget and divided by `24` to get the effective parent batch;
+  otherwise the 8xA100 run overloads GPU buffers by treating `8192` as parent
+  rows and materializing `8192 * 24` model rows.

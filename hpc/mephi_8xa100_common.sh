@@ -93,14 +93,43 @@ beam_round_up() {
   echo $(( ((value + alignment - 1) / alignment) * alignment ))
 }
 
+beam_stream1_output_dim() {
+  local weight_dir="${BEAM_WEIGHT_DIR:-${REPO_DIR}/stream1_weights}"
+  "${NINJA_VENV_DIR}/bin/python" - "${weight_dir}/manifest.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text())
+print(int(manifest["output_dim"]))
+PY
+}
+
+beam_stream1_parent_batch_from_row_budget() {
+  local row_budget="$1"
+  local output_dim="$2"
+  if [ "${output_dim}" -eq 1 ]; then
+    if [ "${row_budget}" -lt 24 ]; then
+      echo "BEAM_B_MICRO row budget is smaller than one 24-move expansion: ${row_budget}" >&2
+      return 2
+    fi
+    echo $((row_budget / 24))
+  else
+    echo "${row_budget}"
+  fi
+}
+
 beam_derive_shard_capacity() {
+  STREAM1_OUTPUT_DIM="$(beam_stream1_output_dim)"
+  BEAM_PARENT_BATCH_EFFECTIVE="$(beam_stream1_parent_batch_from_row_budget "${BEAM_B_MICRO}" "${STREAM1_OUTPUT_DIM}")"
+  STREAM1_ROWS_PER_JOB_EFFECTIVE=$((BEAM_PARENT_BATCH_EFFECTIVE * (STREAM1_OUTPUT_DIM == 1 ? 24 : 1)))
   BEAM_ALIGNMENT=$((WORLD_SIZE_EFFECTIVE * SHARD_COUNT * STREAM4_BATCH_ALIGNMENT))
   GLOBAL_BEAM_WIDTH_EFFECTIVE="$(beam_round_up "${BEAM_WIDTH}" "${BEAM_ALIGNMENT}")"
   LOCAL_BEAM_WIDTH=$((GLOBAL_BEAM_WIDTH_EFFECTIVE / WORLD_SIZE_EFFECTIVE))
   LOGICAL_SHARD_SIZE=$(( (LOCAL_BEAM_WIDTH + SHARD_COUNT - 1) / SHARD_COUNT ))
   SHARD_CAPACITY_RAW=$(( (LOGICAL_SHARD_SIZE * SHARD_CAPACITY_SCALE_PPM + 999999) / 1000000 ))
   SHARD_CAPACITY_CANDIDATES="$(beam_round_up "${SHARD_CAPACITY_RAW}" "${STREAM4_BATCH_ALIGNMENT}")"
-  STREAM3_BATCH_CANDIDATES=$((BEAM_STREAM3_RING_SLOTS * BEAM_B_MICRO * 24))
+  STREAM3_BATCH_CANDIDATES=$((BEAM_STREAM3_RING_SLOTS * BEAM_PARENT_BATCH_EFFECTIVE * 24))
 }
 
 beam_validate_manual_config() {
