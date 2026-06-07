@@ -226,7 +226,7 @@ int main() {
     BEAM_CUDA_CHECK(cudaMalloc(&d_cutlass_out, cutlass_out.size() * sizeof(half)));
     BEAM_CUDA_CHECK(cudaMemcpy(d_cutlass_in, cutlass_in.data(), cutlass_in.size() * sizeof(half), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(d_cutlass_w, cutlass_w.data(), cutlass_w.size() * sizeof(half), cudaMemcpyHostToDevice));
-    stream1_cutlass_linear_cuda(d_cutlass_in, d_cutlass_w, d_cutlass_out, 16, 8, 8, 0);
+    stream1_cutlass_linear_cuda(d_cutlass_in, d_cutlass_w, d_cutlass_out, 16, 8, 8, STREAM1_DTYPE_FP16, 0);
     BEAM_CUDA_CHECK(cudaGetLastError());
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
     BEAM_CUDA_CHECK(cudaMemcpy(cutlass_out.data(), d_cutlass_out, cutlass_out.size() * sizeof(half), cudaMemcpyDeviceToHost));

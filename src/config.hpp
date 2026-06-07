@@ -11,6 +11,10 @@ inline constexpr std::size_t STATE_STORAGE_LEN = 128;
 inline constexpr std::size_t STATE_VALUE_PAD = 128;
 inline constexpr std::size_t MOVE_COUNT = 24;
 inline constexpr std::uint32_t STREAM1_SINGLE_SCORE_OUTPUT_DIM = 1;
+inline constexpr std::uint32_t STREAM1_DTYPE_FP16 = 0;
+inline constexpr std::uint32_t STREAM1_DTYPE_BF16 = 1;
+inline constexpr std::uint32_t STREAM1_NORM_NONE = 0;
+inline constexpr std::uint32_t STREAM1_NORM_LAYERNORM = 1;
 
 inline constexpr float SCORE_MAX_Q = 300.0f;
 inline constexpr std::uint32_t SCORE_SCALE = 1024;
@@ -26,6 +30,8 @@ struct Stream1ModelConfig {
     std::uint32_t hidden2 = 512;
     std::uint32_t residual_count = 2;
     std::uint32_t output_dim = static_cast<std::uint32_t>(MOVE_COUNT);
+    std::uint32_t dtype = STREAM1_DTYPE_FP16;
+    std::uint32_t normalization = STREAM1_NORM_NONE;
 };
 
 struct RuntimeConfig {

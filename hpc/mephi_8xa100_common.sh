@@ -131,7 +131,7 @@ beam_export_common_runtime() {
   export NCCL_DEBUG="${NCCL_DEBUG:-WARN}"
   export NCCL_ASYNC_ERROR_HANDLING=1
   export CUDA_DEVICE_MAX_CONNECTIONS=32
-  export BEAM_WEIGHT_DIR="${REPO_DIR}/stream1_weights"
+  export BEAM_WEIGHT_DIR="${BEAM_WEIGHT_DIR:-${REPO_DIR}/stream1_weights}"
   export BEAM_DEPTH_LOG_EVERY=1
   export BEAM_HISTORY_MODE="${BEAM_HISTORY_MODE:-static_hybrid}"
   export BEAM_HISTORY_SLOT_COUNT="${BEAM_HISTORY_SLOT_COUNT:-2}"

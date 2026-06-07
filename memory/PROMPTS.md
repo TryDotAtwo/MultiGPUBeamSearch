@@ -276,3 +276,12 @@
   to create a reflected synthetic puzzle, solves that synthetic puzzle, and
   prints both solutions plus the inverted reflected solution as a candidate for
   the original puzzle.
+- User requested adding script support for comparing pure solution lengths and
+  showing deltas between an existing submission and newly found solutions.
+- User requested making the Artgor `m_az_v4_v_only.pt` ResMLPDistance model
+  runnable in the project's Stream1 runtime by adding LayerNorm-aware export
+  and runtime support, using bf16 on modern GPUs and fp16 on T4, with no
+  fallback CUDA path.
+- User requested downloading the Artgor value-only model, exporting it for
+  Stream1, pushing the exported weights to GitHub, and using that model for a
+  MEPhI cluster run on puzzle `991`.

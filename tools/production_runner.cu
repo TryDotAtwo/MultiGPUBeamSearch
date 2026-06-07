@@ -3138,6 +3138,9 @@ int main(int argc, char** argv) {
     std::cout << "stream1_model_hidden2=" << stream1_model.hidden2 << "\n";
     std::cout << "stream1_model_residual_count=" << stream1_model.residual_count << "\n";
     std::cout << "stream1_model_output_dim=" << stream1_model.output_dim << "\n";
+    std::cout << "stream1_model_dtype=" << (stream1_model.dtype == STREAM1_DTYPE_BF16 ? "bf16" : "fp16") << "\n";
+    std::cout << "stream1_model_normalization="
+              << (stream1_model.normalization == STREAM1_NORM_LAYERNORM ? "layernorm" : "none") << "\n";
     std::cout << "stream1_model_weight_bytes=" << stream1_weights::total_host_weight_bytes(host_weights) << "\n";
     std::cout << "solved_neighborhood_radius=" << solved_neighborhood.radius << "\n";
     std::cout << "solved_neighborhood_entries=" << solved_neighborhood.entry_count << "\n";
@@ -3201,14 +3204,6 @@ int main(int argc, char** argv) {
     CudaGraphJobTemplates graphs;
     create_dispatcher_streams(streams);
     create_dispatcher_events(events);
-    const std::vector<const half*> residual_fc1_weight =
-        stream1_weights::const_pointer_vector(device_weights.residual_fc1_weight);
-    const std::vector<const half*> residual_fc1_bias =
-        stream1_weights::const_pointer_vector(device_weights.residual_fc1_bias);
-    const std::vector<const half*> residual_fc2_weight =
-        stream1_weights::const_pointer_vector(device_weights.residual_fc2_weight);
-    const std::vector<const half*> residual_fc2_bias =
-        stream1_weights::const_pointer_vector(device_weights.residual_fc2_bias);
     const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
     std::vector<Stream1CutlassScratch> stream1_scratch_lanes;
     stream1_scratch_lanes.reserve(config.inference_parallelism);
@@ -3224,12 +3219,20 @@ int main(int argc, char** argv) {
         Stream1NetworkView{
             device_weights.input_weight,
             device_weights.input_bias,
+            device_weights.input_ln_gamma,
+            device_weights.input_ln_beta,
             device_weights.hidden_weight,
             device_weights.hidden_bias,
-            residual_fc1_weight.data(),
-            residual_fc1_bias.data(),
-            residual_fc2_weight.data(),
-            residual_fc2_bias.data(),
+            device_weights.hidden_ln_gamma,
+            device_weights.hidden_ln_beta,
+            reinterpret_cast<const half* const*>(device_weights.residual_fc1_weight_table),
+            reinterpret_cast<const half* const*>(device_weights.residual_fc1_bias_table),
+            reinterpret_cast<const half* const*>(device_weights.residual_fc1_ln_gamma_table),
+            reinterpret_cast<const half* const*>(device_weights.residual_fc1_ln_beta_table),
+            reinterpret_cast<const half* const*>(device_weights.residual_fc2_weight_table),
+            reinterpret_cast<const half* const*>(device_weights.residual_fc2_bias_table),
+            reinterpret_cast<const half* const*>(device_weights.residual_fc2_ln_gamma_table),
+            reinterpret_cast<const half* const*>(device_weights.residual_fc2_ln_beta_table),
             device_weights.output_weight,
             device_weights.output_bias,
             dims},
