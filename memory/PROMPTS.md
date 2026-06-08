@@ -289,3 +289,6 @@
   a Stream1 row budget and divided by `24` to get the effective parent batch;
   otherwise the 8xA100 run overloads GPU buffers by treating `8192` as parent
   rows and materializing `8192 * 24` model rows.
+- User requested a reflected-only MEPhI job with a 24-hour SLURM limit, using
+  the already found puzzle `991` original solution instead of spending time
+  solving the original again.
