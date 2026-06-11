@@ -1,16 +1,24 @@
 #!/bin/bash
 
 beam_setup_paths() {
-  JOB_DIR="${SLURM_SUBMIT_DIR:-/mnt/pool/6/vokirova/beam8a100}"
-  REPO_DIR="${JOB_DIR}/repo"
-  BUILD_DIR="${JOB_DIR}/build-a100"
-  CUTLASS_DIR="${CUTLASS_DIR:-/mnt/pool/3/vokirova/cutlass}"
-  NINJA_VENV_DIR="${NINJA_VENV_DIR:-/mnt/pool/3/vokirova/ninja-venv}"
-  NCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR:-${NINJA_VENV_DIR}/lib/python3.13/site-packages/nvidia/nccl/include}"
-  NCCL_LIBRARY="${NCCL_LIBRARY:-${NINJA_VENV_DIR}/lib/python3.13/site-packages/nvidia/nccl/lib/libnccl.so.2}"
-  HISTORY_DIR="${JOB_DIR}/history"
-  LOG_DIR="${JOB_DIR}/logs"
-  TUNING_DIR="${LOG_DIR}/tuning_${SLURM_JOB_ID:-manual}"
+  JOB_DIR="${JOB_DIR:-${SLURM_SUBMIT_DIR:-/mnt/pool/6/vokirova/beam8a100}}"
+  if [ -n "${REPO_DIR:-}" ]; then
+    REPO_DIR="${REPO_DIR}"
+  elif [ -d "${JOB_DIR}/repo/.git" ]; then
+    REPO_DIR="${JOB_DIR}/repo"
+  elif [ -d "${JOB_DIR}/.git" ]; then
+    REPO_DIR="${JOB_DIR}"
+  else
+    REPO_DIR="${JOB_DIR}/repo"
+  fi
+  BUILD_DIR="${BUILD_DIR:-${JOB_DIR}/build-a100}"
+  CUTLASS_DIR="${CUTLASS_DIR:-${REPO_DIR}/external/cutlass}"
+  NINJA_VENV_DIR="${NINJA_VENV_DIR:-${VIRTUAL_ENV:-/mnt/pool/3/vokirova/ninja-venv}}"
+  NCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR:-}"
+  NCCL_LIBRARY="${NCCL_LIBRARY:-}"
+  HISTORY_DIR="${HISTORY_DIR:-${JOB_DIR}/history}"
+  LOG_DIR="${LOG_DIR:-${JOB_DIR}/logs}"
+  TUNING_DIR="${TUNING_DIR:-${LOG_DIR}/tuning_${SLURM_JOB_ID:-manual}}"
   TORCHRUN_NNODES="${TORCHRUN_NNODES:-1}"
   TORCHRUN_NPROC_PER_NODE="${TORCHRUN_NPROC_PER_NODE:-8}"
   TORCHRUN_NODE_RANK="${TORCHRUN_NODE_RANK:-${SLURM_NODEID:-0}}"
@@ -33,6 +41,17 @@ beam_preflight() {
   if [ ! -x "${NINJA_VENV_DIR}/bin/python" ]; then
     echo "missing_python=${NINJA_VENV_DIR}/bin/python"
     exit 2
+  fi
+  if [ -z "${NCCL_INCLUDE_DIR}" ] || [ -z "${NCCL_LIBRARY}" ]; then
+    local nccl_base
+    nccl_base="$("${NINJA_VENV_DIR}/bin/python" - <<'PY'
+from pathlib import Path
+import nvidia.nccl
+print(Path(nvidia.nccl.__file__).resolve().parent)
+PY
+)"
+    NCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR:-${nccl_base}/include}"
+    NCCL_LIBRARY="${NCCL_LIBRARY:-${nccl_base}/lib/libnccl.so.2}"
   fi
   if [ ! -f "${NCCL_INCLUDE_DIR}/nccl.h" ]; then
     echo "missing_nccl_header=${NCCL_INCLUDE_DIR}/nccl.h"
@@ -246,7 +265,7 @@ beam_safe_clean_child() {
   resolved_job="$(realpath -m "${JOB_DIR}")"
   resolved_target="$(realpath -m "${target}")"
   case "${resolved_target}" in
-    "${resolved_job}/build-a100"|"${resolved_job}/history")
+    "${resolved_job}/build-a100"|"${resolved_job}/history"|"${resolved_job}"/build-a100-*|"${resolved_job}"/history-*)
       if [ -d "${resolved_target}" ]; then
         echo "cleanup_remove_${label}=${resolved_target}"
         rm -rf --one-file-system "${resolved_target}"
@@ -263,10 +282,13 @@ beam_safe_clear_history_contents() {
   local resolved_history
   resolved_job="$(realpath -m "${JOB_DIR}")"
   resolved_history="$(realpath -m "${HISTORY_DIR}")"
-  if [ "${resolved_history}" != "${resolved_job}/history" ]; then
-    echo "history_clear_skip=unsafe_path:${resolved_history}"
-    return 2
-  fi
+  case "${resolved_history}" in
+    "${resolved_job}/history"|"${resolved_job}"/history-*) ;;
+    *)
+      echo "history_clear_skip=unsafe_path:${resolved_history}"
+      return 2
+      ;;
+  esac
   mkdir -p "${resolved_history}"
   find "${resolved_history}" -mindepth 1 -maxdepth 1 -xdev -exec rm -rf -- {} +
 }

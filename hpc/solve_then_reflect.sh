@@ -9,7 +9,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
-source "${SCRIPT_DIR}/mephi_8xa100_common.sh"
+BEAM_COMMON_SH="${BEAM_COMMON_SH:-${SCRIPT_DIR}/mephi_8xa100_common.sh}"
+if [ ! -f "${BEAM_COMMON_SH}" ]; then
+  echo "missing_common_script=${BEAM_COMMON_SH}"
+  exit 2
+fi
+source "${BEAM_COMMON_SH}"
 
 beam_setup_paths
 

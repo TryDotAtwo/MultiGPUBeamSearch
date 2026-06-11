@@ -3,9 +3,14 @@
 /build/
 /build-docker/
 /build-debug-docker/
+/build-a100/
+/build-a100-*/
+/history/
+/history-*/
 /test_results/
 /external/
 /submit.csv
+core.*
 *.nsys-rep
 *.sqlite
 *.tmp

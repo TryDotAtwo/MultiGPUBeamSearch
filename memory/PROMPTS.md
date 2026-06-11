@@ -1,5 +1,12 @@
 # Prompt History
 
+## 2026-06-11
+- User requested a GitHub-ready portable folder and script so another person can
+  clone the repository and run the current original-plus-reflected beam search
+  on 8xA100 80GB with `BEAM_WIDTH=1400000000` and `SHARD_COUNT=64`.
+- User explicitly requested removing fallback behavior from the common-script
+  sourcing path.
+
 ## 2026-06-05
 - User asked to inspect current uncommitted local work, analyze GitHub and the
   local project, then requested pushing all of the current uncommitted work to

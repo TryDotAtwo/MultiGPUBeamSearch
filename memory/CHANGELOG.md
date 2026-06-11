@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-11
+- Added `hpc/portable_8xa100_80gb/`, a portable 8xA100 80GB SLURM launch
+  package for `BEAM_WIDTH=1400000000` with `SHARD_COUNT=64`. The launcher runs
+  the full original-plus-reflected solve workflow and uses per-job build/history
+  directories to avoid cross-job collisions.
+- Made `hpc/mephi_8xa100_common.sh` support both the MEPhI `workdir/repo`
+  layout and a normal cloned repository root, while keeping cleanup constrained
+  to known build/history child directories.
+- Made NCCL include/library paths auto-detect from the active venv's
+  `nvidia.nccl` package unless explicitly provided.
+- Changed `hpc/solve_then_reflect.sh` to source its common script from explicit
+  `BEAM_COMMON_SH` when provided; no fallback path is used.
+- Ignored portable run artifacts (`build-a100*`, `history*`) and `core.*`
+  dumps in `.gitignore`.
+
 ## 2026-06-05
 - Prepared Kaggle and Molab experiment artifacts for GitHub publication:
   updated the main Kaggle notebooks for multi-model Stream1 test selection,
