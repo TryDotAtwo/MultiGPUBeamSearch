@@ -31,6 +31,18 @@ chmod +x ihes_cube_smoke.sh
 sbatch -p kaf12 ihes_cube_smoke.sh
 ```
 
+To avoid cancelling existing jobs, submit after the newest active `vokirova`
+job:
+
+```bash
+DEP_AFTER="$(squeue -h -u vokirova -o '%i' | tail -n 1)"
+if [ -n "${DEP_AFTER}" ]; then
+  sbatch -p kaf12 --dependency=afterany:${DEP_AFTER} ihes_cube_smoke.sh
+else
+  sbatch -p kaf12 ihes_cube_smoke.sh
+fi
+```
+
 Logs:
 
 ```bash

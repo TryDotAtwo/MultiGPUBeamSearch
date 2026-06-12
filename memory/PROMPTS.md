@@ -8,6 +8,8 @@
   requiring compile-time move-count specialization and direct `puzzle_info`
   generator loading.
 - User requested pushing all cluster-start files for IHES cube tests to GitHub.
+- User requested avoiding `scancel`, using SLURM dependencies instead, and
+  setting cluster script time limits to 24 hours.
 
 ## 2026-06-11
 - User requested a GitHub-ready portable folder and script so another person can

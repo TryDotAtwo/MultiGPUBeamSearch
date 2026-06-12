@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=00:30:00
+#SBATCH --time=24:00:00
 #SBATCH --job-name=ihes_smoke
 #SBATCH --output=/mnt/pool/6/vokirova/beam8a100/ihes_cube_smoke/logs/ihes-smoke-%j.out
 

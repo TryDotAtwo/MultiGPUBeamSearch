@@ -26,6 +26,9 @@
   `cayleypy-ihes-cube`. It downloads Kaggle data, creates dummy 1-output fp16
   weights, compiles with `STATE_LEN=72` / `MOVE_COUNT=18`, and runs a tiny
   single-GPU pipeline check.
+- Standardized tracked HPC SLURM scripts to a `24:00:00` walltime and documented
+  dependency-based IHES smoke submission so new checks can wait for existing
+  jobs instead of cancelling them.
 
 ## 2026-06-11
 - Added `hpc/portable_8xa100_80gb/`, a portable 8xA100 80GB SLURM launch
