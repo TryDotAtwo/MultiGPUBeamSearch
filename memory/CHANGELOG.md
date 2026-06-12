@@ -22,6 +22,10 @@
   `actions`/`names` JSON or top-level `generators` JSON, and added
   `BEAM_GENERATOR_PATH` so non-megaminx runs can use `data/puzzle_info.json`
   directly.
+- Added `hpc/ihes_cube_smoke/`, a GitHub-tracked MEPhI SLURM smoke package for
+  `cayleypy-ihes-cube`. It downloads Kaggle data, creates dummy 1-output fp16
+  weights, compiles with `STATE_LEN=72` / `MOVE_COUNT=18`, and runs a tiny
+  single-GPU pipeline check.
 
 ## 2026-06-11
 - Added `hpc/portable_8xa100_80gb/`, a portable 8xA100 80GB SLURM launch

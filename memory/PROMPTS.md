@@ -7,6 +7,7 @@
 - User asked to try the `cayleypy-ihes-cube` Kaggle competition locally,
   requiring compile-time move-count specialization and direct `puzzle_info`
   generator loading.
+- User requested pushing all cluster-start files for IHES cube tests to GitHub.
 
 ## 2026-06-11
 - User requested a GitHub-ready portable folder and script so another person can
