@@ -15,6 +15,13 @@
 - Added a CMake-script state-sizing smoke check that verifies the current
   megaminx shape remains `120` logical bytes / `128` physical bytes and that
   exact-alignment state lengths still reserve padding for finalization metadata.
+- Extended compile-time puzzle specialization to infer `BEAM_MOVE_COUNT` from
+  `puzzle_info.json`, keeping megaminx at 24 moves and allowing IHES cube to
+  compile with 18 moves.
+- Made `production_runner` read generators/move names from either the old
+  `actions`/`names` JSON or top-level `generators` JSON, and added
+  `BEAM_GENERATOR_PATH` so non-megaminx runs can use `data/puzzle_info.json`
+  directly.
 
 ## 2026-06-11
 - Added `hpc/portable_8xa100_80gb/`, a portable 8xA100 80GB SLURM launch

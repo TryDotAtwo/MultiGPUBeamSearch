@@ -339,22 +339,30 @@ std::string read_text_file(const std::filesystem::path& path) {
 std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path) {
     const std::string text = read_text_file(path);
     std::size_t pos = text.find("\"actions\"");
-    if (pos == std::string::npos) {
-        throw std::runtime_error("p900 generator json missing actions");
+    const bool actions_format = pos != std::string::npos;
+    if (!actions_format) {
+        pos = text.find("\"generators\"");
+        if (pos == std::string::npos) {
+            throw std::runtime_error("generator json missing actions/generators");
+        }
     }
-    pos = text.find('[', pos);
+    if (actions_format) {
+        pos = text.find('[', pos);
+    } else {
+        pos = text.find('{', text.find("\"generators\""));
+    }
     if (pos == std::string::npos) {
-        throw std::runtime_error("p900 generator json malformed actions");
+        throw std::runtime_error("generator json malformed actions/generators");
     }
     std::vector<std::uint8_t> generators(MOVE_COUNT * STATE_STORAGE_LEN);
     for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
         pos = text.find('[', pos + 1);
         if (pos == std::string::npos) {
-            throw std::runtime_error("p900 generator json missing move array");
+            throw std::runtime_error("generator json missing move array");
         }
         for (std::uint32_t p = 0; p < STATE_LEN; ++p) {
             generators[move * STATE_STORAGE_LEN + p] =
-                static_cast<std::uint8_t>(parse_next_u32(text, pos, "p900 generator"));
+                static_cast<std::uint8_t>(parse_next_u32(text, pos, "generator"));
         }
         for (std::uint32_t p = STATE_LEN; p < STATE_STORAGE_LEN; ++p) {
             generators[move * STATE_STORAGE_LEN + p] = static_cast<std::uint8_t>(p);
@@ -366,12 +374,21 @@ std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path
 std::vector<std::string> load_p900_move_names(const std::filesystem::path& path) {
     const std::string text = read_text_file(path);
     std::size_t pos = text.find("\"names\"");
-    if (pos == std::string::npos) {
-        throw std::runtime_error("p900 generator json missing names");
-    }
-    pos = text.find('[', pos);
-    if (pos == std::string::npos) {
-        throw std::runtime_error("p900 generator json malformed names");
+    const bool names_format = pos != std::string::npos;
+    if (names_format) {
+        pos = text.find('[', pos);
+        if (pos == std::string::npos) {
+            throw std::runtime_error("generator json malformed names");
+        }
+    } else {
+        pos = text.find("\"generators\"");
+        if (pos == std::string::npos) {
+            throw std::runtime_error("generator json missing names/generators");
+        }
+        pos = text.find('{', pos);
+        if (pos == std::string::npos) {
+            throw std::runtime_error("generator json malformed generators");
+        }
     }
     std::vector<std::string> names;
     while (names.size() < MOVE_COUNT) {
@@ -385,6 +402,14 @@ std::vector<std::string> load_p900_move_names(const std::filesystem::path& path)
         }
         names.push_back(text.substr(begin + 1, end - begin - 1));
         pos = end;
+        if (!names_format) {
+            const std::size_t colon = text.find(':', pos);
+            const std::size_t array = text.find('[', pos);
+            if (colon == std::string::npos || array == std::string::npos || colon > array) {
+                throw std::runtime_error("generator json malformed generator entry");
+            }
+            pos = array;
+        }
     }
     return names;
 }
@@ -3115,7 +3140,8 @@ int main(int argc, char** argv) {
     std::cout << "frontier_state_capacity=" << plan.frontier_states << "\n";
 #endif
 
-    const std::filesystem::path generator_path = "FullBeamNice/generators/p900.json";
+    const std::filesystem::path generator_path =
+        env_path("BEAM_GENERATOR_PATH", "FullBeamNice/generators/p900.json");
     const std::filesystem::path puzzle_info_path = "data/puzzle_info.json";
     const std::filesystem::path test_csv_path = "data/test.csv";
     const std::vector<std::uint8_t> host_generators = load_p900_generators(generator_path);

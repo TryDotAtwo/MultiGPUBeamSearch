@@ -5,6 +5,7 @@ beam_configure_state_sizing()
 message(STATUS "Beam state logical bytes: ${BEAM_STATE_LOGICAL_BYTES}")
 message(STATUS "Beam state physical bytes: ${BEAM_STATE_PHYSICAL_BYTES}")
 message(STATUS "Beam state alignment: ${BEAM_STATE_ALIGNMENT}")
+message(STATUS "Beam move count: ${BEAM_MOVE_COUNT}")
 project(beam_solver_contracts LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -91,6 +92,7 @@ target_compile_definitions(beam_core PUBLIC
     BEAM_STATE_LOGICAL_BYTES=${BEAM_STATE_LOGICAL_BYTES}
     BEAM_STATE_PHYSICAL_BYTES=${BEAM_STATE_PHYSICAL_BYTES}
     BEAM_STATE_ALIGNMENT=${BEAM_STATE_ALIGNMENT}
+    BEAM_MOVE_COUNT=${BEAM_MOVE_COUNT}
 )
 
 add_executable(contract_tests tests/contract_tests.cpp)
