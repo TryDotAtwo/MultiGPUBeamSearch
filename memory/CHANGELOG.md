@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-12
+- Started compile-time puzzle state specialization. CMake now infers
+  `BEAM_STATE_LOGICAL_BYTES` from `data/puzzle_info.json` by default, computes
+  aligned `BEAM_STATE_PHYSICAL_BYTES`, and passes state size/alignment into all
+  targets as compile definitions.
+- Replaced the fixed `State128` storage definition with a configurable
+  `StatePacked` alias, while preserving the existing `State128` type name for
+  incremental compatibility. Final-response temporary metadata now uses the
+  first padding bytes after `STATE_LEN` instead of hard-coded `v[120]`.
+- Made final materialization state buffers align to `alignof(State128)` /
+  `alignof(FinalResponse)`, and made the old batchnorm-folded Stream1 exporter
+  accept configurable `--num-classes`.
+- Added a CMake-script state-sizing smoke check that verifies the current
+  megaminx shape remains `120` logical bytes / `128` physical bytes and that
+  exact-alignment state lengths still reserve padding for finalization metadata.
+
 ## 2026-06-11
 - Added `hpc/portable_8xa100_80gb/`, a portable 8xA100 80GB SLURM launch
   package for `BEAM_WIDTH=1400000000` with `SHARD_COUNT=64`. The launcher runs

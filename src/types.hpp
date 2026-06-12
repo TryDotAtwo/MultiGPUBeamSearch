@@ -9,9 +9,10 @@ namespace beam {
 
 using StateValue = std::uint8_t;
 
-struct alignas(16) State128 {
+struct alignas(STATE_ALIGNMENT) StatePacked {
     StateValue v[STATE_STORAGE_LEN];
 };
+using State128 = StatePacked;
 
 struct alignas(16) Hash128 {
     std::uint64_t lo;
@@ -69,16 +70,16 @@ using ZobristTable = std::array<std::array<Hash128, STATE_VALUE_PAD>, STATE_STOR
 #define BEAM_HOST_DEVICE
 #endif
 
-static_assert(sizeof(State128) == 128);
-static_assert(alignof(State128) == 16);
+static_assert(sizeof(State128) == STATE_STORAGE_LEN);
+static_assert(alignof(State128) == STATE_ALIGNMENT);
 static_assert(sizeof(Hash128) == 16);
 static_assert(alignof(Hash128) == 16);
 static_assert(sizeof(CandidateMeta) == 32);
 static_assert(alignof(CandidateMeta) == 32);
 static_assert(sizeof(FinalRequest) == 16);
 static_assert(alignof(FinalRequest) == 16);
-static_assert(sizeof(FinalResponse) == 128);
-static_assert(alignof(FinalResponse) == 16);
+static_assert(sizeof(FinalResponse) == STATE_STORAGE_LEN);
+static_assert(alignof(FinalResponse) == STATE_ALIGNMENT);
 static_assert(sizeof(FinalHistoryRecord) == 64);
 static_assert(alignof(FinalHistoryRecord) == 32);
 static_assert(sizeof(FinalHistoryRecord) % sizeof(std::uint64_t) == 0);

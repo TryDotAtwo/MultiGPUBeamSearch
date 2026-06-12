@@ -64,8 +64,8 @@ int main() {
 
     const auto zobrist = make_deterministic_zobrist(42);
     Hash128 h1 = hash_state(state, zobrist);
-    state.v[120] = 99;
-    state.v[127] = 123;
+    state.v[STATE_LEN] = 99;
+    state.v[STATE_STORAGE_LEN - 1] = 123;
     Hash128 h2 = hash_state(state, zobrist);
     require(h1 == h2, "padding must not influence hash");
     clear_state_padding(state);

@@ -1,10 +1,15 @@
 cmake_minimum_required(VERSION 3.22)
+set(BEAM_CUDA_ARCHITECTURES "75;86" CACHE STRING "CUDA architectures to build, e.g. 75;86 or 120")
+include(cmake/BeamStateSizing.cmake)
+beam_configure_state_sizing()
+message(STATUS "Beam state logical bytes: ${BEAM_STATE_LOGICAL_BYTES}")
+message(STATUS "Beam state physical bytes: ${BEAM_STATE_PHYSICAL_BYTES}")
+message(STATUS "Beam state alignment: ${BEAM_STATE_ALIGNMENT}")
 project(beam_solver_contracts LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(BEAM_CUDA_ARCHITECTURES "75;86" CACHE STRING "CUDA architectures to build, e.g. 75;86 or 120")
 option(BEAM_ENABLE_DEBUG "Master switch for all debug instrumentation" OFF)
 option(BEAM_ENABLE_DEPTH_LOGS "Compile production_runner per-depth logs when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_DEBUG_LOGS "Compile production_runner debug/memory logs when BEAM_ENABLE_DEBUG is ON" OFF)
@@ -82,6 +87,11 @@ add_library(beam_core
     src/frontier_cpu.cpp
 )
 target_include_directories(beam_core PUBLIC src)
+target_compile_definitions(beam_core PUBLIC
+    BEAM_STATE_LOGICAL_BYTES=${BEAM_STATE_LOGICAL_BYTES}
+    BEAM_STATE_PHYSICAL_BYTES=${BEAM_STATE_PHYSICAL_BYTES}
+    BEAM_STATE_ALIGNMENT=${BEAM_STATE_ALIGNMENT}
+)
 
 add_executable(contract_tests tests/contract_tests.cpp)
 target_link_libraries(contract_tests PRIVATE beam_core)

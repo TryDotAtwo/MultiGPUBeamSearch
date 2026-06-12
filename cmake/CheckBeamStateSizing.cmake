@@ -1,0 +1,17 @@
+include("${CMAKE_CURRENT_LIST_DIR}/BeamStateSizing.cmake")
+
+beam_configure_state_sizing()
+if(NOT BEAM_STATE_LOGICAL_BYTES STREQUAL "120")
+    message(FATAL_ERROR "Expected inferred logical bytes 120, got ${BEAM_STATE_LOGICAL_BYTES}")
+endif()
+if(NOT BEAM_STATE_PHYSICAL_BYTES STREQUAL "128")
+    message(FATAL_ERROR "Expected inferred physical bytes 128, got ${BEAM_STATE_PHYSICAL_BYTES}")
+endif()
+
+set(BEAM_STATE_LOGICAL_BYTES "128" CACHE STRING "" FORCE)
+beam_configure_state_sizing()
+if(NOT BEAM_STATE_PHYSICAL_BYTES STREQUAL "144")
+    message(FATAL_ERROR "Expected physical bytes 144 for logical 128, got ${BEAM_STATE_PHYSICAL_BYTES}")
+endif()
+
+message(STATUS "Beam state sizing checks passed")

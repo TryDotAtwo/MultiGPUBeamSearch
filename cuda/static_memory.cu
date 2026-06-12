@@ -540,15 +540,15 @@ std::size_t bytes_final_materialize(const RuntimeConfig& config, const DerivedCo
     if (config.world_size > 1U) {
         cursor.take<CandidateMeta>(shape.frontier);
     }
-    cursor.take<State128>(shape.frontier, alignof(CandidateMeta));
+    cursor.take<State128>(shape.frontier, alignof(State128));
     if (config.world_size > 1U) {
         cursor.take<std::uint32_t>(shape.final_slots * shape.final_exchange, 256);
         cursor.take<std::uint32_t>(shape.final_slots * shape.final_exchange, 256);
         cursor.take<FinalRequest>(shape.final_slots * shape.final_exchange, alignof(FinalRequest));
         cursor.take<FinalRequest>(shape.final_slots * shape.final_exchange, alignof(FinalRequest));
         cursor.take<FinalRequest>(shape.final_slots * shape.final_exchange, alignof(FinalRequest));
-        cursor.take<FinalResponse>(shape.final_slots * shape.final_exchange, alignof(CandidateMeta));
-        cursor.take<FinalResponse>(shape.final_slots * shape.final_exchange, alignof(CandidateMeta));
+        cursor.take<FinalResponse>(shape.final_slots * shape.final_exchange, alignof(FinalResponse));
+        cursor.take<FinalResponse>(shape.final_slots * shape.final_exchange, alignof(FinalResponse));
         cursor.take<FinalHistoryRecord>(shape.final_slots * shape.final_chunk, alignof(FinalHistoryRecord));
         cursor.take<FinalHistoryRecord>(shape.final_slots * shape.final_exchange, alignof(FinalHistoryRecord));
         cursor.take_bytes(final_materialize_cub_temp_bytes(static_cast<std::uint32_t>(shape.final_exchange)), 256);
@@ -810,7 +810,7 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
         memory.final.final_candidate_buffer = final_materialize.take<CandidateMeta>(plan.frontier_states);
     }
     memory.final.next_frontier_states_tmp =
-        final_materialize.take<State128>(plan.frontier_states, alignof(CandidateMeta));
+        final_materialize.take<State128>(plan.frontier_states, alignof(State128));
     if (plan.config.world_size > 1U) {
         const std::uint64_t final_slot_items =
             static_cast<std::uint64_t>(plan.final_materialize_slot_count) *
@@ -827,9 +827,9 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
         memory.final.final_mat_request_recv =
             final_materialize.take<FinalRequest>(final_slot_items, alignof(FinalRequest));
         memory.final.final_mat_response_send =
-            final_materialize.take<FinalResponse>(final_slot_items, alignof(CandidateMeta));
+            final_materialize.take<FinalResponse>(final_slot_items, alignof(FinalResponse));
         memory.final.final_mat_response_recv =
-            final_materialize.take<FinalResponse>(final_slot_items, alignof(CandidateMeta));
+            final_materialize.take<FinalResponse>(final_slot_items, alignof(FinalResponse));
         memory.final.final_mat_history_send =
             final_materialize.take<FinalHistoryRecord>(final_history_send_items, alignof(FinalHistoryRecord));
         memory.final.final_mat_history_recv =

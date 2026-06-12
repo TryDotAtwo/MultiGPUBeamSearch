@@ -469,7 +469,7 @@ std::filesystem::path make_history_dir(
     return dir;
 }
 
-std::string state120_to_text(const State128& state) {
+std::string state_to_text(const State128& state) {
     std::ostringstream out;
     for (std::uint32_t i = 0; i < STATE_LEN; ++i) {
         if (i != 0U) {
@@ -2632,7 +2632,7 @@ void write_solution_artifacts(
     const CpuCandidateHistory& history,
     const SolvedSnapshot& solved) {
     const std::string path_text = moves_to_path_text(solution.moves, move_names);
-    const std::string state_text = state120_to_text(final_state);
+    const std::string state_text = state_to_text(final_state);
     const std::filesystem::path solution_log =
         std::filesystem::path("test_results") /
         ("solution_p" + std::to_string(puzzle_id) +
@@ -2647,7 +2647,7 @@ void write_solution_artifacts(
     log << "solution_valid=" << (valid ? 1 : 0) << "\n";
     log << "solution_depth=" << solution.moves.size() << "\n";
     log << "solution_path=" << path_text << "\n";
-    log << "solution_state120=\"" << state_text << "\"\n";
+    log << "solution_state=\"" << state_text << "\"\n";
     log << "history_mode=" << history_mode_name(history.mode) << "\n";
     log << "history_dir=" << history.dir.string() << "\n";
     log << "history_depth_count=" << history.depth_counts.size() << "\n";
@@ -2699,7 +2699,7 @@ void write_solution_artifacts(
     std::cout << "solution_valid=" << (valid ? 1 : 0) << "\n";
     std::cout << "solution_depth=" << solution.moves.size() << "\n";
     std::cout << "solution_path=" << path_text << "\n";
-    std::cout << "solution_state120=\"" << state_text << "\"\n";
+    std::cout << "solution_state=\"" << state_text << "\"\n";
 #endif
 }
 

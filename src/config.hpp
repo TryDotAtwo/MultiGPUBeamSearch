@@ -6,10 +6,18 @@
 
 namespace beam {
 
-inline constexpr std::size_t STATE_LEN = 120;
-inline constexpr std::size_t STATE_STORAGE_LEN = 128;
+inline constexpr std::size_t STATE_LEN = BEAM_STATE_LOGICAL_BYTES;
+inline constexpr std::size_t STATE_STORAGE_LEN = BEAM_STATE_PHYSICAL_BYTES;
+inline constexpr std::size_t STATE_ALIGNMENT = BEAM_STATE_ALIGNMENT;
 inline constexpr std::size_t STATE_VALUE_PAD = 128;
 inline constexpr std::size_t MOVE_COUNT = 24;
+inline constexpr std::size_t FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET = STATE_LEN;
+static_assert(STATE_LEN > 0);
+static_assert(STATE_STORAGE_LEN >= STATE_LEN);
+static_assert(STATE_ALIGNMENT == 16 || STATE_ALIGNMENT == 32 || STATE_ALIGNMENT == 64);
+static_assert(STATE_STORAGE_LEN % STATE_ALIGNMENT == 0);
+static_assert(STATE_STORAGE_LEN >= STATE_LEN + sizeof(std::uint32_t), "FinalResponse requires 4 padding bytes");
+static_assert(STATE_VALUE_PAD <= 256);
 inline constexpr std::uint32_t STREAM1_SINGLE_SCORE_OUTPUT_DIM = 1;
 inline constexpr std::uint32_t STREAM1_DTYPE_FP16 = 0;
 inline constexpr std::uint32_t STREAM1_DTYPE_BF16 = 1;
@@ -25,7 +33,7 @@ inline constexpr std::uint32_t UINT32_THRESHOLD_MAX = std::numeric_limits<std::u
 
 struct Stream1ModelConfig {
     std::uint32_t state_len = static_cast<std::uint32_t>(STATE_LEN);
-    std::uint32_t num_classes = 120;
+    std::uint32_t num_classes = static_cast<std::uint32_t>(STATE_LEN);
     std::uint32_t hidden1 = 1536;
     std::uint32_t hidden2 = 512;
     std::uint32_t residual_count = 2;

@@ -14,17 +14,17 @@ bool padding_is_zero(const State128& state) {
 }
 
 void final_response_set_target_local_idx(FinalResponse& response, std::uint32_t target_local_idx) {
-    response.v[120] = static_cast<std::uint8_t>(target_local_idx);
-    response.v[121] = static_cast<std::uint8_t>(target_local_idx >> 8);
-    response.v[122] = static_cast<std::uint8_t>(target_local_idx >> 16);
-    response.v[123] = static_cast<std::uint8_t>(target_local_idx >> 24);
+    response.v[FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET] = static_cast<std::uint8_t>(target_local_idx);
+    response.v[FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET + 1] = static_cast<std::uint8_t>(target_local_idx >> 8);
+    response.v[FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET + 2] = static_cast<std::uint8_t>(target_local_idx >> 16);
+    response.v[FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET + 3] = static_cast<std::uint8_t>(target_local_idx >> 24);
 }
 
 std::uint32_t final_response_get_target_local_idx(const FinalResponse& response) {
-    return static_cast<std::uint32_t>(response.v[120]) |
-           (static_cast<std::uint32_t>(response.v[121]) << 8) |
-           (static_cast<std::uint32_t>(response.v[122]) << 16) |
-           (static_cast<std::uint32_t>(response.v[123]) << 24);
+    return static_cast<std::uint32_t>(response.v[FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET]) |
+           (static_cast<std::uint32_t>(response.v[FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET + 1]) << 8) |
+           (static_cast<std::uint32_t>(response.v[FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET + 2]) << 16) |
+           (static_cast<std::uint32_t>(response.v[FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET + 3]) << 24);
 }
 
 State128 make_state128(const std::vector<std::uint8_t>& logical_state) {
@@ -55,4 +55,3 @@ bool is_goal_state(const State128& state, const State128& central_state) {
 }
 
 } // namespace beam
-

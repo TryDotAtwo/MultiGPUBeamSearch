@@ -1,5 +1,10 @@
 # Prompt History
 
+## 2026-06-12
+- User requested making the beam search compile natively for each puzzle's
+  state size instead of hard-coding `State128`, with state logical length and
+  alignment derived from puzzle config at compile time.
+
 ## 2026-06-11
 - User requested a GitHub-ready portable folder and script so another person can
   clone the repository and run the current original-plus-reflected beam search

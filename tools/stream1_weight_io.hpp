@@ -184,7 +184,7 @@ inline std::string parse_manifest_string_default(
 
 inline void validate_model_config(const Stream1ModelConfig& model, const std::string& context) {
     if (model.state_len != STATE_LEN) {
-        throw std::runtime_error(context + ": stream1 state_len must match State128 logical length");
+        throw std::runtime_error(context + ": stream1 state_len must match compile-time STATE_LEN");
     }
     if (model.num_classes < STATE_LEN ||
         (model.output_dim != MOVE_COUNT && model.output_dim != STREAM1_SINGLE_SCORE_OUTPUT_DIM)) {

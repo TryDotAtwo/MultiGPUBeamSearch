@@ -91,7 +91,7 @@ def infer_residual_count(sd: TensorDict) -> int:
     return max(blocks) + 1
 
 
-def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDType) -> None:
+def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDType, num_classes: int) -> None:
     checkpoint = torch.load(weights_path, map_location="cpu", weights_only=False)
     sd = strip_orig_mod(unwrap_state_dict(checkpoint))
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -107,10 +107,11 @@ def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDTyp
         raise ValueError(f"hidden_layer input mismatch: hidden_in={hidden_in} hd1={hd1}")
     if output_in != hd2:
         raise ValueError(f"output_layer input mismatch: output_in={output_in} hd2={hd2}")
-    if input_dim % 120 != 0:
-        raise ValueError(f"input_dim is not divisible by 120 classes: input_dim={input_dim}")
-    state_len = input_dim // 120
-    num_classes = 120
+    if num_classes <= 0:
+        raise ValueError(f"num_classes must be positive: {num_classes}")
+    if input_dim % num_classes != 0:
+        raise ValueError(f"input_dim is not divisible by num_classes={num_classes}: input_dim={input_dim}")
+    state_len = input_dim // num_classes
     residual_count = infer_residual_count(sd)
 
     weight, bias = fold_linear_bn(sd, "input_layer", "bn1")
@@ -273,9 +274,10 @@ def main() -> None:
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--format", choices=["batchnorm-folded", "resmlp-layernorm"], default="batchnorm-folded")
     parser.add_argument("--dtype", choices=["fp16", "bf16"], default="fp16")
+    parser.add_argument("--num-classes", type=int, default=120)
     args = parser.parse_args()
     if args.format == "batchnorm-folded":
-        export_batchnorm_folded(args.weights, args.out, args.dtype)
+        export_batchnorm_folded(args.weights, args.out, args.dtype, args.num_classes)
     else:
         export_resmlp_layernorm(args.weights, args.out, args.dtype)
 
