@@ -287,15 +287,17 @@ __global__ void stream1_bias_relu_kernel(
     half* matrix,
     const half* bias,
     std::uint32_t rows,
-    std::uint32_t cols) {
+    std::uint32_t cols,
+    std::uint32_t dtype) {
     const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t total = rows * cols;
     if (i >= total) {
         return;
     }
     const std::uint32_t col = i % cols;
-    const float x = __half2float(matrix[i]) + __half2float(bias[col]);
-    matrix[i] = __float2half(relu_device(x));
+    const float x = stream1_load_scalar_device(matrix, i, dtype) +
+                    stream1_load_scalar_device(bias, col, dtype);
+    stream1_store_scalar_device(matrix, i, relu_device(x), dtype);
 }
 
 __global__ void stream1_residual_add_bias_relu_kernel(
@@ -303,15 +305,18 @@ __global__ void stream1_residual_add_bias_relu_kernel(
     const half* residual,
     const half* bias,
     std::uint32_t rows,
-    std::uint32_t cols) {
+    std::uint32_t cols,
+    std::uint32_t dtype) {
     const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t total = rows * cols;
     if (i >= total) {
         return;
     }
     const std::uint32_t col = i % cols;
-    const float x = __half2float(matrix[i]) + __half2float(residual[i]) + __half2float(bias[col]);
-    matrix[i] = __float2half(relu_device(x));
+    const float x = stream1_load_scalar_device(matrix, i, dtype) +
+                    stream1_load_scalar_device(residual, i, dtype) +
+                    stream1_load_scalar_device(bias, col, dtype);
+    stream1_store_scalar_device(matrix, i, relu_device(x), dtype);
 }
 
 __global__ void stream1_layernorm_relu_kernel(
@@ -519,9 +524,14 @@ void stream1_inference_cutlass_cuda(
         b_micro * (network.dims.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM
             ? static_cast<std::uint32_t>(MOVE_COUNT)
             : 1U);
-    if (network.dims.dtype != STREAM1_DTYPE_FP16 &&
-        network.dims.normalization != STREAM1_NORM_LAYERNORM) {
-        throw std::invalid_argument("Stream1 non-LayerNorm CUTLASS path currently requires fp16 weights");
+    if (network.dims.dtype == STREAM1_DTYPE_BF16) {
+        int device = 0;
+        cudaGetDevice(&device);
+        cudaDeviceProp prop{};
+        cudaGetDeviceProperties(&prop, device);
+        if (prop.major < 8) {
+            throw std::invalid_argument("Stream1 bf16 CUTLASS path requires SM80+ GPU");
+        }
     }
 #if BEAM_HAS_CUTLASS
     const dim3 input_block(128);
@@ -572,7 +582,8 @@ void stream1_inference_cutlass_cuda(
             scratch.hidden2,
             network.hidden_bias,
             inference_rows,
-            network.dims.hidden2);
+            network.dims.hidden2,
+            network.dims.dtype);
     }
 
     half* residual_in = scratch.hidden2;
@@ -603,7 +614,8 @@ void stream1_inference_cutlass_cuda(
                 residual_fc1,
                 network.residual_fc1_bias[block],
                 inference_rows,
-                network.dims.hidden2);
+                network.dims.hidden2,
+                network.dims.dtype);
         }
 
         stream1_cutlass_linear_cuda(
@@ -632,7 +644,8 @@ void stream1_inference_cutlass_cuda(
                 residual_in,
                 network.residual_fc2_bias[block],
                 inference_rows,
-                network.dims.hidden2);
+                network.dims.hidden2,
+                network.dims.dtype);
         }
 
         residual_in = residual_fc2;

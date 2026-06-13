@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-13
+- Enabled the non-LayerNorm Stream1 CUTLASS runtime path to consume bf16
+  exported weights. The post-GEMM bias/ReLU and residual add kernels now use
+  dtype-aware scalar loads/stores, while the existing fp16 half2 fast path is
+  unchanged.
+- Added an early SM80+ guard for bf16 Stream1 inference so bf16 runs fail
+  before kernel launch on GPUs that cannot execute the CUTLASS bf16 path.
+
 ## 2026-06-12
 - Started compile-time puzzle state specialization. CMake now infers
   `BEAM_STATE_LOGICAL_BYTES` from `data/puzzle_info.json` by default, computes

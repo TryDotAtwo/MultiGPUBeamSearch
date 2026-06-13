@@ -1,5 +1,9 @@
 # Prompt History
 
+## 2026-06-13
+- User requested bf16 support for the IHES one-output Stream1 model on the
+  existing CUTLASS path, with no CUDA fallback behavior.
+
 ## 2026-06-12
 - User requested making the beam search compile natively for each puzzle's
   state size instead of hard-coding `State128`, with state logical length and
