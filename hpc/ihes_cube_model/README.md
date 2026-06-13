@@ -8,9 +8,14 @@ The launcher expects the model at:
 /mnt/pool/6/vokirova/beam8a100/ihes_cube_model/model.pth
 ```
 
-It downloads the IHES competition data if needed, exports the `.pth` model to
-`stream1_weights_ihes_bf16`, compiles the runner with IHES state sizing, and
-runs `production_runner` through `torchrun` on 8 GPUs.
+Run `prepare_ihes_cube_model.sh` from the visible `basis` shell before `sbatch`.
+It downloads the IHES competition data, downloads the model from the GitHub
+release asset when missing, and exports the `.pth` model to
+`stream1_weights_ihes_bf16`.
+
+The SLURM `start.sh` does not perform network downloads. It only checks prepared
+inputs, compiles the runner with IHES state sizing, and runs
+`production_runner` through `torchrun` on 8 GPUs.
 
 Default run is intentionally small:
 
@@ -33,11 +38,13 @@ git log -1 --oneline
 cd /mnt/pool/6/vokirova/beam8a100
 mkdir -p ihes_cube_model
 cp repo/hpc/ihes_cube_model/ihes_cube_model.sh ihes_cube_model/start.sh
-sed -i 's/\r$//' ihes_cube_model/start.sh
-bash -n ihes_cube_model/start.sh
-chmod +x ihes_cube_model/start.sh
+cp repo/hpc/ihes_cube_model/prepare_ihes_cube_model.sh ihes_cube_model/prepare.sh
+sed -i 's/\r$//' ihes_cube_model/start.sh ihes_cube_model/prepare.sh
+bash -n ihes_cube_model/start.sh ihes_cube_model/prepare.sh
+chmod +x ihes_cube_model/start.sh ihes_cube_model/prepare.sh
 
 cd ihes_cube_model
+./prepare.sh
 sbatch -p kaf12 start.sh
 ```
 

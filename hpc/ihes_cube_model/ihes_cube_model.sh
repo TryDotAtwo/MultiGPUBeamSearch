@@ -15,9 +15,6 @@ JOB_DIR="${JOB_DIR:-${BASE_DIR}/ihes_cube_model}"
 RUN_DIR="${RUN_DIR:-${JOB_DIR}}"
 DATA_DIR="${DATA_DIR:-${RUN_DIR}/data}"
 MODEL_PATH="${MODEL_PATH:-${RUN_DIR}/model.pth}"
-MODEL_RELEASE_REPO="${MODEL_RELEASE_REPO:-TryDotAtwo/MultiGPUBeamSearch}"
-MODEL_RELEASE_TAG="${MODEL_RELEASE_TAG:-ihes-p888-model}"
-MODEL_RELEASE_ASSET="${MODEL_RELEASE_ASSET:-p888-t000_1778521793_e32692.pth}"
 WEIGHT_DIR="${WEIGHT_DIR:-${RUN_DIR}/stream1_weights_ihes_bf16}"
 BUILD_DIR="${BUILD_DIR:-${RUN_DIR}/build-a100-${SLURM_JOB_ID:-manual}}"
 HISTORY_DIR="${HISTORY_DIR:-${RUN_DIR}/history-${SLURM_JOB_ID:-manual}}"
@@ -74,68 +71,24 @@ BEAM_HISTORY_DISK_BYTES="${BEAM_HISTORY_DISK_BYTES:-274877906944}"
 beam_preflight
 
 if [ ! -f "${MODEL_PATH}" ]; then
-  echo "download_model_from_github=1"
-  if command -v gh >/dev/null 2>&1; then
-    gh release download "${MODEL_RELEASE_TAG}" \
-      --repo "${MODEL_RELEASE_REPO}" \
-      --pattern "${MODEL_RELEASE_ASSET}" \
-      --dir "${RUN_DIR}" \
-      --clobber
-  else
-    "${NINJA_VENV_DIR}/bin/python" - "${MODEL_RELEASE_REPO}" "${MODEL_RELEASE_TAG}" "${MODEL_RELEASE_ASSET}" "${RUN_DIR}" <<'PY'
-import json
-import sys
-import urllib.request
-from pathlib import Path
-
-repo, tag, asset_name, run_dir = sys.argv[1:]
-api = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
-with urllib.request.urlopen(api, timeout=60) as response:
-    release = json.load(response)
-for asset in release["assets"]:
-    if asset["name"] == asset_name:
-        url = asset["browser_download_url"]
-        break
-else:
-    raise RuntimeError(f"asset not found: {asset_name}")
-target = Path(run_dir) / asset_name
-with urllib.request.urlopen(url, timeout=300) as response:
-    target.write_bytes(response.read())
-print(f"downloaded_model_asset={target}")
-PY
-  fi
-  if [ ! -f "${RUN_DIR}/${MODEL_RELEASE_ASSET}" ]; then
-    echo "missing_downloaded_model=${RUN_DIR}/${MODEL_RELEASE_ASSET}"
-    exit 2
-  fi
-  mv -f "${RUN_DIR}/${MODEL_RELEASE_ASSET}" "${MODEL_PATH}"
-else
-  echo "download_model_from_github=0"
+  echo "missing_model=${MODEL_PATH}"
+  echo "run_prepare_script=${REPO_DIR}/hpc/ihes_cube_model/prepare_ihes_cube_model.sh"
+  exit 2
 fi
-
 if [ ! -f "${DATA_DIR}/puzzle_info.json" ] || [ ! -f "${DATA_DIR}/test.csv" ]; then
-  echo "download_ihes_cube_data=1"
-  kaggle competitions download -c cayleypy-ihes-cube -p "${DATA_DIR}" --force
-  unzip -o "${DATA_DIR}/cayleypy-ihes-cube.zip" -d "${DATA_DIR}"
-else
-  echo "download_ihes_cube_data=0"
+  echo "missing_ihes_data=${DATA_DIR}"
+  echo "run_prepare_script=${REPO_DIR}/hpc/ihes_cube_model/prepare_ihes_cube_model.sh"
+  exit 2
+fi
+if [ ! -f "${WEIGHT_DIR}/manifest.json" ]; then
+  echo "missing_stream1_weights=${WEIGHT_DIR}/manifest.json"
+  echo "run_prepare_script=${REPO_DIR}/hpc/ihes_cube_model/prepare_ihes_cube_model.sh"
+  exit 2
 fi
 
 export BEAM_PUZZLE_INFO_JSON="${DATA_DIR}/puzzle_info.json"
 export BEAM_GENERATOR_PATH="${DATA_DIR}/puzzle_info.json"
 export BEAM_WEIGHT_DIR="${WEIGHT_DIR}"
-
-if [ ! -f "${WEIGHT_DIR}/manifest.json" ] || [ "${MODEL_PATH}" -nt "${WEIGHT_DIR}/manifest.json" ]; then
-  echo "export_stream1_weights=1"
-  "${NINJA_VENV_DIR}/bin/python" "${REPO_DIR}/tools/export_stream1_mlp.py" \
-    --weights "${MODEL_PATH}" \
-    --out "${WEIGHT_DIR}" \
-    --format batchnorm-folded \
-    --dtype bf16 \
-    --num-classes 72
-else
-  echo "export_stream1_weights=0"
-fi
 
 beam_configure_build production_runner
 beam_derive_shard_capacity
