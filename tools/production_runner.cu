@@ -1032,16 +1032,23 @@ const char* track_stream4_phase_name(std::uint32_t phase) {
 }
 
 #if BEAM_DEBUG_PATH_TRACE || BEAM_DEBUG_INFERENCE_TRACE
+void require_nccl(ncclResult_t status, const char* op);
+
 struct TrackedSolutionPrefix {
     std::vector<std::uint8_t> moves;
     std::vector<Hash128> prefix_hashes;
     std::vector<bool> survived;
     std::vector<std::uint64_t> final_indices;
+    std::vector<std::uint32_t> final_owner_ranks;
     bool enabled = false;
     bool stop_after_path = false;
     std::uint32_t missing_stop_extra_depths = UINT32_MAX;
     bool has_first_missing_depth = false;
     std::uint32_t first_missing_depth = UINT32_MAX;
+    std::uint32_t last_match_count = 0;
+    std::uint64_t last_first_index = 0;
+    std::uint64_t last_best_index = 0;
+    CandidateMeta last_best_candidate{};
 
     void initialize(
         std::uint64_t puzzle_id,
@@ -1063,6 +1070,7 @@ struct TrackedSolutionPrefix {
         prefix_hashes.reserve(moves.size());
         survived.assign(moves.size(), false);
         final_indices.assign(moves.size(), UINT64_MAX);
+        final_owner_ranks.assign(moves.size(), UINT32_MAX);
         State128 state = initial;
         for (std::uint8_t move : moves) {
             state = apply_move_flat_host(state, generators, move);
@@ -1354,10 +1362,15 @@ struct TrackedSolutionPrefix {
         const CandidateMeta* candidates,
         std::uint32_t count,
         std::uint32_t final_threshold,
-        const std::vector<std::string>& move_names) {
+        const std::vector<std::string>& move_names,
+        bool mark_missing) {
         if (!enabled || depth >= prefix_hashes.size()) {
             return;
         }
+        last_match_count = 0;
+        last_first_index = 0;
+        last_best_index = 0;
+        last_best_candidate = CandidateMeta{};
         const Hash128 target = prefix_hashes[depth];
         std::uint32_t match_count = 0;
         std::uint32_t best_score = UINT32_THRESHOLD_MAX;
@@ -1386,7 +1399,14 @@ struct TrackedSolutionPrefix {
         }
         survived[depth] = match_count != 0U;
         final_indices[depth] = survived[depth] ? best_index : UINT64_MAX;
-        if (!survived[depth] && !has_first_missing_depth) {
+        if (survived[depth]) {
+            final_owner_ranks[depth] = 0U;
+        }
+        last_match_count = match_count;
+        last_first_index = first_index;
+        last_best_index = best_index;
+        last_best_candidate = best_candidate;
+        if (mark_missing && !survived[depth] && !has_first_missing_depth) {
             has_first_missing_depth = true;
             first_missing_depth = depth;
             std::cout << "track_solution_first_missing"
@@ -1416,6 +1436,116 @@ struct TrackedSolutionPrefix {
             UINT32_MAX,
             count,
             move_names);
+    }
+
+    void sync_depth_across_ranks(
+        std::uint64_t puzzle_id,
+        std::uint32_t depth,
+        const StaticMemoryPlan& plan,
+        StaticDeviceMemory& memory,
+        const DispatcherStreams& streams,
+        ncclComm_t comm,
+        std::uint32_t world_size,
+        std::uint32_t rank) {
+        if (!enabled || depth >= prefix_hashes.size() || world_size <= 1U) {
+            return;
+        }
+        if (comm == nullptr) {
+            throw std::invalid_argument("tracked solution distributed sync requires NCCL communicator");
+        }
+        constexpr std::uint32_t packet_words = 8;
+        const std::uint64_t required_words =
+            static_cast<std::uint64_t>(packet_words) * (static_cast<std::uint64_t>(world_size) + 1ULL);
+        const std::uint64_t scratch_words =
+            (plan.frontier_states * sizeof(CandidateMeta)) / sizeof(std::uint64_t);
+        if (memory.final.final_candidate_buffer == nullptr || scratch_words < required_words) {
+            throw std::runtime_error("tracked solution distributed sync scratch buffer is too small");
+        }
+        std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.final.final_candidate_buffer);
+        std::uint64_t* packet_send_device = scratch;
+        std::uint64_t* packet_recv_device = scratch + packet_words;
+        const bool local_found = last_match_count != 0U;
+        std::array<std::uint64_t, packet_words> local_packet{
+            local_found ? 1ULL : 0ULL,
+            static_cast<std::uint64_t>(rank),
+            local_found ? last_best_index : 0ULL,
+            local_found ? static_cast<std::uint64_t>(last_best_candidate.score_key) : 0ULL,
+            local_found ? last_best_candidate.parent_idx : 0ULL,
+            local_found ? static_cast<std::uint64_t>(last_best_candidate.route_packed) : 0ULL,
+            local_found ? last_best_candidate.hash.lo : 0ULL,
+            local_found ? last_best_candidate.hash.hi : 0ULL};
+        BEAM_CUDA_CHECK(cudaMemcpyAsync(
+            packet_send_device,
+            local_packet.data(),
+            packet_words * sizeof(std::uint64_t),
+            cudaMemcpyHostToDevice,
+            streams.stream5));
+        require_nccl(ncclAllGather(
+            packet_send_device,
+            packet_recv_device,
+            packet_words,
+            ncclUint64,
+            comm,
+            streams.stream5), "ncclAllGather tracked solution packet");
+        std::vector<std::uint64_t> packets(static_cast<std::uint64_t>(packet_words) * world_size);
+        BEAM_CUDA_CHECK(cudaMemcpyAsync(
+            packets.data(),
+            packet_recv_device,
+            packets.size() * sizeof(std::uint64_t),
+            cudaMemcpyDeviceToHost,
+            streams.stream5));
+        BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+
+        bool global_found = false;
+        std::uint32_t owner_rank = UINT32_MAX;
+        std::uint64_t owner_index = UINT64_MAX;
+        CandidateMeta best_candidate{Hash128{UINT64_MAX, UINT64_MAX}, UINT64_MAX, UINT32_MAX, UINT32_MAX};
+        for (std::uint32_t peer = 0; peer < world_size; ++peer) {
+            const std::uint64_t* packet = packets.data() + static_cast<std::uint64_t>(peer) * packet_words;
+            if (packet[0] == 0ULL) {
+                continue;
+            }
+            CandidateMeta candidate{};
+            candidate.score_key = static_cast<std::uint32_t>(packet[3]);
+            candidate.parent_idx = packet[4];
+            candidate.route_packed = static_cast<std::uint32_t>(packet[5]);
+            candidate.hash = Hash128{packet[6], packet[7]};
+            if (!global_found || track_candidate_less_host(candidate, best_candidate)) {
+                global_found = true;
+                owner_rank = static_cast<std::uint32_t>(packet[1]);
+                owner_index = packet[2];
+                best_candidate = candidate;
+            }
+        }
+
+        survived[depth] = global_found;
+        final_owner_ranks[depth] = owner_rank;
+        final_indices[depth] = global_found && owner_rank == rank ? owner_index : UINT64_MAX;
+        std::cout << "track_solution_distributed"
+                  << " puzzle_id=" << puzzle_id
+                  << " depth=" << depth
+                  << " prefix_len=" << depth + 1U
+                  << " local_rank=" << rank
+                  << " global_found=" << (global_found ? 1 : 0)
+                  << " owner_rank=" << owner_rank
+                  << " owner_local_index=" << owner_index
+                  << " local_found=" << (local_found ? 1 : 0)
+                  << " local_matches=" << last_match_count
+                  << " continue_on_this_rank=" << (final_indices[depth] != UINT64_MAX ? 1 : 0)
+                  << "\n";
+        if (!global_found && !has_first_missing_depth) {
+            has_first_missing_depth = true;
+            first_missing_depth = depth;
+            std::cout << "track_solution_first_missing"
+                      << " puzzle_id=" << puzzle_id
+                      << " depth=" << depth
+                      << " prefix_len=" << depth + 1U
+                      << " stop_after_depth="
+                      << (missing_stop_extra_depths == UINT32_MAX
+                              ? UINT32_MAX
+                              : first_missing_depth + missing_stop_extra_depths)
+                      << "\n";
+        }
     }
 
     bool should_stop_after_missing(std::uint32_t depth) const {
@@ -3599,7 +3729,17 @@ int main(int argc, char** argv) {
                 history_slot.host,
                 final_state.final_candidate_count,
                 final_state.final_threshold,
-                host_move_names);
+                host_move_names,
+                world_size <= 1U);
+            tracked_solution.sync_depth_across_ranks(
+                puzzle_id,
+                depth,
+                plan,
+                memory,
+                streams,
+                nccl_runtime.comm,
+                world_size,
+                rank);
         }
 #endif
         if (predict_stats.verbose != 0U) {

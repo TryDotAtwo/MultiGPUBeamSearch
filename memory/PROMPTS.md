@@ -8,6 +8,8 @@
   start at `-3`.
 - User provided an IHES submission CSV and requested tracing a known solution
   through the beam pipeline to find why the solver does not detect it.
+- User required the debug tracker to follow a tracked solution across ranks,
+  without changing the beam-search architecture.
 
 ## 2026-06-12
 - User requested making the beam search compile natively for each puzzle's

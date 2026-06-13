@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-06-13
+- Made the path-trace debugger rank-aware for distributed runs. After each
+  local prefix scan, ranks exchange tiny debug packets with NCCL so only the
+  rank that owns the tracked prefix continues issuing the next tracked move.
 - Fixed the path-trace prefinal hash scanner to store its temporary block
   indices in the survivor-sized final select scratch instead of the final
   request buffer, which is not a valid scratch target on the multi-rank final
