@@ -3,6 +3,9 @@
 ## 2026-06-13
 - User requested bf16 support for the IHES one-output Stream1 model on the
   existing CUTLASS path, with no CUDA fallback behavior.
+- User requested stopping the current IHES depth-200 run and adding a `+3`
+  runtime score offset for the single-output model because its output range can
+  start at `-3`.
 
 ## 2026-06-12
 - User requested making the beam search compile natively for each puzzle's

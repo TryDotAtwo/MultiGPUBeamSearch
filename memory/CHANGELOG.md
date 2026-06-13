@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-06-13
+- Added the `+3.0` score offset for Stream1 single-output model quantization so
+  models trained with outputs starting at `-3` are shifted into the nonnegative
+  runtime score-key range before clamping.
 - Enabled the non-LayerNorm Stream1 CUTLASS runtime path to consume bf16
   exported weights. The post-GEMM bias/ReLU and residual add kernels now use
   dtype-aware scalar loads/stores, while the existing fp16 half2 fast path is

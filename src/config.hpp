@@ -25,6 +25,7 @@ inline constexpr std::uint32_t STREAM1_DTYPE_FP16 = 0;
 inline constexpr std::uint32_t STREAM1_DTYPE_BF16 = 1;
 inline constexpr std::uint32_t STREAM1_NORM_NONE = 0;
 inline constexpr std::uint32_t STREAM1_NORM_LAYERNORM = 1;
+inline constexpr float STREAM1_SINGLE_OUTPUT_SCORE_OFFSET = 3.0f;
 
 inline constexpr float SCORE_MAX_Q = 300.0f;
 inline constexpr std::uint32_t SCORE_SCALE = 1024;

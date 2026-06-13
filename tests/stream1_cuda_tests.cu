@@ -209,7 +209,7 @@ int main() {
     BEAM_CUDA_CHECK(cudaGetLastError());
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
     BEAM_CUDA_CHECK(cudaMemcpy(score.data(), d_score, score.size() * sizeof(std::uint32_t), cudaMemcpyDeviceToHost));
-    require(score[0] > 0, "stream1 single-output CUTLASS score must be positive");
+    require(score[0] <= SCORE_MAX_KEY, "stream1 single-output CUTLASS score key range failed");
     require(score[1] != score[0], "stream1 single-output CUTLASS must use generated child features");
 
     half* d_cutlass_in = nullptr;

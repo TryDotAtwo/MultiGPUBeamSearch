@@ -475,6 +475,7 @@ __global__ void stream1_single_output_quantize_kernel(
         q += stream1_load_scalar_device(row, h, dtype) *
              stream1_load_scalar_device(output_weight, h, dtype);
     }
+    q += STREAM1_SINGLE_OUTPUT_SCORE_OFFSET;
     score_ring[i] = score_key_from_float_device(q);
 }
 
