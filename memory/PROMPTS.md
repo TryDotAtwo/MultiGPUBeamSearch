@@ -6,6 +6,8 @@
 - User requested stopping the current IHES depth-200 run and adding a `+3`
   runtime score offset for the single-output model because its output range can
   start at `-3`.
+- User provided an IHES submission CSV and requested tracing a known solution
+  through the beam pipeline to find why the solver does not detect it.
 
 ## 2026-06-12
 - User requested making the beam search compile natively for each puzzle's

@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-06-13
+- Made MEPhI CMake debug flags in `mephi_8xa100_common.sh` overridable from
+  the SLURM environment, so path tracing can be compiled for targeted
+  diagnostics without changing the default fast launcher behavior.
 - Added the `+3.0` score offset for Stream1 single-output model quantization so
   models trained with outputs starting at `-3` are shifted into the nonnegative
   runtime score-key range before clamping.
