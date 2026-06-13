@@ -115,7 +115,24 @@ else
   echo "download_ihes_cube_data_from_github=0"
 fi
 
+REEXPORT_WEIGHTS=0
 if [ ! -f "${WEIGHT_DIR}/manifest.json" ] || [ "${MODEL_PATH}" -nt "${WEIGHT_DIR}/manifest.json" ]; then
+  REEXPORT_WEIGHTS=1
+elif ! "${NINJA_VENV_DIR}/bin/python" - "${WEIGHT_DIR}/manifest.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text())
+if int(manifest["hd1"]) % 8 != 0 or int(manifest["hd2"]) % 8 != 0:
+    raise SystemExit(1)
+PY
+then
+  echo "reexport_reason=hidden_dims_not_aligned"
+  REEXPORT_WEIGHTS=1
+fi
+
+if [ "${REEXPORT_WEIGHTS}" -eq 1 ]; then
   echo "export_stream1_weights=1"
   "${NINJA_VENV_DIR}/bin/python" "${REPO_DIR}/tools/export_stream1_mlp.py" \
     --weights "${MODEL_PATH}" \

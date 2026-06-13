@@ -68,6 +68,23 @@ def weight_suffix(dtype: ExportDType) -> str:
     return ".fp16" if dtype == "fp16" else ".bf16"
 
 
+def round_up(value: int, alignment: int) -> int:
+    return ((value + alignment - 1) // alignment) * alignment
+
+
+def pad_out_in(weight_out_in: torch.Tensor, out_dim: int, in_dim: int) -> torch.Tensor:
+    padded = torch.zeros((out_dim, in_dim), dtype=torch.float32)
+    rows, cols = weight_out_in.shape
+    padded[:rows, :cols] = weight_out_in.detach().float()
+    return padded
+
+
+def pad_vec(values: torch.Tensor, size: int) -> torch.Tensor:
+    padded = torch.zeros(size, dtype=torch.float32)
+    padded[:values.shape[0]] = values.detach().float()
+    return padded
+
+
 def write_hxk(path: Path, weight_out_in: torch.Tensor, dtype: ExportDType) -> None:
     path.write_bytes(tensor_bytes(weight_out_in.t(), dtype))
 
@@ -113,12 +130,18 @@ def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDTyp
         raise ValueError(f"input_dim is not divisible by num_classes={num_classes}: input_dim={input_dim}")
     state_len = input_dim // num_classes
     residual_count = infer_residual_count(sd)
+    hd1_padded = round_up(int(hd1), 8)
+    hd2_padded = round_up(int(hd2), 8)
 
     weight, bias = fold_linear_bn(sd, "input_layer", "bn1")
+    weight = pad_out_in(weight, hd1_padded, input_dim)
+    bias = pad_vec(bias, hd1_padded)
     write_hxk(out_dir / f"input_weight_hxk{suffix}", weight, dtype)
     write_vec(out_dir / f"input_bias{suffix}", bias, dtype)
 
     weight, bias = fold_linear_bn(sd, "hidden_layer", "bn2")
+    weight = pad_out_in(weight, hd2_padded, hd1_padded)
+    bias = pad_vec(bias, hd2_padded)
     write_hxk(out_dir / f"hidden_weight_hxk{suffix}", weight, dtype)
     write_vec(out_dir / f"hidden_bias{suffix}", bias, dtype)
 
@@ -126,21 +149,29 @@ def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDTyp
         prefix = f"residual_blocks.{block}"
         out_prefix = f"residual{block}"
         weight, bias = fold_linear_bn(sd, f"{prefix}.fc1", f"{prefix}.bn1")
+        weight = pad_out_in(weight, hd2_padded, hd2_padded)
+        bias = pad_vec(bias, hd2_padded)
         write_hxk(out_dir / f"{out_prefix}_fc1_weight_hxk{suffix}", weight, dtype)
         write_vec(out_dir / f"{out_prefix}_fc1_bias{suffix}", bias, dtype)
         weight, bias = fold_linear_bn(sd, f"{prefix}.fc2", f"{prefix}.bn2")
+        weight = pad_out_in(weight, hd2_padded, hd2_padded)
+        bias = pad_vec(bias, hd2_padded)
         write_hxk(out_dir / f"{out_prefix}_fc2_weight_hxk{suffix}", weight, dtype)
         write_vec(out_dir / f"{out_prefix}_fc2_bias{suffix}", bias, dtype)
 
     weight, bias = linear_weight_bias(sd, "output_layer")
+    weight = pad_out_in(weight, output_dim, hd2_padded)
     write_hxk(out_dir / f"output_weight_hxk{suffix}", weight, dtype)
     write_vec(out_dir / f"output_bias{suffix}", bias, dtype)
 
     manifest = {
         "state_len": state_len,
         "num_classes": num_classes,
-        "hd1": hd1,
-        "hd2": hd2,
+        "hd1": hd1_padded,
+        "hd2": hd2_padded,
+        "original_hd1": int(hd1),
+        "original_hd2": int(hd2),
+        "hidden_alignment": 8,
         "nrd": residual_count,
         "output_dim": output_dim,
         "dtype": dtype,
@@ -154,8 +185,10 @@ def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDTyp
     print(
         "stream1_export_done"
         f" out_dir={out_dir}"
-        f" hd1={hd1}"
-        f" hd2={hd2}"
+        f" hd1={hd1_padded}"
+        f" hd2={hd2_padded}"
+        f" original_hd1={hd1}"
+        f" original_hd2={hd2}"
         f" nrd={residual_count}"
         f" output_dim={output_dim}"
     )
