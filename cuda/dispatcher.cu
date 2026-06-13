@@ -711,15 +711,13 @@ __global__ void track_clean_survivor_hash_kernel(
     for (std::uint32_t stride = blockDim.x / 2U; stride > 0; stride >>= 1U) {
         if (tid < stride) {
             match_count[tid] += match_count[tid + stride];
-            if (best_score[tid + stride] < best_score[tid]) {
-                best_score[tid] = best_score[tid + stride];
-            }
             if (first_index[tid + stride] < first_index[tid]) {
                 first_index[tid] = first_index[tid + stride];
             }
             if (track_candidate_less_device(best_candidate[tid + stride], best_candidate[tid])) {
                 best_candidate[tid] = best_candidate[tid + stride];
                 best_index[tid] = best_index[tid + stride];
+                best_score[tid] = best_candidate[tid].score_key;
             }
         }
         __syncthreads();
@@ -785,7 +783,6 @@ void scan_tracked_prefinal_hash(
             state.tracked_prefinal_first_index = std::min(state.tracked_prefinal_first_index, first_index[block]);
         }
         state.tracked_prefinal_matches += matches[block];
-        state.tracked_prefinal_best_score_key = std::min(state.tracked_prefinal_best_score_key, best_score[block]);
         if (track_candidate_less_host(best_candidate[block], best)) {
             best = best_candidate[block];
             state.tracked_prefinal_best_index = best_index[block];

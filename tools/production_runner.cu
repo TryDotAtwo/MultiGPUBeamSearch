@@ -1307,6 +1307,8 @@ struct TrackedSolutionPrefix {
         const std::uint8_t move = found ? unpack_move(route_packed) : 0U;
         const std::uint16_t source_rank = found ? unpack_source_rank(route_packed) : 0U;
         const std::uint8_t owner = found ? unpack_owner(route_packed) : 0U;
+        const bool expected_move_valid = depth < moves.size() && moves[depth] < move_names.size();
+        const bool move_valid = found && move < move_names.size();
         const std::int64_t threshold_margin =
             found && final_threshold != UINT32_THRESHOLD_MAX
                 ? static_cast<std::int64_t>(best_score_key) - static_cast<std::int64_t>(final_threshold)
@@ -1316,7 +1318,7 @@ struct TrackedSolutionPrefix {
                   << " depth=" << depth
                   << " prefix_len=" << prefix_len
                   << " expected_move="
-                  << (depth < moves.size() ? move_names[moves[depth]] : "")
+                  << (expected_move_valid ? move_names[moves[depth]] : "")
                   << " found=" << (found ? 1 : 0)
                   << " matches=" << matches
                   << " first_index=" << first_index
@@ -1331,7 +1333,7 @@ struct TrackedSolutionPrefix {
                   << " source_rank=" << static_cast<std::uint32_t>(source_rank)
                   << " owner=" << static_cast<std::uint32_t>(owner)
                   << " move=" << static_cast<std::uint32_t>(move)
-                  << " move_name=" << (found ? move_names[move] : "")
+                  << " move_name=" << (move_valid ? move_names[move] : "")
                   << " shard=" << shard
                   << " local=" << local
                   << " final_candidate_count=" << final_candidate_count
