@@ -74,7 +74,12 @@ fi
 
 if [ ! -f "${DATA_DIR}/puzzle_info.json" ] || [ ! -f "${DATA_DIR}/test.csv" ]; then
   echo "download_ihes_cube_data=1"
-  kaggle competitions download -c cayleypy-ihes-cube -p "${DATA_DIR}" --force
+  if ! "${NINJA_VENV_DIR}/bin/python" -m kaggle --version >/dev/null 2>&1; then
+    echo "missing_kaggle_module=${NINJA_VENV_DIR}/bin/python -m kaggle"
+    echo "install_hint=${NINJA_VENV_DIR}/bin/python -m pip install kaggle"
+    exit 2
+  fi
+  "${NINJA_VENV_DIR}/bin/python" -m kaggle competitions download -c cayleypy-ihes-cube -p "${DATA_DIR}" --force
   unzip -o "${DATA_DIR}/cayleypy-ihes-cube.zip" -d "${DATA_DIR}"
 else
   echo "download_ihes_cube_data=0"
