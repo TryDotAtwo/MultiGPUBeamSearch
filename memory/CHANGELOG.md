@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-06-13
+- Fixed the path-trace prefinal hash scanner to store its temporary block
+  indices in the survivor-sized final select scratch instead of the final
+  request buffer, which is not a valid scratch target on the multi-rank final
+  materialization path.
 - Made MEPhI CMake debug flags in `mephi_8xa100_common.sh` overridable from
   the SLURM environment, so path tracing can be compiled for targeted
   diagnostics without changing the default fast launcher behavior.

@@ -743,7 +743,7 @@ void scan_tracked_prefinal_hash(
     const std::uint32_t block_size = 256;
     const std::uint64_t item_count = plan.survivor_count;
     const std::uint32_t block_count = static_cast<std::uint32_t>((item_count + block_size - 1ULL) / block_size);
-    auto* block_first_index = reinterpret_cast<std::uint64_t*>(memory.final.final_request_buffer);
+    auto* block_first_index = reinterpret_cast<std::uint64_t*>(memory.final.final_keep_flags);
     auto* block_best_index = block_first_index + block_count;
     track_clean_survivor_hash_kernel<<<block_count, block_size, 0, streams.stream3>>>(
         memory.streams.survivor_shard,
