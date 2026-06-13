@@ -1034,6 +1034,16 @@ const char* track_stream4_phase_name(std::uint32_t phase) {
 #if BEAM_DEBUG_PATH_TRACE || BEAM_DEBUG_INFERENCE_TRACE
 void require_nccl(ncclResult_t status, const char* op);
 
+bool track_candidate_less_host(CandidateMeta a, CandidateMeta b) {
+    if (a.score_key != b.score_key) {
+        return a.score_key < b.score_key;
+    }
+    if (a.parent_idx != b.parent_idx) {
+        return a.parent_idx < b.parent_idx;
+    }
+    return a.route_packed < b.route_packed;
+}
+
 struct TrackedSolutionPrefix {
     std::vector<std::uint8_t> moves;
     std::vector<Hash128> prefix_hashes;
