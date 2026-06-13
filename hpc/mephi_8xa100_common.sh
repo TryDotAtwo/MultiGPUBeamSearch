@@ -12,7 +12,7 @@ beam_setup_paths() {
     REPO_DIR="${JOB_DIR}/repo"
   fi
   BUILD_DIR="${BUILD_DIR:-${JOB_DIR}/build-a100}"
-  CUTLASS_DIR="${CUTLASS_DIR:-${REPO_DIR}/external/cutlass}"
+  CUTLASS_DIR="${CUTLASS_DIR:-/mnt/pool/3/vokirova/cutlass}"
   NINJA_VENV_DIR="${NINJA_VENV_DIR:-${VIRTUAL_ENV:-/mnt/pool/3/vokirova/ninja-venv}}"
   NCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR:-}"
   NCCL_LIBRARY="${NCCL_LIBRARY:-}"
