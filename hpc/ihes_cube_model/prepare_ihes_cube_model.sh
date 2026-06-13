@@ -9,6 +9,9 @@ MODEL_PATH="${MODEL_PATH:-${RUN_DIR}/model.pth}"
 MODEL_RELEASE_REPO="${MODEL_RELEASE_REPO:-TryDotAtwo/MultiGPUBeamSearch}"
 MODEL_RELEASE_TAG="${MODEL_RELEASE_TAG:-ihes-p888-model}"
 MODEL_RELEASE_ASSET="${MODEL_RELEASE_ASSET:-p888-t000_1778521793_e32692.pth}"
+DATA_RELEASE_REPO="${DATA_RELEASE_REPO:-${MODEL_RELEASE_REPO}}"
+DATA_RELEASE_TAG="${DATA_RELEASE_TAG:-${MODEL_RELEASE_TAG}}"
+DATA_RELEASE_ASSET="${DATA_RELEASE_ASSET:-cayleypy-ihes-cube.zip}"
 WEIGHT_DIR="${WEIGHT_DIR:-${RUN_DIR}/stream1_weights_ihes_bf16}"
 NINJA_VENV_DIR="${NINJA_VENV_DIR:-${VIRTUAL_ENV:-/mnt/pool/3/vokirova/ninja-venv}}"
 
@@ -73,16 +76,43 @@ else
 fi
 
 if [ ! -f "${DATA_DIR}/puzzle_info.json" ] || [ ! -f "${DATA_DIR}/test.csv" ]; then
-  echo "download_ihes_cube_data=1"
-  if ! "${NINJA_VENV_DIR}/bin/python" -m kaggle --version >/dev/null 2>&1; then
-    echo "missing_kaggle_module=${NINJA_VENV_DIR}/bin/python -m kaggle"
-    echo "install_hint=${NINJA_VENV_DIR}/bin/python -m pip install kaggle"
+  echo "download_ihes_cube_data_from_github=1"
+  if command -v gh >/dev/null 2>&1; then
+    gh release download "${DATA_RELEASE_TAG}" \
+      --repo "${DATA_RELEASE_REPO}" \
+      --pattern "${DATA_RELEASE_ASSET}" \
+      --dir "${DATA_DIR}" \
+      --clobber
+  else
+    "${NINJA_VENV_DIR}/bin/python" - "${DATA_RELEASE_REPO}" "${DATA_RELEASE_TAG}" "${DATA_RELEASE_ASSET}" "${DATA_DIR}" <<'PY'
+import json
+import sys
+import urllib.request
+from pathlib import Path
+
+repo, tag, asset_name, data_dir = sys.argv[1:]
+api = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
+with urllib.request.urlopen(api, timeout=60) as response:
+    release = json.load(response)
+for asset in release["assets"]:
+    if asset["name"] == asset_name:
+        url = asset["browser_download_url"]
+        break
+else:
+    raise RuntimeError(f"asset not found: {asset_name}")
+target = Path(data_dir) / asset_name
+with urllib.request.urlopen(url, timeout=300) as response:
+    target.write_bytes(response.read())
+print(f"downloaded_data_asset={target}")
+PY
+  fi
+  if [ ! -f "${DATA_DIR}/${DATA_RELEASE_ASSET}" ]; then
+    echo "missing_downloaded_data=${DATA_DIR}/${DATA_RELEASE_ASSET}"
     exit 2
   fi
-  "${NINJA_VENV_DIR}/bin/python" -m kaggle competitions download -c cayleypy-ihes-cube -p "${DATA_DIR}" --force
-  unzip -o "${DATA_DIR}/cayleypy-ihes-cube.zip" -d "${DATA_DIR}"
+  unzip -o "${DATA_DIR}/${DATA_RELEASE_ASSET}" -d "${DATA_DIR}"
 else
-  echo "download_ihes_cube_data=0"
+  echo "download_ihes_cube_data_from_github=0"
 fi
 
 if [ ! -f "${WEIGHT_DIR}/manifest.json" ] || [ "${MODEL_PATH}" -nt "${WEIGHT_DIR}/manifest.json" ]; then
