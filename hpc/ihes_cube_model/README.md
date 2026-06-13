@@ -1,0 +1,54 @@
+# IHES Cube Model Run
+
+MEPhI 8xA100 launcher for `cayleypy-ihes-cube` using a real PyTorch model.
+
+The launcher expects the model at:
+
+```text
+/mnt/pool/6/vokirova/beam8a100/ihes_cube_model/model.pth
+```
+
+It downloads the IHES competition data if needed, exports the `.pth` model to
+`stream1_weights_ihes_bf16`, compiles the runner with IHES state sizing, and
+runs `production_runner` through `torchrun` on 8 GPUs.
+
+Default run is intentionally small:
+
+```text
+PUZZLE_ID=0
+DEPTH_LIMIT=12
+BEAM_WIDTH=30000000
+```
+
+## Run
+
+From the visible MEPhI terminal on `basis`:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100/repo
+git fetch origin main --depth 1
+git reset --hard origin/main
+git log -1 --oneline
+
+cd /mnt/pool/6/vokirova/beam8a100
+mkdir -p ihes_cube_model
+cp repo/hpc/ihes_cube_model/ihes_cube_model.sh ihes_cube_model/start.sh
+sed -i 's/\r$//' ihes_cube_model/start.sh
+bash -n ihes_cube_model/start.sh
+chmod +x ihes_cube_model/start.sh
+
+cd ihes_cube_model
+sbatch -p kaf12 start.sh
+```
+
+Override puzzle, depth, or beam width at submit time:
+
+```bash
+sbatch -p kaf12 --export=ALL,PUZZLE_ID=0,DEPTH_LIMIT=20,BEAM_WIDTH=48000000 start.sh
+```
+
+Logs:
+
+```bash
+tail -f /mnt/pool/6/vokirova/beam8a100/ihes_cube_model/logs/ihes-model-<JOBID>.out
+```

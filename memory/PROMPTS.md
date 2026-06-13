@@ -310,3 +310,10 @@
 - User requested a reflected-only MEPhI job with a 24-hour SLURM limit, using
   the already found puzzle `991` original solution instead of spending time
   solving the original again.
+- User provided local IHES model file
+  `C:/Users/Иван Литвак/Downloads/p888-t000_1778521793_e32692.pth` and requested
+  launching the IHES cube solver with that model on MEPhI. The model is a
+  BatchNorm-folded QMLP-style checkpoint with `input_dim=5184=72*72`,
+  `hd1=2556`, `hd2=218`, `nrd=16`, and `output_dim=1`; IHES move count is 18,
+  so one-output row budgeting must divide `BEAM_B_MICRO` by 18, not by the
+  megaminx-specific 24.

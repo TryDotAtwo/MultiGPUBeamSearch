@@ -86,23 +86,31 @@ PY
 
 beam_configure_build() {
   local target="${1:-production_runner}"
-  cmake -S "${REPO_DIR}" -B "${BUILD_DIR}" -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCUTLASS_DIR="${CUTLASS_DIR}" \
-    -DNCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR}" \
-    -DNCCL_LIBRARY="${NCCL_LIBRARY}" \
-    -DBEAM_CUDA_ARCHITECTURES=80 \
-    -DBEAM_ENABLE_DEBUG=ON \
-    -DBEAM_ENABLE_DEPTH_LOGS=ON \
-    -DBEAM_ENABLE_DEBUG_LOGS=OFF \
-    -DBEAM_DEBUG_STREAM_TIMING=OFF \
-    -DBEAM_DEBUG_INFERENCE_TRACE=OFF \
-    -DBEAM_DEBUG_PATH_TRACE=OFF \
-    -DBEAM_DEBUG_FINAL_VALIDATE=OFF \
-    -DBEAM_DEBUG_FINAL_EXCHANGE_TRACE=OFF \
-    -DBEAM_DEBUG_FINAL_HISTOGRAM_TRACE=OFF \
-    -DBEAM_DEBUG_STREAM4_HISTOGRAM_TRACE=OFF \
+  local cmake_args=(
+    -S "${REPO_DIR}"
+    -B "${BUILD_DIR}"
+    -G Ninja
+    -DCMAKE_BUILD_TYPE=Release
+    -DCUTLASS_DIR="${CUTLASS_DIR}"
+    -DNCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR}"
+    -DNCCL_LIBRARY="${NCCL_LIBRARY}"
+    -DBEAM_CUDA_ARCHITECTURES=80
+    -DBEAM_ENABLE_DEBUG=ON
+    -DBEAM_ENABLE_DEPTH_LOGS=ON
+    -DBEAM_ENABLE_DEBUG_LOGS=OFF
+    -DBEAM_DEBUG_STREAM_TIMING=OFF
+    -DBEAM_DEBUG_INFERENCE_TRACE=OFF
+    -DBEAM_DEBUG_PATH_TRACE=OFF
+    -DBEAM_DEBUG_FINAL_VALIDATE=OFF
+    -DBEAM_DEBUG_FINAL_EXCHANGE_TRACE=OFF
+    -DBEAM_DEBUG_FINAL_HISTOGRAM_TRACE=OFF
+    -DBEAM_DEBUG_STREAM4_HISTOGRAM_TRACE=OFF
     -DBEAM_DEBUG_DEPTH_FLOW_TRACE=OFF
+  )
+  if [ -n "${BEAM_PUZZLE_INFO_JSON:-}" ]; then
+    cmake_args+=(-DBEAM_PUZZLE_INFO_JSON="${BEAM_PUZZLE_INFO_JSON}")
+  fi
+  cmake "${cmake_args[@]}"
   cmake --build "${BUILD_DIR}" --target "${target}" -j "${SLURM_CPUS_PER_TASK:-8}"
 }
 
@@ -124,15 +132,38 @@ print(int(manifest["output_dim"]))
 PY
 }
 
+beam_move_count_effective() {
+  local puzzle_info="${BEAM_PUZZLE_INFO_JSON:-${REPO_DIR}/data/puzzle_info.json}"
+  "${NINJA_VENV_DIR}/bin/python" - "${puzzle_info}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+info = json.loads(Path(sys.argv[1]).read_text())
+generators = info.get("generators")
+if isinstance(generators, dict):
+    print(len(generators))
+    raise SystemExit
+actions = info.get("actions")
+if isinstance(actions, dict):
+    names = actions.get("names")
+    if isinstance(names, list):
+        print(len(names))
+        raise SystemExit
+raise RuntimeError(f"cannot infer move count from {sys.argv[1]}")
+PY
+}
+
 beam_stream1_parent_batch_from_row_budget() {
   local row_budget="$1"
   local output_dim="$2"
+  local move_count="$3"
   if [ "${output_dim}" -eq 1 ]; then
-    if [ "${row_budget}" -lt 24 ]; then
-      echo "BEAM_B_MICRO row budget is smaller than one 24-move expansion: ${row_budget}" >&2
+    if [ "${row_budget}" -lt "${move_count}" ]; then
+      echo "BEAM_B_MICRO row budget is smaller than one ${move_count}-move expansion: ${row_budget}" >&2
       return 2
     fi
-    echo $((row_budget / 24))
+    echo $((row_budget / move_count))
   else
     echo "${row_budget}"
   fi
@@ -140,15 +171,16 @@ beam_stream1_parent_batch_from_row_budget() {
 
 beam_derive_shard_capacity() {
   STREAM1_OUTPUT_DIM="$(beam_stream1_output_dim)"
-  BEAM_PARENT_BATCH_EFFECTIVE="$(beam_stream1_parent_batch_from_row_budget "${BEAM_B_MICRO}" "${STREAM1_OUTPUT_DIM}")"
-  STREAM1_ROWS_PER_JOB_EFFECTIVE=$((BEAM_PARENT_BATCH_EFFECTIVE * (STREAM1_OUTPUT_DIM == 1 ? 24 : 1)))
+  BEAM_MOVE_COUNT_EFFECTIVE="$(beam_move_count_effective)"
+  BEAM_PARENT_BATCH_EFFECTIVE="$(beam_stream1_parent_batch_from_row_budget "${BEAM_B_MICRO}" "${STREAM1_OUTPUT_DIM}" "${BEAM_MOVE_COUNT_EFFECTIVE}")"
+  STREAM1_ROWS_PER_JOB_EFFECTIVE=$((BEAM_PARENT_BATCH_EFFECTIVE * (STREAM1_OUTPUT_DIM == 1 ? BEAM_MOVE_COUNT_EFFECTIVE : 1)))
   BEAM_ALIGNMENT=$((WORLD_SIZE_EFFECTIVE * SHARD_COUNT * STREAM4_BATCH_ALIGNMENT))
   GLOBAL_BEAM_WIDTH_EFFECTIVE="$(beam_round_up "${BEAM_WIDTH}" "${BEAM_ALIGNMENT}")"
   LOCAL_BEAM_WIDTH=$((GLOBAL_BEAM_WIDTH_EFFECTIVE / WORLD_SIZE_EFFECTIVE))
   LOGICAL_SHARD_SIZE=$(( (LOCAL_BEAM_WIDTH + SHARD_COUNT - 1) / SHARD_COUNT ))
   SHARD_CAPACITY_RAW=$(( (LOGICAL_SHARD_SIZE * SHARD_CAPACITY_SCALE_PPM + 999999) / 1000000 ))
   SHARD_CAPACITY_CANDIDATES="$(beam_round_up "${SHARD_CAPACITY_RAW}" "${STREAM4_BATCH_ALIGNMENT}")"
-  STREAM3_BATCH_CANDIDATES=$((BEAM_STREAM3_RING_SLOTS * BEAM_PARENT_BATCH_EFFECTIVE * 24))
+  STREAM3_BATCH_CANDIDATES=$((BEAM_STREAM3_RING_SLOTS * BEAM_PARENT_BATCH_EFFECTIVE * BEAM_MOVE_COUNT_EFFECTIVE))
 }
 
 beam_validate_manual_config() {
