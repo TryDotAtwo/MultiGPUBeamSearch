@@ -328,3 +328,7 @@
   `hd1=2556`, `hd2=218`, `nrd=16`, and `output_dim=1`; IHES move count is 18,
   so one-output row budgeting must divide `BEAM_B_MICRO` by 18, not by the
   megaminx-specific 24.
+- User forbade changing solver architecture without discussion, but allowed
+  diagnostics. User asked to verify whether padding is zeroed everywhere and
+  why the tracked IHES solution path reaches the frontier but is not detected
+  as solved.

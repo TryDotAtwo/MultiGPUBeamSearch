@@ -1059,6 +1059,9 @@ struct TrackedSolutionPrefix {
     std::uint64_t last_first_index = 0;
     std::uint64_t last_best_index = 0;
     CandidateMeta last_best_candidate{};
+    State128 final_state{};
+    Hash128 final_hash{};
+    bool final_state_valid = false;
 
     void initialize(
         std::uint64_t puzzle_id,
@@ -1085,6 +1088,11 @@ struct TrackedSolutionPrefix {
         for (std::uint8_t move : moves) {
             state = apply_move_flat_host(state, generators, move);
             prefix_hashes.push_back(hash_state(state, zobrist));
+        }
+        final_state = state;
+        if (!prefix_hashes.empty()) {
+            final_hash = prefix_hashes.back();
+            final_state_valid = true;
         }
         std::cout << "track_solution_start=1"
                   << " puzzle_id=" << puzzle_id
@@ -3359,6 +3367,29 @@ int main(int argc, char** argv) {
     TrackedSolutionPrefix tracked_solution;
 #if BEAM_DEBUG_PATH_TRACE
     tracked_solution.initialize(puzzle_id, host_initial, host_generators, host_zobrist, host_move_names);
+    if (tracked_solution.enabled && tracked_solution.final_state_valid) {
+        const Hash128 central_hash = hash_state(host_central, host_zobrist);
+        const bool final_is_central = states_equal_storage(tracked_solution.final_state, host_central);
+        const bool final_padding_zero = padding_is_zero(tracked_solution.final_state);
+        const bool central_padding_zero = padding_is_zero(host_central);
+        const bool final_hash_is_central = tracked_solution.final_hash == central_hash;
+        const bool final_hash_in_solved_neighborhood =
+            solved_neighborhood.suffix_by_hash.find(tracked_solution.final_hash) !=
+            solved_neighborhood.suffix_by_hash.end();
+        std::cout << "track_solution_host_check=1"
+                  << " puzzle_id=" << puzzle_id
+                  << " final_is_central=" << (final_is_central ? 1 : 0)
+                  << " final_padding_zero=" << (final_padding_zero ? 1 : 0)
+                  << " central_padding_zero=" << (central_padding_zero ? 1 : 0)
+                  << " final_hash_is_central=" << (final_hash_is_central ? 1 : 0)
+                  << " final_hash_in_solved_neighborhood="
+                  << (final_hash_in_solved_neighborhood ? 1 : 0)
+                  << " final_hash_lo=" << tracked_solution.final_hash.lo
+                  << " final_hash_hi=" << tracked_solution.final_hash.hi
+                  << " central_hash_lo=" << central_hash.lo
+                  << " central_hash_hi=" << central_hash.hi
+                  << "\n";
+    }
 #endif
 #if BEAM_ENABLE_DEBUG_LOGS
     std::size_t free_after_all_allocations = 0;
