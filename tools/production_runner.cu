@@ -3292,8 +3292,10 @@ int main(int argc, char** argv) {
 
     const std::filesystem::path generator_path =
         env_path("BEAM_GENERATOR_PATH", "FullBeamNice/generators/p900.json");
-    const std::filesystem::path puzzle_info_path = "data/puzzle_info.json";
-    const std::filesystem::path test_csv_path = "data/test.csv";
+    const std::filesystem::path puzzle_info_path =
+        env_path("BEAM_PUZZLE_INFO_JSON", "data/puzzle_info.json");
+    const std::filesystem::path test_csv_path =
+        env_path("BEAM_TEST_CSV", "data/test.csv");
     const std::vector<std::uint8_t> host_generators = load_p900_generators(generator_path);
     const std::vector<std::string> host_move_names = load_p900_move_names(generator_path);
     const State128 host_central = load_central_state(puzzle_info_path);

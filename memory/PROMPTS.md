@@ -332,3 +332,5 @@
   diagnostics. User asked to verify whether padding is zeroed everywhere and
   why the tracked IHES solution path reaches the frontier but is not detected
   as solved.
+- User identified the IHES tracked-path mismatch as a script/data-path issue
+  and requested pushing the corrected GitHub version plus cluster commands.

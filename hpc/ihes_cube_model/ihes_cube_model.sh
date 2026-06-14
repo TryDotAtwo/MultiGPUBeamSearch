@@ -88,6 +88,7 @@ fi
 
 export BEAM_PUZZLE_INFO_JSON="${DATA_DIR}/puzzle_info.json"
 export BEAM_GENERATOR_PATH="${DATA_DIR}/puzzle_info.json"
+export BEAM_TEST_CSV="${DATA_DIR}/test.csv"
 export BEAM_WEIGHT_DIR="${WEIGHT_DIR}"
 
 beam_configure_build production_runner
