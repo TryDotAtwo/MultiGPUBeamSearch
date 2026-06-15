@@ -334,3 +334,6 @@
   as solved.
 - User identified the IHES tracked-path mismatch as a script/data-path issue
   and requested pushing the corrected GitHub version plus cluster commands.
+- User requested stopping the direct IHES length-24 jobs and rerunning those
+  puzzles with both original and reflected solving, because the current
+  `ihes24_*` jobs only solve the original state.
