@@ -337,3 +337,7 @@
 - User requested stopping the direct IHES length-24 jobs and rerunning those
   puzzles with both original and reflected solving, because the current
   `ihes24_*` jobs only solve the original state.
+- User requested a clear project README explaining how to run the solver on a
+  cluster, Kaggle, and similar environments; then clarified it should avoid
+  specific MEPhI cluster rules and instead document generic 1-GPU and
+  multi-GPU `torchrun` usage.
