@@ -692,3 +692,6 @@
   can be reused as long as the radius/bucket/slot shape stays fixed. Added
   `BEAM_SOLUTION_REPAIR_MODE=resident` to `hpc/ihes_cube_model/ihes_solution_repair.sh`
   to launch this path and write a per-segment TSV.
+- Fixed resident repair input parsing for the actual `solv_uniq.csv` format,
+  which is a JSON object mapping puzzle ids to arrays of solution paths, not
+  only a two-column CSV.

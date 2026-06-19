@@ -619,6 +619,47 @@ std::string trim_ascii(std::string text) {
     return text;
 }
 
+std::string parse_json_string_at(const std::string& text, std::size_t& pos, const char* context) {
+    if (pos >= text.size() || text[pos] != '"') {
+        throw std::runtime_error(std::string("expected JSON string: ") + context);
+    }
+    ++pos;
+    std::string out;
+    while (pos < text.size()) {
+        const char ch = text[pos++];
+        if (ch == '"') {
+            return out;
+        }
+        if (ch == '\\') {
+            if (pos >= text.size()) {
+                throw std::runtime_error(std::string("unterminated JSON escape: ") + context);
+            }
+            const char escaped = text[pos++];
+            if (escaped == '"' || escaped == '\\' || escaped == '/') {
+                out.push_back(escaped);
+            } else if (escaped == 'n') {
+                out.push_back('\n');
+            } else if (escaped == 'r') {
+                out.push_back('\r');
+            } else if (escaped == 't') {
+                out.push_back('\t');
+            } else {
+                throw std::runtime_error(std::string("unsupported JSON escape in ") + context);
+            }
+        } else {
+            out.push_back(ch);
+        }
+    }
+    throw std::runtime_error(std::string("unterminated JSON string: ") + context);
+}
+
+void skip_json_ws(const std::string& text, std::size_t& pos) {
+    while (pos < text.size() &&
+           (text[pos] == ' ' || text[pos] == '\n' || text[pos] == '\r' || text[pos] == '\t')) {
+        ++pos;
+    }
+}
+
 std::map<std::uint64_t, State128> load_initial_states_from_test_csv(const std::filesystem::path& path) {
     std::ifstream file(path);
     if (!file) {
@@ -704,19 +745,89 @@ std::vector<RepairSolutionAssembly> build_repair_solutions_from_csv(
     if (window == 0U) {
         throw std::runtime_error("repair window must be nonzero");
     }
-    std::string header;
-    if (!std::getline(file, header)) {
+    const std::string file_text(
+        (std::istreambuf_iterator<char>(file)),
+        std::istreambuf_iterator<char>());
+    if (file_text.empty()) {
         throw std::runtime_error("repair solutions csv is empty: " + solutions_csv.string());
     }
-    const std::vector<std::string> names = split_csv_line_simple(header);
-    std::size_t id_col = 0;
-    std::size_t path_col = names.empty() ? 1U : names.size() - 1U;
-    for (std::size_t i = 0; i < names.size(); ++i) {
-        const std::string name = trim_ascii(names[i]);
-        if (name == "initial_state_id" || name == "id" || name == "puzzle_id") {
-            id_col = i;
-        } else if (name == "path" || name == "solution") {
-            path_col = i;
+    std::vector<std::pair<std::uint64_t, std::string>> solution_rows;
+    std::size_t format_probe = 0;
+    skip_json_ws(file_text, format_probe);
+    if (format_probe < file_text.size() && file_text[format_probe] == '{') {
+        std::size_t pos = format_probe + 1U;
+        while (true) {
+            skip_json_ws(file_text, pos);
+            if (pos >= file_text.size()) {
+                throw std::runtime_error("unterminated repair solutions JSON object");
+            }
+            if (file_text[pos] == '}') {
+                break;
+            }
+            const std::string key = parse_json_string_at(file_text, pos, "repair puzzle_id");
+            const std::uint64_t puzzle_id = parse_u64(trim_ascii(key).c_str(), "repair puzzle_id");
+            skip_json_ws(file_text, pos);
+            if (pos >= file_text.size() || file_text[pos++] != ':') {
+                throw std::runtime_error("expected ':' after repair JSON puzzle id");
+            }
+            skip_json_ws(file_text, pos);
+            if (pos >= file_text.size() || file_text[pos++] != '[') {
+                throw std::runtime_error("expected solution array in repair JSON");
+            }
+            while (true) {
+                skip_json_ws(file_text, pos);
+                if (pos >= file_text.size()) {
+                    throw std::runtime_error("unterminated repair JSON solution array");
+                }
+                if (file_text[pos] == ']') {
+                    ++pos;
+                    break;
+                }
+                solution_rows.emplace_back(puzzle_id, parse_json_string_at(file_text, pos, "repair solution path"));
+                skip_json_ws(file_text, pos);
+                if (pos < file_text.size() && file_text[pos] == ',') {
+                    ++pos;
+                    continue;
+                }
+                if (pos < file_text.size() && file_text[pos] == ']') {
+                    continue;
+                }
+                throw std::runtime_error("expected ',' or ']' in repair JSON solution array");
+            }
+            skip_json_ws(file_text, pos);
+            if (pos < file_text.size() && file_text[pos] == ',') {
+                ++pos;
+            }
+        }
+    } else {
+        std::istringstream input(file_text);
+        std::string header;
+        if (!std::getline(input, header)) {
+            throw std::runtime_error("repair solutions csv is empty: " + solutions_csv.string());
+        }
+        const std::vector<std::string> names = split_csv_line_simple(header);
+        std::size_t id_col = 0;
+        std::size_t path_col = names.empty() ? 1U : names.size() - 1U;
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            const std::string name = trim_ascii(names[i]);
+            if (name == "initial_state_id" || name == "id" || name == "puzzle_id") {
+                id_col = i;
+            } else if (name == "path" || name == "solution") {
+                path_col = i;
+            }
+        }
+        std::string line;
+        while (std::getline(input, line)) {
+            if (line.empty()) {
+                continue;
+            }
+            const std::vector<std::string> fields = split_csv_line_simple(line);
+            if (fields.size() <= std::max(id_col, path_col)) {
+                continue;
+            }
+            solution_rows.emplace_back(
+                parse_u64(trim_ascii(fields[id_col]).c_str(), "repair puzzle_id"),
+                trim_ascii(fields[path_col]));
         }
     }
 
@@ -724,23 +835,15 @@ std::vector<RepairSolutionAssembly> build_repair_solutions_from_csv(
     std::uint64_t seen_solution_rows = 0;
     std::uint64_t solution_job_id = 9'200'000ULL;
     std::uint64_t repair_id = 9'100'000ULL;
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty()) {
-            continue;
-        }
-        const std::vector<std::string> fields = split_csv_line_simple(line);
-        if (fields.size() <= std::max(id_col, path_col)) {
-            continue;
-        }
+    for (const auto& solution_row : solution_rows) {
         if (seen_solution_rows++ < first_solution_index) {
             continue;
         }
         if (max_solutions != 0ULL && out.size() >= max_solutions) {
             break;
         }
-        const std::uint64_t puzzle_id = parse_u64(trim_ascii(fields[id_col]).c_str(), "repair puzzle_id");
-        const std::string original_path = trim_ascii(fields[path_col]);
+        const std::uint64_t puzzle_id = solution_row.first;
+        const std::string original_path = trim_ascii(solution_row.second);
         if (original_path.empty()) {
             continue;
         }
