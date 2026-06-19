@@ -59,3 +59,15 @@ Logs:
 ```bash
 tail -f /mnt/pool/6/vokirova/beam8a100/ihes_cube_model/logs/ihes-model-<JOBID>.out
 ```
+
+## Solution Repair CSV
+
+Prepare per-solution repair inputs with one window size, `K1 + 7` by default:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100
+cp repo/hpc/ihes_cube_model/prepare_solution_repair_single_window.sh ihes_cube_model/
+sed -i 's/\r$//' ihes_cube_model/prepare_solution_repair_single_window.sh
+chmod +x ihes_cube_model/prepare_solution_repair_single_window.sh
+ihes_cube_model/prepare_solution_repair_single_window.sh
+```

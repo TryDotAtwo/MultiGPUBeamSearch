@@ -365,3 +365,5 @@
 - User clarified that fallback behavior is not acceptable, but explicit modes
   are: keep the old repair behavior as a named mode and add the new plan mode
   as another named mode.
+- User requested removing the repair diversity windows for now: generate only
+  one segment grid with `window = K1 + 7` and run that.

@@ -669,3 +669,7 @@
 - Fixed plan-mode launcher execution by invoking `run_solution_repair_plan.sh`
   through `/bin/bash` inside the distributed wrapper, so it does not depend on
   the repository file executable bit after `git fetch/reset`.
+- Added `hpc/ihes_cube_model/prepare_solution_repair_single_window.sh` for the
+  current IHES repair workflow. It prepares `solution_repair_*` CSV files with
+  exactly one block window, `window = K1 + 7` by default, instead of generating
+  the previous diversity sweep over `K1+1..K1+7`.
