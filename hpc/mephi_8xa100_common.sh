@@ -324,7 +324,7 @@ beam_torchrun_segment_plan() {
     --rdzv-endpoint="${TORCHRUN_RDZV_ENDPOINT}" \
     --rdzv-id="beam8a100_${SLURM_JOB_ID:-manual}_${run_tag}" \
     --no-python \
-    /bin/bash -lc 'if [ "${RANK:-0}" = "0" ]; then exec "$@"; else exec "$@" > "${BEAM_RANK_LOG_DIR}/rank${RANK}.log" 2>&1; fi' \
+    /bin/bash -lc 'if [ "${RANK:-0}" = "0" ]; then exec /bin/bash "$@"; else exec /bin/bash "$@" > "${BEAM_RANK_LOG_DIR}/rank${RANK}.log" 2>&1; fi' \
     bash "${REPO_DIR}/hpc/ihes_cube_model/run_solution_repair_plan.sh" \
       "${plan_tsv}" "${runner_path}" "${BEAM_WIDTH}" "${history_base_dir}" "${JOB_DIR}" \
     2>&1 | tee "${run_log}"

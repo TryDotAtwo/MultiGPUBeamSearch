@@ -666,3 +666,6 @@
   `BEAM_HISTORY_DISK_PATH` per segment so history directories remain isolated;
   plan mode leaves cleanup to the existing job-level safe cleanup after the
   outer distributed run exits.
+- Fixed plan-mode launcher execution by invoking `run_solution_repair_plan.sh`
+  through `/bin/bash` inside the distributed wrapper, so it does not depend on
+  the repository file executable bit after `git fetch/reset`.
