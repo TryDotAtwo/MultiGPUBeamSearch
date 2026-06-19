@@ -644,3 +644,6 @@
   repairs one original solution: it compiles once, runs all segments for that
   solution sequentially, records segment metadata, stitches candidates per
   repair depth, and prints the best candidate.
+- Added the IHES unique-solutions input file
+  `hpc/ihes_cube_model/solv_uniq.csv` so cluster repair jobs can be prepared
+  through GitHub without manually uploading the Telegram copy.

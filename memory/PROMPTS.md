@@ -353,3 +353,5 @@
   repair segments sequentially using block step `K1 + 7` for `beam=900M`, stitch
   the repaired segments, write all new paths and metadata, and optionally add
   diversity by testing windows `K1+1` through `K1+7`.
+- User requested adding `solv_uniq.csv` to GitHub so the cluster can receive it
+  through the normal repository update path instead of manual upload.
