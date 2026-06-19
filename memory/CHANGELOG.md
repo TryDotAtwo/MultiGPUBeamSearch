@@ -655,3 +655,14 @@
   builds one stable `production_runner` under `prebuilt-a100-ihes`, and
   `ihes_solution_repair.sh` can reuse it through `BEAM_PREBUILT_RUNNER` instead
   of running CMake/NVCC inside every solution-repair array task.
+- Added an explicit IHES solution repair execution mode switch:
+  `BEAM_SOLUTION_REPAIR_MODE=plan` runs all segments through one outer
+  `torchrun`, while `BEAM_SOLUTION_REPAIR_MODE=legacy` preserves the previous
+  one-`torchrun`-per-segment behavior. Unknown modes fail immediately; there is
+  no automatic fallback.
+- Added `run_solution_repair_plan.sh` and common `beam_torchrun_segment_plan`
+  orchestration so plan mode runs the whole segment list inside one outer
+  distributed launch. Both plan and legacy modes now set
+  `BEAM_HISTORY_DISK_PATH` per segment so history directories remain isolated;
+  plan mode leaves cleanup to the existing job-level safe cleanup after the
+  outer distributed run exits.

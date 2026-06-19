@@ -184,11 +184,60 @@ echo "build_dir=${BUILD_DIR}"
 RESULT_TSV="${LOG_DIR}/solution_repair_segments_${REPAIR_SOLUTION_JOB_ID}_${SLURM_JOB_ID:-manual}.tsv"
 printf "solution_job_id\trepair_id\tsearch_depth\twindow\tstart_step\ttarget_step\told_segment_len\tsegment_solved\tsegment_len\tsegment_delta\tsegment_path\n" > "${RESULT_TSV}"
 
+BEAM_SOLUTION_REPAIR_MODE="${BEAM_SOLUTION_REPAIR_MODE:-plan}"
+echo "solution_repair_mode=${BEAM_SOLUTION_REPAIR_MODE}"
+
+if [ "${BEAM_SOLUTION_REPAIR_MODE}" = "plan" ]; then
+  PLAN_RUN_LOG="${LOG_DIR}/production_runner_ihes_solution_repair_plan_${REPAIR_SOLUTION_JOB_ID}_${SLURM_JOB_ID:-manual}.log"
+  beam_torchrun_segment_plan \
+    "solution_repair_plan_${REPAIR_SOLUTION_JOB_ID}" \
+    "${PLAN_RUN_LOG}" \
+    "${PLAN_TSV}" \
+    "${BUILD_DIR}/production_runner" \
+    "${HISTORY_BASE_DIR}"
+  python - "${PLAN_RUN_LOG}" "${PLAN_TSV}" "${REPAIR_SOLUTION_JOB_ID}" >> "${RESULT_TSV}" <<'PY'
+import csv
+import re
+import sys
+
+run_log, plan_tsv, solution_job_id = sys.argv[1:4]
+text = open(run_log, encoding="utf-8", errors="ignore").read()
+matches_by_repair = {}
+for match in re.finditer(r"puzzle_solved=1\b[^\n]*\bpuzzle_id=(\d+)\b[^\n]*\bsolution_length=(\d+)\s+solution=([^\s]+)", text):
+    matches_by_repair[match.group(1)] = (int(match.group(2)), match.group(3))
+
+with open(plan_tsv, newline="", encoding="utf-8") as fh:
+    for row in csv.DictReader(fh, delimiter="\t"):
+        repair_id = row["repair_id"]
+        old_len = int(row["old_segment_len"])
+        segment_solved = 0
+        segment_len = old_len
+        segment_path = row["old_segment_path"]
+        if repair_id in matches_by_repair:
+            segment_solved = 1
+            segment_len, segment_path = matches_by_repair[repair_id]
+        delta = segment_len - old_len
+        print("\t".join(map(str, [
+            solution_job_id,
+            repair_id,
+            row["search_depth"],
+            row["window"],
+            row["start_step"],
+            row["target_step"],
+            old_len,
+            segment_solved,
+            segment_len,
+            delta,
+            segment_path,
+        ])))
+PY
+elif [ "${BEAM_SOLUTION_REPAIR_MODE}" = "legacy" ]; then
 tail -n +2 "${PLAN_TSV}" | while IFS=$'\t' read -r REPAIR_ID SEARCH_DEPTH WINDOW START_STEP TARGET_STEP OLD_SEGMENT_LEN OLD_SEGMENT_PATH TARGET_STATE; do
   export PUZZLE_ID="${REPAIR_ID}"
   export DEPTH_LIMIT="${SEARCH_DEPTH}"
   export BEAM_TARGET_STATE_TEXT="${TARGET_STATE}"
   export HISTORY_DIR="${HISTORY_BASE_DIR}/${REPAIR_ID}"
+  export BEAM_HISTORY_DISK_PATH="${HISTORY_DIR}"
   export BEAM_PREDICT_STATS_VERBOSE=0
   export BEAM_PREDICT_STATS_PATH="${RUN_DIR}/predict_stats_solution_repair_${REPAIR_ID}_${SLURM_JOB_ID:-manual}.jsonl"
   beam_prepare_nccl_file "ihes_solution_repair_${REPAIR_ID}"
@@ -238,6 +287,11 @@ print("\t".join(map(str, [
 ])))
 PY
 done
+else
+  echo "invalid_solution_repair_mode=${BEAM_SOLUTION_REPAIR_MODE}"
+  echo "expected_solution_repair_mode=plan_or_legacy"
+  exit 2
+fi
 
 SUMMARY_TXT="${LOG_DIR}/solution_repair_summary_${REPAIR_SOLUTION_JOB_ID}_${SLURM_JOB_ID:-manual}.txt"
 python - "${RESULT_TSV}" "${REPAIR_ORIGINAL_PATH}" "${REPAIR_ORIGINAL_LENGTH}" > "${SUMMARY_TXT}" <<'PY'

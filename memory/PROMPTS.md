@@ -362,3 +362,6 @@
 - User requested precompiled IHES repair jobs: compile the runner once and then
   vary only runtime start/target states so K1 is recomputed per segment without
   paying CMake/NVCC cost for every solution-repair task.
+- User clarified that fallback behavior is not acceptable, but explicit modes
+  are: keep the old repair behavior as a named mode and add the new plan mode
+  as another named mode.
