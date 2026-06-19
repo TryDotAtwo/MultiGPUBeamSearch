@@ -41,7 +41,7 @@ tail -n +2 "${PLAN_TSV}" | while IFS=$'\t' read -r REPAIR_ID SEARCH_DEPTH WINDOW
   sleep 1
 
   set +e
-  bash "${RUNNER_PATH}" "${REPAIR_ID}" "${SEARCH_DEPTH}" "${BEAM_WIDTH_ARG}"
+  /bin/bash -lc 'exec "$@"' bash "${RUNNER_PATH}" "${REPAIR_ID}" "${SEARCH_DEPTH}" "${BEAM_WIDTH_ARG}"
   rc=$?
   set -e
 
