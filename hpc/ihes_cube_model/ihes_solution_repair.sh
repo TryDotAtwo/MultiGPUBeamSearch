@@ -231,7 +231,7 @@ with open(plan_tsv, newline="", encoding="utf-8") as fh:
             segment_path,
         ])))
 PY
-elif [ "${BEAM_SOLUTION_REPAIR_MODE}" = "legacy" ]; then
+elif [ "${BEAM_SOLUTION_REPAIR_MODE}" = "legacy" ] || [ "${BEAM_SOLUTION_REPAIR_MODE}" = "legacy_native" ]; then
 tail -n +2 "${PLAN_TSV}" | while IFS=$'\t' read -r REPAIR_ID SEARCH_DEPTH WINDOW START_STEP TARGET_STEP OLD_SEGMENT_LEN OLD_SEGMENT_PATH TARGET_STATE; do
   export PUZZLE_ID="${REPAIR_ID}"
   export DEPTH_LIMIT="${SEARCH_DEPTH}"
@@ -245,7 +245,11 @@ tail -n +2 "${PLAN_TSV}" | while IFS=$'\t' read -r REPAIR_ID SEARCH_DEPTH WINDOW
 
   echo "segment_start repair_id=${REPAIR_ID} search_depth=${SEARCH_DEPTH} window=${WINDOW} start_step=${START_STEP} target_step=${TARGET_STEP} old_segment_len=${OLD_SEGMENT_LEN}"
   set +e
-  beam_torchrun_production "solution_repair_${REPAIR_ID}" "${RUN_LOG}"
+  if [ "${BEAM_SOLUTION_REPAIR_MODE}" = "legacy_native" ]; then
+    beam_native_production "solution_repair_${REPAIR_ID}" "${RUN_LOG}"
+  else
+    beam_torchrun_production "solution_repair_${REPAIR_ID}" "${RUN_LOG}"
+  fi
   rc=$?
   set -e
   if [ "${rc}" -eq 0 ]; then
@@ -289,7 +293,7 @@ PY
 done
 else
   echo "invalid_solution_repair_mode=${BEAM_SOLUTION_REPAIR_MODE}"
-  echo "expected_solution_repair_mode=plan_or_legacy"
+  echo "expected_solution_repair_mode=plan_legacy_or_legacy_native"
   exit 2
 fi
 

@@ -289,6 +289,73 @@ beam_torchrun_production() {
   return "${torchrun_rc}"
 }
 
+beam_native_production() {
+  local run_tag="$1"
+  local run_log="$2"
+  local rank_log_dir="${LOG_DIR}/ranks_${SLURM_JOB_ID:-manual}_${run_tag}"
+  local gpu_log="${TUNING_DIR}/nvidia_smi_${run_tag}.log"
+  local gpu_monitor_pid=""
+  local world_size="${WORLD_SIZE_EFFECTIVE:-${TORCHRUN_NPROC_PER_NODE:-8}}"
+  mkdir -p "${rank_log_dir}"
+  export BEAM_RANK_LOG_DIR="${rank_log_dir}"
+  echo "run_tag=${run_tag}"
+  echo "run_log=${run_log}"
+  echo "rank_log_dir=${BEAM_RANK_LOG_DIR}"
+  echo "beam_nccl_id_file=${BEAM_NCCL_ID_FILE}"
+  echo "gpu_monitor_log=${gpu_log}"
+  echo "production_launcher=native"
+  echo "production_world_size=${world_size}"
+  (
+    while true; do
+      date -Is
+      nvidia-smi --query-gpu=index,name,temperature.gpu,power.draw,memory.used,memory.total,utilization.gpu,utilization.memory --format=csv,noheader,nounits
+      sleep 5
+    done
+  ) > "${gpu_log}" 2>&1 &
+  gpu_monitor_pid=$!
+  set +e
+  local pids=()
+  local rank
+  for ((rank = 0; rank < world_size; rank++)); do
+    if [ "${rank}" -eq 0 ]; then
+      (
+        export RANK=0
+        export LOCAL_RANK=0
+        export WORLD_SIZE="${world_size}"
+        export LOCAL_WORLD_SIZE="${world_size}"
+        exec "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
+      ) 2>&1 | tee "${run_log}" &
+      pids+=("$!")
+    else
+      (
+        export RANK="${rank}"
+        export LOCAL_RANK="${rank}"
+        export WORLD_SIZE="${world_size}"
+        export LOCAL_WORLD_SIZE="${world_size}"
+        exec "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
+      ) > "${rank_log_dir}/rank${rank}.log" 2>&1 &
+      pids+=("$!")
+    fi
+  done
+  local launch_rc=0
+  local pid
+  for pid in "${pids[@]}"; do
+    if ! wait "${pid}"; then
+      launch_rc=1
+      local other_pid
+      for other_pid in "${pids[@]}"; do
+        kill "${other_pid}" >/dev/null 2>&1 || true
+      done
+    fi
+  done
+  set -e
+  if [ -n "${gpu_monitor_pid}" ]; then
+    kill "${gpu_monitor_pid}" >/dev/null 2>&1 || true
+    wait "${gpu_monitor_pid}" >/dev/null 2>&1 || true
+  fi
+  return "${launch_rc}"
+}
+
 beam_torchrun_segment_plan() {
   local run_tag="$1"
   local run_log="$2"

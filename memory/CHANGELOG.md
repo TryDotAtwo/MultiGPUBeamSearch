@@ -678,3 +678,8 @@
   `WORLD_SIZE_EFFECTIVE` shell ranks directly with `RANK`, `LOCAL_RANK`, and
   `WORLD_SIZE` set, writes only rank 0 to the main log, and stores nonzero ranks
   under the existing rank log directory.
+- Added an explicit `BEAM_SOLUTION_REPAIR_MODE=legacy_native` mode for the
+  current IHES solution repair workflow. It keeps the per-segment legacy
+  execution model, but launches each segment through a lightweight native
+  8-rank shell launcher instead of `torchrun`; existing `legacy` and `plan`
+  modes are unchanged.

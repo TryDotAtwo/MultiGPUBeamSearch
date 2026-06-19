@@ -369,3 +369,6 @@
   one segment grid with `window = K1 + 7` and run that.
 - User requested a small purpose-built launcher for plan mode instead of
   `torchrun`, while keeping legacy mode on `torchrun`.
+- User clarified the immediate request: do not broadly replace legacy behavior;
+  add a runner without `torchrun` specifically for the current IHES repair task,
+  and inspect current logs first.
