@@ -624,3 +624,15 @@
   explains generic 1-GPU execution, multi-GPU `torchrun`, SLURM cluster launch
   patterns, IHES data/model setup, Kaggle notebook usage, logs, cleanup, and
   development tests without relying on site-specific cluster rules.
+- Added host-side segment repair support. `production_runner` now accepts
+  `BEAM_START_STATE_TEXT`/`BEAM_START_STATE_FILE` and
+  `BEAM_TARGET_STATE_TEXT`/`BEAM_TARGET_STATE_FILE`; K1 solved-neighborhood BFS
+  builds from the target override, while default behavior still targets the
+  central state. Added `tools/generate_segment_repair_jobs.py` to turn existing
+  solution paths into synthetic start/target repair jobs, and
+  `hpc/ihes_cube_model/ihes_segment_repair.sh` to run one IHES repair row and
+  print the spliced candidate.
+- Updated the segment repair generator so the default repair window can be
+  derived from beam width: `search_depth = max d where move_count**d <=
+  beam_width`, and `window = K1 + search_depth`. This matches the intended
+  BFS-like depth where the beam can hold the complete frontier layer.

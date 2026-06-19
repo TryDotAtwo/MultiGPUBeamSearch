@@ -341,3 +341,10 @@
   cluster, Kaggle, and similar environments; then clarified it should avoid
   specific MEPhI cluster rules and instead document generic 1-GPU and
   multi-GPU `torchrun` usage.
+- User requested implementing segment repair for IHES solutions: provide custom
+  start and target states to the runner, build K1 BFS from the target state,
+  keep history/reconstruction unchanged so the runner returns `state_i ->
+  state_j`, and splice `original_prefix + repaired_segment + original_suffix`.
+  The first requested sweep is suffix/segment repair with size `K1 + max_depth`,
+  where `max_depth` is the largest depth whose full frontier layer fits into the
+  configured beam width.

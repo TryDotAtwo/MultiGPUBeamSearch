@@ -469,6 +469,34 @@ State128 load_initial_state_from_test_csv(const std::filesystem::path& path, std
     throw std::runtime_error("requested puzzle_id not found in test csv");
 }
 
+State128 parse_state_text(const std::string& state_text, const char* context) {
+    std::size_t pos = 0;
+    State128 state{};
+    for (std::uint32_t p = 0; p < STATE_LEN; ++p) {
+        state.v[p] = static_cast<std::uint8_t>(parse_next_u32(state_text, pos, context));
+    }
+    for (std::uint32_t p = STATE_LEN; p < STATE_STORAGE_LEN; ++p) {
+        state.v[p] = 0;
+    }
+    return state;
+}
+
+bool load_state_override(const char* text_env, const char* file_env, State128& out, const char* context) {
+    if (const char* state_text = std::getenv(text_env)) {
+        if (state_text[0] != '\0') {
+            out = parse_state_text(state_text, context);
+            return true;
+        }
+    }
+    if (const char* state_file = std::getenv(file_env)) {
+        if (state_file[0] != '\0') {
+            out = parse_state_text(read_text_file(state_file), context);
+            return true;
+        }
+    }
+    return false;
+}
+
 std::string timestamp_id() {
     const auto now = std::chrono::system_clock::now();
     const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
@@ -3299,16 +3327,29 @@ int main(int argc, char** argv) {
     const std::vector<std::uint8_t> host_generators = load_p900_generators(generator_path);
     const std::vector<std::string> host_move_names = load_p900_move_names(generator_path);
     const State128 host_central = load_central_state(puzzle_info_path);
-    const State128 host_initial = load_initial_state_from_test_csv(test_csv_path, puzzle_id);
+    State128 host_initial = load_initial_state_from_test_csv(test_csv_path, puzzle_id);
+    State128 host_target = host_central;
+    const bool start_override_enabled = load_state_override(
+        "BEAM_START_STATE_TEXT",
+        "BEAM_START_STATE_FILE",
+        host_initial,
+        "start_state_override");
+    const bool target_override_enabled = load_state_override(
+        "BEAM_TARGET_STATE_TEXT",
+        "BEAM_TARGET_STATE_FILE",
+        host_target,
+        "target_state_override");
     const ZobristTable host_zobrist = make_deterministic_zobrist(0xC0DEC0DEULL);
     SolvedNeighborhoodRuntime solved_neighborhood =
-        build_solved_neighborhood_runtime(host_central, host_generators, host_zobrist);
+        build_solved_neighborhood_runtime(host_target, host_generators, host_zobrist);
     Stream2SuffixRuntime stream2_suffix = build_stream2_suffix_runtime(host_generators);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "real_assets=enabled\n";
     std::cout << "generator_path=" << generator_path.string() << "\n";
     std::cout << "puzzle_info_path=" << puzzle_info_path.string() << "\n";
     std::cout << "test_csv_path=" << test_csv_path.string() << "\n";
+    std::cout << "start_state_override=" << (start_override_enabled ? 1 : 0) << "\n";
+    std::cout << "target_state_override=" << (target_override_enabled ? 1 : 0) << "\n";
     std::cout << "weight_dir=" << weight_dir.string() << "\n";
     std::cout << "stream1_model_state_len=" << stream1_model.state_len << "\n";
     std::cout << "stream1_model_num_classes=" << stream1_model.num_classes << "\n";
@@ -3361,7 +3402,7 @@ int main(int argc, char** argv) {
     require_aligned(central_state, alignof(State128), "central_state");
     require_aligned(zobrist, alignof(Hash128), "zobrist");
     BEAM_CUDA_CHECK(cudaMemcpy(generators, host_generators.data(), host_generators.size(), cudaMemcpyHostToDevice));
-    BEAM_CUDA_CHECK(cudaMemcpy(central_state, &host_central, sizeof(State128), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(central_state, &host_target, sizeof(State128), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(zobrist, &host_zobrist[0][0], STATE_STORAGE_LEN * STATE_VALUE_PAD * sizeof(Hash128), cudaMemcpyHostToDevice));
     stream1_weights::DeviceWeights device_weights = stream1_weights::upload_weights(host_weights);
     stream1_weights::ScratchAllocation stream1_scratch =
@@ -3370,10 +3411,10 @@ int main(int argc, char** argv) {
 #if BEAM_DEBUG_PATH_TRACE
     tracked_solution.initialize(puzzle_id, host_initial, host_generators, host_zobrist, host_move_names);
     if (tracked_solution.enabled && tracked_solution.final_state_valid) {
-        const Hash128 central_hash = hash_state(host_central, host_zobrist);
-        const bool final_is_central = states_equal_storage(tracked_solution.final_state, host_central);
+        const Hash128 central_hash = hash_state(host_target, host_zobrist);
+        const bool final_is_central = states_equal_storage(tracked_solution.final_state, host_target);
         const bool final_padding_zero = padding_is_zero(tracked_solution.final_state);
-        const bool central_padding_zero = padding_is_zero(host_central);
+        const bool central_padding_zero = padding_is_zero(host_target);
         const bool final_hash_is_central = tracked_solution.final_hash == central_hash;
         const bool final_hash_in_solved_neighborhood =
             solved_neighborhood.suffix_by_hash.find(tracked_solution.final_hash) !=
@@ -3624,7 +3665,7 @@ int main(int argc, char** argv) {
             if (distributed_solution.controller_rank) {
                 const State128 final_state =
                     apply_solution_moves(host_initial, distributed_solution.solution.moves, host_generators);
-                const bool valid = states_equal_storage(final_state, host_central);
+                const bool valid = states_equal_storage(final_state, host_target);
                 const double solved_elapsed_sec =
                     std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
                 SolvedSnapshot global_solved = selected_solved_snapshot;
@@ -3650,7 +3691,7 @@ int main(int argc, char** argv) {
                     history,
                     global_solved);
                 if (!valid) {
-                    throw std::runtime_error("CPU solution validation failed: generated state is not central_state");
+                    throw std::runtime_error("CPU solution validation failed: generated state is not target_state");
                 }
                 std::cout << "puzzle_solved=1"
                           << " puzzle_id=" << puzzle_id
@@ -3692,7 +3733,7 @@ int main(int argc, char** argv) {
                 solved_neighborhood,
                 solved_meta.hash);
             const State128 final_state = apply_solution_moves(host_initial, solution.moves, host_generators);
-            const bool valid = states_equal_storage(final_state, host_central);
+            const bool valid = states_equal_storage(final_state, host_target);
             const double solved_elapsed_sec =
                 std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
             write_solution_artifacts(
@@ -3706,7 +3747,7 @@ int main(int argc, char** argv) {
                 history,
                 selected_solved_snapshot);
             if (!valid) {
-                throw std::runtime_error("CPU solution validation failed: generated state is not central_state");
+                throw std::runtime_error("CPU solution validation failed: generated state is not target_state");
             }
             std::cout << "puzzle_solved=1"
                       << " puzzle_id=" << puzzle_id
