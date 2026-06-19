@@ -153,7 +153,16 @@ export BEAM_TEST_CSV="${REPAIR_TEST_CSV}"
 export BEAM_WEIGHT_DIR="${WEIGHT_DIR}"
 
 beam_preflight
-beam_configure_build production_runner
+if [ -n "${BEAM_PREBUILT_RUNNER:-}" ]; then
+  if [ ! -x "${BEAM_PREBUILT_RUNNER}" ]; then
+    echo "missing_prebuilt_runner=${BEAM_PREBUILT_RUNNER}"
+    exit 2
+  fi
+  ln -sf "${BEAM_PREBUILT_RUNNER}" "${BUILD_DIR}/production_runner"
+  echo "using_prebuilt_runner=${BEAM_PREBUILT_RUNNER}"
+else
+  beam_configure_build production_runner
+fi
 beam_derive_shard_capacity
 beam_validate_manual_config
 beam_export_common_runtime

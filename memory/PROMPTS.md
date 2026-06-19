@@ -359,3 +359,6 @@
   continuing the full `solv_uniq.csv` submission; the repair launcher should
   support chunk offsets so each submitted SLURM array can stay within
   `0-999`.
+- User requested precompiled IHES repair jobs: compile the runner once and then
+  vary only runtime start/target states so K1 is recomputed per segment without
+  paying CMake/NVCC cost for every solution-repair task.

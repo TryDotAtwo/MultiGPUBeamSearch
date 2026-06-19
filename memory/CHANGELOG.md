@@ -651,3 +651,7 @@
   `hpc/ihes_cube_model/ihes_solution_repair.sh` so MEPhI SLURM chunks can use
   array indices `0-999` repeatedly while selecting later rows from
   `solution_repair_solutions.csv`.
+- Added prebuilt IHES repair runner support. `prepare_ihes_prebuilt_runner.sh`
+  builds one stable `production_runner` under `prebuilt-a100-ihes`, and
+  `ihes_solution_repair.sh` can reuse it through `BEAM_PREBUILT_RUNNER` instead
+  of running CMake/NVCC inside every solution-repair array task.
