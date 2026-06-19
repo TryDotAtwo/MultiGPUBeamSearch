@@ -298,6 +298,7 @@ beam_torchrun_segment_plan() {
   local rank_log_dir="${LOG_DIR}/ranks_${SLURM_JOB_ID:-manual}_${run_tag}"
   local gpu_log="${TUNING_DIR}/nvidia_smi_${run_tag}.log"
   local gpu_monitor_pid=""
+  local world_size="${WORLD_SIZE_EFFECTIVE:-${TORCHRUN_NPROC_PER_NODE:-8}}"
   mkdir -p "${rank_log_dir}"
   export BEAM_RANK_LOG_DIR="${rank_log_dir}"
   echo "run_tag=${run_tag}"
@@ -316,25 +317,48 @@ beam_torchrun_segment_plan() {
   ) > "${gpu_log}" 2>&1 &
   gpu_monitor_pid=$!
   set +e
-  "${NINJA_VENV_DIR}/bin/python" -m torch.distributed.run \
-    --nnodes="${TORCHRUN_NNODES}" \
-    --nproc-per-node="${TORCHRUN_NPROC_PER_NODE}" \
-    --node-rank="${TORCHRUN_NODE_RANK}" \
-    --rdzv-backend=c10d \
-    --rdzv-endpoint="${TORCHRUN_RDZV_ENDPOINT}" \
-    --rdzv-id="beam8a100_${SLURM_JOB_ID:-manual}_${run_tag}" \
-    --no-python \
-    /bin/bash -lc 'if [ "${RANK:-0}" = "0" ]; then exec /bin/bash "$@"; else exec /bin/bash "$@" > "${BEAM_RANK_LOG_DIR}/rank${RANK}.log" 2>&1; fi' \
-    bash "${REPO_DIR}/hpc/ihes_cube_model/run_solution_repair_plan.sh" \
-      "${plan_tsv}" "${runner_path}" "${BEAM_WIDTH}" "${history_base_dir}" "${JOB_DIR}" \
-    2>&1 | tee "${run_log}"
-  local torchrun_rc=${PIPESTATUS[0]}
+  local pids=()
+  local rank
+  echo "segment_plan_launcher=native"
+  echo "segment_plan_world_size=${world_size}"
+  for ((rank = 0; rank < world_size; rank++)); do
+    if [ "${rank}" -eq 0 ]; then
+      (
+        export RANK=0
+        export LOCAL_RANK=0
+        export WORLD_SIZE="${world_size}"
+        exec /bin/bash "${REPO_DIR}/hpc/ihes_cube_model/run_solution_repair_plan.sh" \
+          "${plan_tsv}" "${runner_path}" "${BEAM_WIDTH}" "${history_base_dir}" "${JOB_DIR}"
+      ) 2>&1 | tee "${run_log}" &
+      pids+=("$!")
+    else
+      (
+        export RANK="${rank}"
+        export LOCAL_RANK="${rank}"
+        export WORLD_SIZE="${world_size}"
+        exec /bin/bash "${REPO_DIR}/hpc/ihes_cube_model/run_solution_repair_plan.sh" \
+          "${plan_tsv}" "${runner_path}" "${BEAM_WIDTH}" "${history_base_dir}" "${JOB_DIR}"
+      ) > "${rank_log_dir}/rank${rank}.log" 2>&1 &
+      pids+=("$!")
+    fi
+  done
+  local launch_rc=0
+  local pid
+  for pid in "${pids[@]}"; do
+    if ! wait "${pid}"; then
+      launch_rc=1
+      local other_pid
+      for other_pid in "${pids[@]}"; do
+        kill "${other_pid}" >/dev/null 2>&1 || true
+      done
+    fi
+  done
   set -e
   if [ -n "${gpu_monitor_pid}" ]; then
     kill "${gpu_monitor_pid}" >/dev/null 2>&1 || true
     wait "${gpu_monitor_pid}" >/dev/null 2>&1 || true
   fi
-  return "${torchrun_rc}"
+  return "${launch_rc}"
 }
 
 beam_safe_clean_child() {

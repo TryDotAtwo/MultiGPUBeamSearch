@@ -367,3 +367,5 @@
   as another named mode.
 - User requested removing the repair diversity windows for now: generate only
   one segment grid with `window = K1 + 7` and run that.
+- User requested a small purpose-built launcher for plan mode instead of
+  `torchrun`, while keeping legacy mode on `torchrun`.

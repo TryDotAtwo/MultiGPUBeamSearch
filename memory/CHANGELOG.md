@@ -673,3 +673,8 @@
   current IHES repair workflow. It prepares `solution_repair_*` CSV files with
   exactly one block window, `window = K1 + 7` by default, instead of generating
   the previous diversity sweep over `K1+1..K1+7`.
+- Replaced the plan-mode repair launcher internals with a native lightweight
+  rank launcher while leaving legacy mode on `torchrun`. Plan mode now starts
+  `WORLD_SIZE_EFFECTIVE` shell ranks directly with `RANK`, `LOCAL_RANK`, and
+  `WORLD_SIZE` set, writes only rank 0 to the main log, and stores nonzero ranks
+  under the existing rank log directory.
