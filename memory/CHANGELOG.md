@@ -683,3 +683,12 @@
   execution model, but launches each segment through a lightweight native
   8-rank shell launcher instead of `torchrun`; existing `legacy` and `plan`
   modes are unchanged.
+- Added a dedicated resident IHES solution-repair mode. `production_runner`
+  now supports `BEAM_REPAIR_SOLUTIONS_CSV`, builds block segment tasks directly
+  from `solv_uniq.csv` plus `BEAM_TEST_CSV`, and runs them in one process/rank
+  group while reusing CUDA/NCCL/model/static allocations. The solved-neighborhood
+  device table now has a stable arena path: later segment targets rebuild the
+  CPU K1 table and overwrite the same device pointers, so CUDA graph templates
+  can be reused as long as the radius/bucket/slot shape stays fixed. Added
+  `BEAM_SOLUTION_REPAIR_MODE=resident` to `hpc/ihes_cube_model/ihes_solution_repair.sh`
+  to launch this path and write a per-segment TSV.

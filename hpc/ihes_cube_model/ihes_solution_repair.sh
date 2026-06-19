@@ -47,7 +47,14 @@ trap cleanup EXIT
 
 beam_setup_paths
 
-for required in "${REPAIR_TEST_CSV}" "${REPAIR_SEGMENTS_CSV}" "${REPAIR_SOLUTIONS_CSV}" "${DATA_DIR}/puzzle_info.json" "${WEIGHT_DIR}/manifest.json"; do
+BEAM_SOLUTION_REPAIR_MODE="${BEAM_SOLUTION_REPAIR_MODE:-plan}"
+required_files=("${DATA_DIR}/puzzle_info.json" "${WEIGHT_DIR}/manifest.json")
+if [ "${BEAM_SOLUTION_REPAIR_MODE}" = "resident" ]; then
+  required_files+=("${DATA_DIR}/test.csv" "${SOLUTIONS_CSV:-${RUN_DIR}/solv_uniq.csv}")
+else
+  required_files+=("${REPAIR_TEST_CSV}" "${REPAIR_SEGMENTS_CSV}" "${REPAIR_SOLUTIONS_CSV}")
+fi
+for required in "${required_files[@]}"; do
   if [ ! -f "${required}" ]; then
     echo "missing_required_file=${required}"
     exit 2
@@ -61,7 +68,7 @@ else
   SOLUTION_ROW_INDEX="${SOLUTION_ROW_INDEX:-}"
 fi
 SOLUTION_JOB_ID="${SOLUTION_JOB_ID:-}"
-if [ -z "${SOLUTION_ROW_INDEX}" ] && [ -z "${SOLUTION_JOB_ID}" ]; then
+if [ "${BEAM_SOLUTION_REPAIR_MODE}" != "resident" ] && [ -z "${SOLUTION_ROW_INDEX}" ] && [ -z "${SOLUTION_JOB_ID}" ]; then
   echo "set SOLUTION_ROW_INDEX, SOLUTION_JOB_ID, or submit as a SLURM array"
   exit 2
 fi
@@ -70,6 +77,7 @@ echo "solution_row_offset=${SOLUTION_ROW_OFFSET}"
 echo "solution_row_index=${SOLUTION_ROW_INDEX}"
 echo "solution_job_id_filter=${SOLUTION_JOB_ID:-}"
 
+if [ "${BEAM_SOLUTION_REPAIR_MODE}" != "resident" ]; then
 PLAN_TSV="${RUN_DIR}/solution_repair_plan_${SLURM_JOB_ID:-manual}_${SOLUTION_ROW_INDEX:-id${SOLUTION_JOB_ID}}.tsv"
 META_ENV="${RUN_DIR}/solution_repair_${SLURM_JOB_ID:-manual}_${SOLUTION_ROW_INDEX:-id${SOLUTION_JOB_ID}}.env"
 python - "${REPAIR_SOLUTIONS_CSV}" "${REPAIR_SEGMENTS_CSV}" "${META_ENV}" "${PLAN_TSV}" "${SOLUTION_ROW_INDEX}" "${SOLUTION_JOB_ID}" <<'PY'
@@ -123,6 +131,14 @@ with open(plan_tsv, "w", encoding="utf-8", newline="") as out:
         writer.writerow({key: row[key] for key in fields})
 PY
 source "${META_ENV}"
+else
+  REPAIR_SOLUTION_JOB_ID="resident"
+  REPAIR_PUZZLE_ID="all"
+  REPAIR_SOLUTION_INDEX="${SOLUTION_ROW_INDEX:-0}"
+  REPAIR_ORIGINAL_LENGTH="0"
+  REPAIR_ORIGINAL_PATH=""
+  REPAIR_SEGMENT_COUNT=1
+fi
 
 if [ "${REPAIR_SEGMENT_COUNT}" -eq 0 ]; then
   echo "no_segments_for_solution_job=${REPAIR_SOLUTION_JOB_ID}"
@@ -184,10 +200,29 @@ echo "build_dir=${BUILD_DIR}"
 RESULT_TSV="${LOG_DIR}/solution_repair_segments_${REPAIR_SOLUTION_JOB_ID}_${SLURM_JOB_ID:-manual}.tsv"
 printf "solution_job_id\trepair_id\tsearch_depth\twindow\tstart_step\ttarget_step\told_segment_len\tsegment_solved\tsegment_len\tsegment_delta\tsegment_path\n" > "${RESULT_TSV}"
 
-BEAM_SOLUTION_REPAIR_MODE="${BEAM_SOLUTION_REPAIR_MODE:-plan}"
 echo "solution_repair_mode=${BEAM_SOLUTION_REPAIR_MODE}"
 
-if [ "${BEAM_SOLUTION_REPAIR_MODE}" = "plan" ]; then
+if [ "${BEAM_SOLUTION_REPAIR_MODE}" = "resident" ]; then
+  export BEAM_TEST_CSV="${DATA_DIR}/test.csv"
+  export BEAM_REPAIR_SOLUTIONS_CSV="${SOLUTIONS_CSV:-${RUN_DIR}/solv_uniq.csv}"
+  export BEAM_REPAIR_K1_RADIUS="${BEAM_SOLVED_NEIGHBORHOOD_RADIUS}"
+  export BEAM_REPAIR_SEARCH_DEPTH="${BEAM_REPAIR_SEARCH_DEPTH:-7}"
+  export BEAM_REPAIR_FIRST_SOLUTION="${BEAM_REPAIR_FIRST_SOLUTION:-${SOLUTION_ROW_INDEX:-0}}"
+  export BEAM_REPAIR_MAX_SOLUTIONS="${BEAM_REPAIR_MAX_SOLUTIONS:-0}"
+  export BEAM_REPAIR_RESULT_TSV="${LOG_DIR}/solution_repair_resident_${SLURM_JOB_ID:-manual}_${BEAM_REPAIR_FIRST_SOLUTION}_${BEAM_REPAIR_MAX_SOLUTIONS}.tsv"
+  export PUZZLE_ID="${PUZZLE_ID:-1}"
+  export DEPTH_LIMIT="${BEAM_REPAIR_SEARCH_DEPTH}"
+  export BEAM_TARGET_STATE_TEXT=
+  export BEAM_HISTORY_DISK_PATH="${HISTORY_BASE_DIR}/resident"
+  beam_prepare_nccl_file "ihes_solution_repair_resident"
+  RESIDENT_RUN_LOG="${LOG_DIR}/production_runner_ihes_solution_repair_resident_${SLURM_JOB_ID:-manual}.log"
+  echo "repair_resident_solutions_csv=${BEAM_REPAIR_SOLUTIONS_CSV}"
+  echo "repair_resident_result_tsv=${BEAM_REPAIR_RESULT_TSV}"
+  echo "repair_resident_first_solution=${BEAM_REPAIR_FIRST_SOLUTION}"
+  echo "repair_resident_max_solutions=${BEAM_REPAIR_MAX_SOLUTIONS}"
+  beam_native_production "solution_repair_resident" "${RESIDENT_RUN_LOG}"
+  exit 0
+elif [ "${BEAM_SOLUTION_REPAIR_MODE}" = "plan" ]; then
   PLAN_RUN_LOG="${LOG_DIR}/production_runner_ihes_solution_repair_plan_${REPAIR_SOLUTION_JOB_ID}_${SLURM_JOB_ID:-manual}.log"
   beam_torchrun_segment_plan \
     "solution_repair_plan_${REPAIR_SOLUTION_JOB_ID}" \
@@ -293,7 +328,7 @@ PY
 done
 else
   echo "invalid_solution_repair_mode=${BEAM_SOLUTION_REPAIR_MODE}"
-  echo "expected_solution_repair_mode=plan_legacy_or_legacy_native"
+  echo "expected_solution_repair_mode=resident_plan_legacy_or_legacy_native"
   exit 2
 fi
 

@@ -23,6 +23,7 @@
 #include <mutex>
 #include <new>
 #include <numeric>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -580,6 +581,219 @@ std::vector<std::uint8_t> parse_solution_path_text(
     return moves;
 }
 
+std::vector<std::string> split_csv_line_simple(const std::string& line) {
+    std::vector<std::string> fields;
+    std::string current;
+    bool quoted = false;
+    for (std::size_t i = 0; i < line.size(); ++i) {
+        const char ch = line[i];
+        if (ch == '"') {
+            if (quoted && i + 1U < line.size() && line[i + 1U] == '"') {
+                current.push_back('"');
+                ++i;
+            } else {
+                quoted = !quoted;
+            }
+        } else if (ch == ',' && !quoted) {
+            fields.push_back(current);
+            current.clear();
+        } else {
+            current.push_back(ch);
+        }
+    }
+    fields.push_back(current);
+    return fields;
+}
+
+std::string trim_ascii(std::string text) {
+    while (!text.empty() && (text.back() == '\r' || text.back() == '\n' || text.back() == ' ' || text.back() == '\t')) {
+        text.pop_back();
+    }
+    std::size_t begin = 0;
+    while (begin < text.size() && (text[begin] == ' ' || text[begin] == '\t')) {
+        ++begin;
+    }
+    if (begin != 0U) {
+        text.erase(0, begin);
+    }
+    return text;
+}
+
+std::map<std::uint64_t, State128> load_initial_states_from_test_csv(const std::filesystem::path& path) {
+    std::ifstream file(path);
+    if (!file) {
+        throw std::runtime_error("cannot open required csv file: " + path.string());
+    }
+    std::map<std::uint64_t, State128> rows;
+    std::string line;
+    std::getline(file, line);
+    while (std::getline(file, line)) {
+        if (line.empty()) {
+            continue;
+        }
+        const std::vector<std::string> fields = split_csv_line_simple(line);
+        if (fields.size() < 2U) {
+            continue;
+        }
+        const std::uint64_t row_id = parse_u64(trim_ascii(fields[0]).c_str(), "initial_state_id");
+        rows.emplace(row_id, parse_state_text(fields[1], "initial_state"));
+    }
+    return rows;
+}
+
+struct RepairTask {
+    std::uint64_t repair_id = 0;
+    std::uint64_t solution_job_id = 0;
+    std::uint64_t puzzle_id = 0;
+    std::uint32_t solution_index = 0;
+    std::uint32_t depth_limit = 0;
+    std::uint32_t window = 0;
+    std::uint32_t start_step = 0;
+    std::uint32_t target_step = 0;
+    std::uint32_t old_segment_len = 0;
+    std::uint32_t original_length = 0;
+    State128 start_state{};
+    State128 target_state{};
+    std::string prefix_path;
+    std::string old_segment_path;
+    std::string suffix_path;
+    std::string original_path;
+};
+
+struct RepairSolutionAssembly {
+    std::uint64_t solution_job_id = 0;
+    std::uint64_t puzzle_id = 0;
+    std::uint32_t solution_index = 0;
+    std::uint32_t original_length = 0;
+    std::string original_path;
+    std::vector<RepairTask> tasks;
+};
+
+State128 apply_move_flat_host(
+    const State128& parent,
+    const std::vector<std::uint8_t>& generators,
+    std::uint8_t move);
+
+std::vector<State128> states_along_solution(
+    const State128& initial,
+    const std::vector<std::uint8_t>& moves,
+    const std::vector<std::uint8_t>& generators) {
+    std::vector<State128> states;
+    states.reserve(moves.size() + 1U);
+    states.push_back(initial);
+    for (std::uint8_t move : moves) {
+        states.push_back(apply_move_flat_host(states.back(), generators, move));
+    }
+    return states;
+}
+
+std::vector<RepairSolutionAssembly> build_repair_solutions_from_csv(
+    const std::filesystem::path& solutions_csv,
+    const std::map<std::uint64_t, State128>& initial_states,
+    const std::vector<std::uint8_t>& generators,
+    const std::vector<std::string>& move_names,
+    std::uint32_t k1_radius,
+    std::uint32_t search_depth,
+    std::uint64_t first_solution_index,
+    std::uint64_t max_solutions) {
+    std::ifstream file(solutions_csv);
+    if (!file) {
+        throw std::runtime_error("cannot open repair solutions csv: " + solutions_csv.string());
+    }
+    const std::uint32_t window = k1_radius + search_depth;
+    if (window == 0U) {
+        throw std::runtime_error("repair window must be nonzero");
+    }
+    std::string header;
+    if (!std::getline(file, header)) {
+        throw std::runtime_error("repair solutions csv is empty: " + solutions_csv.string());
+    }
+    const std::vector<std::string> names = split_csv_line_simple(header);
+    std::size_t id_col = 0;
+    std::size_t path_col = names.empty() ? 1U : names.size() - 1U;
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        const std::string name = trim_ascii(names[i]);
+        if (name == "initial_state_id" || name == "id" || name == "puzzle_id") {
+            id_col = i;
+        } else if (name == "path" || name == "solution") {
+            path_col = i;
+        }
+    }
+
+    std::vector<RepairSolutionAssembly> out;
+    std::uint64_t seen_solution_rows = 0;
+    std::uint64_t solution_job_id = 9'200'000ULL;
+    std::uint64_t repair_id = 9'100'000ULL;
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) {
+            continue;
+        }
+        const std::vector<std::string> fields = split_csv_line_simple(line);
+        if (fields.size() <= std::max(id_col, path_col)) {
+            continue;
+        }
+        if (seen_solution_rows++ < first_solution_index) {
+            continue;
+        }
+        if (max_solutions != 0ULL && out.size() >= max_solutions) {
+            break;
+        }
+        const std::uint64_t puzzle_id = parse_u64(trim_ascii(fields[id_col]).c_str(), "repair puzzle_id");
+        const std::string original_path = trim_ascii(fields[path_col]);
+        if (original_path.empty()) {
+            continue;
+        }
+        const auto initial_found = initial_states.find(puzzle_id);
+        if (initial_found == initial_states.end()) {
+            throw std::runtime_error("repair puzzle_id not found in test csv: " + std::to_string(puzzle_id));
+        }
+        const std::vector<std::uint8_t> moves = parse_solution_path_text(original_path, move_names);
+        if (moves.empty()) {
+            continue;
+        }
+        const std::vector<State128> states = states_along_solution(initial_found->second, moves, generators);
+        RepairSolutionAssembly assembly;
+        assembly.solution_job_id = ++solution_job_id;
+        assembly.puzzle_id = puzzle_id;
+        assembly.solution_index = 0;
+        assembly.original_length = static_cast<std::uint32_t>(moves.size());
+        assembly.original_path = original_path;
+        std::uint32_t start_step = 0;
+        while (start_step < moves.size()) {
+            const std::uint32_t target_step =
+                std::min<std::uint32_t>(static_cast<std::uint32_t>(moves.size()), start_step + window);
+            RepairTask task;
+            task.repair_id = ++repair_id;
+            task.solution_job_id = assembly.solution_job_id;
+            task.puzzle_id = puzzle_id;
+            task.solution_index = assembly.solution_index;
+            task.depth_limit = search_depth;
+            task.window = window;
+            task.start_step = start_step;
+            task.target_step = target_step;
+            task.old_segment_len = target_step - start_step;
+            task.original_length = assembly.original_length;
+            task.start_state = states[start_step];
+            task.target_state = states[target_step];
+            task.original_path = original_path;
+            task.prefix_path = moves_to_path_text(
+                std::vector<std::uint8_t>(moves.begin(), moves.begin() + start_step),
+                move_names);
+            task.old_segment_path = moves_to_path_text(
+                std::vector<std::uint8_t>(moves.begin() + start_step, moves.begin() + target_step),
+                move_names);
+            task.suffix_path = moves_to_path_text(
+                std::vector<std::uint8_t>(moves.begin() + target_step, moves.end()),
+                move_names);
+            assembly.tasks.push_back(std::move(task));
+            start_step = target_step;
+        }
+        out.push_back(std::move(assembly));
+    }
+    return out;
+}
+
 State128 apply_move_flat_host(const State128& parent, const std::vector<std::uint8_t>& generators, std::uint8_t move) {
     if (move >= MOVE_COUNT) {
         throw std::runtime_error("solution move exceeds MOVE_COUNT");
@@ -722,6 +936,34 @@ struct SolvedNeighborhoodRuntime {
         bucket_count = 0;
         entry_count = 0;
         suffix_by_hash.clear();
+    }
+
+    void overwrite_from_same_shape(SolvedNeighborhoodRuntime& source) {
+        if (!enabled()) {
+            throw std::runtime_error("stable solved neighborhood arena is not initialized");
+        }
+        if (!source.enabled()) {
+            throw std::runtime_error("cannot overwrite stable solved neighborhood with disabled source");
+        }
+        if (radius != source.radius ||
+            bucket_count != source.bucket_count ||
+            slot_count != source.slot_count) {
+            throw std::runtime_error(
+                "stable solved neighborhood shape changed: radius/buckets/slots must stay fixed");
+        }
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            device_fingerprints,
+            source.device_fingerprints,
+            slot_count * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToDevice));
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            device_hashes,
+            source.device_hashes,
+            slot_count * sizeof(Hash128),
+            cudaMemcpyDeviceToDevice));
+        entry_count = source.entry_count;
+        device_bytes = source.device_bytes;
+        suffix_by_hash = std::move(source.suffix_by_hash);
     }
 };
 
@@ -3211,6 +3453,31 @@ std::uint32_t propagate_stop_flag(
     return stop_value;
 }
 
+void reset_static_memory_for_task(
+    const StaticMemoryPlan& plan,
+    StaticDeviceMemory& memory,
+    const State128& host_initial,
+    State128* central_state,
+    const State128& host_target,
+    std::uint32_t rank) {
+    BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
+    BEAM_CUDA_CHECK(cudaMemset(memory.current_frontier_states, 0, plan.current_frontier_bytes));
+    if (rank == 0U) {
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            memory.current_frontier_states,
+            &host_initial,
+            sizeof(State128),
+            cudaMemcpyHostToDevice));
+    }
+    BEAM_CUDA_CHECK(cudaMemcpy(central_state, &host_target, sizeof(State128), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemset(memory.streams.current_threshold, 0xff, 2ULL * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(memory.streams.threshold_initialized, 0, 2ULL * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(memory.streams.current_threshold_active_index, 0, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(memory.streams.threshold_request_local, 0, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMemset(memory.streams.threshold_request_global, 0, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -3218,8 +3485,8 @@ int main(int argc, char** argv) {
         std::cerr << "usage: production_runner <puzzle_id> <depth> <beam> [world_size] [local_rank]\n";
         return 2;
     }
-    const std::uint64_t puzzle_id = parse_u64(argv[1], "puzzle_id");
-    const std::uint32_t depth_limit = static_cast<std::uint32_t>(parse_u64(argv[2], "depth"));
+    const std::uint64_t cli_puzzle_id = parse_u64(argv[1], "puzzle_id");
+    const std::uint32_t cli_depth_limit = static_cast<std::uint32_t>(parse_u64(argv[2], "depth"));
     const std::uint64_t beam = parse_u64(argv[3], "beam");
     const std::uint32_t world_size_arg = argc == 6 ? static_cast<std::uint32_t>(parse_u64(argv[4], "world_size")) : 1U;
     const std::uint32_t rank_arg = argc == 6 ? static_cast<std::uint32_t>(parse_u64(argv[5], "local_rank")) : 0U;
@@ -3248,8 +3515,8 @@ int main(int argc, char** argv) {
     const RuntimeConfig config = config_build.config;
     const StaticMemoryPlan plan = config_build.plan;
 #if BEAM_ENABLE_DEBUG_LOGS
-    std::cout << "puzzle_id=" << puzzle_id << "\n";
-    std::cout << "depth_limit=" << depth_limit << "\n";
+    std::cout << "puzzle_id=" << cli_puzzle_id << "\n";
+    std::cout << "depth_limit=" << cli_depth_limit << "\n";
     std::cout << "RUNTIME_CONFIG_MODE=" << (config_build.manual_config ? "manual" : "auto") << "\n";
     std::cout << "USER_GLOBAL_BEAM_WIDTH=" << beam << "\n";
     std::cout << "WORLD_SIZE=" << config.world_size << "\n";
@@ -3327,7 +3594,9 @@ int main(int argc, char** argv) {
     const std::vector<std::uint8_t> host_generators = load_p900_generators(generator_path);
     const std::vector<std::string> host_move_names = load_p900_move_names(generator_path);
     const State128 host_central = load_central_state(puzzle_info_path);
-    State128 host_initial = load_initial_state_from_test_csv(test_csv_path, puzzle_id);
+    const bool repair_resident_mode = env_present("BEAM_REPAIR_SOLUTIONS_CSV");
+    State128 host_initial =
+        repair_resident_mode ? host_central : load_initial_state_from_test_csv(test_csv_path, cli_puzzle_id);
     State128 host_target = host_central;
     const bool start_override_enabled = load_state_override(
         "BEAM_START_STATE_TEXT",
@@ -3340,6 +3609,41 @@ int main(int argc, char** argv) {
         host_target,
         "target_state_override");
     const ZobristTable host_zobrist = make_deterministic_zobrist(0xC0DEC0DEULL);
+    std::vector<RepairTask> repair_tasks;
+    if (repair_resident_mode) {
+        const std::filesystem::path repair_solutions_csv = env_path("BEAM_REPAIR_SOLUTIONS_CSV", "");
+        const std::uint32_t repair_k1_radius =
+            env_u32("BEAM_REPAIR_K1_RADIUS", env_u32("BEAM_SOLVED_NEIGHBORHOOD_RADIUS", 0));
+        const std::uint32_t repair_search_depth =
+            env_u32("BEAM_REPAIR_SEARCH_DEPTH", cli_depth_limit);
+        const std::uint64_t repair_first_solution = env_u64("BEAM_REPAIR_FIRST_SOLUTION", 0);
+        const std::uint64_t repair_MAX_solutions = env_u64("BEAM_REPAIR_MAX_SOLUTIONS", 0);
+        const std::map<std::uint64_t, State128> initial_states =
+            load_initial_states_from_test_csv(test_csv_path);
+        const std::vector<RepairSolutionAssembly> repair_solutions =
+            build_repair_solutions_from_csv(
+                repair_solutions_csv,
+                initial_states,
+                host_generators,
+                host_move_names,
+                repair_k1_radius,
+                repair_search_depth,
+                repair_first_solution,
+                repair_MAX_solutions);
+        for (const RepairSolutionAssembly& solution : repair_solutions) {
+            repair_tasks.insert(repair_tasks.end(), solution.tasks.begin(), solution.tasks.end());
+        }
+        if (repair_tasks.empty()) {
+            throw std::runtime_error("repair resident mode produced no segment tasks");
+        }
+        host_initial = repair_tasks.front().start_state;
+        host_target = repair_tasks.front().target_state;
+        std::cout << "repair_resident_mode=1\n";
+        std::cout << "repair_solutions_csv=" << repair_solutions_csv.string() << "\n";
+        std::cout << "repair_segment_tasks=" << repair_tasks.size() << "\n";
+        std::cout << "repair_k1_radius=" << repair_k1_radius << "\n";
+        std::cout << "repair_search_depth=" << repair_search_depth << "\n";
+    }
     SolvedNeighborhoodRuntime solved_neighborhood =
         build_solved_neighborhood_runtime(host_target, host_generators, host_zobrist);
     Stream2SuffixRuntime stream2_suffix = build_stream2_suffix_runtime(host_generators);
@@ -3409,7 +3713,7 @@ int main(int argc, char** argv) {
         stream1_weights::alloc_stream1_scratch(stream1_model, config.b_micro, config.inference_parallelism);
     TrackedSolutionPrefix tracked_solution;
 #if BEAM_DEBUG_PATH_TRACE
-    tracked_solution.initialize(puzzle_id, host_initial, host_generators, host_zobrist, host_move_names);
+    tracked_solution.initialize(cli_puzzle_id, host_initial, host_generators, host_zobrist, host_move_names);
     if (tracked_solution.enabled && tracked_solution.final_state_valid) {
         const Hash128 central_hash = hash_state(host_target, host_zobrist);
         const bool final_is_central = states_equal_storage(tracked_solution.final_state, host_target);
@@ -3420,7 +3724,7 @@ int main(int argc, char** argv) {
             solved_neighborhood.suffix_by_hash.find(tracked_solution.final_hash) !=
             solved_neighborhood.suffix_by_hash.end();
         std::cout << "track_solution_host_check=1"
-                  << " puzzle_id=" << puzzle_id
+                  << " puzzle_id=" << cli_puzzle_id
                   << " final_is_central=" << (final_is_central ? 1 : 0)
                   << " final_padding_zero=" << (final_padding_zero ? 1 : 0)
                   << " central_padding_zero=" << (central_padding_zero ? 1 : 0)
@@ -3496,6 +3800,59 @@ int main(int argc, char** argv) {
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "runner_phase=graphs_instantiated\n";
 #endif
+
+    if (!repair_resident_mode) {
+        RepairTask task;
+        task.repair_id = cli_puzzle_id;
+        task.solution_job_id = cli_puzzle_id;
+        task.puzzle_id = cli_puzzle_id;
+        task.depth_limit = cli_depth_limit;
+        task.start_state = host_initial;
+        task.target_state = host_target;
+        repair_tasks.push_back(std::move(task));
+    }
+    const std::filesystem::path repair_result_path =
+        env_path("BEAM_REPAIR_RESULT_TSV", "test_results/repair_resident_segments.tsv");
+    std::ofstream repair_result;
+    if (repair_resident_mode && rank == 0U) {
+        const std::filesystem::path parent = repair_result_path.parent_path();
+        if (!parent.empty()) {
+            std::filesystem::create_directories(parent);
+        }
+        repair_result.open(repair_result_path, std::ios::out | std::ios::trunc);
+        if (!repair_result) {
+            throw std::runtime_error("cannot open repair result tsv: " + repair_result_path.string());
+        }
+        repair_result
+            << "solution_job_id\trepair_id\tpuzzle_id\tstart_step\ttarget_step\told_segment_len"
+            << "\tsegment_solved\tsegment_len\tsegment_delta\tsegment_path\tprefix_path\tsuffix_path\n";
+    }
+
+    for (std::size_t task_index = 0; task_index < repair_tasks.size(); ++task_index) {
+    const RepairTask& repair_task = repair_tasks[task_index];
+    const std::uint64_t puzzle_id = repair_task.repair_id;
+    const std::uint32_t depth_limit = repair_task.depth_limit;
+    host_initial = repair_task.start_state;
+    host_target = repair_task.target_state;
+    if (task_index != 0U) {
+        SolvedNeighborhoodRuntime next_solved_neighborhood =
+            build_solved_neighborhood_runtime(host_target, host_generators, host_zobrist);
+        solved_neighborhood.overwrite_from_same_shape(next_solved_neighborhood);
+        next_solved_neighborhood.destroy();
+    }
+    reset_static_memory_for_task(plan, memory, host_initial, central_state, host_target, rank);
+    if (repair_resident_mode) {
+        std::cout << "repair_segment_start"
+                  << " task_index=" << task_index
+                  << " repair_id=" << repair_task.repair_id
+                  << " solution_job_id=" << repair_task.solution_job_id
+                  << " puzzle_id=" << repair_task.puzzle_id
+                  << " start_step=" << repair_task.start_step
+                  << " target_step=" << repair_task.target_step
+                  << " old_segment_len=" << repair_task.old_segment_len
+                  << " depth_limit=" << depth_limit
+                  << "\n";
+    }
 
     const auto start = std::chrono::steady_clock::now();
     CpuCandidateHistory history;
@@ -3575,6 +3932,8 @@ int main(int argc, char** argv) {
     std::uint32_t total_threshold_updates = 0;
     std::uint32_t completed_depths = 0;
     bool solution_found = false;
+    std::string task_solution_path;
+    std::int64_t task_solution_length = -1;
     for (std::uint32_t depth = 0; depth < depth_limit; ++depth) {
         const std::uint32_t current_solution_depth = depth + 1U;
         BEAM_CUDA_CHECK(cudaMemcpy(
@@ -3693,11 +4052,13 @@ int main(int argc, char** argv) {
                 if (!valid) {
                     throw std::runtime_error("CPU solution validation failed: generated state is not target_state");
                 }
+                task_solution_path = moves_to_path_text(distributed_solution.solution.moves, host_move_names);
+                task_solution_length = static_cast<std::int64_t>(distributed_solution.solution.moves.size());
                 std::cout << "puzzle_solved=1"
                           << " puzzle_id=" << puzzle_id
                           << " seconds=" << solved_elapsed_sec
-                          << " solution_length=" << distributed_solution.solution.moves.size()
-                          << " solution=" << moves_to_path_text(distributed_solution.solution.moves, host_move_names)
+                          << " solution_length=" << task_solution_length
+                          << " solution=" << task_solution_path
                           << "\n";
             }
             solution_found = true;
@@ -3749,11 +4110,13 @@ int main(int argc, char** argv) {
             if (!valid) {
                 throw std::runtime_error("CPU solution validation failed: generated state is not target_state");
             }
+            task_solution_path = moves_to_path_text(solution.moves, host_move_names);
+            task_solution_length = static_cast<std::int64_t>(solution.moves.size());
             std::cout << "puzzle_solved=1"
                       << " puzzle_id=" << puzzle_id
                       << " seconds=" << solved_elapsed_sec
-                      << " solution_length=" << solution.moves.size()
-                      << " solution=" << moves_to_path_text(solution.moves, host_move_names)
+                      << " solution_length=" << task_solution_length
+                      << " solution=" << task_solution_path
                       << "\n";
             solution_found = true;
             const auto depth_end = std::chrono::steady_clock::now();
@@ -4027,6 +4390,24 @@ int main(int argc, char** argv) {
     }
 
     history.destroy();
+    if (repair_resident_mode && rank == 0U) {
+        const std::int64_t old_len = static_cast<std::int64_t>(repair_task.old_segment_len);
+        repair_result
+            << repair_task.solution_job_id << '\t'
+            << repair_task.repair_id << '\t'
+            << repair_task.puzzle_id << '\t'
+            << repair_task.start_step << '\t'
+            << repair_task.target_step << '\t'
+            << repair_task.old_segment_len << '\t'
+            << (solution_found ? 1 : 0) << '\t'
+            << (solution_found ? task_solution_length : old_len) << '\t'
+            << ((solution_found ? task_solution_length : old_len) - old_len) << '\t'
+            << (solution_found ? task_solution_path : repair_task.old_segment_path) << '\t'
+            << repair_task.prefix_path << '\t'
+            << repair_task.suffix_path << '\n';
+        repair_result.flush();
+    }
+    }
     destroy_cuda_graph_job_templates(graphs);
     destroy_dispatcher_events(events);
     destroy_dispatcher_streams(streams);

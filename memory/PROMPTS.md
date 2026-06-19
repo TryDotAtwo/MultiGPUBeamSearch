@@ -372,3 +372,8 @@
 - User clarified the immediate request: do not broadly replace legacy behavior;
   add a runner without `torchrun` specifically for the current IHES repair task,
   and inspect current logs first.
+- User requested a separate special repair mode where the beam-search runner
+  itself reads `solv_uniq.csv`, creates the segment plan, processes every
+  segment quickly, cleans per-segment state/history internally, saves all needed
+  metadata to disk, and uses a stable device arena for solved-neighborhood so
+  target K1 tables are overwritten without recreating CUDA graph templates.
