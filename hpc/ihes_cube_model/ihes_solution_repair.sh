@@ -54,12 +54,21 @@ for required in "${REPAIR_TEST_CSV}" "${REPAIR_SEGMENTS_CSV}" "${REPAIR_SOLUTION
   fi
 done
 
-SOLUTION_ROW_INDEX="${SOLUTION_ROW_INDEX:-${SLURM_ARRAY_TASK_ID:-}}"
+SOLUTION_ROW_OFFSET="${SOLUTION_ROW_OFFSET:-0}"
+if [ -z "${SOLUTION_ROW_INDEX:-}" ] && [ -n "${SLURM_ARRAY_TASK_ID:-}" ]; then
+  SOLUTION_ROW_INDEX=$((SOLUTION_ROW_OFFSET + SLURM_ARRAY_TASK_ID))
+else
+  SOLUTION_ROW_INDEX="${SOLUTION_ROW_INDEX:-}"
+fi
 SOLUTION_JOB_ID="${SOLUTION_JOB_ID:-}"
 if [ -z "${SOLUTION_ROW_INDEX}" ] && [ -z "${SOLUTION_JOB_ID}" ]; then
   echo "set SOLUTION_ROW_INDEX, SOLUTION_JOB_ID, or submit as a SLURM array"
   exit 2
 fi
+
+echo "solution_row_offset=${SOLUTION_ROW_OFFSET}"
+echo "solution_row_index=${SOLUTION_ROW_INDEX}"
+echo "solution_job_id_filter=${SOLUTION_JOB_ID:-}"
 
 PLAN_TSV="${RUN_DIR}/solution_repair_plan_${SLURM_JOB_ID:-manual}_${SOLUTION_ROW_INDEX:-id${SOLUTION_JOB_ID}}.tsv"
 META_ENV="${RUN_DIR}/solution_repair_${SLURM_JOB_ID:-manual}_${SOLUTION_ROW_INDEX:-id${SOLUTION_JOB_ID}}.env"

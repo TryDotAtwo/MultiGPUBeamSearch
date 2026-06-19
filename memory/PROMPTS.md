@@ -355,3 +355,7 @@
   diversity by testing windows `K1+1` through `K1+7`.
 - User requested adding `solv_uniq.csv` to GitHub so the cluster can receive it
   through the normal repository update path instead of manual upload.
+- User observed MEPhI rejecting repair arrays above index `999` and requested
+  continuing the full `solv_uniq.csv` submission; the repair launcher should
+  support chunk offsets so each submitted SLURM array can stay within
+  `0-999`.

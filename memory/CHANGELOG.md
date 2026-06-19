@@ -647,3 +647,7 @@
 - Added the IHES unique-solutions input file
   `hpc/ihes_cube_model/solv_uniq.csv` so cluster repair jobs can be prepared
   through GitHub without manually uploading the Telegram copy.
+- Added `SOLUTION_ROW_OFFSET` support to
+  `hpc/ihes_cube_model/ihes_solution_repair.sh` so MEPhI SLURM chunks can use
+  array indices `0-999` repeatedly while selecting later rows from
+  `solution_repair_solutions.csv`.
