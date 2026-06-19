@@ -348,3 +348,8 @@
   The first requested sweep is suffix/segment repair with size `K1 + max_depth`,
   where `max_depth` is the largest depth whose full frontier layer fits into the
   configured beam width.
+- User clarified the desired cluster workflow: process the whole
+  `solv_uniq.csv`, with one SLURM job per original solution. Inside each job,
+  repair segments sequentially using block step `K1 + 7` for `beam=900M`, stitch
+  the repaired segments, write all new paths and metadata, and optionally add
+  diversity by testing windows `K1+1` through `K1+7`.

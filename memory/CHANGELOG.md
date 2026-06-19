@@ -636,3 +636,11 @@
   derived from beam width: `search_depth = max d where move_count**d <=
   beam_width`, and `window = K1 + search_depth`. This matches the intended
   BFS-like depth where the beam can hold the complete frontier layer.
+- Extended IHES segment repair into a per-solution workflow. The generator now
+  writes `solution_jobs.csv` plus segment rows keyed by `solution_job_id`, with
+  block stepping by `K1 + search_depth` by default and optional diversity
+  windows via `--search-depths 1-7`. Added
+  `hpc/ihes_cube_model/ihes_solution_repair.sh`, where one SLURM array task
+  repairs one original solution: it compiles once, runs all segments for that
+  solution sequentially, records segment metadata, stitches candidates per
+  repair depth, and prints the best candidate.
