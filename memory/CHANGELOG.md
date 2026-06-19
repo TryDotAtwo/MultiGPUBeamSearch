@@ -695,3 +695,8 @@
 - Fixed resident repair input parsing for the actual `solv_uniq.csv` format,
   which is a JSON object mapping puzzle ids to arrays of solution paths, not
   only a two-column CSV.
+- Fixed resident repair stable solved-neighborhood reuse across target states.
+  Subsequent K1 tables are now packed into the first segment's fixed bucket
+  count so CUDA graph templates can keep the same device pointers and bucket
+  mask even when a later target has a slightly different deduplicated entry
+  count.

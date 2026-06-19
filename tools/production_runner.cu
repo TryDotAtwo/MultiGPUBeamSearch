@@ -1104,7 +1104,8 @@ bool place_solved_neighborhood_entry(
 SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
     const State128& central_state,
     const std::vector<std::uint8_t>& generators,
-    const ZobristTable& zobrist) {
+    const ZobristTable& zobrist,
+    std::uint32_t fixed_bucket_count = 0) {
     SolvedNeighborhoodRuntime runtime;
     runtime.radius = env_u32("BEAM_SOLVED_NEIGHBORHOOD_RADIUS", 0);
     if (runtime.radius == 0U) {
@@ -1147,7 +1148,13 @@ SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
     }
 
     runtime.entry_count = all_nodes.size();
-    std::uint64_t bucket_count64 = next_power_of_two_u64(std::max<std::uint64_t>(1ULL, runtime.entry_count));
+    if (fixed_bucket_count != 0U && (fixed_bucket_count & (fixed_bucket_count - 1U)) != 0U) {
+        throw std::runtime_error("fixed solved neighborhood bucket count must be a power of two");
+    }
+    std::uint64_t bucket_count64 =
+        fixed_bucket_count == 0U
+            ? next_power_of_two_u64(std::max<std::uint64_t>(1ULL, runtime.entry_count))
+            : static_cast<std::uint64_t>(fixed_bucket_count);
     while (true) {
         if (bucket_count64 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
             throw std::runtime_error("solved neighborhood bucket count exceeds uint32 range");
@@ -1165,6 +1172,9 @@ SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
             }
         }
         if (!packed) {
+            if (fixed_bucket_count != 0U) {
+                throw std::runtime_error("solved neighborhood does not fit stable fixed bucket arena");
+            }
             bucket_count64 *= 2ULL;
             continue;
         }
@@ -3939,7 +3949,11 @@ int main(int argc, char** argv) {
     host_target = repair_task.target_state;
     if (task_index != 0U) {
         SolvedNeighborhoodRuntime next_solved_neighborhood =
-            build_solved_neighborhood_runtime(host_target, host_generators, host_zobrist);
+            build_solved_neighborhood_runtime(
+                host_target,
+                host_generators,
+                host_zobrist,
+                solved_neighborhood.bucket_count);
         solved_neighborhood.overwrite_from_same_shape(next_solved_neighborhood);
         next_solved_neighborhood.destroy();
     }
