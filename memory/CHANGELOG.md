@@ -700,3 +700,9 @@
   count so CUDA graph templates can keep the same device pointers and bucket
   mask even when a later target has a slightly different deduplicated entry
   count.
+- Added resident repair CPU K1 prefetching. In resident mode a bounded host RAM
+  queue now prepares solved-neighborhood K1 tables for upcoming segment tasks
+  while the GPU is solving the current one. `BEAM_REPAIR_K1_PREFETCH_TASKS`
+  controls the number of ready tasks kept in RAM, defaulting to 10; `0`
+  disables it. The stable device arena remains a single table, with a small
+  configurable bucket-count reserve via `BEAM_REPAIR_K1_STABLE_BUCKET_SCALE_PPM`.

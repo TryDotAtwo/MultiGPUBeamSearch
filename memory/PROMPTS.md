@@ -377,3 +377,8 @@
   segment quickly, cleans per-segment state/history internally, saves all needed
   metadata to disk, and uses a stable device arena for solved-neighborhood so
   target K1 tables are overwritten without recreating CUDA graph templates.
+- User clarified resident repair prefetch requirements: do not change K1 depth
+  to 10; instead keep data for the next 10 queued segment tasks prepared in CPU
+  RAM, whether they are windows from the current puzzle/solution or upcoming
+  ones, so GPU execution can advance to the next task without waiting for K1
+  CPU preparation. The buffer must be host RAM, not VRAM.

@@ -11,15 +11,18 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <future>
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <new>
 #include <numeric>
@@ -991,6 +994,21 @@ std::uint64_t next_power_of_two_u64(std::uint64_t value) {
     return value + 1ULL;
 }
 
+struct HostSolvedNeighborhood {
+    std::uint32_t radius = 0;
+    std::uint32_t bucket_count = 0;
+    std::uint64_t entry_count = 0;
+    std::uint64_t slot_count = 0;
+    std::uint64_t device_bytes = 0;
+    std::vector<std::uint32_t> fingerprints;
+    std::vector<Hash128> hashes;
+    std::unordered_map<Hash128, PackedSuffix, Hash128Hasher> suffix_by_hash;
+
+    bool enabled() const {
+        return radius != 0U && !fingerprints.empty() && !hashes.empty();
+    }
+};
+
 struct SolvedNeighborhoodRuntime {
     std::uint32_t radius = 0;
     std::uint32_t bucket_count = 0;
@@ -1041,7 +1059,7 @@ struct SolvedNeighborhoodRuntime {
         suffix_by_hash.clear();
     }
 
-    void overwrite_from_same_shape(SolvedNeighborhoodRuntime& source) {
+    void overwrite_from_host_same_shape(HostSolvedNeighborhood&& source) {
         if (!enabled()) {
             throw std::runtime_error("stable solved neighborhood arena is not initialized");
         }
@@ -1056,14 +1074,14 @@ struct SolvedNeighborhoodRuntime {
         }
         BEAM_CUDA_CHECK(cudaMemcpy(
             device_fingerprints,
-            source.device_fingerprints,
+            source.fingerprints.data(),
             slot_count * sizeof(std::uint32_t),
-            cudaMemcpyDeviceToDevice));
+            cudaMemcpyHostToDevice));
         BEAM_CUDA_CHECK(cudaMemcpy(
             device_hashes,
-            source.device_hashes,
+            source.hashes.data(),
             slot_count * sizeof(Hash128),
-            cudaMemcpyDeviceToDevice));
+            cudaMemcpyHostToDevice));
         entry_count = source.entry_count;
         device_bytes = source.device_bytes;
         suffix_by_hash = std::move(source.suffix_by_hash);
@@ -1101,17 +1119,17 @@ bool place_solved_neighborhood_entry(
     return false;
 }
 
-SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
+HostSolvedNeighborhood build_solved_neighborhood_host(
     const State128& central_state,
     const std::vector<std::uint8_t>& generators,
     const ZobristTable& zobrist,
     std::uint32_t fixed_bucket_count = 0) {
-    SolvedNeighborhoodRuntime runtime;
-    runtime.radius = env_u32("BEAM_SOLVED_NEIGHBORHOOD_RADIUS", 0);
-    if (runtime.radius == 0U) {
-        return runtime;
+    HostSolvedNeighborhood host;
+    host.radius = env_u32("BEAM_SOLVED_NEIGHBORHOOD_RADIUS", 0);
+    if (host.radius == 0U) {
+        return host;
     }
-    if (runtime.radius > 12U) {
+    if (host.radius > 12U) {
         throw std::runtime_error("BEAM_SOLVED_NEIGHBORHOOD_RADIUS must be <= 12");
     }
     if (generators.size() != MOVE_COUNT * STATE_STORAGE_LEN) {
@@ -1123,23 +1141,23 @@ SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
     const Hash128 central_hash = hash_state(central_state, zobrist);
     all_nodes.push_back(SolvedNeighborhoodNode{central_state, central_hash, PackedSuffix{}});
     frontier.push_back(all_nodes.front());
-    runtime.suffix_by_hash.emplace(central_hash, PackedSuffix{});
+    host.suffix_by_hash.emplace(central_hash, PackedSuffix{});
 
-    for (std::uint32_t depth = 0; depth < runtime.radius && !frontier.empty(); ++depth) {
+    for (std::uint32_t depth = 0; depth < host.radius && !frontier.empty(); ++depth) {
         std::vector<SolvedNeighborhoodNode> next;
         next.reserve(frontier.size() * MOVE_COUNT);
         for (const SolvedNeighborhoodNode& node : frontier) {
             for (std::uint8_t move = 0; move < MOVE_COUNT; ++move) {
                 State128 predecessor = apply_inverse_move_flat_host(node.state, generators, move);
                 const Hash128 hash = hash_state(predecessor, zobrist);
-                if (runtime.suffix_by_hash.find(hash) != runtime.suffix_by_hash.end()) {
+                if (host.suffix_by_hash.find(hash) != host.suffix_by_hash.end()) {
                     continue;
                 }
                 const PackedSuffix suffix = prepend_suffix_move(node.suffix, move);
-                if (max_entries != 0ULL && runtime.suffix_by_hash.size() >= max_entries) {
+                if (max_entries != 0ULL && host.suffix_by_hash.size() >= max_entries) {
                     throw std::runtime_error("solved neighborhood exceeded BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES");
                 }
-                runtime.suffix_by_hash.emplace(hash, suffix);
+                host.suffix_by_hash.emplace(hash, suffix);
                 next.push_back(SolvedNeighborhoodNode{predecessor, hash, suffix});
             }
         }
@@ -1147,13 +1165,13 @@ SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
         frontier = std::move(next);
     }
 
-    runtime.entry_count = all_nodes.size();
+    host.entry_count = all_nodes.size();
     if (fixed_bucket_count != 0U && (fixed_bucket_count & (fixed_bucket_count - 1U)) != 0U) {
         throw std::runtime_error("fixed solved neighborhood bucket count must be a power of two");
     }
     std::uint64_t bucket_count64 =
         fixed_bucket_count == 0U
-            ? next_power_of_two_u64(std::max<std::uint64_t>(1ULL, runtime.entry_count))
+            ? next_power_of_two_u64(std::max<std::uint64_t>(1ULL, host.entry_count))
             : static_cast<std::uint64_t>(fixed_bucket_count);
     while (true) {
         if (bucket_count64 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
@@ -1178,25 +1196,153 @@ SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
             bucket_count64 *= 2ULL;
             continue;
         }
-        runtime.bucket_count = bucket_count;
-        runtime.slot_count = fingerprints.size();
-        runtime.device_bytes =
-            runtime.slot_count * (sizeof(std::uint32_t) + sizeof(Hash128));
-        BEAM_CUDA_CHECK(cudaMalloc(&runtime.device_fingerprints, fingerprints.size() * sizeof(std::uint32_t)));
-        BEAM_CUDA_CHECK(cudaMalloc(&runtime.device_hashes, hashes.size() * sizeof(Hash128)));
-        BEAM_CUDA_CHECK(cudaMemcpy(
-            runtime.device_fingerprints,
-            fingerprints.data(),
-            fingerprints.size() * sizeof(std::uint32_t),
-            cudaMemcpyHostToDevice));
-        BEAM_CUDA_CHECK(cudaMemcpy(
-            runtime.device_hashes,
-            hashes.data(),
-            hashes.size() * sizeof(Hash128),
-            cudaMemcpyHostToDevice));
-        return runtime;
+        host.bucket_count = bucket_count;
+        host.slot_count = fingerprints.size();
+        host.device_bytes = host.slot_count * (sizeof(std::uint32_t) + sizeof(Hash128));
+        host.fingerprints = std::move(fingerprints);
+        host.hashes = std::move(hashes);
+        return host;
     }
 }
+
+SolvedNeighborhoodRuntime upload_solved_neighborhood_runtime(HostSolvedNeighborhood&& host) {
+    SolvedNeighborhoodRuntime runtime;
+    runtime.radius = host.radius;
+    runtime.bucket_count = host.bucket_count;
+    runtime.entry_count = host.entry_count;
+    runtime.slot_count = host.slot_count;
+    runtime.device_bytes = host.device_bytes;
+    runtime.suffix_by_hash = std::move(host.suffix_by_hash);
+    if (!host.enabled()) {
+        return runtime;
+    }
+    BEAM_CUDA_CHECK(cudaMalloc(&runtime.device_fingerprints, host.fingerprints.size() * sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&runtime.device_hashes, host.hashes.size() * sizeof(Hash128)));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        runtime.device_fingerprints,
+        host.fingerprints.data(),
+        host.fingerprints.size() * sizeof(std::uint32_t),
+        cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        runtime.device_hashes,
+        host.hashes.data(),
+        host.hashes.size() * sizeof(Hash128),
+        cudaMemcpyHostToDevice));
+    return runtime;
+}
+
+SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
+    const State128& central_state,
+    const std::vector<std::uint8_t>& generators,
+    const ZobristTable& zobrist,
+    std::uint32_t fixed_bucket_count = 0) {
+    return upload_solved_neighborhood_runtime(
+        build_solved_neighborhood_host(central_state, generators, zobrist, fixed_bucket_count));
+}
+
+class RepairSolvedNeighborhoodPrefetch {
+public:
+    RepairSolvedNeighborhoodPrefetch(
+        const std::vector<RepairTask>& tasks,
+        const std::vector<std::uint8_t>& generators,
+        const ZobristTable& zobrist,
+        std::uint32_t fixed_bucket_count,
+        std::size_t begin_index,
+        std::size_t capacity)
+        : tasks_(tasks),
+          generators_(generators),
+          zobrist_(zobrist),
+          fixed_bucket_count_(fixed_bucket_count),
+          next_index_(begin_index),
+          capacity_(capacity) {
+        if (capacity_ != 0U && next_index_ < tasks_.size()) {
+            worker_ = std::thread([this]() { run(); });
+        }
+    }
+
+    RepairSolvedNeighborhoodPrefetch(const RepairSolvedNeighborhoodPrefetch&) = delete;
+    RepairSolvedNeighborhoodPrefetch& operator=(const RepairSolvedNeighborhoodPrefetch&) = delete;
+
+    ~RepairSolvedNeighborhoodPrefetch() {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            stop_ = true;
+        }
+        cv_.notify_all();
+        if (worker_.joinable()) {
+            worker_.join();
+        }
+    }
+
+    bool enabled() const {
+        return worker_.joinable();
+    }
+
+    HostSolvedNeighborhood take(std::size_t task_index) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this, task_index]() {
+            return exception_ != nullptr || stop_ || (!queue_.empty() && queue_.front().first == task_index);
+        });
+        if (exception_ != nullptr) {
+            std::rethrow_exception(exception_);
+        }
+        if (queue_.empty() || queue_.front().first != task_index) {
+            throw std::runtime_error("repair K1 prefetch stopped before requested task was ready");
+        }
+        HostSolvedNeighborhood host = std::move(queue_.front().second);
+        queue_.pop_front();
+        cv_.notify_all();
+        return host;
+    }
+
+private:
+    void run() {
+        try {
+            while (true) {
+                std::size_t task_index = 0;
+                {
+                    std::unique_lock<std::mutex> lock(mutex_);
+                    cv_.wait(lock, [this]() {
+                        return stop_ || queue_.size() < capacity_ || next_index_ >= tasks_.size();
+                    });
+                    if (stop_ || next_index_ >= tasks_.size()) {
+                        return;
+                    }
+                    task_index = next_index_++;
+                }
+                HostSolvedNeighborhood host = build_solved_neighborhood_host(
+                    tasks_[task_index].target_state,
+                    generators_,
+                    zobrist_,
+                    fixed_bucket_count_);
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    queue_.emplace_back(task_index, std::move(host));
+                }
+                cv_.notify_all();
+            }
+        } catch (...) {
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                exception_ = std::current_exception();
+            }
+            cv_.notify_all();
+        }
+    }
+
+    const std::vector<RepairTask>& tasks_;
+    const std::vector<std::uint8_t>& generators_;
+    const ZobristTable& zobrist_;
+    std::uint32_t fixed_bucket_count_ = 0;
+    std::size_t next_index_ = 0;
+    std::size_t capacity_ = 0;
+    std::deque<std::pair<std::size_t, HostSolvedNeighborhood>> queue_;
+    std::mutex mutex_;
+    std::condition_variable cv_;
+    std::thread worker_;
+    std::exception_ptr exception_;
+    bool stop_ = false;
+};
 
 struct Stream2SuffixRuntime {
     std::uint32_t radius = 0;
@@ -3757,8 +3903,33 @@ int main(int argc, char** argv) {
         std::cout << "repair_k1_radius=" << repair_k1_radius << "\n";
         std::cout << "repair_search_depth=" << repair_search_depth << "\n";
     }
+    HostSolvedNeighborhood initial_solved_neighborhood =
+        build_solved_neighborhood_host(host_target, host_generators, host_zobrist);
+    if (repair_resident_mode && initial_solved_neighborhood.enabled()) {
+        const std::uint64_t stable_bucket_scale_ppm =
+            env_u64("BEAM_REPAIR_K1_STABLE_BUCKET_SCALE_PPM", 2'000'000ULL);
+        const std::uint64_t scaled_bucket_count = next_power_of_two_u64(
+            std::max<std::uint64_t>(
+                initial_solved_neighborhood.bucket_count,
+                (static_cast<std::uint64_t>(initial_solved_neighborhood.bucket_count) *
+                     stable_bucket_scale_ppm +
+                 999'999ULL) /
+                    1'000'000ULL));
+        if (scaled_bucket_count > std::numeric_limits<std::uint32_t>::max()) {
+            throw std::runtime_error("resident K1 stable bucket count exceeds uint32 range");
+        }
+        if (scaled_bucket_count != initial_solved_neighborhood.bucket_count) {
+            initial_solved_neighborhood = build_solved_neighborhood_host(
+                host_target,
+                host_generators,
+                host_zobrist,
+                static_cast<std::uint32_t>(scaled_bucket_count));
+        }
+        std::cout << "repair_k1_stable_bucket_count=" << initial_solved_neighborhood.bucket_count << "\n";
+        std::cout << "repair_k1_stable_bucket_scale_ppm=" << stable_bucket_scale_ppm << "\n";
+    }
     SolvedNeighborhoodRuntime solved_neighborhood =
-        build_solved_neighborhood_runtime(host_target, host_generators, host_zobrist);
+        upload_solved_neighborhood_runtime(std::move(initial_solved_neighborhood));
     Stream2SuffixRuntime stream2_suffix = build_stream2_suffix_runtime(host_generators);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "real_assets=enabled\n";
@@ -3940,6 +4111,19 @@ int main(int argc, char** argv) {
             << "solution_job_id\trepair_id\tpuzzle_id\tstart_step\ttarget_step\told_segment_len"
             << "\tsegment_solved\tsegment_len\tsegment_delta\tsegment_path\tprefix_path\tsuffix_path\n";
     }
+    const std::size_t repair_k1_prefetch_tasks =
+        repair_resident_mode ? static_cast<std::size_t>(env_u64("BEAM_REPAIR_K1_PREFETCH_TASKS", 10)) : 0U;
+    std::unique_ptr<RepairSolvedNeighborhoodPrefetch> repair_k1_prefetch;
+    if (repair_resident_mode && repair_k1_prefetch_tasks != 0U && repair_tasks.size() > 1U) {
+        repair_k1_prefetch = std::make_unique<RepairSolvedNeighborhoodPrefetch>(
+            repair_tasks,
+            host_generators,
+            host_zobrist,
+            solved_neighborhood.bucket_count,
+            1U,
+            repair_k1_prefetch_tasks);
+        std::cout << "repair_k1_prefetch_tasks=" << repair_k1_prefetch_tasks << "\n";
+    }
 
     for (std::size_t task_index = 0; task_index < repair_tasks.size(); ++task_index) {
     const RepairTask& repair_task = repair_tasks[task_index];
@@ -3948,14 +4132,15 @@ int main(int argc, char** argv) {
     host_initial = repair_task.start_state;
     host_target = repair_task.target_state;
     if (task_index != 0U) {
-        SolvedNeighborhoodRuntime next_solved_neighborhood =
-            build_solved_neighborhood_runtime(
+        HostSolvedNeighborhood next_solved_neighborhood =
+            repair_k1_prefetch
+                ? repair_k1_prefetch->take(task_index)
+                : build_solved_neighborhood_host(
                 host_target,
                 host_generators,
                 host_zobrist,
                 solved_neighborhood.bucket_count);
-        solved_neighborhood.overwrite_from_same_shape(next_solved_neighborhood);
-        next_solved_neighborhood.destroy();
+        solved_neighborhood.overwrite_from_host_same_shape(std::move(next_solved_neighborhood));
     }
     reset_static_memory_for_task(plan, memory, host_initial, central_state, host_target, rank);
     if (repair_resident_mode) {
