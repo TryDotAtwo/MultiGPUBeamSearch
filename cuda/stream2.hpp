@@ -38,6 +38,7 @@ struct Stream2SolvedBuffers {
     SolvedNeighborhoodDeviceTable solved_neighborhood;
     Stream2SuffixDeviceTable stream2_suffix;
     std::uint32_t* solved_suffix_list = nullptr;
+    std::uint32_t stop_on_found = 1;
 };
 
 void stream2_hash_goal_cuda(

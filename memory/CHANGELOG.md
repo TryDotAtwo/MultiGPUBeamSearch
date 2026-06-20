@@ -1,6 +1,15 @@
 # Changelog
 
 ## 2026-06-20
+- Added `BEAM_SOLVE_BUCKET_MODE` for ordinary solve-to-center runs that keep
+  searching after the first hit. Stream2 can now record solved candidates
+  without setting `stop_flag`; the runner completes the hit depth, completes
+  `BEAM_SOLVE_BUCKET_EXTRA_DEPTHS` more depths, gathers solved buckets from all
+  ranks, reconstructs every stored solution, and writes per-length summaries.
+- Added `hpc/ihes_cube_model/ihes_solve_bucket.sh`, a 8-GPU IHES launcher that
+  selects known length-23 puzzles from `solv_uniq.csv`, runs original and
+  reflected solve-bucket passes, and writes a compact TSV with the best found
+  original-facing solution for each variant.
 - Changed resident solution-repair task ordering to process higher puzzle ids
   first. Parsed solution rows are now stably sorted by descending `puzzle_id`,
   so `1000, 999, ...` are prioritized while preserving per-puzzle solution

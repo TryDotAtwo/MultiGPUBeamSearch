@@ -1,5 +1,15 @@
 # Prompt History
 
+## 2026-06-20
+- User cancelled the segment/frequent-prefix repair direction and requested a
+  normal beam-search-to-center mode for puzzles with known solution length 23.
+  Requirements: do not stop immediately on first solution; finish the current
+  depth and the next depth, collect all solutions from all ranks, store found
+  solutions in a static device bucket and host RAM, report counts by solution
+  length, and name the mode `solve-bucket`.
+- User clarified that the solve-bucket launcher must run both original and
+  reflected variants, like the previous original-plus-reflected workflow.
+
 ## 2026-06-13
 - User requested bf16 support for the IHES one-output Stream1 model on the
   existing CUTLASS path, with no CUDA fallback behavior.

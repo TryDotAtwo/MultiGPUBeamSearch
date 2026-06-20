@@ -202,7 +202,9 @@ __global__ void stream2_hash_goal_kernel(
         }
         __threadfence_system();
         if (atomicCAS(solved.solved_flag, 0U, 1U) == 0U) {
-            atomicExch(solved.stop_flag, 1U);
+            if (solved.stop_on_found != 0U) {
+                atomicExch(solved.stop_flag, 1U);
+            }
         }
     }
 }
