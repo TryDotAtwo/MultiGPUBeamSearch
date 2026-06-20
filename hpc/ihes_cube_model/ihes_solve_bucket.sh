@@ -123,7 +123,8 @@ selected = selected[offset: offset + limit]
 with open(out_path, "w", encoding="utf-8", newline="") as fh:
     writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
     writer.writerow(["puzzle_id", "solution_index", "known_length", "known_path"])
-    writer.writerows(selected)
+    for puzzle_id, idx, path, length in selected:
+        writer.writerow([puzzle_id, idx, length, path])
 
 print(f"solve_bucket_known_length={known_length}")
 print(f"solve_bucket_total_selected={len(selected)}")
