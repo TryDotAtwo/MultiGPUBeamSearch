@@ -833,6 +833,12 @@ std::vector<RepairSolutionAssembly> build_repair_solutions_from_csv(
                 trim_ascii(fields[path_col]));
         }
     }
+    std::stable_sort(
+        solution_rows.begin(),
+        solution_rows.end(),
+        [](const auto& a, const auto& b) {
+            return a.first > b.first;
+        });
 
     std::vector<RepairSolutionAssembly> out;
     std::uint64_t seen_solution_rows = 0;

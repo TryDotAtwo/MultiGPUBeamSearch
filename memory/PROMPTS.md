@@ -386,3 +386,6 @@
   even though the full BFS frontier should fit in the configured beam width,
   and requested an explicit repair mode without model scoring where Stream1 is
   effectively disabled rather than using model scores or fallback behavior.
+- User requested changing resident repair processing order so the run starts
+  from high puzzle ids (`1000`, `999`, ...), instead of beginning at puzzle
+  `0`, then `1`, and so on.

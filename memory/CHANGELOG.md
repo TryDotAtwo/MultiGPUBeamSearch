@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-06-20
+- Changed resident solution-repair task ordering to process higher puzzle ids
+  first. Parsed solution rows are now stably sorted by descending `puzzle_id`,
+  so `1000, 999, ...` are prioritized while preserving per-puzzle solution
+  order.
 - Added an explicit `BEAM_STREAM1_MODE=uniform` runtime mode for repair/debug
   runs. In this mode Stream1 model inference is not launched; the captured
   ring-slot graph fills the score ring with zero scores so selection behaves as
