@@ -1309,16 +1309,24 @@ void instantiate_cuda_graph_job_templates(
         check_cuda(cudaStreamBeginCapture(stream1_lane, cudaStreamCaptureModeGlobal), "cudaStreamBeginCapture ring_slot_graph");
         check_cuda(cudaEventRecord(stream1_done, stream1_lane), "cudaEventRecord ring_slot_fork");
         check_cuda(cudaStreamWaitEvent(stream2_lane, stream1_done, 0), "cudaStreamWaitEvent stream2_fork");
-        stream1_inference_cutlass_cuda(
-            memory.current_frontier_states,
-            memory.streams.parent_base + job,
-            memory.streams.count + job,
-            tables.generators,
-            network.view,
-            network.scratch_lanes[lane],
-            memory.streams.score_ring + candidate_offset,
-            plan.config.b_micro,
-            stream1_lane);
+        if (network.uniform_score) {
+            check_cuda(cudaMemsetAsync(
+                memory.streams.score_ring + candidate_offset,
+                0,
+                candidates_per_slot * sizeof(std::uint32_t),
+                stream1_lane), "cudaMemsetAsync uniform score ring");
+        } else {
+            stream1_inference_cutlass_cuda(
+                memory.current_frontier_states,
+                memory.streams.parent_base + job,
+                memory.streams.count + job,
+                tables.generators,
+                network.view,
+                network.scratch_lanes[lane],
+                memory.streams.score_ring + candidate_offset,
+                plan.config.b_micro,
+                stream1_lane);
+        }
         stream2_hash_goal_cuda(
             memory.current_frontier_states,
             memory.streams.parent_base + job,

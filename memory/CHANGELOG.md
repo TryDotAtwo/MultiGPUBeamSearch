@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-06-20
+- Added an explicit `BEAM_STREAM1_MODE=uniform` runtime mode for repair/debug
+  runs. In this mode Stream1 model inference is not launched; the captured
+  ring-slot graph fills the score ring with zero scores so selection behaves as
+  an unscored BFS frontier subject only to the configured beam width and
+  dedup/final materialization.
+- Fixed distributed repair result reconstruction so rank 0 is always the
+  reconstruction controller after a global solved stop. Previously rank 0 could
+  write `segment_solved=1` with `segment_len=-1` when another rank owned the
+  solved candidate, which made resident repair TSV aggregation report false
+  misses or false deltas.
+
 ## 2026-06-13
 - Made the path-trace debugger rank-aware for distributed runs. After each
   local prefix scan, ranks exchange tiny debug packets with NCCL so only the

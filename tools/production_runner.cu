@@ -3175,6 +3175,7 @@ DistributedReconstructionResult reconstruct_solution_distributed(
     DistributedReconstructionResult result;
     bool best_found = false;
     std::uint32_t best_total_depth = 0;
+    std::uint32_t best_owner = 0;
     for (std::uint32_t peer = 0; peer < world_size; ++peer) {
         const std::uint64_t* packet = packets.data() + static_cast<std::uint64_t>(peer) * packet_words;
         if (packet[0] == 0ULL) {
@@ -3211,12 +3212,13 @@ DistributedReconstructionResult reconstruct_solution_distributed(
              candidate.route_packed == result.solved_meta.route_packed &&
              candidate.hash == result.solved_meta.hash &&
              candidate_suffix_id == result.solved_suffix_id &&
-             peer < result.controller);
+             peer < best_owner);
         if (better) {
             best_found = true;
             best_total_depth = candidate_total_depth;
+            best_owner = peer;
             result.has_solution = true;
-            result.controller = peer;
+            result.controller = 0;
             result.solved_depth = candidate_depth;
             result.solved_suffix_id = candidate_suffix_id;
             result.solved_meta = candidate;
@@ -4035,6 +4037,15 @@ int main(int argc, char** argv) {
     create_dispatcher_streams(streams);
     create_dispatcher_events(events);
     const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
+    const char* stream1_mode_env = std::getenv("BEAM_STREAM1_MODE");
+    const bool stream1_uniform_score =
+        stream1_mode_env != nullptr && std::strcmp(stream1_mode_env, "uniform") == 0;
+    if (stream1_mode_env != nullptr &&
+        !stream1_uniform_score &&
+        std::strcmp(stream1_mode_env, "model") != 0) {
+        throw std::runtime_error("BEAM_STREAM1_MODE must be model or uniform");
+    }
+    std::cout << "stream1_mode=" << (stream1_uniform_score ? "uniform" : "model") << "\n";
     std::vector<Stream1CutlassScratch> stream1_scratch_lanes;
     stream1_scratch_lanes.reserve(config.inference_parallelism);
     const std::uint64_t stream1_rows_per_lane = stream1_inference_rows(config.b_micro, stream1_model);
@@ -4066,7 +4077,8 @@ int main(int argc, char** argv) {
             device_weights.output_weight,
             device_weights.output_bias,
             dims},
-        stream1_scratch_lanes};
+        stream1_scratch_lanes,
+        stream1_uniform_score};
     DispatcherDeviceTables tables{generators, central_state, zobrist};
     Stream2SolvedBuffers solved{
         memory.solved_flag,

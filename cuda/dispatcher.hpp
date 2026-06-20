@@ -60,6 +60,7 @@ struct DispatcherDeviceTables {
 struct DispatcherNetwork {
     Stream1NetworkView view;
     std::vector<Stream1CutlassScratch> scratch_lanes;
+    bool uniform_score = false;
 };
 
 struct DispatcherCollective {

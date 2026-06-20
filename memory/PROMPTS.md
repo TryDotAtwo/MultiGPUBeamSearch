@@ -382,3 +382,7 @@
   RAM, whether they are windows from the current puzzle/solution or upcoming
   ones, so GPU execution can advance to the next task without waiting for K1
   CPU preparation. The buffer must be host RAM, not VRAM.
+- User requested debugging why `K1 + 7` repair windows are reported as missed
+  even though the full BFS frontier should fit in the configured beam width,
+  and requested an explicit repair mode without model scoring where Stream1 is
+  effectively disabled rather than using model scores or fallback behavior.
