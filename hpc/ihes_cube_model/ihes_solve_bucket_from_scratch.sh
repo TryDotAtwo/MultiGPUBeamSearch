@@ -74,6 +74,9 @@ PUZZLE_LIMIT="${PUZZLE_LIMIT:-1}"
 if [ -n "${SLURM_ARRAY_TASK_ID:-}" ]; then
   PUZZLE_OFFSET=$((PUZZLE_OFFSET + SLURM_ARRAY_TASK_ID * PUZZLE_LIMIT))
 fi
+FRESH_RUN_TAG="${FRESH_RUN_TAG:-len${KNOWN_LENGTHS}_offset${PUZZLE_OFFSET}_limit${PUZZLE_LIMIT}}"
+PROGRESS_DIR="${PROGRESS_DIR:-${LOG_DIR}/solve_bucket_fresh_progress_${FRESH_RUN_TAG}}"
+mkdir -p "${PROGRESS_DIR}"
 SOLVE_BUCKET_PLAN="${LOG_DIR}/solve_bucket_fresh_plan_${SLURM_JOB_ID:-manual}_${PUZZLE_OFFSET}_${PUZZLE_LIMIT}.tsv"
 
 "${NINJA_VENV_DIR}/bin/python" - "${SOLUTIONS_CSV}" "${KNOWN_LENGTHS}" "${PUZZLE_OFFSET}" "${PUZZLE_LIMIT}" "${SOLVE_BUCKET_PLAN}" <<'PY'
@@ -479,14 +482,62 @@ best_aggregate_length() {
   ' "${aggregate_tsv}"
 }
 
-write_source_solutions() {
+write_reflected_sources() {
   local puzzle_id="$1"
   local aggregate_tsv="$2"
   local out_tsv="$3"
-  awk -F'\t' -v id="${puzzle_id}" '
-    NR == 1 { next }
-    $1 == id && $2 == "original" { print $11 }
-  ' "${aggregate_tsv}" | awk '!seen[$0]++' > "${out_tsv}"
+  PUZZLE_ID_TEXT="${puzzle_id}" \
+  AGGREGATE_TSV="${aggregate_tsv}" \
+  OUT_TSV="${out_tsv}" \
+  DATA_DIR="${WORK_DATA_DIR}" \
+  "${NINJA_VENV_DIR}/bin/python" - <<'PY'
+import csv
+import hashlib
+import json
+import os
+from pathlib import Path
+
+puzzle_id = int(os.environ["PUZZLE_ID_TEXT"])
+aggregate_tsv = Path(os.environ["AGGREGATE_TSV"])
+out_tsv = Path(os.environ["OUT_TSV"])
+data_dir = Path(os.environ["DATA_DIR"])
+info = json.loads((data_dir / "puzzle_info.json").read_text())
+central = list(info["central_state"])
+generators = info["generators"]
+
+def apply_path(state, path):
+    out = list(state)
+    for token in path.split(".") if path else []:
+        out = [out[i] for i in generators[token]]
+    return out
+
+seen_path = set()
+seen_state = set()
+rows = []
+if aggregate_tsv.exists():
+    with aggregate_tsv.open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh, delimiter="\t")
+        for row in reader:
+            if int(row.get("puzzle_id", -1)) != puzzle_id or row.get("variant") != "original":
+                continue
+            path = row.get("solution_path", "")
+            if not path or path in seen_path:
+                continue
+            seen_path.add(path)
+            reflected_state = apply_path(central, path)
+            state_key = ",".join(str(x) for x in reflected_state)
+            state_hash = hashlib.sha256(state_key.encode("ascii")).hexdigest()[:16]
+            if state_hash in seen_state:
+                print(f"solve_bucket_fresh_skip_duplicate_reflected_state puzzle_id={puzzle_id} state_hash={state_hash}")
+                continue
+            seen_state.add(state_hash)
+            rows.append((len(rows) + 1, state_hash, path))
+with out_tsv.open("w", encoding="utf-8", newline="") as out:
+    writer = csv.writer(out, delimiter="\t", lineterminator="\n")
+    writer.writerow(["source_index", "state_hash", "source_solution"])
+    writer.writerows(rows)
+print(f"solve_bucket_fresh_reflected_sources puzzle_id={puzzle_id} unique_states={len(rows)} unique_paths={len(seen_path)}")
+PY
 }
 
 run_bucket_once() {
@@ -506,16 +557,24 @@ run_bucket_once() {
   beam_torchrun_production "${label}_${puzzle_id}" "${run_log}"
 }
 
-RESULT_TSV="${LOG_DIR}/solve_bucket_fresh_len${KNOWN_LENGTHS//,/plus}_${SLURM_JOB_ID:-manual}_${PUZZLE_OFFSET}_${PUZZLE_LIMIT}.tsv"
-printf "puzzle_id\tvariant\tsource_index\tknown_length\tfound_length\tdelta\trun_puzzle_id\tdepth_index\tfound_depth\towner_rank\tsolution_path\tsource_solution\n" > "${RESULT_TSV}"
+RESULT_TSV="${LOG_DIR}/solve_bucket_fresh_${FRESH_RUN_TAG}.tsv"
+if [ ! -f "${RESULT_TSV}" ]; then
+  printf "puzzle_id\tvariant\tsource_index\tknown_length\tfound_length\tdelta\trun_puzzle_id\tdepth_index\tfound_depth\towner_rank\tsolution_path\tsource_solution\n" > "${RESULT_TSV}"
+fi
 
 tail -n +2 "${SOLVE_BUCKET_PLAN}" | while IFS=$'\t' read -r puzzle_id solution_index known_length baseline_path; do
   echo "solve_bucket_fresh_puzzle_start puzzle_id=${puzzle_id} solution_index=${solution_index} known_length=${known_length}"
   run_depth_limit="${DEPTH_LIMIT_DEFAULT:-${known_length}}"
 
-  original_tsv="${LOG_DIR}/solve_bucket_fresh_original_p${puzzle_id}_${SLURM_JOB_ID:-manual}.tsv"
-  run_bucket_once "solve_bucket_fresh_original" "${puzzle_id}" "${puzzle_id}" "${known_length}" "${original_tsv}" "${run_depth_limit}"
-  append_bucket_results "original" "${puzzle_id}" "${puzzle_id}" "${known_length}" "${original_tsv}" "${RESULT_TSV}" 0 "" 0
+  original_tsv="${LOG_DIR}/solve_bucket_fresh_original_p${puzzle_id}_${FRESH_RUN_TAG}.tsv"
+  original_done="${PROGRESS_DIR}/p${puzzle_id}_original.done"
+  if [ -f "${original_done}" ]; then
+    echo "solve_bucket_fresh_resume_skip_original puzzle_id=${puzzle_id} done=${original_done}"
+  else
+    run_bucket_once "solve_bucket_fresh_original" "${puzzle_id}" "${puzzle_id}" "${known_length}" "${original_tsv}" "${run_depth_limit}"
+    append_bucket_results "original" "${puzzle_id}" "${puzzle_id}" "${known_length}" "${original_tsv}" "${RESULT_TSV}" 0 "" 0
+    printf "done_at=%s\n" "$(date -Is)" > "${original_done}"
+  fi
 
   best_len="$(best_aggregate_length "${puzzle_id}" "${RESULT_TSV}")"
   echo "solve_bucket_fresh_original_done puzzle_id=${puzzle_id} best_len=${best_len} known_length=${known_length}"
@@ -524,31 +583,35 @@ tail -n +2 "${SOLVE_BUCKET_PLAN}" | while IFS=$'\t' read -r puzzle_id solution_i
     continue
   fi
 
-  sources_tsv="${LOG_DIR}/solve_bucket_fresh_sources_p${puzzle_id}_${SLURM_JOB_ID:-manual}.tsv"
-  write_source_solutions "${puzzle_id}" "${RESULT_TSV}" "${sources_tsv}"
-  if [ ! -s "${sources_tsv}" ]; then
+  sources_tsv="${LOG_DIR}/solve_bucket_fresh_sources_p${puzzle_id}_${FRESH_RUN_TAG}.tsv"
+  write_reflected_sources "${puzzle_id}" "${RESULT_TSV}" "${sources_tsv}"
+  if [ "$(wc -l < "${sources_tsv}")" -le 1 ]; then
     echo "solve_bucket_fresh_no_original_sources puzzle_id=${puzzle_id}"
     continue
   fi
 
-  source_index=0
-  while IFS= read -r source_solution; do
+  tail -n +2 "${sources_tsv}" | while IFS=$'\t' read -r source_index state_hash source_solution; do
     if [ -z "${source_solution}" ]; then
       continue
     fi
-    source_index=$((source_index + 1))
+    reflected_done="${PROGRESS_DIR}/p${puzzle_id}_reflected_${state_hash}.done"
+    if [ -f "${reflected_done}" ]; then
+      echo "solve_bucket_fresh_resume_skip_reflected puzzle_id=${puzzle_id} source_index=${source_index} state_hash=${state_hash}"
+      continue
+    fi
     run_puzzle_id=$((9500000 + puzzle_id * 1000 + source_index))
     write_reflected_puzzle "${source_solution}" "${run_puzzle_id}"
-    reflected_tsv="${LOG_DIR}/solve_bucket_fresh_reflected_p${puzzle_id}_s${source_index}_${SLURM_JOB_ID:-manual}.tsv"
+    reflected_tsv="${LOG_DIR}/solve_bucket_fresh_reflected_p${puzzle_id}_s${source_index}_${FRESH_RUN_TAG}.tsv"
     run_bucket_once "solve_bucket_fresh_reflected_s${source_index}" "${puzzle_id}" "${run_puzzle_id}" "${known_length}" "${reflected_tsv}" "${run_depth_limit}"
     append_bucket_results "reflected" "${puzzle_id}" "${run_puzzle_id}" "${known_length}" "${reflected_tsv}" "${RESULT_TSV}" "${source_index}" "${source_solution}" 1
+    printf "done_at=%s\nstate_hash=%s\n" "$(date -Is)" "${state_hash}" > "${reflected_done}"
     best_len="$(best_aggregate_length "${puzzle_id}" "${RESULT_TSV}")"
-    echo "solve_bucket_fresh_reflected_done puzzle_id=${puzzle_id} source_index=${source_index} best_len=${best_len} known_length=${known_length}"
+    echo "solve_bucket_fresh_reflected_done puzzle_id=${puzzle_id} source_index=${source_index} state_hash=${state_hash} best_len=${best_len} known_length=${known_length}"
     if [ "${best_len}" -ge 0 ] && [ "${best_len}" -lt "${known_length}" ]; then
       echo "solve_bucket_fresh_stop_reflected puzzle_id=${puzzle_id} source_index=${source_index} best_len=${best_len}"
       break
     fi
-  done < "${sources_tsv}"
+  done
 done
 
 echo "solve_bucket_fresh_result_tsv=${RESULT_TSV}"
