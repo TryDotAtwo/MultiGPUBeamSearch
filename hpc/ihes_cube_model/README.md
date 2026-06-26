@@ -71,3 +71,40 @@ sed -i 's/\r$//' ihes_cube_model/prepare_solution_repair_single_window.sh
 chmod +x ihes_cube_model/prepare_solution_repair_single_window.sh
 ihes_cube_model/prepare_solution_repair_single_window.sh
 ```
+
+## Fresh bucket array with public result publishing
+
+For one SLURM array task per puzzle, keep `PUZZLE_LIMIT=1`. `PUZZLE_OFFSET` is the first selected puzzle index; each array task adds `SLURM_ARRAY_TASK_ID * PUZZLE_LIMIT`.
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100/repo
+git fetch origin main --depth 1
+git reset --hard origin/main
+git log -1 --oneline
+
+cd /mnt/pool/6/vokirova/beam8a100
+cp repo/hpc/ihes_cube_model/ihes_solve_bucket_from_scratch.sh ihes_cube_model/
+sed -i 's/\r$//' ihes_cube_model/ihes_solve_bucket_from_scratch.sh
+bash -n ihes_cube_model/ihes_solve_bucket_from_scratch.sh
+chmod +x ihes_cube_model/ihes_solve_bucket_from_scratch.sh
+
+unset FRESH_RUN_TAG
+export KNOWN_LENGTHS="23 24"
+export PUZZLE_OFFSET=2
+export PUZZLE_LIMIT=1
+export PUBLISH_RESULTS_REPO_URL="https://github.com/TryDotAtwo/cayleypy-beam-results.git"
+export PUBLISH_RESULTS_DIR="/mnt/pool/6/vokirova/beam8a100/cayleypy-beam-results"
+
+sbatch -p kaf12 --array=0-80%1 --export=ALL ihes_cube_model/ihes_solve_bucket_from_scratch.sh
+```
+
+After each puzzle the script writes:
+
+- `data/ihes_cube/puzzles/pXXXX/solutions.tsv`
+- `data/ihes_cube/puzzles/pXXXX/unique_solutions.tsv`
+- `data/ihes_cube/puzzles/pXXXX/metadata.env`
+- `data/ihes_cube/puzzles/pXXXX/summary.md`
+- `data/ihes_cube/index.tsv`
+- `data/ihes_cube/improvements.tsv`
+
+Publishing is best-effort: local logs remain authoritative if GitHub auth or network is temporarily unavailable.

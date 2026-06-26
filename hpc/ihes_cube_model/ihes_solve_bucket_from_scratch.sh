@@ -160,6 +160,11 @@ BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-134217728}"
 BEAM_HISTORY_RAM_BYTES="${BEAM_HISTORY_RAM_BYTES:-68719476736}"
 BEAM_HISTORY_DISK_BYTES="${BEAM_HISTORY_DISK_BYTES:-4398046511104}"
 BEAM_SOLVED_RESULT_CAPACITY="${BEAM_SOLVED_RESULT_CAPACITY:-1048576}"
+PUBLISH_RESULTS_REPO_URL="${PUBLISH_RESULTS_REPO_URL:-}"
+PUBLISH_RESULTS_DIR="${PUBLISH_RESULTS_DIR:-${RUN_DIR}/public-results}"
+PUBLISH_RESULTS_BRANCH="${PUBLISH_RESULTS_BRANCH:-main}"
+PUBLISH_RESULTS_GIT_NAME="${PUBLISH_RESULTS_GIT_NAME:-beam-results-bot}"
+PUBLISH_RESULTS_GIT_EMAIL="${PUBLISH_RESULTS_GIT_EMAIL:-beam-results-bot@users.noreply.github.com}"
 
 export BEAM_PUZZLE_INFO_JSON="${WORK_DATA_DIR}/puzzle_info.json"
 export BEAM_GENERATOR_PATH="${WORK_DATA_DIR}/puzzle_info.json"
@@ -200,6 +205,8 @@ echo "local_beam_width=${LOCAL_BEAM_WIDTH}"
 echo "shard_count=${SHARD_COUNT}"
 echo "k1_radius=${BEAM_SOLVED_NEIGHBORHOOD_RADIUS}"
 echo "solved_result_capacity=${BEAM_SOLVED_RESULT_CAPACITY}"
+echo "publish_results_repo_url=${PUBLISH_RESULTS_REPO_URL:-disabled}"
+echo "publish_results_dir=${PUBLISH_RESULTS_DIR}"
 
 invert_path_python='
 import sys
@@ -481,6 +488,176 @@ best_aggregate_length() {
     END { if (best == "") print -1; else print best }
   ' "${aggregate_tsv}"
 }
+publish_puzzle_results() {
+  local puzzle_id="$1"
+  local known_length="$2"
+  local result_tsv="$3"
+  local best_len="$4"
+
+  if [ -z "${PUBLISH_RESULTS_REPO_URL}" ] && [ ! -d "${PUBLISH_RESULTS_DIR}/.git" ]; then
+    echo "publish_results_skip puzzle_id=${puzzle_id} reason=disabled"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${PUBLISH_RESULTS_DIR}")"
+  if [ ! -d "${PUBLISH_RESULTS_DIR}/.git" ]; then
+    echo "publish_results_clone repo=${PUBLISH_RESULTS_REPO_URL} dir=${PUBLISH_RESULTS_DIR}"
+    if ! git clone --depth 1 --branch "${PUBLISH_RESULTS_BRANCH}" "${PUBLISH_RESULTS_REPO_URL}" "${PUBLISH_RESULTS_DIR}"; then
+      echo "publish_results_failed puzzle_id=${puzzle_id} stage=clone"
+      return 0
+    fi
+  fi
+
+  (
+    if command -v flock >/dev/null 2>&1; then
+      exec 9>"${RUN_DIR}/publish-results.lock"
+      flock 9
+    fi
+
+    git -C "${PUBLISH_RESULTS_DIR}" config user.name "${PUBLISH_RESULTS_GIT_NAME}"
+    git -C "${PUBLISH_RESULTS_DIR}" config user.email "${PUBLISH_RESULTS_GIT_EMAIL}"
+    git -C "${PUBLISH_RESULTS_DIR}" checkout "${PUBLISH_RESULTS_BRANCH}" >/dev/null 2>&1 || git -C "${PUBLISH_RESULTS_DIR}" checkout -b "${PUBLISH_RESULTS_BRANCH}"
+    git -C "${PUBLISH_RESULTS_DIR}" pull --rebase origin "${PUBLISH_RESULTS_BRANCH}" || true
+
+    PUZZLE_ID_TEXT="${puzzle_id}" \
+    KNOWN_LENGTH_TEXT="${known_length}" \
+    BEST_LENGTH_TEXT="${best_len}" \
+    RESULT_TSV="${result_tsv}" \
+    RESULTS_REPO_DIR="${PUBLISH_RESULTS_DIR}" \
+    FRESH_RUN_TAG_TEXT="${FRESH_RUN_TAG}" \
+    SLURM_JOB_ID_TEXT="${SLURM_JOB_ID:-manual}" \
+    SLURM_ARRAY_TASK_ID_TEXT="${SLURM_ARRAY_TASK_ID:-}" \
+    BEAM_WIDTH_TEXT="${BEAM_WIDTH}" \
+    K1_RADIUS_TEXT="${BEAM_SOLVED_NEIGHBORHOOD_RADIUS}" \
+    "${NINJA_VENV_DIR}/bin/python" - <<'PY'
+import csv
+import os
+from pathlib import Path
+
+puzzle_id = os.environ["PUZZLE_ID_TEXT"]
+known_length = int(os.environ["KNOWN_LENGTH_TEXT"])
+best_len = int(os.environ["BEST_LENGTH_TEXT"])
+result_tsv = Path(os.environ["RESULT_TSV"])
+repo = Path(os.environ["RESULTS_REPO_DIR"])
+base = repo / "data" / "ihes_cube"
+puzzle_dir = base / "puzzles" / f"p{int(puzzle_id):04d}"
+puzzle_dir.mkdir(parents=True, exist_ok=True)
+
+rows = []
+if result_tsv.exists():
+    with result_tsv.open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh, delimiter="\t")
+        fieldnames = reader.fieldnames or []
+        for row in reader:
+            if row.get("puzzle_id") == puzzle_id:
+                rows.append(row)
+else:
+    fieldnames = []
+
+if not fieldnames:
+    fieldnames = [
+        "puzzle_id", "variant", "source_index", "known_length", "found_length",
+        "delta", "run_puzzle_id", "depth_index", "found_depth", "owner_rank",
+        "solution_path", "source_solution",
+    ]
+
+with (puzzle_dir / "solutions.tsv").open("w", encoding="utf-8", newline="") as out:
+    writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+
+unique = {}
+for row in rows:
+    path = row.get("solution_path", "")
+    if path and path not in unique:
+        unique[path] = row
+with (puzzle_dir / "unique_solutions.tsv").open("w", encoding="utf-8", newline="") as out:
+    writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(unique.values())
+
+variant_counts = {}
+length_counts = {}
+for row in rows:
+    variant_counts[row.get("variant", "")] = variant_counts.get(row.get("variant", ""), 0) + 1
+    length_counts[row.get("found_length", "")] = length_counts.get(row.get("found_length", ""), 0) + 1
+
+metadata = {
+    "puzzle_id": puzzle_id,
+    "known_length": str(known_length),
+    "best_length": str(best_len),
+    "delta": str(best_len - known_length if best_len >= 0 else 0),
+    "records": str(len(rows)),
+    "unique_solutions": str(len(unique)),
+    "fresh_run_tag": os.environ["FRESH_RUN_TAG_TEXT"],
+    "slurm_job_id": os.environ["SLURM_JOB_ID_TEXT"],
+    "slurm_array_task_id": os.environ["SLURM_ARRAY_TASK_ID_TEXT"],
+    "beam_width": os.environ["BEAM_WIDTH_TEXT"],
+    "k1_radius": os.environ["K1_RADIUS_TEXT"],
+}
+with (puzzle_dir / "metadata.env").open("w", encoding="utf-8") as out:
+    for key, value in metadata.items():
+        out.write(f"{key}={value}\n")
+
+summary_lines = [
+    f"# IHES Cube Puzzle {puzzle_id}",
+    "",
+    f"known_length: {known_length}",
+    f"best_length: {best_len}",
+    f"delta: {metadata['delta']}",
+    f"records: {len(rows)}",
+    f"unique_solutions: {len(unique)}",
+    "",
+    "## Variant Counts",
+    "",
+]
+for key in sorted(variant_counts):
+    summary_lines.append(f"- {key}: {variant_counts[key]}")
+summary_lines += ["", "## Length Counts", ""]
+for key in sorted(length_counts, key=lambda x: int(x) if x else -1):
+    summary_lines.append(f"- {key}: {length_counts[key]}")
+(puzzle_dir / "summary.md").write_text("\n".join(summary_lines) + "\n", encoding="utf-8")
+
+# Rebuild compact global indexes from per-puzzle metadata.
+index_rows = []
+for meta_path in sorted((base / "puzzles").glob("p*/metadata.env")):
+    item = {}
+    for line in meta_path.read_text(encoding="utf-8").splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            item[k] = v
+    if item:
+        index_rows.append(item)
+index_fields = ["puzzle_id", "known_length", "best_length", "delta", "records", "unique_solutions", "fresh_run_tag", "slurm_job_id", "slurm_array_task_id", "beam_width", "k1_radius"]
+with (base / "index.tsv").open("w", encoding="utf-8", newline="") as out:
+    writer = csv.DictWriter(out, fieldnames=index_fields, delimiter="\t", lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(index_rows)
+with (base / "improvements.tsv").open("w", encoding="utf-8", newline="") as out:
+    writer = csv.DictWriter(out, fieldnames=index_fields, delimiter="\t", lineterminator="\n")
+    writer.writeheader()
+    for item in index_rows:
+        try:
+            if int(item.get("delta", "0")) < 0:
+                writer.writerow(item)
+        except ValueError:
+            pass
+print(f"publish_results_prepared puzzle_id={puzzle_id} records={len(rows)} unique={len(unique)}")
+PY
+
+    git -C "${PUBLISH_RESULTS_DIR}" add "data/ihes_cube"
+    if git -C "${PUBLISH_RESULTS_DIR}" diff --cached --quiet; then
+      echo "publish_results_no_changes puzzle_id=${puzzle_id}"
+      return 0
+    fi
+    git -C "${PUBLISH_RESULTS_DIR}" commit -m "Add IHES puzzle ${puzzle_id} bucket results"
+    if git -C "${PUBLISH_RESULTS_DIR}" push origin "${PUBLISH_RESULTS_BRANCH}"; then
+      echo "publish_results_pushed puzzle_id=${puzzle_id} repo=${PUBLISH_RESULTS_REPO_URL:-existing}"
+    else
+      echo "publish_results_failed puzzle_id=${puzzle_id} stage=push"
+    fi
+  ) || echo "publish_results_failed puzzle_id=${puzzle_id} stage=publish"
+}
 
 write_reflected_sources() {
   local puzzle_id="$1"
@@ -580,6 +757,7 @@ tail -n +2 "${SOLVE_BUCKET_PLAN}" | while IFS=$'\t' read -r puzzle_id solution_i
   echo "solve_bucket_fresh_original_done puzzle_id=${puzzle_id} best_len=${best_len} known_length=${known_length}"
   if [ "${best_len}" -ge 0 ] && [ "${best_len}" -lt "${known_length}" ]; then
     echo "solve_bucket_fresh_skip_reflected puzzle_id=${puzzle_id} reason=original_improved best_len=${best_len}"
+    publish_puzzle_results "${puzzle_id}" "${known_length}" "${RESULT_TSV}" "${best_len}"
     continue
   fi
 
@@ -587,6 +765,7 @@ tail -n +2 "${SOLVE_BUCKET_PLAN}" | while IFS=$'\t' read -r puzzle_id solution_i
   write_reflected_sources "${puzzle_id}" "${RESULT_TSV}" "${sources_tsv}"
   if [ "$(wc -l < "${sources_tsv}")" -le 1 ]; then
     echo "solve_bucket_fresh_no_original_sources puzzle_id=${puzzle_id}"
+    publish_puzzle_results "${puzzle_id}" "${known_length}" "${RESULT_TSV}" "${best_len}"
     continue
   fi
 
@@ -612,6 +791,8 @@ tail -n +2 "${SOLVE_BUCKET_PLAN}" | while IFS=$'\t' read -r puzzle_id solution_i
       break
     fi
   done
+  best_len="$(best_aggregate_length "${puzzle_id}" "${RESULT_TSV}")"
+  publish_puzzle_results "${puzzle_id}" "${known_length}" "${RESULT_TSV}" "${best_len}"
 done
 
 echo "solve_bucket_fresh_result_tsv=${RESULT_TSV}"
