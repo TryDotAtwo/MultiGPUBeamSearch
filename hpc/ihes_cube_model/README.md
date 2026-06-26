@@ -84,18 +84,23 @@ git log -1 --oneline
 
 cd /mnt/pool/6/vokirova/beam8a100
 cp repo/hpc/ihes_cube_model/ihes_solve_bucket_from_scratch.sh ihes_cube_model/
-sed -i 's/\r$//' ihes_cube_model/ihes_solve_bucket_from_scratch.sh
-bash -n ihes_cube_model/ihes_solve_bucket_from_scratch.sh
-chmod +x ihes_cube_model/ihes_solve_bucket_from_scratch.sh
+cp repo/hpc/ihes_cube_model/prepare_ihes_prebuilt_runner.sh ihes_cube_model/
+sed -i 's/\r$//' ihes_cube_model/ihes_solve_bucket_from_scratch.sh ihes_cube_model/prepare_ihes_prebuilt_runner.sh
+bash -n ihes_cube_model/ihes_solve_bucket_from_scratch.sh ihes_cube_model/prepare_ihes_prebuilt_runner.sh
+chmod +x ihes_cube_model/ihes_solve_bucket_from_scratch.sh ihes_cube_model/prepare_ihes_prebuilt_runner.sh
+
+PREBUILD_JOB="$(sbatch -p kaf12 --parsable ihes_cube_model/prepare_ihes_prebuilt_runner.sh)"
+echo "PREBUILD_JOB=${PREBUILD_JOB}"
 
 unset FRESH_RUN_TAG
 export KNOWN_LENGTHS="23 24"
 export PUZZLE_OFFSET=2
 export PUZZLE_LIMIT=1
+export BEAM_PREBUILT_RUNNER="/mnt/pool/6/vokirova/beam8a100/ihes_cube_model/prebuilt-a100-ihes/production_runner"
 export PUBLISH_RESULTS_REPO_URL="https://github.com/TryDotAtwo/cayleypy-beam-results.git"
 export PUBLISH_RESULTS_DIR="/mnt/pool/6/vokirova/beam8a100/cayleypy-beam-results"
 
-sbatch -p kaf12 --array=0-80%1 --export=ALL ihes_cube_model/ihes_solve_bucket_from_scratch.sh
+sbatch -p kaf12 --dependency=afterok:${PREBUILD_JOB} --array=0-80%1 --export=ALL ihes_cube_model/ihes_solve_bucket_from_scratch.sh
 ```
 
 After each puzzle the script writes:
@@ -108,3 +113,5 @@ After each puzzle the script writes:
 - `data/ihes_cube/improvements.tsv`
 
 Publishing is best-effort: local logs remain authoritative if GitHub auth or network is temporarily unavailable.
+
+The array jobs must share BEAM_PREBUILT_RUNNER; otherwise every puzzle task will rebuild the CUDA binary.
