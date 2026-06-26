@@ -628,18 +628,18 @@ for meta_path in sorted((base / "puzzles").glob("p*/metadata.env")):
             item[k] = v
     if item:
         index_rows.append(item)
-index_fields = ["puzzle_id", "known_length", "best_length", "delta", "records", "unique_solutions", "fresh_run_tag", "slurm_job_id", "slurm_array_task_id", "beam_width", "k1_radius"]
+index_fields = ["puzzle_id", "known_length", "best_length", "delta", "records", "unique_solutions", "variants", "source_files", "fresh_run_tag", "slurm_job_id", "slurm_array_task_id", "beam_width", "k1_radius"]
 with (base / "index.tsv").open("w", encoding="utf-8", newline="") as out:
     writer = csv.DictWriter(out, fieldnames=index_fields, delimiter="\t", lineterminator="\n")
     writer.writeheader()
-    writer.writerows(index_rows)
+    writer.writerows({field: row.get(field, "") for field in index_fields} for row in index_rows)
 with (base / "improvements.tsv").open("w", encoding="utf-8", newline="") as out:
     writer = csv.DictWriter(out, fieldnames=index_fields, delimiter="\t", lineterminator="\n")
     writer.writeheader()
     for item in index_rows:
         try:
             if int(item.get("delta", "0")) < 0:
-                writer.writerow(item)
+                writer.writerow({field: item.get(field, "") for field in index_fields})
         except ValueError:
             pass
 print(f"publish_results_prepared puzzle_id={puzzle_id} records={len(rows)} unique={len(unique)}")
