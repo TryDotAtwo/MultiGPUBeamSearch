@@ -3952,9 +3952,6 @@ int main(int argc, char** argv) {
     const stream1_weights::HostWeightBytes host_weights =
         stream1_weights::load_stream1_weights(weight_dir);
     const Stream1ModelConfig& stream1_model = host_weights.model;
-    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
-        throw std::runtime_error("piece_transformer Stream1 forward is not wired yet");
-    }
     const RuntimeConfigBuild config_build =
         build_runtime_config_from_budget(beam, world_size, rank, stream1_model, free_before);
     const RuntimeConfig config = config_build.config;
@@ -4138,15 +4135,28 @@ int main(int argc, char** argv) {
         std::cout << "solve_bucket_result_tsv=" << solve_bucket_result_path.string() << "\n";
     }
     std::cout << "weight_dir=" << weight_dir.string() << "\n";
+    std::cout << "stream1_model_backend="
+              << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
     std::cout << "stream1_model_state_len=" << stream1_model.state_len << "\n";
     std::cout << "stream1_model_num_classes=" << stream1_model.num_classes << "\n";
-    std::cout << "stream1_model_hidden1=" << stream1_model.hidden1 << "\n";
-    std::cout << "stream1_model_hidden2=" << stream1_model.hidden2 << "\n";
-    std::cout << "stream1_model_residual_count=" << stream1_model.residual_count << "\n";
+    if (stream1_model.backend == STREAM1_BACKEND_MLP) {
+        std::cout << "stream1_model_hidden1=" << stream1_model.hidden1 << "\n";
+        std::cout << "stream1_model_hidden2=" << stream1_model.hidden2 << "\n";
+        std::cout << "stream1_model_residual_count=" << stream1_model.residual_count << "\n";
+        std::cout << "stream1_model_normalization="
+                  << (stream1_model.normalization == STREAM1_NORM_LAYERNORM ? "layernorm" : "none") << "\n";
+    } else if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        std::cout << "stream1_model_num_pieces=" << stream1_model.num_pieces << "\n";
+        std::cout << "stream1_model_max_piece_size=" << stream1_model.max_piece_size << "\n";
+        std::cout << "stream1_model_seq_len=" << stream1_model.seq_len << "\n";
+        std::cout << "stream1_model_d_model=" << stream1_model.d_model << "\n";
+        std::cout << "stream1_model_nhead=" << stream1_model.nhead << "\n";
+        std::cout << "stream1_model_head_dim=" << stream1_model.head_dim << "\n";
+        std::cout << "stream1_model_transformer_layers=" << stream1_model.transformer_layers << "\n";
+        std::cout << "stream1_model_ff_dim=" << stream1_model.ff_dim << "\n";
+    }
     std::cout << "stream1_model_output_dim=" << stream1_model.output_dim << "\n";
     std::cout << "stream1_model_dtype=" << (stream1_model.dtype == STREAM1_DTYPE_BF16 ? "bf16" : "fp16") << "\n";
-    std::cout << "stream1_model_normalization="
-              << (stream1_model.normalization == STREAM1_NORM_LAYERNORM ? "layernorm" : "none") << "\n";
     std::cout << "stream1_model_weight_bytes=" << stream1_weights::total_host_weight_bytes(host_weights) << "\n";
     std::cout << "solved_neighborhood_radius=" << solved_neighborhood.radius << "\n";
     std::cout << "solved_neighborhood_entries=" << solved_neighborhood.entry_count << "\n";
@@ -4233,7 +4243,6 @@ int main(int argc, char** argv) {
     CudaGraphJobTemplates graphs;
     create_dispatcher_streams(streams);
     create_dispatcher_events(events);
-    const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
     const char* stream1_mode_env = std::getenv("BEAM_STREAM1_MODE");
     const bool stream1_uniform_score =
         stream1_mode_env != nullptr && std::strcmp(stream1_mode_env, "uniform") == 0;
@@ -4243,18 +4252,27 @@ int main(int argc, char** argv) {
         throw std::runtime_error("BEAM_STREAM1_MODE must be model or uniform");
     }
     std::cout << "stream1_mode=" << (stream1_uniform_score ? "uniform" : "model") << "\n";
-    std::vector<Stream1CutlassScratch> stream1_scratch_lanes;
-    stream1_scratch_lanes.reserve(config.inference_parallelism);
-    const std::uint64_t stream1_rows_per_lane = stream1_inference_rows(config.b_micro, stream1_model);
-    for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
-        stream1_scratch_lanes.push_back(Stream1CutlassScratch{
-            stream1_scratch.hidden1 + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden1,
-            stream1_scratch.hidden2 + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden2,
-            stream1_scratch.residual + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden2,
-            stream1_scratch.output + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.output_dim});
+    std::cout << "stream1_backend="
+              << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
+    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        std::cout << "stream1_transformer_dims"
+                  << " seq_len=" << stream1_model.seq_len
+                  << " d_model=" << stream1_model.d_model
+                  << " nhead=" << stream1_model.nhead
+                  << " head_dim=" << stream1_model.head_dim
+                  << " layers=" << stream1_model.transformer_layers
+                  << " ff_dim=" << stream1_model.ff_dim
+                  << " output_dim=" << stream1_model.output_dim
+                  << "\n";
     }
-    DispatcherNetwork network{
-        Stream1NetworkView{
+
+    DispatcherNetwork network{};
+    network.uniform_score = stream1_uniform_score;
+    stream1_weights::TransformerNetworkViewHolder transformer_view_holder;
+    if (stream1_model.backend == STREAM1_BACKEND_MLP) {
+        const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
+        network.backend = DispatcherStream1Backend::Mlp;
+        network.mlp_view = Stream1NetworkView{
             device_weights.input_weight,
             device_weights.input_bias,
             device_weights.input_ln_gamma,
@@ -4273,9 +4291,25 @@ int main(int argc, char** argv) {
             reinterpret_cast<const half* const*>(device_weights.residual_fc2_ln_beta_table),
             device_weights.output_weight,
             device_weights.output_bias,
-            dims},
-        stream1_scratch_lanes,
-        stream1_uniform_score};
+            dims};
+        network.mlp_scratch_lanes.reserve(config.inference_parallelism);
+        for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
+            network.mlp_scratch_lanes.push_back(
+                stream1_weights::mlp_scratch_view(stream1_scratch, stream1_model, config.b_micro, lane));
+        }
+    } else if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        transformer_view_holder =
+            stream1_weights::transformer_network_view(device_weights.transformer, stream1_model);
+        network.backend = DispatcherStream1Backend::PieceTransformer;
+        network.transformer_view = transformer_view_holder.view;
+        network.transformer_scratch_lanes.reserve(config.inference_parallelism);
+        for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
+            network.transformer_scratch_lanes.push_back(
+                stream1_weights::transformer_scratch_view(stream1_scratch, stream1_model, config.b_micro, lane));
+        }
+    } else {
+        throw std::runtime_error("unsupported Stream1 backend in production runner");
+    }
     DispatcherDeviceTables tables{generators, central_state, zobrist};
     Stream2SolvedBuffers solved{
         memory.solved_flag,
