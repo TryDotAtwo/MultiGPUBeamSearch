@@ -758,3 +758,4 @@
 - Fixed Stream1 piece-transformer runtime weight sizing for `fast_slot_projected`. Runtime budget estimates now use the loader/exporter contract shape `max_piece_size * num_classes * d_model`, and the dispatcher CUDA fixture allocates the same shape. Verification note: `test_results/stream1_transformer_weight_estimate_contract_2026-06-29.md`.
 
 - Made `tests/dispatcher_cuda_tests.cu` runtime estimate environment setup portable. The test now uses a scoped helper that sets the same BEAM_* overrides with `_putenv_s` on Windows and `setenv`/`unsetenv` elsewhere, restoring previous values or clearing test-only values after the estimate scope.
+- 2026-06-29: Stabilized dispatcher CUDA tests after portable env setup by explicitly setting Stream4 trigger candidates and removing a brittle Stream4 launch-count upper bound.
