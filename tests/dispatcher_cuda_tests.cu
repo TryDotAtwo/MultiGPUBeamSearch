@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 using namespace beam;
@@ -22,6 +23,47 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
+void set_test_env(const char* name, const char* value) {
+#if defined(_WIN32)
+    if (_putenv_s(name, value) != 0) {
+        throw std::runtime_error(std::string("failed to set environment variable ") + name);
+    }
+#else
+    if (setenv(name, value, 1) != 0) {
+        throw std::runtime_error(std::string("failed to set environment variable ") + name);
+    }
+#endif
+}
+
+struct ScopedTestEnv {
+    const char* name;
+    bool had_previous = false;
+    std::string previous_value;
+
+    ScopedTestEnv(const char* env_name, const char* value) : name(env_name) {
+        if (const char* previous = std::getenv(name)) {
+            had_previous = true;
+            previous_value = previous;
+        }
+        set_test_env(name, value);
+    }
+
+    ~ScopedTestEnv() {
+#if defined(_WIN32)
+        _putenv_s(name, had_previous ? previous_value.c_str() : "");
+#else
+        if (had_previous) {
+            setenv(name, previous_value.c_str(), 1);
+        } else {
+            unsetenv(name);
+        }
+#endif
+    }
+
+    ScopedTestEnv(const ScopedTestEnv&) = delete;
+    ScopedTestEnv& operator=(const ScopedTestEnv&) = delete;
+};
 
 template <typename T>
 T* cuda_alloc_count(std::uint64_t count, const char* name) {
@@ -141,30 +183,24 @@ void run_transformer_runtime_weight_estimate_test(std::ofstream& report) {
     const Stream1ModelConfig model = tiny_transformer_model();
     Stream1ModelConfig larger_state_model = model;
     larger_state_model.state_len += 7;
-    setenv("BEAM_RUNTIME_CONFIG_MODE", "manual", 1);
-    setenv("BEAM_GPU_HEADROOM_BYTES", "0", 1);
-    setenv("BEAM_STREAM3_RING_SLOTS", "1", 1);
-    setenv("BEAM_SHARD_COUNT", "1", 1);
-    setenv("BEAM_SHARD_BUFFER_COUNT", "2", 1);
-    setenv("BEAM_SHARD_CAPACITY_CANDIDATES", "262144", 1);
-    setenv("BEAM_STREAM4_BATCH_CANDIDATES", "1024", 1);
-    setenv("BEAM_STREAM4_TRIGGER_CANDIDATES", "1024", 1);
-    setenv("BEAM_STREAM4_BATCH_ALIGNMENT", "1", 1);
-    setenv("BEAM_RING_COUNT", "1", 1);
-    const RuntimeConfigBuild runtime_estimate =
-        build_runtime_config_from_budget(1024, 1, 0, model, 1024ULL * 1024ULL * 1024ULL * 1024ULL);
-    const RuntimeConfigBuild larger_state_estimate =
-        build_runtime_config_from_budget(1024, 1, 0, larger_state_model, 1024ULL * 1024ULL * 1024ULL * 1024ULL);
-    unsetenv("BEAM_RUNTIME_CONFIG_MODE");
-    unsetenv("BEAM_GPU_HEADROOM_BYTES");
-    unsetenv("BEAM_STREAM3_RING_SLOTS");
-    unsetenv("BEAM_SHARD_COUNT");
-    unsetenv("BEAM_SHARD_BUFFER_COUNT");
-    unsetenv("BEAM_SHARD_CAPACITY_CANDIDATES");
-    unsetenv("BEAM_STREAM4_BATCH_CANDIDATES");
-    unsetenv("BEAM_STREAM4_TRIGGER_CANDIDATES");
-    unsetenv("BEAM_STREAM4_BATCH_ALIGNMENT");
-    unsetenv("BEAM_RING_COUNT");
+    RuntimeConfigBuild runtime_estimate;
+    RuntimeConfigBuild larger_state_estimate;
+    {
+        const ScopedTestEnv runtime_mode("BEAM_RUNTIME_CONFIG_MODE", "manual");
+        const ScopedTestEnv gpu_headroom("BEAM_GPU_HEADROOM_BYTES", "0");
+        const ScopedTestEnv stream3_ring_slots("BEAM_STREAM3_RING_SLOTS", "1");
+        const ScopedTestEnv shard_count("BEAM_SHARD_COUNT", "1");
+        const ScopedTestEnv shard_buffer_count("BEAM_SHARD_BUFFER_COUNT", "2");
+        const ScopedTestEnv shard_capacity("BEAM_SHARD_CAPACITY_CANDIDATES", "262144");
+        const ScopedTestEnv stream4_batch("BEAM_STREAM4_BATCH_CANDIDATES", "1024");
+        const ScopedTestEnv stream4_trigger("BEAM_STREAM4_TRIGGER_CANDIDATES", "1024");
+        const ScopedTestEnv stream4_alignment("BEAM_STREAM4_BATCH_ALIGNMENT", "1");
+        const ScopedTestEnv ring_count("BEAM_RING_COUNT", "1");
+        runtime_estimate =
+            build_runtime_config_from_budget(1024, 1, 0, model, 1024ULL * 1024ULL * 1024ULL * 1024ULL);
+        larger_state_estimate =
+            build_runtime_config_from_budget(1024, 1, 0, larger_state_model, 1024ULL * 1024ULL * 1024ULL * 1024ULL);
+    }
     require(
         runtime_estimate.estimated_non_static_device_bytes ==
             larger_state_estimate.estimated_non_static_device_bytes,
