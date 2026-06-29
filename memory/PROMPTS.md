@@ -1,6 +1,8 @@
 # Prompt History
 
 ## 2026-06-29
+- User assigned Task 5 quality-fix for the Stream1 piece-transformer worktree: fix only `tools/stream_benchmark.cu` MLP `Stream1NetworkView` construction after LN pointer fields were added, do not change transformer forward semantics, do not wire production transformer dispatch, run a `stream_benchmark` compile check and `stream1_transformer_cuda_tests` if practical, update verification notes, amend the Task 5 commit, and return the final commit SHA.
+- User assigned Task 5 for the Stream1 piece-transformer worktree: implement only the standalone CUDA transformer forward path, keep production dispatcher/runner fail-closed guards, add separate transformer view/scratch API, match exported p900 fast input construction and 4-block pre-norm transformer architecture, use no fallback backend, prepare a fused/tiled attention path for seq_len=51 without adding a new FA2 dependency, verify against the real exported reference where available, and commit the work.
 - User added a later-task requirement for Stream1 piece-transformer forward: use FlashAttention 2 or similar attention speedups where applicable, preserve the exported weight format, and keep the forward path broadly compatible with transformer-style architectures. Task 4 quality fix must only record this requirement, not implement transformer forward.
 - User assigned Task 4 for the Stream1 piece-transformer worktree: implement transformer manifest parsing, exact-size host weight loading, device upload/free containers, and one-lane reusable scratch arena for `backend=piece_transformer`, with no fallback backend, no transformer CUDA forward kernel, no production runner/dispatcher wiring, and no Stream3/Stream4/State128/MLP contract changes.
 - User requested an explicit separate Stream1 `piece_transformer` backend for the Kaggle Megaminx Q-transformer, with no fallback behavior and without breaking the current MLP backend. Manifests must be generated from checkpoint/config metadata, correctness tests come before integration, and target validation is a small 2xT4 Kaggle smoke after correctness tests pass.
@@ -96,7 +98,7 @@
 
 ## 2026-05-22
 - User required NVIDIA Nsight profiling for bottleneck analysis, depth=20, state id=0 only, beam=2**22, with GPU memory usage and remaining GPU memory printed before start.
-- User explicitly prohibited fallback paths: "РЅРёРєР°РєРёС… С„РѕР»Р±РµРєРѕРІ"; fallback code is considered error masking.
+- User explicitly prohibited fallback paths: "????????????????????????????? ?????????????????????????????????"; fallback code is considered error masking.
 - User requested Docker cleanup: delete excess Docker data, keep only one CayleyBeam100H100-related image if available, then continue architecture-aligned code work.
 - User reiterated continuation requirement: continue project work and do not deviate from architecture.
 - User clarified profiler requirement: use NVIDIA Nsight, understand correct usage, build a new clearly named shared GPU image for GPU projects, and audit remaining atomic operations.
@@ -117,7 +119,7 @@
 - User requested production scheduler work: implement real free-slot management for Stream 4 sort slots, parallelize Stream 3 restore/owner/split, and parallelize Stream 3 collectors.
 - User approved global spill ping-pong implementation: add `global_spill_buffer_a + global_spill_buffer_b` so Stream 3 drain reads one spill buffer and writes still-blocked candidates to the other buffer.
 - User clarified current phase is single-GPU algorithm polishing; multi-rank is not required now. User requested periodic threshold update, final global threshold, final load balancing, and materialize wiring in the production depth loop, followed by `production_runner 0 20 4194304`.
-- User requested connection of real data and neural network assets, with explicit reminder to preserve alignment: "РїРѕРґСЂСѓР±Р°Р№ СЂРёР°Р» РґР°С‚Р° Рё РїСЂРѕС‡РµРµ. РќРµР№СЂРѕРЅРєР° Рё РґР°С‚Р° Сѓ С‚РµР±СЏ РµСЃС‚СЊ. РќРµ Р·Р°Р±РёРІР°Р№ Рѕ Р°Р»Р°Р№РјРµРЅС‚Рµ".
+- User requested connection of real data and neural network assets, with explicit reminder to preserve alignment: "????????????????????????????????? ???????????????? ????????????????? ???? ?????????????????????????. ????????????????????????????????? ???? ????????????????? ???? ????????????????? ?????????????????. ???????? ????????????????????????????? ???? ??????????????????????????????????????".
 - User reported Docker container logs only showed NVIDIA header and `ninja: no work to do`, requiring visible runtime progress logging for local Docker runs.
 - User requested `B_MICRO` around `8192` for RTX 3070 tuning, per-stream isolated speed benchmarks before production runs, Stream 1 TensorOp conversion, and consideration of future T4 testing.
 - User clarified Stream 1 must also be benchmarked with 1/2/3/4 concurrent inference jobs across different batch sizes, with a fixed table recorded in the benchmark document.
@@ -135,7 +137,7 @@
 - User requested implementation of the event-driven scheduler without wave barriers after the Stream1 folded-input optimization.
 - User suggested using `RING_COUNT=4` so Stream1 always has write targets.
 - User asked to discuss why enabling Stream1 before Stream4 broke spill convergence and clarified that Stream3 should announce shard readiness while host should manage less stream/shard state.
-- User approved implementing the Stream3-owned shard-ready handoff: "РќСѓ РґР°, РґРµР»Р°Р№".
+- User approved implementing the Stream3-owned shard-ready handoff: "???????? ????????, ?????????????????????".
 - User clarified score/hash ring ownership architecture: Stream1 is the throughput limiter, Stream2 uses the same `B_MICRO` parent batch and then sleeps, Stream3 consumes a full score/hash ring and immediately frees the ring without cleanup, Stream4 and Stream5 must not block score/hash ring reuse, and Stream5 needs its own ring buffers later for send/recv independence.
 - User approved implementing the ring pipeline policy with `RING_COUNT=4` and Stream4-independent ring reuse.
 - User clarified Stream3 collector architecture: Stream3 should partition input by `shard_id` once, sort by shard id, and write batched transactions into each target shard instead of rescanning every shard over the full input.
@@ -179,7 +181,7 @@
 - User requested fixing the Stream1 CUTLASS residual in-place GEMM issue without adding extra runtime checks, then verifying the fix.
 - User required any Stream3/global-spill overflow or hidden data drop to produce an explicit error and stop execution; hidden loss of candidates is forbidden.
 - User required removing the local uncommitted Stream3 spill backpressure patch and discussing the architecture-level solution before implementing any fix.
-- User accepted the puzzle 0 trace diagnosis after Stream1 fix and stated the remaining issue: `Stream1=РёСЃРїСЂР°РІР»РµРЅ`, path loss is `depth6/prefix7`, `score_key=22288 <= final_threshold=27866`, loss location is after Stream1/2 and before Stream4, likely Stream3 collector/global spill; requested checking generated-candidate writes through Stream3 output/local pending/global spill and final spill-drain at depth 6.
+- User accepted the puzzle 0 trace diagnosis after Stream1 fix and stated the remaining issue: `Stream1=????????????????????????????????????`, path loss is `depth6/prefix7`, `score_key=22288 <= final_threshold=27866`, loss location is after Stream1/2 and before Stream4, likely Stream3 collector/global spill; requested checking generated-candidate writes through Stream3 output/local pending/global spill and final spill-drain at depth 6.
 - User corrected the Stream3/Stream4 sizing model: `GLOBAL_BEAM_WIDTH_MAX_SAFE` must be removed, `GLOBAL_BEAM_WIDTH` is only aligned from the user beam, `STREAM3_BATCH_CANDIDATES = RING_SLOT_COUNT * B_MICRO * MOVE_COUNT`, `RING_COUNT = ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))`, and `SHARD_COUNT/STREAM4_BATCH_CANDIDATES` must be selected by a memory-budget config search.
 - User clarified that Stream4 shard resident capacity must not mean logical shard size. Logical shards are larger than `STREAM4_BATCH_CANDIDATES`; Stream4 processes each logical shard in batches, with stream arrays sized by `SHARD_COUNT` and `STREAM4_BATCH_CANDIDATES`.
 - User rejected an extra per-Stream3-launch `global_spill_free` runtime check because spill capacity should be guaranteed by architecture/config; the existing fatal out-of-bounds guard remains acceptable.
@@ -188,7 +190,7 @@
 - User clarified the spill formula must also multiply by Stream4 worker count if missing; using current config fields, Stream4 worker count is represented by `STREAM4_ACTIVE_SORT_SLOTS`.
 - User requested per-stream speed measurements to derive a stable spill size and make the pipeline run confidently.
 - User required a two-level debug model: master debug flag first, then independent speed/inference/path-trace debug flags; when master debug is off, subflags must not affect runtime and debug instrumentation must not be compiled into the production binary.
-- User approved adding the required final request validation after a Kaggle path-trace run crashed in `cudaStreamSynchronize final materialize` with illegal memory access, then requested launching Kaggle with the validation enabled: "РћРєРµР№, РґРѕР±Р°РІСЊ РЅСѓР¶РЅСѓСЋ РІР°Р»РёРґР°С†РёСЋ Рё Р·Р°РїСѓСЃРєР°Р№ РєР°РіР»".
+- User approved adding the required final request validation after a Kaggle path-trace run crashed in `cudaStreamSynchronize final materialize` with illegal memory access, then requested launching Kaggle with the validation enabled: "?????????????????, ???????????????????????? ???????????????????????? ????????????????????????????????????? ???? ????????????????????????????????? ????????????????".
 - User diagnosed the post-validation Kaggle run as too slow without logs: full-beam depths used `stream3_jobs=2049`, `stream4_jobs~4647`, and depth time about `130s`; user asked why current sizing chose such bad `stream4_jobs`.
 - User proposed deriving config from `stream4_jobs` and `stream3_jobs`, clarified that Stream3 receives `N_LOCAL * 24` generated candidates, and required batch execution time to be part of config reasoning, not just job count.
 - User corrected implementation scope: runtime config and auto-detection must live in a separate config file; `production_runner` must not own the config-search implementation.
@@ -252,8 +254,8 @@
 - User clarified that depth-only logs should not materially slow the code because heavy debug trace flags are compiled off, then requested config-only speed tuning for Kaggle T4x2 through notebook parameters rather than architecture changes.
 - User rejected the assumption that the full/small frontier alternation is normal, stated that the pattern is likely a bug, and requested adding debug only to determine the cause. Architecture changes are forbidden; code additions are allowed only for diagnostics.
 - User stopped Kaggle version 79 manually and requested setting `RUN_TIMEOUT_SEC=300` in the Kaggle config.
-- User approved fixing the Kaggle v80 diagnosis by adding the missing multi-rank final-reset cleanup for stale Stream4 histograms: "РђР°Р°Р°, РІРѕРЅ РѕРЅРѕ С‡Рµ. РўР°РєСЃ, С‚РѕРіРґР° РґР°РІР°Р№ РґРѕР±Р°РІР»СЏС‚СЊ РѕС‡РёСЃС‚РєСѓ, РєРѕРЅРµС‡РЅРѕ".
-- User requested Kaggle T4x2 validation after the reset cleanup fix: "РћРєРµР№, С‚РµСЃС‚РёСЂСѓР№ С‚РµРїРµСЂСЊ РЅР° 2С…Рў4 РєР°РіР»Р°".
+- User approved fixing the Kaggle v80 diagnosis by adding the missing multi-rank final-reset cleanup for stale Stream4 histograms: "????????????????, ???????????? ???????????? ?????????. ????????????????, ????????????????????? ????????????????????? ????????????????????????????????????? ??????????????????????????????, ?????????????????????????????".
+- User requested Kaggle T4x2 validation after the reset cleanup fix: "?????????????????, ??????????????????????????????????? ????????????????????????? ???????? 2?????????4 ????????????????????".
 - User requested a Stream2 solved-neighborhood feature first, with correct naming instead of informal `K_1`: `BEAM_SOLVED_NEIGHBORHOOD_RADIUS`. Required behavior: CPU precomputes the central-state neighborhood by inverse moves, GPU stores only read-only hashes/fingerprints, Stream2 detects candidates that are within the configured radius from the solution, and CPU appends the matching suffix after history reconstruction.
 - User requested preserving the current K2 discussion without implementing K2 yet. Future K2 means Stream2 descendant/suffix expansion from each generated candidate; K2 suffix generators should be precomputed and stored, not generated on the fly inside CUDA kernels.
 - User requested testing the new Stream2 solved-neighborhood behavior on Kaggle T4x2 for puzzle IDs 1 through 10.
@@ -273,7 +275,7 @@
 - User provided new model file `%USERPROFILE%\Downloads\Telegram Desktop\p900-t000-q_1779830329_best.pth` and requested comparison against the current project model: parameter count, architecture differences, runtime implications, and compatibility with the existing Stream1 CUDA runner.
 - User requested implementing a universal MLP model interface where Stream1 model dimensions and residual block count are inferred from/exported with weights, required blocks are duplicated automatically, and the existing optimized CUTLASS inference code remains the execution path.
 - User requested running the new model on Kaggle for puzzle ID `0` with the current large-beam parameters, approximately `2**26 + 16M` and specifically the notebook's current `BEAM_WIDTH=2**26+15_506_660`.
-- User observed new-model puzzle-0 depth `7..8` runtimes around `108..111s` with `stream4_jobsв‰€959..1021`, compared those metrics against previous runs, and requested a Kaggle run with timing debug enabled to identify the bottleneck.
+- User observed new-model puzzle-0 depth `7..8` runtimes around `108..111s` with `stream4_jobs????????959..1021`, compared those metrics against previous runs, and requested a Kaggle run with timing debug enabled to identify the bottleneck.
 - User interrupted the attempted dispatcher timing-code investigation and explicitly required no dispatcher/source-code changes; requested only reducing the Kaggle diagnostic beam by `1,000,000`.
 - User requested measuring Stream1 inference speed and Stream3 speed under the current T4x2 parameters, because Stream3 should not dominate the pipeline. Required Stream1 benchmark table: `B_MICRO=[2048,4096,8192,16384]` and concurrent inference count `[1,2,4,8]`.
 - User accepted that current production bottleneck is Stream1 inference and requested launching puzzle ID `0` on Kaggle T4x2 with the previously working good config, without further optimization work, letting the run continue without timeout.
@@ -337,7 +339,7 @@
   the already found puzzle `991` original solution instead of spending time
   solving the original again.
 - User provided local IHES model file
-  `C:/Users/РРІР°РЅ Р›РёС‚РІР°Рє/Downloads/p888-t000_1778521793_e32692.pth` and requested
+  `C:/Users/???????????????? ??????????????????????????/Downloads/p888-t000_1778521793_e32692.pth` and requested
   launching the IHES cube solver with that model on MEPhI. The model is a
   BatchNorm-folded QMLP-style checkpoint with `input_dim=5184=72*72`,
   `hd1=2556`, `hd2=218`, `nrd=16`, and `output_dim=1`; IHES move count is 18,
@@ -416,3 +418,5 @@
 - User clarified that all one-puzzle array jobs should use one shared precompiled beam-search binary instead of rebuilding production_runner in every job.
 
 - User showed a completed IHES puzzle 33 run where compute succeeded but GitHub publishing failed because compute nodes could not resolve github.com and index generation crashed on metadata fields variants/source_files; requested continuing to collect and publish all cluster IHES results robustly.
+
+- User requested Task 5 spec-fix in `D:\100XH100\.worktrees\stream1-piece-transformer`: make registered `stream1_transformer_cuda_tests` safe in clean checkout by skipping with a clear report line when ignored reference fixture files are absent, preserve the full p900 fixture test when present, document clean-checkout and fixture-present verification, run both paths if feasible, and amend the Task 5 commit without production dispatcher wiring or fallback backend.

@@ -1,6 +1,7 @@
 #include "stream1.hpp"
 
 #include "config.hpp"
+#include "cuda_check.hpp"
 #include "nvtx_ranges.hpp"
 
 #include <cuda_runtime.h>
@@ -479,6 +480,473 @@ __global__ void stream1_single_output_quantize_kernel(
     score_ring[i] = score_key_from_float_device(q);
 }
 
+__global__ void stream1_transformer_build_input_kernel(
+    const State128* __restrict__ current_frontier_states,
+    const std::uint64_t* __restrict__ parent_base,
+    const std::uint32_t* __restrict__ count,
+    Stream1TransformerNetworkView network,
+    half* __restrict__ tokens,
+    std::uint32_t b_micro) {
+    const std::uint32_t row_token = blockIdx.x;
+    const std::uint32_t dim = blockIdx.y * blockDim.x + threadIdx.x;
+    const std::uint32_t row = row_token / network.dims.seq_len;
+    const std::uint32_t token = row_token % network.dims.seq_len;
+    if (row >= b_micro || row >= *count || dim >= network.dims.d_model) {
+        return;
+    }
+    float value = 0.0f;
+    if (token == 0U) {
+        value = stream1_load_scalar_device(network.cls_token, dim, network.dims.dtype);
+    } else {
+        const std::uint32_t piece = token - 1U;
+        value = stream1_load_scalar_device(
+            network.fast_piece_static,
+            static_cast<std::uint64_t>(piece) * network.dims.d_model + dim,
+            network.dims.dtype);
+        const State128 state = current_frontier_states[*parent_base + row];
+        for (std::uint32_t slot = 0; slot < network.dims.max_piece_size; ++slot) {
+            const std::uint64_t piece_slot = static_cast<std::uint64_t>(piece) * network.dims.max_piece_size + slot;
+            if (network.piece_mask[piece_slot] == 0U) {
+                continue;
+            }
+            const std::uint32_t pos = static_cast<std::uint32_t>(network.piece_positions[piece_slot]);
+            const std::uint32_t state_value = static_cast<std::uint32_t>(state.v[pos]);
+            const std::uint64_t table_idx =
+                ((static_cast<std::uint64_t>(slot) * network.dims.num_classes + state_value) * network.dims.d_model) + dim;
+            value += stream1_load_scalar_device(network.fast_slot_projected, table_idx, network.dims.dtype);
+        }
+    }
+    const std::uint64_t out_idx = static_cast<std::uint64_t>(row_token) * network.dims.d_model + dim;
+    stream1_store_scalar_device(tokens, out_idx, value, network.dims.dtype);
+}
+
+__global__ void stream1_transformer_layernorm_copy_kernel(
+    const half* __restrict__ input,
+    half* __restrict__ output,
+    const half* __restrict__ gamma,
+    const half* __restrict__ beta,
+    std::uint32_t rows,
+    std::uint32_t cols,
+    std::uint32_t dtype) {
+    const std::uint32_t row = blockIdx.x;
+    if (row >= rows) {
+        return;
+    }
+    extern __shared__ float reduce[];
+    const std::uint64_t base = static_cast<std::uint64_t>(row) * cols;
+    float sum = 0.0f;
+    for (std::uint32_t col = threadIdx.x; col < cols; col += blockDim.x) {
+        sum += stream1_load_scalar_device(input, base + col, dtype);
+    }
+    reduce[threadIdx.x] = sum;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2U; stride > 0U; stride >>= 1U) {
+        if (threadIdx.x < stride) {
+            reduce[threadIdx.x] += reduce[threadIdx.x + stride];
+        }
+        __syncthreads();
+    }
+    const float mean = reduce[0] / static_cast<float>(cols);
+    float var_sum = 0.0f;
+    for (std::uint32_t col = threadIdx.x; col < cols; col += blockDim.x) {
+        const float x = stream1_load_scalar_device(input, base + col, dtype);
+        const float d = x - mean;
+        var_sum += d * d;
+    }
+    reduce[threadIdx.x] = var_sum;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2U; stride > 0U; stride >>= 1U) {
+        if (threadIdx.x < stride) {
+            reduce[threadIdx.x] += reduce[threadIdx.x + stride];
+        }
+        __syncthreads();
+    }
+    const float inv_std = rsqrtf(reduce[0] / static_cast<float>(cols) + 1.0e-5f);
+    for (std::uint32_t col = threadIdx.x; col < cols; col += blockDim.x) {
+        const float x = stream1_load_scalar_device(input, base + col, dtype);
+        const float y = (x - mean) * inv_std *
+            stream1_load_scalar_device(gamma, col, dtype) +
+            stream1_load_scalar_device(beta, col, dtype);
+        stream1_store_scalar_device(output, base + col, y, dtype);
+    }
+}
+
+__global__ void stream1_transformer_residual_bias_add_kernel(
+    half* __restrict__ tokens,
+    const half* __restrict__ branch,
+    const half* __restrict__ bias,
+    std::uint32_t total_tokens,
+    std::uint32_t d_model,
+    std::uint32_t dtype) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t total = total_tokens * d_model;
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t col = i % d_model;
+    const float y = stream1_load_scalar_device(tokens, i, dtype) +
+        stream1_load_scalar_device(branch, i, dtype) +
+        stream1_load_scalar_device(bias, col, dtype);
+    stream1_store_scalar_device(tokens, i, y, dtype);
+}
+
+__global__ void stream1_transformer_bias_silu_kernel(
+    half* __restrict__ matrix,
+    const half* __restrict__ bias,
+    std::uint32_t rows,
+    std::uint32_t cols,
+    std::uint32_t dtype) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t total = rows * cols;
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t col = i % cols;
+    const float x = stream1_load_scalar_device(matrix, i, dtype) +
+        stream1_load_scalar_device(bias, col, dtype);
+    const float y = x / (1.0f + expf(-x));
+    stream1_store_scalar_device(matrix, i, y, dtype);
+}
+
+// Standalone tiled attention for current p900 seq_len=51. Full external FA2 integration is deferred.
+__global__ void stream1_transformer_attention51_kernel(
+    const half* __restrict__ qkv,
+    const half* __restrict__ qkv_bias,
+    float* __restrict__ scores_probs,
+    half* __restrict__ context,
+    Stream1TransformerDims dims,
+    std::uint32_t b_micro) {
+    const std::uint32_t row = blockIdx.x;
+    const std::uint32_t head = blockIdx.y;
+    const std::uint32_t query = blockIdx.z;
+    const std::uint32_t tid = threadIdx.x;
+    if (row >= b_micro || head >= dims.nhead || query >= dims.seq_len) {
+        return;
+    }
+    extern __shared__ float shared[];
+    const std::uint64_t score_base =
+        (((static_cast<std::uint64_t>(row) * dims.nhead + head) * dims.seq_len + query) * dims.seq_len);
+    const std::uint32_t head_offset = head * dims.head_dim;
+    const float scale = rsqrtf(static_cast<float>(dims.head_dim));
+    float score = -3.4028234663852886e38f;
+    if (tid < dims.seq_len) {
+        float dot = 0.0f;
+        for (std::uint32_t d = 0; d < dims.head_dim; ++d) {
+            const std::uint64_t q_idx =
+                (static_cast<std::uint64_t>(row) * dims.seq_len + query) * (3ULL * dims.d_model) + head_offset + d;
+            const std::uint64_t k_idx =
+                (static_cast<std::uint64_t>(row) * dims.seq_len + tid) * (3ULL * dims.d_model) + dims.d_model + head_offset + d;
+            const float q = stream1_load_scalar_device(qkv, q_idx, dims.dtype) +
+                stream1_load_scalar_device(qkv_bias, head_offset + d, dims.dtype);
+            const float k = stream1_load_scalar_device(qkv, k_idx, dims.dtype) +
+                stream1_load_scalar_device(qkv_bias, dims.d_model + head_offset + d, dims.dtype);
+            dot += q * k;
+        }
+        score = dot * scale;
+        scores_probs[score_base + tid] = score;
+    }
+    shared[tid] = score;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2U; stride > 0U; stride >>= 1U) {
+        if (tid < stride) {
+            shared[tid] = fmaxf(shared[tid], shared[tid + stride]);
+        }
+        __syncthreads();
+    }
+    const float max_score = shared[0];
+    float exp_value = 0.0f;
+    if (tid < dims.seq_len) {
+        exp_value = expf(scores_probs[score_base + tid] - max_score);
+        scores_probs[score_base + tid] = exp_value;
+    }
+    shared[tid] = exp_value;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2U; stride > 0U; stride >>= 1U) {
+        if (tid < stride) {
+            shared[tid] += shared[tid + stride];
+        }
+        __syncthreads();
+    }
+    const float inv_sum = 1.0f / shared[0];
+    if (tid < dims.seq_len) {
+        scores_probs[score_base + tid] *= inv_sum;
+    }
+    __syncthreads();
+    if (tid < dims.head_dim) {
+        float acc = 0.0f;
+        for (std::uint32_t key = 0; key < dims.seq_len; ++key) {
+            const float prob = scores_probs[score_base + key];
+            const std::uint64_t v_idx =
+                (static_cast<std::uint64_t>(row) * dims.seq_len + key) * (3ULL * dims.d_model) +
+                2ULL * dims.d_model + head_offset + tid;
+            const float v = stream1_load_scalar_device(qkv, v_idx, dims.dtype) +
+                stream1_load_scalar_device(qkv_bias, 2ULL * dims.d_model + head_offset + tid, dims.dtype);
+            acc += prob * v;
+        }
+        const std::uint64_t out_idx =
+            (static_cast<std::uint64_t>(row) * dims.seq_len + query) * dims.d_model + head_offset + tid;
+        stream1_store_scalar_device(context, out_idx, acc, dims.dtype);
+    }
+}
+
+__global__ void stream1_transformer_cls_layernorm_kernel(
+    const half* __restrict__ tokens,
+    half* __restrict__ cls,
+    const half* __restrict__ gamma,
+    const half* __restrict__ beta,
+    Stream1TransformerDims dims,
+    std::uint32_t b_micro) {
+    const std::uint32_t row = blockIdx.x;
+    if (row >= b_micro) {
+        return;
+    }
+    extern __shared__ float reduce[];
+    const std::uint64_t in_base = static_cast<std::uint64_t>(row) * dims.seq_len * dims.d_model;
+    const std::uint64_t out_base = static_cast<std::uint64_t>(row) * dims.d_model;
+    float sum = 0.0f;
+    for (std::uint32_t col = threadIdx.x; col < dims.d_model; col += blockDim.x) {
+        sum += stream1_load_scalar_device(tokens, in_base + col, dims.dtype);
+    }
+    reduce[threadIdx.x] = sum;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2U; stride > 0U; stride >>= 1U) {
+        if (threadIdx.x < stride) {
+            reduce[threadIdx.x] += reduce[threadIdx.x + stride];
+        }
+        __syncthreads();
+    }
+    const float mean = reduce[0] / static_cast<float>(dims.d_model);
+    float var_sum = 0.0f;
+    for (std::uint32_t col = threadIdx.x; col < dims.d_model; col += blockDim.x) {
+        const float x = stream1_load_scalar_device(tokens, in_base + col, dims.dtype);
+        const float d = x - mean;
+        var_sum += d * d;
+    }
+    reduce[threadIdx.x] = var_sum;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2U; stride > 0U; stride >>= 1U) {
+        if (threadIdx.x < stride) {
+            reduce[threadIdx.x] += reduce[threadIdx.x + stride];
+        }
+        __syncthreads();
+    }
+    const float inv_std = rsqrtf(reduce[0] / static_cast<float>(dims.d_model) + 1.0e-5f);
+    for (std::uint32_t col = threadIdx.x; col < dims.d_model; col += blockDim.x) {
+        const float x = stream1_load_scalar_device(tokens, in_base + col, dims.dtype);
+        const float y = (x - mean) * inv_std *
+            stream1_load_scalar_device(gamma, col, dims.dtype) +
+            stream1_load_scalar_device(beta, col, dims.dtype);
+        stream1_store_scalar_device(cls, out_base + col, y, dims.dtype);
+    }
+}
+
+__global__ void stream1_transformer_score_quantize_kernel(
+    const half* __restrict__ logits,
+    const half* __restrict__ output_bias,
+    const std::uint32_t* __restrict__ count,
+    std::uint32_t* __restrict__ score_ring,
+    std::uint32_t b_micro,
+    Stream1TransformerDims dims) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t total = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t row = i / static_cast<std::uint32_t>(MOVE_COUNT);
+    const std::uint32_t move = i % static_cast<std::uint32_t>(MOVE_COUNT);
+    if (row >= *count) {
+        return;
+    }
+    const float q = stream1_load_scalar_device(logits, static_cast<std::uint64_t>(row) * dims.output_dim + move, dims.dtype) +
+        stream1_load_scalar_device(output_bias, move, dims.dtype);
+    score_ring[i] = score_key_from_float_device(q);
+}
+
+void stream1_transformer_inference_cuda(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const Stream1TransformerNetworkView& network,
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t* score_ring,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    NvtxRange range("Stream1_transformer_inference_launch");
+    const Stream1TransformerDims dims = network.dims;
+    if (dims.output_dim != MOVE_COUNT) {
+        throw std::invalid_argument("Stream1 piece_transformer output_dim must equal MOVE_COUNT");
+    }
+    if (dims.d_model == 0U || dims.nhead == 0U || dims.head_dim == 0U ||
+        dims.d_model != dims.nhead * dims.head_dim) {
+        throw std::invalid_argument("Stream1 piece_transformer d_model must equal nhead * head_dim");
+    }
+    if (dims.seq_len != dims.num_pieces + 1U || dims.max_piece_size == 0U) {
+        throw std::invalid_argument("Stream1 piece_transformer sequence/piece dimensions are inconsistent");
+    }
+    if (dims.seq_len > 64U || dims.head_dim > 64U) {
+        throw std::invalid_argument("Stream1 piece_transformer fused attention tile requires seq_len<=64 and head_dim<=64");
+    }
+    if (dims.dtype == STREAM1_DTYPE_BF16) {
+        int device = 0;
+        cudaGetDevice(&device);
+        cudaDeviceProp prop{};
+        cudaGetDeviceProperties(&prop, device);
+        if (prop.major < 8) {
+            throw std::invalid_argument("Stream1 piece_transformer bf16 path requires SM80+ GPU; use fp16 weights on T4/SM75");
+        }
+    } else if (dims.dtype != STREAM1_DTYPE_FP16) {
+        throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
+    }
+    if (b_micro == 0U) {
+        return;
+    }
+#if BEAM_HAS_CUTLASS
+    const std::uint32_t token_rows = b_micro * dims.seq_len;
+    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.tokens, 0, static_cast<std::uint64_t>(token_rows) * dims.d_model * sizeof(half), stream));
+    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.qkv, 0, static_cast<std::uint64_t>(token_rows) * 3ULL * dims.d_model * sizeof(half), stream));
+    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.attention_scores_probs, 0, static_cast<std::uint64_t>(b_micro) * dims.nhead * dims.seq_len * dims.seq_len * sizeof(float), stream));
+    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.attention_context, 0, static_cast<std::uint64_t>(token_rows) * dims.d_model * sizeof(half), stream));
+    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.ff_hidden, 0, static_cast<std::uint64_t>(token_rows) * dims.ff_dim * sizeof(half), stream));
+    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.logits, 0, static_cast<std::uint64_t>(b_micro) * dims.output_dim * sizeof(half), stream));
+    const dim3 token_block(128);
+    const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
+    stream1_transformer_build_input_kernel<<<token_grid, token_block, 0, stream>>>(
+        current_frontier_states,
+        parent_base,
+        count,
+        network,
+        scratch.tokens,
+        b_micro);
+
+    stream1_transformer_layernorm_copy_kernel<<<token_rows, 256, 256 * sizeof(float), stream>>>(
+        scratch.tokens,
+        scratch.tokens,
+        network.input_ln_gamma,
+        network.input_ln_beta,
+        token_rows,
+        dims.d_model,
+        dims.dtype);
+
+    for (std::uint32_t layer = 0; layer < dims.transformer_layers; ++layer) {
+        const Stream1TransformerBlockView block = network.blocks[layer];
+        stream1_transformer_layernorm_copy_kernel<<<token_rows, 256, 256 * sizeof(float), stream>>>(
+            scratch.tokens,
+            scratch.attention_context,
+            block.ln1_gamma,
+            block.ln1_beta,
+            token_rows,
+            dims.d_model,
+            dims.dtype);
+        stream1_cutlass_linear_cuda(
+            scratch.attention_context,
+            block.attn_qkv_weight,
+            scratch.qkv,
+            token_rows,
+            dims.d_model,
+            3U * dims.d_model,
+            dims.dtype,
+            stream);
+        const dim3 attn_grid(b_micro, dims.nhead, dims.seq_len);
+        stream1_transformer_attention51_kernel<<<attn_grid, 64, 64 * sizeof(float), stream>>>(
+            scratch.qkv,
+            block.attn_qkv_bias,
+            scratch.attention_scores_probs,
+            scratch.attention_context,
+            dims,
+            b_micro);
+        stream1_cutlass_linear_cuda(
+            scratch.attention_context,
+            block.attn_out_weight,
+            scratch.qkv,
+            token_rows,
+            dims.d_model,
+            dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_residual_bias_add_kernel<<<(token_rows * dims.d_model + 255U) / 256U, 256, 0, stream>>>(
+            scratch.tokens,
+            scratch.qkv,
+            block.attn_out_bias,
+            token_rows,
+            dims.d_model,
+            dims.dtype);
+
+        stream1_transformer_layernorm_copy_kernel<<<token_rows, 256, 256 * sizeof(float), stream>>>(
+            scratch.tokens,
+            scratch.attention_context,
+            block.ln2_gamma,
+            block.ln2_beta,
+            token_rows,
+            dims.d_model,
+            dims.dtype);
+        stream1_cutlass_linear_cuda(
+            scratch.attention_context,
+            block.ff1_weight,
+            scratch.ff_hidden,
+            token_rows,
+            dims.d_model,
+            dims.ff_dim,
+            dims.dtype,
+            stream);
+        stream1_transformer_bias_silu_kernel<<<(token_rows * dims.ff_dim + 255U) / 256U, 256, 0, stream>>>(
+            scratch.ff_hidden,
+            block.ff1_bias,
+            token_rows,
+            dims.ff_dim,
+            dims.dtype);
+        stream1_cutlass_linear_cuda(
+            scratch.ff_hidden,
+            block.ff2_weight,
+            scratch.attention_context,
+            token_rows,
+            dims.ff_dim,
+            dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_residual_bias_add_kernel<<<(token_rows * dims.d_model + 255U) / 256U, 256, 0, stream>>>(
+            scratch.tokens,
+            scratch.attention_context,
+            block.ff2_bias,
+            token_rows,
+            dims.d_model,
+            dims.dtype);
+    }
+
+    stream1_transformer_cls_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
+        scratch.tokens,
+        scratch.attention_context,
+        network.output_ln_gamma,
+        network.output_ln_beta,
+        dims,
+        b_micro);
+    stream1_cutlass_linear_cuda(
+        scratch.attention_context,
+        network.output_weight,
+        scratch.logits,
+        b_micro,
+        dims.d_model,
+        dims.output_dim,
+        dims.dtype,
+        stream);
+    stream1_transformer_score_quantize_kernel<<<(b_micro * MOVE_COUNT + 255U) / 256U, 256, 0, stream>>>(
+        scratch.logits,
+        network.output_bias,
+        count,
+        score_ring,
+        b_micro,
+        dims);
+#else
+    (void)current_frontier_states;
+    (void)parent_base;
+    (void)count;
+    (void)network;
+    (void)scratch;
+    (void)score_ring;
+    (void)b_micro;
+    (void)stream;
+    throw std::invalid_argument("Stream1 piece_transformer CUDA forward requires CUTLASS-enabled build");
+#endif
+}
 void stream1_inference_custom_cuda(
     const State128* current_frontier_states,
     const std::uint64_t* parent_base,

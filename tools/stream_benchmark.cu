@@ -331,23 +331,23 @@ std::vector<Stream1Result> benchmark_stream1(
     std::ofstream& report) {
     std::vector<Stream1Result> results;
     const Stream1NetworkDims dims = stream1_weights::network_dims(model);
-    const std::vector<const half*> residual_fc1_weight =
-        stream1_weights::const_pointer_vector(weights.residual_fc1_weight);
-    const std::vector<const half*> residual_fc1_bias =
-        stream1_weights::const_pointer_vector(weights.residual_fc1_bias);
-    const std::vector<const half*> residual_fc2_weight =
-        stream1_weights::const_pointer_vector(weights.residual_fc2_weight);
-    const std::vector<const half*> residual_fc2_bias =
-        stream1_weights::const_pointer_vector(weights.residual_fc2_bias);
     Stream1NetworkView network{
         weights.input_weight,
         weights.input_bias,
+        weights.input_ln_gamma,
+        weights.input_ln_beta,
         weights.hidden_weight,
         weights.hidden_bias,
-        residual_fc1_weight.data(),
-        residual_fc1_bias.data(),
-        residual_fc2_weight.data(),
-        residual_fc2_bias.data(),
+        weights.hidden_ln_gamma,
+        weights.hidden_ln_beta,
+        reinterpret_cast<const half* const*>(weights.residual_fc1_weight_table),
+        reinterpret_cast<const half* const*>(weights.residual_fc1_bias_table),
+        reinterpret_cast<const half* const*>(weights.residual_fc1_ln_gamma_table),
+        reinterpret_cast<const half* const*>(weights.residual_fc1_ln_beta_table),
+        reinterpret_cast<const half* const*>(weights.residual_fc2_weight_table),
+        reinterpret_cast<const half* const*>(weights.residual_fc2_bias_table),
+        reinterpret_cast<const half* const*>(weights.residual_fc2_ln_gamma_table),
+        reinterpret_cast<const half* const*>(weights.residual_fc2_ln_beta_table),
         weights.output_weight,
         weights.output_bias,
         dims};

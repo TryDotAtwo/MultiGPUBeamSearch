@@ -888,6 +888,87 @@ inline Stream1NetworkDims network_dims(const Stream1ModelConfig& model) {
 inline std::vector<const half*> const_pointer_vector(const std::vector<half*>& ptrs) {
     return std::vector<const half*>(ptrs.begin(), ptrs.end());
 }
+inline Stream1TransformerDims transformer_dims(const Stream1ModelConfig& model) {
+    if (model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        throw std::runtime_error("MLP Stream1 model cannot be viewed as a piece_transformer");
+    }
+    return Stream1TransformerDims{
+        model.state_len,
+        model.num_classes,
+        model.num_pieces,
+        model.max_piece_size,
+        model.seq_len,
+        model.d_model,
+        model.nhead,
+        model.head_dim,
+        model.transformer_layers,
+        model.ff_dim,
+        model.output_dim,
+        model.dtype};
+}
+
+struct TransformerNetworkViewHolder {
+    std::vector<Stream1TransformerBlockView> blocks;
+    Stream1TransformerNetworkView view{};
+};
+
+inline TransformerNetworkViewHolder transformer_network_view(
+    const DeviceTransformerWeights& weights,
+    const Stream1ModelConfig& model) {
+    if (model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        throw std::runtime_error("MLP Stream1 weights cannot be viewed as a piece_transformer");
+    }
+    if (weights.blocks.size() != model.transformer_layers) {
+        throw std::runtime_error("device transformer block count does not match manifest");
+    }
+    TransformerNetworkViewHolder holder;
+    holder.blocks.resize(weights.blocks.size());
+    for (std::size_t i = 0; i < weights.blocks.size(); ++i) {
+        const DeviceTransformerBlockWeights& b = weights.blocks[i];
+        holder.blocks[i] = Stream1TransformerBlockView{
+            b.ln1_gamma,
+            b.ln1_beta,
+            b.attn_qkv_weight,
+            b.attn_qkv_bias,
+            b.attn_out_weight,
+            b.attn_out_bias,
+            b.ln2_gamma,
+            b.ln2_beta,
+            b.ff1_weight,
+            b.ff1_bias,
+            b.ff2_weight,
+            b.ff2_bias};
+    }
+    holder.view = Stream1TransformerNetworkView{
+        weights.fast_slot_projected,
+        weights.fast_piece_static,
+        weights.cls_token,
+        weights.input_ln_gamma,
+        weights.input_ln_beta,
+        weights.output_ln_gamma,
+        weights.output_ln_beta,
+        holder.blocks.data(),
+        weights.output_weight,
+        weights.output_bias,
+        weights.piece_positions,
+        weights.piece_mask,
+        weights.piece_types,
+        transformer_dims(model)};
+    return holder;
+}
+
+inline void free_transformer_network_view(TransformerNetworkViewHolder& holder) {
+    holder = TransformerNetworkViewHolder{};
+}
+inline Stream1TransformerScratchView transformer_scratch_view(const ScratchAllocation& scratch) {
+    return Stream1TransformerScratchView{
+        scratch.transformer_tokens,
+        scratch.transformer_qkv,
+        scratch.transformer_attention_scores_probs,
+        scratch.transformer_attention_context,
+        scratch.transformer_ff_hidden,
+        scratch.transformer_logits};
+}
 #endif
 
 } // namespace beam::stream1_weights
