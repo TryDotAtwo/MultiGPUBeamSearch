@@ -737,6 +737,9 @@ int main(int argc, char** argv) {
     const stream1_weights::HostWeightBytes host_weights =
         stream1_weights::load_stream1_weights(weight_dir);
     const Stream1ModelConfig& stream1_model = host_weights.model;
+    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        throw std::runtime_error("piece_transformer Stream1 forward is not wired yet");
+    }
 
     const std::uint32_t max_states =
         stream1_parent_batch_from_row_budget(B_MICRO_SWEEP.back(), stream1_model) *

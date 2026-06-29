@@ -3952,6 +3952,9 @@ int main(int argc, char** argv) {
     const stream1_weights::HostWeightBytes host_weights =
         stream1_weights::load_stream1_weights(weight_dir);
     const Stream1ModelConfig& stream1_model = host_weights.model;
+    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        throw std::runtime_error("piece_transformer Stream1 forward is not wired yet");
+    }
     const RuntimeConfigBuild config_build =
         build_runtime_config_from_budget(beam, world_size, rank, stream1_model, free_before);
     const RuntimeConfig config = config_build.config;
