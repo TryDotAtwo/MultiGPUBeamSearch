@@ -115,7 +115,7 @@ std::uint64_t estimate_stream1_weight_bytes(const Stream1ModelConfig& model) {
     }
     case STREAM1_BACKEND_PIECE_TRANSFORMER: {
         std::uint64_t half_values = 0;
-        half_values += static_cast<std::uint64_t>(model.state_len) * model.num_classes * model.d_model;
+        half_values += static_cast<std::uint64_t>(model.max_piece_size) * model.num_classes * model.d_model;
         half_values += static_cast<std::uint64_t>(model.num_pieces) * model.d_model;
         half_values += model.d_model;
         half_values += 4ULL * model.d_model;

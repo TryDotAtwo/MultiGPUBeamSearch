@@ -1,9 +1,12 @@
 #include "cuda_check.hpp"
 #include "../cuda/dispatcher.hpp"
+#include "../cuda/runtime_config.hpp"
 #include "../tools/stream1_weight_io.hpp"
 
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
+
+#include <cstdlib>
 
 #include <filesystem>
 #include <fstream>
@@ -89,7 +92,7 @@ TransformerDispatcherFixture make_transformer_dispatcher_fixture(
     TransformerDispatcherFixture fixture;
     fixture.blocks.resize(model.transformer_layers);
     fixture.view.fast_slot_projected =
-        fixture.alloc_half(static_cast<std::uint64_t>(model.state_len) * model.num_classes * model.d_model, "fast_slot_projected");
+        fixture.alloc_half(static_cast<std::uint64_t>(model.max_piece_size) * model.num_classes * model.d_model, "fast_slot_projected");
     fixture.view.fast_piece_static =
         fixture.alloc_half(static_cast<std::uint64_t>(model.num_pieces) * model.d_model, "fast_piece_static");
     fixture.view.cls_token = fixture.alloc_half(model.d_model, "cls_token");
@@ -134,8 +137,44 @@ TransformerDispatcherFixture make_transformer_dispatcher_fixture(
     return fixture;
 }
 
+void run_transformer_runtime_weight_estimate_test(std::ofstream& report) {
+    const Stream1ModelConfig model = tiny_transformer_model();
+    Stream1ModelConfig larger_state_model = model;
+    larger_state_model.state_len += 7;
+    setenv("BEAM_RUNTIME_CONFIG_MODE", "manual", 1);
+    setenv("BEAM_GPU_HEADROOM_BYTES", "0", 1);
+    setenv("BEAM_STREAM3_RING_SLOTS", "1", 1);
+    setenv("BEAM_SHARD_COUNT", "1", 1);
+    setenv("BEAM_SHARD_BUFFER_COUNT", "2", 1);
+    setenv("BEAM_SHARD_CAPACITY_CANDIDATES", "262144", 1);
+    setenv("BEAM_STREAM4_BATCH_CANDIDATES", "1024", 1);
+    setenv("BEAM_STREAM4_TRIGGER_CANDIDATES", "1024", 1);
+    setenv("BEAM_STREAM4_BATCH_ALIGNMENT", "1", 1);
+    setenv("BEAM_RING_COUNT", "1", 1);
+    const RuntimeConfigBuild runtime_estimate =
+        build_runtime_config_from_budget(1024, 1, 0, model, 1024ULL * 1024ULL * 1024ULL * 1024ULL);
+    const RuntimeConfigBuild larger_state_estimate =
+        build_runtime_config_from_budget(1024, 1, 0, larger_state_model, 1024ULL * 1024ULL * 1024ULL * 1024ULL);
+    unsetenv("BEAM_RUNTIME_CONFIG_MODE");
+    unsetenv("BEAM_GPU_HEADROOM_BYTES");
+    unsetenv("BEAM_STREAM3_RING_SLOTS");
+    unsetenv("BEAM_SHARD_COUNT");
+    unsetenv("BEAM_SHARD_BUFFER_COUNT");
+    unsetenv("BEAM_SHARD_CAPACITY_CANDIDATES");
+    unsetenv("BEAM_STREAM4_BATCH_CANDIDATES");
+    unsetenv("BEAM_STREAM4_TRIGGER_CANDIDATES");
+    unsetenv("BEAM_STREAM4_BATCH_ALIGNMENT");
+    unsetenv("BEAM_RING_COUNT");
+    require(
+        runtime_estimate.estimated_non_static_device_bytes ==
+            larger_state_estimate.estimated_non_static_device_bytes,
+        "piece_transformer runtime weight estimate must size fast_slot_projected by max_piece_size, not state_len");
+    report << "- transformer_runtime_weight_estimate=pass\n";
+    report.flush();
+}
 void run_transformer_dispatcher_graph_test(std::ofstream& report) {
     const Stream1ModelConfig model = tiny_transformer_model();
+
     RuntimeConfig config;
     config.b_micro = 4;
     config.stream3_batch_candidates = 4 * static_cast<std::uint32_t>(MOVE_COUNT);
@@ -206,6 +245,7 @@ int main() {
     std::ofstream report("test_results/dispatcher_cuda_tests_2026-05-22.md");
     report << "# Dispatcher CUDA Graph Template Tests 2026-05-22\n\n";
     BEAM_CUDA_CHECK(cudaSetDevice(0));
+    run_transformer_runtime_weight_estimate_test(report);
 
     RuntimeConfig config;
     config.b_micro = 16;
