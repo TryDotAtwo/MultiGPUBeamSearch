@@ -1,0 +1,17 @@
+{
+  "id": "trydotatwo/cayley-beam-transformer-2xt4-solve-991",
+  "title": "Cayley Beam Transformer 2xT4 Solve 991",
+  "code_file": "t4-transformer-beam-solve.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": [
+    "vladkuznetsov266/megaminx-qtransformer-1782210824/PyTorch/default/1"
+  ]
+}
