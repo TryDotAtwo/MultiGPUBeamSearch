@@ -1,4 +1,4 @@
-﻿# Stream1 Piece-Transformer Kaggle Solve Check
+# Stream1 Piece-Transformer Kaggle Solve Check
 
 Date: 2026-06-30
 Branch: `codex/stream1-piece-transformer`
@@ -33,6 +33,9 @@ Config:
 - `PUZZLE_COUNT=1`
 - `BEAM_WIDTH=65536`
 - `DEPTH_LIMIT=82`
+- `SHARD_COUNT=1`
+- `STREAM4_BATCH_CANDIDATES=32768`
+- `STREAM4_TRIGGER_CANDIDATES=32768`
 - `TORCHRUN_NPROC_PER_NODE=2`
 - `CUDA_ARCHITECTURES=75`
 - `BEAM_WEIGHT_DIR=/kaggle/working/stream1_transformer_weights_fp16`
@@ -46,4 +49,4 @@ Local package validation before Kaggle push:
 
 ## Kaggle Result
 
-Pending run.
+Version 1 failed in preflight because the initial solve package inherited the smoke SHARD_COUNT=4: stream3_batch=24576 exceeded shard_capacity=9216 at BEAM_WIDTH=65536. The solve package was corrected to SHARD_COUNT=1 and STREAM4_TRIGGER_CANDIDATES=32768, preserving B_MICRO=512 and STREAM3_RING_SLOTS=2.
