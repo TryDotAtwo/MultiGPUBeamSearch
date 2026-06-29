@@ -31,7 +31,7 @@ Config:
 
 - `START_PUZZLE_ID=991`
 - `PUZZLE_COUNT=1`
-- `BEAM_WIDTH=65536`
+- `BEAM_WIDTH=262144`
 - `DEPTH_LIMIT=82`
 - `SHARD_COUNT=1`
 - `STREAM4_BATCH_CANDIDATES=32768`
@@ -50,3 +50,6 @@ Local package validation before Kaggle push:
 ## Kaggle Result
 
 Version 1 failed in preflight because the initial solve package inherited the smoke SHARD_COUNT=4: stream3_batch=24576 exceeded shard_capacity=9216 at BEAM_WIDTH=65536. The solve package was corrected to SHARD_COUNT=1 and STREAM4_TRIGGER_CANDIDATES=32768, preserving B_MICRO=512 and STREAM3_RING_SLOTS=2.
+
+
+Version 2 reached depth 4 with `BEAM_WIDTH=65536`, `SHARD_COUNT=1`, then failed in Stream3 because the small beam left no spill reserve: `spill_capacity=0`, `shard_capacity_candidates=34816`. Version 3 increases only the beam to `262144` while keeping `SHARD_COUNT=1`; the comparison target remains puzzle `991` reference length `82`.
