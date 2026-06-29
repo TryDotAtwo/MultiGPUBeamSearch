@@ -31,3 +31,15 @@
 
 ## Remote Run
 - Actual Kaggle execution is intentionally not included in this task and can be appended later by the coordinator.
+
+## Remote Kaggle Run V1
+- Kernel: `trydotatwo/cayley-beam-transformer-2xt4-smoke`, version `1`.
+- Status: `KernelWorkerStatus.COMPLETE`.
+- GitHub branch cloned by notebook: `codex/stream1-piece-transformer`.
+- Output directory: `test_results/kaggle_t4_transformer_smoke_v1_output/`.
+- Selected checkpoint: `/kaggle/input/models/vladkuznetsov266/megaminx-qtransformer-1782210824/pytorch/default/1/megaminx-transformer/weights/p900-t000-q-rw-sym_1782210824_best.pth`.
+- Export manifest: `backend=piece_transformer`, `dtype=fp16`, `seq_len=51`, `d_model=256`, `layers=4`, `output_dim=24`.
+- Torchrun smoke: puzzle `0`, depth `3`, beam `1048576`, `TORCHRUN_NPROC_PER_NODE=2`, `B_MICRO=512`, `STREAM1_CONCURRENCY=1`, `STREAM3_RING_SLOTS=2`.
+- Runtime evidence: rank log contains `stream1_model_backend=piece_transformer`, `stream1_backend=piece_transformer`, and `stream1_transformer_dims seq_len=51 ... output_dim=24`.
+- Result: `RUN_T4_TRANSFORMER_SMOKE_RC 0 seconds=4.603`; final solver line `puzzle_solved=0 puzzle_id=0 seconds=0.713001 solution_length=-1 solution=`. Depth-3 smoke was not expected to solve puzzle 0.
+- Note: `stream1_transformer_cuda_tests` built but skipped on Kaggle because the ignored local reference fixture is intentionally absent in a clean GitHub checkout. The production 2-rank transformer runner path did execute successfully.
