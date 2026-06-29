@@ -34,6 +34,7 @@ Config:
 - `BEAM_WIDTH=262144`
 - `DEPTH_LIMIT=82`
 - `SHARD_COUNT=1`
+- `SHARD_CAPACITY_SCALE_PPM=2000000`
 - `STREAM4_BATCH_CANDIDATES=32768`
 - `STREAM4_TRIGGER_CANDIDATES=32768`
 - `TORCHRUN_NPROC_PER_NODE=2`
@@ -53,3 +54,6 @@ Version 1 failed in preflight because the initial solve package inherited the sm
 
 
 Version 2 reached depth 4 with `BEAM_WIDTH=65536`, `SHARD_COUNT=1`, then failed in Stream3 because the small beam left no spill reserve: `spill_capacity=0`, `shard_capacity_candidates=34816`. Version 3 increases only the beam to `262144` while keeping `SHARD_COUNT=1`; the comparison target remains puzzle `991` reference length `82`.
+
+
+Version 3 reached depth 31 with `BEAM_WIDTH=262144`, `SHARD_COUNT=1`, then failed in Stream3 because shard capacity was still tight: `existing=138167`, `raw_count=7563`, `shard_capacity_candidates=138240`, `spill_capacity=0`. Version 4 keeps `BEAM_WIDTH=262144` and raises `SHARD_CAPACITY_SCALE_PPM` to `2000000`.
