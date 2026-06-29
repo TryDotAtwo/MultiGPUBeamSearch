@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-06-29
+- User requested an explicit separate Stream1 `piece_transformer` backend for the Kaggle Megaminx Q-transformer, with no fallback behavior and without breaking the current MLP backend. Manifests must be generated from checkpoint/config metadata, correctness tests come before integration, and target validation is a small 2xT4 Kaggle smoke after correctness tests pass.
+
 ## 2026-06-20
 - User cancelled the segment/frequent-prefix repair direction and requested a
   normal beam-search-to-center mode for puzzles with known solution length 23.

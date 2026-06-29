@@ -1,11 +1,14 @@
 #pragma once
 
+#include "../src/config.hpp"
+
+#ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 #include "cuda_check.hpp"
 #include "../cuda/stream1.hpp"
-#include "../src/config.hpp"
 
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
+#endif
 
 #include <cstddef>
 #include <cstdint>
@@ -41,6 +44,7 @@ struct HostWeightBytes {
     std::vector<std::byte> output_bias;
 };
 
+#ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 struct DeviceWeights {
     half* input_weight = nullptr;
     half* input_bias = nullptr;
@@ -76,6 +80,7 @@ struct ScratchAllocation {
     half* residual = nullptr;
     half* output = nullptr;
 };
+#endif
 
 inline std::string read_text_exact(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
@@ -183,6 +188,12 @@ inline std::string parse_manifest_string_default(
 }
 
 inline void validate_model_config(const Stream1ModelConfig& model, const std::string& context) {
+    if (model.backend != STREAM1_BACKEND_MLP && model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        throw std::runtime_error(context + ": unsupported Stream1 backend");
+    }
+    if (model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        throw std::runtime_error(context + ": piece_transformer Stream1 weights require transformer loader");
+    }
     if (model.state_len != STATE_LEN) {
         throw std::runtime_error(context + ": stream1 state_len must match compile-time STATE_LEN");
     }
@@ -215,6 +226,15 @@ inline Stream1ModelConfig load_stream1_manifest(const std::filesystem::path& dir
         throw std::runtime_error("stream1 manifest dtype must be fp16 or bf16: " + manifest_path.string());
     }
     Stream1ModelConfig model;
+    const std::string backend = parse_manifest_string_default(text, "backend", "mlp");
+    if (backend == "mlp") {
+        model.backend = STREAM1_BACKEND_MLP;
+    } else if (backend == "piece_transformer") {
+        model.backend = STREAM1_BACKEND_PIECE_TRANSFORMER;
+        validate_model_config(model, manifest_path.string());
+    } else {
+        throw std::runtime_error("stream1 manifest backend must be one of accepted values: mlp, piece_transformer: " + manifest_path.string());
+    }
     model.state_len = parse_manifest_u32(text, "state_len");
     model.num_classes = parse_manifest_u32(text, "num_classes");
     model.hidden1 = parse_manifest_u32_any(text, "hidden1", "hd1");
@@ -303,6 +323,7 @@ inline HostWeightBytes load_stream1_weights(const std::filesystem::path& dir) {
     return weights;
 }
 
+#ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 inline const half* weight_half_data(const std::vector<std::byte>& bytes) {
     return reinterpret_cast<const half*>(bytes.data());
 }
@@ -488,5 +509,6 @@ inline Stream1NetworkDims network_dims(const Stream1ModelConfig& model) {
 inline std::vector<const half*> const_pointer_vector(const std::vector<half*>& ptrs) {
     return std::vector<const half*>(ptrs.begin(), ptrs.end());
 }
+#endif
 
 } // namespace beam::stream1_weights

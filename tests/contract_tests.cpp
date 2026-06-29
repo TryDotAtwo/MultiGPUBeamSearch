@@ -1,10 +1,13 @@
+#define BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 #include "config.hpp"
 #include "frontier_cpu.hpp"
+#include "../tools/stream1_weight_io.hpp"
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 using namespace beam;
 
@@ -31,6 +34,110 @@ Generator swap01_generator() {
     return generator;
 }
 
+std::string minimal_stream1_manifest(const std::string& backend_line) {
+    std::string manifest = "{\n";
+    if (!backend_line.empty()) {
+        manifest += backend_line + ",\n";
+    }
+    manifest +=
+        "  \"dtype\": \"fp16\",\n"
+        "  \"state_len\": " + std::to_string(STATE_LEN) + ",\n"
+        "  \"num_classes\": " + std::to_string(STATE_LEN) + ",\n"
+        "  \"hidden1\": 1536,\n"
+        "  \"hidden2\": 512,\n"
+        "  \"residual_count\": 2,\n"
+        "  \"output_dim\": " + std::to_string(MOVE_COUNT) + ",\n"
+        "  \"normalization\": \"none\"\n"
+        "}\n";
+    return manifest;
+}
+
+std::filesystem::path write_manifest_fixture(const std::string& name, const std::string& backend_line) {
+    const std::filesystem::path dir = std::filesystem::path("test_results") / name;
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::ofstream manifest(dir / "manifest.json");
+    manifest << minimal_stream1_manifest(backend_line);
+    return dir;
+}
+
+bool error_contains(const std::runtime_error& error, const std::string& needle) {
+    return std::string(error.what()).find(needle) != std::string::npos;
+}
+
+void test_stream1_manifest_backend_parsing() {
+    const Stream1ModelConfig legacy = beam::stream1_weights::load_stream1_manifest(
+        write_manifest_fixture("stream1_manifest_backend_legacy_mlp", ""));
+    require(legacy.backend == STREAM1_BACKEND_MLP, "legacy Stream1 manifest without backend must load as MLP");
+
+    const Stream1ModelConfig explicit_mlp = beam::stream1_weights::load_stream1_manifest(
+        write_manifest_fixture("stream1_manifest_backend_explicit_mlp", "  \"backend\": \"mlp\""));
+    require(explicit_mlp.backend == STREAM1_BACKEND_MLP, "explicit MLP Stream1 manifest must load as MLP");
+
+    bool transformer_threw = false;
+    try {
+        (void)beam::stream1_weights::load_stream1_manifest(
+            write_manifest_fixture("stream1_manifest_backend_piece_transformer", "  \"backend\": \"piece_transformer\""));
+    } catch (const std::runtime_error& error) {
+        transformer_threw = error_contains(error, "piece_transformer Stream1 weights require transformer loader");
+    }
+    require(transformer_threw, "piece_transformer manifest must require transformer loader");
+
+    bool unknown_threw = false;
+    try {
+        (void)beam::stream1_weights::load_stream1_manifest(
+            write_manifest_fixture("stream1_manifest_backend_unknown", "  \"backend\": \"other\""));
+    } catch (const std::runtime_error& error) {
+        unknown_threw = error_contains(error, "accepted values: mlp, piece_transformer");
+    }
+    require(unknown_threw, "unknown Stream1 manifest backend must name accepted values");
+}
+
+void test_stream1_backend_row_modes() {
+    Stream1ModelConfig default_mlp;
+    require(default_mlp.backend == STREAM1_BACKEND_MLP, "default Stream1 backend must be MLP");
+    require(default_mlp.output_dim == MOVE_COUNT, "default MLP output_dim must remain MOVE_COUNT");
+    require(!stream1_uses_child_rows(default_mlp), "default MLP MOVE_COUNT output must use parent rows");
+    require(stream1_rows_per_parent(default_mlp) == 1U, "default MLP MOVE_COUNT output rows_per_parent must be 1");
+
+    Stream1ModelConfig mlp;
+    mlp.backend = STREAM1_BACKEND_MLP;
+    mlp.output_dim = STREAM1_SINGLE_SCORE_OUTPUT_DIM;
+    if (!stream1_uses_child_rows(mlp) || stream1_rows_per_parent(mlp) != MOVE_COUNT) {
+        throw std::runtime_error("MLP one-output backend must use child rows");
+    }
+
+    Stream1ModelConfig transformer;
+    transformer.backend = STREAM1_BACKEND_PIECE_TRANSFORMER;
+    transformer.output_dim = static_cast<std::uint32_t>(MOVE_COUNT);
+    transformer.num_pieces = 50;
+    transformer.max_piece_size = 3;
+    transformer.seq_len = 51;
+    transformer.d_model = 256;
+    transformer.nhead = 8;
+    transformer.head_dim = 32;
+    transformer.transformer_layers = 4;
+    transformer.ff_dim = 1024;
+    if (transformer.num_pieces != 50 || transformer.max_piece_size != 3 || transformer.seq_len != 51 ||
+        transformer.d_model != 256 || transformer.nhead != 8 || transformer.head_dim != 32 ||
+        transformer.transformer_layers != 4 || transformer.ff_dim != 1024) {
+        throw std::runtime_error("piece_transformer sample config metadata mismatch");
+    }
+    if (stream1_uses_child_rows(transformer) || stream1_rows_per_parent(transformer) != 1U) {
+        throw std::runtime_error("piece_transformer backend must use parent rows");
+    }
+
+    Stream1ModelConfig invalid;
+    invalid.backend = 999U;
+    bool threw = false;
+    try {
+        (void)stream1_rows_per_parent(invalid);
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    require(threw, "invalid Stream1 backend must be rejected");
+}
+
 } // namespace
 
 int main() {
@@ -53,6 +160,11 @@ int main() {
     require(q_to_score_key(300.5f) == SCORE_MAX_KEY, "max score clamp failed");
     require(q_to_score_key(1.5f) == 1536, "score rounding failed");
     report << "- score_quantization=pass\n";
+
+    test_stream1_backend_row_modes();
+    report << "- stream1_backend_row_modes=pass\n";
+    test_stream1_manifest_backend_parsing();
+    report << "- stream1_manifest_backend_parsing=pass\n";
 
     State128 state = make_state128(std::vector<std::uint8_t>(STATE_LEN, 7));
     require(padding_is_zero(state), "state padding must be zero");

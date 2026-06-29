@@ -7,7 +7,14 @@
 namespace beam {
 
 bool stream1_uses_child_rows(const Stream1ModelConfig& model) {
-    return model.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM;
+    switch (model.backend) {
+    case STREAM1_BACKEND_MLP:
+        return model.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM;
+    case STREAM1_BACKEND_PIECE_TRANSFORMER:
+        return false;
+    default:
+        throw std::invalid_argument("unsupported Stream1 backend");
+    }
 }
 
 std::uint32_t stream1_rows_per_parent(const Stream1ModelConfig& model) {

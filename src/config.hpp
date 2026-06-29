@@ -21,6 +21,8 @@ static_assert(STATE_STORAGE_LEN % STATE_ALIGNMENT == 0);
 static_assert(STATE_STORAGE_LEN >= STATE_LEN + sizeof(std::uint32_t), "FinalResponse requires 4 padding bytes");
 static_assert(STATE_VALUE_PAD <= 256);
 inline constexpr std::uint32_t STREAM1_SINGLE_SCORE_OUTPUT_DIM = 1;
+inline constexpr std::uint32_t STREAM1_BACKEND_MLP = 0;
+inline constexpr std::uint32_t STREAM1_BACKEND_PIECE_TRANSFORMER = 1;
 inline constexpr std::uint32_t STREAM1_DTYPE_FP16 = 0;
 inline constexpr std::uint32_t STREAM1_DTYPE_BF16 = 1;
 inline constexpr std::uint32_t STREAM1_NORM_NONE = 0;
@@ -35,6 +37,7 @@ inline constexpr std::uint32_t GOAL_SCORE_KEY = 0;
 inline constexpr std::uint32_t UINT32_THRESHOLD_MAX = std::numeric_limits<std::uint32_t>::max();
 
 struct Stream1ModelConfig {
+    std::uint32_t backend = STREAM1_BACKEND_MLP;
     std::uint32_t state_len = static_cast<std::uint32_t>(STATE_LEN);
     std::uint32_t num_classes = static_cast<std::uint32_t>(STATE_LEN);
     std::uint32_t hidden1 = 1536;
@@ -43,6 +46,14 @@ struct Stream1ModelConfig {
     std::uint32_t output_dim = static_cast<std::uint32_t>(MOVE_COUNT);
     std::uint32_t dtype = STREAM1_DTYPE_FP16;
     std::uint32_t normalization = STREAM1_NORM_NONE;
+    std::uint32_t num_pieces = 0;
+    std::uint32_t max_piece_size = 0;
+    std::uint32_t seq_len = 0;
+    std::uint32_t d_model = 0;
+    std::uint32_t nhead = 0;
+    std::uint32_t head_dim = 0;
+    std::uint32_t transformer_layers = 0;
+    std::uint32_t ff_dim = 0;
 };
 
 struct RuntimeConfig {
