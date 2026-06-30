@@ -27,3 +27,10 @@ Kernel id: `trydotatwo/cayley-beam-transformer-2xt4-benchmark`
 ## Remote Result
 
 Pending Kaggle execution.
+
+## Remote Result V1
+
+- Kernel version: 1.
+- Status: `KernelWorkerStatus.ERROR`.
+- Output directory: `test_results/kaggle_t4_transformer_benchmark_v1_output/`.
+- Failure: notebook preflight still used copied smoke `derived_values()` and expected `TORCHRUN_NNODES`, but the benchmark config cell had removed torchrun variables. Fixed in the benchmark notebook by keeping the smoke solver config variables for shared preflight sanity checks while still building/running only `stream_benchmark`.
