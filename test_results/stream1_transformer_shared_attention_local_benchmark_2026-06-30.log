@@ -1,0 +1,18 @@
+stream_benchmark_start=1
+stream1_transformer_micro b_micro=512 concurrency=1 rows_per_launch_group=512 ms_per_launch_group=62.7791 parents_per_sec=8155.6 candidates_per_sec=195734.1 scratch_bytes=120348672
+stream1_transformer_micro b_micro=512 concurrency=2 rows_per_launch_group=1024 ms_per_launch_group=116.1259 parents_per_sec=8818.0 candidates_per_sec=211632.4 scratch_bytes=240697344
+stream1_transformer_micro b_micro=512 concurrency=4 rows_per_launch_group=2048 ms_per_launch_group=234.6689 parents_per_sec=8727.2 candidates_per_sec=209452.6 scratch_bytes=481394688
+stream1_transformer_micro b_micro=1024 concurrency=1 rows_per_launch_group=1024 ms_per_launch_group=116.6326 parents_per_sec=8779.7 candidates_per_sec=210713.0 scratch_bytes=240697344
+stream1_transformer_micro b_micro=1024 concurrency=2 rows_per_launch_group=2048 ms_per_launch_group=240.8970 parents_per_sec=8501.6 candidates_per_sec=204037.4 scratch_bytes=481394688
+stream1_transformer_micro b_micro=1024 concurrency=4 rows_per_launch_group=4096 ms_per_launch_group=522.0866 parents_per_sec=7845.4 candidates_per_sec=188290.6 scratch_bytes=962789376
+stream1_transformer_micro b_micro=2048 concurrency=1 rows_per_launch_group=2048 ms_per_launch_group=273.4971 parents_per_sec=7488.2 candidates_per_sec=179716.7 scratch_bytes=481394688
+stream1_transformer_micro b_micro=2048 concurrency=2 rows_per_launch_group=4096 ms_per_launch_group=533.4327 parents_per_sec=7678.6 candidates_per_sec=184285.7 scratch_bytes=962789376
+stream1_transformer_micro b_micro=2048 concurrency=4 rows_per_launch_group=8192 ms_per_launch_group=1315.1217 parents_per_sec=6229.1 candidates_per_sec=149498.0 scratch_bytes=1925578752
+stream1_transformer_micro b_micro=4096 concurrency=1 rows_per_launch_group=4096 ms_per_launch_group=676.5297 parents_per_sec=6054.4 candidates_per_sec=145306.3 scratch_bytes=962789376
+stream1_transformer_micro b_micro=4096 concurrency=2 rows_per_launch_group=8192 ms_per_launch_group=1638.9811 parents_per_sec=4998.2 candidates_per_sec=119957.5 scratch_bytes=1925578752
+stream1_transformer_micro b_micro=4096 concurrency=4 rows_per_launch_group=16384 ms_per_launch_group=2963.8835 parents_per_sec=5527.9 candidates_per_sec=132669.2 scratch_bytes=3851157504
+stream1_transformer_micro b_micro=8192 concurrency=1 rows_per_launch_group=8192 ms_per_launch_group=1642.2330 parents_per_sec=4988.3 candidates_per_sec=119719.9 scratch_bytes=1925578752
+stream1_transformer_micro b_micro=8192 concurrency=2 rows_per_launch_group=16384 ms_per_launch_group=3333.4224 parents_per_sec=4915.1 candidates_per_sec=117961.6 scratch_bytes=3851157504
+stream1_transformer_micro_skip b_micro=8192 concurrency=4 scratch_bytes=7702315008 free_bytes=7449083904 reason=estimated_allocation_exceeds_available_memory
+stream1_transformer_benchmark_done=1
+stream_benchmark_report=test_results/per_stream_benchmark_2026-05-24.md

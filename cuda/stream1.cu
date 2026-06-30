@@ -79,6 +79,21 @@ void stream1_score_contract_cuda(
 __device__ float relu_device(float x) {
     return x > 0.0f ? x : 0.0f;
 }
+__device__ float stream1_warp_reduce_sum_device(float value) {
+    constexpr unsigned mask = 0xffffffffU;
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        value += __shfl_down_sync(mask, value, offset);
+    }
+    return __shfl_sync(mask, value, 0);
+}
+
+__device__ float stream1_warp_reduce_max_device(float value) {
+    constexpr unsigned mask = 0xffffffffU;
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        value = fmaxf(value, __shfl_down_sync(mask, value, offset));
+    }
+    return __shfl_sync(mask, value, 0);
+}
 
 __device__ std::uint32_t score_key_from_float_device(float q) {
     q = fminf(fmaxf(q, 0.0f), SCORE_MAX_Q);
@@ -608,87 +623,89 @@ __global__ void stream1_transformer_bias_silu_kernel(
     stream1_store_scalar_device(matrix, i, y, dtype);
 }
 
-// Standalone tiled attention for current p900 seq_len=51. Full external FA2 integration is deferred.
+// Warp-specialized attention for p900-like short sequences. One block owns one
+// (row, head); each warp owns one query at a time and reduces head_dim=32 with
+// shuffle instructions. Scores stay in per-warp shared memory.
 __global__ void stream1_transformer_attention51_kernel(
     const half* __restrict__ qkv,
     const half* __restrict__ qkv_bias,
-    float* __restrict__ scores_probs,
     half* __restrict__ context,
     Stream1TransformerDims dims,
     std::uint32_t b_micro) {
     const std::uint32_t row = blockIdx.x;
     const std::uint32_t head = blockIdx.y;
-    const std::uint32_t query = blockIdx.z;
     const std::uint32_t tid = threadIdx.x;
-    if (row >= b_micro || head >= dims.nhead || query >= dims.seq_len) {
+    if (row >= b_micro || head >= dims.nhead) {
         return;
     }
-    extern __shared__ float shared[];
-    const std::uint64_t score_base =
-        (((static_cast<std::uint64_t>(row) * dims.nhead + head) * dims.seq_len + query) * dims.seq_len);
-    const std::uint32_t head_offset = head * dims.head_dim;
-    const float scale = rsqrtf(static_cast<float>(dims.head_dim));
-    float score = -3.4028234663852886e38f;
-    if (tid < dims.seq_len) {
-        float dot = 0.0f;
-        for (std::uint32_t d = 0; d < dims.head_dim; ++d) {
-            const std::uint64_t q_idx =
-                (static_cast<std::uint64_t>(row) * dims.seq_len + query) * (3ULL * dims.d_model) + head_offset + d;
+
+    const std::uint32_t lane = tid & 31U;
+    const std::uint32_t warp = tid >> 5U;
+    const std::uint32_t warp_count = blockDim.x >> 5U;
+    extern __shared__ float shared_scores[];
+    float* scores = shared_scores + static_cast<std::uint64_t>(warp) * 64ULL;
+
+    const std::uint32_t seq_len = dims.seq_len;
+    const std::uint32_t head_dim = dims.head_dim;
+    const std::uint32_t head_offset = head * head_dim;
+    const float scale = rsqrtf(static_cast<float>(head_dim));
+
+    for (std::uint32_t query = warp; query < seq_len; query += warp_count) {
+        const std::uint64_t q_idx =
+            (static_cast<std::uint64_t>(row) * seq_len + query) * (3ULL * dims.d_model) +
+            head_offset + lane;
+        const float q_value = lane < head_dim
+            ? stream1_load_scalar_device(qkv, q_idx, dims.dtype) +
+                stream1_load_scalar_device(qkv_bias, head_offset + lane, dims.dtype)
+            : 0.0f;
+
+        for (std::uint32_t key = 0; key < seq_len; ++key) {
             const std::uint64_t k_idx =
-                (static_cast<std::uint64_t>(row) * dims.seq_len + tid) * (3ULL * dims.d_model) + dims.d_model + head_offset + d;
-            const float q = stream1_load_scalar_device(qkv, q_idx, dims.dtype) +
-                stream1_load_scalar_device(qkv_bias, head_offset + d, dims.dtype);
-            const float k = stream1_load_scalar_device(qkv, k_idx, dims.dtype) +
-                stream1_load_scalar_device(qkv_bias, dims.d_model + head_offset + d, dims.dtype);
-            dot += q * k;
+                (static_cast<std::uint64_t>(row) * seq_len + key) * (3ULL * dims.d_model) +
+                dims.d_model + head_offset + lane;
+            const float k_value = lane < head_dim
+                ? stream1_load_scalar_device(qkv, k_idx, dims.dtype) +
+                    stream1_load_scalar_device(qkv_bias, dims.d_model + head_offset + lane, dims.dtype)
+                : 0.0f;
+            const float dot = stream1_warp_reduce_sum_device(q_value * k_value);
+            if (lane == 0U) {
+                scores[key] = dot * scale;
+            }
         }
-        score = dot * scale;
-        scores_probs[score_base + tid] = score;
-    }
-    shared[tid] = score;
-    __syncthreads();
-    for (std::uint32_t stride = blockDim.x / 2U; stride > 0U; stride >>= 1U) {
-        if (tid < stride) {
-            shared[tid] = fmaxf(shared[tid], shared[tid + stride]);
+        __syncwarp();
+
+        float local_max = -3.4028234663852886e38f;
+        for (std::uint32_t key = lane; key < seq_len; key += 32U) {
+            local_max = fmaxf(local_max, scores[key]);
         }
-        __syncthreads();
-    }
-    const float max_score = shared[0];
-    float exp_value = 0.0f;
-    if (tid < dims.seq_len) {
-        exp_value = expf(scores_probs[score_base + tid] - max_score);
-        scores_probs[score_base + tid] = exp_value;
-    }
-    shared[tid] = exp_value;
-    __syncthreads();
-    for (std::uint32_t stride = blockDim.x / 2U; stride > 0U; stride >>= 1U) {
-        if (tid < stride) {
-            shared[tid] += shared[tid + stride];
+        const float max_score = stream1_warp_reduce_max_device(local_max);
+
+        float local_sum = 0.0f;
+        for (std::uint32_t key = lane; key < seq_len; key += 32U) {
+            const float exp_value = expf(scores[key] - max_score);
+            scores[key] = exp_value;
+            local_sum += exp_value;
         }
-        __syncthreads();
-    }
-    const float inv_sum = 1.0f / shared[0];
-    if (tid < dims.seq_len) {
-        scores_probs[score_base + tid] *= inv_sum;
-    }
-    __syncthreads();
-    if (tid < dims.head_dim) {
-        float acc = 0.0f;
-        for (std::uint32_t key = 0; key < dims.seq_len; ++key) {
-            const float prob = scores_probs[score_base + key];
-            const std::uint64_t v_idx =
-                (static_cast<std::uint64_t>(row) * dims.seq_len + key) * (3ULL * dims.d_model) +
-                2ULL * dims.d_model + head_offset + tid;
-            const float v = stream1_load_scalar_device(qkv, v_idx, dims.dtype) +
-                stream1_load_scalar_device(qkv_bias, 2ULL * dims.d_model + head_offset + tid, dims.dtype);
-            acc += prob * v;
+        const float inv_sum = 1.0f / stream1_warp_reduce_sum_device(local_sum);
+        __syncwarp();
+
+        if (lane < head_dim) {
+            float acc = 0.0f;
+            for (std::uint32_t key = 0; key < seq_len; ++key) {
+                const std::uint64_t v_idx =
+                    (static_cast<std::uint64_t>(row) * seq_len + key) * (3ULL * dims.d_model) +
+                    2ULL * dims.d_model + head_offset + lane;
+                const float v_value = stream1_load_scalar_device(qkv, v_idx, dims.dtype) +
+                    stream1_load_scalar_device(qkv_bias, 2ULL * dims.d_model + head_offset + lane, dims.dtype);
+                acc += scores[key] * inv_sum * v_value;
+            }
+            const std::uint64_t out_idx =
+                (static_cast<std::uint64_t>(row) * seq_len + query) * dims.d_model + head_offset + lane;
+            stream1_store_scalar_device(context, out_idx, acc, dims.dtype);
         }
-        const std::uint64_t out_idx =
-            (static_cast<std::uint64_t>(row) * dims.seq_len + query) * dims.d_model + head_offset + tid;
-        stream1_store_scalar_device(context, out_idx, acc, dims.dtype);
+        __syncwarp();
     }
 }
-
 __global__ void stream1_transformer_cls_layernorm_kernel(
     const half* __restrict__ tokens,
     half* __restrict__ cls,
@@ -802,12 +819,6 @@ void stream1_transformer_inference_cuda(
     }
 #if BEAM_HAS_CUTLASS
     const std::uint32_t token_rows = b_micro * dims.seq_len;
-    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.tokens, 0, static_cast<std::uint64_t>(token_rows) * dims.d_model * sizeof(half), stream));
-    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.qkv, 0, static_cast<std::uint64_t>(token_rows) * 3ULL * dims.d_model * sizeof(half), stream));
-    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.attention_scores_probs, 0, static_cast<std::uint64_t>(b_micro) * dims.nhead * dims.seq_len * dims.seq_len * sizeof(float), stream));
-    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.attention_context, 0, static_cast<std::uint64_t>(token_rows) * dims.d_model * sizeof(half), stream));
-    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.ff_hidden, 0, static_cast<std::uint64_t>(token_rows) * dims.ff_dim * sizeof(half), stream));
-    BEAM_CUDA_CHECK(cudaMemsetAsync(scratch.logits, 0, static_cast<std::uint64_t>(b_micro) * dims.output_dim * sizeof(half), stream));
     const dim3 token_block(128);
     const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
     stream1_transformer_build_input_kernel<<<token_grid, token_block, 0, stream>>>(
@@ -846,11 +857,16 @@ void stream1_transformer_inference_cuda(
             3U * dims.d_model,
             dims.dtype,
             stream);
-        const dim3 attn_grid(b_micro, dims.nhead, dims.seq_len);
-        stream1_transformer_attention51_kernel<<<attn_grid, 64, 64 * sizeof(float), stream>>>(
+        constexpr std::uint32_t attention_threads = 256U;
+        const dim3 attn_grid(b_micro, dims.nhead);
+        constexpr std::uint32_t attention_score_slots_per_warp = 64U;
+        const std::uint32_t attention_shared_floats =
+            (attention_threads / 32U) * attention_score_slots_per_warp;
+        const std::size_t attention_shared_bytes =
+            static_cast<std::size_t>(attention_shared_floats) * sizeof(float);
+        stream1_transformer_attention51_kernel<<<attn_grid, attention_threads, attention_shared_bytes, stream>>>(
             scratch.qkv,
             block.attn_qkv_bias,
-            scratch.attention_scores_probs,
             scratch.attention_context,
             dims,
             b_micro);

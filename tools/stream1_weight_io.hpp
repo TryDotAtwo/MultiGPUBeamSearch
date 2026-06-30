@@ -575,12 +575,10 @@ inline std::uint64_t total_host_weight_bytes(const HostWeightBytes& weights) {
 inline std::uint64_t transformer_scratch_bytes_for_rows(const Stream1ModelConfig& model, std::uint64_t rows) {
     const std::uint64_t token_values = rows * model.seq_len * model.d_model;
     const std::uint64_t qkv_values = rows * model.seq_len * 3ULL * model.d_model;
-    const std::uint64_t attention_values = rows * model.nhead * model.seq_len * model.seq_len;
     const std::uint64_t context_values = rows * model.seq_len * model.d_model;
     const std::uint64_t ff_values = rows * model.seq_len * model.ff_dim;
     const std::uint64_t logits_values = rows * model.output_dim;
-    return fp16_bytes(token_values + qkv_values + context_values + ff_values + logits_values) +
-        attention_values * sizeof(float);
+    return fp16_bytes(token_values + qkv_values + context_values + ff_values + logits_values);
 }
 
 inline std::uint64_t stream1_scratch_bytes(
@@ -837,14 +835,11 @@ inline ScratchAllocation alloc_stream1_scratch(
         if (model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
             const std::uint64_t token_values = rows * model.seq_len * model.d_model;
             const std::uint64_t qkv_values = rows * model.seq_len * 3ULL * model.d_model;
-            const std::uint64_t attention_values = rows * model.nhead * model.seq_len * model.seq_len;
             const std::uint64_t context_values = rows * model.seq_len * model.d_model;
             const std::uint64_t ff_values = rows * model.seq_len * model.ff_dim;
             const std::uint64_t logits_values = rows * model.output_dim;
-            // Future attention kernels can overwrite this float score buffer with softmax probabilities in place.
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_tokens, token_values * sizeof(half)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_qkv, qkv_values * sizeof(half)));
-            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_scores_probs, attention_values * sizeof(float)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_context, context_values * sizeof(half)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_ff_hidden, ff_values * sizeof(half)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_logits, logits_values * sizeof(half)));
@@ -1001,7 +996,9 @@ inline Stream1TransformerScratchView transformer_scratch_view(
     return Stream1TransformerScratchView{
         scratch.transformer_tokens + lane_rows * model.seq_len * model.d_model,
         scratch.transformer_qkv + lane_rows * model.seq_len * 3ULL * model.d_model,
-        scratch.transformer_attention_scores_probs + lane_rows * model.nhead * model.seq_len * model.seq_len,
+        scratch.transformer_attention_scores_probs == nullptr
+            ? nullptr
+            : scratch.transformer_attention_scores_probs + lane_rows * model.nhead * model.seq_len * model.seq_len,
         scratch.transformer_attention_context + lane_rows * model.seq_len * model.d_model,
         scratch.transformer_ff_hidden + lane_rows * model.seq_len * model.ff_dim,
         scratch.transformer_logits + lane_rows * model.output_dim};
