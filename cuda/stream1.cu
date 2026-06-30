@@ -506,7 +506,8 @@ __global__ void stream1_transformer_build_input_kernel(
     const std::uint32_t dim = blockIdx.y * blockDim.x + threadIdx.x;
     const std::uint32_t row = row_token / network.dims.seq_len;
     const std::uint32_t token = row_token % network.dims.seq_len;
-    if (row >= b_micro || row >= *count || dim >= network.dims.d_model) {
+    const std::uint32_t active_count = *count;
+    if (row >= b_micro || row >= active_count || dim >= network.dims.d_model) {
         return;
     }
     float value = 0.0f;
@@ -518,14 +519,15 @@ __global__ void stream1_transformer_build_input_kernel(
             network.fast_piece_static,
             static_cast<std::uint64_t>(piece) * network.dims.d_model + dim,
             network.dims.dtype);
-        const State128 state = current_frontier_states[*parent_base + row];
+        const std::uint64_t parent_idx = *parent_base + static_cast<std::uint64_t>(row);
+        const State128* state = current_frontier_states + parent_idx;
         for (std::uint32_t slot = 0; slot < network.dims.max_piece_size; ++slot) {
             const std::uint64_t piece_slot = static_cast<std::uint64_t>(piece) * network.dims.max_piece_size + slot;
             if (network.piece_mask[piece_slot] == 0U) {
                 continue;
             }
             const std::uint32_t pos = static_cast<std::uint32_t>(network.piece_positions[piece_slot]);
-            const std::uint32_t state_value = static_cast<std::uint32_t>(state.v[pos]);
+            const std::uint32_t state_value = static_cast<std::uint32_t>(state->v[pos]);
             const std::uint64_t table_idx =
                 ((static_cast<std::uint64_t>(slot) * network.dims.num_classes + state_value) * network.dims.d_model) + dim;
             value += stream1_load_scalar_device(network.fast_slot_projected, table_idx, network.dims.dtype);
@@ -584,6 +586,93 @@ __global__ void stream1_transformer_layernorm_copy_kernel(
             stream1_load_scalar_device(beta, col, dtype);
         stream1_store_scalar_device(output, base + col, y, dtype);
     }
+}
+
+__global__ void stream1_transformer_layernorm256_copy_kernel(
+    const half* __restrict__ input,
+    half* __restrict__ output,
+    const half* __restrict__ gamma,
+    const half* __restrict__ beta,
+    std::uint32_t rows,
+    std::uint32_t dtype) {
+    const std::uint32_t row = blockIdx.x;
+    const std::uint32_t tid = threadIdx.x;
+    if (row >= rows || tid >= 256U) {
+        return;
+    }
+
+    extern __shared__ float warp_scratch[];
+    const std::uint32_t lane = tid & 31U;
+    const std::uint32_t warp = tid >> 5U;
+    const std::uint64_t idx = static_cast<std::uint64_t>(row) * 256ULL + tid;
+    const float x = stream1_load_scalar_device(input, idx, dtype);
+
+    const float warp_sum = stream1_warp_reduce_sum_device(x);
+    if (lane == 0U) {
+        warp_scratch[warp] = warp_sum;
+    }
+    __syncthreads();
+
+    float block_sum = tid < 8U ? warp_scratch[tid] : 0.0f;
+    if (warp == 0U) {
+        block_sum = stream1_warp_reduce_sum_device(block_sum);
+        if (lane == 0U) {
+            warp_scratch[0] = block_sum * (1.0f / 256.0f);
+        }
+    }
+    __syncthreads();
+    const float mean = warp_scratch[0];
+
+    const float centered = x - mean;
+    const float warp_var_sum = stream1_warp_reduce_sum_device(centered * centered);
+    if (lane == 0U) {
+        warp_scratch[warp] = warp_var_sum;
+    }
+    __syncthreads();
+
+    float block_var_sum = tid < 8U ? warp_scratch[tid] : 0.0f;
+    if (warp == 0U) {
+        block_var_sum = stream1_warp_reduce_sum_device(block_var_sum);
+        if (lane == 0U) {
+            warp_scratch[0] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+        }
+    }
+    __syncthreads();
+    const float inv_std = warp_scratch[0];
+
+    const float y = centered * inv_std *
+        stream1_load_scalar_device(gamma, tid, dtype) +
+        stream1_load_scalar_device(beta, tid, dtype);
+    stream1_store_scalar_device(output, idx, y, dtype);
+}
+
+void stream1_transformer_layernorm_copy_launch(
+    const half* input,
+    half* output,
+    const half* gamma,
+    const half* beta,
+    std::uint32_t rows,
+    std::uint32_t cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    if (cols == 256U) {
+        stream1_transformer_layernorm256_copy_kernel<<<rows, 256, 8 * sizeof(float), stream>>>(
+            input,
+            output,
+            gamma,
+            beta,
+            rows,
+            dtype);
+        return;
+    }
+    stream1_transformer_layernorm_copy_kernel<<<rows, 256, 256 * sizeof(float), stream>>>(
+        input,
+        output,
+        gamma,
+        beta,
+        rows,
+        cols,
+        dtype);
 }
 
 __global__ void stream1_transformer_residual_bias_add_kernel(
@@ -647,25 +736,29 @@ __global__ void stream1_transformer_attention51_kernel(
 
     const std::uint32_t seq_len = dims.seq_len;
     const std::uint32_t head_dim = dims.head_dim;
+    const std::uint32_t d_model = dims.d_model;
     const std::uint32_t head_offset = head * head_dim;
+    const std::uint64_t qkv_token_stride = 3ULL * static_cast<std::uint64_t>(d_model);
+    const std::uint64_t row_qkv_base = static_cast<std::uint64_t>(row) * seq_len * qkv_token_stride;
+    const std::uint64_t row_context_base = static_cast<std::uint64_t>(row) * seq_len * d_model;
+    const std::uint64_t q_head_base = head_offset + lane;
+    const std::uint64_t k_head_base = static_cast<std::uint64_t>(d_model) + head_offset + lane;
+    const std::uint64_t v_head_base = 2ULL * d_model + head_offset + lane;
+    const float q_bias = lane < head_dim ? stream1_load_scalar_device(qkv_bias, q_head_base, dims.dtype) : 0.0f;
+    const float k_bias = lane < head_dim ? stream1_load_scalar_device(qkv_bias, k_head_base, dims.dtype) : 0.0f;
+    const float v_bias = lane < head_dim ? stream1_load_scalar_device(qkv_bias, v_head_base, dims.dtype) : 0.0f;
     const float scale = rsqrtf(static_cast<float>(head_dim));
 
     for (std::uint32_t query = warp; query < seq_len; query += warp_count) {
-        const std::uint64_t q_idx =
-            (static_cast<std::uint64_t>(row) * seq_len + query) * (3ULL * dims.d_model) +
-            head_offset + lane;
+        const std::uint64_t q_token_base = row_qkv_base + static_cast<std::uint64_t>(query) * qkv_token_stride;
         const float q_value = lane < head_dim
-            ? stream1_load_scalar_device(qkv, q_idx, dims.dtype) +
-                stream1_load_scalar_device(qkv_bias, head_offset + lane, dims.dtype)
+            ? stream1_load_scalar_device(qkv, q_token_base + q_head_base, dims.dtype) + q_bias
             : 0.0f;
 
         for (std::uint32_t key = 0; key < seq_len; ++key) {
-            const std::uint64_t k_idx =
-                (static_cast<std::uint64_t>(row) * seq_len + key) * (3ULL * dims.d_model) +
-                dims.d_model + head_offset + lane;
+            const std::uint64_t k_token_base = row_qkv_base + static_cast<std::uint64_t>(key) * qkv_token_stride;
             const float k_value = lane < head_dim
-                ? stream1_load_scalar_device(qkv, k_idx, dims.dtype) +
-                    stream1_load_scalar_device(qkv_bias, dims.d_model + head_offset + lane, dims.dtype)
+                ? stream1_load_scalar_device(qkv, k_token_base + k_head_base, dims.dtype) + k_bias
                 : 0.0f;
             const float dot = stream1_warp_reduce_sum_device(q_value * k_value);
             if (lane == 0U) {
@@ -692,20 +785,131 @@ __global__ void stream1_transformer_attention51_kernel(
         if (lane < head_dim) {
             float acc = 0.0f;
             for (std::uint32_t key = 0; key < seq_len; ++key) {
-                const std::uint64_t v_idx =
-                    (static_cast<std::uint64_t>(row) * seq_len + key) * (3ULL * dims.d_model) +
-                    2ULL * dims.d_model + head_offset + lane;
-                const float v_value = stream1_load_scalar_device(qkv, v_idx, dims.dtype) +
-                    stream1_load_scalar_device(qkv_bias, 2ULL * dims.d_model + head_offset + lane, dims.dtype);
+                const std::uint64_t v_token_base = row_qkv_base + static_cast<std::uint64_t>(key) * qkv_token_stride;
+                const float v_value = stream1_load_scalar_device(qkv, v_token_base + v_head_base, dims.dtype) + v_bias;
                 acc += scores[key] * inv_sum * v_value;
             }
             const std::uint64_t out_idx =
-                (static_cast<std::uint64_t>(row) * seq_len + query) * dims.d_model + head_offset + lane;
+                row_context_base + static_cast<std::uint64_t>(query) * d_model + head_offset + lane;
             stream1_store_scalar_device(context, out_idx, acc, dims.dtype);
         }
         __syncwarp();
     }
 }
+
+__global__ void stream1_transformer_attention51_exact_kernel(
+    const half* __restrict__ qkv,
+    const half* __restrict__ qkv_bias,
+    half* __restrict__ context,
+    std::uint32_t dtype,
+    std::uint32_t b_micro) {
+    constexpr std::uint32_t seq_len = 51U;
+    constexpr std::uint32_t d_model = 256U;
+    constexpr std::uint32_t head_dim = 32U;
+    constexpr std::uint32_t qkv_token_stride = 3U * d_model;
+    constexpr float scale = 0.1767766952966369f;
+
+    const std::uint32_t row = blockIdx.x;
+    const std::uint32_t head = blockIdx.y;
+    const std::uint32_t tid = threadIdx.x;
+    if (row >= b_micro || head >= 8U) {
+        return;
+    }
+
+    const std::uint32_t lane = tid & 31U;
+    const std::uint32_t warp = tid >> 5U;
+    const std::uint32_t warp_count = blockDim.x >> 5U;
+    extern __shared__ float shared_scores[];
+    float* scores = shared_scores + static_cast<std::uint64_t>(warp) * 64ULL;
+
+    const std::uint32_t head_offset = head * head_dim;
+    const std::uint64_t row_qkv_base = static_cast<std::uint64_t>(row) * seq_len * qkv_token_stride;
+    const std::uint64_t row_context_base = static_cast<std::uint64_t>(row) * seq_len * d_model;
+    const std::uint64_t q_head_base = head_offset + lane;
+    const std::uint64_t k_head_base = d_model + head_offset + lane;
+    const std::uint64_t v_head_base = 2ULL * d_model + head_offset + lane;
+    const float q_bias = stream1_load_scalar_device(qkv_bias, q_head_base, dtype);
+    const float k_bias = stream1_load_scalar_device(qkv_bias, k_head_base, dtype);
+    const float v_bias = stream1_load_scalar_device(qkv_bias, v_head_base, dtype);
+
+    for (std::uint32_t query = warp; query < seq_len; query += warp_count) {
+        const std::uint64_t q_token_base = row_qkv_base + static_cast<std::uint64_t>(query) * qkv_token_stride;
+        const float q_value = stream1_load_scalar_device(qkv, q_token_base + q_head_base, dtype) + q_bias;
+
+        for (std::uint32_t key = 0; key < seq_len; ++key) {
+            const std::uint64_t k_token_base = row_qkv_base + static_cast<std::uint64_t>(key) * qkv_token_stride;
+            const float k_value = stream1_load_scalar_device(qkv, k_token_base + k_head_base, dtype) + k_bias;
+            const float dot = stream1_warp_reduce_sum_device(q_value * k_value);
+            if (lane == 0U) {
+                scores[key] = dot * scale;
+            }
+        }
+        __syncwarp();
+
+        float local_max = -3.4028234663852886e38f;
+        for (std::uint32_t key = lane; key < seq_len; key += 32U) {
+            local_max = fmaxf(local_max, scores[key]);
+        }
+        const float max_score = stream1_warp_reduce_max_device(local_max);
+
+        float local_sum = 0.0f;
+        for (std::uint32_t key = lane; key < seq_len; key += 32U) {
+            const float exp_value = expf(scores[key] - max_score);
+            scores[key] = exp_value;
+            local_sum += exp_value;
+        }
+        const float inv_sum = 1.0f / stream1_warp_reduce_sum_device(local_sum);
+        __syncwarp();
+
+        float acc = 0.0f;
+        for (std::uint32_t key = 0; key < seq_len; ++key) {
+            const std::uint64_t v_token_base = row_qkv_base + static_cast<std::uint64_t>(key) * qkv_token_stride;
+            const float v_value = stream1_load_scalar_device(qkv, v_token_base + v_head_base, dtype) + v_bias;
+            acc += scores[key] * inv_sum * v_value;
+        }
+        const std::uint64_t out_idx =
+            row_context_base + static_cast<std::uint64_t>(query) * d_model + head_offset + lane;
+        stream1_store_scalar_device(context, out_idx, acc, dtype);
+        __syncwarp();
+    }
+}
+
+void stream1_transformer_attention_launch(
+    const half* qkv,
+    const half* qkv_bias,
+    half* context,
+    Stream1TransformerDims dims,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    constexpr std::uint32_t attention_threads = 256U;
+    const dim3 attn_grid(b_micro, dims.nhead);
+    if (dims.seq_len == 51U && dims.d_model == 256U && dims.nhead == 8U && dims.head_dim == 32U) {
+        constexpr std::uint32_t score_floats = (attention_threads / 32U) * 64U;
+        stream1_transformer_attention51_exact_kernel<<<
+            attn_grid,
+            attention_threads,
+            static_cast<std::size_t>(score_floats) * sizeof(float),
+            stream>>>(
+                qkv,
+                qkv_bias,
+                context,
+                dims.dtype,
+                b_micro);
+        return;
+    }
+    constexpr std::uint32_t attention_score_slots_per_warp = 64U;
+    const std::uint32_t attention_shared_floats =
+        (attention_threads / 32U) * attention_score_slots_per_warp;
+    const std::size_t attention_shared_bytes =
+        static_cast<std::size_t>(attention_shared_floats) * sizeof(float);
+    stream1_transformer_attention51_kernel<<<attn_grid, attention_threads, attention_shared_bytes, stream>>>(
+        qkv,
+        qkv_bias,
+        context,
+        dims,
+        b_micro);
+}
+
 __global__ void stream1_transformer_cls_layernorm_kernel(
     const half* __restrict__ tokens,
     half* __restrict__ cls,
@@ -829,25 +1033,27 @@ void stream1_transformer_inference_cuda(
         scratch.tokens,
         b_micro);
 
-    stream1_transformer_layernorm_copy_kernel<<<token_rows, 256, 256 * sizeof(float), stream>>>(
+    stream1_transformer_layernorm_copy_launch(
         scratch.tokens,
         scratch.tokens,
         network.input_ln_gamma,
         network.input_ln_beta,
         token_rows,
         dims.d_model,
-        dims.dtype);
+        dims.dtype,
+        stream);
 
     for (std::uint32_t layer = 0; layer < dims.transformer_layers; ++layer) {
         const Stream1TransformerBlockView block = network.blocks[layer];
-        stream1_transformer_layernorm_copy_kernel<<<token_rows, 256, 256 * sizeof(float), stream>>>(
+        stream1_transformer_layernorm_copy_launch(
             scratch.tokens,
             scratch.attention_context,
             block.ln1_gamma,
             block.ln1_beta,
             token_rows,
             dims.d_model,
-            dims.dtype);
+            dims.dtype,
+            stream);
         stream1_cutlass_linear_cuda(
             scratch.attention_context,
             block.attn_qkv_weight,
@@ -857,19 +1063,13 @@ void stream1_transformer_inference_cuda(
             3U * dims.d_model,
             dims.dtype,
             stream);
-        constexpr std::uint32_t attention_threads = 256U;
-        const dim3 attn_grid(b_micro, dims.nhead);
-        constexpr std::uint32_t attention_score_slots_per_warp = 64U;
-        const std::uint32_t attention_shared_floats =
-            (attention_threads / 32U) * attention_score_slots_per_warp;
-        const std::size_t attention_shared_bytes =
-            static_cast<std::size_t>(attention_shared_floats) * sizeof(float);
-        stream1_transformer_attention51_kernel<<<attn_grid, attention_threads, attention_shared_bytes, stream>>>(
+        stream1_transformer_attention_launch(
             scratch.qkv,
             block.attn_qkv_bias,
             scratch.attention_context,
             dims,
-            b_micro);
+            b_micro,
+            stream);
         stream1_cutlass_linear_cuda(
             scratch.attention_context,
             block.attn_out_weight,
@@ -887,14 +1087,15 @@ void stream1_transformer_inference_cuda(
             dims.d_model,
             dims.dtype);
 
-        stream1_transformer_layernorm_copy_kernel<<<token_rows, 256, 256 * sizeof(float), stream>>>(
+        stream1_transformer_layernorm_copy_launch(
             scratch.tokens,
             scratch.attention_context,
             block.ln2_gamma,
             block.ln2_beta,
             token_rows,
             dims.d_model,
-            dims.dtype);
+            dims.dtype,
+            stream);
         stream1_cutlass_linear_cuda(
             scratch.attention_context,
             block.ff1_weight,

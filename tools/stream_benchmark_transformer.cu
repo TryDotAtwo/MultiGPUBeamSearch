@@ -73,11 +73,28 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
     stream1_weights::TransformerNetworkViewHolder view_holder =
         stream1_weights::transformer_network_view(weights.transformer, model);
 
+    const char* only_b_micro_env = std::getenv("BEAM_STREAM1_TRANSFORMER_B_MICRO");
+    const char* only_concurrency_env = std::getenv("BEAM_STREAM1_TRANSFORMER_CONCURRENCY");
+    const std::uint32_t only_b_micro = only_b_micro_env != nullptr && only_b_micro_env[0] != '\0'
+        ? static_cast<std::uint32_t>(parse_u64(only_b_micro_env, "BEAM_STREAM1_TRANSFORMER_B_MICRO"))
+        : 0U;
+    const std::uint32_t only_concurrency = only_concurrency_env != nullptr && only_concurrency_env[0] != '\0'
+        ? static_cast<std::uint32_t>(parse_u64(only_concurrency_env, "BEAM_STREAM1_TRANSFORMER_CONCURRENCY"))
+        : 0U;
+
     report << "## Stream1 Piece Transformer\n\n";
+    if (only_b_micro != 0U || only_concurrency != 0U) {
+        report << "- filter_b_micro=" << only_b_micro << "\n";
+        report << "- filter_concurrency=" << only_concurrency << "\n\n";
+    }
     report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | scratch_bytes |\n";
     report << "|---:|---:|---:|---:|---:|---:|---:|\n";
     for (std::uint32_t b_micro : TRANSFORMER_B_MICRO_SWEEP) {
         for (std::uint32_t concurrent : TRANSFORMER_STREAM1_CONCURRENCY_SWEEP) {
+            if ((only_b_micro != 0U && b_micro != only_b_micro) ||
+                (only_concurrency != 0U && concurrent != only_concurrency)) {
+                continue;
+            }
             const std::uint64_t rows_per_launch_group = static_cast<std::uint64_t>(b_micro) * concurrent;
             if (rows_per_launch_group > max_states) {
                 report << "|" << b_micro << "|" << concurrent << "|" << rows_per_launch_group
