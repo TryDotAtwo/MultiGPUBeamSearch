@@ -25,7 +25,7 @@ Branch commit tested: `a290524` (`Optimize Stream1 transformer attention`)
 
 The warp-specialized attention patch roughly doubled Kaggle 2xT4 Stream1 throughput (`468478.3 / 232720.5 = 2.01x`) and removed the float global attention score/probability scratch from the transformer scratch estimate. The best T4 point moved from `B_MICRO=512, concurrency=1` to `B_MICRO=1024, concurrency=1`.
 
-The backend remains much slower than the existing MLP path. The main reason is no longer only a bad attention implementation: this p900 transformer runs 51 tokens through four transformer layers with QKV, attention output, and two FFN projections per layer, while the MLP input stage uses folded embeddingbag-style additions and fewer dense layers. A realistic comparison for this exact checkpoint is therefore much more than `5x` compute cost versus MLP before residual kernel inefficiency.
+The backend remains much slower than the existing MLP path. The earlier interpretation that the model is intrinsically far beyond the `~5x` envelope is not reliable: the PyTorch fast path for this checkpoint empirically suggests that `~5x` is a plausible target order. The current native backend should therefore be treated as under-optimized, especially around kernel launch count, LayerNorm/residual/activation fusion, CUTLASS GEMM setup overhead, and the gap versus PyTorch `scaled_dot_product_attention` / `torch.compile` fast inference.
 
 ## Artifacts
 

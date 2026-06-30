@@ -43,4 +43,4 @@ Local progression for comparable small rows:
 - Shared-attention local pass: `195734.1` candidates/s at `B_MICRO=512, concurrency=1`.
 - Warp-attention local pass: `300068.8` candidates/s at `B_MICRO=512, concurrency=1`, best `304663.2` at `B_MICRO=1024, concurrency=1`.
 
-The backend is now much faster, but still far behind the MLP path. A more precise comparison shows the current p900 transformer is intrinsically much heavier than the MLP: MLP uses folded embeddingbag additions for the input stage, while the transformer runs 51 tokens through 4 layers of QKV/attention/FFN. This makes the model closer to roughly `20x` heavier per parent, not `5x`, before remaining kernel efficiency losses.
+The backend is now much faster, but still far behind the MLP path. The later PyTorch fast-path evidence contradicts treating the gap as an intrinsic `~20x` model-cost limit. Keep the empirical target at roughly the PyTorch-observed `~5x` envelope and treat the remaining native gap as an implementation/performance issue: too many unfused kernels, scalar/custom attention versus optimized SDPA-style kernels, and repeated CUTLASS GEMM setup around small fixed transformer shapes.
