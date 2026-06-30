@@ -1,6 +1,7 @@
 # Prompt History
 
 ## 2026-06-30
+- User requested running the split Stream1 piece-transformer benchmark on Kaggle 2xT4 and checking speed. Use a separate benchmark package, not the smoke/solve notebooks, so speed logs are clean and compare per-GPU T4 throughput.
 - User clarified during Task 1 quality review that MLP and transformer benchmark code should be split into separate files to avoid confusion; keep transformer work isolated from MLP files/paths where practical.
 - User assigned Task 1 in `D:\100XH100\.worktrees\stream1-piece-transformer`: add a transformer-only Stream1 microbenchmark path to `tools/stream_benchmark.cu`, explicitly branch on `STREAM1_BACKEND_PIECE_TRANSFORMER`, preserve the existing MLP benchmark path, sweep `B_MICRO={512,1024,2048,4096,8192}` and `STREAM1_CONCURRENCY={1,2,4}`, skip memory-exceeding configs with clear report lines, avoid fallback behavior, update project memory/test results, and keep writes limited to the allowed files. Controller later clarified that no distillation direction or fallback path is allowed and the transformer benchmark must remain an explicit backend branch only.
 - User requested solving the same puzzle as the transformer inference example notebook and verifying that the Stream1 `piece_transformer` beam-search run obtains the same solution length. The comparison target is puzzle `991` from the downloaded example output, where the notebook reports length `82` with `B=65536`.
