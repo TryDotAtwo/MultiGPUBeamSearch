@@ -1,0 +1,58 @@
+[{"stream_name":"stderr","time":10.322807592,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":10.322863493,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":10.322867946,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":10.322870443,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":11.049998696,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":11.050028003,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":11.050050083,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":11.050055183,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":12.690625907,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":12.690687267,"data":"  File \"\u003cstring\u003e\", line 1, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":12.690699146,"data":"  File \"/usr/local/lib/python3.12/dist-packages/papermill/execute.py\", line 131, in execute_notebook\n"}
+,{"stream_name":"stderr","time":12.690741343,"data":"    raise_for_execution_errors(nb, output_path)\n"}
+,{"stream_name":"stderr","time":12.690775103,"data":"  File \"/usr/local/lib/python3.12/dist-packages/papermill/execute.py\", line 251, in raise_for_execution_errors\n"}
+,{"stream_name":"stderr","time":12.690983421,"data":"    raise error\n"}
+,{"stream_name":"stderr","time":12.691227202,"data":"papermill.exceptions.PapermillExecutionError: \n"}
+,{"stream_name":"stderr","time":12.691235671,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stderr","time":12.691240045,"data":"Exception encountered at \"In [2]\":\n"}
+,{"stream_name":"stderr","time":12.691243793,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stderr","time":12.6912473,"data":"NameError                                 Traceback (most recent call last)\n"}
+,{"stream_name":"stderr","time":12.691250776,"data":"/tmp/ipykernel_22/3558763885.py in \u003ccell line: 0\u003e()\n"}
+,{"stream_name":"stderr","time":12.691254461,"data":"    129 \n"}
+,{"stream_name":"stderr","time":12.691257757,"data":"    130 \n"}
+,{"stream_name":"stderr","time":12.691260969,"data":"--\u003e 131 preflight_values = preflight()\n"}
+,{"stream_name":"stderr","time":12.691264398,"data":"    132 for path in (REPO_DIR, BUILD_DIR, WEIGHT_OUT_DIR):\n"}
+,{"stream_name":"stderr","time":12.691267882,"data":"    133     cleanup_path(path)\n"}
+,{"stream_name":"stderr","time":12.691271859,"data":"\n"}
+,{"stream_name":"stderr","time":12.69127569,"data":"/tmp/ipykernel_22/3558763885.py in preflight()\n"}
+,{"stream_name":"stderr","time":12.691279776,"data":"     68 \n"}
+,{"stream_name":"stderr","time":12.691283643,"data":"     69 def preflight():\n"}
+,{"stream_name":"stderr","time":12.691287322,"data":"---\u003e 70     values = derived_values()\n"}
+,{"stream_name":"stderr","time":12.691290754,"data":"     71     print('KAGGLE_MODEL_SOURCE=', KAGGLE_MODEL_SOURCE, flush=True)\n"}
+,{"stream_name":"stderr","time":12.691294258,"data":"     72     print('GITHUB_BRANCH=', GITHUB_BRANCH, flush=True)\n"}
+,{"stream_name":"stderr","time":12.69129768,"data":"\n"}
+,{"stream_name":"stderr","time":12.691300867,"data":"/tmp/ipykernel_22/3558763885.py in derived_values()\n"}
+,{"stream_name":"stderr","time":12.691312464,"data":"     44 \n"}
+,{"stream_name":"stderr","time":12.691315966,"data":"     45 def derived_values():\n"}
+,{"stream_name":"stderr","time":12.691319204,"data":"---\u003e 46     world_size = torchrun_world_size()\n"}
+,{"stream_name":"stderr","time":12.691322628,"data":"     47     beam_alignment = world_size * int(SHARD_COUNT) * int(STREAM4_BATCH_ALIGNMENT)\n"}
+,{"stream_name":"stderr","time":12.691326111,"data":"     48     global_beam_effective = round_up(BEAM_WIDTH, beam_alignment)\n"}
+,{"stream_name":"stderr","time":12.691329638,"data":"\n"}
+,{"stream_name":"stderr","time":12.691332814,"data":"/tmp/ipykernel_22/3558763885.py in torchrun_world_size()\n"}
+,{"stream_name":"stderr","time":12.691336219,"data":"     37 \n"}
+,{"stream_name":"stderr","time":12.691339495,"data":"     38 def torchrun_world_size():\n"}
+,{"stream_name":"stderr","time":12.691347689,"data":"---\u003e 39     world_size = int(TORCHRUN_NNODES) * int(TORCHRUN_NPROC_PER_NODE)\n"}
+,{"stream_name":"stderr","time":12.691351156,"data":"     40     if world_size \u003c= 0:\n"}
+,{"stream_name":"stderr","time":12.691367338,"data":"     41         raise ValueError(f'invalid torchrun topology: nnodes={TORCHRUN_NNODES} nproc={TORCHRUN_NPROC_PER_NODE}')\n"}
+,{"stream_name":"stderr","time":12.691371673,"data":"\n"}
+,{"stream_name":"stderr","time":12.691376063,"data":"NameError: name 'TORCHRUN_NNODES' is not defined\n"}
+,{"stream_name":"stderr","time":12.691379879,"data":"\n"}
+,{"stream_name":"stderr","time":14.927507219,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":14.927556025,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":15.115031729,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":15.115059165,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":15.768082871,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":16.060882488,"data":"[NbConvertApp] Writing 22252 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":18.353340271,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":19.20078228,"data":"[NbConvertApp] Writing 340079 bytes to __results__.html\n"}
+]
