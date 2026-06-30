@@ -11,6 +11,7 @@
 #if BEAM_HAS_CUTLASS
 #include <cutlass/bfloat16.h>
 #include <cutlass/gemm/device/gemm.h>
+#include <cutlass/gemm/device/gemm_array.h>
 #include <cutlass/epilogue/thread/linear_combination_relu.h>
 #include <cutlass/layout/matrix.h>
 #endif
@@ -712,202 +713,401 @@ __global__ void stream1_transformer_bias_silu_kernel(
     stream1_store_scalar_device(matrix, i, y, dtype);
 }
 
-// Warp-specialized attention for p900-like short sequences. One block owns one
-// (row, head); each warp owns one query at a time and reduces head_dim=32 with
-// shuffle instructions. Scores stay in per-warp shared memory.
-__global__ void stream1_transformer_attention51_kernel(
-    const half* __restrict__ qkv,
+constexpr std::uint32_t STREAM1_TRANSFORMER_SEQ51 = 51U;
+constexpr std::uint32_t STREAM1_TRANSFORMER_DMODEL256 = 256U;
+constexpr std::uint32_t STREAM1_TRANSFORMER_HEAD_DIM32 = 32U;
+constexpr std::uint32_t STREAM1_TRANSFORMER_NHEAD8 = 8U;
+constexpr std::uint32_t STREAM1_TRANSFORMER_QKV_STRIDE51 = 3U * STREAM1_TRANSFORMER_DMODEL256;
+constexpr std::uint32_t STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51 = 64U;
+constexpr std::uint32_t STREAM1_TRANSFORMER_PROB_STRIDE51 = STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51;
+constexpr std::uint32_t STREAM1_TRANSFORMER_VPACK_STRIDE51 = STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51 * STREAM1_TRANSFORMER_HEAD_DIM32;
+constexpr std::uint32_t STREAM1_TRANSFORMER_SCORE_STRIDE51 = STREAM1_TRANSFORMER_PROB_STRIDE51 + STREAM1_TRANSFORMER_VPACK_STRIDE51;
+constexpr int STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX = 32768;
+
+__global__ void stream1_transformer_add_qkv_bias_kernel(
+    half* __restrict__ qkv,
     const half* __restrict__ qkv_bias,
-    half* __restrict__ context,
-    Stream1TransformerDims dims,
-    std::uint32_t b_micro) {
-    const std::uint32_t row = blockIdx.x;
-    const std::uint32_t head = blockIdx.y;
-    const std::uint32_t tid = threadIdx.x;
-    if (row >= b_micro || head >= dims.nhead) {
-        return;
-    }
-
-    const std::uint32_t lane = tid & 31U;
-    const std::uint32_t warp = tid >> 5U;
-    const std::uint32_t warp_count = blockDim.x >> 5U;
-    extern __shared__ float shared_scores[];
-    float* scores = shared_scores + static_cast<std::uint64_t>(warp) * 64ULL;
-
-    const std::uint32_t seq_len = dims.seq_len;
-    const std::uint32_t head_dim = dims.head_dim;
-    const std::uint32_t d_model = dims.d_model;
-    const std::uint32_t head_offset = head * head_dim;
-    const std::uint64_t qkv_token_stride = 3ULL * static_cast<std::uint64_t>(d_model);
-    const std::uint64_t row_qkv_base = static_cast<std::uint64_t>(row) * seq_len * qkv_token_stride;
-    const std::uint64_t row_context_base = static_cast<std::uint64_t>(row) * seq_len * d_model;
-    const std::uint64_t q_head_base = head_offset + lane;
-    const std::uint64_t k_head_base = static_cast<std::uint64_t>(d_model) + head_offset + lane;
-    const std::uint64_t v_head_base = 2ULL * d_model + head_offset + lane;
-    const float q_bias = lane < head_dim ? stream1_load_scalar_device(qkv_bias, q_head_base, dims.dtype) : 0.0f;
-    const float k_bias = lane < head_dim ? stream1_load_scalar_device(qkv_bias, k_head_base, dims.dtype) : 0.0f;
-    const float v_bias = lane < head_dim ? stream1_load_scalar_device(qkv_bias, v_head_base, dims.dtype) : 0.0f;
-    const float scale = rsqrtf(static_cast<float>(head_dim));
-
-    for (std::uint32_t query = warp; query < seq_len; query += warp_count) {
-        const std::uint64_t q_token_base = row_qkv_base + static_cast<std::uint64_t>(query) * qkv_token_stride;
-        const float q_value = lane < head_dim
-            ? stream1_load_scalar_device(qkv, q_token_base + q_head_base, dims.dtype) + q_bias
-            : 0.0f;
-
-        for (std::uint32_t key = 0; key < seq_len; ++key) {
-            const std::uint64_t k_token_base = row_qkv_base + static_cast<std::uint64_t>(key) * qkv_token_stride;
-            const float k_value = lane < head_dim
-                ? stream1_load_scalar_device(qkv, k_token_base + k_head_base, dims.dtype) + k_bias
-                : 0.0f;
-            const float dot = stream1_warp_reduce_sum_device(q_value * k_value);
-            if (lane == 0U) {
-                scores[key] = dot * scale;
-            }
-        }
-        __syncwarp();
-
-        float local_max = -3.4028234663852886e38f;
-        for (std::uint32_t key = lane; key < seq_len; key += 32U) {
-            local_max = fmaxf(local_max, scores[key]);
-        }
-        const float max_score = stream1_warp_reduce_max_device(local_max);
-
-        float local_sum = 0.0f;
-        for (std::uint32_t key = lane; key < seq_len; key += 32U) {
-            const float exp_value = expf(scores[key] - max_score);
-            scores[key] = exp_value;
-            local_sum += exp_value;
-        }
-        const float inv_sum = 1.0f / stream1_warp_reduce_sum_device(local_sum);
-        __syncwarp();
-
-        if (lane < head_dim) {
-            float acc = 0.0f;
-            for (std::uint32_t key = 0; key < seq_len; ++key) {
-                const std::uint64_t v_token_base = row_qkv_base + static_cast<std::uint64_t>(key) * qkv_token_stride;
-                const float v_value = stream1_load_scalar_device(qkv, v_token_base + v_head_base, dims.dtype) + v_bias;
-                acc += scores[key] * inv_sum * v_value;
-            }
-            const std::uint64_t out_idx =
-                row_context_base + static_cast<std::uint64_t>(query) * d_model + head_offset + lane;
-            stream1_store_scalar_device(context, out_idx, acc, dims.dtype);
-        }
-        __syncwarp();
-    }
-}
-
-__global__ void stream1_transformer_attention51_exact_kernel(
-    const half* __restrict__ qkv,
-    const half* __restrict__ qkv_bias,
-    half* __restrict__ context,
     std::uint32_t dtype,
     std::uint32_t b_micro) {
-    constexpr std::uint32_t seq_len = 51U;
-    constexpr std::uint32_t d_model = 256U;
-    constexpr std::uint32_t head_dim = 32U;
-    constexpr std::uint32_t qkv_token_stride = 3U * d_model;
-    constexpr float scale = 0.1767766952966369f;
+    const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::uint64_t total = static_cast<std::uint64_t>(b_micro) * STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51;
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t col = static_cast<std::uint32_t>(i % STREAM1_TRANSFORMER_QKV_STRIDE51);
+    const float x = stream1_load_scalar_device(qkv, i, dtype) + stream1_load_scalar_device(qkv_bias, col, dtype);
+    stream1_store_scalar_device(qkv, i, x, dtype);
+}
 
+__global__ void stream1_transformer_softmax51_kernel(
+    half* __restrict__ scores_probs,
+    std::uint32_t dtype,
+    std::uint32_t b_micro) {
     const std::uint32_t row = blockIdx.x;
     const std::uint32_t head = blockIdx.y;
     const std::uint32_t tid = threadIdx.x;
-    if (row >= b_micro || head >= 8U) {
-        return;
-    }
-
     const std::uint32_t lane = tid & 31U;
     const std::uint32_t warp = tid >> 5U;
     const std::uint32_t warp_count = blockDim.x >> 5U;
-    extern __shared__ float shared_scores[];
-    float* scores = shared_scores + static_cast<std::uint64_t>(warp) * 64ULL;
-
-    const std::uint32_t head_offset = head * head_dim;
-    const std::uint64_t row_qkv_base = static_cast<std::uint64_t>(row) * seq_len * qkv_token_stride;
-    const std::uint64_t row_context_base = static_cast<std::uint64_t>(row) * seq_len * d_model;
-    const std::uint64_t q_head_base = head_offset + lane;
-    const std::uint64_t k_head_base = d_model + head_offset + lane;
-    const std::uint64_t v_head_base = 2ULL * d_model + head_offset + lane;
-    const float q_bias = stream1_load_scalar_device(qkv_bias, q_head_base, dtype);
-    const float k_bias = stream1_load_scalar_device(qkv_bias, k_head_base, dtype);
-    const float v_bias = stream1_load_scalar_device(qkv_bias, v_head_base, dtype);
-
-    for (std::uint32_t query = warp; query < seq_len; query += warp_count) {
-        const std::uint64_t q_token_base = row_qkv_base + static_cast<std::uint64_t>(query) * qkv_token_stride;
-        const float q_value = stream1_load_scalar_device(qkv, q_token_base + q_head_base, dtype) + q_bias;
-
-        for (std::uint32_t key = 0; key < seq_len; ++key) {
-            const std::uint64_t k_token_base = row_qkv_base + static_cast<std::uint64_t>(key) * qkv_token_stride;
-            const float k_value = stream1_load_scalar_device(qkv, k_token_base + k_head_base, dtype) + k_bias;
-            const float dot = stream1_warp_reduce_sum_device(q_value * k_value);
-            if (lane == 0U) {
-                scores[key] = dot * scale;
-            }
-        }
-        __syncwarp();
-
+    if (row >= b_micro || head >= STREAM1_TRANSFORMER_NHEAD8) {
+        return;
+    }
+    const std::uint64_t matrix_base =
+        (static_cast<std::uint64_t>(head) * b_micro + row) * STREAM1_TRANSFORMER_SCORE_STRIDE51;
+    for (std::uint32_t query = warp; query < STREAM1_TRANSFORMER_SEQ51; query += warp_count) {
+        const std::uint64_t query_base = matrix_base + static_cast<std::uint64_t>(query) * STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51;
         float local_max = -3.4028234663852886e38f;
-        for (std::uint32_t key = lane; key < seq_len; key += 32U) {
-            local_max = fmaxf(local_max, scores[key]);
+        for (std::uint32_t key = lane; key < STREAM1_TRANSFORMER_SEQ51; key += 32U) {
+            local_max = fmaxf(local_max, stream1_load_scalar_device(scores_probs, query_base + key, dtype));
         }
         const float max_score = stream1_warp_reduce_max_device(local_max);
-
         float local_sum = 0.0f;
-        for (std::uint32_t key = lane; key < seq_len; key += 32U) {
-            const float exp_value = expf(scores[key] - max_score);
-            scores[key] = exp_value;
+        float local_values[2] = {0.0f, 0.0f};
+        std::uint32_t local_keys[2] = {0xffffffffU, 0xffffffffU};
+        std::uint32_t slot = 0U;
+        for (std::uint32_t key = lane; key < STREAM1_TRANSFORMER_SEQ51; key += 32U) {
+            const float exp_value = expf(stream1_load_scalar_device(scores_probs, query_base + key, dtype) - max_score);
             local_sum += exp_value;
+            local_values[slot] = exp_value;
+            local_keys[slot] = key;
+            ++slot;
         }
         const float inv_sum = 1.0f / stream1_warp_reduce_sum_device(local_sum);
-        __syncwarp();
-
-        float acc = 0.0f;
-        for (std::uint32_t key = 0; key < seq_len; ++key) {
-            const std::uint64_t v_token_base = row_qkv_base + static_cast<std::uint64_t>(key) * qkv_token_stride;
-            const float v_value = stream1_load_scalar_device(qkv, v_token_base + v_head_base, dtype) + v_bias;
-            acc += scores[key] * inv_sum * v_value;
+        for (std::uint32_t i = 0; i < slot; ++i) {
+            stream1_store_scalar_device(scores_probs, query_base + local_keys[i], local_values[i] * inv_sum, dtype);
         }
-        const std::uint64_t out_idx =
-            row_context_base + static_cast<std::uint64_t>(query) * d_model + head_offset + lane;
-        stream1_store_scalar_device(context, out_idx, acc, dtype);
-        __syncwarp();
+        for (std::uint32_t key = STREAM1_TRANSFORMER_SEQ51 + lane; key < STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51; key += 32U) {
+            stream1_store_scalar_device(scores_probs, query_base + key, 0.0f, dtype);
+        }
     }
 }
 
+__global__ void stream1_transformer_pack_v51_kernel(
+    const half* __restrict__ qkv,
+    half* __restrict__ scores_probs,
+    std::uint32_t dtype,
+    std::uint32_t b_micro) {
+    const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::uint64_t per_matrix = static_cast<std::uint64_t>(STREAM1_TRANSFORMER_VPACK_STRIDE51);
+    const std::uint64_t total = static_cast<std::uint64_t>(STREAM1_TRANSFORMER_NHEAD8) * b_micro * per_matrix;
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t lane = static_cast<std::uint32_t>(i % STREAM1_TRANSFORMER_HEAD_DIM32);
+    const std::uint32_t key = static_cast<std::uint32_t>((i / STREAM1_TRANSFORMER_HEAD_DIM32) % STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51);
+    const std::uint64_t row_head = i / per_matrix;
+    const std::uint32_t row = static_cast<std::uint32_t>(row_head % b_micro);
+    const std::uint32_t head = static_cast<std::uint32_t>(row_head / b_micro);
+    const std::uint64_t matrix_base =
+        (static_cast<std::uint64_t>(head) * b_micro + row) * STREAM1_TRANSFORMER_SCORE_STRIDE51;
+    float value = 0.0f;
+    if (key < STREAM1_TRANSFORMER_SEQ51) {
+        const std::uint64_t qkv_idx =
+            static_cast<std::uint64_t>(row) * STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51 +
+            static_cast<std::uint64_t>(key) * STREAM1_TRANSFORMER_QKV_STRIDE51 +
+            2ULL * STREAM1_TRANSFORMER_DMODEL256 +
+            static_cast<std::uint64_t>(head) * STREAM1_TRANSFORMER_HEAD_DIM32 +
+            lane;
+        value = stream1_load_scalar_device(qkv, qkv_idx, dtype);
+    }
+    stream1_store_scalar_device(
+        scores_probs,
+        matrix_base + STREAM1_TRANSFORMER_PROB_STRIDE51 + static_cast<std::uint64_t>(key) * STREAM1_TRANSFORMER_HEAD_DIM32 + lane,
+        value,
+        dtype);
+}
+
+__global__ void stream1_transformer_build_attention_ptrs51_kernel(
+    const half* __restrict__ qkv,
+    half* __restrict__ scores_probs,
+    half* __restrict__ context,
+    const half** __restrict__ q_ptrs,
+    const half** __restrict__ k_ptrs,
+    const half** __restrict__ score_const_ptrs,
+    half** __restrict__ score_ptrs,
+    const half** __restrict__ prob_ptrs,
+    const half** __restrict__ v_ptrs,
+    const half** __restrict__ context_const_ptrs,
+    half** __restrict__ context_ptrs,
+    std::uint32_t b_micro) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t total = b_micro * STREAM1_TRANSFORMER_NHEAD8;
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t row = i % b_micro;
+    const std::uint32_t head = i / b_micro;
+    const std::uint64_t qkv_row_base = static_cast<std::uint64_t>(row) *
+        STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51;
+    const std::uint64_t head_offset = static_cast<std::uint64_t>(head) * STREAM1_TRANSFORMER_HEAD_DIM32;
+    half* score_base = scores_probs + static_cast<std::uint64_t>(i) * STREAM1_TRANSFORMER_SCORE_STRIDE51;
+    half* context_base = context +
+        static_cast<std::uint64_t>(row) * STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_DMODEL256 + head_offset;
+    const half* q_base = qkv + qkv_row_base + head_offset;
+    const half* k_base = qkv + qkv_row_base + STREAM1_TRANSFORMER_DMODEL256 + head_offset;
+    const half* v_base = score_base + STREAM1_TRANSFORMER_PROB_STRIDE51;
+    q_ptrs[i] = q_base;
+    k_ptrs[i] = k_base;
+    score_const_ptrs[i] = score_base;
+    score_ptrs[i] = score_base;
+    prob_ptrs[i] = score_base;
+    v_ptrs[i] = v_base;
+    context_const_ptrs[i] = context_base;
+    context_ptrs[i] = context_base;
+}
+#if BEAM_HAS_CUTLASS
+void stream1_transformer_prepare_attention_ptrs_launch(
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    if (scratch.attention_scores_probs == nullptr || scratch.attention_context == nullptr ||
+        scratch.attention_q_ptrs == nullptr || scratch.attention_k_ptrs == nullptr ||
+        scratch.attention_score_const_ptrs == nullptr || scratch.attention_score_ptrs == nullptr ||
+        scratch.attention_prob_ptrs == nullptr || scratch.attention_v_ptrs == nullptr ||
+        scratch.attention_context_const_ptrs == nullptr || scratch.attention_context_ptrs == nullptr) {
+        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires pointer-array scratch");
+    }
+    const std::uint32_t total = b_micro * STREAM1_TRANSFORMER_NHEAD8;
+    stream1_transformer_build_attention_ptrs51_kernel<<<(total + 255U) / 256U, 256, 0, stream>>>(
+        scratch.qkv,
+        scratch.attention_scores_probs,
+        scratch.attention_context,
+        scratch.attention_q_ptrs,
+        scratch.attention_k_ptrs,
+        scratch.attention_score_const_ptrs,
+        scratch.attention_score_ptrs,
+        scratch.attention_prob_ptrs,
+        scratch.attention_v_ptrs,
+        scratch.attention_context_const_ptrs,
+        scratch.attention_context_ptrs,
+        b_micro);
+}
+void stream1_transformer_qk_gemm_array_launch(
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t dtype,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    const cutlass::gemm::GemmCoord problem(
+        static_cast<int>(STREAM1_TRANSFORMER_SEQ51),
+        static_cast<int>(STREAM1_TRANSFORMER_SEQ51),
+        static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32));
+    const int batch_count = static_cast<int>(b_micro * STREAM1_TRANSFORMER_NHEAD8);
+    constexpr float scale = 0.1767766952966369f;
+    cutlass::Status status = cutlass::Status::kSuccess;
+    if (dtype == STREAM1_DTYPE_BF16) {
+        using Gemm = cutlass::gemm::device::GemmArray<
+            cutlass::bfloat16_t,
+            cutlass::layout::RowMajor,
+            cutlass::bfloat16_t,
+            cutlass::layout::ColumnMajor,
+            cutlass::bfloat16_t,
+            cutlass::layout::RowMajor,
+            float,
+            cutlass::arch::OpClassTensorOp,
+            cutlass::arch::Sm80,
+            cutlass::gemm::GemmShape<64, 64, 32>,
+            cutlass::gemm::GemmShape<32, 32, 32>,
+            cutlass::gemm::GemmShape<16, 8, 16>>;
+        Gemm gemm;
+        for (int batch_offset = 0; batch_offset < batch_count; batch_offset += STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX) {
+            const int remaining = batch_count - batch_offset;
+            const int this_batch = remaining < STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX ? remaining : STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX;
+            typename Gemm::Arguments args{
+                problem,
+                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_q_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)),
+                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_k_ptrs + batch_offset),
+                cutlass::layout::ColumnMajor(static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)),
+                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_score_const_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
+                reinterpret_cast<cutlass::bfloat16_t * const *>(scratch.attention_score_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
+                {scale, 0.0f},
+                this_batch};
+            status = gemm(args, nullptr, stream);
+            if (status != cutlass::Status::kSuccess) {
+                break;
+            }
+        }
+    } else if (dtype == STREAM1_DTYPE_FP16) {
+        using Gemm = cutlass::gemm::device::GemmArray<
+            cutlass::half_t,
+            cutlass::layout::RowMajor,
+            cutlass::half_t,
+            cutlass::layout::ColumnMajor,
+            cutlass::half_t,
+            cutlass::layout::RowMajor,
+            float,
+            cutlass::arch::OpClassTensorOp,
+            cutlass::arch::Sm75,
+            cutlass::gemm::GemmShape<64, 64, 32>,
+            cutlass::gemm::GemmShape<32, 32, 32>,
+            cutlass::gemm::GemmShape<16, 8, 8>>;
+        Gemm gemm;
+        for (int batch_offset = 0; batch_offset < batch_count; batch_offset += STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX) {
+            const int remaining = batch_count - batch_offset;
+            const int this_batch = remaining < STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX ? remaining : STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX;
+            typename Gemm::Arguments args{
+                problem,
+                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_q_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)),
+                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_k_ptrs + batch_offset),
+                cutlass::layout::ColumnMajor(static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)),
+                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_score_const_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
+                reinterpret_cast<cutlass::half_t * const *>(scratch.attention_score_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
+                {scale, 0.0f},
+                this_batch};
+            status = gemm(args, nullptr, stream);
+            if (status != cutlass::Status::kSuccess) {
+                break;
+            }
+        }
+    } else {
+        throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
+    }
+    if (status != cutlass::Status::kSuccess) {
+        throw std::runtime_error("Stream1 piece_transformer QK GemmArray launch failed");
+    }
+}
+
+void stream1_transformer_pv_gemm_array_launch(
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t dtype,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    const cutlass::gemm::GemmCoord problem(
+        static_cast<int>(STREAM1_TRANSFORMER_SEQ51),
+        static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32),
+        static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51));
+    const int batch_count = static_cast<int>(b_micro * STREAM1_TRANSFORMER_NHEAD8);
+    cutlass::Status status = cutlass::Status::kSuccess;
+    if (dtype == STREAM1_DTYPE_BF16) {
+        using Gemm = cutlass::gemm::device::GemmArray<
+            cutlass::bfloat16_t,
+            cutlass::layout::RowMajor,
+            cutlass::bfloat16_t,
+            cutlass::layout::RowMajor,
+            cutlass::bfloat16_t,
+            cutlass::layout::RowMajor,
+            float,
+            cutlass::arch::OpClassTensorOp,
+            cutlass::arch::Sm80,
+            cutlass::gemm::GemmShape<64, 32, 32>,
+            cutlass::gemm::GemmShape<32, 32, 32>,
+            cutlass::gemm::GemmShape<16, 8, 16>>;
+        Gemm gemm;
+        for (int batch_offset = 0; batch_offset < batch_count; batch_offset += STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX) {
+            const int remaining = batch_count - batch_offset;
+            const int this_batch = remaining < STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX ? remaining : STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX;
+            typename Gemm::Arguments args{
+                problem,
+                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_prob_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
+                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_v_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32)),
+                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_context_const_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)),
+                reinterpret_cast<cutlass::bfloat16_t * const *>(scratch.attention_context_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)),
+                {1.0f, 0.0f},
+                this_batch};
+            status = gemm(args, nullptr, stream);
+            if (status != cutlass::Status::kSuccess) {
+                break;
+            }
+        }
+    } else if (dtype == STREAM1_DTYPE_FP16) {
+        using Gemm = cutlass::gemm::device::GemmArray<
+            cutlass::half_t,
+            cutlass::layout::RowMajor,
+            cutlass::half_t,
+            cutlass::layout::RowMajor,
+            cutlass::half_t,
+            cutlass::layout::RowMajor,
+            float,
+            cutlass::arch::OpClassTensorOp,
+            cutlass::arch::Sm75,
+            cutlass::gemm::GemmShape<64, 32, 32>,
+            cutlass::gemm::GemmShape<32, 32, 32>,
+            cutlass::gemm::GemmShape<16, 8, 8>>;
+        Gemm gemm;
+        for (int batch_offset = 0; batch_offset < batch_count; batch_offset += STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX) {
+            const int remaining = batch_count - batch_offset;
+            const int this_batch = remaining < STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX ? remaining : STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX;
+            typename Gemm::Arguments args{
+                problem,
+                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_prob_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
+                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_v_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32)),
+                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_context_const_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)),
+                reinterpret_cast<cutlass::half_t * const *>(scratch.attention_context_ptrs + batch_offset),
+                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)),
+                {1.0f, 0.0f},
+                this_batch};
+            status = gemm(args, nullptr, stream);
+            if (status != cutlass::Status::kSuccess) {
+                break;
+            }
+        }
+    } else {
+        throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
+    }
+    if (status != cutlass::Status::kSuccess) {
+        throw std::runtime_error("Stream1 piece_transformer PV GemmArray launch failed");
+    }
+}
+
+#endif
+
 void stream1_transformer_attention_launch(
-    const half* qkv,
+    half* qkv,
     const half* qkv_bias,
-    half* context,
+    const Stream1TransformerScratchView& scratch,
     Stream1TransformerDims dims,
     std::uint32_t b_micro,
     cudaStream_t stream) {
-    constexpr std::uint32_t attention_threads = 256U;
-    const dim3 attn_grid(b_micro, dims.nhead);
-    if (dims.seq_len == 51U && dims.d_model == 256U && dims.nhead == 8U && dims.head_dim == 32U) {
-        constexpr std::uint32_t score_floats = (attention_threads / 32U) * 64U;
-        stream1_transformer_attention51_exact_kernel<<<
-            attn_grid,
-            attention_threads,
-            static_cast<std::size_t>(score_floats) * sizeof(float),
-            stream>>>(
-                qkv,
-                qkv_bias,
-                context,
-                dims.dtype,
-                b_micro);
-        return;
+    if (dims.seq_len != STREAM1_TRANSFORMER_SEQ51 ||
+        dims.d_model != STREAM1_TRANSFORMER_DMODEL256 ||
+        dims.nhead != STREAM1_TRANSFORMER_NHEAD8 ||
+        dims.head_dim != STREAM1_TRANSFORMER_HEAD_DIM32) {
+        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires seq_len=51 d_model=256 nhead=8 head_dim=32");
     }
-    constexpr std::uint32_t attention_score_slots_per_warp = 64U;
-    const std::uint32_t attention_shared_floats =
-        (attention_threads / 32U) * attention_score_slots_per_warp;
-    const std::size_t attention_shared_bytes =
-        static_cast<std::size_t>(attention_shared_floats) * sizeof(float);
-    stream1_transformer_attention51_kernel<<<attn_grid, attention_threads, attention_shared_bytes, stream>>>(
-        qkv,
-        qkv_bias,
-        context,
-        dims,
-        b_micro);
+    if (scratch.attention_scores_probs == nullptr) {
+        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires attention_scores_probs scratch");
+    }
+#if BEAM_HAS_CUTLASS
+    const std::uint64_t qkv_total = static_cast<std::uint64_t>(b_micro) *
+        STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51;
+    stream1_transformer_add_qkv_bias_kernel<<<
+        static_cast<unsigned>((qkv_total + 255ULL) / 256ULL),
+        256,
+        0,
+        stream>>>(qkv, qkv_bias, dims.dtype, b_micro);
+    stream1_transformer_qk_gemm_array_launch(scratch, dims.dtype, b_micro, stream);
+    stream1_transformer_pack_v51_kernel<<<
+        static_cast<unsigned>(((static_cast<std::uint64_t>(b_micro) * STREAM1_TRANSFORMER_NHEAD8 * STREAM1_TRANSFORMER_VPACK_STRIDE51) + 255ULL) / 256ULL),
+        256,
+        0,
+        stream>>>(qkv, scratch.attention_scores_probs, dims.dtype, b_micro);
+    stream1_transformer_softmax51_kernel<<<
+        dim3(b_micro, STREAM1_TRANSFORMER_NHEAD8),
+        256,
+        0,
+        stream>>>(scratch.attention_scores_probs, dims.dtype, b_micro);
+    stream1_transformer_pv_gemm_array_launch(scratch, dims.dtype, b_micro, stream);
+#else
+    (void)qkv;
+    (void)qkv_bias;
+    (void)scratch;
+    (void)dims;
+    (void)b_micro;
+    (void)stream;
+    throw std::invalid_argument("Stream1 piece_transformer tensor attention requires CUTLASS-enabled build");
+#endif
 }
 
 __global__ void stream1_transformer_cls_layernorm_kernel(
@@ -1043,6 +1243,8 @@ void stream1_transformer_inference_cuda(
         dims.dtype,
         stream);
 
+    stream1_transformer_prepare_attention_ptrs_launch(scratch, b_micro, stream);
+
     for (std::uint32_t layer = 0; layer < dims.transformer_layers; ++layer) {
         const Stream1TransformerBlockView block = network.blocks[layer];
         stream1_transformer_layernorm_copy_launch(
@@ -1066,7 +1268,7 @@ void stream1_transformer_inference_cuda(
         stream1_transformer_attention_launch(
             scratch.qkv,
             block.attn_qkv_bias,
-            scratch.attention_context,
+            scratch,
             dims,
             b_micro,
             stream);
