@@ -201,7 +201,10 @@ target_compile_definitions(production_runner PRIVATE
 )
 set_target_properties(production_runner PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
-add_executable(stream_benchmark tools/stream_benchmark.cu)
+add_executable(stream_benchmark
+    tools/stream_benchmark.cu
+    tools/stream_benchmark_mlp.cu
+    tools/stream_benchmark_transformer.cu)
 target_link_libraries(stream_benchmark PRIVATE beam_cuda)
 set_target_properties(stream_benchmark PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
