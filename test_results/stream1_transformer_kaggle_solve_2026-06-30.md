@@ -57,3 +57,26 @@ Version 2 reached depth 4 with `BEAM_WIDTH=65536`, `SHARD_COUNT=1`, then failed 
 
 
 Version 3 reached depth 31 with `BEAM_WIDTH=262144`, `SHARD_COUNT=1`, then failed in Stream3 because shard capacity was still tight: `existing=138167`, `raw_count=7563`, `shard_capacity_candidates=138240`, `spill_capacity=0`. Version 4 keeps `BEAM_WIDTH=262144` and raises `SHARD_CAPACITY_SCALE_PPM` to `2000000`.
+
+
+Version 4 completed successfully:
+
+- kernel status: `KernelWorkerStatus.COMPLETE`
+- `puzzle_solved=1`
+- `puzzle_id=991`
+- `seconds=2463.89`
+- `solution_length=82`
+- reference example length for puzzle `991`: `82`
+- comparison: match
+- output directory: `test_results/kaggle_t4_transformer_solve_v4_output/`
+- torchrun log: `test_results/kaggle_t4_transformer_solve_v4_output/stream1_transformer_solve_logs/torchrun_piece_transformer_solve_p991_d82_b262144.log`
+
+Solution:
+
+`DR.R.-BR.-B.BL.-B.-DL.-DL.D.DL.DR.-FL.-R.-R.-FL.D.F.FL.DR.B.-DL.-L.-F.D.U.-BR.B.-BL.F.-L.F.FR.R.FR.-DR.-R.-DL.-DR.-R.L.FL.L.-FL.-F.-FR.F.F.FR.F.R.-FR.-F.L.F.L.DR.FL.R.DR.DL.DR.-B.-DR.B.B.D.-L.-BL.BR.B.-BR.BL.L.-DR.-B.DL.-BL.-B.DR.BL.-DL.-L`
+
+Speed notes from the successful run:
+
+- The run used `BEAM_WIDTH=262144`, `SHARD_COUNT=1`, `SHARD_CAPACITY_SCALE_PPM=2000000`, `STREAM3_RING_SLOTS=2`, and `B_MICRO=512`.
+- Late full-beam depths were about `33s/depth` on 2xT4; example tail shows depth 76 at `33.1978s` and depth 77 at `33.1503s`.
+- The reference PyTorch notebook reports puzzle `991` length 82 in `209.78s`, but it is a single-phase model-guided sampler with `B=65536`, not the full multi-stream beam pipeline with reconstruction/history and global thresholding.
