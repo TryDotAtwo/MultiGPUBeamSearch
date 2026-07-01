@@ -32,13 +32,59 @@ std::vector<Stream1Result> benchmark_stream1_mlp(
         weights.output_bias,
         dims};
 
+    const char* only_b_micro_env = std::getenv("BEAM_STREAM1_MLP_B_MICRO");
+    const char* only_concurrency_env = std::getenv("BEAM_STREAM1_MLP_CONCURRENCY");
+    const std::uint32_t only_b_micro = only_b_micro_env != nullptr && only_b_micro_env[0] != '\0'
+        ? static_cast<std::uint32_t>(parse_u64(only_b_micro_env, "BEAM_STREAM1_MLP_B_MICRO"))
+        : 0U;
+    const std::uint32_t only_concurrency = only_concurrency_env != nullptr && only_concurrency_env[0] != '\0'
+        ? static_cast<std::uint32_t>(parse_u64(only_concurrency_env, "BEAM_STREAM1_MLP_CONCURRENCY"))
+        : 0U;
+
     report << "## Stream1 TensorOp CUTLASS\n\n";
-    report << "| B_MICRO | concurrent_inference | ms_per_launch_group | parents_per_sec | candidates_per_sec |\n";
-    report << "|---:|---:|---:|---:|---:|\n";
+    if (only_b_micro != 0U || only_concurrency != 0U) {
+        report << "- filter_b_micro=" << only_b_micro << "\n";
+        report << "- filter_concurrency=" << only_concurrency << "\n\n";
+    }
+    report << "| B_MICRO | concurrent_inference | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | scratch_bytes |\n";
+    report << "|---:|---:|---:|---:|---:|---:|---:|\n";
     for (std::uint32_t b_micro : B_MICRO_SWEEP) {
         const std::uint32_t parent_batch = stream1_parent_batch_from_row_budget(b_micro, model);
         for (std::uint32_t concurrent : STREAM1_CONCURRENCY_SWEEP) {
-            if (parent_batch * concurrent > max_states) {
+            if ((only_b_micro != 0U && b_micro != only_b_micro) ||
+                (only_concurrency != 0U && concurrent != only_concurrency)) {
+                continue;
+            }
+            const std::uint64_t rows_per_launch_group = static_cast<std::uint64_t>(parent_batch) * concurrent;
+            if (rows_per_launch_group > max_states) {
+                report << "|" << b_micro << "|" << concurrent << "|" << rows_per_launch_group
+                       << "|skip|skip|skip|0: exceeds prepared state batch|\n";
+                std::cout << "stream1_micro_skip"
+                          << " b_micro=" << b_micro
+                          << " concurrent=" << concurrent
+                          << " reason=exceeds_prepared_state_batch\n";
+                continue;
+            }
+            const std::uint64_t scratch_bytes = stream1_weights::stream1_scratch_bytes(model, parent_batch, concurrent);
+            const std::uint64_t io_bytes = rows_per_launch_group *
+                (sizeof(std::uint64_t) + sizeof(std::uint32_t) + static_cast<std::uint64_t>(MOVE_COUNT) * sizeof(std::uint32_t));
+            std::size_t free_bytes = 0;
+            std::size_t total_bytes = 0;
+            BEAM_CUDA_CHECK(cudaMemGetInfo(&free_bytes, &total_bytes));
+            constexpr std::uint64_t safety_margin_bytes = 256ULL * 1024ULL * 1024ULL;
+            if (scratch_bytes + io_bytes + safety_margin_bytes > free_bytes) {
+                report << "|" << b_micro << "|" << concurrent << "|" << rows_per_launch_group
+                       << "|skip|skip|skip|" << scratch_bytes
+                       << ": estimated allocation exceeds available GPU memory"
+                       << " free_bytes=" << free_bytes
+                       << " io_bytes=" << io_bytes << "|\n";
+                std::cout << "stream1_micro_skip"
+                          << " b_micro=" << b_micro
+                          << " concurrent=" << concurrent
+                          << " rows_per_launch_group=" << rows_per_launch_group
+                          << " scratch_bytes=" << scratch_bytes
+                          << " free_bytes=" << free_bytes
+                          << " reason=estimated_allocation_exceeds_available_memory\n";
                 continue;
             }
             std::vector<cudaStream_t> streams = create_streams(concurrent);
@@ -78,21 +124,25 @@ std::vector<Stream1Result> benchmark_stream1_mlp(
                         streams[i]);
                 }
             });
-            const double parents = static_cast<double>(parent_batch) * concurrent;
+            const double parents = static_cast<double>(rows_per_launch_group);
             const double parent_per_sec = parents * 1000.0 / static_cast<double>(ms);
             const double candidate_per_sec = parents * static_cast<double>(MOVE_COUNT) * 1000.0 / static_cast<double>(ms);
             results.push_back(Stream1Result{b_micro, concurrent, ms, parent_per_sec, candidate_per_sec});
             report << "|" << b_micro
                    << "|" << concurrent
+                   << "|" << rows_per_launch_group
                    << "|" << std::fixed << std::setprecision(4) << ms
                    << "|" << std::setprecision(1) << parent_per_sec
-                   << "|" << candidate_per_sec << "|\n";
+                   << "|" << candidate_per_sec
+                   << "|" << scratch_bytes << "|\n";
             std::cout << "stream1_micro"
                       << " b_micro=" << b_micro
                       << " concurrent=" << concurrent
+                      << " rows_per_launch_group=" << rows_per_launch_group
                       << " ms_per_launch_group=" << std::fixed << std::setprecision(4) << ms
                       << " parents_per_sec=" << std::setprecision(1) << parent_per_sec
                       << " candidates_per_sec=" << candidate_per_sec
+                      << " scratch_bytes=" << scratch_bytes
                       << "\n";
             for (std::uint32_t i = 0; i < concurrent; ++i) {
                 cudaFree(parent_base[i]);
@@ -106,7 +156,6 @@ std::vector<Stream1Result> benchmark_stream1_mlp(
     report << "\n";
     return results;
 }
-
 std::vector<StreamResult> benchmark_stream2(
     const State128* states,
     const std::uint8_t* generators,

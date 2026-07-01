@@ -93,6 +93,19 @@ int main(int argc, char** argv) {
     std::cout << "stream_benchmark_start=1\n";
     benchmark_stream1_mlp(weights, stream1_model, d_states, d_generators, max_states, report);
     std::cout << "stream1_benchmark_done=1\n";
+    if (std::getenv("BEAM_STREAM1_ONLY") != nullptr) {
+        report << "## Status\n\n";
+        report << "- status=pass\n";
+        report.close();
+        stream1_weights::free_weights(weights);
+        cudaFree(d_states);
+        cudaFree(d_generators);
+        cudaFree(d_central);
+        cudaFree(d_zobrist);
+        BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+        std::cout << "stream_benchmark_report=" << report_path << "\n";
+        return 0;
+    }
     if (!stream_micro_only) {
         benchmark_stream2(d_states, d_generators, d_central, d_zobrist, report);
         std::cout << "stream2_benchmark_done=1\n";
