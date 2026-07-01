@@ -1,6 +1,11 @@
 # Prompt History
 
+## 2026-07-01
+- User requested rerunning the latest native CUDA Stream1 transformer backend on Kaggle and assessing whether the observed speed is a real limit or can still be improved.
+- User requested running the public Kaggle notebook `vladkuznetsov266/transformer-inference-example` and measuring its inference speed.
+
 ## 2026-06-30
+- User requested a plain PyTorch inference benchmark for the Stream1 `piece_transformer` export to measure raw Torch speed against the native CUDA backend.
 - User requested using low-reasoning subagents plus profiler-driven coordination to fix Stream1 transformer speed issues for maximum throughput, while preserving the no-fallback/no-distillation constraint and not breaking the MLP path.
 - User requested running the split Stream1 piece-transformer benchmark on Kaggle 2xT4 and checking speed. Use a separate benchmark package, not the smoke/solve notebooks, so speed logs are clean and compare per-GPU T4 throughput.
 - User clarified during Task 1 quality review that MLP and transformer benchmark code should be split into separate files to avoid confusion; keep transformer work isolated from MLP files/paths where practical.
@@ -435,3 +440,4 @@
 - User clarified that the ~5x transformer-vs-MLP expectation is empirical from the PyTorch fast path, so the native Stream1 transformer backend should be treated as under-optimized rather than dismissed as intrinsically much heavier.
 - User requested using NVIDIA Nsight to identify where the Stream1 transformer backend is losing performance.
 - User requested rewriting the Stream1 transformer hot path after Nsight showed the implementation was still far from the expected MLP-relative speed: no fallbacks, no distillation, work with the transformer backend directly, keep MLP separate/untouched, and use Nsight/profiling to find the next bottleneck.
+- User requested cleaning and rewriting the Stream1 transformer inference path from scratch after the previous implementation was considered overcomplicated, with no fallbacks or distillation, keeping MLP files/path separate and preserving transformer correctness and speed.

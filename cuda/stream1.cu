@@ -11,7 +11,7 @@
 #if BEAM_HAS_CUTLASS
 #include <cutlass/bfloat16.h>
 #include <cutlass/gemm/device/gemm.h>
-#include <cutlass/gemm/device/gemm_array.h>
+#include <cutlass/gemm/device/gemm_batched.h>
 #include <cutlass/epilogue/thread/linear_combination_relu.h>
 #include <cutlass/layout/matrix.h>
 #endif
@@ -719,10 +719,12 @@ constexpr std::uint32_t STREAM1_TRANSFORMER_HEAD_DIM32 = 32U;
 constexpr std::uint32_t STREAM1_TRANSFORMER_NHEAD8 = 8U;
 constexpr std::uint32_t STREAM1_TRANSFORMER_QKV_STRIDE51 = 3U * STREAM1_TRANSFORMER_DMODEL256;
 constexpr std::uint32_t STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51 = 64U;
-constexpr std::uint32_t STREAM1_TRANSFORMER_PROB_STRIDE51 = STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51;
-constexpr std::uint32_t STREAM1_TRANSFORMER_VPACK_STRIDE51 = STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51 * STREAM1_TRANSFORMER_HEAD_DIM32;
-constexpr std::uint32_t STREAM1_TRANSFORMER_SCORE_STRIDE51 = STREAM1_TRANSFORMER_PROB_STRIDE51 + STREAM1_TRANSFORMER_VPACK_STRIDE51;
-constexpr int STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX = 32768;
+constexpr std::uint32_t STREAM1_TRANSFORMER_PROB_STRIDE51 =
+    STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51;
+constexpr std::uint32_t STREAM1_TRANSFORMER_VPACK_STRIDE51 =
+    STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51 * STREAM1_TRANSFORMER_HEAD_DIM32;
+constexpr std::uint32_t STREAM1_TRANSFORMER_SCORE_STRIDE51 =
+    STREAM1_TRANSFORMER_PROB_STRIDE51 + STREAM1_TRANSFORMER_VPACK_STRIDE51;
 
 __global__ void stream1_transformer_add_qkv_bias_kernel(
     half* __restrict__ qkv,
@@ -730,12 +732,14 @@ __global__ void stream1_transformer_add_qkv_bias_kernel(
     std::uint32_t dtype,
     std::uint32_t b_micro) {
     const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::uint64_t total = static_cast<std::uint64_t>(b_micro) * STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51;
+    const std::uint64_t total = static_cast<std::uint64_t>(b_micro) *
+        STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51;
     if (i >= total) {
         return;
     }
     const std::uint32_t col = static_cast<std::uint32_t>(i % STREAM1_TRANSFORMER_QKV_STRIDE51);
-    const float x = stream1_load_scalar_device(qkv, i, dtype) + stream1_load_scalar_device(qkv_bias, col, dtype);
+    const float x = stream1_load_scalar_device(qkv, i, dtype) +
+        stream1_load_scalar_device(qkv_bias, col, dtype);
     stream1_store_scalar_device(qkv, i, x, dtype);
 }
 
@@ -755,7 +759,8 @@ __global__ void stream1_transformer_softmax51_kernel(
     const std::uint64_t matrix_base =
         (static_cast<std::uint64_t>(head) * b_micro + row) * STREAM1_TRANSFORMER_SCORE_STRIDE51;
     for (std::uint32_t query = warp; query < STREAM1_TRANSFORMER_SEQ51; query += warp_count) {
-        const std::uint64_t query_base = matrix_base + static_cast<std::uint64_t>(query) * STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51;
+        const std::uint64_t query_base = matrix_base +
+            static_cast<std::uint64_t>(query) * STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51;
         float local_max = -3.4028234663852886e38f;
         for (std::uint32_t key = lane; key < STREAM1_TRANSFORMER_SEQ51; key += 32U) {
             local_max = fmaxf(local_max, stream1_load_scalar_device(scores_probs, query_base + key, dtype));
@@ -775,9 +780,6 @@ __global__ void stream1_transformer_softmax51_kernel(
         const float inv_sum = 1.0f / stream1_warp_reduce_sum_device(local_sum);
         for (std::uint32_t i = 0; i < slot; ++i) {
             stream1_store_scalar_device(scores_probs, query_base + local_keys[i], local_values[i] * inv_sum, dtype);
-        }
-        for (std::uint32_t key = STREAM1_TRANSFORMER_SEQ51 + lane; key < STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51; key += 32U) {
-            stream1_store_scalar_device(scores_probs, query_base + key, 0.0f, dtype);
         }
     }
 }
@@ -812,78 +814,16 @@ __global__ void stream1_transformer_pack_v51_kernel(
     }
     stream1_store_scalar_device(
         scores_probs,
-        matrix_base + STREAM1_TRANSFORMER_PROB_STRIDE51 + static_cast<std::uint64_t>(key) * STREAM1_TRANSFORMER_HEAD_DIM32 + lane,
+        matrix_base + STREAM1_TRANSFORMER_PROB_STRIDE51 +
+            static_cast<std::uint64_t>(key) * STREAM1_TRANSFORMER_HEAD_DIM32 + lane,
         value,
         dtype);
 }
 
-__global__ void stream1_transformer_build_attention_ptrs51_kernel(
-    const half* __restrict__ qkv,
-    half* __restrict__ scores_probs,
-    half* __restrict__ context,
-    const half** __restrict__ q_ptrs,
-    const half** __restrict__ k_ptrs,
-    const half** __restrict__ score_const_ptrs,
-    half** __restrict__ score_ptrs,
-    const half** __restrict__ prob_ptrs,
-    const half** __restrict__ v_ptrs,
-    const half** __restrict__ context_const_ptrs,
-    half** __restrict__ context_ptrs,
-    std::uint32_t b_micro) {
-    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    const std::uint32_t total = b_micro * STREAM1_TRANSFORMER_NHEAD8;
-    if (i >= total) {
-        return;
-    }
-    const std::uint32_t row = i % b_micro;
-    const std::uint32_t head = i / b_micro;
-    const std::uint64_t qkv_row_base = static_cast<std::uint64_t>(row) *
-        STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51;
-    const std::uint64_t head_offset = static_cast<std::uint64_t>(head) * STREAM1_TRANSFORMER_HEAD_DIM32;
-    half* score_base = scores_probs + static_cast<std::uint64_t>(i) * STREAM1_TRANSFORMER_SCORE_STRIDE51;
-    half* context_base = context +
-        static_cast<std::uint64_t>(row) * STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_DMODEL256 + head_offset;
-    const half* q_base = qkv + qkv_row_base + head_offset;
-    const half* k_base = qkv + qkv_row_base + STREAM1_TRANSFORMER_DMODEL256 + head_offset;
-    const half* v_base = score_base + STREAM1_TRANSFORMER_PROB_STRIDE51;
-    q_ptrs[i] = q_base;
-    k_ptrs[i] = k_base;
-    score_const_ptrs[i] = score_base;
-    score_ptrs[i] = score_base;
-    prob_ptrs[i] = score_base;
-    v_ptrs[i] = v_base;
-    context_const_ptrs[i] = context_base;
-    context_ptrs[i] = context_base;
-}
 #if BEAM_HAS_CUTLASS
-void stream1_transformer_prepare_attention_ptrs_launch(
-    const Stream1TransformerScratchView& scratch,
-    std::uint32_t b_micro,
-    cudaStream_t stream) {
-    if (scratch.attention_scores_probs == nullptr || scratch.attention_context == nullptr ||
-        scratch.attention_q_ptrs == nullptr || scratch.attention_k_ptrs == nullptr ||
-        scratch.attention_score_const_ptrs == nullptr || scratch.attention_score_ptrs == nullptr ||
-        scratch.attention_prob_ptrs == nullptr || scratch.attention_v_ptrs == nullptr ||
-        scratch.attention_context_const_ptrs == nullptr || scratch.attention_context_ptrs == nullptr) {
-        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires pointer-array scratch");
-    }
-    const std::uint32_t total = b_micro * STREAM1_TRANSFORMER_NHEAD8;
-    stream1_transformer_build_attention_ptrs51_kernel<<<(total + 255U) / 256U, 256, 0, stream>>>(
-        scratch.qkv,
-        scratch.attention_scores_probs,
-        scratch.attention_context,
-        scratch.attention_q_ptrs,
-        scratch.attention_k_ptrs,
-        scratch.attention_score_const_ptrs,
-        scratch.attention_score_ptrs,
-        scratch.attention_prob_ptrs,
-        scratch.attention_v_ptrs,
-        scratch.attention_context_const_ptrs,
-        scratch.attention_context_ptrs,
-        b_micro);
-}
-void stream1_transformer_qk_gemm_array_launch(
-    const Stream1TransformerScratchView& scratch,
+void stream1_transformer_qk_batched_launch(
+    const half* qkv,
+    half* scores_probs,
     std::uint32_t dtype,
     std::uint32_t b_micro,
     cudaStream_t stream) {
@@ -891,176 +831,168 @@ void stream1_transformer_qk_gemm_array_launch(
         static_cast<int>(STREAM1_TRANSFORMER_SEQ51),
         static_cast<int>(STREAM1_TRANSFORMER_SEQ51),
         static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32));
-    const int batch_count = static_cast<int>(b_micro * STREAM1_TRANSFORMER_NHEAD8);
     constexpr float scale = 0.1767766952966369f;
+    const std::int64_t qkv_batch_stride = static_cast<std::int64_t>(
+        STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51);
+    const std::int64_t score_batch_stride = static_cast<std::int64_t>(STREAM1_TRANSFORMER_SCORE_STRIDE51);
     cutlass::Status status = cutlass::Status::kSuccess;
-    if (dtype == STREAM1_DTYPE_BF16) {
-        using Gemm = cutlass::gemm::device::GemmArray<
-            cutlass::bfloat16_t,
-            cutlass::layout::RowMajor,
-            cutlass::bfloat16_t,
-            cutlass::layout::ColumnMajor,
-            cutlass::bfloat16_t,
-            cutlass::layout::RowMajor,
-            float,
-            cutlass::arch::OpClassTensorOp,
-            cutlass::arch::Sm80,
-            cutlass::gemm::GemmShape<64, 64, 32>,
-            cutlass::gemm::GemmShape<32, 32, 32>,
-            cutlass::gemm::GemmShape<16, 8, 16>>;
-        Gemm gemm;
-        for (int batch_offset = 0; batch_offset < batch_count; batch_offset += STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX) {
-            const int remaining = batch_count - batch_offset;
-            const int this_batch = remaining < STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX ? remaining : STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX;
+    for (std::uint32_t head = 0; head < STREAM1_TRANSFORMER_NHEAD8; ++head) {
+        const std::uint64_t head_offset = static_cast<std::uint64_t>(head) * STREAM1_TRANSFORMER_HEAD_DIM32;
+        const half* q_base = qkv + head_offset;
+        const half* k_base = qkv + STREAM1_TRANSFORMER_DMODEL256 + head_offset;
+        half* score_base = scores_probs +
+            static_cast<std::uint64_t>(head) * b_micro * STREAM1_TRANSFORMER_SCORE_STRIDE51;
+        if (dtype == STREAM1_DTYPE_BF16) {
+            using Gemm = cutlass::gemm::device::GemmBatched<
+                cutlass::bfloat16_t,
+                cutlass::layout::RowMajor,
+                cutlass::bfloat16_t,
+                cutlass::layout::ColumnMajor,
+                cutlass::bfloat16_t,
+                cutlass::layout::RowMajor,
+                float,
+                cutlass::arch::OpClassTensorOp,
+                cutlass::arch::Sm80,
+                cutlass::gemm::GemmShape<64, 64, 32>,
+                cutlass::gemm::GemmShape<32, 32, 32>,
+                cutlass::gemm::GemmShape<16, 8, 16>>;
+            Gemm gemm;
             typename Gemm::Arguments args{
                 problem,
-                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_q_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)),
-                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_k_ptrs + batch_offset),
-                cutlass::layout::ColumnMajor(static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)),
-                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_score_const_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
-                reinterpret_cast<cutlass::bfloat16_t * const *>(scratch.attention_score_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
+                {reinterpret_cast<cutlass::bfloat16_t const*>(q_base), static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)},
+                qkv_batch_stride,
+                {reinterpret_cast<cutlass::bfloat16_t const*>(k_base), static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)},
+                qkv_batch_stride,
+                {reinterpret_cast<cutlass::bfloat16_t const*>(score_base), static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)},
+                score_batch_stride,
+                {reinterpret_cast<cutlass::bfloat16_t*>(score_base), static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)},
+                score_batch_stride,
                 {scale, 0.0f},
-                this_batch};
+                static_cast<int>(b_micro)};
             status = gemm(args, nullptr, stream);
-            if (status != cutlass::Status::kSuccess) {
-                break;
-            }
-        }
-    } else if (dtype == STREAM1_DTYPE_FP16) {
-        using Gemm = cutlass::gemm::device::GemmArray<
-            cutlass::half_t,
-            cutlass::layout::RowMajor,
-            cutlass::half_t,
-            cutlass::layout::ColumnMajor,
-            cutlass::half_t,
-            cutlass::layout::RowMajor,
-            float,
-            cutlass::arch::OpClassTensorOp,
-            cutlass::arch::Sm75,
-            cutlass::gemm::GemmShape<64, 64, 32>,
-            cutlass::gemm::GemmShape<32, 32, 32>,
-            cutlass::gemm::GemmShape<16, 8, 8>>;
-        Gemm gemm;
-        for (int batch_offset = 0; batch_offset < batch_count; batch_offset += STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX) {
-            const int remaining = batch_count - batch_offset;
-            const int this_batch = remaining < STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX ? remaining : STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX;
+        } else if (dtype == STREAM1_DTYPE_FP16) {
+            using Gemm = cutlass::gemm::device::GemmBatched<
+                cutlass::half_t,
+                cutlass::layout::RowMajor,
+                cutlass::half_t,
+                cutlass::layout::ColumnMajor,
+                cutlass::half_t,
+                cutlass::layout::RowMajor,
+                float,
+                cutlass::arch::OpClassTensorOp,
+                cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<64, 64, 32>,
+                cutlass::gemm::GemmShape<32, 32, 32>,
+                cutlass::gemm::GemmShape<16, 8, 8>>;
+            Gemm gemm;
             typename Gemm::Arguments args{
                 problem,
-                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_q_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)),
-                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_k_ptrs + batch_offset),
-                cutlass::layout::ColumnMajor(static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)),
-                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_score_const_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
-                reinterpret_cast<cutlass::half_t * const *>(scratch.attention_score_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
+                {reinterpret_cast<cutlass::half_t const*>(q_base), static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)},
+                qkv_batch_stride,
+                {reinterpret_cast<cutlass::half_t const*>(k_base), static_cast<int>(STREAM1_TRANSFORMER_QKV_STRIDE51)},
+                qkv_batch_stride,
+                {reinterpret_cast<cutlass::half_t const*>(score_base), static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)},
+                score_batch_stride,
+                {reinterpret_cast<cutlass::half_t*>(score_base), static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)},
+                score_batch_stride,
                 {scale, 0.0f},
-                this_batch};
+                static_cast<int>(b_micro)};
             status = gemm(args, nullptr, stream);
-            if (status != cutlass::Status::kSuccess) {
-                break;
-            }
+        } else {
+            throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
         }
-    } else {
-        throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
-    }
-    if (status != cutlass::Status::kSuccess) {
-        throw std::runtime_error("Stream1 piece_transformer QK GemmArray launch failed");
+        if (status != cutlass::Status::kSuccess) {
+            throw std::runtime_error("Stream1 piece_transformer QK GemmBatched launch failed");
+        }
     }
 }
 
-void stream1_transformer_pv_gemm_array_launch(
-    const Stream1TransformerScratchView& scratch,
+void stream1_transformer_pv_batched_launch(
+    const half* qkv,
+    half* scores_probs,
+    half* context,
     std::uint32_t dtype,
     std::uint32_t b_micro,
     cudaStream_t stream) {
+    (void)qkv;
     const cutlass::gemm::GemmCoord problem(
         static_cast<int>(STREAM1_TRANSFORMER_SEQ51),
         static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32),
         static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51));
-    const int batch_count = static_cast<int>(b_micro * STREAM1_TRANSFORMER_NHEAD8);
+    const std::int64_t score_batch_stride = static_cast<std::int64_t>(STREAM1_TRANSFORMER_SCORE_STRIDE51);
+    const std::int64_t context_batch_stride = static_cast<std::int64_t>(
+        STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_DMODEL256);
     cutlass::Status status = cutlass::Status::kSuccess;
-    if (dtype == STREAM1_DTYPE_BF16) {
-        using Gemm = cutlass::gemm::device::GemmArray<
-            cutlass::bfloat16_t,
-            cutlass::layout::RowMajor,
-            cutlass::bfloat16_t,
-            cutlass::layout::RowMajor,
-            cutlass::bfloat16_t,
-            cutlass::layout::RowMajor,
-            float,
-            cutlass::arch::OpClassTensorOp,
-            cutlass::arch::Sm80,
-            cutlass::gemm::GemmShape<64, 32, 32>,
-            cutlass::gemm::GemmShape<32, 32, 32>,
-            cutlass::gemm::GemmShape<16, 8, 16>>;
-        Gemm gemm;
-        for (int batch_offset = 0; batch_offset < batch_count; batch_offset += STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX) {
-            const int remaining = batch_count - batch_offset;
-            const int this_batch = remaining < STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX ? remaining : STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX;
+    for (std::uint32_t head = 0; head < STREAM1_TRANSFORMER_NHEAD8; ++head) {
+        const std::uint64_t head_offset = static_cast<std::uint64_t>(head) * STREAM1_TRANSFORMER_HEAD_DIM32;
+        const half* prob_base = scores_probs +
+            static_cast<std::uint64_t>(head) * b_micro * STREAM1_TRANSFORMER_SCORE_STRIDE51;
+        const half* value_base = prob_base + STREAM1_TRANSFORMER_PROB_STRIDE51;
+        half* context_base = context + head_offset;
+        if (dtype == STREAM1_DTYPE_BF16) {
+            using Gemm = cutlass::gemm::device::GemmBatched<
+                cutlass::bfloat16_t,
+                cutlass::layout::RowMajor,
+                cutlass::bfloat16_t,
+                cutlass::layout::RowMajor,
+                cutlass::bfloat16_t,
+                cutlass::layout::RowMajor,
+                float,
+                cutlass::arch::OpClassTensorOp,
+                cutlass::arch::Sm80,
+                cutlass::gemm::GemmShape<64, 32, 32>,
+                cutlass::gemm::GemmShape<32, 32, 32>,
+                cutlass::gemm::GemmShape<16, 8, 16>>;
+            Gemm gemm;
             typename Gemm::Arguments args{
                 problem,
-                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_prob_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
-                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_v_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32)),
-                reinterpret_cast<cutlass::bfloat16_t const * const *>(scratch.attention_context_const_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)),
-                reinterpret_cast<cutlass::bfloat16_t * const *>(scratch.attention_context_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)),
+                {reinterpret_cast<cutlass::bfloat16_t const*>(prob_base), static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)},
+                score_batch_stride,
+                {reinterpret_cast<cutlass::bfloat16_t const*>(value_base), static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32)},
+                score_batch_stride,
+                {reinterpret_cast<cutlass::bfloat16_t const*>(context_base), static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)},
+                context_batch_stride,
+                {reinterpret_cast<cutlass::bfloat16_t*>(context_base), static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)},
+                context_batch_stride,
                 {1.0f, 0.0f},
-                this_batch};
+                static_cast<int>(b_micro)};
             status = gemm(args, nullptr, stream);
-            if (status != cutlass::Status::kSuccess) {
-                break;
-            }
-        }
-    } else if (dtype == STREAM1_DTYPE_FP16) {
-        using Gemm = cutlass::gemm::device::GemmArray<
-            cutlass::half_t,
-            cutlass::layout::RowMajor,
-            cutlass::half_t,
-            cutlass::layout::RowMajor,
-            cutlass::half_t,
-            cutlass::layout::RowMajor,
-            float,
-            cutlass::arch::OpClassTensorOp,
-            cutlass::arch::Sm75,
-            cutlass::gemm::GemmShape<64, 32, 32>,
-            cutlass::gemm::GemmShape<32, 32, 32>,
-            cutlass::gemm::GemmShape<16, 8, 8>>;
-        Gemm gemm;
-        for (int batch_offset = 0; batch_offset < batch_count; batch_offset += STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX) {
-            const int remaining = batch_count - batch_offset;
-            const int this_batch = remaining < STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX ? remaining : STREAM1_TRANSFORMER_GEMM_ARRAY_BATCH_MAX;
+        } else if (dtype == STREAM1_DTYPE_FP16) {
+            using Gemm = cutlass::gemm::device::GemmBatched<
+                cutlass::half_t,
+                cutlass::layout::RowMajor,
+                cutlass::half_t,
+                cutlass::layout::RowMajor,
+                cutlass::half_t,
+                cutlass::layout::RowMajor,
+                float,
+                cutlass::arch::OpClassTensorOp,
+                cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<64, 32, 32>,
+                cutlass::gemm::GemmShape<32, 32, 32>,
+                cutlass::gemm::GemmShape<16, 8, 8>>;
+            Gemm gemm;
             typename Gemm::Arguments args{
                 problem,
-                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_prob_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)),
-                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_v_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32)),
-                reinterpret_cast<cutlass::half_t const * const *>(scratch.attention_context_const_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)),
-                reinterpret_cast<cutlass::half_t * const *>(scratch.attention_context_ptrs + batch_offset),
-                cutlass::layout::RowMajor(static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)),
+                {reinterpret_cast<cutlass::half_t const*>(prob_base), static_cast<int>(STREAM1_TRANSFORMER_SCORE_ROW_STRIDE51)},
+                score_batch_stride,
+                {reinterpret_cast<cutlass::half_t const*>(value_base), static_cast<int>(STREAM1_TRANSFORMER_HEAD_DIM32)},
+                score_batch_stride,
+                {reinterpret_cast<cutlass::half_t const*>(context_base), static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)},
+                context_batch_stride,
+                {reinterpret_cast<cutlass::half_t*>(context_base), static_cast<int>(STREAM1_TRANSFORMER_DMODEL256)},
+                context_batch_stride,
                 {1.0f, 0.0f},
-                this_batch};
+                static_cast<int>(b_micro)};
             status = gemm(args, nullptr, stream);
-            if (status != cutlass::Status::kSuccess) {
-                break;
-            }
+        } else {
+            throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
         }
-    } else {
-        throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
-    }
-    if (status != cutlass::Status::kSuccess) {
-        throw std::runtime_error("Stream1 piece_transformer PV GemmArray launch failed");
+        if (status != cutlass::Status::kSuccess) {
+            throw std::runtime_error("Stream1 piece_transformer PV GemmBatched launch failed");
+        }
     }
 }
-
 #endif
 
 void stream1_transformer_attention_launch(
@@ -1076,8 +1008,9 @@ void stream1_transformer_attention_launch(
         dims.head_dim != STREAM1_TRANSFORMER_HEAD_DIM32) {
         throw std::invalid_argument("Stream1 piece_transformer tensor attention requires seq_len=51 d_model=256 nhead=8 head_dim=32");
     }
-    if (scratch.attention_scores_probs == nullptr) {
-        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires attention_scores_probs scratch");
+    if (qkv == nullptr || qkv_bias == nullptr || scratch.attention_scores_probs == nullptr ||
+        scratch.attention_context == nullptr) {
+        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires qkv, qkv_bias, score scratch, and attention_context");
     }
 #if BEAM_HAS_CUTLASS
     const std::uint64_t qkv_total = static_cast<std::uint64_t>(b_micro) *
@@ -1087,9 +1020,10 @@ void stream1_transformer_attention_launch(
         256,
         0,
         stream>>>(qkv, qkv_bias, dims.dtype, b_micro);
-    stream1_transformer_qk_gemm_array_launch(scratch, dims.dtype, b_micro, stream);
+    stream1_transformer_qk_batched_launch(qkv, scratch.attention_scores_probs, dims.dtype, b_micro, stream);
     stream1_transformer_pack_v51_kernel<<<
-        static_cast<unsigned>(((static_cast<std::uint64_t>(b_micro) * STREAM1_TRANSFORMER_NHEAD8 * STREAM1_TRANSFORMER_VPACK_STRIDE51) + 255ULL) / 256ULL),
+        static_cast<unsigned>(((static_cast<std::uint64_t>(b_micro) * STREAM1_TRANSFORMER_NHEAD8 *
+            STREAM1_TRANSFORMER_VPACK_STRIDE51) + 255ULL) / 256ULL),
         256,
         0,
         stream>>>(qkv, scratch.attention_scores_probs, dims.dtype, b_micro);
@@ -1098,7 +1032,13 @@ void stream1_transformer_attention_launch(
         256,
         0,
         stream>>>(scratch.attention_scores_probs, dims.dtype, b_micro);
-    stream1_transformer_pv_gemm_array_launch(scratch, dims.dtype, b_micro, stream);
+    stream1_transformer_pv_batched_launch(
+        qkv,
+        scratch.attention_scores_probs,
+        scratch.attention_context,
+        dims.dtype,
+        b_micro,
+        stream);
 #else
     (void)qkv;
     (void)qkv_bias;
@@ -1109,7 +1049,6 @@ void stream1_transformer_attention_launch(
     throw std::invalid_argument("Stream1 piece_transformer tensor attention requires CUTLASS-enabled build");
 #endif
 }
-
 __global__ void stream1_transformer_cls_layernorm_kernel(
     const half* __restrict__ tokens,
     half* __restrict__ cls,
@@ -1243,7 +1182,6 @@ void stream1_transformer_inference_cuda(
         dims.dtype,
         stream);
 
-    stream1_transformer_prepare_attention_ptrs_launch(scratch, b_micro, stream);
 
     for (std::uint32_t layer = 0; layer < dims.transformer_layers; ++layer) {
         const Stream1TransformerBlockView block = network.blocks[layer];

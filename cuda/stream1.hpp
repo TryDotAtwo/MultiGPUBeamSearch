@@ -98,14 +98,6 @@ struct Stream1TransformerScratchView {
     half* tokens;
     half* qkv;
     half* attention_scores_probs;
-    const half** attention_q_ptrs;
-    const half** attention_k_ptrs;
-    const half** attention_score_const_ptrs;
-    half** attention_score_ptrs;
-    const half** attention_prob_ptrs;
-    const half** attention_v_ptrs;
-    const half** attention_context_const_ptrs;
-    half** attention_context_ptrs;
     half* attention_context;
     half* ff_hidden;
     half* logits;

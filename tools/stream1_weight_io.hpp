@@ -156,14 +156,6 @@ struct ScratchAllocation {
     half* transformer_tokens = nullptr;
     half* transformer_qkv = nullptr;
     half* transformer_attention_scores_probs = nullptr;
-    const half** transformer_attention_q_ptrs = nullptr;
-    const half** transformer_attention_k_ptrs = nullptr;
-    const half** transformer_attention_score_const_ptrs = nullptr;
-    half** transformer_attention_score_ptrs = nullptr;
-    const half** transformer_attention_prob_ptrs = nullptr;
-    const half** transformer_attention_v_ptrs = nullptr;
-    const half** transformer_attention_context_const_ptrs = nullptr;
-    half** transformer_attention_context_ptrs = nullptr;
     half* transformer_attention_context = nullptr;
     half* transformer_ff_hidden = nullptr;
     half* transformer_logits = nullptr;
@@ -590,11 +582,9 @@ inline std::uint64_t transformer_scratch_bytes_for_rows(const Stream1ModelConfig
     const std::uint64_t qkv_values = rows * model.seq_len * 3ULL * model.d_model;
     const std::uint64_t score_values = rows * model.nhead * transformer_attention_score_stride(model);
     const std::uint64_t context_values = rows * model.seq_len * model.d_model;
-    const std::uint64_t pointer_values = rows * model.nhead;
     const std::uint64_t ff_values = rows * model.seq_len * model.ff_dim;
     const std::uint64_t logits_values = rows * model.output_dim;
-    return fp16_bytes(token_values + qkv_values + score_values + context_values + ff_values + logits_values) +
-        8ULL * pointer_values * sizeof(void*);
+    return fp16_bytes(token_values + qkv_values + score_values + context_values + ff_values + logits_values);
 }
 
 inline std::uint64_t stream1_scratch_bytes(
@@ -853,20 +843,11 @@ inline ScratchAllocation alloc_stream1_scratch(
             const std::uint64_t qkv_values = rows * model.seq_len * 3ULL * model.d_model;
             const std::uint64_t score_values = rows * model.nhead * transformer_attention_score_stride(model);
             const std::uint64_t context_values = rows * model.seq_len * model.d_model;
-            const std::uint64_t pointer_values = rows * model.nhead;
             const std::uint64_t ff_values = rows * model.seq_len * model.ff_dim;
             const std::uint64_t logits_values = rows * model.output_dim;
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_tokens, token_values * sizeof(half)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_qkv, qkv_values * sizeof(half)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_scores_probs, score_values * sizeof(half)));
-            BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&scratch.transformer_attention_q_ptrs), pointer_values * sizeof(void*)));
-            BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&scratch.transformer_attention_k_ptrs), pointer_values * sizeof(void*)));
-            BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&scratch.transformer_attention_score_const_ptrs), pointer_values * sizeof(void*)));
-            BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&scratch.transformer_attention_score_ptrs), pointer_values * sizeof(void*)));
-            BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&scratch.transformer_attention_prob_ptrs), pointer_values * sizeof(void*)));
-            BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&scratch.transformer_attention_v_ptrs), pointer_values * sizeof(void*)));
-            BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&scratch.transformer_attention_context_const_ptrs), pointer_values * sizeof(void*)));
-            BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&scratch.transformer_attention_context_ptrs), pointer_values * sizeof(void*)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_context, context_values * sizeof(half)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_ff_hidden, ff_values * sizeof(half)));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_logits, logits_values * sizeof(half)));
@@ -886,14 +867,6 @@ inline void free_stream1_scratch(ScratchAllocation& scratch) {
     cudaFree(scratch.transformer_tokens);
     cudaFree(scratch.transformer_qkv);
     cudaFree(scratch.transformer_attention_scores_probs);
-    cudaFree(scratch.transformer_attention_q_ptrs);
-    cudaFree(scratch.transformer_attention_k_ptrs);
-    cudaFree(scratch.transformer_attention_score_const_ptrs);
-    cudaFree(scratch.transformer_attention_score_ptrs);
-    cudaFree(scratch.transformer_attention_prob_ptrs);
-    cudaFree(scratch.transformer_attention_v_ptrs);
-    cudaFree(scratch.transformer_attention_context_const_ptrs);
-    cudaFree(scratch.transformer_attention_context_ptrs);
     cudaFree(scratch.transformer_attention_context);
     cudaFree(scratch.transformer_ff_hidden);
     cudaFree(scratch.transformer_logits);
@@ -1013,14 +986,6 @@ inline Stream1TransformerScratchView transformer_scratch_view(const ScratchAlloc
         scratch.transformer_tokens,
         scratch.transformer_qkv,
         scratch.transformer_attention_scores_probs,
-        scratch.transformer_attention_q_ptrs,
-        scratch.transformer_attention_k_ptrs,
-        scratch.transformer_attention_score_const_ptrs,
-        scratch.transformer_attention_score_ptrs,
-        scratch.transformer_attention_prob_ptrs,
-        scratch.transformer_attention_v_ptrs,
-        scratch.transformer_attention_context_const_ptrs,
-        scratch.transformer_attention_context_ptrs,
         scratch.transformer_attention_context,
         scratch.transformer_ff_hidden,
         scratch.transformer_logits};
@@ -1039,17 +1004,7 @@ inline Stream1TransformerScratchView transformer_scratch_view(
     return Stream1TransformerScratchView{
         scratch.transformer_tokens + lane_rows * model.seq_len * model.d_model,
         scratch.transformer_qkv + lane_rows * model.seq_len * 3ULL * model.d_model,
-        scratch.transformer_attention_scores_probs == nullptr
-            ? nullptr
-            : scratch.transformer_attention_scores_probs + lane_rows * model.nhead * transformer_attention_score_stride(model),
-        scratch.transformer_attention_q_ptrs == nullptr ? nullptr : scratch.transformer_attention_q_ptrs + lane_rows * model.nhead,
-        scratch.transformer_attention_k_ptrs == nullptr ? nullptr : scratch.transformer_attention_k_ptrs + lane_rows * model.nhead,
-        scratch.transformer_attention_score_const_ptrs == nullptr ? nullptr : scratch.transformer_attention_score_const_ptrs + lane_rows * model.nhead,
-        scratch.transformer_attention_score_ptrs == nullptr ? nullptr : scratch.transformer_attention_score_ptrs + lane_rows * model.nhead,
-        scratch.transformer_attention_prob_ptrs == nullptr ? nullptr : scratch.transformer_attention_prob_ptrs + lane_rows * model.nhead,
-        scratch.transformer_attention_v_ptrs == nullptr ? nullptr : scratch.transformer_attention_v_ptrs + lane_rows * model.nhead,
-        scratch.transformer_attention_context_const_ptrs == nullptr ? nullptr : scratch.transformer_attention_context_const_ptrs + lane_rows * model.nhead,
-        scratch.transformer_attention_context_ptrs == nullptr ? nullptr : scratch.transformer_attention_context_ptrs + lane_rows * model.nhead,
+        scratch.transformer_attention_scores_probs + lane_rows * model.nhead * transformer_attention_score_stride(model),
         scratch.transformer_attention_context + lane_rows * model.seq_len * model.d_model,
         scratch.transformer_ff_hidden + lane_rows * model.seq_len * model.ff_dim,
         scratch.transformer_logits + lane_rows * model.output_dim};
