@@ -442,3 +442,5 @@
 - User requested rewriting the Stream1 transformer hot path after Nsight showed the implementation was still far from the expected MLP-relative speed: no fallbacks, no distillation, work with the transformer backend directly, keep MLP separate/untouched, and use Nsight/profiling to find the next bottleneck.
 - User requested cleaning and rewriting the Stream1 transformer inference path from scratch after the previous implementation was considered overcomplicated, with no fallbacks or distillation, keeping MLP files/path separate and preserving transformer correctness and speed.
 - User requested running the current clean Stream1 piece-transformer backend on Kaggle 2xT4 "as it will be" and directly answering whether it is still slower than the PyTorch fast path on Kaggle.
+
+- User requested a Kaggle 2xT4 comparison between the native CUTLASS Stream1 MLP benchmark and an equivalent PyTorch MLP inference benchmark, to understand how native vs Torch speeds compare on the same exported MLP weights.

@@ -51,7 +51,7 @@ def parse_initial_state(test_csv: Path, puzzle_id: int, state_len: int) -> List[
     with test_csv.open("r", encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
-            raw_id = row.get("id") or row.get("puzzle_id") or row.get("ID")
+            raw_id = row.get("id") or row.get("puzzle_id") or row.get("initial_state_id") or row.get("ID")
             if raw_id is None or int(raw_id) != puzzle_id:
                 continue
             raw_state = row.get("initial_state") or row.get("state")
