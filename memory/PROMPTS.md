@@ -1,6 +1,7 @@
 # Prompt History
 
 ## 2026-07-03
+- User requested first making the native Stream1 transformer attention path behave like PyTorch SDPA, then trying to improve beyond that, while preserving the no-fallback/no-distillation rule and not touching the MLP path.
 - User requested continuing the Stream1 transformer optimization toward a fused transformer inference backend using CUTLASS/FlashAttention-style GPU kernels, with separate transformer files/paths, no fallback behavior, no distillation, and no breakage to the existing MLP path.
 ## 2026-07-02
 - User requested investigating how PyTorch runs the Kaggle Megaminx transformer fast path and why the native Stream1 piece-transformer implementation is slower, with comparison against existing native/PyTorch MLP evidence and no fallback or distillation direction.

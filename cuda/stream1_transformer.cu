@@ -369,7 +369,8 @@ __global__ void stream1_transformer_pack_v51_kernel(
         dtype);
 }
 enum class Stream1TransformerAttentionBackend : std::uint32_t {
-    Sm75Fp16Tensor,
+    Sm75Fp16Fmha,
+    Sm80Fp16Fmha,
     Sm80Bf16Fmha,
 };
 
@@ -378,22 +379,33 @@ Stream1TransformerAttentionBackend stream1_transformer_select_attention_backend(
     BEAM_CUDA_CHECK(cudaGetDevice(&device));
     cudaDeviceProp prop{};
     BEAM_CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+#if BEAM_HAS_CUTLASS_FMHA
     if (dtype == STREAM1_DTYPE_BF16) {
         if (prop.major >= 8) {
-#if BEAM_HAS_CUTLASS_FMHA
             return Stream1TransformerAttentionBackend::Sm80Bf16Fmha;
-#else
-            throw std::invalid_argument("Stream1 piece_transformer bf16 requires CUTLASS FMHA example headers for SM80+");
-#endif
         }
         throw std::invalid_argument("Stream1 piece_transformer bf16 attention requires SM80+; export fp16 weights for T4/SM75");
     }
     if (dtype == STREAM1_DTYPE_FP16) {
+        if (prop.major >= 8) {
+            return Stream1TransformerAttentionBackend::Sm80Fp16Fmha;
+        }
         if (prop.major > 7 || (prop.major == 7 && prop.minor >= 5)) {
-            return Stream1TransformerAttentionBackend::Sm75Fp16Tensor;
+            return Stream1TransformerAttentionBackend::Sm75Fp16Fmha;
+        }
+        throw std::invalid_argument("Stream1 piece_transformer fp16 FMHA requires SM75+ GPU");
+    }
+#else
+    if (dtype == STREAM1_DTYPE_BF16) {
+        throw std::invalid_argument("Stream1 piece_transformer bf16 requires CUTLASS FMHA example headers for SM80+");
+    }
+    if (dtype == STREAM1_DTYPE_FP16) {
+        if (prop.major > 7 || (prop.major == 7 && prop.minor >= 5)) {
+            throw std::invalid_argument("Stream1 piece_transformer fp16 requires CUTLASS FMHA example headers for SDPA-style attention");
         }
         throw std::invalid_argument("Stream1 piece_transformer fp16 attention requires SM75+ GPU");
     }
+#endif
     throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
 }
 
@@ -799,44 +811,6 @@ void stream1_transformer_pv_batched_launch_typed(
     }
 }
 
-void stream1_transformer_qk_batched_launch(
-    const half* qkv,
-    half* scores_probs,
-    Stream1TransformerAttentionBackend backend,
-    std::uint32_t b_micro,
-    cudaStream_t stream) {
-    switch (backend) {
-    case Stream1TransformerAttentionBackend::Sm75Fp16Tensor:
-        stream1_transformer_qk_batched_launch_typed<
-            cutlass::half_t,
-            cutlass::arch::Sm75,
-            cutlass::gemm::GemmShape<16, 8, 8>>(qkv, scores_probs, b_micro, stream);
-        return;
-    case Stream1TransformerAttentionBackend::Sm80Bf16Fmha:
-        break;
-    }
-    throw std::invalid_argument("Stream1 piece_transformer unknown attention backend");
-}
-
-void stream1_transformer_pv_batched_launch(
-    const half* qkv,
-    half* scores_probs,
-    half* context,
-    Stream1TransformerAttentionBackend backend,
-    std::uint32_t b_micro,
-    cudaStream_t stream) {
-    switch (backend) {
-    case Stream1TransformerAttentionBackend::Sm75Fp16Tensor:
-        stream1_transformer_pv_batched_launch_typed<
-            cutlass::half_t,
-            cutlass::arch::Sm75,
-            cutlass::gemm::GemmShape<16, 8, 8>>(qkv, scores_probs, context, b_micro, stream);
-        return;
-    case Stream1TransformerAttentionBackend::Sm80Bf16Fmha:
-        break;
-    }
-    throw std::invalid_argument("Stream1 piece_transformer unknown attention backend");
-}
 #endif
 void stream1_transformer_attention_launch(
     half* qkv,
@@ -856,35 +830,15 @@ void stream1_transformer_attention_launch(
         throw std::invalid_argument("Stream1 piece_transformer tensor attention requires qkv, score scratch, and attention_context");
     }
 #if BEAM_HAS_CUTLASS
-    if (attention_backend == Stream1TransformerAttentionBackend::Sm80Bf16Fmha) {
-        stream1_transformer_fmha_attention_cuda(
-            qkv,
-            scratch.attention_scores_probs,
-            scratch.attention_context,
-            dims,
-            b_micro,
-            stream);
-        return;
-    }
-    stream1_transformer_qk_batched_launch(qkv, scratch.attention_scores_probs, attention_backend, b_micro, stream);
-    stream1_transformer_pack_v51_kernel<<<
-        static_cast<unsigned>(((static_cast<std::uint64_t>(b_micro) * STREAM1_TRANSFORMER_NHEAD8 *
-            STREAM1_TRANSFORMER_HEAD_OUTPUT_STRIDE51) + 255ULL) / 256ULL),
-        256,
-        0,
-        stream>>>(qkv, scratch.attention_scores_probs, dims.dtype, b_micro);
-    stream1_transformer_softmax51_kernel<<<
-        dim3(b_micro, STREAM1_TRANSFORMER_NHEAD8),
-        256,
-        0,
-        stream>>>(scratch.attention_scores_probs, dims.dtype, b_micro);
-    stream1_transformer_pv_batched_launch(
+    stream1_transformer_fmha_attention_cuda(
         qkv,
         scratch.attention_scores_probs,
         scratch.attention_context,
-        attention_backend,
+        dims,
+        attention_backend == Stream1TransformerAttentionBackend::Sm75Fp16Fmha,
         b_micro,
         stream);
+    return;
 
 #else
     (void)qkv;

@@ -125,6 +125,7 @@ void stream1_transformer_fmha_attention_cuda(
     half* packed_qkv,
     half* context,
     Stream1TransformerDims dims,
+    bool sm75_fp16,
     std::uint32_t b_micro,
     cudaStream_t stream) {
     if (dims.seq_len != FMHA_SEQ51 || dims.d_model != FMHA_DMODEL256 ||
@@ -141,6 +142,13 @@ void stream1_transformer_fmha_attention_cuda(
         256,
         0,
         stream>>>(qkv, packed_qkv, dims.dtype, b_micro);
+    if (sm75_fp16) {
+        if (dims.dtype != STREAM1_DTYPE_FP16) {
+            throw std::invalid_argument("Stream1 piece_transformer SM75 CUTLASS FMHA requires fp16");
+        }
+        stream1_transformer_fmha_launch_typed<cutlass::half_t, cutlass::arch::Sm75>(packed_qkv, context, b_micro, stream);
+        return;
+    }
     if (dims.dtype == STREAM1_DTYPE_BF16) {
         stream1_transformer_fmha_launch_typed<cutlass::bfloat16_t, cutlass::arch::Sm80>(packed_qkv, context, b_micro, stream);
         return;
@@ -155,6 +163,7 @@ void stream1_transformer_fmha_attention_cuda(
     (void)packed_qkv;
     (void)context;
     (void)dims;
+    (void)sm75_fp16;
     (void)b_micro;
     (void)stream;
     throw std::invalid_argument("Stream1 piece_transformer CUTLASS FMHA requires CUTLASS example 41 headers");

@@ -9,6 +9,7 @@ void stream1_transformer_fmha_attention_cuda(
     half* packed_qkv,
     half* context,
     Stream1TransformerDims dims,
+    bool sm75_fp16,
     std::uint32_t b_micro,
     cudaStream_t stream);
 
