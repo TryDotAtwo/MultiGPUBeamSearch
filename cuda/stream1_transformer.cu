@@ -11,8 +11,11 @@
 
 #if BEAM_HAS_CUTLASS
 #include <cutlass/bfloat16.h>
+#include <cutlass/epilogue/thread/activation.h>
+#include <cutlass/epilogue/thread/linear_combination_bias_elementwise.h>
 #include <cutlass/gemm/device/gemm.h>
 #include <cutlass/gemm/device/gemm_batched.h>
+#include <cutlass/gemm/device/gemm_universal_with_broadcast.h>
 #include <cutlass/layout/matrix.h>
 #include <cutlass/numeric_types.h>
 #endif
@@ -482,6 +485,117 @@ void stream1_transformer_linear_residual_cuda(
 }
 
 template <typename Element, typename ArchTag, typename InstructionShape>
+void stream1_transformer_ff1_linear_bias_silu_typed(
+    const half* input,
+    const half* weight,
+    const half* bias,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    cudaStream_t stream) {
+    constexpr int elements_per_access = 128 / cutlass::sizeof_bits<Element>::value;
+    using Epilogue = cutlass::epilogue::thread::LinearCombinationBiasElementwise<
+        Element,
+        float,
+        float,
+        Element,
+        Element,
+        elements_per_access,
+        cutlass::epilogue::thread::SiLu<float>,
+        cutlass::plus<float>,
+        false,
+        Element>;
+    using Gemm = cutlass::gemm::device::GemmUniversalWithBroadcast<
+        Element,
+        cutlass::layout::RowMajor,
+        Element,
+        cutlass::layout::RowMajor,
+        Element,
+        cutlass::layout::RowMajor,
+        float,
+        cutlass::arch::OpClassTensorOp,
+        ArchTag,
+        cutlass::gemm::GemmShape<128, 64, 32>,
+        cutlass::gemm::GemmShape<64, 32, 32>,
+        InstructionShape,
+        Epilogue>;
+
+    const cutlass::gemm::GemmCoord problem(
+        static_cast<int>(rows),
+        static_cast<int>(output_cols),
+        static_cast<int>(input_cols));
+    typename Epilogue::Params epilogue_params{1.0f, 0.0f};
+    const std::int64_t batch_stride_a = static_cast<std::int64_t>(rows) * input_cols;
+    const std::int64_t batch_stride_b = static_cast<std::int64_t>(input_cols) * output_cols;
+    const std::int64_t batch_stride_output = static_cast<std::int64_t>(rows) * output_cols;
+
+    typename Gemm::Arguments args(
+        cutlass::gemm::GemmUniversalMode::kGemm,
+        problem,
+        1,
+        epilogue_params,
+        reinterpret_cast<Element const*>(input),
+        reinterpret_cast<Element const*>(weight),
+        reinterpret_cast<Element const*>(output),
+        reinterpret_cast<Element*>(output),
+        const_cast<Element*>(reinterpret_cast<Element const*>(bias)),
+        nullptr,
+        batch_stride_a,
+        batch_stride_b,
+        batch_stride_output,
+        batch_stride_output,
+        0,
+        0,
+        static_cast<int>(input_cols),
+        static_cast<int>(output_cols),
+        static_cast<int>(output_cols),
+        static_cast<int>(output_cols),
+        0,
+        static_cast<int>(output_cols));
+
+    Gemm gemm;
+    const cutlass::Status status = gemm(args, nullptr, stream);
+    if (status != cutlass::Status::kSuccess) {
+        throw std::runtime_error("Stream1 piece_transformer FF1 fused GEMM launch failed");
+    }
+}
+
+void stream1_transformer_ff1_linear_bias_silu_cuda(
+    const half* input,
+    const half* weight,
+    const half* bias,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    if (dtype == STREAM1_DTYPE_BF16) {
+        int device = 0;
+        cudaDeviceProp prop{};
+        BEAM_CUDA_CHECK(cudaGetDevice(&device));
+        BEAM_CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+        if (prop.major < 8) {
+            throw std::invalid_argument("Stream1 piece_transformer bf16 FF1 fused GEMM requires SM80+");
+        }
+        stream1_transformer_ff1_linear_bias_silu_typed<
+            cutlass::bfloat16_t,
+            cutlass::arch::Sm80,
+            cutlass::gemm::GemmShape<16, 8, 16>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+        return;
+    }
+    if (dtype == STREAM1_DTYPE_FP16) {
+        stream1_transformer_ff1_linear_bias_silu_typed<
+            cutlass::half_t,
+            cutlass::arch::Sm75,
+            cutlass::gemm::GemmShape<16, 8, 8>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+        return;
+    }
+    throw std::invalid_argument("Stream1 piece_transformer FF1 fused GEMM dtype must be fp16 or bf16");
+}
+
+template <typename Element, typename ArchTag, typename InstructionShape>
 void stream1_transformer_qk_batched_launch_typed(
     const half* qkv,
     half* scores_probs,
@@ -875,21 +989,16 @@ void stream1_transformer_inference_cuda(
             dims.d_model,
             dims.dtype,
             stream);
-        stream1_cutlass_linear_cuda(
+        stream1_transformer_ff1_linear_bias_silu_cuda(
             scratch.attention_context,
             block.ff1_weight,
+            block.ff1_bias,
             scratch.ff_hidden,
             token_rows,
             dims.d_model,
             dims.ff_dim,
             dims.dtype,
             stream);
-        stream1_transformer_bias_silu_kernel<<<(token_rows * dims.ff_dim + 255U) / 256U, 256, 0, stream>>>(
-            scratch.ff_hidden,
-            block.ff1_bias,
-            token_rows,
-            dims.ff_dim,
-            dims.dtype);
         stream1_transformer_linear_residual_cuda(
             scratch.ff_hidden,
             block.ff2_weight,
