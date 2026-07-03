@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-03
+- Updated `kaggle_t4_transformer_benchmark/t4-transformer-stream1-benchmark.ipynb` to pin the next 2xT4 Stream1 transformer benchmark to tag `stream1-transformer-strided-fmha-6d29ac4` with expected commit prefix `6d29ac4`. Notebook JSON and code-cell AST validation passed.
 - Ran Kaggle 2xT4 benchmark version 11 against tag `stream1-transformer-fmha-44352f1`. The CUTLASS FMHA attention route completed successfully with best T4 throughput `502218.5` candidates/s on GPU0 and `500790.0` on GPU1, aggregate `1003008.5` candidates/s. This is `1.077x` of v10 graph replay and about `0.80x` of the PyTorch SDPA reference. Evidence: `test_results/stream1_transformer_kaggle_benchmark_v11_fmha_2026-07-03.md`.
 - Improved the Stream1 `piece_transformer` FMHA route by removing the explicit QKV repack kernel and passing the original QKV projection buffer directly to CUTLASS FMHA via strided Q/K/V pointers. Docker verification rebuilt SM75/SM86 targets and passed `stream1_transformer_cuda_tests`, `dispatcher_cuda_tests`, and `contract_tests`; local SM86 graph points reached `698530.6` candidates/s at `512x2` and `737089.2` at `1024x1`. Evidence: `test_results/stream1_transformer_fmha_strided_qkv_2026-07-03.md`.
 - Updated `kaggle_t4_transformer_benchmark/t4-transformer-stream1-benchmark.ipynb` to pin the next 2xT4 Stream1 transformer benchmark to tag `stream1-transformer-fmha-44352f1` with expected commit prefix `44352f1`. Notebook JSON and code-cell AST validation passed.
