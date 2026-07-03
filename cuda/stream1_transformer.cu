@@ -283,6 +283,39 @@ __global__ void stream1_transformer_bias_add_kernel(
     stream1_transformer_store_scalar_device(matrix, i, x, dtype);
 }
 
+__global__ void stream1_transformer_bias_add256_fp16_kernel(
+    half* __restrict__ matrix,
+    const half* __restrict__ bias,
+    std::uint32_t rows) {
+    const std::uint32_t row = blockIdx.x;
+    const std::uint32_t tid = threadIdx.x;
+    if (row >= rows || tid >= 128U) {
+        return;
+    }
+    const std::uint64_t idx = static_cast<std::uint64_t>(row) * 256ULL + static_cast<std::uint64_t>(tid) * 2ULL;
+    const half2 x = *reinterpret_cast<const half2*>(matrix + idx);
+    const half2 b = *reinterpret_cast<const half2*>(bias + static_cast<std::uint64_t>(tid) * 2ULL);
+    *reinterpret_cast<half2*>(matrix + idx) = __hadd2(x, b);
+}
+
+void stream1_transformer_bias_add_launch(
+    half* matrix,
+    const half* bias,
+    std::uint32_t rows,
+    std::uint32_t cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    if (cols == 256U && dtype == STREAM1_DTYPE_FP16) {
+        stream1_transformer_bias_add256_fp16_kernel<<<rows, 128, 0, stream>>>(matrix, bias, rows);
+        return;
+    }
+    stream1_transformer_bias_add_kernel<<<(rows * cols + 255U) / 256U, 256, 0, stream>>>(
+        matrix,
+        bias,
+        rows,
+        cols,
+        dtype);
+}
 constexpr std::uint32_t STREAM1_TRANSFORMER_SEQ51 = 51U;
 constexpr std::uint32_t STREAM1_TRANSFORMER_DMODEL256 = 256U;
 constexpr std::uint32_t STREAM1_TRANSFORMER_HEAD_DIM32 = 32U;
@@ -1020,12 +1053,13 @@ void stream1_transformer_inference_cuda(
             dims.d_model,
             dims.dtype,
             stream);
-        stream1_transformer_bias_add_kernel<<<(token_rows * dims.d_model + 255U) / 256U, 256, 0, stream>>>(
+        stream1_transformer_bias_add_launch(
             scratch.tokens,
             block.attn_out_bias,
             token_rows,
             dims.d_model,
-            dims.dtype);
+            dims.dtype,
+            stream);
 
         stream1_transformer_layernorm_copy_launch(
             scratch.tokens,
@@ -1055,12 +1089,13 @@ void stream1_transformer_inference_cuda(
             dims.d_model,
             dims.dtype,
             stream);
-        stream1_transformer_bias_add_kernel<<<(token_rows * dims.d_model + 255U) / 256U, 256, 0, stream>>>(
+        stream1_transformer_bias_add_launch(
             scratch.tokens,
             block.ff2_bias,
             token_rows,
             dims.d_model,
-            dims.dtype);
+            dims.dtype,
+            stream);
     }
 
     stream1_transformer_cls_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
