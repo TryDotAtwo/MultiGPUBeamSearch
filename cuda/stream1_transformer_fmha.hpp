@@ -6,7 +6,6 @@ namespace beam {
 
 void stream1_transformer_fmha_attention_cuda(
     half* qkv,
-    const half* qkv_bias,
     half* packed_qkv,
     half* context,
     Stream1TransformerDims dims,

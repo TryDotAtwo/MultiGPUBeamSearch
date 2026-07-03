@@ -42,7 +42,6 @@ __device__ void stream1_fmha_store_scalar_device(half* ptr, std::uint64_t idx, f
 
 __global__ void stream1_transformer_fmha_pack_qkv_bmhk51_kernel(
     const half* __restrict__ qkv,
-    const half* __restrict__ qkv_bias,
     half* __restrict__ packed_qkv,
     std::uint32_t dtype,
     std::uint32_t b_micro) {
@@ -63,8 +62,7 @@ __global__ void stream1_transformer_fmha_pack_qkv_bmhk51_kernel(
         static_cast<std::uint64_t>(head) * FMHA_HEAD_DIM32 + dim;
     const std::uint64_t src_idx = static_cast<std::uint64_t>(row) * FMHA_SEQ51 * FMHA_QKV_STRIDE51 +
         static_cast<std::uint64_t>(token) * FMHA_QKV_STRIDE51 + qkv_col;
-    const float value = stream1_fmha_load_scalar_device(qkv, src_idx, dtype) +
-        stream1_fmha_load_scalar_device(qkv_bias, qkv_col, dtype);
+    const float value = stream1_fmha_load_scalar_device(qkv, src_idx, dtype);
     stream1_fmha_store_scalar_device(packed_qkv, i, value, dtype);
 }
 
@@ -124,7 +122,6 @@ void stream1_transformer_fmha_launch_typed(
 
 void stream1_transformer_fmha_attention_cuda(
     half* qkv,
-    const half* qkv_bias,
     half* packed_qkv,
     half* context,
     Stream1TransformerDims dims,
@@ -134,8 +131,8 @@ void stream1_transformer_fmha_attention_cuda(
         dims.nhead != FMHA_NHEAD8 || dims.head_dim != FMHA_HEAD_DIM32) {
         throw std::invalid_argument("Stream1 piece_transformer CUTLASS FMHA requires seq_len=51 d_model=256 nhead=8 head_dim=32");
     }
-    if (qkv == nullptr || qkv_bias == nullptr || packed_qkv == nullptr || context == nullptr) {
-        throw std::invalid_argument("Stream1 piece_transformer CUTLASS FMHA requires qkv, qkv_bias, packed_qkv, and context");
+    if (qkv == nullptr || packed_qkv == nullptr || context == nullptr) {
+        throw std::invalid_argument("Stream1 piece_transformer CUTLASS FMHA requires qkv, packed_qkv, and context");
     }
 #if BEAM_HAS_CUTLASS && BEAM_HAS_CUTLASS_FMHA
     const std::uint64_t qkv_total = static_cast<std::uint64_t>(b_micro) * FMHA_SEQ51 * FMHA_QKV_STRIDE51;
@@ -143,7 +140,7 @@ void stream1_transformer_fmha_attention_cuda(
         static_cast<unsigned>((qkv_total + 255ULL) / 256ULL),
         256,
         0,
-        stream>>>(qkv, qkv_bias, packed_qkv, dims.dtype, b_micro);
+        stream>>>(qkv, packed_qkv, dims.dtype, b_micro);
     if (dims.dtype == STREAM1_DTYPE_BF16) {
         stream1_transformer_fmha_launch_typed<cutlass::bfloat16_t, cutlass::arch::Sm80>(packed_qkv, context, b_micro, stream);
         return;
@@ -155,7 +152,6 @@ void stream1_transformer_fmha_attention_cuda(
     throw std::invalid_argument("Stream1 piece_transformer CUTLASS FMHA dtype must be fp16 or bf16");
 #else
     (void)qkv;
-    (void)qkv_bias;
     (void)packed_qkv;
     (void)context;
     (void)dims;

@@ -287,22 +287,6 @@ constexpr std::uint32_t STREAM1_TRANSFORMER_HEAD_OUTPUT_STRIDE51 =
 constexpr std::uint32_t STREAM1_TRANSFORMER_SCORE_STRIDE51 =
     STREAM1_TRANSFORMER_PROB_STRIDE51 + STREAM1_TRANSFORMER_HEAD_OUTPUT_STRIDE51;
 
-__global__ void stream1_transformer_add_qkv_bias_kernel(
-    half* __restrict__ qkv,
-    const half* __restrict__ qkv_bias,
-    std::uint32_t dtype,
-    std::uint32_t b_micro) {
-    const std::uint64_t i = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::uint64_t total = static_cast<std::uint64_t>(b_micro) *
-        STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51;
-    if (i >= total) {
-        return;
-    }
-    const std::uint32_t col = static_cast<std::uint32_t>(i % STREAM1_TRANSFORMER_QKV_STRIDE51);
-    const float x = stream1_transformer_load_scalar_device(qkv, i, dtype) +
-        stream1_transformer_load_scalar_device(qkv_bias, col, dtype);
-    stream1_transformer_store_scalar_device(qkv, i, x, dtype);
-}
 
 __global__ void stream1_transformer_softmax51_kernel(
     half* __restrict__ scores_probs,
@@ -484,6 +468,116 @@ void stream1_transformer_linear_residual_cuda(
     throw std::invalid_argument("Stream1 piece_transformer residual GEMM dtype must be fp16 or bf16");
 }
 
+template <typename Element, typename ArchTag, typename InstructionShape>
+void stream1_transformer_linear_bias_typed(
+    const half* input,
+    const half* weight,
+    const half* bias,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    cudaStream_t stream) {
+    constexpr int elements_per_access = 128 / cutlass::sizeof_bits<Element>::value;
+    using Epilogue = cutlass::epilogue::thread::LinearCombinationBiasElementwise<
+        Element,
+        float,
+        float,
+        Element,
+        Element,
+        elements_per_access,
+        cutlass::epilogue::thread::Identity<float>,
+        cutlass::plus<float>,
+        false,
+        Element>;
+    using Gemm = cutlass::gemm::device::GemmUniversalWithBroadcast<
+        Element,
+        cutlass::layout::RowMajor,
+        Element,
+        cutlass::layout::RowMajor,
+        Element,
+        cutlass::layout::RowMajor,
+        float,
+        cutlass::arch::OpClassTensorOp,
+        ArchTag,
+        cutlass::gemm::GemmShape<128, 64, 32>,
+        cutlass::gemm::GemmShape<64, 32, 32>,
+        InstructionShape,
+        Epilogue>;
+
+    const cutlass::gemm::GemmCoord problem(
+        static_cast<int>(rows),
+        static_cast<int>(output_cols),
+        static_cast<int>(input_cols));
+    typename Epilogue::Params epilogue_params{1.0f, 0.0f};
+    const std::int64_t batch_stride_a = static_cast<std::int64_t>(rows) * input_cols;
+    const std::int64_t batch_stride_b = static_cast<std::int64_t>(input_cols) * output_cols;
+    const std::int64_t batch_stride_output = static_cast<std::int64_t>(rows) * output_cols;
+
+    typename Gemm::Arguments args(
+        cutlass::gemm::GemmUniversalMode::kGemm,
+        problem,
+        1,
+        epilogue_params,
+        reinterpret_cast<Element const*>(input),
+        reinterpret_cast<Element const*>(weight),
+        reinterpret_cast<Element const*>(output),
+        reinterpret_cast<Element*>(output),
+        const_cast<Element*>(reinterpret_cast<Element const*>(bias)),
+        nullptr,
+        batch_stride_a,
+        batch_stride_b,
+        batch_stride_output,
+        batch_stride_output,
+        0,
+        0,
+        static_cast<int>(input_cols),
+        static_cast<int>(output_cols),
+        static_cast<int>(output_cols),
+        static_cast<int>(output_cols),
+        0,
+        static_cast<int>(output_cols));
+
+    Gemm gemm;
+    const cutlass::Status status = gemm(args, nullptr, stream);
+    if (status != cutlass::Status::kSuccess) {
+        throw std::runtime_error("Stream1 piece_transformer linear+bias GEMM launch failed");
+    }
+}
+
+void stream1_transformer_linear_bias_cuda(
+    const half* input,
+    const half* weight,
+    const half* bias,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    if (dtype == STREAM1_DTYPE_BF16) {
+        int device = 0;
+        cudaDeviceProp prop{};
+        BEAM_CUDA_CHECK(cudaGetDevice(&device));
+        BEAM_CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+        if (prop.major < 8) {
+            throw std::invalid_argument("Stream1 piece_transformer bf16 linear+bias GEMM requires SM80+");
+        }
+        stream1_transformer_linear_bias_typed<
+            cutlass::bfloat16_t,
+            cutlass::arch::Sm80,
+            cutlass::gemm::GemmShape<16, 8, 16>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+        return;
+    }
+    if (dtype == STREAM1_DTYPE_FP16) {
+        stream1_transformer_linear_bias_typed<
+            cutlass::half_t,
+            cutlass::arch::Sm75,
+            cutlass::gemm::GemmShape<16, 8, 8>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+        return;
+    }
+    throw std::invalid_argument("Stream1 piece_transformer linear+bias GEMM dtype must be fp16 or bf16");
+}
 template <typename Element, typename ArchTag, typename InstructionShape>
 void stream1_transformer_ff1_linear_bias_silu_typed(
     const half* input,
@@ -746,7 +840,6 @@ void stream1_transformer_pv_batched_launch(
 #endif
 void stream1_transformer_attention_launch(
     half* qkv,
-    const half* qkv_bias,
     const Stream1TransformerScratchView& scratch,
     Stream1TransformerDims dims,
     std::uint32_t b_micro,
@@ -758,17 +851,14 @@ void stream1_transformer_attention_launch(
         dims.head_dim != STREAM1_TRANSFORMER_HEAD_DIM32) {
         throw std::invalid_argument("Stream1 piece_transformer tensor attention requires seq_len=51 d_model=256 nhead=8 head_dim=32");
     }
-    if (qkv == nullptr || qkv_bias == nullptr || scratch.attention_scores_probs == nullptr ||
+    if (qkv == nullptr || scratch.attention_scores_probs == nullptr ||
         scratch.attention_context == nullptr) {
-        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires qkv, qkv_bias, score scratch, and attention_context");
+        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires qkv, score scratch, and attention_context");
     }
 #if BEAM_HAS_CUTLASS
-    const std::uint64_t qkv_total = static_cast<std::uint64_t>(b_micro) *
-        STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_QKV_STRIDE51;
     if (attention_backend == Stream1TransformerAttentionBackend::Sm80Bf16Fmha) {
         stream1_transformer_fmha_attention_cuda(
             qkv,
-            qkv_bias,
             scratch.attention_scores_probs,
             scratch.attention_context,
             dims,
@@ -776,11 +866,6 @@ void stream1_transformer_attention_launch(
             stream);
         return;
     }
-    stream1_transformer_add_qkv_bias_kernel<<<
-        static_cast<unsigned>((qkv_total + 255ULL) / 256ULL),
-        256,
-        0,
-        stream>>>(qkv, qkv_bias, dims.dtype, b_micro);
     stream1_transformer_qk_batched_launch(qkv, scratch.attention_scores_probs, attention_backend, b_micro, stream);
     stream1_transformer_pack_v51_kernel<<<
         static_cast<unsigned>(((static_cast<std::uint64_t>(b_micro) * STREAM1_TRANSFORMER_NHEAD8 *
@@ -803,7 +888,6 @@ void stream1_transformer_attention_launch(
 
 #else
     (void)qkv;
-    (void)qkv_bias;
     (void)scratch;
     (void)dims;
     (void)b_micro;
@@ -947,9 +1031,10 @@ void stream1_transformer_inference_cuda(
             dims.d_model,
             dims.dtype,
             stream);
-        stream1_cutlass_linear_cuda(
+        stream1_transformer_linear_bias_cuda(
             scratch.attention_context,
             block.attn_qkv_weight,
+            block.attn_qkv_bias,
             scratch.qkv,
             token_rows,
             dims.d_model,
@@ -958,7 +1043,6 @@ void stream1_transformer_inference_cuda(
             stream);
         stream1_transformer_attention_launch(
             scratch.qkv,
-            block.attn_qkv_bias,
             scratch,
             dims,
             b_micro,
