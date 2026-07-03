@@ -161,23 +161,26 @@ __global__ void stream1_transformer_layernorm256_copy_kernel(
     std::uint32_t dtype) {
     const std::uint32_t row = blockIdx.x;
     const std::uint32_t tid = threadIdx.x;
-    if (row >= rows || tid >= 256U) {
+    if (row >= rows || tid >= 128U) {
         return;
     }
 
     extern __shared__ float warp_scratch[];
     const std::uint32_t lane = tid & 31U;
     const std::uint32_t warp = tid >> 5U;
-    const std::uint64_t idx = static_cast<std::uint64_t>(row) * 256ULL + tid;
-    const float x = stream1_transformer_load_scalar_device(input, idx, dtype);
+    const std::uint64_t base = static_cast<std::uint64_t>(row) * 256ULL;
+    const std::uint32_t col0 = tid;
+    const std::uint32_t col1 = tid + 128U;
+    const float x0 = stream1_transformer_load_scalar_device(input, base + col0, dtype);
+    const float x1 = stream1_transformer_load_scalar_device(input, base + col1, dtype);
 
-    const float warp_sum = stream1_transformer_warp_reduce_sum_device(x);
+    const float warp_sum = stream1_transformer_warp_reduce_sum_device(x0 + x1);
     if (lane == 0U) {
         warp_scratch[warp] = warp_sum;
     }
     __syncthreads();
 
-    float block_sum = tid < 8U ? warp_scratch[tid] : 0.0f;
+    float block_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
     if (warp == 0U) {
         block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
         if (lane == 0U) {
@@ -187,14 +190,16 @@ __global__ void stream1_transformer_layernorm256_copy_kernel(
     __syncthreads();
     const float mean = warp_scratch[0];
 
-    const float centered = x - mean;
-    const float warp_var_sum = stream1_transformer_warp_reduce_sum_device(centered * centered);
+    const float centered0 = x0 - mean;
+    const float centered1 = x1 - mean;
+    const float warp_var_sum = stream1_transformer_warp_reduce_sum_device(
+        centered0 * centered0 + centered1 * centered1);
     if (lane == 0U) {
         warp_scratch[warp] = warp_var_sum;
     }
     __syncthreads();
 
-    float block_var_sum = tid < 8U ? warp_scratch[tid] : 0.0f;
+    float block_var_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
     if (warp == 0U) {
         block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
         if (lane == 0U) {
@@ -204,10 +209,14 @@ __global__ void stream1_transformer_layernorm256_copy_kernel(
     __syncthreads();
     const float inv_std = warp_scratch[0];
 
-    const float y = centered * inv_std *
-        stream1_transformer_load_scalar_device(gamma, tid, dtype) +
-        stream1_transformer_load_scalar_device(beta, tid, dtype);
-    stream1_transformer_store_scalar_device(output, idx, y, dtype);
+    const float y0 = centered0 * inv_std *
+        stream1_transformer_load_scalar_device(gamma, col0, dtype) +
+        stream1_transformer_load_scalar_device(beta, col0, dtype);
+    const float y1 = centered1 * inv_std *
+        stream1_transformer_load_scalar_device(gamma, col1, dtype) +
+        stream1_transformer_load_scalar_device(beta, col1, dtype);
+    stream1_transformer_store_scalar_device(output, base + col0, y0, dtype);
+    stream1_transformer_store_scalar_device(output, base + col1, y1, dtype);
 }
 
 void stream1_transformer_layernorm_copy_launch(
@@ -220,7 +229,7 @@ void stream1_transformer_layernorm_copy_launch(
     std::uint32_t dtype,
     cudaStream_t stream) {
     if (cols == 256U) {
-        stream1_transformer_layernorm256_copy_kernel<<<rows, 256, 8 * sizeof(float), stream>>>(
+        stream1_transformer_layernorm256_copy_kernel<<<rows, 128, 4 * sizeof(float), stream>>>(
             input,
             output,
             gamma,
