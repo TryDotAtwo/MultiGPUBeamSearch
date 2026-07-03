@@ -103,6 +103,8 @@ target_link_libraries(history_tests PRIVATE beam_core)
 
 add_library(beam_cuda
     cuda/stream1.cu
+    cuda/stream1_transformer.cu
+    cuda/stream1_transformer_fmha.cu
     cuda/stream2.cu
     cuda/stream3.cu
     cuda/stream4.cu
@@ -118,6 +120,12 @@ if(CUTLASS_DIR AND EXISTS "${CUTLASS_DIR}/include")
     target_include_directories(beam_cuda PUBLIC "${CUTLASS_DIR}/include")
     if(EXISTS "${CUTLASS_DIR}/tools/util/include")
         target_include_directories(beam_cuda PUBLIC "${CUTLASS_DIR}/tools/util/include")
+    endif()
+    if(EXISTS "${CUTLASS_DIR}/examples/41_fused_multi_head_attention/kernel_forward.h")
+        target_include_directories(beam_cuda PUBLIC "${CUTLASS_DIR}/examples/41_fused_multi_head_attention")
+        target_compile_definitions(beam_cuda PUBLIC BEAM_HAS_CUTLASS_FMHA=1)
+    else()
+        target_compile_definitions(beam_cuda PUBLIC BEAM_HAS_CUTLASS_FMHA=0)
     endif()
     target_compile_definitions(beam_cuda PUBLIC BEAM_HAS_CUTLASS=1)
 else()

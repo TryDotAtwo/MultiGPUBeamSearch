@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-07-02
+- User requested investigating how PyTorch runs the Kaggle Megaminx transformer fast path and why the native Stream1 piece-transformer implementation is slower, with comparison against existing native/PyTorch MLP evidence and no fallback or distillation direction.
+
 ## 2026-07-01
 - User requested rerunning the latest native CUDA Stream1 transformer backend on Kaggle and assessing whether the observed speed is a real limit or can still be improved.
 - User requested running the public Kaggle notebook `vladkuznetsov266/transformer-inference-example` and measuring its inference speed.
@@ -444,3 +447,4 @@
 - User requested running the current clean Stream1 piece-transformer backend on Kaggle 2xT4 "as it will be" and directly answering whether it is still slower than the PyTorch fast path on Kaggle.
 
 - User requested a Kaggle 2xT4 comparison between the native CUTLASS Stream1 MLP benchmark and an equivalent PyTorch MLP inference benchmark, to understand how native vs Torch speeds compare on the same exported MLP weights.
+- User requested the Stream1 transformer backend use CUTLASS FlashAttention-style fused inference immediately, with a correct T4 backend and no fallbacks: attention, epilogues, layout, and launch overhead should be optimized together while preserving the MLP path.
