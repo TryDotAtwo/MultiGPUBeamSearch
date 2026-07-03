@@ -60,6 +60,16 @@ struct Stream1TransformerBenchmarkResources {
     }
 };
 
+float time_transformer_graph_ms(
+    const std::vector<cudaStream_t>& streams,
+    std::uint32_t iterations,
+    const std::vector<cudaGraphExec_t>& execs) {
+    return time_gpu_ms(streams, iterations, [&]() {
+        for (std::uint32_t i = 0; i < execs.size(); ++i) {
+            BEAM_CUDA_CHECK(cudaGraphLaunch(execs[i], streams[i]));
+        }
+    });
+}
 std::vector<Stream1Result> benchmark_stream1_transformer(
     const stream1_weights::DeviceWeights& weights,
     const Stream1ModelConfig& model,
@@ -73,6 +83,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
     stream1_weights::TransformerNetworkViewHolder view_holder =
         stream1_weights::transformer_network_view(weights.transformer, model);
 
+    const bool graph_bench = std::getenv("BEAM_STREAM1_TRANSFORMER_GRAPH_BENCH") != nullptr;
     const char* only_b_micro_env = std::getenv("BEAM_STREAM1_TRANSFORMER_B_MICRO");
     const char* only_concurrency_env = std::getenv("BEAM_STREAM1_TRANSFORMER_CONCURRENCY");
     const std::uint32_t only_b_micro = only_b_micro_env != nullptr && only_b_micro_env[0] != '\0'
@@ -83,6 +94,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
         : 0U;
 
     report << "## Stream1 Piece Transformer\n\n";
+    report << "- graph_bench=" << (graph_bench ? 1 : 0) << "\n";
     if (only_b_micro != 0U || only_concurrency != 0U) {
         report << "- filter_b_micro=" << only_b_micro << "\n";
         report << "- filter_concurrency=" << only_concurrency << "\n\n";
@@ -144,8 +156,12 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
             }
 
             const std::uint32_t iterations = b_micro >= 4096 ? 4U : 6U;
-            const float ms = time_gpu_ms(resources.streams, iterations, [&]() {
+            float ms = 0.0f;
+            if (graph_bench) {
+                std::vector<cudaGraph_t> graphs(concurrent, nullptr);
+                std::vector<cudaGraphExec_t> execs(concurrent, nullptr);
                 for (std::uint32_t i = 0; i < concurrent; ++i) {
+                    BEAM_CUDA_CHECK(cudaStreamBeginCapture(resources.streams[i], cudaStreamCaptureModeGlobal));
                     stream1_transformer_inference_cuda(
                         states,
                         resources.parent_base[i],
@@ -155,8 +171,31 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                         resources.score[i],
                         b_micro,
                         resources.streams[i]);
+                    BEAM_CUDA_CHECK(cudaStreamEndCapture(resources.streams[i], &graphs[i]));
+                    BEAM_CUDA_CHECK(cudaGraphInstantiate(&execs[i], graphs[i], nullptr, nullptr, 0));
                 }
-            });
+                ms = time_transformer_graph_ms(resources.streams, iterations, execs);
+                for (cudaGraphExec_t exec : execs) {
+                    cudaGraphExecDestroy(exec);
+                }
+                for (cudaGraph_t graph : graphs) {
+                    cudaGraphDestroy(graph);
+                }
+            } else {
+                ms = time_gpu_ms(resources.streams, iterations, [&]() {
+                    for (std::uint32_t i = 0; i < concurrent; ++i) {
+                        stream1_transformer_inference_cuda(
+                            states,
+                            resources.parent_base[i],
+                            resources.count[i],
+                            view_holder.view,
+                            scratch_views[i],
+                            resources.score[i],
+                            b_micro,
+                            resources.streams[i]);
+                    }
+                });
+            }
             const double parents = static_cast<double>(rows_per_launch_group);
             const double parent_per_sec = parents * 1000.0 / static_cast<double>(ms);
             const double candidate_per_sec = parents * static_cast<double>(MOVE_COUNT) * 1000.0 / static_cast<double>(ms);
