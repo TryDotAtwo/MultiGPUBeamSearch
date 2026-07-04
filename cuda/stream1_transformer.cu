@@ -20,6 +20,8 @@
 #include <cutlass/numeric_types.h>
 #endif
 
+#include <cstdlib>
+#include <cstring>
 #include <stdexcept>
 
 namespace beam {
@@ -1239,6 +1241,17 @@ __global__ void stream1_transformer_score_quantize_kernel(
     score_ring[i] = stream1_transformer_score_key_from_float_device(q);
 }
 
+bool stream1_transformer_block51_requested() {
+    const char* value = std::getenv("BEAM_STREAM1_TRANSFORMER_BLOCK51");
+    if (value == nullptr || value[0] == '\0' || std::strcmp(value, "0") == 0) {
+        return false;
+    }
+    if (std::strcmp(value, "1") == 0) {
+        return true;
+    }
+    throw std::invalid_argument("BEAM_STREAM1_TRANSFORMER_BLOCK51 must be unset, 0, or 1");
+}
+
 bool stream1_transformer_is_block51_shape(Stream1TransformerDims dims) {
     return dims.state_len == 120U &&
         dims.num_classes == 120U &&
@@ -1415,7 +1428,7 @@ void stream1_transformer_inference_cuda(
     if (b_micro == 0U) {
         return;
     }
-    if (stream1_transformer_is_block51_shape(dims)) {
+    if (stream1_transformer_block51_requested()) {
         stream1_transformer_inference_block51_cuda(
             current_frontier_states,
             parent_base,

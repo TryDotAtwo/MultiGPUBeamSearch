@@ -22,8 +22,9 @@ ff_dim=1024
 output_dim=24
 ```
 
-The top-level transformer entry now routes this exact shape through
-`stream1_transformer_inference_block51_cuda`. Non-matching shapes remain on the
+The top-level transformer entry can route this exact shape through
+`stream1_transformer_inference_block51_cuda` when `BEAM_STREAM1_TRANSFORMER_BLOCK51=1` is set.
+Non-matching shapes throw if this backend is explicitly requested; otherwise they remain on the
 existing checked generic path.
 
 The first block51 specialization fuses input token construction with input
