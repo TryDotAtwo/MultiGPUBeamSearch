@@ -453,3 +453,5 @@
 - User requested a Kaggle 2xT4 comparison between the native CUTLASS Stream1 MLP benchmark and an equivalent PyTorch MLP inference benchmark, to understand how native vs Torch speeds compare on the same exported MLP weights.
 - User requested the Stream1 transformer backend use CUTLASS FlashAttention-style fused inference immediately, with a correct T4 backend and no fallbacks: attention, epilogues, layout, and launch overhead should be optimized together while preserving the MLP path.
 - User requested continuing the Stream1 transformer optimization after local measurements were inconclusive, with profiling/benchmarking focused on why the native transformer path still lags the PyTorch fast path; changes must keep the MLP path separate and avoid fallbacks or distillation.
+
+- User requested implementing a special fused transformer block for the current `seq=51,d=256,h=8` model and using that structure as the base for other transformer sizes. The implementation should stay transformer-only, avoid fallbacks/distillation, and preserve the MLP path.
