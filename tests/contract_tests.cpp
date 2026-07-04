@@ -168,6 +168,37 @@ void write_transformer_weight_fixture_files(const std::filesystem::path& dir, bo
     write_zero_file(dir / "piece_types.u8", 50ULL);
 }
 
+
+std::filesystem::path write_mlp_weight_fixture(const std::string& name) {
+    const std::filesystem::path dir = std::filesystem::path("test_results") / name;
+    std::filesystem::create_directories(dir);
+    std::ofstream manifest(dir / "manifest.json");
+    manifest << "{\n"
+             << "  \"backend\": \"mlp\",\n"
+             << "  \"dtype\": \"fp16\",\n"
+             << "  \"state_len\": " << STATE_LEN << ",\n"
+             << "  \"num_classes\": " << STATE_LEN << ",\n"
+             << "  \"hidden1\": 8,\n"
+             << "  \"hidden2\": 8,\n"
+             << "  \"residual_count\": 1,\n"
+             << "  \"output_dim\": " << MOVE_COUNT << ",\n"
+             << "  \"normalization\": \"none\"\n"
+             << "}\n";
+    constexpr std::uint64_t elem = sizeof(std::uint16_t);
+    const std::string suffix = ".fp16";
+    write_zero_file(dir / ("input_weight_hxk" + suffix),
+        static_cast<std::uint64_t>(STATE_LEN) * STATE_LEN * 8ULL * elem);
+    write_zero_file(dir / ("input_bias" + suffix), 8ULL * elem);
+    write_zero_file(dir / ("hidden_weight_hxk" + suffix), 8ULL * 8ULL * elem);
+    write_zero_file(dir / ("hidden_bias" + suffix), 8ULL * elem);
+    write_zero_file(dir / ("residual0_fc1_weight_hxk" + suffix), 8ULL * 8ULL * elem);
+    write_zero_file(dir / ("residual0_fc1_bias" + suffix), 8ULL * elem);
+    write_zero_file(dir / ("residual0_fc2_weight_hxk" + suffix), 8ULL * 8ULL * elem);
+    write_zero_file(dir / ("residual0_fc2_bias" + suffix), 8ULL * elem);
+    write_zero_file(dir / ("output_weight_hxk" + suffix), 8ULL * MOVE_COUNT * elem);
+    write_zero_file(dir / ("output_bias" + suffix), MOVE_COUNT * elem);
+    return dir;
+}
 bool error_contains(const std::runtime_error& error, const std::string& needle) {
     return std::string(error.what()).find(needle) != std::string::npos;
 }
@@ -271,9 +302,11 @@ void test_stream1_transformer_weight_size_contract() {
 }
 
 void test_stream1_mlp_weight_loading_still_works() {
-    const auto weights = beam::stream1_weights::load_stream1_weights("stream1_weights");
-    require(weights.model.backend == STREAM1_BACKEND_MLP, "existing stream1_weights manifest must load as MLP");
-    require(weights.input_weight.size() > 0, "MLP input_weight must load");
+    const auto weights = beam::stream1_weights::load_stream1_weights(
+        write_mlp_weight_fixture("stream1_mlp_weight_loading_ok"));
+    require(weights.model.backend == STREAM1_BACKEND_MLP, "fixture MLP manifest must load as MLP");
+    require(weights.input_weight.size() == static_cast<std::uint64_t>(STATE_LEN) * STATE_LEN * 8ULL * sizeof(std::uint16_t),
+        "MLP input_weight fixture size mismatch");
     require(weights.output_bias.size() == weights.model.output_dim * sizeof(std::uint16_t), "MLP output_bias size mismatch");
 }
 
