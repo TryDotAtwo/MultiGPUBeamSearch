@@ -456,3 +456,5 @@
 
 - User requested implementing a special fused transformer block for the current `seq=51,d=256,h=8` model and using that structure as the base for other transformer sizes. The implementation should stay transformer-only, avoid fallbacks/distillation, and preserve the MLP path.
 - User requested continuing Stream1 transformer optimization until the native path beats the PyTorch path; changes must keep MLP separate and avoid fallback/distillation.
+- User accepted switching the transformer production direction to C++ LibTorch if native CUDA cannot materially beat PyTorch, and requested archiving all native transformer experiments and ideas. Requirements: keep MLP/CUTLASS path separate, no fallbacks, no distillation, preserve `piece_transformer` model contract, and use LibTorch as an explicit execution backend.
+- User explicitly requested deleting Stream1/Kaggle weights from the repository/worktree because they were wasting disk space and should not be kept permanently.

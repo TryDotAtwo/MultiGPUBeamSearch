@@ -1,0 +1,2 @@
+batch,iters,elapsed_ms,parents_per_sec,candidates_per_sec,device,dtype
+2,1,322.759,6.19657,148.718,cpu,fp16
