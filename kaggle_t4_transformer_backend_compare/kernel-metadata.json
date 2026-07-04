@@ -1,0 +1,17 @@
+{
+  "id": "trydotatwo/cayley-beam-transformer-backend-compare-2xt4",
+  "title": "Cayley Beam Transformer Backend Compare 2xT4",
+  "code_file": "t4-transformer-backend-compare.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": [
+    "vladkuznetsov266/megaminx-qtransformer-1782210824/PyTorch/default/1"
+  ]
+}
