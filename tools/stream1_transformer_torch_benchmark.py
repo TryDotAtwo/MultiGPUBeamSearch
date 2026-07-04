@@ -20,6 +20,9 @@ import torch.nn.functional as F
 
 SCORE_MAX_Q = 300.0
 SCORE_SCALE = 1024.0
+FNV64_OFFSET = 1469598103934665603
+FNV64_PRIME = 1099511628211
+FNV64_MASK = (1 << 64) - 1
 
 
 def parse_batch_sizes(text: str) -> List[int]:
@@ -50,6 +53,17 @@ def load_file_tensor(path: Path, shape: Tuple[int, ...], dtype: torch.dtype, dev
 
 def score_keys(logits: torch.Tensor) -> torch.Tensor:
     return torch.round(torch.clamp(logits.float(), 0.0, SCORE_MAX_Q) * SCORE_SCALE).to(torch.int64)
+
+
+def score_key_digest(keys: torch.Tensor) -> int:
+    digest = FNV64_OFFSET
+    flat = keys.detach().to(device="cpu", dtype=torch.int64).contiguous().view(-1)
+    for raw in flat.tolist():
+        value = int(raw) & 0xFFFFFFFF
+        for shift in (0, 8, 16, 24):
+            digest ^= (value >> shift) & 0xFF
+            digest = (digest * FNV64_PRIME) & FNV64_MASK
+    return digest
 
 
 class PieceTransformerTorch:
@@ -253,6 +267,7 @@ def benchmark_batch(
     elapsed_ms = float(start.elapsed_time(end))
     keys = score_keys(logits)
     checksum = int(keys.sum().item())
+    score_digest = score_key_digest(keys)
     first_score_keys = ",".join(str(int(x)) for x in keys[0].detach().cpu().tolist()) if batch > 0 else ""
     del logits
     parents_per_s = (batch * iters) / (elapsed_ms / 1000.0)
@@ -267,6 +282,7 @@ def benchmark_batch(
         "candidates_per_s": candidates_per_s,
         "peak_mem_gib": peak_gib,
         "checksum": checksum,
+        "score_key_digest": score_digest,
         "first_score_keys": first_score_keys,
         "status": "ok",
     }
@@ -285,18 +301,18 @@ def write_report(path: Path, rows: List[Dict[str, object]], metadata: Dict[str, 
         f"- reference_rows={metadata['reference_rows']}",
         f"- reference_max_abs_score_key_error={metadata['reference_max_abs_score_key_error']}",
         "",
-        "| batch | iters | ms/iter | parents/s | candidates/s | peak GiB | checksum | status |",
-        "|---:|---:|---:|---:|---:|---:|---:|---|",
+        "| batch | iters | ms/iter | parents/s | candidates/s | peak GiB | checksum | score_key_digest | status |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in rows:
         if row.get("status") == "ok":
             lines.append(
-                "| {batch} | {iters} | {ms_per_iter:.4f} | {parents_per_s:.1f} | {candidates_per_s:.1f} | {peak_mem_gib:.3f} | {checksum} | ok |".format(
+                "| {batch} | {iters} | {ms_per_iter:.4f} | {parents_per_s:.1f} | {candidates_per_s:.1f} | {peak_mem_gib:.3f} | {checksum} | {score_key_digest} | ok |".format(
                     **row
                 )
             )
         else:
-            lines.append(f"| {row['batch']} | - | - | - | - | - | - | {row['status']} |")
+            lines.append(f"| {row['batch']} | - | - | - | - | - | - | - | {row['status']} |")
     if best is not None:
         lines.extend(
             [
@@ -351,6 +367,7 @@ def main() -> None:
             f" candidates_per_s={row['candidates_per_s']:.1f}"
             f" peak_mem_gib={row['peak_mem_gib']:.3f}"
             f" checksum={row['checksum']}"
+            f" score_key_digest={row['score_key_digest']}"
             f" first_score_keys={row['first_score_keys']}",
             flush=True,
         )
@@ -366,7 +383,7 @@ def main() -> None:
     }
     write_report(args.report, rows, metadata)
     with args.report.with_suffix(".tsv").open("w", newline="", encoding="utf-8") as fh:
-        fieldnames = ["batch", "iters", "elapsed_ms", "ms_per_iter", "parents_per_s", "candidates_per_s", "peak_mem_gib", "checksum", "first_score_keys", "status"]
+        fieldnames = ["batch", "iters", "elapsed_ms", "ms_per_iter", "parents_per_s", "candidates_per_s", "peak_mem_gib", "checksum", "score_key_digest", "first_score_keys", "status"]
         writer = csv.DictWriter(fh, fieldnames=fieldnames, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)

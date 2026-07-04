@@ -471,3 +471,4 @@
 - User requested keeping all three Stream1 piece-transformer execution paths as available explicit backends for parallel development: PyTorch, native CUDA/CUTLASS, and C++ LibTorch. These must be selectable backends, not fallbacks.
 ## 2026-07-05
 - User approved continuing the Stream1 piece-transformer backend plan: implement correctness parity and a unified benchmark/launcher layer for the explicit `pytorch`, `libtorch`, and `native_cutlass` backends, keep all three selectable for further development, preserve no-fallback/no-distillation policy, and do not disturb the MLP/default path.
+- User requested verifying that the current Stream1 transformer backend work is OK and then improving further. The selected improvement must stay within explicit backend verification/performance work, avoid fallback/distillation, and preserve the MLP/default path.

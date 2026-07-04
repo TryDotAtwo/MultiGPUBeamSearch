@@ -95,3 +95,6 @@ The selection is explicit. None of these paths may silently fall back to another
 The three Stream1 `piece_transformer` backends now share a parity launcher contract. PyTorch and LibTorch benchmarks emit `checksum` and `first_score_keys`, and the native CUTLASS transformer microbenchmark emits the same fields while optionally using `BEAM_STREAM1_SYNTHETIC_STATES=1` for deterministic synthetic inputs.
 
 `tools/stream1_transformer_parity.py` is the correctness gate for comparing explicit backends on one synthetic batch. It supports a dry-run mode for clean checkout validation and an execution mode for GPU hosts with exported weights and built backend binaries. This is only a verification layer; production dispatch still selects one backend explicitly and must not silently fall back.
+## 2026-07-05 Score-Key Digest Gate
+
+The backend parity contract now includes `score_key_digest`, a deterministic FNV-1a 64-bit digest over all quantized score keys in batch-major, move-major order. The digest is emitted by the PyTorch benchmark, the C++ LibTorch benchmark, and the native CUTLASS transformer microbenchmark. Parity execution should treat digest mismatch as a hard correctness failure; checksum and first-row score keys are secondary diagnostics.

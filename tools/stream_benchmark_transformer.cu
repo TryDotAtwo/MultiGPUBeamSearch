@@ -3,8 +3,12 @@
 
 namespace beam::bench {
 
+constexpr std::uint64_t FNV64_OFFSET = 1469598103934665603ULL;
+constexpr std::uint64_t FNV64_PRIME = 1099511628211ULL;
+
 struct ScoreSummary {
     std::uint64_t checksum = 0;
+    std::uint64_t score_key_digest = FNV64_OFFSET;
     std::string first_score_keys;
 };
 
@@ -22,6 +26,10 @@ ScoreSummary summarize_score_buffers(
             cudaMemcpyDeviceToHost));
         for (std::uint32_t value : host) {
             summary.checksum += value;
+            for (int shift = 0; shift < 32; shift += 8) {
+                summary.score_key_digest ^= static_cast<std::uint64_t>((value >> shift) & 0xFFU);
+                summary.score_key_digest *= FNV64_PRIME;
+            }
         }
         if (lane == 0 && !host.empty()) {
             std::ostringstream out;
@@ -134,8 +142,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
         report << "- filter_b_micro=" << only_b_micro << "\n";
         report << "- filter_concurrency=" << only_concurrency << "\n\n";
     }
-    report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | checksum | first_score_keys | scratch_bytes |\n";
-    report << "|---:|---:|---:|---:|---:|---:|---:|---|---:|\n";
+    report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | checksum | score_key_digest | first_score_keys | scratch_bytes |\n";
+    report << "|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|\n";
     for (std::uint32_t b_micro : TRANSFORMER_B_MICRO_SWEEP) {
         for (std::uint32_t concurrent : TRANSFORMER_STREAM1_CONCURRENCY_SWEEP) {
             if ((only_b_micro != 0U && b_micro != only_b_micro) ||
@@ -145,7 +153,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
             const std::uint64_t rows_per_launch_group = static_cast<std::uint64_t>(b_micro) * concurrent;
             if (rows_per_launch_group > max_states) {
                 report << "|" << b_micro << "|" << concurrent << "|" << rows_per_launch_group
-                       << "|skip|skip|skip|skip|skip|0: exceeds prepared state batch|\n";
+                       << "|skip|skip|skip|skip|skip|skip|0: exceeds prepared state batch|\n";
                 std::cout << "stream1_transformer_micro_skip"
                           << " b_micro=" << b_micro
                           << " concurrency=" << concurrent
@@ -165,7 +173,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
             constexpr std::uint64_t safety_margin_bytes = 256ULL * 1024ULL * 1024ULL;
             if (scratch_bytes + io_bytes + safety_margin_bytes > free_bytes) {
                 report << "|" << b_micro << "|" << concurrent << "|" << rows_per_launch_group
-                       << "|skip|skip|skip|skip|skip|" << scratch_bytes
+                       << "|skip|skip|skip|skip|skip|skip|" << scratch_bytes
                        << ": estimated allocation exceeds available GPU memory"
                        << " free_bytes=" << free_bytes
                        << " io_bytes=" << io_bytes << "|\n";
@@ -243,6 +251,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                    << "|" << std::setprecision(1) << parent_per_sec
                    << "|" << candidate_per_sec
                    << "|" << score_summary.checksum
+                   << "|" << score_summary.score_key_digest
                    << "|`" << score_summary.first_score_keys << "`"
                    << "|" << scratch_bytes << "|\n";
             std::cout << "stream1_transformer_micro"
@@ -253,6 +262,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                       << " parents_per_sec=" << std::setprecision(1) << parent_per_sec
                       << " candidates_per_sec=" << candidate_per_sec
                       << " checksum=" << score_summary.checksum
+                      << " score_key_digest=" << score_summary.score_key_digest
                       << " first_score_keys=" << score_summary.first_score_keys
                       << " scratch_bytes=" << scratch_bytes
                       << "\n";

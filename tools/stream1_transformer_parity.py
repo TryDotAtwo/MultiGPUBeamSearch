@@ -42,6 +42,7 @@ class BackendRun:
     env: Dict[str, str]
     return_code: int
     checksum: int | None
+    score_key_digest: int | None
     first_score_keys: List[int]
     log_path: str
     status: str
@@ -112,8 +113,9 @@ def run_backend(invocation: BackendInvocation, out_dir: Path) -> BackendRun:
             parsed = parse_pairs(line)
 
     checksum = int(parsed["checksum"]) if "checksum" in parsed else None
+    score_digest = int(parsed["score_key_digest"]) if "score_key_digest" in parsed else None
     first_score_keys = parse_csv_ints(parsed.get("first_score_keys", ""))
-    status = "ok" if completed.returncode == 0 and checksum is not None and first_score_keys else "failed"
+    status = "ok" if completed.returncode == 0 and checksum is not None and score_digest is not None and first_score_keys else "failed"
     return BackendRun(
         backend=invocation.backend,
         mode=invocation.mode,
@@ -121,6 +123,7 @@ def run_backend(invocation: BackendInvocation, out_dir: Path) -> BackendRun:
         env=dict(invocation.env),
         return_code=completed.returncode,
         checksum=checksum,
+        score_key_digest=score_digest,
         first_score_keys=first_score_keys,
         log_path=str(log_path),
         status=status,
@@ -132,12 +135,35 @@ def compare_runs(runs: List[BackendRun], tolerance: int) -> Dict[str, object]:
     if not ok_runs:
         return {"status": "failed", "reason": "no backend produced score keys", "comparisons": []}
     baseline = ok_runs[0]
+    if baseline.score_key_digest is None:
+        return {"status": "failed", "reason": "baseline missing score key digest", "comparisons": []}
     comparisons = []
     overall = "pass"
     for run in runs:
         if run.status != "ok":
             overall = "failed"
             comparisons.append({"backend": run.backend, "mode": run.mode, "status": run.status})
+            continue
+        if run.score_key_digest is None:
+            overall = "failed"
+            comparisons.append({
+                "backend": run.backend,
+                "mode": run.mode,
+                "status": "failed",
+                "reason": "missing score key digest",
+            })
+            continue
+        if run.score_key_digest != baseline.score_key_digest:
+            overall = "failed"
+            comparisons.append({
+                "backend": run.backend,
+                "mode": run.mode,
+                "status": "failed",
+                "reason": "score key digest mismatch",
+                "score_key_digest": run.score_key_digest,
+                "baseline_score_key_digest": baseline.score_key_digest,
+                "checksum_delta": None if run.checksum is None or baseline.checksum is None else run.checksum - baseline.checksum,
+            })
             continue
         if len(run.first_score_keys) != len(baseline.first_score_keys):
             overall = "failed"
@@ -159,6 +185,7 @@ def compare_runs(runs: List[BackendRun], tolerance: int) -> Dict[str, object]:
             "status": status,
             "max_abs_first_row_diff": max_abs_diff,
             "checksum_delta": None if run.checksum is None or baseline.checksum is None else run.checksum - baseline.checksum,
+            "score_key_digest": run.score_key_digest,
         })
     return {
         "status": overall,
@@ -176,6 +203,7 @@ def write_reports(out_dir: Path, runs: List[BackendRun], comparison: Dict[str, o
             "status": run.status,
             "return_code": run.return_code,
             "checksum": run.checksum,
+            "score_key_digest": run.score_key_digest,
             "first_score_keys": run.first_score_keys,
             "log_path": run.log_path,
             "command": run.command,
@@ -194,13 +222,13 @@ def write_reports(out_dir: Path, runs: List[BackendRun], comparison: Dict[str, o
         f"- status={comparison['status']}",
         f"- tolerance={comparison.get('tolerance')}",
         "",
-        "| backend | mode | status | return_code | checksum | first_score_keys |",
-        "|---|---|---|---:|---:|---|",
+        "| backend | mode | status | return_code | checksum | score_key_digest | first_score_keys |",
+        "|---|---|---|---:|---:|---:|---|",
     ]
     for run in runs:
         first = ",".join(str(value) for value in run.first_score_keys)
         lines.append(
-            f"| {run.backend} | {run.mode} | {run.status} | {run.return_code} | {run.checksum} | `{first}` |"
+            f"| {run.backend} | {run.mode} | {run.status} | {run.return_code} | {run.checksum} | {run.score_key_digest} | `{first}` |"
         )
     lines.extend(["", "## Comparisons", "", "```json", json.dumps(comparison, indent=2, sort_keys=True), "```", ""])
     (out_dir / "stream1_transformer_parity.md").write_text("\n".join(lines), encoding="utf-8")
@@ -244,6 +272,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 env=dict(invocation.env),
                 return_code=0,
                 checksum=None,
+                score_key_digest=None,
                 first_score_keys=[],
                 log_path="",
                 status="dry_run",

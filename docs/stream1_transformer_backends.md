@@ -97,7 +97,7 @@ The private Kaggle package `kaggle_t4_transformer_backend_compare/` currently ru
 For strategy decisions, use the aggregate backend summary from that package. For production integration work, keep the three backend families independently selectable through the launcher above.
 ## Parity Gate
 
-Use `tools/stream1_transformer_parity.py` to compare selected backends on the same synthetic state batch. This gate is explicit backend comparison, not runtime fallback behavior.
+Use `tools/stream1_transformer_parity.py` to compare selected backends on the same synthetic state batch. This gate is explicit backend comparison, not runtime fallback behavior. Real runs require a matching `score_key_digest`, a stable FNV-1a 64-bit digest over every quantized score key in batch-major, move-major order; `first_score_keys` remains a small readable sanity check.
 
 Dry-run the parity plan without requiring weights or built binaries:
 

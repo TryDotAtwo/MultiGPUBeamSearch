@@ -20,6 +20,9 @@ namespace fs = std::filesystem;
 
 namespace {
 
+constexpr std::uint64_t FNV64_OFFSET = 1469598103934665603ULL;
+constexpr std::uint64_t FNV64_PRIME = 1099511628211ULL;
+
 struct Args {
     fs::path weight_dir;
     std::vector<std::int64_t> batches{384, 512, 768, 1024};
@@ -89,6 +92,21 @@ std::string format_first_score_keys(const torch::Tensor& keys) {
     }
     return out.str();
 }
+
+std::uint64_t score_key_digest(const torch::Tensor& keys) {
+    torch::Tensor flat = keys.to(torch::kCPU).to(torch::kInt64).contiguous().view({-1});
+    auto accessor = flat.accessor<std::int64_t, 1>();
+    std::uint64_t digest = FNV64_OFFSET;
+    for (std::int64_t i = 0; i < flat.size(0); ++i) {
+        const std::uint32_t value = static_cast<std::uint32_t>(accessor[i]);
+        for (int shift = 0; shift < 32; shift += 8) {
+            digest ^= static_cast<std::uint64_t>((value >> shift) & 0xFFU);
+            digest *= FNV64_PRIME;
+        }
+    }
+    return digest;
+}
+
 std::int16_t cuda_device_index(const torch::Device& device) {
     if (!device.is_cuda()) {
         throw std::runtime_error("CUDA graph mode requires a CUDA device");
@@ -205,6 +223,7 @@ int main(int argc, char** argv) {
             const double candidates_per_sec = parents_per_sec * model.move_count;
             const torch::Tensor keys = beam::stream1_libtorch::score_keys(logits);
             const auto checksum = keys.sum().item<std::int64_t>();
+            const std::uint64_t score_digest = score_key_digest(keys);
             const std::string first_score_keys = format_first_score_keys(keys);
             std::cout << "stream1_transformer_libtorch_micro"
                       << " mode=" << mode
@@ -214,6 +233,7 @@ int main(int argc, char** argv) {
                       << " parents_per_sec=" << parents_per_sec
                       << " candidates_per_sec=" << candidates_per_sec
                       << " checksum=" << checksum
+                      << " score_key_digest=" << score_digest
                       << " first_score_keys=" << first_score_keys
                       << "\n";
             if (csv) {
