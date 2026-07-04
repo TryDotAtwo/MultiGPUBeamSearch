@@ -1,0 +1,56 @@
+{
+  "rows_csv": "/kaggle/working/stream1_libtorch_transformer_rows.csv",
+  "best_by_mode_gpu": {
+    "cuda_graph/gpu0": {
+      "mode": "cuda_graph",
+      "gpu": 0,
+      "batch": 384,
+      "iters": 100,
+      "elapsed_ms": 1413.27,
+      "parents_per_sec": 27171.0,
+      "candidates_per_sec": 652104.0,
+      "checksum": 465948672
+    },
+    "cuda_graph/gpu1": {
+      "mode": "cuda_graph",
+      "gpu": 1,
+      "batch": 384,
+      "iters": 100,
+      "elapsed_ms": 1439.61,
+      "parents_per_sec": 26673.8,
+      "candidates_per_sec": 640172.0,
+      "checksum": 465948672
+    },
+    "eager/gpu0": {
+      "mode": "eager",
+      "gpu": 0,
+      "batch": 384,
+      "iters": 100,
+      "elapsed_ms": 1353.86,
+      "parents_per_sec": 28363.3,
+      "candidates_per_sec": 680720.0,
+      "checksum": 465948672
+    },
+    "eager/gpu1": {
+      "mode": "eager",
+      "gpu": 1,
+      "batch": 384,
+      "iters": 100,
+      "elapsed_ms": 1363.06,
+      "parents_per_sec": 28172.0,
+      "candidates_per_sec": 676128.0,
+      "checksum": 465948672
+    }
+  },
+  "aggregate_by_mode_candidates_per_sec": {
+    "eager": 1356848.0,
+    "cuda_graph": 1292276.0
+  },
+  "pytorch_batch_process_per_t4_reference": 630697.0,
+  "pytorch_batch_process_2xt4_reference": 1261394.0,
+  "libtorch_over_pytorch_2xt4_by_mode": {
+    "eager": 1.075673421627184,
+    "cuda_graph": 1.0244824376840227
+  },
+  "cuda_graph_over_eager": 0.9524102920887233
+}

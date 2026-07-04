@@ -1,0 +1,191 @@
+[{"stream_name":"stdout","time":1.197188726,"data":"KAGGLE_MODEL_SOURCE= vladkuznetsov266/megaminx-qtransformer-1782210824/PyTorch/default/1\n"}
+,{"stream_name":"stdout","time":1.197496805,"data":"GITHUB_BRANCH= codex/stream1-piece-transformer\n"}
+,{"stream_name":"stdout","time":1.197502609,"data":"EXPECTED_COMMIT_PREFIX= \n"}
+,{"stream_name":"stdout","time":1.197515584,"data":"BENCH_MODES= ['eager', 'cuda_graph']\n"}
+,{"stream_name":"stdout","time":1.198141196,"data":"disk_tmp= /tmp: free=1143627423744 total=8656922775552\n"}
+,{"stream_name":"stdout","time":1.198151644,"data":"disk_working= /kaggle/working: free=20940509184 total=20957446144\n"}
+,{"stream_name":"stdout","time":1.198155987,"data":"+ nvidia-smi\n"}
+,{"stream_name":"stdout","time":1.641034495,"data":"Sat Jul  4 15:01:14 2026       \n"}
+,{"stream_name":"stdout","time":1.6410676789999998,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":1.6410782940000002,"data":"| NVIDIA-SMI 580.159.04             Driver Version: 580.159.04     CUDA Version: 13.0     |\n"}
+,{"stream_name":"stdout","time":1.6410811619999999,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":1.641083727,"data":"| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n"}
+,{"stream_name":"stdout","time":1.641086104,"data":"| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n"}
+,{"stream_name":"stdout","time":1.641088538,"data":"|                                         |                        |               MIG M. |\n"}
+,{"stream_name":"stdout","time":1.641090979,"data":"|=========================================+========================+======================|\n"}
+,{"stream_name":"stdout","time":1.6410932329999999,"data":"|   0  Tesla T4                       Off |   00000000:00:04.0 Off |                    0 |\n"}
+,{"stream_name":"stdout","time":1.6410954439999998,"data":"| N/A   39C    P8             10W /   70W |       0MiB /  15360MiB |      0%      Default |\n"}
+,{"stream_name":"stdout","time":1.641097728,"data":"|                                         |                        |                  N/A |\n"}
+,{"stream_name":"stdout","time":1.6410999450000001,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":1.641102165,"data":"|   1  Tesla T4                       Off |   00000000:00:05.0 Off |                    0 |\n"}
+,{"stream_name":"stdout","time":1.64110439,"data":"| N/A   40C    P8             10W /   70W |       0MiB /  15360MiB |      0%      Default |\n"}
+,{"stream_name":"stdout","time":1.6411066779999999,"data":"|                                         |                        |                  N/A |\n"}
+,{"stream_name":"stdout","time":1.6411089269999999,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":1.64111118,"data":"\n"}
+,{"stream_name":"stdout","time":1.6411132830000001,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":1.641115694,"data":"| Processes:                                                                              |\n"}
+,{"stream_name":"stdout","time":1.6411179040000001,"data":"|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n"}
+,{"stream_name":"stdout","time":1.641120113,"data":"|        ID   ID                                                               Usage      |\n"}
+,{"stream_name":"stdout","time":1.641122376,"data":"|=========================================================================================|\n"}
+,{"stream_name":"stdout","time":1.641134318,"data":"|  No running processes found                                                             |\n"}
+,{"stream_name":"stdout","time":1.6411376629999999,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":1.641139978,"data":"+ bash -lc which nsys \u0026\u0026 nsys --version || true\n"}
+,{"stream_name":"stdout","time":8.704651855,"data":"torch_version= 2.10.0+cu128\n"}
+,{"stream_name":"stdout","time":8.704693986,"data":"torch_cmake_prefix_path= /usr/local/lib/python3.12/dist-packages/torch/share/cmake\n"}
+,{"stream_name":"stdout","time":8.731860525,"data":"torch_cuda_device_count= 2\n"}
+,{"stream_name":"stdout","time":8.732018288,"data":"+ git clone --branch codex/stream1-piece-transformer --depth 1 https://github.com/TryDotAtwo/MultiGPUBeamSearch.git /tmp/beam_solver_libtorch_transformer_bench\n"}
+,{"stream_name":"stderr","time":8.775698385,"data":"Cloning into '/tmp/beam_solver_libtorch_transformer_bench'...\n"}
+,{"stream_name":"stdout","time":9.715001904,"data":"+ git rev-parse --short HEAD\n"}
+,{"stream_name":"stdout","time":9.719047339,"data":"72fcc9f\n"}
+,{"stream_name":"stdout","time":9.719065549,"data":"checked_out_commit= 72fcc9f\n"}
+,{"stream_name":"stdout","time":9.861159077,"data":"selected_transformer_checkpoint= /kaggle/input/models/vladkuznetsov266/megaminx-qtransformer-1782210824/pytorch/default/1/megaminx-transformer/weights/p900-t000-q-rw-sym_1782210824_best.pth\n"}
+,{"stream_name":"stdout","time":9.861221368,"data":"+ /usr/bin/python3 /tmp/beam_solver_libtorch_transformer_bench/tools/export_stream1.py --weights /kaggle/input/models/vladkuznetsov266/megaminx-qtransformer-1782210824/pytorch/default/1/megaminx-transformer/weights/p900-t000-q-rw-sym_1782210824_best.pth --out /kaggle/working/stream1_transformer_weights_fp16 --format piece-transformer --dtype fp16 --num-classes 120\n"}
+,{"stream_name":"stdout","time":11.968093105,"data":"stream1_export_done out_dir=/kaggle/working/stream1_transformer_weights_fp16 format=piece_transformer dtype=fp16 seq_len=51 d_model=256 layers=4 output_dim=24\n"}
+,{"stream_name":"stdout","time":13.941091692,"data":"exported_manifest_summary= {'backend': 'piece_transformer', 'dtype': 'fp16', 'seq_len': 51, 'd_model': 256, 'nhead': 8, 'layers': 4, 'output_dim': 24}\n"}
+,{"stream_name":"stdout","time":13.94112294,"data":"+ git clone --depth 1 https://github.com/NVIDIA/cutlass.git /tmp/cutlass\n"}
+,{"stream_name":"stderr","time":13.943034228,"data":"Cloning into '/tmp/cutlass'...\n"}
+,{"stream_name":"stdout","time":19.528937974,"data":"+ cmake -S /tmp/beam_solver_libtorch_transformer_bench -B /tmp/beam_build_libtorch_transformer_bench -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local/lib/python3.12/dist-packages/torch/share/cmake -DBEAM_ENABLE_LIBTORCH_STREAM1=ON -DBEAM_CUDA_ARCHITECTURES=75 -DCUTLASS_DIR=/tmp/cutlass\n"}
+,{"stream_name":"stdout","time":19.899870179,"data":"-- Beam state logical bytes: 120\n"}
+,{"stream_name":"stdout","time":19.899899242,"data":"-- Beam state physical bytes: 128\n"}
+,{"stream_name":"stdout","time":19.899904776,"data":"-- Beam state alignment: 16\n"}
+,{"stream_name":"stdout","time":19.899912771,"data":"-- Beam move count: 24\n"}
+,{"stream_name":"stdout","time":20.330699602,"data":"-- The CXX compiler identification is GNU 11.4.0\n"}
+,{"stream_name":"stdout","time":22.47882912,"data":"-- The CUDA compiler identification is NVIDIA 12.8.93 with host compiler GNU 11.4.0\n"}
+,{"stream_name":"stdout","time":22.506936197,"data":"-- Detecting CXX compiler ABI info\n"}
+,{"stream_name":"stdout","time":22.586696192,"data":"-- Detecting CXX compiler ABI info - done\n"}
+,{"stream_name":"stdout","time":22.605958665,"data":"-- Check for working CXX compiler: /usr/bin/c++ - skipped\n"}
+,{"stream_name":"stdout","time":22.607697605,"data":"-- Detecting CXX compile features\n"}
+,{"stream_name":"stdout","time":22.609959185,"data":"-- Detecting CXX compile features - done\n"}
+,{"stream_name":"stdout","time":22.636570573,"data":"-- Detecting CUDA compiler ABI info\n"}
+,{"stream_name":"stdout","time":23.717605161,"data":"-- Detecting CUDA compiler ABI info - done\n"}
+,{"stream_name":"stdout","time":23.781101413000002,"data":"-- Check for working CUDA compiler: /usr/local/cuda/bin/nvcc - skipped\n"}
+,{"stream_name":"stdout","time":24.13889972,"data":"-- Detecting CUDA compile features\n"}
+,{"stream_name":"stdout","time":24.139572158,"data":"-- Detecting CUDA compile features - done\n"}
+,{"stream_name":"stdout","time":24.208555894,"data":"-- Found CUDA: /usr/local/cuda (found version \"12.8\")\n"}
+,{"stream_name":"stdout","time":24.215325584,"data":"-- Found CUDAToolkit: /usr/local/cuda/include (found version \"12.8.93\")\n"}
+,{"stream_name":"stdout","time":24.231658584,"data":"-- Performing Test CMAKE_HAVE_LIBC_PTHREAD\n"}
+,{"stream_name":"stdout","time":24.330768206,"data":"-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success\n"}
+,{"stream_name":"stdout","time":24.332171863,"data":"-- Found Threads: TRUE\n"}
+,{"stream_name":"stdout","time":24.371736996,"data":"-- PyTorch: CUDA detected: 12.8\n"}
+,{"stream_name":"stdout","time":24.371754858,"data":"-- PyTorch: CUDA nvcc is: /usr/local/cuda/bin/nvcc\n"}
+,{"stream_name":"stdout","time":24.371759312000002,"data":"-- PyTorch: CUDA toolkit directory: /usr/local/cuda\n"}
+,{"stream_name":"stdout","time":24.490522362,"data":"-- PyTorch: Header version is: 12.8\n"}
+,{"stream_name":"stdout","time":25.139313719,"data":"-- Found Python: /usr/local/bin/python (found version \"3.12.13\") found components: Interpreter\n"}
+,{"stream_name":"stderr","time":25.140975995,"data":"CMake Warning at /usr/local/lib/python3.12/dist-packages/torch/share/cmake/Caffe2/public/cuda.cmake:149 (message):\n"}
+,{"stream_name":"stderr","time":25.140995979,"data":"  Failed to compute shorthash for libnvrtc.so\n"}
+,{"stream_name":"stderr","time":25.141001556,"data":"Call Stack (most recent call first):\n"}
+,{"stream_name":"stderr","time":25.141006346,"data":"  /usr/local/lib/python3.12/dist-packages/torch/share/cmake/Caffe2/Caffe2Config.cmake:86 (include)\n"}
+,{"stream_name":"stderr","time":25.141011348,"data":"  /usr/local/lib/python3.12/dist-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)\n"}
+,{"stream_name":"stderr","time":25.141027415,"data":"  CMakeLists.txt:223 (find_package)\n"}
+,{"stream_name":"stderr","time":25.141032997,"data":"\n"}
+,{"stream_name":"stderr","time":25.141037532,"data":"\n"}
+,{"stream_name":"stdout","time":25.141176527,"data":"-- USE_CUDNN is set to 0. Compiling without cuDNN support\n"}
+,{"stream_name":"stdout","time":25.141187098,"data":"-- USE_CUSPARSELT is set to 0. Compiling without cuSPARSELt support\n"}
+,{"stream_name":"stdout","time":25.141214544,"data":"-- USE_CUDSS is set to 0. Compiling without cuDSS support\n"}
+,{"stream_name":"stdout","time":25.141272413,"data":"-- USE_CUFILE is set to 0. Compiling without cuFile support\n"}
+,{"stream_name":"stdout","time":26.479702234,"data":"-- Autodetected CUDA architecture(s):  7.5 7.5\n"}
+,{"stream_name":"stderr","time":26.480022874,"data":"CMake Warning at /usr/local/lib/python3.12/dist-packages/torch/share/cmake/Caffe2/public/cuda.cmake:332 (message):\n"}
+,{"stream_name":"stderr","time":26.480051219,"data":"  pytorch is not compatible with `CMAKE_CUDA_ARCHITECTURES` and will ignore\n"}
+,{"stream_name":"stderr","time":26.480073911,"data":"  its value.  Please configure `TORCH_CUDA_ARCH_LIST` instead.\n"}
+,{"stream_name":"stdout","time":26.480069336,"data":"-- Added CUDA NVCC flags for: -gencode;arch=compute_75,code=sm_75\n"}
+,{"stream_name":"stderr","time":26.480078513,"data":"Call Stack (most recent call first):\n"}
+,{"stream_name":"stderr","time":26.480095154,"data":"  /usr/local/lib/python3.12/dist-packages/torch/share/cmake/Caffe2/Caffe2Config.cmake:86 (include)\n"}
+,{"stream_name":"stderr","time":26.480099892,"data":"  /usr/local/lib/python3.12/dist-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)\n"}
+,{"stream_name":"stderr","time":26.480103467,"data":"  CMakeLists.txt:223 (find_package)\n"}
+,{"stream_name":"stderr","time":26.480106956,"data":"\n"}
+,{"stream_name":"stderr","time":26.480109939,"data":"\n"}
+,{"stream_name":"stderr","time":26.53272372,"data":"CMake Warning at /usr/local/lib/python3.12/dist-packages/torch/share/cmake/Torch/TorchConfig.cmake:22 (message):\n"}
+,{"stream_name":"stderr","time":26.532744543,"data":"  static library kineto_LIBRARY-NOTFOUND not found.\n"}
+,{"stream_name":"stderr","time":26.532749293,"data":"Call Stack (most recent call first):\n"}
+,{"stream_name":"stderr","time":26.532756187,"data":"  /usr/local/lib/python3.12/dist-packages/torch/share/cmake/Torch/TorchConfig.cmake:125 (append_torchlib_if_found)\n"}
+,{"stream_name":"stderr","time":26.53275892,"data":"  CMakeLists.txt:223 (find_package)\n"}
+,{"stream_name":"stderr","time":26.532761167,"data":"\n"}
+,{"stream_name":"stderr","time":26.532763296,"data":"\n"}
+,{"stream_name":"stdout","time":26.534850368,"data":"-- Found Torch: /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch.so\n"}
+,{"stream_name":"stdout","time":26.535415036,"data":"-- Configuring done (6.7s)\n"}
+,{"stream_name":"stdout","time":26.591094115,"data":"-- Generating done (0.1s)\n"}
+,{"stream_name":"stdout","time":26.591811373,"data":"-- Build files have been written to: /tmp/beam_build_libtorch_transformer_bench\n"}
+,{"stream_name":"stdout","time":26.602007507,"data":"+ cmake --build /tmp/beam_build_libtorch_transformer_bench --target stream1_transformer_libtorch_benchmark -j 2\n"}
+,{"stream_name":"stdout","time":47.102212623,"data":"[1/3] Building CXX object CMakeFiles/stream1_transformer_libtorch_benchmark.dir/tools/stream1_transformer_libtorch_backend.cpp.o\n"}
+,{"stream_name":"stdout","time":56.051091069,"data":"[2/3] Building CXX object CMakeFiles/stream1_transformer_libtorch_benchmark.dir/tools/stream1_transformer_libtorch_benchmark.cpp.o\n"}
+,{"stream_name":"stdout","time":56.76079455,"data":"[3/3] Linking CXX executable stream1_transformer_libtorch_benchmark\n"}
+,{"stream_name":"stdout","time":56.762614104,"data":"RUN_STREAM1_LIBTORCH_BENCH_START {'gpu': 0, 'mode': 'eager', 'log': '/kaggle/working/stream1_libtorch_transformer_logs/stream1_libtorch_transformer_eager_gpu0.log', 'csv': '/kaggle/working/stream1_libtorch_transformer_logs/stream1_libtorch_transformer_eager_gpu0.csv'}\n"}
+,{"stream_name":"stdout","time":95.323127873,"data":"stream1_transformer_libtorch_backend=1 mode=eager device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1\n"}
+,{"stream_name":"stdout","time":95.323170504,"data":"stream1_transformer_libtorch_micro mode=eager batch=128 iters=100 elapsed_ms=473.96 parents_per_sec=27006.5 candidates_per_sec=648156 checksum=155316224\n"}
+,{"stream_name":"stdout","time":95.323184198,"data":"stream1_transformer_libtorch_micro mode=eager batch=192 iters=100 elapsed_ms=705.961 parents_per_sec=27197 candidates_per_sec=652727 checksum=232974336\n"}
+,{"stream_name":"stdout","time":95.323212363,"data":"stream1_transformer_libtorch_micro mode=eager batch=256 iters=100 elapsed_ms=923.386 parents_per_sec=27724.1 candidates_per_sec=665378 checksum=310632448\n"}
+,{"stream_name":"stdout","time":95.323219308,"data":"stream1_transformer_libtorch_micro mode=eager batch=320 iters=100 elapsed_ms=1143.69 parents_per_sec=27979.7 candidates_per_sec=671513 checksum=388290560\n"}
+,{"stream_name":"stdout","time":95.323223649,"data":"stream1_transformer_libtorch_micro mode=eager batch=384 iters=100 elapsed_ms=1353.86 parents_per_sec=28363.3 candidates_per_sec=680720 checksum=465948672\n"}
+,{"stream_name":"stdout","time":95.323227603,"data":"stream1_transformer_libtorch_micro mode=eager batch=448 iters=100 elapsed_ms=1587.92 parents_per_sec=28213 candidates_per_sec=677113 checksum=543606784\n"}
+,{"stream_name":"stdout","time":95.323231399,"data":"stream1_transformer_libtorch_micro mode=eager batch=512 iters=100 elapsed_ms=1854.25 parents_per_sec=27612.2 candidates_per_sec=662693 checksum=621264896\n"}
+,{"stream_name":"stdout","time":95.323235533,"data":"stream1_transformer_libtorch_micro mode=eager batch=640 iters=100 elapsed_ms=2292.02 parents_per_sec=27922.9 candidates_per_sec=670150 checksum=776581120\n"}
+,{"stream_name":"stdout","time":95.323239353,"data":"stream1_transformer_libtorch_micro mode=eager batch=768 iters=100 elapsed_ms=2747.5 parents_per_sec=27952.7 candidates_per_sec=670864 checksum=931897344\n"}
+,{"stream_name":"stdout","time":95.323243879,"data":"stream1_transformer_libtorch_micro mode=eager batch=1024 iters=100 elapsed_ms=3758.47 parents_per_sec=27245.1 candidates_per_sec=653883 checksum=1242529792\n"}
+,{"stream_name":"stdout","time":95.323252696,"data":"stream1_transformer_libtorch_micro mode=eager batch=1536 iters=100 elapsed_ms=5673.16 parents_per_sec=27074.8 candidates_per_sec=649796 checksum=1863794688\n"}
+,{"stream_name":"stdout","time":95.323256361,"data":"stream1_transformer_libtorch_micro mode=eager batch=2048 iters=100 elapsed_ms=7657.18 parents_per_sec=26746.1 candidates_per_sec=641907 checksum=2485059584\n"}
+,{"stream_name":"stdout","time":95.516562327,"data":"RUN_STREAM1_LIBTORCH_BENCH_DONE {'gpu': 0, 'mode': 'eager', 'rc': 0, 'seconds': 38.75391459465027, 'rows': 12}\n"}
+,{"stream_name":"stdout","time":95.516917844,"data":"RUN_STREAM1_LIBTORCH_BENCH_START {'gpu': 1, 'mode': 'eager', 'log': '/kaggle/working/stream1_libtorch_transformer_logs/stream1_libtorch_transformer_eager_gpu1.log', 'csv': '/kaggle/working/stream1_libtorch_transformer_logs/stream1_libtorch_transformer_eager_gpu1.csv'}\n"}
+,{"stream_name":"stdout","time":133.237972367,"data":"stream1_transformer_libtorch_backend=1 mode=eager device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1\n"}
+,{"stream_name":"stdout","time":133.238010536,"data":"stream1_transformer_libtorch_micro mode=eager batch=128 iters=100 elapsed_ms=483.163 parents_per_sec=26492.1 candidates_per_sec=635810 checksum=155316224\n"}
+,{"stream_name":"stdout","time":133.238131891,"data":"stream1_transformer_libtorch_micro mode=eager batch=192 iters=100 elapsed_ms=714.5 parents_per_sec=26872 candidates_per_sec=644927 checksum=232974336\n"}
+,{"stream_name":"stdout","time":133.238142715,"data":"stream1_transformer_libtorch_micro mode=eager batch=256 iters=100 elapsed_ms=930.764 parents_per_sec=27504.3 candidates_per_sec=660103 checksum=310632448\n"}
+,{"stream_name":"stdout","time":133.238148181,"data":"stream1_transformer_libtorch_micro mode=eager batch=320 iters=100 elapsed_ms=1155.81 parents_per_sec=27686.3 candidates_per_sec=664471 checksum=388290560\n"}
+,{"stream_name":"stdout","time":133.238152839,"data":"stream1_transformer_libtorch_micro mode=eager batch=384 iters=100 elapsed_ms=1363.06 parents_per_sec=28172 candidates_per_sec=676128 checksum=465948672\n"}
+,{"stream_name":"stdout","time":133.238170037,"data":"stream1_transformer_libtorch_micro mode=eager batch=448 iters=100 elapsed_ms=1607.29 parents_per_sec=27873.1 candidates_per_sec=668954 checksum=543606784\n"}
+,{"stream_name":"stdout","time":133.238174947,"data":"stream1_transformer_libtorch_micro mode=eager batch=512 iters=100 elapsed_ms=1851.27 parents_per_sec=27656.7 candidates_per_sec=663761 checksum=621264896\n"}
+,{"stream_name":"stdout","time":133.238179386,"data":"stream1_transformer_libtorch_micro mode=eager batch=640 iters=100 elapsed_ms=2300.31 parents_per_sec=27822.4 candidates_per_sec=667736 checksum=776581120\n"}
+,{"stream_name":"stdout","time":133.238183233,"data":"stream1_transformer_libtorch_micro mode=eager batch=768 iters=100 elapsed_ms=2757.09 parents_per_sec=27855.5 candidates_per_sec=668532 checksum=931897344\n"}
+,{"stream_name":"stdout","time":133.238187346,"data":"stream1_transformer_libtorch_micro mode=eager batch=1024 iters=100 elapsed_ms=3769.69 parents_per_sec=27164 candidates_per_sec=651936 checksum=1242529792\n"}
+,{"stream_name":"stdout","time":133.238203429,"data":"stream1_transformer_libtorch_micro mode=eager batch=1536 iters=100 elapsed_ms=5789.76 parents_per_sec=26529.6 candidates_per_sec=636710 checksum=1863794688\n"}
+,{"stream_name":"stdout","time":133.238210306,"data":"stream1_transformer_libtorch_micro mode=eager batch=2048 iters=100 elapsed_ms=7759.18 parents_per_sec=26394.6 candidates_per_sec=633469 checksum=2485059584\n"}
+,{"stream_name":"stdout","time":133.408690279,"data":"RUN_STREAM1_LIBTORCH_BENCH_DONE {'gpu': 1, 'mode': 'eager', 'rc': 0, 'seconds': 37.89170837402344, 'rows': 12}\n"}
+,{"stream_name":"stdout","time":133.409051089,"data":"RUN_STREAM1_LIBTORCH_BENCH_START {'gpu': 0, 'mode': 'cuda_graph', 'log': '/kaggle/working/stream1_libtorch_transformer_logs/stream1_libtorch_transformer_cuda_graph_gpu0.log', 'csv': '/kaggle/working/stream1_libtorch_transformer_logs/stream1_libtorch_transformer_cuda_graph_gpu0.csv'}\n"}
+,{"stream_name":"stdout","time":173.625307437,"data":"stream1_transformer_libtorch_backend=1 mode=cuda_graph device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1\n"}
+,{"stream_name":"stdout","time":173.625341856,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=128 iters=100 elapsed_ms=490.828 parents_per_sec=26078.4 candidates_per_sec=625882 checksum=155316224\n"}
+,{"stream_name":"stdout","time":173.625348873,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=192 iters=100 elapsed_ms=727.787 parents_per_sec=26381.4 candidates_per_sec=633152 checksum=232974336\n"}
+,{"stream_name":"stdout","time":173.625366911,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=256 iters=100 elapsed_ms=946.265 parents_per_sec=27053.7 candidates_per_sec=649290 checksum=310632448\n"}
+,{"stream_name":"stdout","time":173.625372697,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=320 iters=100 elapsed_ms=1187.44 parents_per_sec=26948.7 candidates_per_sec=646768 checksum=388290560\n"}
+,{"stream_name":"stdout","time":173.625378166,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=384 iters=100 elapsed_ms=1413.27 parents_per_sec=27171 candidates_per_sec=652104 checksum=465948672\n"}
+,{"stream_name":"stdout","time":173.625383807,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=448 iters=100 elapsed_ms=1672.26 parents_per_sec=26790.1 candidates_per_sec=642962 checksum=543606784\n"}
+,{"stream_name":"stdout","time":173.625388753,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=512 iters=100 elapsed_ms=1945.03 parents_per_sec=26323.4 candidates_per_sec=631763 checksum=621264896\n"}
+,{"stream_name":"stdout","time":173.625402114,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=640 iters=100 elapsed_ms=2450.81 parents_per_sec=26113.8 candidates_per_sec=626731 checksum=776581120\n"}
+,{"stream_name":"stdout","time":173.625419338,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=768 iters=100 elapsed_ms=2938.95 parents_per_sec=26131.7 candidates_per_sec=627162 checksum=931897344\n"}
+,{"stream_name":"stdout","time":173.625424274,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=1024 iters=100 elapsed_ms=4053.7 parents_per_sec=25260.9 candidates_per_sec=606261 checksum=1242529792\n"}
+,{"stream_name":"stdout","time":173.625436468,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=1536 iters=100 elapsed_ms=6132.55 parents_per_sec=25046.7 candidates_per_sec=601121 checksum=1863794688\n"}
+,{"stream_name":"stdout","time":173.625492341,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=2048 iters=100 elapsed_ms=8306.95 parents_per_sec=24654.1 candidates_per_sec=591698 checksum=2485059584\n"}
+,{"stream_name":"stdout","time":173.82520946,"data":"RUN_STREAM1_LIBTORCH_BENCH_DONE {'gpu': 0, 'mode': 'cuda_graph', 'rc': 0, 'seconds': 40.41601014137268, 'rows': 12}\n"}
+,{"stream_name":"stdout","time":173.825506263,"data":"RUN_STREAM1_LIBTORCH_BENCH_START {'gpu': 1, 'mode': 'cuda_graph', 'log': '/kaggle/working/stream1_libtorch_transformer_logs/stream1_libtorch_transformer_cuda_graph_gpu1.log', 'csv': '/kaggle/working/stream1_libtorch_transformer_logs/stream1_libtorch_transformer_cuda_graph_gpu1.csv'}\n"}
+,{"stream_name":"stdout","time":214.771683275,"data":"stream1_transformer_libtorch_backend=1 mode=cuda_graph device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1\n"}
+,{"stream_name":"stdout","time":214.771715938,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=128 iters=100 elapsed_ms=486.997 parents_per_sec=26283.5 candidates_per_sec=630805 checksum=155316224\n"}
+,{"stream_name":"stdout","time":214.771819571,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=192 iters=100 elapsed_ms=733.69 parents_per_sec=26169.1 candidates_per_sec=628058 checksum=232974336\n"}
+,{"stream_name":"stdout","time":214.77182892,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=256 iters=100 elapsed_ms=960.897 parents_per_sec=26641.8 candidates_per_sec=639403 checksum=310632448\n"}
+,{"stream_name":"stdout","time":214.77183408,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=320 iters=100 elapsed_ms=1208.91 parents_per_sec=26470.1 candidates_per_sec=635283 checksum=388290560\n"}
+,{"stream_name":"stdout","time":214.771839018,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=384 iters=100 elapsed_ms=1439.61 parents_per_sec=26673.8 candidates_per_sec=640172 checksum=465948672\n"}
+,{"stream_name":"stdout","time":214.771844388,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=448 iters=100 elapsed_ms=1719.45 parents_per_sec=26054.9 candidates_per_sec=625318 checksum=543606784\n"}
+,{"stream_name":"stdout","time":214.771849535,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=512 iters=100 elapsed_ms=1955.4 parents_per_sec=26183.9 candidates_per_sec=628413 checksum=621264896\n"}
+,{"stream_name":"stdout","time":214.771854923,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=640 iters=100 elapsed_ms=2466.53 parents_per_sec=25947.4 candidates_per_sec=622737 checksum=776581120\n"}
+,{"stream_name":"stdout","time":214.77187151,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=768 iters=100 elapsed_ms=2960.03 parents_per_sec=25945.7 candidates_per_sec=622696 checksum=931897344\n"}
+,{"stream_name":"stdout","time":214.771877729,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=1024 iters=100 elapsed_ms=4058.03 parents_per_sec=25233.9 candidates_per_sec=605613 checksum=1242529792\n"}
+,{"stream_name":"stdout","time":214.771893085,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=1536 iters=100 elapsed_ms=6310.39 parents_per_sec=24340.8 candidates_per_sec=584179 checksum=1863794688\n"}
+,{"stream_name":"stdout","time":214.771897002,"data":"stream1_transformer_libtorch_micro mode=cuda_graph batch=2048 iters=100 elapsed_ms=8630.88 parents_per_sec=23728.8 candidates_per_sec=569490 checksum=2485059584\n"}
+,{"stream_name":"stdout","time":214.957134628,"data":"RUN_STREAM1_LIBTORCH_BENCH_DONE {'gpu': 1, 'mode': 'cuda_graph', 'rc': 0, 'seconds': 41.13153290748596, 'rows': 12}\n"}
+,{"stream_name":"stdout","time":214.9579503,"data":"NSYS_PROFILE_UNAVAILABLE=nsys_not_found\n"}
+,{"stream_name":"stdout","time":214.960818054,"data":"STREAM1_LIBTORCH_WEIGHTS_CLEANED= /kaggle/working/stream1_transformer_weights_fp16\n"}
+,{"stream_name":"stdout","time":214.960835344,"data":"STREAM1_LIBTORCH_BENCH_CSV= /kaggle/working/stream1_libtorch_transformer_rows.csv\n"}
+,{"stream_name":"stdout","time":214.960879985,"data":"STREAM1_LIBTORCH_BEST_MODE_GPU cuda_graph 0 {'mode': 'cuda_graph', 'gpu': 0, 'batch': 384, 'iters': 100, 'elapsed_ms': 1413.27, 'parents_per_sec': 27171.0, 'candidates_per_sec': 652104.0, 'checksum': 465948672}\n"}
+,{"stream_name":"stdout","time":214.960886769,"data":"STREAM1_LIBTORCH_BEST_MODE_GPU cuda_graph 1 {'mode': 'cuda_graph', 'gpu': 1, 'batch': 384, 'iters': 100, 'elapsed_ms': 1439.61, 'parents_per_sec': 26673.8, 'candidates_per_sec': 640172.0, 'checksum': 465948672}\n"}
+,{"stream_name":"stdout","time":214.960910189,"data":"STREAM1_LIBTORCH_BEST_MODE_GPU eager 0 {'mode': 'eager', 'gpu': 0, 'batch': 384, 'iters': 100, 'elapsed_ms': 1353.86, 'parents_per_sec': 28363.3, 'candidates_per_sec': 680720.0, 'checksum': 465948672}\n"}
+,{"stream_name":"stdout","time":214.960917886,"data":"STREAM1_LIBTORCH_BEST_MODE_GPU eager 1 {'mode': 'eager', 'gpu': 1, 'batch': 384, 'iters': 100, 'elapsed_ms': 1363.06, 'parents_per_sec': 28172.0, 'candidates_per_sec': 676128.0, 'checksum': 465948672}\n"}
+,{"stream_name":"stdout","time":214.960940904,"data":"STREAM1_LIBTORCH_BEST_2XT4_AGG_CANDIDATES_PER_SEC cuda_graph 1292276.0\n"}
+,{"stream_name":"stdout","time":214.96094865,"data":"STREAM1_LIBTORCH_OVER_PYTORCH_2XT4 cuda_graph 1.0244824376840227\n"}
+,{"stream_name":"stdout","time":214.96096448,"data":"STREAM1_LIBTORCH_BEST_2XT4_AGG_CANDIDATES_PER_SEC eager 1356848.0\n"}
+,{"stream_name":"stdout","time":214.960981616,"data":"STREAM1_LIBTORCH_OVER_PYTORCH_2XT4 eager 1.075673421627184\n"}
+,{"stream_name":"stdout","time":214.960990674,"data":"STREAM1_LIBTORCH_CUDA_GRAPH_OVER_EAGER= 0.9524102920887233\n"}
+,{"stream_name":"stdout","time":214.961065864,"data":"STREAM1_LIBTORCH_SUMMARY_JSON= /kaggle/working/stream1_libtorch_transformer_summary.json\n"}
+,{"stream_name":"stderr","time":217.58354669,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":217.583572056,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":217.900557783,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":217.900584091,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":218.576747273,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":219.988411072,"data":"[NbConvertApp] Writing 339647 bytes to __results__.html\n"}
+]

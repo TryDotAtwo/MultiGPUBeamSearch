@@ -1,0 +1,13 @@
+stream1_transformer_libtorch_backend=1 mode=eager device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1
+stream1_transformer_libtorch_micro mode=eager batch=128 iters=100 elapsed_ms=483.163 parents_per_sec=26492.1 candidates_per_sec=635810 checksum=155316224
+stream1_transformer_libtorch_micro mode=eager batch=192 iters=100 elapsed_ms=714.5 parents_per_sec=26872 candidates_per_sec=644927 checksum=232974336
+stream1_transformer_libtorch_micro mode=eager batch=256 iters=100 elapsed_ms=930.764 parents_per_sec=27504.3 candidates_per_sec=660103 checksum=310632448
+stream1_transformer_libtorch_micro mode=eager batch=320 iters=100 elapsed_ms=1155.81 parents_per_sec=27686.3 candidates_per_sec=664471 checksum=388290560
+stream1_transformer_libtorch_micro mode=eager batch=384 iters=100 elapsed_ms=1363.06 parents_per_sec=28172 candidates_per_sec=676128 checksum=465948672
+stream1_transformer_libtorch_micro mode=eager batch=448 iters=100 elapsed_ms=1607.29 parents_per_sec=27873.1 candidates_per_sec=668954 checksum=543606784
+stream1_transformer_libtorch_micro mode=eager batch=512 iters=100 elapsed_ms=1851.27 parents_per_sec=27656.7 candidates_per_sec=663761 checksum=621264896
+stream1_transformer_libtorch_micro mode=eager batch=640 iters=100 elapsed_ms=2300.31 parents_per_sec=27822.4 candidates_per_sec=667736 checksum=776581120
+stream1_transformer_libtorch_micro mode=eager batch=768 iters=100 elapsed_ms=2757.09 parents_per_sec=27855.5 candidates_per_sec=668532 checksum=931897344
+stream1_transformer_libtorch_micro mode=eager batch=1024 iters=100 elapsed_ms=3769.69 parents_per_sec=27164 candidates_per_sec=651936 checksum=1242529792
+stream1_transformer_libtorch_micro mode=eager batch=1536 iters=100 elapsed_ms=5789.76 parents_per_sec=26529.6 candidates_per_sec=636710 checksum=1863794688
+stream1_transformer_libtorch_micro mode=eager batch=2048 iters=100 elapsed_ms=7759.18 parents_per_sec=26394.6 candidates_per_sec=633469 checksum=2485059584
