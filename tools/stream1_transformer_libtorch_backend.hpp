@@ -1,4 +1,5 @@
 #pragma once
+#include <ATen/ops/linear.h>
 #include <ATen/ops/scaled_dot_product_attention.h>
 #include <torch/cuda.h>
 #include <torch/torch.h>
@@ -258,6 +259,9 @@ struct PieceTransformerLibTorch {
         return torch::layer_norm(x, {static_cast<std::int64_t>(d_model)}, gamma, beta, 1.0e-5, false);
     }
 
+    torch::Tensor linear_hxk(const torch::Tensor& x, const torch::Tensor& weight_hxk, const torch::Tensor& bias) const {
+        return at::linear(x, weight_hxk.transpose(0, 1), bias);
+    }
     torch::Tensor build_tokens(const torch::Tensor& state_u8) const {
         const torch::Tensor states = state_u8.index({torch::indexing::Slice(), torch::indexing::Slice(0, state_len)})
                                          .to(torch::kLong);
@@ -283,7 +287,7 @@ struct PieceTransformerLibTorch {
         torch::Tensor x = layer_norm(build_tokens(state_u8), input_ln_gamma, input_ln_beta);
         for (const TransformerBlock& block : blocks) {
             torch::Tensor y = layer_norm(x, block.ln1_gamma, block.ln1_beta);
-            torch::Tensor qkv = torch::matmul(y, block.qkv_weight) + block.qkv_bias;
+            torch::Tensor qkv = linear_hxk(y, block.qkv_weight, block.qkv_bias);
             qkv = qkv.view({batch,
                             static_cast<std::int64_t>(seq_len),
                             3,
@@ -297,15 +301,15 @@ struct PieceTransformerLibTorch {
                                         .reshape({batch,
                                                   static_cast<std::int64_t>(seq_len),
                                                   static_cast<std::int64_t>(d_model)});
-            x = x + torch::matmul(context, block.attn_out_weight) + block.attn_out_bias;
+            x = x + linear_hxk(context, block.attn_out_weight, block.attn_out_bias);
 
             y = layer_norm(x, block.ln2_gamma, block.ln2_beta);
-            y = torch::matmul(y, block.ff1_weight) + block.ff1_bias;
+            y = linear_hxk(y, block.ff1_weight, block.ff1_bias);
             y = y * torch::sigmoid(y);
-            x = x + torch::matmul(y, block.ff2_weight) + block.ff2_bias;
+            x = x + linear_hxk(y, block.ff2_weight, block.ff2_bias);
         }
         torch::Tensor cls = layer_norm(x.index({torch::indexing::Slice(), 0, torch::indexing::Slice()}), output_ln_gamma, output_ln_beta);
-        return torch::matmul(cls, output_weight) + output_bias;
+        return linear_hxk(cls, output_weight, output_bias);
     }
 };
 
