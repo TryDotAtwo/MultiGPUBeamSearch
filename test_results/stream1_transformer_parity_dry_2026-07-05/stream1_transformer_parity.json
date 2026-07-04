@@ -1,0 +1,95 @@
+{
+  "comparison": {
+    "backends": [
+      {
+        "backend": "pytorch",
+        "mode": "eager"
+      },
+      {
+        "backend": "libtorch",
+        "mode": "eager"
+      },
+      {
+        "backend": "native_cutlass",
+        "mode": "eager"
+      }
+    ],
+    "reason": "backend invocations generated without execution",
+    "status": "dry_run",
+    "tolerance": 3072
+  },
+  "runs": [
+    {
+      "backend": "pytorch",
+      "checksum": null,
+      "command": [
+        "C:\\Users\\\u0418\u0432\u0430\u043d \u041b\u0438\u0442\u0432\u0430\u043a\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "D:\\100XH100\\.worktrees\\stream1-piece-transformer\\tools\\stream1_transformer_torch_benchmark.py",
+        "--weight-dir",
+        "weights_fp16",
+        "--batch-sizes",
+        "256",
+        "--warmup",
+        "2",
+        "--iters",
+        "3",
+        "--report",
+        "test_results\\stream1_transformer_parity_dry_2026-07-05\\pytorch_eager.md",
+        "--skip-reference"
+      ],
+      "env": {},
+      "first_score_keys": [],
+      "log_path": "",
+      "mode": "eager",
+      "return_code": 0,
+      "status": "dry_run"
+    },
+    {
+      "backend": "libtorch",
+      "checksum": null,
+      "command": [
+        "build-smoke\\stream1_transformer_libtorch_benchmark.exe",
+        "--weight-dir",
+        "weights_fp16",
+        "--batches",
+        "256",
+        "--warmup",
+        "2",
+        "--iters",
+        "3",
+        "--device",
+        "cuda:0",
+        "--csv",
+        "test_results\\stream1_transformer_parity_dry_2026-07-05\\libtorch_eager.csv"
+      ],
+      "env": {},
+      "first_score_keys": [],
+      "log_path": "",
+      "mode": "eager",
+      "return_code": 0,
+      "status": "dry_run"
+    },
+    {
+      "backend": "native_cutlass",
+      "checksum": null,
+      "command": [
+        "build-smoke\\stream_benchmark.exe",
+        "991"
+      ],
+      "env": {
+        "BEAM_STREAM1_SYNTHETIC_STATES": "1",
+        "BEAM_STREAM1_TRANSFORMER_BLOCK51": "1",
+        "BEAM_STREAM1_TRANSFORMER_B_MICRO": "256",
+        "BEAM_STREAM1_TRANSFORMER_CONCURRENCY": "1",
+        "BEAM_STREAM_BENCH_REPORT": "test_results\\stream1_transformer_parity_dry_2026-07-05\\native_cutlass_eager.md",
+        "BEAM_STREAM_MICRO_ONLY": "1",
+        "BEAM_WEIGHT_DIR": "weights_fp16"
+      },
+      "first_score_keys": [],
+      "log_path": "",
+      "mode": "eager",
+      "return_code": 0,
+      "status": "dry_run"
+    }
+  ]
+}

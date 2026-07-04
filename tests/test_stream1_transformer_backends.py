@@ -24,6 +24,9 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
             puzzle_id="991",
             b_micro=None,
             concurrency=None,
+            reference_json=None,
+            require_reference=False,
+            synthetic_states=False,
             report=None,
             csv=None,
         )
@@ -44,6 +47,7 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
         self.assertIn("stream1_transformer_torch_benchmark.py", command[1])
         self.assertIn("--weight-dir", command)
         self.assertIn("weights_fp16", command)
+        self.assertIn("--skip-reference", command)
 
     def test_libtorch_invocation_uses_opt_in_cpp_tool(self) -> None:
         invocation = build_invocation(self.base_args("libtorch", "cuda_graph"))
@@ -58,6 +62,7 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
         args = self.base_args("native_cutlass", "graph")
         args.b_micro = "256"
         args.concurrency = "2"
+        args.synthetic_states = True
         invocation = build_invocation(args)
         self.assertEqual(invocation.backend, "native_cutlass")
         self.assertEqual(invocation.mode, "graph")
@@ -68,6 +73,7 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
         self.assertEqual(env["BEAM_STREAM1_TRANSFORMER_GRAPH_BENCH"], "1")
         self.assertEqual(env["BEAM_STREAM1_TRANSFORMER_B_MICRO"], "256")
         self.assertEqual(env["BEAM_STREAM1_TRANSFORMER_CONCURRENCY"], "2")
+        self.assertEqual(env["BEAM_STREAM1_SYNTHETIC_STATES"], "1")
 
     def test_invalid_mode_fails_closed(self) -> None:
         with self.assertRaises(ValueError):

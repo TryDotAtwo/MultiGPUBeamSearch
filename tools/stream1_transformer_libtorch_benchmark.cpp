@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -72,6 +73,22 @@ Args parse_args(int argc, char** argv) {
     return args;
 }
 
+
+std::string format_first_score_keys(const torch::Tensor& keys) {
+    if (keys.size(0) <= 0) {
+        return "";
+    }
+    torch::Tensor first = keys.index({0}).to(torch::kCPU).contiguous();
+    auto accessor = first.accessor<std::int64_t, 1>();
+    std::ostringstream out;
+    for (std::int64_t i = 0; i < first.size(0); ++i) {
+        if (i != 0) {
+            out << ',';
+        }
+        out << accessor[i];
+    }
+    return out.str();
+}
 std::int16_t cuda_device_index(const torch::Device& device) {
     if (!device.is_cuda()) {
         throw std::runtime_error("CUDA graph mode requires a CUDA device");
@@ -186,7 +203,9 @@ int main(int argc, char** argv) {
                 : run_eager(model, states, args.warmup, args.iters, device, elapsed_ms);
             const double parents_per_sec = (static_cast<double>(batch) * args.iters) / (elapsed_ms / 1000.0);
             const double candidates_per_sec = parents_per_sec * model.move_count;
-            const auto checksum = beam::stream1_libtorch::score_keys(logits).sum().item<std::int64_t>();
+            const torch::Tensor keys = beam::stream1_libtorch::score_keys(logits);
+            const auto checksum = keys.sum().item<std::int64_t>();
+            const std::string first_score_keys = format_first_score_keys(keys);
             std::cout << "stream1_transformer_libtorch_micro"
                       << " mode=" << mode
                       << " batch=" << batch
@@ -195,6 +214,7 @@ int main(int argc, char** argv) {
                       << " parents_per_sec=" << parents_per_sec
                       << " candidates_per_sec=" << candidates_per_sec
                       << " checksum=" << checksum
+                      << " first_score_keys=" << first_score_keys
                       << "\n";
             if (csv) {
                 csv << mode << ','

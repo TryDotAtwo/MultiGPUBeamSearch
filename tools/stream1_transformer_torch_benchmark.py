@@ -251,6 +251,9 @@ def benchmark_batch(
         end.record()
         torch.cuda.synchronize(model.device)
     elapsed_ms = float(start.elapsed_time(end))
+    keys = score_keys(logits)
+    checksum = int(keys.sum().item())
+    first_score_keys = ",".join(str(int(x)) for x in keys[0].detach().cpu().tolist()) if batch > 0 else ""
     del logits
     parents_per_s = (batch * iters) / (elapsed_ms / 1000.0)
     candidates_per_s = parents_per_s * model.move_count
@@ -263,6 +266,8 @@ def benchmark_batch(
         "parents_per_s": parents_per_s,
         "candidates_per_s": candidates_per_s,
         "peak_mem_gib": peak_gib,
+        "checksum": checksum,
+        "first_score_keys": first_score_keys,
         "status": "ok",
     }
 
@@ -280,18 +285,18 @@ def write_report(path: Path, rows: List[Dict[str, object]], metadata: Dict[str, 
         f"- reference_rows={metadata['reference_rows']}",
         f"- reference_max_abs_score_key_error={metadata['reference_max_abs_score_key_error']}",
         "",
-        "| batch | iters | ms/iter | parents/s | candidates/s | peak GiB | status |",
-        "|---:|---:|---:|---:|---:|---:|---|",
+        "| batch | iters | ms/iter | parents/s | candidates/s | peak GiB | checksum | status |",
+        "|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in rows:
         if row.get("status") == "ok":
             lines.append(
-                "| {batch} | {iters} | {ms_per_iter:.4f} | {parents_per_s:.1f} | {candidates_per_s:.1f} | {peak_mem_gib:.3f} | ok |".format(
+                "| {batch} | {iters} | {ms_per_iter:.4f} | {parents_per_s:.1f} | {candidates_per_s:.1f} | {peak_mem_gib:.3f} | {checksum} | ok |".format(
                     **row
                 )
             )
         else:
-            lines.append(f"| {row['batch']} | - | - | - | - | - | {row['status']} |")
+            lines.append(f"| {row['batch']} | - | - | - | - | - | - | {row['status']} |")
     if best is not None:
         lines.extend(
             [
@@ -312,6 +317,7 @@ def main() -> None:
     parser.add_argument("--warmup", type=int, default=8)
     parser.add_argument("--iters", type=int, default=30)
     parser.add_argument("--reference-tolerance", type=int, default=3072)
+    parser.add_argument("--skip-reference", action="store_true", help="Skip reference JSON validation for synthetic benchmark/parity runs.")
     parser.add_argument("--report", type=Path, default=Path("test_results/stream1_transformer_torch_benchmark_2026-06-30.md"))
     args = parser.parse_args()
 
@@ -321,9 +327,12 @@ def main() -> None:
     torch.backends.cudnn.allow_tf32 = False
     device = torch.device("cuda")
     model = PieceTransformerTorch(args.weight_dir, device)
-    ref_status, ref_rows, ref_error = validate_reference(model, args.reference_json, args.reference_tolerance)
-    if ref_status != "pass":
-        raise RuntimeError(f"reference validation failed: max_abs_score_key_error={ref_error}")
+    if args.skip_reference:
+        ref_status, ref_rows, ref_error = "skip", 0, 0
+    else:
+        ref_status, ref_rows, ref_error = validate_reference(model, args.reference_json, args.reference_tolerance)
+        if ref_status != "pass":
+            raise RuntimeError(f"reference validation failed: max_abs_score_key_error={ref_error}")
 
     rows: List[Dict[str, object]] = []
     for batch in parse_batch_sizes(args.batch_sizes):
@@ -340,7 +349,9 @@ def main() -> None:
             f" ms_per_iter={row['ms_per_iter']:.4f}"
             f" parents_per_s={row['parents_per_s']:.1f}"
             f" candidates_per_s={row['candidates_per_s']:.1f}"
-            f" peak_mem_gib={row['peak_mem_gib']:.3f}",
+            f" peak_mem_gib={row['peak_mem_gib']:.3f}"
+            f" checksum={row['checksum']}"
+            f" first_score_keys={row['first_score_keys']}",
             flush=True,
         )
 
@@ -355,7 +366,7 @@ def main() -> None:
     }
     write_report(args.report, rows, metadata)
     with args.report.with_suffix(".tsv").open("w", newline="", encoding="utf-8") as fh:
-        fieldnames = ["batch", "iters", "elapsed_ms", "ms_per_iter", "parents_per_s", "candidates_per_s", "peak_mem_gib", "status"]
+        fieldnames = ["batch", "iters", "elapsed_ms", "ms_per_iter", "parents_per_s", "candidates_per_s", "peak_mem_gib", "checksum", "first_score_keys", "status"]
         writer = csv.DictWriter(fh, fieldnames=fieldnames, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)

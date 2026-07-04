@@ -115,7 +115,7 @@ def build_invocation(args: argparse.Namespace) -> BackendInvocation:
     if args.backend == "pytorch":
         parse_csv_values(args.batches, "--batches")
         report = Path(args.report) if args.report else default_report_path("pytorch", mode)
-        command = (
+        command_parts = [
             sys.executable,
             str(REPO_ROOT / "tools" / "stream1_transformer_torch_benchmark.py"),
             "--weight-dir",
@@ -128,8 +128,12 @@ def build_invocation(args: argparse.Namespace) -> BackendInvocation:
             str(args.iters),
             "--report",
             str(report),
-        )
-        return BackendInvocation(args.backend, mode, command)
+        ]
+        if args.reference_json:
+            command_parts.extend(["--reference-json", args.reference_json])
+        if not args.require_reference:
+            command_parts.append("--skip-reference")
+        return BackendInvocation(args.backend, mode, tuple(command_parts))
 
     if args.backend == "libtorch":
         parse_csv_values(args.batches, "--batches")
@@ -165,6 +169,8 @@ def build_invocation(args: argparse.Namespace) -> BackendInvocation:
         }
         if mode == "graph":
             env["BEAM_STREAM1_TRANSFORMER_GRAPH_BENCH"] = "1"
+        if args.synthetic_states:
+            env["BEAM_STREAM1_SYNTHETIC_STATES"] = "1"
         if args.b_micro:
             int(args.b_micro)
             env["BEAM_STREAM1_TRANSFORMER_B_MICRO"] = str(args.b_micro)
@@ -217,6 +223,9 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--build-dir", default="build", help="CMake build directory for C++ backends.")
     parser.add_argument("--device", default="cuda:0", help="Torch/LibTorch device string.")
     parser.add_argument("--batches", default="384,512,768,1024", help="CSV batch sizes for PyTorch/LibTorch.")
+    parser.add_argument("--reference-json", help="Optional PyTorch reference JSON path.")
+    parser.add_argument("--require-reference", action="store_true", help="Require PyTorch reference validation instead of adding --skip-reference.")
+    parser.add_argument("--synthetic-states", action="store_true", help="Use synthetic arange-pattern states for native CUTLASS parity runs.")
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--iters", type=int, default=50)
     parser.add_argument("--puzzle-id", default="991", help="Puzzle id passed to native stream_benchmark.")

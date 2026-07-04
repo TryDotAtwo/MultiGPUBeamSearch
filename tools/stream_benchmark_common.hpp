@@ -324,6 +324,28 @@ inline std::vector<State128> make_state_batch(
     return states;
 }
 
+inline std::vector<State128> make_synthetic_state_batch(
+    std::uint32_t count,
+    std::uint32_t state_len,
+    std::uint32_t num_classes) {
+    if (state_len > STATE_LEN) {
+        throw std::runtime_error("synthetic state_len exceeds logical State128 bytes");
+    }
+    std::vector<State128> states(count);
+    for (std::uint32_t row = 0; row < count; ++row) {
+        for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+            states[row].v[p] = 0;
+        }
+        for (std::uint32_t p = 0; p < state_len; ++p) {
+            const std::uint64_t value =
+                (static_cast<std::uint64_t>(row) * state_len + p) * 17ULL + 23ULL;
+            states[row].v[p] = static_cast<std::uint8_t>(value % num_classes);
+        }
+    }
+    return states;
+}
+
+
 std::vector<Stream1Result> benchmark_stream1_mlp(
     const stream1_weights::DeviceWeights& weights,
     const Stream1ModelConfig& model,

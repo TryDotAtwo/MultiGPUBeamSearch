@@ -36,7 +36,10 @@ int main(int argc, char** argv) {
             ? TRANSFORMER_B_MICRO_SWEEP.back() * TRANSFORMER_STREAM1_CONCURRENCY_SWEEP.back()
             : stream1_parent_batch_from_row_budget(B_MICRO_SWEEP.back(), stream1_model) *
                   STREAM1_CONCURRENCY_SWEEP.back();
-    const std::vector<State128> host_states = make_state_batch(host_initial, max_states, stream1_model.num_classes);
+    const bool synthetic_states = std::getenv("BEAM_STREAM1_SYNTHETIC_STATES") != nullptr;
+    const std::vector<State128> host_states = synthetic_states
+        ? make_synthetic_state_batch(max_states, stream1_model.state_len, stream1_model.num_classes)
+        : make_state_batch(host_initial, max_states, stream1_model.num_classes);
     State128* d_states = device_alloc<State128>(max_states);
     std::uint8_t* d_generators = device_alloc<std::uint8_t>(MOVE_COUNT * STATE_STORAGE_LEN);
     State128* d_central = device_alloc<State128>(1);
@@ -64,6 +67,7 @@ int main(int argc, char** argv) {
     report << "- generator_path=" << generator_path.string() << "\n";
     report << "- puzzle_info_path=" << puzzle_info_path.string() << "\n";
     report << "- test_csv_path=" << test_csv_path.string() << "\n";
+    report << "- synthetic_states=" << (synthetic_states ? 1 : 0) << "\n";
     report << "- weight_dir=" << weight_dir.string() << "\n";
     report << "- stream1_model_hidden1=" << stream1_model.hidden1 << "\n";
     report << "- stream1_model_hidden2=" << stream1_model.hidden2 << "\n";

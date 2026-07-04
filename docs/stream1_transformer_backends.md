@@ -95,3 +95,30 @@ The private Kaggle package `kaggle_t4_transformer_backend_compare/` currently ru
 - native CUTLASS eager/graph.
 
 For strategy decisions, use the aggregate backend summary from that package. For production integration work, keep the three backend families independently selectable through the launcher above.
+## Parity Gate
+
+Use `tools/stream1_transformer_parity.py` to compare selected backends on the same synthetic state batch. This gate is explicit backend comparison, not runtime fallback behavior.
+
+Dry-run the parity plan without requiring weights or built binaries:
+
+```bash
+python tools/stream1_transformer_parity.py \
+  --weight-dir /path/to/stream1_transformer_weights_fp16 \
+  --build-dir build-transformer \
+  --backends pytorch,libtorch,native_cutlass \
+  --batch 256 \
+  --dry-run
+```
+
+Run the parity gate after the three backend tools are available:
+
+```bash
+python tools/stream1_transformer_parity.py \
+  --weight-dir /path/to/stream1_transformer_weights_fp16 \
+  --build-dir build-transformer \
+  --backends pytorch,libtorch,native_cutlass \
+  --batch 256 \
+  --tolerance 3072
+```
+
+The native CUTLASS parity path sets `BEAM_STREAM1_SYNTHETIC_STATES=1` so it uses the same deterministic arange-pattern state batch as the Torch/LibTorch benchmark paths.

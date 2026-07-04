@@ -90,3 +90,8 @@ The three supported backend names are:
 - `native_cutlass`: native C++/CUDA/CUTLASS execution through the existing Stream1 transformer runtime.
 
 The selection is explicit. None of these paths may silently fall back to another path. They should be optimized and verified independently.
+## 2026-07-05 Backend Parity Contract
+
+The three Stream1 `piece_transformer` backends now share a parity launcher contract. PyTorch and LibTorch benchmarks emit `checksum` and `first_score_keys`, and the native CUTLASS transformer microbenchmark emits the same fields while optionally using `BEAM_STREAM1_SYNTHETIC_STATES=1` for deterministic synthetic inputs.
+
+`tools/stream1_transformer_parity.py` is the correctness gate for comparing explicit backends on one synthetic batch. It supports a dry-run mode for clean checkout validation and an execution mode for GPU hosts with exported weights and built backend binaries. This is only a verification layer; production dispatch still selects one backend explicitly and must not silently fall back.

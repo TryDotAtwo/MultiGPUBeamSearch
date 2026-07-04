@@ -1,6 +1,41 @@
+#include <sstream>
 #include "stream_benchmark_common.hpp"
 
 namespace beam::bench {
+
+struct ScoreSummary {
+    std::uint64_t checksum = 0;
+    std::string first_score_keys;
+};
+
+ScoreSummary summarize_score_buffers(
+    const std::vector<std::uint32_t*>& score_buffers,
+    std::uint32_t b_micro,
+    std::uint32_t concurrent) {
+    ScoreSummary summary;
+    std::vector<std::uint32_t> host(static_cast<std::uint64_t>(b_micro) * MOVE_COUNT);
+    for (std::uint32_t lane = 0; lane < concurrent; ++lane) {
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            host.data(),
+            score_buffers[lane],
+            host.size() * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost));
+        for (std::uint32_t value : host) {
+            summary.checksum += value;
+        }
+        if (lane == 0 && !host.empty()) {
+            std::ostringstream out;
+            for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
+                if (move != 0) {
+                    out << ',';
+                }
+                out << host[move];
+            }
+            summary.first_score_keys = out.str();
+        }
+    }
+    return summary;
+}
 
 struct Stream1TransformerBenchmarkResources {
     std::vector<cudaStream_t> streams;
@@ -99,8 +134,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
         report << "- filter_b_micro=" << only_b_micro << "\n";
         report << "- filter_concurrency=" << only_concurrency << "\n\n";
     }
-    report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | scratch_bytes |\n";
-    report << "|---:|---:|---:|---:|---:|---:|---:|\n";
+    report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | checksum | first_score_keys | scratch_bytes |\n";
+    report << "|---:|---:|---:|---:|---:|---:|---:|---|---:|\n";
     for (std::uint32_t b_micro : TRANSFORMER_B_MICRO_SWEEP) {
         for (std::uint32_t concurrent : TRANSFORMER_STREAM1_CONCURRENCY_SWEEP) {
             if ((only_b_micro != 0U && b_micro != only_b_micro) ||
@@ -110,7 +145,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
             const std::uint64_t rows_per_launch_group = static_cast<std::uint64_t>(b_micro) * concurrent;
             if (rows_per_launch_group > max_states) {
                 report << "|" << b_micro << "|" << concurrent << "|" << rows_per_launch_group
-                       << "|skip|skip|skip|0: exceeds prepared state batch|\n";
+                       << "|skip|skip|skip|skip|skip|0: exceeds prepared state batch|\n";
                 std::cout << "stream1_transformer_micro_skip"
                           << " b_micro=" << b_micro
                           << " concurrency=" << concurrent
@@ -130,7 +165,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
             constexpr std::uint64_t safety_margin_bytes = 256ULL * 1024ULL * 1024ULL;
             if (scratch_bytes + io_bytes + safety_margin_bytes > free_bytes) {
                 report << "|" << b_micro << "|" << concurrent << "|" << rows_per_launch_group
-                       << "|skip|skip|skip|" << scratch_bytes
+                       << "|skip|skip|skip|skip|skip|" << scratch_bytes
                        << ": estimated allocation exceeds available GPU memory"
                        << " free_bytes=" << free_bytes
                        << " io_bytes=" << io_bytes << "|\n";
@@ -196,6 +231,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                     }
                 });
             }
+            const ScoreSummary score_summary = summarize_score_buffers(resources.score, b_micro, concurrent);
             const double parents = static_cast<double>(rows_per_launch_group);
             const double parent_per_sec = parents * 1000.0 / static_cast<double>(ms);
             const double candidate_per_sec = parents * static_cast<double>(MOVE_COUNT) * 1000.0 / static_cast<double>(ms);
@@ -206,6 +242,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                    << "|" << std::fixed << std::setprecision(4) << ms
                    << "|" << std::setprecision(1) << parent_per_sec
                    << "|" << candidate_per_sec
+                   << "|" << score_summary.checksum
+                   << "|`" << score_summary.first_score_keys << "`"
                    << "|" << scratch_bytes << "|\n";
             std::cout << "stream1_transformer_micro"
                       << " b_micro=" << b_micro
@@ -214,6 +252,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                       << " ms_per_launch_group=" << std::fixed << std::setprecision(4) << ms
                       << " parents_per_sec=" << std::setprecision(1) << parent_per_sec
                       << " candidates_per_sec=" << candidate_per_sec
+                      << " checksum=" << score_summary.checksum
+                      << " first_score_keys=" << score_summary.first_score_keys
                       << " scratch_bytes=" << scratch_bytes
                       << "\n";
         }
