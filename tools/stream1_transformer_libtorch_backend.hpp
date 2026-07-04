@@ -289,9 +289,9 @@ struct PieceTransformerLibTorch {
                             3,
                             static_cast<std::int64_t>(nhead),
                             static_cast<std::int64_t>(head_dim)});
-            torch::Tensor q = qkv.select(2, 0).permute({0, 2, 1, 3}).contiguous();
-            torch::Tensor k = qkv.select(2, 1).permute({0, 2, 1, 3}).contiguous();
-            torch::Tensor v = qkv.select(2, 2).permute({0, 2, 1, 3}).contiguous();
+            torch::Tensor q = qkv.select(2, 0).permute({0, 2, 1, 3});
+            torch::Tensor k = qkv.select(2, 1).permute({0, 2, 1, 3});
+            torch::Tensor v = qkv.select(2, 2).permute({0, 2, 1, 3});
             torch::Tensor attn = at::scaled_dot_product_attention(q, k, v, std::nullopt, 0.0, false, std::nullopt, false);
             torch::Tensor context = attn.permute({0, 2, 1, 3})
                                         .reshape({batch,
