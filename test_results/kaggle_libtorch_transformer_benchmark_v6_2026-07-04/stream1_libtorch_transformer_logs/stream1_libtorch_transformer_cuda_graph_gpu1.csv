@@ -1,0 +1,13 @@
+mode,batch,iters,elapsed_ms,parents_per_sec,candidates_per_sec,device,dtype
+cuda_graph,128,100,477.697,26795.2,643086,cuda:0,fp16
+cuda_graph,192,100,715.763,26824.5,643789,cuda:0,fp16
+cuda_graph,256,100,937.251,27313.9,655534,cuda:0,fp16
+cuda_graph,320,100,1162.3,27531.7,660761,cuda:0,fp16
+cuda_graph,384,100,1384.12,27743.3,665838,cuda:0,fp16
+cuda_graph,448,100,1624.36,27580,661921,cuda:0,fp16
+cuda_graph,512,100,1874.57,27312.9,655509,cuda:0,fp16
+cuda_graph,640,100,2327.13,27501.7,660041,cuda:0,fp16
+cuda_graph,768,100,2788.12,27545.4,661090,cuda:0,fp16
+cuda_graph,1024,100,3741.34,27369.9,656877,cuda:0,fp16
+cuda_graph,1536,100,5685.88,27014.3,648342,cuda:0,fp16
+cuda_graph,2048,100,7676.52,26678.8,640291,cuda:0,fp16
