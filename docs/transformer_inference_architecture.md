@@ -74,3 +74,8 @@ After the native CUDA/CUTLASS v19 extended 2xT4 sweep, the best verified native 
 The current transformer direction is an explicit C++ LibTorch execution backend for the same `piece_transformer` exported weights. This does not change the manifest backend, does not distill to MLP, and does not add fallback behavior. Default builds remain Torch-free; the C++ LibTorch benchmark/tool target is enabled only with `BEAM_ENABLE_LIBTORCH_STREAM1=ON`.
 
 Production dispatcher integration is a separate step because the current dispatcher captures Stream1+Stream2 CUDA Graph templates. LibTorch op dispatch must either be proven graph-capture safe with stable allocations or run through a named non-graph Stream1 execution path.
+## 2026-07-04 CUTLASS Profiling Update
+
+A later Docker Nsight pass compared the explicit C++ LibTorch/cuBLAS path against the native CUTLASS Stream1 transformer path on local RTX 3070. The native CUTLASS backend is already the practical cuBLAS replacement route for production: local b384/c1 reached `871235.6` candidates/s and b512/c2 reached `991974.7`, versus local LibTorch eager `578741`. Nsight Compute 2025.1.1 confirmed both cuBLASLt and CUTLASS sampled GEMMs use HMMA tensor cores.
+
+The current bottleneck is not missing tensor-core use. Native CUTLASS sampled kernels are around `40-43%` SM throughput and `62-70%` DRAM throughput, so the next work should tune transformer-specific GEMM/epilogue/layout/LayerNorm structure. A wider `128x128x32` QKV/FF1 tile regressed versus the current `128x64x32` tile and was reverted. Evidence: `test_results/stream1_transformer_cutlass_vs_libtorch_profile_2026-07-04.md`.

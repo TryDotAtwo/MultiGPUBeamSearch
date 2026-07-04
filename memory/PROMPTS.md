@@ -464,4 +464,6 @@
 - User requested making the LibTorch Stream1 transformer CUDA Graph question explicit so graph replay works, continuing performance work, using a profiler, and spawning a subagent to research acceleration options. No fallbacks or MLP disruption are allowed.
 
 ## 2026-07-04
-- User required Docker-based profiling after Kaggle lacked Nsight: "В докере просто имейдж поправь, чтоб Nsight бил и профилируй". Requirement: make/use a Docker image with Nsight available, run profiler locally, and use the result to guide Stream1 transformer performance work.
+- User required Docker-based profiling after Kaggle lacked Nsight: "пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ Nsight пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ". Requirement: make/use a Docker image with Nsight available, run profiler locally, and use the result to guide Stream1 transformer performance work.
+
+- User asked whether cuBLAS can be replaced by CUTLASS for the Stream1 transformer and requested installing/using a compatible profiler build in Docker to understand the bottleneck and keep improving. Requirements: no fallbacks or distillation, preserve MLP/default path, use Nsight profiling evidence, and do not keep bad CUTLASS experiments if they regress.
