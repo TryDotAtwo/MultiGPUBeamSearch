@@ -12,7 +12,7 @@ import time
 
 GITHUB_REPO_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
 GITHUB_BRANCH = "codex/stream1-piece-transformer"
-EXPECTED_COMMIT_PREFIX = "d3525a4"
+EXPECTED_COMMIT_PREFIX = os.environ.get("EXPECTED_COMMIT_PREFIX", "")
 KAGGLE_MODEL_SOURCE = "vladkuznetsov266/megaminx-qtransformer-1782210824/PyTorch/default/1"
 MODEL_SOURCE_SLUG = "megaminx-qtransformer-1782210824"
 MODEL_INPUT_ROOTS = [
@@ -30,7 +30,7 @@ ROWS_CSV = WORK_DIR / "stream1_libtorch_transformer_rows.csv"
 SUMMARY_JSON = WORK_DIR / "stream1_libtorch_transformer_summary.json"
 CUDA_ARCHITECTURES = "75"
 BENCH_GPUS = [0, 1]
-BENCH_BATCHES = [384, 512, 768, 1024, 1536, 2048, 3072, 4096]
+BENCH_BATCHES = [128, 192, 256, 320, 384, 448, 512, 640, 768, 1024, 1536, 2048]
 BENCH_WARMUP = 20
 BENCH_ITERS = 100
 
@@ -121,7 +121,7 @@ def prepare_repo_and_weights(torch_cmake_prefix_path: str):
     run_checked(["git", "clone", "--branch", GITHUB_BRANCH, "--depth", "1", GITHUB_REPO_URL, REPO_DIR])
     actual = run_capture(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_DIR).stdout.strip()
     print("checked_out_commit=", actual, flush=True)
-    if not actual.startswith(EXPECTED_COMMIT_PREFIX):
+    if EXPECTED_COMMIT_PREFIX and not actual.startswith(EXPECTED_COMMIT_PREFIX):
         raise RuntimeError(f"expected commit prefix {EXPECTED_COMMIT_PREFIX}, got {actual}")
     checkpoint_path = find_model_checkpoint()
     print("selected_transformer_checkpoint=", checkpoint_path, flush=True)

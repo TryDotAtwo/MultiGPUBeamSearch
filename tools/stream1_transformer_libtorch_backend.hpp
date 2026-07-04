@@ -175,6 +175,8 @@ struct PieceTransformerLibTorch {
     torch::Tensor output_bias;
     torch::Tensor piece_positions;
     torch::Tensor piece_mask;
+    std::vector<torch::Tensor> slot_active_piece_indices;
+    std::vector<torch::Tensor> slot_active_positions;
     std::vector<TransformerBlock> blocks;
 
     PieceTransformerLibTorch(fs::path dir, torch::Device target_device)
@@ -234,6 +236,22 @@ struct PieceTransformerLibTorch {
                 .to(torch::kLong);
         piece_mask = load_tensor(weight_dir / "piece_mask.u8", {num_pieces, max_piece_size}, torch::kUInt8, device)
                          .to(torch::kBool);
+        slot_active_piece_indices.reserve(max_piece_size);
+        slot_active_positions.reserve(max_piece_size);
+        for (std::uint32_t slot = 0; slot < max_piece_size; ++slot) {
+            torch::Tensor active =
+                torch::nonzero(piece_mask.index({torch::indexing::Slice(), static_cast<std::int64_t>(slot)}))
+                    .flatten()
+                    .to(torch::kLong);
+            slot_active_piece_indices.push_back(active);
+            if (active.numel() == 0) {
+                slot_active_positions.push_back(
+                    torch::empty({0}, torch::TensorOptions().dtype(torch::kLong).device(device)));
+            } else {
+                slot_active_positions.push_back(
+                    piece_positions.index({active, static_cast<std::int64_t>(slot)}).to(torch::kLong));
+            }
+        }
 
         blocks.reserve(num_layers);
         for (std::uint32_t i = 0; i < num_layers; ++i) {
@@ -265,15 +283,17 @@ struct PieceTransformerLibTorch {
         const std::int64_t batch = states.size(0);
         torch::Tensor pieces = fast_piece_static.unsqueeze(0).expand({batch, -1, -1}).clone();
         for (std::uint32_t slot = 0; slot < max_piece_size; ++slot) {
-            torch::Tensor positions = piece_positions.index({torch::indexing::Slice(), static_cast<std::int64_t>(slot)});
-            torch::Tensor state_values = states.index_select(1, positions).reshape({-1});
+            const torch::Tensor& active = slot_active_piece_indices[slot];
+            const std::int64_t active_count = active.numel();
+            if (active_count == 0) {
+                continue;
+            }
+            torch::Tensor state_values = states.index_select(1, slot_active_positions[slot]).reshape({-1});
             torch::Tensor gathered = fast_slot_projected.index({static_cast<std::int64_t>(slot)})
                                          .index_select(0, state_values)
-                                         .view({batch, static_cast<std::int64_t>(num_pieces), static_cast<std::int64_t>(d_model)});
-            torch::Tensor mask = piece_mask.index({torch::indexing::Slice(), static_cast<std::int64_t>(slot)})
-                                     .to(dtype)
-                                     .view({1, static_cast<std::int64_t>(num_pieces), 1});
-            pieces = pieces + gathered * mask;
+                                         .view({batch, active_count, static_cast<std::int64_t>(d_model)});
+            torch::Tensor current = pieces.index({torch::indexing::Slice(), active, torch::indexing::Slice()});
+            pieces.index_put_({torch::indexing::Slice(), active, torch::indexing::Slice()}, current + gathered);
         }
         torch::Tensor cls = cls_token.view({1, 1, static_cast<std::int64_t>(d_model)}).expand({batch, 1, -1});
         return torch::cat({cls, pieces}, 1);

@@ -1,5 +1,7 @@
 #include "stream1_transformer_libtorch_backend.hpp"
 
+#include <c10/core/InferenceMode.h>
+
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -69,7 +71,7 @@ Args parse_args(int argc, char** argv) {
 int main(int argc, char** argv) {
     try {
         Args args = parse_args(argc, argv);
-        torch::NoGradGuard no_grad;
+        c10::InferenceMode inference_mode(true);
         torch::Device device(args.device);
         if (device.is_cuda() && !torch::cuda::is_available()) {
             throw std::runtime_error("requested CUDA device but LibTorch CUDA is not available");
