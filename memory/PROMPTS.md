@@ -462,3 +462,6 @@
 - User requested taking the Kaggle-downloaded transformer weights again and measuring real C++ LibTorch Stream1 GPU speed instead of relying on the CPU smoke or build-only checks. Weights should be treated as temporary runtime artifacts, not restored to Git.
 - User requested no deletion while checking disk usage: only list files and inspect `.git`; after confirming disk state was acceptable, user asked to continue Stream1 transformer LibTorch work.
 - User requested making the LibTorch Stream1 transformer CUDA Graph question explicit so graph replay works, continuing performance work, using a profiler, and spawning a subagent to research acceleration options. No fallbacks or MLP disruption are allowed.
+
+## 2026-07-04
+- User required Docker-based profiling after Kaggle lacked Nsight: "В докере просто имейдж поправь, чтоб Nsight бил и профилируй". Requirement: make/use a Docker image with Nsight available, run profiler locally, and use the result to guide Stream1 transformer performance work.

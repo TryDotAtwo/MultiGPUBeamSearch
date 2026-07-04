@@ -1,0 +1,121 @@
+stream1_transformer_libtorch_backend=1 mode=cuda_graph device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1
+stream1_transformer_libtorch_micro mode=cuda_graph batch=384 iters=50 elapsed_ms=769.746 parents_per_sec=24943.3 candidates_per_sec=598639 checksum=465948672
+Collecting data...
+Generating '/tmp/nsys-report-66ad.qdstrm'
+[1/8] [0%                          ] graph_b384.nsys-rep[1/8] [0%                          ] graph_b384.nsys-rep[1/8] [===========50%              ] graph_b384.nsys-rep[1/8] [========================100%] graph_b384.nsys-rep[1/8] [========================100%] graph_b384.nsys-rep
+[2/8] [0%                          ] graph_b384.sqlite[2/8] [1%                          ] graph_b384.sqlite[2/8] [2%                          ] graph_b384.sqlite[2/8] [3%                          ] graph_b384.sqlite[2/8] [4%                          ] graph_b384.sqlite[2/8] [5%                          ] graph_b384.sqlite[2/8] [6%                          ] graph_b384.sqlite[2/8] [7%                          ] graph_b384.sqlite[2/8] [8%                          ] graph_b384.sqlite[2/8] [9%                          ] graph_b384.sqlite[2/8] [10%                         ] graph_b384.sqlite[2/8] [11%                         ] graph_b384.sqlite[2/8] [12%                         ] graph_b384.sqlite[2/8] [13%                         ] graph_b384.sqlite[2/8] [14%                         ] graph_b384.sqlite[2/8] [=15%                        ] graph_b384.sqlite[2/8] [=16%                        ] graph_b384.sqlite[2/8] [=17%                        ] graph_b384.sqlite[2/8] [==18%                       ] graph_b384.sqlite[2/8] [==19%                       ] graph_b384.sqlite[2/8] [==20%                       ] graph_b384.sqlite[2/8] [==21%                       ] graph_b384.sqlite[2/8] [===22%                      ] graph_b384.sqlite[2/8] [===23%                      ] graph_b384.sqlite[2/8] [===24%                      ] graph_b384.sqlite[2/8] [====25%                     ] graph_b384.sqlite[2/8] [====26%                     ] graph_b384.sqlite[2/8] [====27%                     ] graph_b384.sqlite[2/8] [====28%                     ] graph_b384.sqlite[2/8] [=====29%                    ] graph_b384.sqlite[2/8] [=====30%                    ] graph_b384.sqlite[2/8] [=====31%                    ] graph_b384.sqlite[2/8] [=====32%                    ] graph_b384.sqlite[2/8] [======33%                   ] graph_b384.sqlite[2/8] [======34%                   ] graph_b384.sqlite[2/8] [======35%                   ] graph_b384.sqlite[2/8] [=======36%                  ] graph_b384.sqlite[2/8] [=======37%                  ] graph_b384.sqlite[2/8] [=======38%                  ] graph_b384.sqlite[2/8] [=======39%                  ] graph_b384.sqlite[2/8] [========40%                 ] graph_b384.sqlite[2/8] [========41%                 ] graph_b384.sqlite[2/8] [========42%                 ] graph_b384.sqlite[2/8] [=========43%                ] graph_b384.sqlite[2/8] [=========44%                ] graph_b384.sqlite[2/8] [=========45%                ] graph_b384.sqlite[2/8] [=========46%                ] graph_b384.sqlite[2/8] [==========47%               ] graph_b384.sqlite[2/8] [==========48%               ] graph_b384.sqlite[2/8] [==========49%               ] graph_b384.sqlite[2/8] [===========50%              ] graph_b384.sqlite[2/8] [===========51%              ] graph_b384.sqlite[2/8] [===========52%              ] graph_b384.sqlite[2/8] [===========53%              ] graph_b384.sqlite[2/8] [============54%             ] graph_b384.sqlite[2/8] [============55%             ] graph_b384.sqlite[2/8] [============56%             ] graph_b384.sqlite[2/8] [============57%             ] graph_b384.sqlite[2/8] [=============58%            ] graph_b384.sqlite[2/8] [=============59%            ] graph_b384.sqlite[2/8] [=============60%            ] graph_b384.sqlite[2/8] [==============61%           ] graph_b384.sqlite[2/8] [==============62%           ] graph_b384.sqlite[2/8] [==============63%           ] graph_b384.sqlite[2/8] [==============64%           ] graph_b384.sqlite[2/8] [===============65%          ] graph_b384.sqlite[2/8] [===============66%          ] graph_b384.sqlite[2/8] [===============67%          ] graph_b384.sqlite[2/8] [================68%         ] graph_b384.sqlite[2/8] [================69%         ] graph_b384.sqlite[2/8] [================70%         ] graph_b384.sqlite[2/8] [================71%         ] graph_b384.sqlite[2/8] [=================72%        ] graph_b384.sqlite[2/8] [=================73%        ] graph_b384.sqlite[2/8] [=================74%        ] graph_b384.sqlite[2/8] [==================75%       ] graph_b384.sqlite[2/8] [==================76%       ] graph_b384.sqlite[2/8] [==================77%       ] graph_b384.sqlite[2/8] [==================78%       ] graph_b384.sqlite[2/8] [===================79%      ] graph_b384.sqlite[2/8] [===================80%      ] graph_b384.sqlite[2/8] [===================81%      ] graph_b384.sqlite[2/8] [===================82%      ] graph_b384.sqlite[2/8] [====================83%     ] graph_b384.sqlite[2/8] [====================84%     ] graph_b384.sqlite[2/8] [====================85%     ] graph_b384.sqlite[2/8] [=====================86%    ] graph_b384.sqlite[2/8] [=====================87%    ] graph_b384.sqlite[2/8] [=====================88%    ] graph_b384.sqlite[2/8] [=====================89%    ] graph_b384.sqlite[2/8] [======================90%   ] graph_b384.sqlite[2/8] [======================91%   ] graph_b384.sqlite[2/8] [======================92%   ] graph_b384.sqlite[2/8] [=======================93%  ] graph_b384.sqlite[2/8] [=======================94%  ] graph_b384.sqlite[2/8] [=======================95%  ] graph_b384.sqlite[2/8] [=======================96%  ] graph_b384.sqlite[2/8] [========================97% ] graph_b384.sqlite[2/8] [========================98% ] graph_b384.sqlite[2/8] [========================99% ] graph_b384.sqlite[2/8] [========================100%] graph_b384.sqlite[2/8] [========================100%] graph_b384.sqlite
+[3/8] Executing 'nvtx_sum' stats report
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)    Med (ns)   Min (ns)  Max (ns)  StdDev (ns)   Style           Range         
+ --------  ---------------  ---------  ----------  ----------  --------  --------  -----------  -------  ----------------------
+    100.0         16042041          1  16042041.0  16042041.0  16042041  16042041          0.0  PushPop  cuBLAS:cublasCreate_v2
+
+[4/8] Executing 'osrt_sum' stats report
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)    Med (ns)    Min (ns)  Max (ns)   StdDev (ns)           Name         
+ --------  ---------------  ---------  ----------  -----------  --------  ---------  -----------  ----------------------
+     83.7       2104569833         26  80944993.6  100179062.0      1886  100235262   35851092.9  poll                  
+      6.0        151062091       5439     27773.9       2785.0      1003    9088186     245091.9  ioctl                 
+      4.6        116687096         60   1944784.9    1530043.5   1141230    7236454    1199563.6  fopen64               
+      3.1         77728074        146    532384.1     245476.0      1112    6472780     878628.6  read                  
+      1.8         44852315         67    669437.5     623264.0      1020    2975427     452034.2  fclose                
+      0.6         14662073          3   4887357.7     502126.0    394684   13765263    7688679.2  fread                 
+      0.1          1448111         10    144811.1     136735.0    111435     188524      29566.7  pthread_create        
+      0.0          1190108         17     70006.4      69918.0     63852      78256       4364.6  sleep                 
+      0.0          1180032         24     49168.0       3702.5      1472     482898     133826.3  fopen                 
+      0.0           710705         24     29612.7      16181.0      3972     112383      29654.0  mmap                  
+      0.0           666856          4    166714.0      80124.5     54724     451883     190492.5  sem_timedwait         
+      0.0           242281         15     16152.1       7345.0      1353     142233      35354.6  open                  
+      0.0           173922          1    173922.0     173922.0    173922     173922          0.0  pthread_join          
+      0.0           138424         17      8142.6       5679.0      5461      29026       6680.1  fgets                 
+      0.0            93553          4     23388.3      20784.5     17618      34366       7533.8  write                 
+      0.0            86474          1     86474.0      86474.0     86474      86474          0.0  pthread_cond_wait     
+      0.0            52583          6      8763.8       1728.0      1091      44896      17704.9  fflush                
+      0.0            20598          1     20598.0      20598.0     20598      20598          0.0  pthread_cond_broadcast
+      0.0            20200          3      6733.3       7886.0      2092      10222       4185.8  pipe2                 
+      0.0            18280          2      9140.0       9140.0      1049      17231      11442.4  fileno                
+      0.0            17106          4      4276.5       2574.5      1525      10432       4178.3  fwrite                
+      0.0            10599          6      1766.5       1392.5      1047       3664        996.9  close                 
+      0.0             5004          3      1668.0       1715.0      1526       1763        125.3  pthread_mutex_trylock 
+      0.0             4622          3      1540.7       1531.0      1513       1578         33.6  fcntl                 
+
+[5/8] Executing 'cuda_api_sum' stats report
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)   Med (ns)   Min (ns)  Max (ns)   StdDev (ns)                     Name                   
+ --------  ---------------  ---------  ----------  ---------  --------  ---------  -----------  ------------------------------------------
+     73.4       1017389107         63  16149033.4    74708.0      9915  757045008   99486704.7  cudaStreamSynchronize                     
+     20.3        282059617       1061    265843.2     8502.0       619   87466721    3206622.5  cudaLaunchKernel                          
+      2.3         31315947         14   2236853.4  2212379.0    680934    5036204    1355786.5  cuLibraryLoadData                         
+      1.1         15243604         24    635150.2   601825.5      5323    1567041     288075.2  cudaMalloc                                
+      0.8         11319586         51    221952.7    45711.0     36001    2264423     364894.8  cudaGraphLaunch_v10000                    
+      0.5          7452199        128     58220.3      911.5       580    2695709     303298.3  cudaStreamCreateWithPriority              
+      0.5          6790961        357     19022.3     9419.0       634     443614      37606.3  cudaLaunchKernelExC_v11060                
+      0.4          5555005         60     92583.4    78293.5     53967     444467      53878.4  cudaMemcpyAsync                           
+      0.2          3359733          1   3359733.0  3359733.0   3359733    3359733          0.0  cudaGraphInstantiateWithFlags_v11040      
+      0.2          2715709          1   2715709.0  2715709.0   2715709    2715709          0.0  cudaHostAlloc                             
+      0.2          2097691          1   2097691.0  2097691.0   2097691    2097691          0.0  cudaFree                                  
+      0.0           477527          1    477527.0   477527.0    477527     477527          0.0  cudaGraphDestroy_v10000                   
+      0.0           242256         76      3187.6     1151.5       271      19214       3824.7  cudaStreamIsCapturing_v10000              
+      0.0           158034          1    158034.0   158034.0    158034     158034          0.0  cudaGraphExecDestroy_v10000               
+      0.0           122113        838       145.7      108.0        59       9097        324.1  cuGetProcAddress_v2                       
+      0.0            78055         14      5575.4     6573.0       943      13098       3815.8  cuLibraryGetKernel                        
+      0.0            64309          1     64309.0    64309.0     64309      64309          0.0  cudaStreamEndCapture_v10000               
+      0.0            64298        116       554.3      281.0       236       3394        619.9  cudaStreamGetCaptureInfo_v2_v11030        
+      0.0            41229          1     41229.0    41229.0     41229      41229          0.0  cudaStreamBeginCapture_v10000             
+      0.0            33627         16      2101.7     1946.0       524       4471       1470.5  cudaThreadExchangeStreamCaptureMode_v10010
+      0.0            20489         18      1138.3      275.5       262       6624       1827.5  cudaEventCreateWithFlags                  
+      0.0             9416          3      3138.7     3718.0      1920       3778       1055.8  cuInit                                    
+      0.0             5387          1      5387.0     5387.0      5387       5387          0.0  cudaGraphGetNodes_v10000                  
+      0.0             2721          1      2721.0     2721.0      2721       2721          0.0  cudaGetDeviceProperties_v2_v12000         
+      0.0             1334          2       667.0      667.0       364        970        428.5  cudaGetDriverEntryPoint_v11030            
+      0.0             1114          3       371.3      195.0       179        740        319.4  cuModuleGetLoadingMode                    
+
+[6/8] Executing 'cuda_gpu_kern_sum' stats report
+
+ Time (%)  Total Time (ns)  Instances  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  --------  --------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     29.9         88978717        240  370744.7  384357.5    124935   1482194     217005.0  sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize64x96x32_stage4_warpsize2x2x1_tensor16x8x16_execute_k…
+     16.7         49615039         80  620188.0  582800.0    488827   2639091     305017.8  sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize160x128x32_stage4_warpsize2x2x1_tensor16x8x16_execute…
+     13.3         39605353         80  495066.9  457673.0    384885   1863655     214996.1  void pytorch_flash::flash_fwd_kernel<Flash_fwd_kernel_traits<(int)32, (int)128, (int)128, (int)4, (…
+     11.1         33100384        200  165501.9  161321.0      4768   1480466     148351.7  void at::native::<unnamed>::vectorized_layer_norm_kernel<c10::Half, float>(int, T2, const T1 *, con…
+      9.5         28167062         80  352088.3  329682.5    325138   1253350     140858.1  void at::native::vectorized_elementwise_kernel<(int)4, at::native::BinaryFunctor<c10::Half, c10::Ha…
+      7.0         20876668        220   94893.9   81956.0     79909   1245253     110436.4  void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctor_add<c10::Half>, std:…
+      5.9         17484426         80  218555.3  218396.5    215979    221805        935.9  void at::native::vectorized_elementwise_kernel<(int)4, at::native::sigmoid_kernel_cuda(at::TensorIt…
+      3.3          9915043         60  165250.7  168105.5    141928    179242      11421.6  void at::native::<unnamed>::indexSelectLargeIndex<c10::Half, long, unsigned int, (int)2, (int)2, (i…
+      1.8          5389098         60   89818.3   76852.0     67524    912882     108122.5  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      0.9          2582959         20  129147.9  131175.0    110950    140008       9230.3  void at::native::<unnamed>::CatArrayBatchedCopy<at::native::<unnamed>::OpaqueType<(unsigned int)2>,…
+      0.4          1149795         57   20171.8    7809.0      3424     49539      19105.0  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      0.1           416626         60    6943.8    6944.5      5696      7616        458.7  void at::native::<unnamed>::indexSelectLargeIndex<long, long, unsigned int, (int)-1, (int)-1, (int)…
+      0.1           203474         60    3391.2    3264.0      2688      4161        398.3  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl<at::native::…
+      0.0           121480         20    6074.0    6241.0      5216      6528        358.7  sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize32x32x64_stage6_warpsize2x2x1_tensor16x8x16_execute_k…
+      0.0            84196         22    3827.1    3969.0      2304      4288        496.9  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.0             4704          1    4704.0    4704.0      4704      4704          0.0  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.0             4032          1    4032.0    4032.0      4032      4032          0.0  void at::native::vectorized_elementwise_kernel<(int)2, at::native::BUnaryFunctor<long, long, long, …
+      0.0             3840          1    3840.0    3840.0      3840      3840          0.0  void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<long, at::native::func_wrappe…
+      0.0             3456          1    3456.0    3456.0      3456      3456          0.0  void at::native::vectorized_elementwise_kernel<(int)2, at::native::AUnaryFunctor<long, long, long, …
+      0.0             3456          2    1728.0    1728.0      1696      1760         45.3  void at::native::vectorized_elementwise_kernel<(int)2, at::native::FillFunctor<long>, std::array<ch…
+      0.0             3008          1    3008.0    3008.0      3008      3008          0.0  void at::native::vectorized_elementwise_kernel<(int)4, at::native::<unnamed>::launch_clamp_scalar(a…
+      0.0             2752          1    2752.0    2752.0      2752      2752          0.0  void <unnamed>::elementwise_kernel_with_index<int, at::native::arange_cuda_out(const c10::Scalar &,…
+      0.0             2752          1    2752.0    2752.0      2752      2752          0.0  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.0             2496          1    2496.0    2496.0      2496      2496          0.0  void at::native::vectorized_elementwise_kernel<(int)2, at::native::CUDAFunctorOnSelf_add<long>, std…
+      0.0             2464          1    2464.0    2464.0      2464      2464          0.0  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.0             2304          1    2304.0    2304.0      2304      2304          0.0  void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<float, float, floa…
+      0.0             1280          1    1280.0    1280.0      1280      1280          0.0  void at::native::vectorized_elementwise_kernel<(int)4, at::native::round_kernel_cuda(at::TensorIter…
+
+[7/8] Executing 'cuda_gpu_mem_time_sum' stats report
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Operation          
+ --------  ---------------  -----  --------  --------  --------  --------  -----------  ----------------------------
+     99.6           574176     59    9731.8     608.0       544     43362      15740.8  [CUDA memcpy Host-to-Device]
+      0.4             2272      1    2272.0    2272.0      2272      2272          0.0  [CUDA memcpy Device-to-Host]
+
+[8/8] Executing 'cuda_gpu_mem_size_sum' stats report
+
+ Total (MB)  Count  Avg (MB)  Med (MB)  Min (MB)  Max (MB)  StdDev (MB)           Operation          
+ ----------  -----  --------  --------  --------  --------  -----------  ----------------------------
+      6.543     59     0.111     0.001     0.000     0.524        0.195  [CUDA memcpy Host-to-Device]
+      0.000      1     0.000     0.000     0.000     0.000        0.000  [CUDA memcpy Device-to-Host]
+
+Generated:
+	/workspace/test_results/nsight_libtorch_transformer_2026-07-04/graph_b384.nsys-rep
+	/workspace/test_results/nsight_libtorch_transformer_2026-07-04/graph_b384.sqlite
