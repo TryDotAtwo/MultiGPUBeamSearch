@@ -118,6 +118,13 @@ inline torch::Tensor load_tensor(
     return cpu.clone().to(device, /*non_blocking=*/false);
 }
 
+inline torch::Tensor load_linear_weight_kxh(
+    const fs::path& path,
+    const std::vector<std::int64_t>& hxk_shape,
+    torch::ScalarType dtype,
+    const torch::Device& device) {
+    return load_tensor(path, hxk_shape, dtype, device).transpose(0, 1).contiguous();
+}
 inline torch::Tensor make_states(
     std::int64_t batch,
     std::int64_t state_len,
@@ -135,15 +142,15 @@ inline torch::Tensor score_keys(const torch::Tensor& logits) {
 struct TransformerBlock {
     torch::Tensor ln1_gamma;
     torch::Tensor ln1_beta;
-    torch::Tensor qkv_weight;
+    torch::Tensor qkv_weight_kxh;
     torch::Tensor qkv_bias;
-    torch::Tensor attn_out_weight;
+    torch::Tensor attn_out_weight_kxh;
     torch::Tensor attn_out_bias;
     torch::Tensor ln2_gamma;
     torch::Tensor ln2_beta;
-    torch::Tensor ff1_weight;
+    torch::Tensor ff1_weight_kxh;
     torch::Tensor ff1_bias;
-    torch::Tensor ff2_weight;
+    torch::Tensor ff2_weight_kxh;
     torch::Tensor ff2_bias;
 };
 
@@ -172,7 +179,7 @@ struct PieceTransformerLibTorch {
     torch::Tensor input_ln_beta;
     torch::Tensor output_ln_gamma;
     torch::Tensor output_ln_beta;
-    torch::Tensor output_weight;
+    torch::Tensor output_weight_kxh;
     torch::Tensor output_bias;
     torch::Tensor piece_positions;
     torch::Tensor piece_mask;
@@ -228,7 +235,7 @@ struct PieceTransformerLibTorch {
         input_ln_beta = load_tensor(weight_dir / ("input_ln_beta" + dtype_suffix), {d_model}, dtype, device);
         output_ln_gamma = load_tensor(weight_dir / ("output_ln_gamma" + dtype_suffix), {d_model}, dtype, device);
         output_ln_beta = load_tensor(weight_dir / ("output_ln_beta" + dtype_suffix), {d_model}, dtype, device);
-        output_weight = load_tensor(weight_dir / ("output_weight_hxk" + dtype_suffix), {d_model, output_dim}, dtype, device);
+        output_weight_kxh = load_linear_weight_kxh(weight_dir / ("output_weight_hxk" + dtype_suffix), {d_model, output_dim}, dtype, device);
         output_bias = load_tensor(weight_dir / ("output_bias" + dtype_suffix), {output_dim}, dtype, device);
         piece_positions =
             load_tensor(weight_dir / "piece_positions.u16", {num_pieces, max_piece_size}, torch::kInt16, device)
@@ -241,15 +248,15 @@ struct PieceTransformerLibTorch {
             blocks.push_back(TransformerBlock{
                 load_tensor(weight_dir / (prefix + "_ln1_gamma" + dtype_suffix), {d_model}, dtype, device),
                 load_tensor(weight_dir / (prefix + "_ln1_beta" + dtype_suffix), {d_model}, dtype, device),
-                load_tensor(weight_dir / (prefix + "_attn_qkv_weight_hxk" + dtype_suffix), {d_model, 3U * d_model}, dtype, device),
+                load_linear_weight_kxh(weight_dir / (prefix + "_attn_qkv_weight_hxk" + dtype_suffix), {d_model, 3U * d_model}, dtype, device),
                 load_tensor(weight_dir / (prefix + "_attn_qkv_bias" + dtype_suffix), {3U * d_model}, dtype, device),
-                load_tensor(weight_dir / (prefix + "_attn_out_weight_hxk" + dtype_suffix), {d_model, d_model}, dtype, device),
+                load_linear_weight_kxh(weight_dir / (prefix + "_attn_out_weight_hxk" + dtype_suffix), {d_model, d_model}, dtype, device),
                 load_tensor(weight_dir / (prefix + "_attn_out_bias" + dtype_suffix), {d_model}, dtype, device),
                 load_tensor(weight_dir / (prefix + "_ln2_gamma" + dtype_suffix), {d_model}, dtype, device),
                 load_tensor(weight_dir / (prefix + "_ln2_beta" + dtype_suffix), {d_model}, dtype, device),
-                load_tensor(weight_dir / (prefix + "_ff1_weight_hxk" + dtype_suffix), {d_model, ff_dim}, dtype, device),
+                load_linear_weight_kxh(weight_dir / (prefix + "_ff1_weight_hxk" + dtype_suffix), {d_model, ff_dim}, dtype, device),
                 load_tensor(weight_dir / (prefix + "_ff1_bias" + dtype_suffix), {ff_dim}, dtype, device),
-                load_tensor(weight_dir / (prefix + "_ff2_weight_hxk" + dtype_suffix), {ff_dim, d_model}, dtype, device),
+                load_linear_weight_kxh(weight_dir / (prefix + "_ff2_weight_hxk" + dtype_suffix), {ff_dim, d_model}, dtype, device),
                 load_tensor(weight_dir / (prefix + "_ff2_bias" + dtype_suffix), {d_model}, dtype, device),
             });
         }
@@ -259,8 +266,8 @@ struct PieceTransformerLibTorch {
         return torch::layer_norm(x, {static_cast<std::int64_t>(d_model)}, gamma, beta, 1.0e-5, false);
     }
 
-    torch::Tensor linear_hxk(const torch::Tensor& x, const torch::Tensor& weight_hxk, const torch::Tensor& bias) const {
-        return at::linear(x, weight_hxk.transpose(0, 1), bias);
+    torch::Tensor linear_kxh(const torch::Tensor& x, const torch::Tensor& weight_kxh, const torch::Tensor& bias) const {
+        return at::linear(x, weight_kxh, bias);
     }
     torch::Tensor build_tokens(const torch::Tensor& state_u8) const {
         const torch::Tensor states = state_u8.index({torch::indexing::Slice(), torch::indexing::Slice(0, state_len)})
@@ -287,7 +294,7 @@ struct PieceTransformerLibTorch {
         torch::Tensor x = layer_norm(build_tokens(state_u8), input_ln_gamma, input_ln_beta);
         for (const TransformerBlock& block : blocks) {
             torch::Tensor y = layer_norm(x, block.ln1_gamma, block.ln1_beta);
-            torch::Tensor qkv = linear_hxk(y, block.qkv_weight, block.qkv_bias);
+            torch::Tensor qkv = linear_kxh(y, block.qkv_weight_kxh, block.qkv_bias);
             qkv = qkv.view({batch,
                             static_cast<std::int64_t>(seq_len),
                             3,
@@ -301,15 +308,15 @@ struct PieceTransformerLibTorch {
                                         .reshape({batch,
                                                   static_cast<std::int64_t>(seq_len),
                                                   static_cast<std::int64_t>(d_model)});
-            x = x + linear_hxk(context, block.attn_out_weight, block.attn_out_bias);
+            x = x + linear_kxh(context, block.attn_out_weight_kxh, block.attn_out_bias);
 
             y = layer_norm(x, block.ln2_gamma, block.ln2_beta);
-            y = linear_hxk(y, block.ff1_weight, block.ff1_bias);
+            y = linear_kxh(y, block.ff1_weight_kxh, block.ff1_bias);
             y = y * torch::sigmoid(y);
-            x = x + linear_hxk(y, block.ff2_weight, block.ff2_bias);
+            x = x + linear_kxh(y, block.ff2_weight_kxh, block.ff2_bias);
         }
         torch::Tensor cls = layer_norm(x.index({torch::indexing::Slice(), 0, torch::indexing::Slice()}), output_ln_gamma, output_ln_beta);
-        return linear_hxk(cls, output_weight, output_bias);
+        return linear_kxh(cls, output_weight_kxh, output_bias);
     }
 };
 

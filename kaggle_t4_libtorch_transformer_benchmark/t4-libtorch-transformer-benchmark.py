@@ -30,14 +30,18 @@ ROWS_CSV = WORK_DIR / "stream1_libtorch_transformer_rows.csv"
 SUMMARY_JSON = WORK_DIR / "stream1_libtorch_transformer_summary.json"
 CUDA_ARCHITECTURES = "75"
 BENCH_GPUS = [0, 1]
+BENCH_MODES = ["eager", "cuda_graph"]
 BENCH_BATCHES = [128, 192, 256, 320, 384, 448, 512, 640, 768, 1024, 1536, 2048]
 BENCH_WARMUP = 20
 BENCH_ITERS = 100
+NSYS_ITERS = 20
+NSYS_WARMUP = 5
 
 BENCH_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 row_pattern = re.compile(
     r"stream1_transformer_libtorch_micro\s+"
+    r"mode=(?P<mode>\w+)\s+"
     r"batch=(?P<batch>\d+)\s+"
     r"iters=(?P<iters>\d+)\s+"
     r"elapsed_ms=(?P<elapsed>[0-9.eE+-]+)\s+"
@@ -102,9 +106,11 @@ def preflight():
     print("KAGGLE_MODEL_SOURCE=", KAGGLE_MODEL_SOURCE, flush=True)
     print("GITHUB_BRANCH=", GITHUB_BRANCH, flush=True)
     print("EXPECTED_COMMIT_PREFIX=", EXPECTED_COMMIT_PREFIX, flush=True)
+    print("BENCH_MODES=", BENCH_MODES, flush=True)
     print("disk_tmp=", disk_line("/tmp"), flush=True)
     print("disk_working=", disk_line("/kaggle/working"), flush=True)
     run_capture(["nvidia-smi"], check=False)
+    run_capture(["bash", "-lc", "which nsys && nsys --version || true"], check=False)
     import torch
     print("torch_version=", torch.__version__, flush=True)
     print("torch_cmake_prefix_path=", torch.utils.cmake_prefix_path, flush=True)
@@ -162,9 +168,9 @@ def prepare_repo_and_weights(torch_cmake_prefix_path: str):
     run_checked(["cmake", "--build", BUILD_DIR, "--target", "stream1_transformer_libtorch_benchmark", "-j", "2"])
 
 
-def run_one_gpu(gpu: int):
-    log_path = BENCH_LOG_DIR / f"stream1_libtorch_transformer_gpu{gpu}.log"
-    csv_path = BENCH_LOG_DIR / f"stream1_libtorch_transformer_gpu{gpu}.csv"
+def run_one_gpu(gpu: int, mode: str):
+    log_path = BENCH_LOG_DIR / f"stream1_libtorch_transformer_{mode}_gpu{gpu}.log"
+    csv_path = BENCH_LOG_DIR / f"stream1_libtorch_transformer_{mode}_gpu{gpu}.csv"
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = str(gpu)
     cmd = [
@@ -176,7 +182,11 @@ def run_one_gpu(gpu: int):
         "--iters", str(BENCH_ITERS),
         "--csv", csv_path,
     ]
-    print("RUN_STREAM1_LIBTORCH_BENCH_START", {"gpu": gpu, "log": str(log_path), "csv": str(csv_path)}, flush=True)
+    if mode == "cuda_graph":
+        cmd.append("--cuda-graph")
+    elif mode != "eager":
+        raise RuntimeError(f"unknown mode {mode}")
+    print("RUN_STREAM1_LIBTORCH_BENCH_START", {"gpu": gpu, "mode": mode, "log": str(log_path), "csv": str(csv_path)}, flush=True)
     rows = []
     start = time.time()
     with log_path.open("w", buffering=1, encoding="utf-8") as log:
@@ -189,6 +199,7 @@ def run_one_gpu(gpu: int):
             if match:
                 group = match.groupdict()
                 rows.append({
+                    "mode": group["mode"],
                     "gpu": gpu,
                     "batch": int(group["batch"]),
                     "iters": int(group["iters"]),
@@ -199,46 +210,96 @@ def run_one_gpu(gpu: int):
                 })
         rc = proc.wait()
     elapsed = time.time() - start
-    print("RUN_STREAM1_LIBTORCH_BENCH_DONE", {"gpu": gpu, "rc": rc, "seconds": elapsed, "rows": len(rows)}, flush=True)
+    print("RUN_STREAM1_LIBTORCH_BENCH_DONE", {"gpu": gpu, "mode": mode, "rc": rc, "seconds": elapsed, "rows": len(rows)}, flush=True)
     if rc != 0:
         raise subprocess.CalledProcessError(rc, [str(x) for x in cmd])
     if not rows:
-        raise RuntimeError(f"no libtorch benchmark rows parsed for gpu {gpu}")
+        raise RuntimeError(f"no libtorch benchmark rows parsed for gpu {gpu} mode {mode}")
     return rows
+
+
+def maybe_run_nsys_profile(best_graph_row):
+    if not best_graph_row:
+        print("NSYS_PROFILE_SKIPPED=no_graph_row", flush=True)
+        return
+    nsys_path = shutil.which("nsys")
+    if not nsys_path:
+        print("NSYS_PROFILE_UNAVAILABLE=nsys_not_found", flush=True)
+        return
+    gpu = int(best_graph_row["gpu"])
+    batch = int(best_graph_row["batch"])
+    output_base = WORK_DIR / f"stream1_libtorch_cuda_graph_nsys_gpu{gpu}_b{batch}"
+    env = os.environ.copy()
+    env["CUDA_VISIBLE_DEVICES"] = str(gpu)
+    cmd = [
+        nsys_path, "profile",
+        "--trace=cuda,nvtx,osrt,cublas",
+        "--stats=true",
+        "--force-overwrite=true",
+        "-o", output_base,
+        BUILD_DIR / "stream1_transformer_libtorch_benchmark",
+        "--weight-dir", WEIGHT_OUT_DIR,
+        "--device", "cuda:0",
+        "--batches", str(batch),
+        "--warmup", str(NSYS_WARMUP),
+        "--iters", str(NSYS_ITERS),
+        "--cuda-graph",
+    ]
+    result = run_capture(cmd, cwd=REPO_DIR, env=env, check=False)
+    print("NSYS_PROFILE_RC=", result.returncode, flush=True)
+    print("NSYS_PROFILE_OUTPUT_BASE=", output_base, flush=True)
 
 
 def main():
     torch_cmake_prefix_path = preflight()
     prepare_repo_and_weights(torch_cmake_prefix_path)
     all_rows = []
-    for gpu in BENCH_GPUS:
-        all_rows.extend(run_one_gpu(gpu))
+    for mode in BENCH_MODES:
+        for gpu in BENCH_GPUS:
+            all_rows.extend(run_one_gpu(gpu, mode))
     with ROWS_CSV.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["gpu", "batch", "iters", "elapsed_ms", "parents_per_sec", "candidates_per_sec", "checksum"])
+        writer = csv.DictWriter(fh, fieldnames=["mode", "gpu", "batch", "iters", "elapsed_ms", "parents_per_sec", "candidates_per_sec", "checksum"])
         writer.writeheader()
         writer.writerows(all_rows)
-    best_by_gpu = {}
+    best_by_mode_gpu = {}
     for row in all_rows:
-        gpu = row["gpu"]
-        if gpu not in best_by_gpu or row["candidates_per_sec"] > best_by_gpu[gpu]["candidates_per_sec"]:
-            best_by_gpu[gpu] = row
-    aggregate = sum(row["candidates_per_sec"] for row in best_by_gpu.values())
+        key = (row["mode"], row["gpu"])
+        if key not in best_by_mode_gpu or row["candidates_per_sec"] > best_by_mode_gpu[key]["candidates_per_sec"]:
+            best_by_mode_gpu[key] = row
+    aggregate_by_mode = {}
+    for mode in BENCH_MODES:
+        aggregate_by_mode[mode] = sum(
+            row["candidates_per_sec"]
+            for (row_mode, _gpu), row in best_by_mode_gpu.items()
+            if row_mode == mode
+        )
+    best_graph_row = None
+    graph_rows = [row for (mode, _gpu), row in best_by_mode_gpu.items() if mode == "cuda_graph"]
+    if graph_rows:
+        best_graph_row = max(graph_rows, key=lambda row: row["candidates_per_sec"])
+    maybe_run_nsys_profile(best_graph_row)
     summary = {
         "rows_csv": str(ROWS_CSV),
-        "best_by_gpu": {str(k): v for k, v in sorted(best_by_gpu.items())},
-        "aggregate_candidates_per_sec": aggregate,
+        "best_by_mode_gpu": {f"{mode}/gpu{gpu}": row for (mode, gpu), row in sorted(best_by_mode_gpu.items())},
+        "aggregate_by_mode_candidates_per_sec": aggregate_by_mode,
         "pytorch_batch_process_per_t4_reference": 630697.0,
         "pytorch_batch_process_2xt4_reference": 1261394.0,
-        "libtorch_over_pytorch_2xt4": aggregate / 1261394.0,
+        "libtorch_over_pytorch_2xt4_by_mode": {mode: aggregate / 1261394.0 for mode, aggregate in aggregate_by_mode.items()},
+        "cuda_graph_over_eager": (
+            aggregate_by_mode.get("cuda_graph", 0.0) / aggregate_by_mode.get("eager", 1.0)
+            if aggregate_by_mode.get("eager", 0.0) > 0 else None
+        ),
     }
     SUMMARY_JSON.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     cleanup_path(WEIGHT_OUT_DIR)
     print("STREAM1_LIBTORCH_WEIGHTS_CLEANED=", WEIGHT_OUT_DIR, flush=True)
     print("STREAM1_LIBTORCH_BENCH_CSV=", ROWS_CSV, flush=True)
-    for gpu, row in sorted(best_by_gpu.items()):
-        print("STREAM1_LIBTORCH_BEST_GPU", gpu, row, flush=True)
-    print("STREAM1_LIBTORCH_BEST_2XT4_AGG_CANDIDATES_PER_SEC=", aggregate, flush=True)
-    print("STREAM1_LIBTORCH_OVER_PYTORCH_2XT4=", summary["libtorch_over_pytorch_2xt4"], flush=True)
+    for (mode, gpu), row in sorted(best_by_mode_gpu.items()):
+        print("STREAM1_LIBTORCH_BEST_MODE_GPU", mode, gpu, row, flush=True)
+    for mode, aggregate in sorted(aggregate_by_mode.items()):
+        print("STREAM1_LIBTORCH_BEST_2XT4_AGG_CANDIDATES_PER_SEC", mode, aggregate, flush=True)
+        print("STREAM1_LIBTORCH_OVER_PYTORCH_2XT4", mode, summary["libtorch_over_pytorch_2xt4_by_mode"][mode], flush=True)
+    print("STREAM1_LIBTORCH_CUDA_GRAPH_OVER_EAGER=", summary["cuda_graph_over_eager"], flush=True)
     print("STREAM1_LIBTORCH_SUMMARY_JSON=", SUMMARY_JSON, flush=True)
 
 
