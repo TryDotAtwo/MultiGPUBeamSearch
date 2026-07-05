@@ -31,11 +31,13 @@ SUMMARY_JSON = WORK_DIR / "stream1_libtorch_transformer_summary.json"
 CUDA_ARCHITECTURES = "75"
 BENCH_GPUS = [0, 1]
 BENCH_MODES = ["eager", "cuda_graph"]
-BENCH_BATCHES = [128, 192, 256, 320, 384, 448, 512, 640, 768, 1024, 1536, 2048]
+BENCH_BATCHES = [64, 72, 80, 88, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768]
 BENCH_WARMUP = 20
 BENCH_ITERS = 100
 NSYS_ITERS = 20
 NSYS_WARMUP = 5
+PYTORCH_BATCH_PROCESS_PER_T4_REFERENCE = 710752.75
+PYTORCH_BATCH_PROCESS_2XT4_REFERENCE = 1421505.5
 
 BENCH_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -141,6 +143,7 @@ def prepare_repo_and_weights(torch_cmake_prefix_path: str):
     ], cwd=REPO_DIR)
     manifest = json.loads((WEIGHT_OUT_DIR / "manifest.json").read_text(encoding="utf-8"))
     summary = {
+        "checked_out_commit": actual,
         "backend": manifest.get("backend"),
         "dtype": manifest.get("dtype"),
         "seq_len": manifest.get("seq_len"),
@@ -166,6 +169,7 @@ def prepare_repo_and_weights(torch_cmake_prefix_path: str):
         f"-DCUTLASS_DIR={CUTLASS_DIR}",
     ], cwd=REPO_DIR)
     run_checked(["cmake", "--build", BUILD_DIR, "--target", "stream1_transformer_libtorch_benchmark", "-j", "2"])
+    return actual
 
 
 def run_one_gpu(gpu: int, mode: str):
@@ -252,7 +256,7 @@ def maybe_run_nsys_profile(best_graph_row):
 
 def main():
     torch_cmake_prefix_path = preflight()
-    prepare_repo_and_weights(torch_cmake_prefix_path)
+    checked_out_commit = prepare_repo_and_weights(torch_cmake_prefix_path)
     all_rows = []
     for mode in BENCH_MODES:
         for gpu in BENCH_GPUS:
@@ -279,12 +283,16 @@ def main():
         best_graph_row = max(graph_rows, key=lambda row: row["candidates_per_sec"])
     maybe_run_nsys_profile(best_graph_row)
     summary = {
+        "checked_out_commit": checked_out_commit,
         "rows_csv": str(ROWS_CSV),
         "best_by_mode_gpu": {f"{mode}/gpu{gpu}": row for (mode, gpu), row in sorted(best_by_mode_gpu.items())},
         "aggregate_by_mode_candidates_per_sec": aggregate_by_mode,
-        "pytorch_batch_process_per_t4_reference": 630697.0,
-        "pytorch_batch_process_2xt4_reference": 1261394.0,
-        "libtorch_over_pytorch_2xt4_by_mode": {mode: aggregate / 1261394.0 for mode, aggregate in aggregate_by_mode.items()},
+        "pytorch_batch_process_per_t4_reference": PYTORCH_BATCH_PROCESS_PER_T4_REFERENCE,
+        "pytorch_batch_process_2xt4_reference": PYTORCH_BATCH_PROCESS_2XT4_REFERENCE,
+        "libtorch_over_pytorch_2xt4_by_mode": {
+            mode: aggregate / PYTORCH_BATCH_PROCESS_2XT4_REFERENCE
+            for mode, aggregate in aggregate_by_mode.items()
+        },
         "cuda_graph_over_eager": (
             aggregate_by_mode.get("cuda_graph", 0.0) / aggregate_by_mode.get("eager", 1.0)
             if aggregate_by_mode.get("eager", 0.0) > 0 else None
