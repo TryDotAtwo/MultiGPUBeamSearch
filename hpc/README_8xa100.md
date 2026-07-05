@@ -135,19 +135,13 @@ bash -n mephi_8xa100_common.sh start_8xa100_libtorch_megaminx.sh
 chmod +x start_8xa100_libtorch_megaminx.sh
 ```
 
-Weights must be prepared outside the compute payload. Either place exported weights at:
+The exported Vlad transformer weights are tracked in the repo at:
 
 ```text
-/mnt/pool/6/vokirova/beam8a100/stream1_transformer_weights_fp16/manifest.json
+repo/weights/megaminx_vlad_transformer_fp16/manifest.json
 ```
 
-or place Vlad's full Kaggle model dump under:
-
-```text
-/mnt/pool/6/vokirova/beam8a100/models/megaminx_vlad_transformer/
-```
-
-The dump must include the `.pth`, metadata/generator files, and the `pilgrim/model.py` source needed by `tools/export_stream1.py`.
+The launcher uses that directory automatically. You only need `BEAM_WEIGHT_DIR` if you want to override the bundled weights with another exported `piece_transformer` directory.
 
 Submit a first 900M run, defaulting to puzzle `991` and depth `120`:
 

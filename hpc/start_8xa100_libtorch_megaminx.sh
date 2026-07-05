@@ -35,7 +35,14 @@ BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCA
 BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM="${BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM:-1200000}"
 
 MODEL_DIR="${MODEL_DIR:-${JOB_DIR}/models/megaminx_vlad_transformer}"
-BEAM_WEIGHT_DIR="${BEAM_WEIGHT_DIR:-${JOB_DIR}/stream1_transformer_weights_fp16}"
+REPO_WEIGHT_DIR="${REPO_DIR}/weights/megaminx_vlad_transformer_fp16"
+if [ -z "${BEAM_WEIGHT_DIR:-}" ]; then
+  if [ -f "${REPO_WEIGHT_DIR}/manifest.json" ]; then
+    BEAM_WEIGHT_DIR="${REPO_WEIGHT_DIR}"
+  else
+    BEAM_WEIGHT_DIR="${JOB_DIR}/stream1_transformer_weights_fp16"
+  fi
+fi
 
 find_transformer_checkpoint() {
   if [ -n "${BEAM_TRANSFORMER_PTH:-}" ]; then
