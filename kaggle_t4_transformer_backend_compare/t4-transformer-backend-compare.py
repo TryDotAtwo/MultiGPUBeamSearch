@@ -13,7 +13,7 @@ import time
 
 GITHUB_REPO_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
 GITHUB_BRANCH = "codex/stream1-piece-transformer"
-EXPECTED_COMMIT_PREFIX = os.environ.get("EXPECTED_COMMIT_PREFIX", "1c069c5")
+EXPECTED_COMMIT_PREFIX = os.environ.get("EXPECTED_COMMIT_PREFIX", "")
 KAGGLE_MODEL_SOURCE = "vladkuznetsov266/megaminx-qtransformer-1782210824/PyTorch/default/1"
 MODEL_SOURCE_SLUG = "megaminx-qtransformer-1782210824"
 MODEL_ARTIFACT_NAME = "megaminx_qtransformer_1782210824_e99997"
