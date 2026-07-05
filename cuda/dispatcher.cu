@@ -1278,7 +1278,8 @@ void instantiate_cuda_graph_job_templates(
     Stream2SolvedBuffers solved,
     DispatcherStreams& streams,
     DispatcherEvents& events,
-    CudaGraphJobTemplates& graphs) {
+    CudaGraphJobTemplates& graphs,
+    bool skip_ring_slot_templates) {
     NvtxRange range("Dispatcher_instantiate_cuda_graph_job_templates");
     if (!memory.current_frontier_states || !memory.scratch_pool || !tables.generators || !tables.central_state || !tables.zobrist) {
         throw std::invalid_argument("dispatcher graph templates require preallocated architecture memory and read-only tables");
@@ -1293,7 +1294,7 @@ void instantiate_cuda_graph_job_templates(
     if (!known_stream1_backend) {
         throw std::invalid_argument("unknown Stream1 dispatcher backend");
     }
-    if (!network.uniform_score) {
+    if (!skip_ring_slot_templates && !network.uniform_score) {
         if (network.backend == DispatcherStream1Backend::Mlp &&
             network.mlp_scratch_lanes.size() < plan.config.inference_parallelism) {
             throw std::invalid_argument("Stream1 MLP scratch lane count is smaller than Stream1 concurrency");
@@ -1310,6 +1311,7 @@ void instantiate_cuda_graph_job_templates(
     const std::uint32_t ring_slot_job_count = plan.config.ring_count * plan.derived.ring_slot_count;
     graphs.ring_slot_graphs.resize(ring_slot_job_count, nullptr);
     graphs.ring_slot_execs.resize(ring_slot_job_count, nullptr);
+    if (!skip_ring_slot_templates) {
     const std::uint64_t candidates_per_slot = static_cast<std::uint64_t>(plan.config.b_micro) * MOVE_COUNT;
     for (std::uint32_t job = 0; job < ring_slot_job_count; ++job) {
         const std::uint32_t ring_slot = job % plan.derived.ring_slot_count;
@@ -1370,6 +1372,7 @@ void instantiate_cuda_graph_job_templates(
         check_cuda(cudaEventRecord(stream2_done, stream2_lane), "cudaEventRecord ring_slot_join");
         check_cuda(cudaStreamWaitEvent(stream1_lane, stream2_done, 0), "cudaStreamWaitEvent stream1_join");
         instantiate_captured_graph(stream1_lane, graphs.ring_slot_graphs[job], graphs.ring_slot_execs[job]);
+    }
     }
 
     graphs.stream3_ring_graphs.resize(plan.config.ring_count, nullptr);
@@ -2945,6 +2948,9 @@ DepthDispatchState run_depth_cuda_graphs(
                         launch_context.stream2_lane = streams.stream2_lanes[lane];
                         ring_slot_launcher->launch(launch_context, ring_slot_launcher->user);
                     } else {
+                        if (graphs.ring_slot_execs[job] == nullptr) {
+                            throw std::runtime_error("ring-slot graph template is missing and no custom launcher is installed");
+                        }
                         check_cuda(cudaGraphLaunch(graphs.ring_slot_execs[job], lane_stream), "cudaGraphLaunch ring_slot");
                     }
                     ++state.ring_slot_jobs_launched;

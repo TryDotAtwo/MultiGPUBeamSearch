@@ -118,3 +118,10 @@ Production wiring should use the repeated-pass result as the default LibTorch si
 The dispatcher now has an optional `DispatcherRingSlotLauncher` hook at the ring-slot scheduling boundary. The default path is unchanged: when no hook is supplied, MLP and native `piece_transformer` Stream1 still launch the pre-instantiated ring-slot CUDA Graph templates. The hook is intentionally Torch-free and only exposes the ring/slot/job context, CUDA streams, parent window, and score-ring offset. This gives a named non-graph Stream1 execution path a stable integration point without linking LibTorch into the default `beam_cuda` build.
 
 A test passthrough launcher exercises the hook by launching the existing graph exec and checking that the hook call count matches `ring_slot_jobs_launched`. This is scaffolding for explicit `libtorch:eager` production integration, not a fallback route.
+## 2026-07-05 LibTorch Production Runner Hook
+
+The production runner now has an explicit opt-in C++ LibTorch Stream1 path for exported `piece_transformer` weights. The default `production_runner` target remains Torch-free and still uses the existing pre-instantiated ring-slot CUDA Graph templates for MLP and native CUTLASS Stream1. The new `production_runner_libtorch_stream1` target is built only with `BEAM_ENABLE_LIBTORCH_STREAM1=ON` and is selected at runtime with `BEAM_STREAM1_EXECUTOR=libtorch_eager`.
+
+The LibTorch production path uses the dispatcher ring-slot hook as a named non-graph Stream1 executor. It skips native Stream1 weight upload/scratch and native ring-slot graph instantiation, writes quantized score keys into the existing score ring, then launches the existing Stream2 hash/goal kernel on the paired Stream2 lane. Stream3/Stream4/Stream5/finalization remain the normal production pipeline.
+
+This is not a fallback. If the binary is not built with LibTorch support, if the selected model is not `backend=piece_transformer`, if `BEAM_STREAM1_MODE=uniform` is requested, or if `output_dim != MOVE_COUNT`, the runner fails closed.

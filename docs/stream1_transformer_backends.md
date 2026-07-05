@@ -75,6 +75,7 @@ cmake -S . -B build-libtorch-stream1 \
   -DCUTLASS_DIR=/opt/cutlass \
   -DBEAM_CUDA_ARCHITECTURES=75
 cmake --build build-libtorch-stream1 --target stream1_transformer_libtorch_benchmark -j2
+cmake --build build-libtorch-stream1 --target production_runner_libtorch_stream1 -j2
 ```
 
 `native_cutlass` uses the existing `stream_benchmark` target:
@@ -141,3 +142,21 @@ python tools/stream1_transformer_parity.py \
 
 The native CUTLASS parity path sets `BEAM_STREAM1_SYNTHETIC_STATES=1` so it uses the same deterministic arange-pattern state batch as the Torch/LibTorch benchmark paths.
 Backend entries accept `backend:mode`; a bare backend defaults to `eager`. Examples: `libtorch:cuda_graph`, `native_cutlass:graph`, and `pytorch`.
+## Production Runner Selection
+
+The default production binary remains the normal Torch-free target:
+
+```bash
+cmake --build build-transformer --target production_runner -j2
+```
+
+To run Stream1 through C++ LibTorch, build the explicit target and set the executor env:
+
+```bash
+cmake --build build-libtorch-stream1 --target production_runner_libtorch_stream1 -j2
+BEAM_STREAM1_EXECUTOR=libtorch_eager \
+BEAM_WEIGHT_DIR=/path/to/stream1_transformer_weights_fp16 \
+./build-libtorch-stream1/production_runner_libtorch_stream1 <puzzle_id> <depth> <beam> [world_size] [local_rank]
+```
+
+`libtorch_eager` currently supports the exported `piece_transformer` contract only when the model's `output_dim` equals compile-time `MOVE_COUNT`. A 24-output model works in a 24-move build; an 18-output model requires an 18-move build and matching generators/runtime config. Single-output transformer row-mode is intentionally not wired yet and fails closed instead of being guessed.

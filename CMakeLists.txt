@@ -231,6 +231,25 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF)
+
+    add_executable(production_runner_libtorch_stream1
+        tools/production_runner.cu
+        tools/stream1_libtorch_ring_slot_launcher.cpp
+        tools/stream1_transformer_libtorch_backend.cpp)
+    target_link_libraries(production_runner_libtorch_stream1 PRIVATE beam_cuda "${TORCH_LIBRARIES}")
+    target_include_directories(production_runner_libtorch_stream1 PRIVATE "${TORCH_INCLUDE_DIRS}")
+    target_compile_definitions(production_runner_libtorch_stream1 PRIVATE
+        BEAM_HAS_LIBTORCH_STREAM1=1
+        BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
+        BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>
+    )
+    set_target_properties(production_runner_libtorch_stream1 PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF)
 endif()
 
 enable_testing()

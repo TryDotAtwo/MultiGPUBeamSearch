@@ -296,7 +296,8 @@ void instantiate_cuda_graph_job_templates(
     Stream2SolvedBuffers solved,
     DispatcherStreams& streams,
     DispatcherEvents& events,
-    CudaGraphJobTemplates& graphs);
+    CudaGraphJobTemplates& graphs,
+    bool skip_ring_slot_templates = false);
 
 void destroy_cuda_graph_job_templates(CudaGraphJobTemplates& graphs);
 
