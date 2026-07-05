@@ -75,6 +75,27 @@ struct DispatcherCollective {
     ncclComm_t comm = nullptr;
 };
 
+struct DispatcherRingSlotLaunchContext {
+    std::uint32_t job = UINT32_MAX;
+    std::uint32_t ring = UINT32_MAX;
+    std::uint32_t ring_slot = UINT32_MAX;
+    std::uint32_t lane = UINT32_MAX;
+    std::uint32_t b_micro = 0;
+    std::uint64_t candidate_offset = 0;
+    std::uint64_t parent_base = 0;
+    std::uint32_t count = 0;
+    cudaStream_t stream1_lane = nullptr;
+    cudaStream_t stream2_lane = nullptr;
+};
+
+using DispatcherRingSlotLaunchFn = void (*)(const DispatcherRingSlotLaunchContext& context, void* user);
+
+struct DispatcherRingSlotLauncher {
+    DispatcherRingSlotLaunchFn launch = nullptr;
+    void* user = nullptr;
+    const char* name = nullptr;
+};
+
 struct GeneratedTrackRequest {
     bool enabled = false;
     std::uint64_t parent_idx = UINT64_MAX;
@@ -286,7 +307,8 @@ DepthDispatchState run_depth_cuda_graphs(
     DispatcherStreams& streams,
     std::uint64_t frontier_size,
     GeneratedTrackRequest track_request = {},
-    const DispatcherCollective* collective = nullptr);
+    const DispatcherCollective* collective = nullptr,
+    const DispatcherRingSlotLauncher* ring_slot_launcher = nullptr);
 
 FinalizeDepthState finalize_depth_single_gpu(
     const StaticMemoryPlan& plan,

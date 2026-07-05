@@ -36,6 +36,23 @@ void set_test_env(const char* name, const char* value) {
 #endif
 }
 
+struct TestRingSlotLauncherState {
+    CudaGraphJobTemplates* graphs = nullptr;
+    std::uint32_t calls = 0;
+};
+
+void test_ring_slot_graph_launcher(const DispatcherRingSlotLaunchContext& context, void* user) {
+    auto* state = static_cast<TestRingSlotLauncherState*>(user);
+    if (state == nullptr || state->graphs == nullptr) {
+        throw std::runtime_error("test ring-slot launcher missing graph state");
+    }
+    if (context.job >= state->graphs->ring_slot_execs.size()) {
+        throw std::runtime_error("test ring-slot launcher job out of range");
+    }
+    BEAM_CUDA_CHECK(cudaGraphLaunch(state->graphs->ring_slot_execs[context.job], context.stream1_lane));
+    ++state->calls;
+}
+
 struct ScopedTestEnv {
     const char* name;
     bool had_previous = false;
@@ -381,11 +398,22 @@ int main() {
     }
     const std::uint64_t frontier_size =
         static_cast<std::uint64_t>(config.b_micro) * ring_slot_job_count + 3ULL;
-    const DepthDispatchState state = run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size);
+    TestRingSlotLauncherState launcher_state{&graphs, 0};
+    DispatcherRingSlotLauncher ring_slot_launcher{test_ring_slot_graph_launcher, &launcher_state, "test_graph_passthrough"};
+    const DepthDispatchState state = run_depth_cuda_graphs(
+        plan,
+        memory,
+        graphs,
+        streams,
+        frontier_size,
+        {},
+        nullptr,
+        &ring_slot_launcher);
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
     require(state.depth_drained, "depth dispatcher must drain the depth");
     require(state.frontier_cursor == frontier_size, "depth dispatcher frontier cursor mismatch");
     require(state.ring_slot_jobs_launched == ring_slot_job_count + 1U, "ring slot launch count mismatch");
+    require(launcher_state.calls == state.ring_slot_jobs_launched, "custom ring-slot launcher call count mismatch");
     const std::uint32_t expected_parent_jobs = static_cast<std::uint32_t>(
         (frontier_size + config.b_micro - 1ULL) / config.b_micro);
     const std::uint32_t expected_stream3_jobs =
@@ -394,6 +422,7 @@ int main() {
     require(state.stream4_jobs_launched > 0, "stream4 conditional scheduler did not launch dirty flush");
     require(state.stream4_active_sort_slots_used > 0, "stream4 active sort slot usage missing");
     require(state.stream4_active_sort_slots_used <= config.stream4_active_sort_slots, "stream4 active sort slot usage mismatch");
+    report << "- custom_ring_slot_launcher=pass\n";
     report << "- stream4_conditional_launches=" << state.stream4_jobs_launched << "\n";
     report << "- stream4_active_sort_slots_used=" << state.stream4_active_sort_slots_used << "\n";
     run_transformer_dispatcher_graph_test(report);

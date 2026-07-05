@@ -113,3 +113,8 @@ The next production integration should therefore be a named non-graph Stream1 Li
 Kaggle 2xT4 LibTorch-only benchmark v11 repeated each batch three times to reduce single-row noise. The stable candidate remains eager LibTorch at `batch=384` on both T4s: aggregate mean `1467441.7` candidates/s, best aggregate `1497577.0`, and `1.032x` of the full backend compare v5 original PyTorch `batch_process` aggregate. CUDA Graph is still explicit and functional, but slower in this benchmark: aggregate mean `1411365.0`, best aggregate `1442113.0`, and graph/eager best `0.963x`.
 
 Production wiring should use the repeated-pass result as the default LibTorch sizing point and keep CUDA Graph as a benchmark mode until a graph-capture path beats eager under the same measurement contract.
+## 2026-07-05 Dispatcher Ring-Slot Hook
+
+The dispatcher now has an optional `DispatcherRingSlotLauncher` hook at the ring-slot scheduling boundary. The default path is unchanged: when no hook is supplied, MLP and native `piece_transformer` Stream1 still launch the pre-instantiated ring-slot CUDA Graph templates. The hook is intentionally Torch-free and only exposes the ring/slot/job context, CUDA streams, parent window, and score-ring offset. This gives a named non-graph Stream1 execution path a stable integration point without linking LibTorch into the default `beam_cuda` build.
+
+A test passthrough launcher exercises the hook by launching the existing graph exec and checking that the hook call count matches `ring_slot_jobs_launched`. This is scaffolding for explicit `libtorch:eager` production integration, not a fallback route.

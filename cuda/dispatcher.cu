@@ -1667,7 +1667,8 @@ DepthDispatchState run_depth_cuda_graphs(
     DispatcherStreams& streams,
     std::uint64_t frontier_size,
     GeneratedTrackRequest track_request,
-    const DispatcherCollective* collective) {
+    const DispatcherCollective* collective,
+    const DispatcherRingSlotLauncher* ring_slot_launcher) {
     NvtxRange range("Dispatcher_depth_cuda_graphs");
 #if !BEAM_DEBUG_PATH_TRACE
     track_request = {};
@@ -1693,6 +1694,10 @@ DepthDispatchState run_depth_cuda_graphs(
         streams.stream2_lanes.size() < plan.config.inference_parallelism) {
         throw std::invalid_argument("Stream1 concurrency resources do not match runtime config");
     }
+    if (ring_slot_launcher != nullptr && ring_slot_launcher->launch == nullptr) {
+        throw std::invalid_argument("custom ring-slot launcher requires a launch callback");
+    }
+    const bool use_custom_ring_slot_launcher = ring_slot_launcher != nullptr;
     const std::uint64_t parents_per_stream3_round =
         static_cast<std::uint64_t>(plan.derived.ring_slot_count) * plan.config.b_micro;
     const std::uint64_t local_exchange_rounds =
@@ -2926,7 +2931,22 @@ DepthDispatchState run_depth_cuda_graphs(
                     cudaMemcpyHostToDevice,
                     lane_stream), "cudaMemcpyAsync count");
                 if (count_value != 0U) {
-                    check_cuda(cudaGraphLaunch(graphs.ring_slot_execs[job], lane_stream), "cudaGraphLaunch ring_slot");
+                    if (use_custom_ring_slot_launcher) {
+                        DispatcherRingSlotLaunchContext launch_context{};
+                        launch_context.job = job;
+                        launch_context.ring = ring;
+                        launch_context.ring_slot = slot;
+                        launch_context.lane = lane;
+                        launch_context.b_micro = plan.config.b_micro;
+                        launch_context.candidate_offset = static_cast<std::uint64_t>(job) * candidates_per_slot;
+                        launch_context.parent_base = parent_base_value;
+                        launch_context.count = count_value;
+                        launch_context.stream1_lane = lane_stream;
+                        launch_context.stream2_lane = streams.stream2_lanes[lane];
+                        ring_slot_launcher->launch(launch_context, ring_slot_launcher->user);
+                    } else {
+                        check_cuda(cudaGraphLaunch(graphs.ring_slot_execs[job], lane_stream), "cudaGraphLaunch ring_slot");
+                    }
                     ++state.ring_slot_jobs_launched;
                 }
             }
