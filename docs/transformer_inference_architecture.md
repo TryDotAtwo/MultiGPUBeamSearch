@@ -108,3 +108,8 @@ The C++ LibTorch FFN activation now calls `at::silu(...)` directly after the FF1
 Kaggle 2xT4 LibTorch-only sweeps v8-v10 identified explicit C++ LibTorch eager as the current fastest exported-weight transformer path. The best v10 row was `batch=384` on both T4s, aggregate `1534314.0` candidates/s, about `1.079x` of the full backend compare v5 original PyTorch `batch_process` reference (`1421505.5`). CUDA Graph capture remains available as an explicit mode, but it was slower than eager in the v10 run.
 
 The next production integration should therefore be a named non-graph Stream1 LibTorch eager path, not an attempt to force LibTorch into the existing dispatcher CUDA graph templates. The path must remain explicit, fail closed when LibTorch is unavailable, and keep the MLP/default native paths Torch-free.
+## 2026-07-05 LibTorch Repeated-Pass Stability
+
+Kaggle 2xT4 LibTorch-only benchmark v11 repeated each batch three times to reduce single-row noise. The stable candidate remains eager LibTorch at `batch=384` on both T4s: aggregate mean `1467441.7` candidates/s, best aggregate `1497577.0`, and `1.032x` of the full backend compare v5 original PyTorch `batch_process` aggregate. CUDA Graph is still explicit and functional, but slower in this benchmark: aggregate mean `1411365.0`, best aggregate `1442113.0`, and graph/eager best `0.963x`.
+
+Production wiring should use the repeated-pass result as the default LibTorch sizing point and keep CUDA Graph as a benchmark mode until a graph-capture path beats eager under the same measurement contract.

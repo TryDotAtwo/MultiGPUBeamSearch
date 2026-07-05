@@ -98,7 +98,7 @@ The private Kaggle package `kaggle_t4_transformer_backend_compare/` currently ru
 For strategy decisions, use the aggregate backend summary from that package. For production integration work, keep the three backend families independently selectable through the launcher above.
 ## Current T4 Candidate
 
-Kaggle 2xT4 v10 found the fastest exported-weight transformer path so far in explicit C++ LibTorch eager mode at `batch=384` on both T4s: aggregate `1534314.0` candidates/s, about `1.079x` of the full-compare v5 original PyTorch `batch_process` reference. CUDA Graph capture works as an explicit benchmark mode, but it was slower than eager in that run.
+Kaggle 2xT4 v11 repeated-pass stability confirmed explicit C++ LibTorch eager as the current exported-weight transformer candidate. With three passes per batch, `batch=384` was the mean-best point on both T4s: aggregate mean `1467441.7` candidates/s, about `1.032x` of the full-compare v5 original PyTorch `batch_process` reference. The best single v11 eager rows aggregated to `1497577.0` candidates/s. CUDA Graph capture works as an explicit benchmark mode, but it remained slower than eager: aggregate mean `1411365.0` candidates/s and best aggregate `1442113.0`.
 
 Use repeated passes when tuning this backend because single rows are noisy on Kaggle T4:
 
