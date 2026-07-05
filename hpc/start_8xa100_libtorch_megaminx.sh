@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=megaminx-libtorch-900m
+#SBATCH --job-name=megaminx-transformer-900m
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:8
@@ -16,6 +16,7 @@ beam_setup_paths
 PUZZLE_ID="${PUZZLE_ID:-991}"
 DEPTH_LIMIT="${DEPTH_LIMIT:-120}"
 BEAM_WIDTH="${BEAM_WIDTH:-900000000}"
+MEGAMINX_STREAM1_BACKEND="${MEGAMINX_STREAM1_BACKEND:-${BEAM_STREAM1_EXECUTOR:-libtorch_eager}}"
 
 SHARD_COUNT="${SHARD_COUNT:-32}"
 STREAM4_BATCH_ALIGNMENT="${STREAM4_BATCH_ALIGNMENT:-1024}"
@@ -96,34 +97,52 @@ trap cleanup EXIT
 
 beam_preflight
 
-export BEAM_ENABLE_LIBTORCH_STREAM1=ON
-if [ -z "${CMAKE_PREFIX_PATH:-}" ]; then
-  CMAKE_PREFIX_PATH="$("${NINJA_VENV_DIR}/bin/python" - <<'PY'
+CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:-}"
+TORCH_LIB_DIR="${TORCH_LIB_DIR:-}"
+
+prepare_libtorch_weights
+
+case "${MEGAMINX_STREAM1_BACKEND}" in
+  libtorch_eager)
+    export BEAM_ENABLE_LIBTORCH_STREAM1=ON
+    if [ -z "${CMAKE_PREFIX_PATH}" ]; then
+      CMAKE_PREFIX_PATH="$("${NINJA_VENV_DIR}/bin/python" - <<'PY'
 import torch
 print(torch.utils.cmake_prefix_path)
 PY
 )"
-  export CMAKE_PREFIX_PATH
-fi
-TORCH_LIB_DIR="$("${NINJA_VENV_DIR}/bin/python" - <<'PY'
+      export CMAKE_PREFIX_PATH
+    fi
+    TORCH_LIB_DIR="$("${NINJA_VENV_DIR}/bin/python" - <<'PY'
 from pathlib import Path
 import torch
 print(Path(torch.__file__).resolve().parent / "lib")
 PY
 )"
-export LD_LIBRARY_PATH="${TORCH_LIB_DIR}:$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
-
-prepare_libtorch_weights
-
-beam_configure_build production_runner_libtorch_stream1
-export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner_libtorch_stream1"
-export BEAM_STREAM1_EXECUTOR=libtorch_eager
+    export LD_LIBRARY_PATH="${TORCH_LIB_DIR}:$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
+    beam_configure_build production_runner_libtorch_stream1
+    export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner_libtorch_stream1"
+    export BEAM_STREAM1_EXECUTOR=libtorch_eager
+    ;;
+  native_cuda_graph|cuda_graph)
+    export BEAM_ENABLE_LIBTORCH_STREAM1=OFF
+    export LD_LIBRARY_PATH="$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
+    beam_configure_build production_runner
+    export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner"
+    export BEAM_STREAM1_EXECUTOR=native_cuda_graph
+    ;;
+  *)
+    echo "invalid_megaminx_stream1_backend=${MEGAMINX_STREAM1_BACKEND}"
+    echo "allowed_megaminx_stream1_backend=libtorch_eager,native_cuda_graph"
+    exit 2
+    ;;
+esac
 export BEAM_WEIGHT_DIR
 
 beam_derive_shard_capacity
 beam_validate_manual_config
 
-if [ "${STREAM1_OUTPUT_DIM}" -ne "${BEAM_MOVE_COUNT_EFFECTIVE}" ]; then
+if [ "${BEAM_STREAM1_EXECUTOR}" = "libtorch_eager" ] && [ "${STREAM1_OUTPUT_DIM}" -ne "${BEAM_MOVE_COUNT_EFFECTIVE}" ]; then
   echo "invalid_libtorch_output_dim=${STREAM1_OUTPUT_DIM} move_count=${BEAM_MOVE_COUNT_EFFECTIVE}"
   exit 2
 fi
@@ -135,6 +154,7 @@ beam_width=${BEAM_WIDTH}
 global_beam_width_effective=${GLOBAL_BEAM_WIDTH_EFFECTIVE}
 local_beam_width=${LOCAL_BEAM_WIDTH}
 shard_count=${SHARD_COUNT}
+megaminx_stream1_backend=${MEGAMINX_STREAM1_BACKEND}
 stream1_executor=${BEAM_STREAM1_EXECUTOR}
 stream1_weight_dir=${BEAM_WEIGHT_DIR}
 stream1_output_dim=${STREAM1_OUTPUT_DIM}
@@ -154,14 +174,15 @@ EOF
 
 beam_export_common_runtime
 export BEAM_PREDICT_STATS_VERBOSE="${BEAM_PREDICT_STATS_VERBOSE:-1}"
-export BEAM_PREDICT_STATS_PATH="${BEAM_PREDICT_STATS_PATH:-${JOB_DIR}/predict_stats_libtorch_p${PUZZLE_ID}_b${BEAM_WIDTH}_d${DEPTH_LIMIT}.jsonl}"
+export BEAM_PREDICT_STATS_PATH="${BEAM_PREDICT_STATS_PATH:-${JOB_DIR}/predict_stats_${BEAM_STREAM1_EXECUTOR}_p${PUZZLE_ID}_b${BEAM_WIDTH}_d${DEPTH_LIMIT}.jsonl}"
 export BEAM_B_MICRO
 export BEAM_STREAM1_CONCURRENCY
 export BEAM_STREAM3_RING_SLOTS
 export BEAM_SHARD_BUFFER_COUNT
 beam_export_manual_config
-beam_prepare_nccl_file "megaminx_libtorch"
+RUN_TAG="megaminx_${BEAM_STREAM1_EXECUTOR}"
+beam_prepare_nccl_file "${RUN_TAG}"
 
-RUN_LOG="${LOG_DIR}/production_runner_libtorch_p${PUZZLE_ID}_d${DEPTH_LIMIT}_b${BEAM_WIDTH}_${SLURM_JOB_ID:-manual}.log"
-beam_torchrun_production "megaminx_libtorch" "${RUN_LOG}"
+RUN_LOG="${LOG_DIR}/production_runner_${BEAM_STREAM1_EXECUTOR}_p${PUZZLE_ID}_d${DEPTH_LIMIT}_b${BEAM_WIDTH}_${SLURM_JOB_ID:-manual}.log"
+beam_torchrun_production "${RUN_TAG}" "${RUN_LOG}"
 echo "finished_at=$(date -Is)"

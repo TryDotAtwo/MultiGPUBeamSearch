@@ -115,9 +115,72 @@ Network rule:
 - `start.sh` does not run `git clone`, `git fetch`, or `git reset` inside the
   compute job. Prepare `repo/` and `/mnt/pool/3/vokirova/cutlass` from the
   visible `basis` shell before `sbatch`.
+
+## Megaminx Transformer Backend Benchmark
+
+Run this before a large 900M+ Megaminx solve on 8xA100 40GB. It benchmarks isolated Stream1 backends and short full-beam production runs for `native_cuda_graph` and `libtorch_eager`, then writes a best config env file.
+
+Prepare the repo and scripts on `basis`:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100/repo
+git fetch origin codex/stream1-piece-transformer --depth 1
+git reset --hard FETCH_HEAD
+git log -1 --oneline
+test -f weights/megaminx_vlad_transformer_fp16/manifest.json
+
+cd /mnt/pool/6/vokirova/beam8a100
+cp repo/hpc/mephi_8xa100_common.sh .
+cp repo/hpc/bench_8xa100_megaminx_transformer.sh .
+cp repo/hpc/start_8xa100_libtorch_megaminx.sh .
+sed -i 's/\r$//' mephi_8xa100_common.sh bench_8xa100_megaminx_transformer.sh start_8xa100_libtorch_megaminx.sh
+bash -n mephi_8xa100_common.sh bench_8xa100_megaminx_transformer.sh start_8xa100_libtorch_megaminx.sh
+chmod +x bench_8xa100_megaminx_transformer.sh start_8xa100_libtorch_megaminx.sh
+```
+
+Submit the default benchmark:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100
+sbatch -p kaf12 bench_8xa100_megaminx_transformer.sh
+```
+
+Default benchmark stages:
+
+- isolated single-GPU Stream1: `pytorch:eager`, `libtorch:eager`, `libtorch:cuda_graph`, `native_cutlass:graph`;
+- full 8-GPU smoke at `64M`, depth `12`, both production backends;
+- target full-loop sweep at `900M`, depth `8`, both production backends, `B_MICRO=8192 12288`, concurrency `8`.
+
+Useful expansion knobs:
+
+```bash
+sbatch -p kaf12 \
+  --export=ALL,TARGET_B_MICRO_SWEEP="4096 8192 12288 16384",TARGET_CONCURRENCY_SWEEP="4 8" \
+  bench_8xa100_megaminx_transformer.sh
+```
+
+Read benchmark results:
+
+```bash
+squeue -u vokirova -o "%.18i %.9P %.40j %.8T %.10M %.10L %.20R"
+tail -n 200 /mnt/pool/6/vokirova/beam8a100/slurm-<job_id>.out
+column -t -s $'\t' /mnt/pool/6/vokirova/beam8a100/logs/tuning_<job_id>/megaminx_transformer_bench_<job_id>.tsv
+column -t -s $'\t' /mnt/pool/6/vokirova/beam8a100/logs/tuning_<job_id>/megaminx_transformer_stream1_isolated_<job_id>.tsv
+cat /mnt/pool/6/vokirova/beam8a100/logs/best_megaminx_transformer.env
+```
+
+To launch with the benchmark-selected backend and parameters:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100
+source logs/best_megaminx_transformer.env
+export DEPTH_LIMIT=120
+sbatch -p kaf12 --export=ALL start_8xa100_libtorch_megaminx.sh
+```
+
 ## Megaminx Vlad Transformer LibTorch Run
 
-Use this launcher for the explicit C++ LibTorch Stream1 `piece_transformer` path. It builds `production_runner_libtorch_stream1`, sets `BEAM_STREAM1_EXECUTOR=libtorch_eager`, and keeps the existing Stream2/3/4/5/finalization pipeline.
+Use this launcher for the explicit Megaminx `piece_transformer` path. It supports `MEGAMINX_STREAM1_BACKEND=libtorch_eager` and `MEGAMINX_STREAM1_BACKEND=native_cuda_graph`, and keeps the existing Stream2/3/4/5/finalization pipeline.
 
 Prepare the repo and scripts on `basis`:
 
