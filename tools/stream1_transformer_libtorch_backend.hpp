@@ -308,8 +308,7 @@ struct PieceTransformerLibTorch {
         return at::linear(x, weight_kxh, bias);
     }
     torch::Tensor build_tokens(const torch::Tensor& state_u8) const {
-        const torch::Tensor states = state_u8.index({torch::indexing::Slice(), torch::indexing::Slice(0, state_len)})
-                                         .to(torch::kLong);
+        const torch::Tensor states = state_u8.narrow(1, 0, static_cast<std::int64_t>(state_len)).to(torch::kLong);
         const std::int64_t batch = states.size(0);
         torch::Tensor pieces = fast_piece_static.unsqueeze(0).expand({batch, -1, -1}).clone();
         for (std::uint32_t slot = 0; slot < max_piece_size; ++slot) {

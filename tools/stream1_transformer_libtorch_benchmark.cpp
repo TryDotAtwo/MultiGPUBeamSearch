@@ -218,6 +218,7 @@ int main(int argc, char** argv) {
                   << " output_dim=" << model.output_dim
                   << " transposed_linear_weights=1"
                   << " static_token_plan=1"
+                  << " state_slice=narrow"
                   << " slot_count=" << model.max_piece_size
                   << "\n";
 
