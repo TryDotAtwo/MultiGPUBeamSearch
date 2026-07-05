@@ -204,7 +204,7 @@ int main(int argc, char** argv) {
         std::ofstream csv;
         if (!args.csv_path.empty()) {
             csv.open(args.csv_path, std::ios::out | std::ios::trunc);
-            csv << "mode,pass,batch,iters,elapsed_ms,parents_per_sec,candidates_per_sec,device,dtype\n";
+            csv << "mode,pass,batch,iters,elapsed_ms,parents_per_sec,candidates_per_sec,device,dtype,native_equivalent_activation_bytes\n";
         }
 
         std::cout << "stream1_transformer_libtorch_backend=1"
@@ -217,6 +217,8 @@ int main(int argc, char** argv) {
                   << " layers=" << model.num_layers
                   << " output_dim=" << model.output_dim
                   << " transposed_linear_weights=1"
+                  << " static_token_plan=1"
+                  << " slot_count=" << model.max_piece_size
                   << "\n";
 
         for (std::int64_t pass = 0; pass < args.passes; ++pass) {
@@ -228,6 +230,7 @@ int main(int argc, char** argv) {
                     : run_eager(model, states, args.warmup, args.iters, device, elapsed_ms);
                 const double parents_per_sec = (static_cast<double>(batch) * args.iters) / (elapsed_ms / 1000.0);
                 const double candidates_per_sec = parents_per_sec * model.move_count;
+                const std::uint64_t activation_bytes = model.native_equivalent_activation_bytes(static_cast<std::uint64_t>(batch));
                 const torch::Tensor keys = beam::stream1_libtorch::score_keys(logits);
                 const auto checksum = keys.sum().item<std::int64_t>();
                 const std::uint64_t score_digest = score_key_digest(keys);
@@ -242,6 +245,7 @@ int main(int argc, char** argv) {
                           << " checksum=" << checksum
                           << " score_key_digest=" << score_digest
                           << " first_score_keys=" << first_score_keys
+                          << " native_equivalent_activation_bytes=" << activation_bytes
                           << " pass=" << pass
                           << "\n";
                 if (csv) {
@@ -253,7 +257,8 @@ int main(int argc, char** argv) {
                         << parents_per_sec << ','
                         << candidates_per_sec << ','
                         << device.str() << ','
-                        << model.dtype_suffix.substr(1) << '\n';
+                        << model.dtype_suffix.substr(1) << ','
+                        << activation_bytes << '\n';
                 }
             }
         }

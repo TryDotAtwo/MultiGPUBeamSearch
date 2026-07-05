@@ -78,8 +78,8 @@ class PieceTransformerTorch:
 
         self.state_len = int(self.manifest["state_len"])
         self.num_classes = int(self.manifest["num_classes"])
-        self.move_count = int(self.manifest["move_count"])
         self.output_dim = int(self.manifest["output_dim"])
+        self.move_count = int(self.manifest.get("move_count", self.output_dim))
         self.num_pieces = int(self.manifest["num_pieces"])
         self.max_piece_size = int(self.manifest["max_piece_size"])
         self.seq_len = int(self.manifest["seq_len"])

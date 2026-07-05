@@ -108,6 +108,7 @@ def make_args(
         synthetic_states=True,
         warmup=warmup,
         iters=iters,
+        passes=1,
         puzzle_id="991",
         b_micro=str(batch) if backend == "native_cutlass" else None,
         concurrency="1" if backend == "native_cutlass" else None,

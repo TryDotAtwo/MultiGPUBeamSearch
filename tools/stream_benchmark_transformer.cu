@@ -142,8 +142,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
         report << "- filter_b_micro=" << only_b_micro << "\n";
         report << "- filter_concurrency=" << only_concurrency << "\n\n";
     }
-    report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | checksum | score_key_digest | first_score_keys | scratch_bytes |\n";
-    report << "|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|\n";
+    report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | checksum | score_key_digest | first_score_keys | scratch_bytes | token_bytes | qkv_bytes | attention_bytes | context_bytes | ff_hidden_bytes | logits_bytes |\n";
+    report << "|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|\n";
     for (std::uint32_t b_micro : TRANSFORMER_B_MICRO_SWEEP) {
         for (std::uint32_t concurrent : TRANSFORMER_STREAM1_CONCURRENCY_SWEEP) {
             if ((only_b_micro != 0U && b_micro != only_b_micro) ||
@@ -153,7 +153,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
             const std::uint64_t rows_per_launch_group = static_cast<std::uint64_t>(b_micro) * concurrent;
             if (rows_per_launch_group > max_states) {
                 report << "|" << b_micro << "|" << concurrent << "|" << rows_per_launch_group
-                       << "|skip|skip|skip|skip|skip|skip|0: exceeds prepared state batch|\n";
+                       << "|skip|skip|skip|skip|skip|skip|0: exceeds prepared state batch|skip|skip|skip|skip|skip|skip|\n";
                 std::cout << "stream1_transformer_micro_skip"
                           << " b_micro=" << b_micro
                           << " concurrency=" << concurrent
@@ -161,8 +161,9 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                 continue;
             }
 
-            const std::uint64_t scratch_bytes =
-                stream1_weights::stream1_scratch_bytes(model, b_micro, concurrent);
+            const stream1_weights::TransformerScratchBytePlan scratch_plan =
+                stream1_weights::transformer_scratch_byte_plan(model, rows_per_launch_group);
+            const std::uint64_t scratch_bytes = scratch_plan.total_bytes();
             const std::uint64_t io_bytes =
                 rows_per_launch_group *
                 (sizeof(std::uint64_t) + sizeof(std::uint32_t) +
@@ -176,7 +177,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                        << "|skip|skip|skip|skip|skip|skip|" << scratch_bytes
                        << ": estimated allocation exceeds available GPU memory"
                        << " free_bytes=" << free_bytes
-                       << " io_bytes=" << io_bytes << "|\n";
+                       << " io_bytes=" << io_bytes << "|skip|skip|skip|skip|skip|skip|\n";
                 std::cout << "stream1_transformer_micro_skip"
                           << " b_micro=" << b_micro
                           << " concurrency=" << concurrent
@@ -253,7 +254,13 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                    << "|" << score_summary.checksum
                    << "|" << score_summary.score_key_digest
                    << "|`" << score_summary.first_score_keys << "`"
-                   << "|" << scratch_bytes << "|\n";
+                   << "|" << scratch_bytes
+                   << "|" << scratch_plan.token_bytes
+                   << "|" << scratch_plan.qkv_bytes
+                   << "|" << scratch_plan.attention_bytes
+                   << "|" << scratch_plan.context_bytes
+                   << "|" << scratch_plan.ff_hidden_bytes
+                   << "|" << scratch_plan.logits_bytes << "|\n";
             std::cout << "stream1_transformer_micro"
                       << " b_micro=" << b_micro
                       << " concurrency=" << concurrent
@@ -265,6 +272,12 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                       << " score_key_digest=" << score_summary.score_key_digest
                       << " first_score_keys=" << score_summary.first_score_keys
                       << " scratch_bytes=" << scratch_bytes
+                      << " token_bytes=" << scratch_plan.token_bytes
+                      << " qkv_bytes=" << scratch_plan.qkv_bytes
+                      << " attention_bytes=" << scratch_plan.attention_bytes
+                      << " context_bytes=" << scratch_plan.context_bytes
+                      << " ff_hidden_bytes=" << scratch_plan.ff_hidden_bytes
+                      << " logits_bytes=" << scratch_plan.logits_bytes
                       << "\n";
         }
     }

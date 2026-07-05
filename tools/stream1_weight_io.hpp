@@ -577,14 +577,34 @@ inline std::uint64_t transformer_attention_score_stride(const Stream1ModelConfig
     return static_cast<std::uint64_t>(model.seq_len) * row_stride + row_stride * model.head_dim;
 }
 
+struct TransformerScratchBytePlan {
+    std::uint64_t rows = 0;
+    std::uint64_t token_bytes = 0;
+    std::uint64_t qkv_bytes = 0;
+    std::uint64_t attention_bytes = 0;
+    std::uint64_t context_bytes = 0;
+    std::uint64_t ff_hidden_bytes = 0;
+    std::uint64_t logits_bytes = 0;
+
+    std::uint64_t total_bytes() const {
+        return token_bytes + qkv_bytes + attention_bytes + context_bytes + ff_hidden_bytes + logits_bytes;
+    }
+};
+
+inline TransformerScratchBytePlan transformer_scratch_byte_plan(const Stream1ModelConfig& model, std::uint64_t rows) {
+    TransformerScratchBytePlan plan;
+    plan.rows = rows;
+    plan.token_bytes = fp16_bytes(rows * model.seq_len * model.d_model);
+    plan.qkv_bytes = fp16_bytes(rows * model.seq_len * 3ULL * model.d_model);
+    plan.attention_bytes = fp16_bytes(rows * model.nhead * transformer_attention_score_stride(model));
+    plan.context_bytes = fp16_bytes(rows * model.seq_len * model.d_model);
+    plan.ff_hidden_bytes = fp16_bytes(rows * model.seq_len * model.ff_dim);
+    plan.logits_bytes = fp16_bytes(rows * model.output_dim);
+    return plan;
+}
+
 inline std::uint64_t transformer_scratch_bytes_for_rows(const Stream1ModelConfig& model, std::uint64_t rows) {
-    const std::uint64_t token_values = rows * model.seq_len * model.d_model;
-    const std::uint64_t qkv_values = rows * model.seq_len * 3ULL * model.d_model;
-    const std::uint64_t score_values = rows * model.nhead * transformer_attention_score_stride(model);
-    const std::uint64_t context_values = rows * model.seq_len * model.d_model;
-    const std::uint64_t ff_values = rows * model.seq_len * model.ff_dim;
-    const std::uint64_t logits_values = rows * model.output_dim;
-    return fp16_bytes(token_values + qkv_values + score_values + context_values + ff_values + logits_values);
+    return transformer_scratch_byte_plan(model, rows).total_bytes();
 }
 
 inline std::uint64_t stream1_scratch_bytes(
@@ -839,18 +859,13 @@ inline ScratchAllocation alloc_stream1_scratch(
             return scratch;
         }
         if (model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
-            const std::uint64_t token_values = rows * model.seq_len * model.d_model;
-            const std::uint64_t qkv_values = rows * model.seq_len * 3ULL * model.d_model;
-            const std::uint64_t score_values = rows * model.nhead * transformer_attention_score_stride(model);
-            const std::uint64_t context_values = rows * model.seq_len * model.d_model;
-            const std::uint64_t ff_values = rows * model.seq_len * model.ff_dim;
-            const std::uint64_t logits_values = rows * model.output_dim;
-            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_tokens, token_values * sizeof(half)));
-            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_qkv, qkv_values * sizeof(half)));
-            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_scores_probs, score_values * sizeof(half)));
-            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_context, context_values * sizeof(half)));
-            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_ff_hidden, ff_values * sizeof(half)));
-            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_logits, logits_values * sizeof(half)));
+            const TransformerScratchBytePlan plan = transformer_scratch_byte_plan(model, rows);
+            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_tokens, plan.token_bytes));
+            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_qkv, plan.qkv_bytes));
+            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_scores_probs, plan.attention_bytes));
+            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_context, plan.context_bytes));
+            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_ff_hidden, plan.ff_hidden_bytes));
+            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_logits, plan.logits_bytes));
             return scratch;
         }
         throw std::runtime_error("unsupported Stream1 backend in scratch allocation");
