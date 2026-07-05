@@ -118,7 +118,7 @@ Network rule:
 
 ## Megaminx Transformer Backend Benchmark
 
-Run this before a large 900M+ Megaminx solve on 8xA100 40GB. It benchmarks isolated Stream1 backends and short full-beam production runs for `native_cuda_graph` and `libtorch_eager`, then writes a best config env file.
+Run this before a large 900M+ Megaminx solve on 8xA100 40GB. The default job now benchmarks only Stream1 inference backends and writes the selected backend plus `BEAM_B_MICRO` / `BEAM_STREAM1_CONCURRENCY` to `logs/best_megaminx_transformer_stream1.env`. The rest of the 900M pipeline config stays the known 24-output MLP-style config: 32 shards, Stream3 ring 8, Stream4 batch 262144, Stream4 trigger 1048576, final chunk 98304, final exchange scale 2x, shard capacity scale 1x.
 
 Prepare the repo and scripts on `basis`:
 
@@ -138,24 +138,35 @@ bash -n mephi_8xa100_common.sh bench_8xa100_megaminx_transformer.sh start_8xa100
 chmod +x bench_8xa100_megaminx_transformer.sh start_8xa100_libtorch_megaminx.sh
 ```
 
-Submit the default benchmark:
+Submit Stream1-only backend/batch/concurrency benchmark:
 
 ```bash
 cd /mnt/pool/6/vokirova/beam8a100
 sbatch -p kaf12 bench_8xa100_megaminx_transformer.sh
 ```
 
-Default benchmark stages:
+Default Stream1 benchmark covers:
 
-- isolated single-GPU Stream1: `pytorch:eager`, `libtorch:eager`, `libtorch:cuda_graph`, `native_cutlass:graph`;
-- full 8-GPU smoke at `64M`, depth `12`, both production backends;
-- target full-loop sweep at `900M`, depth `8`, both production backends, `B_MICRO=8192 12288`, concurrency `8`.
+- `pytorch:eager` for reference timing only;
+- `libtorch:eager` and `libtorch:cuda_graph` over batches `4096,8192,12288,16384`;
+- `native_cutlass:graph` over `B_MICRO=4096 8192 12288 16384` and concurrency `4 8`.
 
-Useful expansion knobs:
+To benchmark Stream1 and immediately run one selected 900M depth-8 target pass in the same job:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100
+sbatch -p kaf12 \
+  --export=ALL,RUN_SELECTED_900M_AFTER_STREAM1=1,TARGET_DEPTH_LIMIT=8 \
+  bench_8xa100_megaminx_transformer.sh
+```
+
+The selected 900M pass changes only Stream1 backend, `BEAM_B_MICRO`, and `BEAM_STREAM1_CONCURRENCY`; all other pipeline parameters remain the 24-output 900M config.
+
+Optional Stream1 expansion knobs:
 
 ```bash
 sbatch -p kaf12 \
-  --export=ALL,TARGET_B_MICRO_SWEEP="4096 8192 12288 16384",TARGET_CONCURRENCY_SWEEP="4 8" \
+  --export=ALL,ISOLATED_BATCHES="4096,8192,12288,16384",ISOLATED_NATIVE_B_MICRO_SWEEP="8192 12288 16384",ISOLATED_NATIVE_CONCURRENCY_SWEEP="4 8" \
   bench_8xa100_megaminx_transformer.sh
 ```
 
@@ -164,20 +175,26 @@ Read benchmark results:
 ```bash
 squeue -u vokirova -o "%.18i %.9P %.40j %.8T %.10M %.10L %.20R"
 tail -n 200 /mnt/pool/6/vokirova/beam8a100/slurm-<job_id>.out
-column -t -s $'\t' /mnt/pool/6/vokirova/beam8a100/logs/tuning_<job_id>/megaminx_transformer_bench_<job_id>.tsv
 column -t -s $'\t' /mnt/pool/6/vokirova/beam8a100/logs/tuning_<job_id>/megaminx_transformer_stream1_isolated_<job_id>.tsv
+cat /mnt/pool/6/vokirova/beam8a100/logs/best_megaminx_transformer_stream1.env
+```
+
+If the selected 900M pass was enabled, also inspect:
+
+```bash
+column -t -s $'\t' /mnt/pool/6/vokirova/beam8a100/logs/tuning_<job_id>/megaminx_transformer_bench_<job_id>.tsv
 cat /mnt/pool/6/vokirova/beam8a100/logs/best_megaminx_transformer.env
 ```
 
-To launch with the benchmark-selected backend and parameters:
+To launch a real depth-120 solve with the selected Stream1 config:
 
 ```bash
 cd /mnt/pool/6/vokirova/beam8a100
-source logs/best_megaminx_transformer.env
+source logs/best_megaminx_transformer_stream1.env
 export DEPTH_LIMIT=120
+export BEAM_WIDTH=900000000
 sbatch -p kaf12 --export=ALL start_8xa100_libtorch_megaminx.sh
 ```
-
 ## Megaminx Vlad Transformer LibTorch Run
 
 Use this launcher for the explicit Megaminx `piece_transformer` path. It supports `MEGAMINX_STREAM1_BACKEND=libtorch_eager` and `MEGAMINX_STREAM1_BACKEND=native_cuda_graph`, and keeps the existing Stream2/3/4/5/finalization pipeline.

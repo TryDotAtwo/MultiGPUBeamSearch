@@ -43,13 +43,17 @@ TARGET_SHARD_COUNT_SWEEP="${TARGET_SHARD_COUNT_SWEEP:-32}"
 TARGET_FINAL_CHUNK_SWEEP="${TARGET_FINAL_CHUNK_SWEEP:-98304}"
 TARGET_SHARD_CAPACITY_SCALE_PPM="${TARGET_SHARD_CAPACITY_SCALE_PPM:-1000000}"
 
-ISOLATED_BATCHES="${ISOLATED_BATCHES:-4096,8192,12288}"
+ISOLATED_BATCHES="${ISOLATED_BATCHES:-4096,8192,12288,16384}"
+ISOLATED_NATIVE_B_MICRO_SWEEP="${ISOLATED_NATIVE_B_MICRO_SWEEP:-4096 8192 12288 16384}"
+ISOLATED_NATIVE_CONCURRENCY_SWEEP="${ISOLATED_NATIVE_CONCURRENCY_SWEEP:-4 8}"
 ISOLATED_WARMUP="${ISOLATED_WARMUP:-8}"
 ISOLATED_ITERS="${ISOLATED_ITERS:-25}"
 ISOLATED_PASSES="${ISOLATED_PASSES:-2}"
 RUN_ISOLATED_STREAM1="${RUN_ISOLATED_STREAM1:-1}"
-RUN_FULL_SMOKE="${RUN_FULL_SMOKE:-1}"
-RUN_TARGET_SWEEP="${RUN_TARGET_SWEEP:-1}"
+RUN_FULL_SMOKE="${RUN_FULL_SMOKE:-0}"
+SMOKE_BACKEND_SWEEP="${SMOKE_BACKEND_SWEEP:-native_cuda_graph libtorch_eager}"
+RUN_TARGET_SWEEP="${RUN_TARGET_SWEEP:-0}"
+RUN_SELECTED_900M_AFTER_STREAM1="${RUN_SELECTED_900M_AFTER_STREAM1:-0}"
 DEPTH_AVG_MIN="${DEPTH_AVG_MIN:-3}"
 
 MODEL_DIR="${MODEL_DIR:-${JOB_DIR}/models/megaminx_vlad_transformer}"
@@ -143,22 +147,28 @@ export BEAM_PREDICT_STATS_VERBOSE="${BEAM_PREDICT_STATS_VERBOSE:-1}"
 
 SUMMARY="${TUNING_DIR}/megaminx_transformer_bench_${SLURM_JOB_ID:-manual}.tsv"
 BEST_ENV="${LOG_DIR}/best_megaminx_transformer.env"
+BEST_STREAM1_ENV="${LOG_DIR}/best_megaminx_transformer_stream1.env"
 ISOLATED_SUMMARY="${TUNING_DIR}/megaminx_transformer_stream1_isolated_${SLURM_JOB_ID:-manual}.tsv"
 mkdir -p "${TUNING_DIR}"
-echo -e "stage\tbackend\tmode\tstatus\tbest_candidates_per_sec\tb_micro\tconcurrency\tbatch_csv\tlog" > "${ISOLATED_SUMMARY}"
+echo -e "stage\tbackend\tmode\tstatus\tbest_candidates_per_sec\tbest_batch\tb_micro\tconcurrency\tbatch_csv\tlog" > "${ISOLATED_SUMMARY}"
 echo -e "stage\tbackend\tstatus\tavg_depth_sec\tlast_depth\tmax_gpu_mem_mib\tmax_gpu_util_pct\tbeam_width\tdepth_limit\tshard_count\tb_micro\tconcurrency\tring_slots\tstream3_batch\tstream4_batch\tstream4_trigger\tfinal_chunk\tfinal_exchange_scale_ppm\tshard_capacity_scale_ppm\tshard_capacity\tlogical_shard\trunner\tlog" > "${SUMMARY}"
 
-parse_best_cps() {
+parse_best_cps_batch() {
   local log="$1"
   awk '
     /candidates_per_sec=/ {
-      cps="";
+      cps=""; batch="";
       for (i=1; i<=NF; ++i) {
         if ($i ~ /^candidates_per_sec=/) { split($i,a,"="); cps=a[2]; }
+        if ($i ~ /^batch=/) { split($i,a,"="); batch=a[2]; }
+        if ($i ~ /^b_micro=/) { split($i,a,"="); batch=a[2]; }
       }
-      if (cps != "" && cps+0 > best) { best=cps+0; }
+      if (cps != "" && cps+0 > best) { best=cps+0; best_batch=batch; }
     }
-    END { if (best > 0) printf "%.6f", best; else printf "NA"; }
+    END {
+      if (best > 0) printf "%.6f\t%s", best, (best_batch != "" ? best_batch : "NA");
+      else printf "NA\tNA";
+    }
   ' "${log}"
 }
 
@@ -225,9 +235,9 @@ run_isolated_backend() {
   if [ "${rc}" -ne 0 ]; then
     status="FAIL_${rc}"
   fi
-  local cps
-  cps="$(parse_best_cps "${log}")"
-  echo -e "isolated\t${backend}\t${mode}\t${status}\t${cps}\t${b_micro}\t${concurrency}\t${ISOLATED_BATCHES}\t${log}" >> "${ISOLATED_SUMMARY}"
+  local cps_batch
+  cps_batch="$(parse_best_cps_batch "${log}")"
+  echo -e "isolated\t${backend}\t${mode}\t${status}\t${cps_batch}\t${b_micro}\t${concurrency}\t${ISOLATED_BATCHES}\t${log}" >> "${ISOLATED_SUMMARY}"
 }
 
 set_backend_runner() {
@@ -285,7 +295,7 @@ run_full_config() {
     status="INVALID"
     cat "${TUNING_DIR}/${tag}.preflight" | tee "${log}"
     echo -e "${stage}\t${backend}\t${status}\tNA\t0\tNA\tNA\t${BEAM_WIDTH}\t${DEPTH_LIMIT}\t${SHARD_COUNT}\t${BEAM_B_MICRO}\t${BEAM_STREAM1_CONCURRENCY}\t${BEAM_STREAM3_RING_SLOTS}\t${STREAM3_BATCH_CANDIDATES}\t${STREAM4_BATCH_CANDIDATES}\t${STREAM4_TRIGGER_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM}\t${SHARD_CAPACITY_SCALE_PPM}\t${SHARD_CAPACITY_CANDIDATES}\t${LOGICAL_SHARD_SIZE}\t${BEAM_PRODUCTION_RUNNER_PATH}\t${log}" >> "${SUMMARY}"
-    return 1
+    return 0
   fi
 
   beam_safe_clear_history_contents
@@ -299,9 +309,9 @@ run_full_config() {
   beam_prepare_nccl_file "${tag}"
 
   echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY} log=${log}"
+  local rc=0
   set +e
-  beam_torchrun_production "${tag}" "${log}"
-  local rc=$?
+  beam_torchrun_production "${tag}" "${log}" || rc=$?
   set -e
   if [ "${rc}" -ne 0 ]; then
     status="FAIL_${rc}"
@@ -309,6 +319,40 @@ run_full_config() {
   avg_last="$(parse_avg_depth_sec "${log}")"
   gpu_max="$(parse_gpu_maxima "${gpu_log}")"
   echo -e "${stage}\t${backend}\t${status}\t${avg_last}\t${gpu_max}\t${BEAM_WIDTH}\t${DEPTH_LIMIT}\t${SHARD_COUNT}\t${BEAM_B_MICRO}\t${BEAM_STREAM1_CONCURRENCY}\t${BEAM_STREAM3_RING_SLOTS}\t${STREAM3_BATCH_CANDIDATES}\t${STREAM4_BATCH_CANDIDATES}\t${STREAM4_TRIGGER_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}\t${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM}\t${SHARD_CAPACITY_SCALE_PPM}\t${SHARD_CAPACITY_CANDIDATES}\t${LOGICAL_SHARD_SIZE}\t${BEAM_PRODUCTION_RUNNER_PATH}\t${log}" >> "${SUMMARY}"
+  return 0
+}
+
+write_best_stream1_env() {
+  awk -F'\t' -v default_concurrency="${TARGET_CONCURRENCY_SWEEP%% *}" '
+    NR == 1 { next }
+    $1 == "isolated" && $4 == "OK" && $5 != "NA" {
+      runner_backend=""; b=""; c="";
+      if ($2 == "native_cutlass" && $3 == "graph") {
+        runner_backend="native_cuda_graph"; b=$7; c=$8;
+      } else if ($2 == "libtorch" && $3 == "eager") {
+        runner_backend="libtorch_eager"; b=$6; c=default_concurrency;
+      } else {
+        next;
+      }
+      if (b == "" || b == "NA") { next; }
+      if (c == "" || c == "NA") { c=default_concurrency; }
+      if (best == "" || $5 + 0 > best + 0) {
+        best=$5; backend=runner_backend; bench_backend=$2; mode=$3; batch=$6; bmicro=b; concurrency=c; log=$10;
+      }
+    }
+    END {
+      if (best == "") { exit 1 }
+      print "export MEGAMINX_STREAM1_BACKEND=" backend;
+      print "export BEAM_B_MICRO=" bmicro;
+      print "export BEAM_STREAM1_CONCURRENCY=" concurrency;
+      print "export BEST_STREAM1_BACKEND_BENCH=" bench_backend;
+      print "export BEST_STREAM1_MODE=" mode;
+      print "export BEST_STREAM1_BATCH=" batch;
+      print "export BEST_STREAM1_CANDIDATES_PER_SEC=" best;
+      print "export BEST_STREAM1_SOURCE_LOG=" log;
+    }
+  ' "${ISOLATED_SUMMARY}" > "${BEST_STREAM1_ENV}.tmp" || return 1
+  mv "${BEST_STREAM1_ENV}.tmp" "${BEST_STREAM1_ENV}"
 }
 
 write_best_env() {
@@ -351,11 +395,33 @@ if [ "${RUN_ISOLATED_STREAM1}" = "1" ]; then
   run_isolated_backend pytorch eager
   run_isolated_backend libtorch eager
   run_isolated_backend libtorch cuda_graph
-  run_isolated_backend native_cutlass graph "${SMOKE_B_MICRO}" "${SMOKE_CONCURRENCY}"
+  for b_micro in ${ISOLATED_NATIVE_B_MICRO_SWEEP}; do
+    for concurrency in ${ISOLATED_NATIVE_CONCURRENCY_SWEEP}; do
+      run_isolated_backend native_cutlass graph "${b_micro}" "${concurrency}"
+    done
+  done
+  if write_best_stream1_env; then
+    echo "best_megaminx_transformer_stream1_env=${BEST_STREAM1_ENV}"
+    cat "${BEST_STREAM1_ENV}"
+  else
+    echo "best_megaminx_transformer_stream1_env=none"
+  fi
+fi
+
+if [ "${RUN_SELECTED_900M_AFTER_STREAM1}" = "1" ]; then
+  if [ ! -f "${BEST_STREAM1_ENV}" ]; then
+    echo "missing_best_stream1_env=${BEST_STREAM1_ENV}"
+    exit 2
+  fi
+  # shellcheck disable=SC1090
+  source "${BEST_STREAM1_ENV}"
+  echo "selected_900m_from_stream1_env=${BEST_STREAM1_ENV}"
+  echo "selected_900m_backend=${MEGAMINX_STREAM1_BACKEND} b_micro=${BEAM_B_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY}"
+  run_full_config target "${MEGAMINX_STREAM1_BACKEND}" "${TARGET_BEAM_WIDTH}" "${TARGET_DEPTH_LIMIT}" "${TARGET_SHARD_COUNT_SWEEP%% *}" "${BEAM_B_MICRO}" "${BEAM_STREAM1_CONCURRENCY}" "${TARGET_RING_SLOTS_SWEEP%% *}" "${TARGET_FINAL_CHUNK_SWEEP%% *}" "${TARGET_SHARD_CAPACITY_SCALE_PPM}"
 fi
 
 if [ "${RUN_FULL_SMOKE}" = "1" ]; then
-  for backend in native_cuda_graph libtorch_eager; do
+  for backend in ${SMOKE_BACKEND_SWEEP}; do
     run_full_config smoke "${backend}" "${SMOKE_BEAM_WIDTH}" "${SMOKE_DEPTH_LIMIT}" "${SMOKE_SHARD_COUNT}" "${SMOKE_B_MICRO}" "${SMOKE_CONCURRENCY}" "${BEAM_STREAM3_RING_SLOTS}" "${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}" "${SMOKE_SHARD_CAPACITY_SCALE_PPM}"
   done
 fi
