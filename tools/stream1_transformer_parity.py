@@ -17,7 +17,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -56,6 +56,31 @@ def parse_csv_ints(text: str) -> List[int]:
 
 def parse_pairs(line: str) -> Dict[str, str]:
     return {match.group("key"): match.group("value") for match in PAIR_RE.finditer(line)}
+
+
+def parse_backend_modes(text: str) -> List[Tuple[str, str]]:
+    specs: List[Tuple[str, str]] = []
+    for raw in text.split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        if ":" in raw:
+            backend, mode = raw.split(":", 1)
+            backend = backend.strip()
+            mode = mode.strip()
+        else:
+            backend = raw
+            mode = "eager"
+        if not backend or not mode:
+            raise ValueError(f"invalid backend mode spec: {raw!r}")
+        specs.append((backend, mode))
+    if not specs:
+        raise ValueError("--backends must contain at least one backend")
+    return specs
+
+
+def is_result_line(line: str, prefix: str) -> bool:
+    return line.startswith(prefix + " ")
 
 
 def make_args(
@@ -109,7 +134,7 @@ def run_backend(invocation: BackendInvocation, out_dir: Path) -> BackendRun:
     parsed: Dict[str, str] = {}
     prefix = ROW_PREFIXES[invocation.backend]
     for line in completed.stdout.splitlines():
-        if line.startswith(prefix):
+        if is_result_line(line, prefix):
             parsed = parse_pairs(line)
 
     checksum = int(parsed["checksum"]) if "checksum" in parsed else None
@@ -130,7 +155,7 @@ def run_backend(invocation: BackendInvocation, out_dir: Path) -> BackendRun:
     )
 
 
-def compare_runs(runs: List[BackendRun], tolerance: int) -> Dict[str, object]:
+def compare_runs(runs: List[BackendRun], tolerance: int, require_exact_digest: bool = False) -> Dict[str, object]:
     ok_runs = [run for run in runs if run.status == "ok"]
     if not ok_runs:
         return {"status": "failed", "reason": "no backend produced score keys", "comparisons": []}
@@ -153,7 +178,8 @@ def compare_runs(runs: List[BackendRun], tolerance: int) -> Dict[str, object]:
                 "reason": "missing score key digest",
             })
             continue
-        if run.score_key_digest != baseline.score_key_digest:
+        exact_digest_match = run.score_key_digest == baseline.score_key_digest
+        if require_exact_digest and not exact_digest_match:
             overall = "failed"
             comparisons.append({
                 "backend": run.backend,
@@ -186,11 +212,14 @@ def compare_runs(runs: List[BackendRun], tolerance: int) -> Dict[str, object]:
             "max_abs_first_row_diff": max_abs_diff,
             "checksum_delta": None if run.checksum is None or baseline.checksum is None else run.checksum - baseline.checksum,
             "score_key_digest": run.score_key_digest,
+            "baseline_score_key_digest": baseline.score_key_digest,
+            "exact_score_key_digest_match": exact_digest_match,
         })
     return {
         "status": overall,
         "baseline": {"backend": baseline.backend, "mode": baseline.mode},
         "tolerance": tolerance,
+        "require_exact_digest": require_exact_digest,
         "comparisons": comparisons,
     }
 
@@ -246,20 +275,24 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tolerance", type=int, default=3072)
     parser.add_argument("--out-dir", type=Path, default=Path("test_results/stream1_transformer_parity"))
     parser.add_argument("--dry-run", action="store_true", help="Write planned backend invocations without executing them.")
+    parser.add_argument(
+        "--require-exact-digest",
+        action="store_true",
+        help="Fail when full score_key_digest differs. By default digest is required and reported, but cross-backend pass/fail uses first-row score-key tolerance.",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = make_parser().parse_args(argv)
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    backend_names = [part.strip() for part in args.backends.split(",") if part.strip()]
-    unknown = [name for name in backend_names if name not in BACKENDS]
+    backend_modes = parse_backend_modes(args.backends)
+    unknown = [name for name, _ in backend_modes if name not in BACKENDS]
     if unknown:
         raise SystemExit(f"unknown backend(s): {','.join(unknown)}")
 
     runs: List[BackendRun] = []
-    for backend in backend_names:
-        mode = "eager"
+    for backend, mode in backend_modes:
         invocation = build_invocation(
             make_args(backend, mode, args.weight_dir, args.build_dir, args.device, args.batch, args.warmup, args.iters, args.out_dir)
         )
@@ -286,10 +319,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "status": "dry_run",
             "reason": "backend invocations generated without execution",
             "tolerance": args.tolerance,
+            "require_exact_digest": args.require_exact_digest,
             "backends": [{"backend": run.backend, "mode": run.mode} for run in runs],
         }
         if args.dry_run
-        else compare_runs(runs, args.tolerance)
+        else compare_runs(runs, args.tolerance, args.require_exact_digest)
     )
     write_reports(args.out_dir, runs, comparison)
     print(f"stream1_transformer_parity_status={comparison['status']}")

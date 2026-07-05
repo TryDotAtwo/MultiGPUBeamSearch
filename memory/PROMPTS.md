@@ -472,3 +472,4 @@
 ## 2026-07-05
 - User approved continuing the Stream1 piece-transformer backend plan: implement correctness parity and a unified benchmark/launcher layer for the explicit `pytorch`, `libtorch`, and `native_cutlass` backends, keep all three selectable for further development, preserve no-fallback/no-distillation policy, and do not disturb the MLP/default path.
 - User requested verifying that the current Stream1 transformer backend work is OK and then improving further. The selected improvement must stay within explicit backend verification/performance work, avoid fallback/distillation, and preserve the MLP/default path.
+- User approved continuing the Stream1 piece-transformer improvement pass after the branch was pushed: verify the current state, keep improving performance/correctness, preserve all three explicit backends, and keep MLP/default behavior separate.

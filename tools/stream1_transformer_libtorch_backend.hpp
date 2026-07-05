@@ -1,6 +1,7 @@
 #pragma once
 #include <ATen/ops/linear.h>
 #include <ATen/ops/scaled_dot_product_attention.h>
+#include <ATen/ops/silu.h>
 #include <torch/cuda.h>
 #include <torch/torch.h>
 
@@ -311,8 +312,7 @@ struct PieceTransformerLibTorch {
             x = x + linear_kxh(context, block.attn_out_weight_kxh, block.attn_out_bias);
 
             y = layer_norm(x, block.ln2_gamma, block.ln2_beta);
-            y = linear_kxh(y, block.ff1_weight_kxh, block.ff1_bias);
-            y = y * torch::sigmoid(y);
+            y = at::silu(linear_kxh(y, block.ff1_weight_kxh, block.ff1_bias));
             x = x + linear_kxh(y, block.ff2_weight_kxh, block.ff2_bias);
         }
         torch::Tensor cls = layer_norm(x.index({torch::indexing::Slice(), 0, torch::indexing::Slice()}), output_ln_gamma, output_ln_beta);

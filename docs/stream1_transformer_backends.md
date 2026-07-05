@@ -97,7 +97,7 @@ The private Kaggle package `kaggle_t4_transformer_backend_compare/` currently ru
 For strategy decisions, use the aggregate backend summary from that package. For production integration work, keep the three backend families independently selectable through the launcher above.
 ## Parity Gate
 
-Use `tools/stream1_transformer_parity.py` to compare selected backends on the same synthetic state batch. This gate is explicit backend comparison, not runtime fallback behavior. Real runs require a matching `score_key_digest`, a stable FNV-1a 64-bit digest over every quantized score key in batch-major, move-major order; `first_score_keys` remains a small readable sanity check.
+Use `tools/stream1_transformer_parity.py` to compare selected backends on the same synthetic state batch. This gate is explicit backend comparison, not runtime fallback behavior. Real runs require every backend to emit `score_key_digest`, a stable FNV-1a 64-bit digest over every quantized score key in batch-major, move-major order. Cross-backend pass/fail uses `first_score_keys` tolerance by default because PyTorch, LibTorch, and native CUTLASS can choose different valid FP16 kernel orders; add `--require-exact-digest` when comparing backend-family variants that must be bit-exact.
 
 Dry-run the parity plan without requiring weights or built binaries:
 
@@ -116,9 +116,10 @@ Run the parity gate after the three backend tools are available:
 python tools/stream1_transformer_parity.py \
   --weight-dir /path/to/stream1_transformer_weights_fp16 \
   --build-dir build-transformer \
-  --backends pytorch,libtorch,native_cutlass \
+  --backends pytorch,libtorch:cuda_graph,native_cutlass:graph \
   --batch 256 \
   --tolerance 3072
 ```
 
 The native CUTLASS parity path sets `BEAM_STREAM1_SYNTHETIC_STATES=1` so it uses the same deterministic arange-pattern state batch as the Torch/LibTorch benchmark paths.
+Backend entries accept `backend:mode`; a bare backend defaults to `eager`. Examples: `libtorch:cuda_graph`, `native_cutlass:graph`, and `pytorch`.

@@ -97,4 +97,9 @@ The three Stream1 `piece_transformer` backends now share a parity launcher contr
 `tools/stream1_transformer_parity.py` is the correctness gate for comparing explicit backends on one synthetic batch. It supports a dry-run mode for clean checkout validation and an execution mode for GPU hosts with exported weights and built backend binaries. This is only a verification layer; production dispatch still selects one backend explicitly and must not silently fall back.
 ## 2026-07-05 Score-Key Digest Gate
 
-The backend parity contract now includes `score_key_digest`, a deterministic FNV-1a 64-bit digest over all quantized score keys in batch-major, move-major order. The digest is emitted by the PyTorch benchmark, the C++ LibTorch benchmark, and the native CUTLASS transformer microbenchmark. Parity execution should treat digest mismatch as a hard correctness failure; checksum and first-row score keys are secondary diagnostics.
+The backend parity contract now includes `score_key_digest`, a deterministic FNV-1a 64-bit digest over all quantized score keys in batch-major, move-major order. The digest is emitted by the PyTorch benchmark, the C++ LibTorch benchmark, and the native CUTLASS transformer microbenchmark. The parity runner requires the digest to exist and reports exact digest agreement, but default cross-backend pass/fail uses first-row score-key tolerance because different FP16 projection kernels can shift quantized keys slightly. Use `--require-exact-digest` for strict bit-exact comparisons inside one backend family.
+## 2026-07-05 Backend Mode Parity Update
+
+`tools/stream1_transformer_parity.py` now accepts explicit backend modes in `backend:mode` form, so one run can compare `pytorch`, `libtorch:eager`, `libtorch:cuda_graph`, `native_cutlass:eager`, and `native_cutlass:graph`. The parser now only consumes true result rows, avoiding the previous `_report=` line collision in PyTorch logs.
+
+The C++ LibTorch FFN activation now calls `at::silu(...)` directly after the FF1 `at::linear` projection, matching the Python reference expression at the operator level while keeping the opt-in LibTorch target separate from default MLP/native builds.
