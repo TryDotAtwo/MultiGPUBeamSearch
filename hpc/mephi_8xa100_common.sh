@@ -110,6 +110,12 @@ beam_configure_build() {
   if [ -n "${BEAM_PUZZLE_INFO_JSON:-}" ]; then
     cmake_args+=(-DBEAM_PUZZLE_INFO_JSON="${BEAM_PUZZLE_INFO_JSON}")
   fi
+  if [ -n "${CMAKE_PREFIX_PATH:-}" ]; then
+    cmake_args+=(-DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}")
+  fi
+  if [ "${BEAM_ENABLE_LIBTORCH_STREAM1:-OFF}" = "ON" ]; then
+    cmake_args+=(-DBEAM_ENABLE_LIBTORCH_STREAM1=ON)
+  fi
   cmake "${cmake_args[@]}"
   cmake --build "${BUILD_DIR}" --target "${target}" -j "${SLURM_CPUS_PER_TASK:-8}"
 }
@@ -258,9 +264,11 @@ beam_torchrun_production() {
   export BEAM_RANK_LOG_DIR="${rank_log_dir}"
   echo "run_tag=${run_tag}"
   echo "run_log=${run_log}"
+  local runner_path="${BEAM_PRODUCTION_RUNNER_PATH:-${BUILD_DIR}/production_runner}"
   echo "rank_log_dir=${BEAM_RANK_LOG_DIR}"
   echo "beam_nccl_id_file=${BEAM_NCCL_ID_FILE}"
   echo "gpu_monitor_log=${gpu_log}"
+  echo "production_runner_path=${runner_path}"
   (
     while true; do
       date -Is
@@ -279,7 +287,7 @@ beam_torchrun_production() {
     --rdzv-id="beam8a100_${SLURM_JOB_ID:-manual}_${run_tag}" \
     --no-python \
     /bin/bash -lc 'if [ "${RANK:-0}" = "0" ]; then exec "$@"; else exec "$@" > "${BEAM_RANK_LOG_DIR}/rank${RANK}.log" 2>&1; fi' \
-    bash "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}" 2>&1 | tee "${run_log}"
+    bash "${runner_path}" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}" 2>&1 | tee "${run_log}"
   local torchrun_rc=${PIPESTATUS[0]}
   set -e
   if [ -n "${gpu_monitor_pid}" ]; then
@@ -296,6 +304,7 @@ beam_native_production() {
   local gpu_log="${TUNING_DIR}/nvidia_smi_${run_tag}.log"
   local gpu_monitor_pid=""
   local world_size="${WORLD_SIZE_EFFECTIVE:-${TORCHRUN_NPROC_PER_NODE:-8}}"
+  local runner_path="${BEAM_PRODUCTION_RUNNER_PATH:-${BUILD_DIR}/production_runner}"
   mkdir -p "${rank_log_dir}"
   export BEAM_RANK_LOG_DIR="${rank_log_dir}"
   echo "run_tag=${run_tag}"
@@ -305,6 +314,7 @@ beam_native_production() {
   echo "gpu_monitor_log=${gpu_log}"
   echo "production_launcher=native"
   echo "production_world_size=${world_size}"
+  echo "production_runner_path=${runner_path}"
   (
     while true; do
       date -Is
@@ -323,7 +333,7 @@ beam_native_production() {
         export LOCAL_RANK=0
         export WORLD_SIZE="${world_size}"
         export LOCAL_WORLD_SIZE="${world_size}"
-        exec "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
+        exec "${runner_path}" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
       ) 2>&1 | tee "${run_log}" &
       pids+=("$!")
     else
@@ -332,7 +342,7 @@ beam_native_production() {
         export LOCAL_RANK="${rank}"
         export WORLD_SIZE="${world_size}"
         export LOCAL_WORLD_SIZE="${world_size}"
-        exec "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
+        exec "${runner_path}" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
       ) > "${rank_log_dir}/rank${rank}.log" 2>&1 &
       pids+=("$!")
     fi

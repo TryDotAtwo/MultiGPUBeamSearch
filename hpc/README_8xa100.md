@@ -115,3 +115,74 @@ Network rule:
 - `start.sh` does not run `git clone`, `git fetch`, or `git reset` inside the
   compute job. Prepare `repo/` and `/mnt/pool/3/vokirova/cutlass` from the
   visible `basis` shell before `sbatch`.
+## Megaminx Vlad Transformer LibTorch Run
+
+Use this launcher for the explicit C++ LibTorch Stream1 `piece_transformer` path. It builds `production_runner_libtorch_stream1`, sets `BEAM_STREAM1_EXECUTOR=libtorch_eager`, and keeps the existing Stream2/3/4/5/finalization pipeline.
+
+Prepare the repo and scripts on `basis`:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100/repo
+git fetch origin codex/stream1-piece-transformer --depth 1
+git reset --hard FETCH_HEAD
+git log -1 --oneline
+
+cd /mnt/pool/6/vokirova/beam8a100
+cp repo/hpc/mephi_8xa100_common.sh .
+cp repo/hpc/start_8xa100_libtorch_megaminx.sh .
+sed -i 's/\r$//' mephi_8xa100_common.sh start_8xa100_libtorch_megaminx.sh
+bash -n mephi_8xa100_common.sh start_8xa100_libtorch_megaminx.sh
+chmod +x start_8xa100_libtorch_megaminx.sh
+```
+
+Weights must be prepared outside the compute payload. Either place exported weights at:
+
+```text
+/mnt/pool/6/vokirova/beam8a100/stream1_transformer_weights_fp16/manifest.json
+```
+
+or place Vlad's full Kaggle model dump under:
+
+```text
+/mnt/pool/6/vokirova/beam8a100/models/megaminx_vlad_transformer/
+```
+
+The dump must include the `.pth`, metadata/generator files, and the `pilgrim/model.py` source needed by `tools/export_stream1.py`.
+
+Submit a first 900M run, defaulting to puzzle `991` and depth `120`:
+
+```bash
+cd /mnt/pool/6/vokirova/beam8a100
+sbatch -p kaf12 start_8xa100_libtorch_megaminx.sh
+```
+
+Useful overrides:
+
+```bash
+sbatch -p kaf12 \
+  --export=ALL,PUZZLE_ID=991,DEPTH_LIMIT=120,BEAM_WIDTH=900000000 \
+  start_8xa100_libtorch_megaminx.sh
+```
+
+Default 8xA100-40GB config:
+
+- `BEAM_WIDTH=900000000`
+- `SHARD_COUNT=32`
+- `SHARD_CAPACITY_SCALE_PPM=1000000`
+- `STREAM4_BATCH_CANDIDATES=262144`
+- `STREAM4_TRIGGER_CANDIDATES=1048576`
+- `BEAM_B_MICRO=8192`
+- `BEAM_STREAM1_CONCURRENCY=8`
+- `BEAM_STREAM3_RING_SLOTS=8`
+- `BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES=98304`
+- `BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=2000000`
+
+Logs:
+
+```bash
+squeue -u vokirova -o "%.18i %.9P %.40j %.8T %.10M %.10L %.20R"
+tail -n 200 /mnt/pool/6/vokirova/beam8a100/slurm-<job_id>.out
+tail -f /mnt/pool/6/vokirova/beam8a100/logs/production_runner_libtorch_p991_d120_b900000000_<job_id>.log
+```
+
+The script writes `nvidia-smi` samples every five seconds under `logs/tuning_<job_id>/` and removes only the job build directory plus successful-run history, using the same guarded cleanup rules as the other MEPhI launchers.
