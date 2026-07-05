@@ -125,3 +125,10 @@ The production runner now has an explicit opt-in C++ LibTorch Stream1 path for e
 The LibTorch production path uses the dispatcher ring-slot hook as a named non-graph Stream1 executor. It skips native Stream1 weight upload/scratch and native ring-slot graph instantiation, writes quantized score keys into the existing score ring, then launches the existing Stream2 hash/goal kernel on the paired Stream2 lane. Stream3/Stream4/Stream5/finalization remain the normal production pipeline.
 
 This is not a fallback. If the binary is not built with LibTorch support, if the selected model is not `backend=piece_transformer`, if `BEAM_STREAM1_MODE=uniform` is requested, or if `output_dim != MOVE_COUNT`, the runner fails closed.
+## 2026-07-05 LibTorch Narrow State Slice
+
+The LibTorch token-build path now uses `narrow(1, 0, state_len)` for the logical state-byte slice instead of the generic `Slice()` indexing route. The change is intentionally small and stays inside the explicit LibTorch backend; MLP/default native builds remain Torch-free and unchanged.
+
+Kaggle 2xT4 LibTorch-only stability v12 completed on commit `7c25b2e`. Eager LibTorch at `batch=384` stayed the best production candidate: aggregate best `1535135.0` candidates/s and aggregate mean-best `1501530.7`, versus v11 `1497577.0` best and `1467441.7` mean-best. CUDA Graph remained functional but slower than eager: v12 graph best aggregate `1459206.0` and mean-best `1416463.0`.
+
+An in-place `addcmul_` token-build experiment was rejected: it passed small tests but failed real-weight CUDA Graph execution with an ATen device-side assert. Evidence: `test_results/stream1_libtorch_narrow_state_slice_2026-07-05.md`.

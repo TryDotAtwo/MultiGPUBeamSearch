@@ -99,7 +99,7 @@ The private Kaggle package `kaggle_t4_transformer_backend_compare/` currently ru
 For strategy decisions, use the aggregate backend summary from that package. For production integration work, keep the three backend families independently selectable through the launcher above.
 ## Current T4 Candidate
 
-Kaggle 2xT4 v11 repeated-pass stability confirmed explicit C++ LibTorch eager as the current exported-weight transformer candidate. With three passes per batch, `batch=384` was the mean-best point on both T4s: aggregate mean `1467441.7` candidates/s, about `1.032x` of the full-compare v5 original PyTorch `batch_process` reference. The best single v11 eager rows aggregated to `1497577.0` candidates/s. CUDA Graph capture works as an explicit benchmark mode, but it remained slower than eager: aggregate mean `1411365.0` candidates/s and best aggregate `1442113.0`.
+Kaggle 2xT4 v12 repeated-pass stability confirmed explicit C++ LibTorch eager as the current exported-weight transformer candidate. With three passes per batch, `batch=384` was the mean-best point on both T4s: aggregate mean-best `1501530.7` candidates/s, about `1.056x` of the full-compare v5 original PyTorch `batch_process` reference. The best single v12 eager rows aggregated to `1535135.0` candidates/s. CUDA Graph capture works as an explicit benchmark mode, but it remained slower than eager: aggregate mean-best `1416463.0` candidates/s and best aggregate `1459206.0`.
 
 Use repeated passes when tuning this backend because single rows are noisy on Kaggle T4:
 
@@ -113,7 +113,9 @@ python tools/stream1_transformer_backends.py \
   --passes 3
 ```
 
-This is a measured benchmark candidate, not a fallback route. Production integration should select `libtorch:eager` explicitly and fail loudly if LibTorch is unavailable.
+This is a measured benchmark candidate, not a fallback route. Production integration should select libtorch:eager explicitly and fail loudly if LibTorch is unavailable.
+
+The v12 result includes the `state_slice=narrow` token-build cleanup. A previous `addcmul_` in-place token accumulation attempt was rejected after real-weight CUDA Graph execution failed, so do not reintroduce that path without a separate bug explanation and graph-mode proof.
 ## Parity Gate
 
 Use `tools/stream1_transformer_parity.py` to compare selected backends on the same synthetic state batch. This gate is explicit backend comparison, not runtime fallback behavior. Real runs require every backend to emit `score_key_digest`, a stable FNV-1a 64-bit digest over every quantized score key in batch-major, move-major order. Cross-backend pass/fail uses `first_score_keys` tolerance by default because PyTorch, LibTorch, and native CUTLASS can choose different valid FP16 kernel orders; add `--require-exact-digest` when comparing backend-family variants that must be bit-exact.
