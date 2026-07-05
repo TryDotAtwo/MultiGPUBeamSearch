@@ -34,15 +34,16 @@ python tools/stream1_transformer_backends.py \
   --dry-run
 ```
 
-Dry-run a C++ LibTorch graph run:
+Dry-run the current measured C++ LibTorch T4 candidate:
 
 ```bash
 python tools/stream1_transformer_backends.py \
   --backend libtorch \
-  --mode cuda_graph \
+  --mode eager \
   --build-dir build-libtorch-stream1 \
   --weight-dir /path/to/stream1_transformer_weights_fp16 \
-  --batches 192,384 \
+  --batches 384 \
+  --passes 3 \
   --dry-run
 ```
 
@@ -95,6 +96,23 @@ The private Kaggle package `kaggle_t4_transformer_backend_compare/` currently ru
 - native CUTLASS eager/graph.
 
 For strategy decisions, use the aggregate backend summary from that package. For production integration work, keep the three backend families independently selectable through the launcher above.
+## Current T4 Candidate
+
+Kaggle 2xT4 v10 found the fastest exported-weight transformer path so far in explicit C++ LibTorch eager mode at `batch=384` on both T4s: aggregate `1534314.0` candidates/s, about `1.079x` of the full-compare v5 original PyTorch `batch_process` reference. CUDA Graph capture works as an explicit benchmark mode, but it was slower than eager in that run.
+
+Use repeated passes when tuning this backend because single rows are noisy on Kaggle T4:
+
+```bash
+python tools/stream1_transformer_backends.py \
+  --backend libtorch \
+  --mode eager \
+  --build-dir build-libtorch-stream1 \
+  --weight-dir /path/to/stream1_transformer_weights_fp16 \
+  --batches 384 \
+  --passes 3
+```
+
+This is a measured benchmark candidate, not a fallback route. Production integration should select `libtorch:eager` explicitly and fail loudly if LibTorch is unavailable.
 ## Parity Gate
 
 Use `tools/stream1_transformer_parity.py` to compare selected backends on the same synthetic state batch. This gate is explicit backend comparison, not runtime fallback behavior. Real runs require every backend to emit `score_key_digest`, a stable FNV-1a 64-bit digest over every quantized score key in batch-major, move-major order. Cross-backend pass/fail uses `first_score_keys` tolerance by default because PyTorch, LibTorch, and native CUTLASS can choose different valid FP16 kernel orders; add `--require-exact-digest` when comparing backend-family variants that must be bit-exact.

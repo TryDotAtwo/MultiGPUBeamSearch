@@ -103,3 +103,8 @@ The backend parity contract now includes `score_key_digest`, a deterministic FNV
 `tools/stream1_transformer_parity.py` now accepts explicit backend modes in `backend:mode` form, so one run can compare `pytorch`, `libtorch:eager`, `libtorch:cuda_graph`, `native_cutlass:eager`, and `native_cutlass:graph`. The parser now only consumes true result rows, avoiding the previous `_report=` line collision in PyTorch logs.
 
 The C++ LibTorch FFN activation now calls `at::silu(...)` directly after the FF1 `at::linear` projection, matching the Python reference expression at the operator level while keeping the opt-in LibTorch target separate from default MLP/native builds.
+## 2026-07-05 LibTorch T4 Candidate Update
+
+Kaggle 2xT4 LibTorch-only sweeps v8-v10 identified explicit C++ LibTorch eager as the current fastest exported-weight transformer path. The best v10 row was `batch=384` on both T4s, aggregate `1534314.0` candidates/s, about `1.079x` of the full backend compare v5 original PyTorch `batch_process` reference (`1421505.5`). CUDA Graph capture remains available as an explicit mode, but it was slower than eager in the v10 run.
+
+The next production integration should therefore be a named non-graph Stream1 LibTorch eager path, not an attempt to force LibTorch into the existing dispatcher CUDA graph templates. The path must remain explicit, fail closed when LibTorch is unavailable, and keep the MLP/default native paths Torch-free.

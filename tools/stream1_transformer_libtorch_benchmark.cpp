@@ -28,6 +28,7 @@ struct Args {
     std::vector<std::int64_t> batches{384, 512, 768, 1024};
     std::int64_t warmup = 10;
     std::int64_t iters = 50;
+    std::int64_t passes = 1;
     std::string device = "cuda:0";
     fs::path csv_path;
     bool cuda_graph = false;
@@ -51,6 +52,8 @@ Args parse_args(int argc, char** argv) {
             args.warmup = std::stoll(require_value("--warmup"));
         } else if (key == "--iters") {
             args.iters = std::stoll(require_value("--iters"));
+        } else if (key == "--passes") {
+            args.passes = std::stoll(require_value("--passes"));
         } else if (key == "--device") {
             args.device = require_value("--device");
         } else if (key == "--csv") {
@@ -72,6 +75,9 @@ Args parse_args(int argc, char** argv) {
     }
     if (args.warmup < 0 || args.iters <= 0) {
         throw std::runtime_error("--warmup must be >= 0 and --iters must be > 0");
+    }
+    if (args.passes <= 0) {
+        throw std::runtime_error("--passes must be > 0");
     }
     return args;
 }
@@ -198,7 +204,7 @@ int main(int argc, char** argv) {
         std::ofstream csv;
         if (!args.csv_path.empty()) {
             csv.open(args.csv_path, std::ios::out | std::ios::trunc);
-            csv << "mode,batch,iters,elapsed_ms,parents_per_sec,candidates_per_sec,device,dtype\n";
+            csv << "mode,pass,batch,iters,elapsed_ms,parents_per_sec,candidates_per_sec,device,dtype\n";
         }
 
         std::cout << "stream1_transformer_libtorch_backend=1"
@@ -213,38 +219,42 @@ int main(int argc, char** argv) {
                   << " transposed_linear_weights=1"
                   << "\n";
 
-        for (std::int64_t batch : args.batches) {
-            torch::Tensor states = beam::stream1_libtorch::make_states(batch, model.state_len, model.num_classes, device);
-            double elapsed_ms = 0.0;
-            torch::Tensor logits = args.cuda_graph
-                ? run_cuda_graph(model, states, args.warmup, args.iters, device, elapsed_ms)
-                : run_eager(model, states, args.warmup, args.iters, device, elapsed_ms);
-            const double parents_per_sec = (static_cast<double>(batch) * args.iters) / (elapsed_ms / 1000.0);
-            const double candidates_per_sec = parents_per_sec * model.move_count;
-            const torch::Tensor keys = beam::stream1_libtorch::score_keys(logits);
-            const auto checksum = keys.sum().item<std::int64_t>();
-            const std::uint64_t score_digest = score_key_digest(keys);
-            const std::string first_score_keys = format_first_score_keys(keys);
-            std::cout << "stream1_transformer_libtorch_micro"
-                      << " mode=" << mode
-                      << " batch=" << batch
-                      << " iters=" << args.iters
-                      << " elapsed_ms=" << elapsed_ms
-                      << " parents_per_sec=" << parents_per_sec
-                      << " candidates_per_sec=" << candidates_per_sec
-                      << " checksum=" << checksum
-                      << " score_key_digest=" << score_digest
-                      << " first_score_keys=" << first_score_keys
-                      << "\n";
-            if (csv) {
-                csv << mode << ','
-                    << batch << ','
-                    << args.iters << ','
-                    << elapsed_ms << ','
-                    << parents_per_sec << ','
-                    << candidates_per_sec << ','
-                    << device.str() << ','
-                    << model.dtype_suffix.substr(1) << '\n';
+        for (std::int64_t pass = 0; pass < args.passes; ++pass) {
+            for (std::int64_t batch : args.batches) {
+                torch::Tensor states = beam::stream1_libtorch::make_states(batch, model.state_len, model.num_classes, device);
+                double elapsed_ms = 0.0;
+                torch::Tensor logits = args.cuda_graph
+                    ? run_cuda_graph(model, states, args.warmup, args.iters, device, elapsed_ms)
+                    : run_eager(model, states, args.warmup, args.iters, device, elapsed_ms);
+                const double parents_per_sec = (static_cast<double>(batch) * args.iters) / (elapsed_ms / 1000.0);
+                const double candidates_per_sec = parents_per_sec * model.move_count;
+                const torch::Tensor keys = beam::stream1_libtorch::score_keys(logits);
+                const auto checksum = keys.sum().item<std::int64_t>();
+                const std::uint64_t score_digest = score_key_digest(keys);
+                const std::string first_score_keys = format_first_score_keys(keys);
+                std::cout << "stream1_transformer_libtorch_micro"
+                          << " mode=" << mode
+                          << " batch=" << batch
+                          << " iters=" << args.iters
+                          << " elapsed_ms=" << elapsed_ms
+                          << " parents_per_sec=" << parents_per_sec
+                          << " candidates_per_sec=" << candidates_per_sec
+                          << " checksum=" << checksum
+                          << " score_key_digest=" << score_digest
+                          << " first_score_keys=" << first_score_keys
+                          << " pass=" << pass
+                          << "\n";
+                if (csv) {
+                    csv << mode << ','
+                        << pass << ','
+                        << batch << ','
+                        << args.iters << ','
+                        << elapsed_ms << ','
+                        << parents_per_sec << ','
+                        << candidates_per_sec << ','
+                        << device.str() << ','
+                        << model.dtype_suffix.substr(1) << '\n';
+                }
             }
         }
         return 0;

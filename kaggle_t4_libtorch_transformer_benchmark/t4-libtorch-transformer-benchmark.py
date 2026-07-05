@@ -31,9 +31,10 @@ SUMMARY_JSON = WORK_DIR / "stream1_libtorch_transformer_summary.json"
 CUDA_ARCHITECTURES = "75"
 BENCH_GPUS = [0, 1]
 BENCH_MODES = ["eager", "cuda_graph"]
-BENCH_BATCHES = [64, 72, 80, 88, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768]
+BENCH_BATCHES = [80, 256, 320, 384, 448, 512, 640]
 BENCH_WARMUP = 20
 BENCH_ITERS = 100
+BENCH_PASSES = 3
 NSYS_ITERS = 20
 NSYS_WARMUP = 5
 PYTORCH_BATCH_PROCESS_PER_T4_REFERENCE = 710752.75
@@ -51,6 +52,10 @@ row_pattern = re.compile(
     r"candidates_per_sec=(?P<candidates>[0-9.eE+-]+)\s+"
     r"checksum=(?P<checksum>-?\d+)"
 )
+
+def parse_pass_index(line):
+    match = re.search(r"\spass=(\d+)", line)
+    return int(match.group(1)) if match else 0
 
 
 def run_checked(cmd, cwd=None, env=None):
@@ -184,6 +189,7 @@ def run_one_gpu(gpu: int, mode: str):
         "--batches", ",".join(str(x) for x in BENCH_BATCHES),
         "--warmup", str(BENCH_WARMUP),
         "--iters", str(BENCH_ITERS),
+        "--passes", str(BENCH_PASSES),
         "--csv", csv_path,
     ]
     if mode == "cuda_graph":
@@ -206,6 +212,7 @@ def run_one_gpu(gpu: int, mode: str):
                     "mode": group["mode"],
                     "gpu": gpu,
                     "batch": int(group["batch"]),
+                    "pass": parse_pass_index(line),
                     "iters": int(group["iters"]),
                     "elapsed_ms": float(group["elapsed"]),
                     "parents_per_sec": float(group["parents"]),
@@ -254,6 +261,28 @@ def maybe_run_nsys_profile(best_graph_row):
     print("NSYS_PROFILE_OUTPUT_BASE=", output_base, flush=True)
 
 
+
+def summarize_mean_rows(rows):
+    groups = {}
+    for row in rows:
+        key = (row["mode"], row["gpu"], row["batch"])
+        groups.setdefault(key, []).append(row)
+    summaries = []
+    for (mode, gpu, batch), values in sorted(groups.items()):
+        candidates = [float(row["candidates_per_sec"]) for row in values]
+        elapsed = [float(row["elapsed_ms"]) for row in values]
+        summaries.append({
+            "mode": mode,
+            "gpu": gpu,
+            "batch": batch,
+            "passes": len(values),
+            "mean_candidates_per_sec": sum(candidates) / len(candidates),
+            "best_candidates_per_sec": max(candidates),
+            "min_candidates_per_sec": min(candidates),
+            "mean_elapsed_ms": sum(elapsed) / len(elapsed),
+        })
+    return summaries
+
 def main():
     torch_cmake_prefix_path = preflight()
     checked_out_commit = prepare_repo_and_weights(torch_cmake_prefix_path)
@@ -262,7 +291,7 @@ def main():
         for gpu in BENCH_GPUS:
             all_rows.extend(run_one_gpu(gpu, mode))
     with ROWS_CSV.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["mode", "gpu", "batch", "iters", "elapsed_ms", "parents_per_sec", "candidates_per_sec", "checksum"])
+        writer = csv.DictWriter(fh, fieldnames=["mode", "gpu", "pass", "batch", "iters", "elapsed_ms", "parents_per_sec", "candidates_per_sec", "checksum"])
         writer.writeheader()
         writer.writerows(all_rows)
     best_by_mode_gpu = {}
@@ -277,6 +306,19 @@ def main():
             for (row_mode, _gpu), row in best_by_mode_gpu.items()
             if row_mode == mode
         )
+    mean_rows = summarize_mean_rows(all_rows)
+    best_mean_by_mode_gpu = {}
+    for row in mean_rows:
+        key = (row["mode"], row["gpu"])
+        if key not in best_mean_by_mode_gpu or row["mean_candidates_per_sec"] > best_mean_by_mode_gpu[key]["mean_candidates_per_sec"]:
+            best_mean_by_mode_gpu[key] = row
+    aggregate_mean_by_mode = {}
+    for mode in BENCH_MODES:
+        aggregate_mean_by_mode[mode] = sum(
+            row["mean_candidates_per_sec"]
+            for (row_mode, _gpu), row in best_mean_by_mode_gpu.items()
+            if row_mode == mode
+        )
     best_graph_row = None
     graph_rows = [row for (mode, _gpu), row in best_by_mode_gpu.items() if mode == "cuda_graph"]
     if graph_rows:
@@ -287,11 +329,18 @@ def main():
         "rows_csv": str(ROWS_CSV),
         "best_by_mode_gpu": {f"{mode}/gpu{gpu}": row for (mode, gpu), row in sorted(best_by_mode_gpu.items())},
         "aggregate_by_mode_candidates_per_sec": aggregate_by_mode,
+        "mean_by_mode_gpu_batch": mean_rows,
+        "best_mean_by_mode_gpu": {f"{mode}/gpu{gpu}": row for (mode, gpu), row in sorted(best_mean_by_mode_gpu.items())},
+        "aggregate_mean_by_mode_candidates_per_sec": aggregate_mean_by_mode,
         "pytorch_batch_process_per_t4_reference": PYTORCH_BATCH_PROCESS_PER_T4_REFERENCE,
         "pytorch_batch_process_2xt4_reference": PYTORCH_BATCH_PROCESS_2XT4_REFERENCE,
         "libtorch_over_pytorch_2xt4_by_mode": {
             mode: aggregate / PYTORCH_BATCH_PROCESS_2XT4_REFERENCE
             for mode, aggregate in aggregate_by_mode.items()
+        },
+        "libtorch_mean_over_pytorch_2xt4_by_mode": {
+            mode: aggregate / PYTORCH_BATCH_PROCESS_2XT4_REFERENCE
+            for mode, aggregate in aggregate_mean_by_mode.items()
         },
         "cuda_graph_over_eager": (
             aggregate_by_mode.get("cuda_graph", 0.0) / aggregate_by_mode.get("eager", 1.0)
@@ -307,6 +356,11 @@ def main():
     for mode, aggregate in sorted(aggregate_by_mode.items()):
         print("STREAM1_LIBTORCH_BEST_2XT4_AGG_CANDIDATES_PER_SEC", mode, aggregate, flush=True)
         print("STREAM1_LIBTORCH_OVER_PYTORCH_2XT4", mode, summary["libtorch_over_pytorch_2xt4_by_mode"][mode], flush=True)
+    for (mode, gpu), row in sorted(best_mean_by_mode_gpu.items()):
+        print("STREAM1_LIBTORCH_BEST_MEAN_MODE_GPU", mode, gpu, row, flush=True)
+    for mode, aggregate in sorted(aggregate_mean_by_mode.items()):
+        print("STREAM1_LIBTORCH_BEST_MEAN_2XT4_AGG_CANDIDATES_PER_SEC", mode, aggregate, flush=True)
+        print("STREAM1_LIBTORCH_MEAN_OVER_PYTORCH_2XT4", mode, summary["libtorch_mean_over_pytorch_2xt4_by_mode"][mode], flush=True)
     print("STREAM1_LIBTORCH_CUDA_GRAPH_OVER_EAGER=", summary["cuda_graph_over_eager"], flush=True)
     print("STREAM1_LIBTORCH_SUMMARY_JSON=", SUMMARY_JSON, flush=True)
 

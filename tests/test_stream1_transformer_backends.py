@@ -21,6 +21,7 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
             batches="128,256",
             warmup=1,
             iters=2,
+            passes=3,
             puzzle_id="991",
             b_micro=None,
             concurrency=None,
@@ -57,6 +58,8 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
         self.assertIn("stream1_transformer_libtorch_benchmark", command)
         self.assertIn("--cuda-graph", invocation.command)
         self.assertIn("--batches", invocation.command)
+        self.assertIn("--passes", invocation.command)
+        self.assertIn("3", invocation.command)
 
     def test_native_invocation_sets_native_environment(self) -> None:
         args = self.base_args("native_cutlass", "graph")

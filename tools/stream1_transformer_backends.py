@@ -149,6 +149,8 @@ def build_invocation(args: argparse.Namespace) -> BackendInvocation:
             str(args.warmup),
             "--iters",
             str(args.iters),
+            "--passes",
+            str(args.passes),
             "--device",
             args.device,
             "--csv",
@@ -228,6 +230,7 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--synthetic-states", action="store_true", help="Use synthetic arange-pattern states for native CUTLASS parity runs.")
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--iters", type=int, default=50)
+    parser.add_argument("--passes", type=int, default=1, help="Number of repeated LibTorch benchmark passes per batch.")
     parser.add_argument("--puzzle-id", default="991", help="Puzzle id passed to native stream_benchmark.")
     parser.add_argument("--b-micro", help="Optional native CUTLASS B_MICRO filter.")
     parser.add_argument("--concurrency", help="Optional native CUTLASS concurrency filter.")
