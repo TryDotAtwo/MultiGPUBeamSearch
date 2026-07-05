@@ -25,15 +25,22 @@ FNV64_PRIME = 1099511628211
 FNV64_MASK = (1 << 64) - 1
 
 
-def parse_batch_sizes(text: str) -> List[int]:
+def parse_positive_ints(text: str, label: str) -> List[int]:
     values = []
     for part in text.split(","):
         part = part.strip()
         if part:
-            values.append(int(part))
+            value = int(part)
+            if value <= 0:
+                raise ValueError(f"{label} values must be positive")
+            values.append(value)
     if not values:
-        raise ValueError("at least one batch size is required")
+        raise ValueError(f"at least one {label} value is required")
     return values
+
+
+def parse_batch_sizes(text: str) -> List[int]:
+    return parse_positive_ints(text, "batch size")
 
 
 def product(shape: Iterable[int]) -> int:
@@ -247,21 +254,24 @@ def make_states(batch: int, state_len: int, num_classes: int, device: torch.devi
 def benchmark_batch(
     model: PieceTransformerTorch,
     batch: int,
+    concurrency: int,
     warmup: int,
     iters: int,
 ) -> Dict[str, object]:
-    states = make_states(batch, model.state_len, model.num_classes, model.device)
+    states_group = [make_states(batch, model.state_len, model.num_classes, model.device) for _ in range(concurrency)]
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats(model.device)
     with torch.inference_mode():
         for _ in range(warmup):
-            logits = model.forward(states)
+            for states in states_group:
+                logits = model.forward(states)
         torch.cuda.synchronize(model.device)
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         start.record()
         for _ in range(iters):
-            logits = model.forward(states)
+            for states in states_group:
+                logits = model.forward(states)
         end.record()
         torch.cuda.synchronize(model.device)
     elapsed_ms = float(start.elapsed_time(end))
@@ -270,11 +280,14 @@ def benchmark_batch(
     score_digest = score_key_digest(keys)
     first_score_keys = ",".join(str(int(x)) for x in keys[0].detach().cpu().tolist()) if batch > 0 else ""
     del logits
-    parents_per_s = (batch * iters) / (elapsed_ms / 1000.0)
+    rows_per_launch_group = batch * concurrency
+    parents_per_s = (rows_per_launch_group * iters) / (elapsed_ms / 1000.0)
     candidates_per_s = parents_per_s * model.move_count
     peak_gib = torch.cuda.max_memory_allocated(model.device) / (1024.0**3)
     return {
         "batch": batch,
+        "concurrency": concurrency,
+        "rows_per_launch_group": rows_per_launch_group,
         "iters": iters,
         "elapsed_ms": elapsed_ms,
         "ms_per_iter": elapsed_ms / iters,
@@ -301,23 +314,25 @@ def write_report(path: Path, rows: List[Dict[str, object]], metadata: Dict[str, 
         f"- reference_rows={metadata['reference_rows']}",
         f"- reference_max_abs_score_key_error={metadata['reference_max_abs_score_key_error']}",
         "",
-        "| batch | iters | ms/iter | parents/s | candidates/s | peak GiB | checksum | score_key_digest | status |",
-        "|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        "| batch | concurrency | rows/group | iters | ms/iter | parents/s | candidates/s | peak GiB | checksum | score_key_digest | status |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in rows:
         if row.get("status") == "ok":
             lines.append(
-                "| {batch} | {iters} | {ms_per_iter:.4f} | {parents_per_s:.1f} | {candidates_per_s:.1f} | {peak_mem_gib:.3f} | {checksum} | {score_key_digest} | ok |".format(
+                "| {batch} | {concurrency} | {rows_per_launch_group} | {iters} | {ms_per_iter:.4f} | {parents_per_s:.1f} | {candidates_per_s:.1f} | {peak_mem_gib:.3f} | {checksum} | {score_key_digest} | ok |".format(
                     **row
                 )
             )
         else:
-            lines.append(f"| {row['batch']} | - | - | - | - | - | - | - | {row['status']} |")
+            lines.append(f"| {row['batch']} | {row.get('concurrency', '-')} | - | - | - | - | - | - | - | - | {row['status']} |")
     if best is not None:
         lines.extend(
             [
                 "",
                 f"best_batch={best['batch']}",
+                f"best_concurrency={best['concurrency']}",
+                f"best_rows_per_launch_group={best['rows_per_launch_group']}",
                 f"best_candidates_per_s={float(best['candidates_per_s']):.1f}",
             ]
         )
@@ -330,6 +345,7 @@ def main() -> None:
     parser.add_argument("--weight-dir", type=Path, default=Path("test_results/stream1_transformer_reference/weights_fp16"))
     parser.add_argument("--reference-json", type=Path, default=Path("test_results/stream1_transformer_reference/reference.json"))
     parser.add_argument("--batch-sizes", default="128,256,512,1024,2048,4096")
+    parser.add_argument("--concurrency", default="1")
     parser.add_argument("--warmup", type=int, default=8)
     parser.add_argument("--iters", type=int, default=30)
     parser.add_argument("--reference-tolerance", type=int, default=3072)
@@ -352,25 +368,28 @@ def main() -> None:
 
     rows: List[Dict[str, object]] = []
     for batch in parse_batch_sizes(args.batch_sizes):
-        try:
-            row = benchmark_batch(model, batch, args.warmup, args.iters)
-        except RuntimeError as exc:
-            torch.cuda.empty_cache()
-            rows.append({"batch": batch, "status": type(exc).__name__ + ": " + str(exc).splitlines()[0][:160]})
-            continue
-        rows.append(row)
-        print(
-            "torch_stream1_transformer"
-            f" batch={row['batch']}"
-            f" ms_per_iter={row['ms_per_iter']:.4f}"
-            f" parents_per_s={row['parents_per_s']:.1f}"
-            f" candidates_per_s={row['candidates_per_s']:.1f}"
-            f" peak_mem_gib={row['peak_mem_gib']:.3f}"
-            f" checksum={row['checksum']}"
-            f" score_key_digest={row['score_key_digest']}"
-            f" first_score_keys={row['first_score_keys']}",
-            flush=True,
-        )
+        for concurrency in parse_positive_ints(args.concurrency, "concurrency"):
+            try:
+                row = benchmark_batch(model, batch, concurrency, args.warmup, args.iters)
+            except RuntimeError as exc:
+                torch.cuda.empty_cache()
+                rows.append({"batch": batch, "concurrency": concurrency, "status": type(exc).__name__ + ": " + str(exc).splitlines()[0][:160]})
+                continue
+            rows.append(row)
+            print(
+                "torch_stream1_transformer"
+                f" batch={row['batch']}"
+                f" concurrency={row['concurrency']}"
+                f" rows_per_launch_group={row['rows_per_launch_group']}"
+                f" ms_per_iter={row['ms_per_iter']:.4f}"
+                f" parents_per_s={row['parents_per_s']:.1f}"
+                f" candidates_per_s={row['candidates_per_s']:.1f}"
+                f" peak_mem_gib={row['peak_mem_gib']:.3f}"
+                f" checksum={row['checksum']}"
+                f" score_key_digest={row['score_key_digest']}"
+                f" first_score_keys={row['first_score_keys']}",
+                flush=True,
+            )
 
     metadata = {
         "torch_version": torch.__version__,
@@ -383,7 +402,7 @@ def main() -> None:
     }
     write_report(args.report, rows, metadata)
     with args.report.with_suffix(".tsv").open("w", newline="", encoding="utf-8") as fh:
-        fieldnames = ["batch", "iters", "elapsed_ms", "ms_per_iter", "parents_per_s", "candidates_per_s", "peak_mem_gib", "checksum", "score_key_digest", "first_score_keys", "status"]
+        fieldnames = ["batch", "concurrency", "rows_per_launch_group", "iters", "elapsed_ms", "ms_per_iter", "parents_per_s", "candidates_per_s", "peak_mem_gib", "checksum", "score_key_digest", "first_score_keys", "status"]
         writer = csv.DictWriter(fh, fieldnames=fieldnames, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)

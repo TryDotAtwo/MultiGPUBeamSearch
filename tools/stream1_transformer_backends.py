@@ -122,6 +122,8 @@ def build_invocation(args: argparse.Namespace) -> BackendInvocation:
             str(weight_dir),
             "--batch-sizes",
             args.batches,
+            "--concurrency",
+            args.concurrency or "1",
             "--warmup",
             str(args.warmup),
             "--iters",
@@ -145,6 +147,8 @@ def build_invocation(args: argparse.Namespace) -> BackendInvocation:
             str(weight_dir),
             "--batches",
             args.batches,
+            "--concurrency",
+            args.concurrency or "1",
             "--warmup",
             str(args.warmup),
             "--iters",
@@ -225,6 +229,7 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--build-dir", default="build", help="CMake build directory for C++ backends.")
     parser.add_argument("--device", default="cuda:0", help="Torch/LibTorch device string.")
     parser.add_argument("--batches", default="384,512,768,1024", help="CSV batch sizes for PyTorch/LibTorch.")
+    parser.add_argument("--concurrency", default="1", help="CSV concurrency values for PyTorch/LibTorch, or a single native CUTLASS concurrency filter.")
     parser.add_argument("--reference-json", help="Optional PyTorch reference JSON path.")
     parser.add_argument("--require-reference", action="store_true", help="Require PyTorch reference validation instead of adding --skip-reference.")
     parser.add_argument("--synthetic-states", action="store_true", help="Use synthetic arange-pattern states for native CUTLASS parity runs.")
@@ -233,7 +238,6 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--passes", type=int, default=1, help="Number of repeated LibTorch benchmark passes per batch.")
     parser.add_argument("--puzzle-id", default="991", help="Puzzle id passed to native stream_benchmark.")
     parser.add_argument("--b-micro", help="Optional native CUTLASS B_MICRO filter.")
-    parser.add_argument("--concurrency", help="Optional native CUTLASS concurrency filter.")
     parser.add_argument("--report", help="Report path for PyTorch/native CUTLASS backends.")
     parser.add_argument("--csv", help="CSV path for LibTorch backend.")
     parser.add_argument("--dry-run", action="store_true", help="Print selected command/env without executing.")

@@ -484,3 +484,4 @@
 - User clarified the MEPhI target is 8xA100 40GB and requested benchmarking Stream1 backends plus beam-search parameters before launching a large Megaminx transformer solve around 900M. Requirements: run through sbatch on kaf12, compare production backends on equal configs, record memory/speed/failures, and produce a best env for the later solve.
 ## 2026-07-06
 - User clarified the MEPhI Megaminx transformer benchmark order: first test only Stream1 inference backends and choose backend plus `B_MICRO`/concurrency from measured throughput; then run 900M using the same 24-output MLP-style pipeline parameters as before, changing only the selected Stream1 backend, `BEAM_B_MICRO`, and `BEAM_STREAM1_CONCURRENCY`.
+- User required full MEPhI Stream1 transformer benchmarking across all three backend families, with `B_MICRO=512 1024 2048 4096 8192 12288 16384` and concurrency `1 2 4 8`, instead of only running the full grid for native CUTLASS.

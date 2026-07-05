@@ -145,11 +145,13 @@ cd /mnt/pool/6/vokirova/beam8a100
 sbatch -p kaf12 bench_8xa100_megaminx_transformer.sh
 ```
 
-Default Stream1 benchmark covers:
+Default Stream1 benchmark covers the full requested grid for all explicit backend families:
 
-- `pytorch:eager` for reference timing only;
-- `libtorch:eager` and `libtorch:cuda_graph` over batches `4096,8192,12288,16384`;
-- `native_cutlass:graph` over `B_MICRO=4096 8192 12288 16384` and concurrency `4 8`.
+- `B_MICRO` / per-inference batch: `512 1024 2048 4096 8192 12288 16384`;
+- concurrency / inference calls per card in one measured group: `1 2 4 8`;
+- backend modes: `pytorch:eager`, `libtorch:eager`, `libtorch:cuda_graph`, and `native_cutlass:graph`.
+
+For PyTorch and LibTorch, `B_MICRO` is passed as the benchmark batch size so all rows share the same `batch x concurrency` contract as native CUTLASS. PyTorch remains a reference timing backend and is not selected for production runner output; `best_megaminx_transformer_stream1.env` selects among production-capable `native_cuda_graph` and `libtorch_eager` rows.
 
 To benchmark Stream1 and immediately run one selected 900M depth-8 target pass in the same job:
 
@@ -162,11 +164,11 @@ sbatch -p kaf12 \
 
 The selected 900M pass changes only Stream1 backend, `BEAM_B_MICRO`, and `BEAM_STREAM1_CONCURRENCY`; all other pipeline parameters remain the 24-output 900M config.
 
-Optional Stream1 expansion knobs:
+Optional Stream1 grid knobs:
 
 ```bash
 sbatch -p kaf12 \
-  --export=ALL,ISOLATED_BATCH_LIST="4096 8192 12288 16384",ISOLATED_NATIVE_B_MICRO_SWEEP="8192 12288 16384",ISOLATED_NATIVE_CONCURRENCY_SWEEP="4 8" \
+  --export=ALL,ISOLATED_B_MICRO_SWEEP="512 1024 2048 4096 8192 12288 16384",ISOLATED_CONCURRENCY_SWEEP="1 2 4 8" \
   bench_8xa100_megaminx_transformer.sh
 ```
 

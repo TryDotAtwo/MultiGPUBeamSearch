@@ -40,7 +40,9 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
         self.assertEqual(rows["native_cutlass"]["modes"], ["eager", "graph"])
 
     def test_pytorch_invocation_uses_python_torch_tool(self) -> None:
-        invocation = build_invocation(self.base_args("pytorch"))
+        args = self.base_args("pytorch")
+        args.concurrency = "4"
+        invocation = build_invocation(args)
         self.assertEqual(invocation.backend, "pytorch")
         self.assertEqual(invocation.mode, "eager")
         command = list(invocation.command)
@@ -49,9 +51,13 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
         self.assertIn("--weight-dir", command)
         self.assertIn("weights_fp16", command)
         self.assertIn("--skip-reference", command)
+        self.assertIn("--concurrency", command)
+        self.assertIn("4", command)
 
     def test_libtorch_invocation_uses_opt_in_cpp_tool(self) -> None:
-        invocation = build_invocation(self.base_args("libtorch", "cuda_graph"))
+        args = self.base_args("libtorch", "cuda_graph")
+        args.concurrency = "8"
+        invocation = build_invocation(args)
         self.assertEqual(invocation.backend, "libtorch")
         self.assertEqual(invocation.mode, "cuda_graph")
         command = " ".join(invocation.command)
@@ -60,6 +66,8 @@ class Stream1TransformerBackendRegistryTests(unittest.TestCase):
         self.assertIn("--batches", invocation.command)
         self.assertIn("--passes", invocation.command)
         self.assertIn("3", invocation.command)
+        self.assertIn("--concurrency", invocation.command)
+        self.assertIn("8", invocation.command)
 
     def test_native_invocation_sets_native_environment(self) -> None:
         args = self.base_args("native_cutlass", "graph")

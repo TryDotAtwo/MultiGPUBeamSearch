@@ -43,10 +43,10 @@ TARGET_SHARD_COUNT_SWEEP="${TARGET_SHARD_COUNT_SWEEP:-32}"
 TARGET_FINAL_CHUNK_SWEEP="${TARGET_FINAL_CHUNK_SWEEP:-98304}"
 TARGET_SHARD_CAPACITY_SCALE_PPM="${TARGET_SHARD_CAPACITY_SCALE_PPM:-1000000}"
 
-ISOLATED_BATCH_LIST="${ISOLATED_BATCH_LIST:-4096 8192 12288 16384}"
+ISOLATED_B_MICRO_SWEEP="${ISOLATED_B_MICRO_SWEEP:-${ISOLATED_BATCH_LIST:-${ISOLATED_NATIVE_B_MICRO_SWEEP:-512 1024 2048 4096 8192 12288 16384}}}"
+ISOLATED_CONCURRENCY_SWEEP="${ISOLATED_CONCURRENCY_SWEEP:-${ISOLATED_NATIVE_CONCURRENCY_SWEEP:-1 2 4 8}}"
+ISOLATED_BATCH_LIST="${ISOLATED_BATCH_LIST:-${ISOLATED_B_MICRO_SWEEP}}"
 ISOLATED_BATCHES="${ISOLATED_BATCHES:-${ISOLATED_BATCH_LIST// /,}}"
-ISOLATED_NATIVE_B_MICRO_SWEEP="${ISOLATED_NATIVE_B_MICRO_SWEEP:-4096 8192 12288 16384}"
-ISOLATED_NATIVE_CONCURRENCY_SWEEP="${ISOLATED_NATIVE_CONCURRENCY_SWEEP:-4 8}"
 ISOLATED_WARMUP="${ISOLATED_WARMUP:-8}"
 ISOLATED_ITERS="${ISOLATED_ITERS:-25}"
 ISOLATED_PASSES="${ISOLATED_PASSES:-2}"
@@ -157,7 +157,7 @@ echo -e "stage\tbackend\tstatus\tavg_depth_sec\tlast_depth\tmax_gpu_mem_mib\tmax
 parse_best_cps_batch() {
   local log="$1"
   awk '
-    /candidates_per_sec=/ {
+    /candidates_per_sec=|candidates_per_s=/ {
       cps=""; batch="";
       for (i=1; i<=NF; ++i) {
         if ($i ~ /^candidates_per_sec=/ || $i ~ /^candidates_per_s=/) { split($i,a,"="); cps=a[2]; }
@@ -215,20 +215,31 @@ run_isolated_backend() {
   local mode="$2"
   local b_micro="${3:-NA}"
   local concurrency="${4:-NA}"
+  local batch_csv="${5:-}"
+  if [ -z "${batch_csv}" ]; then
+    if [ "${b_micro}" != "NA" ]; then
+      batch_csv="${b_micro}"
+    else
+      batch_csv="${ISOLATED_BATCHES}"
+    fi
+  fi
   local tag="isolated_${backend}_${mode}_b${b_micro}_c${concurrency}"
   local log="${TUNING_DIR}/${tag}.log"
   local status="OK"
   local rc=0
-  local cmd=("${NINJA_VENV_DIR}/bin/python" "${REPO_DIR}/tools/stream1_transformer_backends.py" --backend "${backend}" --mode "${mode}" --weight-dir "${BEAM_WEIGHT_DIR}" --build-dir "${BUILD_DIR}" --batches "${ISOLATED_BATCHES}" --warmup "${ISOLATED_WARMUP}" --iters "${ISOLATED_ITERS}" --passes "${ISOLATED_PASSES}" --device cuda:0)
+  local cmd=("${NINJA_VENV_DIR}/bin/python" "${REPO_DIR}/tools/stream1_transformer_backends.py" --backend "${backend}" --mode "${mode}" --weight-dir "${BEAM_WEIGHT_DIR}" --build-dir "${BUILD_DIR}" --batches "${batch_csv}" --warmup "${ISOLATED_WARMUP}" --iters "${ISOLATED_ITERS}" --passes "${ISOLATED_PASSES}" --device cuda:0)
+  if [ "${concurrency}" != "NA" ]; then
+    cmd+=(--concurrency "${concurrency}")
+  fi
   if [ "${backend}" = "libtorch" ]; then
     cmd+=(--csv "${TUNING_DIR}/${tag}.csv")
   else
     cmd+=(--report "${TUNING_DIR}/${tag}.md")
   fi
   if [ "${backend}" = "native_cutlass" ]; then
-    cmd+=(--b-micro "${b_micro}" --concurrency "${concurrency}" --synthetic-states)
+    cmd+=(--b-micro "${b_micro}" --synthetic-states)
   fi
-  echo "isolated_start backend=${backend} mode=${mode} b_micro=${b_micro} concurrency=${concurrency} log=${log}"
+  echo "isolated_start backend=${backend} mode=${mode} b_micro=${b_micro} concurrency=${concurrency} batches=${batch_csv} log=${log}"
   set +e
   "${cmd[@]}" 2>&1 | tee "${log}"
   rc=${PIPESTATUS[0]}
@@ -238,9 +249,8 @@ run_isolated_backend() {
   fi
   local cps_batch
   cps_batch="$(parse_best_cps_batch "${log}")"
-  echo -e "isolated\t${backend}\t${mode}\t${status}\t${cps_batch}\t${b_micro}\t${concurrency}\t${ISOLATED_BATCHES}\t${log}" >> "${ISOLATED_SUMMARY}"
+  echo -e "isolated\t${backend}\t${mode}\t${status}\t${cps_batch}\t${b_micro}\t${concurrency}\t${batch_csv}\t${log}" >> "${ISOLATED_SUMMARY}"
 }
-
 set_backend_runner() {
   local backend="$1"
   case "${backend}" in
@@ -331,7 +341,7 @@ write_best_stream1_env() {
       if ($2 == "native_cutlass" && $3 == "graph") {
         runner_backend="native_cuda_graph"; b=$7; c=$8;
       } else if ($2 == "libtorch" && $3 == "eager") {
-        runner_backend="libtorch_eager"; b=$6; c=default_concurrency;
+        runner_backend="libtorch_eager"; b=$7; c=$8;
       } else {
         next;
       }
@@ -393,11 +403,11 @@ echo "torch_cmake_prefix=${CMAKE_PREFIX_PATH}"
 echo "torch_lib_dir=${TORCH_LIB_DIR}"
 
 if [ "${RUN_ISOLATED_STREAM1}" = "1" ]; then
-  run_isolated_backend pytorch eager
-  run_isolated_backend libtorch eager
-  run_isolated_backend libtorch cuda_graph
-  for b_micro in ${ISOLATED_NATIVE_B_MICRO_SWEEP}; do
-    for concurrency in ${ISOLATED_NATIVE_CONCURRENCY_SWEEP}; do
+  for b_micro in ${ISOLATED_B_MICRO_SWEEP}; do
+    for concurrency in ${ISOLATED_CONCURRENCY_SWEEP}; do
+      run_isolated_backend pytorch eager "${b_micro}" "${concurrency}"
+      run_isolated_backend libtorch eager "${b_micro}" "${concurrency}"
+      run_isolated_backend libtorch cuda_graph "${b_micro}" "${concurrency}"
       run_isolated_backend native_cutlass graph "${b_micro}" "${concurrency}"
     done
   done
