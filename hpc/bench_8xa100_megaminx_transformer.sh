@@ -43,7 +43,8 @@ TARGET_SHARD_COUNT_SWEEP="${TARGET_SHARD_COUNT_SWEEP:-32}"
 TARGET_FINAL_CHUNK_SWEEP="${TARGET_FINAL_CHUNK_SWEEP:-98304}"
 TARGET_SHARD_CAPACITY_SCALE_PPM="${TARGET_SHARD_CAPACITY_SCALE_PPM:-1000000}"
 
-ISOLATED_BATCHES="${ISOLATED_BATCHES:-4096,8192,12288,16384}"
+ISOLATED_BATCH_LIST="${ISOLATED_BATCH_LIST:-4096 8192 12288 16384}"
+ISOLATED_BATCHES="${ISOLATED_BATCHES:-${ISOLATED_BATCH_LIST// /,}}"
 ISOLATED_NATIVE_B_MICRO_SWEEP="${ISOLATED_NATIVE_B_MICRO_SWEEP:-4096 8192 12288 16384}"
 ISOLATED_NATIVE_CONCURRENCY_SWEEP="${ISOLATED_NATIVE_CONCURRENCY_SWEEP:-4 8}"
 ISOLATED_WARMUP="${ISOLATED_WARMUP:-8}"
@@ -159,7 +160,7 @@ parse_best_cps_batch() {
     /candidates_per_sec=/ {
       cps=""; batch="";
       for (i=1; i<=NF; ++i) {
-        if ($i ~ /^candidates_per_sec=/) { split($i,a,"="); cps=a[2]; }
+        if ($i ~ /^candidates_per_sec=/ || $i ~ /^candidates_per_s=/) { split($i,a,"="); cps=a[2]; }
         if ($i ~ /^batch=/) { split($i,a,"="); batch=a[2]; }
         if ($i ~ /^b_micro=/) { split($i,a,"="); batch=a[2]; }
       }
@@ -337,7 +338,7 @@ write_best_stream1_env() {
       if (b == "" || b == "NA") { next; }
       if (c == "" || c == "NA") { c=default_concurrency; }
       if (best == "" || $5 + 0 > best + 0) {
-        best=$5; backend=runner_backend; bench_backend=$2; mode=$3; batch=$6; bmicro=b; concurrency=c; log=$10;
+        best=$5; backend=runner_backend; bench_backend=$2; mode=$3; batch=$6; bmicro=b; concurrency=c; source_log=$10;
       }
     }
     END {
@@ -349,7 +350,7 @@ write_best_stream1_env() {
       print "export BEST_STREAM1_MODE=" mode;
       print "export BEST_STREAM1_BATCH=" batch;
       print "export BEST_STREAM1_CANDIDATES_PER_SEC=" best;
-      print "export BEST_STREAM1_SOURCE_LOG=" log;
+      print "export BEST_STREAM1_SOURCE_LOG=" source_log;
     }
   ' "${ISOLATED_SUMMARY}" > "${BEST_STREAM1_ENV}.tmp" || return 1
   mv "${BEST_STREAM1_ENV}.tmp" "${BEST_STREAM1_ENV}"
@@ -361,7 +362,7 @@ write_best_env() {
     $1 == "target" && $3 == "OK" && $4 != "NA" {
       if (best == "" || $4 + 0 < best + 0) {
         best=$4; backend=$2; beam=$8; depth=$9; shard=$10; b=$11; c=$12; ring=$13;
-        s3=$14; s4=$15; trig=$16; fc=$17; fs=$18; scale=$19; cap=$20; logical=$21; runner=$22; log=$23;
+        s3=$14; s4=$15; trig=$16; fc=$17; fs=$18; scale=$19; cap=$20; logical=$21; runner=$22; source_log=$23;
       }
     }
     END {
@@ -378,7 +379,7 @@ write_best_env() {
       print "export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=" fs;
       print "export SHARD_CAPACITY_SCALE_PPM=" scale;
       print "export BEST_MEGAMINX_AVG_DEPTH_SEC=" best;
-      print "export BEST_MEGAMINX_SOURCE_LOG=" log;
+      print "export BEST_MEGAMINX_SOURCE_LOG=" source_log;
     }
   ' "${SUMMARY}" > "${BEST_ENV}.tmp" || return 1
   mv "${BEST_ENV}.tmp" "${BEST_ENV}"
