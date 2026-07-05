@@ -13,7 +13,7 @@ import time
 
 GITHUB_REPO_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
 GITHUB_BRANCH = "codex/stream1-piece-transformer"
-EXPECTED_COMMIT_PREFIX = os.environ.get("EXPECTED_COMMIT_PREFIX", "")
+EXPECTED_COMMIT_PREFIX = os.environ.get("EXPECTED_COMMIT_PREFIX", "1c069c5")
 KAGGLE_MODEL_SOURCE = "vladkuznetsov266/megaminx-qtransformer-1782210824/PyTorch/default/1"
 MODEL_SOURCE_SLUG = "megaminx-qtransformer-1782210824"
 MODEL_ARTIFACT_NAME = "megaminx_qtransformer_1782210824_e99997"
@@ -65,8 +65,10 @@ native_row_pattern = re.compile(
     r"rows_per_launch_group=(?P<rows>\d+)\s+"
     r"ms_per_launch_group=(?P<ms>[0-9.eE+-]+)\s+"
     r"parents_per_sec=(?P<parents>[0-9.eE+-]+)\s+"
-    r"candidates_per_sec=(?P<candidates>[0-9.eE+-]+)\s+"
-    r"scratch_bytes=(?P<scratch>\d+)"
+    r"candidates_per_sec=(?P<candidates>[0-9.eE+-]+)"
+    r"(?:\s+checksum=(?P<checksum>-?\d+))?"
+    r"(?:\s+score_key_digest=(?P<score_key_digest>\d+))?"
+    r".*?\s+scratch_bytes=(?P<scratch>\d+)"
 )
 
 child_row_pattern = re.compile(r"BACKEND_COMPARE_CHILD_ROW\s+(?P<pairs>.+)$")
@@ -510,6 +512,8 @@ def run_native(gpu: int, mode: str) -> list[dict[str, object]]:
                         "parents_per_sec": float(values["parents"]),
                         "candidates_per_sec": float(values["candidates"]),
                         "scratch_bytes": int(values["scratch"]),
+                        "checksum": int(values["checksum"]) if values.get("checksum") else None,
+                        "score_key_digest": values.get("score_key_digest", ""),
                         "source": "stream_benchmark",
                     }
                 )
@@ -555,6 +559,7 @@ def write_outputs(rows: list[dict[str, object]], started: float) -> None:
         "peak_mem_gib",
         "scratch_bytes",
         "checksum",
+        "score_key_digest",
         "source",
     ]
     with ROWS_CSV.open("w", newline="", encoding="utf-8") as fh:
