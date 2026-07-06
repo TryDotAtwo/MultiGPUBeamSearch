@@ -18,10 +18,21 @@ source "${BEAM_COMMON_SH}"
 
 beam_setup_paths
 
-ORIGINAL_PUZZLE_ID="${PUZZLE_ID:-0}"
+ORIGINAL_PUZZLE_ID="${PUZZLE_ID:-${SLURM_ARRAY_TASK_ID:-0}}"
 DEPTH_LIMIT="${DEPTH_LIMIT:-80}"
-BEAM_WIDTH="${BEAM_WIDTH:-700000000}"
+BEAM_WIDTH="${BEAM_WIDTH:-900000000}"
 SYNTHETIC_PUZZLE_ID="${SYNTHETIC_PUZZLE_ID:-$((9000000 + ORIGINAL_PUZZLE_ID))}"
+MEGAMINX_STREAM1_BACKEND="${MEGAMINX_STREAM1_BACKEND:-${BEAM_STREAM1_EXECUTOR:-native_cuda_graph}}"
+
+MODEL_DIR="${MODEL_DIR:-${JOB_DIR}/models/megaminx_vlad_transformer}"
+REPO_WEIGHT_DIR="${REPO_DIR}/weights/megaminx_vlad_transformer_fp16"
+if [ -z "${BEAM_WEIGHT_DIR:-}" ]; then
+  if [ -f "${REPO_WEIGHT_DIR}/manifest.json" ]; then
+    BEAM_WEIGHT_DIR="${REPO_WEIGHT_DIR}"
+  else
+    BEAM_WEIGHT_DIR="${JOB_DIR}/stream1_transformer_weights_fp16"
+  fi
+fi
 
 BEST_CONFIG_ENV="${BEST_CONFIG_ENV:-/dev/null}"
 if [ -f "${BEST_CONFIG_ENV}" ]; then
@@ -72,6 +83,78 @@ cleanup() {
 }
 trap cleanup EXIT
 
+find_transformer_checkpoint() {
+  if [ -n "${BEAM_TRANSFORMER_PTH:-}" ]; then
+    printf '%s\n' "${BEAM_TRANSFORMER_PTH}"
+    return 0
+  fi
+  if [ -d "${MODEL_DIR}" ]; then
+    find "${MODEL_DIR}" -maxdepth 5 -type f \( -name '*.pth' -o -name '*.pt' \) | sort | head -n 1
+  fi
+}
+
+prepare_stream1_weights() {
+  if [ -f "${BEAM_WEIGHT_DIR}/manifest.json" ]; then
+    echo "using_existing_weight_dir=${BEAM_WEIGHT_DIR}"
+    return 0
+  fi
+  local checkpoint
+  checkpoint="$(find_transformer_checkpoint || true)"
+  if [ -z "${checkpoint}" ] || [ ! -f "${checkpoint}" ]; then
+    echo "missing_stream1_weights=${BEAM_WEIGHT_DIR}/manifest.json"
+    echo "missing_transformer_checkpoint=${MODEL_DIR}/*.pth"
+    return 2
+  fi
+  echo "export_transformer_checkpoint=${checkpoint}"
+  rm -rf -- "${BEAM_WEIGHT_DIR}.tmp"
+  mkdir -p "${BEAM_WEIGHT_DIR}.tmp"
+  "${NINJA_VENV_DIR}/bin/python" "${REPO_DIR}/tools/export_stream1.py" \
+    --weights "${checkpoint}" \
+    --out "${BEAM_WEIGHT_DIR}.tmp" \
+    --dtype fp16 \
+    --format piece-transformer
+  rm -rf -- "${BEAM_WEIGHT_DIR}"
+  mv "${BEAM_WEIGHT_DIR}.tmp" "${BEAM_WEIGHT_DIR}"
+  echo "exported_weight_dir=${BEAM_WEIGHT_DIR}"
+}
+
+configure_stream1_runner() {
+  case "${MEGAMINX_STREAM1_BACKEND}" in
+    libtorch_eager)
+      export BEAM_ENABLE_LIBTORCH_STREAM1=ON
+      if [ -z "${CMAKE_PREFIX_PATH:-}" ]; then
+        CMAKE_PREFIX_PATH="$("${NINJA_VENV_DIR}/bin/python" - <<'PY'
+import torch
+print(torch.utils.cmake_prefix_path)
+PY
+)"
+        export CMAKE_PREFIX_PATH
+      fi
+      TORCH_LIB_DIR="$("${NINJA_VENV_DIR}/bin/python" - <<'PY'
+from pathlib import Path
+import torch
+print(Path(torch.__file__).resolve().parent / "lib")
+PY
+)"
+      export LD_LIBRARY_PATH="${TORCH_LIB_DIR}:$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
+      beam_configure_build production_runner_libtorch_stream1
+      export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner_libtorch_stream1"
+      export BEAM_STREAM1_EXECUTOR=libtorch_eager
+      ;;
+    native_cuda_graph|cuda_graph)
+      export BEAM_ENABLE_LIBTORCH_STREAM1=OFF
+      export LD_LIBRARY_PATH="$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
+      beam_configure_build production_runner
+      export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner"
+      export BEAM_STREAM1_EXECUTOR=native_cuda_graph
+      ;;
+    *)
+      echo "invalid_megaminx_stream1_backend=${MEGAMINX_STREAM1_BACKEND}"
+      echo "allowed_megaminx_stream1_backend=libtorch_eager,native_cuda_graph"
+      exit 2
+      ;;
+  esac
+}
 extract_solution_line() {
   local puzzle_id="$1"
   local run_log="$2"
@@ -216,9 +299,16 @@ PY
 }
 
 beam_preflight
-beam_configure_build production_runner
+prepare_stream1_weights
+configure_stream1_runner
+export BEAM_WEIGHT_DIR
 beam_derive_shard_capacity
 beam_validate_manual_config
+
+if [ "${BEAM_STREAM1_EXECUTOR}" = "libtorch_eager" ] && [ "${STREAM1_OUTPUT_DIM}" -ne "${BEAM_MOVE_COUNT_EFFECTIVE}" ]; then
+  echo "invalid_libtorch_output_dim=${STREAM1_OUTPUT_DIM} move_count=${BEAM_MOVE_COUNT_EFFECTIVE}"
+  exit 2
+fi
 
 echo "original_puzzle_id=${ORIGINAL_PUZZLE_ID}"
 echo "synthetic_puzzle_id=${SYNTHETIC_PUZZLE_ID}"
@@ -226,6 +316,9 @@ echo "beam_width=${BEAM_WIDTH}"
 echo "global_beam_width_effective=${GLOBAL_BEAM_WIDTH_EFFECTIVE}"
 echo "local_beam_width=${LOCAL_BEAM_WIDTH}"
 echo "shard_count=${SHARD_COUNT}"
+echo "megaminx_stream1_backend=${MEGAMINX_STREAM1_BACKEND}"
+echo "stream1_executor=${BEAM_STREAM1_EXECUTOR}"
+echo "stream1_weight_dir=${BEAM_WEIGHT_DIR}"
 echo "stream1_output_dim=${STREAM1_OUTPUT_DIM}"
 echo "beam_b_micro_row_budget=${BEAM_B_MICRO}"
 echo "beam_parent_batch_effective=${BEAM_PARENT_BATCH_EFFECTIVE}"

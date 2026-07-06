@@ -485,3 +485,4 @@
 ## 2026-07-06
 - User clarified the MEPhI Megaminx transformer benchmark order: first test only Stream1 inference backends and choose backend plus `B_MICRO`/concurrency from measured throughput; then run 900M using the same 24-output MLP-style pipeline parameters as before, changing only the selected Stream1 backend, `BEAM_B_MICRO`, and `BEAM_STREAM1_CONCURRENCY`.
 - User required full MEPhI Stream1 transformer benchmarking across all three backend families, with `B_MICRO=512 1024 2048 4096 8192 12288 16384` and concurrency `1 2 4 8`, instead of only running the full grid for native CUTLASS.
+- User selected the measured best Megaminx transformer Stream1 config `native_cutlass graph`, `B_MICRO=512`, `concurrency=2`, requested a 900M test on puzzle 990, then original+reflected runs for puzzles 990 through 1000 if the test is clean.
