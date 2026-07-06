@@ -1769,7 +1769,8 @@ DepthDispatchState run_depth_cuda_graphs(
     std::uint64_t frontier_size,
     GeneratedTrackRequest track_request,
     const DispatcherCollective* collective,
-    const DispatcherRingSlotLauncher* ring_slot_launcher) {
+    const DispatcherRingSlotLauncher* ring_slot_launcher,
+    DepthDispatchStopStage stop_stage) {
     NvtxRange range("Dispatcher_depth_cuda_graphs");
 #if !BEAM_DEBUG_PATH_TRACE
     track_request = {};
@@ -1791,6 +1792,9 @@ DepthDispatchState run_depth_cuda_graphs(
     }
     if (track_request.enabled && track_request.move >= MOVE_COUNT) {
         throw std::invalid_argument("generated track request move exceeds MOVE_COUNT");
+    }
+    if (stop_stage != DepthDispatchStopStage::Full && plan.config.world_size != 1U) {
+        throw std::invalid_argument("dispatcher stop-stage smoke modes are single-process only");
     }
     const bool multi_rank = plan.config.world_size > 1U;
     if (multi_rank && (collective == nullptr || collective->comm == nullptr)) {
@@ -3716,6 +3720,9 @@ DepthDispatchState run_depth_cuda_graphs(
             return false;
         }
         if (!multi_rank && !stream3_has_writable_buffer()) {
+            if (stop_stage != DepthDispatchStopStage::Full) {
+                throw std::runtime_error("dispatcher stop-stage smoke hit Stream3 shard backpressure; increase BEAM_SHARD_CAPACITY_CANDIDATES or reduce BEAM_PIPELINE_SMOKE_RINGS");
+            }
             stream3_build_ready_shard_queue_cuda(
                 memory.streams.clean_count,
                 memory.streams.dirty_count,
@@ -3877,6 +3884,52 @@ DepthDispatchState run_depth_cuda_graphs(
     };
 
     check_cuda(cudaMemset(memory.streams.fatal_error_flag, 0, sizeof(std::uint32_t)), "cudaMemset stream fatal flag");
+
+    if (stop_stage == DepthDispatchStopStage::AfterStream12) {
+        launch_free_rings();
+        while (state.frontier_cursor < frontier_size || !stream1_running_rings.empty() || !stream3_ready_rings.empty()) {
+            bool progressed = release_completed_rings_nonblocking();
+            progressed = discard_ready_rings_after_stop() || progressed;
+            progressed = launch_free_rings() || progressed;
+            if (!progressed) {
+                if (!stream1_running_rings.empty()) {
+                    wait_oldest_ring();
+                    discard_ready_rings_after_stop();
+                } else {
+                    std::this_thread::yield();
+                }
+            }
+        }
+        throw_if_stream_fatal_error("after_stream12_stop_stage");
+        state.depth_drained = true;
+        return state;
+    }
+
+    if (stop_stage == DepthDispatchStopStage::AfterStream3) {
+        launch_free_rings();
+        while (state.frontier_cursor < frontier_size || any_active_ring() || stream3_active || !stream3_ready_rings.empty()) {
+            bool progressed = release_completed_rings_nonblocking();
+            progressed = release_stream3_nonblocking() || progressed;
+            progressed = launch_free_rings() || progressed;
+            progressed = try_launch_stream3() || progressed;
+            if (!progressed) {
+                if (stream3_active) {
+                    wait_stream3();
+                } else if (!stream1_running_rings.empty()) {
+                    wait_oldest_ring();
+                } else if (!stream3_ready_rings.empty()) {
+                    if (!try_launch_stream3()) {
+                        throw std::runtime_error("dispatcher stop-stage Stream3 queue could not launch despite ready rings");
+                    }
+                } else {
+                    std::this_thread::yield();
+                }
+            }
+        }
+        throw_if_stream_fatal_error("after_stream3_stop_stage");
+        state.depth_drained = true;
+        return state;
+    }
     launch_free_rings();
     while ((!state.stop_requested && state.frontier_cursor < frontier_size) ||
         any_active_ring() ||

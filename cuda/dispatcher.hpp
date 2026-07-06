@@ -82,6 +82,12 @@ struct DispatcherCollective {
     ncclComm_t comm = nullptr;
 };
 
+enum class DepthDispatchStopStage : std::uint8_t {
+    Full = 0,
+    AfterStream12 = 1,
+    AfterStream3 = 2,
+};
+
 struct DispatcherRingSlotLaunchContext {
     std::uint32_t job = UINT32_MAX;
     std::uint32_t ring = UINT32_MAX;
@@ -316,7 +322,8 @@ DepthDispatchState run_depth_cuda_graphs(
     std::uint64_t frontier_size,
     GeneratedTrackRequest track_request = {},
     const DispatcherCollective* collective = nullptr,
-    const DispatcherRingSlotLauncher* ring_slot_launcher = nullptr);
+    const DispatcherRingSlotLauncher* ring_slot_launcher = nullptr,
+    DepthDispatchStopStage stop_stage = DepthDispatchStopStage::Full);
 
 FinalizeDepthState finalize_depth_single_gpu(
     const StaticMemoryPlan& plan,

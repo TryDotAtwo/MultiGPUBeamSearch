@@ -55,6 +55,13 @@ RUN_FULL_SMOKE="${RUN_FULL_SMOKE:-0}"
 SMOKE_BACKEND_SWEEP="${SMOKE_BACKEND_SWEEP:-native_cuda_graph libtorch_eager}"
 RUN_TARGET_SWEEP="${RUN_TARGET_SWEEP:-0}"
 RUN_SELECTED_900M_AFTER_STREAM1="${RUN_SELECTED_900M_AFTER_STREAM1:-0}"
+RUN_PIPELINE_SMOKE="${RUN_PIPELINE_SMOKE:-0}"
+PIPELINE_SMOKE_MODES="${PIPELINE_SMOKE_MODES:-stream12 stream123}"
+PIPELINE_GRAPH_WINDOW_SWEEP="${PIPELINE_GRAPH_WINDOW_SWEEP:-16 32 64}"
+PIPELINE_B_MICRO_SWEEP="${PIPELINE_B_MICRO_SWEEP:-512}"
+PIPELINE_CONCURRENCY_SWEEP="${PIPELINE_CONCURRENCY_SWEEP:-2}"
+PIPELINE_SMOKE_RINGS="${PIPELINE_SMOKE_RINGS:-32}"
+PIPELINE_SHARD_COUNT="${PIPELINE_SHARD_COUNT:-32}"
 DEPTH_AVG_MIN="${DEPTH_AVG_MIN:-3}"
 
 MODEL_DIR="${MODEL_DIR:-${JOB_DIR}/models/megaminx_vlad_transformer}"
@@ -139,6 +146,7 @@ export LD_LIBRARY_PATH="${TORCH_LIB_DIR}:$(dirname "${NCCL_LIBRARY}"):${LD_LIBRA
 prepare_transformer_weights
 
 beam_configure_build stream_benchmark
+beam_configure_build stream_pipeline_benchmark
 beam_configure_build stream1_transformer_libtorch_benchmark
 beam_configure_build production_runner
 beam_configure_build production_runner_libtorch_stream1
@@ -150,8 +158,10 @@ SUMMARY="${TUNING_DIR}/megaminx_transformer_bench_${SLURM_JOB_ID:-manual}.tsv"
 BEST_ENV="${LOG_DIR}/best_megaminx_transformer.env"
 BEST_STREAM1_ENV="${LOG_DIR}/best_megaminx_transformer_stream1.env"
 ISOLATED_SUMMARY="${TUNING_DIR}/megaminx_transformer_stream1_isolated_${SLURM_JOB_ID:-manual}.tsv"
+PIPELINE_SUMMARY="${TUNING_DIR}/megaminx_transformer_pipeline_smoke_${SLURM_JOB_ID:-manual}.tsv"
 mkdir -p "${TUNING_DIR}"
 echo -e "stage\tbackend\tmode\tstatus\tbest_candidates_per_sec\tbest_batch\tb_micro\tconcurrency\tbatch_csv\tlog" > "${ISOLATED_SUMMARY}"
+echo -e "mode\twindow\tb_micro\tconcurrency\tring_slots\tstream3_batch\tgraph_window_jobs\tphysical_jobs\tcandidates_per_sec\tdepth_like_ms\tstatus\tlog" > "${PIPELINE_SUMMARY}"
 echo -e "stage\tbackend\tstatus\tavg_depth_sec\tlast_depth\tmax_gpu_mem_mib\tmax_gpu_util_pct\tbeam_width\tdepth_limit\tshard_count\tb_micro\tconcurrency\tring_slots\tstream3_batch\tstream4_batch\tstream4_trigger\tfinal_chunk\tfinal_exchange_scale_ppm\tshard_capacity_scale_ppm\tshard_capacity\tlogical_shard\trunner\tlog" > "${SUMMARY}"
 
 parse_best_cps_batch() {
@@ -250,6 +260,62 @@ run_isolated_backend() {
   local cps_batch
   cps_batch="$(parse_best_cps_batch "${log}")"
   echo -e "isolated\t${backend}\t${mode}\t${status}\t${cps_batch}\t${b_micro}\t${concurrency}\t${batch_csv}\t${log}" >> "${ISOLATED_SUMMARY}"
+}
+parse_pipeline_smoke_result() {
+  local log="$1"
+  awk '
+    /stream_pipeline_benchmark/ {
+      for (i=1; i<=NF; ++i) {
+        split($i, a, "=");
+        if (a[1] == "ring_slots") ring_slots=a[2];
+        if (a[1] == "stream3_batch") stream3_batch=a[2];
+        if (a[1] == "graph_window_jobs") graph_window_jobs=a[2];
+        if (a[1] == "physical_jobs") physical_jobs=a[2];
+        if (a[1] == "candidates_per_sec") cps=a[2];
+        if (a[1] == "depth_like_ms") ms=a[2];
+      }
+    }
+    END {
+      if (cps == "") cps="NA";
+      if (ms == "") ms="NA";
+      if (ring_slots == "") ring_slots="NA";
+      if (stream3_batch == "") stream3_batch="NA";
+      if (graph_window_jobs == "") graph_window_jobs="NA";
+      if (physical_jobs == "") physical_jobs="NA";
+      printf "%s\t%s\t%s\t%s\t%s\t%s", ring_slots, stream3_batch, graph_window_jobs, physical_jobs, cps, ms;
+    }
+  ' "${log}"
+}
+
+run_pipeline_smoke_config() {
+  local mode="$1"
+  local window="$2"
+  local b_micro="$3"
+  local concurrency="$4"
+  local tag="pipeline_${mode}_w${window}_b${b_micro}_c${concurrency}"
+  local log="${TUNING_DIR}/${tag}.log"
+  local status="OK"
+  local rc=0
+
+  echo "pipeline_smoke_start mode=${mode} window=${window} b_micro=${b_micro} concurrency=${concurrency} log=${log}"
+  set +e
+  BEAM_PIPELINE_BENCH_MODE="${mode}" \
+  BEAM_RING_GRAPH_EXECS_PER_LANE="${window}" \
+  BEAM_B_MICRO="${b_micro}" \
+  BEAM_STREAM1_CONCURRENCY="${concurrency}" \
+  BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS}" \
+  BEAM_PIPELINE_SMOKE_RINGS="${PIPELINE_SMOKE_RINGS}" \
+  BEAM_SHARD_COUNT="${PIPELINE_SHARD_COUNT}" \
+  BEAM_WEIGHT_DIR="${BEAM_WEIGHT_DIR}" \
+  "${BUILD_DIR}/stream_pipeline_benchmark" "${PUZZLE_ID}" 2>&1 | tee "${log}"
+  rc=${PIPESTATUS[0]}
+  set -e
+  if [ "${rc}" -ne 0 ]; then
+    status="FAIL_${rc}"
+  fi
+  local parsed
+  parsed="$(parse_pipeline_smoke_result "${log}")"
+  echo -e "${mode}\t${window}\t${b_micro}\t${concurrency}\t${parsed}\t${status}\t${log}" >> "${PIPELINE_SUMMARY}"
 }
 set_backend_runner() {
   local backend="$1"
@@ -398,6 +464,7 @@ write_best_env() {
 echo "benchmark_started_at=$(date -Is)"
 echo "summary=${SUMMARY}"
 echo "isolated_summary=${ISOLATED_SUMMARY}"
+echo "pipeline_smoke_summary=${PIPELINE_SUMMARY}"
 echo "weight_dir=${BEAM_WEIGHT_DIR}"
 echo "torch_cmake_prefix=${CMAKE_PREFIX_PATH}"
 echo "torch_lib_dir=${TORCH_LIB_DIR}"
@@ -417,6 +484,18 @@ if [ "${RUN_ISOLATED_STREAM1}" = "1" ]; then
   else
     echo "best_megaminx_transformer_stream1_env=none"
   fi
+fi
+
+if [ "${RUN_PIPELINE_SMOKE}" = "1" ]; then
+  for mode in ${PIPELINE_SMOKE_MODES}; do
+    for window in ${PIPELINE_GRAPH_WINDOW_SWEEP}; do
+      for b_micro in ${PIPELINE_B_MICRO_SWEEP}; do
+        for concurrency in ${PIPELINE_CONCURRENCY_SWEEP}; do
+          run_pipeline_smoke_config "${mode}" "${window}" "${b_micro}" "${concurrency}"
+        done
+      done
+    done
+  done
 fi
 
 if [ "${RUN_SELECTED_900M_AFTER_STREAM1}" = "1" ]; then
@@ -462,4 +541,5 @@ fi
 
 echo "benchmark_summary=${SUMMARY}"
 echo "isolated_stream1_summary=${ISOLATED_SUMMARY}"
+echo "pipeline_smoke_summary=${PIPELINE_SUMMARY}"
 echo "finished_at=$(date -Is)"

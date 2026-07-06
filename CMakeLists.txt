@@ -219,6 +219,10 @@ add_executable(stream_benchmark
     tools/stream_benchmark_transformer.cu)
 target_link_libraries(stream_benchmark PRIVATE beam_cuda)
 set_target_properties(stream_benchmark PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(stream_pipeline_benchmark tools/stream_pipeline_benchmark.cu)
+target_link_libraries(stream_pipeline_benchmark PRIVATE beam_cuda)
+set_target_properties(stream_pipeline_benchmark PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 if(BEAM_ENABLE_LIBTORCH_STREAM1)
     find_package(Torch REQUIRED)
     add_executable(stream1_transformer_libtorch_benchmark
