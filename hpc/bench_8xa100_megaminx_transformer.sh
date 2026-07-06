@@ -358,6 +358,7 @@ run_full_config() {
   BEAM_B_MICRO="${b_micro}"
   BEAM_STREAM1_CONCURRENCY="${concurrency}"
   BEAM_STREAM3_RING_SLOTS="${ring_slots}"
+  BEAM_STREAM3_BATCH_CANDIDATES="${FULL_STREAM3_BATCH_CANDIDATES:-$((b_micro * 24 * ring_slots))}"
   BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${final_chunk}"
   SHARD_CAPACITY_SCALE_PPM="${capacity_scale}"
   STREAM4_TRIGGER_CANDIDATES=$((STREAM4_BATCH_CANDIDATES * STREAM4_TRIGGER_MULT))
@@ -390,7 +391,7 @@ run_full_config() {
   beam_export_manual_config
   beam_prepare_nccl_file "${tag}"
 
-  echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY} log=${log}"
+  echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY} stream3_batch=${STREAM3_BATCH_CANDIDATES} log=${log}"
   local rc=0
   set +e
   beam_torchrun_production "${tag}" "${log}" || rc=$?

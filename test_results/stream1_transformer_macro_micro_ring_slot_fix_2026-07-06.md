@@ -80,3 +80,33 @@ Verification:
 ```text
 stream_pipeline_benchmark mode=stream123 window=64 b_micro=8192 concurrency=8 ring_slots=8 stream3_batch=1572864 graph_window_jobs=8 physical_jobs=8 frontier_size=65536 ring_slot_jobs=8 stream3_jobs=1 stream4_jobs=0 candidates=1572864 depth_like_ms=2335.81 candidates_per_sec=673369 shard_capacity=1572864 allocation_bytes=5091152640 status=OK
 ```
+
+## Full Target Launcher Follow-up
+
+Cluster job `31758` failed before launching the solver:
+
+```text
+invalid_stream1_concurrency=8 stream3_effective_ring_slots=4
+```
+
+Cause: the full target path could also inherit a stale `BEAM_STREAM3_BATCH_CANDIDATES` from the submit shell. That stale value overrode `BEAM_STREAM3_RING_SLOTS=8` and made the helper derive only four effective Stream3 ring slots.
+
+Fix: `run_full_config` now sets a run-local `BEAM_STREAM3_BATCH_CANDIDATES` before deriving/validating manual config:
+
+```text
+BEAM_STREAM3_BATCH_CANDIDATES = b_micro * 24 * ring_slots
+```
+
+For the current 700M Megaminx transformer target:
+
+```text
+8192 * 24 * 8 = 1572864
+```
+
+A custom full-run value can still be supplied through `FULL_STREAM3_BATCH_CANDIDATES`; stale generic shell env no longer changes target/smoke full-run slot geometry.
+
+Verification:
+
+```text
+bash_syntax_ok=1
+```
