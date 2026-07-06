@@ -182,6 +182,8 @@ int main(int argc, char** argv) {
 
     StaticDeviceMemory memory;
     allocate_static_device_memory(plan, memory);
+    BenchmarkThresholdBuffers threshold_buffers = alloc_benchmark_threshold_buffers();
+    attach_benchmark_threshold_buffers(memory, threshold_buffers);
     std::uint8_t* d_generators = device_alloc<std::uint8_t>(MOVE_COUNT * STATE_STORAGE_LEN);
     State128* d_central = device_alloc<State128>(1);
     Hash128* d_zobrist = device_alloc<Hash128>(STATE_STORAGE_LEN * STATE_VALUE_PAD);
@@ -289,6 +291,7 @@ int main(int argc, char** argv) {
     stream1_weights::free_transformer_network_view(transformer_view_holder);
     stream1_weights::free_stream1_scratch(stream1_scratch);
     stream1_weights::free_weights(device_weights);
+    free_benchmark_threshold_buffers(threshold_buffers);
     free_static_device_memory(memory);
     cudaFree(d_generators);
     cudaFree(d_central);

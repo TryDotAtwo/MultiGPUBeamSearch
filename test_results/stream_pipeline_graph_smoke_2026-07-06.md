@@ -130,3 +130,35 @@ mode,window,b_micro,concurrency,ring_slots,stream3_batch,graph_window_jobs,physi
 - `stream12` far below baseline points at graph-window scheduling, job-index memcpy/event synchronization, or Stream2 graph work.
 - `stream123` far below `stream12` points at Stream3.
 - If `stream123` is healthy while full solve is slow, continue profiling Stream4/5/history/finalization.
+
+## 2026-07-06 Cluster Smoke Fix
+
+Cluster job 31743 reached the new pipeline-smoke path, but the first `stream12 window=32 b_micro=512 concurrency=2` run aborted before measurement:
+
+```text
+pipeline_smoke_start mode=stream12 window=32 b_micro=512 concurrency=2
+what(): CUDA error: cudaMemset(memory.streams.current_threshold_active_index, 0, sizeof(std::uint32_t))
+file=.../tools/stream_pipeline_benchmark.cu line=86 message=invalid argument
+```
+
+The CMake/Torch warnings in the same log are build noise; the real failure was inside the new benchmark reset path. Existing stream microbenchmarks allocate the threshold triple through `BenchmarkThresholdBuffers` and attach it to `StaticDeviceMemory` before touching Stream3/4 threshold kernels. The new pipeline smoke tool used the static layout threshold pointers directly, which is not the established benchmark pattern.
+
+Fix: `stream_pipeline_benchmark` now allocates and attaches benchmark threshold buffers before reset/graph instantiation, then frees them before `free_static_device_memory`.
+
+Local Docker verification after the fix:
+
+```bash
+cmake -S . -B build-stream-pipeline-smoke-fix -DCUTLASS_DIR=/opt/cutlass -DBEAM_CUDA_ARCHITECTURES=75
+cmake --build build-stream-pipeline-smoke-fix --target stream_pipeline_benchmark contract_tests -j2
+./build-stream-pipeline-smoke-fix/contract_tests
+```
+
+Result:
+
+```text
+[100%] Built target stream_pipeline_benchmark
+[100%] Built target contract_tests
+contract_tests=pass
+```
+
+A100 runtime smoke still needs to be re-run on the cluster because local Docker has no NVIDIA driver.
