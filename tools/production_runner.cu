@@ -69,6 +69,120 @@ using namespace beam;
 
 namespace {
 
+struct NativeEagerRingSlotLauncherState {
+    StaticDeviceMemory* memory = nullptr;
+    DispatcherDeviceTables tables{};
+    const DispatcherNetwork* network = nullptr;
+    Stream2SolvedBuffers solved{};
+    RuntimeConfig config{};
+    std::vector<cudaEvent_t> score_ready;
+    std::vector<cudaEvent_t> hash_ready;
+
+    ~NativeEagerRingSlotLauncherState() {
+        destroy_events();
+    }
+
+    void reset_events(std::uint32_t inference_parallelism) {
+        destroy_events();
+        score_ready.assign(inference_parallelism, nullptr);
+        hash_ready.assign(inference_parallelism, nullptr);
+        for (std::uint32_t lane = 0; lane < inference_parallelism; ++lane) {
+            BEAM_CUDA_CHECK(cudaEventCreateWithFlags(&score_ready[lane], cudaEventDisableTiming));
+            BEAM_CUDA_CHECK(cudaEventCreateWithFlags(&hash_ready[lane], cudaEventDisableTiming));
+        }
+    }
+
+    void destroy_events() noexcept {
+        for (cudaEvent_t& event : score_ready) {
+            if (event != nullptr) {
+                cudaEventDestroy(event);
+                event = nullptr;
+            }
+        }
+        for (cudaEvent_t& event : hash_ready) {
+            if (event != nullptr) {
+                cudaEventDestroy(event);
+                event = nullptr;
+            }
+        }
+    }
+};
+
+void launch_native_eager_ring_slot(const DispatcherRingSlotLaunchContext& context, void* user) {
+    if (user == nullptr) {
+        throw std::invalid_argument("native_eager Stream1 launcher missing user pointer");
+    }
+    auto* state = static_cast<NativeEagerRingSlotLauncherState*>(user);
+    if (state->memory == nullptr || state->network == nullptr) {
+        throw std::invalid_argument("native_eager Stream1 launcher is not initialized");
+    }
+    if (context.lane >= state->config.inference_parallelism) {
+        throw std::invalid_argument("native_eager Stream1 launcher lane exceeds inference_parallelism");
+    }
+    if (context.count > state->config.b_micro || context.b_micro != state->config.b_micro) {
+        throw std::invalid_argument("native_eager Stream1 launcher b_micro/count mismatch");
+    }
+
+    StaticDeviceMemory& memory = *state->memory;
+    const DispatcherNetwork& network = *state->network;
+    const cudaEvent_t score_ready = state->score_ready.at(context.lane);
+    const cudaEvent_t hash_ready = state->hash_ready.at(context.lane);
+    const std::uint64_t candidates_per_slot =
+        static_cast<std::uint64_t>(state->config.b_micro) * MOVE_COUNT;
+    const std::uint64_t candidate_offset = context.candidate_offset;
+
+    BEAM_CUDA_CHECK(cudaEventRecord(score_ready, context.stream1_lane));
+    BEAM_CUDA_CHECK(cudaStreamWaitEvent(context.stream2_lane, score_ready, 0));
+    if (network.uniform_score) {
+        BEAM_CUDA_CHECK(cudaMemsetAsync(
+            memory.streams.score_ring + candidate_offset,
+            0,
+            candidates_per_slot * sizeof(std::uint32_t),
+            context.stream1_lane));
+    } else if (network.backend == DispatcherStream1Backend::Mlp) {
+        stream1_inference_cutlass_cuda(
+            memory.current_frontier_states,
+            memory.streams.parent_base + context.job,
+            memory.streams.count + context.job,
+            state->tables.generators,
+            network.mlp_view,
+            network.mlp_scratch_lanes.at(context.lane),
+            memory.streams.score_ring + candidate_offset,
+            state->config.b_micro,
+            context.stream1_lane);
+    } else if (network.backend == DispatcherStream1Backend::PieceTransformer) {
+        stream1_transformer_inference_cuda(
+            memory.current_frontier_states,
+            memory.streams.parent_base + context.job,
+            memory.streams.count + context.job,
+            network.transformer_view,
+            network.transformer_scratch_lanes.at(context.lane),
+            memory.streams.score_ring + candidate_offset,
+            state->config.b_micro,
+            context.stream1_lane);
+    } else {
+        throw std::invalid_argument("unknown native_eager Stream1 dispatcher backend");
+    }
+
+    stream2_hash_goal_cuda(
+        memory.current_frontier_states,
+        memory.streams.parent_base + context.job,
+        memory.streams.count + context.job,
+        state->tables.generators,
+        state->tables.central_state,
+        state->tables.zobrist,
+        memory.streams.hash_ring + candidate_offset,
+        0,
+        0,
+        state->config.b_micro,
+        0,
+        state->config.local_rank,
+        state->solved,
+        context.stream2_lane);
+    BEAM_CUDA_CHECK(cudaEventRecord(hash_ready, context.stream2_lane));
+    BEAM_CUDA_CHECK(cudaStreamWaitEvent(context.stream1_lane, hash_ready, 0));
+}
+
 std::uint64_t parse_u64(const char* text, const char* name) {
     char* end = nullptr;
     const unsigned long long value = std::strtoull(text, &end, 10);
@@ -3961,8 +4075,11 @@ int main(int argc, char** argv) {
             ? std::string("native_cuda_graph")
             : std::string(stream1_executor_env);
     const bool use_libtorch_stream1_executor = stream1_executor == "libtorch_eager";
-    if (!use_libtorch_stream1_executor && stream1_executor != "native_cuda_graph" && stream1_executor != "cuda_graph") {
-        throw std::runtime_error("BEAM_STREAM1_EXECUTOR must be native_cuda_graph, cuda_graph, or libtorch_eager");
+    const bool use_native_eager_stream1_executor =
+        stream1_executor == "native_eager" || stream1_executor == "native_no_graph";
+    if (!use_libtorch_stream1_executor && !use_native_eager_stream1_executor &&
+        stream1_executor != "native_cuda_graph" && stream1_executor != "cuda_graph") {
+        throw std::runtime_error("BEAM_STREAM1_EXECUTOR must be native_cuda_graph, cuda_graph, native_eager, native_no_graph, or libtorch_eager");
     }
 #if !BEAM_HAS_LIBTORCH_STREAM1
     if (use_libtorch_stream1_executor) {
@@ -4376,10 +4493,12 @@ int main(int argc, char** argv) {
         stream2_suffix.device_table(),
         memory.solved_suffix_list,
         solve_bucket_mode ? 0U : 1U};
-    const bool skip_native_ring_slot_templates = use_libtorch_stream1_executor;
+    const bool skip_native_ring_slot_templates = use_libtorch_stream1_executor || use_native_eager_stream1_executor;
 #if BEAM_HAS_LIBTORCH_STREAM1
     std::unique_ptr<stream1_libtorch::RingSlotLauncher> libtorch_stream1_launcher;
 #endif
+    NativeEagerRingSlotLauncherState native_eager_launcher_state;
+    DispatcherRingSlotLauncher native_eager_ring_slot_launcher{};
     const DispatcherRingSlotLauncher* ring_slot_launcher = nullptr;
     if (use_libtorch_stream1_executor) {
 #if BEAM_HAS_LIBTORCH_STREAM1
@@ -4404,6 +4523,18 @@ int main(int argc, char** argv) {
 #else
         throw std::runtime_error("internal build error: LibTorch Stream1 executor selected without BEAM_HAS_LIBTORCH_STREAM1");
 #endif
+    }
+    if (use_native_eager_stream1_executor) {
+        native_eager_launcher_state.memory = &memory;
+        native_eager_launcher_state.tables = tables;
+        native_eager_launcher_state.network = &network;
+        native_eager_launcher_state.solved = solved;
+        native_eager_launcher_state.config = config;
+        native_eager_launcher_state.reset_events(config.inference_parallelism);
+        native_eager_ring_slot_launcher.launch = &launch_native_eager_ring_slot;
+        native_eager_ring_slot_launcher.user = &native_eager_launcher_state;
+        native_eager_ring_slot_launcher.name = "native_eager";
+        ring_slot_launcher = &native_eager_ring_slot_launcher;
     }
     instantiate_cuda_graph_job_templates(
         plan,

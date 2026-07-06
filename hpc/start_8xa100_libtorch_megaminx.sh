@@ -131,9 +131,16 @@ PY
     export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner"
     export BEAM_STREAM1_EXECUTOR=native_cuda_graph
     ;;
+  native_eager|native_no_graph)
+    export BEAM_ENABLE_LIBTORCH_STREAM1=OFF
+    export LD_LIBRARY_PATH="$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
+    beam_configure_build production_runner
+    export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner"
+    export BEAM_STREAM1_EXECUTOR=native_eager
+    ;;
   *)
     echo "invalid_megaminx_stream1_backend=${MEGAMINX_STREAM1_BACKEND}"
-    echo "allowed_megaminx_stream1_backend=libtorch_eager,native_cuda_graph"
+    echo "allowed_megaminx_stream1_backend=libtorch_eager,native_cuda_graph,native_eager,native_no_graph"
     exit 2
     ;;
 esac
