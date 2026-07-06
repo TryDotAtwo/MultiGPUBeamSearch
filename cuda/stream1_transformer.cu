@@ -230,6 +230,184 @@ void stream1_transformer_build_input_layernorm51x256_launch(
         tokens,
         b_micro);
 }
+
+__global__ void stream1_transformer_build_input_kernel_graph_job(
+    const State128* __restrict__ current_frontier_states,
+    const std::uint64_t* __restrict__ parent_base,
+    const std::uint32_t* __restrict__ count,
+    const std::uint32_t* __restrict__ graph_job_index,
+    Stream1TransformerNetworkView network,
+    half* __restrict__ tokens,
+    std::uint32_t b_micro) {
+    const std::uint32_t row_token = blockIdx.x;
+    const std::uint32_t dim = blockIdx.y * blockDim.x + threadIdx.x;
+    const std::uint32_t row = row_token / network.dims.seq_len;
+    const std::uint32_t token = row_token % network.dims.seq_len;
+    const std::uint32_t job = *graph_job_index;
+    const std::uint32_t active_count = count[job];
+    if (row >= b_micro || row >= active_count || dim >= network.dims.d_model) {
+        return;
+    }
+    float value = 0.0f;
+    if (token == 0U) {
+        value = stream1_transformer_load_scalar_device(network.cls_token, dim, network.dims.dtype);
+    } else {
+        const std::uint32_t piece = token - 1U;
+        value = stream1_transformer_load_scalar_device(
+            network.fast_piece_static,
+            static_cast<std::uint64_t>(piece) * network.dims.d_model + dim,
+            network.dims.dtype);
+        const std::uint64_t parent_idx = parent_base[job] + static_cast<std::uint64_t>(row);
+        const State128* state = current_frontier_states + parent_idx;
+        for (std::uint32_t slot = 0; slot < network.dims.max_piece_size; ++slot) {
+            const std::uint64_t piece_slot = static_cast<std::uint64_t>(piece) * network.dims.max_piece_size + slot;
+            if (network.piece_mask[piece_slot] == 0U) {
+                continue;
+            }
+            const std::uint32_t pos = static_cast<std::uint32_t>(network.piece_positions[piece_slot]);
+            const std::uint32_t state_value = static_cast<std::uint32_t>(state->v[pos]);
+            const std::uint64_t table_idx =
+                ((static_cast<std::uint64_t>(slot) * network.dims.num_classes + state_value) * network.dims.d_model) + dim;
+            value += stream1_transformer_load_scalar_device(network.fast_slot_projected, table_idx, network.dims.dtype);
+        }
+    }
+    const std::uint64_t out_idx = static_cast<std::uint64_t>(row_token) * network.dims.d_model + dim;
+    stream1_transformer_store_scalar_device(tokens, out_idx, value, network.dims.dtype);
+}
+
+__device__ float stream1_transformer_input_token_value51x256_graph_job_device(
+    const State128* __restrict__ current_frontier_states,
+    const std::uint64_t* __restrict__ parent_base,
+    const std::uint32_t* __restrict__ graph_job_index,
+    Stream1TransformerNetworkView network,
+    std::uint32_t row,
+    std::uint32_t token,
+    std::uint32_t dim) {
+    if (token == 0U) {
+        return stream1_transformer_load_scalar_device(network.cls_token, dim, network.dims.dtype);
+    }
+    const std::uint32_t piece = token - 1U;
+    float value = stream1_transformer_load_scalar_device(
+        network.fast_piece_static,
+        static_cast<std::uint64_t>(piece) * 256ULL + dim,
+        network.dims.dtype);
+    const std::uint32_t job = *graph_job_index;
+    const std::uint64_t parent_idx = parent_base[job] + static_cast<std::uint64_t>(row);
+    const State128* state = current_frontier_states + parent_idx;
+    for (std::uint32_t slot = 0; slot < 3U; ++slot) {
+        const std::uint64_t piece_slot = static_cast<std::uint64_t>(piece) * 3ULL + slot;
+        if (network.piece_mask[piece_slot] == 0U) {
+            continue;
+        }
+        const std::uint32_t pos = static_cast<std::uint32_t>(network.piece_positions[piece_slot]);
+        const std::uint32_t state_value = static_cast<std::uint32_t>(state->v[pos]);
+        const std::uint64_t table_idx =
+            ((static_cast<std::uint64_t>(slot) * 120ULL + state_value) * 256ULL) + dim;
+        value += stream1_transformer_load_scalar_device(network.fast_slot_projected, table_idx, network.dims.dtype);
+    }
+    return value;
+}
+
+__global__ void stream1_transformer_build_input_layernorm51x256_graph_job_kernel(
+    const State128* __restrict__ current_frontier_states,
+    const std::uint64_t* __restrict__ parent_base,
+    const std::uint32_t* __restrict__ count,
+    const std::uint32_t* __restrict__ graph_job_index,
+    Stream1TransformerNetworkView network,
+    half* __restrict__ tokens,
+    std::uint32_t b_micro) {
+    const std::uint32_t row_token = blockIdx.x;
+    const std::uint32_t tid = threadIdx.x;
+    if (tid >= 128U) {
+        return;
+    }
+    const std::uint32_t row = row_token / 51U;
+    const std::uint32_t token = row_token % 51U;
+    if (row >= b_micro) {
+        return;
+    }
+
+    extern __shared__ float warp_scratch[];
+    const std::uint32_t lane = tid & 31U;
+    const std::uint32_t warp = tid >> 5U;
+    const std::uint64_t base = static_cast<std::uint64_t>(row_token) * 256ULL;
+    const std::uint32_t col0 = tid;
+    const std::uint32_t col1 = tid + 128U;
+    const std::uint32_t job = *graph_job_index;
+    const bool active = row < count[job];
+    const float x0 = active ? stream1_transformer_input_token_value51x256_graph_job_device(
+        current_frontier_states, parent_base, graph_job_index, network, row, token, col0) : 0.0f;
+    const float x1 = active ? stream1_transformer_input_token_value51x256_graph_job_device(
+        current_frontier_states, parent_base, graph_job_index, network, row, token, col1) : 0.0f;
+
+    const float warp_sum = stream1_transformer_warp_reduce_sum_device(x0 + x1);
+    if (lane == 0U) {
+        warp_scratch[warp] = warp_sum;
+    }
+    __syncthreads();
+
+    float block_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+    if (warp == 0U) {
+        block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
+        if (lane == 0U) {
+            warp_scratch[0] = block_sum * (1.0f / 256.0f);
+        }
+    }
+    __syncthreads();
+    const float mean = warp_scratch[0];
+
+    const float centered0 = x0 - mean;
+    const float centered1 = x1 - mean;
+    const float warp_var_sum = stream1_transformer_warp_reduce_sum_device(
+        centered0 * centered0 + centered1 * centered1);
+    if (lane == 0U) {
+        warp_scratch[warp] = warp_var_sum;
+    }
+    __syncthreads();
+
+    float block_var_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+    if (warp == 0U) {
+        block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
+        if (lane == 0U) {
+            warp_scratch[0] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+        }
+    }
+    __syncthreads();
+    const float inv_std = warp_scratch[0];
+
+    const float y0 = centered0 * inv_std *
+        stream1_transformer_load_scalar_device(network.input_ln_gamma, col0, network.dims.dtype) +
+        stream1_transformer_load_scalar_device(network.input_ln_beta, col0, network.dims.dtype);
+    const float y1 = centered1 * inv_std *
+        stream1_transformer_load_scalar_device(network.input_ln_gamma, col1, network.dims.dtype) +
+        stream1_transformer_load_scalar_device(network.input_ln_beta, col1, network.dims.dtype);
+    stream1_transformer_store_scalar_device(tokens, base + col0, y0, network.dims.dtype);
+    stream1_transformer_store_scalar_device(tokens, base + col1, y1, network.dims.dtype);
+}
+
+void stream1_transformer_build_input_layernorm51x256_graph_job_launch(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const std::uint32_t* graph_job_index,
+    const Stream1TransformerNetworkView& network,
+    half* tokens,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    const Stream1TransformerDims dims = network.dims;
+    if (dims.seq_len != 51U || dims.d_model != 256U || dims.num_pieces != 50U ||
+        dims.max_piece_size != 3U || dims.num_classes != 120U) {
+        throw std::invalid_argument("Stream1 piece_transformer block51 fused input requires seq=51 d=256 pieces=50 max_piece=3 classes=120");
+    }
+    stream1_transformer_build_input_layernorm51x256_graph_job_kernel<<<b_micro * 51U, 128, 4 * sizeof(float), stream>>>(
+        current_frontier_states,
+        parent_base,
+        count,
+        graph_job_index,
+        network,
+        tokens,
+        b_micro);
+}
 __global__ void stream1_transformer_layernorm_copy_kernel(
     const half* __restrict__ input,
     half* __restrict__ output,
@@ -1241,6 +1419,31 @@ __global__ void stream1_transformer_score_quantize_kernel(
     score_ring[i] = stream1_transformer_score_key_from_float_device(q);
 }
 
+__global__ void stream1_transformer_score_quantize_graph_job_kernel(
+    const half* __restrict__ logits,
+    const half* __restrict__ output_bias,
+    const std::uint32_t* __restrict__ count,
+    const std::uint32_t* __restrict__ graph_job_index,
+    std::uint32_t* __restrict__ score_ring,
+    std::uint32_t b_micro,
+    Stream1TransformerDims dims) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t total = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t job = *graph_job_index;
+    const std::uint32_t row = i / static_cast<std::uint32_t>(MOVE_COUNT);
+    const std::uint32_t move = i % static_cast<std::uint32_t>(MOVE_COUNT);
+    if (row >= count[job]) {
+        return;
+    }
+    const float q = stream1_transformer_load_scalar_device(logits, static_cast<std::uint64_t>(row) * dims.output_dim + move, dims.dtype) +
+        stream1_transformer_load_scalar_device(output_bias, move, dims.dtype);
+    const std::uint64_t out_idx = static_cast<std::uint64_t>(job) * b_micro * MOVE_COUNT + i;
+    score_ring[out_idx] = stream1_transformer_score_key_from_float_device(q);
+}
+
 bool stream1_transformer_block51_requested() {
     const char* value = std::getenv("BEAM_STREAM1_TRANSFORMER_BLOCK51");
     if (value == nullptr || value[0] == '\0' || std::strcmp(value, "0") == 0) {
@@ -1398,6 +1601,341 @@ void stream1_transformer_inference_block51_cuda(
         score_ring,
         b_micro,
         dims);
+}
+void stream1_transformer_inference_block51_graph_job_cuda(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const std::uint32_t* graph_job_index,
+    const Stream1TransformerNetworkView& network,
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t* score_ring,
+    std::uint32_t b_micro,
+    Stream1TransformerAttentionBackend attention_backend,
+    cudaStream_t stream) {
+    NvtxRange range("Stream1_transformer_block51_graph_job_launch");
+    const Stream1TransformerDims dims = network.dims;
+    if (!stream1_transformer_is_block51_shape(dims)) {
+        throw std::invalid_argument("Stream1 piece_transformer block51 backend requires exact p900 seq=51 d=256 h=8 ff=1024 layers=4 shape");
+    }
+    if (b_micro == 0U) {
+        return;
+    }
+    const std::uint32_t token_rows = b_micro * 51U;
+    stream1_transformer_build_input_layernorm51x256_graph_job_launch(
+        current_frontier_states,
+        parent_base,
+        count,
+        graph_job_index,
+        network,
+        scratch.tokens,
+        b_micro,
+        stream);
+
+    for (std::uint32_t layer = 0; layer < 4U; ++layer) {
+        const Stream1TransformerBlockView block = network.blocks[layer];
+        stream1_transformer_layernorm_copy_launch(
+            scratch.tokens,
+            scratch.attention_context,
+            block.ln1_gamma,
+            block.ln1_beta,
+            token_rows,
+            256U,
+            dims.dtype,
+            stream);
+        stream1_transformer_linear_bias_cuda(
+            scratch.attention_context,
+            block.attn_qkv_weight,
+            block.attn_qkv_bias,
+            scratch.qkv,
+            token_rows,
+            256U,
+            768U,
+            dims.dtype,
+            stream);
+        stream1_transformer_attention_launch(
+            scratch.qkv,
+            scratch,
+            dims,
+            b_micro,
+            attention_backend,
+            stream);
+        stream1_transformer_linear_residual_cuda(
+            scratch.attention_context,
+            block.attn_out_weight,
+            scratch.tokens,
+            token_rows,
+            256U,
+            256U,
+            dims.dtype,
+            stream);
+        stream1_transformer_bias_add_launch(
+            scratch.tokens,
+            block.attn_out_bias,
+            token_rows,
+            256U,
+            dims.dtype,
+            stream);
+        stream1_transformer_layernorm_copy_launch(
+            scratch.tokens,
+            scratch.attention_context,
+            block.ln2_gamma,
+            block.ln2_beta,
+            token_rows,
+            256U,
+            dims.dtype,
+            stream);
+        stream1_transformer_ff1_linear_bias_silu_cuda(
+            scratch.attention_context,
+            block.ff1_weight,
+            block.ff1_bias,
+            scratch.ff_hidden,
+            token_rows,
+            256U,
+            1024U,
+            dims.dtype,
+            stream);
+        stream1_transformer_linear_residual_cuda(
+            scratch.ff_hidden,
+            block.ff2_weight,
+            scratch.tokens,
+            token_rows,
+            1024U,
+            256U,
+            dims.dtype,
+            stream);
+        stream1_transformer_bias_add_launch(
+            scratch.tokens,
+            block.ff2_bias,
+            token_rows,
+            256U,
+            dims.dtype,
+            stream);
+    }
+
+    stream1_transformer_cls_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
+        scratch.tokens,
+        scratch.attention_context,
+        network.output_ln_gamma,
+        network.output_ln_beta,
+        dims,
+        b_micro);
+    stream1_cutlass_linear_cuda(
+        scratch.attention_context,
+        network.output_weight,
+        scratch.logits,
+        b_micro,
+        256U,
+        dims.output_dim,
+        dims.dtype,
+        stream);
+    stream1_transformer_score_quantize_graph_job_kernel<<<(b_micro * MOVE_COUNT + 255U) / 256U, 256, 0, stream>>>(
+        scratch.logits,
+        network.output_bias,
+        count,
+        graph_job_index,
+        score_ring,
+        b_micro,
+        dims);
+}
+
+void stream1_transformer_inference_graph_job_cuda(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const std::uint32_t* graph_job_index,
+    const Stream1TransformerNetworkView& network,
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t* score_ring,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    NvtxRange range("Stream1_transformer_graph_job_inference_launch");
+    const Stream1TransformerDims dims = network.dims;
+    if (dims.output_dim != MOVE_COUNT) {
+        throw std::invalid_argument("Stream1 piece_transformer output_dim must equal MOVE_COUNT");
+    }
+    if (dims.d_model == 0U || dims.nhead == 0U || dims.head_dim == 0U ||
+        dims.d_model != dims.nhead * dims.head_dim) {
+        throw std::invalid_argument("Stream1 piece_transformer d_model must equal nhead * head_dim");
+    }
+    if (dims.seq_len != dims.num_pieces + 1U || dims.max_piece_size == 0U) {
+        throw std::invalid_argument("Stream1 piece_transformer sequence/piece dimensions are inconsistent");
+    }
+    if (dims.seq_len > 64U || dims.head_dim > 64U) {
+        throw std::invalid_argument("Stream1 piece_transformer fused attention tile requires seq_len<=64 and head_dim<=64");
+    }
+    const Stream1TransformerAttentionBackend attention_backend =
+        stream1_transformer_select_attention_backend(dims.dtype);
+    if (b_micro == 0U) {
+        return;
+    }
+    if (stream1_transformer_block51_requested()) {
+        stream1_transformer_inference_block51_graph_job_cuda(
+            current_frontier_states,
+            parent_base,
+            count,
+            graph_job_index,
+            network,
+            scratch,
+            score_ring,
+            b_micro,
+            attention_backend,
+            stream);
+        return;
+    }
+#if BEAM_HAS_CUTLASS
+    const std::uint32_t token_rows = b_micro * dims.seq_len;
+    const dim3 token_block(128);
+    const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
+    stream1_transformer_build_input_kernel_graph_job<<<token_grid, token_block, 0, stream>>>(
+        current_frontier_states,
+        parent_base,
+        count,
+        graph_job_index,
+        network,
+        scratch.tokens,
+        b_micro);
+
+    stream1_transformer_layernorm_copy_launch(
+        scratch.tokens,
+        scratch.tokens,
+        network.input_ln_gamma,
+        network.input_ln_beta,
+        token_rows,
+        dims.d_model,
+        dims.dtype,
+        stream);
+
+    for (std::uint32_t layer = 0; layer < dims.transformer_layers; ++layer) {
+        const Stream1TransformerBlockView block = network.blocks[layer];
+        if (layer == 0U) {
+            stream1_transformer_layernorm_copy_launch(
+                scratch.tokens,
+                scratch.attention_context,
+                block.ln1_gamma,
+                block.ln1_beta,
+                token_rows,
+                dims.d_model,
+                dims.dtype,
+                stream);
+        } else {
+            const Stream1TransformerBlockView prev_block = network.blocks[layer - 1U];
+            stream1_transformer_bias_layernorm_copy_launch(
+                scratch.tokens,
+                scratch.attention_context,
+                prev_block.ff2_bias,
+                block.ln1_gamma,
+                block.ln1_beta,
+                token_rows,
+                dims.d_model,
+                dims.dtype,
+                stream);
+        }
+        stream1_transformer_linear_bias_cuda(
+            scratch.attention_context,
+            block.attn_qkv_weight,
+            block.attn_qkv_bias,
+            scratch.qkv,
+            token_rows,
+            dims.d_model,
+            3U * dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_attention_launch(
+            scratch.qkv,
+            scratch,
+            dims,
+            b_micro,
+            attention_backend,
+            stream);
+        stream1_transformer_linear_residual_cuda(
+            scratch.attention_context,
+            block.attn_out_weight,
+            scratch.tokens,
+            token_rows,
+            dims.d_model,
+            dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_bias_layernorm_copy_launch(
+            scratch.tokens,
+            scratch.attention_context,
+            block.attn_out_bias,
+            block.ln2_gamma,
+            block.ln2_beta,
+            token_rows,
+            dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_ff1_linear_bias_silu_cuda(
+            scratch.attention_context,
+            block.ff1_weight,
+            block.ff1_bias,
+            scratch.ff_hidden,
+            token_rows,
+            dims.d_model,
+            dims.ff_dim,
+            dims.dtype,
+            stream);
+        stream1_transformer_linear_residual_cuda(
+            scratch.ff_hidden,
+            block.ff2_weight,
+            scratch.tokens,
+            token_rows,
+            dims.ff_dim,
+            dims.d_model,
+            dims.dtype,
+            stream);
+    }
+
+    if (dims.transformer_layers > 0U) {
+        const Stream1TransformerBlockView last_block = network.blocks[dims.transformer_layers - 1U];
+        stream1_transformer_cls_bias_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
+            scratch.tokens,
+            scratch.attention_context,
+            last_block.ff2_bias,
+            network.output_ln_gamma,
+            network.output_ln_beta,
+            dims,
+            b_micro);
+    } else {
+        stream1_transformer_cls_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
+            scratch.tokens,
+            scratch.attention_context,
+            network.output_ln_gamma,
+            network.output_ln_beta,
+            dims,
+            b_micro);
+    }
+    stream1_cutlass_linear_cuda(
+        scratch.attention_context,
+        network.output_weight,
+        scratch.logits,
+        b_micro,
+        dims.d_model,
+        dims.output_dim,
+        dims.dtype,
+        stream);
+    stream1_transformer_score_quantize_graph_job_kernel<<<(b_micro * MOVE_COUNT + 255U) / 256U, 256, 0, stream>>>(
+        scratch.logits,
+        network.output_bias,
+        count,
+        graph_job_index,
+        score_ring,
+        b_micro,
+        dims);
+#else
+    (void)current_frontier_states;
+    (void)parent_base;
+    (void)count;
+    (void)graph_job_index;
+    (void)network;
+    (void)scratch;
+    (void)score_ring;
+    (void)b_micro;
+    (void)stream;
+    throw std::invalid_argument("Stream1 piece_transformer CUDA forward requires CUTLASS-enabled build");
+#endif
 }
 void stream1_transformer_inference_cuda(
     const State128* current_frontier_states,

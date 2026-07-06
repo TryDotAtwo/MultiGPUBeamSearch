@@ -145,6 +145,17 @@ void stream1_transformer_inference_cuda(
     std::uint32_t b_micro,
     cudaStream_t stream);
 
+void stream1_transformer_inference_graph_job_cuda(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const std::uint32_t* graph_job_index,
+    const Stream1TransformerNetworkView& network,
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t* score_ring,
+    std::uint32_t b_micro,
+    cudaStream_t stream);
+
 void stream1_cutlass_linear_cuda(
     const half* input,
     const half* weight,

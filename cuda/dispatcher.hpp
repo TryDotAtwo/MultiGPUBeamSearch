@@ -45,6 +45,13 @@ struct DispatcherEvents {
 struct CudaGraphJobTemplates {
     std::vector<cudaGraph_t> ring_slot_graphs;
     std::vector<cudaGraphExec_t> ring_slot_execs;
+    std::vector<cudaEvent_t> ring_slot_done;
+    std::vector<std::uint8_t> ring_slot_in_use;
+    std::uint32_t* ring_slot_job_index = nullptr;
+    std::uint32_t ring_slot_physical_jobs = 0;
+    std::uint32_t ring_slot_window_rings = 0;
+    std::uint32_t ring_slot_window_jobs = 0;
+    bool ring_slot_windowed = false;
     std::vector<cudaGraph_t> stream3_ring_graphs;
     std::vector<cudaGraphExec_t> stream3_ring_execs;
     std::vector<cudaGraph_t> stream4_shard_graphs;

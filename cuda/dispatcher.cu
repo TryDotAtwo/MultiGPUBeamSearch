@@ -929,6 +929,42 @@ void instantiate_captured_graph(cudaStream_t stream, cudaGraph_t& graph, cudaGra
     check_cuda(cudaGraphInstantiate(&exec, graph, nullptr, nullptr, 0), "cudaGraphInstantiate");
 }
 
+std::uint32_t parse_graph_execs_per_lane_env() {
+    const char* value = std::getenv("BEAM_RING_GRAPH_EXECS_PER_LANE");
+    if (value == nullptr || value[0] == '\0') {
+        return 0U;
+    }
+    char* end = nullptr;
+    const unsigned long parsed = std::strtoul(value, &end, 10);
+    if (end == value || *end != '\0' || parsed == 0UL || parsed > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::invalid_argument("BEAM_RING_GRAPH_EXECS_PER_LANE must be a nonzero uint32 when set");
+    }
+    return static_cast<std::uint32_t>(parsed);
+}
+
+std::uint32_t choose_ring_slot_graph_window_rings(
+    const StaticMemoryPlan& plan,
+    const DispatcherNetwork& network,
+    bool skip_ring_slot_templates) {
+    const std::uint32_t cap_per_lane = parse_graph_execs_per_lane_env();
+    if (skip_ring_slot_templates || cap_per_lane == 0U) {
+        return plan.config.ring_count;
+    }
+    if (network.uniform_score || network.backend != DispatcherStream1Backend::PieceTransformer) {
+        throw std::invalid_argument(
+            "BEAM_RING_GRAPH_EXECS_PER_LANE currently supports only PieceTransformer native graph templates");
+    }
+    const std::uint32_t slots_per_lane = static_cast<std::uint32_t>(
+        (static_cast<std::uint64_t>(plan.derived.ring_slot_count) + plan.config.inference_parallelism - 1ULL) /
+        plan.config.inference_parallelism);
+    if (slots_per_lane == 0U || cap_per_lane < slots_per_lane) {
+        throw std::invalid_argument(
+            "BEAM_RING_GRAPH_EXECS_PER_LANE is smaller than one ring worth of slots for a Stream1 lane");
+    }
+    const std::uint32_t window_rings = std::max<std::uint32_t>(1U, cap_per_lane / slots_per_lane);
+    return std::min(plan.config.ring_count, window_rings);
+}
+
 void ensure_stream4_slot_resources(DispatcherStreams& streams, std::uint32_t slot_count) {
     if (streams.stream4_slot_streams.size() == slot_count && streams.stream4_slot_done.size() == slot_count) {
         return;
@@ -1309,72 +1345,126 @@ void instantiate_cuda_graph_job_templates(
     const bool predict_stats_enabled = predict_stats_enabled_from_env();
 
     const std::uint32_t ring_slot_job_count = plan.config.ring_count * plan.derived.ring_slot_count;
-    graphs.ring_slot_graphs.resize(ring_slot_job_count, nullptr);
-    graphs.ring_slot_execs.resize(ring_slot_job_count, nullptr);
-    if (!skip_ring_slot_templates) {
-    const std::uint64_t candidates_per_slot = static_cast<std::uint64_t>(plan.config.b_micro) * MOVE_COUNT;
-    for (std::uint32_t job = 0; job < ring_slot_job_count; ++job) {
-        const std::uint32_t ring_slot = job % plan.derived.ring_slot_count;
-        const std::uint32_t lane = ring_slot % plan.config.inference_parallelism;
-        cudaStream_t stream1_lane = streams.stream1_lanes[lane];
-        cudaStream_t stream2_lane = streams.stream2_lanes[lane];
-        cudaEvent_t stream1_done = events.stream1_lane_done[lane];
-        cudaEvent_t stream2_done = events.stream2_lane_done[lane];
-        const std::uint64_t candidate_offset = static_cast<std::uint64_t>(job) * candidates_per_slot;
-        check_cuda(cudaStreamBeginCapture(stream1_lane, cudaStreamCaptureModeGlobal), "cudaStreamBeginCapture ring_slot_graph");
-        check_cuda(cudaEventRecord(stream1_done, stream1_lane), "cudaEventRecord ring_slot_fork");
-        check_cuda(cudaStreamWaitEvent(stream2_lane, stream1_done, 0), "cudaStreamWaitEvent stream2_fork");
-        if (network.uniform_score) {
-            check_cuda(cudaMemsetAsync(
-                memory.streams.score_ring + candidate_offset,
-                0,
-                candidates_per_slot * sizeof(std::uint32_t),
-                stream1_lane), "cudaMemsetAsync uniform score ring");
-        } else if (network.backend == DispatcherStream1Backend::Mlp) {
-            stream1_inference_cutlass_cuda(
-                memory.current_frontier_states,
-                memory.streams.parent_base + job,
-                memory.streams.count + job,
-                tables.generators,
-                network.mlp_view,
-                network.mlp_scratch_lanes[lane],
-                memory.streams.score_ring + candidate_offset,
-                plan.config.b_micro,
-                stream1_lane);
-        } else if (network.backend == DispatcherStream1Backend::PieceTransformer) {
-            stream1_transformer_inference_cuda(
-                memory.current_frontier_states,
-                memory.streams.parent_base + job,
-                memory.streams.count + job,
-                network.transformer_view,
-                network.transformer_scratch_lanes[lane],
-                memory.streams.score_ring + candidate_offset,
-                plan.config.b_micro,
-                stream1_lane);
-        } else {
-            throw std::invalid_argument("unknown Stream1 dispatcher backend");
+    const std::uint32_t ring_slot_window_rings = choose_ring_slot_graph_window_rings(plan, network, skip_ring_slot_templates);
+    const std::uint32_t ring_slot_graph_job_count = ring_slot_window_rings * plan.derived.ring_slot_count;
+    graphs.ring_slot_physical_jobs = ring_slot_job_count;
+    graphs.ring_slot_window_rings = ring_slot_window_rings;
+    graphs.ring_slot_window_jobs = ring_slot_graph_job_count;
+    graphs.ring_slot_windowed = ring_slot_window_rings < plan.config.ring_count;
+    graphs.ring_slot_graphs.resize(ring_slot_graph_job_count, nullptr);
+    graphs.ring_slot_execs.resize(ring_slot_graph_job_count, nullptr);
+    graphs.ring_slot_done.assign(ring_slot_graph_job_count, nullptr);
+    graphs.ring_slot_in_use.assign(ring_slot_graph_job_count, 0U);
+    if (graphs.ring_slot_windowed) {
+        check_cuda(
+            cudaMalloc(
+                reinterpret_cast<void**>(&graphs.ring_slot_job_index),
+                static_cast<std::uint64_t>(ring_slot_graph_job_count) * sizeof(std::uint32_t)),
+            "cudaMalloc ring slot graph job index");
+        check_cuda(
+            cudaMemset(graphs.ring_slot_job_index, 0, static_cast<std::uint64_t>(ring_slot_graph_job_count) * sizeof(std::uint32_t)),
+            "cudaMemset ring slot graph job index");
+        for (std::uint32_t job = 0; job < ring_slot_graph_job_count; ++job) {
+            check_cuda(
+                cudaEventCreateWithFlags(&graphs.ring_slot_done[job], cudaEventDisableTiming),
+                "cudaEventCreate ring slot graph done");
         }
-        stream2_hash_goal_cuda(
-            memory.current_frontier_states,
-            memory.streams.parent_base + job,
-            memory.streams.count + job,
-            tables.generators,
-            tables.central_state,
-            tables.zobrist,
-            memory.streams.hash_ring + candidate_offset,
-            0,
-            0,
-            plan.config.b_micro,
-            0,
-            plan.config.local_rank,
-            solved,
-            stream2_lane);
-        check_cuda(cudaEventRecord(stream2_done, stream2_lane), "cudaEventRecord ring_slot_join");
-        check_cuda(cudaStreamWaitEvent(stream1_lane, stream2_done, 0), "cudaStreamWaitEvent stream1_join");
-        instantiate_captured_graph(stream1_lane, graphs.ring_slot_graphs[job], graphs.ring_slot_execs[job]);
     }
+    if (!skip_ring_slot_templates) {
+        const std::uint64_t candidates_per_slot = static_cast<std::uint64_t>(plan.config.b_micro) * MOVE_COUNT;
+        for (std::uint32_t graph_job = 0; graph_job < ring_slot_graph_job_count; ++graph_job) {
+            const std::uint32_t ring_slot = graph_job % plan.derived.ring_slot_count;
+            const std::uint32_t lane = ring_slot % plan.config.inference_parallelism;
+            cudaStream_t stream1_lane = streams.stream1_lanes[lane];
+            cudaStream_t stream2_lane = streams.stream2_lanes[lane];
+            cudaEvent_t stream1_done = events.stream1_lane_done[lane];
+            cudaEvent_t stream2_done = events.stream2_lane_done[lane];
+            const std::uint64_t candidate_offset = static_cast<std::uint64_t>(graph_job) * candidates_per_slot;
+            const std::uint32_t* graph_job_index =
+                graphs.ring_slot_windowed ? graphs.ring_slot_job_index + graph_job : nullptr;
+            check_cuda(cudaStreamBeginCapture(stream1_lane, cudaStreamCaptureModeGlobal), "cudaStreamBeginCapture ring_slot_graph");
+            check_cuda(cudaEventRecord(stream1_done, stream1_lane), "cudaEventRecord ring_slot_fork");
+            check_cuda(cudaStreamWaitEvent(stream2_lane, stream1_done, 0), "cudaStreamWaitEvent stream2_fork");
+            if (network.uniform_score) {
+                check_cuda(cudaMemsetAsync(
+                    memory.streams.score_ring + candidate_offset,
+                    0,
+                    candidates_per_slot * sizeof(std::uint32_t),
+                    stream1_lane), "cudaMemsetAsync uniform score ring");
+            } else if (network.backend == DispatcherStream1Backend::Mlp) {
+                stream1_inference_cutlass_cuda(
+                    memory.current_frontier_states,
+                    memory.streams.parent_base + graph_job,
+                    memory.streams.count + graph_job,
+                    tables.generators,
+                    network.mlp_view,
+                    network.mlp_scratch_lanes[lane],
+                    memory.streams.score_ring + candidate_offset,
+                    plan.config.b_micro,
+                    stream1_lane);
+            } else if (network.backend == DispatcherStream1Backend::PieceTransformer) {
+                if (graphs.ring_slot_windowed) {
+                    stream1_transformer_inference_graph_job_cuda(
+                        memory.current_frontier_states,
+                        memory.streams.parent_base,
+                        memory.streams.count,
+                        graph_job_index,
+                        network.transformer_view,
+                        network.transformer_scratch_lanes[lane],
+                        memory.streams.score_ring,
+                        plan.config.b_micro,
+                        stream1_lane);
+                } else {
+                    stream1_transformer_inference_cuda(
+                        memory.current_frontier_states,
+                        memory.streams.parent_base + graph_job,
+                        memory.streams.count + graph_job,
+                        network.transformer_view,
+                        network.transformer_scratch_lanes[lane],
+                        memory.streams.score_ring + candidate_offset,
+                        plan.config.b_micro,
+                        stream1_lane);
+                }
+            } else {
+                throw std::invalid_argument("unknown Stream1 dispatcher backend");
+            }
+            if (graphs.ring_slot_windowed) {
+                stream2_hash_goal_graph_job_cuda(
+                    memory.current_frontier_states,
+                    memory.streams.parent_base,
+                    memory.streams.count,
+                    graph_job_index,
+                    tables.generators,
+                    tables.central_state,
+                    tables.zobrist,
+                    memory.streams.hash_ring,
+                    plan.config.b_micro,
+                    0,
+                    plan.config.local_rank,
+                    solved,
+                    stream2_lane);
+            } else {
+                stream2_hash_goal_cuda(
+                    memory.current_frontier_states,
+                    memory.streams.parent_base + graph_job,
+                    memory.streams.count + graph_job,
+                    tables.generators,
+                    tables.central_state,
+                    tables.zobrist,
+                    memory.streams.hash_ring + candidate_offset,
+                    0,
+                    0,
+                    plan.config.b_micro,
+                    0,
+                    plan.config.local_rank,
+                    solved,
+                    stream2_lane);
+            }
+            check_cuda(cudaEventRecord(stream2_done, stream2_lane), "cudaEventRecord ring_slot_join");
+            check_cuda(cudaStreamWaitEvent(stream1_lane, stream2_done, 0), "cudaStreamWaitEvent stream1_join");
+            instantiate_captured_graph(stream1_lane, graphs.ring_slot_graphs[graph_job], graphs.ring_slot_execs[graph_job]);
+        }
     }
-
     graphs.stream3_ring_graphs.resize(plan.config.ring_count, nullptr);
     graphs.stream3_ring_execs.resize(plan.config.ring_count, nullptr);
     for (std::uint32_t ring = 0; ring < plan.config.ring_count; ++ring) {
@@ -1640,6 +1730,14 @@ void destroy_cuda_graph_job_templates(CudaGraphJobTemplates& graphs) {
             cudaGraphDestroy(graph);
         }
     }
+    for (cudaEvent_t event : graphs.ring_slot_done) {
+        if (event) {
+            cudaEventDestroy(event);
+        }
+    }
+    if (graphs.ring_slot_job_index != nullptr) {
+        cudaFree(graphs.ring_slot_job_index);
+    }
     for (cudaGraphExec_t exec : graphs.stream3_ring_execs) {
         if (exec) {
             cudaGraphExecDestroy(exec);
@@ -1678,8 +1776,15 @@ DepthDispatchState run_depth_cuda_graphs(
 #endif
     const std::uint32_t ring_slot_job_count = plan.config.ring_count * plan.derived.ring_slot_count;
     const std::uint64_t candidates_per_slot = static_cast<std::uint64_t>(plan.config.b_micro) * MOVE_COUNT;
-    if (graphs.ring_slot_execs.size() != ring_slot_job_count ||
-        graphs.stream3_ring_execs.size() != plan.config.ring_count ||
+    const bool use_custom_ring_slot_launcher = ring_slot_launcher != nullptr;
+    if (!use_custom_ring_slot_launcher &&
+        (graphs.ring_slot_physical_jobs != ring_slot_job_count ||
+         graphs.ring_slot_window_jobs == 0U ||
+         graphs.ring_slot_window_rings == 0U ||
+         graphs.ring_slot_execs.size() != graphs.ring_slot_window_jobs)) {
+        throw std::invalid_argument("depth dispatcher ring-slot graph window does not match static memory plan");
+    }
+    if (graphs.stream3_ring_execs.size() != plan.config.ring_count ||
         graphs.stream4_shard_execs.size() !=
             static_cast<std::uint64_t>(plan.storage_shard_count) * plan.config.stream4_active_sort_slots) {
         throw std::invalid_argument("depth dispatcher graph template counts do not match static memory plan");
@@ -1700,7 +1805,6 @@ DepthDispatchState run_depth_cuda_graphs(
     if (ring_slot_launcher != nullptr && ring_slot_launcher->launch == nullptr) {
         throw std::invalid_argument("custom ring-slot launcher requires a launch callback");
     }
-    const bool use_custom_ring_slot_launcher = ring_slot_launcher != nullptr;
     const std::uint64_t parents_per_stream3_round =
         static_cast<std::uint64_t>(plan.derived.ring_slot_count) * plan.config.b_micro;
     const std::uint64_t local_exchange_rounds =
@@ -2889,6 +2993,40 @@ DepthDispatchState run_depth_cuda_graphs(
         }
     };
 
+    const auto ring_slot_graph_template_job = [&](std::uint32_t ring, std::uint32_t slot) -> std::uint32_t {
+        if (!graphs.ring_slot_windowed) {
+            return ring * plan.derived.ring_slot_count + slot;
+        }
+        return (ring % graphs.ring_slot_window_rings) * plan.derived.ring_slot_count + slot;
+    };
+
+    const auto ring_slot_graph_template_available = [&](std::uint32_t template_job) -> bool {
+        if (!graphs.ring_slot_windowed || graphs.ring_slot_in_use[template_job] == 0U) {
+            return true;
+        }
+        const cudaError_t status = cudaEventQuery(graphs.ring_slot_done[template_job]);
+        if (status == cudaSuccess) {
+            graphs.ring_slot_in_use[template_job] = 0U;
+            return true;
+        }
+        if (status != cudaErrorNotReady) {
+            check_cuda(status, "cudaEventQuery ring slot graph done");
+        }
+        return false;
+    };
+
+    const auto ring_slot_graph_templates_available_for_ring = [&](std::uint32_t ring) -> bool {
+        if (use_custom_ring_slot_launcher || !graphs.ring_slot_windowed) {
+            return true;
+        }
+        for (std::uint32_t slot = 0; slot < plan.derived.ring_slot_count; ++slot) {
+            const std::uint32_t template_job = ring_slot_graph_template_job(ring, slot);
+            if (!ring_slot_graph_template_available(template_job)) {
+                return false;
+            }
+        }
+        return true;
+    };
     const auto launch_free_rings = [&]() -> bool {
         if (state.stop_requested) {
             return false;
@@ -2896,6 +3034,9 @@ DepthDispatchState run_depth_cuda_graphs(
         bool launched_any = false;
         for (std::uint32_t ring = 0; ring < plan.config.ring_count && state.frontier_cursor < frontier_size; ++ring) {
             if (ring_state[ring] != RingState::Free) {
+                continue;
+            }
+            if (!ring_slot_graph_templates_available_for_ring(ring)) {
                 continue;
             }
             ring_state[ring] = RingState::Stream1Running;
@@ -2948,10 +3089,25 @@ DepthDispatchState run_depth_cuda_graphs(
                         launch_context.stream2_lane = streams.stream2_lanes[lane];
                         ring_slot_launcher->launch(launch_context, ring_slot_launcher->user);
                     } else {
-                        if (graphs.ring_slot_execs[job] == nullptr) {
+                        const std::uint32_t template_job = ring_slot_graph_template_job(ring, slot);
+                        if (template_job >= graphs.ring_slot_execs.size() || graphs.ring_slot_execs[template_job] == nullptr) {
                             throw std::runtime_error("ring-slot graph template is missing and no custom launcher is installed");
                         }
-                        check_cuda(cudaGraphLaunch(graphs.ring_slot_execs[job], lane_stream), "cudaGraphLaunch ring_slot");
+                        if (graphs.ring_slot_windowed) {
+                            check_cuda(cudaMemcpyAsync(
+                                graphs.ring_slot_job_index + template_job,
+                                &job,
+                                sizeof(job),
+                                cudaMemcpyHostToDevice,
+                                lane_stream), "cudaMemcpyAsync ring slot graph job index");
+                        }
+                        check_cuda(cudaGraphLaunch(graphs.ring_slot_execs[template_job], lane_stream), "cudaGraphLaunch ring_slot");
+                        if (graphs.ring_slot_windowed) {
+                            check_cuda(
+                                cudaEventRecord(graphs.ring_slot_done[template_job], lane_stream),
+                                "cudaEventRecord ring slot graph done");
+                            graphs.ring_slot_in_use[template_job] = 1U;
+                        }
                     }
                     ++state.ring_slot_jobs_launched;
                 }

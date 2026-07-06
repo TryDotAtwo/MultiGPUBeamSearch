@@ -4419,16 +4419,14 @@ int main(int argc, char** argv) {
     }
     std::cout << "stream1_mode=" << (stream1_uniform_score ? "uniform" : "model") << "\n";
     std::cout << "stream1_executor=" << stream1_executor << "\n";
-    const std::uint64_t runtime_ring_slot_graph_slots_per_lane =
-        (plan.derived.ring_slot_count + config.inference_parallelism - 1ULL) / config.inference_parallelism;
-    const std::uint64_t runtime_ring_slot_graph_execs =
+    const std::uint64_t runtime_ring_slot_physical_jobs =
         static_cast<std::uint64_t>(config.ring_count) * plan.derived.ring_slot_count;
-    const std::uint64_t runtime_ring_slot_graph_execs_per_lane =
-        static_cast<std::uint64_t>(config.ring_count) * runtime_ring_slot_graph_slots_per_lane;
     std::cout << "runtime_ring_count=" << config.ring_count << "\n";
     std::cout << "runtime_ring_slot_count=" << plan.derived.ring_slot_count << "\n";
-    std::cout << "runtime_ring_slot_graph_execs=" << runtime_ring_slot_graph_execs << "\n";
-    std::cout << "runtime_ring_slot_graph_execs_per_lane=" << runtime_ring_slot_graph_execs_per_lane << "\n";
+    const char* ring_graph_execs_per_lane_requested = std::getenv("BEAM_RING_GRAPH_EXECS_PER_LANE");
+    std::cout << "runtime_ring_slot_physical_jobs=" << runtime_ring_slot_physical_jobs << "\n";
+    std::cout << "runtime_ring_graph_execs_per_lane_requested="
+              << (ring_graph_execs_per_lane_requested == nullptr ? "" : ring_graph_execs_per_lane_requested) << "\n";
     std::cout << "stream1_backend="
               << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
     if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
@@ -4556,6 +4554,10 @@ int main(int argc, char** argv) {
         events,
         graphs,
         skip_native_ring_slot_templates);
+    std::cout << "runtime_ring_slot_graph_windowed=" << (graphs.ring_slot_windowed ? 1 : 0) << "\n";
+    std::cout << "runtime_ring_slot_graph_window_rings=" << graphs.ring_slot_window_rings << "\n";
+    std::cout << "runtime_ring_slot_graph_window_jobs=" << graphs.ring_slot_window_jobs << "\n";
+    std::cout << "runtime_ring_slot_graph_physical_jobs=" << graphs.ring_slot_physical_jobs << "\n";
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "runner_phase=graphs_instantiated\n";
 #endif
