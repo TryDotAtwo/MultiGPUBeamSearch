@@ -59,3 +59,24 @@ stream_pipeline_benchmark mode=stream123 window=16 b_micro=8192 concurrency=2 ri
 ## Notes
 
 The local throughput is not the A100 target number; the purpose of this smoke was to prove the corrected external ring-slot shape and Stream3 compatibility before rerunning MEPhI jobs.
+## Pipeline Smoke Launcher Follow-up
+
+Cluster job `31756` still failed because `BEAM_STREAM3_BATCH_CANDIDATES` could be inherited from the submit shell and override `BEAM_STREAM3_RING_SLOTS`, deriving an effective `RING_SLOT_COUNT` smaller than `BEAM_STREAM1_CONCURRENCY`.
+
+`run_pipeline_smoke_config` now computes and passes an explicit smoke-local Stream3 batch:
+
+```text
+stream3_batch = b_micro * 24 * BEAM_STREAM3_RING_SLOTS
+```
+
+For the intended macro/micro test this is:
+
+```text
+8192 * 24 * 8 = 1572864
+```
+
+Verification:
+
+```text
+stream_pipeline_benchmark mode=stream123 window=64 b_micro=8192 concurrency=8 ring_slots=8 stream3_batch=1572864 graph_window_jobs=8 physical_jobs=8 frontier_size=65536 ring_slot_jobs=8 stream3_jobs=1 stream4_jobs=0 candidates=1572864 depth_like_ms=2335.81 candidates_per_sec=673369 shard_capacity=1572864 allocation_bytes=5091152640 status=OK
+```

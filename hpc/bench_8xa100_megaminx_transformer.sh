@@ -297,8 +297,9 @@ run_pipeline_smoke_config() {
   local log="${TUNING_DIR}/${tag}.log"
   local status="OK"
   local rc=0
+  local stream3_batch="${PIPELINE_STREAM3_BATCH_CANDIDATES:-$((b_micro * 24 * BEAM_STREAM3_RING_SLOTS))}"
 
-  echo "pipeline_smoke_start mode=${mode} window=${window} b_micro=${b_micro} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} concurrency=${concurrency} log=${log}"
+  echo "pipeline_smoke_start mode=${mode} window=${window} b_micro=${b_micro} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} concurrency=${concurrency} stream3_batch=${stream3_batch} log=${log}"
   set +e
   BEAM_PIPELINE_BENCH_MODE="${mode}" \
   BEAM_RING_GRAPH_EXECS_PER_LANE="${window}" \
@@ -306,6 +307,7 @@ run_pipeline_smoke_config() {
   BEAM_STREAM1_TRANSFORMER_MICRO="${BEAM_STREAM1_TRANSFORMER_MICRO}" \
   BEAM_STREAM1_CONCURRENCY="${concurrency}" \
   BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS}" \
+  BEAM_STREAM3_BATCH_CANDIDATES="${stream3_batch}" \
   BEAM_PIPELINE_SMOKE_RINGS="${PIPELINE_SMOKE_RINGS}" \
   BEAM_SHARD_COUNT="${PIPELINE_SHARD_COUNT}" \
   BEAM_WEIGHT_DIR="${BEAM_WEIGHT_DIR}" \
