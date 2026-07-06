@@ -149,14 +149,28 @@ std::uint64_t estimate_read_only_table_bytes() {
            static_cast<std::uint64_t>(STATE_STORAGE_LEN) * STATE_VALUE_PAD * sizeof(Hash128);
 }
 
+std::uint64_t estimate_stream1_scratch_b_micro(
+    const RuntimeConfig& config,
+    const Stream1ModelConfig& stream1_model) {
+    if (stream1_model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        return config.b_micro;
+    }
+    const std::uint32_t transformer_micro = env_u32("BEAM_STREAM1_TRANSFORMER_MICRO", config.b_micro);
+    if (transformer_micro == 0U || transformer_micro > config.b_micro) {
+        throw std::invalid_argument("BEAM_STREAM1_TRANSFORMER_MICRO must be in [1, B_MICRO]");
+    }
+    return transformer_micro;
+}
+
 std::uint64_t estimate_non_static_device_bytes(
     const RuntimeConfig& config,
     const Stream1ModelConfig& stream1_model) {
+    const std::uint32_t scratch_b_micro = estimate_stream1_scratch_b_micro(config, stream1_model);
     return estimate_read_only_table_bytes() +
            estimate_stream1_weight_bytes(stream1_model) +
            stream1_weights::stream1_scratch_bytes(
                stream1_model,
-               config.b_micro,
+               scratch_b_micro,
                config.inference_parallelism);
 }
 

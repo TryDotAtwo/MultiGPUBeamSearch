@@ -110,3 +110,24 @@ Verification:
 ```text
 bash_syntax_ok=1
 ```
+
+## Runtime Budget Estimate Follow-up 2026-07-07
+
+Cluster job `31759` reached production runner startup but failed the manual GPU budget guard:
+
+```text
+manual runtime config exceeds GPU budget: required=58475547300 budget=41100640256 free_before=41163751168 headroom=536870912
+```
+
+The `s31572864` token in the log path is the tag prefix `s3` plus `1572864`; Stream3 batch was already correct.
+
+Cause: `estimate_non_static_device_bytes` still estimated PieceTransformer Stream1 scratch using external `B_MICRO=8192`, while the actual production runner allocation had already been changed to use internal `BEAM_STREAM1_TRANSFORMER_MICRO=512`. The guard was therefore rejecting a configuration based on scratch memory that would not be allocated.
+
+Fix: Runtime config budget estimation now uses `BEAM_STREAM1_TRANSFORMER_MICRO` for PieceTransformer scratch byte estimates, with the same `[1, B_MICRO]` validation as production allocation. MLP estimates still use external `B_MICRO`.
+
+Verification:
+
+```text
+100% tests passed, 0 tests failed out of 13
+stream_pipeline_benchmark mode=stream123 window=64 b_micro=8192 concurrency=8 ring_slots=8 stream3_batch=1572864 graph_window_jobs=8 physical_jobs=8 frontier_size=65536 ring_slot_jobs=8 stream3_jobs=1 stream4_jobs=0 candidates=1572864 depth_like_ms=2517.36 candidates_per_sec=624808 shard_capacity=1572864 allocation_bytes=5091152640 status=OK
+```
