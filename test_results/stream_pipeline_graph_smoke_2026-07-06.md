@@ -161,4 +161,23 @@ Result:
 contract_tests=pass
 ```
 
-A100 runtime smoke still needs to be re-run on the cluster because local Docker has no NVIDIA driver.
+A100 runtime smoke still needs to be re-run on the cluster after local/Kaggle checks.
+
+## 2026-07-06 Local RTX Runtime Smoke
+
+Local Docker GPU access was rechecked with `docker run --gpus all ... nvidia-smi` and found one RTX 3070 Laptop GPU with CUDA 12.8 driver support. The pipeline smoke tool was rebuilt for `sm_86` and run with a small local-safe config:
+
+```bash
+cmake -S . -B build-stream-pipeline-local86 -DCUTLASS_DIR=/opt/cutlass -DBEAM_CUDA_ARCHITECTURES=86
+cmake --build build-stream-pipeline-local86 --target stream_pipeline_benchmark contract_tests -j2
+./build-stream-pipeline-local86/contract_tests
+```
+
+Runtime smoke:
+
+```text
+stream_pipeline_benchmark mode=stream12 window=16 b_micro=64 concurrency=1 ring_slots=1 stream3_batch=1536 graph_window_jobs=2 physical_jobs=2 frontier_size=128 ring_slot_jobs=2 stream3_jobs=0 stream4_jobs=0 candidates=3072 depth_like_ms=3.5295 candidates_per_sec=870379 shard_capacity=4096 allocation_bytes=32162304 status=OK
+stream_pipeline_benchmark mode=stream123 window=16 b_micro=64 concurrency=1 ring_slots=1 stream3_batch=1536 graph_window_jobs=2 physical_jobs=2 frontier_size=128 ring_slot_jobs=2 stream3_jobs=2 stream4_jobs=0 candidates=3072 depth_like_ms=3.90817 candidates_per_sec=786045 shard_capacity=4096 allocation_bytes=32162304 status=OK
+```
+
+Result: local runtime path is clean for `stream12` and `stream123`; next validation target is Kaggle 2xT4 with the new script package `kaggle_t4_pipeline_smoke`.
