@@ -1,0 +1,1 @@
+stream_pipeline_benchmark mode=stream123 window=16 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=32 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=32 stream4_jobs=0 candidates=3145728 depth_like_ms=6006.12 candidates_per_sec=523753 shard_capacity=1048576 allocation_bytes=3281187584 status=OK

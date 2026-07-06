@@ -239,3 +239,20 @@ stream_pipeline_benchmark mode=stream123 window=16 b_micro=512 concurrency=2 rin
 ```
 
 Kaggle 2xT4 v3 should run the same cluster-like smoke dimensions with windows `16/32/64`.
+
+## 2026-07-06 Kaggle 2xT4 Smoke v3
+
+Kaggle kernel `trydotatwo/cayley-beam-pipeline-smoke-2xt4` version 3 completed successfully on commit `62c14bb`. It built `stream_pipeline_benchmark` and `contract_tests`, `contract_tests=pass`, and all cluster-like pipeline smoke rows returned `status=OK`.
+
+Downloaded outputs: `test_results/kaggle_pipeline_smoke_v3_2026-07-06/`.
+
+```text
+stream12  window=16  b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 candidates_per_sec=563956 depth_like_ms=5577.97 stream3_jobs=0 graph_window_jobs=32 physical_jobs=256 allocation_bytes=3281187584
+stream12  window=32  b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 candidates_per_sec=547178 depth_like_ms=5749    stream3_jobs=0 graph_window_jobs=64 physical_jobs=256 allocation_bytes=3281187584
+stream12  window=64  b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 candidates_per_sec=533020 depth_like_ms=5901.71 stream3_jobs=0 graph_window_jobs=128 physical_jobs=256 allocation_bytes=3281187584
+stream123 window=16  b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 candidates_per_sec=523753 depth_like_ms=6006.12 stream3_jobs=32 graph_window_jobs=32 physical_jobs=256 allocation_bytes=3281187584
+stream123 window=32  b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 candidates_per_sec=504416 depth_like_ms=6236.37 stream3_jobs=32 graph_window_jobs=64 physical_jobs=256 allocation_bytes=3281187584
+stream123 window=64  b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 candidates_per_sec=493849 depth_like_ms=6369.81 stream3_jobs=32 graph_window_jobs=128 physical_jobs=256 allocation_bytes=3281187584
+```
+
+Result: local Docker and Kaggle 2xT4 are clean after the `threshold_request_local/global` fix. The next validation step is to rerun the MEPhI 8xA100 `RUN_PIPELINE_SMOKE=1` sweep on commit `62c14bb` or newer.
