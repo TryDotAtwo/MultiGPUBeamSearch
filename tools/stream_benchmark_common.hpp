@@ -60,6 +60,8 @@ struct BenchmarkThresholdBuffers {
     std::uint32_t* current_threshold = nullptr;
     std::uint32_t* threshold_initialized = nullptr;
     std::uint32_t* active_index = nullptr;
+    std::uint32_t* request_local = nullptr;
+    std::uint32_t* request_global = nullptr;
 };
 
 inline BenchmarkThresholdBuffers alloc_benchmark_threshold_buffers() {
@@ -67,6 +69,8 @@ inline BenchmarkThresholdBuffers alloc_benchmark_threshold_buffers() {
     BEAM_CUDA_CHECK(cudaMalloc(&buffers.current_threshold, 2ULL * sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMalloc(&buffers.threshold_initialized, 2ULL * sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMalloc(&buffers.active_index, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&buffers.request_local, sizeof(std::uint32_t)));
+    BEAM_CUDA_CHECK(cudaMalloc(&buffers.request_global, sizeof(std::uint32_t)));
     return buffers;
 }
 
@@ -74,12 +78,16 @@ inline void attach_benchmark_threshold_buffers(StaticDeviceMemory& memory, const
     memory.streams.current_threshold = buffers.current_threshold;
     memory.streams.threshold_initialized = buffers.threshold_initialized;
     memory.streams.current_threshold_active_index = buffers.active_index;
+    memory.streams.threshold_request_local = buffers.request_local;
+    memory.streams.threshold_request_global = buffers.request_global;
 }
 
 inline void free_benchmark_threshold_buffers(BenchmarkThresholdBuffers& buffers) {
     cudaFree(buffers.current_threshold);
     cudaFree(buffers.threshold_initialized);
     cudaFree(buffers.active_index);
+    cudaFree(buffers.request_local);
+    cudaFree(buffers.request_global);
     buffers = {};
 }
 

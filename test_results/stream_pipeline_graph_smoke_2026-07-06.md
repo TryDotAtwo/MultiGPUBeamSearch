@@ -208,3 +208,34 @@ stream123 window=32  b_micro=512 concurrency=2 ring_slots=2 stream3_batch=24576 
 ```
 
 Result: local runtime and Kaggle 2xT4 runtime are clean. Next step is the MEPhI 8xA100 `RUN_PIPELINE_SMOKE=1` sweep on the same branch.
+
+## 2026-07-06 Cluster Smoke Fix 2
+
+MEPhI cluster job 31745 used the updated benchmark but failed all rows before measurement with `FAIL_134`:
+
+```text
+pipeline_smoke_start mode=stream12 window=16 b_micro=512 concurrency=2
+what(): CUDA error: cudaMemset(memory.streams.threshold_request_local, 0, sizeof(std::uint32_t))
+file=.../tools/stream_pipeline_benchmark.cu line=87 message=invalid argument
+```
+
+The previous fix attached benchmark-owned `current_threshold`, `threshold_initialized`, and `current_threshold_active_index`, but the reset path also clears `threshold_request_local` and `threshold_request_global`. Those request pointers must follow the same benchmark-owned-buffer rule because the pipeline smoke tool is not a production full-depth allocation.
+
+Fix: extend `BenchmarkThresholdBuffers` with `request_local` and `request_global`, allocate them with `cudaMalloc`, attach them to `StaticDeviceMemory`, and free them with the other benchmark threshold buffers. Production runner/static layout defaults remain unchanged.
+
+Local Docker verification after the request-buffer fix:
+
+```text
+contract_tests=pass
+stream_pipeline_benchmark mode=stream12 window=16 b_micro=64 concurrency=1 ring_slots=1 stream3_batch=1536 graph_window_jobs=2 physical_jobs=2 frontier_size=128 ring_slot_jobs=2 stream3_jobs=0 stream4_jobs=0 candidates=3072 depth_like_ms=3.47383 candidates_per_sec=884325 shard_capacity=4096 allocation_bytes=21823744 status=OK
+stream_pipeline_benchmark mode=stream123 window=16 b_micro=64 concurrency=1 ring_slots=1 stream3_batch=1536 graph_window_jobs=2 physical_jobs=2 frontier_size=128 ring_slot_jobs=2 stream3_jobs=2 stream4_jobs=0 candidates=3072 depth_like_ms=10.9191 candidates_per_sec=281341 shard_capacity=4096 allocation_bytes=21823744 status=OK
+```
+
+Cluster-like local RTX smoke also passed with the A100 smoke layout (`B_MICRO=512`, concurrency `2`, ring slots `8`, rings `32`, shard count `32`, stream3 batch `98304`):
+
+```text
+stream_pipeline_benchmark mode=stream12 window=16 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=32 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=0 stream4_jobs=0 candidates=3145728 depth_like_ms=3712.62 candidates_per_sec=847307 shard_capacity=1048576 allocation_bytes=3281187584 status=OK
+stream_pipeline_benchmark mode=stream123 window=16 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=32 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=32 stream4_jobs=0 candidates=3145728 depth_like_ms=4129.25 candidates_per_sec=761815 shard_capacity=1048576 allocation_bytes=3281187584 status=OK
+```
+
+Kaggle 2xT4 v3 should run the same cluster-like smoke dimensions with windows `16/32/64`.
