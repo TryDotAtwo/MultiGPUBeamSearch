@@ -29,7 +29,7 @@ MODES = ["stream12", "stream123"]
 WINDOWS = [16, 32]
 B_MICRO = 512
 CONCURRENCY = 2
-RING_SLOTS = 1
+RING_SLOTS = 2
 RINGS = 4
 SHARD_COUNT = 8
 SHARD_CAPACITY = 65536
@@ -100,6 +100,8 @@ def preflight() -> None:
         print(f"torch_cuda_device_{index}={torch.cuda.get_device_name(index)}", flush=True)
     if gpu_count < 1:
         raise RuntimeError("pipeline smoke requires at least one CUDA device")
+    if CONCURRENCY > RING_SLOTS:
+        raise RuntimeError(f"CONCURRENCY={CONCURRENCY} must be <= RING_SLOTS={RING_SLOTS}")
 
 
 def prepare_repo_and_build() -> str:
@@ -130,7 +132,7 @@ def prepare_repo_and_build() -> str:
         cwd=REPO_DIR,
     )
     run_checked(["cmake", "--build", BUILD_DIR, "--target", "stream_pipeline_benchmark", "contract_tests", "-j", "2"])
-    run_checked([BUILD_DIR / "contract_tests"])
+    run_checked([BUILD_DIR / "contract_tests"], cwd=REPO_DIR)
     return actual
 
 

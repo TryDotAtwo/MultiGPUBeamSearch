@@ -181,3 +181,15 @@ stream_pipeline_benchmark mode=stream123 window=16 b_micro=64 concurrency=1 ring
 ```
 
 Result: local runtime path is clean for `stream12` and `stream123`; next validation target is Kaggle 2xT4 with the new script package `kaggle_t4_pipeline_smoke`.
+
+## 2026-07-06 Kaggle 2xT4 Smoke v1
+
+Kaggle kernel `trydotatwo/cayley-beam-pipeline-smoke-2xt4` version 1 built `stream_pipeline_benchmark` and passed `contract_tests`, but all four runtime rows failed before graph execution:
+
+```text
+what(): STREAM1_CONCURRENCY must be in [1, RING_SLOT_COUNT]
+```
+
+Root cause: the package used `CONCURRENCY=2` with `RING_SLOTS=1`. This is a config error caught by the runtime guard, not a CUDA graph/runtime failure. Downloaded outputs are under `test_results/kaggle_pipeline_smoke_v1_2026-07-06/`.
+
+Fix for v2: set `RING_SLOTS=2`, add a package preflight guard for `CONCURRENCY <= RING_SLOTS`, and run `contract_tests` from the cloned repo under `/tmp` so Kaggle outputs do not include contract-test fixture files.
