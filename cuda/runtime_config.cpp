@@ -185,11 +185,30 @@ std::uint32_t set_stream3_batch_from_ring_slots(RuntimeConfig& config, std::uint
     return ring_slot_count;
 }
 
-void set_ring_count_from_logical_shard(RuntimeConfig& config) {
+std::uint32_t set_stream3_batch_from_candidates(RuntimeConfig& config, std::uint32_t stream3_batch_candidates) {
     const std::uint64_t slot_candidates = ring_slot_candidate_count(config);
+    if (stream3_batch_candidates == 0U || slot_candidates == 0ULL) {
+        throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be nonzero");
+    }
+    if (static_cast<std::uint64_t>(stream3_batch_candidates) % slot_candidates != 0ULL) {
+        throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be divisible by B_MICRO * MOVE_COUNT");
+    }
+    const std::uint64_t ring_slot_count = static_cast<std::uint64_t>(stream3_batch_candidates) / slot_candidates;
+    if (ring_slot_count == 0ULL) {
+        throw std::invalid_argument("derived RING_SLOT_COUNT must be nonzero");
+    }
+    config.stream3_batch_candidates = stream3_batch_candidates;
+    return checked_u32(ring_slot_count, "stream3_ring_slots");
+}
+
+void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stream3_staging_ring_slots) {
     const std::uint64_t local_capacity = local_frontier_capacity(config);
     const std::uint64_t logical_shard_size = ceil_div_u64(local_capacity, config.shard_count);
-    config.ring_count = checked_u32(ceil_div_u64(logical_shard_size, slot_candidates), "ring_count");
+    const std::uint64_t staging_slots = std::max<std::uint64_t>(1ULL, stream3_staging_ring_slots);
+    const std::uint64_t target_ring_candidates = logical_shard_size * staging_slots;
+    config.ring_count = checked_u32(
+        ceil_div_u64(target_ring_candidates, config.stream3_batch_candidates),
+        "ring_count");
     if (config.ring_count == 0U) {
         throw std::invalid_argument("derived RING_COUNT must be nonzero");
     }
@@ -377,7 +396,7 @@ bool try_make_candidate(
     if (config.inference_parallelism > ring_slot_count) {
         return false;
     }
-    set_ring_count_from_logical_shard(config);
+    set_ring_count_from_logical_shard(config, ring_slot_count);
     set_shard_capacity_from_logical_shard(config);
     set_global_spill_capacity(config);
     if (config.stream4_batch_candidates > config.shard_capacity_candidates ||
@@ -504,7 +523,8 @@ RuntimeConfigBuild build_manual_runtime_config(
     build.gpu_headroom_bytes = gpu_headroom_bytes;
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;
-    build.stream3_ring_slots = required_env_u32("BEAM_STREAM3_RING_SLOTS");
+    const std::uint32_t requested_stream3_ring_slots = required_env_u32("BEAM_STREAM3_RING_SLOTS");
+    build.stream3_ring_slots = requested_stream3_ring_slots;
     build.config.shard_count = required_env_u32("BEAM_SHARD_COUNT");
     build.config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 2);
     build.config.stream4_batch_candidates = required_env_u32("BEAM_STREAM4_BATCH_CANDIDATES");
@@ -514,14 +534,20 @@ RuntimeConfigBuild build_manual_runtime_config(
     build.config.global_spill_capacity =
         build.config.shard_buffer_count > 1U ? env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 0) :
         required_env_u32("BEAM_GLOBAL_SPILL_CAPACITY");
-    set_stream3_batch_from_ring_slots(build.config, build.stream3_ring_slots);
+    if (env_present("BEAM_STREAM3_BATCH_CANDIDATES")) {
+        build.stream3_ring_slots = set_stream3_batch_from_candidates(
+            build.config,
+            required_env_u32("BEAM_STREAM3_BATCH_CANDIDATES"));
+    } else {
+        set_stream3_batch_from_ring_slots(build.config, build.stream3_ring_slots);
+    }
     if (build.config.inference_parallelism > build.stream3_ring_slots) {
-        throw std::invalid_argument("manual BEAM_STREAM1_CONCURRENCY must be <= BEAM_STREAM3_RING_SLOTS");
+        throw std::invalid_argument("manual BEAM_STREAM1_CONCURRENCY must be <= effective STREAM3 ring slots");
     }
     if (env_present("BEAM_RING_COUNT")) {
         build.config.ring_count = env_u32("BEAM_RING_COUNT", 1);
     } else {
-        set_ring_count_from_logical_shard(build.config);
+        set_ring_count_from_logical_shard(build.config, requested_stream3_ring_slots);
     }
     if (build.config.stream4_batch_candidates % build.config.stream4_batch_alignment != 0U) {
         throw std::invalid_argument("manual BEAM_STREAM4_BATCH_CANDIDATES must be aligned to BEAM_STREAM4_BATCH_ALIGNMENT");

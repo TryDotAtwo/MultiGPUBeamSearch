@@ -34,6 +34,11 @@ std::uint64_t env_u64(const char* name, std::uint64_t fallback) {
     return parse_u64(value, name);
 }
 
+bool env_present(const char* name) {
+    const char* value = std::getenv(name);
+    return value != nullptr && value[0] != '\0';
+}
+
 std::filesystem::path env_path(const char* name, std::filesystem::path fallback) {
     const char* value = std::getenv(name);
     if (value == nullptr || value[0] == '\0') {
@@ -130,8 +135,19 @@ int main(int argc, char** argv) {
     RuntimeConfig config;
     config.b_micro = env_u32("BEAM_B_MICRO", env_u32("BEAM_PIPELINE_B_MICRO", 512U));
     config.inference_parallelism = env_u32("BEAM_STREAM1_CONCURRENCY", 2U);
-    const std::uint32_t ring_slots = env_u32("BEAM_STREAM3_RING_SLOTS", 8U);
-    config.stream3_batch_candidates = config.b_micro * static_cast<std::uint32_t>(MOVE_COUNT) * ring_slots;
+    const std::uint64_t slot_candidates = static_cast<std::uint64_t>(config.b_micro) * MOVE_COUNT;
+    std::uint32_t ring_slots = env_u32("BEAM_STREAM3_RING_SLOTS", 8U);
+    if (env_present("BEAM_STREAM3_BATCH_CANDIDATES")) {
+        config.stream3_batch_candidates = env_u32("BEAM_STREAM3_BATCH_CANDIDATES", 0U);
+        if (config.stream3_batch_candidates == 0U ||
+            static_cast<std::uint64_t>(config.stream3_batch_candidates) % slot_candidates != 0ULL) {
+            throw std::runtime_error("BEAM_STREAM3_BATCH_CANDIDATES must be divisible by B_MICRO * MOVE_COUNT");
+        }
+        ring_slots = static_cast<std::uint32_t>(
+            static_cast<std::uint64_t>(config.stream3_batch_candidates) / slot_candidates);
+    } else {
+        config.stream3_batch_candidates = config.b_micro * static_cast<std::uint32_t>(MOVE_COUNT) * ring_slots;
+    }
     config.stream4_batch_candidates = env_u32("STREAM4_BATCH_CANDIDATES", env_u32("BEAM_STREAM4_BATCH_CANDIDATES", 262144U));
     config.stream4_trigger_candidates = env_u32("STREAM4_TRIGGER_CANDIDATES", env_u32("BEAM_STREAM4_TRIGGER_CANDIDATES", 524288U));
     config.stream4_batch_alignment = env_u32("STREAM4_BATCH_ALIGNMENT", env_u32("BEAM_STREAM4_BATCH_ALIGNMENT", 1024U));

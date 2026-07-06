@@ -361,7 +361,7 @@ run_full_config() {
   set_backend_runner "${backend}"
   beam_derive_shard_capacity
 
-  local tag="${stage}_${backend}_bw${BEAM_WIDTH}_d${DEPTH_LIMIT}_sh${SHARD_COUNT}_b${BEAM_B_MICRO}_c${BEAM_STREAM1_CONCURRENCY}_r${BEAM_STREAM3_RING_SLOTS}_fc${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}"
+  local tag="${stage}_${backend}_bw${BEAM_WIDTH}_d${DEPTH_LIMIT}_sh${SHARD_COUNT}_b${BEAM_B_MICRO}_c${BEAM_STREAM1_CONCURRENCY}_r${BEAM_STREAM3_RING_SLOTS}_s3${STREAM3_BATCH_CANDIDATES}_fc${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES}"
   local log="${TUNING_DIR}/${tag}.log"
   local gpu_log="${TUNING_DIR}/nvidia_smi_${tag}.log"
   local status="OK"
@@ -449,6 +449,7 @@ write_best_env() {
       print "export BEAM_B_MICRO=" b;
       print "export BEAM_STREAM1_CONCURRENCY=" c;
       print "export BEAM_STREAM3_RING_SLOTS=" ring;
+      print "export BEAM_STREAM3_BATCH_CANDIDATES=" s3;
       print "export STREAM4_BATCH_CANDIDATES=" s4;
       print "export STREAM4_TRIGGER_CANDIDATES=" trig;
       print "export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES=" fc;
