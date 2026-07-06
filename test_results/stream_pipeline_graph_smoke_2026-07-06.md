@@ -193,3 +193,18 @@ what(): STREAM1_CONCURRENCY must be in [1, RING_SLOT_COUNT]
 Root cause: the package used `CONCURRENCY=2` with `RING_SLOTS=1`. This is a config error caught by the runtime guard, not a CUDA graph/runtime failure. Downloaded outputs are under `test_results/kaggle_pipeline_smoke_v1_2026-07-06/`.
 
 Fix for v2: set `RING_SLOTS=2`, add a package preflight guard for `CONCURRENCY <= RING_SLOTS`, and run `contract_tests` from the cloned repo under `/tmp` so Kaggle outputs do not include contract-test fixture files.
+
+## 2026-07-06 Kaggle 2xT4 Smoke v2
+
+Kaggle kernel `trydotatwo/cayley-beam-pipeline-smoke-2xt4` version 2 completed successfully on commit `1cd5355`. It built `stream_pipeline_benchmark` and `contract_tests`, `contract_tests=pass`, and all pipeline smoke rows returned `status=OK`.
+
+Downloaded outputs: `test_results/kaggle_pipeline_smoke_v2_2026-07-06/`.
+
+```text
+stream12  window=16  b_micro=512 concurrency=2 ring_slots=2 stream3_batch=24576 candidates_per_sec=610063 depth_like_ms=161.137 stream3_jobs=0
+stream12  window=32  b_micro=512 concurrency=2 ring_slots=2 stream3_batch=24576 candidates_per_sec=631061 depth_like_ms=155.776 stream3_jobs=0
+stream123 window=16  b_micro=512 concurrency=2 ring_slots=2 stream3_batch=24576 candidates_per_sec=661734 depth_like_ms=148.555 stream3_jobs=4
+stream123 window=32  b_micro=512 concurrency=2 ring_slots=2 stream3_batch=24576 candidates_per_sec=624255 depth_like_ms=157.474 stream3_jobs=4
+```
+
+Result: local runtime and Kaggle 2xT4 runtime are clean. Next step is the MEPhI 8xA100 `RUN_PIPELINE_SMOKE=1` sweep on the same branch.
