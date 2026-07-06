@@ -135,6 +135,10 @@ int main(int argc, char** argv) {
     RuntimeConfig config;
     config.b_micro = env_u32("BEAM_B_MICRO", env_u32("BEAM_PIPELINE_B_MICRO", 512U));
     config.inference_parallelism = env_u32("BEAM_STREAM1_CONCURRENCY", 2U);
+    const std::uint32_t transformer_micro = env_u32("BEAM_STREAM1_TRANSFORMER_MICRO", config.b_micro);
+    if (transformer_micro == 0U || transformer_micro > config.b_micro) {
+        throw std::runtime_error("BEAM_STREAM1_TRANSFORMER_MICRO must be in [1, B_MICRO]");
+    }
     const std::uint64_t slot_candidates = static_cast<std::uint64_t>(config.b_micro) * MOVE_COUNT;
     std::uint32_t ring_slots = env_u32("BEAM_STREAM3_RING_SLOTS", 8U);
     if (env_present("BEAM_STREAM3_BATCH_CANDIDATES")) {
@@ -209,17 +213,18 @@ int main(int argc, char** argv) {
 
     stream1_weights::DeviceWeights device_weights = stream1_weights::upload_weights(host_weights);
     stream1_weights::ScratchAllocation stream1_scratch =
-        stream1_weights::alloc_stream1_scratch(stream1_model, config.b_micro, config.inference_parallelism);
+        stream1_weights::alloc_stream1_scratch(stream1_model, transformer_micro, config.inference_parallelism);
     stream1_weights::TransformerNetworkViewHolder transformer_view_holder =
         stream1_weights::transformer_network_view(device_weights.transformer, stream1_model);
 
     DispatcherNetwork network{};
     network.backend = DispatcherStream1Backend::PieceTransformer;
     network.transformer_view = transformer_view_holder.view;
+    network.transformer_micro = transformer_micro;
     network.transformer_scratch_lanes.reserve(config.inference_parallelism);
     for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
         network.transformer_scratch_lanes.push_back(
-            stream1_weights::transformer_scratch_view(stream1_scratch, stream1_model, config.b_micro, lane));
+            stream1_weights::transformer_scratch_view(stream1_scratch, stream1_model, transformer_micro, lane));
     }
 
     DispatcherStreams streams;

@@ -25,6 +25,7 @@ BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS:-8}"
 BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-98304}"
 BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-2000000}"
 BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM="${BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM:-1200000}"
+BEAM_STREAM1_TRANSFORMER_MICRO="${BEAM_STREAM1_TRANSFORMER_MICRO:-512}"
 
 SMOKE_BEAM_WIDTH="${SMOKE_BEAM_WIDTH:-64000000}"
 SMOKE_DEPTH_LIMIT="${SMOKE_DEPTH_LIMIT:-12}"
@@ -58,8 +59,8 @@ RUN_SELECTED_900M_AFTER_STREAM1="${RUN_SELECTED_900M_AFTER_STREAM1:-0}"
 RUN_PIPELINE_SMOKE="${RUN_PIPELINE_SMOKE:-0}"
 PIPELINE_SMOKE_MODES="${PIPELINE_SMOKE_MODES:-stream12 stream123}"
 PIPELINE_GRAPH_WINDOW_SWEEP="${PIPELINE_GRAPH_WINDOW_SWEEP:-16 32 64}"
-PIPELINE_B_MICRO_SWEEP="${PIPELINE_B_MICRO_SWEEP:-512}"
-PIPELINE_CONCURRENCY_SWEEP="${PIPELINE_CONCURRENCY_SWEEP:-2}"
+PIPELINE_B_MICRO_SWEEP="${PIPELINE_B_MICRO_SWEEP:-${TARGET_B_MICRO_SWEEP%% *}}"
+PIPELINE_CONCURRENCY_SWEEP="${PIPELINE_CONCURRENCY_SWEEP:-${TARGET_CONCURRENCY_SWEEP%% *}}"
 PIPELINE_SMOKE_RINGS="${PIPELINE_SMOKE_RINGS:-32}"
 PIPELINE_SHARD_COUNT="${PIPELINE_SHARD_COUNT:-32}"
 DEPTH_AVG_MIN="${DEPTH_AVG_MIN:-3}"
@@ -297,11 +298,12 @@ run_pipeline_smoke_config() {
   local status="OK"
   local rc=0
 
-  echo "pipeline_smoke_start mode=${mode} window=${window} b_micro=${b_micro} concurrency=${concurrency} log=${log}"
+  echo "pipeline_smoke_start mode=${mode} window=${window} b_micro=${b_micro} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} concurrency=${concurrency} log=${log}"
   set +e
   BEAM_PIPELINE_BENCH_MODE="${mode}" \
   BEAM_RING_GRAPH_EXECS_PER_LANE="${window}" \
   BEAM_B_MICRO="${b_micro}" \
+  BEAM_STREAM1_TRANSFORMER_MICRO="${BEAM_STREAM1_TRANSFORMER_MICRO}" \
   BEAM_STREAM1_CONCURRENCY="${concurrency}" \
   BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS}" \
   BEAM_PIPELINE_SMOKE_RINGS="${PIPELINE_SMOKE_RINGS}" \
@@ -377,6 +379,7 @@ run_full_config() {
 
   beam_safe_clear_history_contents
   export BEAM_B_MICRO
+  export BEAM_STREAM1_TRANSFORMER_MICRO
   export BEAM_STREAM1_CONCURRENCY
   export BEAM_STREAM3_RING_SLOTS
   export BEAM_SHARD_BUFFER_COUNT
@@ -385,7 +388,7 @@ run_full_config() {
   beam_export_manual_config
   beam_prepare_nccl_file "${tag}"
 
-  echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY} log=${log}"
+  echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY} log=${log}"
   local rc=0
   set +e
   beam_torchrun_production "${tag}" "${log}" || rc=$?
@@ -400,7 +403,7 @@ run_full_config() {
 }
 
 write_best_stream1_env() {
-  awk -F'\t' -v default_concurrency="${TARGET_CONCURRENCY_SWEEP%% *}" '
+  awk -F'\t' -v default_concurrency="${TARGET_CONCURRENCY_SWEEP%% *}" -v target_bmicro="${TARGET_B_MICRO_SWEEP%% *}" '
     NR == 1 { next }
     $1 == "isolated" && $4 == "OK" && $5 != "NA" {
       runner_backend=""; b=""; c="";
@@ -420,11 +423,13 @@ write_best_stream1_env() {
     END {
       if (best == "") { exit 1 }
       print "export MEGAMINX_STREAM1_BACKEND=" backend;
-      print "export BEAM_B_MICRO=" bmicro;
+      print "export BEAM_B_MICRO=" target_bmicro;
+      print "export BEAM_STREAM1_TRANSFORMER_MICRO=" bmicro;
       print "export BEAM_STREAM1_CONCURRENCY=" concurrency;
       print "export BEST_STREAM1_BACKEND_BENCH=" bench_backend;
       print "export BEST_STREAM1_MODE=" mode;
       print "export BEST_STREAM1_BATCH=" batch;
+      print "export BEST_STREAM1_ISOLATED_B_MICRO=" bmicro;
       print "export BEST_STREAM1_CANDIDATES_PER_SEC=" best;
       print "export BEST_STREAM1_SOURCE_LOG=" source_log;
     }
@@ -433,7 +438,7 @@ write_best_stream1_env() {
 }
 
 write_best_env() {
-  awk -F'\t' '
+  awk -F'\t' -v transformer_micro="${BEAM_STREAM1_TRANSFORMER_MICRO}" '
     NR == 1 { next }
     $1 == "target" && $3 == "OK" && $4 != "NA" {
       if (best == "" || $4 + 0 < best + 0) {
@@ -447,6 +452,7 @@ write_best_env() {
       print "export BEAM_WIDTH=" beam;
       print "export SHARD_COUNT=" shard;
       print "export BEAM_B_MICRO=" b;
+      print "export BEAM_STREAM1_TRANSFORMER_MICRO=" transformer_micro;
       print "export BEAM_STREAM1_CONCURRENCY=" c;
       print "export BEAM_STREAM3_RING_SLOTS=" ring;
       print "export BEAM_STREAM3_BATCH_CANDIDATES=" s3;
@@ -507,7 +513,7 @@ if [ "${RUN_SELECTED_900M_AFTER_STREAM1}" = "1" ]; then
   # shellcheck disable=SC1090
   source "${BEST_STREAM1_ENV}"
   echo "selected_900m_from_stream1_env=${BEST_STREAM1_ENV}"
-  echo "selected_900m_backend=${MEGAMINX_STREAM1_BACKEND} b_micro=${BEAM_B_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY}"
+  echo "selected_900m_backend=${MEGAMINX_STREAM1_BACKEND} b_micro=${BEAM_B_MICRO} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY}"
   run_full_config target "${MEGAMINX_STREAM1_BACKEND}" "${TARGET_BEAM_WIDTH}" "${TARGET_DEPTH_LIMIT}" "${TARGET_SHARD_COUNT_SWEEP%% *}" "${BEAM_B_MICRO}" "${BEAM_STREAM1_CONCURRENCY}" "${TARGET_RING_SLOTS_SWEEP%% *}" "${TARGET_FINAL_CHUNK_SWEEP%% *}" "${TARGET_SHARD_CAPACITY_SCALE_PPM}"
 fi
 

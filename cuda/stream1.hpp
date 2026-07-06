@@ -143,6 +143,7 @@ void stream1_transformer_inference_cuda(
     const Stream1TransformerScratchView& scratch,
     std::uint32_t* score_ring,
     std::uint32_t b_micro,
+    std::uint32_t parent_offset,
     cudaStream_t stream);
 
 void stream1_transformer_inference_graph_job_cuda(
@@ -154,6 +155,8 @@ void stream1_transformer_inference_graph_job_cuda(
     const Stream1TransformerScratchView& scratch,
     std::uint32_t* score_ring,
     std::uint32_t b_micro,
+    std::uint32_t slot_b_micro,
+    std::uint32_t parent_offset,
     cudaStream_t stream);
 
 void stream1_cutlass_linear_cuda(

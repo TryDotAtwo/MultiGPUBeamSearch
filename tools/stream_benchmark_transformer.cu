@@ -214,6 +214,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                         scratch_views[i],
                         resources.score[i],
                         b_micro,
+                        0U,
                         resources.streams[i]);
                     BEAM_CUDA_CHECK(cudaStreamEndCapture(resources.streams[i], &graphs[i]));
                     BEAM_CUDA_CHECK(cudaGraphInstantiate(&execs[i], graphs[i], nullptr, nullptr, 0));
@@ -236,6 +237,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                             scratch_views[i],
                             resources.score[i],
                             b_micro,
+                            0U,
                             resources.streams[i]);
                     }
                 });

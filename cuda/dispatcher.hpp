@@ -75,6 +75,7 @@ struct DispatcherNetwork {
     std::vector<Stream1CutlassScratch> mlp_scratch_lanes;
     Stream1TransformerNetworkView transformer_view{};
     std::vector<Stream1TransformerScratchView> transformer_scratch_lanes;
+    std::uint32_t transformer_micro = 0;
     bool uniform_score = false;
 };
 

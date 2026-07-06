@@ -67,13 +67,14 @@ __global__ void stream1_transformer_build_input_kernel(
     const std::uint32_t* __restrict__ count,
     Stream1TransformerNetworkView network,
     half* __restrict__ tokens,
-    std::uint32_t b_micro) {
+    std::uint32_t b_micro,
+    std::uint32_t parent_offset) {
     const std::uint32_t row_token = blockIdx.x;
     const std::uint32_t dim = blockIdx.y * blockDim.x + threadIdx.x;
     const std::uint32_t row = row_token / network.dims.seq_len;
     const std::uint32_t token = row_token % network.dims.seq_len;
     const std::uint32_t active_count = *count;
-    if (row >= b_micro || row >= active_count || dim >= network.dims.d_model) {
+    if (row >= b_micro || parent_offset + row >= active_count || dim >= network.dims.d_model) {
         return;
     }
     float value = 0.0f;
@@ -85,7 +86,7 @@ __global__ void stream1_transformer_build_input_kernel(
             network.fast_piece_static,
             static_cast<std::uint64_t>(piece) * network.dims.d_model + dim,
             network.dims.dtype);
-        const std::uint64_t parent_idx = *parent_base + static_cast<std::uint64_t>(row);
+        const std::uint64_t parent_idx = *parent_base + static_cast<std::uint64_t>(parent_offset + row);
         const State128* state = current_frontier_states + parent_idx;
         for (std::uint32_t slot = 0; slot < network.dims.max_piece_size; ++slot) {
             const std::uint64_t piece_slot = static_cast<std::uint64_t>(piece) * network.dims.max_piece_size + slot;
@@ -107,6 +108,7 @@ __device__ float stream1_transformer_input_token_value51x256_device(
     const State128* __restrict__ current_frontier_states,
     const std::uint64_t* __restrict__ parent_base,
     Stream1TransformerNetworkView network,
+    std::uint32_t parent_offset,
     std::uint32_t row,
     std::uint32_t token,
     std::uint32_t dim) {
@@ -118,7 +120,7 @@ __device__ float stream1_transformer_input_token_value51x256_device(
         network.fast_piece_static,
         static_cast<std::uint64_t>(piece) * 256ULL + dim,
         network.dims.dtype);
-    const std::uint64_t parent_idx = *parent_base + static_cast<std::uint64_t>(row);
+    const std::uint64_t parent_idx = *parent_base + static_cast<std::uint64_t>(parent_offset + row);
     const State128* state = current_frontier_states + parent_idx;
     for (std::uint32_t slot = 0; slot < 3U; ++slot) {
         const std::uint64_t piece_slot = static_cast<std::uint64_t>(piece) * 3ULL + slot;
@@ -140,7 +142,8 @@ __global__ void stream1_transformer_build_input_layernorm51x256_kernel(
     const std::uint32_t* __restrict__ count,
     Stream1TransformerNetworkView network,
     half* __restrict__ tokens,
-    std::uint32_t b_micro) {
+    std::uint32_t b_micro,
+    std::uint32_t parent_offset) {
     const std::uint32_t row_token = blockIdx.x;
     const std::uint32_t tid = threadIdx.x;
     if (tid >= 128U) {
@@ -158,11 +161,11 @@ __global__ void stream1_transformer_build_input_layernorm51x256_kernel(
     const std::uint64_t base = static_cast<std::uint64_t>(row_token) * 256ULL;
     const std::uint32_t col0 = tid;
     const std::uint32_t col1 = tid + 128U;
-    const bool active = row < *count;
+    const bool active = parent_offset + row < *count;
     const float x0 = active ? stream1_transformer_input_token_value51x256_device(
-        current_frontier_states, parent_base, network, row, token, col0) : 0.0f;
+        current_frontier_states, parent_base, network, parent_offset, row, token, col0) : 0.0f;
     const float x1 = active ? stream1_transformer_input_token_value51x256_device(
-        current_frontier_states, parent_base, network, row, token, col1) : 0.0f;
+        current_frontier_states, parent_base, network, parent_offset, row, token, col1) : 0.0f;
 
     const float warp_sum = stream1_transformer_warp_reduce_sum_device(x0 + x1);
     if (lane == 0U) {
@@ -216,6 +219,7 @@ void stream1_transformer_build_input_layernorm51x256_launch(
     const Stream1TransformerNetworkView& network,
     half* tokens,
     std::uint32_t b_micro,
+    std::uint32_t parent_offset,
     cudaStream_t stream) {
     const Stream1TransformerDims dims = network.dims;
     if (dims.seq_len != 51U || dims.d_model != 256U || dims.num_pieces != 50U ||
@@ -228,7 +232,8 @@ void stream1_transformer_build_input_layernorm51x256_launch(
         count,
         network,
         tokens,
-        b_micro);
+        b_micro,
+        parent_offset);
 }
 
 __global__ void stream1_transformer_build_input_kernel_graph_job(
@@ -238,14 +243,15 @@ __global__ void stream1_transformer_build_input_kernel_graph_job(
     const std::uint32_t* __restrict__ graph_job_index,
     Stream1TransformerNetworkView network,
     half* __restrict__ tokens,
-    std::uint32_t b_micro) {
+    std::uint32_t b_micro,
+    std::uint32_t parent_offset) {
     const std::uint32_t row_token = blockIdx.x;
     const std::uint32_t dim = blockIdx.y * blockDim.x + threadIdx.x;
     const std::uint32_t row = row_token / network.dims.seq_len;
     const std::uint32_t token = row_token % network.dims.seq_len;
     const std::uint32_t job = *graph_job_index;
     const std::uint32_t active_count = count[job];
-    if (row >= b_micro || row >= active_count || dim >= network.dims.d_model) {
+    if (row >= b_micro || parent_offset + row >= active_count || dim >= network.dims.d_model) {
         return;
     }
     float value = 0.0f;
@@ -257,7 +263,7 @@ __global__ void stream1_transformer_build_input_kernel_graph_job(
             network.fast_piece_static,
             static_cast<std::uint64_t>(piece) * network.dims.d_model + dim,
             network.dims.dtype);
-        const std::uint64_t parent_idx = parent_base[job] + static_cast<std::uint64_t>(row);
+        const std::uint64_t parent_idx = parent_base[job] + static_cast<std::uint64_t>(parent_offset + row);
         const State128* state = current_frontier_states + parent_idx;
         for (std::uint32_t slot = 0; slot < network.dims.max_piece_size; ++slot) {
             const std::uint64_t piece_slot = static_cast<std::uint64_t>(piece) * network.dims.max_piece_size + slot;
@@ -280,6 +286,7 @@ __device__ float stream1_transformer_input_token_value51x256_graph_job_device(
     const std::uint64_t* __restrict__ parent_base,
     const std::uint32_t* __restrict__ graph_job_index,
     Stream1TransformerNetworkView network,
+    std::uint32_t parent_offset,
     std::uint32_t row,
     std::uint32_t token,
     std::uint32_t dim) {
@@ -292,7 +299,7 @@ __device__ float stream1_transformer_input_token_value51x256_graph_job_device(
         static_cast<std::uint64_t>(piece) * 256ULL + dim,
         network.dims.dtype);
     const std::uint32_t job = *graph_job_index;
-    const std::uint64_t parent_idx = parent_base[job] + static_cast<std::uint64_t>(row);
+    const std::uint64_t parent_idx = parent_base[job] + static_cast<std::uint64_t>(parent_offset + row);
     const State128* state = current_frontier_states + parent_idx;
     for (std::uint32_t slot = 0; slot < 3U; ++slot) {
         const std::uint64_t piece_slot = static_cast<std::uint64_t>(piece) * 3ULL + slot;
@@ -315,7 +322,8 @@ __global__ void stream1_transformer_build_input_layernorm51x256_graph_job_kernel
     const std::uint32_t* __restrict__ graph_job_index,
     Stream1TransformerNetworkView network,
     half* __restrict__ tokens,
-    std::uint32_t b_micro) {
+    std::uint32_t b_micro,
+    std::uint32_t parent_offset) {
     const std::uint32_t row_token = blockIdx.x;
     const std::uint32_t tid = threadIdx.x;
     if (tid >= 128U) {
@@ -334,11 +342,11 @@ __global__ void stream1_transformer_build_input_layernorm51x256_graph_job_kernel
     const std::uint32_t col0 = tid;
     const std::uint32_t col1 = tid + 128U;
     const std::uint32_t job = *graph_job_index;
-    const bool active = row < count[job];
+    const bool active = parent_offset + row < count[job];
     const float x0 = active ? stream1_transformer_input_token_value51x256_graph_job_device(
-        current_frontier_states, parent_base, graph_job_index, network, row, token, col0) : 0.0f;
+        current_frontier_states, parent_base, graph_job_index, network, parent_offset, row, token, col0) : 0.0f;
     const float x1 = active ? stream1_transformer_input_token_value51x256_graph_job_device(
-        current_frontier_states, parent_base, graph_job_index, network, row, token, col1) : 0.0f;
+        current_frontier_states, parent_base, graph_job_index, network, parent_offset, row, token, col1) : 0.0f;
 
     const float warp_sum = stream1_transformer_warp_reduce_sum_device(x0 + x1);
     if (lane == 0U) {
@@ -393,6 +401,7 @@ void stream1_transformer_build_input_layernorm51x256_graph_job_launch(
     const Stream1TransformerNetworkView& network,
     half* tokens,
     std::uint32_t b_micro,
+    std::uint32_t parent_offset,
     cudaStream_t stream) {
     const Stream1TransformerDims dims = network.dims;
     if (dims.seq_len != 51U || dims.d_model != 256U || dims.num_pieces != 50U ||
@@ -406,7 +415,8 @@ void stream1_transformer_build_input_layernorm51x256_graph_job_launch(
         graph_job_index,
         network,
         tokens,
-        b_micro);
+        b_micro,
+        parent_offset);
 }
 __global__ void stream1_transformer_layernorm_copy_kernel(
     const half* __restrict__ input,
@@ -1403,6 +1413,7 @@ __global__ void stream1_transformer_score_quantize_kernel(
     const std::uint32_t* __restrict__ count,
     std::uint32_t* __restrict__ score_ring,
     std::uint32_t b_micro,
+    std::uint32_t parent_offset,
     Stream1TransformerDims dims) {
     const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t total = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
@@ -1411,7 +1422,7 @@ __global__ void stream1_transformer_score_quantize_kernel(
     }
     const std::uint32_t row = i / static_cast<std::uint32_t>(MOVE_COUNT);
     const std::uint32_t move = i % static_cast<std::uint32_t>(MOVE_COUNT);
-    if (row >= *count) {
+    if (parent_offset + row >= *count) {
         return;
     }
     const float q = stream1_transformer_load_scalar_device(logits, static_cast<std::uint64_t>(row) * dims.output_dim + move, dims.dtype) +
@@ -1426,6 +1437,8 @@ __global__ void stream1_transformer_score_quantize_graph_job_kernel(
     const std::uint32_t* __restrict__ graph_job_index,
     std::uint32_t* __restrict__ score_ring,
     std::uint32_t b_micro,
+    std::uint32_t slot_b_micro,
+    std::uint32_t parent_offset,
     Stream1TransformerDims dims) {
     const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t total = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
@@ -1435,12 +1448,13 @@ __global__ void stream1_transformer_score_quantize_graph_job_kernel(
     const std::uint32_t job = *graph_job_index;
     const std::uint32_t row = i / static_cast<std::uint32_t>(MOVE_COUNT);
     const std::uint32_t move = i % static_cast<std::uint32_t>(MOVE_COUNT);
-    if (row >= count[job]) {
+    if (parent_offset + row >= count[job]) {
         return;
     }
     const float q = stream1_transformer_load_scalar_device(logits, static_cast<std::uint64_t>(row) * dims.output_dim + move, dims.dtype) +
         stream1_transformer_load_scalar_device(output_bias, move, dims.dtype);
-    const std::uint64_t out_idx = static_cast<std::uint64_t>(job) * b_micro * MOVE_COUNT + i;
+    const std::uint64_t out_idx = static_cast<std::uint64_t>(job) * slot_b_micro * MOVE_COUNT +
+        static_cast<std::uint64_t>(parent_offset) * MOVE_COUNT + i;
     score_ring[out_idx] = stream1_transformer_score_key_from_float_device(q);
 }
 
@@ -1477,6 +1491,7 @@ void stream1_transformer_inference_block51_cuda(
     const Stream1TransformerScratchView& scratch,
     std::uint32_t* score_ring,
     std::uint32_t b_micro,
+    std::uint32_t parent_offset,
     Stream1TransformerAttentionBackend attention_backend,
     cudaStream_t stream) {
     NvtxRange range("Stream1_transformer_block51_launch");
@@ -1495,6 +1510,7 @@ void stream1_transformer_inference_block51_cuda(
         network,
         scratch.tokens,
         b_micro,
+        parent_offset,
         stream);
 
     for (std::uint32_t layer = 0; layer < 4U; ++layer) {
@@ -1600,6 +1616,7 @@ void stream1_transformer_inference_block51_cuda(
         count,
         score_ring,
         b_micro,
+        parent_offset,
         dims);
 }
 void stream1_transformer_inference_block51_graph_job_cuda(
@@ -1611,6 +1628,8 @@ void stream1_transformer_inference_block51_graph_job_cuda(
     const Stream1TransformerScratchView& scratch,
     std::uint32_t* score_ring,
     std::uint32_t b_micro,
+    std::uint32_t slot_b_micro,
+    std::uint32_t parent_offset,
     Stream1TransformerAttentionBackend attention_backend,
     cudaStream_t stream) {
     NvtxRange range("Stream1_transformer_block51_graph_job_launch");
@@ -1630,6 +1649,7 @@ void stream1_transformer_inference_block51_graph_job_cuda(
         network,
         scratch.tokens,
         b_micro,
+        parent_offset,
         stream);
 
     for (std::uint32_t layer = 0; layer < 4U; ++layer) {
@@ -1736,6 +1756,8 @@ void stream1_transformer_inference_block51_graph_job_cuda(
         graph_job_index,
         score_ring,
         b_micro,
+        slot_b_micro,
+        parent_offset,
         dims);
 }
 
@@ -1748,6 +1770,8 @@ void stream1_transformer_inference_graph_job_cuda(
     const Stream1TransformerScratchView& scratch,
     std::uint32_t* score_ring,
     std::uint32_t b_micro,
+    std::uint32_t slot_b_micro,
+    std::uint32_t parent_offset,
     cudaStream_t stream) {
     NvtxRange range("Stream1_transformer_graph_job_inference_launch");
     const Stream1TransformerDims dims = network.dims;
@@ -1779,6 +1803,8 @@ void stream1_transformer_inference_graph_job_cuda(
             scratch,
             score_ring,
             b_micro,
+            slot_b_micro,
+            parent_offset,
             attention_backend,
             stream);
         return;
@@ -1794,7 +1820,8 @@ void stream1_transformer_inference_graph_job_cuda(
         graph_job_index,
         network,
         scratch.tokens,
-        b_micro);
+        b_micro,
+        parent_offset);
 
     stream1_transformer_layernorm_copy_launch(
         scratch.tokens,
@@ -1923,6 +1950,8 @@ void stream1_transformer_inference_graph_job_cuda(
         graph_job_index,
         score_ring,
         b_micro,
+        slot_b_micro,
+        parent_offset,
         dims);
 #else
     (void)current_frontier_states;
@@ -1945,6 +1974,7 @@ void stream1_transformer_inference_cuda(
     const Stream1TransformerScratchView& scratch,
     std::uint32_t* score_ring,
     std::uint32_t b_micro,
+    std::uint32_t parent_offset,
     cudaStream_t stream) {
     NvtxRange range("Stream1_transformer_inference_launch");
     const Stream1TransformerDims dims = network.dims;
@@ -1975,6 +2005,7 @@ void stream1_transformer_inference_cuda(
             scratch,
             score_ring,
             b_micro,
+            parent_offset,
             attention_backend,
             stream);
         return;
@@ -1989,7 +2020,8 @@ void stream1_transformer_inference_cuda(
         count,
         network,
         scratch.tokens,
-        b_micro);
+        b_micro,
+        parent_offset);
 
     stream1_transformer_layernorm_copy_launch(
         scratch.tokens,
@@ -2119,6 +2151,7 @@ void stream1_transformer_inference_cuda(
         count,
         score_ring,
         b_micro,
+        parent_offset,
         dims);
 #else
     (void)current_frontier_states;

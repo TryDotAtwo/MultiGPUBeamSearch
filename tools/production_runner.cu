@@ -151,15 +151,26 @@ void launch_native_eager_ring_slot(const DispatcherRingSlotLaunchContext& contex
             state->config.b_micro,
             context.stream1_lane);
     } else if (network.backend == DispatcherStream1Backend::PieceTransformer) {
-        stream1_transformer_inference_cuda(
-            memory.current_frontier_states,
-            memory.streams.parent_base + context.job,
-            memory.streams.count + context.job,
-            network.transformer_view,
-            network.transformer_scratch_lanes.at(context.lane),
-            memory.streams.score_ring + candidate_offset,
-            state->config.b_micro,
-            context.stream1_lane);
+        const std::uint32_t transformer_micro =
+            network.transformer_micro == 0U ? state->config.b_micro : network.transformer_micro;
+        if (transformer_micro == 0U || transformer_micro > state->config.b_micro) {
+            throw std::invalid_argument("native_eager Stream1 transformer micro must be in [1, B_MICRO]");
+        }
+        for (std::uint32_t parent_offset = 0; parent_offset < state->config.b_micro;
+             parent_offset += transformer_micro) {
+            const std::uint32_t chunk = std::min(transformer_micro, state->config.b_micro - parent_offset);
+            stream1_transformer_inference_cuda(
+                memory.current_frontier_states,
+                memory.streams.parent_base + context.job,
+                memory.streams.count + context.job,
+                network.transformer_view,
+                network.transformer_scratch_lanes.at(context.lane),
+                memory.streams.score_ring + candidate_offset +
+                    static_cast<std::uint64_t>(parent_offset) * MOVE_COUNT,
+                chunk,
+                parent_offset,
+                context.stream1_lane);
+        }
     } else {
         throw std::invalid_argument("unknown native_eager Stream1 dispatcher backend");
     }
@@ -4112,6 +4123,14 @@ int main(int argc, char** argv) {
     const RuntimeConfigBuild config_build =
         build_runtime_config_from_budget(beam, world_size, rank, stream1_model, free_before);
     const RuntimeConfig config = config_build.config;
+    const std::uint32_t stream1_transformer_micro =
+        stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER
+            ? env_u32("BEAM_STREAM1_TRANSFORMER_MICRO", config.b_micro)
+            : config.b_micro;
+    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER &&
+        (stream1_transformer_micro == 0U || stream1_transformer_micro > config.b_micro)) {
+        throw std::runtime_error("BEAM_STREAM1_TRANSFORMER_MICRO must be in [1, B_MICRO]");
+    }
     const StaticMemoryPlan plan = config_build.plan;
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "puzzle_id=" << cli_puzzle_id << "\n";
@@ -4123,6 +4142,11 @@ int main(int argc, char** argv) {
     std::cout << "CUDA_DEVICE_LOCAL_RANK=" << device_local_rank << "\n";
     std::cout << "B_MICRO=" << config.b_micro << "\n";
     std::cout << "STREAM1_ROWS_PER_JOB=" << stream1_inference_rows(config.b_micro, stream1_model) << "\n";
+    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        std::cout << "STREAM1_TRANSFORMER_MICRO=" << stream1_transformer_micro << "\n";
+        std::cout << "STREAM1_TRANSFORMER_MICRO_ROWS="
+                  << stream1_inference_rows(stream1_transformer_micro, stream1_model) << "\n";
+    }
     std::cout << "STREAM1_CONCURRENCY=" << config.inference_parallelism << "\n";
     std::cout << "STREAM3_RING_SLOTS=" << config_build.stream3_ring_slots << "\n";
     std::cout << "RING_COUNT=" << config.ring_count << "\n";
@@ -4364,8 +4388,10 @@ int main(int argc, char** argv) {
     stream1_weights::ScratchAllocation stream1_scratch;
     if (!use_libtorch_stream1_executor) {
         device_weights = stream1_weights::upload_weights(host_weights);
+        const std::uint32_t scratch_b_micro =
+            stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? stream1_transformer_micro : config.b_micro;
         stream1_scratch =
-            stream1_weights::alloc_stream1_scratch(stream1_model, config.b_micro, config.inference_parallelism);
+            stream1_weights::alloc_stream1_scratch(stream1_model, scratch_b_micro, config.inference_parallelism);
     }
     TrackedSolutionPrefix tracked_solution;
 #if BEAM_DEBUG_PATH_TRACE
@@ -4430,6 +4456,7 @@ int main(int argc, char** argv) {
     std::cout << "stream1_backend="
               << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
     if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        std::cout << "stream1_transformer_micro=" << stream1_transformer_micro << "\n";
         std::cout << "stream1_transformer_dims"
                   << " seq_len=" << stream1_model.seq_len
                   << " d_model=" << stream1_model.d_model
@@ -4479,10 +4506,11 @@ int main(int argc, char** argv) {
             stream1_weights::transformer_network_view(device_weights.transformer, stream1_model);
         network.backend = DispatcherStream1Backend::PieceTransformer;
         network.transformer_view = transformer_view_holder.view;
+        network.transformer_micro = stream1_transformer_micro;
         network.transformer_scratch_lanes.reserve(config.inference_parallelism);
         for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
             network.transformer_scratch_lanes.push_back(
-                stream1_weights::transformer_scratch_view(stream1_scratch, stream1_model, config.b_micro, lane));
+                stream1_weights::transformer_scratch_view(stream1_scratch, stream1_model, stream1_transformer_micro, lane));
         }
     } else {
         throw std::runtime_error("unsupported Stream1 backend in production runner");

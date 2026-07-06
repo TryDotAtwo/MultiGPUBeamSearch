@@ -162,6 +162,7 @@ int main() {
         scratch_view,
         d_score,
         reference_count,
+        0U,
         0);
     BEAM_CUDA_CHECK(cudaGetLastError());
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());

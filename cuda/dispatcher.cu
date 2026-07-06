@@ -1403,27 +1403,40 @@ void instantiate_cuda_graph_job_templates(
                     plan.config.b_micro,
                     stream1_lane);
             } else if (network.backend == DispatcherStream1Backend::PieceTransformer) {
-                if (graphs.ring_slot_windowed) {
-                    stream1_transformer_inference_graph_job_cuda(
-                        memory.current_frontier_states,
-                        memory.streams.parent_base,
-                        memory.streams.count,
-                        graph_job_index,
-                        network.transformer_view,
-                        network.transformer_scratch_lanes[lane],
-                        memory.streams.score_ring,
-                        plan.config.b_micro,
-                        stream1_lane);
-                } else {
-                    stream1_transformer_inference_cuda(
-                        memory.current_frontier_states,
-                        memory.streams.parent_base + graph_job,
-                        memory.streams.count + graph_job,
-                        network.transformer_view,
-                        network.transformer_scratch_lanes[lane],
-                        memory.streams.score_ring + candidate_offset,
-                        plan.config.b_micro,
-                        stream1_lane);
+                const std::uint32_t transformer_micro =
+                    network.transformer_micro == 0U ? plan.config.b_micro : network.transformer_micro;
+                if (transformer_micro == 0U || transformer_micro > plan.config.b_micro) {
+                    throw std::invalid_argument("Stream1 transformer micro must be in [1, B_MICRO]");
+                }
+                for (std::uint32_t parent_offset = 0; parent_offset < plan.config.b_micro;
+                     parent_offset += transformer_micro) {
+                    const std::uint32_t chunk = std::min(transformer_micro, plan.config.b_micro - parent_offset);
+                    if (graphs.ring_slot_windowed) {
+                        stream1_transformer_inference_graph_job_cuda(
+                            memory.current_frontier_states,
+                            memory.streams.parent_base,
+                            memory.streams.count,
+                            graph_job_index,
+                            network.transformer_view,
+                            network.transformer_scratch_lanes[lane],
+                            memory.streams.score_ring,
+                            chunk,
+                            plan.config.b_micro,
+                            parent_offset,
+                            stream1_lane);
+                    } else {
+                        stream1_transformer_inference_cuda(
+                            memory.current_frontier_states,
+                            memory.streams.parent_base + graph_job,
+                            memory.streams.count + graph_job,
+                            network.transformer_view,
+                            network.transformer_scratch_lanes[lane],
+                            memory.streams.score_ring + candidate_offset +
+                                static_cast<std::uint64_t>(parent_offset) * MOVE_COUNT,
+                            chunk,
+                            parent_offset,
+                            stream1_lane);
+                    }
                 }
             } else {
                 throw std::invalid_argument("unknown Stream1 dispatcher backend");
