@@ -4419,6 +4419,16 @@ int main(int argc, char** argv) {
     }
     std::cout << "stream1_mode=" << (stream1_uniform_score ? "uniform" : "model") << "\n";
     std::cout << "stream1_executor=" << stream1_executor << "\n";
+    const std::uint64_t runtime_ring_slot_graph_slots_per_lane =
+        (plan.derived.ring_slot_count + config.inference_parallelism - 1ULL) / config.inference_parallelism;
+    const std::uint64_t runtime_ring_slot_graph_execs =
+        static_cast<std::uint64_t>(config.ring_count) * plan.derived.ring_slot_count;
+    const std::uint64_t runtime_ring_slot_graph_execs_per_lane =
+        static_cast<std::uint64_t>(config.ring_count) * runtime_ring_slot_graph_slots_per_lane;
+    std::cout << "runtime_ring_count=" << config.ring_count << "\n";
+    std::cout << "runtime_ring_slot_count=" << plan.derived.ring_slot_count << "\n";
+    std::cout << "runtime_ring_slot_graph_execs=" << runtime_ring_slot_graph_execs << "\n";
+    std::cout << "runtime_ring_slot_graph_execs_per_lane=" << runtime_ring_slot_graph_execs_per_lane << "\n";
     std::cout << "stream1_backend="
               << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
     if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {

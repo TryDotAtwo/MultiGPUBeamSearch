@@ -131,6 +131,14 @@ PY
     export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner"
     export BEAM_STREAM1_EXECUTOR=native_cuda_graph
     ;;
+  native_windowed_graph|native_graph_window)
+    export BEAM_ENABLE_LIBTORCH_STREAM1=OFF
+    export LD_LIBRARY_PATH="$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
+    export BEAM_RING_GRAPH_EXECS_PER_LANE="${BEAM_RING_GRAPH_EXECS_PER_LANE:-32}"
+    beam_configure_build production_runner
+    export BEAM_PRODUCTION_RUNNER_PATH="${BUILD_DIR}/production_runner"
+    export BEAM_STREAM1_EXECUTOR=native_cuda_graph
+    ;;
   native_eager|native_no_graph)
     export BEAM_ENABLE_LIBTORCH_STREAM1=OFF
     export LD_LIBRARY_PATH="$(dirname "${NCCL_LIBRARY}"):${LD_LIBRARY_PATH:-}"
@@ -140,7 +148,7 @@ PY
     ;;
   *)
     echo "invalid_megaminx_stream1_backend=${MEGAMINX_STREAM1_BACKEND}"
-    echo "allowed_megaminx_stream1_backend=libtorch_eager,native_cuda_graph,native_eager,native_no_graph"
+    echo "allowed_megaminx_stream1_backend=libtorch_eager,native_cuda_graph,native_windowed_graph,native_eager,native_no_graph"
     exit 2
     ;;
 esac
@@ -163,6 +171,7 @@ local_beam_width=${LOCAL_BEAM_WIDTH}
 shard_count=${SHARD_COUNT}
 megaminx_stream1_backend=${MEGAMINX_STREAM1_BACKEND}
 stream1_executor=${BEAM_STREAM1_EXECUTOR}
+ring_graph_execs_per_lane=${BEAM_RING_GRAPH_EXECS_PER_LANE:-}
 stream1_weight_dir=${BEAM_WEIGHT_DIR}
 stream1_output_dim=${STREAM1_OUTPUT_DIM}
 beam_b_micro_parent_budget=${BEAM_B_MICRO}

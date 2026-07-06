@@ -195,6 +195,32 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config) {
     }
 }
 
+void apply_ring_graph_exec_window(RuntimeConfig& config, std::uint32_t ring_slot_count) {
+    if (!env_present("BEAM_RING_GRAPH_EXECS_PER_LANE")) {
+        return;
+    }
+    const std::uint32_t max_execs_per_lane = env_u32("BEAM_RING_GRAPH_EXECS_PER_LANE", 0);
+    if (max_execs_per_lane == 0U) {
+        throw std::invalid_argument("BEAM_RING_GRAPH_EXECS_PER_LANE must be nonzero when set");
+    }
+    if (config.inference_parallelism == 0U || ring_slot_count == 0U) {
+        throw std::invalid_argument("ring graph window requires nonzero STREAM1_CONCURRENCY and STREAM3_RING_SLOTS");
+    }
+    const std::uint32_t max_slots_per_lane = checked_u32(
+        (static_cast<std::uint64_t>(ring_slot_count) + config.inference_parallelism - 1ULL) /
+            config.inference_parallelism,
+        "ring graph slots per lane");
+    if (max_execs_per_lane < max_slots_per_lane) {
+        throw std::invalid_argument(
+            "BEAM_RING_GRAPH_EXECS_PER_LANE is smaller than one physical ring worth of slots for a lane");
+    }
+    const std::uint32_t max_rings = max_execs_per_lane / max_slots_per_lane;
+    if (max_rings == 0U) {
+        throw std::invalid_argument("BEAM_RING_GRAPH_EXECS_PER_LANE produced zero physical rings");
+    }
+    config.ring_count = std::max<std::uint32_t>(1U, std::min(config.ring_count, max_rings));
+}
+
 void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
     const std::uint64_t logical_shard_size = logical_shard_size_for(config);
     const std::uint64_t scaled_capacity =
@@ -377,6 +403,7 @@ bool try_make_candidate(
         return false;
     }
     set_ring_count_from_logical_shard(config);
+    apply_ring_graph_exec_window(config, ring_slot_count);
     set_shard_capacity_from_logical_shard(config);
     set_global_spill_capacity(config);
     if (config.stream4_batch_candidates > config.shard_capacity_candidates ||
@@ -521,6 +548,7 @@ RuntimeConfigBuild build_manual_runtime_config(
         build.config.ring_count = env_u32("BEAM_RING_COUNT", 1);
     } else {
         set_ring_count_from_logical_shard(build.config);
+        apply_ring_graph_exec_window(build.config, build.stream3_ring_slots);
     }
     if (build.config.stream4_batch_candidates % build.config.stream4_batch_alignment != 0U) {
         throw std::invalid_argument("manual BEAM_STREAM4_BATCH_CANDIDATES must be aligned to BEAM_STREAM4_BATCH_ALIGNMENT");
