@@ -26,6 +26,8 @@ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDAT
 BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-2000000}"
 BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM="${BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM:-1200000}"
 BEAM_STREAM1_TRANSFORMER_MICRO="${BEAM_STREAM1_TRANSFORMER_MICRO:-512}"
+BEAM_STREAM1_TRANSFORMER_BLOCK51="${BEAM_STREAM1_TRANSFORMER_BLOCK51:-1}"
+BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY="${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY:-1}"
 
 SMOKE_BEAM_WIDTH="${SMOKE_BEAM_WIDTH:-64000000}"
 SMOKE_DEPTH_LIMIT="${SMOKE_DEPTH_LIMIT:-12}"
@@ -305,6 +307,8 @@ run_pipeline_smoke_config() {
   BEAM_RING_GRAPH_EXECS_PER_LANE="${window}" \
   BEAM_B_MICRO="${b_micro}" \
   BEAM_STREAM1_TRANSFORMER_MICRO="${BEAM_STREAM1_TRANSFORMER_MICRO}" \
+  BEAM_STREAM1_TRANSFORMER_BLOCK51="${BEAM_STREAM1_TRANSFORMER_BLOCK51}" \
+  BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY="${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY}" \
   BEAM_STREAM1_CONCURRENCY="${concurrency}" \
   BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS}" \
   BEAM_STREAM3_BATCH_CANDIDATES="${stream3_batch}" \
@@ -383,6 +387,8 @@ run_full_config() {
   beam_safe_clear_history_contents
   export BEAM_B_MICRO
   export BEAM_STREAM1_TRANSFORMER_MICRO
+  export BEAM_STREAM1_TRANSFORMER_BLOCK51
+  export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY
   export BEAM_STREAM1_CONCURRENCY
   export BEAM_STREAM3_RING_SLOTS
   export BEAM_SHARD_BUFFER_COUNT
@@ -391,7 +397,7 @@ run_full_config() {
   beam_export_manual_config
   beam_prepare_nccl_file "${tag}"
 
-  echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} concurrency=${BEAM_STREAM1_CONCURRENCY} stream3_batch=${STREAM3_BATCH_CANDIDATES} log=${log}"
+  echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} block51=${BEAM_STREAM1_TRANSFORMER_BLOCK51} final_cls_only=${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY} concurrency=${BEAM_STREAM1_CONCURRENCY} stream3_batch=${STREAM3_BATCH_CANDIDATES} log=${log}"
   local rc=0
   set +e
   beam_torchrun_production "${tag}" "${log}" || rc=$?
@@ -428,6 +434,8 @@ write_best_stream1_env() {
       print "export MEGAMINX_STREAM1_BACKEND=" backend;
       print "export BEAM_B_MICRO=" target_bmicro;
       print "export BEAM_STREAM1_TRANSFORMER_MICRO=" bmicro;
+      print "export BEAM_STREAM1_TRANSFORMER_BLOCK51=1";
+      print "export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY=1";
       print "export BEAM_STREAM1_CONCURRENCY=" concurrency;
       print "export BEST_STREAM1_BACKEND_BENCH=" bench_backend;
       print "export BEST_STREAM1_MODE=" mode;
@@ -456,6 +464,8 @@ write_best_env() {
       print "export SHARD_COUNT=" shard;
       print "export BEAM_B_MICRO=" b;
       print "export BEAM_STREAM1_TRANSFORMER_MICRO=" transformer_micro;
+      print "export BEAM_STREAM1_TRANSFORMER_BLOCK51=1";
+      print "export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY=1";
       print "export BEAM_STREAM1_CONCURRENCY=" c;
       print "export BEAM_STREAM3_RING_SLOTS=" ring;
       print "export BEAM_STREAM3_BATCH_CANDIDATES=" s3;

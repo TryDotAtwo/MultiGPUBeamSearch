@@ -4466,6 +4466,14 @@ int main(int argc, char** argv) {
                   << " ff_dim=" << stream1_model.ff_dim
                   << " output_dim=" << stream1_model.output_dim
                   << "\n";
+        const char* block51_env = std::getenv("BEAM_STREAM1_TRANSFORMER_BLOCK51");
+        const char* final_cls_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY");
+        std::cout << "stream1_transformer_block51="
+                  << (block51_env != nullptr && std::strcmp(block51_env, "1") == 0 ? 1 : 0)
+                  << " raw=" << (block51_env == nullptr ? "" : block51_env) << "\n";
+        std::cout << "stream1_transformer_final_cls_only="
+                  << (final_cls_env != nullptr && std::strcmp(final_cls_env, "1") == 0 ? 1 : 0)
+                  << " raw=" << (final_cls_env == nullptr ? "" : final_cls_env) << "\n";
     }
 
     DispatcherNetwork network{};

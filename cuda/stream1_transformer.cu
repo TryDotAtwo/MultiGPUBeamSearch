@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
+#include <string>
 
 namespace beam {
 
@@ -1407,6 +1408,25 @@ __global__ void stream1_transformer_cls_bias_layernorm_kernel(
         stream1_transformer_store_scalar_device(cls, out_base + col, y, dims.dtype);
     }
 }
+__global__ void stream1_transformer_gather_cls256_kernel(
+    const half* __restrict__ token_rows,
+    half* __restrict__ cls_rows,
+    Stream1TransformerDims dims,
+    std::uint32_t b_micro) {
+    const std::uint32_t row = blockIdx.x;
+    const std::uint32_t tid = threadIdx.x;
+    if (row >= b_micro || tid >= 128U) {
+        return;
+    }
+    const std::uint64_t src_base = static_cast<std::uint64_t>(row) * STREAM1_TRANSFORMER_SEQ51 * STREAM1_TRANSFORMER_DMODEL256;
+    const std::uint64_t dst_base = static_cast<std::uint64_t>(row) * STREAM1_TRANSFORMER_DMODEL256;
+    const std::uint32_t col0 = tid;
+    const std::uint32_t col1 = tid + 128U;
+    const float x0 = stream1_transformer_load_scalar_device(token_rows, src_base + col0, dims.dtype);
+    const float x1 = stream1_transformer_load_scalar_device(token_rows, src_base + col1, dims.dtype);
+    stream1_transformer_store_scalar_device(cls_rows, dst_base + col0, x0, dims.dtype);
+    stream1_transformer_store_scalar_device(cls_rows, dst_base + col1, x1, dims.dtype);
+}
 __global__ void stream1_transformer_score_quantize_kernel(
     const half* __restrict__ logits,
     const half* __restrict__ output_bias,
@@ -1458,17 +1478,24 @@ __global__ void stream1_transformer_score_quantize_graph_job_kernel(
     score_ring[out_idx] = stream1_transformer_score_key_from_float_device(q);
 }
 
-bool stream1_transformer_block51_requested() {
-    const char* value = std::getenv("BEAM_STREAM1_TRANSFORMER_BLOCK51");
+bool stream1_transformer_env_flag(const char* name) {
+    const char* value = std::getenv(name);
     if (value == nullptr || value[0] == '\0' || std::strcmp(value, "0") == 0) {
         return false;
     }
     if (std::strcmp(value, "1") == 0) {
         return true;
     }
-    throw std::invalid_argument("BEAM_STREAM1_TRANSFORMER_BLOCK51 must be unset, 0, or 1");
+    throw std::invalid_argument(std::string(name) + " must be unset, 0, or 1");
 }
 
+bool stream1_transformer_block51_requested() {
+    return stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_BLOCK51");
+}
+
+bool stream1_transformer_final_cls_only_requested() {
+    return stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY");
+}
 bool stream1_transformer_is_block51_shape(Stream1TransformerDims dims) {
     return dims.state_len == 120U &&
         dims.num_classes == 120U &&
@@ -1483,6 +1510,113 @@ bool stream1_transformer_is_block51_shape(Stream1TransformerDims dims) {
         dims.output_dim == MOVE_COUNT;
 }
 
+void stream1_transformer_final_layer_cls_only_block51_cuda(
+    const Stream1TransformerNetworkView& network,
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t b_micro,
+    Stream1TransformerAttentionBackend attention_backend,
+    cudaStream_t stream) {
+    const Stream1TransformerDims dims = network.dims;
+    const Stream1TransformerBlockView block = network.blocks[3];
+    const std::uint32_t token_rows = b_micro * STREAM1_TRANSFORMER_SEQ51;
+
+    stream1_transformer_layernorm_copy_launch(
+        scratch.tokens,
+        scratch.attention_context,
+        block.ln1_gamma,
+        block.ln1_beta,
+        token_rows,
+        STREAM1_TRANSFORMER_DMODEL256,
+        dims.dtype,
+        stream);
+    stream1_transformer_linear_bias_cuda(
+        scratch.attention_context,
+        block.attn_qkv_weight,
+        block.attn_qkv_bias,
+        scratch.qkv,
+        token_rows,
+        STREAM1_TRANSFORMER_DMODEL256,
+        3U * STREAM1_TRANSFORMER_DMODEL256,
+        dims.dtype,
+        stream);
+    stream1_transformer_attention_launch(
+        scratch.qkv,
+        scratch,
+        dims,
+        b_micro,
+        attention_backend,
+        stream);
+    stream1_transformer_gather_cls256_kernel<<<b_micro, 128, 0, stream>>>(
+        scratch.attention_context,
+        scratch.attention_scores_probs,
+        dims,
+        b_micro);
+    stream1_transformer_gather_cls256_kernel<<<b_micro, 128, 0, stream>>>(
+        scratch.tokens,
+        scratch.qkv,
+        dims,
+        b_micro);
+    stream1_transformer_linear_residual_cuda(
+        scratch.attention_scores_probs,
+        block.attn_out_weight,
+        scratch.qkv,
+        b_micro,
+        STREAM1_TRANSFORMER_DMODEL256,
+        STREAM1_TRANSFORMER_DMODEL256,
+        dims.dtype,
+        stream);
+    stream1_transformer_bias_add_launch(
+        scratch.qkv,
+        block.attn_out_bias,
+        b_micro,
+        STREAM1_TRANSFORMER_DMODEL256,
+        dims.dtype,
+        stream);
+    stream1_transformer_layernorm_copy_launch(
+        scratch.qkv,
+        scratch.attention_context,
+        block.ln2_gamma,
+        block.ln2_beta,
+        b_micro,
+        STREAM1_TRANSFORMER_DMODEL256,
+        dims.dtype,
+        stream);
+    stream1_transformer_ff1_linear_bias_silu_cuda(
+        scratch.attention_context,
+        block.ff1_weight,
+        block.ff1_bias,
+        scratch.ff_hidden,
+        b_micro,
+        STREAM1_TRANSFORMER_DMODEL256,
+        1024U,
+        dims.dtype,
+        stream);
+    stream1_transformer_linear_residual_cuda(
+        scratch.ff_hidden,
+        block.ff2_weight,
+        scratch.qkv,
+        b_micro,
+        1024U,
+        STREAM1_TRANSFORMER_DMODEL256,
+        dims.dtype,
+        stream);
+    stream1_transformer_bias_add_launch(
+        scratch.qkv,
+        block.ff2_bias,
+        b_micro,
+        STREAM1_TRANSFORMER_DMODEL256,
+        dims.dtype,
+        stream);
+    stream1_transformer_layernorm_copy_launch(
+        scratch.qkv,
+        scratch.attention_context,
+        network.output_ln_gamma,
+        network.output_ln_beta,
+        b_micro,
+        STREAM1_TRANSFORMER_DMODEL256,
+        dims.dtype,
+        stream);
+}
 void stream1_transformer_inference_block51_cuda(
     const State128* current_frontier_states,
     const std::uint64_t* parent_base,
@@ -1513,7 +1647,9 @@ void stream1_transformer_inference_block51_cuda(
         parent_offset,
         stream);
 
-    for (std::uint32_t layer = 0; layer < 4U; ++layer) {
+    const bool final_cls_only = stream1_transformer_final_cls_only_requested();
+    const std::uint32_t full_token_layer_count = final_cls_only ? 3U : 4U;
+    for (std::uint32_t layer = 0; layer < full_token_layer_count; ++layer) {
         const Stream1TransformerBlockView block = network.blocks[layer];
         stream1_transformer_layernorm_copy_launch(
             scratch.tokens,
@@ -1594,13 +1730,17 @@ void stream1_transformer_inference_block51_cuda(
             stream);
     }
 
-    stream1_transformer_cls_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
-        scratch.tokens,
-        scratch.attention_context,
-        network.output_ln_gamma,
-        network.output_ln_beta,
-        dims,
-        b_micro);
+    if (final_cls_only) {
+        stream1_transformer_final_layer_cls_only_block51_cuda(network, scratch, b_micro, attention_backend, stream);
+    } else {
+        stream1_transformer_cls_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
+            scratch.tokens,
+            scratch.attention_context,
+            network.output_ln_gamma,
+            network.output_ln_beta,
+            dims,
+            b_micro);
+    }
     stream1_cutlass_linear_cuda(
         scratch.attention_context,
         network.output_weight,
@@ -1652,7 +1792,9 @@ void stream1_transformer_inference_block51_graph_job_cuda(
         parent_offset,
         stream);
 
-    for (std::uint32_t layer = 0; layer < 4U; ++layer) {
+    const bool final_cls_only = stream1_transformer_final_cls_only_requested();
+    const std::uint32_t full_token_layer_count = final_cls_only ? 3U : 4U;
+    for (std::uint32_t layer = 0; layer < full_token_layer_count; ++layer) {
         const Stream1TransformerBlockView block = network.blocks[layer];
         stream1_transformer_layernorm_copy_launch(
             scratch.tokens,
@@ -1733,13 +1875,17 @@ void stream1_transformer_inference_block51_graph_job_cuda(
             stream);
     }
 
-    stream1_transformer_cls_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
-        scratch.tokens,
-        scratch.attention_context,
-        network.output_ln_gamma,
-        network.output_ln_beta,
-        dims,
-        b_micro);
+    if (final_cls_only) {
+        stream1_transformer_final_layer_cls_only_block51_cuda(network, scratch, b_micro, attention_backend, stream);
+    } else {
+        stream1_transformer_cls_layernorm_kernel<<<b_micro, 256, 256 * sizeof(float), stream>>>(
+            scratch.tokens,
+            scratch.attention_context,
+            network.output_ln_gamma,
+            network.output_ln_beta,
+            dims,
+            b_micro);
+    }
     stream1_cutlass_linear_cuda(
         scratch.attention_context,
         network.output_weight,
