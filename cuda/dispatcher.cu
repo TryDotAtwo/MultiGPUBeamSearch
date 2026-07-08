@@ -60,6 +60,11 @@ bool predict_stats_enabled_from_env() {
     return value != nullptr && value[0] != '\0' && std::strtoull(value, nullptr, 10) != 0ULL;
 }
 
+bool ring_graph_debug_sync_enabled_from_env() {
+    const char* value = std::getenv("BEAM_DEBUG_RING_GRAPH_SYNC");
+    return value != nullptr && value[0] != '\0' && std::strtoull(value, nullptr, 10) != 0ULL;
+}
+
 void check_cuda(cudaError_t status, const char* op) {
     if (status != cudaSuccess) {
         throw std::runtime_error(std::string(op) + ": " + cudaGetErrorString(status));
@@ -1904,6 +1909,7 @@ DepthDispatchState run_depth_cuda_graphs(
     }
     std::uint32_t stream4_jobs_since_threshold_update = 0;
     const bool pipeline_stats_enabled = std::getenv("BEAM_DEBUG_PIPELINE_STATS") != nullptr;
+    const bool ring_graph_debug_sync_enabled = ring_graph_debug_sync_enabled_from_env();
 
     std::vector<cudaEvent_t> ring_done(plan.config.ring_count, nullptr);
     std::vector<cudaEvent_t> ring_lane_done(
@@ -3124,6 +3130,27 @@ DepthDispatchState run_depth_cuda_graphs(
                                 cudaEventRecord(graphs.ring_slot_done[template_job], lane_stream),
                                 "cudaEventRecord ring slot graph done");
                             graphs.ring_slot_in_use[template_job] = 1U;
+                            if (ring_graph_debug_sync_enabled) {
+                                const cudaError_t sync_status = cudaStreamSynchronize(lane_stream);
+                                if (sync_status != cudaSuccess) {
+                                    std::cerr
+                                        << "ring_slot_graph_debug_error"
+                                        << " rank=" << plan.config.local_rank
+                                        << " ring=" << ring
+                                        << " slot=" << slot
+                                        << " lane=" << lane
+                                        << " job=" << job
+                                        << " template_job=" << template_job
+                                        << " parent_base=" << parent_base_value
+                                        << " count=" << count_value
+                                        << " b_micro=" << plan.config.b_micro
+                                        << " cuda_op=cudaStreamSynchronize"
+                                        << " cuda_status=" << cudaGetErrorString(sync_status)
+                                        << '\n';
+                                    std::cerr.flush();
+                                    check_cuda(sync_status, "cudaStreamSynchronize ring slot graph debug");
+                                }
+                            }
                         }
                     }
                     ++state.ring_slot_jobs_launched;

@@ -4450,9 +4450,12 @@ int main(int argc, char** argv) {
     std::cout << "runtime_ring_count=" << config.ring_count << "\n";
     std::cout << "runtime_ring_slot_count=" << plan.derived.ring_slot_count << "\n";
     const char* ring_graph_execs_per_lane_requested = std::getenv("BEAM_RING_GRAPH_EXECS_PER_LANE");
+    const char* ring_graph_debug_sync = std::getenv("BEAM_DEBUG_RING_GRAPH_SYNC");
     std::cout << "runtime_ring_slot_physical_jobs=" << runtime_ring_slot_physical_jobs << "\n";
     std::cout << "runtime_ring_graph_execs_per_lane_requested="
               << (ring_graph_execs_per_lane_requested == nullptr ? "" : ring_graph_execs_per_lane_requested) << "\n";
+    std::cout << "runtime_ring_graph_debug_sync="
+              << (ring_graph_debug_sync == nullptr ? "" : ring_graph_debug_sync) << "\n";
     std::cout << "stream1_backend="
               << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
     if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
