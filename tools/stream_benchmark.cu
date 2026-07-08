@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
     report << "- stream1_model_output_dim=" << stream1_model.output_dim << "\n";
     report << "- stream1_model_weight_bytes=" << stream1_weights::total_host_weight_bytes(host_weights) << "\n";
     report << "- cuda_architectures=75,86\n";
-    report << "- stream1_gemm=TensorOp_Sm75_common_for_T4_and_RTX3070\n";
+    report << "- stream1_gemm=TensorOp_runtime_arch_dispatch_sm80_or_sm75\n";
     if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
         report << "- stream1_backend=piece_transformer\n\n";
         std::cout << "stream_benchmark_start=1\n";
