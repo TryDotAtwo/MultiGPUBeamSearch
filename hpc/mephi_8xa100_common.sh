@@ -126,6 +126,11 @@ beam_round_up() {
   echo $(( ((value + alignment - 1) / alignment) * alignment ))
 }
 
+beam_default_final_exchange_scale_ppm() {
+  local world_size="${WORLD_SIZE_EFFECTIVE:-${TORCHRUN_NPROC_PER_NODE:-1}}"
+  echo $((world_size * 1000000))
+}
+
 beam_stream1_output_dim() {
   local weight_dir="${BEAM_WEIGHT_DIR:-${REPO_DIR}/stream1_weights}"
   "${NINJA_VENV_DIR}/bin/python" - "${weight_dir}/manifest.json" <<'PY'
@@ -257,7 +262,7 @@ beam_export_manual_config() {
   export BEAM_GLOBAL_SPILL_CAPACITY="${BEAM_GLOBAL_SPILL_CAPACITY:-0}"
   export BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM="${BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM:-1200000}"
   export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-0}"
-  export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-1200000}"
+  export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
   export BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-$((3 * 1024 * 1024 * 1024))}"
 }
 

@@ -163,7 +163,8 @@ int main(int argc, char** argv) {
     config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 2U);
     config.global_spill_capacity = env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 1048576U);
     config.final_materialize_chunk_candidates = env_u32("BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES", 98304U);
-    config.final_materialize_exchange_scale_ppm = env_u32("BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM", 2000000U);
+    config.final_materialize_exchange_scale_ppm =
+        env_u32("BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM", config.world_size * 1000000U);
     config.solved_result_capacity = 0U;
 
     const std::uint64_t default_frontier =

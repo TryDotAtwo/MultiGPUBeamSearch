@@ -499,3 +499,5 @@
 ## 2026-07-08
 
 User provided MEPhI 8xA100 Megaminx transformer windowed graph logs: `runtime_ring_slot_graph_windowed=1`, `BEAM_RING_GRAPH_EXECS_PER_LANE=8`, but the run aborted at depth 7 with only torchrun `SIGABRT`. Requirement: stop guessing and add diagnostics to expose the exact CUDA failure/context in the windowed graph path without changing production behavior or MLP path.
+
+User clarified the final materialize exchange capacity policy after the 700M Megaminx transformer run failed on rank 7 with `exchange recv total exceeds device capacity`: `BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM` should default to `WORLD_SIZE_EFFECTIVE * 1000000`; smaller values such as 2x are not reliable.
