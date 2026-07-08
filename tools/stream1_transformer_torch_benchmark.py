@@ -80,8 +80,15 @@ class PieceTransformerTorch:
         self.manifest = json.loads((weight_dir / "manifest.json").read_text(encoding="utf-8"))
         if self.manifest.get("backend") != "piece_transformer":
             raise ValueError("manifest backend must be piece_transformer")
-        if self.manifest.get("dtype") != "fp16":
-            raise ValueError("plain torch benchmark currently expects exported fp16 weights")
+        manifest_dtype = str(self.manifest.get("dtype"))
+        if manifest_dtype == "fp16":
+            self.dtype = torch.float16
+            self.dtype_suffix = ".fp16"
+        elif manifest_dtype == "bf16":
+            self.dtype = torch.bfloat16
+            self.dtype_suffix = ".bf16"
+        else:
+            raise ValueError(f"plain torch benchmark expects exported fp16 or bf16 weights, got {manifest_dtype!r}")
 
         self.state_len = int(self.manifest["state_len"])
         self.num_classes = int(self.manifest["num_classes"])
@@ -102,8 +109,8 @@ class PieceTransformerTorch:
         if self.output_dim != self.move_count:
             raise ValueError("output_dim must equal move_count")
 
-        suffix = ".fp16"
-        half = torch.float16
+        suffix = self.dtype_suffix
+        half = self.dtype
         self.fast_slot_projected = load_file_tensor(
             weight_dir / f"fast_slot_projected{suffix}",
             (self.max_piece_size, self.num_classes, self.d_model),

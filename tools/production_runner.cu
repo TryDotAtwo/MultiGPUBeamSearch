@@ -4471,12 +4471,16 @@ int main(int argc, char** argv) {
                   << "\n";
         const char* block51_env = std::getenv("BEAM_STREAM1_TRANSFORMER_BLOCK51");
         const char* final_cls_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY");
+        const char* final_cls_attention_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION");
         std::cout << "stream1_transformer_block51="
                   << (block51_env != nullptr && std::strcmp(block51_env, "1") == 0 ? 1 : 0)
                   << " raw=" << (block51_env == nullptr ? "" : block51_env) << "\n";
         std::cout << "stream1_transformer_final_cls_only="
                   << (final_cls_env != nullptr && std::strcmp(final_cls_env, "1") == 0 ? 1 : 0)
                   << " raw=" << (final_cls_env == nullptr ? "" : final_cls_env) << "\n";
+        std::cout << "stream1_transformer_final_cls_attention="
+                  << (final_cls_attention_env != nullptr && std::strcmp(final_cls_attention_env, "1") == 0 ? 1 : 0)
+                  << " raw=" << (final_cls_attention_env == nullptr ? "" : final_cls_attention_env) << "\n";
     }
 
     DispatcherNetwork network{};

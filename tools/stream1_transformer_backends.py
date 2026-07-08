@@ -170,7 +170,9 @@ def build_invocation(args: argparse.Namespace) -> BackendInvocation:
         env: Dict[str, str] = {
             "BEAM_WEIGHT_DIR": str(weight_dir),
             "BEAM_STREAM_MICRO_ONLY": "1",
-            "BEAM_STREAM1_TRANSFORMER_BLOCK51": "1",
+            "BEAM_STREAM1_TRANSFORMER_BLOCK51": os.environ.get("BEAM_STREAM1_TRANSFORMER_BLOCK51", "1"),
+            "BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY": os.environ.get("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY", "1"),
+            "BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION": os.environ.get("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION", "0"),
             "BEAM_STREAM_BENCH_REPORT": str(report),
         }
         if mode == "graph":

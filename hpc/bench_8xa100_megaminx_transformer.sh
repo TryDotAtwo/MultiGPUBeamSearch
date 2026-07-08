@@ -30,6 +30,9 @@ BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM="${BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM:-12
 BEAM_STREAM1_TRANSFORMER_MICRO="${BEAM_STREAM1_TRANSFORMER_MICRO:-512}"
 BEAM_STREAM1_TRANSFORMER_BLOCK51="${BEAM_STREAM1_TRANSFORMER_BLOCK51:-1}"
 BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY="${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY:-1}"
+BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION="${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION:-0}"
+ISOLATED_FINAL_CLS_ATTENTION_SWEEP="${ISOLATED_FINAL_CLS_ATTENTION_SWEEP:-0 1}"
+BEAM_STREAM1_EXPORT_DTYPE="${BEAM_STREAM1_EXPORT_DTYPE:-fp16}"
 
 SMOKE_BEAM_WIDTH="${SMOKE_BEAM_WIDTH:-64000000}"
 SMOKE_DEPTH_LIMIT="${SMOKE_DEPTH_LIMIT:-12}"
@@ -70,7 +73,7 @@ PIPELINE_SHARD_COUNT="${PIPELINE_SHARD_COUNT:-32}"
 DEPTH_AVG_MIN="${DEPTH_AVG_MIN:-3}"
 
 MODEL_DIR="${MODEL_DIR:-${JOB_DIR}/models/megaminx_vlad_transformer}"
-REPO_WEIGHT_DIR="${REPO_DIR}/weights/megaminx_vlad_transformer_fp16"
+REPO_WEIGHT_DIR="${REPO_DIR}/weights/megaminx_vlad_transformer_${BEAM_STREAM1_EXPORT_DTYPE}"
 if [ -z "${BEAM_WEIGHT_DIR:-}" ]; then
   if [ -f "${REPO_WEIGHT_DIR}/manifest.json" ]; then
     BEAM_WEIGHT_DIR="${REPO_WEIGHT_DIR}"
@@ -107,7 +110,7 @@ prepare_transformer_weights() {
   "${NINJA_VENV_DIR}/bin/python" "${REPO_DIR}/tools/export_stream1.py" \
     --weights "${checkpoint}" \
     --out "${BEAM_WEIGHT_DIR}.tmp" \
-    --dtype fp16 \
+    --dtype "${BEAM_STREAM1_EXPORT_DTYPE}" \
     --format piece-transformer
   rm -rf -- "${BEAM_WEIGHT_DIR}"
   mv "${BEAM_WEIGHT_DIR}.tmp" "${BEAM_WEIGHT_DIR}"
@@ -165,7 +168,7 @@ BEST_STREAM1_ENV="${LOG_DIR}/best_megaminx_transformer_stream1.env"
 ISOLATED_SUMMARY="${TUNING_DIR}/megaminx_transformer_stream1_isolated_${SLURM_JOB_ID:-manual}.tsv"
 PIPELINE_SUMMARY="${TUNING_DIR}/megaminx_transformer_pipeline_smoke_${SLURM_JOB_ID:-manual}.tsv"
 mkdir -p "${TUNING_DIR}"
-echo -e "stage\tbackend\tmode\tstatus\tbest_candidates_per_sec\tbest_batch\tb_micro\tconcurrency\tbatch_csv\tlog" > "${ISOLATED_SUMMARY}"
+echo -e "stage\tbackend\tmode\tstatus\tbest_candidates_per_sec\tbest_batch\tb_micro\tconcurrency\tbatch_csv\tfinal_cls_attention\tlog" > "${ISOLATED_SUMMARY}"
 echo -e "mode\twindow\tb_micro\tconcurrency\tring_slots\tstream3_batch\tgraph_window_jobs\tphysical_jobs\tcandidates_per_sec\tdepth_like_ms\tstatus\tlog" > "${PIPELINE_SUMMARY}"
 echo -e "stage\tbackend\tstatus\tavg_depth_sec\tlast_depth\tmax_gpu_mem_mib\tmax_gpu_util_pct\tbeam_width\tdepth_limit\tshard_count\tb_micro\tconcurrency\tring_slots\tstream3_batch\tstream4_batch\tstream4_trigger\tfinal_chunk\tfinal_exchange_scale_ppm\tshard_capacity_scale_ppm\tshard_capacity\tlogical_shard\trunner\tlog" > "${SUMMARY}"
 
@@ -231,6 +234,7 @@ run_isolated_backend() {
   local b_micro="${3:-NA}"
   local concurrency="${4:-NA}"
   local batch_csv="${5:-}"
+  local final_cls_attention="${6:-NA}"
   if [ -z "${batch_csv}" ]; then
     if [ "${b_micro}" != "NA" ]; then
       batch_csv="${b_micro}"
@@ -238,7 +242,7 @@ run_isolated_backend() {
       batch_csv="${ISOLATED_BATCHES}"
     fi
   fi
-  local tag="isolated_${backend}_${mode}_b${b_micro}_c${concurrency}"
+  local tag="isolated_${backend}_${mode}_b${b_micro}_c${concurrency}_fca${final_cls_attention}"
   local log="${TUNING_DIR}/${tag}.log"
   local status="OK"
   local rc=0
@@ -254,9 +258,9 @@ run_isolated_backend() {
   if [ "${backend}" = "native_cutlass" ]; then
     cmd+=(--b-micro "${b_micro}" --synthetic-states)
   fi
-  echo "isolated_start backend=${backend} mode=${mode} b_micro=${b_micro} concurrency=${concurrency} batches=${batch_csv} log=${log}"
+  echo "isolated_start backend=${backend} mode=${mode} b_micro=${b_micro} concurrency=${concurrency} batches=${batch_csv} final_cls_attention=${final_cls_attention} log=${log}"
   set +e
-  "${cmd[@]}" 2>&1 | tee "${log}"
+  BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION="${final_cls_attention}" "${cmd[@]}" 2>&1 | tee "${log}"
   rc=${PIPESTATUS[0]}
   set -e
   if [ "${rc}" -ne 0 ]; then
@@ -264,7 +268,7 @@ run_isolated_backend() {
   fi
   local cps_batch
   cps_batch="$(parse_best_cps_batch "${log}")"
-  echo -e "isolated\t${backend}\t${mode}\t${status}\t${cps_batch}\t${b_micro}\t${concurrency}\t${batch_csv}\t${log}" >> "${ISOLATED_SUMMARY}"
+  echo -e "isolated\t${backend}\t${mode}\t${status}\t${cps_batch}\t${b_micro}\t${concurrency}\t${batch_csv}\t${final_cls_attention}\t${log}" >> "${ISOLATED_SUMMARY}"
 }
 parse_pipeline_smoke_result() {
   local log="$1"
@@ -311,6 +315,7 @@ run_pipeline_smoke_config() {
   BEAM_STREAM1_TRANSFORMER_MICRO="${BEAM_STREAM1_TRANSFORMER_MICRO}" \
   BEAM_STREAM1_TRANSFORMER_BLOCK51="${BEAM_STREAM1_TRANSFORMER_BLOCK51}" \
   BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY="${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY}" \
+  BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION="${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION}" \
   BEAM_STREAM1_CONCURRENCY="${concurrency}" \
   BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS}" \
   BEAM_STREAM3_BATCH_CANDIDATES="${stream3_batch}" \
@@ -391,6 +396,7 @@ run_full_config() {
   export BEAM_STREAM1_TRANSFORMER_MICRO
   export BEAM_STREAM1_TRANSFORMER_BLOCK51
   export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY
+  export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION
   export BEAM_STREAM1_CONCURRENCY
   export BEAM_STREAM3_RING_SLOTS
   export BEAM_SHARD_BUFFER_COUNT
@@ -399,7 +405,7 @@ run_full_config() {
   beam_export_manual_config
   beam_prepare_nccl_file "${tag}"
 
-  echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} block51=${BEAM_STREAM1_TRANSFORMER_BLOCK51} final_cls_only=${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY} concurrency=${BEAM_STREAM1_CONCURRENCY} stream3_batch=${STREAM3_BATCH_CANDIDATES} log=${log}"
+  echo "full_start stage=${stage} backend=${backend} beam_width=${BEAM_WIDTH} depth_limit=${DEPTH_LIMIT} b_micro=${BEAM_B_MICRO} transformer_micro=${BEAM_STREAM1_TRANSFORMER_MICRO} block51=${BEAM_STREAM1_TRANSFORMER_BLOCK51} final_cls_only=${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY} final_cls_attention=${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION} concurrency=${BEAM_STREAM1_CONCURRENCY} stream3_batch=${STREAM3_BATCH_CANDIDATES} log=${log}"
   local rc=0
   set +e
   beam_torchrun_production "${tag}" "${log}" || rc=$?
@@ -428,16 +434,18 @@ write_best_stream1_env() {
       if (b == "" || b == "NA") { next; }
       if (c == "" || c == "NA") { c=default_concurrency; }
       if (best == "" || $5 + 0 > best + 0) {
-        best=$5; backend=runner_backend; bench_backend=$2; mode=$3; batch=$6; bmicro=b; concurrency=c; source_log=$10;
+        best=$5; backend=runner_backend; bench_backend=$2; mode=$3; batch=$6; bmicro=b; concurrency=c; final_cls_attention=$10; source_log=$11;
       }
     }
     END {
       if (best == "") { exit 1 }
+      if (final_cls_attention == "" || final_cls_attention == "NA") { final_cls_attention=0 }
       print "export MEGAMINX_STREAM1_BACKEND=" backend;
       print "export BEAM_B_MICRO=" target_bmicro;
       print "export BEAM_STREAM1_TRANSFORMER_MICRO=" bmicro;
       print "export BEAM_STREAM1_TRANSFORMER_BLOCK51=1";
       print "export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY=1";
+      print "export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION=" final_cls_attention;
       print "export BEAM_STREAM1_CONCURRENCY=" concurrency;
       print "export BEST_STREAM1_BACKEND_BENCH=" bench_backend;
       print "export BEST_STREAM1_MODE=" mode;
@@ -451,7 +459,7 @@ write_best_stream1_env() {
 }
 
 write_best_env() {
-  awk -F'\t' -v transformer_micro="${BEAM_STREAM1_TRANSFORMER_MICRO}" '
+  awk -F'\t' -v transformer_micro="${BEAM_STREAM1_TRANSFORMER_MICRO}" -v final_cls_attention="${BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION}" '
     NR == 1 { next }
     $1 == "target" && $3 == "OK" && $4 != "NA" {
       if (best == "" || $4 + 0 < best + 0) {
@@ -461,6 +469,7 @@ write_best_env() {
     }
     END {
       if (best == "") { exit 1 }
+      if (final_cls_attention == "" || final_cls_attention == "NA") { final_cls_attention=0 }
       print "export MEGAMINX_STREAM1_BACKEND=" backend;
       print "export BEAM_WIDTH=" beam;
       print "export SHARD_COUNT=" shard;
@@ -468,6 +477,7 @@ write_best_env() {
       print "export BEAM_STREAM1_TRANSFORMER_MICRO=" transformer_micro;
       print "export BEAM_STREAM1_TRANSFORMER_BLOCK51=1";
       print "export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY=1";
+      print "export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION=" final_cls_attention;
       print "export BEAM_STREAM1_CONCURRENCY=" c;
       print "export BEAM_STREAM3_RING_SLOTS=" ring;
       print "export BEAM_STREAM3_BATCH_CANDIDATES=" s3;
@@ -494,10 +504,12 @@ echo "torch_lib_dir=${TORCH_LIB_DIR}"
 if [ "${RUN_ISOLATED_STREAM1}" = "1" ]; then
   for b_micro in ${ISOLATED_B_MICRO_SWEEP}; do
     for concurrency in ${ISOLATED_CONCURRENCY_SWEEP}; do
-      run_isolated_backend pytorch eager "${b_micro}" "${concurrency}"
-      run_isolated_backend libtorch eager "${b_micro}" "${concurrency}"
-      run_isolated_backend libtorch cuda_graph "${b_micro}" "${concurrency}"
-      run_isolated_backend native_cutlass graph "${b_micro}" "${concurrency}"
+      run_isolated_backend pytorch eager "${b_micro}" "${concurrency}" "" "NA"
+      run_isolated_backend libtorch eager "${b_micro}" "${concurrency}" "" "NA"
+      run_isolated_backend libtorch cuda_graph "${b_micro}" "${concurrency}" "" "NA"
+      for final_cls_attention in ${ISOLATED_FINAL_CLS_ATTENTION_SWEEP}; do
+        run_isolated_backend native_cutlass graph "${b_micro}" "${concurrency}" "" "${final_cls_attention}"
+      done
     done
   done
   if write_best_stream1_env; then

@@ -1638,6 +1638,10 @@ bool stream1_transformer_block51_requested() {
 bool stream1_transformer_final_cls_only_requested() {
     return stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY");
 }
+
+bool stream1_transformer_final_cls_attention_requested() {
+    return stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION");
+}
 bool stream1_transformer_is_block51_shape(Stream1TransformerDims dims) {
     return dims.state_len == 120U &&
         dims.num_classes == 120U &&
@@ -1672,18 +1676,28 @@ void stream1_transformer_final_layer_cls_only_block51_from_ln1_cuda(
         3U * STREAM1_TRANSFORMER_DMODEL256,
         dims.dtype,
         stream);
-    stream1_transformer_attention_launch(
-        scratch.qkv,
-        scratch,
-        dims,
-        b_micro,
-        attention_backend,
-        stream);
-    stream1_transformer_gather_cls256_kernel<<<b_micro, 128, 0, stream>>>(
-        scratch.attention_context,
-        scratch.attention_scores_probs,
-        dims,
-        b_micro);
+    if (stream1_transformer_final_cls_attention_requested()) {
+        stream1_transformer_fmha_cls_attention_cuda(
+            scratch.qkv,
+            scratch.attention_scores_probs,
+            dims,
+            attention_backend == Stream1TransformerAttentionBackend::Sm75Fp16Fmha,
+            b_micro,
+            stream);
+    } else {
+        stream1_transformer_attention_launch(
+            scratch.qkv,
+            scratch,
+            dims,
+            b_micro,
+            attention_backend,
+            stream);
+        stream1_transformer_gather_cls256_kernel<<<b_micro, 128, 0, stream>>>(
+            scratch.attention_context,
+            scratch.attention_scores_probs,
+            dims,
+            b_micro);
+    }
     stream1_transformer_gather_cls256_kernel<<<b_micro, 128, 0, stream>>>(
         scratch.tokens,
         scratch.qkv,

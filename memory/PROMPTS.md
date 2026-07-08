@@ -502,3 +502,12 @@ User provided MEPhI 8xA100 Megaminx transformer windowed graph logs: `runtime_ri
 
 User clarified the final materialize exchange capacity policy after the 700M Megaminx transformer run failed on rank 7 with `exchange recv total exceeds device capacity`: `BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM` should default to `WORLD_SIZE_EFFECTIVE * 1000000`; smaller values such as 2x are not reliable.
 - 2026-07-08: User requested optimizing native Stream1 transformer inference so it actually loads tensor cores and uses A100-class GPUs properly. Requirements: keep MLP path separate, no fallbacks/distillation, use real profiling/benchmark evidence, preserve correctness, and make the transformer hot path behave like the proven MLP-style pipeline.
+
+## 2026-07-08 Stream1 Transformer BF16 / CLS Attention
+
+User asked to continue optimizing Stream1 transformer inference, including BF16 for A100 and RTX 3070. Requirements captured:
+
+- Keep MLP path safe and separate.
+- Add BF16 support for modern GPUs, including A100 and 3070.
+- Continue optimizing native transformer inference, but do not force a slower or numerically risky path.
+- Use measured correctness and speed, not assumptions.
