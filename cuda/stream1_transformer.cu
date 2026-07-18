@@ -1,5 +1,6 @@
 #include "stream1.hpp"
 #include "stream1_transformer_fmha.hpp"
+#include "stream1_transformer_gemm_policy.hpp"
 
 #include "config.hpp"
 #include "cuda_check.hpp"
@@ -1282,6 +1283,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
     }
     if (dtype == STREAM1_DTYPE_FP16) {
         if (stream1_transformer_current_device_sm80_or_newer()) {
+            static_cast<void>(parse_stream1_transformer_ff1_policy(
+                std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_POLICY")));
             stream1_transformer_ff1_linear_bias_silu_typed<
                 cutlass::half_t,
                 cutlass::arch::Sm80,

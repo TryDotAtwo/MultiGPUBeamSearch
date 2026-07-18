@@ -173,6 +173,10 @@ add_executable(stream1_transformer_cuda_tests tests/stream1_transformer_cuda_tes
 target_link_libraries(stream1_transformer_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream1_transformer_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
+add_executable(stream1_transformer_gemm_policy_tests tests/stream1_transformer_gemm_policy_tests.cpp)
+target_include_directories(stream1_transformer_gemm_policy_tests PRIVATE cuda)
+target_compile_features(stream1_transformer_gemm_policy_tests PRIVATE cxx_std_17)
+
 add_executable(stream3_cuda_tests tests/stream3_cuda_tests.cu)
 target_link_libraries(stream3_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream3_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
@@ -261,6 +265,7 @@ add_test(NAME contract_tests COMMAND contract_tests)
 add_test(NAME history_tests COMMAND history_tests)
 add_test(NAME stream1_cuda_tests COMMAND stream1_cuda_tests)
 add_test(NAME stream1_transformer_cuda_tests COMMAND stream1_transformer_cuda_tests)
+add_test(NAME stream1_transformer_gemm_policy_tests COMMAND stream1_transformer_gemm_policy_tests)
 add_test(NAME stream2_cuda_tests COMMAND stream2_cuda_tests)
 add_test(NAME stream3_cuda_tests COMMAND stream3_cuda_tests)
 add_test(NAME stream4_cuda_tests COMMAND stream4_cuda_tests)
