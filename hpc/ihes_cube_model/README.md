@@ -13,6 +13,17 @@ It downloads the IHES competition data, downloads the model from the GitHub
 release asset when missing, and exports the `.pth` model to
 `stream1_weights_ihes_bf16`.
 
+Default release model:
+
+```text
+p888-t000_1780290207_e40960.pth
+```
+
+The prepare script writes `model.pth.release_asset` beside `model.pth`; if the
+default release asset changes, the default `model.pth` is re-downloaded and the
+Stream1 weights are re-exported. Explicit custom `MODEL_PATH` values keep the
+caller-provided file.
+
 The SLURM `start.sh` does not perform network downloads. It only checks prepared
 inputs, compiles the runner with IHES state sizing, and runs
 `production_runner` through `torchrun` on 8 GPUs.

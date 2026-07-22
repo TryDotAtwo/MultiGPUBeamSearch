@@ -5,10 +5,12 @@ BASE_DIR="${BASE_DIR:-/mnt/pool/6/vokirova/beam8a100}"
 REPO_DIR="${REPO_DIR:-${BASE_DIR}/repo}"
 RUN_DIR="${RUN_DIR:-${BASE_DIR}/ihes_cube_model}"
 DATA_DIR="${DATA_DIR:-${RUN_DIR}/data}"
-MODEL_PATH="${MODEL_PATH:-${RUN_DIR}/model.pth}"
+DEFAULT_MODEL_PATH="${RUN_DIR}/model.pth"
+MODEL_PATH="${MODEL_PATH:-${DEFAULT_MODEL_PATH}}"
 MODEL_RELEASE_REPO="${MODEL_RELEASE_REPO:-TryDotAtwo/MultiGPUBeamSearch}"
 MODEL_RELEASE_TAG="${MODEL_RELEASE_TAG:-ihes-p888-model}"
-MODEL_RELEASE_ASSET="${MODEL_RELEASE_ASSET:-p888-t000_1778521793_e32692.pth}"
+MODEL_RELEASE_ASSET="${MODEL_RELEASE_ASSET:-p888-t000_1780290207_e40960.pth}"
+MODEL_MARKER_PATH="${MODEL_MARKER_PATH:-${MODEL_PATH}.release_asset}"
 DATA_RELEASE_REPO="${DATA_RELEASE_REPO:-${MODEL_RELEASE_REPO}}"
 DATA_RELEASE_TAG="${DATA_RELEASE_TAG:-${MODEL_RELEASE_TAG}}"
 DATA_RELEASE_ASSET="${DATA_RELEASE_ASSET:-cayleypy-ihes-cube.zip}"
@@ -32,10 +34,21 @@ fi
 echo "repo_dir=${REPO_DIR}"
 echo "run_dir=${RUN_DIR}"
 echo "model_path=${MODEL_PATH}"
+echo "model_release_asset=${MODEL_RELEASE_ASSET}"
 echo "data_dir=${DATA_DIR}"
 echo "weight_dir=${WEIGHT_DIR}"
 
+DOWNLOAD_MODEL=0
 if [ ! -f "${MODEL_PATH}" ]; then
+  DOWNLOAD_MODEL=1
+elif [ "${MODEL_PATH}" = "${DEFAULT_MODEL_PATH}" ]; then
+  if [ ! -f "${MODEL_MARKER_PATH}" ] || [ "$(cat "${MODEL_MARKER_PATH}")" != "${MODEL_RELEASE_ASSET}" ]; then
+    echo "reexport_reason=model_release_asset_changed"
+    DOWNLOAD_MODEL=1
+  fi
+fi
+
+if [ "${DOWNLOAD_MODEL}" -eq 1 ]; then
   echo "download_model_from_github=1"
   if command -v gh >/dev/null 2>&1; then
     gh release download "${MODEL_RELEASE_TAG}" \
@@ -71,6 +84,7 @@ PY
     exit 2
   fi
   mv -f "${RUN_DIR}/${MODEL_RELEASE_ASSET}" "${MODEL_PATH}"
+  printf "%s\n" "${MODEL_RELEASE_ASSET}" > "${MODEL_MARKER_PATH}"
 else
   echo "download_model_from_github=0"
 fi
