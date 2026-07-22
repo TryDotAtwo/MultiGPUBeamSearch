@@ -176,6 +176,31 @@ int main() {
             "legacy FF1 m64n128 parse failed");
     require_rejects(Family::Ff1, "invalid-policy");
 
+    require(stream1_transformer_gemm_policy_supported_on_sm(
+                Family::Qkv, Policy::M128N128, 75),
+            "SM75 must expose opt-in QKV m128n128 for hardware tuning");
+    require(stream1_transformer_gemm_policy_supported_on_sm(
+                Family::Ff1, Policy::M64N128, 75),
+            "SM75 must expose opt-in FF1 m64n128 for hardware tuning");
+    require(stream1_transformer_gemm_policy_supported_on_sm(
+                Family::AttentionOut, Policy::M128N128, 75),
+            "SM75 must expose opt-in attention-out m128n128 for hardware tuning");
+    require(stream1_transformer_gemm_policy_supported_on_sm(
+                Family::Ff2, Policy::M64N64, 75),
+            "SM75 must expose opt-in FF2 m64n64 for hardware tuning");
+    require(!stream1_transformer_gemm_policy_supported_on_sm(
+                Family::Cls, Policy::M128N128, 75),
+            "SM75 must keep uncompiled CLS m128n128 fail-closed");
+
+    require(stream1_transformer_gemm_stage_supported_on_sm(
+                Family::Ff1, Stream1TransformerGemmStagePolicy::Stages2, 75),
+            "SM75 FF1 must compile with two pipeline stages");
+    require(!stream1_transformer_gemm_stage_supported_on_sm(
+                Family::Ff1, Stream1TransformerGemmStagePolicy::Stages3, 75),
+            "SM75 FF1 must reject unsupported three-stage fused epilogue");
+    require(stream1_transformer_gemm_stage_supported_on_sm(
+                Family::Ff1, Stream1TransformerGemmStagePolicy::Stages3, 80),
+            "SM80 FF1 must retain three-stage support");
     std::cout << "stream1_transformer_gemm_policy_tests=pass\n";
     return 0;
 }

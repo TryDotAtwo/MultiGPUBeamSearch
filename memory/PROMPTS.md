@@ -1,6 +1,7 @@
 # Prompt History
 
 ## 2026-07-22
+- User explicitly approved pushing transformer commit `18e5996` and its reproducible tag to the existing GitHub repository for a private Kaggle 2xT4 run, then asked to launch immediately when the T4 slot became available.
 - User set the persistent goal to optimize native transformer inference sequentially on local RTX 3070 using the profiler-equipped long-lived Docker GPU queue, preserving byte-exact math and measured speed gates; only after 3070 improvements are exhausted should work move to independent 2xT4 profiling and tuning.
 - User reported that an interactive game had contaminated local RTX 3070 timings and required checking that the GPU is free before every performance measurement; suspect or mid-run-contaminated series must be discarded rather than interpreted.
 ## 2026-07-18

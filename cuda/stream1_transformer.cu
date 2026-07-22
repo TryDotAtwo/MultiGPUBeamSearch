@@ -1419,12 +1419,43 @@ void stream1_transformer_linear_residual_cuda(
                 cutlass::gemm::GemmShape<64, 32, 32>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
             return;
         }
+        const bool is_ff2 = input_cols == 1024U && output_cols == 256U;
+        const Stream1TransformerGemmFamily family = is_ff2
+            ? Stream1TransformerGemmFamily::Ff2
+            : Stream1TransformerGemmFamily::AttentionOut;
+        const char* env_name = is_ff2
+            ? "BEAM_STREAM1_TRANSFORMER_FF2_POLICY"
+            : "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_POLICY";
+        const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
+            family, std::getenv(env_name));
+        if (!stream1_transformer_gemm_policy_supported_on_sm(family, policy, 75)) {
+            throw std::invalid_argument("Stream1 transformer residual GEMM policy is not compiled for SM75");
+        }
+        if (policy == Stream1TransformerGemmPolicy::M64N64) {
+            stream1_transformer_linear_residual_typed<
+                cutlass::half_t, cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<16, 8, 8>,
+                cutlass::gemm::GemmShape<64, 64, 32>,
+                cutlass::gemm::GemmShape<32, 32, 32>>(
+                    input, weight, residual_inout, rows, input_cols, output_cols, stream);
+            return;
+        }
+        if (policy == Stream1TransformerGemmPolicy::M128N128) {
+            stream1_transformer_linear_residual_typed<
+                cutlass::half_t, cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<16, 8, 8>,
+                cutlass::gemm::GemmShape<128, 128, 32>,
+                cutlass::gemm::GemmShape<64, 64, 32>>(
+                    input, weight, residual_inout, rows, input_cols, output_cols, stream);
+            return;
+        }
         stream1_transformer_linear_residual_typed<
             cutlass::half_t,
             cutlass::arch::Sm75,
             cutlass::gemm::GemmShape<16, 8, 8>,
             cutlass::gemm::GemmShape<128, 64, 32>,
-            cutlass::gemm::GemmShape<64, 32, 32>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
+            cutlass::gemm::GemmShape<64, 32, 32>>(
+                input, weight, residual_inout, rows, input_cols, output_cols, stream);
         return;
     }
     throw std::invalid_argument("Stream1 piece_transformer residual GEMM dtype must be fp16 or bf16");
@@ -1446,7 +1477,8 @@ template <
     typename InstructionShape,
     typename ThreadblockShape,
     typename WarpShape,
-    int Swizzle = 1>
+    int Swizzle = 1,
+    int Stages = 3>
 void stream1_transformer_linear_residual_bias_round_typed(
     const half* input,
     const half* weight,
@@ -1483,7 +1515,7 @@ void stream1_transformer_linear_residual_bias_round_typed(
         InstructionShape,
         Epilogue,
         cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<Swizzle>,
-        3>;
+        Stages>;
 
     const cutlass::gemm::GemmCoord problem(
         static_cast<int>(rows),
@@ -1563,8 +1595,8 @@ void stream1_transformer_residual_bias_round_layernorm_cuda(
             residual_inout, normalized_output, bias, gamma, beta, rows, output_cols, dtype, stream);
         return;
     }
-    if (dtype != STREAM1_DTYPE_FP16 || !stream1_transformer_current_device_sm80_or_newer()) {
-        throw std::invalid_argument("fused residual+bias-round epilogue requires fp16 SM80+");
+    if (dtype != STREAM1_DTYPE_FP16) {
+        throw std::invalid_argument("fused residual+bias-round epilogue requires fp16 SM75+");
     }
     if (output_cols != 256U) {
         throw std::invalid_argument("fused residual+bias-round epilogue requires output_cols=256");
@@ -1585,21 +1617,40 @@ void stream1_transformer_residual_bias_round_layernorm_cuda(
             swizzle_policy)) {
         throw std::invalid_argument("residual GEMM swizzle is not compiled for this family and policy");
     }
-    if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity2) {
+    if (stream1_transformer_current_device_sm80_or_newer()) {
+        if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity2) {
+            stream1_transformer_linear_residual_bias_round_typed<
+                cutlass::half_t,
+                cutlass::arch::Sm80,
+                cutlass::gemm::GemmShape<16, 8, 16>,
+                cutlass::gemm::GemmShape<128, 128, 32>,
+                cutlass::gemm::GemmShape<64, 64, 32>,
+                2>(input, weight, residual_inout, bias, rows, input_cols, output_cols, stream);
+        } else {
+            stream1_transformer_linear_residual_bias_round_typed<
+                cutlass::half_t,
+                cutlass::arch::Sm80,
+                cutlass::gemm::GemmShape<16, 8, 16>,
+                cutlass::gemm::GemmShape<128, 128, 32>,
+                cutlass::gemm::GemmShape<64, 64, 32>>(
+                    input, weight, residual_inout, bias, rows, input_cols, output_cols, stream);
+        }
+    } else if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity2) {
         stream1_transformer_linear_residual_bias_round_typed<
             cutlass::half_t,
-            cutlass::arch::Sm80,
-            cutlass::gemm::GemmShape<16, 8, 16>,
+            cutlass::arch::Sm75,
+            cutlass::gemm::GemmShape<16, 8, 8>,
             cutlass::gemm::GemmShape<128, 128, 32>,
             cutlass::gemm::GemmShape<64, 64, 32>,
-            2>(input, weight, residual_inout, bias, rows, input_cols, output_cols, stream);
+            2, 2>(input, weight, residual_inout, bias, rows, input_cols, output_cols, stream);
     } else {
         stream1_transformer_linear_residual_bias_round_typed<
             cutlass::half_t,
-            cutlass::arch::Sm80,
-            cutlass::gemm::GemmShape<16, 8, 16>,
+            cutlass::arch::Sm75,
+            cutlass::gemm::GemmShape<16, 8, 8>,
             cutlass::gemm::GemmShape<128, 128, 32>,
-            cutlass::gemm::GemmShape<64, 64, 32>>(
+            cutlass::gemm::GemmShape<64, 64, 32>,
+            1, 2>(
                 input, weight, residual_inout, bias, rows, input_cols, output_cols, stream);
     }
     stream1_transformer_layernorm_copy_launch(
@@ -1787,6 +1838,66 @@ void stream1_transformer_linear_bias_cuda(
                 cutlass::gemm::GemmShape<16, 8, 16>,
                 cutlass::gemm::GemmShape<128, 64, 32>,
                 cutlass::gemm::GemmShape<64, 32, 32>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            return;
+        }
+        const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
+            Stream1TransformerGemmFamily::Qkv,
+            std::getenv("BEAM_STREAM1_TRANSFORMER_QKV_POLICY"));
+        const Stream1TransformerGemmSwizzlePolicy swizzle_policy =
+            parse_stream1_transformer_gemm_swizzle_policy(
+                std::getenv("BEAM_STREAM1_TRANSFORMER_QKV_SWIZZLE"));
+        if (!stream1_transformer_gemm_policy_supported_on_sm(
+                Stream1TransformerGemmFamily::Qkv, policy, 75) ||
+            !stream1_transformer_gemm_swizzle_allowed(
+                Stream1TransformerGemmFamily::Qkv,
+                policy,
+                Stream1TransformerGemmStagePolicy::Stages3,
+                swizzle_policy)) {
+            throw std::invalid_argument("QKV policy or swizzle is not compiled for SM75");
+        }
+        if (policy == Stream1TransformerGemmPolicy::M64N128) {
+            stream1_transformer_linear_bias_typed<
+                cutlass::half_t, cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<16, 8, 8>,
+                cutlass::gemm::GemmShape<64, 128, 32>,
+                cutlass::gemm::GemmShape<32, 64, 32>>(
+                    input, weight, bias, output, rows, input_cols, output_cols, stream);
+            return;
+        }
+        if (policy == Stream1TransformerGemmPolicy::M128N128) {
+            if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity4) {
+                stream1_transformer_linear_bias_typed<
+                    cutlass::half_t, cutlass::arch::Sm75,
+                    cutlass::gemm::GemmShape<16, 8, 8>,
+                    cutlass::gemm::GemmShape<128, 128, 32>,
+                    cutlass::gemm::GemmShape<64, 64, 32>, 4>(
+                        input, weight, bias, output, rows, input_cols, output_cols, stream);
+                return;
+            }
+            if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity8) {
+                stream1_transformer_linear_bias_typed<
+                    cutlass::half_t, cutlass::arch::Sm75,
+                    cutlass::gemm::GemmShape<16, 8, 8>,
+                    cutlass::gemm::GemmShape<128, 128, 32>,
+                    cutlass::gemm::GemmShape<64, 64, 32>, 8>(
+                        input, weight, bias, output, rows, input_cols, output_cols, stream);
+                return;
+            }
+            stream1_transformer_linear_bias_typed<
+                cutlass::half_t, cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<16, 8, 8>,
+                cutlass::gemm::GemmShape<128, 128, 32>,
+                cutlass::gemm::GemmShape<64, 64, 32>>(
+                    input, weight, bias, output, rows, input_cols, output_cols, stream);
+            return;
+        }
+        if (policy == Stream1TransformerGemmPolicy::M256N128) {
+            stream1_transformer_linear_bias_typed<
+                cutlass::half_t, cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<16, 8, 8>,
+                cutlass::gemm::GemmShape<256, 128, 32>,
+                cutlass::gemm::GemmShape<64, 64, 32>>(
+                    input, weight, bias, output, rows, input_cols, output_cols, stream);
             return;
         }
         stream1_transformer_linear_bias_typed<
@@ -2017,12 +2128,61 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
                     input, weight, bias, output, rows, input_cols, output_cols, stream, stage_policy);
             return;
         }
+        const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
+            Stream1TransformerGemmFamily::Ff1,
+            std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_POLICY"));
+        const char* stage_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_STAGES");
+        const Stream1TransformerGemmStagePolicy stage_policy =
+            stage_env == nullptr || stage_env[0] == '\0'
+                ? Stream1TransformerGemmStagePolicy::Stages2
+                : parse_stream1_transformer_gemm_stage_policy(stage_env);
+        const Stream1TransformerGemmSwizzlePolicy swizzle_policy =
+            parse_stream1_transformer_gemm_swizzle_policy(
+                std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_SWIZZLE"));
+        if (!stream1_transformer_gemm_policy_supported_on_sm(
+                Stream1TransformerGemmFamily::Ff1, policy, 75) ||
+            !stream1_transformer_gemm_stage_supported_on_sm(
+                Stream1TransformerGemmFamily::Ff1, stage_policy, 75) ||
+            swizzle_policy != Stream1TransformerGemmSwizzlePolicy::Identity1) {
+            throw std::invalid_argument("FF1 policy requires stages=2 and swizzle=1 on SM75");
+        }
+        if (policy == Stream1TransformerGemmPolicy::M64N128) {
+            stream1_transformer_ff1_linear_bias_silu_typed<
+                cutlass::half_t,
+                cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<16, 8, 8>,
+                cutlass::gemm::GemmShape<64, 128, 32>,
+                cutlass::gemm::GemmShape<32, 64, 32>,
+                2>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            return;
+        }
+        if (policy == Stream1TransformerGemmPolicy::M128N128W64N32) {
+            stream1_transformer_ff1_linear_bias_silu_typed<
+                cutlass::half_t,
+                cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<16, 8, 8>,
+                cutlass::gemm::GemmShape<128, 128, 32>,
+                cutlass::gemm::GemmShape<64, 32, 32>,
+                2>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            return;
+        }
+        if (policy == Stream1TransformerGemmPolicy::M128N128) {
+            stream1_transformer_ff1_linear_bias_silu_typed<
+                cutlass::half_t,
+                cutlass::arch::Sm75,
+                cutlass::gemm::GemmShape<16, 8, 8>,
+                cutlass::gemm::GemmShape<128, 128, 32>,
+                cutlass::gemm::GemmShape<64, 64, 32>,
+                2>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            return;
+        }
         stream1_transformer_ff1_linear_bias_silu_typed<
             cutlass::half_t,
             cutlass::arch::Sm75,
             cutlass::gemm::GemmShape<16, 8, 8>,
             cutlass::gemm::GemmShape<128, 64, 32>,
-            cutlass::gemm::GemmShape<64, 32, 32>, 2>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            cutlass::gemm::GemmShape<64, 32, 32>,
+            2>(input, weight, bias, output, rows, input_cols, output_cols, stream);
         return;
     }
     throw std::invalid_argument("Stream1 piece_transformer FF1 fused GEMM dtype must be fp16 or bf16");

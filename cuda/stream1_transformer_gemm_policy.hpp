@@ -69,6 +69,22 @@ inline bool stream1_transformer_gemm_policy_allowed(Stream1TransformerGemmFamily
 }
 
 
+inline bool stream1_transformer_gemm_policy_supported_on_sm(
+    Stream1TransformerGemmFamily family,
+    Stream1TransformerGemmPolicy policy,
+    int sm) {
+    return sm >= 75 && stream1_transformer_gemm_policy_allowed(family, policy);
+}
+inline bool stream1_transformer_gemm_stage_supported_on_sm(
+    Stream1TransformerGemmFamily family,
+    Stream1TransformerGemmStagePolicy stage_policy,
+    int sm) {
+    if (sm < 75) return false;
+    if (sm == 75 && family == Stream1TransformerGemmFamily::Ff1) {
+        return stage_policy == Stream1TransformerGemmStagePolicy::Stages2;
+    }
+    return true;
+}
 inline Stream1TransformerGemmPolicy parse_stream1_transformer_gemm_policy(Stream1TransformerGemmFamily family, const char* value) {
     Stream1TransformerGemmPolicy policy = Stream1TransformerGemmPolicy::Baseline;
     if (value == nullptr || value[0] == '\0' || std::strcmp(value, "baseline") == 0) policy = Stream1TransformerGemmPolicy::Baseline;
