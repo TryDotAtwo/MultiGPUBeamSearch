@@ -201,6 +201,19 @@ int main() {
     require(stream1_transformer_gemm_stage_supported_on_sm(
                 Family::Ff1, Stream1TransformerGemmStagePolicy::Stages3, 80),
             "SM80 FF1 must retain three-stage support");
+    require(stream1_transformer_gemm_stage_supported_on_sm(
+                Family::Qkv, Stream1TransformerGemmStagePolicy::Stages2, 75),
+            "SM75 QKV must report the CUTLASS default two-stage mainloop");
+    require(!stream1_transformer_gemm_stage_supported_on_sm(
+                Family::Qkv, Stream1TransformerGemmStagePolicy::Stages3, 75),
+            "SM75 QKV must reject the unsupported explicit three-stage mainloop");
+    require(stream1_transformer_gemm_stage_supported_on_sm(
+                Family::Qkv, Stream1TransformerGemmStagePolicy::Stages3, 80),
+            "SM80 QKV must retain the three-stage mainloop contract");
+    require(stream1_transformer_gemm_swizzle_allowed(
+                Family::Qkv, Policy::M128N128, Stream1TransformerGemmStagePolicy::Stages2,
+                Stream1TransformerGemmSwizzlePolicy::Identity8),
+            "SM75 QKV stages2 must retain identity8 swizzle reuse");
     std::cout << "stream1_transformer_gemm_policy_tests=pass\n";
     return 0;
 }

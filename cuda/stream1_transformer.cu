@@ -1851,7 +1851,7 @@ void stream1_transformer_linear_bias_cuda(
             !stream1_transformer_gemm_swizzle_allowed(
                 Stream1TransformerGemmFamily::Qkv,
                 policy,
-                Stream1TransformerGemmStagePolicy::Stages3,
+                Stream1TransformerGemmStagePolicy::Stages2,
                 swizzle_policy)) {
             throw std::invalid_argument("QKV policy or swizzle is not compiled for SM75");
         }

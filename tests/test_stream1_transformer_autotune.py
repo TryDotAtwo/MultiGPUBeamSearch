@@ -114,6 +114,27 @@ class AutotuneTests(unittest.TestCase):
         selected["BEAM_STREAM1_TRANSFORMER_ATTENTION_TILE_POLICY"] = "q64k64v4"
         cache = {"schema_version": 3, "signature": signature, "selected_environment": selected}
         self.assertEqual(resolve_cached_environment(cache, signature), (selected, "cache_hit"))
+
+    def test_environment_cache_accepts_exact_sm75_winner(self):
+        signature = {"gpu": "sm75", "workload": "block51-b384-c1"}
+        selected = baseline_environment()
+        selected.update(
+            {
+                "BEAM_STREAM1_TRANSFORMER_QKV_POLICY": "m128n128",
+                "BEAM_STREAM1_TRANSFORMER_QKV_SWIZZLE": "8",
+                "BEAM_STREAM1_TRANSFORMER_FF1_POLICY": "m128n128w64n32",
+                "BEAM_STREAM1_TRANSFORMER_FF1_STAGES": "2",
+                "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_POLICY": "m128n128",
+                "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_EPILOGUE": "fused",
+                "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_SWIZZLE": "2",
+                "BEAM_STREAM1_TRANSFORMER_FF2_POLICY": "m128n128",
+                "BEAM_STREAM1_TRANSFORMER_FF2_EPILOGUE": "fused",
+                "BEAM_STREAM1_TRANSFORMER_FF2_SWIZZLE": "2",
+            }
+        )
+        cache = {"schema_version": 3, "signature": signature, "selected_environment": selected}
+        self.assertEqual(resolve_cached_environment(cache, signature), (selected, "cache_hit"))
+
     def test_family_selection_preserves_previous_policies(self):
         current = baseline_policy_map()
         current["ff1"] = "m128n128"

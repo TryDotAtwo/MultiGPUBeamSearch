@@ -80,6 +80,9 @@ inline bool stream1_transformer_gemm_stage_supported_on_sm(
     Stream1TransformerGemmStagePolicy stage_policy,
     int sm) {
     if (sm < 75) return false;
+    if (sm == 75 && family == Stream1TransformerGemmFamily::Qkv) {
+        return stage_policy == Stream1TransformerGemmStagePolicy::Stages2;
+    }
     if (sm == 75 && family == Stream1TransformerGemmFamily::Ff1) {
         return stage_policy == Stream1TransformerGemmStagePolicy::Stages2;
     }
@@ -126,14 +129,20 @@ inline bool stream1_transformer_gemm_swizzle_allowed(
         return true;
     }
 
-    if (gemm_policy != Stream1TransformerGemmPolicy::M128N128 ||
-        stage_policy != Stream1TransformerGemmStagePolicy::Stages3) {
+    if (gemm_policy != Stream1TransformerGemmPolicy::M128N128) {
         return false;
     }
     if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity8 ||
         swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity4) {
-        return family == Stream1TransformerGemmFamily::Qkv ||
-            family == Stream1TransformerGemmFamily::Ff1;
+        if (family == Stream1TransformerGemmFamily::Qkv) {
+            return stage_policy == Stream1TransformerGemmStagePolicy::Stages2 ||
+                stage_policy == Stream1TransformerGemmStagePolicy::Stages3;
+        }
+        return family == Stream1TransformerGemmFamily::Ff1 &&
+            stage_policy == Stream1TransformerGemmStagePolicy::Stages3;
+    }
+    if (stage_policy != Stream1TransformerGemmStagePolicy::Stages3) {
+        return false;
     }
     if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity2) {
         return family == Stream1TransformerGemmFamily::AttentionOut ||

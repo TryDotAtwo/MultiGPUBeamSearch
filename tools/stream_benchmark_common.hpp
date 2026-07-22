@@ -30,7 +30,7 @@ namespace beam::bench {
 
 inline constexpr std::array<std::uint32_t, 6> B_MICRO_SWEEP{2048, 4096, 8192, 16384, 32768, 65536};
 inline constexpr std::array<std::uint32_t, 6> STREAM1_CONCURRENCY_SWEEP{1, 2, 4, 8, 16, 32};
-inline constexpr std::array<std::uint32_t, 13> TRANSFORMER_B_MICRO_SWEEP{256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 8192, 12288, 16384, 24576};
+inline constexpr std::array<std::uint32_t, 18> TRANSFORMER_B_MICRO_SWEEP{128, 192, 256, 320, 384, 448, 512, 640, 768, 1024, 1536, 2048, 3072, 4096, 8192, 12288, 16384, 24576};
 inline constexpr std::array<std::uint32_t, 8> TRANSFORMER_STREAM1_CONCURRENCY_SWEEP{1, 2, 3, 4, 5, 6, 8, 12};
 inline constexpr std::array<std::uint32_t, 6> STREAM4_BATCH_SWEEP{196608, 262144, 393216, 524288, 699392, 1048576};
 inline constexpr std::array<std::uint32_t, 4> STREAM4_SHARD_CAPACITY_SWEEP{1048576, 2621440, 5242880, 10485760};

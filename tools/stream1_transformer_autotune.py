@@ -19,12 +19,12 @@ from typing import Any, Iterable
 SCHEMA_VERSION = 1
 MULTIFAMILY_SCHEMA_VERSION = 2
 BASELINE_POLICY = "baseline"
-KNOWN_POLICIES = (BASELINE_POLICY, "m64n128", "m128n128", "m64n64")
+KNOWN_POLICIES = (BASELINE_POLICY, "m64n128", "m128n128", "m128n128w64n32", "m64n64")
 POLICY_FAMILIES = ("qkv", "attn_out", "ff1", "ff2")
 FAMILY_POLICIES = {
     "qkv": frozenset((BASELINE_POLICY, "m64n128", "m128n128")),
     "attn_out": frozenset((BASELINE_POLICY, "m64n64", "m128n128")),
-    "ff1": frozenset((BASELINE_POLICY, "m64n128", "m128n128")),
+    "ff1": frozenset((BASELINE_POLICY, "m64n128", "m128n128", "m128n128w64n32")),
     "ff2": frozenset((BASELINE_POLICY, "m64n64", "m128n128")),
 }
 POLICY_ENVIRONMENT = {
