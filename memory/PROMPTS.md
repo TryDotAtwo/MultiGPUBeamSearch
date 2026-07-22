@@ -1,5 +1,13 @@
 # Prompt History
 
+## 2026-07-22
+- User set the persistent goal to optimize native transformer inference sequentially on local RTX 3070 using the profiler-equipped long-lived Docker GPU queue, preserving byte-exact math and measured speed gates; only after 3070 improvements are exhausted should work move to independent 2xT4 profiling and tuning.
+- User reported that an interactive game had contaminated local RTX 3070 timings and required checking that the GPU is free before every performance measurement; suspect or mid-run-contaminated series must be discarded rather than interpreted.
+## 2026-07-18
+- User requested optimizing native transformer inference locally on RTX 3070 through Docker as the Ampere-family development proxy before A100 validation, with every optimization checked against historical math outputs and speed measurements.
+- User required strict deterministic correctness: changed checksum/digest means an implementation defect for this workflow, so a faster candidate must not be accepted when any repeated output differs.
+- User clarified that transformer shapes and inputs vary and approved a shape-aware, hardware-aware autotuner that selects kernels by GPU, dtype, GEMM shapes, concurrency, and fused operation, validates complete outputs, caches only verified winners, and otherwise uses baseline.
+
 ## 2026-07-03
 - User requested continuing native Stream1 transformer optimization after strided FMHA, asking what still differs from the PyTorch path and approving further profiler-driven improvements while preserving the no-fallback/no-distillation and MLP-isolation constraints.
 - User requested first making the native Stream1 transformer attention path behave like PyTorch SDPA, then trying to improve beyond that, while preserving the no-fallback/no-distillation rule and not touching the MLP path.
@@ -511,3 +519,22 @@ User asked to continue optimizing Stream1 transformer inference, including BF16 
 - Add BF16 support for modern GPUs, including A100 and 3070.
 - Continue optimizing native transformer inference, but do not force a slower or numerically risky path.
 - Use measured correctness and speed, not assumptions.
+
+## 2026-07-19 Backend determinism and MLP benchmark
+
+User requested checking determinism across PyTorch, LibTorch, and native CUTLASS transformer backends, plus MLP, to identify the source of changing score digests. User clarified that the real MLP production path was already working and required limiting the fix to the eager benchmark. `CUDA_LAUNCH_BLOCKING` is diagnostic-only and undesirable as a solution; do not add fallback paths.
+
+User requested continuing with native CUTLASS after Docker recovery and disk cleanup. Requirements: diagnose and fix the real native cause, keep mathematical correctness gated by comparison with prior/full score results, validate eager and CUDA Graph independently, use normal asynchronous execution rather than `CUDA_LAUNCH_BLOCKING`, add no fallback, and leave production MLP untouched.
+
+## 2026-07-19 Native transformer hardware-memory optimization
+
+User approved optimizing native transformer inference around memory-system efficiency rather than ALU throughput. Scope includes FlashAttention-2-style register/shared-memory/L2 reuse, coalesced Q/K/V movement, async copies, shape-specific GEMM and attention policies, layout/fusion experiments, exact full-dump correctness gates, local RTX 3070 validation first, and independent A100 tuning afterward. This is hardware reuse within one fixed-sequence inference, not autoregressive KV caching.
+
+## 2026-07-22 — Long-running transformer inference optimization goal
+
+- Work sequentially on transformer inference performance on the local RTX 3070 first.
+- Use the profiler-enabled Docker environment to guide optimization, with exact mathematical comparisons and real speed measurements.
+- Continue until further meaningful RTX 3070 improvements are exhausted by evidence, then move to independent optimization on 2xT4; do not transfer SM86 policies blindly.
+## 2026-07-22 — RTX 3070 benchmark validity
+
+User reported that an interactive game had been running during part of the recent transformer tuning and required checking that the GPU is free for every performance measurement. Suspect overlapping timings must be discarded. Accepted local RTX 3070 performance series require an immediate utilization/process idle check, and longer acceptance series should be bookended by another idle check; correctness dumps remain independently gated by the canonical full-score SHA.

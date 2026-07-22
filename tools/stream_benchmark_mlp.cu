@@ -1,6 +1,49 @@
 #include "stream_benchmark_common.hpp"
+#include "stream1_transformer_score_dump.hpp"
+#include <fstream>
 
 namespace beam::bench {
+constexpr std::uint64_t MLP_FNV64_OFFSET = 1469598103934665603ULL;
+constexpr std::uint64_t MLP_FNV64_PRIME = 1099511628211ULL;
+
+struct MlpScoreSummary {
+    std::uint64_t checksum = 0;
+    std::uint64_t digest = MLP_FNV64_OFFSET;
+};
+
+MlpScoreSummary summarize_mlp_scores(
+    const std::vector<std::uint32_t*>& score_buffers,
+    std::uint32_t parents_per_lane,
+    std::uint32_t concurrent) {
+    std::ofstream dump;
+    if (const char* path = std::getenv("BEAM_STREAM1_MLP_SCORE_DUMP"); path != nullptr && path[0] != '\0') {
+        dump.open(path, std::ios::binary | std::ios::trunc);
+        if (!dump) throw std::runtime_error("failed to open Stream1 MLP score dump");
+        const Stream1TransformerScoreDumpHeader header = make_stream1_transformer_score_dump_header(
+            concurrent, static_cast<std::uint64_t>(parents_per_lane) * MOVE_COUNT);
+        dump.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    }
+    MlpScoreSummary summary;
+    std::vector<std::uint32_t> host(static_cast<std::uint64_t>(parents_per_lane) * MOVE_COUNT);
+    for (std::uint32_t lane = 0; lane < concurrent; ++lane) {
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            host.data(), score_buffers[lane], host.size() * sizeof(std::uint32_t), cudaMemcpyDeviceToHost));
+        if (dump.is_open()) {
+            dump.write(reinterpret_cast<const char*>(host.data()),
+                       static_cast<std::streamsize>(host.size() * sizeof(std::uint32_t)));
+        }
+        for (std::uint32_t value : host) {
+            summary.checksum += value;
+            for (int shift = 0; shift < 32; shift += 8) {
+                summary.digest ^= static_cast<std::uint64_t>((value >> shift) & 0xFFU);
+                summary.digest *= MLP_FNV64_PRIME;
+            }
+        }
+    }
+    if (dump.is_open() && !dump) throw std::runtime_error("failed to write Stream1 MLP score dump");
+    return summary;
+}
+
 
 std::vector<Stream1Result> benchmark_stream1_mlp(
     const stream1_weights::DeviceWeights& weights,
@@ -20,14 +63,14 @@ std::vector<Stream1Result> benchmark_stream1_mlp(
         weights.hidden_bias,
         weights.hidden_ln_gamma,
         weights.hidden_ln_beta,
-        reinterpret_cast<const half* const*>(weights.residual_fc1_weight_table),
-        reinterpret_cast<const half* const*>(weights.residual_fc1_bias_table),
-        reinterpret_cast<const half* const*>(weights.residual_fc1_ln_gamma_table),
-        reinterpret_cast<const half* const*>(weights.residual_fc1_ln_beta_table),
-        reinterpret_cast<const half* const*>(weights.residual_fc2_weight_table),
-        reinterpret_cast<const half* const*>(weights.residual_fc2_bias_table),
-        reinterpret_cast<const half* const*>(weights.residual_fc2_ln_gamma_table),
-        reinterpret_cast<const half* const*>(weights.residual_fc2_ln_beta_table),
+        weights.residual_fc1_weight.data(),
+        weights.residual_fc1_bias.data(),
+        weights.residual_fc1_ln_gamma.data(),
+        weights.residual_fc1_ln_beta.data(),
+        weights.residual_fc2_weight.data(),
+        weights.residual_fc2_bias.data(),
+        weights.residual_fc2_ln_gamma.data(),
+        weights.residual_fc2_ln_beta.data(),
         weights.output_weight,
         weights.output_bias,
         dims};
@@ -124,6 +167,7 @@ std::vector<Stream1Result> benchmark_stream1_mlp(
                         streams[i]);
                 }
             });
+            const MlpScoreSummary score_summary = summarize_mlp_scores(score, parent_batch, concurrent);
             const double parents = static_cast<double>(rows_per_launch_group);
             const double parent_per_sec = parents * 1000.0 / static_cast<double>(ms);
             const double candidate_per_sec = parents * static_cast<double>(MOVE_COUNT) * 1000.0 / static_cast<double>(ms);
@@ -143,6 +187,8 @@ std::vector<Stream1Result> benchmark_stream1_mlp(
                       << " parents_per_sec=" << std::setprecision(1) << parent_per_sec
                       << " candidates_per_sec=" << candidate_per_sec
                       << " scratch_bytes=" << scratch_bytes
+                      << " checksum=" << score_summary.checksum
+                      << " score_key_digest=" << score_summary.digest
                       << "\n";
             for (std::uint32_t i = 0; i < concurrent; ++i) {
                 cudaFree(parent_base[i]);

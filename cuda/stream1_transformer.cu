@@ -1,6 +1,7 @@
 #include "stream1.hpp"
 #include "stream1_transformer_fmha.hpp"
 #include "stream1_transformer_gemm_policy.hpp"
+#include "stream1_transformer_layernorm_policy.hpp"
 
 #include "config.hpp"
 #include "cuda_check.hpp"
@@ -14,6 +15,8 @@
 #include <cutlass/bfloat16.h>
 #include <cutlass/epilogue/thread/activation.h>
 #include <cutlass/epilogue/thread/linear_combination_bias_elementwise.h>
+#include <cutlass/epilogue/thread/linear_combination.h>
+#include <cutlass/epilogue/thread/linear_combination_silu.h>
 #include <cutlass/gemm/device/gemm.h>
 #include <cutlass/gemm/device/gemm_batched.h>
 #include <cutlass/gemm/device/gemm_universal_with_broadcast.h>
@@ -179,11 +182,14 @@ __global__ void stream1_transformer_build_input_layernorm51x256_kernel(
     if (warp == 0U) {
         block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
         if (lane == 0U) {
-            warp_scratch[0] = block_sum * (1.0f / 256.0f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
         }
     }
     __syncthreads();
-    const float mean = warp_scratch[0];
+    const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+    __syncthreads();
+#endif
 
     const float centered0 = x0 - mean;
     const float centered1 = x1 - mean;
@@ -198,11 +204,11 @@ __global__ void stream1_transformer_build_input_layernorm51x256_kernel(
     if (warp == 0U) {
         block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
         if (lane == 0U) {
-            warp_scratch[0] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
         }
     }
     __syncthreads();
-    const float inv_std = warp_scratch[0];
+    const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
 
     const float y0 = centered0 * inv_std *
         stream1_transformer_load_scalar_device(network.input_ln_gamma, col0, network.dims.dtype) +
@@ -228,7 +234,7 @@ void stream1_transformer_build_input_layernorm51x256_launch(
         dims.max_piece_size != 3U || dims.num_classes != 120U) {
         throw std::invalid_argument("Stream1 piece_transformer block51 fused input requires seq=51 d=256 pieces=50 max_piece=3 classes=120");
     }
-    stream1_transformer_build_input_layernorm51x256_kernel<<<b_micro * 51U, 128, 4 * sizeof(float), stream>>>(
+    stream1_transformer_build_input_layernorm51x256_kernel<<<b_micro * 51U, 128, STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float), stream>>>(
         current_frontier_states,
         parent_base,
         count,
@@ -360,11 +366,14 @@ __global__ void stream1_transformer_build_input_layernorm51x256_graph_job_kernel
     if (warp == 0U) {
         block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
         if (lane == 0U) {
-            warp_scratch[0] = block_sum * (1.0f / 256.0f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
         }
     }
     __syncthreads();
-    const float mean = warp_scratch[0];
+    const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+    __syncthreads();
+#endif
 
     const float centered0 = x0 - mean;
     const float centered1 = x1 - mean;
@@ -379,11 +388,11 @@ __global__ void stream1_transformer_build_input_layernorm51x256_graph_job_kernel
     if (warp == 0U) {
         block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
         if (lane == 0U) {
-            warp_scratch[0] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
         }
     }
     __syncthreads();
-    const float inv_std = warp_scratch[0];
+    const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
 
     const float y0 = centered0 * inv_std *
         stream1_transformer_load_scalar_device(network.input_ln_gamma, col0, network.dims.dtype) +
@@ -410,7 +419,7 @@ void stream1_transformer_build_input_layernorm51x256_graph_job_launch(
         dims.max_piece_size != 3U || dims.num_classes != 120U) {
         throw std::invalid_argument("Stream1 piece_transformer block51 fused input requires seq=51 d=256 pieces=50 max_piece=3 classes=120");
     }
-    stream1_transformer_build_input_layernorm51x256_graph_job_kernel<<<b_micro * 51U, 128, 4 * sizeof(float), stream>>>(
+    stream1_transformer_build_input_layernorm51x256_graph_job_kernel<<<b_micro * 51U, 128, STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float), stream>>>(
         current_frontier_states,
         parent_base,
         count,
@@ -447,6 +456,7 @@ __global__ void stream1_transformer_layernorm_copy_kernel(
         __syncthreads();
     }
     const float mean = reduce[0] / static_cast<float>(cols);
+    __syncthreads();
     float var_sum = 0.0f;
     for (std::uint32_t col = threadIdx.x; col < cols; col += blockDim.x) {
         const float x = stream1_transformer_load_scalar_device(input, base + col, dtype);
@@ -503,11 +513,14 @@ __global__ void stream1_transformer_layernorm256_copy_kernel(
     if (warp == 0U) {
         block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
         if (lane == 0U) {
-            warp_scratch[0] = block_sum * (1.0f / 256.0f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
         }
     }
     __syncthreads();
-    const float mean = warp_scratch[0];
+    const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+    __syncthreads();
+#endif
 
     const float centered0 = x0 - mean;
     const float centered1 = x1 - mean;
@@ -522,11 +535,11 @@ __global__ void stream1_transformer_layernorm256_copy_kernel(
     if (warp == 0U) {
         block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
         if (lane == 0U) {
-            warp_scratch[0] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
         }
     }
     __syncthreads();
-    const float inv_std = warp_scratch[0];
+    const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
 
     const float y0 = centered0 * inv_std *
         stream1_transformer_load_scalar_device(gamma, col0, dtype) +
@@ -576,11 +589,14 @@ __global__ void stream1_transformer_bias_layernorm256_copy_kernel(
     if (warp == 0U) {
         block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
         if (lane == 0U) {
-            warp_scratch[0] = block_sum * (1.0f / 256.0f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
         }
     }
     __syncthreads();
-    const float mean = warp_scratch[0];
+    const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+    __syncthreads();
+#endif
 
     const float centered0 = x0 - mean;
     const float centered1 = x1 - mean;
@@ -595,11 +611,11 @@ __global__ void stream1_transformer_bias_layernorm256_copy_kernel(
     if (warp == 0U) {
         block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
         if (lane == 0U) {
-            warp_scratch[0] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
         }
     }
     __syncthreads();
-    const float inv_std = warp_scratch[0];
+    const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
 
     const float y0 = centered0 * inv_std *
         stream1_transformer_load_scalar_device(gamma, col0, dtype) +
@@ -659,11 +675,14 @@ __global__ void stream1_transformer_bias_round_layernorm256_copy_kernel(
     if (warp == 0U) {
         block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
         if (lane == 0U) {
-            warp_scratch[0] = block_sum * (1.0f / 256.0f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
         }
     }
     __syncthreads();
-    const float mean = warp_scratch[0];
+    const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+    __syncthreads();
+#endif
 
     const float centered0 = x0 - mean;
     const float centered1 = x1 - mean;
@@ -678,11 +697,11 @@ __global__ void stream1_transformer_bias_round_layernorm256_copy_kernel(
     if (warp == 0U) {
         block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
         if (lane == 0U) {
-            warp_scratch[0] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+            warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] = rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
         }
     }
     __syncthreads();
-    const float inv_std = warp_scratch[0];
+    const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
 
     const float y0 = centered0 * inv_std *
         stream1_transformer_load_scalar_device(gamma, col0, dtype) +
@@ -692,6 +711,237 @@ __global__ void stream1_transformer_bias_round_layernorm256_copy_kernel(
         stream1_transformer_load_scalar_device(beta, col1, dtype);
     stream1_transformer_store_scalar_device(output, base + col0, y0, dtype);
     stream1_transformer_store_scalar_device(output, base + col1, y1, dtype);
+}
+__global__ void stream1_transformer_bias_round_layernorm256_copy_persistent_kernel(
+    half* __restrict__ input_inout,
+    half* __restrict__ output,
+    const half* __restrict__ bias,
+    const half* __restrict__ gamma,
+    const half* __restrict__ beta,
+    std::uint32_t rows,
+    std::uint32_t dtype) {
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t lane = tid & 31U;
+    const std::uint32_t warp = tid >> 5U;
+    const std::uint32_t col0 = tid;
+    const std::uint32_t col1 = tid + 128U;
+    extern __shared__ float warp_scratch[];
+
+
+    for (std::uint32_t row = blockIdx.x; row < rows; row += gridDim.x) {
+        const std::uint64_t base = static_cast<std::uint64_t>(row) * 256ULL;
+        const float biased0 = stream1_transformer_load_scalar_device(input_inout, base + col0, dtype) +
+            stream1_transformer_load_scalar_device(bias, col0, dtype);
+        const float biased1 = stream1_transformer_load_scalar_device(input_inout, base + col1, dtype) +
+            stream1_transformer_load_scalar_device(bias, col1, dtype);
+        const float x0 = stream1_transformer_round_to_model_dtype_device(biased0, dtype);
+        const float x1 = stream1_transformer_round_to_model_dtype_device(biased1, dtype);
+        stream1_transformer_store_scalar_device(input_inout, base + col0, x0, dtype);
+        stream1_transformer_store_scalar_device(input_inout, base + col1, x1, dtype);
+
+        const float warp_sum = stream1_transformer_warp_reduce_sum_device(x0 + x1);
+        if (lane == 0U) {
+            warp_scratch[warp] = warp_sum;
+        }
+        __syncthreads();
+
+        float block_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+        if (warp == 0U) {
+            block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
+            if (lane == 0U) {
+                warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
+            }
+        }
+        __syncthreads();
+        const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+        __syncthreads();
+#endif
+
+        const float centered0 = x0 - mean;
+        const float centered1 = x1 - mean;
+        const float warp_var_sum = stream1_transformer_warp_reduce_sum_device(
+            centered0 * centered0 + centered1 * centered1);
+        if (lane == 0U) {
+            warp_scratch[warp] = warp_var_sum;
+        }
+        __syncthreads();
+
+        float block_var_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+        if (warp == 0U) {
+            block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
+            if (lane == 0U) {
+                warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] =
+                    rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+            }
+        }
+        __syncthreads();
+        const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
+
+        const float y0 = centered0 * inv_std *
+            stream1_transformer_load_scalar_device(gamma, col0, dtype) +
+            stream1_transformer_load_scalar_device(beta, col0, dtype);
+        const float y1 = centered1 * inv_std *
+            stream1_transformer_load_scalar_device(gamma, col1, dtype) +
+            stream1_transformer_load_scalar_device(beta, col1, dtype);
+        stream1_transformer_store_scalar_device(output, base + col0, y0, dtype);
+        stream1_transformer_store_scalar_device(output, base + col1, y1, dtype);
+        __syncthreads();
+    }
+}
+__global__ void stream1_transformer_bias_round_layernorm256_copy_block2_kernel(
+    half* __restrict__ input_inout,
+    half* __restrict__ output,
+    const half* __restrict__ bias,
+    const half* __restrict__ gamma,
+    const half* __restrict__ beta,
+    std::uint32_t rows,
+    std::uint32_t dtype) {
+    const std::uint32_t row_slot = threadIdx.x >> 7U;
+    const std::uint32_t tid = threadIdx.x & 127U;
+    const std::uint32_t row = blockIdx.x * 2U + row_slot;
+    const bool active = row < rows;
+    const std::uint32_t lane = tid & 31U;
+    const std::uint32_t warp = tid >> 5U;
+    const std::uint64_t base = static_cast<std::uint64_t>(row) * 256ULL;
+    const std::uint32_t col0 = tid;
+    const std::uint32_t col1 = tid + 128U;
+    extern __shared__ float shared_scratch[];
+    float* const warp_scratch =
+        shared_scratch + row_slot * STREAM1_TRANSFORMER_LN256_SHARED_FLOATS;
+
+    float x0 = 0.0f;
+    float x1 = 0.0f;
+    if (active) {
+        const float biased0 = stream1_transformer_load_scalar_device(input_inout, base + col0, dtype) +
+            stream1_transformer_load_scalar_device(bias, col0, dtype);
+        const float biased1 = stream1_transformer_load_scalar_device(input_inout, base + col1, dtype) +
+            stream1_transformer_load_scalar_device(bias, col1, dtype);
+        x0 = stream1_transformer_round_to_model_dtype_device(biased0, dtype);
+        x1 = stream1_transformer_round_to_model_dtype_device(biased1, dtype);
+        stream1_transformer_store_scalar_device(input_inout, base + col0, x0, dtype);
+        stream1_transformer_store_scalar_device(input_inout, base + col1, x1, dtype);
+    }
+
+    const float warp_sum = stream1_transformer_warp_reduce_sum_device(x0 + x1);
+    if (lane == 0U) {
+        warp_scratch[warp] = warp_sum;
+    }
+    __syncthreads();
+
+    float block_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+    if (warp == 0U) {
+        block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
+        if (lane == 0U) {
+            warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
+        }
+    }
+    __syncthreads();
+    const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+    __syncthreads();
+#endif
+
+    const float centered0 = x0 - mean;
+    const float centered1 = x1 - mean;
+    const float warp_var_sum = stream1_transformer_warp_reduce_sum_device(
+        centered0 * centered0 + centered1 * centered1);
+    if (lane == 0U) {
+        warp_scratch[warp] = warp_var_sum;
+    }
+    __syncthreads();
+
+    float block_var_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+    if (warp == 0U) {
+        block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
+        if (lane == 0U) {
+            warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] =
+                rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+        }
+    }
+    __syncthreads();
+    const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
+
+    if (active) {
+        const float y0 = centered0 * inv_std *
+            stream1_transformer_load_scalar_device(gamma, col0, dtype) +
+            stream1_transformer_load_scalar_device(beta, col0, dtype);
+        const float y1 = centered1 * inv_std *
+            stream1_transformer_load_scalar_device(gamma, col1, dtype) +
+            stream1_transformer_load_scalar_device(beta, col1, dtype);
+        stream1_transformer_store_scalar_device(output, base + col0, y0, dtype);
+        stream1_transformer_store_scalar_device(output, base + col1, y1, dtype);
+    }
+}
+__global__ void stream1_transformer_layernorm256_copy_persistent_kernel(
+    const half* __restrict__ input,
+    half* __restrict__ output,
+    const half* __restrict__ gamma,
+    const half* __restrict__ beta,
+    std::uint32_t rows,
+    std::uint32_t dtype) {
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t lane = tid & 31U;
+    const std::uint32_t warp = tid >> 5U;
+    const std::uint32_t col0 = tid;
+    const std::uint32_t col1 = tid + 128U;
+    extern __shared__ float warp_scratch[];
+
+    const float gamma0 = stream1_transformer_load_scalar_device(gamma, col0, dtype);
+    const float gamma1 = stream1_transformer_load_scalar_device(gamma, col1, dtype);
+    const float beta0 = stream1_transformer_load_scalar_device(beta, col0, dtype);
+    const float beta1 = stream1_transformer_load_scalar_device(beta, col1, dtype);
+
+    for (std::uint32_t row = blockIdx.x; row < rows; row += gridDim.x) {
+        const std::uint64_t base = static_cast<std::uint64_t>(row) * 256ULL;
+        const float x0 = stream1_transformer_load_scalar_device(input, base + col0, dtype);
+        const float x1 = stream1_transformer_load_scalar_device(input, base + col1, dtype);
+
+        const float warp_sum = stream1_transformer_warp_reduce_sum_device(x0 + x1);
+        if (lane == 0U) {
+            warp_scratch[warp] = warp_sum;
+        }
+        __syncthreads();
+
+        float block_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+        if (warp == 0U) {
+            block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
+            if (lane == 0U) {
+                warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
+            }
+        }
+        __syncthreads();
+        const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+        __syncthreads();
+#endif
+
+        const float centered0 = x0 - mean;
+        const float centered1 = x1 - mean;
+        const float warp_var_sum = stream1_transformer_warp_reduce_sum_device(
+            centered0 * centered0 + centered1 * centered1);
+        if (lane == 0U) {
+            warp_scratch[warp] = warp_var_sum;
+        }
+        __syncthreads();
+
+        float block_var_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+        if (warp == 0U) {
+            block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
+            if (lane == 0U) {
+                warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] =
+                    rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+            }
+        }
+        __syncthreads();
+        const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
+
+        const float y0 = __fadd_rn(__fmul_rn(__fmul_rn(centered0, inv_std), gamma0), beta0);
+        const float y1 = __fadd_rn(__fmul_rn(__fmul_rn(centered1, inv_std), gamma1), beta1);
+        stream1_transformer_store_scalar_device(output, base + col0, y0, dtype);
+        stream1_transformer_store_scalar_device(output, base + col1, y1, dtype);
+        __syncthreads();
+    }
 }
 void stream1_transformer_layernorm_copy_launch(
     const half* input,
@@ -703,7 +953,42 @@ void stream1_transformer_layernorm_copy_launch(
     std::uint32_t dtype,
     cudaStream_t stream) {
     if (cols == 256U) {
-        stream1_transformer_layernorm256_copy_kernel<<<rows, 128, 4 * sizeof(float), stream>>>(
+        const Stream1TransformerLayerNormRowsPolicy policy =
+            parse_stream1_transformer_layernorm_rows_policy(
+                std::getenv("BEAM_STREAM1_TRANSFORMER_LAYERNORM_ROWS_POLICY"));
+        if (!stream1_transformer_layernorm_copy_policy_supported(policy)) {
+            throw std::invalid_argument("LayerNorm copy path supports only row or persistent policy");
+        }
+        if (policy == Stream1TransformerLayerNormRowsPolicy::PersistentRows) {
+            constexpr int threads = 128;
+            const std::size_t shared_bytes = STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float);
+            int active_blocks_per_sm = 0;
+            BEAM_CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                &active_blocks_per_sm,
+                stream1_transformer_layernorm256_copy_persistent_kernel,
+                threads,
+                shared_bytes));
+            int device = 0;
+            cudaDeviceProp prop{};
+            BEAM_CUDA_CHECK(cudaGetDevice(&device));
+            BEAM_CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+            const int blocks_per_sm = stream1_transformer_layernorm_persistent_blocks_per_sm(
+                std::getenv("BEAM_STREAM1_TRANSFORMER_LAYERNORM_PERSISTENT_BLOCKS_PER_SM"),
+                active_blocks_per_sm);
+            const std::uint32_t resident_grid = static_cast<std::uint32_t>(
+                blocks_per_sm * prop.multiProcessorCount);
+            const std::uint32_t grid = rows < resident_grid ? rows : resident_grid;
+            stream1_transformer_layernorm256_copy_persistent_kernel<<<
+                grid, threads, shared_bytes, stream>>>(
+                input,
+                output,
+                gamma,
+                beta,
+                rows,
+                dtype);
+            return;
+        }
+        stream1_transformer_layernorm256_copy_kernel<<<rows, 128, STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float), stream>>>(
             input,
             output,
             gamma,
@@ -735,7 +1020,7 @@ void stream1_transformer_bias_layernorm_copy_launch(
     if (cols != 256U) {
         throw std::invalid_argument("Stream1 piece_transformer fused bias LayerNorm requires cols=256");
     }
-    stream1_transformer_bias_layernorm256_copy_kernel<<<rows, 128, 4 * sizeof(float), stream>>>(
+    stream1_transformer_bias_layernorm256_copy_kernel<<<rows, 128, STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float), stream>>>(
         input_inout,
         output,
         bias,
@@ -758,7 +1043,53 @@ void stream1_transformer_bias_round_layernorm_copy_launch(
     if (cols != 256U) {
         throw std::invalid_argument("Stream1 piece_transformer rounded fused bias LayerNorm requires cols=256");
     }
-    stream1_transformer_bias_round_layernorm256_copy_kernel<<<rows, 128, 4 * sizeof(float), stream>>>(
+    const Stream1TransformerLayerNormRowsPolicy policy =
+        parse_stream1_transformer_layernorm_rows_policy(
+            std::getenv("BEAM_STREAM1_TRANSFORMER_LAYERNORM_ROWS_POLICY"));
+    if (policy == Stream1TransformerLayerNormRowsPolicy::PersistentRows) {
+        constexpr int threads = 128;
+        const std::size_t shared_bytes = STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float);
+        int active_blocks_per_sm = 0;
+        BEAM_CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            &active_blocks_per_sm,
+            stream1_transformer_bias_round_layernorm256_copy_persistent_kernel,
+            threads,
+            shared_bytes));
+        int device = 0;
+        cudaDeviceProp prop{};
+        BEAM_CUDA_CHECK(cudaGetDevice(&device));
+        BEAM_CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+        const std::uint32_t resident_grid = static_cast<std::uint32_t>(
+            active_blocks_per_sm * prop.multiProcessorCount);
+        const std::uint32_t grid = rows < resident_grid ? rows : resident_grid;
+        stream1_transformer_bias_round_layernorm256_copy_persistent_kernel<<<
+            grid, threads, shared_bytes, stream>>>(
+            input_inout,
+            output,
+            bias,
+            gamma,
+            beta,
+            rows,
+            dtype);
+        return;
+    }
+    if (policy == Stream1TransformerLayerNormRowsPolicy::TwoRowsPerBlock) {
+        stream1_transformer_bias_round_layernorm256_copy_block2_kernel<<<
+            (rows + 1U) / 2U,
+            256,
+            2U * STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float),
+            stream>>>(
+            input_inout,
+            output,
+            bias,
+            gamma,
+            beta,
+            rows,
+            dtype);
+        return;
+    }
+
+    stream1_transformer_bias_round_layernorm256_copy_kernel<<<rows, 128, STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float), stream>>>(
         input_inout,
         output,
         bias,
@@ -986,7 +1317,12 @@ bool stream1_transformer_current_device_sm80_or_newer() {
     return cached_sm80;
 }
 
-template <typename Element, typename ArchTag, typename InstructionShape>
+template <
+    typename Element,
+    typename ArchTag,
+    typename InstructionShape,
+    typename ThreadblockShape,
+    typename WarpShape>
 void stream1_transformer_linear_residual_typed(
     const half* input,
     const half* weight,
@@ -1006,8 +1342,8 @@ void stream1_transformer_linear_residual_typed(
         float,
         cutlass::arch::OpClassTensorOp,
         ArchTag,
-        cutlass::gemm::GemmShape<128, 64, 32>,
-        cutlass::gemm::GemmShape<64, 32, 32>,
+        ThreadblockShape,
+        WarpShape,
         InstructionShape>;
     Gemm gemm;
     typename Gemm::Arguments args{
@@ -1043,27 +1379,247 @@ void stream1_transformer_linear_residual_cuda(
         stream1_transformer_linear_residual_typed<
             cutlass::bfloat16_t,
             cutlass::arch::Sm80,
-            cutlass::gemm::GemmShape<16, 8, 16>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
+            cutlass::gemm::GemmShape<16, 8, 16>,
+            cutlass::gemm::GemmShape<128, 64, 32>,
+            cutlass::gemm::GemmShape<64, 32, 32>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
         return;
     }
     if (dtype == STREAM1_DTYPE_FP16) {
         if (stream1_transformer_current_device_sm80_or_newer()) {
+            const bool is_ff2 = input_cols == 1024U && output_cols == 256U;
+            const Stream1TransformerGemmFamily family = is_ff2
+                ? Stream1TransformerGemmFamily::Ff2
+                : Stream1TransformerGemmFamily::AttentionOut;
+            const char* env_name = is_ff2
+                ? "BEAM_STREAM1_TRANSFORMER_FF2_POLICY"
+                : "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_POLICY";
+            const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
+                family, std::getenv(env_name));
+            if (policy == Stream1TransformerGemmPolicy::M64N64) {
+                stream1_transformer_linear_residual_typed<
+                    cutlass::half_t, cutlass::arch::Sm80,
+                    cutlass::gemm::GemmShape<16, 8, 16>,
+                    cutlass::gemm::GemmShape<64, 64, 32>,
+                    cutlass::gemm::GemmShape<32, 32, 32>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
+                return;
+            }
+            if (policy == Stream1TransformerGemmPolicy::M128N128) {
+                stream1_transformer_linear_residual_typed<
+                    cutlass::half_t, cutlass::arch::Sm80,
+                    cutlass::gemm::GemmShape<16, 8, 16>,
+                    cutlass::gemm::GemmShape<128, 128, 32>,
+                    cutlass::gemm::GemmShape<64, 64, 32>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
+                return;
+            }
             stream1_transformer_linear_residual_typed<
                 cutlass::half_t,
                 cutlass::arch::Sm80,
-                cutlass::gemm::GemmShape<16, 8, 16>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
+                cutlass::gemm::GemmShape<16, 8, 16>,
+                cutlass::gemm::GemmShape<128, 64, 32>,
+                cutlass::gemm::GemmShape<64, 32, 32>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
             return;
         }
         stream1_transformer_linear_residual_typed<
             cutlass::half_t,
             cutlass::arch::Sm75,
-            cutlass::gemm::GemmShape<16, 8, 8>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
+            cutlass::gemm::GemmShape<16, 8, 8>,
+            cutlass::gemm::GemmShape<128, 64, 32>,
+            cutlass::gemm::GemmShape<64, 32, 32>>(input, weight, residual_inout, rows, input_cols, output_cols, stream);
         return;
     }
     throw std::invalid_argument("Stream1 piece_transformer residual GEMM dtype must be fp16 or bf16");
 }
 
-template <typename Element, typename ArchTag, typename InstructionShape>
+template <typename Element>
+struct Stream1TransformerRoundThenAdd {
+    CUTLASS_HOST_DEVICE
+    float operator()(float value, float bias) const {
+        const Element rounded = cutlass::NumericConverter<Element, float>()(value);
+        const float rounded_value = cutlass::NumericConverter<float, Element>()(rounded);
+        return rounded_value + bias;
+    }
+};
+
+template <
+    typename Element,
+    typename ArchTag,
+    typename InstructionShape,
+    typename ThreadblockShape,
+    typename WarpShape,
+    int Swizzle = 1>
+void stream1_transformer_linear_residual_bias_round_typed(
+    const half* input,
+    const half* weight,
+    half* residual_inout,
+    const half* bias,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    cudaStream_t stream) {
+    constexpr int elements_per_access = 128 / cutlass::sizeof_bits<Element>::value;
+    using Epilogue = cutlass::epilogue::thread::LinearCombinationBiasElementwise<
+        Element,
+        float,
+        float,
+        Element,
+        Element,
+        elements_per_access,
+        cutlass::epilogue::thread::Identity<float>,
+        Stream1TransformerRoundThenAdd<Element>,
+        false,
+        Element>;
+    using Gemm = cutlass::gemm::device::GemmUniversalWithBroadcast<
+        Element,
+        cutlass::layout::RowMajor,
+        Element,
+        cutlass::layout::RowMajor,
+        Element,
+        cutlass::layout::RowMajor,
+        float,
+        cutlass::arch::OpClassTensorOp,
+        ArchTag,
+        ThreadblockShape,
+        WarpShape,
+        InstructionShape,
+        Epilogue,
+        cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<Swizzle>,
+        3>;
+
+    const cutlass::gemm::GemmCoord problem(
+        static_cast<int>(rows),
+        static_cast<int>(output_cols),
+        static_cast<int>(input_cols));
+    typename Epilogue::Params epilogue_params{1.0f, 1.0f};
+    const std::int64_t batch_stride_a = static_cast<std::int64_t>(rows) * input_cols;
+    const std::int64_t batch_stride_b = static_cast<std::int64_t>(input_cols) * output_cols;
+    const std::int64_t batch_stride_output = static_cast<std::int64_t>(rows) * output_cols;
+    typename Gemm::Arguments args(
+        cutlass::gemm::GemmUniversalMode::kGemm,
+        problem,
+        1,
+        epilogue_params,
+        reinterpret_cast<Element const*>(input),
+        reinterpret_cast<Element const*>(weight),
+        reinterpret_cast<Element const*>(residual_inout),
+        reinterpret_cast<Element*>(residual_inout),
+        const_cast<Element*>(reinterpret_cast<Element const*>(bias)),
+        nullptr,
+        batch_stride_a,
+        batch_stride_b,
+        batch_stride_output,
+        batch_stride_output,
+        0,
+        0,
+        static_cast<int>(input_cols),
+        static_cast<int>(output_cols),
+        static_cast<int>(output_cols),
+        static_cast<int>(output_cols),
+        0,
+        static_cast<int>(output_cols));
+
+    Gemm gemm;
+    const cutlass::Status status = gemm(args, nullptr, stream);
+    if (status != cutlass::Status::kSuccess) {
+        throw std::runtime_error("Stream1 piece_transformer fused residual+bias-round GEMM launch failed");
+    }
+}
+
+void stream1_transformer_residual_bias_round_layernorm_cuda(
+    const half* input,
+    const half* weight,
+    half* residual_inout,
+    const half* bias,
+    half* normalized_output,
+    const half* gamma,
+    const half* beta,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    const bool is_ff2 = input_cols == 1024U && output_cols == 256U;
+
+    const Stream1TransformerGemmFamily family = is_ff2
+        ? Stream1TransformerGemmFamily::Ff2
+        : Stream1TransformerGemmFamily::AttentionOut;
+    const char* epilogue_env = is_ff2
+        ? "BEAM_STREAM1_TRANSFORMER_FF2_EPILOGUE"
+        : "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_EPILOGUE";
+    const Stream1TransformerResidualEpiloguePolicy epilogue_policy =
+        parse_stream1_transformer_residual_epilogue_policy(std::getenv(epilogue_env));
+    const char* swizzle_env = is_ff2
+        ? "BEAM_STREAM1_TRANSFORMER_FF2_SWIZZLE"
+        : "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_SWIZZLE";
+    const Stream1TransformerGemmSwizzlePolicy swizzle_policy =
+        parse_stream1_transformer_gemm_swizzle_policy(std::getenv(swizzle_env));
+    if (epilogue_policy == Stream1TransformerResidualEpiloguePolicy::Separate) {
+
+        if (swizzle_policy != Stream1TransformerGemmSwizzlePolicy::Identity1) {
+            throw std::invalid_argument("residual GEMM swizzle greater than 1 requires fused epilogue");
+        }
+        stream1_transformer_linear_residual_cuda(
+            input, weight, residual_inout, rows, input_cols, output_cols, dtype, stream);
+        stream1_transformer_bias_round_layernorm_copy_launch(
+            residual_inout, normalized_output, bias, gamma, beta, rows, output_cols, dtype, stream);
+        return;
+    }
+    if (dtype != STREAM1_DTYPE_FP16 || !stream1_transformer_current_device_sm80_or_newer()) {
+        throw std::invalid_argument("fused residual+bias-round epilogue requires fp16 SM80+");
+    }
+    if (output_cols != 256U) {
+        throw std::invalid_argument("fused residual+bias-round epilogue requires output_cols=256");
+    }
+
+    const char* gemm_env = is_ff2
+        ? "BEAM_STREAM1_TRANSFORMER_FF2_POLICY"
+        : "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_POLICY";
+    const Stream1TransformerGemmPolicy gemm_policy =
+        parse_stream1_transformer_gemm_policy(family, std::getenv(gemm_env));
+    if (gemm_policy != Stream1TransformerGemmPolicy::M128N128) {
+        throw std::invalid_argument("fused residual+bias-round epilogue is compiled only for m128n128");
+    }
+    if (!stream1_transformer_gemm_swizzle_allowed(
+            family,
+            gemm_policy,
+            Stream1TransformerGemmStagePolicy::Stages3,
+            swizzle_policy)) {
+        throw std::invalid_argument("residual GEMM swizzle is not compiled for this family and policy");
+    }
+    if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity2) {
+        stream1_transformer_linear_residual_bias_round_typed<
+            cutlass::half_t,
+            cutlass::arch::Sm80,
+            cutlass::gemm::GemmShape<16, 8, 16>,
+            cutlass::gemm::GemmShape<128, 128, 32>,
+            cutlass::gemm::GemmShape<64, 64, 32>,
+            2>(input, weight, residual_inout, bias, rows, input_cols, output_cols, stream);
+    } else {
+        stream1_transformer_linear_residual_bias_round_typed<
+            cutlass::half_t,
+            cutlass::arch::Sm80,
+            cutlass::gemm::GemmShape<16, 8, 16>,
+            cutlass::gemm::GemmShape<128, 128, 32>,
+            cutlass::gemm::GemmShape<64, 64, 32>>(
+                input, weight, residual_inout, bias, rows, input_cols, output_cols, stream);
+    }
+    stream1_transformer_layernorm_copy_launch(
+        residual_inout,
+        normalized_output,
+        gamma,
+        beta,
+        rows,
+        output_cols,
+        dtype,
+        stream);
+}
+
+template <
+    typename Element,
+    typename ArchTag,
+    typename InstructionShape,
+    typename ThreadblockShape,
+    typename WarpShape,
+    int Swizzle = 1>
 void stream1_transformer_linear_bias_typed(
     const half* input,
     const half* weight,
@@ -1095,10 +1651,11 @@ void stream1_transformer_linear_bias_typed(
         float,
         cutlass::arch::OpClassTensorOp,
         ArchTag,
-        cutlass::gemm::GemmShape<128, 64, 32>,
-        cutlass::gemm::GemmShape<64, 32, 32>,
+        ThreadblockShape,
+        WarpShape,
         InstructionShape,
-        Epilogue>;
+        Epilogue,
+        cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<Swizzle>>;
 
     const cutlass::gemm::GemmCoord problem(
         static_cast<int>(rows),
@@ -1161,26 +1718,97 @@ void stream1_transformer_linear_bias_cuda(
         stream1_transformer_linear_bias_typed<
             cutlass::bfloat16_t,
             cutlass::arch::Sm80,
-            cutlass::gemm::GemmShape<16, 8, 16>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            cutlass::gemm::GemmShape<16, 8, 16>,
+            cutlass::gemm::GemmShape<128, 64, 32>,
+            cutlass::gemm::GemmShape<64, 32, 32>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
         return;
     }
     if (dtype == STREAM1_DTYPE_FP16) {
         if (stream1_transformer_current_device_sm80_or_newer()) {
+            const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
+                Stream1TransformerGemmFamily::Qkv,
+                std::getenv("BEAM_STREAM1_TRANSFORMER_QKV_POLICY"));
+
+            const Stream1TransformerGemmSwizzlePolicy swizzle_policy =
+                parse_stream1_transformer_gemm_swizzle_policy(
+                    std::getenv("BEAM_STREAM1_TRANSFORMER_QKV_SWIZZLE"));
+            if (!stream1_transformer_gemm_swizzle_allowed(
+                    Stream1TransformerGemmFamily::Qkv,
+                    policy,
+                    Stream1TransformerGemmStagePolicy::Stages3,
+                    swizzle_policy)) {
+                throw std::invalid_argument("QKV swizzle is not compiled for this policy and stage count");
+            }
+            if (policy == Stream1TransformerGemmPolicy::M64N128) {
+                stream1_transformer_linear_bias_typed<
+                    cutlass::half_t, cutlass::arch::Sm80,
+                    cutlass::gemm::GemmShape<16, 8, 16>,
+                    cutlass::gemm::GemmShape<64, 128, 32>,
+                    cutlass::gemm::GemmShape<32, 64, 32>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                return;
+            }
+            if (policy == Stream1TransformerGemmPolicy::M128N128) {
+                if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity4) {
+                    stream1_transformer_linear_bias_typed<
+                        cutlass::half_t, cutlass::arch::Sm80,
+                        cutlass::gemm::GemmShape<16, 8, 16>,
+                        cutlass::gemm::GemmShape<128, 128, 32>,
+                        cutlass::gemm::GemmShape<64, 64, 32>,
+                        4>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                    return;
+                }
+                if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity8) {
+                    stream1_transformer_linear_bias_typed<
+                        cutlass::half_t, cutlass::arch::Sm80,
+                        cutlass::gemm::GemmShape<16, 8, 16>,
+                        cutlass::gemm::GemmShape<128, 128, 32>,
+                        cutlass::gemm::GemmShape<64, 64, 32>,
+                        8>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                    return;
+                }
+                stream1_transformer_linear_bias_typed<
+                    cutlass::half_t, cutlass::arch::Sm80,
+                    cutlass::gemm::GemmShape<16, 8, 16>,
+                    cutlass::gemm::GemmShape<128, 128, 32>,
+                    cutlass::gemm::GemmShape<64, 64, 32>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                return;
+            }
+            if (policy == Stream1TransformerGemmPolicy::M256N128) {
+                stream1_transformer_linear_bias_typed<
+                    cutlass::half_t, cutlass::arch::Sm80,
+                    cutlass::gemm::GemmShape<16, 8, 16>,
+                    cutlass::gemm::GemmShape<256, 128, 32>,
+                    cutlass::gemm::GemmShape<64, 64, 32>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                return;
+            }
             stream1_transformer_linear_bias_typed<
                 cutlass::half_t,
                 cutlass::arch::Sm80,
-                cutlass::gemm::GemmShape<16, 8, 16>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                cutlass::gemm::GemmShape<16, 8, 16>,
+                cutlass::gemm::GemmShape<128, 64, 32>,
+                cutlass::gemm::GemmShape<64, 32, 32>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
             return;
         }
         stream1_transformer_linear_bias_typed<
             cutlass::half_t,
             cutlass::arch::Sm75,
-            cutlass::gemm::GemmShape<16, 8, 8>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            cutlass::gemm::GemmShape<16, 8, 8>,
+            cutlass::gemm::GemmShape<128, 64, 32>,
+            cutlass::gemm::GemmShape<64, 32, 32>>(
+                input, weight, bias, output, rows, input_cols, output_cols, stream);
         return;
     }
     throw std::invalid_argument("Stream1 piece_transformer linear+bias GEMM dtype must be fp16 or bf16");
 }
-template <typename Element, typename ArchTag, typename InstructionShape>
+template <
+
+    typename Element,
+    typename ArchTag,
+    typename InstructionShape,
+    typename ThreadblockShape,
+    typename WarpShape,
+    int Stages,
+    int Swizzle = 1>
 void stream1_transformer_ff1_linear_bias_silu_typed(
     const half* input,
     const half* weight,
@@ -1212,10 +1840,12 @@ void stream1_transformer_ff1_linear_bias_silu_typed(
         float,
         cutlass::arch::OpClassTensorOp,
         ArchTag,
-        cutlass::gemm::GemmShape<128, 64, 32>,
-        cutlass::gemm::GemmShape<64, 32, 32>,
+        ThreadblockShape,
+        WarpShape,
         InstructionShape,
-        Epilogue>;
+        Epilogue,
+        cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<Swizzle>,
+        Stages>;
 
     const cutlass::gemm::GemmCoord problem(
         static_cast<int>(rows),
@@ -1257,6 +1887,34 @@ void stream1_transformer_ff1_linear_bias_silu_typed(
     }
 }
 
+template <
+    typename Element,
+    typename ArchTag,
+    typename InstructionShape,
+    typename ThreadblockShape,
+    typename WarpShape>
+void stream1_transformer_ff1_linear_bias_silu_policy(
+    const half* input,
+    const half* weight,
+    const half* bias,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    cudaStream_t stream,
+    Stream1TransformerGemmStagePolicy stage_policy) {
+
+    if (stage_policy == Stream1TransformerGemmStagePolicy::Stages2) {
+        stream1_transformer_ff1_linear_bias_silu_typed<
+            Element, ArchTag, InstructionShape, ThreadblockShape, WarpShape, 2>(
+                input, weight, bias, output, rows, input_cols, output_cols, stream);
+        return;
+    }
+    stream1_transformer_ff1_linear_bias_silu_typed<
+        Element, ArchTag, InstructionShape, ThreadblockShape, WarpShape, 3>(
+            input, weight, bias, output, rows, input_cols, output_cols, stream);
+}
+
 void stream1_transformer_ff1_linear_bias_silu_cuda(
     const half* input,
     const half* weight,
@@ -1278,23 +1936,93 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
         stream1_transformer_ff1_linear_bias_silu_typed<
             cutlass::bfloat16_t,
             cutlass::arch::Sm80,
-            cutlass::gemm::GemmShape<16, 8, 16>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            cutlass::gemm::GemmShape<16, 8, 16>,
+            cutlass::gemm::GemmShape<128, 64, 32>,
+            cutlass::gemm::GemmShape<64, 32, 32>, 3>(input, weight, bias, output, rows, input_cols, output_cols, stream);
         return;
     }
     if (dtype == STREAM1_DTYPE_FP16) {
         if (stream1_transformer_current_device_sm80_or_newer()) {
-            static_cast<void>(parse_stream1_transformer_ff1_policy(
-                std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_POLICY")));
-            stream1_transformer_ff1_linear_bias_silu_typed<
+            const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
+                Stream1TransformerGemmFamily::Ff1,
+                std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_POLICY"));
+            const Stream1TransformerGemmStagePolicy stage_policy = parse_stream1_transformer_gemm_stage_policy(
+                std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_STAGES"));
+            const Stream1TransformerGemmSwizzlePolicy swizzle_policy =
+                parse_stream1_transformer_gemm_swizzle_policy(
+                    std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_SWIZZLE"));
+            if (!stream1_transformer_gemm_swizzle_allowed(
+                    Stream1TransformerGemmFamily::Ff1, policy, stage_policy, swizzle_policy)) {
+                throw std::invalid_argument("FF1 swizzle is not compiled for this policy and stage count");
+            }
+
+            if (policy == Stream1TransformerGemmPolicy::M64N128) {
+                stream1_transformer_ff1_linear_bias_silu_policy<
+                    cutlass::half_t,
+                    cutlass::arch::Sm80,
+                    cutlass::gemm::GemmShape<16, 8, 16>,
+                    cutlass::gemm::GemmShape<64, 128, 32>,
+                    cutlass::gemm::GemmShape<32, 64, 32>>(
+                        input, weight, bias, output, rows, input_cols, output_cols, stream, stage_policy);
+                return;
+            }
+            if (policy == Stream1TransformerGemmPolicy::M128N128W64N32) {
+                stream1_transformer_ff1_linear_bias_silu_policy<
+                    cutlass::half_t,
+                    cutlass::arch::Sm80,
+                    cutlass::gemm::GemmShape<16, 8, 16>,
+                    cutlass::gemm::GemmShape<128, 128, 32>,
+                    cutlass::gemm::GemmShape<64, 32, 32>>(
+                        input, weight, bias, output, rows, input_cols, output_cols, stream, stage_policy);
+                return;
+            }
+            if (policy == Stream1TransformerGemmPolicy::M128N128) {
+                if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity4) {
+                    stream1_transformer_ff1_linear_bias_silu_typed<
+                        cutlass::half_t,
+                        cutlass::arch::Sm80,
+                        cutlass::gemm::GemmShape<16, 8, 16>,
+                        cutlass::gemm::GemmShape<128, 128, 32>,
+                        cutlass::gemm::GemmShape<64, 64, 32>,
+                        3,
+                        4>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                    return;
+                }
+                if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity8) {
+                    stream1_transformer_ff1_linear_bias_silu_typed<
+                        cutlass::half_t,
+                        cutlass::arch::Sm80,
+                        cutlass::gemm::GemmShape<16, 8, 16>,
+                        cutlass::gemm::GemmShape<128, 128, 32>,
+                        cutlass::gemm::GemmShape<64, 64, 32>,
+                        3,
+                        8>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                    return;
+                }
+                stream1_transformer_ff1_linear_bias_silu_policy<
+                    cutlass::half_t,
+                    cutlass::arch::Sm80,
+                    cutlass::gemm::GemmShape<16, 8, 16>,
+                    cutlass::gemm::GemmShape<128, 128, 32>,
+                    cutlass::gemm::GemmShape<64, 64, 32>>(
+                        input, weight, bias, output, rows, input_cols, output_cols, stream, stage_policy);
+                return;
+            }
+            stream1_transformer_ff1_linear_bias_silu_policy<
                 cutlass::half_t,
                 cutlass::arch::Sm80,
-                cutlass::gemm::GemmShape<16, 8, 16>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+                cutlass::gemm::GemmShape<16, 8, 16>,
+                cutlass::gemm::GemmShape<128, 64, 32>,
+                cutlass::gemm::GemmShape<64, 32, 32>>(
+                    input, weight, bias, output, rows, input_cols, output_cols, stream, stage_policy);
             return;
         }
         stream1_transformer_ff1_linear_bias_silu_typed<
             cutlass::half_t,
             cutlass::arch::Sm75,
-            cutlass::gemm::GemmShape<16, 8, 8>>(input, weight, bias, output, rows, input_cols, output_cols, stream);
+            cutlass::gemm::GemmShape<16, 8, 8>,
+            cutlass::gemm::GemmShape<128, 64, 32>,
+            cutlass::gemm::GemmShape<64, 32, 32>, 2>(input, weight, bias, output, rows, input_cols, output_cols, stream);
         return;
     }
     throw std::invalid_argument("Stream1 piece_transformer FF1 fused GEMM dtype must be fp16 or bf16");
@@ -1475,6 +2203,7 @@ __global__ void stream1_transformer_cls_layernorm_kernel(
         __syncthreads();
     }
     const float mean = reduce[0] / static_cast<float>(dims.d_model);
+    __syncthreads();
     float var_sum = 0.0f;
     for (std::uint32_t col = threadIdx.x; col < dims.d_model; col += blockDim.x) {
         const float x = stream1_transformer_load_scalar_device(tokens, in_base + col, dims.dtype);
@@ -1528,6 +2257,7 @@ __global__ void stream1_transformer_cls_bias_layernorm_kernel(
         __syncthreads();
     }
     const float mean = reduce[0] / static_cast<float>(dims.d_model);
+    __syncthreads();
     float var_sum = 0.0f;
     for (std::uint32_t col = threadIdx.x; col < dims.d_model; col += blockDim.x) {
         const float x = stream1_transformer_load_scalar_device(tokens, in_base + col, dims.dtype) +
@@ -1645,6 +2375,8 @@ bool stream1_transformer_final_cls_only_requested() {
 bool stream1_transformer_final_cls_attention_requested() {
     return stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION");
 }
+
+
 bool stream1_transformer_is_block51_shape(Stream1TransformerDims dims) {
     return dims.state_len == 120U &&
         dims.num_classes == 120U &&
@@ -1706,22 +2438,16 @@ void stream1_transformer_final_layer_cls_only_block51_from_ln1_cuda(
         scratch.qkv,
         dims,
         b_micro);
-    stream1_transformer_linear_residual_cuda(
+    stream1_transformer_residual_bias_round_layernorm_cuda(
         scratch.attention_scores_probs,
         block.attn_out_weight,
         scratch.qkv,
-        b_micro,
-        STREAM1_TRANSFORMER_DMODEL256,
-        STREAM1_TRANSFORMER_DMODEL256,
-        dims.dtype,
-        stream);
-    stream1_transformer_bias_round_layernorm_copy_launch(
-        scratch.qkv,
-        scratch.attention_context,
         block.attn_out_bias,
+        scratch.attention_context,
         block.ln2_gamma,
         block.ln2_beta,
         b_micro,
+        STREAM1_TRANSFORMER_DMODEL256,
         STREAM1_TRANSFORMER_DMODEL256,
         dims.dtype,
         stream);
@@ -1735,22 +2461,16 @@ void stream1_transformer_final_layer_cls_only_block51_from_ln1_cuda(
         1024U,
         dims.dtype,
         stream);
-    stream1_transformer_linear_residual_cuda(
+    stream1_transformer_residual_bias_round_layernorm_cuda(
         scratch.ff_hidden,
         block.ff2_weight,
         scratch.qkv,
-        b_micro,
-        1024U,
-        STREAM1_TRANSFORMER_DMODEL256,
-        dims.dtype,
-        stream);
-    stream1_transformer_bias_round_layernorm_copy_launch(
-        scratch.qkv,
-        scratch.attention_context,
         block.ff2_bias,
+        scratch.attention_context,
         network.output_ln_gamma,
         network.output_ln_beta,
         b_micro,
+        1024U,
         STREAM1_TRANSFORMER_DMODEL256,
         dims.dtype,
         stream);
@@ -1792,6 +2512,7 @@ void stream1_transformer_block51_run_layers_cuda(
     const Stream1TransformerDims dims = network.dims;
     const std::uint32_t token_rows = b_micro * STREAM1_TRANSFORMER_SEQ51;
     const bool final_cls_only = stream1_transformer_final_cls_only_requested();
+
     const std::uint32_t full_token_layer_count = final_cls_only ? 3U : 4U;
     bool ln1_precomputed = false;
     bool final_ln1_precomputed = false;
@@ -1828,22 +2549,16 @@ void stream1_transformer_block51_run_layers_cuda(
             b_micro,
             attention_backend,
             stream);
-        stream1_transformer_linear_residual_cuda(
+        stream1_transformer_residual_bias_round_layernorm_cuda(
             scratch.attention_context,
             block.attn_out_weight,
             scratch.tokens,
-            token_rows,
-            STREAM1_TRANSFORMER_DMODEL256,
-            STREAM1_TRANSFORMER_DMODEL256,
-            dims.dtype,
-            stream);
-        stream1_transformer_bias_round_layernorm_copy_launch(
-            scratch.tokens,
-            scratch.attention_context,
             block.attn_out_bias,
+            scratch.attention_context,
             block.ln2_gamma,
             block.ln2_beta,
             token_rows,
+            STREAM1_TRANSFORMER_DMODEL256,
             STREAM1_TRANSFORMER_DMODEL256,
             dims.dtype,
             stream);
@@ -1857,43 +2572,48 @@ void stream1_transformer_block51_run_layers_cuda(
             1024U,
             dims.dtype,
             stream);
-        stream1_transformer_linear_residual_cuda(
-            scratch.ff_hidden,
-            block.ff2_weight,
-            scratch.tokens,
-            token_rows,
-            1024U,
-            STREAM1_TRANSFORMER_DMODEL256,
-            dims.dtype,
-            stream);
-
         if (layer + 1U < full_token_layer_count) {
             const Stream1TransformerBlockView next_block = network.blocks[layer + 1U];
-            stream1_transformer_bias_round_layernorm_copy_launch(
+            stream1_transformer_residual_bias_round_layernorm_cuda(
+                scratch.ff_hidden,
+                block.ff2_weight,
                 scratch.tokens,
-                scratch.attention_context,
                 block.ff2_bias,
+                scratch.attention_context,
                 next_block.ln1_gamma,
                 next_block.ln1_beta,
                 token_rows,
+                1024U,
                 STREAM1_TRANSFORMER_DMODEL256,
                 dims.dtype,
                 stream);
             ln1_precomputed = true;
         } else if (final_cls_only) {
             const Stream1TransformerBlockView final_block = network.blocks[3];
-            stream1_transformer_bias_round_layernorm_copy_launch(
+            stream1_transformer_residual_bias_round_layernorm_cuda(
+                scratch.ff_hidden,
+                block.ff2_weight,
                 scratch.tokens,
-                scratch.attention_context,
                 block.ff2_bias,
+                scratch.attention_context,
                 final_block.ln1_gamma,
                 final_block.ln1_beta,
                 token_rows,
+                1024U,
                 STREAM1_TRANSFORMER_DMODEL256,
                 dims.dtype,
                 stream);
             final_ln1_precomputed = true;
         } else {
+            stream1_transformer_linear_residual_cuda(
+                scratch.ff_hidden,
+                block.ff2_weight,
+                scratch.tokens,
+                token_rows,
+                1024U,
+                STREAM1_TRANSFORMER_DMODEL256,
+                dims.dtype,
+                stream);
             stream1_transformer_bias_add_launch(
                 scratch.tokens,
                 block.ff2_bias,

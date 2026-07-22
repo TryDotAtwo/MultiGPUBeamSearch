@@ -1,4 +1,7 @@
 #include <sstream>
+#include <cstring>
+#include <fstream>
+#include "stream1_transformer_score_dump.hpp"
 #include "stream_benchmark_common.hpp"
 
 namespace beam::bench {
@@ -12,10 +15,62 @@ struct ScoreSummary {
     std::string first_score_keys;
 };
 
+bool env_flag_enabled(const char* name) {
+    const char* value = std::getenv(name);
+    return value != nullptr && std::strcmp(value, "1") == 0;
+}
+std::uint64_t estimate_transformer_dense_flops_per_parent(const Stream1ModelConfig& model) {
+    const std::uint64_t s = model.seq_len;
+    const std::uint64_t d = model.d_model;
+    const std::uint64_t ff = model.ff_dim;
+    const std::uint64_t out = model.output_dim;
+    const std::uint64_t full_layer =
+        6ULL * s * d * d +
+        2ULL * s * d * d +
+        2ULL * s * d * ff +
+        2ULL * s * ff * d +
+        4ULL * s * s * d;
+    const bool block51_final_cls =
+        env_flag_enabled("BEAM_STREAM1_TRANSFORMER_BLOCK51") &&
+        env_flag_enabled("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY") &&
+        model.seq_len == 51U && model.d_model == 256U &&
+        model.nhead == 8U && model.head_dim == 32U &&
+        model.transformer_layers == 4U && model.ff_dim == 1024U;
+    if (block51_final_cls) {
+        const std::uint64_t final_attention = env_flag_enabled("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION")
+            ? 4ULL * s * d
+            : 4ULL * s * s * d;
+        const std::uint64_t final_layer =
+            6ULL * s * d * d +
+            final_attention +
+            2ULL * d * d +
+            2ULL * d * ff +
+            2ULL * ff * d +
+            2ULL * d * out;
+        return 3ULL * full_layer + final_layer;
+    }
+    return static_cast<std::uint64_t>(model.transformer_layers) * full_layer + 2ULL * d * out;
+}
+
+
 ScoreSummary summarize_score_buffers(
     const std::vector<std::uint32_t*>& score_buffers,
     std::uint32_t b_micro,
     std::uint32_t concurrent) {
+    std::ofstream score_dump;
+    if (const char* dump_path = std::getenv("BEAM_STREAM1_TRANSFORMER_SCORE_DUMP");
+        dump_path != nullptr && dump_path[0] != '\0') {
+        score_dump.open(dump_path, std::ios::binary | std::ios::trunc);
+        if (!score_dump) {
+            throw std::runtime_error("failed to open Stream1 transformer score dump");
+        }
+        const Stream1TransformerScoreDumpHeader header = make_stream1_transformer_score_dump_header(
+            concurrent, static_cast<std::uint64_t>(b_micro) * MOVE_COUNT);
+        score_dump.write(reinterpret_cast<const char*>(&header), sizeof(header));
+        if (!score_dump) {
+            throw std::runtime_error("failed to write Stream1 transformer score dump header");
+        }
+    }
     ScoreSummary summary;
     std::vector<std::uint32_t> host(static_cast<std::uint64_t>(b_micro) * MOVE_COUNT);
     for (std::uint32_t lane = 0; lane < concurrent; ++lane) {
@@ -24,6 +79,14 @@ ScoreSummary summarize_score_buffers(
             score_buffers[lane],
             host.size() * sizeof(std::uint32_t),
             cudaMemcpyDeviceToHost));
+        if (score_dump.is_open()) {
+            score_dump.write(
+                reinterpret_cast<const char*>(host.data()),
+                static_cast<std::streamsize>(host.size() * sizeof(std::uint32_t)));
+            if (!score_dump) {
+                throw std::runtime_error("failed to write Stream1 transformer score dump payload");
+            }
+        }
         for (std::uint32_t value : host) {
             summary.checksum += value;
             for (int shift = 0; shift < 32; shift += 8) {
@@ -142,8 +205,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
         report << "- filter_b_micro=" << only_b_micro << "\n";
         report << "- filter_concurrency=" << only_concurrency << "\n\n";
     }
-    report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | checksum | score_key_digest | first_score_keys | scratch_bytes | token_bytes | qkv_bytes | attention_bytes | context_bytes | ff_hidden_bytes | logits_bytes |\n";
-    report << "|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|\n";
+    report << "| b_micro | concurrency | rows_per_launch_group | ms_per_launch_group | parents_per_sec | candidates_per_sec | estimated_flops_per_parent | achieved_tflops | checksum | score_key_digest | first_score_keys | scratch_bytes | token_bytes | qkv_bytes | attention_bytes | context_bytes | ff_hidden_bytes | logits_bytes |\n";
+    report << "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|\n";
     for (std::uint32_t b_micro : TRANSFORMER_B_MICRO_SWEEP) {
         for (std::uint32_t concurrent : TRANSFORMER_STREAM1_CONCURRENCY_SWEEP) {
             if ((only_b_micro != 0U && b_micro != only_b_micro) ||
@@ -199,6 +262,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                 BEAM_CUDA_CHECK(cudaMemcpy(resources.count[i], &b_micro, sizeof(b_micro), cudaMemcpyHostToDevice));
             }
 
+
             const std::uint32_t iterations = b_micro >= 4096 ? 4U : 6U;
             float ms = 0.0f;
             if (graph_bench) {
@@ -246,6 +310,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
             const double parents = static_cast<double>(rows_per_launch_group);
             const double parent_per_sec = parents * 1000.0 / static_cast<double>(ms);
             const double candidate_per_sec = parents * static_cast<double>(MOVE_COUNT) * 1000.0 / static_cast<double>(ms);
+            const std::uint64_t flops_per_parent = estimate_transformer_dense_flops_per_parent(model);
+            const double achieved_tflops = parent_per_sec * static_cast<double>(flops_per_parent) / 1.0e12;
             results.push_back(Stream1Result{b_micro, concurrent, ms, parent_per_sec, candidate_per_sec});
             report << "|" << b_micro
                    << "|" << concurrent
@@ -253,6 +319,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                    << "|" << std::fixed << std::setprecision(4) << ms
                    << "|" << std::setprecision(1) << parent_per_sec
                    << "|" << candidate_per_sec
+                   << "|" << flops_per_parent
+                   << "|" << std::setprecision(3) << achieved_tflops
                    << "|" << score_summary.checksum
                    << "|" << score_summary.score_key_digest
                    << "|`" << score_summary.first_score_keys << "`"
@@ -270,6 +338,8 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
                       << " ms_per_launch_group=" << std::fixed << std::setprecision(4) << ms
                       << " parents_per_sec=" << std::setprecision(1) << parent_per_sec
                       << " candidates_per_sec=" << candidate_per_sec
+                      << " estimated_flops_per_parent=" << flops_per_parent
+                      << " achieved_tflops=" << std::setprecision(3) << achieved_tflops
                       << " checksum=" << score_summary.checksum
                       << " score_key_digest=" << score_summary.score_key_digest
                       << " first_score_keys=" << score_summary.first_score_keys

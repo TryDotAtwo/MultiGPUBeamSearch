@@ -74,9 +74,19 @@ def score_key_digest(keys: torch.Tensor) -> int:
 
 
 class PieceTransformerTorch:
-    def __init__(self, weight_dir: Path, device: torch.device) -> None:
+    def __init__(
+        self,
+        weight_dir: Path,
+        device: torch.device,
+        projection_mode: str = "linear",
+        qkv_contiguous: bool = False,
+    ) -> None:
         self.weight_dir = weight_dir
         self.device = device
+        if projection_mode not in {"linear", "matmul"}:
+            raise ValueError("projection_mode must be linear or matmul")
+        self.projection_mode = projection_mode
+        self.qkv_contiguous = qkv_contiguous
         self.manifest = json.loads((weight_dir / "manifest.json").read_text(encoding="utf-8"))
         if self.manifest.get("backend") != "piece_transformer":
             raise ValueError("manifest backend must be piece_transformer")
@@ -134,6 +144,7 @@ class PieceTransformerTorch:
             half,
             device,
         )
+        self.output_weight_linear = self.output_weight.t().contiguous()
         self.output_bias = load_file_tensor(weight_dir / f"output_bias{suffix}", (self.output_dim,), half, device)
         self.piece_positions = load_file_tensor(
             weight_dir / "piece_positions.u16",
@@ -151,8 +162,7 @@ class PieceTransformerTorch:
         self.blocks: List[Dict[str, torch.Tensor]] = []
         for block in range(self.num_layers):
             prefix = f"block{block}"
-            self.blocks.append(
-                {
+            block_tensors = {
                     "ln1_gamma": load_file_tensor(weight_dir / f"{prefix}_ln1_gamma{suffix}", (self.d_model,), half, device),
                     "ln1_beta": load_file_tensor(weight_dir / f"{prefix}_ln1_beta{suffix}", (self.d_model,), half, device),
                     "qkv_weight": load_file_tensor(
@@ -196,10 +206,26 @@ class PieceTransformerTorch:
                     ),
                     "ff2_bias": load_file_tensor(weight_dir / f"{prefix}_ff2_bias{suffix}", (self.d_model,), half, device),
                 }
-            )
+            block_tensors["qkv_weight_linear"] = block_tensors["qkv_weight"].t().contiguous()
+            block_tensors["attn_out_weight_linear"] = block_tensors["attn_out_weight"].t().contiguous()
+            block_tensors["ff1_weight_linear"] = block_tensors["ff1_weight"].t().contiguous()
+            block_tensors["ff2_weight_linear"] = block_tensors["ff2_weight"].t().contiguous()
+            self.blocks.append(block_tensors)
 
     def layer_norm(self, x: torch.Tensor, gamma: torch.Tensor, beta: torch.Tensor) -> torch.Tensor:
         return F.layer_norm(x, (self.d_model,), gamma, beta, eps=1.0e-5)
+
+    def project(self, x: torch.Tensor, weight_hxk: torch.Tensor, weight_kxh: torch.Tensor, bias: torch.Tensor) -> torch.Tensor:
+        if self.projection_mode == "linear":
+            return F.linear(x, weight_kxh, bias)
+        return x.matmul(weight_hxk) + bias
+
+    def estimated_flops_per_parent(self) -> int:
+        s = self.seq_len
+        d = self.d_model
+        ff = self.ff_dim
+        full_layer = 6 * s * d * d + 2 * s * d * d + 2 * s * d * ff + 2 * s * ff * d + 4 * s * s * d
+        return self.num_layers * full_layer + 2 * d * self.output_dim
 
     def build_tokens(self, states: torch.Tensor) -> torch.Tensor:
         states = states[:, : self.state_len].long()
@@ -222,21 +248,25 @@ class PieceTransformerTorch:
         batch = x.shape[0]
         for block in self.blocks:
             y = self.layer_norm(x, block["ln1_gamma"], block["ln1_beta"])
-            qkv = y.matmul(block["qkv_weight"]) + block["qkv_bias"]
+            qkv = self.project(y, block["qkv_weight"], block["qkv_weight_linear"], block["qkv_bias"])
             qkv = qkv.reshape(batch, self.seq_len, 3, self.nhead, self.head_dim)
-            q = qkv[:, :, 0, :, :].permute(0, 2, 1, 3).contiguous()
-            k = qkv[:, :, 1, :, :].permute(0, 2, 1, 3).contiguous()
-            v = qkv[:, :, 2, :, :].permute(0, 2, 1, 3).contiguous()
+            q = qkv[:, :, 0, :, :].permute(0, 2, 1, 3)
+            k = qkv[:, :, 1, :, :].permute(0, 2, 1, 3)
+            v = qkv[:, :, 2, :, :].permute(0, 2, 1, 3)
+            if self.qkv_contiguous:
+                q = q.contiguous()
+                k = k.contiguous()
+                v = v.contiguous()
             attn = F.scaled_dot_product_attention(q, k, v, dropout_p=0.0, is_causal=False)
             context = attn.permute(0, 2, 1, 3).reshape(batch, self.seq_len, self.d_model)
-            x = x + context.matmul(block["attn_out_weight"]) + block["attn_out_bias"]
+            x = x + self.project(context, block["attn_out_weight"], block["attn_out_weight_linear"], block["attn_out_bias"])
 
             y = self.layer_norm(x, block["ln2_gamma"], block["ln2_beta"])
-            y = F.silu(y.matmul(block["ff1_weight"]) + block["ff1_bias"])
-            x = x + y.matmul(block["ff2_weight"]) + block["ff2_bias"]
+            y = F.silu(self.project(y, block["ff1_weight"], block["ff1_weight_linear"], block["ff1_bias"]))
+            x = x + self.project(y, block["ff2_weight"], block["ff2_weight_linear"], block["ff2_bias"])
 
         cls = self.layer_norm(x[:, 0, :], self.output_ln_gamma, self.output_ln_beta)
-        return cls.matmul(self.output_weight) + self.output_bias
+        return self.project(cls, self.output_weight, self.output_weight_linear, self.output_bias)
 
 
 def validate_reference(model: PieceTransformerTorch, reference_path: Path, tolerance: int) -> Tuple[str, int, int]:
@@ -290,6 +320,8 @@ def benchmark_batch(
     rows_per_launch_group = batch * concurrency
     parents_per_s = (rows_per_launch_group * iters) / (elapsed_ms / 1000.0)
     candidates_per_s = parents_per_s * model.move_count
+    flops_per_parent = model.estimated_flops_per_parent()
+    achieved_tflops = parents_per_s * flops_per_parent / 1.0e12
     peak_gib = torch.cuda.max_memory_allocated(model.device) / (1024.0**3)
     return {
         "batch": batch,
@@ -300,6 +332,8 @@ def benchmark_batch(
         "ms_per_iter": elapsed_ms / iters,
         "parents_per_s": parents_per_s,
         "candidates_per_s": candidates_per_s,
+        "estimated_flops_per_parent": flops_per_parent,
+        "achieved_tflops": achieved_tflops,
         "peak_mem_gib": peak_gib,
         "checksum": checksum,
         "score_key_digest": score_digest,
@@ -317,22 +351,24 @@ def write_report(path: Path, rows: List[Dict[str, object]], metadata: Dict[str, 
         f"- cuda_version={metadata['cuda_version']}",
         f"- device={metadata['device_name']}",
         f"- weight_dir={metadata['weight_dir']}",
+        f"- projection_mode={metadata.get('projection_mode', 'matmul')}",
+        f"- qkv_contiguous={metadata.get('qkv_contiguous', 1)}",
         f"- reference_status={metadata['reference_status']}",
         f"- reference_rows={metadata['reference_rows']}",
         f"- reference_max_abs_score_key_error={metadata['reference_max_abs_score_key_error']}",
         "",
-        "| batch | concurrency | rows/group | iters | ms/iter | parents/s | candidates/s | peak GiB | checksum | score_key_digest | status |",
-        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        "| batch | concurrency | rows/group | iters | ms/iter | parents/s | candidates/s | est TFLOP/s | peak GiB | checksum | score_key_digest | status |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in rows:
         if row.get("status") == "ok":
             lines.append(
-                "| {batch} | {concurrency} | {rows_per_launch_group} | {iters} | {ms_per_iter:.4f} | {parents_per_s:.1f} | {candidates_per_s:.1f} | {peak_mem_gib:.3f} | {checksum} | {score_key_digest} | ok |".format(
+                "| {batch} | {concurrency} | {rows_per_launch_group} | {iters} | {ms_per_iter:.4f} | {parents_per_s:.1f} | {candidates_per_s:.1f} | {achieved_tflops:.3f} | {peak_mem_gib:.3f} | {checksum} | {score_key_digest} | ok |".format(
                     **row
                 )
             )
         else:
-            lines.append(f"| {row['batch']} | {row.get('concurrency', '-')} | - | - | - | - | - | - | - | - | {row['status']} |")
+            lines.append(f"| {row['batch']} | {row.get('concurrency', '-')} | - | - | - | - | - | - | - | - | - | {row['status']} |")
     if best is not None:
         lines.extend(
             [
@@ -357,6 +393,8 @@ def main() -> None:
     parser.add_argument("--iters", type=int, default=30)
     parser.add_argument("--reference-tolerance", type=int, default=3072)
     parser.add_argument("--skip-reference", action="store_true", help="Skip reference JSON validation for synthetic benchmark/parity runs.")
+    parser.add_argument("--projection-mode", choices=("linear", "matmul"), default="linear")
+    parser.add_argument("--qkv-contiguous", action="store_true", help="Materialize Q/K/V as contiguous tensors before SDPA.")
     parser.add_argument("--report", type=Path, default=Path("test_results/stream1_transformer_torch_benchmark_2026-06-30.md"))
     args = parser.parse_args()
 
@@ -365,7 +403,12 @@ def main() -> None:
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
     device = torch.device("cuda")
-    model = PieceTransformerTorch(args.weight_dir, device)
+    model = PieceTransformerTorch(
+        args.weight_dir,
+        device,
+        projection_mode=args.projection_mode,
+        qkv_contiguous=args.qkv_contiguous,
+    )
     if args.skip_reference:
         ref_status, ref_rows, ref_error = "skip", 0, 0
     else:
@@ -391,6 +434,7 @@ def main() -> None:
                 f" ms_per_iter={row['ms_per_iter']:.4f}"
                 f" parents_per_s={row['parents_per_s']:.1f}"
                 f" candidates_per_s={row['candidates_per_s']:.1f}"
+                f" achieved_tflops={row['achieved_tflops']:.3f}"
                 f" peak_mem_gib={row['peak_mem_gib']:.3f}"
                 f" checksum={row['checksum']}"
                 f" score_key_digest={row['score_key_digest']}"
@@ -403,13 +447,15 @@ def main() -> None:
         "cuda_version": torch.version.cuda,
         "device_name": torch.cuda.get_device_name(device),
         "weight_dir": str(args.weight_dir),
+        "projection_mode": args.projection_mode,
+        "qkv_contiguous": int(args.qkv_contiguous),
         "reference_status": ref_status,
         "reference_rows": ref_rows,
         "reference_max_abs_score_key_error": ref_error,
     }
     write_report(args.report, rows, metadata)
     with args.report.with_suffix(".tsv").open("w", newline="", encoding="utf-8") as fh:
-        fieldnames = ["batch", "concurrency", "rows_per_launch_group", "iters", "elapsed_ms", "ms_per_iter", "parents_per_s", "candidates_per_s", "peak_mem_gib", "checksum", "score_key_digest", "first_score_keys", "status"]
+        fieldnames = ["batch", "concurrency", "rows_per_launch_group", "iters", "elapsed_ms", "ms_per_iter", "parents_per_s", "candidates_per_s", "estimated_flops_per_parent", "achieved_tflops", "peak_mem_gib", "checksum", "score_key_digest", "first_score_keys", "status"]
         writer = csv.DictWriter(fh, fieldnames=fieldnames, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)

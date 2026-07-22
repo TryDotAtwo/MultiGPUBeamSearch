@@ -1,4 +1,4 @@
-﻿# Native Transformer Memory-Traffic Optimization Design
+# Native Transformer Memory-Traffic Optimization Design
 
 Date: 2026-07-19
 Target branch: `codex/stream1-piece-transformer`
