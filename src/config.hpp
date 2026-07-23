@@ -79,6 +79,7 @@ struct RuntimeConfig {
     std::uint64_t user_global_beam_width = 1'000'000;
     std::uint32_t global_threshold_update_period_shards = 64;
     std::uint32_t solved_result_capacity = 1024;
+    std::uint64_t solve_bucket_gather_scratch_bytes = 0;
 };
 
 struct DerivedConfig {

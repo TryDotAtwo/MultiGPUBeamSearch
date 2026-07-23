@@ -677,6 +677,8 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     config.global_threshold_update_period_shards =
         env_u32("BEAM_GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS", 64);
     config.solved_result_capacity = env_u32("BEAM_SOLVED_RESULT_CAPACITY", 1024);
+    config.solve_bucket_gather_scratch_bytes =
+        env_u64("BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES", 0);
     build.gpu_headroom_bytes = env_u64("BEAM_GPU_HEADROOM_BYTES", 768ULL * 1024ULL * 1024ULL);
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;

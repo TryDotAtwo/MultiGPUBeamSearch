@@ -3260,14 +3260,14 @@ std::vector<SolveBucketRecord> gather_solve_bucket_records_distributed(
     std::uint32_t capacity) {
     constexpr std::uint32_t packet_words = 8;
     const std::uint64_t scratch_words =
-        (plan.frontier_states * sizeof(State128)) / sizeof(std::uint64_t);
+        memory.scratch_pool_bytes / sizeof(std::uint64_t);
     const std::uint64_t records_per_rank = static_cast<std::uint64_t>(capacity);
     const std::uint64_t send_words = records_per_rank * packet_words;
     const std::uint64_t recv_words = send_words * static_cast<std::uint64_t>(world_size);
-    if (scratch_words < send_words + recv_words || memory.final.next_frontier_states_tmp == nullptr) {
+    if (scratch_words < send_words + recv_words || memory.scratch_pool == nullptr) {
         throw std::runtime_error("solve bucket distributed gather scratch buffer is too small");
     }
-    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.final.next_frontier_states_tmp);
+    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.scratch_pool);
     std::uint64_t* send_device = scratch;
     std::uint64_t* recv_device = scratch + send_words;
 
@@ -4189,6 +4189,7 @@ int main(int argc, char** argv) {
     std::cout << "SCORE_MAX_KEY=" << SCORE_MAX_KEY << "\n";
     std::cout << "SCORE_BIN_COUNT=" << SCORE_BIN_COUNT << "\n";
     std::cout << "SOLVED_RESULT_CAPACITY=" << config.solved_result_capacity << "\n";
+    std::cout << "SOLVE_BUCKET_GATHER_SCRATCH_BYTES=" << config.solve_bucket_gather_scratch_bytes << "\n";
     std::cout << "gpu_total_bytes=" << total_before << "\n";
     std::cout << "gpu_free_before_bytes=" << free_before << "\n";
     std::cout << "gpu_headroom_bytes=" << config_build.gpu_headroom_bytes << "\n";
