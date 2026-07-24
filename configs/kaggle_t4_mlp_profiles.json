@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "hardware": "kaggle_2xt4",
+  "description": "Seed profiles pending the dedicated measured 2xT4 sweep.",
+  "profiles": {
+    "output1": {
+      "16": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "17": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "18": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "19": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "20": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "21": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "22": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "23": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "24": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "25": {"validation_status": "seed", "runtime": {"b_micro": 49152, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}}
+    },
+    "output_move_count": {
+      "16": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "17": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "18": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "19": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "20": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "21": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "22": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "23": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "24": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}},
+      "25": {"validation_status": "seed", "runtime": {"b_micro": 2048, "stream1_concurrency": 4, "stream3_ring_slots": 4, "shard_count": 8, "shard_capacity_scale_ppm": 1050000, "stream4_batch_candidates": 98304, "stream4_trigger_candidates": 98304, "stream4_active_sort_slots": 4}}
+    }
+  }
+}
