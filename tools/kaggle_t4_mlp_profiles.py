@@ -98,3 +98,44 @@ def select_profile(
         **profile,
     }
 
+
+def validate_manifest(
+    manifest: dict[str, Any],
+    state_len: int,
+    num_classes: int,
+    move_count: int,
+) -> str:
+    """Validate a Stream1 MLP manifest against the selected generator."""
+    for field, expected in (("state_len", state_len), ("num_classes", num_classes)):
+        actual = manifest.get(field)
+        if actual != expected:
+            raise ValueError(
+                f"manifest {field} mismatch: observed={actual!r}, expected={expected!r}"
+            )
+    normalization = manifest.get("normalization")
+    if normalization not in {"batchnorm_folded", "layernorm"}:
+        raise ValueError(
+            "unsupported MLP manifest normalization: "
+            f"observed={normalization!r}, expected batchnorm_folded or layernorm"
+        )
+    output_dim = manifest.get("output_dim")
+    if not isinstance(output_dim, int):
+        raise ValueError(f"manifest output_dim must be an integer; got {output_dim!r}")
+    if not isinstance(move_count, int) or move_count <= 1:
+        raise ValueError(f"move_count must be an integer greater than one; got {move_count!r}")
+    return _model_class(output_dim, move_count)
+
+
+def supported_model_header() -> str:
+    """Return the exact reader-facing model support contract."""
+    return """# SUPPORTED MODELS
+
+This notebook does not support an arbitrary PyTorch architecture. It accepts
+only these checkpoint layouts already implemented by `export_stream1_mlp.py`:
+
+1. PilgrimAttnRes-style BatchNorm MLP (`batchnorm-folded`).
+2. ResMLPDistance-style LayerNorm MLP (`resmlp-layernorm`).
+
+The exported head must have `output_dim=1` or `output_dim=move_count` (24 for
+Megaminx). Every other checkpoint layout or output width fails before launch.
+"""
