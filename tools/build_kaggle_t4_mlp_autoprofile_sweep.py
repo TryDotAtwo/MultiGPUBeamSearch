@@ -75,7 +75,8 @@ gpu_rows = subprocess.check_output(
     ],
     text=True,
 ).strip().splitlines()
-if len(gpu_rows) != 2 or any("NVIDIA T4" not in row for row in gpu_rows):
+gpu_names = [row.split(",", 1)[0].strip() for row in gpu_rows]
+if len(gpu_rows) != 2 or any(name not in {"Tesla T4", "NVIDIA T4"} for name in gpu_names):
     raise RuntimeError(f"expected exactly two NVIDIA T4 GPUs; observed={gpu_rows!r}")
 print("validated_hardware=", gpu_rows)
 
@@ -593,9 +594,10 @@ print(json.dumps(summary, indent=2))
 '''
 
 
-def _code_cell(source: str) -> dict[str, Any]:
+def _code_cell(source: str, cell_id: str) -> dict[str, Any]:
     return {
         "cell_type": "code",
+        "id": cell_id,
         "execution_count": None,
         "metadata": {},
         "outputs": [],
@@ -609,10 +611,10 @@ def build_notebook(out_dir: Path = OUT_DIR) -> tuple[Path, Path]:
     metadata_path = out_dir / "kernel-metadata.json"
     notebook = {
         "cells": [
-            _code_cell(CONFIG_CELL),
-            _code_cell(SETUP_CELL),
-            _code_cell(RUNNER_CELL),
-            _code_cell(SWEEP_CELL),
+            _code_cell(CONFIG_CELL, "config"),
+            _code_cell(SETUP_CELL, "setup"),
+            _code_cell(RUNNER_CELL, "runner"),
+            _code_cell(SWEEP_CELL, "sweep"),
         ],
         "metadata": {
             "kernelspec": {
