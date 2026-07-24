@@ -136,3 +136,12 @@ and a submission CSV in solve mode.
 - Every profile has evidence or is explicitly marked unvalidated.
 - Downloaded logs, results, paths, and submission are inspected.
 - The notebook remains private until publication is separately approved.
+
+## Approved Tuning and Final-Solve Refinement
+
+Profile selection is based on successful completion and `depth_sec` for
+`depth_done=8`; tuning runs do not need to solve puzzle 0. After all profile
+anchors are measured and the universal notebook is ready, the final real-2xT4
+gate consists of exactly two puzzle-0 solve runs at requested beam `2**21` and
+maximum depth `100`: one `output_dim=24` run and one `output_dim=1` run. Both
+must return solutions that validate against puzzle 0.

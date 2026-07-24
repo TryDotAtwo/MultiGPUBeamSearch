@@ -743,3 +743,7 @@
 - Updated IHES fresh bucket array documentation to use one shared precompiled production_runner. The documented flow submits prepare_ihes_prebuilt_runner.sh first, then submits the puzzle array with --dependency=afterok:<prebuild_job> and BEAM_PREBUILT_RUNNER=/mnt/pool/6/vokirova/beam8a100/ihes_cube_model/prebuilt-a100-ihes/production_runner so each one-puzzle task reuses the same binary instead of rebuilding.
 
 - Fixed IHES live results publishing index generation after raw/backfill metadata added extra keys. The fresh bucket publisher now includes variants/source_files columns in data/ihes_cube/index.tsv and filters metadata rows to declared fields before writing index/improvements, so older per-puzzle metadata cannot crash publishing.
+- Refined the Kaggle 2xT4 MLP autoprofile sweep to select configurations by
+  completed `depth_done=8` timing instead of solve completion. The final
+  acceptance gate is two puzzle-0 solves at beam `2**21`, depth 100: output-24
+  and output-1, both with validated solution paths.

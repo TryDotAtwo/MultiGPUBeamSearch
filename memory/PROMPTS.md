@@ -411,3 +411,7 @@
 - User clarified that all one-puzzle array jobs should use one shared precompiled beam-search binary instead of rebuilding production_runner in every job.
 
 - User showed a completed IHES puzzle 33 run where compute succeeded but GitHub publishing failed because compute nodes could not resolve github.com and index generation crashed on metadata fields variants/source_files; requested continuing to collect and publish all cluster IHES results robustly.
+- User clarified that profile tuning need not solve a puzzle: compare completed
+  `depth_done=8` timings. Once profiles and the notebook are ready, run exactly
+  one output-24 and one output-1 final solve on puzzle 0 with beam `2**21` and
+  maximum depth 100; both models must return valid solutions.

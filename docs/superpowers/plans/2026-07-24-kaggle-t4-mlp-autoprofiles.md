@@ -376,3 +376,11 @@ git add test_results/kaggle_t4_mlp_universal_2026-07-24.md memory/CHANGELOG.md m
 git commit -m "test: verify universal Kaggle 2xT4 MLP notebook"
 ```
 
+
+## Approved Execution Refinement
+
+- Tune every `2**16..2**25` anchor by completing and timing `depth_done=8`;
+  tuning attempts are not required to solve the puzzle.
+- The final notebook gate is exactly two real 2xT4 solve runs on puzzle `0`,
+  requested beam `2**21`, and maximum depth `100`: one output-24 model and one
+  output-1 model. Both returned paths must validate as solutions.

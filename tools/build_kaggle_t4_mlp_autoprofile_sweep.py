@@ -19,7 +19,12 @@ from pathlib import Path
 OUTPUT_CLASSES = ('output1', 'output_move_count')
 BEAM_POWERS = tuple(range(16, 26))
 REPRESENTATIVE_POWERS = (16, 19, 22, 25)
-SHARD_VARIANTS = (2, 4, 8, 16, 32, 64)
+SHARD_CANDIDATES_BY_POWER = {
+    16: (2, 4), 17: (2, 4), 18: (2, 4),
+    19: (4, 8), 20: (4, 8), 21: (4, 8),
+    22: (8, 16), 23: (8, 16),
+    24: (16, 32), 25: (32, 64),
+}
 TORCHRUN_NNODES = 1
 TORCHRUN_NPROC_PER_NODE = 2
 TORCHRUN_NODE_RANK = 0
@@ -30,9 +35,9 @@ GITHUB_REPO_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
 GITHUB_BRANCH = "main"
 CUDA_ARCHITECTURES = "75"
 PUZZLE_ID = 0
-DEPTH_LIMIT = 7
+DEPTH_LIMIT = 9
 WARMUP_DEPTH_LIMIT = 4
-RUN_TIMEOUT_SEC = 1500
+RUN_TIMEOUT_SEC = 4000
 STREAM4_BATCH_ALIGNMENT = 1024
 SHARD_CAPACITY_SCALE_PPM = 1050000
 GPU_HEADROOM_BYTES = 224 * 1024**2
@@ -406,116 +411,37 @@ def run_attempt(model_class, beam_power, runtime, phase, ordinal):
 
 SWEEP_CELL = r'''
 attempts = []
-
-# Warm libraries, graphs, and setup-heavy paths once per model class.
 for model_class in OUTPUT_CLASSES:
-    attempts.append(
-        run_attempt(
-            model_class,
-            16,
-            runtime_seed(model_class, 8),
-            phase="warmup",
-            ordinal=0,
-        )
-    )
+    attempts.append(run_attempt(model_class, 16, runtime_seed(model_class, 4), phase="warmup", ordinal=0))
 
-# Explore the main layout family at representative powers.
+# Measure depth 8 directly for every output class and every profile anchor.
 for model_class in OUTPUT_CLASSES:
-    for beam_power in REPRESENTATIVE_POWERS:
-        for ordinal, shard_count in enumerate(SHARD_VARIANTS):
+    for beam_power in BEAM_POWERS:
+        for ordinal, shard_count in enumerate(SHARD_CANDIDATES_BY_POWER[beam_power]):
             try:
-                attempts.append(
-                    run_attempt(
-                        model_class,
-                        beam_power,
-                        runtime_seed(model_class, shard_count),
-                        phase="representative",
-                        ordinal=ordinal,
-                    )
-                )
+                attempts.append(run_attempt(model_class, beam_power, runtime_seed(model_class, shard_count), phase="depth8", ordinal=ordinal))
             except Exception as exc:
-                attempts.append(
-                    {
-                        "config_id": f"orchestration_{model_class}_p{beam_power}_sh{shard_count}",
-                        "phase": "representative",
-                        "model_class": model_class,
-                        "output_dim": 1 if model_class == "output1" else 24,
-                        "beam_power": beam_power,
-                        "requested_beam": 2**beam_power,
-                        "status": "failed",
-                        "error_class": "orchestration_exception",
-                        "return_code": -998,
-                        "exception": repr(exc),
-                    }
-                )
+                attempts.append({
+                    "config_id": f"orchestration_{model_class}_p{beam_power}_sh{shard_count}",
+                    "phase": "depth8", "model_class": model_class,
+                    "output_dim": 1 if model_class == "output1" else 24,
+                    "beam_power": beam_power, "requested_beam": 2**beam_power,
+                    "status": "failed", "error_class": "orchestration_exception",
+                    "return_code": -998, "exception": repr(exc),
+                })
                 print("attempt_exception", repr(exc), flush=True)
                 continue
 
 
 def successful_rows(model_class, beam_power):
-    return [
-        row
-        for row in attempts
-        if row.get("phase") != "warmup"
-        and row.get("model_class") == model_class
-        and row.get("beam_power") == beam_power
-        and row.get("status") == "ok"
-        and row.get("steady_state_sec") is not None
-    ]
+    return [row for row in attempts
+            if row.get("phase") == "depth8"
+            and row.get("model_class") == model_class
+            and row.get("beam_power") == beam_power
+            and row.get("status") == "ok"
+            and row.get("max_depth_completed", -1) >= 8
+            and row.get("steady_state_sec") is not None]
 
-
-representative_winners = {}
-for model_class in OUTPUT_CLASSES:
-    for beam_power in REPRESENTATIVE_POWERS:
-        rows = successful_rows(model_class, beam_power)
-        if rows:
-            representative_winners[(model_class, beam_power)] = min(
-                rows, key=lambda row: row["steady_state_sec"]
-            )
-
-# Non-representative anchors inherit candidates from their nearest measured
-# representative neighbors, but are measured explicitly before being selected.
-for model_class in OUTPUT_CLASSES:
-    for beam_power in BEAM_POWERS:
-        if beam_power in REPRESENTATIVE_POWERS:
-            continue
-        neighbor_powers = sorted(
-            REPRESENTATIVE_POWERS,
-            key=lambda power: (abs(power - beam_power), power),
-        )[:2]
-        seen_runtime_keys = set()
-        ordinal = 0
-        for neighbor_power in neighbor_powers:
-            winner = representative_winners.get((model_class, neighbor_power))
-            if winner is None:
-                continue
-            runtime = {
-                key: winner[key]
-                for key in (
-                    "b_micro",
-                    "stream1_concurrency",
-                    "stream3_ring_slots",
-                    "shard_count",
-                    "shard_capacity_scale_ppm",
-                    "stream4_batch_candidates",
-                    "stream4_trigger_candidates",
-                    "stream4_active_sort_slots",
-                )
-            }
-            runtime_key = tuple(runtime.items())
-            if runtime_key in seen_runtime_keys:
-                continue
-            seen_runtime_keys.add(runtime_key)
-            attempts.append(
-                run_attempt(
-                    model_class,
-                    beam_power,
-                    runtime,
-                    phase="intermediate",
-                    ordinal=ordinal,
-                )
-            )
-            ordinal += 1
 
 fieldnames = sorted({key for row in attempts for key in row})
 attempts_csv = WORK_DIR / "autoprofile_attempts.csv"
@@ -527,40 +453,29 @@ with attempts_csv.open("w", newline="", encoding="utf-8") as handle:
         serialized["depth_timings"] = json.dumps(serialized.get("depth_timings"))
         writer.writerow(serialized)
 
-selected = {
-    "schema_version": 1,
-    "hardware": "kaggle_2xt4",
-    "profiles": {"output1": {}, "output_move_count": {}},
-}
+selected = {"schema_version": 1, "hardware": "kaggle_2xt4",
+            "selection_metric": "depth_done=8 depth_sec",
+            "profiles": {"output1": {}, "output_move_count": {}}}
 for model_class in OUTPUT_CLASSES:
     for beam_power in BEAM_POWERS:
         rows = successful_rows(model_class, beam_power)
         if not rows:
             selected["profiles"][model_class][str(beam_power)] = {
                 "validation_status": "unvalidated",
-                "reason": "no successful measured row",
+                "reason": "no successful row completed depth 8",
             }
             continue
         winner = min(rows, key=lambda row: row["steady_state_sec"])
-        runtime = {
-            key: winner[key]
-            for key in (
-                "b_micro",
-                "stream1_concurrency",
-                "stream3_ring_slots",
-                "shard_count",
-                "shard_capacity_scale_ppm",
-                "stream4_batch_candidates",
-                "stream4_trigger_candidates",
-                "stream4_active_sort_slots",
-            )
-        }
+        runtime = {key: winner[key] for key in (
+            "b_micro", "stream1_concurrency", "stream3_ring_slots",
+            "shard_count", "shard_capacity_scale_ppm",
+            "stream4_batch_candidates", "stream4_trigger_candidates",
+            "stream4_active_sort_slots")}
         selected["profiles"][model_class][str(beam_power)] = {
-            "validation_status": "measured",
-            "runtime": runtime,
+            "validation_status": "measured", "runtime": runtime,
             "evidence": {
-                "config_id": winner["config_id"],
-                "steady_state_sec": winner["steady_state_sec"],
+                "config_id": winner["config_id"], "depth": 8,
+                "depth_sec": winner["steady_state_sec"],
                 "elapsed_sec": winner["elapsed_sec"],
                 "static_vram_bytes": winner["static_vram_bytes"],
                 "free_vram_bytes": winner["free_vram_bytes"],
@@ -568,31 +483,19 @@ for model_class in OUTPUT_CLASSES:
             },
         }
 
-(WORK_DIR / "selected_profiles.json").write_text(
-    json.dumps(selected, indent=2) + "\n",
-    encoding="utf-8",
-)
+(WORK_DIR / "selected_profiles.json").write_text(json.dumps(selected, indent=2) + "\n", encoding="utf-8")
 summary = {
     "hardware": gpu_rows,
     "torchrun_world_size": TORCHRUN_NNODES * TORCHRUN_NPROC_PER_NODE,
-    "attempt_count": len(attempts),
+    "selection_depth": 8, "attempt_count": len(attempts),
     "successful_count": sum(row.get("status") == "ok" for row in attempts),
     "failed_count": sum(row.get("status") != "ok" for row in attempts),
-    "repository_commit": subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=REPO_DIR, text=True
-    ).strip(),
-    "outputs": {
-        "attempts_csv": str(attempts_csv),
-        "selected_profiles": str(WORK_DIR / "selected_profiles.json"),
-    },
+    "repository_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_DIR, text=True).strip(),
+    "outputs": {"attempts_csv": str(attempts_csv), "selected_profiles": str(WORK_DIR / "selected_profiles.json")},
 }
-(WORK_DIR / "run_summary.json").write_text(
-    json.dumps(summary, indent=2) + "\n",
-    encoding="utf-8",
-)
+(WORK_DIR / "run_summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 print(json.dumps(summary, indent=2))
 '''
-
 
 def _code_cell(source: str, cell_id: str) -> dict[str, Any]:
     return {

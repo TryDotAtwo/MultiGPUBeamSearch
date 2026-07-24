@@ -28,7 +28,10 @@ def test_builder_emits_private_two_t4_notebook(tmp_path: Path) -> None:
     assert "--nproc-per-node=" in source
     assert "OUTPUT_CLASSES = ('output1', 'output_move_count')" in source
     assert "BEAM_POWERS = tuple(range(16, 26))" in source
-    assert "REPRESENTATIVE_POWERS = (16, 19, 22, 25)" in source
+    assert "DEPTH_LIMIT = 9" in source
+    assert "SHARD_CANDIDATES_BY_POWER" in source
+    assert '"selection_metric": "depth_done=8 depth_sec"' in source
+    assert 'row.get("max_depth_completed", -1) >= 8' in source
     assert "warmup" in source
     assert "autoprofile_attempts.csv" in source
     assert "selected_profiles.json" in source
