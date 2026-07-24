@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import math
 
@@ -93,4 +93,3 @@ def test_profile_status_must_be_explicit() -> None:
     profiles["profiles"]["output1"]["20"]["validation_status"] = "unknown"
     with pytest.raises(ValueError, match="validation_status"):
         select_profile(profiles, 2**20, output_dim=1, move_count=24)
-
