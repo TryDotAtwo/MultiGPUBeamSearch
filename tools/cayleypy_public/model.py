@@ -98,6 +98,8 @@ def export_checkpoint(
     """Export one supported checkpoint atomically with public metadata only."""
     if out_dir.exists():
         raise ValueError(f"export output directory already exists: {out_dir}")
+    checkpoint_sha256 = _sha256(path)
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
     format = detect_checkpoint_format(path)
     temporary_dir = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.tmp-", dir=out_dir.parent))
     try:
@@ -119,7 +121,7 @@ def export_checkpoint(
         return ExportedModel(
             format=format,
             dtype="fp16",
-            checkpoint_sha256=_sha256(path),
+            checkpoint_sha256=checkpoint_sha256,
             manifest=validated_manifest,
         )
     finally:

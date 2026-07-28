@@ -220,3 +220,26 @@ def test_explicit_cli_batchnorm_mode_keeps_bf16(monkeypatch, tmp_path: Path) -> 
     export_stream1_mlp.main()
 
     assert observed == {"dtype": "bf16", "num_classes": 120}
+
+
+def test_export_checkpoint_hash_failure_leaves_no_final_destination(monkeypatch, tmp_path: Path) -> None:
+    from tools.cayleypy_public import model
+
+    path = write_checkpoint(tmp_path, _exportable_batchnorm_state())
+    out_dir = tmp_path / "export"
+    monkeypatch.setattr(model, "_sha256", lambda _: (_ for _ in ()).throw(OSError("source unavailable")))
+
+    with pytest.raises(OSError, match="source unavailable"):
+        export_checkpoint(path, out_dir, num_classes=3, state_len=4, move_count=24)
+
+    assert not out_dir.exists()
+
+
+def test_export_checkpoint_creates_nested_output_parent(tmp_path: Path) -> None:
+    path = write_checkpoint(tmp_path, _exportable_batchnorm_state())
+    out_dir = tmp_path / "nested" / "export"
+
+    exported = export_checkpoint(path, out_dir, num_classes=3, state_len=4, move_count=24)
+
+    assert exported.manifest["source_weights"] == path.name
+    assert (out_dir / "manifest.json").is_file()
