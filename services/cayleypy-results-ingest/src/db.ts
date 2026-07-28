@@ -11,6 +11,10 @@ export async function findByIdempotency(db: D1Database, key: string): Promise<Su
   return db.prepare("SELECT submission_id, idempotency_key, state, raw_r2_key FROM submissions WHERE idempotency_key = ?").bind(key).first<SubmissionRow>();
 }
 
+export async function findBySubmissionId(db: D1Database, id: string): Promise<SubmissionRow | null> {
+  return db.prepare("SELECT submission_id, idempotency_key, state, raw_r2_key FROM submissions WHERE submission_id = ?").bind(id).first<SubmissionRow>();
+}
+
 export async function transition(db: D1Database, id: string, from: SubmissionState[], to: SubmissionState, patch: TransitionPatch = {}): Promise<boolean> {
   if (from.length === 0) return false;
   const now = new Date().toISOString();
