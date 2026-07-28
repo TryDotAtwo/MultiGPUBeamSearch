@@ -763,3 +763,5 @@
 - Added Task 1 public CayleyPy typed input contracts: frozen run configuration validation plus strict standard puzzle/test/submission loading with selected-id and permutation gates.
 
 - Corrected the public CayleyPy loader to the repository-standard initial_state_id/initial_state comma-delimited CSV contract, and hardened configuration parsing against bool-as-int and string boolean coercion.
+
+- Added automatic public Stream1 MLP checkpoint schema detection and fp16 export wrapper. The exporter now supports `--format auto`, accepts only unambiguous BatchNorm-folded or ResMLP-LayerNorm tensor signatures, writes only the checkpoint basename into public manifests, and returns a SHA-256-attested sanitized export contract.

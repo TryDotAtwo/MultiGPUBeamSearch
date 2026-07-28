@@ -179,7 +179,7 @@ def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDTyp
         "layout": "row-major input activations times weight_hxk",
         "batchnorm": "folded into preceding linear weights",
         "embeddingbag": "removed from runtime; input layer exported as position-class table",
-        "source_weights": str(weights_path),
+        "source_weights": weights_path.name,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(
@@ -286,7 +286,7 @@ def export_resmlp_layernorm(weights_path: Path, out_dir: Path, dtype: ExportDTyp
         "normalization": "layernorm",
         "layout": "row-major input activations times weight_hxk",
         "embedding": "folded into position-class input table",
-        "source_weights": str(weights_path),
+        "source_weights": weights_path.name,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(
@@ -305,11 +305,16 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--weights", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--format", choices=["batchnorm-folded", "resmlp-layernorm"], default="batchnorm-folded")
+    parser.add_argument("--format", choices=["auto", "batchnorm-folded", "resmlp-layernorm"], default="auto")
     parser.add_argument("--dtype", choices=["fp16", "bf16"], default="fp16")
     parser.add_argument("--num-classes", type=int, default=120)
     args = parser.parse_args()
-    if args.format == "batchnorm-folded":
+    format = args.format
+    if format == "auto":
+        from tools.cayleypy_public.model import detect_checkpoint_format
+
+        format = detect_checkpoint_format(args.weights)
+    if format == "batchnorm-folded":
         export_batchnorm_folded(args.weights, args.out, args.dtype, args.num_classes)
     else:
         export_resmlp_layernorm(args.weights, args.out, args.dtype)
