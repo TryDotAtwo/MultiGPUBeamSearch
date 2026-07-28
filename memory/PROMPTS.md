@@ -426,3 +426,5 @@
 - Review required replacing unavailable @cloudflare/workers-types=4.20260728.0 with exact confirmed-published 5.20260727.1, removing only the recreated package-local npm cache, and retaining the npm CONNECT timeout/HTTP 502 gate as an explicit blocker without inventing a lockfile.
 
 - User requested the missing CayleyPy ingest Task 1 dependency/runtime gate on private CPU Kaggle kernel trydotatwo/cayleypy-results-ingest-npm-gate, with committed inputs, npm lock/ci/test/typecheck evidence, exact lockfile integration, bounded config-only reruns, private metadata, GPU disabled, Internet enabled, and no Cloudflare deployment.
+
+- User requested CayleyPy Results Ingest Task 2: exact D1 migration, canonical semantic idempotency, service-generated immutable raw R2 keys with SHA-256 metadata, R2-before-receipt durability, retryable queue-failure persistence, compare-and-transition state updates, real Miniflare bindings, a bounded private Kaggle CPU npm gate, reports, and no Cloudflare deployment/resources/secrets/public push.

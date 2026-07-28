@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "dev": "wrangler dev --env staging",
     "deploy:staging": "wrangler deploy --env staging",
