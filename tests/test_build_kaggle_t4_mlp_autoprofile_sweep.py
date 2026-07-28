@@ -39,6 +39,16 @@ def test_builder_emits_private_two_t4_notebook(tmp_path: Path) -> None:
     assert "except subprocess.TimeoutExpired" in source
     assert "continue" in source
     assert "str(requested_beam)" in source
+    assert "min_capacity = max(" in source
+    assert 'runtime["stream4_batch_candidates"]' in source
+    assert 'runtime["stream3_batch_candidates"]' in source
+    assert "BEAM_STREAM3_BATCH_CANDIDATES" in source
+    assert "RANK_PREFIX_RE" in source
+    assert "DEPTH_RE.finditer" in source
+    assert '"output1": {19: (2, 16)}' in source
+    assert '"output_move_count": {' in source
+    assert "16: (2, 4)" in source
+    assert '"stream3_batch_candidates": 196608' in source
 
 
 def test_generated_code_cells_parse(tmp_path: Path) -> None:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 
 import pytest
 
@@ -93,3 +95,21 @@ def test_profile_status_must_be_explicit() -> None:
     profiles["profiles"]["output1"]["20"]["validation_status"] = "unknown"
     with pytest.raises(ValueError, match="validation_status"):
         select_profile(profiles, 2**20, output_dim=1, move_count=24)
+
+
+def test_checked_in_registry_has_twenty_measured_anchors() -> None:
+    registry = json.loads(
+        Path("configs/kaggle_t4_mlp_profiles.json").read_text(encoding="utf-8")
+    )
+    measured = []
+    for model_class in ("output1", "output_move_count"):
+        assert set(registry["profiles"][model_class]) == {
+            str(power) for power in range(16, 26)
+        }
+        for power, profile in registry["profiles"][model_class].items():
+            assert profile["validation_status"] == "measured"
+            assert profile["evidence"]["kernel_version"] in {4, 5}
+            assert profile["evidence"]["depth"] == 8
+            assert profile["evidence"]["depth_sec"] > 0
+            measured.append((model_class, power))
+    assert len(measured) == 20

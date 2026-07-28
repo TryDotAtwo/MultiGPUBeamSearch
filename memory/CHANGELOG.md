@@ -747,3 +747,9 @@
   completed `depth_done=8` timing instead of solve completion. The final
   acceptance gate is two puzzle-0 solves at beam `2**21`, depth 100: output-24
   and output-1, both with validated solution paths.
+
+- Kaggle 2xT4 MLP autoprofile v3 completed but exposed notebook/config issues: small-beam shard capacity was below Stream3/4 minima and combined rank stdout corrupted depth timing parsing. Added regression tests and config-only v4 fixes for capacity clamping, explicit Stream3 batch sizing, strict numeric parsing, and full per-rank logs with rank-0 tee. Private v4 was pushed; CUDA/C++ algorithms were not changed.
+
+- Kaggle 2xT4 MLP autoprofile v4 completed with 13/20 depth-8 anchors measured. Per-rank logs showed the remaining small output-move-count guard was caused by the runtime-derived Stream3 batch of 196608, not the notebook's 98304 estimate. Launched private focused v5 only for output-1 p19 and output-move-count p16..p21 with a 196608 capacity floor; existing valid v4 rows will be retained. CUDA/C++ algorithms unchanged.
+
+- Focused Kaggle autoprofile v5 completed all seven missing anchors; merged v4/v5 winners into a 20/20 measured 2xT4 registry with exact evidence. Built the universal private MLP notebook with the explicit supported-model header, exact-beam nearest-profile selection, preflight, full rank logs, solution validation, and output artifacts. Local full gate reached 23 passing tests. Private universal v1 launched for output-1 puzzle 0, beam 2**21, depth 100 acceptance.

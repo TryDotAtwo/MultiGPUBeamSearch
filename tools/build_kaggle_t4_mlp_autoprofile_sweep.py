@@ -24,6 +24,13 @@ SHARD_CANDIDATES_BY_POWER = {
     19: (4, 8), 20: (4, 8), 21: (4, 8),
     22: (8, 16), 23: (8, 16),
     24: (16, 32), 25: (32, 64),
+}# v5 focused completion sweep: v4 already measured every other anchor.
+FOCUSED_TARGETS = {
+    "output1": {19: (2, 16)},
+    "output_move_count": {
+        16: (2, 4), 17: (2, 4), 18: (2, 4),
+        19: (4, 8), 20: (4, 8), 21: (4, 8),
+    },
 }
 TORCHRUN_NNODES = 1
 TORCHRUN_NPROC_PER_NODE = 2
@@ -162,7 +169,8 @@ import sys
 import time
 from pathlib import Path
 
-DEPTH_RE = re.compile(r"depth_done=(\d+).*?depth_sec=([0-9.eE+-]+)")
+DEPTH_RE = re.compile(r"depth_done=(\d+).*?depth_sec=([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)")
+RANK_PREFIX_RE = re.compile(r"^\[[^]]*\]:")
 OUTPUT_DIM_RE = re.compile(r"stream1_model_output_dim=(\d+)")
 STATIC_RE = re.compile(r"(?:static_allocation_bytes|static_bytes)=(\d+)")
 FREE_RE = re.compile(r"(?:free_after_all_allocations_bytes|free_bytes)=(\d+)")
@@ -185,6 +193,7 @@ def runtime_seed(model_class, shard_count):
         "b_micro": b_micro,
         "stream1_concurrency": concurrency,
         "stream3_ring_slots": ring_slots,
+        "stream3_batch_candidates": 196608,
         "shard_count": shard_count,
         "shard_capacity_scale_ppm": SHARD_CAPACITY_SCALE_PPM,
         "stream4_batch_candidates": 98304,
@@ -212,9 +221,9 @@ def classify_error(return_code, output, timed_out):
 
 def parse_measurements(output):
     by_depth = {}
-    for depth_text, sec_text in DEPTH_RE.findall(output):
-        depth = int(depth_text)
-        seconds = float(sec_text)
+    for match in DEPTH_RE.finditer(output):
+        depth = int(match.group(1))
+        seconds = float(match.group(2))
         by_depth[depth] = max(seconds, by_depth.get(depth, 0.0))
     measured = sorted(by_depth.items())
     steady = measured[-1][1] if measured else None
@@ -242,6 +251,12 @@ def derived_layout(requested_beam, runtime):
         (logical_shard * int(runtime["shard_capacity_scale_ppm"]) + 999999) // 1000000,
         STREAM4_BATCH_ALIGNMENT,
     )
+    min_capacity = max(
+        int(runtime["stream3_batch_candidates"]),
+        int(runtime["stream4_batch_candidates"]),
+        int(runtime["stream4_trigger_candidates"]),
+    )
+    capacity = max(capacity, round_up(min_capacity, STREAM4_BATCH_ALIGNMENT))
     return effective_beam, local_beam, capacity
 
 
@@ -259,6 +274,7 @@ def make_env(model_class, runtime, history_path):
             "BEAM_B_MICRO": str(runtime["b_micro"]),
             "BEAM_STREAM1_CONCURRENCY": str(runtime["stream1_concurrency"]),
             "BEAM_STREAM3_RING_SLOTS": str(runtime["stream3_ring_slots"]),
+            "BEAM_STREAM3_BATCH_CANDIDATES": str(runtime["stream3_batch_candidates"]),
             "BEAM_SHARD_COUNT": str(runtime["shard_count"]),
             "BEAM_SHARD_BUFFER_COUNT": "2",
             "BEAM_SHARD_CAPACITY_CANDIDATES": str(runtime["shard_capacity_candidates"]),
@@ -312,6 +328,9 @@ def run_attempt(model_class, beam_power, runtime, phase, ordinal):
         f"--rdzv-backend={TORCHRUN_RDZV_BACKEND}",
         f"--rdzv-endpoint={TORCHRUN_RDZV_ENDPOINT}",
         f"--rdzv-id={config_id}",
+        f"--log-dir={WORK_DIR / (config_id + '_ranks')}",
+        "--redirects=3",
+        "--tee=0:3",
         str(BUILD_DIR / "production_runner"),
         str(PUZZLE_ID),
         str(depth_limit),
@@ -411,13 +430,10 @@ def run_attempt(model_class, beam_power, runtime, phase, ordinal):
 
 SWEEP_CELL = r'''
 attempts = []
-for model_class in OUTPUT_CLASSES:
-    attempts.append(run_attempt(model_class, 16, runtime_seed(model_class, 4), phase="warmup", ordinal=0))
-
-# Measure depth 8 directly for every output class and every profile anchor.
-for model_class in OUTPUT_CLASSES:
-    for beam_power in BEAM_POWERS:
-        for ordinal, shard_count in enumerate(SHARD_CANDIDATES_BY_POWER[beam_power]):
+# Complete only the seven anchors left unmeasured by v4.
+for model_class, powers in FOCUSED_TARGETS.items():
+    for beam_power, shard_candidates in powers.items():
+        for ordinal, shard_count in enumerate(shard_candidates):
             try:
                 attempts.append(run_attempt(model_class, beam_power, runtime_seed(model_class, shard_count), phase="depth8", ordinal=ordinal))
             except Exception as exc:
