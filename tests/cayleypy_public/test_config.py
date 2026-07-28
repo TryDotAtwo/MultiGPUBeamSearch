@@ -42,3 +42,19 @@ def test_positive_config_fields_reject_zero(field, value):
 def test_touch_radius_rejects_out_of_range_value():
     with pytest.raises(ValueError, match="TOUCH_BFS_RADIUS"):
         PublicRunConfig.from_mapping({**BASE, "touch_bfs_radius": 13})
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "puzzle_id_start", "puzzle_id_end", "beam_width", "max_depth",
+        "max_collected_solutions", "collect_until_depth", "touch_bfs_radius",
+    ],
+)
+def test_numeric_config_fields_reject_bool(field):
+    with pytest.raises(ValueError, match=field.upper()):
+        PublicRunConfig.from_mapping({**BASE, field: True})
+
+
+def test_publish_results_requires_real_bool():
+    with pytest.raises(ValueError, match="PUBLISH_RESULTS"):
+        PublicRunConfig.from_mapping({**BASE, "publish_results": "false"})

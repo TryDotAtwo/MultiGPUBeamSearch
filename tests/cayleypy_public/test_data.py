@@ -13,9 +13,9 @@ def write_fixtures(tmp_path, ids=(7, 8, 9)):
         "generators": {"swap01": [1, 0, 2], "rotate": [1, 2, 0]},
     }), encoding="utf-8")
     test_csv = tmp_path / "test.csv"
-    pd.DataFrame({"id": ids, "state": ["0;1;2"] * len(ids)}).to_csv(test_csv, index=False)
-    submission_csv = tmp_path / "submission.csv"
-    pd.DataFrame({"id": [7, 8, 9], "moves": ["", "", ""]}).to_csv(submission_csv, index=False)
+    pd.DataFrame({"initial_state_id": ids, "initial_state": ["0,1,2"] * len(ids)}).to_csv(test_csv, index=False)
+    submission_csv = tmp_path / "sample_submission.csv"
+    pd.DataFrame({"initial_state_id": [7, 8, 9], "path": ["", "", ""]}).to_csv(submission_csv, index=False)
     return puzzle_info, test_csv, submission_csv
 
 
@@ -28,7 +28,7 @@ def test_load_contract_derives_standard_dimensions(tmp_path):
     assert contract.state_len == 3
     assert contract.num_classes == 3
     assert contract.initial_states == {7: (0, 1, 2), 8: (0, 1, 2), 9: (0, 1, 2)}
-    assert contract.sample_submission["id"].tolist() == [7, 8, 9]
+    assert contract.sample_submission["initial_state_id"].tolist() == [7, 8, 9]
 
 
 def test_load_contract_rejects_missing_selected_state_id(tmp_path):

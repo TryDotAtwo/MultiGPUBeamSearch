@@ -24,11 +24,12 @@ class PuzzleContract:
 
 
 def _state_from_cell(value: object) -> tuple[int, ...]:
-    if isinstance(value, str):
-        return tuple(int(part) for part in value.split(";"))
-    if isinstance(value, (list, tuple)):
-        return tuple(int(part) for part in value)
-    raise ValueError("test state must be a semicolon-separated string or sequence")
+    if not isinstance(value, str):
+        raise ValueError("initial_state must be a comma-separated string")
+    try:
+        return tuple(int(part) for part in value.split(","))
+    except ValueError as error:
+        raise ValueError("initial_state must contain comma-separated integers") from error
 
 
 def load_puzzle_contract(
@@ -54,24 +55,24 @@ def load_puzzle_contract(
 
     selected_ids = tuple(range(start, end + 1))
     test_frame = pd.read_csv(test_csv)
-    if "id" not in test_frame or "state" not in test_frame:
-        raise ValueError("test CSV must contain id and state columns")
+    if "initial_state_id" not in test_frame or "initial_state" not in test_frame:
+        raise ValueError("test CSV must contain initial_state_id and initial_state columns")
     initial_states: dict[int, tuple[int, ...]] = {}
     for puzzle_id in selected_ids:
-        rows = test_frame.loc[test_frame["id"] == puzzle_id]
+        rows = test_frame.loc[test_frame["initial_state_id"] == puzzle_id]
         if len(rows) == 0:
             raise ValueError(f"missing selected test id {puzzle_id}")
         if len(rows) > 1:
             raise ValueError(f"duplicate selected test id {puzzle_id}")
-        state = _state_from_cell(rows.iloc[0]["state"])
+        state = _state_from_cell(rows.iloc[0]["initial_state"])
         if len(state) != state_len:
             raise ValueError(f"state for id {puzzle_id} must have state_len {state_len}")
         initial_states[puzzle_id] = state
 
     sample_submission = pd.read_csv(sample_submission_csv)
-    if "id" not in sample_submission:
-        raise ValueError("sample submission must contain id column")
-    submission_ids = set(sample_submission["id"])
+    if "initial_state_id" not in sample_submission:
+        raise ValueError("sample submission must contain initial_state_id column")
+    submission_ids = set(sample_submission["initial_state_id"])
     for puzzle_id in selected_ids:
         if puzzle_id not in submission_ids:
             raise ValueError(f"sample submission missing selected id {puzzle_id}")

@@ -761,3 +761,5 @@
 - Polished the universal Megaminx 2xT4 notebook for other users: the header now has a Quick start, exact supported architecture/output contract, explicit checkpoint attachment instructions, nearest-profile/alignment behavior, and artifact descriptions. Added contract tests for these user-facing sections; runtime and solver algorithms are unchanged.
 
 - Added Task 1 public CayleyPy typed input contracts: frozen run configuration validation plus strict standard puzzle/test/submission loading with selected-id and permutation gates.
+
+- Corrected the public CayleyPy loader to the repository-standard initial_state_id/initial_state comma-delimited CSV contract, and hardened configuration parsing against bool-as-int and string boolean coercion.
