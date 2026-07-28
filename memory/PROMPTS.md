@@ -422,3 +422,5 @@
 - User requested Task 1 of the CayleyPy Results Ingest plan: build the strict Worker schema/local runtime with exact pinned dependencies, safe Ajv validation, bounded batch/envelope fields, logical staging/production bindings without resource ids, tests, typecheck, and no Cloudflare deployment or external resource creation.
 
 - Review required CayleyPy ingest Task 1 to enforce UUID/date-time/URI formats, use exact ingress raw byte length for the 25 MiB cap, add regression tests, and remove only worktree-local npm caches while retaining the unavailable npm gate as an explicit concern.
+
+- Review required replacing unavailable @cloudflare/workers-types=4.20260728.0 with exact confirmed-published 5.20260727.1, removing only the recreated package-local npm cache, and retaining the npm CONNECT timeout/HTTP 502 gate as an explicit blocker without inventing a lockfile.

@@ -763,3 +763,5 @@
 - Added the initial CayleyPy results-ingest Worker scaffold: a pinned local TypeScript runtime, strict version-one JSON Schema, compiled Ajv batch validation with value-free errors, and logical Cloudflare binding names without resource identifiers. No Cloudflare resources were created or deployed.
 
 - Hardened CayleyPy ingest schema validation by enabling pinned Ajv format checks for UUID, URI, and date-time fields, and by accepting the ingress-provided raw request byte length for the exact 25 MiB gate while retaining canonical-size fallback validation.
+
+- Corrected the CayleyPy ingest Worker type package to the exact confirmed-published @cloudflare/workers-types=5.20260727.1; no floating dependency range or lockfile was introduced while npm connectivity remained unavailable.
