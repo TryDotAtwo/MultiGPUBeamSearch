@@ -776,3 +776,7 @@
 - Added public CayleyPy Task 4 path helpers: strict dot-separated replay, permutation-derived inverse lookup without name conventions, reflected-state construction, CPU original-path validation, and deterministic semantic solution deduplication.
 - Hardened public CayleyPy Task 4 records and validation: `SolutionRecord` now owns an immutable tuple copy of `reached_state`, and original-solution validation returns `False` for malformed direct generator values while preserving unrelated runtime failures.
 - Added Task 5 public 2xT4 runner orchestration contracts, deterministic torchrun invocation/log capture, bounded collection parsing, and host-only solve-bucket depth/capacity stops without CUDA stream changes.
+
+## 2026-07-29
+- Hardened public CayleyPy Task 5 orchestration after independent review: complete reflection modes and CPU revalidation, real solve-bucket TSV parsing, semantic result deduplication, hard subprocess/log failures, retained per-invocation artifacts, live rank-0 streaming, exact manual 2xT4 runtime variables, bounded static-hybrid history preflight, and guarded scratch cleanup.
+- Reworked Task 5 collect-mode host controls without changing CUDA kernels or Stream 1-5 algorithms: the solved snapshot now covers the full local one-depth Stream2 bound, distributed records gather in bounded chunks through existing scratch, and overflow/capacity/depth stop reasons synchronize across ranks with explicit depth taking precedence over the legacy window.

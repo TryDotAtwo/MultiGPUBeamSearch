@@ -10,8 +10,8 @@ def main() -> int:
         path = Path(result)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
-            "puzzle_id\\tdepth_index\\tfound_depth\\ttotal_depth\\tknown_length\\tdelta\\towner_rank\\tsolution\\n"
-            "7\\t3\\t4\\t4\\t0\\t0\\t0\\tcounterclockwise\\n", encoding="utf-8"
+            "puzzle_id\tdepth_index\tfound_depth\ttotal_depth\tknown_length\tdelta\towner_rank\tsolution_path\n"
+            "7\t0\t1\t1\t0\t0\t0\tcounterclockwise\n", encoding="utf-8"
         )
         print("collection_status=capacity_reached")
     else:
