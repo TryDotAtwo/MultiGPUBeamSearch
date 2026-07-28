@@ -1,0 +1,86 @@
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+import pandas as pd
+
+
+@dataclass(frozen=True)
+class PuzzleContract:
+    central_state: tuple[int, ...]
+    generators: dict[str, tuple[int, ...]]
+    initial_states: dict[int, tuple[int, ...]]
+    sample_submission: pd.DataFrame
+    state_len: int
+    num_classes: int
+
+    @property
+    def move_names(self) -> tuple[str, ...]:
+        return tuple(self.generators)
+
+    @property
+    def move_count(self) -> int:
+        return len(self.generators)
+
+
+def _state_from_cell(value: object) -> tuple[int, ...]:
+    if isinstance(value, str):
+        return tuple(int(part) for part in value.split(";"))
+    if isinstance(value, (list, tuple)):
+        return tuple(int(part) for part in value)
+    raise ValueError("test state must be a semicolon-separated string or sequence")
+
+
+def load_puzzle_contract(
+    puzzle_info_path: Path,
+    test_csv: Path,
+    sample_submission_csv: Path,
+    start: int,
+    end: int,
+) -> PuzzleContract:
+    if start > end:
+        raise ValueError("selected puzzle range must be non-empty")
+    info = json.loads(puzzle_info_path.read_text(encoding="utf-8"))
+    central_state = tuple(int(item) for item in info["central_state"])
+    state_len = len(central_state)
+    if state_len == 0:
+        raise ValueError("central_state must not be empty")
+
+    generators = {name: tuple(int(item) for item in permutation) for name, permutation in info["generators"].items()}
+    expected_permutation = set(range(state_len))
+    for name, permutation in generators.items():
+        if len(permutation) != state_len or set(permutation) != expected_permutation:
+            raise ValueError(f"generator {name} must be a permutation of range(state_len)")
+
+    selected_ids = tuple(range(start, end + 1))
+    test_frame = pd.read_csv(test_csv)
+    if "id" not in test_frame or "state" not in test_frame:
+        raise ValueError("test CSV must contain id and state columns")
+    initial_states: dict[int, tuple[int, ...]] = {}
+    for puzzle_id in selected_ids:
+        rows = test_frame.loc[test_frame["id"] == puzzle_id]
+        if len(rows) == 0:
+            raise ValueError(f"missing selected test id {puzzle_id}")
+        if len(rows) > 1:
+            raise ValueError(f"duplicate selected test id {puzzle_id}")
+        state = _state_from_cell(rows.iloc[0]["state"])
+        if len(state) != state_len:
+            raise ValueError(f"state for id {puzzle_id} must have state_len {state_len}")
+        initial_states[puzzle_id] = state
+
+    sample_submission = pd.read_csv(sample_submission_csv)
+    if "id" not in sample_submission:
+        raise ValueError("sample submission must contain id column")
+    submission_ids = set(sample_submission["id"])
+    for puzzle_id in selected_ids:
+        if puzzle_id not in submission_ids:
+            raise ValueError(f"sample submission missing selected id {puzzle_id}")
+
+    return PuzzleContract(
+        central_state=central_state,
+        generators=generators,
+        initial_states=initial_states,
+        sample_submission=sample_submission,
+        state_len=state_len,
+        num_classes=state_len,
+    )
