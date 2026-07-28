@@ -431,3 +431,4 @@
 ## 2026-07-28
 - User requested Task 4 only for the public CayleyPy 2xT4 notebook: implement permutation-based path replay/inversion, reflection semantics, validation of every original solution, frozen records, and deterministic deduplication; reject invalid or ambiguous moves fail-closed without CUDA/C++ changes.
 - Reviewer requested Task 4 fix round 1/5: normalize caller-provided reached states inside frozen solution records, fail closed with a boolean for malformed direct generator values without swallowing unrelated system errors, and correct the SDD commit evidence.
+- User requested Task 5 only for the public CayleyPy notebook: two-rank torchrun orchestration, first/collect modes, reflection validation, bounded host-side collection stops, and no CUDA algorithm changes.

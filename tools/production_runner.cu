@@ -27,6 +27,7 @@
 #include <new>
 #include <numeric>
 #include <map>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -4040,6 +4041,10 @@ int main(int argc, char** argv) {
     const bool solve_bucket_mode = env_bool("BEAM_SOLVE_BUCKET_MODE", false);
     const std::uint32_t solve_bucket_extra_depths =
         env_u32("BEAM_SOLVE_BUCKET_EXTRA_DEPTHS", 1U);
+    const std::uint32_t solve_bucket_stop_depth =
+        env_u32("BEAM_SOLVE_BUCKET_STOP_DEPTH", 0U);
+    const std::uint64_t solve_bucket_max_solutions =
+        env_u64("BEAM_SOLVE_BUCKET_MAX_SOLUTIONS", 0U);
     const std::uint32_t solve_bucket_known_length =
         env_u32("BEAM_SOLVE_BUCKET_KNOWN_LENGTH", 0U);
     const std::filesystem::path solve_bucket_result_path =
@@ -4458,6 +4463,7 @@ int main(int argc, char** argv) {
     std::string task_solution_path;
     std::int64_t task_solution_length = -1;
     std::vector<SolveBucketRecord> solve_bucket_records;
+    std::set<std::string> solve_bucket_unique_paths;
     bool solve_bucket_found_any = false;
     std::uint32_t solve_bucket_first_found_depth_index = 0;
     for (std::uint32_t depth = 0; depth < depth_limit; ++depth) {
@@ -4635,6 +4641,14 @@ int main(int argc, char** argv) {
                                 ? 0
                                 : static_cast<std::int64_t>(record.total_depth) -
                                       static_cast<std::int64_t>(solve_bucket_known_length);
+                        const bool unique_record = solve_bucket_unique_paths.insert(record.path).second;
+                        if (!unique_record) {
+                            continue;
+                        }
+                        if (solve_bucket_max_solutions != 0U &&
+                            solve_bucket_records.size() >= solve_bucket_max_solutions) {
+                            continue;
+                        }
                         if (solve_bucket_result) {
                             solve_bucket_result
                                 << repair_task.puzzle_id << '\t'
@@ -4664,11 +4678,21 @@ int main(int argc, char** argv) {
                 }
             }
             reset_solved_buffers(memory);
-            if (solve_bucket_found_any && depth >= solve_bucket_first_found_depth_index + solve_bucket_extra_depths) {
+            const bool bucket_capacity_reached = solve_bucket_max_solutions != 0U &&
+                solve_bucket_records.size() >= solve_bucket_max_solutions;
+            const bool bucket_depth_reached = solve_bucket_stop_depth != 0U &&
+                completed_depths >= solve_bucket_stop_depth;
+            if (bucket_capacity_reached || bucket_depth_reached ||
+                (solve_bucket_found_any && depth >= solve_bucket_first_found_depth_index + solve_bucket_extra_depths)) {
                 solution_found = solve_bucket_found_any;
                 const auto depth_end = std::chrono::steady_clock::now();
                 const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
                 if (rank == 0U) {
+                    if (bucket_capacity_reached) {
+                        std::cout << "collection_status=capacity_reached\n";
+                    } else {
+                        std::cout << "collection_status=depth_reached\n";
+                    }
                     std::cout << "solve_bucket_stop=1"
                               << " puzzle_id=" << repair_task.puzzle_id
                               << " depth_index=" << depth
