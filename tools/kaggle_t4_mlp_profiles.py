@@ -95,6 +95,8 @@ def select_profile(
         "profile_power": profile_power,
         "profile_anchor_beam": 2**profile_power,
         "model_class": model_class,
+        "hardware": profiles["hardware"],
+        "profile_registry_schema_version": profiles.get("schema_version"),
         **profile,
     }
 

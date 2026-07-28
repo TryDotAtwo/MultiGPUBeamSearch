@@ -423,3 +423,5 @@
 - User clarified Task 2 exporter validation must use explicit selected-puzzle state_len, num_classes, and move_count parameters; manifests must not invent move_count.
 - User requested Task 2 review fixes: preserve bf16 in explicit exporter modes; require fp16 and explicit state_len/move_count in auto mode; atomically fail public exports; and add ResMLP plus malformed-checkpoint regression coverage.
 - User requested Task 2 review round 2: hash the source checkpoint before any export/promotion and preserve valid nested output-directory behavior.
+
+- User requested public CayleyPy Task 3: measured 2xT4 profile selection plus move-count-aware runtime preflight; retain exact requested/effective beam semantics, support move counts 18 and 24, enforce capacity/history/tmp guards, and do not change CUDA/C++ algorithms.
