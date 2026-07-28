@@ -185,9 +185,9 @@ Field and payload sizes are bounded. Unknown fields are rejected at the public A
 
 ### 9.2 State machine
 
-`received -> queued -> validating -> validated | rejected -> staged -> published`
+The producer persists `received`, sends `{submission_id}` to the at-least-once Queue, and then compare-transitions `received|retryable -> queued`. Queue delivery may run before that producer transition, so the consumer must compare-transition `received|queued|retryable -> validating`. Producer confirmation accepts a reread already at `queued` or later; an ambiguous Queue failure likewise returns `queued` when a reread proves consumer progress, otherwise it confirms `retryable`.
 
-Failures record `retryable` or `terminal` status. Retryable failures use bounded exponential backoff. Every transition is idempotent. Raw R2 storage occurs before the Worker returns an accepted receipt.
+The downstream path is `validating -> validated | rejected -> staged -> published`; exhausted work becomes `dead_letter`. Retryable failures use bounded exponential backoff. Every consumer action and state transition is idempotent. A failed enqueue attempt increments `retry_count`, refreshes `updated_at`, and records only a safe error; a later successful enqueue clears that stale error. Raw R2 storage occurs before the Worker returns an accepted receipt.
 
 ### 9.3 Concurrency and loss prevention
 
@@ -195,7 +195,11 @@ The service target is at least 100 concurrent notebook clients. HTTP handlers do
 
 Every result uses a unique append-only repository path derived from schema version, competition, puzzle type, date, and submission id. No client-selected path is trusted. The Durable Object batches unique records into the staging branch, preventing competing GitHub ref updates. Index files are derived later and are never mutated by individual clients.
 
-At-least-once delivery cannot duplicate results because D1 and repository paths use the deterministic idempotency key/submission id. R2 raw payloads and DLQ make accepted work recoverable even during GitHub, DNS, Queue, or consumer outages.
+A normal concurrent duplicate waits a bounded interval for the first producer and reuses its receipt without another Queue send. If the shared row is still `received` after the final reread, the duplicate resends the same `{submission_id}` and confirms `queued`/later or `retryable`; this recovery may create another Queue delivery, so downstream consumer idempotency is mandatory. All such deliveries still reference one D1 row and one retained winning raw object.
+
+The Worker scheduled handler also runs a bounded recovery page over stale `received|retryable` rows, using the `(state,updated_at)` index and a `staleBefore` cutoff as backoff eligibility. It resends the same `{submission_id}`, uses checked state transitions, retains raw R2, and advances failed retry metadata so one hot page cannot starve older tail rows.
+
+At-least-once delivery cannot duplicate published results because D1 and repository paths use the deterministic idempotency key/submission id. R2 raw payloads and DLQ make accepted work recoverable even during GitHub, DNS, Queue, or consumer outages.
 
 ### 9.4 Abuse controls
 

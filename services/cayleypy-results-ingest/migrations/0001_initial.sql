@@ -19,3 +19,4 @@ CREATE TABLE submissions (
 );
 CREATE INDEX submissions_lookup ON submissions(competition,puzzle_type,puzzle_id,created_at);
 CREATE INDEX submissions_run ON submissions(run_id,created_at);
+CREATE INDEX submissions_recovery ON submissions(state,updated_at);

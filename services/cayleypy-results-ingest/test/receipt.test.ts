@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 
 import { canonicalJson, computeIdempotency } from "../src/ids.js";
 import { transition } from "../src/db.js";
-import { receiveEnvelope, SafeIngestError, type IngestEnv } from "../src/storage.js";
+import { receiveEnvelope, recoverStaleSubmissions, SafeIngestError, type IngestEnv } from "../src/storage.js";
 
 declare module "cloudflare:test" { interface ProvidedEnv extends Pick<IngestEnv, "RESULTS_DB" | "RAW_RESULTS"> {} }
 
@@ -174,24 +174,72 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
     const winner = await winnerPending;
     expect(duplicate).toMatchObject({ submission_id: winner.submission_id, state: "queued", duplicate: true });
   });
-  test("fails safely when a received duplicate does not settle before the bound", async () => {
+  test("resends a stale received duplicate after the bounded wait", async () => {
     const queueGate = deferred();
-    const queueStarted = deferred();
+    const firstQueueStarted = deferred();
+    const secondQueueStarted = deferred();
+    let enqueueCount = 0;
     const bindings: IngestEnv = {
       RESULTS_DB: env.RESULTS_DB,
       RAW_RESULTS: env.RAW_RESULTS,
-      VALIDATE_QUEUE: { send: async () => { queueStarted.resolve(); await queueGate.promise; } } as unknown as Queue,
+      VALIDATE_QUEUE: {
+        send: async () => {
+          enqueueCount += 1;
+          if (enqueueCount === 1) firstQueueStarted.resolve();
+          if (enqueueCount === 2) secondQueueStarted.resolve();
+          await queueGate.promise;
+        },
+      } as unknown as Queue,
     };
     const winnerPending = receiveEnvelope(bindings, validEnvelope());
-    await queueStarted.promise;
-    await expect(receiveEnvelope(bindings, validEnvelope(), {
-      duplicatePollAttempts: 2,
+    await firstQueueStarted.promise;
+    const duplicatePending = receiveEnvelope(bindings, validEnvelope(), {
+      duplicatePollAttempts: 1,
       duplicatePollDelayMs: 0,
-    })).rejects.toMatchObject({ code: "duplicate_wait_timeout" });
+    });
+    await secondQueueStarted.promise;
     queueGate.resolve();
-    await winnerPending;
+    const [winner, duplicate] = await Promise.all([winnerPending, duplicatePending]);
+    expect(duplicate).toMatchObject({ submission_id: winner.submission_id, state: "queued", duplicate: true });
+    expect(enqueueCount).toBe(2);
+    expect(await env.RESULTS_DB.prepare("SELECT COUNT(*) AS count FROM submissions").first<number>("count")).toBe(1);
   });
 
+  test("scheduled recovery repairs a crash-before-send received row with the same service message", async () => {
+    const envelope = validEnvelope();
+    const idempotency = await computeIdempotency(envelope);
+    const submissionId = "019c1234-5678-7abc-8def-0123456789ab";
+    const rawKey = `raw/v1/2000/01/01/${submissionId}.json`;
+    await env.RAW_RESULTS.put(rawKey, canonicalJson(envelope));
+    await env.RESULTS_DB.prepare(
+      "INSERT INTO submissions (submission_id,idempotency_key,run_id,author_name,competition,puzzle_type,puzzle_id,state,raw_r2_key,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+    ).bind(
+      submissionId,
+      idempotency,
+      envelope.run_id,
+      envelope.author.name,
+      envelope.competition,
+      envelope.puzzle_type,
+      envelope.puzzle_id,
+      "received",
+      rawKey,
+      "2000-01-01T00:00:00.000Z",
+      "2000-01-01T00:00:00.000Z",
+    ).run();
+    const messages: unknown[] = [];
+    const recovery = await recoverStaleSubmissions(
+      {
+        RESULTS_DB: env.RESULTS_DB,
+        RAW_RESULTS: env.RAW_RESULTS,
+        VALIDATE_QUEUE: { send: async (message: unknown) => { messages.push(message); } } as unknown as Queue,
+      },
+      { staleBefore: new Date("2001-01-01T00:00:00.000Z"), limit: 10 },
+    );
+    expect(recovery).toEqual({ scanned: 1, queued: 1, retryable: 0, failed: 0 });
+    expect(messages).toEqual([{ submission_id: submissionId }]);
+    expect(await env.RESULTS_DB.prepare("SELECT state FROM submissions").first<string>("state")).toBe("queued");
+    expect(await env.RAW_RESULTS.head(rawKey)).not.toBeNull();
+  });
   test("retains immutable raw when the D1 insert outcome is ambiguous", async () => {
     const bindings: IngestEnv = {
       RESULTS_DB: dbWithInsertFailure(),
@@ -290,9 +338,9 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
   test("retains R2 object and a retryable row when durable queue write fails", async () => {
     const bindings: IngestEnv = { RESULTS_DB: env.RESULTS_DB, RAW_RESULTS: env.RAW_RESULTS, VALIDATE_QUEUE: { send: async () => { throw new Error("injected"); } } as unknown as Queue };
     const receipt = await receiveEnvelope(bindings, validEnvelope());
-    const row = await env.RESULTS_DB.prepare("SELECT state, safe_error, raw_r2_key FROM submissions WHERE submission_id = ?").bind(receipt.submission_id).first<{ state: string; safe_error: string; raw_r2_key: string }>();
+    const row = await env.RESULTS_DB.prepare("SELECT state, safe_error, retry_count, raw_r2_key FROM submissions WHERE submission_id = ?").bind(receipt.submission_id).first<{ state: string; safe_error: string; retry_count: number; raw_r2_key: string }>();
     expect(receipt.state).toBe("retryable");
-    expect(row).toMatchObject({ state: "retryable", safe_error: "queue_unavailable" });
+    expect(row).toMatchObject({ state: "retryable", safe_error: "queue_unavailable", retry_count: 1 });
     expect(await env.RAW_RESULTS.head(row!.raw_r2_key)).not.toBeNull();
   });
 
@@ -309,17 +357,21 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
     await expect(receiveEnvelope(bindings, validEnvelope())).resolves.toMatchObject({ state: "queued", duplicate: false });
   });
 
-  test("fails safely when successful Queue send conflicts with a retryable state", async () => {
+  test("successful Queue send advances a concurrent retryable row and clears its stale error", async () => {
     const bindings: IngestEnv = {
       RESULTS_DB: env.RESULTS_DB,
       RAW_RESULTS: env.RAW_RESULTS,
       VALIDATE_QUEUE: {
         send: async ({ submission_id }: { submission_id: string }) => {
-          await env.RESULTS_DB.prepare("UPDATE submissions SET state = ? WHERE submission_id = ?").bind("retryable", submission_id).run();
+          await env.RESULTS_DB.prepare("UPDATE submissions SET state = ?, safe_error = ? WHERE submission_id = ?")
+            .bind("retryable", "queue_unavailable", submission_id)
+            .run();
         },
       } as unknown as Queue,
     };
-    await expect(receiveEnvelope(bindings, validEnvelope())).rejects.toMatchObject({ code: "state_transition_conflict" });
+    await expect(receiveEnvelope(bindings, validEnvelope())).resolves.toMatchObject({ state: "queued" });
+    const row = await env.RESULTS_DB.prepare("SELECT state, safe_error FROM submissions").first<{ state: string; safe_error: string | null }>();
+    expect(row).toEqual({ state: "queued", safe_error: null });
   });
 
   test("does not mislabel a D1 transition error as Queue unavailable", async () => {
@@ -333,18 +385,95 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
     expect(row).toEqual({ state: "received", safe_error: null });
   });
 
-  test("does not return retryable when Queue failure races with another state", async () => {
+  test("returns queued when ambiguous Queue failure already reached the consumer", async () => {
     const bindings: IngestEnv = {
       RESULTS_DB: env.RESULTS_DB,
       RAW_RESULTS: env.RAW_RESULTS,
       VALIDATE_QUEUE: {
         send: async ({ submission_id }: { submission_id: string }) => {
-          await env.RESULTS_DB.prepare("UPDATE submissions SET state = ? WHERE submission_id = ?").bind("queued", submission_id).run();
-          throw new Error("injected_queue_failure");
+          await env.RESULTS_DB.prepare("UPDATE submissions SET state = ? WHERE submission_id = ?")
+            .bind("validating", submission_id)
+            .run();
+          throw new Error("ambiguous_queue_failure");
         },
       } as unknown as Queue,
     };
-    await expect(receiveEnvelope(bindings, validEnvelope())).rejects.toMatchObject({ code: "state_transition_conflict" });
+    await expect(receiveEnvelope(bindings, validEnvelope())).resolves.toMatchObject({ state: "queued" });
+  });
+
+  test("scheduled recovery re-enqueues stale retryable rows and retains raw", async () => {
+    const failing: IngestEnv = {
+      RESULTS_DB: env.RESULTS_DB,
+      RAW_RESULTS: env.RAW_RESULTS,
+      VALIDATE_QUEUE: { send: async () => { throw new Error("offline"); } } as unknown as Queue,
+    };
+    const receipt = await receiveEnvelope(failing, validEnvelope());
+    await env.RESULTS_DB.prepare("UPDATE submissions SET updated_at = ? WHERE submission_id = ?")
+      .bind("2000-01-01T00:00:00.000Z", receipt.submission_id)
+      .run();
+    const messages: unknown[] = [];
+    const recovery = await recoverStaleSubmissions(
+      {
+        RESULTS_DB: env.RESULTS_DB,
+        RAW_RESULTS: env.RAW_RESULTS,
+        VALIDATE_QUEUE: { send: async (message: unknown) => { messages.push(message); } } as unknown as Queue,
+      },
+      { staleBefore: new Date("2001-01-01T00:00:00.000Z"), limit: 10 },
+    );
+    expect(recovery).toEqual({ scanned: 1, queued: 1, retryable: 0, failed: 0 });
+    expect(messages).toEqual([{ submission_id: receipt.submission_id }]);
+    const row = await env.RESULTS_DB.prepare(
+      "SELECT state, safe_error, retry_count, raw_r2_key FROM submissions",
+    ).first<{ state: string; safe_error: string | null; retry_count: number; raw_r2_key: string }>();
+    expect(row).toMatchObject({ state: "queued", safe_error: null, retry_count: 1 });
+    expect(await env.RAW_RESULTS.head(row!.raw_r2_key)).not.toBeNull();
+  });
+
+  test("failed recovery advances retry metadata so a bounded page cannot starve its tail", async () => {
+    const envelope = validEnvelope();
+    const submissionIds: string[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      const submissionId = `019c0000-0000-7000-8000-00000000000${index}`;
+      const rawKey = `raw/v1/2000/01/01/${submissionId}.json`;
+      submissionIds.push(submissionId);
+      await env.RAW_RESULTS.put(rawKey, canonicalJson(envelope));
+      await env.RESULTS_DB.prepare(
+        "INSERT INTO submissions (submission_id,idempotency_key,run_id,author_name,competition,puzzle_type,puzzle_id,state,raw_r2_key,safe_error,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      ).bind(
+        submissionId,
+        (index + 1).toString(16).padStart(64, "0"),
+        `${envelope.run_id}-${index}`,
+        envelope.author.name,
+        envelope.competition,
+        envelope.puzzle_type,
+        envelope.puzzle_id + index,
+        "retryable",
+        rawKey,
+        "queue_unavailable",
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z",
+      ).run();
+    }
+
+    const messages: string[] = [];
+    const recoveryEnv: IngestEnv = {
+      RESULTS_DB: env.RESULTS_DB,
+      RAW_RESULTS: env.RAW_RESULTS,
+      VALIDATE_QUEUE: {
+        send: async ({ submission_id }: { submission_id: string }) => {
+          messages.push(submission_id);
+          throw new Error("still_offline");
+        },
+      } as unknown as Queue,
+    };
+    const options = { staleBefore: new Date("2001-01-01T00:00:00.000Z"), limit: 2 };
+
+    await expect(recoverStaleSubmissions(recoveryEnv, options)).resolves.toEqual({ scanned: 2, queued: 0, retryable: 2, failed: 0 });
+    await expect(recoverStaleSubmissions(recoveryEnv, options)).resolves.toEqual({ scanned: 1, queued: 0, retryable: 1, failed: 0 });
+    await expect(recoverStaleSubmissions(recoveryEnv, options)).resolves.toEqual({ scanned: 0, queued: 0, retryable: 0, failed: 0 });
+    expect(messages).toEqual(submissionIds);
+    const rows = await env.RESULTS_DB.prepare("SELECT submission_id, retry_count FROM submissions ORDER BY submission_id").all<{ submission_id: string; retry_count: number }>();
+    expect(rows.results).toEqual(submissionIds.map((submission_id) => ({ submission_id, retry_count: 1 })));
   });
 
   test("compare-and-transition changes exactly one eligible row", async () => {

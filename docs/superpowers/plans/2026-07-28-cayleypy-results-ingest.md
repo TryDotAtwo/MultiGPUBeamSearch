@@ -146,6 +146,7 @@ git commit -m "feat: scaffold strict CayleyPy results Worker"
 - Produces: `canonicalJson(value: unknown) -> string`
 - Produces: `computeIdempotency(envelope: ResultEnvelopeV1) -> Promise<string>`
 - Produces: `receiveEnvelope(env, envelope, requestMeta) -> Promise<Receipt>`.
+- Produces: `recoverStaleSubmissions(env, { staleBefore, limit }) -> Promise<RecoverySummary>`; the helper scans only a bounded stale `received|retryable` page and resends the existing `{submission_id}`.
 
 - [ ] **Step 1: Write the D1 migration**
 
@@ -171,11 +172,12 @@ CREATE TABLE submissions (
 );
 CREATE INDEX submissions_lookup ON submissions(competition,puzzle_type,puzzle_id,created_at);
 CREATE INDEX submissions_run ON submissions(run_id,created_at);
+CREATE INDEX submissions_recovery ON submissions(state,updated_at);
 ```
 
 - [ ] **Step 2: Write failing durability/idempotency tests**
 
-Use Miniflare bindings. Assert R2 `put` occurs before D1 received/queued state and before the returned receipt. Inject Queue failure: raw object and `retryable` row remain. Submit the same idempotency key twice: return the original submission id and enqueue once.
+Use Miniflare bindings. Assert R2 `put` occurs before D1 received/queued state and before the returned receipt. Inject Queue failure: raw object and `retryable` row remain. Submit the same idempotency key twice: return the original submission id and enqueue once before the bounded wait expires. Also cover a stale `received` duplicate resend, crash-before-send recovery, retryable sweeping, immediate consumer progress before the producer marks `queued`, recovery duplication with one D1 row, retry-page fairness beyond `limit`, and clearing stale `safe_error` after success.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -197,13 +199,22 @@ Use `If-None-Match: *` semantics where supported; otherwise test existence and t
 ```ts
 export async function transition(
   db: D1Database, id: string, from: SubmissionState[], to: SubmissionState,
-  patch: { safeError?: string; githubPath?: string; githubCommitSha?: string } = {},
+  patch: {
+    safeError?: string | null;
+    githubPath?: string;
+    githubCommitSha?: string;
+    incrementRetryCount?: boolean;
+  } = {},
 ): Promise<boolean>
 ```
 
-The SQL update includes `WHERE submission_id=? AND state IN (...)`; affected row count must be one or the transition is an idempotent no-op/conflict.
+The SQL update includes `WHERE submission_id=? AND state IN (...)`; affected row count must be one or the transition is an idempotent no-op/conflict. Successful Queue confirmation compare-transitions `received|retryable -> queued` and clears `safe_error`. Failed confirmation compare-transitions `received|retryable -> retryable`, increments `retry_count`, and refreshes `updated_at`; a false result is accepted only after a reread proves queued-or-later or retryable.
 
-- [ ] **Step 6: Test and commit**
+- [ ] **Step 6: Implement bounded stale-delivery recovery**
+
+Query `state IN ('received','retryable') AND updated_at <= ?`, ordered by `updated_at,submission_id` and capped at `limit <= 100`. For each row, resend exactly `{submission_id}`, confirm `queued`/later or `retryable` with the same checked transitions, and never remove its raw R2 object. A duplicate request that reaches its final bounded reread while still `received` uses the same resend path. Failed retries must advance `updated_at` and `retry_count` so the next bounded page can reach its tail.
+
+- [ ] **Step 7: Test and commit**
 
 Run: `npm test -- receipt.test.ts && npm run typecheck`
 Expected: PASS.
@@ -218,10 +229,12 @@ git commit -m "feat: persist CayleyPy result receipts durably"
 **Files:**
 - Create: `services/cayleypy-results-ingest/src/worker.ts`
 - Create: `services/cayleypy-results-ingest/test/worker.test.ts`
+- Modify: `services/cayleypy-results-ingest/wrangler.jsonc` with a bounded recovery cron trigger.
 
 **Interfaces:**
 - Produces routes: `POST /v1/results`, `GET /v1/submissions/:id`, `GET /healthz`.
 - `POST` returns `202 { receipts: [{ submission_id, idempotency_key, status_url }] }`.
+- Produces `scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void>` with `RECOVERY_STALE_MS = 60_000` and `RECOVERY_LIMIT = 50`. It computes `staleBefore = new Date(controller.scheduledTime - RECOVERY_STALE_MS)` and calls `recoverStaleSubmissions(env, { staleBefore, limit: RECOVERY_LIMIT })`.
 
 - [ ] **Step 1: Write failing route tests**
 
@@ -240,7 +253,11 @@ Read `Content-Length` before body, then stream/count with a 25 MiB hard limit. A
 
 Use a Cloudflare Rate Limiting binding when available plus a D1/global fallback counter. Start with 30 requests/minute/IP, 100 envelopes/request, and 2,000 envelopes/minute globally; expose exact limits in `/healthz` but no infrastructure ids. `store_only` persists to R2/D1 without Queue publication.
 
-- [ ] **Step 5: Test and commit**
+- [ ] **Step 5: Implement and test the scheduled recovery entry point**
+
+Add the exact `scheduled(controller, env, ctx)` interface above and configure the cron. Its test seeds stale and fresh `received|retryable` rows, proves only the bounded eligible page is resent, proves the same submission ids are used, and proves failures advance retry metadata without deleting raw R2. Record only bounded counts, never payloads or binding identifiers.
+
+- [ ] **Step 6: Test and commit**
 
 Run: `npm test -- worker.test.ts receipt.test.ts && npm run typecheck`
 Expected: PASS.
@@ -261,6 +278,7 @@ git commit -m "feat: expose bounded public result receipts"
 **Interfaces:**
 - Produces: `validateSolution(envelope: ResultEnvelopeV1) -> ReplayResult`.
 - Produces Queue handler `queue(batch: MessageBatch<ValidationMessage>, env: Env): Promise<void>`.
+- Preserves the Task 3 `scheduled(controller, env, ctx)` export when composing the Worker entry point; Queue and scheduled recovery both use the same idempotent D1 transition contract.
 
 - [ ] **Step 1: Write failing replay property tests**
 
@@ -268,7 +286,7 @@ Generate small random permutations and valid paths. Assert exact final-state equ
 
 - [ ] **Step 2: Write failing duplicate/out-of-order consumer tests**
 
-Deliver the same message twice, deliver after state already `validated`, deliver while `retryable`, and inject malformed R2 body/hash mismatch. Assert one validated transition, terminal rejection with code, or retry/DLQ without duplicate GitHub enqueue.
+Deliver the same message twice; deliver immediately while the producer row is still `received`; deliver from `queued` and `retryable`; deliver after state is already `validating` or `validated`; and inject malformed R2 body/hash mismatch. Assert one effective validation/publisher enqueue, terminal rejection with code, or retry/DLQ without duplicate GitHub enqueue. Duplicate and out-of-order delivery must be an idempotent no-op once another consumer owns or completed the row.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -281,9 +299,13 @@ Validate proof permutations before applying moves. Bound `state_len <= 128`, `mo
 
 - [ ] **Step 5: Implement Queue state transitions and retry policy**
 
-Transition `queued|retryable -> validating`; terminal validation errors become `rejected`; R2/D1/DO/network errors use `message.retry({delaySeconds})` with capped exponential delay. After configured attempts, write `dead_letter`, keep raw R2, and enqueue to `VALIDATE_DLQ`.
+Compare-transition `received|queued|retryable -> validating` and clear stale `safe_error`. The `received` source is mandatory because Cloudflare Queue may deliver before the producer's post-send `queued` transition. If the transition returns false, reread: already `validating|validated|rejected|staged|published|dead_letter` is an idempotent duplicate/no-op; any other state is a checked conflict. Terminal validation errors become `rejected`; R2/D1/DO/network errors use `message.retry({delaySeconds})` with capped exponential delay. After configured attempts, write `dead_letter`, keep raw R2, and enqueue to `VALIDATE_DLQ`. Every downstream write is keyed by `submission_id`/idempotency key so recovery-created duplicate messages cannot duplicate publication.
 
-- [ ] **Step 6: Test and commit**
+- [ ] **Step 6: Compose Queue and scheduled handlers without dropping recovery**
+
+Export both `queue(batch, env)` and the Task 3 `scheduled(controller, env, ctx)` handler from the final Worker module. Add an integration test that an immediate consumer can move `received -> validating` before the producer's checked `queued` confirmation, while the scheduled handler still recovers stale `received|retryable` rows.
+
+- [ ] **Step 7: Test and commit**
 
 Run: `npm test -- replay.test.ts consumer.test.ts && npm run typecheck`
 Expected: PASS.

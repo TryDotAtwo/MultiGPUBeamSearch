@@ -1,26 +1,32 @@
-# CayleyPy Results Ingest Task 2 verification (2026-07-29)
+# CayleyPy Results Ingest Task 2 round-2 verification (2026-07-29)
 
 ## Delivered
 
-- Added migration `0001_initial.sql` for the submission state machine and indexes.
-- Added deterministic canonical JSON and SHA-256 semantic idempotency. Client transport fields (`submission_id`, supplied idempotency key, and timestamp) are excluded from semantic identity.
-- Raw payload keys are service generated as `raw/v1/YYYY/MM/DD/<uuidv7>.json`; the client supplies no storage or repository path. R2 uses `If-None-Match: *` and stores SHA-256 custom metadata.
-- Receipt order is R2 raw object, D1 `received`, awaited durable Queue write, confirmed D1 `queued`, then receipt. Queue failures retain raw R2 and return retryable only after D1 confirms `retryable` with safe code `queue_unavailable`.
-- Concurrent duplicates that observe `received` use a bounded D1 reread loop. They cannot return `queued` before the winner's Queue write resolves. A bounded timeout fails with safe code `duplicate_wait_timeout`.
-- An `ON CONFLICT` loser deletes and verifies absence of only its own service-generated raw key before returning the winner receipt. Failed cleanup returns `duplicate_raw_cleanup_failed`; an ambiguous D1 insert exception preserves immutable raw for operator recovery and returns `submission_persist_failed`; it is never destructively cleaned.
-- Queue errors and D1 transition errors are handled separately. Every compare-and-transition result is checked; a false result is accepted only when a reread proves the required settled state. Other conflicts fail with safe, value-free codes.
+- Closed the D1/Queue crash window without claiming exactly-once delivery. A duplicate that remains `received` after its final bounded reread resends the same `{submission_id}` and then confirms `queued`/later or `retryable`; a normal concurrent duplicate still observes one Queue send when the winner completes inside the wait.
+- Added `recoverStaleSubmissions(env, { staleBefore, limit })`. It queries a bounded `received|retryable` page through `submissions(state,updated_at)`, resends the existing submission id, retains raw R2, and uses checked state transitions.
+- Queue-send success compare-transitions `received|retryable -> queued` and clears stale `safe_error`. Queue-send failure first accepts consumer progress already at queued-or-later; otherwise it compare-transitions `received|retryable -> retryable`, increments `retry_count`, refreshes `updated_at`, and records only `queue_unavailable`.
+- Failed retry metadata gives the bounded recovery query fairness: a failed first page moves behind untouched stale rows rather than hot-looping forever.
+- Updated the architecture and implementation plan contract. Task 3 must expose `scheduled(controller, env, ctx)` with `RECOVERY_STALE_MS = 60_000` and `RECOVERY_LIMIT = 50`; Task 4 must preserve that handler and idempotently compare-transition `received|queued|retryable -> validating` because Queue delivery may beat the producer's post-send `queued` update.
+- Real Miniflare coverage now includes immediate-consumer interleaving, ambiguous Queue failure after consumer progress, crash-before-send scheduled recovery, stale duplicate resend, retryable sweeping, one-row recovery duplication, retry-page fairness beyond `limit`, stale-error clearing, normal one-enqueue duplicates, raw retention, and prior concurrency/cleanup gates.
 
 ## Private CPU runtime gate
 
-- Kernel: `trydotatwo/cayleypy-results-ingest-npm-gate`, private, CPU-only, Internet enabled, version 10.
+- Kernel: `trydotatwo/cayleypy-results-ingest-npm-gate`, version 12, private, CPU-only, Internet enabled.
+- Pulled metadata confirms `is_private=true`, `enable_gpu=false`, and the expected kernel id. The pulled v12 notebook carries the same 14-file `EXPECTED_SHA256` map as the locally generated source.
+- Terminal status: `KernelWorkerStatus.COMPLETE`.
 - Node `v20.19.0`, npm `10.8.2`.
 - `npm install --package-lock-only --no-audit --no-fund`: PASS.
 - `npm ci --no-audit --no-fund`: PASS.
-- `npm test`: PASS — 11 schema tests in Node plus 15 receipt/concurrency/order/cleanup/retry/transition tests with real Miniflare D1/R2 bindings.
+- `npm test`: PASS - 11 schema tests plus 18 real Miniflare D1/R2 receipt/recovery tests.
 - `npm run typecheck`: PASS.
-- Exact embedded/downloaded SHA-256: `src/storage.ts=ecd55cb4088a35b9672314e149d44bff83c5af69316dff3d87d78581d1e0a2c7`; `test/receipt.test.ts=97a13c8545147686369cf7cb5290d69af94408ffc0615984d4a4eef42940d215`.
-- Evidence: `test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v10/`.
+- Downloaded `payload-sha256.json` matches all 14 current worktree inputs byte-for-byte. Key hashes: migration `8c3fe6fdc4381e123a901593962194f90aae7bfc484e6a6f5685195d05cb0ba6`; `src/db.ts` `a16b27d6c09808a22a52824f9a1b8997b86e6898c8b6d04463df8c4551378221`; `src/storage.ts` `5727b582b69318766f07c60f859a7603097922572df9bfa8723ffb5e3f8e6553`; `test/receipt.test.ts` `c6215277858f55d8422e23244254a4761b3ba802efde4b99f7fc8ac645120698`.
+- The downloaded regenerated lockfile is text-equivalent to the embedded lockfile; its byte hash differs only because npm normalized CRLF to LF (`6c8415...` input, `fec430...` output). The exact input hash is present in the 14/14 payload proof, and `npm ci` used the regenerated lock successfully.
+- Evidence: `test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v12/` and `test_results/kaggle_cayleypy_results_ingest_npm_gate/pulled_v12/`.
 
-## Concern
+## v11 diagnostic run
 
-The pinned Vitest pool's bundled Miniflare warns that its latest emulated compatibility date is `2025-07-12`, falling back from the Worker pin `2026-07-28`. The gate passed; this remains a local-emulation limitation and no dependency upgrade was made in Task 2.
+Version 11 remained `KernelWorkerStatus.RUNNING` across repeated polls through at least `2026-07-29 00:55:20 +03:00`. A live `kaggle kernels output` attempt at that time returned no files. The identified cause was test-only microtask starvation: a new concurrency test polled with `await Promise.resolve()` and could prevent timers/runtime progress indefinitely. No production code used that loop. The test was replaced with explicit deferred Queue-start signals, and v11 was superseded by exact private v12. Kaggle CLI exposes only the latest version's logs after supersession, so no v11 terminal artifact was available.
+
+## Runtime limitation
+
+The pinned Vitest pool's bundled Miniflare warns that its latest emulated compatibility date is `2025-07-12`, falling back from the Worker pin `2026-07-28`. The v12 gate passed; this remains a local-emulation limitation and no dependency upgrade was made in Task 2.
