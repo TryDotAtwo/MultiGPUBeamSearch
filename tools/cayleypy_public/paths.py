@@ -93,7 +93,7 @@ def validate_original_solution(initial: Sequence[int], central: Sequence[int], p
     """Return whether a complete, valid path takes the original state to center."""
     try:
         return apply_path(initial, path, generators) == tuple(central)
-    except ValueError:
+    except (TypeError, ValueError):
         return False
 
 
@@ -108,6 +108,13 @@ class SolutionRecord:
     source_solution_sha256: str | None
     valid: bool
     reached_state: State
+
+    def __post_init__(self) -> None:
+        try:
+            normalized_state = tuple(self.reached_state)
+        except TypeError as error:
+            raise ValueError("reached_state must be an iterable state") from error
+        object.__setattr__(self, "reached_state", normalized_state)
 
 
 def _digest(text: str) -> str:

@@ -774,3 +774,4 @@
 - Hardened the public CayleyPy 2xT4 runtime plan: only world size 2 is accepted, and the derived runtime mapping is immutable while preflight serialization emits a detached JSON-safe copy.
 
 - Added public CayleyPy Task 4 path helpers: strict dot-separated replay, permutation-derived inverse lookup without name conventions, reflected-state construction, CPU original-path validation, and deterministic semantic solution deduplication.
+- Hardened public CayleyPy Task 4 records and validation: `SolutionRecord` now owns an immutable tuple copy of `reached_state`, and original-solution validation returns `False` for malformed direct generator values while preserving unrelated runtime failures.

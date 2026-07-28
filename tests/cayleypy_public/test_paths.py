@@ -64,6 +64,31 @@ def test_solution_record_is_frozen():
         record.path = "clockwise"
 
 
+def test_solution_record_copies_mutable_reached_state_before_deduplication():
+    mutable_state = [0, 1, 2]
+    record = _record("original", "counterclockwise", "counterclockwise", mutable_state, 3)
+
+    mutable_state[0] = 9
+
+    assert record.reached_state == (0, 1, 2)
+    assert isinstance(record.reached_state, tuple)
+
+
+def test_validate_original_solution_returns_false_for_non_iterable_generator_value():
+    malformed_generators = {"clockwise": None}
+
+    assert validate_original_solution((0, 1, 2), (0, 1, 2), "clockwise", malformed_generators) is False
+
+
+def test_validate_original_solution_does_not_hide_unrelated_runtime_errors():
+    class BrokenMapping(dict):
+        def items(self):
+            raise RuntimeError("external generator source failed")
+
+    with pytest.raises(RuntimeError, match="external generator source failed"):
+        validate_original_solution((0, 1, 2), (0, 1, 2), "", BrokenMapping(clockwise=(1, 2, 0)))
+
+
 def test_deduplicate_uses_original_path_and_reached_state_then_earliest_provenance():
     first = _record("reflected", "clockwise", "counterclockwise", (0, 1, 2), 8, source="z")
     earlier = _record("original", "counterclockwise", "counterclockwise", (0, 1, 2), 3, source="a")

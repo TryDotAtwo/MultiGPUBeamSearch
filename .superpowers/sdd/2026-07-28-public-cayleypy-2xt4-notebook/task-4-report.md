@@ -20,8 +20,24 @@ The implementation never infers an inverse from a name; duplicate or absent inve
 
 ## Commit
 
-7bd1a7c (`feat: add CayleyPy reflection and path validation`).
+Original reviewed Task 4 commit: `cfdf7e778c53d3dbf593b61466992cde377a0efb` (`feat: add CayleyPy reflection and path validation`).
 
 ## Concerns
 
 `SolutionRecord` includes an explicit `reached_state` field beyond the plan's abbreviated field list because the mandated dedupe key cannot be computed from the listed fields alone. Future runner construction must supply the CPU-replayed terminal state.
+
+## Fix round 1/5
+
+### RED
+
+`python -m pytest tests/cayleypy_public/test_paths.py -q` produced `2 failed, 10 passed`. The failures demonstrated that a caller-owned list mutated `SolutionRecord.reached_state` after construction and that a `None` generator permutation leaked `TypeError` from `validate_original_solution`.
+
+### GREEN
+
+`SolutionRecord.__post_init__` now copies any iterable reached state into a tuple using frozen-dataclass-safe assignment, rejecting a non-iterable state as `ValueError`. `validate_original_solution` now treats only input-contract `TypeError` and `ValueError` as invalid (`False`); the regression confirms unrelated `RuntimeError` still propagates.
+
+### Verification
+
+- `python -m pytest tests/cayleypy_public/test_paths.py -q` -> `12 passed`
+- `python -m py_compile tools/cayleypy_public/paths.py tests/cayleypy_public/test_paths.py`
+- `git diff --check`
