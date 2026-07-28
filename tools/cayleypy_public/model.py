@@ -1,4 +1,4 @@
-﻿"""Public, fail-closed Stream1 MLP checkpoint export contracts."""
+"""Public, fail-closed Stream1 MLP checkpoint export contracts."""
 
 from __future__ import annotations
 
@@ -71,27 +71,28 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _validated_manifest(path: Path, num_classes: int) -> dict[str, object]:
+def _validated_manifest(
+    path: Path, *, state_len: int, num_classes: int, move_count: int,
+) -> dict[str, object]:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError("export manifest must be an object")
-    if not isinstance(manifest.get("state_len"), int) or manifest["state_len"] <= 0:
-        raise ValueError("export manifest requires a positive integer state_len")
+    if manifest.get("state_len") != state_len:
+        raise ValueError(f"export manifest state_len mismatch: {manifest.get('state_len')!r}")
     if manifest.get("num_classes") != num_classes:
         raise ValueError(f"export manifest num_classes mismatch: {manifest.get('num_classes')!r}")
     if manifest.get("normalization") not in {"batchnorm_folded", "layernorm"}:
         raise ValueError("export manifest has unsupported normalization")
     output_dim = manifest.get("output_dim")
-    move_count = manifest.get("move_count")
-    allowed = {1}
-    if isinstance(move_count, int):
-        allowed.add(move_count)
+    allowed = {1, move_count}
     if not isinstance(output_dim, int) or output_dim not in allowed:
         raise ValueError("export manifest output_dim must be 1 or move_count")
     return manifest
 
 
-def export_checkpoint(path: Path, out_dir: Path, num_classes: int) -> ExportedModel:
+def export_checkpoint(
+    path: Path, out_dir: Path, num_classes: int, *, state_len: int, move_count: int,
+) -> ExportedModel:
     """Export one supported checkpoint with public metadata only."""
     format = detect_checkpoint_format(path)
     if format == "batchnorm-folded":
@@ -106,5 +107,7 @@ def export_checkpoint(path: Path, out_dir: Path, num_classes: int) -> ExportedMo
         format=format,
         dtype="fp16",
         checkpoint_sha256=_sha256(path),
-        manifest=_validated_manifest(manifest_path, num_classes),
+        manifest=_validated_manifest(
+            manifest_path, state_len=state_len, num_classes=num_classes, move_count=move_count,
+        ),
     )

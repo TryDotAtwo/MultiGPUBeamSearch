@@ -56,6 +56,22 @@ def test_rejects_unknown_schema(tmp_path: Path) -> None:
         detect_checkpoint_format(write_checkpoint(tmp_path, {"weight": torch.zeros(1)}))
 
 
+def _exportable_batchnorm_state(output_dim: int = 1) -> dict[str, torch.Tensor]:
+    state_dict = batchnorm_schema()
+    state_dict["output_layer.weight"] = torch.zeros(output_dim, 8)
+    for prefix in ("bn1", "bn2", "residual_blocks.0.bn1", "residual_blocks.0.bn2"):
+        state_dict.update({
+            f"{prefix}.weight": torch.ones(8),
+            f"{prefix}.bias": torch.zeros(8),
+            f"{prefix}.running_mean": torch.zeros(8),
+            f"{prefix}.running_var": torch.ones(8),
+        })
+    state_dict.update({
+        "residual_blocks.0.fc2.weight": torch.zeros(8, 8),
+        "output_layer.bias": torch.zeros(output_dim),
+    })
+    return state_dict
+
 def test_export_checkpoint_sanitizes_manifest_and_hashes_source(tmp_path: Path) -> None:
     state_dict = batchnorm_schema()
     for prefix in ("bn1", "bn2", "residual_blocks.0.bn1", "residual_blocks.0.bn2"):
@@ -71,7 +87,7 @@ def test_export_checkpoint_sanitizes_manifest_and_hashes_source(tmp_path: Path) 
     })
     path = write_checkpoint(tmp_path, state_dict)
 
-    exported = export_checkpoint(path, tmp_path / "export", num_classes=3)
+    exported = export_checkpoint(path, tmp_path / "export", num_classes=3, state_len=4, move_count=24)
 
     assert exported.format == "batchnorm-folded"
     assert exported.dtype == "fp16"
@@ -79,3 +95,21 @@ def test_export_checkpoint_sanitizes_manifest_and_hashes_source(tmp_path: Path) 
     assert exported.manifest["source_weights"] == path.name
     assert exported.manifest["state_len"] == 4
     assert exported.manifest["num_classes"] == 3
+
+
+def test_export_checkpoint_rejects_state_len_mismatch(tmp_path: Path) -> None:
+    path = write_checkpoint(tmp_path, _exportable_batchnorm_state())
+    with pytest.raises(ValueError, match="state_len mismatch"):
+        export_checkpoint(path, tmp_path / "export", num_classes=3, state_len=5, move_count=24)
+
+
+def test_export_checkpoint_accepts_move_count_head(tmp_path: Path) -> None:
+    path = write_checkpoint(tmp_path, _exportable_batchnorm_state(output_dim=24))
+    exported = export_checkpoint(path, tmp_path / "export", num_classes=3, state_len=4, move_count=24)
+    assert exported.manifest["output_dim"] == 24
+
+
+def test_export_checkpoint_rejects_other_output_dim(tmp_path: Path) -> None:
+    path = write_checkpoint(tmp_path, _exportable_batchnorm_state(output_dim=7))
+    with pytest.raises(ValueError, match="output_dim"):
+        export_checkpoint(path, tmp_path / "export", num_classes=3, state_len=4, move_count=24)

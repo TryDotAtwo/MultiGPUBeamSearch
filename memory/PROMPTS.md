@@ -420,3 +420,4 @@
 - User requested automatic best-effort result publication without a user GitHub token through a Cloudflare service backed by a GitHub App. It must support at least 100 concurrent publishers without loss or git conflicts, retain author/puzzle/model/run provenance, preserve accepted raw payloads, validate paths, deduplicate idempotently, and publish append-only records to TryDotAtwo/cayleypy-beam-results through a staging/CI gate.
 
 - User requested a public standard-CayleyPy notebook Task 2: automatically detect supported BatchNorm-folded or ResMLP-LayerNorm Stream1 MLP checkpoints, force fp16 export, sanitize the manifest, and fail closed on unsupported schemas.
+- User clarified Task 2 exporter validation must use explicit selected-puzzle state_len, num_classes, and move_count parameters; manifests must not invent move_count.
