@@ -766,3 +766,4 @@
 
 - Added automatic public Stream1 MLP checkpoint schema detection and fp16 export wrapper. The exporter now supports `--format auto`, accepts only unambiguous BatchNorm-folded or ResMLP-LayerNorm tensor signatures, writes only the checkpoint basename into public manifests, and returns a SHA-256-attested sanitized export contract.
 - Clarified the public model-export contract: callers must provide the selected puzzle state length and move count, so the sanitized export manifest is checked against actual puzzle dimensions and only permits scalar or exact move-count heads.
+- Hardened public automatic Stream1 export: auto CLI now requires fp16 plus explicit puzzle dimensions, validates atomically through a temporary sibling directory, rejects pre-existing output paths, and converts missing schema-matched tensors into a clear public ValueError. Explicit legacy exporter modes retain bf16 support.

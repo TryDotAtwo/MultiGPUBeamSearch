@@ -7,6 +7,8 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
+import tempfile
 from typing import Literal, Mapping
 
 import torch
@@ -93,21 +95,33 @@ def _validated_manifest(
 def export_checkpoint(
     path: Path, out_dir: Path, num_classes: int, *, state_len: int, move_count: int,
 ) -> ExportedModel:
-    """Export one supported checkpoint with public metadata only."""
+    """Export one supported checkpoint atomically with public metadata only."""
+    if out_dir.exists():
+        raise ValueError(f"export output directory already exists: {out_dir}")
     format = detect_checkpoint_format(path)
-    if format == "batchnorm-folded":
-        export_batchnorm_folded(path, out_dir, dtype="fp16", num_classes=num_classes)
-    else:
-        export_resmlp_layernorm(path, out_dir, dtype="fp16")
-    manifest_path = out_dir / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["source_weights"] = path.name
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    return ExportedModel(
-        format=format,
-        dtype="fp16",
-        checkpoint_sha256=_sha256(path),
-        manifest=_validated_manifest(
+    temporary_dir = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.tmp-", dir=out_dir.parent))
+    try:
+        try:
+            if format == "batchnorm-folded":
+                export_batchnorm_folded(path, temporary_dir, dtype="fp16", num_classes=num_classes)
+            else:
+                export_resmlp_layernorm(path, temporary_dir, dtype="fp16")
+        except KeyError as error:
+            raise ValueError(f"invalid checkpoint tensors: missing {error.args[0]!r}") from error
+        manifest_path = temporary_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["source_weights"] = path.name
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        validated_manifest = _validated_manifest(
             manifest_path, state_len=state_len, num_classes=num_classes, move_count=move_count,
-        ),
-    )
+        )
+        temporary_dir.replace(out_dir)
+        return ExportedModel(
+            format=format,
+            dtype="fp16",
+            checkpoint_sha256=_sha256(path),
+            manifest=validated_manifest,
+        )
+    finally:
+        if temporary_dir.exists():
+            shutil.rmtree(temporary_dir)

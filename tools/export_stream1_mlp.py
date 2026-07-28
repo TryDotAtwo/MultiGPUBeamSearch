@@ -308,17 +308,27 @@ def main() -> None:
     parser.add_argument("--format", choices=["auto", "batchnorm-folded", "resmlp-layernorm"], default="auto")
     parser.add_argument("--dtype", choices=["fp16", "bf16"], default="fp16")
     parser.add_argument("--num-classes", type=int, default=120)
+    parser.add_argument("--state-len", type=int)
+    parser.add_argument("--move-count", type=int)
     args = parser.parse_args()
-    format = args.format
-    if format == "auto":
-        from tools.cayleypy_public.model import detect_checkpoint_format
+    if args.format == "auto":
+        if args.dtype != "fp16":
+            parser.error("--format auto requires --dtype fp16")
+        if args.state_len is None or args.move_count is None:
+            parser.error("--format auto requires --state-len and --move-count")
+        from tools.cayleypy_public.model import export_checkpoint
 
-        format = detect_checkpoint_format(args.weights)
-    if format == "batchnorm-folded":
+        export_checkpoint(
+            args.weights,
+            args.out,
+            args.num_classes,
+            state_len=args.state_len,
+            move_count=args.move_count,
+        )
+    elif args.format == "batchnorm-folded":
         export_batchnorm_folded(args.weights, args.out, args.dtype, args.num_classes)
     else:
         export_resmlp_layernorm(args.weights, args.out, args.dtype)
-
 
 if __name__ == "__main__":
     main()
