@@ -1,0 +1,14 @@
+{
+  "name": "cayleypy-results-ingest",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-28",
+  "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" },
+  "d1_databases": [{ "binding": "RESULTS_DB", "database_name": "cayleypy-results-staging" }],
+  "r2_buckets": [{ "binding": "RAW_RESULTS", "bucket_name": "cayleypy-results-raw-staging" }],
+  "queues": { "producers": [{ "binding": "VALIDATE_QUEUE", "queue": "cayleypy-validate-staging" }, { "binding": "VALIDATE_DLQ", "queue": "cayleypy-validate-dlq-staging" }] },
+  "durable_objects": { "bindings": [{ "name": "GITHUB_WRITER", "class_name": "GitHubWriter" }] },
+  "env": {
+    "staging": { "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" } },
+    "production": { "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" } }
+  }
+}

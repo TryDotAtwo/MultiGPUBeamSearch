@@ -1,0 +1,20 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev --env staging",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.8.55",
+    "@cloudflare/workers-types": "4.20260728.0",
+    "ajv": "8.17.1",
+    "jose": "6.0.11",
+    "typescript": "5.8.3",
+    "vitest": "3.2.4",
+    "wrangler": "4.26.0"
+  }
+}
