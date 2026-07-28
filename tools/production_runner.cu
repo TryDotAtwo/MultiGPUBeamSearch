@@ -16,17 +16,20 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <future>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <numeric>
 #include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -2976,6 +2979,12 @@ State128 apply_solution_moves(
     return state;
 }
 
+struct SolvedSnapshotHeader {
+    bool found = false;
+    std::uint32_t count = 0;
+    std::uint32_t overflow = 0;
+};
+
 struct SolvedSnapshot {
     bool found = false;
     std::uint32_t count = 0;
@@ -2992,6 +3001,24 @@ struct SolveBucketRecord {
     CandidateMeta meta{};
     std::uint32_t suffix_id = 0;
     std::string path;
+};
+
+struct SolveBucketRecordLess {
+    bool operator()(const SolveBucketRecord& a, const SolveBucketRecord& b) const {
+        if (a.total_depth != b.total_depth) return a.total_depth < b.total_depth;
+        if (a.owner_rank != b.owner_rank) return a.owner_rank < b.owner_rank;
+        if (a.found_depth != b.found_depth) return a.found_depth < b.found_depth;
+        if (a.meta.parent_idx != b.meta.parent_idx) return a.meta.parent_idx < b.meta.parent_idx;
+        if (a.meta.route_packed != b.meta.route_packed) return a.meta.route_packed < b.meta.route_packed;
+        if (a.meta.hash.lo != b.meta.hash.lo) return a.meta.hash.lo < b.meta.hash.lo;
+        if (a.meta.hash.hi != b.meta.hash.hi) return a.meta.hash.hi < b.meta.hash.hi;
+        return a.suffix_id < b.suffix_id;
+    }
+};
+
+struct SolveBucketRecordBatch {
+    std::vector<SolveBucketRecord> records;
+    bool may_have_more = false;
 };
 
 std::uint32_t solved_total_depth(
@@ -3082,16 +3109,36 @@ void append_solution_suffixes(
 
 void require_nccl(ncclResult_t status, const char* op);
 
-SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint32_t capacity) {
-    SolvedSnapshot snapshot;
+SolvedSnapshotHeader read_solved_snapshot_header(const StaticDeviceMemory& memory) {
+    SolvedSnapshotHeader header;
     std::uint32_t flag = 0;
     BEAM_CUDA_CHECK(cudaMemcpy(&flag, memory.solved_flag, sizeof(flag), cudaMemcpyDeviceToHost));
-    snapshot.found = flag != 0U;
+    header.found = flag != 0U;
+    if (!header.found) {
+        return header;
+    }
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &header.count,
+        memory.solved_count,
+        sizeof(header.count),
+        cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &header.overflow,
+        memory.solved_overflow,
+        sizeof(header.overflow),
+        cudaMemcpyDeviceToHost));
+    return header;
+}
+
+SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint32_t capacity) {
+    const SolvedSnapshotHeader header = read_solved_snapshot_header(memory);
+    SolvedSnapshot snapshot;
+    snapshot.found = header.found;
+    snapshot.count = header.count;
+    snapshot.overflow = header.overflow;
     if (!snapshot.found) {
         return snapshot;
     }
-    BEAM_CUDA_CHECK(cudaMemcpy(&snapshot.count, memory.solved_count, sizeof(snapshot.count), cudaMemcpyDeviceToHost));
-    BEAM_CUDA_CHECK(cudaMemcpy(&snapshot.overflow, memory.solved_overflow, sizeof(snapshot.overflow), cudaMemcpyDeviceToHost));
     const std::uint32_t stored = std::min(snapshot.count, capacity);
     snapshot.meta.resize(stored);
     snapshot.depth.resize(stored);
@@ -3139,8 +3186,8 @@ std::uint64_t solve_bucket_gather_records_per_chunk(
         max_host_records_per_chunk);
 }
 
-std::vector<SolveBucketRecord> gather_solve_bucket_records_distributed(
-    const SolvedSnapshot& local_solved,
+SolveBucketRecordBatch gather_solve_bucket_record_batch_distributed(
+    const SolvedSnapshotHeader& local_solved_header,
     const SolvedNeighborhoodRuntime& solved_neighborhood,
     const Stream2SuffixRuntime& stream2_suffix,
     const StaticMemoryPlan& plan,
@@ -3149,148 +3196,175 @@ std::vector<SolveBucketRecord> gather_solve_bucket_records_distributed(
     ncclComm_t comm,
     std::uint32_t world_size,
     std::uint32_t rank,
-    std::uint32_t capacity) {
+    std::uint32_t capacity,
+    const SolveBucketRecord* cursor,
+    std::size_t batch_limit) {
     constexpr std::uint64_t packet_words = 8ULL;
+    constexpr std::size_t max_selection_batch_records = 65'536ULL;
+    constexpr std::uint64_t max_host_records_per_chunk = 65'536ULL;
+    if (batch_limit == 0ULL || batch_limit > max_selection_batch_records) {
+        throw std::invalid_argument("solve bucket selection batch limit must be in [1,65536]");
+    }
     if (memory.final.next_frontier_states_tmp == nullptr) {
         throw std::runtime_error("solve bucket distributed gather scratch buffer is unavailable");
     }
     const std::uint64_t scratch_words =
         (plan.frontier_states * sizeof(State128)) / sizeof(std::uint64_t);
-    const std::uint64_t records_per_chunk =
+    const std::uint64_t exchange_records_per_chunk =
         solve_bucket_gather_records_per_chunk(scratch_words, world_size);
-    if (records_per_chunk == 0ULL) {
+    if (exchange_records_per_chunk == 0ULL) {
         throw std::runtime_error("solve bucket distributed gather scratch cannot fit one record chunk");
     }
 
-    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.final.next_frontier_states_tmp);
-    const std::uint32_t stored = std::min<std::uint32_t>(
-        static_cast<std::uint32_t>(local_solved.meta.size()), capacity);
-    std::uint32_t global_stored = stored;
-    if (world_size > 1U) {
-        std::uint32_t* count_scratch = reinterpret_cast<std::uint32_t*>(scratch);
+    const SolveBucketRecordLess less;
+    const std::uint32_t stored = std::min(local_solved_header.count, capacity);
+    std::set<SolveBucketRecord, SolveBucketRecordLess> local_selected_records;
+    for (std::uint64_t base = 0ULL; base < stored; base += max_host_records_per_chunk) {
+        const std::uint64_t local_chunk_records = std::min<std::uint64_t>(
+            max_host_records_per_chunk,
+            static_cast<std::uint64_t>(stored) - base);
+        std::vector<CandidateMeta> local_meta(static_cast<std::size_t>(local_chunk_records));
+        std::vector<std::uint32_t> local_depth(static_cast<std::size_t>(local_chunk_records));
+        std::vector<std::uint32_t> local_suffix(static_cast<std::size_t>(local_chunk_records));
         BEAM_CUDA_CHECK(cudaMemcpyAsync(
-            count_scratch,
-            &stored,
-            sizeof(stored),
-            cudaMemcpyHostToDevice,
+            local_meta.data(),
+            memory.solved_meta_list + base,
+            local_chunk_records * sizeof(CandidateMeta),
+            cudaMemcpyDeviceToHost,
             streams.stream5));
-        require_nccl(ncclAllReduce(
-            count_scratch,
-            count_scratch + 1,
-            1,
-            ncclUint32,
-            ncclMax,
-            comm,
-            streams.stream5), "ncclAllReduce solve bucket stored count");
         BEAM_CUDA_CHECK(cudaMemcpyAsync(
-            &global_stored,
-            count_scratch + 1,
-            sizeof(global_stored),
+            local_depth.data(),
+            memory.solved_depth_list + base,
+            local_chunk_records * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost,
+            streams.stream5));
+        BEAM_CUDA_CHECK(cudaMemcpyAsync(
+            local_suffix.data(),
+            memory.solved_suffix_list + base,
+            local_chunk_records * sizeof(std::uint32_t),
             cudaMemcpyDeviceToHost,
             streams.stream5));
         BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
-    }
 
-    std::vector<SolveBucketRecord> records;
-    for (std::uint64_t base = 0ULL; base < global_stored; base += records_per_chunk) {
-        const std::uint64_t chunk_records = std::min<std::uint64_t>(
-            records_per_chunk,
-            static_cast<std::uint64_t>(global_stored) - base);
-        const std::uint64_t send_words = chunk_records * packet_words;
-        const std::uint64_t recv_words = send_words * static_cast<std::uint64_t>(world_size);
-        if (send_words + recv_words > scratch_words) {
-            throw std::runtime_error("solve bucket distributed gather chunk exceeds fixed scratch");
-        }
-        std::uint64_t* send_device = scratch;
-        std::uint64_t* recv_device = scratch + send_words;
-        std::vector<std::uint64_t> send(static_cast<std::size_t>(send_words), 0ULL);
-        for (std::uint64_t offset = 0ULL; offset < chunk_records; ++offset) {
-            const std::uint64_t local_index = base + offset;
-            if (local_index >= stored) {
+        for (std::uint64_t offset = 0ULL; offset < local_chunk_records; ++offset) {
+            SolveBucketRecord record;
+            record.owner_rank = rank;
+            record.found_depth = local_depth[static_cast<std::size_t>(offset)];
+            record.meta = local_meta[static_cast<std::size_t>(offset)];
+            record.suffix_id = local_suffix[static_cast<std::size_t>(offset)];
+            record.total_depth = solved_total_depth(
+                solved_neighborhood,
+                stream2_suffix,
+                record.meta,
+                record.found_depth,
+                record.suffix_id);
+            if (cursor != nullptr && !less(*cursor, record)) {
                 continue;
             }
-            const std::uint32_t i = static_cast<std::uint32_t>(local_index);
-            const std::uint32_t suffix_id =
-                i < local_solved.suffix.size() ? local_solved.suffix[i] : 0U;
-            const CandidateMeta& candidate = local_solved.meta[i];
-            std::uint64_t* packet = send.data() + offset * packet_words;
-            packet[0] = 1ULL;
-            packet[1] = rank;
-            packet[2] = i < local_solved.depth.size() ? local_solved.depth[i] : 0ULL;
-            packet[3] = candidate.parent_idx;
-            packet[4] = candidate.route_packed;
-            packet[5] = candidate.hash.lo;
-            packet[6] = candidate.hash.hi;
-            packet[7] = suffix_id;
-        }
-        BEAM_CUDA_CHECK(cudaMemcpyAsync(
-            send_device,
-            send.data(),
-            send.size() * sizeof(std::uint64_t),
-            cudaMemcpyHostToDevice,
-            streams.stream5));
-        require_nccl(ncclAllGather(
-            send_device,
-            recv_device,
-            static_cast<std::size_t>(send_words),
-            ncclUint64,
-            comm,
-            streams.stream5), "ncclAllGather solve bucket record chunk");
-        std::vector<std::uint64_t> recv(static_cast<std::size_t>(recv_words), 0ULL);
-        BEAM_CUDA_CHECK(cudaMemcpyAsync(
-            recv.data(),
-            recv_device,
-            recv.size() * sizeof(std::uint64_t),
-            cudaMemcpyDeviceToHost,
-            streams.stream5));
-        BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
-
-        for (std::uint32_t peer = 0; peer < world_size; ++peer) {
-            const std::uint64_t* peer_packets =
-                recv.data() + static_cast<std::uint64_t>(peer) * send_words;
-            for (std::uint64_t offset = 0ULL; offset < chunk_records; ++offset) {
-                const std::uint64_t* packet = peer_packets + offset * packet_words;
-                if (packet[0] == 0ULL) {
-                    continue;
-                }
-                SolveBucketRecord record;
-                record.owner_rank = static_cast<std::uint32_t>(packet[1]);
-                record.found_depth = static_cast<std::uint32_t>(packet[2]);
-                record.meta.parent_idx = packet[3];
-                record.meta.route_packed = static_cast<std::uint32_t>(packet[4]);
-                record.meta.hash = Hash128{packet[5], packet[6]};
-                record.meta.score_key = GOAL_SCORE_KEY;
-                record.suffix_id = static_cast<std::uint32_t>(packet[7]);
-                record.total_depth = solved_total_depth(
-                    solved_neighborhood,
-                    stream2_suffix,
-                    record.meta,
-                    record.found_depth,
-                    record.suffix_id);
-                records.push_back(record);
+            local_selected_records.insert(record);
+            if (local_selected_records.size() > batch_limit) {
+                local_selected_records.erase(std::prev(local_selected_records.end()));
             }
         }
     }
-    std::sort(records.begin(), records.end(), [](const SolveBucketRecord& a, const SolveBucketRecord& b) {
-        if (a.total_depth != b.total_depth) return a.total_depth < b.total_depth;
-        if (a.owner_rank != b.owner_rank) return a.owner_rank < b.owner_rank;
-        if (a.meta.parent_idx != b.meta.parent_idx) return a.meta.parent_idx < b.meta.parent_idx;
-        if (a.meta.route_packed != b.meta.route_packed) return a.meta.route_packed < b.meta.route_packed;
-        if (a.meta.hash.lo != b.meta.hash.lo) return a.meta.hash.lo < b.meta.hash.lo;
-        if (a.meta.hash.hi != b.meta.hash.hi) return a.meta.hash.hi < b.meta.hash.hi;
-        return a.suffix_id < b.suffix_id;
-    });
-    records.erase(
-        std::unique(records.begin(), records.end(), [](const SolveBucketRecord& a, const SolveBucketRecord& b) {
-            return a.owner_rank == b.owner_rank &&
-                a.found_depth == b.found_depth &&
-                a.meta.parent_idx == b.meta.parent_idx &&
-                a.meta.route_packed == b.meta.route_packed &&
-                a.meta.hash == b.meta.hash &&
-                a.suffix_id == b.suffix_id;
-        }),
-        records.end());
-    return records;
+    std::vector<SolveBucketRecord> local_selected_vector(
+        local_selected_records.begin(), local_selected_records.end());
+
+    // Exactness: every global next-K record is in its rank-local next-K; otherwise K
+    // smaller eligible records on that same rank would precede it globally.
+    std::set<SolveBucketRecord, SolveBucketRecordLess> selected_records;
+    if (world_size <= 1U) {
+        selected_records = local_selected_records;
+    } else {
+        std::uint64_t* scratch =
+            reinterpret_cast<std::uint64_t*>(memory.final.next_frontier_states_tmp);
+        for (std::uint64_t base = 0ULL; base < batch_limit; base += exchange_records_per_chunk) {
+            const std::uint64_t chunk_records = std::min<std::uint64_t>(
+                exchange_records_per_chunk,
+                static_cast<std::uint64_t>(batch_limit) - base);
+            const std::uint64_t send_words = chunk_records * packet_words;
+            const std::uint64_t recv_words = send_words * static_cast<std::uint64_t>(world_size);
+            if (send_words + recv_words > scratch_words) {
+                throw std::runtime_error("solve bucket distributed gather chunk exceeds fixed scratch");
+            }
+            std::vector<std::uint64_t> send(static_cast<std::size_t>(send_words), 0ULL);
+            for (std::uint64_t offset = 0ULL; offset < chunk_records; ++offset) {
+                const std::uint64_t local_index = base + offset;
+                if (local_index >= local_selected_vector.size()) {
+                    continue;
+                }
+                const SolveBucketRecord& record =
+                    local_selected_vector[static_cast<std::size_t>(local_index)];
+                std::uint64_t* packet = send.data() + offset * packet_words;
+                packet[0] = 1ULL;
+                packet[1] = record.owner_rank;
+                packet[2] = record.found_depth;
+                packet[3] = record.meta.parent_idx;
+                packet[4] = record.meta.route_packed;
+                packet[5] = record.meta.hash.lo;
+                packet[6] = record.meta.hash.hi;
+                packet[7] = record.suffix_id;
+            }
+
+            std::uint64_t* send_device = scratch;
+            std::uint64_t* recv_device = scratch + send_words;
+            BEAM_CUDA_CHECK(cudaMemcpyAsync(
+                send_device,
+                send.data(),
+                send.size() * sizeof(std::uint64_t),
+                cudaMemcpyHostToDevice,
+                streams.stream5));
+            require_nccl(ncclAllGather(
+                send_device,
+                recv_device,
+                static_cast<std::size_t>(send_words),
+                ncclUint64,
+                comm,
+                streams.stream5), "ncclAllGather solve bucket rank-local next-K");
+            std::vector<std::uint64_t> recv(static_cast<std::size_t>(recv_words), 0ULL);
+            BEAM_CUDA_CHECK(cudaMemcpyAsync(
+                recv.data(),
+                recv_device,
+                recv.size() * sizeof(std::uint64_t),
+                cudaMemcpyDeviceToHost,
+                streams.stream5));
+            BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+
+            for (std::uint32_t peer = 0; peer < world_size; ++peer) {
+                const std::uint64_t* peer_packets =
+                    recv.data() + static_cast<std::uint64_t>(peer) * send_words;
+                for (std::uint64_t offset = 0ULL; offset < chunk_records; ++offset) {
+                    const std::uint64_t* packet = peer_packets + offset * packet_words;
+                    if (packet[0] == 0ULL) {
+                        continue;
+                    }
+                    SolveBucketRecord record;
+                    record.owner_rank = static_cast<std::uint32_t>(packet[1]);
+                    record.found_depth = static_cast<std::uint32_t>(packet[2]);
+                    record.meta.parent_idx = packet[3];
+                    record.meta.route_packed = static_cast<std::uint32_t>(packet[4]);
+                    record.meta.hash = Hash128{packet[5], packet[6]};
+                    record.meta.score_key = GOAL_SCORE_KEY;
+                    record.suffix_id = static_cast<std::uint32_t>(packet[7]);
+                    record.total_depth = solved_total_depth(
+                        solved_neighborhood,
+                        stream2_suffix,
+                        record.meta,
+                        record.found_depth,
+                        record.suffix_id);
+                    selected_records.insert(record);
+                    if (selected_records.size() > batch_limit) {
+                        selected_records.erase(std::prev(selected_records.end()));
+                    }
+                }
+            }
+        }
+    }
+
+    SolveBucketRecordBatch batch;
+    batch.records.assign(selected_records.begin(), selected_records.end());
+    batch.may_have_more = batch.records.size() == batch_limit;
+    return batch;
 }
 
 std::uint32_t propagate_solved_flag(
@@ -3974,6 +4048,44 @@ std::uint32_t propagate_host_stop_value(
     return propagate_stop_flag(memory, streams, comm, world_size);
 }
 
+std::uint64_t synchronize_rank0_accepted_count(
+    std::uint64_t rank0_count,
+    StaticDeviceMemory& memory,
+    DispatcherStreams& streams,
+    ncclComm_t comm,
+    std::uint32_t world_size,
+    std::uint32_t rank) {
+    if (world_size <= 1U) {
+        return rank0_count;
+    }
+    if (memory.final.next_frontier_states_tmp == nullptr) {
+        throw std::runtime_error("solve bucket accepted-count broadcast scratch is unavailable");
+    }
+    std::uint64_t synchronized_count = rank == 0U ? rank0_count : 0ULL;
+    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.final.next_frontier_states_tmp);
+    BEAM_CUDA_CHECK(cudaMemcpyAsync(
+        scratch,
+        &synchronized_count,
+        sizeof(synchronized_count),
+        cudaMemcpyHostToDevice,
+        streams.stream5));
+    require_nccl(ncclBroadcast(
+        scratch,
+        scratch,
+        1,
+        ncclUint64,
+        0,
+        comm,
+        streams.stream5), "ncclBroadcast solve bucket accepted count");
+    BEAM_CUDA_CHECK(cudaMemcpyAsync(
+        &synchronized_count,
+        scratch,
+        sizeof(synchronized_count),
+        cudaMemcpyDeviceToHost,
+        streams.stream5));
+    BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+    return synchronized_count;
+}
 void reset_static_memory_for_task(
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
@@ -4540,7 +4652,8 @@ int main(int argc, char** argv) {
     bool solution_found = false;
     std::string task_solution_path;
     std::int64_t task_solution_length = -1;
-    std::vector<SolveBucketRecord> solve_bucket_records;
+    std::uint64_t solve_bucket_record_count = 0ULL;
+    std::map<std::uint32_t, std::uint64_t> solve_bucket_counts_by_length;
     std::set<std::string> solve_bucket_unique_paths;
     bool solve_bucket_found_any = false;
     std::uint32_t solve_bucket_first_found_depth_index = 0;
@@ -4615,8 +4728,12 @@ int main(int argc, char** argv) {
         const std::uint32_t global_solved_value = solve_bucket_mode
             ? propagate_solved_flag(memory, streams, nccl_runtime.comm, world_size)
             : global_stop_value;
+        const SolvedSnapshotHeader solved_header =
+            solve_bucket_mode && global_solved_value != 0U
+                ? read_solved_snapshot_header(memory)
+                : SolvedSnapshotHeader{};
         const SolvedSnapshot solved_snapshot =
-            global_solved_value != 0U
+            !solve_bucket_mode && global_solved_value != 0U
                 ? read_solved_snapshot(memory, config.solved_result_capacity)
                 : SolvedSnapshot{};
         const SolvedSnapshot selected_solved_snapshot =
@@ -4625,7 +4742,7 @@ int main(int argc, char** argv) {
                 : select_best_solved_snapshot(solved_snapshot, solved_neighborhood, stream2_suffix);
         if (solve_bucket_mode) {
             const std::uint32_t global_solved_overflow = propagate_host_stop_value(
-                solved_snapshot.overflow != 0U ? 1U : 0U,
+                solved_header.overflow != 0U ? 1U : 0U,
                 memory,
                 streams,
                 nccl_runtime.comm,
@@ -4634,48 +4751,56 @@ int main(int argc, char** argv) {
                 throw std::runtime_error(
                     "solve bucket overflow: increase BEAM_SOLVED_RESULT_CAPACITY for this run");
             }
-            std::vector<SolveBucketRecord> depth_records;
-            if (global_solved_value != 0U && world_size > 1U) {
-                depth_records = gather_solve_bucket_records_distributed(
-                    solved_snapshot,
-                    solved_neighborhood,
-                    stream2_suffix,
-                    plan,
+
+            if (global_solved_value != 0U) {
+                history.finish_all();
+            }
+            std::optional<SolveBucketRecord> scan_cursor;
+            bool scan_more = global_solved_value != 0U;
+            std::uint64_t synchronized_accepted_count = 0ULL;
+            while (true) {
+                synchronized_accepted_count = synchronize_rank0_accepted_count(
+                    solve_bucket_record_count,
                     memory,
                     streams,
                     nccl_runtime.comm,
                     world_size,
-                    rank,
-                    config.solved_result_capacity);
-            } else if (global_solved_value != 0U && solved_snapshot.found) {
-                const std::uint32_t stored =
-                    std::min<std::uint32_t>(
-                        static_cast<std::uint32_t>(solved_snapshot.meta.size()),
-                        config.solved_result_capacity);
-                for (std::uint32_t i = 0; i < stored; ++i) {
-                    SolveBucketRecord record;
-                    record.owner_rank = rank;
-                    record.found_depth = i < solved_snapshot.depth.size() ? solved_snapshot.depth[i] : 0U;
-                    record.meta = solved_snapshot.meta[i];
-                    record.suffix_id = i < solved_snapshot.suffix.size() ? solved_snapshot.suffix[i] : 0U;
-                    record.total_depth =
-                        solved_total_depth(
-                            solved_neighborhood,
-                            stream2_suffix,
-                            record.meta,
-                            record.found_depth,
-                            record.suffix_id);
-                    depth_records.push_back(record);
+                    rank);
+                if (!scan_more ||
+                    (solve_bucket_max_solutions != 0ULL &&
+                     synchronized_accepted_count >= solve_bucket_max_solutions)) {
+                    break;
                 }
-            }
-
-            if (!depth_records.empty()) {
-                history.finish_all();
+                constexpr std::uint64_t max_selection_batch_records = 65'536ULL;
+                const std::uint64_t remaining = solve_bucket_max_solutions == 0ULL
+                    ? max_selection_batch_records
+                    : solve_bucket_max_solutions - synchronized_accepted_count;
+                const std::size_t batch_limit = static_cast<std::size_t>(
+                    std::min<std::uint64_t>(remaining, max_selection_batch_records));
+                const SolveBucketRecordBatch batch =
+                    gather_solve_bucket_record_batch_distributed(
+                        solved_header,
+                        solved_neighborhood,
+                        stream2_suffix,
+                        plan,
+                        memory,
+                        streams,
+                        nccl_runtime.comm,
+                        world_size,
+                        rank,
+                        config.solved_result_capacity,
+                        scan_cursor ? &*scan_cursor : nullptr,
+                        batch_limit);
+                if (batch.records.empty()) {
+                    scan_more = false;
+                    continue;
+                }
                 if (!solve_bucket_found_any) {
                     solve_bucket_found_any = true;
                     solve_bucket_first_found_depth_index = depth;
                 }
-                for (SolveBucketRecord& record : depth_records) {
+                for (SolveBucketRecord record : batch.records) {
+                    std::exception_ptr rank0_processing_exception;
                     ReconstructedSolution solution;
                     if (world_size > 1U) {
                         SolvedSnapshot local_record;
@@ -4686,7 +4811,7 @@ int main(int argc, char** argv) {
                             local_record.depth.push_back(record.found_depth);
                             local_record.suffix.push_back(record.suffix_id);
                         }
-                        const DistributedReconstructionResult distributed_solution =
+                        DistributedReconstructionResult distributed_solution =
                             reconstruct_solution_distributed(
                                 history,
                                 local_record,
@@ -4699,13 +4824,21 @@ int main(int argc, char** argv) {
                                 world_size,
                                 rank);
                         if (!distributed_solution.has_solution) {
-                            throw std::runtime_error("solve bucket reconstruction did not receive selected record");
+                            throw std::runtime_error(
+                                "solve bucket reconstruction did not receive selected record");
                         }
                         if (distributed_solution.controller_rank) {
-                            solution = distributed_solution.solution;
+                            try {
+                                solution = std::move(distributed_solution.solution);
+                            } catch (...) {
+                                rank0_processing_exception = std::current_exception();
+                            }
                         }
                     } else {
-                        solution = reconstruct_solution_from_history(history, record.meta, record.found_depth);
+                        solution = reconstruct_solution_from_history(
+                            history,
+                            record.meta,
+                            record.found_depth);
                         append_solution_suffixes(
                             solution,
                             stream2_suffix,
@@ -4713,58 +4846,82 @@ int main(int argc, char** argv) {
                             solved_neighborhood,
                             record.meta.hash);
                     }
-                    if (rank == 0U) {
-                        const State128 final_state = apply_solution_moves(host_initial, solution.moves, host_generators);
-                        const bool valid = states_equal_storage(final_state, host_target);
-                        if (!valid) {
-                            throw std::runtime_error("solve bucket CPU solution validation failed");
+                    if (rank == 0U && !rank0_processing_exception) {
+                        try {
+                            const State128 final_state =
+                                apply_solution_moves(host_initial, solution.moves, host_generators);
+                            const bool valid = states_equal_storage(final_state, host_target);
+                            if (!valid) {
+                                throw std::runtime_error(
+                                    "solve bucket CPU solution validation failed");
+                            }
+                            record.path = moves_to_path_text(solution.moves, host_move_names);
+                            record.total_depth = static_cast<std::uint32_t>(solution.moves.size());
+                            const std::int64_t delta =
+                                solve_bucket_known_length == 0U
+                                    ? 0
+                                    : static_cast<std::int64_t>(record.total_depth) -
+                                          static_cast<std::int64_t>(solve_bucket_known_length);
+                            const bool unique_record =
+                                solve_bucket_unique_paths.insert(record.path).second;
+                            const bool capacity_available =
+                                solve_bucket_max_solutions == 0ULL ||
+                                solve_bucket_record_count < solve_bucket_max_solutions;
+                            if (unique_record && capacity_available) {
+                                if (solve_bucket_result) {
+                                    solve_bucket_result
+                                        << repair_task.puzzle_id << '\t'
+                                        << depth << '\t'
+                                        << record.found_depth << '\t'
+                                        << record.total_depth << '\t'
+                                        << solve_bucket_known_length << '\t'
+                                        << delta << '\t'
+                                        << record.owner_rank << '\t'
+                                        << record.path << '\n';
+                                    solve_bucket_result.flush();
+                                }
+                                std::cout << "solve_bucket_solution=1"
+                                          << " puzzle_id=" << repair_task.puzzle_id
+                                          << " depth_index=" << depth
+                                          << " found_depth=" << record.found_depth
+                                          << " solution_length=" << record.total_depth
+                                          << " owner_rank=" << record.owner_rank
+                                          << " solution=" << record.path << "\n";
+                                if (task_solution_length < 0 ||
+                                    static_cast<std::int64_t>(record.total_depth) <
+                                        task_solution_length) {
+                                    task_solution_length =
+                                        static_cast<std::int64_t>(record.total_depth);
+                                    task_solution_path = record.path;
+                                }
+                                ++solve_bucket_record_count;
+                                ++solve_bucket_counts_by_length[record.total_depth];
+                            }
+                        } catch (...) {
+                            rank0_processing_exception = std::current_exception();
                         }
-                        record.path = moves_to_path_text(solution.moves, host_move_names);
-                        record.total_depth = static_cast<std::uint32_t>(solution.moves.size());
-                        const std::int64_t delta =
-                            solve_bucket_known_length == 0U
-                                ? 0
-                                : static_cast<std::int64_t>(record.total_depth) -
-                                      static_cast<std::int64_t>(solve_bucket_known_length);
-                        const bool unique_record = solve_bucket_unique_paths.insert(record.path).second;
-                        if (!unique_record) {
-                            continue;
+                    }
+                    const std::uint32_t global_processing_error = propagate_host_stop_value(
+                        rank0_processing_exception ? 1U : 0U,
+                        memory,
+                        streams,
+                        nccl_runtime.comm,
+                        world_size);
+                    if (global_processing_error != 0U) {
+                        if (rank == 0U && rank0_processing_exception) {
+                            std::rethrow_exception(rank0_processing_exception);
                         }
-                        if (solve_bucket_max_solutions != 0U &&
-                            solve_bucket_records.size() >= solve_bucket_max_solutions) {
-                            continue;
-                        }
-                        if (solve_bucket_result) {
-                            solve_bucket_result
-                                << repair_task.puzzle_id << '\t'
-                                << depth << '\t'
-                                << record.found_depth << '\t'
-                                << record.total_depth << '\t'
-                                << solve_bucket_known_length << '\t'
-                                << delta << '\t'
-                                << record.owner_rank << '\t'
-                                << record.path << '\n';
-                            solve_bucket_result.flush();
-                        }
-                        std::cout << "solve_bucket_solution=1"
-                                  << " puzzle_id=" << repair_task.puzzle_id
-                                  << " depth_index=" << depth
-                                  << " found_depth=" << record.found_depth
-                                  << " solution_length=" << record.total_depth
-                                  << " owner_rank=" << record.owner_rank
-                                  << " solution=" << record.path << "\n";
-                        if (task_solution_length < 0 ||
-                            static_cast<std::int64_t>(record.total_depth) < task_solution_length) {
-                            task_solution_length = static_cast<std::int64_t>(record.total_depth);
-                            task_solution_path = record.path;
-                        }
-                        solve_bucket_records.push_back(std::move(record));
+                        throw std::runtime_error(
+                            "rank 0 solve bucket record processing failed");
                     }
                 }
+                scan_cursor = batch.records.back();
+                scan_more = batch.may_have_more;
             }
+
             reset_solved_buffers(memory);
-            const bool bucket_capacity_reached = solve_bucket_max_solutions != 0U &&
-                solve_bucket_records.size() >= solve_bucket_max_solutions;
+            const bool bucket_capacity_reached = solve_bucket_max_solutions != 0ULL &&
+                synchronized_accepted_count >= solve_bucket_max_solutions;
             const bool bucket_depth_reached = solve_bucket_stop_depth != 0U &&
                 completed_depths >= solve_bucket_stop_depth;
             const bool bucket_legacy_window_reached =
@@ -4783,7 +4940,8 @@ int main(int argc, char** argv) {
             if (bucket_global_stop_reason != 0U) {
                 solution_found = solve_bucket_found_any;
                 const auto depth_end = std::chrono::steady_clock::now();
-                const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
+                const double depth_sec =
+                    std::chrono::duration<double>(depth_end - depth_start).count();
                 if (rank == 0U) {
                     if (bucket_global_stop_reason == 2U) {
                         std::cout << "collection_status=capacity_reached\n";
@@ -4793,9 +4951,10 @@ int main(int argc, char** argv) {
                     std::cout << "solve_bucket_stop=1"
                               << " puzzle_id=" << repair_task.puzzle_id
                               << " depth_index=" << depth
-                              << " first_found_depth_index=" << solve_bucket_first_found_depth_index
+                              << " first_found_depth_index="
+                              << solve_bucket_first_found_depth_index
                               << " extra_depths=" << solve_bucket_extra_depths
-                              << " records=" << solve_bucket_records.size()
+                              << " records=" << synchronized_accepted_count
                               << " depth_sec=" << depth_sec << "\n";
                 }
                 break;
@@ -4859,6 +5018,9 @@ int main(int argc, char** argv) {
                           << " puzzle_id=" << puzzle_id
                           << " seconds=" << solved_elapsed_sec
                           << " solution_length=" << task_solution_length
+                          << " found_depth=" << distributed_solution.solved_depth
+                          << " touch_depth="
+                          << (distributed_solution.solution.moves.size() - distributed_solution.solved_depth)
                           << " solution=" << task_solution_path
                           << "\n";
             }
@@ -4917,6 +5079,8 @@ int main(int argc, char** argv) {
                       << " puzzle_id=" << puzzle_id
                       << " seconds=" << solved_elapsed_sec
                       << " solution_length=" << task_solution_length
+                      << " found_depth=" << solved_depth
+                      << " touch_depth=" << (solution.moves.size() - solved_depth)
                       << " solution=" << task_solution_path
                       << "\n";
             solution_found = true;
@@ -5163,18 +5327,14 @@ int main(int argc, char** argv) {
     std::cout << "history_flush_sec=" << history_flush_sec << "\n";
 #endif
     if (solve_bucket_mode && rank == 0U) {
-        std::map<std::uint32_t, std::uint64_t> counts_by_length;
-        for (const SolveBucketRecord& record : solve_bucket_records) {
-            ++counts_by_length[record.total_depth];
-        }
         std::cout << "solve_bucket_summary=1"
                   << " puzzle_id=" << repair_task.puzzle_id
-                  << " records=" << solve_bucket_records.size()
+                  << " records=" << solve_bucket_record_count
                   << " best_length=" << task_solution_length
                   << " known_length=" << solve_bucket_known_length
                   << " result_tsv=" << solve_bucket_result_path.string()
                   << "\n";
-        for (const auto& [length, count] : counts_by_length) {
+        for (const auto& [length, count] : solve_bucket_counts_by_length) {
             std::cout << "solve_bucket_length_count"
                       << " puzzle_id=" << repair_task.puzzle_id
                       << " length=" << length

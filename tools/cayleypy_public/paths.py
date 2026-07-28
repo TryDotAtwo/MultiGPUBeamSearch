@@ -100,7 +100,7 @@ def validate_original_solution(initial: Sequence[int], central: Sequence[int], p
 @dataclass(frozen=True)
 class SolutionRecord:
     puzzle_id: int
-    variant: Literal["original", "reflected"]
+    variant: Literal["original", "reflected", "source"]
     path: str
     original_oriented_path: str
     found_depth: int
@@ -125,8 +125,9 @@ def _state_digest(state: Sequence[int]) -> str:
     return _digest(",".join(str(value) for value in state))
 
 
-def _provenance_key(record: SolutionRecord) -> tuple[int, int, str, str, str]:
+def _provenance_key(record: SolutionRecord) -> tuple[int, int, int, str, str, str]:
     return (
+        1 if record.variant == "source" else 0,
         record.found_depth,
         record.touch_depth,
         record.source_solution_sha256 or "",

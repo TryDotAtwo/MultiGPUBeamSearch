@@ -34,7 +34,39 @@ _SOLVED_RECORD_BYTES = 32 + 4 + 4
 _T4_DEVICE_BYTES = 16 * 1024**3
 _T4_HEADROOM_BYTES = 768 * 1024**2
 _MAX_GATHER_RECORDS_PER_CHUNK = 65_536
-_RANK_ENV_KEYS = frozenset({"WORLD_SIZE", "RANK", "LOCAL_RANK"})
+_PROCESS_STOP_TIMEOUT_SECONDS = 5.0
+_DIAGNOSTIC_TAIL_BYTES = 4 * 1024 * 1024
+_TORCHRUN_RESERVED_ENV_KEYS = frozenset({
+    "LOCAL_RANK",
+    "RANK",
+    "GROUP_RANK",
+    "ROLE_RANK",
+    "ROLE_NAME",
+    "LOCAL_WORLD_SIZE",
+    "WORLD_SIZE",
+    "GROUP_WORLD_SIZE",
+    "ROLE_WORLD_SIZE",
+    "MASTER_ADDR",
+    "MASTER_PORT",
+    "TORCHELASTIC_RESTART_COUNT",
+    "TORCHELASTIC_MAX_RESTARTS",
+    "TORCHELASTIC_RUN_ID",
+    "TORCHELASTIC_USE_AGENT_STORE",
+    "TORCHELASTIC_ERROR_FILE",
+    "TORCH_NCCL_ASYNC_ERROR_HANDLING",
+    "PYTHON_EXEC",
+})
+_RELEASE_SOLUTION_RE = re.compile(
+    r"puzzle_solved=1 puzzle_id=(?P<puzzle_id>\d+) seconds=(?P<seconds>[0-9.eE+-]+) "
+    r"solution_length=(?P<solution_length>\d+) found_depth=(?P<found_depth>\d+) "
+    r"touch_depth=(?P<touch_depth>\d+) solution=(?P<solution>.*)"
+)
+_RELEASE_SOLUTION_LEGACY_RE = re.compile(
+    r"puzzle_solved=1 puzzle_id=(?P<puzzle_id>\d+) seconds=(?P<seconds>[0-9.eE+-]+) "
+    r"solution_length=(?P<solution_length>\d+) solution=(?P<solution>.*)"
+)
+_DEBUG_SOLUTION_PATH_RE = re.compile(r"solution_path=(?P<solution>.*)")
+_TORCHRUN_TEE_PREFIX_RE = re.compile(r"\[[^]\r\n]+\]:(?P<line>.*)")
 _HISTORY_MODE = "static_hybrid"
 _HISTORY_SLOT_COUNT = 2
 _HISTORY_WORKERS = 1
@@ -183,6 +215,14 @@ def derive_gather_chunk_plan(
     )
 
 
+def derive_collection_batch_limit(max_solutions: int, accepted_count: int) -> int:
+    """Return the next deterministic host-selection limit, capped at one fixed chunk."""
+    values = {"max_solutions": max_solutions, "accepted_count": accepted_count}
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in values.values()):
+        raise ValueError(f"collection batch inputs must be non-negative integers: {values}")
+    if max_solutions == 0:
+        return _MAX_GATHER_RECORDS_PER_CHUNK
+    return min(max(max_solutions - accepted_count, 0), _MAX_GATHER_RECORDS_PER_CHUNK)
 def _resolved_history_path(history_dir: Path) -> Path:
     candidate = PurePosixPath(history_dir.as_posix())
     if ".." in candidate.parts or _HISTORY_ROOT not in candidate.parents:
@@ -350,6 +390,14 @@ def build_runner_invocation(
     )
 
 
+def _solver_log_lines(output: str) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for raw_line in output.splitlines():
+        match = _TORCHRUN_TEE_PREFIX_RE.fullmatch(raw_line)
+        normalized.append(match.group("line") if match is not None else raw_line)
+    return tuple(normalized)
+
+
 def _parse_uint(row: dict[str, str], name: str) -> int:
     try:
         value = int(row[name])
@@ -396,22 +444,63 @@ def parse_runner_output(
                     reached_state=(),
                 ))
     if not records:
-        matches = re.findall(r"(?<![A-Za-z0-9_])solution_path=([^\r\n]*)", output)
-        if matches:
-            path = matches[-1].strip()
-            records.append(SolutionRecord(
-                puzzle_id=puzzle_id,
-                variant=variant,
-                path=path,
-                original_oriented_path=path,
-                found_depth=_path_depth(path),
-                touch_depth=0,
-                source_solution_sha256=None,
-                valid=True,
-                reached_state=(),
-            ))
-            if status == "not_collected":
-                status = "first_solution"
+        release_rows: list[tuple[str, int, int]] = []
+        for line in _solver_log_lines(output):
+            if not line.startswith("puzzle_solved=1"):
+                continue
+            match = _RELEASE_SOLUTION_RE.fullmatch(line)
+            legacy = False
+            if match is None:
+                match = _RELEASE_SOLUTION_LEGACY_RE.fullmatch(line)
+                legacy = match is not None
+            if match is None:
+                raise ValueError("malformed puzzle_solved=1 release line")
+            release_puzzle_id = int(match.group("puzzle_id"))
+            if release_puzzle_id != puzzle_id:
+                raise ValueError(
+                    f"release solution puzzle id {release_puzzle_id} does not match requested puzzle id {puzzle_id}"
+                )
+            path = match.group("solution")
+            solution_length = int(match.group("solution_length"))
+            found_depth = solution_length if legacy else int(match.group("found_depth"))
+            touch_depth = 0 if legacy else int(match.group("touch_depth"))
+            if _path_depth(path) != solution_length or found_depth + touch_depth != solution_length:
+                raise ValueError("release solution length/depth fields do not match solution path")
+            release_rows.append((path, found_depth, touch_depth))
+        if release_rows:
+            for path, found_depth, touch_depth in release_rows:
+                records.append(SolutionRecord(
+                    puzzle_id=puzzle_id,
+                    variant=variant,
+                    path=path,
+                    original_oriented_path=path,
+                    found_depth=found_depth,
+                    touch_depth=touch_depth,
+                    source_solution_sha256=None,
+                    valid=True,
+                    reached_state=(),
+                ))
+        else:
+            debug_paths = [
+                match.group("solution")
+                for line in _solver_log_lines(output)
+                if (match := _DEBUG_SOLUTION_PATH_RE.fullmatch(line)) is not None
+            ]
+            if debug_paths:
+                path = debug_paths[-1]
+                records.append(SolutionRecord(
+                    puzzle_id=puzzle_id,
+                    variant=variant,
+                    path=path,
+                    original_oriented_path=path,
+                    found_depth=_path_depth(path),
+                    touch_depth=0,
+                    source_solution_sha256=None,
+                    valid=True,
+                    reached_state=(),
+                ))
+        if records and status == "not_collected":
+            status = "first_solution"
     return ParsedRunnerOutput(tuple(records), status)
 
 
@@ -437,6 +526,70 @@ def collect_torchrun_rank_logs(invocation: RunnerInvocation) -> None:
         captured.append((output_path, f"[stdout]\n{stdout}[stderr]\n{stderr}"))
     for output_path, text in captured:
         output_path.write_text(text, encoding="utf-8")
+
+
+def collect_available_torchrun_rank_logs(invocation: RunnerInvocation) -> tuple[str, ...]:
+    """Best-effort materialization for ranks whose redirected streams are already complete."""
+    errors: list[str] = []
+    for rank, output_path in enumerate(invocation.rank_logs):
+        try:
+            stdout, stderr = _read_rank_streams(invocation.torchrun_log_dir, rank)
+            if stdout and not stdout.endswith("\n"):
+                stdout += "\n"
+            if stderr and not stderr.endswith("\n"):
+                stderr += "\n"
+            output_path.write_text(f"[stdout]\n{stdout}[stderr]\n{stderr}", encoding="utf-8")
+        except (OSError, RuntimeError, UnicodeError) as error:
+            errors.append(f"rank {rank}: {error}")
+    return tuple(errors)
+
+
+def _bounded_log_tail(path: Path, max_bytes: int = _DIAGNOSTIC_TAIL_BYTES) -> str:
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            handle.seek(max(size - max_bytes, 0), os.SEEK_SET)
+            return handle.read(max_bytes).decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _wait_process_bounded(process: object, timeout_seconds: float) -> int:
+    wait = getattr(process, "wait", None)
+    if not callable(wait):
+        raise RuntimeError("torchrun process does not expose wait()")
+    try:
+        return int(wait(timeout=timeout_seconds))
+    except TypeError:
+        # Minimal test doubles may not accept the timeout keyword; real Popen always does.
+        return int(wait())
+
+
+def _stop_process(process: object, timeout_seconds: float = _PROCESS_STOP_TIMEOUT_SECONDS) -> int:
+    """Reap a child, escalating terminate to kill with bounded real-Popen waits."""
+    poll = getattr(process, "poll", None)
+    if callable(poll):
+        return_code = poll()
+        if return_code is not None:
+            return int(return_code)
+    terminate = getattr(process, "terminate", None)
+    if callable(terminate):
+        terminate()
+    try:
+        return _wait_process_bounded(process, timeout_seconds)
+    except subprocess.TimeoutExpired:
+        kill = getattr(process, "kill", None)
+        if not callable(kill):
+            raise RuntimeError("torchrun process timed out and does not expose kill()")
+        kill()
+        return _wait_process_bounded(process, timeout_seconds)
+
+
+def _add_exception_note(error: BaseException, note: str) -> None:
+    add_note = getattr(error, "add_note", None)
+    if callable(add_note):
+        add_note(note)
 
 
 def stream_process_output(
@@ -465,12 +618,16 @@ def stream_process_output(
     return int(process.wait()), tail
 
 
-def _run_one(invocation: RunnerInvocation, extra_env: dict[str, str]) -> InvocationExecution:
-    environment = {key: value for key, value in os.environ.items() if key not in _RANK_ENV_KEYS}
+def _run_one(invocation: RunnerInvocation) -> InvocationExecution:
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("BEAM_")
+        and not key.startswith("TORCHELASTIC_")
+        and key not in _TORCHRUN_RESERVED_ENV_KEYS
+    }
     environment.update(invocation.env)
-    environment.update(extra_env)
     started = time.monotonic()
-    execution: InvocationExecution | None = None
     try:
         process = subprocess.Popen(
             invocation.command,
@@ -482,25 +639,75 @@ def _run_one(invocation: RunnerInvocation, extra_env: dict[str, str]) -> Invocat
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
+    except BaseException as primary_error:
+        try:
+            cleanup_history_runtime(invocation.history_dir)
+        except Exception as cleanup_error:
+            _add_exception_note(
+                primary_error, f"history scratch cleanup failed after spawn error: {cleanup_error}"
+            )
+        raise
+
+    execution: InvocationExecution | None = None
+    try:
         return_code, output_tail = stream_process_output(process, invocation.combined_log)
         elapsed = time.monotonic() - started
         execution = InvocationExecution(invocation, return_code, elapsed, output_tail)
         try:
             collect_torchrun_rank_logs(invocation)
-        except RuntimeError as error:
+        except (OSError, RuntimeError, UnicodeError) as error:
             raise InvocationLogCaptureError(
                 execution, f"torchrun log capture failed: {error}"
             ) from error
-        return execution
-    finally:
+    except BaseException as primary_error:
+        process_stopped = False
+        return_code = -1
         try:
-            cleanup_history_runtime(invocation.history_dir)
-        except (OSError, RuntimeError) as error:
-            if execution is not None:
-                raise InvocationLogCaptureError(
-                    execution, f"history scratch cleanup failed: {error}"
-                ) from error
-            raise
+            return_code = _stop_process(process)
+            process_stopped = True
+        except Exception as stop_error:
+            _add_exception_note(primary_error, f"torchrun process cleanup failed: {stop_error}")
+        if execution is None:
+            execution = InvocationExecution(
+                invocation,
+                return_code,
+                time.monotonic() - started,
+                _bounded_log_tail(invocation.combined_log),
+            )
+        try:
+            setattr(primary_error, "execution", execution)
+        except (AttributeError, TypeError):
+            _add_exception_note(primary_error, "partial invocation execution could not be attached")
+        try:
+            diagnostic_errors = collect_available_torchrun_rank_logs(invocation)
+        except Exception as diagnostic_failure:
+            diagnostic_errors = ()
+            _add_exception_note(
+                primary_error, f"partial torchrun log capture failed: {diagnostic_failure}"
+            )
+        for diagnostic_error in diagnostic_errors:
+            _add_exception_note(primary_error, f"partial torchrun log capture failed: {diagnostic_error}")
+        if process_stopped:
+            try:
+                cleanup_history_runtime(invocation.history_dir)
+            except Exception as cleanup_error:
+                _add_exception_note(
+                    primary_error, f"history scratch cleanup failed: {cleanup_error}"
+                )
+        else:
+            _add_exception_note(
+                primary_error,
+                f"history scratch retained because torchrun may still be alive: {invocation.history_dir}",
+            )
+        raise
+
+    try:
+        cleanup_history_runtime(invocation.history_dir)
+    except Exception as cleanup_error:
+        raise InvocationLogCaptureError(
+            execution, f"history scratch cleanup failed: {cleanup_error}"
+        ) from cleanup_error
+    return execution
 
 
 def _reflection_sources(
@@ -625,20 +832,38 @@ def run_public_search(
 ) -> RunArtifacts:
     """Run requested variants and retain only CPU-validated original-oriented paths."""
     del model
+    if config.reflect_mode != "off":
+        invert_path("", contract.generators)  # Validate inverse closure before any GPU launch.
     external_sources = _reflection_sources(config, contract)  # Must finish before any GPU launch.
     if config.solution_mode == "collect":
         derive_solved_result_capacity(plan, contract.move_count)
     submission = contract.sample_submission.copy(deep=True)
     submission_column = _submission_column(submission)
     records: list[SolutionRecord] = []
+    if config.reflect_mode != "off":
+        for source_puzzle_id in sorted(external_sources):
+            for source_path, source_sha256 in external_sources[source_puzzle_id]:
+                records.append(SolutionRecord(
+                    puzzle_id=source_puzzle_id,
+                    variant="source",
+                    path=source_path,
+                    original_oriented_path=source_path,
+                    found_depth=_path_depth(source_path),
+                    touch_depth=0,
+                    source_solution_sha256=source_sha256,
+                    valid=True,
+                    reached_state=contract.central_state,
+                ))
     executions: list[InvocationExecution] = []
     statuses: list[CollectionStatus] = []
 
     def execute(invocation: RunnerInvocation) -> ParsedRunnerOutput:
         try:
-            execution = _run_one(invocation, {})
-        except InvocationLogCaptureError as error:
-            execution = error.execution
+            execution = _run_one(invocation)
+        except Exception as error:
+            execution = getattr(error, "execution", None)
+            if not isinstance(execution, InvocationExecution):
+                raise
             executions.append(execution)
             partial = _build_artifacts(records, submission, executions, statuses)
             raise PublicSearchRunError(
@@ -696,7 +921,7 @@ def run_public_search(
                 key=lambda record: (
                     _path_depth(record.original_oriented_path),
                     record.original_oriented_path,
-                    0 if record.variant == "original" else 1,
+                    {"source": 0, "original": 1, "reflected": 2}[record.variant],
                     record.source_solution_sha256 or "",
                 ),
             )

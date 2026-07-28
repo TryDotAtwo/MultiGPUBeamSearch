@@ -4,34 +4,42 @@
 
 Task 5 introduced deterministic two-rank `torch.distributed.run` command construction, first/collect parsing, reflected-search orchestration, `RunArtifacts`, and host-only solve-bucket stop controls. The original reviewed commit was `2f90ed4` (`feat: orchestrate public CayleyPy search modes`).
 
-## Independent review fix round
+## Independent review fix round one
 
-### RED
+The first fix round completed reflection orchestration, real solve-bucket TSV parsing, full local-depth snapshot sizing, hard subprocess/log failures, unique invocation artifacts, live bounded output streaming, manual measured-profile variables, static-hybrid history preflight, guarded scratch cleanup, and synchronized host collection stops. Its standalone commit was `022b5399c8bf81de4bd33693fd927b5137d6ed84`.
 
-The review regressions initially produced 11 failures covering incomplete reflection modes, the real TSV schema, unsafe snapshot sizing, missing invocation artifacts, false-success process parsing, and rank-local collection stops. Further focused RED passes exposed the capacity-sized distributed gather, missing live streaming, decorative profile knobs without manual runtime mode, unbounded history defaults, and leaked 32 GiB static-hybrid scratch arenas. The last focused RED checks were:
+## Independent review fix round two
 
-- missing manual runtime/history variables and `preflight_history_runtime`: `2 failed, 14 passed`;
-- missing per-invocation cleanup contract: the sequential scratch regression failed before launch/cleanup.
+### RED evidence
 
-### GREEN
+The second review began from exact commit `022b5399c8bf81de4bd33693fd927b5137d6ed84` and added focused regressions before each implementation slice:
 
-Python orchestration now prevalidates all reflection sources before launch; implements `off`, `after_original`, and `only`; creates a standard one-row reflected `test.csv`; validates reflected results in reflected and original orientations; semantically deduplicates final records; and selects the shortest deterministic submission path. The parser consumes the real `solution_path` TSV field and maps `found_depth`, `total_depth`, and touch depth exactly. Nonzero subprocess exits and missing real rank logs are hard failures with prior artifacts retained only for diagnosis.
+- release first-mode parsing and poisoned inherited environment: `6 failed, 20 passed`;
+- external-source records, deterministic reflection-source union, and pre-launch inverse closure: four intended failures;
+- solver provenance on an exact external-source duplicate: `2 failed`;
+- bounded cursor collection contracts: `4 failed, 31 deselected`;
+- live-child stream failure, kill fallback, cleanup masking, and partial artifacts: `4 failed, 35 deselected`;
+- rank-symmetric post-reconstruction failure handling: one focused failure;
+- rank-local next-K exchange optimization: one focused failure.
 
-Every invocation now has a unique rendezvous, torchrun log directory, combined log, both real rank stdout/stderr artifacts, NCCL id path, and history scratch path. Rank-0 tee output is streamed live while the full combined log is flushed incrementally and only a bounded parser tail remains in memory. The manual T4 profile contract is explicit (`manual`, A/B shard buffers, no global spill, Stream5 scale 1.0, 768 MiB headroom). Internal static-hybrid history defaults use two slots, one worker, 28 GiB RAM and 32 GiB disk totals, with C++-matching per-rank capacity and `/tmp` free-space preflight. Scratch cleanup validates the resolved path as a strict descendant of `/tmp/beam_history_public`, runs after spawn/stream/log success or failure, and leaves artifact logs and unrelated paths untouched.
+### GREEN implementation
 
-Collect mode sizes the solved snapshot for the full safe local one-depth Stream2 upper bound (`local_beam * move_count`) and fails early on uint32 or necessary T4 memory lower-bound overflow. The existing final scratch buffer is reused for bounded record chunks; host packet vectors are capped at 65,536 records per chunk, and only actual stored counts are gathered. Host stop reasons and true snapshot overflow are synchronized across ranks through the existing stop-flag collective. Explicit stop depth takes precedence over the legacy first-hit window, and status is emitted only for the boundary actually reached.
+First-mode parsing now consumes the real anchored release record, including exact puzzle id, `solution_length`, `found_depth`, `touch_depth`, and an empty solution path. It accepts the legacy release record as `found_depth=solution_length, touch_depth=0`, retains exact-line debug `solution_path` compatibility, and strips only a strict torchrun tee prefix such as `[default0]:`. Unrelated log text is never searched as a substring. Both first-mode C++ release branches emit found/touch depths. Child environments retain ordinary runtime controls such as `PATH` and `CUDA_VISIBLE_DEVICES`, but remove every inherited `BEAM_*` and reserved torchrun rank/master/torchelastic variable before applying the explicit invocation contract.
+
+Validated external reflection sources are first-class original-oriented solution candidates before any GPU launch and retain their source SHA-256. Source-only solutions can populate the submission, shorter sources beat longer reflected results, and `after_original` uses a deterministic union of external and newly discovered sources. Exact semantic duplicates retain the stronger original/reflected solver provenance. Generator inverse closure is validated globally before the first original or reflected subprocess.
+
+Collect mode reads only the solved header up front. Each rank scans its device metadata in fixed host chunks of at most 65,536 records, retains only its rank-local next-K after the strict cursor `(total_depth, owner_rank, found_depth, parent_idx, route_packed, hash.lo, hash.hi, suffix_id)`, and exchanges only those bounded next-K packets through fixed NCCL scratch. This is exact because any global next-K record omitted from a rank-local next-K would already have K smaller eligible records on that rank. The global batch remains bounded by the synchronized remaining unique target; the cursor advances on the last raw selected record even when reconstructed paths duplicate, so later scans can fill the requested unique count. Overflow and rank-0 accepted counts are synchronized before depth/pass decisions. Rank-0 validation, path conversion, and output exceptions are captured, collectively propagated after each reconstructed record, and only then rethrown, preventing another rank from entering the next reconstruction collective alone.
+
+After `Popen`, any stream or log-capture exception now stops and reaps torchrun before history deletion, using bounded terminate/wait and kill/wait fallback. Partial combined and available rank diagnostics are retained. The original exception remains primary; teardown or scratch-cleanup failures are attached as notes and never replace it. `run_public_search` exposes a diagnostic `RunArtifacts` snapshot whenever an execution was established.
 
 No CUDA kernel, Stream 1-5 algorithm, device struct, or device-buffer contract was changed.
 
 ## Verification
 
-- `python -m py_compile tools/cayleypy_public/runner.py tests/cayleypy_public/test_runner.py tests/cayleypy_public/fixtures/fake_production_runner.py`
-- `python -m pytest tests/cayleypy_public/test_runner.py -q` -> `20 passed`
-- `python -m pytest tests/cayleypy_public -q` -> `75 passed`
+- `python -m py_compile tools/cayleypy_public/runner.py tools/cayleypy_public/paths.py tests/cayleypy_public/test_runner.py tests/cayleypy_public/test_paths.py tests/cayleypy_public/fixtures/fake_production_runner.py`
+- `python -m pytest tests/cayleypy_public/test_runner.py -q` -> `41 passed`
+- `python -m pytest tests/cayleypy_public/test_paths.py tests/cayleypy_public/test_runner.py -q` -> `54 passed`
+- `python -m pytest tests/cayleypy_public -q` -> `97 passed`
 - `git diff --check`
 
-The local Windows checkout has CUDA toolkits but no `cl.exe`/configured NCCL build toolchain, so this fix round does not claim a local `production_runner` compile or GPU run. Coverage for the C++ change is limited to the executable Python chunk-plan mirror and focused C++ source-contract regressions; a real 2xT4 build/run remains the downstream notebook acceptance gate.
-
-## Review notes
-
-The Python solved-snapshot memory check is deliberately a necessary lower bound (snapshot arrays plus current frontier), not a replacement for `production_runner`'s exact `StaticMemoryPlan` and non-static device-budget gate. At the largest profile, unsafe move-count/beam combinations fail closed rather than reducing the requested beam.
+The local Windows checkout has CUDA toolkits but no `cl.exe` or configured NCCL build toolchain, so this round makes no local `production_runner` compile or GPU-run claim. The C++ host-only changes are covered by executable Python contract mirrors and focused source-contract regressions; a real 2xT4 build/run remains the downstream notebook acceptance gate.

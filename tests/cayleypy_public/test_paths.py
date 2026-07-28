@@ -100,6 +100,15 @@ def test_deduplicate_uses_original_path_and_reached_state_then_earliest_provenan
     assert hashlib.sha256(earlier.original_oriented_path.encode("utf-8")).hexdigest()
 
 
+def test_deduplicate_preserves_solver_provenance_on_exact_source_duplicate():
+    solver = _record("original", "counterclockwise", "counterclockwise", (0, 1, 2), 1)
+    source = _record(
+        "source", "counterclockwise", "counterclockwise", (0, 1, 2), 1, source="external-sha"
+    )
+
+    assert deduplicate_solutions([solver, source]) == [solver]
+
+
 def _record(variant, path, original_oriented_path, reached_state, found_depth, source=None):
     return SolutionRecord(
         puzzle_id=7,

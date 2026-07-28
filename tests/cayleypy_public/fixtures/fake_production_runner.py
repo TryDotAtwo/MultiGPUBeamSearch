@@ -15,7 +15,10 @@ def main() -> int:
         )
         print("collection_status=capacity_reached")
     else:
-        print("solution_path=counterclockwise")
+        print(
+            "[default0]:puzzle_solved=1 puzzle_id=7 seconds=0.125 solution_length=1 "
+            "found_depth=1 touch_depth=0 solution=counterclockwise"
+        )
     return 0
 
 
