@@ -187,7 +187,7 @@ Field and payload sizes are bounded. Unknown fields are rejected at the public A
 
 `INGEST_MODE` is a case-sensitive exact allowlist with only `normal`, `store_only`, and `reject`. Missing, empty, mixed-case, or otherwise unknown values resolve to `reject`; raw configuration values are never returned or logged. In `normal`, the HTTP producer validates the envelope, persists immutable raw R2 plus a D1 row, and sends `{submission_id}` to the Queue. In `store_only`, it validates and persists raw R2 plus a D1 row that remains `received`, but performs zero Queue sends. In `reject`, including the fail-closed missing/unknown cases, the endpoint accepts nothing and performs no R2, D1, or Queue write.
 
-In `normal`, the producer persists `received`, sends `{submission_id}` to the at-least-once Queue, and then compare-transitions `received|retryable -> queued`. Queue delivery may run before that producer transition, so the consumer must compare-transition `received|queued|retryable -> validating`. Producer confirmation accepts a reread already at `queued` or later; an ambiguous Queue failure likewise returns `queued` when a reread proves consumer progress, otherwise it confirms `retryable`.
+In `normal`, the producer persists `received`, sends `{submission_id}` to the at-least-once Queue, and confirms the send with `received|queued|retryable -> queued`; the `queued -> queued` case is required for scheduled resend confirmation. Queue delivery may run before that confirmation, so the consumer must compare-transition `received|queued|retryable -> validating`. A successful confirmation refreshes `updated_at` and clears `ingest_paused` or any other stale `safe_error`. An ambiguous Queue failure returns `queued` only when a reread proves consumer progress beyond `queued`; otherwise an eligible `received|queued|retryable` row is confirmed `retryable`.
 
 The downstream path is `validating -> validated | rejected -> staged -> published`; exhausted work becomes `dead_letter`. Retryable failures use bounded exponential backoff. Every consumer action and state transition is idempotent. A failed enqueue attempt increments `retry_count`, refreshes `updated_at`, and records only a safe error; a later successful enqueue clears that stale error. Raw R2 storage occurs before the Worker returns an accepted receipt.
 
@@ -199,9 +199,9 @@ Every result uses a unique append-only repository path derived from schema versi
 
 A normal concurrent duplicate waits a bounded interval for the first producer and reuses its receipt without another Queue send. If the shared row is still `received` after the final reread, the duplicate resends the same `{submission_id}` and confirms `queued`/later or `retryable`; this recovery may create another Queue delivery, so downstream consumer idempotency is mandatory. All such deliveries still reference one D1 row and one retained winning raw object.
 
-The Worker scheduled handler is a strict no-op unless the resolved mode is `normal`. In `normal` it runs a bounded recovery page over stale `received|retryable` rows, using the `(state,updated_at)` index and a `staleBefore` cutoff as backoff eligibility. It resends the same `{submission_id}`, uses checked state transitions, retains raw R2, and advances failed retry metadata so one hot page cannot starve older tail rows. Thus a `store_only` row remains `received` even after it is stale; switching to `normal` lets the next scheduled run recover it.
+The Worker scheduled handler is a strict no-op unless the resolved mode is `normal`. In `normal` it runs a bounded recovery page over stale `received|queued|retryable` rows, using the `(state,updated_at)` index and a `staleBefore` cutoff as backoff eligibility. It resends the same `{submission_id}`, uses checked state transitions, retains raw R2, and advances failed retry metadata so one hot page cannot starve older tail rows. A successful stale `queued` resend performs `queued -> queued`, refreshes `updated_at`, and clears `ingest_paused` or another stale `safe_error`, so the same row cannot flood every cron page. Thus a `store_only` row remains `received` even after it is stale; switching to `normal` lets the next scheduled run recover that same id once per eligible scan.
 
-Queue backlog delivery also checks the mode before any D1 transition, R2 read, replay validation, or publication enqueue. For every non-`normal` mode, including missing/unknown values, it leaves state untouched and parks the message with a fixed bounded 300-second retry delay. It never logs the message body or raw mode value. When mode returns to `normal`, the same message follows the ordinary idempotent consumer path.
+Queue backlog delivery resolves `INGEST_MODE` before inspecting the message body. For every non-`normal` mode, including missing/unknown values, it parses only `submission_id` and conditionally parks D1 `received|queued|retryable -> retryable` with `safe_error=ingest_paused`, unchanged `retry_count`, refreshed `updated_at`, and the raw R2 reference untouched. It rereads and verifies that durable park, then ACKs; a successful park never calls `message.retry()` and therefore consumes no Cloudflare `max_retries` attempt. Before that ACK it performs no R2 read, replay, publisher enqueue, token/GitHub access, payload log, or raw-mode log. A duplicate delivery repeats the same idempotent D1 park and still leaves one row. A D1 exception or unverifiable transition is not ACKed and follows the platform retry/exhaustion path; the unchanged stale row remains recoverable. When mode returns to `normal`, scheduled recovery resends the same parked `retryable` id, and it also rescues a stale `queued` row left after park failures exhausted Queue delivery.
 
 At-least-once delivery cannot duplicate published results because D1 and repository paths use the deterministic idempotency key/submission id. R2 raw payloads and DLQ make accepted work recoverable even during GitHub, DNS, Queue, or consumer outages.
 
@@ -232,7 +232,7 @@ Validated result records are written append-only to a staging branch in `TryDotA
 
 The Worker never holds a personal access token. GitHub App private key and installation id live only in Cloudflare Secrets. A publication failure never changes the notebook solve result; `publish_status=failed` includes a safe reason and submission ids for later status lookup.
 
-The GitHub writer re-resolves `INGEST_MODE` immediately before any external token or GitHub API/ref/tree/commit write. If the mode is not `normal`, it makes no external request, does not mark rows `staged` or `published`, retains the validated ids, and re-arms bounded local work for later retry without logging payloads. This final guard covers mode changes after Queue validation but before publication.
+The GitHub writer first persists accepted validated ids durably in Durable Object storage, then re-resolves `INGEST_MODE` immediately before any external token or GitHub API/ref/tree/commit write. If the mode is not `normal`, it makes no external request, does not mark rows `staged` or `published`, retains those durable ids, and re-arms a bounded alarm without logging payloads or the raw mode. The `setAlarm` call is part of the durable contract: if it fails, the operation throws and is retried rather than silently stranding ids. This final guard covers mode changes after Queue validation but before publication.
 
 ## 11. Testing and Acceptance
 
@@ -253,14 +253,14 @@ Existing real acceptance evidence for puzzle 0 at beam `2**21`, depth 100 remain
 
 - Worker schema/size/rate/idempotency tests;
 - exact mode tests for `normal`, `store_only`, `reject`, missing, mixed-case, and unknown values, including zero persistence in fail-closed modes;
-- scheduled-mode tests proving a `store_only` row older than 60 seconds is not enqueued and is recovered only after resuming `normal`;
+- scheduled-mode tests proving a `store_only` row older than 60 seconds is not enqueued, stale `queued` joins `received|retryable` only in `normal`, and a successful same-id resend refreshes `updated_at` and clears `ingest_paused`/stale errors before the next bounded page;
 - property tests for permutation replay and malformed moves;
 - D1 state transition and retry tests;
 - Queue duplicate/out-of-order delivery tests;
-- non-`normal` Queue backlog tests proving state, validation, and publication remain untouched with the bounded retry delay, followed by a `normal` resume test;
+- non-`normal` Queue backlog tests for `received|queued|retryable` proving durable `ingest_paused` parking, unchanged retry count/raw, reread verification, successful ACK with no message retry or prohibited binding access, idempotent duplicates beyond the configured `max_retries` equivalent, transition-false reread, a same-id normal resume, and D1 park exceptions through platform exhaustion followed by stale-queued recovery;
 - R2-before-receipt durability test;
 - Durable Object batching and simulated GitHub ref conflict tests;
-- GitHub writer final-guard tests proving non-`normal` modes make zero external requests and `normal` resume publishes retained ids;
+- GitHub writer final-guard tests proving ids are durable before the mode guard, non-`normal` modes make zero external requests and re-arm an alarm, `setAlarm` failure throws/retries, and `normal` resume publishes retained ids;
 - GitHub App permission and secret-leak tests;
 - CI append-only and deterministic-index tests;
 - load test with at least 100 concurrent publishers, retries, duplicates, mixed puzzles, and injected GitHub outage;

@@ -149,7 +149,8 @@ git commit -m "feat: scaffold strict CayleyPy results Worker"
 - Produces: `canonicalJson(value: unknown) -> string`
 - Produces: `computeIdempotency(envelope: ResultEnvelopeV1) -> Promise<string>`
 - Produces: `receiveEnvelope(env, envelope, requestMeta) -> Promise<Receipt>`.
-- Produces: `recoverStaleSubmissions(env, { staleBefore, limit }) -> Promise<RecoverySummary>`; the helper scans only a bounded stale `received|retryable` page and resends the existing `{submission_id}`.
+- Produces: `recoverStaleSubmissions(env, { staleBefore, limit }) -> Promise<RecoverySummary>`; the helper scans only a bounded stale `received|queued|retryable` page and resends the existing `{submission_id}`.
+- Produces: `parkPausedSubmission(db, submissionId) -> Promise<SubmissionRow>`; this reusable Task 2 primitive conditionally transitions `received|queued|retryable -> retryable` with `safe_error=ingest_paused`, leaves `retry_count` and raw R2 untouched, refreshes `updated_at`, rereads, and returns only after it verifies the durable park.
 
 - [ ] **Step 1: Write the D1 migration**
 
@@ -182,7 +183,7 @@ The Miniflare receipt suite must load the real migration directory with pinned `
 
 - [ ] **Step 2: Write failing durability/idempotency tests**
 
-Use Miniflare bindings initialized from the exact migration bytes. Assert the deployable `state` CHECK rejects an invalid state and `PRAGMA index_info('submissions_recovery')` returns columns `state,updated_at`. Assert R2 `put` occurs before D1 received/queued state and before the returned receipt. Inject Queue failure: raw object and `retryable` row remain. Submit the same idempotency key twice: return the original submission id and enqueue once before the bounded wait expires. Also cover a stale `received` duplicate resend, crash-before-send recovery, retryable sweeping, immediate consumer progress before the producer marks `queued`, recovery duplication with one D1 row, retry-page fairness beyond `limit`, and clearing stale `safe_error` after success.
+Use Miniflare bindings initialized from the exact migration bytes. Assert the deployable `state` CHECK rejects an invalid state and `PRAGMA index_info('submissions_recovery')` returns columns `state,updated_at`. Assert R2 `put` occurs before D1 received/queued state and before the returned receipt. Inject Queue failure: raw object and `retryable` row remain. Submit the same idempotency key twice: return the original submission id and enqueue once before the bounded wait expires. Also cover a stale `received` duplicate resend, crash-before-send recovery, retryable sweeping, immediate consumer progress before the producer marks `queued`, recovery duplication with one D1 row, retry-page fairness beyond `limit`, and clearing stale `safe_error` after success. Add direct real-D1 tests for parking each of `received|queued|retryable`, unchanged retry counts and raw objects, 101 idempotent duplicate parks with one row, transition-false plus verified reread, repeated D1 park exceptions, and normal stale-`queued` same-id recovery.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -213,11 +214,11 @@ export async function transition(
 ): Promise<boolean>
 ```
 
-The SQL update includes `WHERE submission_id=? AND state IN (...)`; affected row count must be one or the transition is an idempotent no-op/conflict. Successful Queue confirmation compare-transitions `received|retryable -> queued` and clears `safe_error`. Failed confirmation compare-transitions `received|retryable -> retryable`, increments `retry_count`, and refreshes `updated_at`; a false result is accepted only after a reread proves queued-or-later or retryable.
+The SQL update includes `WHERE submission_id=? AND state IN (...)`; affected row count must be one or the transition is an idempotent no-op/conflict. Successful Queue confirmation compare-transitions `received|queued|retryable -> queued`, clears `safe_error`, and refreshes `updated_at`, including `queued -> queued` after recovery resend. Failed confirmation compare-transitions `received|queued|retryable -> retryable`, increments `retry_count`, and refreshes `updated_at`; a false result is accepted only after a reread proves consumer progress beyond `queued` or a retryable state. `parkPausedSubmission` uses the same transition helper without incrementing retries and requires a reread proving `retryable` plus `ingest_paused`, whether the transition returned true or false.
 
 - [ ] **Step 6: Implement bounded stale-delivery recovery**
 
-Query `state IN ('received','retryable') AND updated_at <= ?`, ordered by `updated_at,submission_id` and capped at `limit <= 100`. For each row, resend exactly `{submission_id}`, confirm `queued`/later or `retryable` with the same checked transitions, and never remove its raw R2 object. A duplicate request that reaches its final bounded reread while still `received` uses the same resend path. Failed retries must advance `updated_at` and `retry_count` so the next bounded page can reach its tail.
+Query `state IN ('received','queued','retryable') AND updated_at <= ?`, ordered by `updated_at,submission_id` and capped at `limit <= 100`. For each row, resend exactly `{submission_id}`, confirm `queued`/later or `retryable` with the same checked transitions, and never remove its raw R2 object. A successful stale `queued` resend performs `queued -> queued`, refreshes `updated_at`, and clears `ingest_paused`/any stale `safe_error`, preventing cron flood and page starvation. A duplicate request that reaches its final bounded reread while still `received` uses the same resend path. Failed retries must advance `updated_at` and `retry_count` so the next bounded page can reach its tail.
 
 - [ ] **Step 7: Test and commit**
 
@@ -261,7 +262,7 @@ Use a Cloudflare Rate Limiting binding when available plus a D1/global fallback 
 
 - [ ] **Step 5: Implement and test the scheduled recovery entry point**
 
-Add the exact `scheduled(controller, env, ctx)` interface above and configure the cron. Its normal-mode test seeds stale and fresh `received|retryable` rows, proves only the bounded eligible page is resent, proves the same submission ids are used, and proves failures advance retry metadata without deleting raw R2. Additional tests prove `store_only`, `reject`, missing, and unknown modes are strict no-ops; specifically, a `store_only` row older than 60 seconds remains `received` with zero Queue sends, then switching to `normal` lets scheduled recovery enqueue that same id. Record only bounded counts, never payloads, raw mode values, or binding identifiers.
+Add the exact `scheduled(controller, env, ctx)` interface above and configure the cron. Its normal-mode test seeds stale and fresh `received|queued|retryable` rows, proves only the bounded eligible page is resent with the same submission ids, proves successful `queued -> queued` refresh/clearing, and proves failures advance retry metadata without deleting raw R2. Additional tests prove `store_only`, `reject`, missing, and unknown modes are strict no-ops; specifically, a `store_only` row older than 60 seconds remains `received` with zero Queue sends, then switching to `normal` lets scheduled recovery enqueue that same id. Record only bounded counts, never payloads, raw mode values, or binding identifiers.
 
 - [ ] **Step 6: Test and commit**
 
@@ -285,7 +286,7 @@ git commit -m "feat: expose bounded public result receipts"
 - Produces: `validateSolution(envelope: ResultEnvelopeV1) -> ReplayResult`.
 - Produces Queue handler `queue(batch: MessageBatch<ValidationMessage>, env: Env): Promise<void>`.
 - Preserves the Task 3 `scheduled(controller, env, ctx)` export when composing the Worker entry point; Queue and scheduled recovery both use the same idempotent D1 transition contract.
-- Reuses the Task 3 exact mode resolver and defines `MODE_PAUSE_DELAY_SECONDS = 300`; every non-`normal` mode parks Queue messages for that bounded delay before any state transition, validation, or publication work.
+- Reuses the Task 3 exact mode resolver. Every non-`normal` delivery resolves mode first, parses only `submission_id`, durably parks the D1 row through `parkPausedSubmission`, and ACKs only after verification; successful parking never calls `message.retry()` and consumes no Cloudflare `max_retries` attempt.
 
 - [ ] **Step 1: Write failing replay property tests**
 
@@ -293,7 +294,7 @@ Generate small random permutations and valid paths. Assert exact final-state equ
 
 - [ ] **Step 2: Write failing duplicate/out-of-order consumer tests**
 
-Deliver the same message twice; deliver immediately while the producer row is still `received`; deliver from `queued` and `retryable`; deliver after state is already `validating` or `validated`; and inject malformed R2 body/hash mismatch. Assert one effective validation/publisher enqueue, terminal rejection with code, or retry/DLQ without duplicate GitHub enqueue. Duplicate and out-of-order delivery must be an idempotent no-op once another consumer owns or completed the row. For `store_only`, `reject`, missing, and unknown modes, seed backlog messages and assert the exact 300-second retry, no D1 transition, no R2/replay validation, no publisher enqueue, and no payload/raw-mode logs; then switch to `normal` and prove the retained message proceeds.
+Deliver the same message twice; deliver immediately while the producer row is still `received`; deliver from `queued` and `retryable`; deliver after state is already `validating` or `validated`; and inject malformed R2 body/hash mismatch. Assert one effective validation/publisher enqueue, terminal rejection with code, or retry/DLQ without duplicate GitHub enqueue. Duplicate and out-of-order delivery must be an idempotent no-op once another consumer owns or completed the row. For `store_only`, `reject`, missing, and unknown modes, test `received|queued|retryable` inputs and assert a successful D1 park becomes one `retryable` row with `safe_error=ingest_paused`, unchanged `retry_count`, refreshed `updated_at`, retained raw, ACK, zero `message.retry()`, and zero R2/replay/publisher/token/GitHub/payload/raw-mode-log access. Repeat delivery beyond a configured-`max_retries` equivalent, cover transition-false plus reread, switch to `normal` and prove scheduled recovery sends the same id once, and inject D1 park exceptions through Queue exhaustion before stale-`queued` recovery.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -306,11 +307,11 @@ Validate proof permutations before applying moves. Bound `state_len <= 128`, `mo
 
 - [ ] **Step 5: Implement Queue state transitions and retry policy**
 
-Resolve mode before reading a message body or touching D1/R2. If it is not `normal`, call `message.retry({ delaySeconds: MODE_PAUSE_DELAY_SECONDS })` and do nothing else; this parking path does not consume validation-attempt budget or log payloads/raw mode values. In `normal`, compare-transition `received|queued|retryable -> validating` and clear stale `safe_error`. The `received` source is mandatory because Cloudflare Queue may deliver before the producer's post-send `queued` transition. If the transition returns false, reread: already `validating|validated|rejected|staged|published|dead_letter` is an idempotent duplicate/no-op; any other state is a checked conflict. Terminal validation errors become `rejected`; R2/D1/DO/network errors use `message.retry({delaySeconds})` with capped exponential delay. After configured attempts, write `dead_letter`, keep raw R2, and enqueue to `VALIDATE_DLQ`. Every downstream write is keyed by `submission_id`/idempotency key so recovery-created duplicate messages cannot duplicate publication.
+Resolve mode before inspecting a message body or touching D1/R2. If it is not `normal`, parse only `submission_id`, call `parkPausedSubmission`, verify the reread, and then `message.ack()`. Do not read R2, replay, touch the publisher/token/GitHub bindings, call `message.retry()`, or log payload/raw mode. A D1 exception or unverifiable park must not ACK; it follows the platform retry/exhaustion path, leaving the row for normal stale recovery. In `normal`, compare-transition `received|queued|retryable -> validating` and clear stale `safe_error`. The `received` source is mandatory because Cloudflare Queue may deliver before the producer's post-send `queued` transition. If the transition returns false, reread: already `validating|validated|rejected|staged|published|dead_letter` is an idempotent duplicate/no-op; any other state is a checked conflict. Terminal validation errors become `rejected`; R2/D1/DO/network errors use `message.retry({delaySeconds})` with capped exponential delay. After configured attempts, write `dead_letter`, keep raw R2, and enqueue to `VALIDATE_DLQ`. Every downstream write is keyed by `submission_id`/idempotency key so recovery-created duplicate messages cannot duplicate publication.
 
 - [ ] **Step 6: Compose Queue and scheduled handlers without dropping recovery**
 
-Export both `queue(batch, env)` and the Task 3 `scheduled(controller, env, ctx)` handler from the final Worker module. Add an integration test that an immediate consumer can move `received -> validating` before the producer's checked `queued` confirmation, while the scheduled handler still recovers stale `received|retryable` rows.
+Export both `queue(batch, env)` and the Task 3 `scheduled(controller, env, ctx)` handler from the final Worker module. Add an integration test that an immediate consumer can move `received -> validating` before the producer's checked `queued` confirmation, while the scheduled handler still recovers stale `received|queued|retryable` rows. Include the D1-park-failure/exhaustion case whose unchanged stale `queued` row is resent after mode returns to `normal`.
 
 - [ ] **Step 7: Test and commit**
 
@@ -341,7 +342,7 @@ Mock GitHub endpoints. Assert JWT `iss`, `iat`, `exp <= 10m`, installation-only 
 
 - [ ] **Step 2: Write failing writer batching/conflict tests**
 
-Queue 100 unique validated ids. Assert a bounded batch creates unique paths, one tree/commit/ref update, and marks D1 rows staged. Inject Git ref `422` conflict twice; writer refetches head and retries without losing/duplicating files. Existing different content at a target path is terminal corruption. For `store_only`, `reject`, missing, and unknown modes at the final guard, assert zero token/GitHub requests, zero `staged|published` transitions, retained validated ids, a bounded re-armed alarm, and no payload/raw-mode logs; switch to `normal` and prove the retained batch publishes.
+Queue 100 unique validated ids and first assert they are committed to Durable Object storage before the final mode guard. Assert a bounded batch creates unique paths, one tree/commit/ref update, and marks D1 rows staged. Inject Git ref `422` conflict twice; writer refetches head and retries without losing/duplicating files. Existing different content at a target path is terminal corruption. For `store_only`, `reject`, missing, and unknown modes at the final guard, assert zero token/GitHub requests, zero `staged|published` transitions, durable retained validated ids, a bounded re-armed alarm, and no payload/raw-mode logs; inject `setAlarm` failure and assert the operation throws/retries without silently stranding ids, then switch to `normal` and prove the retained batch publishes.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -365,7 +366,7 @@ function resultPath(r: ResultEnvelopeV1): string {
 
 Only `safe()`-normalized identifiers from allowlisted fields affect paths. File content is canonical JSON. Batch maximum: 100 records or 5 MiB, alarm within 30 seconds.
 
-Immediately before requesting a GitHub installation token or making any external ref/tree/commit call, re-resolve `INGEST_MODE`. Unless it is `normal`, retain the validated ids, make no external request or publication transition, and re-arm the Durable Object alarm with a bounded delay. This is a final defense against a mode change after validation.
+Persist validated ids durably before the final mode guard. Immediately before requesting a GitHub installation token or making any external ref/tree/commit call, re-resolve `INGEST_MODE`. Unless it is `normal`, retain those durable ids, make no external request or publication transition, and re-arm the Durable Object alarm with a bounded delay. Await `setAlarm`; if it fails, throw so the caller/runtime retries and never silently strands pending ids. This is a final defense against a mode change after validation.
 
 - [ ] **Step 6: Test and commit**
 

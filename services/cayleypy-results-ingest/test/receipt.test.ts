@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 
 import { canonicalJson, computeIdempotency } from "../src/ids.js";
 import { transition } from "../src/db.js";
-import { receiveEnvelope, recoverStaleSubmissions, SafeIngestError, type IngestEnv } from "../src/storage.js";
+import { parkPausedSubmission, receiveEnvelope, recoverStaleSubmissions, SafeIngestError, type IngestEnv } from "../src/storage.js";
 
 const validEnvelope = () => ({
   schema_version: 1 as const, submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e7f", run_id: "run-20260728-001", idempotency_key: "a".repeat(64),
@@ -83,6 +83,56 @@ function dbWithTransitionFailure(): D1Database {
       return env.RESULTS_DB.prepare(query);
     },
   } as unknown as D1Database;
+}
+
+function dbWithTransitionNoop(): D1Database {
+  return {
+    prepare(query: string) {
+      if (query.startsWith("UPDATE submissions SET")) {
+        return {
+          bind: () => ({
+            run: async () => ({ success: true, meta: { changes: 0 } }),
+          }),
+        } as unknown as D1PreparedStatement;
+      }
+      return env.RESULTS_DB.prepare(query);
+    },
+  } as unknown as D1Database;
+}
+
+
+async function seedSubmission(
+  submissionId: string,
+  idempotencyKey: string,
+  state: "received" | "queued" | "retryable",
+  options: {
+    safeError?: string | null;
+    retryCount?: number;
+    updatedAt?: string;
+  } = {},
+): Promise<string> {
+  const envelope = validEnvelope();
+  const rawKey = `raw/v1/2000/01/01/${submissionId}.json`;
+  const updatedAt = options.updatedAt ?? "2000-01-01T00:00:00.000Z";
+  await env.RAW_RESULTS.put(rawKey, canonicalJson(envelope));
+  await env.RESULTS_DB.prepare(
+    "INSERT INTO submissions (submission_id,idempotency_key,run_id,author_name,competition,puzzle_type,puzzle_id,state,raw_r2_key,safe_error,retry_count,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+  ).bind(
+    submissionId,
+    idempotencyKey,
+    `${envelope.run_id}-${submissionId}`,
+    envelope.author.name,
+    envelope.competition,
+    envelope.puzzle_type,
+    envelope.puzzle_id,
+    state,
+    rawKey,
+    options.safeError ?? null,
+    options.retryCount ?? 0,
+    "2000-01-01T00:00:00.000Z",
+    updatedAt,
+  ).run();
+  return rawKey;
 }
 
 beforeEach(async () => {
@@ -496,6 +546,136 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
     expect(messages).toEqual(submissionIds);
     const rows = await env.RESULTS_DB.prepare("SELECT submission_id, retry_count FROM submissions ORDER BY submission_id").all<{ submission_id: string; retry_count: number }>();
     expect(rows.results).toEqual(submissionIds.map((submission_id) => ({ submission_id, retry_count: 1 })));
+  });
+
+  test("parks received, queued, and retryable rows without consuming retry budget or raw", async () => {
+    const fixtures = [
+      {
+        submissionId: "019c1000-0000-7000-8000-000000000001",
+        idempotencyKey: "1".repeat(64),
+        state: "received",
+        retryCount: 2,
+      },
+      {
+        submissionId: "019c1000-0000-7000-8000-000000000002",
+        idempotencyKey: "2".repeat(64),
+        state: "queued",
+        retryCount: 3,
+      },
+      {
+        submissionId: "019c1000-0000-7000-8000-000000000003",
+        idempotencyKey: "3".repeat(64),
+        state: "retryable",
+        retryCount: 4,
+      },
+    ] as const;
+    const rawKeys = new Map<string, string>();
+    for (const fixture of fixtures) {
+      rawKeys.set(
+        fixture.submissionId,
+        await seedSubmission(
+          fixture.submissionId,
+          fixture.idempotencyKey,
+          fixture.state,
+          { safeError: "stale_error", retryCount: fixture.retryCount },
+        ),
+      );
+    }
+
+    const park = parkPausedSubmission;
+    for (const fixture of fixtures) {
+      const row = await park(env.RESULTS_DB, fixture.submissionId);
+      expect(row).toMatchObject({
+        submission_id: fixture.submissionId,
+        state: "retryable",
+        safe_error: "ingest_paused",
+        retry_count: fixture.retryCount,
+        raw_r2_key: rawKeys.get(fixture.submissionId),
+      });
+      expect(Date.parse(row.updated_at)).toBeGreaterThan(Date.parse("2000-01-01T00:00:00.000Z"));
+      expect(await env.RAW_RESULTS.head(row.raw_r2_key)).not.toBeNull();
+    }
+  });
+
+  test("duplicate pause deliveries beyond a max-retries-equivalent remain one parked row", async () => {
+    const submissionId = "019c1000-0000-7000-8000-000000000004";
+    const rawKey = await seedSubmission(
+      submissionId,
+      "4".repeat(64),
+      "retryable",
+      { safeError: "ingest_paused", retryCount: 7 },
+    );
+    const park = parkPausedSubmission;
+
+    for (let delivery = 0; delivery < 101; delivery += 1) {
+      await expect(park(env.RESULTS_DB, submissionId)).resolves.toMatchObject({
+        submission_id: submissionId,
+        state: "retryable",
+        safe_error: "ingest_paused",
+        retry_count: 7,
+      });
+    }
+
+    expect(await env.RESULTS_DB.prepare("SELECT COUNT(*) AS count FROM submissions").first<number>("count")).toBe(1);
+    expect(await env.RAW_RESULTS.head(rawKey)).not.toBeNull();
+  });
+
+  test("accepts a false pause transition only after reread verifies the durable park", async () => {
+    const submissionId = "019c1000-0000-7000-8000-000000000005";
+    const rawKey = await seedSubmission(
+      submissionId,
+      "5".repeat(64),
+      "retryable",
+      { safeError: "ingest_paused", retryCount: 8 },
+    );
+
+    await expect(parkPausedSubmission(dbWithTransitionNoop(), submissionId)).resolves.toEqual({
+      submission_id: submissionId,
+      idempotency_key: "5".repeat(64),
+      state: "retryable",
+      raw_r2_key: rawKey,
+      safe_error: "ingest_paused",
+      retry_count: 8,
+      updated_at: "2000-01-01T00:00:00.000Z",
+    });
+  });
+
+  test("normal recovery rescues one stale queued row after repeated D1 park failures", async () => {
+    const submissionId = "019c1000-0000-7000-8000-000000000006";
+    const rawKey = await seedSubmission(
+      submissionId,
+      "6".repeat(64),
+      "queued",
+      { safeError: "stale_error", retryCount: 9 },
+    );
+    const park = parkPausedSubmission;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await expect(park(dbWithTransitionFailure(), submissionId)).rejects.toMatchObject({
+        code: "state_transition_failed",
+      });
+    }
+
+    const messages: unknown[] = [];
+    const recoveryEnv: IngestEnv = {
+      RESULTS_DB: env.RESULTS_DB,
+      RAW_RESULTS: env.RAW_RESULTS,
+      VALIDATE_QUEUE: { send: async (message: unknown) => { messages.push(message); } } as unknown as Queue,
+    };
+    await expect(recoverStaleSubmissions(
+      recoveryEnv,
+      { staleBefore: new Date("2001-01-01T00:00:00.000Z"), limit: 10 },
+    )).resolves.toEqual({ scanned: 1, queued: 1, retryable: 0, failed: 0 });
+    expect(messages).toEqual([{ submission_id: submissionId }]);
+    const row = await env.RESULTS_DB.prepare(
+      "SELECT state, safe_error, retry_count, raw_r2_key, updated_at FROM submissions",
+    ).first<{ state: string; safe_error: string | null; retry_count: number; raw_r2_key: string; updated_at: string }>();
+    expect(row).toMatchObject({ state: "queued", safe_error: null, retry_count: 9, raw_r2_key: rawKey });
+    expect(Date.parse(row!.updated_at)).toBeGreaterThan(Date.parse("2000-01-01T00:00:00.000Z"));
+    expect(await env.RAW_RESULTS.head(rawKey)).not.toBeNull();
+    await expect(recoverStaleSubmissions(
+      recoveryEnv,
+      { staleBefore: new Date("2001-01-01T00:00:00.000Z"), limit: 10 },
+    )).resolves.toEqual({ scanned: 0, queued: 0, retryable: 0, failed: 0 });
   });
 
   test("compare-and-transition changes exactly one eligible row", async () => {

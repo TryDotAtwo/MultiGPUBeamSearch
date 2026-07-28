@@ -16,6 +16,9 @@ export interface SubmissionRow {
   idempotency_key: string;
   state: SubmissionState;
   raw_r2_key: string;
+  safe_error: string | null;
+  retry_count: number;
+  updated_at: string;
 }
 
 export interface TransitionPatch {
@@ -27,14 +30,14 @@ export interface TransitionPatch {
 
 export async function findByIdempotency(db: D1Database, key: string): Promise<SubmissionRow | null> {
   return db
-    .prepare("SELECT submission_id, idempotency_key, state, raw_r2_key FROM submissions WHERE idempotency_key = ?")
+    .prepare("SELECT submission_id, idempotency_key, state, raw_r2_key, safe_error, retry_count, updated_at FROM submissions WHERE idempotency_key = ?")
     .bind(key)
     .first<SubmissionRow>();
 }
 
 export async function findBySubmissionId(db: D1Database, id: string): Promise<SubmissionRow | null> {
   return db
-    .prepare("SELECT submission_id, idempotency_key, state, raw_r2_key FROM submissions WHERE submission_id = ?")
+    .prepare("SELECT submission_id, idempotency_key, state, raw_r2_key, safe_error, retry_count, updated_at FROM submissions WHERE submission_id = ?")
     .bind(id)
     .first<SubmissionRow>();
 }
@@ -46,9 +49,9 @@ export async function findStaleRecoverable(
 ): Promise<SubmissionRow[]> {
   const result = await db
     .prepare(
-      "SELECT submission_id, idempotency_key, state, raw_r2_key FROM submissions WHERE state IN (?,?) AND updated_at <= ? ORDER BY updated_at, submission_id LIMIT ?",
+      "SELECT submission_id, idempotency_key, state, raw_r2_key, safe_error, retry_count, updated_at FROM submissions WHERE state IN (?,?,?) AND updated_at <= ? ORDER BY updated_at, submission_id LIMIT ?",
     )
-    .bind("received", "retryable", staleBefore, limit)
+    .bind("received", "queued", "retryable", staleBefore, limit)
     .all<SubmissionRow>();
   return result.results;
 }

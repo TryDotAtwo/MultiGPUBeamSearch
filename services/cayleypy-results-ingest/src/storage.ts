@@ -125,13 +125,37 @@ async function safeReadSubmission(db: D1Database, id: string): Promise<Submissio
   }
 }
 
+export async function parkPausedSubmission(
+  db: D1Database,
+  submissionId: string,
+): Promise<SubmissionRow> {
+  let changed: boolean;
+  try {
+    changed = await transition(
+      db,
+      submissionId,
+      ["received", "queued", "retryable"],
+      "retryable",
+      { safeError: "ingest_paused" },
+    );
+  } catch {
+    throw new SafeIngestError("state_transition_failed");
+  }
+
+  const current = await safeReadSubmission(db, submissionId);
+  if (current.state === "retryable" && current.safe_error === "ingest_paused") {
+    return current;
+  }
+  throw new SafeIngestError(changed ? "state_transition_failed" : "state_transition_conflict");
+}
+
 async function confirmQueueSuccess(env: IngestEnv, row: SubmissionRow, duplicate: boolean): Promise<Receipt> {
   let changed: boolean;
   try {
     changed = await transition(
       env.RESULTS_DB,
       row.submission_id,
-      ["received", "retryable"],
+      ["received", "queued", "retryable"],
       "queued",
       { safeError: null },
     );
@@ -161,7 +185,7 @@ async function confirmQueueSuccess(env: IngestEnv, row: SubmissionRow, duplicate
 
 async function confirmQueueFailure(env: IngestEnv, row: SubmissionRow, duplicate: boolean): Promise<Receipt> {
   let current = await safeReadSubmission(env.RESULTS_DB, row.submission_id);
-  if (QUEUED_OR_LATER.has(current.state)) {
+  if (current.state !== "queued" && QUEUED_OR_LATER.has(current.state)) {
     return {
       submission_id: current.submission_id,
       idempotency_key: current.idempotency_key,
@@ -169,7 +193,7 @@ async function confirmQueueFailure(env: IngestEnv, row: SubmissionRow, duplicate
       duplicate,
     };
   }
-  if (current.state !== "received" && current.state !== "retryable") {
+  if (current.state !== "received" && current.state !== "queued" && current.state !== "retryable") {
     throw new SafeIngestError("state_transition_conflict");
   }
 
@@ -178,7 +202,7 @@ async function confirmQueueFailure(env: IngestEnv, row: SubmissionRow, duplicate
     changed = await transition(
       env.RESULTS_DB,
       row.submission_id,
-      ["received", "retryable"],
+      ["received", "queued", "retryable"],
       "retryable",
       { safeError: "queue_unavailable", incrementRetryCount: true },
     );
@@ -195,7 +219,7 @@ async function confirmQueueFailure(env: IngestEnv, row: SubmissionRow, duplicate
   }
 
   current = await safeReadSubmission(env.RESULTS_DB, row.submission_id);
-  if (QUEUED_OR_LATER.has(current.state)) {
+  if (current.state !== "queued" && QUEUED_OR_LATER.has(current.state)) {
     return {
       submission_id: current.submission_id,
       idempotency_key: current.idempotency_key,
@@ -358,6 +382,9 @@ export async function receiveEnvelope(
       idempotency_key: idempotencyKey,
       state: "received",
       raw_r2_key: key,
+      safe_error: null,
+      retry_count: 0,
+      updated_at: timestamp,
     },
     false,
   );

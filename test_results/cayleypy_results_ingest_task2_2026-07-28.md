@@ -1,14 +1,54 @@
-# CayleyPy Results Ingest Task 2 round-3 verification (2026-07-29)
+# CayleyPy Results Ingest Task 2 round-4 verification (2026-07-29)
 
-## Delivered
+## Round-4 delivered
 
-- Replaced the receipt suite's handwritten D1 schema with the pinned Cloudflare migration harness. `vitest.config.ts` calls `readD1Migrations()` on the real `migrations/` directory, injects the parsed migrations through `TEST_MIGRATIONS`, and `test/apply-migrations.ts` calls `applyD1Migrations()` against Miniflare `RESULTS_DB`.
-- Added a real-migration regression test that proves `0001_initial.sql` was recorded in `d1_migrations`, `submissions_recovery` has the exact `(state,updated_at)` columns, and the deployable `state` CHECK rejects an invalid state.
-- Tightened the future operating contract without implementing Task 3. `INGEST_MODE` is the exact case-sensitive allowlist `normal|store_only|reject`; missing, empty, mixed-case, and unknown values fail closed as `reject`. Normal HTTP persists and queues, `store_only` persists raw R2 plus D1 `received` without Queue publication, and reject/fail-closed modes accept and persist nothing.
-- The scheduled recovery contract is a strict no-op outside `normal`; a stale `store_only` row remains unqueued until normal mode resumes. The future Task 4 Queue handler parks every non-normal backlog message for a fixed bounded 300 seconds before any state transition, R2/replay validation, or publication enqueue, without payload/raw-mode logs. The future GitHub writer rechecks mode immediately before external authentication or GitHub mutation and retains validated ids without `staged|published` transitions outside `normal`.
-- Added explicit future tests for all modes, stale `store_only` recovery, non-normal Queue backlog isolation, the GitHub final guard, and normal-mode resumption. No fourth operating mode was introduced.
+- Added the reusable current `parkPausedSubmission(db, submissionId)` storage primitive without implementing the Task 3 Worker or Task 4 Queue handler. It conditionally transitions `received|queued|retryable -> retryable`, writes only `safe_error=ingest_paused`, leaves `retry_count` and raw R2 untouched, refreshes `updated_at`, rereads D1, and returns only after the durable state is verified. A false transition is accepted only when that reread already proves the same park.
+- Extended bounded normal recovery to stale `queued` alongside `received|retryable`. A successful resend of the same `{submission_id}` performs `queued -> queued`, refreshes `updated_at`, clears `ingest_paused` or another stale `safe_error`, retains raw, and therefore leaves the row ineligible for the next old-cutoff cron page. Queue-send failure from queued remains recoverable as retryable and advances retry metadata.
+- Added real-migration Miniflare tests for all three park source states, unchanged retry budget/raw, 101 duplicate parks with one D1 row, transition-false+reread, repeated D1 park errors, and same-id stale-queued normal recovery. The full receipt suite grew from 19 to 23 tests.
+- Corrected the future Task 4 contract: resolve mode first; in non-normal modes parse only `submission_id`; durably park and then ACK; never call `message.retry()` after successful parking; and touch no R2/replay/publisher/token/GitHub/payload/raw-mode-log surface. D1 park failure remains on the platform retry/exhaustion path, with stale queued normal recovery as the loss-prevention backstop.
+- Corrected the future GitHub writer contract: persist validated ids durably before the final mode guard, re-arm a bounded alarm outside normal, and throw/retry if `setAlarm` fails. No Task 3/4 handler, fourth mode, Cloudflare resource, deployment, secret, GitHub mutation, or public publication was added.
 
-## TDD and v13 failure evidence
+## TDD RED: private CPU v15
+
+- Kernel: `trydotatwo/cayleypy-results-ingest-npm-gate`, immutable version 15.
+- Terminal notebook status: `KernelWorkerStatus.COMPLETE`; the embedded gate correctly records RED because command results are captured rather than raised as a notebook exception.
+- Pulled metadata: expected id, `is_private=true`, `enable_gpu=false`, `enable_tpu=false`, `machine_shape=None`, `enable_internet=true`.
+- Node `v20.19.0`; npm `10.8.2`; lock generation and `npm ci` passed.
+- `npm test`: RED. Schema was 11/11 green; the existing receipt suite was 19/19 green; exactly four new tests failed with `expected undefined to be type of 'function'` because `parkPausedSubmission` did not exist. TypeScript typecheck passed, `npm-test` exited 1, and `all_commands_passed=false`.
+- Exact RED payload anchors: `src/db.ts=a16b27d6c09808a22a52824f9a1b8997b86e6898c8b6d04463df8c4551378221`, `src/storage.ts=5727b582b69318766f07c60f859a7603097922572df9bfa8723ffb5e3f8e6553`, `test/receipt.test.ts=f1428d528a226d70ec7304e7b67e678021d2c03fb189e5a80e98c009c923fad9`.
+
+Preserved v15 evidence SHA-256:
+
+- `outputs_v15/payload-sha256.json`: `aaec5cb3418b0070cfbf2f143f806eb4facdc3bced2fffcd0d490836b1b45442`
+- `outputs_v15/npm-test.log`: `73c53a298c8b58cc16104d5f4cc95602bf5ade66f605a03fa6b474a01da162a7`
+- `outputs_v15/npm-gate-results.json`: `2e0e7fad28ae683ff85535a11a6aa2cdfd8ebf081507685ec7a48622eced77ba`
+- `pulled_v15/kernel-metadata.json`: `572d93ed4dd74d3aeabba1951ab4e098cbf6d217219c5b9edddab17bdbb35ae0`
+- `pulled_v15/cayleypy-results-ingest-npm-gate.ipynb`: `901795f45e754e145ff5aacfdde788fc338ba3d84058544cc4e77f6af02279a3`
+
+## GREEN: private CPU v16
+
+- Kernel: `trydotatwo/cayleypy-results-ingest-npm-gate`, immutable version 16; terminal status `KernelWorkerStatus.COMPLETE`.
+- Pulled metadata again proves private CPU execution with Internet enabled and no GPU/TPU/machine shape.
+- All six gate commands exited 0: Node/npm version checks, lock-only install, `npm ci`, `npm test`, and `npm run typecheck`; `all_commands_passed=true`.
+- `npm test`: PASS - 11/11 schema tests and 23/23 real Miniflare migration/D1/R2 receipt/recovery tests. The 101-duplicate park case itself took 1.620 seconds. The pinned runtime still emits the recorded compatibility fallback warning from requested `2026-07-28` to supported `2025-07-12`.
+- Exact downloaded `payload-sha256.json` was rechecked against all 15 current worktree inputs: 15 checked, zero mismatches.
+
+Key v16 embedded payload SHA-256 values:
+
+- `migrations/0001_initial.sql`: `8c3fe6fdc4381e123a901593962194f90aae7bfc484e6a6f5685195d05cb0ba6`
+- `src/db.ts`: `d46481ee7eb8a7d2cbc3673f305566b31b6605eb4c6cae1d7547cfbec72a6609`
+- `src/storage.ts`: `33bd45217acef630ed8bb54b70facd9b69776b6a8c5bfb34721d4e79d9dd14bf`
+- `test/receipt.test.ts`: `686b3beb31adb722f1647bbd8a9ab95807edb06419222178cfe436eb1b2e6094`
+
+Preserved v16 evidence SHA-256:
+
+- `outputs_v16/payload-sha256.json`: `4ed67212b37f336527f475f212cc1ea586bc49bf91f0b0184c2151e25facf91f`
+- `outputs_v16/npm-test.log`: `e7d4b0cf734a14a9f598975096667c5760aeef9a57c0bece7bd2c0ac920bd34a`
+- `outputs_v16/npm-gate-results.json`: `7f0bc2d34a6c521dade186bc3076f0a0cc6a1fd3676806b747cb322284130132`
+- `pulled_v16/kernel-metadata.json`: `572d93ed4dd74d3aeabba1951ab4e098cbf6d217219c5b9edddab17bdbb35ae0`
+- `pulled_v16/cayleypy-results-ingest-npm-gate.ipynb`: `29ab7adc4e402752b5c0756807a5a8814b3c55d352649e539bbe16b5eb0f9107`
+
+## Prior round-3 TDD and v13 failure evidence
 
 The migration contract was first exercised against the old handwritten receipt schema and failed because it lacked the deployable `state` CHECK and `submissions_recovery` index. Exact private Kaggle v13 then provided the runtime RED case for the first raw-loader implementation: 11/11 schema tests passed and TypeScript typecheck passed, but `env.RESULTS_DB.exec()` treated the multiline `CREATE TABLE` as incomplete, so the receipt suite failed in setup and all 19 receipt tests were skipped. `npm test` exited 1 and `all_commands_passed=false`.
 
@@ -16,7 +56,7 @@ Kaggle versions are immutable, so v13 could not be corrected in place. Its failu
 
 The fix follows the exact APIs exported by pinned `@cloudflare/vitest-pool-workers=0.8.55`: Node-side `readD1Migrations()` delegates SQL splitting to Wrangler, and Worker-side `applyD1Migrations()` applies and records the parsed migration. This avoids both raw multiline `D1.exec()` and a second handwritten schema.
 
-## Private CPU v14 runtime gate
+## Prior private CPU v14 runtime gate
 
 - Kernel: `trydotatwo/cayleypy-results-ingest-npm-gate`, version 14.
 - Terminal status: `KernelWorkerStatus.COMPLETE`.
@@ -50,4 +90,4 @@ The downloaded regenerated lockfile is text-equivalent to the embedded lockfile;
 
 ## Boundaries and runtime note
 
-No Task 3 Worker source, Cloudflare deployment/resource/secret, git push, or public publication was created. The failed local npm installs left only a partial `node_modules` tree, which was removed before staging; the exact private v14 gate is the dependency/runtime verification. The pinned Vitest pool still warns that its newest emulated compatibility date is `2025-07-12` and falls back from configured `2026-07-28`; this limitation is recorded and no dependency upgrade was made.
+No Task 3 Worker source, Task 4 consumer/replay source, GitHub writer implementation, Cloudflare deployment/resource/secret, git push, GitHub mutation, or public publication was created. The exact private v16 gate is the dependency/runtime verification; v15 preserves the behavior-first RED evidence. The pinned Vitest pool still warns that its newest emulated compatibility date is `2025-07-12` and falls back from configured `2026-07-28`; this limitation is recorded and no dependency upgrade was made. Kaggle's Windows CLI downloaded every requested artifact before returning exit 1 on console encoding of a checkmark; the JSON results and files above are complete and were inspected directly.
