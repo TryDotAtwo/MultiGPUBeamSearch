@@ -32,6 +32,10 @@ const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true }
 addFormats(ajv);
 const validate = ajv.compile(schema);
 
+function isResultBatchV1(value: unknown): value is ResultBatchV1 {
+  return validate(value);
+}
+
 export function validateBatch(value: unknown, rawByteLength?: number): ValidationResult {
   let serialized: string;
   try { serialized = JSON.stringify(value); } catch { return { ok: false, errors: [{ path: "", keyword: "serialization" }] }; }
@@ -39,8 +43,8 @@ export function validateBatch(value: unknown, rawByteLength?: number): Validatio
   if (byteLength === undefined || byteLength > MAX_SERIALIZED_BATCH_BYTES) {
     return { ok: false, errors: [{ path: "", keyword: "maxBytes" }] };
   }
-  if (!validate(value)) {
+  if (!isResultBatchV1(value)) {
     return { ok: false, errors: (validate.errors ?? []).map((error) => ({ path: error.instancePath, keyword: error.keyword })) };
   }
-  return { ok: true, value: value as ResultBatchV1 };
+  return { ok: true, value };
 }

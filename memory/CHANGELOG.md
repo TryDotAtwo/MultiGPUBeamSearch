@@ -765,3 +765,5 @@
 - Hardened CayleyPy ingest schema validation by enabling pinned Ajv format checks for UUID, URI, and date-time fields, and by accepting the ingress-provided raw request byte length for the exact 25 MiB gate while retaining canonical-size fallback validation.
 
 - Corrected the CayleyPy ingest Worker type package to the exact confirmed-published @cloudflare/workers-types=5.20260727.1; no floating dependency range or lockfile was introduced while npm connectivity remained unavailable.
+
+- Completed the CayleyPy results-ingest npm runtime gate on private CPU Kaggle kernel trydotatwo/cayleypy-results-ingest-npm-gate v3. Pinned Wrangler-compatible Worker Types 4.20260702.1, retained batch-level safe JSON pointers, replaced the Ajv success cast with a type guard, and integrated the exact Kaggle lockfile. Kaggle Node 20.19.0/npm 10.8.2 passed lock generation, npm ci, 11/11 Vitest tests, and TypeScript typecheck.

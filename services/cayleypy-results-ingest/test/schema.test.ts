@@ -37,7 +37,7 @@ describe("validateBatch", () => {
 
   test("rejects an unknown envelope field without echoing its value", () => {
     const result = validate({ ...validResult(), unexpected: "private-token-value" });
-    expect(result).toMatchObject({ ok: false, errors: [{ path: "", keyword: "additionalProperties" }] });
+    expect(result).toMatchObject({ ok: false, errors: [{ path: "/results/0", keyword: "additionalProperties" }] });
     expect(JSON.stringify(result)).not.toContain("private-token-value");
   });
 
@@ -46,9 +46,9 @@ describe("validateBatch", () => {
     expect(result).toMatchObject({ ok: false, errors: [{ path: "/schema_version", keyword: "const" }] });
   });
   test.each([
-    ["submission UUID", { submission_id: "not-a-uuid" }, "/submission_id"],
-    ["submission timestamp", { submitted_at: "2026-99-99" }, "/submitted_at"],
-    ["Kaggle run URL", { kaggle: { ...validResult().kaggle, run_url: "not a url" } }, "/kaggle/run_url"],
+    ["submission UUID", { submission_id: "not-a-uuid" }, "/results/0/submission_id"],
+    ["submission timestamp", { submitted_at: "2026-99-99" }, "/results/0/submitted_at"],
+    ["Kaggle run URL", { kaggle: { ...validResult().kaggle, run_url: "not a url" } }, "/results/0/kaggle/run_url"],
   ])("rejects an invalid %s format", (_label, patch, path) => {
     const result = validate({ ...validResult(), ...patch });
     expect(result).toMatchObject({ ok: false, errors: [{ path, keyword: "format" }] });
@@ -66,7 +66,7 @@ describe("validateBatch", () => {
 
   test("rejects invalid closed enums", () => {
     const result = validate({ ...validResult(), runtime: { ...validResult().runtime, solution_mode: "unbounded" } });
-    expect(result).toMatchObject({ ok: false, errors: [{ path: "/runtime/solution_mode", keyword: "enum" }] });
+    expect(result).toMatchObject({ ok: false, errors: [{ path: "/results/0/runtime/solution_mode", keyword: "enum" }] });
   });
 
   test("rejects batches with more than one hundred results", () => {

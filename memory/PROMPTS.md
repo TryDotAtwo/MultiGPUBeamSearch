@@ -424,3 +424,5 @@
 - Review required CayleyPy ingest Task 1 to enforce UUID/date-time/URI formats, use exact ingress raw byte length for the 25 MiB cap, add regression tests, and remove only worktree-local npm caches while retaining the unavailable npm gate as an explicit concern.
 
 - Review required replacing unavailable @cloudflare/workers-types=4.20260728.0 with exact confirmed-published 5.20260727.1, removing only the recreated package-local npm cache, and retaining the npm CONNECT timeout/HTTP 502 gate as an explicit blocker without inventing a lockfile.
+
+- User requested the missing CayleyPy ingest Task 1 dependency/runtime gate on private CPU Kaggle kernel trydotatwo/cayleypy-results-ingest-npm-gate, with committed inputs, npm lock/ci/test/typecheck evidence, exact lockfile integration, bounded config-only reruns, private metadata, GPU disabled, Internet enabled, and no Cloudflare deployment.
