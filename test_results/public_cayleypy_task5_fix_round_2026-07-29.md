@@ -11,10 +11,11 @@ Scope: Python orchestration plus host-only collection control in `production_run
 - Subprocess lifecycle/partial diagnostics RED: `4 failed, 35 deselected`.
 - Rank-symmetric processing-error RED: one focused failure.
 - Rank-local next-K exchange RED: one focused failure.
+- Exact-prefix and finite-seconds parser P2 RED: `6 failed, 2 passed, 41 deselected`.
 
 ## Verified contracts
 
-- anchored release first-mode parsing with strict torchrun-prefix normalization, exact ids/depths/lengths, empty paths, legacy release compatibility, and exact-line debug fallback;
+- anchored release first-mode parsing with normalization of exactly `[default0]:`, hostile-prefix rejection, a finite nonnegative decimal seconds grammar with an optional valid exponent, exact ids/depths/lengths, empty paths, legacy release compatibility, and exact-line debug fallback;
 - inherited `BEAM_*` and reserved torchrun rank/master/torchelastic variables removed before the explicit invocation environment, while `PATH` and CUDA visibility remain available;
 - validated external sources are original-oriented submission/reflection candidates with SHA provenance; independently discovered exact duplicates retain solver provenance;
 - inverse closure and all reflection-source paths fail before any subprocess;
@@ -34,6 +35,6 @@ python -m pytest tests/cayleypy_public -q
 git diff --check
 ```
 
-Results: runner `41 passed`; focused paths+runner `54 passed`; full public package `97 passed`.
+Results: runner `49 passed`; focused paths+runner `62 passed`; full public package `105 passed`.
 
 No local CUDA compile/GPU claim: CUDA toolkits are installed, but this Windows environment has no `cl.exe` or configured NCCL build toolchain.

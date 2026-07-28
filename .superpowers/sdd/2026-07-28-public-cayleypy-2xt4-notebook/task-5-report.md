@@ -21,10 +21,11 @@ The second review began from exact commit `022b5399c8bf81de4bd33693fd927b5137d6e
 - live-child stream failure, kill fallback, cleanup masking, and partial artifacts: `4 failed, 35 deselected`;
 - rank-symmetric post-reconstruction failure handling: one focused failure;
 - rank-local next-K exchange optimization: one focused failure.
+- exact-prefix and finite-seconds parser P2: `6 failed, 2 passed, 41 deselected` before the narrow fix.
 
 ### GREEN implementation
 
-First-mode parsing now consumes the real anchored release record, including exact puzzle id, `solution_length`, `found_depth`, `touch_depth`, and an empty solution path. It accepts the legacy release record as `found_depth=solution_length, touch_depth=0`, retains exact-line debug `solution_path` compatibility, and strips only a strict torchrun tee prefix such as `[default0]:`. Unrelated log text is never searched as a substring. Both first-mode C++ release branches emit found/touch depths. Child environments retain ordinary runtime controls such as `PATH` and `CUDA_VISIBLE_DEVICES`, but remove every inherited `BEAM_*` and reserved torchrun rank/master/torchelastic variable before applying the explicit invocation contract.
+First-mode parsing now consumes the real anchored release record, including exact puzzle id, `solution_length`, `found_depth`, `touch_depth`, and an empty solution path. It accepts the legacy release record as `found_depth=solution_length, touch_depth=0`, retains exact-line debug `solution_path` compatibility, and normalizes exactly the fixed `--tee=0:3` rank-0 prefix `[default0]:`; hostile lookalike prefixes remain ordinary unrelated text. Release seconds use a nonnegative decimal grammar with an optional valid exponent and must convert to a finite float. Unrelated log text is never searched as a substring. Both first-mode C++ release branches emit found/touch depths. Child environments retain ordinary runtime controls such as `PATH` and `CUDA_VISIBLE_DEVICES`, but remove every inherited `BEAM_*` and reserved torchrun rank/master/torchelastic variable before applying the explicit invocation contract.
 
 Validated external reflection sources are first-class original-oriented solution candidates before any GPU launch and retain their source SHA-256. Source-only solutions can populate the submission, shorter sources beat longer reflected results, and `after_original` uses a deterministic union of external and newly discovered sources. Exact semantic duplicates retain the stronger original/reflected solver provenance. Generator inverse closure is validated globally before the first original or reflected subprocess.
 
@@ -37,9 +38,9 @@ No CUDA kernel, Stream 1-5 algorithm, device struct, or device-buffer contract w
 ## Verification
 
 - `python -m py_compile tools/cayleypy_public/runner.py tools/cayleypy_public/paths.py tests/cayleypy_public/test_runner.py tests/cayleypy_public/test_paths.py tests/cayleypy_public/fixtures/fake_production_runner.py`
-- `python -m pytest tests/cayleypy_public/test_runner.py -q` -> `41 passed`
-- `python -m pytest tests/cayleypy_public/test_paths.py tests/cayleypy_public/test_runner.py -q` -> `54 passed`
-- `python -m pytest tests/cayleypy_public -q` -> `97 passed`
+- `python -m pytest tests/cayleypy_public/test_runner.py -q` -> `49 passed`
+- `python -m pytest tests/cayleypy_public/test_paths.py tests/cayleypy_public/test_runner.py -q` -> `62 passed`
+- `python -m pytest tests/cayleypy_public -q` -> `105 passed`
 - `git diff --check`
 
 The local Windows checkout has CUDA toolkits but no `cl.exe` or configured NCCL build toolchain, so this round makes no local `production_runner` compile or GPU-run claim. The C++ host-only changes are covered by executable Python contract mirrors and focused source-contract regressions; a real 2xT4 build/run remains the downstream notebook acceptance gate.

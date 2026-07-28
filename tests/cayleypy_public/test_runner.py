@@ -387,6 +387,43 @@ def test_debug_solution_path_compatibility_is_anchored_to_a_complete_line() -> N
     assert [record.path for record in tee_compatible.records] == ["counterclockwise"]
 
 
+def test_only_real_rank0_tee_prefix_is_normalized() -> None:
+    hostile_debug = runner.parse_runner_output(
+        "[evil]:solution_path=counterclockwise\n", None, 7, "original"
+    )
+    hostile_release = runner.parse_runner_output(
+        "[evil]:puzzle_solved=1 puzzle_id=7 seconds=0 solution_length=0 "
+        "found_depth=0 touch_depth=0 solution=\n",
+        None,
+        7,
+        "original",
+    )
+    real_empty_release = runner.parse_runner_output(
+        "[default0]:puzzle_solved=1 puzzle_id=7 seconds=0e+0 solution_length=0 "
+        "found_depth=0 touch_depth=0 solution=\n",
+        None,
+        7,
+        "original",
+    )
+
+    assert hostile_debug.records == ()
+    assert hostile_release.records == ()
+    assert [
+        (record.path, record.found_depth, record.touch_depth)
+        for record in real_empty_release.records
+    ] == [("", 0, 0)]
+
+
+@pytest.mark.parametrize("seconds", ("e+-", "NaN", "Inf", "+", "-", "-1", "1e9999"))
+def test_release_first_mode_parser_rejects_malformed_or_nonfinite_seconds(seconds: str) -> None:
+    line = (
+        f"puzzle_solved=1 puzzle_id=7 seconds={seconds} solution_length=0 "
+        "found_depth=0 touch_depth=0 solution=\n"
+    )
+
+    with pytest.raises(ValueError, match="malformed|finite"):
+        runner.parse_runner_output(line, None, 7, "original")
+
 def test_real_tsv_schema_prefers_solution_path_and_maps_depths_adversarially(tmp_path: Path) -> None:
     result_tsv = tmp_path / "results.tsv"
     result_tsv.write_text(

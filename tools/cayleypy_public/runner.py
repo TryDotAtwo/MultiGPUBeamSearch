@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
 import csv
+import math
 import os
 import re
 import shutil
@@ -57,16 +58,16 @@ _TORCHRUN_RESERVED_ENV_KEYS = frozenset({
     "PYTHON_EXEC",
 })
 _RELEASE_SOLUTION_RE = re.compile(
-    r"puzzle_solved=1 puzzle_id=(?P<puzzle_id>\d+) seconds=(?P<seconds>[0-9.eE+-]+) "
+    r"puzzle_solved=1 puzzle_id=(?P<puzzle_id>\d+) seconds=(?P<seconds>[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?) "
     r"solution_length=(?P<solution_length>\d+) found_depth=(?P<found_depth>\d+) "
     r"touch_depth=(?P<touch_depth>\d+) solution=(?P<solution>.*)"
 )
 _RELEASE_SOLUTION_LEGACY_RE = re.compile(
-    r"puzzle_solved=1 puzzle_id=(?P<puzzle_id>\d+) seconds=(?P<seconds>[0-9.eE+-]+) "
+    r"puzzle_solved=1 puzzle_id=(?P<puzzle_id>\d+) seconds=(?P<seconds>[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?) "
     r"solution_length=(?P<solution_length>\d+) solution=(?P<solution>.*)"
 )
 _DEBUG_SOLUTION_PATH_RE = re.compile(r"solution_path=(?P<solution>.*)")
-_TORCHRUN_TEE_PREFIX_RE = re.compile(r"\[[^]\r\n]+\]:(?P<line>.*)")
+_TORCHRUN_TEE_PREFIX_RE = re.compile(r"\[default0\]:(?P<line>.*)")
 _HISTORY_MODE = "static_hybrid"
 _HISTORY_SLOT_COUNT = 2
 _HISTORY_WORKERS = 1
@@ -455,6 +456,9 @@ def parse_runner_output(
                 legacy = match is not None
             if match is None:
                 raise ValueError("malformed puzzle_solved=1 release line")
+            seconds = float(match.group("seconds"))
+            if not math.isfinite(seconds):
+                raise ValueError("release solution seconds must be finite")
             release_puzzle_id = int(match.group("puzzle_id"))
             if release_puzzle_id != puzzle_id:
                 raise ValueError(
