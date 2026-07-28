@@ -415,3 +415,6 @@
   `depth_done=8` timings. Once profiles and the notebook are ready, run exactly
   one output-24 and one output-1 final solve on puzzle 0 with beam `2**21` and
   maximum depth 100; both models must return valid solutions.
+
+- User requested a public standard-CayleyPy Kaggle notebook for real 2xT4 MultiGPUBeamSearch. It must accept the standard puzzle_info.json/test.csv/sample_submission.csv structure, one supported checkpoint with automatic batchnorm-folded or resmlp-layernorm detection and automatic fp16 on T4, output_dim exactly 1 or move_count, inclusive puzzle range, reflection modes off/after_original/only, first or bounded collect-until-depth solution modes, configurable solved-neighborhood BFS touch radius, nearest measured beam profile selection, independent path validation, and maximal reproducibility artifacts.
+- User requested automatic best-effort result publication without a user GitHub token through a Cloudflare service backed by a GitHub App. It must support at least 100 concurrent publishers without loss or git conflicts, retain author/puzzle/model/run provenance, preserve accepted raw payloads, validate paths, deduplicate idempotently, and publish append-only records to TryDotAtwo/cayleypy-beam-results through a staging/CI gate.
