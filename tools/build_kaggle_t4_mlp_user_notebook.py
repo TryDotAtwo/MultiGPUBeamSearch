@@ -27,7 +27,7 @@ CONFIG = r'''
 from pathlib import Path
 
 # USER SETTINGS — normally this is the only cell to edit.
-MODEL_SOURCE_MODE = "checkpoint"  # checkpoint | repository_exported
+MODEL_SOURCE_MODE = "repository_exported"  # checkpoint | repository_exported
 CHECKPOINT_PATH = Path("/kaggle/input/models/arabidopsisthalian/megaminx2048-512-8-e4000/pytorch/default/1/weights_megaminx2048_512_8_e4000.pth")
 CHECKPOINT_FORMAT = "batchnorm-folded"  # batchnorm-folded | resmlp-layernorm
 MODEL_DTYPE = "fp16"  # fp16 on T4
