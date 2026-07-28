@@ -45,6 +45,14 @@ describe("validateBatch", () => {
     const result = validateBatch({ schema_version: 2, results: [validResult()] });
     expect(result).toMatchObject({ ok: false, errors: [{ path: "/schema_version", keyword: "const" }] });
   });
+  test.each([
+    ["submission UUID", { submission_id: "not-a-uuid" }, "/submission_id"],
+    ["submission timestamp", { submitted_at: "2026-99-99" }, "/submitted_at"],
+    ["Kaggle run URL", { kaggle: { ...validResult().kaggle, run_url: "not a url" } }, "/kaggle/run_url"],
+  ])("rejects an invalid %s format", (_label, patch, path) => {
+    const result = validate({ ...validResult(), ...patch });
+    expect(result).toMatchObject({ ok: false, errors: [{ path, keyword: "format" }] });
+  });
 
   test("rejects oversized author names, paths, and proofs", () => {
     for (const result of [
@@ -69,5 +77,10 @@ describe("validateBatch", () => {
   test("rejects a serialized request larger than twenty-five MiB", () => {
     const result = validateBatch({ schema_version: 1, results: [validResult()], padding: "x".repeat(25 * 1024 * 1024) });
     expect(result).toMatchObject({ ok: false });
+  });
+  test("uses ingress raw byte length even when parsed JSON is compact", () => {
+    const batch = { schema_version: 1, results: [validResult()] };
+    const result = validateBatch(batch, 25 * 1024 * 1024 + 1);
+    expect(result).toEqual({ ok: false, errors: [{ path: "", keyword: "maxBytes" }] });
   });
 });

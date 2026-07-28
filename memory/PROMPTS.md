@@ -420,3 +420,5 @@
 - User requested automatic best-effort result publication without a user GitHub token through a Cloudflare service backed by a GitHub App. It must support at least 100 concurrent publishers without loss or git conflicts, retain author/puzzle/model/run provenance, preserve accepted raw payloads, validate paths, deduplicate idempotently, and publish append-only records to TryDotAtwo/cayleypy-beam-results through a staging/CI gate.
 
 - User requested Task 1 of the CayleyPy Results Ingest plan: build the strict Worker schema/local runtime with exact pinned dependencies, safe Ajv validation, bounded batch/envelope fields, logical staging/production bindings without resource ids, tests, typecheck, and no Cloudflare deployment or external resource creation.
+
+- Review required CayleyPy ingest Task 1 to enforce UUID/date-time/URI formats, use exact ingress raw byte length for the 25 MiB cap, add regression tests, and remove only worktree-local npm caches while retaining the unavailable npm gate as an explicit concern.

@@ -761,3 +761,5 @@
 - Polished the universal Megaminx 2xT4 notebook for other users: the header now has a Quick start, exact supported architecture/output contract, explicit checkpoint attachment instructions, nearest-profile/alignment behavior, and artifact descriptions. Added contract tests for these user-facing sections; runtime and solver algorithms are unchanged.
 
 - Added the initial CayleyPy results-ingest Worker scaffold: a pinned local TypeScript runtime, strict version-one JSON Schema, compiled Ajv batch validation with value-free errors, and logical Cloudflare binding names without resource identifiers. No Cloudflare resources were created or deployed.
+
+- Hardened CayleyPy ingest schema validation by enabling pinned Ajv format checks for UUID, URI, and date-time fields, and by accepting the ingress-provided raw request byte length for the exact 25 MiB gate while retaining canonical-size fallback validation.

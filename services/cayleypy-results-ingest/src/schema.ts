@@ -1,4 +1,5 @@
 import Ajv2020 from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
 import schema from "../../../configs/cayleypy_results_schema_v1.json";
 
 export interface ResultEnvelopeV1 {
@@ -27,12 +28,15 @@ export interface SafeSchemaError { path: string; keyword: string }
 export type ValidationResult = { ok: true; value: ResultBatchV1 } | { ok: false; errors: SafeSchemaError[] };
 
 const MAX_SERIALIZED_BATCH_BYTES = 25 * 1024 * 1024;
-const validate = new Ajv2020({ allErrors: true, strict: true, validateFormats: false }).compile(schema);
+const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
+addFormats(ajv);
+const validate = ajv.compile(schema);
 
-export function validateBatch(value: unknown): ValidationResult {
+export function validateBatch(value: unknown, rawByteLength?: number): ValidationResult {
   let serialized: string;
   try { serialized = JSON.stringify(value); } catch { return { ok: false, errors: [{ path: "", keyword: "serialization" }] }; }
-  if (serialized === undefined || new TextEncoder().encode(serialized).byteLength > MAX_SERIALIZED_BATCH_BYTES) {
+  const byteLength = rawByteLength ?? (serialized === undefined ? undefined : new TextEncoder().encode(serialized).byteLength);
+  if (byteLength === undefined || byteLength > MAX_SERIALIZED_BATCH_BYTES) {
     return { ok: false, errors: [{ path: "", keyword: "maxBytes" }] };
   }
   if (!validate(value)) {
