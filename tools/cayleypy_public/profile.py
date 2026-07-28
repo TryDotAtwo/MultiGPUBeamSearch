@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from tools.kaggle_t4_mlp_profiles import align_beam
@@ -33,7 +34,7 @@ class RuntimePlan:
     parent_batch: int
     stream3_batch_candidates: int
     shard_capacity_candidates: int
-    runtime: dict[str, int]
+    runtime: Mapping[str, int]
     cross_puzzle_profile_note: str
 
 
@@ -68,6 +69,8 @@ def derive_runtime(
     requested_beam = _positive_int(beam_width, "beam_width")
     moves = _positive_int(move_count, "move_count")
     ranks = _positive_int(world_size, "world_size")
+    if ranks != 2:
+        raise ValueError("world_size must be exactly 2 for kaggle_2xt4")
     if profile.get("validation_status") != "measured":
         raise ValueError("profile validation_status must be measured")
 
@@ -112,7 +115,7 @@ def derive_runtime(
         parent_batch=parent_batch,
         stream3_batch_candidates=stream3_batch,
         shard_capacity_candidates=capacity,
-        runtime=runtime,
+        runtime=MappingProxyType(dict(runtime)),
         cross_puzzle_profile_note="measured_24_move_seed" if moves != 24 else "",
     )
 
@@ -146,7 +149,17 @@ def serialize_preflight(
         "profile_evidence": dict(evidence),
         "hardware": hardware,
         "move_count": moves,
-        **asdict(plan),
+        "requested_beam": plan.requested_beam,
+        "effective_beam": plan.effective_beam,
+        "alignment_delta": plan.alignment_delta,
+        "profile_power": plan.profile_power,
+        "model_class": plan.model_class,
+        "local_beam": plan.local_beam,
+        "parent_batch": plan.parent_batch,
+        "stream3_batch_candidates": plan.stream3_batch_candidates,
+        "shard_capacity_candidates": plan.shard_capacity_candidates,
+        "runtime": dict(plan.runtime),
+        "cross_puzzle_profile_note": plan.cross_puzzle_profile_note,
         "capacity_derivation": {
             "stream3_batch_candidates": plan.stream3_batch_candidates,
             "stream4_batch_candidates": plan.runtime["stream4_batch_candidates"],

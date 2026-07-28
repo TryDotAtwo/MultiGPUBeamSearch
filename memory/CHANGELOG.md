@@ -770,3 +770,5 @@
 - Made public checkpoint export attestation pre-promotion: the source SHA-256 is computed before exporting and reused after validation, while missing nested output parents are created before temporary sibling allocation.
 
 - Added public CayleyPy 2xT4 runtime-plan derivation from measured profiles. The preflight preserves the requested beam except for documented distributed alignment, derives parent and Stream3 batches from the actual move count, enforces 1024-aligned shard capacity floors, records measured evidence/history budgets, and fails closed for unmeasured profiles or insufficient /tmp history disk. CUDA/C++ algorithms are unchanged.
+
+- Hardened the public CayleyPy 2xT4 runtime plan: only world size 2 is accepted, and the derived runtime mapping is immutable while preflight serialization emits a detached JSON-safe copy.

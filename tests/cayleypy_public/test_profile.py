@@ -45,6 +45,21 @@ def test_derive_runtime_marks_cross_puzzle_18_move_use() -> None:
     assert plan.local_beam == plan.effective_beam // 2
 
 
+@pytest.mark.parametrize("world_size", [1, 4])
+def test_derive_runtime_rejects_non_2xt4_world_sizes(world_size: int) -> None:
+    profile = select_profile(REGISTRY, 2**20, output_dim=1, move_count=24)
+
+    with pytest.raises(ValueError, match="world_size"):
+        derive_runtime(profile, 2**20, output_dim=1, move_count=24, world_size=world_size)
+
+
+def test_runtime_mapping_cannot_be_mutated_after_derivation() -> None:
+    profile = select_profile(REGISTRY, 2**20, output_dim=1, move_count=24)
+    plan = derive_runtime(profile, 2**20, output_dim=1, move_count=24)
+
+    with pytest.raises(TypeError):
+        plan.runtime["stream4_batch_candidates"] = 1  # type: ignore[index]
+    assert serialize_preflight(plan, profile, 24, 1, 100, 100)["runtime"]["stream4_batch_candidates"] == 98_304
 def test_preflight_serialization_records_evidence_budgets_and_tmp_guard() -> None:
     profile = select_profile(REGISTRY, 2**20, output_dim=24, move_count=24)
     plan = derive_runtime(profile, 2**20, output_dim=24, move_count=24)
