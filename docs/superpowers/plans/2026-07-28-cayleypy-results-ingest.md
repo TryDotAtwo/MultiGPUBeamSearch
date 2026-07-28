@@ -4,7 +4,7 @@
 
 **Goal:** Deploy a public Cloudflare ingestion service that accepts validated CayleyPy notebook result envelopes from at least 100 concurrent clients, durably preserves accepted payloads, independently replays solutions, and safely publishes append-only records to `TryDotAtwo/cayleypy-beam-results` through a GitHub App and CI gate.
 
-**Architecture:** A stateless Worker validates and persists each request to R2 and D1 before returning `202`, then enqueues per-result jobs. Queue consumers replay solutions and update an idempotent D1 state machine. A Durable Object serializes/batches GitHub App writes to a staging branch; the results repository independently validates append-only records and deterministic indexes before auto-merge. Raw accepted payloads and exhausted failures remain recoverable in R2/DLQ.
+**Architecture:** In `normal`, a stateless Worker validates and persists each request to R2 and D1 before returning `202`, then enqueues per-result jobs. In `store_only` it persists accepted receipts without Queue publication, while `reject` and fail-closed modes persist nothing. Queue consumers replay solutions and update an idempotent D1 state machine. A Durable Object serializes/batches GitHub App writes to a staging branch; the results repository independently validates append-only records and deterministic indexes before auto-merge. Raw accepted payloads and exhausted failures remain recoverable in R2/DLQ.
 
 **Tech Stack:** Cloudflare Workers TypeScript, Wrangler, D1, R2, Queues, Durable Objects, Vitest/Miniflare, Ajv JSON Schema, `jose` GitHub App JWT, GitHub Actions, Python 3.12 CI replay/index tools, k6 load testing.
 
@@ -21,6 +21,7 @@
 - Use append-only unique result files; derive indexes later.
 - Claimed authors are explicitly marked unverified until a future identity layer exists.
 - A GitHub outage must not lose accepted results.
+- Treat `INGEST_MODE` as the exact case-sensitive allowlist `normal|store_only|reject`; missing, empty, mixed-case, and unknown values fail closed as `reject`.
 - Do not deploy production or publish the Kaggle notebook until 100-client load/recovery, secret, and append-only gates pass.
 
 ---
@@ -141,6 +142,8 @@ git commit -m "feat: scaffold strict CayleyPy results Worker"
 - Create: `services/cayleypy-results-ingest/src/db.ts`
 - Create: `services/cayleypy-results-ingest/src/storage.ts`
 - Create: `services/cayleypy-results-ingest/test/receipt.test.ts`
+- Create: `services/cayleypy-results-ingest/test/apply-migrations.ts`
+- Modify: `services/cayleypy-results-ingest/vitest.config.ts`
 
 **Interfaces:**
 - Produces: `canonicalJson(value: unknown) -> string`
@@ -175,9 +178,11 @@ CREATE INDEX submissions_run ON submissions(run_id,created_at);
 CREATE INDEX submissions_recovery ON submissions(state,updated_at);
 ```
 
+The Miniflare receipt suite must load the real migration directory with pinned `readD1Migrations()`, pass those parsed migrations through a test-only binding, and apply them with `applyD1Migrations()`; it must not maintain a handwritten test-schema copy.
+
 - [ ] **Step 2: Write failing durability/idempotency tests**
 
-Use Miniflare bindings. Assert R2 `put` occurs before D1 received/queued state and before the returned receipt. Inject Queue failure: raw object and `retryable` row remain. Submit the same idempotency key twice: return the original submission id and enqueue once before the bounded wait expires. Also cover a stale `received` duplicate resend, crash-before-send recovery, retryable sweeping, immediate consumer progress before the producer marks `queued`, recovery duplication with one D1 row, retry-page fairness beyond `limit`, and clearing stale `safe_error` after success.
+Use Miniflare bindings initialized from the exact migration bytes. Assert the deployable `state` CHECK rejects an invalid state and `PRAGMA index_info('submissions_recovery')` returns columns `state,updated_at`. Assert R2 `put` occurs before D1 received/queued state and before the returned receipt. Inject Queue failure: raw object and `retryable` row remain. Submit the same idempotency key twice: return the original submission id and enqueue once before the bounded wait expires. Also cover a stale `received` duplicate resend, crash-before-send recovery, retryable sweeping, immediate consumer progress before the producer marks `queued`, recovery duplication with one D1 row, retry-page fairness beyond `limit`, and clearing stale `safe_error` after success.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -234,11 +239,12 @@ git commit -m "feat: persist CayleyPy result receipts durably"
 **Interfaces:**
 - Produces routes: `POST /v1/results`, `GET /v1/submissions/:id`, `GET /healthz`.
 - `POST` returns `202 { receipts: [{ submission_id, idempotency_key, status_url }] }`.
-- Produces `scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void>` with `RECOVERY_STALE_MS = 60_000` and `RECOVERY_LIMIT = 50`. It computes `staleBefore = new Date(controller.scheduledTime - RECOVERY_STALE_MS)` and calls `recoverStaleSubmissions(env, { staleBefore, limit: RECOVERY_LIMIT })`.
+- Produces `type IngestMode = "normal" | "store_only" | "reject"` and one resolver that returns only those values. It accepts only exact case-sensitive matches and resolves missing, empty, mixed-case, or unknown input to `reject` without exposing the raw input.
+- Produces `scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void>` with `RECOVERY_STALE_MS = 60_000` and `RECOVERY_LIMIT = 50`. It returns before touching recovery unless the resolved mode is `normal`; otherwise it computes `staleBefore = new Date(controller.scheduledTime - RECOVERY_STALE_MS)` and calls `recoverStaleSubmissions(env, { staleBefore, limit: RECOVERY_LIMIT })`.
 
 - [ ] **Step 1: Write failing route tests**
 
-Assert method/content-type/body-size/schema failures; per-IP `429` with `Retry-After`; accepted batch receipts; duplicate receipt; safe `404`; health response without binding/secret detail; emergency `INGEST_MODE=reject|store_only|normal` behavior.
+Assert method/content-type/body-size/schema failures; per-IP `429` with `Retry-After`; accepted batch receipts; duplicate receipt; safe `404`; and health response without binding/secret detail. Cover each mode explicitly: `normal` persists R2/D1 and sends Queue work; `store_only` persists R2/D1 as `received` and sends no Queue work; exact `reject`, missing, empty, mixed-case, and arbitrary unknown values accept nothing and write nothing to R2/D1/Queue.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -247,15 +253,15 @@ Expected: FAIL because `worker.ts` does not exist.
 
 - [ ] **Step 3: Implement bounded body parsing and receipts**
 
-Read `Content-Length` before body, then stream/count with a 25 MiB hard limit. Accept only `application/json`. Persist/enqueue each result independently and return mixed receipt status without echoing result content.
+Read `Content-Length` before body, then stream/count with a 25 MiB hard limit. Accept only `application/json`. In `normal`, persist/enqueue each result independently and return mixed receipt status without echoing result content. Keep persistence and Queue publication separate so `store_only` can leave accepted rows in `received`; reject fail-closed modes before any persistence.
 
 - [ ] **Step 4: Implement rate limiting and emergency modes**
 
-Use a Cloudflare Rate Limiting binding when available plus a D1/global fallback counter. Start with 30 requests/minute/IP, 100 envelopes/request, and 2,000 envelopes/minute globally; expose exact limits in `/healthz` but no infrastructure ids. `store_only` persists to R2/D1 without Queue publication.
+Use a Cloudflare Rate Limiting binding when available plus a D1/global fallback counter. Start with 30 requests/minute/IP, 100 envelopes/request, and 2,000 envelopes/minute globally; expose exact limits in `/healthz` but no infrastructure ids. Resolve the mode once through the exact allowlist: `normal` persists and queues, `store_only` persists raw R2 plus a D1 `received` row with zero Queue sends, and `reject`/missing/unknown returns a safe disabled response with zero R2/D1/Queue writes. Never echo or log the raw mode value.
 
 - [ ] **Step 5: Implement and test the scheduled recovery entry point**
 
-Add the exact `scheduled(controller, env, ctx)` interface above and configure the cron. Its test seeds stale and fresh `received|retryable` rows, proves only the bounded eligible page is resent, proves the same submission ids are used, and proves failures advance retry metadata without deleting raw R2. Record only bounded counts, never payloads or binding identifiers.
+Add the exact `scheduled(controller, env, ctx)` interface above and configure the cron. Its normal-mode test seeds stale and fresh `received|retryable` rows, proves only the bounded eligible page is resent, proves the same submission ids are used, and proves failures advance retry metadata without deleting raw R2. Additional tests prove `store_only`, `reject`, missing, and unknown modes are strict no-ops; specifically, a `store_only` row older than 60 seconds remains `received` with zero Queue sends, then switching to `normal` lets scheduled recovery enqueue that same id. Record only bounded counts, never payloads, raw mode values, or binding identifiers.
 
 - [ ] **Step 6: Test and commit**
 
@@ -279,6 +285,7 @@ git commit -m "feat: expose bounded public result receipts"
 - Produces: `validateSolution(envelope: ResultEnvelopeV1) -> ReplayResult`.
 - Produces Queue handler `queue(batch: MessageBatch<ValidationMessage>, env: Env): Promise<void>`.
 - Preserves the Task 3 `scheduled(controller, env, ctx)` export when composing the Worker entry point; Queue and scheduled recovery both use the same idempotent D1 transition contract.
+- Reuses the Task 3 exact mode resolver and defines `MODE_PAUSE_DELAY_SECONDS = 300`; every non-`normal` mode parks Queue messages for that bounded delay before any state transition, validation, or publication work.
 
 - [ ] **Step 1: Write failing replay property tests**
 
@@ -286,7 +293,7 @@ Generate small random permutations and valid paths. Assert exact final-state equ
 
 - [ ] **Step 2: Write failing duplicate/out-of-order consumer tests**
 
-Deliver the same message twice; deliver immediately while the producer row is still `received`; deliver from `queued` and `retryable`; deliver after state is already `validating` or `validated`; and inject malformed R2 body/hash mismatch. Assert one effective validation/publisher enqueue, terminal rejection with code, or retry/DLQ without duplicate GitHub enqueue. Duplicate and out-of-order delivery must be an idempotent no-op once another consumer owns or completed the row.
+Deliver the same message twice; deliver immediately while the producer row is still `received`; deliver from `queued` and `retryable`; deliver after state is already `validating` or `validated`; and inject malformed R2 body/hash mismatch. Assert one effective validation/publisher enqueue, terminal rejection with code, or retry/DLQ without duplicate GitHub enqueue. Duplicate and out-of-order delivery must be an idempotent no-op once another consumer owns or completed the row. For `store_only`, `reject`, missing, and unknown modes, seed backlog messages and assert the exact 300-second retry, no D1 transition, no R2/replay validation, no publisher enqueue, and no payload/raw-mode logs; then switch to `normal` and prove the retained message proceeds.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -299,7 +306,7 @@ Validate proof permutations before applying moves. Bound `state_len <= 128`, `mo
 
 - [ ] **Step 5: Implement Queue state transitions and retry policy**
 
-Compare-transition `received|queued|retryable -> validating` and clear stale `safe_error`. The `received` source is mandatory because Cloudflare Queue may deliver before the producer's post-send `queued` transition. If the transition returns false, reread: already `validating|validated|rejected|staged|published|dead_letter` is an idempotent duplicate/no-op; any other state is a checked conflict. Terminal validation errors become `rejected`; R2/D1/DO/network errors use `message.retry({delaySeconds})` with capped exponential delay. After configured attempts, write `dead_letter`, keep raw R2, and enqueue to `VALIDATE_DLQ`. Every downstream write is keyed by `submission_id`/idempotency key so recovery-created duplicate messages cannot duplicate publication.
+Resolve mode before reading a message body or touching D1/R2. If it is not `normal`, call `message.retry({ delaySeconds: MODE_PAUSE_DELAY_SECONDS })` and do nothing else; this parking path does not consume validation-attempt budget or log payloads/raw mode values. In `normal`, compare-transition `received|queued|retryable -> validating` and clear stale `safe_error`. The `received` source is mandatory because Cloudflare Queue may deliver before the producer's post-send `queued` transition. If the transition returns false, reread: already `validating|validated|rejected|staged|published|dead_letter` is an idempotent duplicate/no-op; any other state is a checked conflict. Terminal validation errors become `rejected`; R2/D1/DO/network errors use `message.retry({delaySeconds})` with capped exponential delay. After configured attempts, write `dead_letter`, keep raw R2, and enqueue to `VALIDATE_DLQ`. Every downstream write is keyed by `submission_id`/idempotency key so recovery-created duplicate messages cannot duplicate publication.
 
 - [ ] **Step 6: Compose Queue and scheduled handlers without dropping recovery**
 
@@ -326,6 +333,7 @@ git commit -m "feat: replay and validate queued CayleyPy results"
 **Interfaces:**
 - Produces: `getInstallationToken(env, now) -> Promise<string>` with in-memory expiry cache.
 - Produces Durable Object RPC: `enqueueValidated(submissionId: string) -> Promise<void>` and alarm-driven `flush() -> Promise<FlushResult>`.
+- Reuses the exact mode resolver and performs a final `normal` guard immediately before external GitHub authentication or mutation.
 
 - [ ] **Step 1: Write failing GitHub JWT/token tests**
 
@@ -333,7 +341,7 @@ Mock GitHub endpoints. Assert JWT `iss`, `iat`, `exp <= 10m`, installation-only 
 
 - [ ] **Step 2: Write failing writer batching/conflict tests**
 
-Queue 100 unique validated ids. Assert a bounded batch creates unique paths, one tree/commit/ref update, and marks D1 rows staged. Inject Git ref `422` conflict twice; writer refetches head and retries without losing/duplicating files. Existing different content at a target path is terminal corruption.
+Queue 100 unique validated ids. Assert a bounded batch creates unique paths, one tree/commit/ref update, and marks D1 rows staged. Inject Git ref `422` conflict twice; writer refetches head and retries without losing/duplicating files. Existing different content at a target path is terminal corruption. For `store_only`, `reject`, missing, and unknown modes at the final guard, assert zero token/GitHub requests, zero `staged|published` transitions, retained validated ids, a bounded re-armed alarm, and no payload/raw-mode logs; switch to `normal` and prove the retained batch publishes.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -356,6 +364,8 @@ function resultPath(r: ResultEnvelopeV1): string {
 ```
 
 Only `safe()`-normalized identifiers from allowlisted fields affect paths. File content is canonical JSON. Batch maximum: 100 records or 5 MiB, alarm within 30 seconds.
+
+Immediately before requesting a GitHub installation token or making any external ref/tree/commit call, re-resolve `INGEST_MODE`. Unless it is `normal`, retain the validated ids, make no external request or publication transition, and re-arm the Durable Object alarm with a bounded delay. This is a final defense against a mode change after validation.
 
 - [ ] **Step 6: Test and commit**
 
@@ -532,7 +542,7 @@ Change only the environment mode, submit one known valid proof, and verify R2, D
 
 - [ ] **Step 5: Write operations guide**
 
-Document safe commands for health, D1 submission lookup, R2 presence, Queue/DLQ metrics, retry/replay by submission id, `normal|store_only|reject`, GitHub App key rotation, rollback to the previous Worker version, and incident evidence capture. Do not put secrets in commands.
+Document safe commands for health, D1 submission lookup, R2 presence, Queue/DLQ metrics, retry/replay by submission id, the exact case-sensitive `normal|store_only|reject` allowlist and fail-closed missing/unknown behavior, GitHub App key rotation, rollback to the previous Worker version, and incident evidence capture. Do not put secrets in commands.
 
 - [ ] **Step 6: Record URL/version/evidence and commit**
 

@@ -5,10 +5,6 @@ import { canonicalJson, computeIdempotency } from "../src/ids.js";
 import { transition } from "../src/db.js";
 import { receiveEnvelope, recoverStaleSubmissions, SafeIngestError, type IngestEnv } from "../src/storage.js";
 
-declare module "cloudflare:test" { interface ProvidedEnv extends Pick<IngestEnv, "RESULTS_DB" | "RAW_RESULTS"> {} }
-
-const schema = "CREATE TABLE IF NOT EXISTS submissions (submission_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, run_id TEXT NOT NULL, author_name TEXT NOT NULL, competition TEXT NOT NULL, puzzle_type TEXT NOT NULL, puzzle_id INTEGER NOT NULL, state TEXT NOT NULL, raw_r2_key TEXT NOT NULL UNIQUE, safe_error TEXT, retry_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, github_path TEXT, github_commit_sha TEXT)";
-
 const validEnvelope = () => ({
   schema_version: 1 as const, submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e7f", run_id: "run-20260728-001", idempotency_key: "a".repeat(64),
   author: { name: "Ada", verification: "claimed" as const }, kaggle: { owner: "ada", slug: "run", version: 1 }, competition: "santa-2023", puzzle_type: "cube", puzzle_id: 42,
@@ -90,13 +86,39 @@ function dbWithTransitionFailure(): D1Database {
 }
 
 beforeEach(async () => {
-  await env.RESULTS_DB.exec(schema);
   await env.RESULTS_DB.exec("DELETE FROM submissions");
   const listed = await env.RAW_RESULTS.list({ prefix: "raw/" });
   if (listed.objects.length) await env.RAW_RESULTS.delete(listed.objects.map((object: R2Object) => object.key));
 });
 
 describe("receipt durability with Miniflare D1 and R2 bindings", () => {
+  test("applies the deployable migration, state CHECK, and recovery index", async () => {
+    const appliedMigration = await env.RESULTS_DB.prepare("SELECT name FROM d1_migrations").first<string>("name");
+    expect(appliedMigration).toBe("0001_initial.sql");
+
+    const index = await env.RESULTS_DB.prepare("PRAGMA index_info('submissions_recovery')")
+      .all<{ seqno: number; cid: number; name: string }>();
+    expect(index.results.map((column) => column.name)).toEqual(["state", "updated_at"]);
+
+    const envelope = validEnvelope();
+    const invalidInsert = env.RESULTS_DB.prepare(
+      "INSERT INTO submissions (submission_id,idempotency_key,run_id,author_name,competition,puzzle_type,puzzle_id,state,raw_r2_key,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+    ).bind(
+      "019c9999-0000-7000-8000-000000000000",
+      "f".repeat(64),
+      envelope.run_id,
+      envelope.author.name,
+      envelope.competition,
+      envelope.puzzle_type,
+      envelope.puzzle_id,
+      "terminal",
+      "raw/v1/invalid-state.json",
+      "2000-01-01T00:00:00.000Z",
+      "2000-01-01T00:00:00.000Z",
+    ).run();
+    await expect(invalidInsert).rejects.toThrow();
+    expect(await env.RESULTS_DB.prepare("SELECT COUNT(*) AS count FROM submissions").first<number>("count")).toBe(0);
+  });
   test("canonical JSON is key-order stable and semantic idempotency excludes transport ids", async () => {
     expect(canonicalJson({ z: [true, null], a: 1 })).toBe('{"a":1,"z":[true,null]}');
     const changedTransport = { ...validEnvelope(), submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70", idempotency_key: "d".repeat(64), submitted_at: "2026-07-28T11:00:00.000Z" };
