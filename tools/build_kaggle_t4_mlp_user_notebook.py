@@ -9,18 +9,47 @@ OUT_DIR = Path("kaggle_t4_mlp_universal")
 OUT_NOTEBOOK = OUT_DIR / "cayley-beam-2xt4-mlp.ipynb"
 REGISTRY_PATH = Path("configs/kaggle_t4_mlp_profiles.json")
 
-HEADER = """# Universal Cayley Beam Search — Kaggle 2×T4
+HEADER = """# Universal Megaminx Beam Search — Kaggle 2×T4
 
-## SUPPORTED MODELS
+Ready-to-run private notebook for the MultiGPUBeamSearch MLP path. The default
+`repository_exported` mode works out of the box with the repository 24-output model.
+
+## Quick start
+
+1. Select the Kaggle **2×T4** accelerator and keep Internet enabled.
+2. Edit only the first code cell: `BEAM_WIDTH`, `MAX_DEPTH`, and `PUZZLE_IDS`.
+3. Run all cells. The notebook selects a measured profile, builds the solver, runs
+   two ranks, validates every found solution, and writes submission artifacts.
+
+To use your own checkpoint, attach it as a Kaggle model/dataset, set
+`MODEL_SOURCE_MODE = "checkpoint"`, point `CHECKPOINT_PATH` to the `.pth`, and choose
+its exact `CHECKPOINT_FORMAT`. `CHECKPOINT_PATH` is ignored in `repository_exported` mode.
+
+## Supported models — exact contract
 
 This notebook does not support an arbitrary PyTorch architecture. It accepts only:
 
-1. PilgrimAttnRes-style BatchNorm MLP via `batchnorm-folded` export.
-2. ResMLPDistance-style LayerNorm MLP via `resmlp-layernorm` export.
+1. PilgrimAttnRes-style BatchNorm MLP through `batchnorm-folded` export.
+2. ResMLPDistance-style LayerNorm MLP through `resmlp-layernorm` export.
 
-The exported head must have `output_dim=1` or `output_dim=move_count` (24 for Megaminx).
-The user supplies the exact beam. The notebook selects the nearest measured `2**16..2**25`
-profile and changes the effective beam only by the solver's distributed alignment.
+The exported manifest is inspected automatically. Its head must be exactly
+`output_dim=1` or `output_dim=24` (`move_count` for Megaminx). Other output sizes
+and arbitrary architectures fail before the expensive run.
+
+## Beam profiles
+
+`BEAM_WIDTH` remains the user's requested beam. The notebook chooses the nearest
+measured anchor from `2**16..2**25` using half-up rounding of `log2(beam)`, clamps
+outside that range, and applies only the documented two-rank/shard alignment to the
+effective beam. Both requested and effective values are printed and saved.
+
+## Output artifacts
+
+- `selected_profile.json` — selected measured profile and alignment delta.
+- `beam_run_results.csv` — status, timing, solution, and validation per puzzle.
+- `run_summary.json` — hardware/model/run summary.
+- `submission.csv` — updated paths when `RUN_MODE = "solve"`.
+- `beam_logs/` — combined and per-rank logs for reproducibility.
 """
 
 CONFIG = r'''

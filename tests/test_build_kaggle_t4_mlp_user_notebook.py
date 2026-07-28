@@ -18,6 +18,10 @@ def test_universal_notebook_contract(tmp_path: Path) -> None:
     assert "batchnorm-folded" in markdown
     assert "resmlp-layernorm" in markdown
     assert "arbitrary PyTorch" in markdown
+    assert "Quick start" in markdown
+    assert "repository_exported" in markdown
+    assert "output_dim=1" in markdown and "output_dim=24" in markdown
+    assert "selected_profile.json" in markdown and "run_summary.json" in markdown
     first_code = next("".join(c["source"]) for c in notebook["cells"] if c["cell_type"] == "code")
     for name in ("CHECKPOINT_PATH", "CHECKPOINT_FORMAT", "MODEL_DTYPE", "PUZZLE_INFO_JSON", "TEST_CSV", "SAMPLE_SUBMISSION_CSV", "BEAM_WIDTH", "MAX_DEPTH", "PUZZLE_IDS", "RUN_MODE", "MODEL_SOURCE_MODE"):
         assert name in first_code
