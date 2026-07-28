@@ -427,3 +427,6 @@
 - User requested public CayleyPy Task 3: measured 2xT4 profile selection plus move-count-aware runtime preflight; retain exact requested/effective beam semantics, support move counts 18 and 24, enforce capacity/history/tmp guards, and do not change CUDA/C++ algorithms.
 
 - Reviewer requested Task 3 hardening: fail closed unless the public runtime uses exactly two T4 ranks, and prevent post-derivation mutation of RuntimePlan runtime values.
+
+## 2026-07-28
+- User requested Task 4 only for the public CayleyPy 2xT4 notebook: implement permutation-based path replay/inversion, reflection semantics, validation of every original solution, frozen records, and deterministic deduplication; reject invalid or ambiguous moves fail-closed without CUDA/C++ changes.

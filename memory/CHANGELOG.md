@@ -772,3 +772,5 @@
 - Added public CayleyPy 2xT4 runtime-plan derivation from measured profiles. The preflight preserves the requested beam except for documented distributed alignment, derives parent and Stream3 batches from the actual move count, enforces 1024-aligned shard capacity floors, records measured evidence/history budgets, and fails closed for unmeasured profiles or insufficient /tmp history disk. CUDA/C++ algorithms are unchanged.
 
 - Hardened the public CayleyPy 2xT4 runtime plan: only world size 2 is accepted, and the derived runtime mapping is immutable while preflight serialization emits a detached JSON-safe copy.
+
+- Added public CayleyPy Task 4 path helpers: strict dot-separated replay, permutation-derived inverse lookup without name conventions, reflected-state construction, CPU original-path validation, and deterministic semantic solution deduplication.
