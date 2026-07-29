@@ -27,7 +27,7 @@ export interface ResultBatchV1 { schema_version: 1; results: ResultEnvelopeV1[] 
 export interface SafeSchemaError { path: string; keyword: string }
 export type ValidationResult = { ok: true; value: ResultBatchV1 } | { ok: false; errors: SafeSchemaError[] };
 
-const MAX_SERIALIZED_BATCH_BYTES = 25 * 1024 * 1024;
+export const MAX_SERIALIZED_BATCH_BYTES = 4 * 1024 * 1024;
 const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
 addFormats(ajv);
 const validate = ajv.compile(schema);
@@ -37,9 +37,13 @@ function isResultBatchV1(value: unknown): value is ResultBatchV1 {
 }
 
 export function validateBatch(value: unknown, rawByteLength?: number): ValidationResult {
-  let serialized: string;
-  try { serialized = JSON.stringify(value); } catch { return { ok: false, errors: [{ path: "", keyword: "serialization" }] }; }
-  const byteLength = rawByteLength ?? (serialized === undefined ? undefined : new TextEncoder().encode(serialized).byteLength);
+  let byteLength = rawByteLength;
+  if (byteLength === undefined) {
+    let serialized: string | undefined;
+    try { serialized = JSON.stringify(value); } catch { return { ok: false, errors: [{ path: "", keyword: "serialization" }] }; }
+    byteLength = serialized === undefined ? undefined : new TextEncoder().encode(serialized).byteLength;
+    serialized = undefined;
+  }
   if (byteLength === undefined || byteLength > MAX_SERIALIZED_BATCH_BYTES) {
     return { ok: false, errors: [{ path: "", keyword: "maxBytes" }] };
   }

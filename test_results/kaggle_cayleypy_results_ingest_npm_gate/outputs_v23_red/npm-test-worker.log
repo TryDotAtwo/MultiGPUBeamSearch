@@ -1,0 +1,792 @@
+
+ RUN  v3.2.4 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+[vpw:info] Starting isolated runtimes for vitest.config.ts...
+[mf:warn] The latest compatibility date supported by the installed Cloudflare Workers Runtime is "2025-07-12",
+but you've requested "2026-07-28". Falling back to "2025-07-12"...
+[mf:warn] The latest compatibility date supported by the installed Cloudflare Workers Runtime is "2025-07-12",
+but you've requested "2026-07-28". Falling back to "2025-07-12"...
+ ✓ test/receipt.test.ts (23 tests) 8656ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > resends a stale received duplicate after the bounded wait  555ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > failed recovery advances retry metadata so a bounded page cannot starve its tail  362ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > duplicate pause deliveries beyond a max-retries-equivalent remain one parked row  3156ms
+ ❯ test/worker.test.ts (47 tests | 6 failed) 25825ms
+   ✓ Task 3 public ingest contract > resolves only exact case-sensitive modes and fails closed 193ms
+   ✓ Task 3 public ingest contract > normal POST returns a durable receipt 204ms
+   ✓ Task 3 public ingest contract > health exposes exact limits and no raw mode 131ms
+   ✓ fail-closed modes and bounded request parsing > mode reject writes nothing and does not touch the rate binding 184ms
+   ✓ fail-closed modes and bounded request parsing > mode undefined writes nothing and does not touch the rate binding 191ms
+   ✓ fail-closed modes and bounded request parsing > mode  writes nothing and does not touch the rate binding  476ms
+   ✓ fail-closed modes and bounded request parsing > mode Normal writes nothing and does not touch the rate binding 184ms
+   ✓ fail-closed modes and bounded request parsing > mode unknown writes nothing and does not touch the rate binding 183ms
+   ✓ fail-closed modes and bounded request parsing > rejects the wrong method with an Allow header 155ms
+   ✓ fail-closed modes and bounded request parsing > rejects content type  184ms
+   ✓ fail-closed modes and bounded request parsing > rejects content type text/plain 196ms
+   ✓ fail-closed modes and bounded request parsing > rejects content type application/problem+json 163ms
+   ✓ fail-closed modes and bounded request parsing > accepts application/json parameters 227ms
+   ✓ fail-closed modes and bounded request parsing > rejects an oversized Content-Length before reading the stream 166ms
+   × fail-closed modes and bounded request parsing > counts a streaming body and stops immediately above the four MiB hard bound 182ms
+     → expected 400 to be 413 // Object.is equality
+   ✓ fail-closed modes and bounded request parsing > accepts an exact four MiB chunked JSON body with UTF-8 split across chunks 284ms
+   ✓ fail-closed modes and bounded request parsing > returns value-free malformed JSON and strict-schema errors 189ms
+   ✓ fail-closed modes and bounded request parsing > enforces at most 100 envelopes 190ms
+   ✓ durable receipts, status, health, and logging safety > normal mode persists each envelope, sends per-id work, and gives duplicate receipts  373ms
+   ✓ durable receipts, status, health, and logging safety > returns mixed durable receipt states when one per-item Queue send fails  324ms
+   ✓ durable receipts, status, health, and logging safety > returns 202 with safe per-index errors when one item cannot be persisted 260ms
+   ✓ durable receipts, status, health, and logging safety > store_only persists immutable raw and one received receipt without Queue sends  310ms
+   ✓ durable receipts, status, health, and logging safety > GET status returns only the public receipt state and a safe 404  303ms
+   × durable receipts, status, health, and logging safety > rejects malformed percent encoding before touching D1 130ms
+     → URI malformed
+   ✓ durable receipts, status, health, and logging safety > health exposes exact limits and resolved mode, never bindings or raw config 142ms
+   ✓ durable receipts, status, health, and logging safety > does not log payloads, raw modes, failures, or binding details 158ms
+   ✓ Cloudflare binding plus load-bearing bounded D1 rate limits > the real migration has one bounded row per rate scope 157ms
+   ✓ Cloudflare binding plus load-bearing bounded D1 rate limits > uses the Cloudflare binding when present and returns 429 with Retry-After 163ms
+   ✓ Cloudflare binding plus load-bearing bounded D1 rate limits > keeps D1 per-IP accounting active even when the binding allows  2430ms
+   ✓ Cloudflare binding plus load-bearing bounded D1 rate limits > resets the bounded per-scope row at a new minute window 141ms
+   × Cloudflare binding plus load-bearing bounded D1 rate limits > samples the rate window at each counter consumption across a slow boundary 143ms
+     → expected { window_start: 1800000000000, …(1) } to deeply equal { window_start: 1800000060000, …(1) }
+   × Cloudflare binding plus load-bearing bounded D1 rate limits > rejects a stale global counter write instead of rolling the window backward 151ms
+     → expected [ 202, 202 ] to deeply equal [ 429, 202 ]
+   ✓ Cloudflare binding plus load-bearing bounded D1 rate limits > rejects a batch that would cross the global envelope limit atomically 140ms
+   ✓ mode-gated scheduled recovery > mode store_only is a strict recovery no-op 121ms
+   ✓ mode-gated scheduled recovery > mode reject is a strict recovery no-op 111ms
+   ✓ mode-gated scheduled recovery > mode undefined is a strict recovery no-op 114ms
+   ✓ mode-gated scheduled recovery > mode  is a strict recovery no-op 106ms
+   ✓ mode-gated scheduled recovery > mode Normal is a strict recovery no-op 119ms
+   ✓ mode-gated scheduled recovery > mode unknown is a strict recovery no-op 119ms
+   ✓ mode-gated scheduled recovery > a stale store_only row remains received until normal recovery sends the same id 195ms
+   ✓ mode-gated scheduled recovery > normal recovery bounds stale pages, refreshes queued rows, and advances failures fairly  1492ms
+   ✓ concurrency and early-reject regression gates > reject mode returns before consuming the body or invoking rate infrastructure 90ms
+   ✓ concurrency and early-reject regression gates > concurrent store_only duplicates converge on one received row and raw object 194ms
+   × concurrency and early-reject regression gates > bounds per-envelope storage concurrency while preserving receipt order 2610ms
+     → expected [ …(100) ] to deeply equal [ …(100) ]
+   × concurrency and early-reject regression gates > keeps one hundred received duplicates below one thousand internal binding calls 9858ms
+     → expected [ { index: +0, …(1) }, …(99) ] to be undefined
+   ✓ concurrency and early-reject regression gates > atomic D1 per-IP accounting admits exactly 30 concurrent requests  1257ms
+   ✓ concurrency and early-reject regression gates > atomic global accounting admits only one concurrent final envelope 170ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/worker.test.ts > fail-closed modes and bounded request parsing > counts a streaming body and stops immediately above the four MiB hard bound
+AssertionError: expected 400 to be 413 // Object.is equality
+
+- Expected
++ Received
+
+- 413
++ 400
+
+ ❯ test/worker.test.ts:317:29
+    315|     });
+    316|     const response = await fetchRequest(postRequest(stream), bindings(…
+    317|     expect(response.status).toBe(413);
+       |                             ^
+    318|     expect(await response.json()).toEqual({ error: "request_too_large"…
+    319|     expect(chunks).toBe(5);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  test/worker.test.ts > durable receipts, status, health, and logging safety > rejects malformed percent encoding before touching D1
+URIError: URI malformed
+ ❯ fetchRequest src/worker.ts:282:25
+    280|   if (statusMatch !== null) {
+    281|     if (request.method !== "GET") return methodNotAllowed("GET");
+    282|     return handleStatus(decodeURIComponent(statusMatch[1]), env);
+       |                         ^
+    283|   }
+    284|   return errorResponse(404, "not_found");
+ ❯ test/worker.test.ts:469:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  test/worker.test.ts > Cloudflare binding plus load-bearing bounded D1 rate limits > samples the rate window at each counter consumption across a slow boundary
+AssertionError: expected { window_start: 1800000000000, …(1) } to deeply equal { window_start: 1800000060000, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "count": 2,
+-   "window_start": 1800000060000,
++   "count": 1,
++   "window_start": 1800000000000,
+  }
+
+ ❯ test/worker.test.ts:598:34
+    596|       expect([fast.status, resumed.status]).toEqual([202, 202]);
+    597|       expect(await env.RESULTS_DB.prepare("SELECT window_start,count F…
+    598|         .bind("global").first()).toEqual({ window_start: newWindow, co…
+       |                                  ^
+    599|     } finally {
+    600|       releaseBinding.resolve();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  test/worker.test.ts > Cloudflare binding plus load-bearing bounded D1 rate limits > rejects a stale global counter write instead of rolling the window backward
+AssertionError: expected [ 202, 202 ] to deeply equal [ 429, 202 ]
+
+- Expected
++ Received
+
+  [
+-   429,
++   202,
+    202,
+  ]
+
+ ❯ test/worker.test.ts:626:54
+    624|       releaseGlobalRun.resolve();
+    625|       const staleResponse = await stale;
+    626|       expect([staleResponse.status, current.status]).toEqual([429, 202…
+       |                                                      ^
+    627|       expect(await env.RESULTS_DB.prepare("SELECT window_start,count F…
+    628|         .bind("global").first()).toEqual({ window_start: newWindow, co…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  test/worker.test.ts > concurrency and early-reject regression gates > bounds per-envelope storage concurrency while preserving receipt order
+AssertionError: expected [ …(100) ] to deeply equal [ …(100) ]
+
+- Expected
++ Received
+
+  [
+-   "0000000000000000000000000000000000000000000000000000000000000001",
+-   "0000000000000000000000000000000000000000000000000000000000000002",
+-   "0000000000000000000000000000000000000000000000000000000000000003",
+-   "0000000000000000000000000000000000000000000000000000000000000004",
+-   "0000000000000000000000000000000000000000000000000000000000000005",
+-   "0000000000000000000000000000000000000000000000000000000000000006",
+-   "0000000000000000000000000000000000000000000000000000000000000007",
+-   "0000000000000000000000000000000000000000000000000000000000000008",
+-   "0000000000000000000000000000000000000000000000000000000000000009",
+-   "000000000000000000000000000000000000000000000000000000000000000a",
+-   "000000000000000000000000000000000000000000000000000000000000000b",
+-   "000000000000000000000000000000000000000000000000000000000000000c",
+-   "000000000000000000000000000000000000000000000000000000000000000d",
+-   "000000000000000000000000000000000000000000000000000000000000000e",
+-   "000000000000000000000000000000000000000000000000000000000000000f",
+-   "0000000000000000000000000000000000000000000000000000000000000010",
+-   "0000000000000000000000000000000000000000000000000000000000000011",
+-   "0000000000000000000000000000000000000000000000000000000000000012",
+-   "0000000000000000000000000000000000000000000000000000000000000013",
+-   "0000000000000000000000000000000000000000000000000000000000000014",
+-   "0000000000000000000000000000000000000000000000000000000000000015",
+-   "0000000000000000000000000000000000000000000000000000000000000016",
+-   "0000000000000000000000000000000000000000000000000000000000000017",
+-   "0000000000000000000000000000000000000000000000000000000000000018",
+-   "0000000000000000000000000000000000000000000000000000000000000019",
+-   "000000000000000000000000000000000000000000000000000000000000001a",
+-   "000000000000000000000000000000000000000000000000000000000000001b",
+-   "000000000000000000000000000000000000000000000000000000000000001c",
+-   "000000000000000000000000000000000000000000000000000000000000001d",
+-   "000000000000000000000000000000000000000000000000000000000000001e",
+-   "000000000000000000000000000000000000000000000000000000000000001f",
+-   "0000000000000000000000000000000000000000000000000000000000000020",
+-   "0000000000000000000000000000000000000000000000000000000000000021",
+-   "0000000000000000000000000000000000000000000000000000000000000022",
+-   "0000000000000000000000000000000000000000000000000000000000000023",
+-   "0000000000000000000000000000000000000000000000000000000000000024",
+-   "0000000000000000000000000000000000000000000000000000000000000025",
+-   "0000000000000000000000000000000000000000000000000000000000000026",
+-   "0000000000000000000000000000000000000000000000000000000000000027",
+-   "0000000000000000000000000000000000000000000000000000000000000028",
+-   "0000000000000000000000000000000000000000000000000000000000000029",
+-   "000000000000000000000000000000000000000000000000000000000000002a",
+-   "000000000000000000000000000000000000000000000000000000000000002b",
+-   "000000000000000000000000000000000000000000000000000000000000002c",
+-   "000000000000000000000000000000000000000000000000000000000000002d",
+-   "000000000000000000000000000000000000000000000000000000000000002e",
+-   "000000000000000000000000000000000000000000000000000000000000002f",
+-   "0000000000000000000000000000000000000000000000000000000000000030",
+-   "0000000000000000000000000000000000000000000000000000000000000031",
+-   "0000000000000000000000000000000000000000000000000000000000000032",
+-   "0000000000000000000000000000000000000000000000000000000000000033",
+-   "0000000000000000000000000000000000000000000000000000000000000034",
+-   "0000000000000000000000000000000000000000000000000000000000000035",
+-   "0000000000000000000000000000000000000000000000000000000000000036",
+-   "0000000000000000000000000000000000000000000000000000000000000037",
+-   "0000000000000000000000000000000000000000000000000000000000000038",
+-   "0000000000000000000000000000000000000000000000000000000000000039",
+-   "000000000000000000000000000000000000000000000000000000000000003a",
+-   "000000000000000000000000000000000000000000000000000000000000003b",
+-   "000000000000000000000000000000000000000000000000000000000000003c",
+-   "000000000000000000000000000000000000000000000000000000000000003d",
+-   "000000000000000000000000000000000000000000000000000000000000003e",
+-   "000000000000000000000000000000000000000000000000000000000000003f",
+-   "0000000000000000000000000000000000000000000000000000000000000040",
+-   "0000000000000000000000000000000000000000000000000000000000000041",
+-   "0000000000000000000000000000000000000000000000000000000000000042",
+-   "0000000000000000000000000000000000000000000000000000000000000043",
+-   "0000000000000000000000000000000000000000000000000000000000000044",
+-   "0000000000000000000000000000000000000000000000000000000000000045",
+-   "0000000000000000000000000000000000000000000000000000000000000046",
+-   "0000000000000000000000000000000000000000000000000000000000000047",
+-   "0000000000000000000000000000000000000000000000000000000000000048",
+-   "0000000000000000000000000000000000000000000000000000000000000049",
+-   "000000000000000000000000000000000000000000000000000000000000004a",
+-   "000000000000000000000000000000000000000000000000000000000000004b",
+-   "000000000000000000000000000000000000000000000000000000000000004c",
+-   "000000000000000000000000000000000000000000000000000000000000004d",
+-   "000000000000000000000000000000000000000000000000000000000000004e",
+-   "000000000000000000000000000000000000000000000000000000000000004f",
+-   "0000000000000000000000000000000000000000000000000000000000000050",
+-   "0000000000000000000000000000000000000000000000000000000000000051",
+-   "0000000000000000000000000000000000000000000000000000000000000052",
+-   "0000000000000000000000000000000000000000000000000000000000000053",
+-   "0000000000000000000000000000000000000000000000000000000000000054",
+-   "0000000000000000000000000000000000000000000000000000000000000055",
+-   "0000000000000000000000000000000000000000000000000000000000000056",
+-   "0000000000000000000000000000000000000000000000000000000000000057",
+-   "0000000000000000000000000000000000000000000000000000000000000058",
+-   "0000000000000000000000000000000000000000000000000000000000000059",
+-   "000000000000000000000000000000000000000000000000000000000000005a",
+-   "000000000000000000000000000000000000000000000000000000000000005b",
+-   "000000000000000000000000000000000000000000000000000000000000005c",
+-   "000000000000000000000000000000000000000000000000000000000000005d",
+-   "000000000000000000000000000000000000000000000000000000000000005e",
+-   "000000000000000000000000000000000000000000000000000000000000005f",
+-   "0000000000000000000000000000000000000000000000000000000000000060",
+-   "0000000000000000000000000000000000000000000000000000000000000061",
+-   "0000000000000000000000000000000000000000000000000000000000000062",
+-   "0000000000000000000000000000000000000000000000000000000000000063",
+-   "0000000000000000000000000000000000000000000000000000000000000064",
++   "790dda1bebfc9b8301aa0030c0df3f173ebd8a69e56d4f153802492e9e317b21",
++   "070077ba77ab2226f97445474510a489b7f242427a3109afcba2a92b18aa00a9",
++   "8127f28e2cd3c88ba2609f04c8b8f5202837110ef542a006f3011414bb5cdf37",
++   "8afbd60e842b9a15b49428f3d31819d7dd9ad716a035a1d9bbd1f65227fbf2f8",
++   "f0f4d9cb86d4c5baad7153be8fdc291dfd80b162b4e16c5abd04d7fcbfaf2127",
++   "047cabb9ffb2b81d36010f4e54b10d011913efa0eea4deb3fe2d5a4ace02b851",
++   "292a442b8a0d2f09c4beb2cd1990ca28e6a81762c75c990710a48b4e9be59b48",
++   "11c8e2b0e39735c07593b4d42e4eccae36121df4016d0ce2ccf34365d4badf46",
++   "3a942ab8b7c9c67fcd61628fbb063bbe4e3cd81ebc35dbff422ac36f4ea8431d",
++   "66b559c9e6813129220040b4fc9feda56a0a9d180770b9e0631994edff8f3a4b",
++   "8531add1c671fae230e0c860cc8be7b96c9b0527025bb119d074082a9a7dc840",
++   "19f0eb8c26c29d3ca27e72e2bb76c412090ff9c0dd738d63fa64b7dcf476118f",
++   "c4215ec63ff882f41974b1f234acfb7117a78d80ca13d1989fd5a290d5376dad",
++   "7b44268667466da18f507e6addbe20e05679f780a73f48490e22d47b98c96c2c",
++   "0e5fe1f4d56215785a34e4be1948b1065484d34f9ff973e2a824a689909055e0",
++   "892e190161aa3b4c198ba2ffd51fad6d9f9b553b83186e0a909f82d1b3cd9d83",
++   "cd8c91bcf46d387008aacf05a6238c30afac1d4fb6d5a71859ac65e5b13a7e3b",
++   "2c34fa2b1ecff5fe63580335e1ec91b640f188061851091b29f289e403ee1c8c",
++   "1df16df2ec6c46b5f06f07b9449a30e7c2d11860fe8cb92445b956c453e85008",
++   "9eaa16fb4fa3ccba0483c771a600b4d6dfa609223a6ff37582e78b08a3935fc9",
++   "31b1235c05fb0d1e564f59f9d91652961902e2555f97ca3bbacb70ff1f714521",
++   "1aef19a8002bdcad6a6fd7d76e8b41d9cde12e9714f24c075f727b163ab86a67",
++   "8918af8f72543657b4ece822df1114a6ad6d971b0c6c47b8dbf72fc870464ace",
++   "b81a54f0b5c14f9163974bbb4fa42fe7bce794d39fc6b5c5ac52b8359d2223d6",
++   "86663012d1c0e393250a1db0f0b247bc32a8d0088f3318cc0f0bea2c8b394325",
++   "5b3e04f2b8b2580d43c3840ad7e7572b4cf56059e5af8d9d2d14eefa9b51a3c3",
++   "abcc582e2eec4374ec2b532d8e9d68b6d592981f60927cac8f588b030e3548d0",
++   "8f4c95b4ed411e06819ae598b2891cb7c06225b2a0f38b9831724ebf81d63f3b",
++   "d2c40f719b8536c48697a28bdcc16e9fe659e146edbcf3e0c1ce3e0f71ff3465",
++   "3d3ea570d0fd2a0ac2297b28d6a6c5f61745b1b41fe772a0dbb1b71330f0203e",
++   "885be3dc83831c23d832b4248b5d4deb8251c6b09ec1b5bd4e8c3e5570aaa881",
++   "580babdcfb520ab0aa4f33c1ce84c5405a37100f14cb574ca735b06a7b36d36c",
++   "fa500078697a6bccc3adef72852bfe03ddf3dc8aaef45e149147bde1630a00bf",
++   "9878fdbc35061635bb709301efc8c4e44785b94075bb2a6d315f74a04207fd7e",
++   "1b314738e0eb2602b34eb751b39acfbf63e8cceef0998a344f01aca7f0a98a35",
++   "c23e5608ceba2d380a3e9d46b36e5c26e95a87f349b797117f38a59b4da11e9b",
++   "064b35bab6d22b88effc38e4430de5baa23a14b203a120f4abe08445a5b15918",
++   "8751abd7957a33d3f69368d9a05771d7aa6ff4587b9dad3eaad393de6e00d2ea",
++   "48e161e521ea84c48c8dd75f465a1dcf0f5231bdcbe4d5ca79c14ed32a3d9317",
++   "57c0fd8a35a5d299e27227a83f03989590f9ac3a349bf61a30fe874b8230867e",
++   "7f043d720d1714d32fef1b88844aa2b0e6b83607368482474e7bb11e25a27756",
++   "73fb0a9d90ff6423bcb049acae95efc5b280ca236986787619758267a140d3b6",
++   "e165db89f527276bd2da0a692c3e18458e0981c71625541745a3d81e92805544",
++   "b5c1cf0e1cc7357b5f90eb3175939cadcd24d0675a27a97fd10fb3c0c7324f3a",
++   "9d85ae118e8c91f97280e8093c82ce54a77cd5a1839ce68911e1feb6bb07960c",
++   "b74a6c2baad62b7c737b40236a8bae6de90ea9ff31398ff4efd74eda3652d503",
++   "500e3839e105322850ce91b048072598fa1613ceb1022a96daa290abfcdfa692",
++   "6e3aef680dd804b2ef1c59032dfd3bc1ce56070cbbd67f99aea169ec134e0e5f",
++   "2f4df753623e10726afe4f5fade68ab50b30f29ac7c6172b98ea001183bad449",
++   "61b9a82c1d4a745bb91fe8b1c7f6f3b802d531df348a92b9e1e710eb8f5efc7b",
++   "4fb24caeb8a1ca50f456f89f6872ee3813739a71ee63b2a9a4ed0cea432fdee0",
++   "44c414ba6704fd4656d4a7d4b86e247a863adc7cf727ec586309c720bee16965",
++   "d5f4bebf426e9c6f9e5b5803b1ba7abd87503391dade8060a37fa22023e6fd54",
++   "7c72e1e0f2ccf28eae652edf247a5c91e286a0d98f43c2f5f4e39435e719c4b8",
++   "6d311916f666824d81814553986a1ae4e855b877599ced953932d28c739ea994",
++   "ab5207aed9c24f9b0e68b599b17e0e322d3b9067efd697ae9c2e8500f2391df0",
++   "edb15cf86f6659d96c5fe5261665f6acf1a8e939e003fbe99236ad836e71417f",
++   "451849c4aaa185740217f59a547d02cff80c2514c1fc16b427f24d105471a3db",
++   "e5c15b7de3a4033f12ff4d8acc22953181764d2d8d4de9e588951bb364370b06",
++   "7ed1cc1b4eb98ebe67de62f640d3795f2b28297e3936d143b0a2dd1e7902a000",
++   "469c4b46a3400c3c10e3aa3fac803b94d762ae3ad6841b7b2b959fb70fd7b23a",
++   "ca8427fbb3db6c192793e4a476e29ffacfd11990850fe3365c227fa802fd46b0",
++   "70111d9d6d339e8cae708bb14f3c4eef38e9f29636ffdeb3cd6280b2db6ad39b",
++   "6c3880f5e6b4656b161bf80dcca24589b7975f5990b40a378441f40c3edffeec",
++   "1ee4f7f214ce20927c7e2d84ac7de8650b439fd4212c7613a3642313ce5919f7",
++   "e4b6c4237f7a3f704327cdc724546243896192d767b55887b1169ad209573607",
++   "e271e29c697b756bef3553b0eafe9cbb942856dd29cd5d4b463bdfeb14fe577e",
++   "2bff93822dcd7a71fb05795228959c6b5cfd965065e87b2a1d3c6a940068daca",
++   "fde919924cfe9c4cdf9ede79e0f7d9b70cf1b9108dcf7b084b8b03ec6e87b1fd",
++   "2f92451f0cd39efc23bdc496059be9aea5300fd78e224b9bc9bf153d40473bad",
++   "52b7e52af6e7ca82a78b38da350baab4ace10852247a3305384d30b139deec0a",
++   "631c9700a18f2ed0612d5d95225b4d5acfc472755c8ab5c4eee3960d24c3d3af",
++   "df721be94f4b3e97ca5bb1c3ad71b52a0ba1f881a12f79c96fd95f173c23f5af",
++   "6b0be4d2e7a0dae9e2f2575fda3c3bca666129d600f0c0932adf2cbea85566b2",
++   "a3941393165e8e9fb9fae012a5a1d184240dc0a2b8ed7c619c089889e6c12121",
++   "2b60133b446146711f87a41866df962fa156a68160b1a7e06f3f826508ecfe2d",
++   "98ded022a66322d8d3f4b496ad138f1226e4e3022aeefceafafd6f17a663dddc",
++   "696bad0d0c5a59d538a1eb06ae1e825185bed406bb0a6567726cc745e8c40003",
++   "356851d1364037cb92e6494516357b0f8897d07557e1b20dc3f1be2ceaa34d12",
++   "2adfe0e17c7fa3cd0a5259c5063d27778d8c05392fec4043d722be0c0f0750c1",
++   "73d4febb69feef3d5bf0e4e85b20a5a4cd1fe09a6012e9a009349b94f76c6bfd",
++   "835ae1aceaef96dca0644602a1e848b10d172c77200e0dee9b9d64d5fcb5c47a",
++   "9df6c026476976e8476faa8b50ef044a92939a1b9708c732c38e96ca4e0768c7",
++   "de60c4e486ef64408a06e1a93190006a477cac8036ce31e61615f276d5a6023a",
++   "8a9df9788e0a691a46bf13d80107906285602a9e09726dda52d9d9ab0e9d6a38",
++   "74e7d204f29f9db1bbcc12fdd801a757a5ae78dd72ab07bbf98502ae95b367a1",
++   "f524793eb17786b94d9c0654526925dc8b746852ec481f778d2d8cefa05032fa",
++   "2142bef5a737f4f6310a12045ba76a3c51d284972c500acb1f3764ea937327b5",
++   "883fa1546839332e4f519f534edae71ef3475169ca362fb2a08f83cb9763e9bd",
++   "8ab7930e8625fec1388302537ffbcc97eddfbeeae62df37b86487ecb116cf716",
++   "0932dae724371137ede1fee31f9a6985f7026ec84a790e942d9ee061f1cf1202",
++   "99245c0111393e12065d0bb75b1a240c75d84712defa46136529240ca2aa395b",
++   "78445343d60438ec2688c92c26f03a2c7b74d2d4d5f76ba11752e0cae939b0ea",
++   "b7586a30d379535396e179decf93a976e1fc70dea25a63423c1a9d3c09719ada",
++   "d6abcf17d2f5b9a4cae7ae2e14073f44e52c2ed4a6f8d26d8269f001a0a2ed4d",
++   "36670fc561c6ad36a07e34f983ce9774603d04bec9b1f57298144a0adc2b0989",
++   "41c19fef0f169ac1d7553a99fc9bcd52c4f0fc3939f6873a031db41ec347ff5b",
++   "48c02735cf32112754f724eee7ecc92d8c2c32f8ea17eed6fa5ee134fec17ec0",
++   "939602f4f77670d1684ba2f383cb91f91f91fcf648c538c958fe196f5f2abcb0",
++   "f13fed22c9ecd4dc1c786eab6c6da2718564d88f2b498f5ea88bf9f8aff68c8b",
+  ]
+
+ ❯ test/worker.test.ts:782:8
+    780|     expect(body.errors).toBeUndefined();
+    781|     expect(body.receipts.map(({ idempotency_key }) => idempotency_key))
+    782|       .toEqual(uniqueResultBatch(100).results.map(({ idempotency_key }…
+       |        ^
+    783|     expect(maxInflightPuts).toBeGreaterThan(1);
+    784|     expect(maxInflightPuts).toBeLessThanOrEqual(8);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  test/worker.test.ts > concurrency and early-reject regression gates > keeps one hundred received duplicates below one thousand internal binding calls
+AssertionError: expected [ { index: +0, …(1) }, …(99) ] to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+[
+  {
+    "code": "submission_lookup_failed",
+    "index": 0,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 1,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 2,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 3,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 4,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 5,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 6,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 7,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 8,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 9,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 10,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 11,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 12,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 13,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 14,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 15,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 16,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 17,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 18,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 19,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 20,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 21,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 22,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 23,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 24,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 25,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 26,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 27,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 28,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 29,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 30,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 31,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 32,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 33,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 34,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 35,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 36,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 37,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 38,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 39,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 40,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 41,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 42,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 43,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 44,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 45,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 46,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 47,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 48,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 49,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 50,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 51,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 52,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 53,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 54,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 55,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 56,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 57,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 58,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 59,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 60,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 61,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 62,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 63,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 64,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 65,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 66,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 67,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 68,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 69,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 70,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 71,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 72,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 73,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 74,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 75,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 76,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 77,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 78,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 79,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 80,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 81,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 82,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 83,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 84,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 85,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 86,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 87,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 88,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 89,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 90,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 91,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 92,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 93,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 94,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 95,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 96,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 97,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 98,
+  },
+  {
+    "code": "submission_lookup_failed",
+    "index": 99,
+  },
+]
+
+ ❯ test/worker.test.ts:804:25
+    802|     expect(response.status).toBe(202);
+    803|     const body = await response.json() as { receipts: unknown[]; error…
+    804|     expect(body.errors).toBeUndefined();
+       |                         ^
+    805|     expect(body.receipts).toHaveLength(100);
+    806|     expect(bindingCalls).toBeLessThan(1_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  6 failed | 64 passed (70)
+   Start at  10:00:35
+   Duration  28.15s (transform 422ms, setup 328ms, collect 808ms, tests 34.48s, environment 1ms, prepare 730ms)
+
+[vpw:debug] Shutting down runtimes...

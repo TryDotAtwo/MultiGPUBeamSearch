@@ -1,0 +1,101 @@
+{
+    "schema_version":  1,
+    "kernel_ref":  "trydotatwo/cayleypy-results-ingest-npm-gate",
+    "kernel_version":  25,
+    "phase":  "green",
+    "push_observed_utc":  "2026-07-29T10:15:41.2892015+00:00",
+    "terminal_status":  "KernelWorkerStatus.COMPLETE",
+    "status_captured_utc":  "2026-07-29T10:18:19.2085951Z",
+    "pull_captured_utc":  "2026-07-29T10:19:06.7300945Z",
+    "evidence_policy":  "list-free; no identity-bearing kernel list capture",
+    "semantic_validation":  {
+                                "all_commands_passed":  true,
+                                "schema":  "12 passed, 12 total",
+                                "worker_pool":  "70 passed, 70 total",
+                                "explicit_worker_pool":  "70 passed, 70 total",
+                                "typecheck_exit_code":  0,
+                                "exact_duplicate_binding_calls":  702,
+                                "payload_files":  18,
+                                "semantic_payload_mismatches":  0
+                            },
+    "files":  [
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v25_green/push_receipt.txt",
+                      "bytes":  556,
+                      "sha256":  "6361e1aecb11247c04a5ee14fb427eaefd1fd82638d23e9f0de200cfa18ebc08",
+                      "last_write_utc":  "2026-07-29T10:15:44.3862243Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v25_green/status_latest.txt",
+                      "bytes":  452,
+                      "sha256":  "6d1304b4caa8a1a5165a7c3d31a5a9fadaea1aef73be8e9d941570f234a83a75",
+                      "last_write_utc":  "2026-07-29T10:18:19.2085951Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v25_green/output_download.txt",
+                      "bytes":  3034,
+                      "sha256":  "333e4efe5c11269d51544c050b2ac71e83df48625c93d951fa2a6363a2f817d7",
+                      "last_write_utc":  "2026-07-29T10:18:42.1752320Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v25_green/pull_receipt.txt",
+                      "bytes":  512,
+                      "sha256":  "746dc751d6a492476f184af8680e0ef318a8e4fc200f0d8420cddfd050762fab",
+                      "last_write_utc":  "2026-07-29T10:19:06.7300945Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v25_green/pull/kernel-metadata.json",
+                      "bytes":  616,
+                      "sha256":  "572d93ed4dd74d3aeabba1951ab4e098cbf6d217219c5b9edddab17bdbb35ae0",
+                      "last_write_utc":  "2026-07-29T10:19:06.7225723Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v25_green/pull/cayleypy-results-ingest-npm-gate.ipynb",
+                      "bytes":  86125,
+                      "sha256":  "65e9f119e50f56046c60bc6fce36fe6ecb1c618181f7da51b0d1f51be7db9d92",
+                      "last_write_utc":  "2026-07-29T10:19:06.7215592Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v25_green/node-version.log",
+                      "bytes":  9,
+                      "sha256":  "9ade604c07477212e1030c6f9d55f0437ae42ee62e5b87102f65194f47e260f5",
+                      "last_write_utc":  "2026-07-29T10:18:30.4814641Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v25_green/npm-version.log",
+                      "bytes":  7,
+                      "sha256":  "457af6bcb860725c02c36308c43603dd9dd50fdae02abe4d09b1f85541b6431f",
+                      "last_write_utc":  "2026-07-29T10:18:39.6602111Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v25_green/npm-gate-results.json",
+                      "bytes":  3471,
+                      "sha256":  "8ce3402e5f1d9b42d9e3a556ec5b6d560912e020f669a34cc59ccc795c880b5d",
+                      "last_write_utc":  "2026-07-29T10:18:32.5704549Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v25_green/payload-sha256.json",
+                      "bytes":  2236,
+                      "sha256":  "8a57b47803c610e3ba8bda75ac639393b52c078f07291c60c6200307e8917b44",
+                      "last_write_utc":  "2026-07-29T10:18:42.1623890Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v25_green/npm-test.log",
+                      "bytes":  3777,
+                      "sha256":  "5e0c4d27650a8d411fe9cf0efa9ad376bf5d6d351741c10abe1769a455426300",
+                      "last_write_utc":  "2026-07-29T10:18:37.8087111Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v25_green/npm-test-worker.log",
+                      "bytes":  2975,
+                      "sha256":  "e0e57a2e67a5310b4306fddeb64cb4695d6490740fc01fb9c4f6737c4466d748",
+                      "last_write_utc":  "2026-07-29T10:18:36.5043025Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v25_green/npm-typecheck.log",
+                      "bytes":  29,
+                      "sha256":  "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+                      "last_write_utc":  "2026-07-29T10:18:38.7278143Z"
+                  }
+              ]
+}

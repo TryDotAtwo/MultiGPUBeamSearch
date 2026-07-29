@@ -22,7 +22,7 @@ export default defineWorkersConfig(async () => {
         workers: {
           miniflare: {
             bindings: { TEST_MIGRATIONS: migrations },
-            compatibilityDate: "2026-07-28",
+            compatibilityDate: "2025-07-12",
             d1Databases: ["RESULTS_DB"],
             r2Buckets: ["RAW_RESULTS"],
           },

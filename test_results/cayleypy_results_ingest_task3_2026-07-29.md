@@ -2,44 +2,44 @@
 
 ## Result
 
-Exact private CPU Kaggle v21 is GREEN for the current Task 3 executable payload: all six gate commands exited 0, schema 11/11 passed, real-migration receipt 23/23 passed, Worker 41/41 passed, the Worker pool was 64/64, and TypeScript typecheck passed. The downloaded manifest contained 18 inputs and all 18 SHA-256 values matched the current worktree with zero mismatches.
+Exact private CPU Kaggle v25 is GREEN for the hardened Task 3 payload: terminal `KernelWorkerStatus.COMPLETE`; all seven gate commands exited 0; schema 12/12 passed; the real-migration receipt plus Worker pool passed 70/70 in both the normal npm test and an independent Worker rerun; and TypeScript typecheck passed. The pulled notebook's embedded 18-file archive, its expected hashes, both downloaded manifests, and the current worktree agree with zero semantic payload mismatches.
 
 ## TDD trail
 
-- v17 preserved behavior-first RED: schema 11/11 and receipt 23/23 passed; Worker test collection and typecheck failed because `src/worker.ts` did not exist.
-- v18 and v19 passed typecheck plus the existing suites but exposed the pinned Worker pool's Ajv deep-import collection failure. A generic dependency include in v19 did not change the failure.
-- v20 fixed collection with exact optimizer entries and reached 60/64. Its four failures were all test-harness defects; production `worker.ts` and `storage.ts` already had their final v21 hashes.
-- v21 corrected those tests and passed every gate.
+- Original Task 3: v17 preserved the missing-Worker RED; v18-v20 isolated Worker-pool Ajv resolution and test-harness defects; v21 passed schema 11/11, receipt 23/23, Worker 41/41, Worker pool 64/64, and typecheck.
+- Review v22 preserved the three intended schema RED failures but was superseded because a test helper had one unintended TypeScript reference. Its diagnostic gate-results SHA-256 is `63a57db678988ffdfa1f2ea9400ec962272dbd864ae80fe7e4711029a27a28c9`.
+- Corrected review v23 is the accepted RED: schema 3 failed / 9 passed, Worker pool 6 failed / 64 passed, and typecheck exit 0. The failures exactly covered the 4 MiB body limit, malformed percent encoding, two adversarial minute-window races, envelope concurrency, and the duplicate subrequest budget.
+- v24 had the final production hashes and reached schema 12/12 plus Worker pool 68/70. Its two remaining failures were test oracles: response order was compared to client transport keys rather than canonical semantic hashes, and the bounded 100-item Miniflare case exceeded Vitest's default five-second timeout. Gate-results SHA-256 is `4c624328b38ee34287413034b37b73867ae56b40a1bc9c88a981b4f3589efa3a`.
+- v25 corrected only those test oracles, asserted the exact 702 binding calls, and passed every gate.
 
-## Verified contract
+## Verified current contract
 
-- Exact fail-closed mode resolver; reject/missing/empty/mixed/unknown touch no body, rate binding, R2, D1, or Queue.
-- 25 MiB declared and streamed body limits, strict JSON/schema handling, and no more than 100 envelopes.
-- Safe normal/store-only/duplicate/mixed receipts; store-only has an explicit Queue-free persistence contract.
-- Safe status/health surfaces and zero payload/raw-mode/infrastructure logging.
-- Optional Cloudflare rate binding plus load-bearing atomic D1 per-IP/global counters, including exactly 30 concurrent per-IP admissions and one concurrent global final-envelope admission.
-- Normal-only scheduled recovery with 60-second staleness, a 50-row bound, same-id resends, queued refresh/error clearing, store-only resumption, and retry failure fairness.
+- The request body has an exact 4 MiB declared/streamed limit. It is decoded incrementally with fatal UTF-8 handling, without retaining byte chunks or allocating a second full byte buffer; the parsed path skips duplicate schema serialization when raw byte length is known.
+- D1 rate windows are sampled at each counter consumption. Equal windows increment, newer windows reset, and stale writes change zero rows and return `429`; slow-boundary and stale-run interleavings are tested.
+- Per-envelope storage concurrency is at most eight and response order is stable. A request-wide budget of 400 duplicate rereads is passed through `RequestMeta`; 100 existing `received` duplicates use exactly 702 D1/Queue terminal calls, below 1,000.
+- Malformed percent escapes return `400 invalid_submission_id` before D1. The existing fail-closed mode, safe receipt/status/health, 100-envelope, authoritative per-IP/global rate, and normal-only recovery contracts remain covered.
+- Wrangler and the pinned Worker pool both use the exact supported compatibility date `2025-07-12`; the final logs contain no fallback warning.
 
-## Exact v21 payload anchors
+## Exact v25 payload anchors
 
-- `migrations/0002_ingest_rate_limits.sql`: `803e8b3af0dc4e1af2ddd32301a14fdba9d543cf9d5512a934f2d581f85e28f4`
-- `src/storage.ts`: `929a71468e5f5773e1c6aad8416360a93e46213b5f715819dd8bdd9fc9338c8b`
-- `src/worker.ts`: `085838c41e6b1f8286bcbd83c632e869e446746672f407f64822b4d544ba898b`
-- `test/worker.test.ts`: `d0f61086053ab8a9287e597392d5290dab00db22e59d48284640421c3b78d89b`
-- `vitest.config.ts`: `06efb33ebd896711ccf3c2331417ed24b3fe44a46a485ec9b652a444402fd895`
-- `wrangler.jsonc`: `66c6bbde521691a81f28d7861c3e8e1800cefd0d9a7fa6cdd1f0da4e67d918cd`
+- `src/schema.ts`: `5b2d0cdc1736bb5af720624d6f069567975d06991821e6a22776eacc3199126f`
+- `src/storage.ts` (unchanged): `929a71468e5f5773e1c6aad8416360a93e46213b5f715819dd8bdd9fc9338c8b`
+- `src/worker.ts`: `f45a1fb11fb80c93a872e20645faa3c7e822075b640347b64f3be8a93259dc11`
+- `test/schema.test.ts`: `28ff4675db6dc1be505e9d9591f0491e84dab8d4cf6b7fad24895fab79f4900c`
+- `test/worker.test.ts`: `4a3f514a3e33f47599aa529c72e175d1211d3b74962518c0105dee1c89363ddc`
+- `vitest.config.ts`: `a63ad781e2a6832f52ab0d0ba0e6a2950595492fd12883fa4ecb71f212d790e6`
+- `wrangler.jsonc`: `fbca840524e5c93b7805418e5046f83bbc89fde2ecca272c99be2011c93625d7`
 
-## Evidence artifact SHA-256
+## Committed raw evidence
 
-- `outputs_v21/payload-sha256.json`: `6555a361bcd9b46bb73b4d6dfeb5bf07117a0f86254bb9cdcd3d9a2ca4b2a62b`
-- `outputs_v21/npm-test.log`: `43f2914fb8db9a3f037fc82357ec9064f02b6ebdb36873b2bd814cc773d52759`
-- `outputs_v21/npm-typecheck.log`: `8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f`
-- `outputs_v21/npm-gate-results.json`: `fe1b97f873759e337e468d312e19211871455286ad403a3c4a70e1d4103a9274`
-- `pulled_v21/kernel-metadata.json`: `572d93ed4dd74d3aeabba1951ab4e098cbf6d217219c5b9edddab17bdbb35ae0`
-- `pulled_v21/cayleypy-results-ingest-npm-gate.ipynb`: `a0a4a7a68b50433093f89ee659bd4cf1a19d14245aaf97bfa683b647d3669e5d`
+- Accepted v23 RED capture manifest: `control_v23_red/capture-manifest.json`, SHA-256 `a11ab20590ec7701a5ef89b90e3b62fa04216f049248e15e622a07c98e95daca`.
+- Final v25 GREEN capture manifest: `control_v25_green/capture-manifest.json`, SHA-256 `e8c8b612c1df1707ea5018167a9463472cf496215fe8b01eb888ef3325dfc11d`.
+- Each manifest records kernel ref/version, push/status/pull UTC timestamps, exact retained-file hashes, and semantic validation. Retained raw evidence includes push receipt, COMPLETE status, output/pull receipt, pulled private metadata and notebook, node/npm versions, gate results, payload manifest, schema/Worker logs, and typecheck log.
+- v25 pulled notebook SHA-256 is `65e9f119e50f56046c60bc6fce36fe6ecb1c618181f7da51b0d1f51be7db9d92`; the pushed notebook SHA-256 was `3741c70e333a22f93173afb9d7e219a915ca4b71d2f85cbf8a6f0f865c7b3abd`. Kaggle normalizes the notebook wrapper, so payload acceptance is based on parsed embedded-archive semantics, not wrapper byte equality.
+- The evidence set is intentionally list-free. It excludes identity-bearing kernel-list output, zero-byte main logs, downloaded duplicate lockfiles, and invalid/partial bulk from v22/v24. A staged-evidence scan is required to show no secrets, tokens, real local names, or user-home paths.
 
-## Metadata and limitations
+## Metadata and boundary
 
-Pulled v21 metadata confirms `trydotatwo/cayleypy-results-ingest-npm-gate`, `is_private=true`, CPU-only (`enable_gpu=false`, `enable_tpu=false`, `machine_shape=None`), and Internet enabled. The pinned test runtime falls back from compatibility date `2026-07-28` to supported `2025-07-12`. Wrangler remains pinned to 4.26.0, below the documented 4.36.0 minimum for Rate Limiting binding configuration, so no such resource/binding was configured or created; the tested D1 limiter is authoritative. The v21 manifest hashes exact pre-filter worktree bytes; Git normalizes CRLF to LF for 11 staged text inputs, and a normalized-content audit found zero non-EOL differences.
+Pulled v23 and v25 metadata confirm `trydotatwo/cayleypy-results-ingest-npm-gate`, `is_private=true`, CPU-only (`enable_gpu=false`, `enable_tpu=false`, `machine_shape=None`), and Internet enabled. The Windows Kaggle CLI downloaded every output before its console failed to encode a Unicode checkmark; the output-download receipts preserve that bounded known issue and the files were inspected directly.
 
-No Task 4 consumer/replay/writer, deployment, resource or secret creation, git push, GitHub mutation, or public publication was performed.
+No Task 4 consumer/replay/writer, CUDA or beam-search change, deployment, Cloudflare resource/secret creation, git push, GitHub mutation, or public publication was performed.

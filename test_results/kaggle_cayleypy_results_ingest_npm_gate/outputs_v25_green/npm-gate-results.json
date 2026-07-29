@@ -1,0 +1,93 @@
+{
+  "all_commands_passed": true,
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "--version"
+      ],
+      "exit_code": 0,
+      "label": "node-version"
+    },
+    {
+      "argv": [
+        "npm",
+        "--version"
+      ],
+      "exit_code": 0,
+      "label": "npm-version"
+    },
+    {
+      "argv": [
+        "npm",
+        "install",
+        "--package-lock-only",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit_code": 0,
+      "label": "npm-install-package-lock-only"
+    },
+    {
+      "argv": [
+        "npm",
+        "ci",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit_code": 0,
+      "label": "npm-ci"
+    },
+    {
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "exit_code": 0,
+      "label": "npm-test"
+    },
+    {
+      "argv": [
+        "npm",
+        "exec",
+        "--",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.config.ts"
+      ],
+      "exit_code": 0,
+      "label": "npm-test-worker"
+    },
+    {
+      "argv": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "label": "npm-typecheck"
+    }
+  ],
+  "lockfile_present": true,
+  "payload_sha256": {
+    "configs/cayleypy_results_schema_v1.json": "5dc4888c70836229e0fb31508cf967082a186e472091d58826450368c2a9f126",
+    "services/cayleypy-results-ingest/migrations/0001_initial.sql": "8c3fe6fdc4381e123a901593962194f90aae7bfc484e6a6f5685195d05cb0ba6",
+    "services/cayleypy-results-ingest/migrations/0002_ingest_rate_limits.sql": "803e8b3af0dc4e1af2ddd32301a14fdba9d543cf9d5512a934f2d581f85e28f4",
+    "services/cayleypy-results-ingest/package-lock.json": "6c84152419596a537b4f0df8dee1ab2e843103faf606506bd46a6483fcf10b81",
+    "services/cayleypy-results-ingest/package.json": "e55ba61809d63740bd7d4dd4c009e57f06f2c1b3346a4ad3f147812641a29863",
+    "services/cayleypy-results-ingest/src/db.ts": "d46481ee7eb8a7d2cbc3673f305566b31b6605eb4c6cae1d7547cfbec72a6609",
+    "services/cayleypy-results-ingest/src/ids.ts": "beec2434b4d4c96eaf7aeef3258f938f2e1ca6c123389096987365ff8e6727a6",
+    "services/cayleypy-results-ingest/src/schema.ts": "5b2d0cdc1736bb5af720624d6f069567975d06991821e6a22776eacc3199126f",
+    "services/cayleypy-results-ingest/src/storage.ts": "929a71468e5f5773e1c6aad8416360a93e46213b5f715819dd8bdd9fc9338c8b",
+    "services/cayleypy-results-ingest/src/worker.ts": "f45a1fb11fb80c93a872e20645faa3c7e822075b640347b64f3be8a93259dc11",
+    "services/cayleypy-results-ingest/test/apply-migrations.ts": "f7cc52a868ed3bf5ae2cf93fead32335a1541019d7828e16eb1375b0ebe5918d",
+    "services/cayleypy-results-ingest/test/receipt.test.ts": "686b3beb31adb722f1647bbd8a9ab95807edb06419222178cfe436eb1b2e6094",
+    "services/cayleypy-results-ingest/test/schema.test.ts": "28ff4675db6dc1be505e9d9591f0491e84dab8d4cf6b7fad24895fab79f4900c",
+    "services/cayleypy-results-ingest/test/worker.test.ts": "4a3f514a3e33f47599aa529c72e175d1211d3b74962518c0105dee1c89363ddc",
+    "services/cayleypy-results-ingest/tsconfig.json": "0000e32074d2a3730a337cc3291e247cddbef2ebd8f98772b83cfe48a538bfd0",
+    "services/cayleypy-results-ingest/vitest.config.ts": "a63ad781e2a6832f52ab0d0ba0e6a2950595492fd12883fa4ecb71f212d790e6",
+    "services/cayleypy-results-ingest/vitest.schema.config.ts": "e06f4a73c0c2a9a662c2a9e2485e0fda83fcdae435efa0b7207960fa7fdc2d9a",
+    "services/cayleypy-results-ingest/wrangler.jsonc": "fbca840524e5c93b7805418e5046f83bbc89fde2ecca272c99be2011c93625d7"
+  }
+}

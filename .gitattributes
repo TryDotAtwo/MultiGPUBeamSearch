@@ -6,3 +6,9 @@
 *.png binary
 *.nsys-rep binary
 *.sqlite binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v23_red/*.log binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v25_green/*.log binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v23_red/pull/kernel-metadata.json binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v25_green/pull/kernel-metadata.json binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v23_red/pull/cayleypy-results-ingest-npm-gate.ipynb binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v25_green/pull/cayleypy-results-ingest-npm-gate.ipynb binary

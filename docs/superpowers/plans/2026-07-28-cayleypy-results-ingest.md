@@ -96,7 +96,7 @@ If an exact package version is unavailable at execution time, resolve it once, r
 
 - [ ] **Step 2: Write failing strict-schema tests**
 
-Test a valid result and rejection for unknown field, unsupported schema, oversized author/path/proof, invalid enum, more than 100 results, and serialized request over 25 MiB. Verify errors contain JSON pointer/code only, not submitted values.
+Test a valid result and rejection for unknown field, unsupported schema, oversized author/path/proof, invalid enum, more than 100 results, and serialized request over 4 MiB. Verify errors contain JSON pointer/code only, not submitted values.
 
 - [ ] **Step 3: Run and verify RED**
 
@@ -246,7 +246,7 @@ git commit -m "feat: persist CayleyPy result receipts durably"
 - Produces `receiveEnvelopeStoreOnly(env, envelope, requestMeta) -> Promise<StoredReceipt>`; it preserves the Task 2 R2-before-D1/idempotency contract while its environment type has no Queue binding and its implementation performs zero Queue access.
 - Produces `type IngestMode = "normal" | "store_only" | "reject"` and one resolver that returns only those values. It accepts only exact case-sensitive matches and resolves missing, empty, mixed-case, or unknown input to `reject` without exposing the raw input.
 - Produces `scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void>` with `RECOVERY_STALE_MS = 60_000` and `RECOVERY_LIMIT = 50`. It returns before touching recovery unless the resolved mode is `normal`; otherwise it computes `staleBefore = new Date(controller.scheduledTime - RECOVERY_STALE_MS)` and calls `recoverStaleSubmissions(env, { staleBefore, limit: RECOVERY_LIMIT })`.
-- Uses one atomic conditional D1 UPSERT per IP/global scope as the authoritative fixed-minute counter. The optional Cloudflare Rate Limiting binding is an additional per-location fast rejection path; it is not treated as the global source of truth and no binding/resource is provisioned in Task 3.
+- Uses one atomic conditional D1 UPSERT per IP/global scope as the authoritative fixed-minute counter. Sample the current minute at each counter consumption; equal windows increment, newer windows reset, and stale windows must make zero changes and be rejected. The optional Cloudflare Rate Limiting binding is an additional per-location fast rejection path; it is not treated as the global source of truth and no binding/resource is provisioned in Task 3.
 
 - [x] **Step 1: Write failing route tests**
 
@@ -259,11 +259,11 @@ Expected: FAIL because `worker.ts` does not exist.
 
 - [x] **Step 3: Implement bounded body parsing and receipts**
 
-Read `Content-Length` before body, then stream/count with a 25 MiB hard limit. Accept only `application/json`. In `normal`, persist/enqueue each result independently and return mixed receipt status without echoing result content. Keep persistence and Queue publication separate so `store_only` can leave accepted rows in `received`; reject fail-closed modes before any persistence.
+Read `Content-Length` before body, then incrementally decode fatal UTF-8 and count bytes with a 4 MiB hard limit. Do not retain byte chunks, allocate a second full byte buffer, or reserialize after ingress supplied the raw length; clear avoidable decoded-text references after parsing. Accept only `application/json`. In `normal`, persist/enqueue each result independently and return mixed receipt status without echoing result content. Keep persistence and Queue publication separate so `store_only` can leave accepted rows in `received`; reject fail-closed modes before any persistence.
 
 - [x] **Step 4: Implement rate limiting and emergency modes**
 
-Use a Cloudflare Rate Limiting binding when available plus an authoritative D1 per-IP/global counter. Start with 30 requests/minute/IP, 100 envelopes/request, and 2,000 envelopes/minute globally; expose exact limits in `/healthz` but no infrastructure ids. Resolve the mode once through the exact allowlist: `normal` persists and queues, `store_only` persists raw R2 plus a D1 `received` row with zero Queue sends, and `reject`/missing/unknown returns a safe disabled response with zero R2/D1/Queue writes. Never echo or log the raw mode value. Each D1 scope update must be one conditional UPSERT so concurrent requests cannot pass through a read-then-write race. Do not configure or create a Rate Limiting binding until the pinned Wrangler supports its documented configuration and an operator provisions the resource.
+Use a Cloudflare Rate Limiting binding when available plus an authoritative D1 per-IP/global counter. Start with 30 requests/minute/IP, 100 envelopes/request, and 2,000 envelopes/minute globally; expose exact limits in `/healthz` but no infrastructure ids. Resolve the mode once through the exact allowlist: `normal` persists and queues, `store_only` persists raw R2 plus a D1 `received` row with zero Queue sends, and `reject`/missing/unknown returns a safe disabled response with zero R2/D1/Queue writes. Never echo or log the raw mode value. Each D1 scope update must be one monotonic conditional UPSERT so concurrent or stale requests cannot pass through a read-then-write race or roll the minute backward. Bound envelope storage to eight concurrent operations while preserving receipt order. Divide a request-wide 400-reread duplicate budget across envelopes and pass it through `RequestMeta`; the 100-existing-duplicate gate must stay below 1,000 internal binding calls. Malformed percent encoding on the status path must return a safe 400 before D1. Do not configure or create a Rate Limiting binding until the pinned Wrangler supports its documented configuration and an operator provisions the resource.
 
 - [x] **Step 5: Implement and test the scheduled recovery entry point**
 
@@ -271,7 +271,7 @@ Add the exact `scheduled(controller, env, ctx)` interface above and configure th
 
 - [x] **Step 6: Test and commit**
 
-Run: `npm test -- worker.test.ts receipt.test.ts && npm run typecheck`
+Run the exact private CPU gate: schema suite, real-migration receipt+Worker pool, an independent Worker rerun, and `npm run typecheck`; require a byte/semantic match for every embedded payload file.
 Expected: PASS.
 
 ```bash

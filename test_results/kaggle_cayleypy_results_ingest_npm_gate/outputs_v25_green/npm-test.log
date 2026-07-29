@@ -1,0 +1,48 @@
+
+> test
+> vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts
+
+
+ RUN  v3.2.4 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+ ✓ test/schema.test.ts (12 tests) 47ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  10:16:08
+   Duration  584ms (transform 74ms, setup 0ms, collect 243ms, tests 47ms, environment 0ms, prepare 111ms)
+
+
+ RUN  v3.2.4 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+[vpw:info] Starting isolated runtimes for vitest.config.ts...
+ ✓ test/receipt.test.ts (23 tests) 9719ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > orders R2 durability, D1 received state, Queue durability, and receipt  345ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > holds a concurrent duplicate until the winner Queue write is durable  314ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > accepts a winner that settles on the final bounded reread  304ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > resends a stale received duplicate after the bounded wait  323ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > removes only the D1 conflict loser service-generated raw object  324ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > successful Queue send advances a concurrent retryable row and clears its stale error  573ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > scheduled recovery re-enqueues stale retryable rows and retains raw  317ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > failed recovery advances retry metadata so a bounded page cannot starve its tail  398ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > parks received, queued, and retryable rows without consuming retry budget or raw  388ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > duplicate pause deliveries beyond a max-retries-equivalent remain one parked row  3382ms
+ ✓ test/worker.test.ts (47 tests) 28539ms
+   ✓ Task 3 public ingest contract > normal POST returns a durable receipt  344ms
+   ✓ fail-closed modes and bounded request parsing > accepts an exact four MiB chunked JSON body with UTF-8 split across chunks  619ms
+   ✓ durable receipts, status, health, and logging safety > normal mode persists each envelope, sends per-id work, and gives duplicate receipts  416ms
+   ✓ durable receipts, status, health, and logging safety > returns mixed durable receipt states when one per-item Queue send fails  416ms
+   ✓ durable receipts, status, health, and logging safety > returns 202 with safe per-index errors when one item cannot be persisted  319ms
+   ✓ durable receipts, status, health, and logging safety > store_only persists immutable raw and one received receipt without Queue sends  343ms
+   ✓ Cloudflare binding plus load-bearing bounded D1 rate limits > keeps D1 per-IP accounting active even when the binding allows  2545ms
+   ✓ mode-gated scheduled recovery > normal recovery bounds stale pages, refreshes queued rows, and advances failures fairly  1768ms
+   ✓ concurrency and early-reject regression gates > bounds per-envelope storage concurrency while preserving receipt order  3102ms
+   ✓ concurrency and early-reject regression gates > keeps one hundred received duplicates below one thousand internal binding calls  9617ms
+   ✓ concurrency and early-reject regression gates > atomic D1 per-IP accounting admits exactly 30 concurrent requests  1780ms
+
+ Test Files  2 passed (2)
+      Tests  70 passed (70)
+   Start at  10:16:10
+   Duration  30.40s (transform 271ms, setup 307ms, collect 558ms, tests 38.26s, environment 1ms, prepare 644ms)
+
+[vpw:debug] Shutting down runtimes...

@@ -1,5 +1,5 @@
 import { findBySubmissionId } from "./db.js";
-import { validateBatch, type ResultEnvelopeV1 } from "./schema.js";
+import { MAX_SERIALIZED_BATCH_BYTES, validateBatch, type ResultEnvelopeV1 } from "./schema.js";
 import {
   SafeIngestError,
   receiveEnvelope,
@@ -19,7 +19,7 @@ export interface WorkerEnv extends IngestEnv {
   INGEST_RATE_LIMIT?: IngestRateLimit;
 }
 
-export const MAX_REQUEST_BYTES = 25 * 1024 * 1024;
+export const MAX_REQUEST_BYTES = MAX_SERIALIZED_BATCH_BYTES;
 export const MAX_RESULTS_PER_REQUEST = 100;
 export const PER_IP_REQUESTS_PER_MINUTE = 30;
 export const GLOBAL_ENVELOPES_PER_MINUTE = 2_000;
@@ -27,6 +27,8 @@ export const RECOVERY_STALE_MS = 60_000;
 export const RECOVERY_LIMIT = 50;
 const RATE_WINDOW_MS = 60_000;
 const RETRY_AFTER_SECONDS = 60;
+const ENVELOPE_CONCURRENCY = 8;
+const DUPLICATE_REREAD_BUDGET = 400;
 
 class SafeHttpError extends Error {
   constructor(readonly status: number, readonly code: string) {
@@ -71,39 +73,50 @@ function declaredBodyLength(request: Request): number | null {
   return length;
 }
 
-async function readBoundedBody(request: Request): Promise<Uint8Array> {
+async function readBoundedText(request: Request): Promise<{ text: string; rawByteLength: number }> {
   const declared = declaredBodyLength(request);
   if (declared !== null && declared > MAX_REQUEST_BYTES) {
     throw new SafeHttpError(413, "request_too_large");
   }
 
-  if (request.body === null) return new Uint8Array();
+  if (request.body === null) return { text: "", rawByteLength: 0 };
   const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let text = "";
   let total = 0;
   try {
     while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        throw new SafeHttpError(400, "invalid_body");
+      }
+      if (chunk.done) break;
+      total += chunk.value.byteLength;
       if (total > MAX_REQUEST_BYTES) {
-        await reader.cancel();
+        try { await reader.cancel(); } catch { /* Best-effort cancellation after the hard bound. */ }
         throw new SafeHttpError(413, "request_too_large");
       }
-      chunks.push(value);
+      try {
+        text += decoder.decode(chunk.value, { stream: true });
+      } catch {
+        try { await reader.cancel(); } catch { /* Best-effort cancellation after invalid UTF-8. */ }
+        throw new SafeHttpError(400, "invalid_json");
+      }
     }
+    try {
+      text += decoder.decode();
+    } catch {
+      throw new SafeHttpError(400, "invalid_json");
+    }
+    return { text, rawByteLength: total };
   } catch (error) {
-    if (error instanceof SafeHttpError) throw error;
-    throw new SafeHttpError(400, "invalid_body");
+    text = "";
+    throw error;
+  } finally {
+    reader.releaseLock();
   }
-
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return bytes;
 }
 
 async function parseBatch(request: Request): Promise<{ value: ResultEnvelopeV1[]; rawByteLength: number } | Response> {
@@ -111,9 +124,9 @@ async function parseBatch(request: Request): Promise<{ value: ResultEnvelopeV1[]
     return errorResponse(415, "unsupported_media_type");
   }
 
-  let bytes: Uint8Array;
+  let body: { text: string; rawByteLength: number };
   try {
-    bytes = await readBoundedBody(request);
+    body = await readBoundedText(request);
   } catch (error) {
     if (error instanceof SafeHttpError) return errorResponse(error.status, error.code);
     return errorResponse(400, "invalid_body");
@@ -121,24 +134,25 @@ async function parseBatch(request: Request): Promise<{ value: ResultEnvelopeV1[]
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    parsed = JSON.parse(body.text);
   } catch {
     return errorResponse(400, "invalid_json");
+  } finally {
+    body.text = "";
   }
-  const validation = validateBatch(parsed, bytes.byteLength);
+  const validation = validateBatch(parsed, body.rawByteLength);
   if (!validation.ok) {
     return jsonResponse({ error: "invalid_schema", errors: validation.errors }, 400);
   }
-  return { value: validation.value.results, rawByteLength: bytes.byteLength };
+  return { value: validation.value.results, rawByteLength: body.rawByteLength };
 }
-
 async function consumeD1Limit(
   db: D1Database,
   scope: string,
   amount: number,
   maximum: number,
-  windowStart: number,
 ): Promise<boolean> {
+  const windowStart = Math.floor(Date.now() / RATE_WINDOW_MS) * RATE_WINDOW_MS;
   const result = await db.prepare(
     `INSERT INTO ingest_rate_limits (scope,window_start,count) VALUES (?,?,?)
      ON CONFLICT(scope) DO UPDATE SET
@@ -148,16 +162,16 @@ async function consumeD1Limit(
          THEN ingest_rate_limits.count + excluded.count
          ELSE excluded.count
        END
-     WHERE CASE
-       WHEN ingest_rate_limits.window_start = excluded.window_start
-       THEN ingest_rate_limits.count + excluded.count
-       ELSE excluded.count
-     END <= ?`,
-  ).bind(scope, windowStart, amount, maximum).run();
+     WHERE
+       (excluded.window_start > ingest_rate_limits.window_start AND excluded.count <= ?)
+       OR
+       (excluded.window_start = ingest_rate_limits.window_start
+        AND ingest_rate_limits.count + excluded.count <= ?)`,
+  ).bind(scope, windowStart, amount, maximum, maximum).run();
   return result.meta.changes === 1;
 }
 
-async function allowIpRequest(request: Request, env: WorkerEnv, windowStart: number): Promise<boolean> {
+async function allowIpRequest(request: Request, env: WorkerEnv): Promise<boolean> {
   const ip = request.headers.get("CF-Connecting-IP")?.trim() || "unknown";
   if (env.INGEST_RATE_LIMIT !== undefined) {
     try {
@@ -166,9 +180,8 @@ async function allowIpRequest(request: Request, env: WorkerEnv, windowStart: num
       // The D1 counter below remains the authoritative fallback.
     }
   }
-  return consumeD1Limit(env.RESULTS_DB, `ip:${ip}`, 1, PER_IP_REQUESTS_PER_MINUTE, windowStart);
+  return consumeD1Limit(env.RESULTS_DB, `ip:${ip}`, 1, PER_IP_REQUESTS_PER_MINUTE);
 }
-
 function receiptResponse(
   request: Request,
   receipt: { submission_id: string; idempotency_key: string },
@@ -184,14 +197,33 @@ function safeIngestCode(error: unknown): string {
   return error instanceof SafeIngestError ? error.code : "ingest_failed";
 }
 
+async function mapBounded<T, U>(
+  values: readonly T[],
+  concurrency: number,
+  operation: (value: T, index: number) => Promise<U>,
+): Promise<U[]> {
+  const output = new Array<U>(values.length);
+  let nextIndex = 0;
+  const consume = async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      output[index] = await operation(values[index], index);
+    }
+  };
+  await Promise.all(Array.from(
+    { length: Math.min(concurrency, values.length) },
+    () => consume(),
+  ));
+  return output;
+}
 async function handlePostResults(request: Request, env: WorkerEnv): Promise<Response> {
   const mode = resolveIngestMode(env.INGEST_MODE);
   if (mode === "reject") return errorResponse(503, "ingest_disabled");
 
-  const windowStart = Math.floor(Date.now() / RATE_WINDOW_MS) * RATE_WINDOW_MS;
   let ipAllowed: boolean;
   try {
-    ipAllowed = await allowIpRequest(request, env, windowStart);
+    ipAllowed = await allowIpRequest(request, env);
   } catch {
     return errorResponse(503, "rate_limit_unavailable");
   }
@@ -207,23 +239,26 @@ async function handlePostResults(request: Request, env: WorkerEnv): Promise<Resp
       "global",
       parsed.value.length,
       GLOBAL_ENVELOPES_PER_MINUTE,
-      windowStart,
     );
   } catch {
     return errorResponse(503, "rate_limit_unavailable");
   }
   if (!globallyAllowed) return rateLimited();
 
-  const outcomes = await Promise.all(parsed.value.map(async (envelope, index) => {
+  const duplicatePollAttempts = Math.max(
+    1,
+    Math.floor(DUPLICATE_REREAD_BUDGET / parsed.value.length),
+  );
+  const outcomes = await mapBounded(parsed.value, ENVELOPE_CONCURRENCY, async (envelope, index) => {
     try {
       const receipt = mode === "normal"
-        ? await receiveEnvelope(env, envelope)
+        ? await receiveEnvelope(env, envelope, { duplicatePollAttempts })
         : await receiveEnvelopeStoreOnly(env, envelope);
       return { ok: true as const, receipt: receiptResponse(request, receipt) };
     } catch (error) {
       return { ok: false as const, error: { index, code: safeIngestCode(error) } };
     }
-  }));
+  });
 
   const receipts = outcomes.filter((outcome) => outcome.ok).map((outcome) => outcome.receipt);
   const errors = outcomes.filter((outcome) => !outcome.ok).map((outcome) => outcome.error);
@@ -279,7 +314,13 @@ export async function fetchRequest(
   const statusMatch = /^\/v1\/submissions\/([^/]+)$/.exec(pathname);
   if (statusMatch !== null) {
     if (request.method !== "GET") return methodNotAllowed("GET");
-    return handleStatus(decodeURIComponent(statusMatch[1]), env);
+    let submissionId: string;
+    try {
+      submissionId = decodeURIComponent(statusMatch[1]);
+    } catch {
+      return errorResponse(400, "invalid_submission_id");
+    }
+    return handleStatus(submissionId, env);
   }
   return errorResponse(404, "not_found");
 }

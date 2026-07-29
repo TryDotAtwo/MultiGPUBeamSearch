@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { canonicalJson } from "../src/ids.js";
+import { canonicalJson, computeIdempotency } from "../src/ids.js";
 
 import {
   GLOBAL_ENVELOPES_PER_MINUTE,
@@ -102,13 +102,14 @@ const TEST_IP = "203.0.113.42";
 function customBindings(
   mode: string | undefined,
   options: {
+    db?: D1Database;
     queue?: Queue;
     bucket?: R2Bucket;
     rateLimit?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   } = {},
 ): WorkerEnv {
   const value: WorkerEnv = {
-    RESULTS_DB: env.RESULTS_DB,
+    RESULTS_DB: options.db ?? env.RESULTS_DB,
     RAW_RESULTS: options.bucket ?? env.RAW_RESULTS,
     VALIDATE_QUEUE: options.queue ?? ({ send: async () => undefined } as unknown as Queue),
   };
@@ -119,6 +120,19 @@ function customBindings(
 
 function resultBatch(...indexes: number[]) {
   return { schema_version: 1 as const, results: indexes.map((index) => validEnvelope(index)) };
+}
+
+function uniqueResultBatch(count: number, offset = 0) {
+  return {
+    schema_version: 1 as const,
+    results: Array.from({ length: count }, (_, index) => {
+      const envelope = validEnvelope(offset + index);
+      return {
+        ...envelope,
+        idempotency_key: (offset + index + 1).toString(16).padStart(64, "0"),
+      };
+    }),
+  };
 }
 
 function postRequest(body: BodyInit | null, contentType = "application/json", extraHeaders: HeadersInit = {}): Request {
@@ -141,6 +155,59 @@ function proxyBucket(overrides: Partial<R2Bucket> = {}): R2Bucket {
     list: (...args: Parameters<R2Bucket["list"]>) => env.RAW_RESULTS.list(...args),
     ...overrides,
   } as unknown as R2Bucket;
+}
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+type D1TerminalMethod = "all" | "first" | "raw" | "run";
+
+function proxyDatabase(
+  beforeTerminal: (sql: string, method: D1TerminalMethod, values: unknown[]) => void | Promise<void>,
+): D1Database {
+  const wrap = (statement: D1PreparedStatement, sql: string, values: unknown[] = []): D1PreparedStatement =>
+    new Proxy(statement, {
+      get(target, property) {
+        if (property === "bind") {
+          return (...nextValues: unknown[]) => wrap(target.bind(...nextValues), sql, nextValues);
+        }
+        if (property === "all" || property === "first" || property === "raw" || property === "run") {
+          return async (...args: unknown[]) => {
+            await beforeTerminal(sql, property, values);
+            return Reflect.apply(
+              Reflect.get(target, property, target) as (...input: unknown[]) => unknown,
+              target,
+              args,
+            );
+          };
+        }
+        const member = Reflect.get(target, property, target) as unknown;
+        return typeof member === "function" ? member.bind(target) : member;
+      },
+    });
+  return new Proxy(env.RESULTS_DB, {
+    get(target, property) {
+      if (property === "prepare") return (sql: string) => wrap(target.prepare(sql), sql);
+      const member = Reflect.get(target, property, target) as unknown;
+      return typeof member === "function" ? member.bind(target) : member;
+    },
+  });
+}
+
+function countedBucket(onCall: () => void): R2Bucket {
+  return new Proxy(env.RAW_RESULTS, {
+    get(target, property) {
+      const member = Reflect.get(target, property, target) as unknown;
+      if (typeof member !== "function") return member;
+      return (...args: unknown[]) => {
+        onCall();
+        return Reflect.apply(member as (...input: unknown[]) => unknown, target, args);
+      };
+    },
+  });
 }
 
 async function rowCount(): Promise<number> {
@@ -237,20 +304,43 @@ describe("fail-closed modes and bounded request parsing", () => {
     expect(request.bodyUsed).toBe(false);
   });
 
-  test("counts a streaming body and stops at the exact 25 MiB hard bound", async () => {
+  test("counts a streaming body and stops immediately above the four MiB hard bound", async () => {
     let chunks = 0;
     const stream = new ReadableStream<Uint8Array>({
       pull(streamController) {
         chunks += 1;
-        streamController.enqueue(new Uint8Array(chunks <= 25 ? 1024 * 1024 : 1));
-        if (chunks === 26) streamController.close();
+        streamController.enqueue(new Uint8Array(chunks <= 4 ? 1024 * 1024 : 1));
+        if (chunks === 5) streamController.close();
       },
     });
     const response = await fetchRequest(postRequest(stream), bindings(), context());
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error: "request_too_large" });
-    expect(chunks).toBe(26);
+    expect(chunks).toBe(5);
     expect(await rowCount()).toBe(0);
+  });
+
+  test("accepts an exact four MiB chunked JSON body with UTF-8 split across chunks", async () => {
+    const envelope = { ...validEnvelope(0), author: { name: "Ada-😀", verification: "claimed" as const } };
+    const encoded = new TextEncoder().encode(JSON.stringify({ schema_version: 1, results: [envelope] }));
+    const body = new Uint8Array(4 * 1024 * 1024);
+    body.fill(0x20);
+    body.set(encoded);
+    const emojiStart = body.indexOf(0xf0);
+    expect(emojiStart).toBeGreaterThan(0);
+    const ends = [emojiStart + 2, 1024 * 1024, 2 * 1024 * 1024, 3 * 1024 * 1024, body.byteLength];
+    let start = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const end = ends.shift();
+        if (end === undefined) return controller.close();
+        controller.enqueue(body.slice(start, end));
+        start = end;
+      },
+    });
+    const response = await fetchRequest(postRequest(stream), customBindings("store_only"), context());
+    expect(response.status).toBe(202);
+    expect((await response.json() as { receipts: unknown[] }).receipts).toHaveLength(1);
   });
 
   test("returns value-free malformed JSON and strict-schema errors", async () => {
@@ -373,6 +463,19 @@ describe("durable receipts, status, health, and logging safety", () => {
     expect(await missing.json()).toEqual({ error: "not_found" });
   });
 
+  test("rejects malformed percent encoding before touching D1", async () => {
+    let d1Calls = 0;
+    const db = proxyDatabase(() => { d1Calls += 1; });
+    const response = await fetchRequest(
+      new Request(`${URL}/v1/submissions/%`),
+      customBindings("normal", { db }),
+      context(),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_submission_id" });
+    expect(d1Calls).toBe(0);
+  });
+
   test("health exposes exact limits and resolved mode, never bindings or raw config", async () => {
     const workerEnv = customBindings("unknown-RAW-MODE");
     Object.assign(workerEnv, { SECRET_TOKEN: "LEAK_ME", DB_ID: "binding-123" });
@@ -462,6 +565,72 @@ describe("Cloudflare binding plus load-bearing bounded D1 rate limits", () => {
     expect(await env.RESULTS_DB.prepare("SELECT window_start,count FROM ingest_rate_limits WHERE scope = ?")
       .bind(`ip:${TEST_IP}`).first()).toEqual({ window_start: currentWindow, count: 1 });
     expect(await env.RESULTS_DB.prepare("SELECT COUNT(*) AS count FROM ingest_rate_limits").first<number>("count")).toBe(2);
+  });
+
+  test("samples the rate window at each counter consumption across a slow boundary", async () => {
+    const oldWindow = 1_800_000_000_000;
+    const newWindow = oldWindow + 60_000;
+    const enteredBinding = deferred();
+    const releaseBinding = deferred();
+    let bindingCalls = 0;
+    const dateNow = vi.spyOn(Date, "now").mockReturnValue(oldWindow + 59_999);
+    try {
+      const workerEnv = customBindings("store_only", {
+        rateLimit: {
+          limit: async () => {
+            bindingCalls += 1;
+            if (bindingCalls === 1) {
+              enteredBinding.resolve();
+              await releaseBinding.promise;
+            }
+            return { success: true };
+          },
+        },
+      });
+      const slow = postJson(resultBatch(10), workerEnv);
+      await enteredBinding.promise;
+      dateNow.mockReturnValue(newWindow + 1);
+      const fast = await postJson(resultBatch(11), workerEnv);
+      releaseBinding.resolve();
+      const resumed = await slow;
+      expect([fast.status, resumed.status]).toEqual([202, 202]);
+      expect(await env.RESULTS_DB.prepare("SELECT window_start,count FROM ingest_rate_limits WHERE scope = ?")
+        .bind("global").first()).toEqual({ window_start: newWindow, count: 2 });
+    } finally {
+      releaseBinding.resolve();
+      dateNow.mockRestore();
+    }
+  });
+
+  test("rejects a stale global counter write instead of rolling the window backward", async () => {
+    const oldWindow = 1_800_000_000_000;
+    const newWindow = oldWindow + 60_000;
+    const globalRunEntered = deferred();
+    const releaseGlobalRun = deferred();
+    let delayed = false;
+    const db = proxyDatabase(async (sql, method, values) => {
+      if (!delayed && method === "run" && sql.includes("INSERT INTO ingest_rate_limits") && values[0] === "global") {
+        delayed = true;
+        globalRunEntered.resolve();
+        await releaseGlobalRun.promise;
+      }
+    });
+    const dateNow = vi.spyOn(Date, "now").mockReturnValue(oldWindow + 59_999);
+    try {
+      const stale = postJson(resultBatch(20), customBindings("store_only", { db }));
+      await globalRunEntered.promise;
+      dateNow.mockReturnValue(newWindow + 1);
+      const current = await postJson(resultBatch(21), customBindings("store_only"));
+      releaseGlobalRun.resolve();
+      const staleResponse = await stale;
+      expect([staleResponse.status, current.status]).toEqual([429, 202]);
+      expect(await env.RESULTS_DB.prepare("SELECT window_start,count FROM ingest_rate_limits WHERE scope = ?")
+        .bind("global").first()).toEqual({ window_start: newWindow, count: 1 });
+      expect(await rowCount()).toBe(1);
+    } finally {
+      releaseGlobalRun.resolve();
+      dateNow.mockRestore();
+    }
   });
 
   test("rejects a batch that would cross the global envelope limit atomically", async () => {
@@ -589,6 +758,53 @@ describe("concurrency and early-reject regression gates", () => {
     expect({ sends, rows: await rowCount(), raw: await rawCount() }).toEqual({ sends: 0, rows: 1, raw: 1 });
     expect(await env.RESULTS_DB.prepare("SELECT state FROM submissions").first<string>("state")).toBe("received");
   });
+
+  test("bounds per-envelope storage concurrency while preserving receipt order", async () => {
+    let activePuts = 0;
+    let maxInflightPuts = 0;
+    const bucket = proxyBucket({
+      put: async (key, value, options) => {
+        activePuts += 1;
+        maxInflightPuts = Math.max(maxInflightPuts, activePuts);
+        try {
+          await new Promise<void>((resolve) => setTimeout(resolve, 5));
+          return await env.RAW_RESULTS.put(key, value, options);
+        } finally {
+          activePuts -= 1;
+        }
+      },
+    });
+    const response = await postJson(uniqueResultBatch(100), customBindings("store_only", { bucket }));
+    expect(response.status).toBe(202);
+    const body = await response.json() as { receipts: Array<{ idempotency_key: string }>; errors?: unknown[] };
+    expect(body.errors).toBeUndefined();
+    const expectedOrder = await Promise.all(uniqueResultBatch(100).results.map(computeIdempotency));
+    expect(body.receipts.map(({ idempotency_key }) => idempotency_key)).toEqual(expectedOrder);
+    expect(maxInflightPuts).toBeGreaterThan(1);
+    expect(maxInflightPuts).toBeLessThanOrEqual(8);
+  });
+
+  test("keeps one hundred received duplicates below one thousand internal binding calls", async () => {
+    const batch = uniqueResultBatch(100, 200);
+    const seeded = await postJson(batch, customBindings("store_only"));
+    expect((await seeded.json() as { receipts: unknown[] }).receipts).toHaveLength(100);
+    await env.RESULTS_DB.exec("DELETE FROM ingest_rate_limits");
+
+    let bindingCalls = 0;
+    const countCall = () => {
+      bindingCalls += 1;
+      if (bindingCalls >= 1_000) throw new Error("internal binding call budget exceeded");
+    };
+    const db = proxyDatabase(countCall);
+    const bucket = countedBucket(countCall);
+    const queue = { send: async () => { countCall(); } } as unknown as Queue;
+    const response = await postJson(batch, customBindings("normal", { db, bucket, queue }));
+    expect(response.status).toBe(202);
+    const body = await response.json() as { receipts: unknown[]; errors?: unknown[] };
+    expect(body.errors).toBeUndefined();
+    expect(body.receipts).toHaveLength(100);
+    expect(bindingCalls).toBe(702);
+  }, 30_000);
 
   test("atomic D1 per-IP accounting admits exactly 30 concurrent requests", async () => {
     const responses = await Promise.all(Array.from({ length: PER_IP_REQUESTS_PER_MINUTE + 5 }, (_, index) =>

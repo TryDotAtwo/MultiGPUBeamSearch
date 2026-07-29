@@ -1,0 +1,189 @@
+
+> test
+> vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts
+
+
+ RUN  v3.2.4 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+ ❯ test/schema.test.ts (12 tests | 3 failed) 103ms
+   ✓ validateBatch > accepts a bounded version-one result envelope 10ms
+   ✓ validateBatch > rejects an unknown envelope field without echoing its value 2ms
+   ✓ validateBatch > rejects an unsupported schema version 1ms
+   ✓ validateBatch > rejects an invalid submission UUID format 1ms
+   ✓ validateBatch > rejects an invalid submission timestamp format 1ms
+   ✓ validateBatch > rejects an invalid Kaggle run URL format 1ms
+   ✓ validateBatch > rejects oversized author names, paths, and proofs 5ms
+   ✓ validateBatch > rejects invalid closed enums 1ms
+   ✓ validateBatch > rejects batches with more than one hundred results 5ms
+   × validateBatch > rejects a serialized request larger than four MiB 60ms
+     → expected { ok: false, …(1) } to deeply equal { ok: false, …(1) }
+   × validateBatch > uses ingress raw byte length even when parsed JSON is compact 5ms
+     → expected { ok: true, value: { …(2) } } to deeply equal { ok: false, …(1) }
+   × validateBatch > does not serialize a parsed batch when ingress already supplied its byte length 5ms
+     → expected { ok: false, …(1) } to match object { ok: true }
+(1 matching property omitted from actual)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/schema.test.ts > validateBatch > rejects a serialized request larger than four MiB
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: false, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "errors": [[22m
+[2m      {[22m
+[32m-       "keyword": "maxBytes",[39m
+[31m+       "keyword": "additionalProperties",[39m
+[2m        "path": "",[22m
+[2m      },[22m
+[2m    ],[22m
+[2m    "ok": false,[22m
+[2m  }[22m
+
+ ❯ test/schema.test.ts:79:20
+     77|   test("rejects a serialized request larger than four MiB", () => {
+     78|     const result = validateBatch({ schema_version: 1, results: [validR…
+     79|     expect(result).toEqual({ ok: false, errors: [{ path: "", keyword: …
+       |                    ^
+     80|   });
+     81| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/schema.test.ts > validateBatch > uses ingress raw byte length even when parsed JSON is compact
+AssertionError: expected { ok: true, value: { …(2) } } to deeply equal { ok: false, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "errors": [[39m
+[31m+   "ok": true,[39m
+[31m+   "value": {[39m
+[31m+     "results": [[39m
+[2m        {[22m
+[32m-       "keyword": "maxBytes",[39m
+[32m-       "path": "",[39m
+[31m+         "author": {[39m
+[31m+           "name": "Ada Lovelace",[39m
+[31m+           "verification": "claimed",[39m
+[31m+         },[39m
+[31m+         "competition": "santa-2023",[39m
+[31m+         "hardware": {[39m
+[31m+           "gpu_names": [[39m
+[31m+             "Tesla T4",[39m
+[31m+           ],[39m
+[31m+           "total_runtime_ms": 1234,[39m
+[31m+           "world_size": 2,[39m
+[31m+         },[39m
+[31m+         "idempotency_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",[39m
+[31m+         "kaggle": {[39m
+[31m+           "owner": "ada",[39m
+[31m+           "slug": "cayleypy-run",[39m
+[31m+           "version": 1,[39m
+[31m+         },[39m
+[31m+         "model": {[39m
+[31m+           "filename": "model.pth",[39m
+[31m+           "format": "batchnorm-folded",[39m
+[31m+           "manifest": {[39m
+[31m+             "output_dim": 1,[39m
+[31m+           },[39m
+[31m+           "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",[39m
+[31m+         },[39m
+[31m+         "orientation": {[39m
+[31m+           "final_orientation": "original",[39m
+[31m+           "search_mode": "off",[39m
+[31m+         },[39m
+[31m+         "profile": {[39m
+[31m+           "alignment_delta": 0,[39m
+[31m+           "effective_beam": 1024,[39m
+[31m+           "evidence": "t4-v1",[39m
+[31m+           "requested_beam": 1024,[39m
+[31m+         },[39m
+[31m+         "proof": {[39m
+[31m+           "central_state": [[39m
+[31m+             1,[39m
+[31m+             2,[39m
+[31m+             0,[39m
+[31m+           ],[39m
+[31m+           "generators": {[39m
+[31m+             "r": [[39m
+[31m+               1,[39m
+[31m+               2,[39m
+[31m+               0,[39m
+[31m+             ],[39m
+[2m            },[22m
+[31m+           "initial_state": [[39m
+[31m+             0,[39m
+[31m+             1,[39m
+[31m+             2,[39m
+[2m            ],[22m
+[32m-   "ok": false,[39m
+[31m+         },[39m
+[31m+         "puzzle_id": 42,[39m
+[31m+         "puzzle_type": "cube",[39m
+[31m+         "run_id": "run-20260728-001",[39m
+[31m+         "runtime": {[39m
+[31m+           "max_collected_solutions": 1,[39m
+[31m+           "max_depth": 10,[39m
+[31m+           "solution_mode": "first",[39m
+[31m+           "touch_bfs_radius": 1,[39m
+[31m+         },[39m
+[31m+         "schema_version": 1,[39m
+[31m+         "solution": {[39m
+[31m+           "length": 1,[39m
+[31m+           "path": [[39m
+[31m+             "r",[39m
+[31m+           ],[39m
+[31m+           "solved_depth": 1,[39m
+[31m+           "validation": "valid",[39m
+[31m+         },[39m
+[31m+         "solver_commit": "cccccccccccccccccccccccccccccccccccccccc",[39m
+[31m+         "submission_id": "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e7f",[39m
+[31m+         "submitted_at": "2026-07-28T10:00:00.000Z",[39m
+[31m+       },[39m
+[31m+     ],[39m
+[31m+     "schema_version": 1,[39m
+[31m+   },[39m
+[2m  }[22m
+
+ ❯ test/schema.test.ts:85:20
+     83|     const batch = { schema_version: 1, results: [validResult()] };
+     84|     const result = validateBatch(batch, 4 * 1024 * 1024 + 1);
+     85|     expect(result).toEqual({ ok: false, errors: [{ path: "", keyword: …
+       |                    ^
+     86|   });
+     87| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/schema.test.ts > validateBatch > does not serialize a parsed batch when ingress already supplied its byte length
+AssertionError: expected { ok: false, …(1) } to match object { ok: true }
+(1 matching property omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "ok": true,[39m
+[31m+   "ok": false,[39m
+[2m  }[22m
+
+ ❯ test/schema.test.ts:93:40
+     91|     Object.defineProperty(batch, "toJSON", { enumerable: false, value:…
+     92| 
+     93|     expect(validateBatch(batch, 1024)).toMatchObject({ ok: true });
+       |                                        ^
+     94|     expect(toJSON).not.toHaveBeenCalled();
+     95|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 9 passed (12)
+   Start at  10:00:32
+   Duration  797ms (transform 94ms, setup 0ms, collect 299ms, tests 103ms, environment 0ms, prepare 122ms)
+

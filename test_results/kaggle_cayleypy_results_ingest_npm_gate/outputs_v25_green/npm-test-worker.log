@@ -1,0 +1,31 @@
+
+ RUN  v3.2.4 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+[vpw:info] Starting isolated runtimes for vitest.config.ts...
+ ✓ test/receipt.test.ts (23 tests) 9921ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > accepts a winner that settles on the final bounded reread  368ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > resends a stale received duplicate after the bounded wait  312ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > retains immutable raw when the D1 insert outcome is ambiguous  311ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > removes only the D1 conflict loser service-generated raw object  355ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > scheduled recovery re-enqueues stale retryable rows and retains raw  310ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > failed recovery advances retry metadata so a bounded page cannot starve its tail  427ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > parks received, queued, and retryable rows without consuming retry budget or raw  348ms
+   ✓ receipt durability with Miniflare D1 and R2 bindings > duplicate pause deliveries beyond a max-retries-equivalent remain one parked row  3806ms
+ ✓ test/worker.test.ts (47 tests) 28498ms
+   ✓ durable receipts, status, health, and logging safety > normal mode persists each envelope, sends per-id work, and gives duplicate receipts  393ms
+   ✓ durable receipts, status, health, and logging safety > returns mixed durable receipt states when one per-item Queue send fails  400ms
+   ✓ durable receipts, status, health, and logging safety > returns 202 with safe per-index errors when one item cannot be persisted  304ms
+   ✓ durable receipts, status, health, and logging safety > store_only persists immutable raw and one received receipt without Queue sends  349ms
+   ✓ durable receipts, status, health, and logging safety > GET status returns only the public receipt state and a safe 404  370ms
+   ✓ Cloudflare binding plus load-bearing bounded D1 rate limits > keeps D1 per-IP accounting active even when the binding allows  2807ms
+   ✓ mode-gated scheduled recovery > normal recovery bounds stale pages, refreshes queued rows, and advances failures fairly  1792ms
+   ✓ concurrency and early-reject regression gates > bounds per-envelope storage concurrency while preserving receipt order  3311ms
+   ✓ concurrency and early-reject regression gates > keeps one hundred received duplicates below one thousand internal binding calls  9360ms
+   ✓ concurrency and early-reject regression gates > atomic D1 per-IP accounting admits exactly 30 concurrent requests  1560ms
+
+ Test Files  2 passed (2)
+      Tests  70 passed (70)
+   Start at  10:16:42
+   Duration  30.36s (transform 292ms, setup 305ms, collect 628ms, tests 38.42s, environment 1ms, prepare 603ms)
+
+[vpw:debug] Shutting down runtimes...

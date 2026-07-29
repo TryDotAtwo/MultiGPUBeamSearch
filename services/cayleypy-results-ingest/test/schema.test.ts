@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { validateBatch } from "../src/schema.js";
 
@@ -74,13 +74,23 @@ describe("validateBatch", () => {
     expect(result).toMatchObject({ ok: false, errors: [{ path: "/results", keyword: "maxItems" }] });
   });
 
-  test("rejects a serialized request larger than twenty-five MiB", () => {
-    const result = validateBatch({ schema_version: 1, results: [validResult()], padding: "x".repeat(25 * 1024 * 1024) });
-    expect(result).toMatchObject({ ok: false });
+  test("rejects a serialized request larger than four MiB", () => {
+    const result = validateBatch({ schema_version: 1, results: [validResult()], padding: "x".repeat(4 * 1024 * 1024) });
+    expect(result).toEqual({ ok: false, errors: [{ path: "", keyword: "maxBytes" }] });
   });
+
   test("uses ingress raw byte length even when parsed JSON is compact", () => {
     const batch = { schema_version: 1, results: [validResult()] };
-    const result = validateBatch(batch, 25 * 1024 * 1024 + 1);
+    const result = validateBatch(batch, 4 * 1024 * 1024 + 1);
     expect(result).toEqual({ ok: false, errors: [{ path: "", keyword: "maxBytes" }] });
+  });
+
+  test("does not serialize a parsed batch when ingress already supplied its byte length", () => {
+    const batch = { schema_version: 1 as const, results: [validResult()] };
+    const toJSON = vi.fn(() => { throw new Error("must not serialize twice"); });
+    Object.defineProperty(batch, "toJSON", { enumerable: false, value: toJSON });
+
+    expect(validateBatch(batch, 1024)).toMatchObject({ ok: true });
+    expect(toJSON).not.toHaveBeenCalled();
   });
 });
