@@ -837,6 +837,11 @@ def _validate_remote_attestation(root: Path) -> dict[str, Any]:
         "push_receipt.txt", "status.txt", "kernel-metadata.json",
         "pulled-notebook.ipynb",
     )
+    expected_names = set(raw_names) | {"capture_manifest.json"}
+    observed_names = {entry.name for entry in remote.iterdir()}
+    if observed_names != expected_names:
+        raise ValueError("remote evidence entries differ from the exact contract")
+
     raw = {name: (remote / name).read_bytes() for name in raw_names}
     capture = _read_json(remote / "capture_manifest.json")
     expected_hashes = {name: _digest(payload) for name, payload in raw.items()}

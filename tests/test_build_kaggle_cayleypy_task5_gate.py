@@ -461,6 +461,19 @@ def test_downloaded_gate_validator_requires_exact_list_free_remote_attestation(
     assert "last_run_time_utc" not in validated["remote_attestation"]
 
 
+def test_downloaded_gate_validator_rejects_extra_remote_entry(tmp_path: Path) -> None:
+    _write_fake_gate(tmp_path)
+    (tmp_path / "remote/list.csv").write_text(
+        "ref,title,author,lastRunTime,totalVotes\n"
+        f"{KERNEL_SLUG},CayleyPy Public Task 5 2xT4 Gate,"
+        "Ivan Litvak,2026-07-29 01:05:00.000000,0\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="remote Kaggle attestation"):
+        validate_gate_output(tmp_path)
+
+
 def test_downloaded_gate_validator_rejects_nonidentical_collect_bytes(tmp_path: Path) -> None:
     _write_fake_gate(tmp_path, mismatch=True)
     with pytest.raises(ValueError, match="byte-identical"):

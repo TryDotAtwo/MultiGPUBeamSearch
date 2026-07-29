@@ -11,8 +11,8 @@ Version 1 was diagnostic-only and failed the exact-slug provenance gate. Version
 ## Review-P2 closure and remote attestation
 
 - Capture TDD RED: two focused failures (`DID NOT RAISE` for an oversized EOF tail; no TERM/KILL calls after a read exception). GREEN: both adversarial generated-cell tests pass and assert bounded waits, selector closure, kill fallback, and reap.
-- Remote-attestation TDD RED: the validator required an identity-bearing list artifact. GREEN: one adversarial test requires list-free evidence and rejects wrong slug, pushed v2, public metadata, non-COMPLETE status, an inverted push/completion observation window, and a semantically different pulled notebook.
-- Retained remote evidence is SHA-256 bound in `remote/capture_manifest.json`: exact push receipt, exact COMPLETE status, pulled private metadata, and pulled notebook. Known Kaggle CLI warning/blank lines are tolerated only around exactly one success or status record.
+- Remote-attestation TDD RED: the validator required an identity-bearing list artifact. A later fail-closed RED showed that it accepted an extra identity-bearing `remote/list.csv`. GREEN: list-free evidence rejects wrong slug, pushed v2, public metadata, non-COMPLETE status, an inverted push/completion observation window, a semantically different pulled notebook, and every extra remote file or directory.
+- Retained remote evidence is SHA-256 bound in `remote/capture_manifest.json`: exact push receipt, exact COMPLETE status, pulled private metadata, and pulled notebook. `remote/` must contain exactly that manifest and those four raw artifacts. Known Kaggle CLI warning/blank lines are tolerated only around exactly one success or status record.
 - Exact remote facts: pushed version 3; private `true`; status `COMPLETE`; push observed `2026-07-29T01:28:41.367231Z`; completion observed `2026-07-29T01:31:29.760778Z`; therefore push observation precedes completion observation. No author identity, list artifact, or remote-run timestamp is retained or claimed.
 - Kaggle rewrote notebook cell `source` arrays as strings on pull. Raw hashes differ, but after only that representation normalization the pulled notebook is JSON-identical to the pushed package.
 
@@ -76,8 +76,8 @@ Each emitted 16 distinct, independently replayed valid paths. The two raw TSV fi
 
 ## Independent verification
 
-- `python -m pytest tests/test_build_kaggle_cayleypy_task5_gate.py -q` -> `9 passed`.
-- `python -m pytest -q` -> `137 passed`.
+- `python -m pytest tests/test_build_kaggle_cayleypy_task5_gate.py -q` -> `10 passed`.
+- `python -m pytest -q` -> `138 passed`.
 - Generated code-cell AST parsing, payload decompression, byte count, source SHA, private metadata, and package scan passed before push.
 - `validate_gate_output(test_results/kaggle_cayleypy_task5_2xt4_gate_v3_2026-07-29)` -> `status=ok` with source, binary, collection, external remote, and pulled-notebook attestations above.
 - A negative regression changes a remotely claimed CPU-valid path from `BR` to invalid `U`; the independent validator rejects it as CPU-invalid.
