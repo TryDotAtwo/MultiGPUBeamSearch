@@ -23,7 +23,7 @@ const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 
 function boundedLimit(value: number | undefined): number {
-  if (!Number.isInteger(value)) return DEFAULT_LIMIT;
+  if (value === undefined || !Number.isInteger(value)) return DEFAULT_LIMIT;
   return Math.max(1, Math.min(value, MAX_LIMIT));
 }
 

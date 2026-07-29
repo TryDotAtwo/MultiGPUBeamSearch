@@ -1,3 +1,8 @@
+- Fixed the two exact private npm gate v36 TypeScript/test failures: explicit
+  `undefined` narrowing before the bounded operator-replay limit clamp, and a
+  standalone negative Vitest assertion for secret-free deployment config.
+  Focused static contracts and the staging migration resolver test pass; no
+  Kaggle rerun, deploy, resource mutation, or beam/CUDA change occurred.
 - Refreshed the private Kaggle npm gate payload for the status-rate-limit,
   operator-replay, migration-0003, and staging deployment-helper changes.
   The generated gate remains private, CPU-only, and non-deploying.

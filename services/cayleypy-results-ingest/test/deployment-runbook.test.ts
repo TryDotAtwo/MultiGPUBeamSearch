@@ -10,7 +10,7 @@ describe("staging deployment runbook contract", () => {
     expect(runbook).toContain("cayleypy-results-staging"); expect(runbook).toContain("cayleypy-results-raw-staging"); expect(runbook).toContain("cayleypy-validate-staging"); expect(runbook).toContain("cayleypy-validate-dlq-staging"); expect(runbook).toContain("declarative `exports.GitHubWriter`"); expect(runbook).toContain("`store_only`"); expect(runbook).toContain("activate normal"); expect(runbook).toContain("80 unique valid envelopes, 10");
   });
   test("accepts only an exact tool-returned D1 UUID and keeps secrets out of config", () => {
-    expect(script).toContain("d1_database_id must be the exact UUID returned"); expect(script).toContain("^[0-9a-fA-F]{8}"); expect(script).toContain("GITHUB_APP_PRIVATE_KEY").toBe(false); expect(runbook).toContain("wrangler secret put GITHUB_APP_PRIVATE_KEY --env staging");
+    expect(script).toContain("d1_database_id must be the exact UUID returned"); expect(script).toContain("^[0-9a-fA-F]{8}"); expect(script).not.toContain("GITHUB_APP_PRIVATE_KEY"); expect(runbook).toContain("wrangler secret put GITHUB_APP_PRIVATE_KEY --env staging");
   });
   test("has a fail-closed mode transition and performs migrations before first deploy", () => {
     expect(script).toContain("ValidateSet('preflight', 'store_only', 'activate_normal', 'rollback_store_only')"); expect(script).toContain("$targetMode = if ($Phase -eq 'activate_normal') { 'normal' } else { 'store_only' }"); expect(script).toContain("'d1', 'migrations', 'apply'"); expect(script).toContain("if ($Phase -eq 'store_only')"); expect(script).toContain("Require-CommandResult @('deploy'");

@@ -1,3 +1,7 @@
+- Private Kaggle npm gate v36 completed with exactly two non-beam failures:
+  fix operator-replay `undefined` narrowing and the invalid Vitest matcher
+  chain, use focused TDD/static gates, update memory, commit/push only scoped
+  changes, and do not rerun Kaggle or touch beam/CUDA.
 - Before staging deploy, rerun the exact private Kaggle npm gate over every
   newly hardened ingest source, migration, runbook test, and TypeScript file.
 - Independent review found a P1 in the staging deployment helper: generated
