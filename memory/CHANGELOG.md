@@ -1,3 +1,11 @@
+- Added a fail-closed CayleyPy results-ingest staging deployment runbook and
+  helper. It pins the existing Wrangler toolchain, accepts a D1 ID only from a
+  current Wrangler response, keeps the tracked config and App secrets untouched,
+  applies D1 migrations before `store_only`, then permits a separately reviewed
+  `normal` activation, deterministic 100-publisher k6/recovery audit, and
+  config-only rollback to `store_only`. No Cloudflare resource, secret, or
+  Worker deployment was performed; local API timeout/unauth is documented only
+  in private deployment guidance.
 # Changelog
 
 ## 2026-06-20

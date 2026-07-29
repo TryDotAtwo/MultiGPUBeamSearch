@@ -19,3 +19,5 @@ __pycache__/
 .ipynb_checkpoints/
 FullBeamNice/weights/
 FullBeamNice/generators.zip
+/services/cayleypy-results-ingest/staging-resources.private.json
+/services/cayleypy-results-ingest/.staging-deploy-private/

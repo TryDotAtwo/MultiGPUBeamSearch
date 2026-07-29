@@ -1,3 +1,9 @@
+- User authorized all non-beam work. Prepare a fail-closed staging Cloudflare
+  deployment runbook/scripts for the CayleyPy results ingest: exact D1/R2/Queue
+  /DLQ/DO inventory, migrations, GitHub App secret install, store-only to
+  normal activation, rollback/recovery, and live k6/recovery audit. Do not
+  deploy, create resources or secrets, invent resource IDs/endpoints/auth, or
+  change beam/CUDA architecture.
 # Prompt History
 
 ## 2026-06-20
