@@ -70,6 +70,14 @@ def _state_list(value: object, name: str) -> list[object]:
     return list(value)
 
 
+def _validate_state_classes(state: Sequence[object], num_classes: int, name: str) -> None:
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 or value >= num_classes
+           for value in state):
+        raise ValueError(
+            f"{name} values must be integers in [0, num_classes) for the supported permutation contract"
+        )
+
+
 def _generator_map(value: object) -> dict[str, list[object]]:
     source = _mapping(value, "context.proof.generators")
     return {
@@ -142,6 +150,8 @@ def _validate_replay_contract(envelope: Mapping[str, object]) -> None:
     if manifest.get("num_classes") != state_len:
         raise ValueError("model manifest num_classes must equal the supported permutation state_len")
 
+    _validate_state_classes(initial_state, state_len, "proof.initial_state")
+    _validate_state_classes(central_state, state_len, "proof.central_state")
     expected_hashes = {
         "initial_state_sha256": _hash_json(list(initial_state)),
         "central_state_sha256": _hash_json(list(central_state)),

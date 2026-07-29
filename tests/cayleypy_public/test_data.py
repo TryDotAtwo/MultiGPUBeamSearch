@@ -31,7 +31,6 @@ def test_load_contract_derives_standard_dimensions(tmp_path):
     assert contract.sample_submission["initial_state_id"].tolist() == [7, 8, 9]
 
 
-
 def test_load_contract_rejects_state_len_above_state128_logical_capacity(tmp_path):
     puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path, ids=(7,))
     oversized_state = list(range(121))
@@ -66,4 +65,62 @@ def test_load_contract_rejects_non_permutation_generator(tmp_path):
         "central_state": [0, 1, 2], "generators": {"bad": [0, 0, 2]},
     }), encoding="utf-8")
     with pytest.raises(ValueError, match="permutation"):
+        load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 9)
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ([-1, 1, 2], r"central_state values must be integers in \[0, num_classes\)"),
+        ([0, 1, 3], r"central_state values must be integers in \[0, num_classes\)"),
+    ],
+)
+def test_load_contract_rejects_negative_or_overflow_central_state(tmp_path, value, message):
+    puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path)
+    puzzle_info.write_text(json.dumps({
+        "central_state": value,
+        "generators": {"swap01": [1, 0, 2], "rotate": [1, 2, 0]},
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 9)
+
+
+@pytest.mark.parametrize("state", ["-1,1,2", "0,1,3"])
+def test_load_contract_rejects_negative_or_overflow_initial_state(tmp_path, state):
+    puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path)
+    pd.DataFrame({
+        "initial_state_id": [7, 8, 9],
+        "initial_state": [state, "0,1,2", "0,1,2"],
+    }).to_csv(test_csv, index=False)
+
+    with pytest.raises(ValueError, match=r"state for id 7 values must be integers in \[0, num_classes\)"):
+        load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 9)
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        [True, 1, 2],
+        [0, 1, 2.0],
+    ],
+)
+def test_load_contract_rejects_non_integer_json_central_state(tmp_path, value):
+    puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path)
+    puzzle_info.write_text(json.dumps({
+        "central_state": value,
+        "generators": {"swap01": [1, 0, 2], "rotate": [1, 2, 0]},
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="central_state must contain JSON integers"):
+        load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 9)
+
+
+def test_load_contract_rejects_float_generator_entry(tmp_path):
+    puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path)
+    puzzle_info.write_text(json.dumps({
+        "central_state": [0, 1, 2],
+        "generators": {"swap01": [1, 0, 2.0]},
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="generator swap01 must contain JSON integers"):
         load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 9)

@@ -284,6 +284,39 @@ def test_build_result_envelope_rejects_replay_invalid_source_context(corruption:
         build_result_envelope(context, solution)
 
 
+@pytest.mark.parametrize(
+    ("state_name", "invalid_value"),
+    [
+        ("initial_state", -1),
+        ("initial_state", 3),
+        ("central_state", -1),
+        ("central_state", 3),
+    ],
+)
+def test_build_result_envelope_rejects_negative_or_overflow_state_labels(
+    state_name: str, invalid_value: int,
+) -> None:
+    envelope = deepcopy(build_result_envelope(_context(), _solution()))
+    envelope["proof"][state_name][0] = invalid_value
+
+    with pytest.raises(
+        ValueError,
+        match=rf"proof\.{state_name} values must be integers in \[0, num_classes\)",
+    ):
+        results_module._validate_replay_contract(envelope)
+
+
+def test_build_result_envelope_rejects_manifest_num_classes_mismatch() -> None:
+    context = deepcopy(_context())
+    context["model"]["manifest"]["num_classes"] = 4
+
+    with pytest.raises(
+        ValueError,
+        match="model manifest num_classes must equal the supported permutation state_len",
+    ):
+        build_result_envelope(context, _solution())
+
+
 def test_build_result_envelope_drops_unknown_sensitive_and_non_json_fields() -> None:
     assert callable(build_result_envelope), "Task 6 result envelope builder is missing"
 

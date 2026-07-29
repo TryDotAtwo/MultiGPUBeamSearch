@@ -32,6 +32,19 @@ def _state_from_cell(value: object) -> tuple[int, ...]:
         raise ValueError("initial_state must contain comma-separated integers") from error
 
 
+def _strict_json_integer_state(value: object, name: str) -> tuple[int, ...]:
+    if not isinstance(value, list) or any(type(item) is not int for item in value):
+        raise ValueError(f"{name} must contain JSON integers")
+    return tuple(value)
+
+
+def _validate_state_classes(state: tuple[int, ...], num_classes: int, name: str) -> None:
+    if any(value < 0 or value >= num_classes for value in state):
+        raise ValueError(
+            f"{name} values must be integers in [0, num_classes) for the supported permutation contract"
+        )
+
+
 def load_puzzle_contract(
     puzzle_info_path: Path,
     test_csv: Path,
@@ -42,14 +55,18 @@ def load_puzzle_contract(
     if start > end:
         raise ValueError("selected puzzle range must be non-empty")
     info = json.loads(puzzle_info_path.read_text(encoding="utf-8"))
-    central_state = tuple(int(item) for item in info["central_state"])
+    central_state = _strict_json_integer_state(info["central_state"], "central_state")
     state_len = len(central_state)
     if not 1 <= state_len <= 120:
         raise ValueError(
             "public runner requires 1 <= state_len <= 120 for the State128 logical payload"
         )
+    _validate_state_classes(central_state, state_len, "central_state")
 
-    generators = {name: tuple(int(item) for item in permutation) for name, permutation in info["generators"].items()}
+    generators = {
+        name: _strict_json_integer_state(permutation, f"generator {name}")
+        for name, permutation in info["generators"].items()
+    }
     expected_permutation = set(range(state_len))
     for name, permutation in generators.items():
         if len(permutation) != state_len or set(permutation) != expected_permutation:
@@ -69,6 +86,7 @@ def load_puzzle_contract(
         state = _state_from_cell(rows.iloc[0]["initial_state"])
         if len(state) != state_len:
             raise ValueError(f"state for id {puzzle_id} must have state_len {state_len}")
+        _validate_state_classes(state, state_len, f"state for id {puzzle_id}")
         initial_states[puzzle_id] = state
 
     sample_submission = pd.read_csv(sample_submission_csv)
