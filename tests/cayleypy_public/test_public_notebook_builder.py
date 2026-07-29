@@ -46,7 +46,8 @@ def test_public_notebook_contract_and_no_hidden_model_or_secret_controls(tmp_pat
     required = (
         "puzzle_info.json", "test.csv", "sample_submission.csv", "Tesla/NVIDIA T4",
         "checkpoint-only", "batchnorm-folded", "resmlp-layernorm", "fp16",
-        "output_dim=1", "output_dim=move_count", "PUZZLE_ID_START..PUZZLE_ID_END",
+        "output_dim=1", "output_dim=move_count", "1 <= state_len <= 120",
+        "PUZZLE_ID_START..PUZZLE_ID_END",
         "off`, `after_original`, or `only", "first", "collect", "touch-BFS",
         "best effort", "2**16..2**25",
     )
@@ -87,4 +88,3 @@ def test_reader_facing_notebook_source_is_ascii_clean(tmp_path: Path) -> None:
     rendered = notebook_path.read_text(encoding="utf-8")
     rendered.encode("ascii")
     assert "2xT4" in rendered
-    assert "vЂ" not in rendered

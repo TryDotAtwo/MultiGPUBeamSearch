@@ -24,3 +24,7 @@ Independent final gate after review fixes:
 - `py -m pytest tests/cayleypy_public/test_public_notebook_builder.py -q`: 5 passed.
 - `py -m pytest -q`: 217 passed.
 - Builder compileall, JSON/AST/empty-output checks, ASCII notebook scan, forbidden-control/secret scan, and `git diff --check`: passed.
+
+State128 contract update: the reader-facing header now explicitly states the fixed public runner requirement `1 <= state_len <= 120`, and the focused notebook contract test requires the exact text. The notebook was regenerated; no runtime, CLI-schema, beam-search, or CUDA implementation changed.
+
+Final observed gates after the State128 header update: focused notebook tests `5 passed`; all public CayleyPy tests `184 passed`; full repository Python tests `217 passed`; compileall, generated-notebook JSON load, AST parse for every code cell, empty-output check, ASCII/secret/forbidden-control scan, exact State128 text assertion, and `git diff --check` passed. The notebook was not executed on GPUs and was not pushed.

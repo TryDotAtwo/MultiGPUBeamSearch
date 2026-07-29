@@ -35,6 +35,7 @@ implementation; this notebook does not contain a second solver.
   families are **batchnorm-folded** and **resmlp-layernorm**.
 - Model dtype is automatically **fp16**. The head must be exactly
   `output_dim=1` or `output_dim=move_count` for the selected puzzle type.
+- The fixed public State128 runner requires `1 <= state_len <= 120`.
 - The inclusive `PUZZLE_ID_START..PUZZLE_ID_END` range is checked strictly:
   a missing ID is a configuration error.
 
