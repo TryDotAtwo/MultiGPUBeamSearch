@@ -76,7 +76,7 @@ def test_notebook_pins_official_repository_and_preserves_artifacts_on_cli_failur
 
     assert "SOLVER_REPOSITORY" not in config_source
     assert "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git" in setup_source
-    assert "3bbbe50a9460695507aee58bf443c1d3b0bd5032" in config_source
+    assert "6e07844737e782be92ea4dcf49f9c3b14bc4c0ed" in config_source
     assert "check=False" in run_source
     assert "RUN_RETURN_CODE = run_process.returncode" in run_source
     assert "if RUN_RETURN_CODE != 0:" in display_source
