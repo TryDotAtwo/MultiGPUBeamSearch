@@ -466,7 +466,7 @@ def test_downloaded_gate_validator_rejects_extra_remote_entry(tmp_path: Path) ->
     (tmp_path / "remote/list.csv").write_text(
         "ref,title,author,lastRunTime,totalVotes\n"
         f"{KERNEL_SLUG},CayleyPy Public Task 5 2xT4 Gate,"
-        "Ivan Litvak,2026-07-29 01:05:00.000000,0\n",
+        "REDACTED AUTHOR,2026-07-29 01:05:00.000000,0\n",
         encoding="utf-8",
     )
 
