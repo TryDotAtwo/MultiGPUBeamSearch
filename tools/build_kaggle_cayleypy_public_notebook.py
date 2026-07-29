@@ -193,7 +193,7 @@ run_config = {
 }
 CONFIG_PATH.write_text(json.dumps(run_config, sort_keys=True) + "\n", encoding="utf-8")
 run_process = subprocess.run(
-    ["python", str(REPO / "tools" / "run_cayleypy_public.py"),
+    ["python", "-m", "tools.run_cayleypy_public",
      "--config-json", str(CONFIG_PATH), "--output-dir", str(OUTPUT_DIR)],
     cwd=REPO,
     check=False,

@@ -79,6 +79,8 @@ def test_notebook_pins_official_repository_and_preserves_artifacts_on_cli_failur
     assert "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git" in setup_source
     assert "bb505484a839d3b78819f86aa28e76b842faab09" in config_source
     assert "check=False" in run_source
+    assert '["python", "-m", "tools.run_cayleypy_public"' in run_source
+    assert 'str(REPO / "tools" / "run_cayleypy_public.py")' not in run_source
     assert "RUN_RETURN_CODE = run_process.returncode" in run_source
     assert "if RUN_RETURN_CODE != 0:" in display_source
     assert "artifacts above were retained" in display_source
