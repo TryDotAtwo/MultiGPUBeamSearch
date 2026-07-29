@@ -13,6 +13,5 @@ test_results/kaggle_cayleypy_task5_2xt4_gate_v*/cayleypy-public-task-5-2xt4-gate
 test_results/kaggle_cayleypy_task5_2xt4_gate_v*/runs/*/combined.log binary
 test_results/kaggle_cayleypy_task5_2xt4_gate_v*/remote/push_receipt.txt binary
 test_results/kaggle_cayleypy_task5_2xt4_gate_v*/remote/status.txt binary
-test_results/kaggle_cayleypy_task5_2xt4_gate_v*/remote/list.csv binary
 test_results/kaggle_cayleypy_task5_2xt4_gate_v*/remote/kernel-metadata.json binary
 test_results/kaggle_cayleypy_task5_2xt4_gate_v*/remote/pulled-notebook.ipynb binary

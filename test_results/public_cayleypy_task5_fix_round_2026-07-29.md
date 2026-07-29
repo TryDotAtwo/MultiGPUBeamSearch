@@ -44,6 +44,6 @@ Scope remained notebook/gate-only: `production_runner.cu`, CUDA kernels, Stream 
 
 - RED: the generated gate did not cap bytes read after child EOF and left the process group alive after a capture read exception; the downloaded-output validator also trusted notebook-local claims without independent Kaggle lifecycle evidence.
 - GREEN: live and EOF reads share the exact byte cap; every capture/selector/read exception closes capture and attempts bounded TERM/wait then KILL/wait/reap without masking the primary error.
-- The external gate now hashes and parses the full Kaggle push/status/list outputs plus pulled private metadata/notebook, requires exact slug/version 3/private/COMPLETE, orders remote `lastRunTime` inside the observed push/completion window, and asserts semantic equality of the pulled notebook.
+- The external gate now hashes and parses the exact Kaggle push receipt and COMPLETE status plus pulled private metadata/notebook, requires exact slug/version 3/private/COMPLETE, requires `push_observed_at <= completion_observed_at`, and asserts semantic equality of the pulled notebook without retaining author/list or remote-run-timestamp evidence.
 - Real private v3 completed on two T4s and preserved the accepted CPU-valid `BR` plus byte-identical 16-row collect artifact SHA-256 `74c12063c3f7cd6399546d6dd865d537e966bf8d9b935510174f9d46a92c748e`.
 - Final local gates: 9 focused tests and 137 full tests.

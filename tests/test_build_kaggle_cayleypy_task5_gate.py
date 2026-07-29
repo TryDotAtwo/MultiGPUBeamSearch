@@ -246,7 +246,6 @@ def _write_remote_attestation(
     version: int = 3,
     private: bool = True,
     status: str = "COMPLETE",
-    last_run_time: str = "2026-07-29 01:05:00.000000",
     push_observed_at: str = "2026-07-29T01:00:00+00:00",
     completion_observed_at: str = "2026-07-29T01:06:00+00:00",
     pulled_notebook: bytes | None = None,
@@ -264,12 +263,6 @@ def _write_remote_attestation(
             "Warning: Looks like you're using an outdated `kaggle` version "
             "(installed: 2.1.2), please consider upgrading to the latest version (2.2.2)\n"
             f'{slug} has status "KernelWorkerStatus.{status}"\n'
-        ).encode(),
-        "list.csv": (
-            "Warning: Looks like you're using an outdated `kaggle` version "
-            "(installed: 2.1.2), please consider upgrading to the latest version (2.2.2)\n"
-            "ref,title,author,lastRunTime,totalVotes\n"
-            f"\n{slug},CayleyPy Public Task 5 2xT4 Gate,Ivan Litvak,{last_run_time},0\n\n"
         ).encode(),
         "kernel-metadata.json": (
             json.dumps({
@@ -428,7 +421,7 @@ def test_downloaded_gate_validator_requires_raw_deterministic_two_rank_evidence(
     ).hexdigest()
 
 
-def test_downloaded_gate_validator_requires_exact_raw_remote_attestation(
+def test_downloaded_gate_validator_requires_exact_list_free_remote_attestation(
     tmp_path: Path,
 ) -> None:
     cases = (
@@ -438,7 +431,7 @@ def test_downloaded_gate_validator_requires_exact_raw_remote_attestation(
         {"status": "RUNNING"},
         {"pulled_notebook": b'{"cells": []}\n'},
         {
-            "last_run_time": "2026-07-29 01:07:00.000000",
+            "push_observed_at": "2026-07-29T01:07:00+00:00",
             "completion_observed_at": "2026-07-29T01:06:00+00:00",
         },
     )
@@ -459,12 +452,13 @@ def test_downloaded_gate_validator_requires_exact_raw_remote_attestation(
         "private": True,
         "pushed_version": 3,
         "status": "COMPLETE",
-        "last_run_time_utc": "2026-07-29T01:05:00+00:00",
         "completion_observed_at_utc": "2026-07-29T01:06:00+00:00",
         "pushed_notebook_sha256": sha256(OUT_NOTEBOOK.read_bytes()).hexdigest(),
         "pulled_notebook_sha256": sha256(OUT_NOTEBOOK.read_bytes()).hexdigest(),
         "pulled_notebook_semantic_match": True,
     }
+    assert not (valid_root / "remote/list.csv").exists()
+    assert "last_run_time_utc" not in validated["remote_attestation"]
 
 
 def test_downloaded_gate_validator_rejects_nonidentical_collect_bytes(tmp_path: Path) -> None:

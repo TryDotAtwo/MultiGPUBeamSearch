@@ -834,7 +834,7 @@ def _parse_release_line(line: str) -> dict[str, Any]:
 def _validate_remote_attestation(root: Path) -> dict[str, Any]:
     remote = root / "remote"
     raw_names = (
-        "push_receipt.txt", "status.txt", "list.csv", "kernel-metadata.json",
+        "push_receipt.txt", "status.txt", "kernel-metadata.json",
         "pulled-notebook.ipynb",
     )
     raw = {name: (remote / name).read_bytes() for name in raw_names}
@@ -878,31 +878,6 @@ def _validate_remote_attestation(root: Path) -> dict[str, Any]:
     ):
         raise ValueError("status receipt is not exact COMPLETE for the expected slug")
 
-    raw_list_lines = raw["list.csv"].decode("utf-8").splitlines()
-    list_lines = [
-        line for line in raw_list_lines
-        if line and warning_pattern.fullmatch(line) is None
-    ]
-    if any(
-        warning_pattern.fullmatch(line) is None
-        for line in raw_list_lines if line and line not in list_lines
-    ):
-        raise ValueError("kernels-list output contains an unexpected non-CSV line")
-    reader = csv.DictReader(list_lines)
-    if tuple(reader.fieldnames or ()) != (
-        "ref", "title", "author", "lastRunTime", "totalVotes"
-    ):
-        raise ValueError("kernels-list CSV has an unexpected schema")
-    list_rows = list(reader)
-    if len(list_rows) != 1 or list_rows[0].get("ref") != KERNEL_SLUG:
-        raise ValueError("kernels-list CSV does not contain exactly the expected slug")
-    try:
-        last_run = datetime.strptime(
-            list_rows[0]["lastRunTime"], "%Y-%m-%d %H:%M:%S.%f"
-        ).replace(tzinfo=timezone.utc)
-    except (KeyError, TypeError, ValueError) as exc:
-        raise ValueError("kernels-list lastRunTime is missing or malformed") from exc
-
     pulled = json.loads(raw["kernel-metadata.json"].decode("utf-8"))
     expected_pulled = {
         "id": KERNEL_SLUG,
@@ -944,19 +919,13 @@ def _validate_remote_attestation(root: Path) -> dict[str, Any]:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError(f"capture manifest {key} is not timezone-aware")
         observed[key] = value.astimezone(timezone.utc)
-    if not (
-        observed["push_observed_at_utc"]
-        <= last_run
-        <= observed["completion_observed_at_utc"]
-    ):
-        raise ValueError("remote lastRunTime is outside the push/completion observation window")
-
+    if observed["push_observed_at_utc"] > observed["completion_observed_at_utc"]:
+        raise ValueError("push observation is later than completion observation")
     return {
         "slug": KERNEL_SLUG,
         "private": True,
         "pushed_version": KERNEL_VERSION,
         "status": "COMPLETE",
-        "last_run_time_utc": last_run.isoformat(),
         "completion_observed_at_utc": observed["completion_observed_at_utc"].isoformat(),
         "pushed_notebook_sha256": pushed_notebook_sha,
         "pulled_notebook_sha256": pulled_notebook_sha,
