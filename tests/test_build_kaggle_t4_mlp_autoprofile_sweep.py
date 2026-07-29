@@ -30,15 +30,24 @@ def test_builder_emits_private_two_t4_notebook(tmp_path: Path) -> None:
     assert "OUTPUT_CLASSES = ('output1', 'output_move_count')" in source
     assert "BEAM_POWERS = tuple(range(16, 26))" in source
     assert "DEPTH_LIMIT = 9" in source
-    assert "SHARD_CANDIDATES_BY_POWER" in source
+    assert "REPLICATION_TARGETS" in source
+    assert "MEASURED_REPETITIONS = 3" in source
+    assert "MATERIAL_IMPROVEMENT_RATIO = 0.95" in source
+    assert "INTER_ATTEMPT_COOLDOWN_SEC = 10" in source
+    assert "RUN_TIMEOUT_SEC = 120" in source
+    assert "PROCESS_GROUP_TERM_GRACE_SEC = 10" in source
+    assert "attempt_timeout_cleanup" in source
+    assert "rendezvous_port" in source
     assert '"selection_metric": "depth_done=8 depth_sec"' in source
-    assert 'row.get("max_depth_completed", -1) >= 8' in source
-    assert "warmup" in source
-    assert "autoprofile_attempts.csv" in source
+    assert 'parsed["max_depth_completed"] >= expected_last_depth' in source
+    assert "phase=\"warmup\"" in source
+    assert "phase=\"replication\"" in source
+    assert "autoprofile_replication_attempts.csv" in source
+    assert "replication_decisions.json" in source
     assert "selected_profiles.json" in source
     assert "run_summary.json" in source
     assert "except subprocess.TimeoutExpired" in source
-    assert "continue" in source
+    assert "all_ok" in source
     assert "str(requested_beam)" in source
     assert "min_capacity = max(" in source
     assert 'runtime["stream4_batch_candidates"]' in source
@@ -50,9 +59,11 @@ def test_builder_emits_private_two_t4_notebook(tmp_path: Path) -> None:
     assert "CANONICAL_PROFILE_REGISTRY_SHA256" in source
     assert "actual_registry_sha256" in source
     assert "expected_anchor_keys" in source
-    assert "missing_targets" in source
-    assert "no_missing_anchors" in source
-    assert "canonical_v4_v5_seed_plus_new_depth8_attempts" in source
+    assert "PINNED_SOLVER_COMMIT" in source
+    assert '["git", "checkout"' in source
+    assert "tree_sha256" in source
+    assert "all runs succeeded" in source
+    assert '+ "\\\\n"' not in source  # JSON artifacts must end in a real newline, not a literal escape
     assert "kernel_version" in source
     assert '"stream3_batch_candidates": 196608' in source
 

@@ -774,3 +774,8 @@
   embedded canonical registry: zero missing anchors, zero attempts,
   `no_missing_anchors`, and 20/20 measured profiles retained. The v7 run is a
   registry/package validation only; timing provenance remains versions 4/5.
+
+- Added private autoprofile v8 replication-gate generator: pinned solver commit, embedded canonical registry, exported-model tree hashes, fixed two-alternative plus control tuples, warmup + three depth-8 measurements, median/5% all-success acceptance, and per-run decision artifacts. No CUDA/C++ or beam-search architecture changes.
+- Private v8 terminal result: 26/32 attempts succeeded, with six intermittent rank-1 double free or corruption (!prev) teardown aborts. p19 alternate sh8 was slower (0.755211s median vs sh4 0.700020s); p16 was incomplete. Registry unchanged. v9 adds only fresh deterministic rendezvous ports and a 10-second inter-attempt teardown cooldown before repeating the complete protocol.
+- Private v9 repeated the bounded 32-attempt protocol with fresh rendezvous ports/cooldown but remained harness-unstable (22/32 successful; p21 control attempts hung). Registry unchanged. Prepared v10 config-only hardening: 120-second per-attempt cap, explicit process-group TERM/KILL cleanup, retained unique rendezvous and cooldown; no CUDA/C++/beam changes.
+- Private v10 terminal result: 31/32 attempts completed under the 120-second cap; the sole failure was another rank-1 SIGABRT/double-free on p16 alternate sh2. p19 has full three-repeat evidence and sh8 is slower than canonical sh4; p16 alternate lacks a complete all-success set. Registry remains unchanged. Fixed a notebook artifact-only literal-\\n JSON suffix and added a regression test; no v11 push because no profile update is justified.

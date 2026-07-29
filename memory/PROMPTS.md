@@ -422,3 +422,5 @@
 - User authorized a next efficient private depth-8 2xT4 autoprofile sweep only
   for genuinely missing anchors, explicitly requiring reuse of sufficient
   measurements, fail-fast evidence capture, exact requested beam aside from
+
+- User requested a bounded private Kaggle 2xT4 v8 replication gate for suspicious v6 profile observations: compare output_move_count p16 sh4 vs sh2 and p19 sh4 vs sh8 with >=3 post-warmup repetitions, measure output1 p19 and output_move_count p17/p20/p21 same-tuple variance, retain canonical unless every run succeeds and the alternate median is materially/reproducibly faster; no CUDA/C++ or beam-architecture edits.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the private Kaggle 2xT4 MLP autoprofile sweep notebook."""
+"""Build the private Kaggle 2xT4 MLP profile-replication notebook."""
 
 from __future__ import annotations
 
@@ -12,6 +12,9 @@ from typing import Any
 OUT_DIR = Path("kaggle_t4_mlp_autoprofile_sweep")
 OUT_NOTEBOOK = OUT_DIR / "t4-mlp-autoprofile-sweep.ipynb"
 PROFILE_REGISTRY_PATH = Path("configs/kaggle_t4_mlp_profiles.json")
+# The replication gate pins the exact solver revision used by accepted v4/v5
+# evidence; Kaggle must not silently benchmark whatever ``main`` became later.
+PINNED_SOLVER_COMMIT = "6f95bd6bdb32b5f6ef7cca32b96967bce6036503"
 
 
 CONFIG_CELL = r'''
@@ -19,18 +22,27 @@ import hashlib
 import json
 from pathlib import Path
 
-# Fixed real-hardware sweep contract.
+# Fixed real-hardware replication contract. This is deliberately not a broad
+# optimizer: it adjudicates two suspicious alternatives and measures controls.
 OUTPUT_CLASSES = ('output1', 'output_move_count')
 BEAM_POWERS = tuple(range(16, 26))
-REPRESENTATIVE_POWERS = (16, 19, 22, 25)
-SHARD_CANDIDATES_BY_POWER = {
-    16: (2, 4), 17: (2, 4), 18: (2, 4),
-    19: (4, 8), 20: (4, 8), 21: (4, 8),
-    22: (8, 16), 23: (8, 16),
-    24: (16, 32), 25: (32, 64),
-}
-# v6 never repeats an anchor already backed by a valid depth-8 record. The
-# embedded canonical v4/v5 evidence supplies the seed; only gaps are run.
+DEPTH_LIMIT = 9  # runner emits 0..8; metric is depth_done=8
+WARMUP_DEPTH_LIMIT = 4
+MEASURED_REPETITIONS = 3
+MATERIAL_IMPROVEMENT_RATIO = 0.95  # alternate median must be >=5% faster
+INTER_ATTEMPT_COOLDOWN_SEC = 10  # let torchrun/NCCL teardown finish before next pair
+# Only canonical/alternate pairs may change selected_profiles. Controls are
+# evidence-only and never modify a tuple.
+REPLICATION_TARGETS = (
+    ('output_move_count', 16, 'canonical', 4),
+    ('output_move_count', 16, 'alternate', 2),
+    ('output_move_count', 19, 'canonical', 4),
+    ('output_move_count', 19, 'alternate', 8),
+    ('output1', 19, 'control_same_tuple', 16),
+    ('output_move_count', 17, 'control_same_tuple', 2),
+    ('output_move_count', 20, 'control_same_tuple', 8),
+    ('output_move_count', 21, 'control_same_tuple', 8),
+)
 TORCHRUN_NNODES = 1
 TORCHRUN_NPROC_PER_NODE = 2
 TORCHRUN_NODE_RANK = 0
@@ -39,11 +51,11 @@ TORCHRUN_RDZV_ENDPOINT = "127.0.0.1:29500"
 
 GITHUB_REPO_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
 GITHUB_BRANCH = "main"
+PINNED_SOLVER_COMMIT = "__PINNED_SOLVER_COMMIT__"
 CUDA_ARCHITECTURES = "75"
 PUZZLE_ID = 0
-DEPTH_LIMIT = 9
-WARMUP_DEPTH_LIMIT = 4
-RUN_TIMEOUT_SEC = 4000
+RUN_TIMEOUT_SEC = 120  # hard external cap per depth-8 torchrun attempt
+PROCESS_GROUP_TERM_GRACE_SEC = 10
 STREAM4_BATCH_ALIGNMENT = 1024
 SHARD_CAPACITY_SCALE_PPM = 1050000
 GPU_HEADROOM_BYTES = 224 * 1024**2
@@ -58,6 +70,7 @@ OUTPUT1_CHECKPOINT = Path(
 
 
 SETUP_CELL = r'''
+import hashlib
 import json
 import os
 import shutil
@@ -95,6 +108,11 @@ for path in (REPO_DIR, BUILD_DIR, OUTPUT1_DIR, OUTPUT24_DIR):
     if path.exists():
         shutil.rmtree(path)
 checked(["git", "clone", "--branch", GITHUB_BRANCH, "--depth", "1", GITHUB_REPO_URL, REPO_DIR])
+checked(["git", "fetch", "--depth", "1", "origin", PINNED_SOLVER_COMMIT], cwd=REPO_DIR)
+checked(["git", "checkout", "--detach", PINNED_SOLVER_COMMIT], cwd=REPO_DIR)
+actual_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_DIR, text=True).strip()
+if actual_commit != PINNED_SOLVER_COMMIT:
+    raise RuntimeError(f"pinned solver commit mismatch: {actual_commit} != {PINNED_SOLVER_COMMIT}")
 if not OUTPUT1_CHECKPOINT.is_file():
     raise FileNotFoundError(f"output1 checkpoint not found: {OUTPUT1_CHECKPOINT}")
 checked(
@@ -127,6 +145,18 @@ for model_class, model_dir in MODEL_DIRS.items():
     if model_class == "output_move_count" and output_dim != 24:
         raise RuntimeError(f"output_move_count manifest mismatch: {manifest}")
     print("validated_model=", model_class, manifest)
+
+def tree_sha256(root):
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+MODEL_ARTIFACTS = {model_class: {"tree_sha256": tree_sha256(model_dir), "manifest": json.loads((model_dir / "manifest.json").read_text(encoding="utf-8"))} for model_class, model_dir in MODEL_DIRS.items()}
+print("model_artifacts=", json.dumps(MODEL_ARTIFACTS, sort_keys=True))
 
 if not (CUTLASS_DIR / "include").exists():
     if CUTLASS_DIR.exists():
@@ -316,6 +346,7 @@ def run_attempt(model_class, beam_power, runtime, phase, ordinal):
     log_path = WORK_DIR / f"{config_id}.log"
     env = make_env(model_class, runtime, history_path)
     depth_limit = WARMUP_DEPTH_LIMIT if phase == "warmup" else DEPTH_LIMIT
+    rendezvous_port = 29500 + (int(hashlib.sha256(config_id.encode("utf-8")).hexdigest()[:4], 16) % 1000)
     cmd = [
         sys.executable,
         "-m",
@@ -325,7 +356,7 @@ def run_attempt(model_class, beam_power, runtime, phase, ordinal):
         f"--nproc-per-node={TORCHRUN_NPROC_PER_NODE}",
         f"--node-rank={TORCHRUN_NODE_RANK}",
         f"--rdzv-backend={TORCHRUN_RDZV_BACKEND}",
-        f"--rdzv-endpoint={TORCHRUN_RDZV_ENDPOINT}",
+        f"--rdzv-endpoint=127.0.0.1:{rendezvous_port}",
         f"--rdzv-id={config_id}",
         f"--log-dir={WORK_DIR / (config_id + '_ranks')}",
         "--redirects=3",
@@ -384,11 +415,12 @@ def run_attempt(model_class, beam_power, runtime, phase, ordinal):
         if proc is not None and proc.poll() is None:
             os.killpg(proc.pid, signal.SIGTERM)
             try:
-                tail, _ = proc.communicate(timeout=10)
+                tail, _ = proc.communicate(timeout=PROCESS_GROUP_TERM_GRACE_SEC)
             except subprocess.TimeoutExpired:
                 os.killpg(proc.pid, signal.SIGKILL)
                 tail, _ = proc.communicate()
             output += tail or ""
+        print("attempt_timeout_cleanup", config_id, "process_group_terminated=1", flush=True)
     finally:
         elapsed = time.perf_counter() - started
         log_path.write_text(output, encoding="utf-8")
@@ -423,11 +455,16 @@ def run_attempt(model_class, beam_power, runtime, phase, ordinal):
         "log_path": str(log_path),
     }
     print("attempt_done", json.dumps(row, default=str), flush=True)
+    # v8 saw intermittent rank teardown aborts. Keep each measurement a fresh
+    # process pair and give launch/NCCL cleanup a bounded quiet interval.
+    time.sleep(INTER_ATTEMPT_COOLDOWN_SEC)
     return row
 '''
 
 
 SWEEP_CELL = r'''
+from statistics import median
+
 canonical_registry_bytes = CANONICAL_PROFILE_REGISTRY_JSON.encode("utf-8")
 actual_registry_sha256 = hashlib.sha256(canonical_registry_bytes).hexdigest()
 if actual_registry_sha256 != CANONICAL_PROFILE_REGISTRY_SHA256:
@@ -436,53 +473,41 @@ canonical_payload = json.loads(CANONICAL_PROFILE_REGISTRY_JSON)
 if canonical_payload.get("hardware") != "kaggle_2xt4":
     raise RuntimeError(f"unexpected canonical hardware: {canonical_payload.get('hardware')!r}")
 canonical_profiles = canonical_payload.get("profiles", {})
+expected_anchor_keys = {str(power) for power in BEAM_POWERS}
 if set(canonical_profiles) != set(OUTPUT_CLASSES):
     raise RuntimeError("canonical profile model classes mismatch")
-expected_anchor_keys = {str(power) for power in BEAM_POWERS}
 for model_class in OUTPUT_CLASSES:
     if set(canonical_profiles[model_class]) != expected_anchor_keys:
         raise RuntimeError(f"canonical profile anchors mismatch for {model_class}")
-missing_targets = {}
-for model_class in OUTPUT_CLASSES:
-    model_profiles = canonical_profiles.get(model_class, {})
-    for beam_power in BEAM_POWERS:
-        profile = model_profiles.get(str(beam_power), {})
-        evidence, runtime = profile.get("evidence"), profile.get("runtime")
-        if not (profile.get("validation_status") == "measured" and isinstance(runtime, dict) and isinstance(evidence, dict) and evidence.get("depth") == 8 and isinstance(evidence.get("depth_sec"), (int, float)) and evidence["depth_sec"] > 0 and isinstance(evidence.get("kernel_version"), int) and evidence["kernel_version"] >= 1):
-            missing_targets.setdefault(model_class, []).append(beam_power)
+    for power in BEAM_POWERS:
+        row = canonical_profiles[model_class][str(power)]
+        if row.get("validation_status") != "measured" or not isinstance(row.get("runtime"), dict):
+            raise RuntimeError(f"canonical profile is not measured: {model_class}/p{power}")
+
+def canonical_runtime(model_class, beam_power, shard_count):
+    runtime = dict(canonical_profiles[model_class][str(beam_power)]["runtime"])
+    runtime["shard_count"] = int(shard_count)
+    # The v4/v5 registry deliberately leaves stream3 sizing out of the public
+    # profile. The established safe 2xT4 floor is fixed here, identically for
+    # every compared tuple.
+    runtime["stream3_batch_candidates"] = 196608
+    return runtime
 
 attempts = []
-for model_class, powers in missing_targets.items():
-    for beam_power in powers:
-        shard_candidates = SHARD_CANDIDATES_BY_POWER[beam_power]
-        for ordinal, shard_count in enumerate(shard_candidates):
-            try:
-                attempts.append(run_attempt(model_class, beam_power, runtime_seed(model_class, shard_count), phase="depth8", ordinal=ordinal))
-            except Exception as exc:
-                attempts.append({
-                    "config_id": f"orchestration_{model_class}_p{beam_power}_sh{shard_count}",
-                    "phase": "depth8", "model_class": model_class,
-                    "output_dim": 1 if model_class == "output1" else 24,
-                    "beam_power": beam_power, "requested_beam": 2**beam_power,
-                    "status": "failed", "error_class": "orchestration_exception",
-                    "return_code": -998, "exception": repr(exc),
-                })
-                print("attempt_exception", repr(exc), flush=True)
-                continue
-
-
-def successful_rows(model_class, beam_power):
-    return [row for row in attempts
-            if row.get("phase") == "depth8"
-            and row.get("model_class") == model_class
-            and row.get("beam_power") == beam_power
-            and row.get("status") == "ok"
-            and row.get("max_depth_completed", -1) >= 8
-            and row.get("steady_state_sec") is not None]
-
+for model_class, beam_power, label, shard_count in REPLICATION_TARGETS:
+    runtime = canonical_runtime(model_class, beam_power, shard_count)
+    warmup = run_attempt(model_class, beam_power, runtime, phase="warmup", ordinal=f"{label}_warmup")
+    warmup["tuple_label"] = label
+    warmup["replication_index"] = -1
+    attempts.append(warmup)
+    for repetition in range(MEASURED_REPETITIONS):
+        row = run_attempt(model_class, beam_power, runtime, phase="replication", ordinal=f"{label}_r{repetition}")
+        row["tuple_label"] = label
+        row["replication_index"] = repetition
+        attempts.append(row)
 
 fieldnames = sorted({key for row in attempts for key in row})
-attempts_csv = WORK_DIR / "autoprofile_attempts.csv"
+attempts_csv = WORK_DIR / "autoprofile_replication_attempts.csv"
 with attempts_csv.open("w", newline="", encoding="utf-8") as handle:
     writer = csv.DictWriter(handle, fieldnames=fieldnames)
     writer.writeheader()
@@ -491,49 +516,78 @@ with attempts_csv.open("w", newline="", encoding="utf-8") as handle:
         serialized["depth_timings"] = json.dumps(serialized.get("depth_timings"))
         writer.writerow(serialized)
 
-selected = {
-    "schema_version": 1,
-    "hardware": "kaggle_2xt4",
-    "selection_metric": "depth_done=8 depth_sec",
-    "profile_source": "canonical_v4_v5_seed_plus_new_depth8_attempts",
-    "profiles": {model_class: dict(canonical_profiles[model_class]) for model_class in OUTPUT_CLASSES},
-}
-for model_class in OUTPUT_CLASSES:
-    for beam_power in BEAM_POWERS:
-        rows = successful_rows(model_class, beam_power)
-        if not rows:
-            continue
-        winner = min(rows, key=lambda row: row["steady_state_sec"])
-        runtime = {key: winner[key] for key in (
-            "b_micro", "stream1_concurrency", "stream3_ring_slots",
-            "shard_count", "shard_capacity_scale_ppm",
-            "stream4_batch_candidates", "stream4_trigger_candidates",
-            "stream4_active_sort_slots")}
-        selected["profiles"][model_class][str(beam_power)] = {
-            "validation_status": "measured", "runtime": runtime,
-            "evidence": {
-                "config_id": winner["config_id"], "depth": 8,
-                "depth_sec": winner["steady_state_sec"],
-                "elapsed_sec": winner["elapsed_sec"],
-                "static_vram_bytes": winner["static_vram_bytes"],
-                "free_vram_bytes": winner["free_vram_bytes"],
-                "log_path": winner["log_path"],
-            },
-        }
+def tuple_rows(model_class, beam_power, label, phase):
+    return [row for row in attempts if row.get("model_class") == model_class
+            and row.get("beam_power") == beam_power and row.get("tuple_label") == label
+            and row.get("phase") == phase]
 
-(WORK_DIR / "selected_profiles.json").write_text(json.dumps(selected, indent=2) + "\n", encoding="utf-8")
-summary = {
-    "hardware": gpu_rows,
-    "torchrun_world_size": TORCHRUN_NNODES * TORCHRUN_NPROC_PER_NODE,
+def tuple_evidence(model_class, beam_power, label):
+    warmups = tuple_rows(model_class, beam_power, label, "warmup")
+    rows = tuple_rows(model_class, beam_power, label, "replication")
+    timings = [row.get("steady_state_sec") for row in rows if row.get("status") == "ok"]
+    all_ok = (len(warmups) == 1 and warmups[0].get("status") == "ok"
+              and len(rows) == MEASURED_REPETITIONS
+              and len(timings) == MEASURED_REPETITIONS)
+    return {"warmup_ok": len(warmups) == 1 and warmups[0].get("status") == "ok",
+            "all_runs_ok": all_ok, "timings_sec": timings,
+            "median_sec": median(timings) if len(timings) == MEASURED_REPETITIONS else None,
+            "attempt_ids": [row.get("config_id") for row in warmups + rows]}
+
+selected = {"schema_version": 1, "hardware": "kaggle_2xt4",
+            "selection_metric": "depth_done=8 median of three post-warmup repetitions",
+            "profile_source": "canonical_v4_v5_plus_v8_bounded_replication_gate",
+            "profiles": {model_class: dict(canonical_profiles[model_class]) for model_class in OUTPUT_CLASSES}}
+decisions = {"schema_version": 1, "canonical_profile_sha256": CANONICAL_PROFILE_REGISTRY_SHA256,
+             "pinned_solver_commit": PINNED_SOLVER_COMMIT,
+             "measured_repetitions": MEASURED_REPETITIONS,
+             "material_improvement_ratio": MATERIAL_IMPROVEMENT_RATIO,
+             "inter_attempt_cooldown_sec": INTER_ATTEMPT_COOLDOWN_SEC,
+             "per_attempt_timeout_sec": RUN_TIMEOUT_SEC,
+             "process_group_term_grace_sec": PROCESS_GROUP_TERM_GRACE_SEC,
+             "targets": []}
+for model_class, beam_power in (("output_move_count", 16), ("output_move_count", 19)):
+    base = tuple_evidence(model_class, beam_power, "canonical")
+    alternate = tuple_evidence(model_class, beam_power, "alternate")
+    accepted = bool(base["all_runs_ok"] and alternate["all_runs_ok"]
+                    and alternate["median_sec"] <= base["median_sec"] * MATERIAL_IMPROVEMENT_RATIO)
+    decision = {"model_class": model_class, "beam_power": beam_power,
+                "canonical": base, "alternate": alternate,
+                "accepted_alternate": accepted,
+                "reason": "all runs succeeded and alternate median is materially faster" if accepted
+                          else "canonical retained: incomplete/failed evidence or insufficient median improvement"}
+    decisions["targets"].append(decision)
+    if accepted:
+        canonical = canonical_profiles[model_class][str(beam_power)]
+        runtime = canonical_runtime(model_class, beam_power, 2 if beam_power == 16 else 8)
+        selected["profiles"][model_class][str(beam_power)] = {
+            "validation_status": "measured", "runtime": {key: runtime[key] for key in (
+                "b_micro", "stream1_concurrency", "stream3_ring_slots", "shard_count",
+                "shard_capacity_scale_ppm", "stream4_batch_candidates",
+                "stream4_trigger_candidates", "stream4_active_sort_slots")},
+            "evidence": {"config_id": alternate["attempt_ids"][-1], "depth": 8,
+                         "depth_sec_median": alternate["median_sec"],
+                         "replication_timings_sec": alternate["timings_sec"],
+                         "selection": "v8 bounded replication gate"},
+        }
+for model_class, beam_power, label, shard_count in REPLICATION_TARGETS:
+    if label == "control_same_tuple":
+        decisions["targets"].append({"model_class": model_class, "beam_power": beam_power,
+            "control_same_tuple": tuple_evidence(model_class, beam_power, label),
+            "selected_change": False, "reason": "variance control only; canonical tuple cannot change"})
+
+selected_path = WORK_DIR / "selected_profiles.json"
+decisions_path = WORK_DIR / "replication_decisions.json"
+selected_path.write_text(json.dumps(selected, indent=2) + "\n", encoding="utf-8")
+decisions_path.write_text(json.dumps(decisions, indent=2) + "\n", encoding="utf-8")
+summary = {"hardware": gpu_rows, "torchrun_world_size": TORCHRUN_NNODES * TORCHRUN_NPROC_PER_NODE,
     "selection_depth": 8, "attempt_count": len(attempts),
-    "missing_anchor_count": sum(len(powers) for powers in missing_targets.values()),
-    "sweep_status": "no_missing_anchors" if not missing_targets else "completed_missing_anchor_sweep",
-    "canonical_profile_source": f"embedded_sha256:{CANONICAL_PROFILE_REGISTRY_SHA256}",
     "successful_count": sum(row.get("status") == "ok" for row in attempts),
     "failed_count": sum(row.get("status") != "ok" for row in attempts),
-    "repository_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_DIR, text=True).strip(),
-    "outputs": {"attempts_csv": str(attempts_csv), "selected_profiles": str(WORK_DIR / "selected_profiles.json")},
-}
+    "canonical_profile_source": f"embedded_sha256:{CANONICAL_PROFILE_REGISTRY_SHA256}",
+    "repository_commit": actual_commit, "pinned_solver_commit": PINNED_SOLVER_COMMIT,
+    "model_artifacts": MODEL_ARTIFACTS,
+    "outputs": {"attempts_csv": str(attempts_csv), "selected_profiles": str(selected_path),
+                "replication_decisions": str(decisions_path)}}
 (WORK_DIR / "run_summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 print(json.dumps(summary, indent=2))
 '''
@@ -566,6 +620,8 @@ def build_notebook(out_dir: Path = OUT_DIR) -> tuple[Path, Path]:
             raise ValueError(f"profile registry anchors mismatch for {model_class}")
     registry_sha256 = hashlib.sha256(registry_text.encode("utf-8")).hexdigest()
     config_source = CONFIG_CELL.rstrip() + "\n"
+    config_source += f"PINNED_SOLVER_COMMIT = {PINNED_SOLVER_COMMIT!r}\n"
+    config_source = config_source.replace("__PINNED_SOLVER_COMMIT__", PINNED_SOLVER_COMMIT)
     config_source += f"CANONICAL_PROFILE_REGISTRY_JSON = {registry_text!r}\n"
     config_source += f"CANONICAL_PROFILE_REGISTRY_SHA256 = {registry_sha256!r}\n"
     notebook = {
