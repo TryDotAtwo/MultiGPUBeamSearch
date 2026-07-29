@@ -11,7 +11,7 @@ State = tuple[int, ...]
 Generators = Mapping[str, Sequence[int]]
 
 
-def _tokens(path: str) -> tuple[str, ...]:
+def tokenize_path(path: str) -> tuple[str, ...]:
     if not isinstance(path, str):
         raise ValueError("path must be a dot-separated string")
     if path == "":
@@ -19,6 +19,11 @@ def _tokens(path: str) -> tuple[str, ...]:
     tokens = tuple(path.split("."))
     if any(not token for token in tokens):
         raise ValueError("path must not contain empty move tokens")
+    if any(
+        len(token) > 128 or any(character < "!" or character > "~" for character in token)
+        for token in tokens
+    ):
+        raise ValueError("path move tokens must be printable ASCII without spaces and at most 128 characters")
     return tokens
 
 
@@ -65,7 +70,7 @@ def apply_path(state: Sequence[int], path: str, generators: Generators) -> State
     """Replay a standard dot-separated CayleyPy path on ``state``."""
     current = tuple(state)
     normalized = _validated_generators(generators, len(current))
-    for move in _tokens(path):
+    for move in tokenize_path(path):
         try:
             permutation = normalized[move]
         except KeyError as error:
@@ -77,7 +82,7 @@ def apply_path(state: Sequence[int], path: str, generators: Generators) -> State
 def invert_path(path: str, generators: Generators) -> str:
     """Return the algebraic inverse without relying on generator-name syntax."""
     inverse_names = _inverse_names(generators)
-    moves = _tokens(path)
+    moves = tokenize_path(path)
     for move in moves:
         if move not in inverse_names:
             raise ValueError(f"unknown move token {move!r}")
@@ -108,6 +113,7 @@ class SolutionRecord:
     source_solution_sha256: str | None
     valid: bool
     reached_state: State
+    reflected_source_path: str | None = None
 
     def __post_init__(self) -> None:
         try:

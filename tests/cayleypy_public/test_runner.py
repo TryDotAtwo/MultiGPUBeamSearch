@@ -499,6 +499,14 @@ def test_after_original_runs_original_then_reflected_and_updates_shortest_submis
     assert [record.original_oriented_path for record in artifacts.solution_records] == [
         "clockwise.clockwise", "counterclockwise",
     ]
+    original, reflected = artifacts.solution_records
+    assert original.path == "clockwise.clockwise"
+    assert original.reflected_source_path is None
+    assert reflected.path == "clockwise"
+    assert reflected.reflected_source_path == "clockwise.clockwise"
+    assert reflected.source_solution_sha256 == hashlib.sha256(
+        reflected.reflected_source_path.encode("utf-8")
+    ).hexdigest()
     assert artifacts.submission.loc[artifacts.submission["initial_state_id"] == 7, "path"].item() == "counterclockwise"
     assert len(artifacts.combined_logs) == 2
     assert len(artifacts.rank_logs) == 2
@@ -528,6 +536,7 @@ def test_only_uses_validated_external_source_when_reflected_search_has_no_hit(
     assert artifacts.solution_records[0].source_solution_sha256 == hashlib.sha256(
         b"counterclockwise"
     ).hexdigest()
+    assert artifacts.solution_records[0].reflected_source_path == "counterclockwise"
     assert artifacts.submission.loc[
         artifacts.submission["initial_state_id"] == 7, "path"
     ].item() == "counterclockwise"
@@ -551,6 +560,12 @@ def test_discovered_reflected_duplicate_retains_solver_provenance(
     assert [(record.variant, record.original_oriented_path) for record in artifacts.solution_records] == [
         ("reflected", "counterclockwise"),
     ]
+    reflected = artifacts.solution_records[0]
+    assert reflected.path == "clockwise"
+    assert reflected.reflected_source_path == "counterclockwise"
+    assert reflected.source_solution_sha256 == hashlib.sha256(
+        reflected.reflected_source_path.encode("utf-8")
+    ).hexdigest()
 
 def test_short_external_source_beats_longer_reflected_candidate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
@@ -600,6 +615,10 @@ def test_after_original_uses_deterministic_union_of_external_and_discovered_sour
     assert [call.source_solution_sha256 for call in calls[1:]] == [
         hashlib.sha256(external_path.encode("utf-8")).hexdigest(),
         hashlib.sha256(discovered_path.encode("utf-8")).hexdigest(),
+    ]
+    assert [call.reflected_source_path for call in calls[1:]] == [
+        external_path,
+        discovered_path,
     ]
     assert {(record.variant, record.original_oriented_path) for record in artifacts.solution_records} == {
         ("source", external_path),
@@ -656,11 +675,11 @@ def test_only_prevalidates_source_before_gpu_and_never_runs_original(
 
     assert variants == ["reflected"]
     assert [
-        (record.variant, record.original_oriented_path)
+        (record.variant, record.path, record.original_oriented_path, record.reflected_source_path)
         for record in artifacts.solution_records
     ] == [
-        ("source", "clockwise.clockwise"),
-        ("reflected", "counterclockwise"),
+        ("source", "clockwise.clockwise", "clockwise.clockwise", "clockwise.clockwise"),
+        ("reflected", "clockwise", "counterclockwise", "clockwise.clockwise"),
     ]
 
 
@@ -734,6 +753,7 @@ def test_final_records_use_semantic_solution_deduplication(
     )
 
     assert [record.original_oriented_path for record in artifacts.solution_records] == ["counterclockwise"]
+
     assert artifacts.submission.loc[artifacts.submission["initial_state_id"] == 7, "path"].item() == "counterclockwise"
 
 

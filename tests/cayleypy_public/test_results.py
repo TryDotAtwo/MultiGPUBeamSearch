@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import hashlib
 import socket
 import json
 from pathlib import Path
@@ -31,7 +32,9 @@ except ImportError:
     publish_results = None
 
 
-SCHEMA_PATH = Path("configs/cayleypy_results_schema_v1.json")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+SCHEMA_PATH = _REPO_ROOT / "configs/cayleypy_results_schema_v1.json"
+GOLDEN_PATH = _REPO_ROOT / "configs/cayleypy_results_v1_golden.json"
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SHA_C = "c" * 64
@@ -39,91 +42,13 @@ SHA_D = "d" * 64
 
 
 def _context() -> dict[str, object]:
-    return {
-        "author": "alice",
-        "kaggle": {
-            "kernel_slug": "alice/cayleypy-public",
-            "kernel_version": 7,
-            "notebook_sha256": SHA_A,
-            "unknown_kaggle_field": "drop-me",
-        },
-        "proof_bundle": {
-            "path_valid": True,
-            "initial_state_sha256": SHA_A,
-            "target_state_sha256": SHA_B,
-            "reached_state_sha256": SHA_B,
-            "generators_sha256": SHA_C,
-            "private_trace": "drop-me",
-        },
-        "profile": {
-            "profile_evidence_version": 1,
-            "profile_power": 16,
-            "model_class": "output_move_count",
-            "requested_beam": 65_536,
-            "effective_beam": 65_536,
-            "world_size": 2,
-            "runtime": {
-                "b_micro": 2_048,
-                "stream1_concurrency": 4,
-                "stream3_ring_slots": 4,
-                "shard_count": 4,
-                "shard_capacity_scale_ppm": 1_050_000,
-                "stream4_batch_candidates": 98_304,
-                "stream4_trigger_candidates": 98_304,
-                "stream4_active_sort_slots": 4,
-                "environment": {"SECRET": "drop-me"},
-            },
-        },
-        "model": {
-            "checkpoint_sha256": SHA_D,
-            "manifest": {
-                "state_len": 120,
-                "num_classes": 120,
-                "hd1": 256,
-                "hd2": 256,
-                "nrd": 4,
-                "output_dim": 24,
-                "dtype": "fp16",
-                "normalization": "layernorm",
-                "layout": "row-major input activations times weight_hxk",
-                "source_weights": "C:/private/checkpoints/secret-model.pt",
-                "api_token": "model-token-must-not-appear",
-                "tensor": torch.tensor([42]),
-            },
-        },
-        "hardware": {
-            "platform": "kaggle",
-            "accelerator": "Tesla T4",
-            "accelerator_count": 2,
-            "world_size": 2,
-            "driver_details": "drop-me",
-        },
-        "timings": {
-            "solve_seconds": 0.095335,
-            "wall_seconds": 4.72,
-            "raw_timing_log": "drop-me",
-        },
-        "solver_commit": "e" * 40,
-        "checkpoint_path": Path("C:/private/checkpoints/secret-model.pt"),
-        "token": "top-level-token-must-not-appear",
-        "environment": {"KAGGLE_KEY": "environment-secret"},
-        "tensor": torch.tensor([7]),
-        "unknown": "drop-me",
-    }
+    context, _ = _producer_inputs(_golden_case("original_unicode_author"))
+    return context
 
 
 def _solution() -> dict[str, object]:
-    return {
-        "puzzle_id": 1,
-        "path": "BR",
-        "move_count": 1,
-        "found_depth": 1,
-        "touch_depth": 0,
-        "variant": "original",
-        "valid": True,
-        "raw_state_tensor": torch.tensor([1, 2, 3]),
-        "unknown": "drop-me",
-    }
+    _, solution = _producer_inputs(_golden_case("original_unicode_author"))
+    return solution
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -132,31 +57,155 @@ def _canonical_bytes(value: object) -> bytes:
     ).encode("utf-8")
 
 
+def test_canonical_v1_batch_schema_and_shared_goldens_are_present() -> None:
+    assert GOLDEN_PATH.is_file(), "canonical v1 shared golden fixtures are missing"
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    golden = json.loads(GOLDEN_PATH.read_text(encoding="utf-8"))
+
+    Draft202012Validator.check_schema(schema)
+    assert schema["required"] == ["schema_version", "results"]
+    assert schema["$defs"]["state"]["maxItems"] == 120
+    result_schema = schema["$defs"]["result"]
+    assert "client_submission_id" in result_schema["required"]
+    assert "submission_id" not in result_schema["properties"]
+    assert set(result_schema["properties"]["proof"]["required"]) == {
+        "initial_state", "central_state", "generators", "initial_state_sha256",
+        "central_state_sha256", "generators_sha256", "reached_state_sha256",
+    }
+    assert [case["name"] for case in golden["cases"]] == [
+        "original_unicode_author", "reflected", "empty_path_source",
+    ]
+    unicode_author = golden["cases"][0]["envelope"]["author"]["name"]
+    assert unicode_author == "\u0410\u043b\u0438\u0441\u0430 \u0394"
+    assert 63 not in map(ord, unicode_author)
+    assert any(ord(character) > 127 for character in unicode_author)
+    assert golden["cases"][0]["envelope"]["puzzle_type"] == "cube_3/3/3"
+    assert result_schema["properties"]["puzzle_type"]["$ref"] == "#/$defs/puzzle_type"
+    assert golden["semantic_excludes"] == [
+        "client_submission_id", "idempotency_key", "submitted_at", "run_id",
+    ]
+
+
+    for case in golden["cases"]:
+        envelope = case["envelope"]
+        Draft202012Validator(schema).validate({"schema_version": 1, "results": [envelope]})
+        assert _canonical_bytes(envelope).decode("utf-8") == case["canonical_json"]
+
+
+def _golden_case(name: str) -> dict[str, object]:
+    fixtures = json.loads(GOLDEN_PATH.read_text(encoding="utf-8"))
+    return next(case for case in fixtures["cases"] if case["name"] == name)
+
+
+def _producer_inputs(case: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
+    envelope = case["envelope"]
+    proof = envelope["proof"]
+    orientation = envelope["orientation"]
+    expected_solution = envelope["solution"]
+    model = dict(envelope["model"])
+    model["manifest"] = {
+        **model["manifest"],
+        "source_weights": "C:/private/checkpoints/secret-model.pt",
+        "api_token": "model-token-must-not-appear",
+        "tensor": torch.tensor([42]),
+    }
+    context = {
+        "run_id": envelope["run_id"],
+        "author": {**envelope["author"], "unknown_author_field": "drop-me"},
+        "kaggle": {**envelope["kaggle"], "unknown_kaggle_field": "drop-me"},
+        "competition": envelope["competition"],
+        "puzzle_type": envelope["puzzle_type"],
+        "proof": {
+            "initial_state": proof["initial_state"],
+            "central_state": proof["central_state"],
+            "generators": proof["generators"],
+            "initial_state_sha256": "0" * 64,
+            "private_trace": "drop-me",
+        },
+        "search_mode": orientation["search_mode"],
+        "profile": {**envelope["profile"], "unknown_profile_field": "drop-me"},
+        "runtime": {**envelope["runtime"], "environment": {"SECRET": "drop-me"}},
+        "model": model,
+        "hardware": {**envelope["hardware"], "driver_details": "drop-me"},
+        "timings": {**envelope["timings"], "raw_timing_log": "drop-me"},
+        "solver_commit": envelope["solver_commit"],
+        "checkpoint_path": Path("C:/private/checkpoints/secret-model.pt"),
+        "token": "top-level-token-must-not-appear",
+        "tensor": torch.tensor([7]),
+    }
+    searched_path = orientation.get("searched_path", expected_solution["path"])
+    solution = {
+        "puzzle_id": envelope["puzzle_id"],
+        "path": ".".join(searched_path),
+        "original_oriented_path": ".".join(expected_solution["path"]),
+        "found_depth": expected_solution["solved_depth"],
+        "touch_depth": expected_solution.get("touch_depth"),
+        "variant": orientation["final_orientation"],
+        "valid": True,
+        "reached_state": proof["central_state"],
+        "collection_status": expected_solution["collection_status"],
+        "raw_state_tensor": torch.tensor([1, 2, 3]),
+    }
+    if "collection_index" in expected_solution:
+        solution["collection_index"] = expected_solution["collection_index"]
+    if orientation["final_orientation"] == "reflected":
+        solution["reflected_source_path"] = ".".join(orientation["reflected_source_path"])
+        solution["source_solution_sha256"] = orientation["reflected_source_sha256"]
+    return context, solution
+
+
+@pytest.mark.parametrize(
+    "case_name", ["original_unicode_author", "reflected", "empty_path_source"],
+)
+def test_build_result_envelope_matches_shared_canonical_goldens(
+    monkeypatch, case_name: str,
+) -> None:
+    case = _golden_case(case_name)
+    context, solution = _producer_inputs(case)
+    expected = case["envelope"]
+    expected_bytes = case["canonical_json"].encode("utf-8")
+
+    assert hashlib.sha256(expected_bytes).hexdigest() == case["canonical_sha256"]
+    assert expected["idempotency_key"] == case["semantic_sha256"]
+    monkeypatch.setattr(results_module, "_uuid7", lambda: expected["client_submission_id"])
+    monkeypatch.setattr(
+        results_module, "_submitted_at_utc", lambda: expected["submitted_at"], raising=False,
+    )
+
+    envelope = build_result_envelope(context, solution)
+
+    assert envelope == expected
+    assert _canonical_bytes(envelope) == expected_bytes
+    assert hashlib.sha256(_canonical_bytes(envelope)).hexdigest() == case["canonical_sha256"]
+
+
 def test_build_result_envelope_has_exact_schema_and_required_provenance() -> None:
     assert callable(build_result_envelope), "Task 6 result envelope builder is missing"
-    assert SCHEMA_PATH.is_file(), "Task 6 result schema is missing"
-
     envelope = build_result_envelope(_context(), _solution())
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    Draft202012Validator.check_schema(schema)
-    Draft202012Validator(schema).validate(envelope)
 
+    Draft202012Validator.check_schema(schema)
+    Draft202012Validator(schema).validate({"schema_version": 1, "results": [envelope]})
     assert set(envelope) == {
-        "schema_version", "submission_id", "idempotency_key", "author", "kaggle",
-        "proof_bundle", "solution", "profile", "model", "hardware", "timings",
-        "solver_commit",
+        "schema_version", "client_submission_id", "run_id", "idempotency_key",
+        "submitted_at", "author", "kaggle", "competition", "puzzle_type",
+        "puzzle_id", "proof", "orientation", "solution", "profile", "runtime",
+        "model", "hardware", "timings", "solver_commit",
     }
-    assert envelope["schema_version"] == 1
-    assert envelope["author"] == "alice"
-    assert envelope["kaggle"]["kernel_slug"] == "alice/cayleypy-public"
-    assert envelope["proof_bundle"]["path_valid"] is True
-    assert envelope["solution"]["path"] == "BR"
-    assert envelope["profile"]["runtime"]["shard_count"] == 4
-    assert envelope["model"]["checkpoint_sha256"] == SHA_D
-    assert envelope["hardware"]["accelerator_count"] == 2
-    assert envelope["timings"]["solve_seconds"] == 0.095335
-    assert envelope["solver_commit"] == "e" * 40
-    assert uuid.UUID(envelope["submission_id"]).version == 7
+    assert envelope["author"] == {
+        "name": "\u0410\u043b\u0438\u0441\u0430 \u0394", "kaggle_username": "alice-k", "verification": "claimed",
+    }
+    assert envelope["kaggle"]["notebook_sha256"] == SHA_A
+    assert envelope["proof"]["initial_state"] == [2, 0, 1]
+    assert envelope["proof"]["central_state"] == [0, 1, 2]
+    assert envelope["solution"]["path"] == ["clockwise"]
+    assert envelope["orientation"] == {"search_mode": "off", "final_orientation": "original"}
+    assert envelope["runtime"]["shard_count"] == 4
+    assert envelope["model"]["sha256"] == SHA_D
+    assert envelope["hardware"]["gpu_names"] == ["Tesla T4", "Tesla T4"]
+    assert envelope["timings"] == {"solve_us": 95_335, "wall_us": 4_720_000}
+    assert uuid.UUID(envelope["client_submission_id"]).version == 7
+    assert envelope["submitted_at"].endswith("Z")
     assert len(_canonical_bytes(envelope)) <= MAX_ENVELOPE_BYTES
 
 
@@ -167,13 +216,41 @@ def test_build_result_envelope_has_deterministic_semantic_idempotency() -> None:
 
     first = build_result_envelope(context, solution)
     second = build_result_envelope(
-        dict(reversed(tuple(context.items()))), dict(reversed(tuple(solution.items())))
+        {**dict(reversed(tuple(context.items()))), "run_id": "different-run-id"},
+        dict(reversed(tuple(solution.items()))),
     )
-    changed = build_result_envelope(context, {**solution, "path": "BR.BR", "move_count": 2})
+    changed = build_result_envelope(
+        {**context, "timings": {**context["timings"], "solve_us": 95_336}}, solution,
+    )
 
-    assert first["submission_id"] != second["submission_id"]
+    assert first["client_submission_id"] != second["client_submission_id"]
+    assert first["run_id"] != second["run_id"]
     assert first["idempotency_key"] == second["idempotency_key"]
     assert first["idempotency_key"] != changed["idempotency_key"]
+
+
+@pytest.mark.parametrize(
+    ("model_class", "output_dim", "message"),
+    [
+        ("output1", 2, "output1 profile requires model manifest output_dim=1"),
+        (
+            "output_move_count",
+            1,
+            "output_move_count profile requires output_dim equal to generator count",
+        ),
+    ],
+)
+def test_build_result_envelope_rejects_model_output_contract_drift(
+    model_class: str, output_dim: int, message: str,
+) -> None:
+    context = _context()
+    context["profile"] = {**context["profile"], "model_class": model_class}
+    context["model"] = {
+        **context["model"],
+        "manifest": {**context["model"]["manifest"], "output_dim": output_dim},
+    }
+    with pytest.raises(ValueError, match=message):
+        build_result_envelope(context, _solution())
 
 
 def test_build_result_envelope_drops_unknown_sensitive_and_non_json_fields() -> None:
@@ -192,11 +269,23 @@ def test_build_result_envelope_drops_unknown_sensitive_and_non_json_fields() -> 
 
 def test_build_result_envelope_rejects_payload_over_256_kib() -> None:
     assert callable(build_result_envelope), "Task 6 result envelope builder is missing"
+    context = _context()
     solution = _solution()
-    solution["path"] = "U" * (MAX_ENVELOPE_BYTES - 128)
+    long_move = "U" * 64
+    context["proof"] = {
+        "initial_state": [0, 1, 2],
+        "central_state": [0, 1, 2],
+        "generators": {long_move: [0, 1, 2], "V" * 64: [0, 1, 2]},
+    }
+    solution.update({
+        "path": ".".join([long_move] * 4_096),
+        "original_oriented_path": ".".join([long_move] * 4_096),
+        "found_depth": 4_096,
+        "reached_state": [0, 1, 2],
+    })
 
     with pytest.raises(ValueError, match="256 KiB"):
-        build_result_envelope(_context(), solution)
+        build_result_envelope(context, solution)
 
 
 class _FakeResponse:
@@ -298,14 +387,26 @@ def test_publish_results_rejects_100_near_limit_envelopes_before_http(
     monkeypatch, tmp_path: Path,
 ) -> None:
     assert callable(publish_results), "Task 6 publisher is missing"
+    context = _context()
     solution = _solution()
-    solution["path"] = "U" * (MAX_ENVELOPE_BYTES - 4_096)
-    solution["move_count"] = MAX_ENVELOPE_BYTES - 4_096
-    envelope = build_result_envelope(_context(), solution)
+    long_move = "U" * 54
+    context["proof"] = {
+        "initial_state": [0, 1, 2],
+        "central_state": [0, 1, 2],
+        "generators": {long_move: [0, 1, 2], "V" * 54: [0, 1, 2]},
+    }
+    long_path = ".".join([long_move] * 4_096)
+    solution.update({
+        "path": long_path,
+        "original_oriented_path": long_path,
+        "found_depth": 4_096,
+        "reached_state": [0, 1, 2],
+    })
+    envelope = build_result_envelope(context, solution)
     envelopes = [envelope] * 100
     request_bytes = _canonical_bytes({"schema_version": 1, "results": envelopes})
 
-    assert MAX_ENVELOPE_BYTES - 8_192 < len(_canonical_bytes(envelope)) <= MAX_ENVELOPE_BYTES
+    assert MAX_ENVELOPE_BYTES - 32 * 1_024 < len(_canonical_bytes(envelope)) <= MAX_ENVELOPE_BYTES
     assert len(request_bytes) > MAX_PUBLISH_REQUEST_BYTES
 
     def unexpected_http(request, timeout):
@@ -387,6 +488,34 @@ def test_publish_results_returns_safe_retryable_status_for_network_failures(
     ):
         assert forbidden not in status.safe_error
         assert forbidden not in persisted
+
+
+
+def test_publish_results_rejects_model_output_semantic_drift_before_http(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    envelope = build_result_envelope(_context(), _solution())
+    envelope["model"]["manifest"]["output_dim"] = 1
+    semantic = {
+        key: value
+        for key, value in envelope.items()
+        if key not in {
+            "client_submission_id", "idempotency_key", "submitted_at", "run_id",
+        }
+    }
+    envelope["idempotency_key"] = hashlib.sha256(_canonical_bytes(semantic)).hexdigest()
+
+    def unexpected_http(request, timeout):
+        raise AssertionError("semantic model drift must not reach HTTP")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(results_module, "urlopen", unexpected_http, raising=False)
+
+    status = publish_results("https://results.example/ingest", [envelope])
+
+    assert status.ok is False
+    assert status.retryable is False
+    assert status.safe_error == "publish payload failed validation"
 
 
 def test_publish_results_rejects_schema_drift_before_http(monkeypatch, tmp_path: Path) -> None:

@@ -41,6 +41,9 @@ Detection uses checkpoint tensor keys and shapes. Ambiguous, mixed, incomplete, 
 
 The exported manifest must match the selected puzzle's state length and class count. Its head must be exactly `output_dim=1` or `output_dim=move_count`. Arbitrary PyTorch architectures and other output dimensions are explicitly unsupported.
 
+The fixed `State128` runner contract supports only `1 <= state_len <= 120`; larger
+standard CayleyPy puzzles fail in public input preflight before export, build, or CUDA launch. The notebook header must state this limit prominently beside the two checkpoint families and the `output_dim=1` or exact-`move_count` head contract.
+
 ### 2.3 Non-goals
 
 - Automatic support for arbitrary PyTorch networks.

@@ -31,6 +31,23 @@ def test_load_contract_derives_standard_dimensions(tmp_path):
     assert contract.sample_submission["initial_state_id"].tolist() == [7, 8, 9]
 
 
+
+def test_load_contract_rejects_state_len_above_state128_logical_capacity(tmp_path):
+    puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path, ids=(7,))
+    oversized_state = list(range(121))
+    puzzle_info.write_text(json.dumps({
+        "central_state": oversized_state,
+        "generators": {"identity": oversized_state},
+    }), encoding="utf-8")
+    pd.DataFrame({
+        "initial_state_id": [7],
+        "initial_state": [",".join(str(value) for value in oversized_state)],
+    }).to_csv(test_csv, index=False)
+
+    with pytest.raises(ValueError, match=r"1 <= state_len <= 120.*State128"):
+        load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 7)
+
+
 def test_load_contract_rejects_missing_selected_state_id(tmp_path):
     puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path, ids=(7, 9))
     with pytest.raises(ValueError, match="missing selected test id 8"):

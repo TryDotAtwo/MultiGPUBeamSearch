@@ -1,44 +1,54 @@
-# Task 6 result envelope and best-effort publisher report
+# Task 6 canonical result-contract reconciliation report
 
 Date: 2026-07-29
-Base commit: `4305300118fb464e6a31d069f1185010e3a02bb4`
-Review-fix base commit: `93d9394bd15f4168325d18339b07516db484abcb`
+Base commit: `c53f52dfd18189ebf8ad75123abaa1962ee910db`
 
 ## Outcome
 
-Implemented the Task 6 contract without integrating it into the solver or performing any external publish. The result layer is isolated to `configs/cayleypy_results_schema_v1.json`, `tools/cayleypy_public/results.py`, and `tests/cayleypy_public/test_results.py`.
+Reconciled the public producer with one replay-capable canonical v1 batch contract. The previous producer-only envelope and the earlier ingest draft disagreed on identity, proof, reflection, collection, profile, runtime, model, hardware, and timing fields. This slice replaces the public schema and producer contract, preserves runner provenance needed by the canonical envelope, and adds shared byte-exact fixtures for producer/ingest parity.
 
-## Envelope contract
+No external endpoint was contacted. The ingest worktree was read only and was not edited. No checkpoint export algorithm, measured profile, beam-search algorithm, CUDA/C++, Stream 1-5, or GPU execution path changed.
 
-- Draft 2020-12 schema version 1 requires author, Kaggle kernel slug/version/notebook hash, replay proof bundle, solution, measured profile/runtime, checkpoint SHA-256 plus sanitized exporter manifest, hardware, timings, and solver commit.
-- Every object is fail-closed with `additionalProperties: false`. The builder copies only explicit allowlists, so unknown fields, environment mappings, tokens, absolute checkpoint paths, `source_weights`, and tensors cannot enter the envelope.
-- Canonical JSON uses sorted keys, compact separators, UTF-8, and rejects non-finite or non-JSON values.
-- Submission ids are UUIDv7. The SHA-256 idempotency key covers the complete sanitized semantic payload but excludes the unique submission id itself.
-- Both build and publish paths enforce the exact schema and the 256 KiB per-envelope limit. The publisher recomputes the semantic idempotency key before HTTP.
-- The manifest contract uses the real exporter field `nrd`; no model, profile, runner, beam, or CUDA code changed.
+## Canonical v1 batch contract
 
-## Publisher contract
+- The root is exactly `{"schema_version":1,"results":[...]}` with 1-100 closed result objects.
+- Transport identity is `client_submission_id` UUIDv7 plus `run_id`, UTC `submitted_at`, and SHA-256 `idempotency_key`.
+- Semantic idempotency excludes exactly `client_submission_id`, `idempotency_key`, `submitted_at`, and `run_id`; every other canonical field participates.
+- Proofs retain full logical `initial_state`, `central_state`, and generator permutation arrays, plus producer-recomputed canonical SHA-256 hashes for those values and the reached state.
+- Logical state arrays are bounded to 1-120 entries, matching `State128.v[0..119]`; the public input loader rejects larger states before export, build, or CUDA launch.
+- Standard slash-bearing puzzle types such as `cube_3/3/3` use a dedicated bounded grammar. Competition and run identifiers retain their separate path-safe grammar.
+- Solutions use strict printable-ASCII, dot-free move tokens and store the CPU-validated original-oriented path as an array. Reflected results also retain the exact searched path, source path, and SHA-256 of the exact source dot string.
+- Full selected profile, runtime tuning, model filename/hash/format/sanitized manifest, hardware, and integer-microsecond timings are retained. Unknown, private, tensor, environment, token, and absolute-path inputs are omitted by allowlist.
+- Producer semantic checks require `output1` manifests to have `output_dim=1` and `output_move_count` manifests to have `output_dim` equal to the generator count.
+- The existing 256 KiB per-envelope, 100 results per request, and 4 MiB canonical request limits remain enforced before HTTP.
 
-- Requests are canonical `POST` bodies shaped as `{"schema_version":1,"results":[...]}`, limited to 100 envelopes, and rejected locally as non-retryable when the complete canonical body exceeds 4 MiB.
-- HTTP 202 is accepted; HTTP 200 is a duplicate success. HTTP 429 and 5xx plus timeout/DNS failures are retryable failures. Schema, endpoint, timeout, empty-request, and request-size failures are non-retryable.
-- Publishing is best-effort: ordinary validation, HTTP, DNS, timeout, and persistence exceptions are converted to `PublishStatus` instead of escaping into solve completion.
-- `publish_status.json` is atomically written and fsynced before normal return. It stores only endpoint scheme plus host and optional port, never userinfo, path, query, or fragment, together with a bounded safe error.
-- Response headers and bodies are never copied or read into status. Safe errors are generic, sanitized, and at most 2 KiB.
+## Shared fixtures and canonicalization
+
+`configs/cayleypy_results_v1_golden.json` contains three cases in stable order:
+
+1. Original orientation with a real UTF-8 author (`Алиса Δ`) and standard-style `cube_3/3/3` puzzle type.
+2. Reflected orientation with searched path, exact reflection source path, and source hash.
+3. Source orientation with an empty solution path.
+
+Each case stores the exact canonical UTF-8 JSON string, full-envelope SHA-256, and semantic SHA-256. Independent Node and Python canonicalizers reproduced all three byte strings and hashes. The author code points were verified as `1040,1083,1080,1089,1072,32,916`, with no replacement `?` code point.
 
 ## TDD evidence
 
-- Envelope RED: four assertions failed because the builder/schema were absent (`4 failed`). GREEN: schema, provenance, UUIDv7/idempotency, redaction, and size tests passed (`4 passed`).
-- Publisher RED: eight assertions failed because the publisher was absent (`8 failed, 4 deselected`). GREEN: 202, duplicate 200, timeout, DNS, 429, 500, schema-before-HTTP, and 100-result-limit cases passed (`8 passed, 4 deselected`).
-- Exporter compatibility RED: the realistic `nrd` manifest fixture failed because the first schema draft required `blocks`. GREEN changed the schema/allowlist to `nrd` and restored all 12 focused tests.
-- Review RED: the path-secret status test retained `/private/path-secret` (`1 failed, 13 deselected`); the request-bound pair let a 100-envelope near-limit body cross the HTTP boundary (`1 failed, 1 passed, 12 deselected`).
-- Review GREEN: origin-only status plus 100-small accepted and 100-near-limit locally rejected (`3 passed, 11 deselected`), then all focused tests passed.
+- Shared-contract RED: the golden fixture was absent, then the old envelope-only schema rejected the batch contract. GREEN: schema meta-validation and all three fixtures passed.
+- Producer RED: all three golden cases failed because the old builder required `proof_bundle`. GREEN: canonical producer bytes and hashes matched all three fixtures.
+- Model semantic RED: two invalid model/profile combinations were accepted (`2 failed`). GREEN: both are rejected before schema publication.
+- Publisher semantic RED: a schema-valid envelope with a recomputed idempotency key and inconsistent output head reached the HTTP boundary as retryable. GREEN: publish validation rejects it locally as a non-retryable payload error.
+- Standard puzzle-type RED: `cube_3/3/3` still referenced the slash-forbidding generic identifier (`1 failed`). GREEN: the dedicated puzzle-type definition validates the golden.
+- State-cap RED: a 121-element puzzle reached contract loading (`1 failed`). GREEN: public preflight rejects it with the fixed `State128` logical-capacity message.
+- Schema-cap RED: the result schema still allowed 128 logical state entries (`1 failed`). GREEN: the canonical proof-state bound is 120.
 
 ## Verification
 
-- `py -3 -m pytest -q tests/cayleypy_public/test_results.py` -> `14 passed`.
-- `py -3 -m pytest -q tests/cayleypy_public` -> `119 passed`.
-- `py -3 -m pytest -q` -> `152 passed`.
-- Durable verification note: `test_results/cayleypy_public_task6_2026-07-29.md`.
-- JSON Schema meta-validation, public-artifact secret scan, and `git diff --check` are final commit gates.
+- `python -m pytest -q tests/cayleypy_public/test_results.py` -> `21 passed`.
+- `python -m pytest -q tests/cayleypy_public/test_data.py tests/cayleypy_public/test_paths.py tests/cayleypy_public/test_runner.py tests/cayleypy_public/test_results.py` -> `102 passed`.
+- `python -m pytest -q tests/cayleypy_public` -> `141 passed`.
+- `python -m pytest -q` -> `174 passed`.
+- Independent Node and Python canonical fixture checks -> `3 passed` in each runtime with identical UTF-8 code points and SHA-256 values.
+- Python compile, Draft 2020-12 schema meta-validation, secret/private-path/tensor scans, exact staged-payload inspection, and whitespace checks are final commit gates.
 
-No external endpoint was contacted, no result was deployed or published, and no package, runner, model, beam, CUDA, or ingest implementation was changed.
+The future Task 7 notebook contract now explicitly requires its header to place the fixed `1 <= state_len <= 120` limit beside both supported checkpoint families and the `output_dim=1` or exact-`move_count` head rule.

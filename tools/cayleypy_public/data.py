@@ -44,8 +44,10 @@ def load_puzzle_contract(
     info = json.loads(puzzle_info_path.read_text(encoding="utf-8"))
     central_state = tuple(int(item) for item in info["central_state"])
     state_len = len(central_state)
-    if state_len == 0:
-        raise ValueError("central_state must not be empty")
+    if not 1 <= state_len <= 120:
+        raise ValueError(
+            "public runner requires 1 <= state_len <= 120 for the State128 logical payload"
+        )
 
     generators = {name: tuple(int(item) for item in permutation) for name, permutation in info["generators"].items()}
     expected_permutation = set(range(state_len))

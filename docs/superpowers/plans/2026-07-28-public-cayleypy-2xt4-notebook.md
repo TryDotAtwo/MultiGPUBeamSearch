@@ -452,7 +452,7 @@ git commit -m "feat: publish validated CayleyPy result envelopes"
 
 - [ ] **Step 1: Write failing notebook contract tests**
 
-Assert the first code cell contains exactly the public settings and no `MODEL_SOURCE`, `MODEL_DTYPE`, or `CHECKPOINT_FORMAT`. Assert the header names the two supported models, standard CayleyPy scope, two T4 requirement, all reflection/collection modes, touch BFS, best-effort publication, and claimed author semantics.
+Assert the first code cell contains exactly the public settings and no `MODEL_SOURCE`, `MODEL_DTYPE`, or `CHECKPOINT_FORMAT`. Assert the header names the two supported models, the fixed `1 <= state_len <= 120` `State128` limit, the `output_dim=1` or exact-`move_count` heads, standard CayleyPy scope, two T4 requirement, all reflection/collection modes, touch BFS, best-effort publication, and claimed author semantics.
 
 - [ ] **Step 2: Write parse/secret/public-metadata tests**
 

@@ -91,6 +91,7 @@ class RunnerInvocation:
     puzzle_id: int
     variant: Variant
     source_solution_sha256: str | None = None
+    reflected_source_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -341,6 +342,7 @@ def build_runner_invocation(
     *,
     runner_path: str = "production_runner",
     source_solution_sha256: str | None = None,
+    reflected_source_path: str | None = None,
 ) -> RunnerInvocation:
     """Build a hermetic two-rank torchrun invocation for exactly one variant."""
     run_id = uuid.uuid4().hex
@@ -388,6 +390,7 @@ def build_runner_invocation(
         puzzle_id=puzzle_id,
         variant=variant,
         source_solution_sha256=source_solution_sha256,
+        reflected_source_path=reflected_source_path,
     )
 
 
@@ -441,6 +444,7 @@ def parse_runner_output(
                     found_depth=found_depth,
                     touch_depth=total_depth - found_depth,
                     source_solution_sha256=None,
+                    reflected_source_path=None,
                     valid=True,
                     reached_state=(),
                 ))
@@ -481,6 +485,7 @@ def parse_runner_output(
                     found_depth=found_depth,
                     touch_depth=touch_depth,
                     source_solution_sha256=None,
+                    reflected_source_path=None,
                     valid=True,
                     reached_state=(),
                 ))
@@ -500,6 +505,7 @@ def parse_runner_output(
                     found_depth=_path_depth(path),
                     touch_depth=0,
                     source_solution_sha256=None,
+                    reflected_source_path=None,
                     valid=True,
                     reached_state=(),
                 ))
@@ -790,6 +796,7 @@ def _validated_records(
     variant: Variant,
     reflected_state: tuple[int, ...] | None = None,
     source_sha256: str | None = None,
+    reflected_source_path: str | None = None,
 ) -> list[SolutionRecord]:
     validated: list[SolutionRecord] = []
     for raw in parsed.records:
@@ -818,6 +825,7 @@ def _validated_records(
             found_depth=raw.found_depth,
             touch_depth=raw.touch_depth,
             source_solution_sha256=source_sha256,
+            reflected_source_path=reflected_source_path,
             valid=True,
             reached_state=contract.central_state,
         ))
@@ -855,6 +863,7 @@ def run_public_search(
                     found_depth=_path_depth(source_path),
                     touch_depth=0,
                     source_solution_sha256=source_sha256,
+                    reflected_source_path=source_path,
                     valid=True,
                     reached_state=contract.central_state,
                 ))
@@ -910,11 +919,13 @@ def run_public_search(
                 invocation = build_runner_invocation(
                     config, plan, contract.move_count, puzzle_id, "reflected", weights_dir, artifact_dir,
                     runner_path=runner_path, source_solution_sha256=source_sha256,
+                    reflected_source_path=source_path,
                 )
                 _write_reflected_test_row(invocation, puzzle_id, reflected_state)
                 records.extend(_validated_records(
                     execute(invocation), contract, puzzle_id, "reflected",
                     reflected_state=reflected_state, source_sha256=source_sha256,
+                    reflected_source_path=source_path,
                 ))
 
         records = deduplicate_solutions(records)

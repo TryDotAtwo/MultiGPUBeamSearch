@@ -8,6 +8,7 @@ from tools.cayleypy_public.paths import (
     deduplicate_solutions,
     invert_path,
     make_reflected_state,
+    tokenize_path,
     validate_original_solution,
 )
 
@@ -28,6 +29,36 @@ def test_apply_and_invert_round_trip_with_dot_separated_moves():
     assert reached == (2, 0, 1)
     assert invert_path(path, GENERATORS) == "counterclockwise.counterclockwise"
     assert apply_path(reached, invert_path(path, GENERATORS), GENERATORS) == initial
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("", ()),
+        ("clockwise", ("clockwise",)),
+        ("clockwise.counterclockwise", ("clockwise", "counterclockwise")),
+    ],
+)
+def test_tokenize_path_exposes_strict_dot_separated_tokens(path, expected):
+    assert tokenize_path(path) == expected
+
+
+@pytest.mark.parametrize("path", [None, 1, (), ["clockwise"]])
+def test_tokenize_path_rejects_non_string_values(path):
+    with pytest.raises(ValueError, match="dot-separated string"):
+        tokenize_path(path)
+
+
+@pytest.mark.parametrize("path", [".", ".clockwise", "clockwise.", "clockwise..counterclockwise"])
+def test_tokenize_path_rejects_empty_move_tokens(path):
+    with pytest.raises(ValueError, match="empty move tokens"):
+        tokenize_path(path)
+
+
+@pytest.mark.parametrize("path", ["move\nline", "\N{LATIN SMALL LETTER E WITH ACUTE}", "x" * 129])
+def test_tokenize_path_rejects_non_printable_non_ascii_or_oversized_tokens(path):
+    with pytest.raises(ValueError, match="printable ASCII.*128"):
+        tokenize_path(path)
 
 
 def test_reflection_round_trip_inverts_a_reflected_solution_to_original_solution():
@@ -118,6 +149,7 @@ def _record(variant, path, original_oriented_path, reached_state, found_depth, s
         found_depth=found_depth,
         touch_depth=0,
         source_solution_sha256=source,
+        reflected_source_path=original_oriented_path if variant in {"reflected", "source"} else None,
         valid=True,
         reached_state=reached_state,
     )
