@@ -20,6 +20,11 @@ except ModuleNotFoundError:
     build_result_envelope = None
 
 try:
+    from tools.cayleypy_public.results import MAX_PUBLISH_REQUEST_BYTES
+except ImportError:
+    MAX_PUBLISH_REQUEST_BYTES = 4 * 1024 * 1024
+
+try:
     from tools.cayleypy_public.results import PublishStatus, publish_results
 except ImportError:
     PublishStatus = None
@@ -224,7 +229,10 @@ def test_publish_results_posts_canonical_request_and_persists_202_status(
     envelope = build_result_envelope(_context(), _solution())
 
     status = publish_results(
-        "https://endpoint-user:endpoint-password@example.test/ingest?token=query-secret",
+        (
+            "https://endpoint-user:endpoint-password@example.test/"
+            "private/path-secret?token=query-secret#fragment-secret"
+        ),
         [envelope],
         timeout_s=2.5,
     )
@@ -236,7 +244,7 @@ def test_publish_results_posts_canonical_request_and_persists_202_status(
     assert status.status_code == 202
     assert status.result_count == 1
     assert status.duplicate is False
-    assert status.endpoint == "https://example.test/ingest"
+    assert status.endpoint == "https://example.test"
     request = observed["request"]
     assert observed["timeout"] == 2.5
     assert request.get_method() == "POST"
@@ -245,7 +253,7 @@ def test_publish_results_posts_canonical_request_and_persists_202_status(
     persisted = json.loads(Path("publish_status.json").read_text(encoding="utf-8"))
     assert persisted == {
         "duplicate": False,
-        "endpoint": "https://example.test/ingest",
+        "endpoint": "https://example.test",
         "ok": True,
         "result_count": 1,
         "retryable": False,
@@ -253,6 +261,67 @@ def test_publish_results_posts_canonical_request_and_persists_202_status(
         "schema_version": 1,
         "status_code": 202,
     }
+    persisted_text = Path("publish_status.json").read_text(encoding="utf-8")
+    for forbidden in (
+        "endpoint-user", "endpoint-password", "path-secret", "query-secret",
+        "fragment-secret",
+    ):
+        assert forbidden not in status.endpoint
+        assert forbidden not in persisted_text
+
+
+def test_publish_results_allows_100_small_envelopes_within_request_limit(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    assert callable(publish_results), "Task 6 publisher is missing"
+    observed: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout):
+        observed.update(request=request, timeout=timeout)
+        return _FakeResponse(202)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(results_module, "urlopen", fake_urlopen, raising=False)
+    envelopes = [build_result_envelope(_context(), _solution()) for _ in range(100)]
+
+    status = publish_results("https://results.example/ingest", envelopes)
+
+    assert status.ok is True
+    assert status.result_count == 100
+    assert len(observed["request"].data) <= MAX_PUBLISH_REQUEST_BYTES
+    assert observed["request"].data == _canonical_bytes(
+        {"schema_version": 1, "results": envelopes}
+    )
+
+
+def test_publish_results_rejects_100_near_limit_envelopes_before_http(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    assert callable(publish_results), "Task 6 publisher is missing"
+    solution = _solution()
+    solution["path"] = "U" * (MAX_ENVELOPE_BYTES - 4_096)
+    solution["move_count"] = MAX_ENVELOPE_BYTES - 4_096
+    envelope = build_result_envelope(_context(), solution)
+    envelopes = [envelope] * 100
+    request_bytes = _canonical_bytes({"schema_version": 1, "results": envelopes})
+
+    assert MAX_ENVELOPE_BYTES - 8_192 < len(_canonical_bytes(envelope)) <= MAX_ENVELOPE_BYTES
+    assert len(request_bytes) > MAX_PUBLISH_REQUEST_BYTES
+
+    def unexpected_http(request, timeout):
+        raise AssertionError("oversized canonical request must not reach HTTP")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(results_module, "urlopen", unexpected_http, raising=False)
+
+    status = publish_results("https://results.example/ingest", envelopes)
+
+    assert status.ok is False
+    assert status.retryable is False
+    assert status.status_code is None
+    assert status.result_count == 100
+    assert status.safe_error == "publish request exceeds 4 MiB"
+    assert Path("publish_status.json").is_file()
 
 
 def test_publish_results_treats_http_200_as_duplicate_success(monkeypatch, tmp_path: Path) -> None:

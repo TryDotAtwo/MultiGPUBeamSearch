@@ -22,6 +22,7 @@ from urllib.request import Request, urlopen
 
 SCHEMA_VERSION = 1
 MAX_ENVELOPE_BYTES = 256 * 1024
+MAX_PUBLISH_REQUEST_BYTES = 4 * 1024 * 1024
 MAX_RESULTS_PER_REQUEST = 100
 _SCHEMA_PATH = Path(__file__).resolve().parents[2] / "configs/cayleypy_results_schema_v1.json"
 
@@ -179,7 +180,7 @@ def _safe_endpoint(url: str) -> str:
         host = f"[{hostname}]" if ":" in hostname else hostname
         if parsed.port is not None:
             host = f"{host}:{parsed.port}"
-        return urlunsplit((parsed.scheme, host, parsed.path, "", ""))
+        return urlunsplit((parsed.scheme, host, "", "", ""))
     except (TypeError, ValueError):
         return "<invalid endpoint>"
 
@@ -294,6 +295,13 @@ def publish_results(
             raise ValueError("unsupported results endpoint")
         validated = [_validate_publish_envelope(envelope) for envelope in items]
         body = _canonical_bytes({"schema_version": SCHEMA_VERSION, "results": validated})
+        if len(body) > MAX_PUBLISH_REQUEST_BYTES:
+            return _failure(
+                endpoint,
+                result_count,
+                "publish request exceeds 4 MiB",
+                retryable=False,
+            )
         request = Request(
             url,
             data=body,

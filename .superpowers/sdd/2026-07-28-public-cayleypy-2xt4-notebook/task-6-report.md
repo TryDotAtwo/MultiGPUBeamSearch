@@ -2,6 +2,7 @@
 
 Date: 2026-07-29
 Base commit: `4305300118fb464e6a31d069f1185010e3a02bb4`
+Review-fix base commit: `93d9394bd15f4168325d18339b07516db484abcb`
 
 ## Outcome
 
@@ -18,10 +19,10 @@ Implemented the Task 6 contract without integrating it into the solver or perfor
 
 ## Publisher contract
 
-- Requests are canonical `POST` bodies shaped as `{"schema_version":1,"results":[...]}` and are limited to 100 envelopes.
+- Requests are canonical `POST` bodies shaped as `{"schema_version":1,"results":[...]}`, limited to 100 envelopes, and rejected locally as non-retryable when the complete canonical body exceeds 4 MiB.
 - HTTP 202 is accepted; HTTP 200 is a duplicate success. HTTP 429 and 5xx plus timeout/DNS failures are retryable failures. Schema, endpoint, timeout, empty-request, and request-size failures are non-retryable.
 - Publishing is best-effort: ordinary validation, HTTP, DNS, timeout, and persistence exceptions are converted to `PublishStatus` instead of escaping into solve completion.
-- `publish_status.json` is atomically written and fsynced before normal return. It stores only a credential-stripped endpoint and a bounded safe error.
+- `publish_status.json` is atomically written and fsynced before normal return. It stores only endpoint scheme plus host and optional port, never userinfo, path, query, or fragment, together with a bounded safe error.
 - Response headers and bodies are never copied or read into status. Safe errors are generic, sanitized, and at most 2 KiB.
 
 ## TDD evidence
@@ -29,11 +30,14 @@ Implemented the Task 6 contract without integrating it into the solver or perfor
 - Envelope RED: four assertions failed because the builder/schema were absent (`4 failed`). GREEN: schema, provenance, UUIDv7/idempotency, redaction, and size tests passed (`4 passed`).
 - Publisher RED: eight assertions failed because the publisher was absent (`8 failed, 4 deselected`). GREEN: 202, duplicate 200, timeout, DNS, 429, 500, schema-before-HTTP, and 100-result-limit cases passed (`8 passed, 4 deselected`).
 - Exporter compatibility RED: the realistic `nrd` manifest fixture failed because the first schema draft required `blocks`. GREEN changed the schema/allowlist to `nrd` and restored all 12 focused tests.
+- Review RED: the path-secret status test retained `/private/path-secret` (`1 failed, 13 deselected`); the request-bound pair let a 100-envelope near-limit body cross the HTTP boundary (`1 failed, 1 passed, 12 deselected`).
+- Review GREEN: origin-only status plus 100-small accepted and 100-near-limit locally rejected (`3 passed, 11 deselected`), then all focused tests passed.
 
 ## Verification
 
-- `py -3 -m pytest -q tests/cayleypy_public/test_results.py` -> `12 passed`.
-- `py -3 -m pytest -q` -> `150 passed`.
+- `py -3 -m pytest -q tests/cayleypy_public/test_results.py` -> `14 passed`.
+- `py -3 -m pytest -q tests/cayleypy_public` -> `119 passed`.
+- `py -3 -m pytest -q` -> `152 passed`.
 - Durable verification note: `test_results/cayleypy_public_task6_2026-07-29.md`.
 - JSON Schema meta-validation, public-artifact secret scan, and `git diff --check` are final commit gates.
 
