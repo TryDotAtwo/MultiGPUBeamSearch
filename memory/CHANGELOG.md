@@ -807,3 +807,5 @@
   twice, typecheck, exact registry/resolved stack checks, and 33/33 pre/post
   payload hashes. No live k6 staging load, deployment, GitHub mutation, token,
   CUDA change, or beam-search architecture change was performed.
+
+- 2026-07-30: Added D1-backed status GET rate limiting and explicit dry-run, bounded dead-letter operator replay with retained-R2 verification; production remains reject.

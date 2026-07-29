@@ -460,3 +460,5 @@
   environment; and a bounded recovery audit over receipt, D1, R2, status, and
   GitHub evidence. No external run, commit, push, deployment, or beam/CUDA
   change is authorized during preparation.
+
+- 2026-07-30: Implement P1 GET status rate limit and safe bounded dead-letter replay; author verification remains claimed and production mode remains reject.

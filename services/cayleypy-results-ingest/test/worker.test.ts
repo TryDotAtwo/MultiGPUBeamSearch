@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { canonicalJson, computeIdempotency } from "../src/ids.js";
 import type { ResultEnvelopeV1 } from "../src/schema.js";
+import { replayDeadLetters } from "../src/operator-replay.js";
 
 import {
   GLOBAL_ENVELOPES_PER_MINUTE,
@@ -217,7 +218,7 @@ function controller(scheduledTime = Date.now()): ScheduledController {
 
 async function seedSubmission(
   index: number,
-  state: "received" | "queued" | "retryable",
+  state: "received" | "queued" | "retryable" | "dead_letter",
   updatedAt: string,
   safeError: string | null = "stale_error",
   retryCount = 0,
@@ -455,6 +456,36 @@ describe("durable receipts, status, health, and logging safety", () => {
     const missing = await fetchRequest(new Request(`${URL}/v1/submissions/019cffff-ffff-7fff-8fff-ffffffffffff`), bindings(), context());
     expect(missing.status).toBe(404);
     expect(await missing.json()).toEqual({ error: "not_found" });
+  });
+
+  test("GET status uses the D1 IP limit and returns only a safe 429", async () => {
+    const accepted = await postJson(resultBatch(0), bindings());
+    const receipt = (await accepted.json() as { receipts: Array<{ submission_id: string }> }).receipts[0];
+    const windowStart = Math.floor(Date.now() / 60_000) * 60_000;
+    await env.RESULTS_DB.prepare("INSERT INTO ingest_rate_limits (scope,window_start,count) VALUES (?,?,?)")
+      .bind(`status-ip:${TEST_IP}`, windowStart, 30).run();
+    const response = await fetchRequest(
+      new Request(`${URL}/v1/submissions/${receipt.submission_id}`, { headers: { "CF-Connecting-IP": TEST_IP } }),
+      bindings(), context(),
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    const body = await response.text();
+    expect(body).toBe('{"error":"rate_limited"}');
+    expect(body).not.toContain(receipt.submission_id);
+  });
+
+  test("operator dead-letter replay is dry-run by default and retains raw before a bounded apply", async () => {
+    const first = await seedSubmission(801, "dead_letter", "2000-01-01T00:00:00.000Z", "publisher_unavailable");
+    const second = await seedSubmission(802, "dead_letter", "2000-01-02T00:00:00.000Z", "publisher_unavailable");
+    const dry = await replayDeadLetters(bindings(), { limit: 1 });
+    expect(dry).toEqual({ dry_run: true, selected: [first], replayed: [], skipped_missing_raw: [] });
+    expect(await env.RESULTS_DB.prepare("SELECT state FROM submissions WHERE submission_id = ?").bind(first).first<string>("state")).toBe("dead_letter");
+    const applied = await replayDeadLetters(bindings(), { apply: true, limit: 1 });
+    expect(applied).toEqual({ dry_run: false, selected: [first], replayed: [first], skipped_missing_raw: [] });
+    expect(await env.RESULTS_DB.prepare("SELECT state,safe_error FROM submissions WHERE submission_id = ?").bind(first).first()).toEqual({ state: "retryable", safe_error: "operator_replay_pending" });
+    expect(await env.RESULTS_DB.prepare("SELECT state FROM submissions WHERE submission_id = ?").bind(second).first<string>("state")).toBe("dead_letter");
+    expect(await env.RAW_RESULTS.head(`raw/v1/2000/01/01/${first}.json`)).not.toBeNull();
   });
 
   test("rejects malformed percent encoding before touching D1", async () => {

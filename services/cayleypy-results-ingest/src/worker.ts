@@ -24,6 +24,7 @@ export interface WorkerEnv extends IngestEnv {
 export const MAX_REQUEST_BYTES = MAX_SERIALIZED_BATCH_BYTES;
 export const MAX_RESULTS_PER_REQUEST = 100;
 export const PER_IP_REQUESTS_PER_MINUTE = 30;
+export const PER_IP_STATUS_REQUESTS_PER_MINUTE = 30;
 export const GLOBAL_ENVELOPES_PER_MINUTE = 2_000;
 export const RECOVERY_STALE_MS = 60_000;
 export const RECOVERY_LIMIT = 50;
@@ -266,7 +267,17 @@ async function handlePostResults(request: Request, env: WorkerEnv): Promise<Resp
   return jsonResponse(errors.length === 0 ? { receipts } : { receipts, errors }, 202);
 }
 
-async function handleStatus(submissionId: string, env: WorkerEnv): Promise<Response> {
+async function allowStatusRequest(request: Request, env: WorkerEnv): Promise<boolean> {
+  const ip = request.headers.get("CF-Connecting-IP")?.trim() || "unknown";
+  return consumeD1Limit(env.RESULTS_DB, `status-ip:${ip}`, 1, PER_IP_STATUS_REQUESTS_PER_MINUTE);
+}
+
+async function handleStatus(request: Request, submissionId: string, env: WorkerEnv): Promise<Response> {
+  try {
+    if (!(await allowStatusRequest(request, env))) return rateLimited();
+  } catch {
+    return errorResponse(503, "rate_limit_unavailable");
+  }
   let row;
   try {
     row = await findBySubmissionId(env.RESULTS_DB, submissionId);
@@ -321,7 +332,7 @@ export async function fetchRequest(
     } catch {
       return errorResponse(400, "invalid_submission_id");
     }
-    return handleStatus(submissionId, env);
+    return handleStatus(request, submissionId, env);
   }
   return errorResponse(404, "not_found");
 }

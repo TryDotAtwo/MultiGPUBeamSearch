@@ -63,6 +63,16 @@ export async function findStaleRecoverable(
   return result.results;
 }
 
+/** Bounded, oldest-first operator inventory. Dead letters are never auto-replayed. */
+export async function findDeadLetters(db: D1Database, limit: number): Promise<SubmissionRow[]> {
+  const result = await db
+    .prepare(
+      "SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE state = ? ORDER BY updated_at, submission_id LIMIT ?",
+    )
+    .bind("dead_letter", limit)
+    .all<SubmissionRow>();
+  return result.results;
+}
 export async function transition(
   db: D1Database,
   id: string,
