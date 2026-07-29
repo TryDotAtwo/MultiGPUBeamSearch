@@ -52,3 +52,17 @@ Each case stores the exact canonical UTF-8 JSON string, full-envelope SHA-256, a
 - Python compile, Draft 2020-12 schema meta-validation, secret/private-path/tensor scans, exact staged-payload inspection, and whitespace checks are final commit gates.
 
 The future Task 7 notebook contract now explicitly requires its header to place the fixed `1 <= state_len <= 120` limit beside both supported checkpoint families and the `output_dim=1` or exact-`move_count` head rule.
+
+## Independent review follow-up
+
+An independent review of commit `d9e0a681...` reproduced two replay-contract gaps at the public publish boundary: model `manifest.state_len` was not capped/equal to proof state length, and a caller could recompute semantic idempotency over corrupt proof hashes, unequal states, or a non-permutation generator. The follow-up now:
+
+- caps manifest `state_len` at 120 in the canonical schema;
+- requires one shared `1..120` length across initial/central/generator arrays and the model manifest;
+- requires every generator to be a permutation of `range(state_len)`;
+- recomputes initial, central, generator, and reached-state hashes;
+- independently replays the original-oriented solution to the central state;
+- checks reflected source/searched paths and their inverse-to-original relation;
+- rejects all such corruption locally before HTTP even when idempotency was recomputed.
+
+Follow-up gates: `32` result tests, `152` public tests, and `185` whole-repository tests passed. Python compile and `git diff --check` also passed. No C++/CUDA, Stream, checkpoint-export, profile, external publish, or beam-search architecture file changed.

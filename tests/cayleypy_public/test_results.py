@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from copy import deepcopy
 import hashlib
 import socket
 import json
@@ -57,6 +58,17 @@ def _canonical_bytes(value: object) -> bytes:
     ).encode("utf-8")
 
 
+def _recompute_idempotency(envelope: dict[str, object]) -> None:
+    semantic = {
+        key: value
+        for key, value in envelope.items()
+        if key not in {
+            "client_submission_id", "idempotency_key", "submitted_at", "run_id",
+        }
+    }
+    envelope["idempotency_key"] = hashlib.sha256(_canonical_bytes(semantic)).hexdigest()
+
+
 def test_canonical_v1_batch_schema_and_shared_goldens_are_present() -> None:
     assert GOLDEN_PATH.is_file(), "canonical v1 shared golden fixtures are missing"
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -65,6 +77,7 @@ def test_canonical_v1_batch_schema_and_shared_goldens_are_present() -> None:
     Draft202012Validator.check_schema(schema)
     assert schema["required"] == ["schema_version", "results"]
     assert schema["$defs"]["state"]["maxItems"] == 120
+    assert schema["$defs"]["manifest"]["properties"]["state_len"]["maximum"] == 120
     result_schema = schema["$defs"]["result"]
     assert "client_submission_id" in result_schema["required"]
     assert "submission_id" not in result_schema["properties"]
@@ -251,6 +264,24 @@ def test_build_result_envelope_rejects_model_output_contract_drift(
     }
     with pytest.raises(ValueError, match=message):
         build_result_envelope(context, _solution())
+
+
+@pytest.mark.parametrize("corruption", ["manifest_state_len", "generator_permutation", "solution_replay"])
+def test_build_result_envelope_rejects_replay_invalid_source_context(corruption: str) -> None:
+    context = deepcopy(_context())
+    solution = deepcopy(_solution())
+    if corruption == "manifest_state_len":
+        context["model"]["manifest"]["state_len"] = 121
+    elif corruption == "generator_permutation":
+        context["proof"]["generators"]["clockwise"] = [0, 0, 2]
+    elif corruption == "solution_replay":
+        solution["path"] = "counterclockwise"
+        solution["original_oriented_path"] = "counterclockwise"
+    else:  # pragma: no cover - parametrization is exhaustive.
+        raise AssertionError(corruption)
+
+    with pytest.raises(ValueError):
+        build_result_envelope(context, solution)
 
 
 def test_build_result_envelope_drops_unknown_sensitive_and_non_json_fields() -> None:
@@ -511,6 +542,83 @@ def test_publish_results_rejects_model_output_semantic_drift_before_http(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(results_module, "urlopen", unexpected_http, raising=False)
 
+    status = publish_results("https://results.example/ingest", [envelope])
+
+    assert status.ok is False
+    assert status.retryable is False
+    assert status.safe_error == "publish payload failed validation"
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "initial_hash",
+        "generator_permutation",
+        "state_length",
+        "manifest_state_len",
+        "manifest_num_classes",
+        "solution_replay",
+        "reached_hash",
+    ],
+)
+def test_publish_results_rejects_replay_contract_corruption_even_with_fresh_idempotency(
+    monkeypatch, tmp_path: Path, corruption: str,
+) -> None:
+    envelope = deepcopy(build_result_envelope(_context(), _solution()))
+    proof = envelope["proof"]
+    manifest = envelope["model"]["manifest"]
+    if corruption == "initial_hash":
+        proof["initial_state_sha256"] = SHA_A
+    elif corruption == "generator_permutation":
+        proof["generators"]["clockwise"] = [0, 0, 2]
+        proof["generators_sha256"] = hashlib.sha256(
+            _canonical_bytes(proof["generators"])
+        ).hexdigest()
+    elif corruption == "state_length":
+        proof["central_state"] = [0, 1]
+        proof["central_state_sha256"] = hashlib.sha256(
+            _canonical_bytes(proof["central_state"])
+        ).hexdigest()
+        proof["reached_state_sha256"] = proof["central_state_sha256"]
+    elif corruption == "manifest_state_len":
+        manifest["state_len"] = 121
+    elif corruption == "manifest_num_classes":
+        manifest["num_classes"] = 4
+    elif corruption == "solution_replay":
+        envelope["solution"]["path"] = ["counterclockwise"]
+    elif corruption == "reached_hash":
+        proof["reached_state_sha256"] = SHA_B
+    else:  # pragma: no cover - parametrization is exhaustive.
+        raise AssertionError(corruption)
+    _recompute_idempotency(envelope)
+
+    def unexpected_http(request, timeout):
+        raise AssertionError("replay-invalid envelope must not reach HTTP")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(results_module, "urlopen", unexpected_http, raising=False)
+
+    status = publish_results("https://results.example/ingest", [envelope])
+
+    assert status.ok is False
+    assert status.retryable is False
+    assert status.safe_error == "publish payload failed validation"
+
+
+def test_publish_results_rejects_reflection_provenance_tamper_before_http(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    case = _golden_case("reflected")
+    context, solution = _producer_inputs(case)
+    envelope = build_result_envelope(context, solution)
+    envelope["orientation"]["reflected_source_sha256"] = SHA_C
+    _recompute_idempotency(envelope)
+
+    def unexpected_http(request, timeout):
+        raise AssertionError("reflection-invalid envelope must not reach HTTP")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(results_module, "urlopen", unexpected_http, raising=False)
     status = publish_results("https://results.example/ingest", [envelope])
 
     assert status.ok is False

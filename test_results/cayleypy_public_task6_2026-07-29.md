@@ -44,3 +44,14 @@ No code point was 63 (`?`), so the fixture exercises real non-ASCII canonicaliza
 - Public schema/golden forbidden-field, sentinel-secret, absolute-private-path, tensor-payload, and collapsed-Unicode scan -> no hits. Source/tests were separately inspected; sensitive-looking strings there are synthetic negative-test sentinels and allowlist field names, not serialized public data or real credentials.
 - `git diff --check` -> passed.
 - Exact staged payload inspection -> only the canonical-contract, provenance, preflight, tests, plans/spec, report/ledger, and memory files listed in the commit.
+
+## Independent review closure
+
+The public publisher now treats the replay proof as a semantic contract rather than schema-only metadata. Regression cases cover corrupt proof hashes, non-permutation generators, unequal state lengths, manifest state length 121, inconsistent model class count, replay-invalid original and reflected paths, and corrupt reached-state hashes. Every tampered publish case recomputes idempotency and is still rejected before HTTP; source-context build cases also fail closed.
+
+Final follow-up gates:
+
+- `python -m pytest tests/cayleypy_public/test_results.py -q` -> `32 passed`.
+- `python -m pytest tests/cayleypy_public -q` -> `152 passed`.
+- `python -m pytest -q` -> `185 passed`.
+- Python compile and `git diff --check` -> passed.

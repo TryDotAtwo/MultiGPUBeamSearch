@@ -20,7 +20,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
-from tools.cayleypy_public.paths import tokenize_path
+from tools.cayleypy_public.paths import invert_path, tokenize_path
 
 
 SCHEMA_VERSION = 1
@@ -101,6 +101,86 @@ def _validate_model_output_contract(
         raise ValueError(
             "output_move_count profile requires output_dim equal to generator count"
         )
+
+
+def _apply_tokens(
+    state: tuple[int, ...], tokens: Sequence[object], generators: Mapping[str, tuple[int, ...]],
+) -> tuple[int, ...]:
+    current = state
+    for token in tokens:
+        if not isinstance(token, str) or token not in generators:
+            raise ValueError("solution path contains an unknown move token")
+        permutation = generators[token]
+        current = tuple(current[index] for index in permutation)
+    return current
+
+
+def _validate_replay_contract(envelope: Mapping[str, object]) -> None:
+    proof = _mapping(envelope.get("proof"), "envelope.proof")
+    initial_state = tuple(_state_list(proof.get("initial_state"), "envelope.proof.initial_state"))
+    central_state = tuple(_state_list(proof.get("central_state"), "envelope.proof.central_state"))
+    state_len = len(initial_state)
+    if not 1 <= state_len <= 120 or len(central_state) != state_len:
+        raise ValueError("proof states must share a State128 logical length in 1..120")
+
+    generator_source = _mapping(proof.get("generators"), "envelope.proof.generators")
+    generators = {
+        name: tuple(_state_list(permutation, f"envelope.proof.generators.{name}"))
+        for name, permutation in generator_source.items()
+    }
+    expected_indices = tuple(range(state_len))
+    if any(len(permutation) != state_len or tuple(sorted(permutation)) != expected_indices
+           for permutation in generators.values()):
+        raise ValueError("every proof generator must be a permutation of range(state_len)")
+
+    manifest = _mapping(
+        _mapping(envelope.get("model"), "envelope.model").get("manifest"),
+        "envelope.model.manifest",
+    )
+    if manifest.get("state_len") != state_len:
+        raise ValueError("model manifest state_len must equal proof state_len")
+    if manifest.get("num_classes") != state_len:
+        raise ValueError("model manifest num_classes must equal the supported permutation state_len")
+
+    expected_hashes = {
+        "initial_state_sha256": _hash_json(list(initial_state)),
+        "central_state_sha256": _hash_json(list(central_state)),
+        "generators_sha256": _hash_json({name: list(value) for name, value in generators.items()}),
+    }
+    if any(proof.get(name) != expected for name, expected in expected_hashes.items()):
+        raise ValueError("proof hash does not match its canonical replay value")
+
+    solution = _mapping(envelope.get("solution"), "envelope.solution")
+    path = solution.get("path")
+    if isinstance(path, (str, bytes, bytearray)) or not isinstance(path, Sequence):
+        raise ValueError("solution.path must be a token array")
+    if solution.get("length") != len(path):
+        raise ValueError("solution length does not match its token path")
+    reached_state = _apply_tokens(initial_state, path, generators)
+    if reached_state != central_state:
+        raise ValueError("solution path does not replay from initial state to central state")
+    if proof.get("reached_state_sha256") != _hash_json(list(reached_state)):
+        raise ValueError("reached state hash does not match replay")
+
+    orientation = _mapping(envelope.get("orientation"), "envelope.orientation")
+    if orientation.get("final_orientation") == "reflected":
+        source_path = orientation.get("reflected_source_path")
+        searched_path = orientation.get("searched_path")
+        if not isinstance(source_path, Sequence) or isinstance(source_path, (str, bytes, bytearray)):
+            raise ValueError("reflected source path must be a token array")
+        if not isinstance(searched_path, Sequence) or isinstance(searched_path, (str, bytes, bytearray)):
+            raise ValueError("reflected searched path must be a token array")
+        source_text = ".".join(source_path)
+        if orientation.get("reflected_source_sha256") != sha256(source_text.encode("utf-8")).hexdigest():
+            raise ValueError("reflected source hash does not match its exact source path")
+        if _apply_tokens(initial_state, source_path, generators) != central_state:
+            raise ValueError("reflected source path is not a valid original solution")
+        reflected_state = _apply_tokens(central_state, source_path, generators)
+        if _apply_tokens(reflected_state, searched_path, generators) != central_state:
+            raise ValueError("reflected searched path does not replay to central state")
+        expected_original = tokenize_path(invert_path(".".join(searched_path), generators))
+        if tuple(path) != expected_original:
+            raise ValueError("reflected searched path does not match original-oriented solution")
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -268,9 +348,7 @@ def build_result_envelope(
         "submitted_at": _submitted_at_utc(),
     }
     envelope["idempotency_key"] = _hash_json(_semantic_payload(envelope))
-    _validate_schema(envelope)
-    if len(_canonical_bytes(envelope)) > MAX_ENVELOPE_BYTES:
-        raise ValueError("result envelope exceeds 256 KiB")
+    _validate_publish_envelope(envelope)
     return envelope
 
 
@@ -363,6 +441,7 @@ def _validate_publish_envelope(envelope: object) -> dict[str, object]:
         raise ValueError("result envelope exceeds 256 KiB")
     proof = _mapping(normalized.get("proof"), "envelope.proof")
     generators = _mapping(proof.get("generators"), "envelope.proof.generators")
+    _validate_replay_contract(normalized)
     _validate_model_output_contract(
         _mapping(normalized.get("profile"), "envelope.profile"),
         _mapping(normalized.get("model"), "envelope.model"),

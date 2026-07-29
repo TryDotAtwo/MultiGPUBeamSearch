@@ -86,7 +86,8 @@
       ],
       "properties": {
         "state_len": {
-          "$ref": "#/$defs/positive_integer"
+          "$ref": "#/$defs/positive_integer",
+          "maximum": 120
         },
         "num_classes": {
           "$ref": "#/$defs/positive_integer"
