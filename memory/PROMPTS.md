@@ -1,3 +1,8 @@
+- Independent review found a P1 in the staging deployment helper: generated
+  config lived outside the service while `migrations_dir` was absent, so Wrangler
+  could not resolve D1 migrations. Fix via TDD in a separate commit, exercise a
+  seeded SQL upgrade if possible, do not push/deploy, and preserve production
+  `INGEST_MODE=reject`.
 - User authorized all non-beam work. Prepare a fail-closed staging Cloudflare
   deployment runbook/scripts for the CayleyPy results ingest: exact D1/R2/Queue
   /DLQ/DO inventory, migrations, GitHub App secret install, store-only to

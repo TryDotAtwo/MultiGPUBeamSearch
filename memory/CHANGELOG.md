@@ -1,3 +1,9 @@
+- Fixed the staging deployment helper migration resolver: the generated private
+  Wrangler config now gives `RESULTS_DB` an absolute `migrations_dir` pointing
+  to the service's tracked migrations before remote apply/deploy. A real
+  PowerShell integration test preserved the missing-property RED, verifies
+  Wrangler command ordering, and applies 0001 then 0002 to a seeded SQLite DB.
+  No deploy, resource/secret mutation, production activation, or beam/CUDA change occurred.
 - Added a fail-closed CayleyPy results-ingest staging deployment runbook and
   helper. It pins the existing Wrangler toolchain, accepts a D1 ID only from a
   current Wrangler response, keeps the tracked config and App secrets untouched,

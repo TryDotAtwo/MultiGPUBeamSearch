@@ -38,6 +38,7 @@ function New-GeneratedConfig($Resources, [string]$Mode) {
   $d1 = @($staging.d1_databases | Where-Object { $_.binding -eq 'RESULTS_DB' })
   if ($d1.Count -ne 1 -or $d1[0].database_name -ne $Resources.d1_database_name) { throw 'unexpected staging D1 binding' }
   $d1[0] | Add-Member -NotePropertyName database_id -NotePropertyValue ([string]$Resources.d1_database_id) -Force
+  $d1[0] | Add-Member -NotePropertyName migrations_dir -NotePropertyValue ([System.IO.Path]::GetFullPath($migrationDir)) -Force
   $staging.vars.INGEST_MODE = $Mode
   $stageDir = Join-Path $serviceRoot '.staging-deploy-private'
   New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
