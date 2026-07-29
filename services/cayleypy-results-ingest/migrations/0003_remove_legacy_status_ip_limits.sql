@@ -1,0 +1,1 @@
+DELETE FROM ingest_rate_limits WHERE scope LIKE 'status-ip:%';

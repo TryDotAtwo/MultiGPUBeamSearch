@@ -464,3 +464,5 @@
 - 2026-07-30: Implement P1 GET status rate limit and safe bounded dead-letter replay; author verification remains claimed and production mode remains reject.
 
 - 2026-07-30: Fix bounded cardinality for anonymous status GET rate-limit storage; preserve production reject.
+
+- 2026-07-30: Add fail-safe legacy status-ip cleanup migration and correct fixed-bucket documentation.

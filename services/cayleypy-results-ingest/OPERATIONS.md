@@ -4,7 +4,7 @@
 
 POST /v1/results is intentionally anonymous so public Kaggle notebooks can publish without a secret. Submitted author fields are **claimed**, not identity-verified; dashboards and public indexes must preserve that label.
 
-Submission status URLs are bearer-like: do not publish, commit, or include them in logs. The Worker applies a D1-backed per-IP GET limit and returns only { "error": "rate_limited" } on exhaustion.
+Submission status URLs are bearer-like: do not publish, commit, or include them in logs. The Worker applies a D1-backed fixed-bucket GET limit and returns only { "error": "rate_limited" } on exhaustion.
 
 ## Dead-letter replay
 

@@ -32,7 +32,7 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ["test/receipt.test.ts", "test/worker.test.ts", "test/consumer.test.ts", "test/replay.test.ts", "test/github-app.test.ts", "test/github-writer.test.ts"],
+    include: ["test/receipt.test.ts", "test/worker.test.ts", "test/consumer.test.ts", "test/replay.test.ts", "test/github-app.test.ts", "test/github-writer.test.ts", "test/migration-upgrade.test.ts"],
     deps: {
       optimizer: {
         ssr: {
