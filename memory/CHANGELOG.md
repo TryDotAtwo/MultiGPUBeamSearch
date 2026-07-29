@@ -813,3 +813,6 @@
   to that exact revision. Public release remains blocked until the revision is
   reachable from the official GitHub repository and the private 2xT4 release
   smoke passes.
+
+## 2026-07-30
+- Hardened the public CayleyPy best-effort publisher against DNS-resolved private-address endpoints. Immediately before HTTP, every IPv4/IPv6 DNS answer must be globally routable; loopback, private, link-local, reserved, unspecified, multicast, malformed, empty, and resolution-failure answers fail closed with a hostname-free safe status. Added deterministic regressions for private address classes and public Cloudflare IPv4/IPv6 answers. Notebook metadata remains private; beam/CUDA are unchanged.

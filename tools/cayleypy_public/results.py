@@ -7,11 +7,13 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from hashlib import sha256
+from ipaddress import ip_address
 import json
 import math
 import os
 from pathlib import Path
 import secrets
+import socket
 import time
 import uuid
 
@@ -38,6 +40,39 @@ class _NoRedirectHandler(HTTPRedirectHandler):
 def urlopen(request: Request, timeout: float):
     """Open exactly one configured endpoint; redirects are deliberately disabled."""
     return build_opener(_NoRedirectHandler()).open(request, timeout=timeout)
+
+
+def _is_public_resolved_address(address_text: str) -> bool:
+    try:
+        address = ip_address(address_text)
+    except ValueError:
+        return False
+    return address.is_global and not any((
+        address.is_loopback,
+        address.is_private,
+        address.is_link_local,
+        address.is_reserved,
+        address.is_unspecified,
+        address.is_multicast,
+    ))
+
+
+def _endpoint_resolves_only_to_public_addresses(url: str) -> bool:
+    try:
+        parsed = urlsplit(url)
+        if parsed.hostname is None:
+            return False
+        answers = socket.getaddrinfo(
+            parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM,
+        )
+    except (ValueError, socket.gaierror, OSError):
+        return False
+    addresses: list[str] = []
+    for family, _, _, _, sockaddr in answers:
+        if family not in {socket.AF_INET, socket.AF_INET6} or not sockaddr:
+            return False
+        addresses.append(sockaddr[0])
+    return bool(addresses) and all(_is_public_resolved_address(address) for address in addresses)
 
 _SCHEMA_PATH = Path(__file__).resolve().parents[2] / "configs/cayleypy_results_schema_v1.json"
 
@@ -508,6 +543,13 @@ def publish_results(
         parsed = urlsplit(url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname:
             raise ValueError("unsupported results endpoint")
+        if not _endpoint_resolves_only_to_public_addresses(url):
+            return _failure(
+                endpoint,
+                result_count,
+                "results endpoint must resolve only to public IP addresses",
+                retryable=False,
+            )
         validated = [_validate_publish_envelope(envelope) for envelope in items]
         body = _canonical_bytes({"schema_version": SCHEMA_VERSION, "results": validated})
         if len(body) > MAX_PUBLISH_REQUEST_BYTES:

@@ -42,6 +42,18 @@ SHA_C = "c" * 64
 SHA_D = "d" * 64
 
 
+
+@pytest.fixture(autouse=True)
+def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep publisher tests deterministic without live DNS."""
+    monkeypatch.setattr(
+        results_module.socket,
+        "getaddrinfo",
+        lambda host, port, *, type: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("104.16.0.1", port)),
+        ],
+    )
+
 def _context() -> dict[str, object]:
     context, _ = _producer_inputs(_golden_case("original_unicode_author"))
     return context
@@ -742,3 +754,62 @@ def test_publish_results_rejects_more_than_100_envelopes_before_http(
     assert status.result_count == 101
     assert status.safe_error == "publish request exceeds 100 results"
     assert Path("publish_status.json").is_file()
+
+@pytest.mark.parametrize(
+    "resolved_address",
+    [
+        "127.0.0.1", "10.0.0.1", "169.254.1.1", "240.0.0.1", "0.0.0.0", "224.0.0.1",
+        "::1", "fc00::1", "fe80::1", "2001:db8::1", "::", "ff00::1",
+    ],
+)
+def test_publish_results_rejects_nonpublic_dns_answers_before_http_without_leaking_host(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, resolved_address: str,
+) -> None:
+    family = socket.AF_INET6 if ":" in resolved_address else socket.AF_INET
+    monkeypatch.setattr(
+        results_module.socket,
+        "getaddrinfo",
+        lambda host, port, *, type: [
+            (family, socket.SOCK_STREAM, 6, "", (resolved_address, port)),
+        ],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_module,
+        "urlopen",
+        lambda request, timeout: (_ for _ in ()).throw(AssertionError("private DNS answer reached HTTP")),
+    )
+    monkeypatch.chdir(tmp_path)
+
+    status = publish_results(
+        "https://dns-secret.example/ingest",
+        [build_result_envelope(_context(), _solution())],
+    )
+
+    assert status.ok is False
+    assert status.retryable is False
+    assert status.safe_error == "results endpoint must resolve only to public IP addresses"
+    assert "dns-secret" not in status.safe_error
+
+
+def test_publish_results_accepts_global_ipv4_and_ipv6_dns_answers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        results_module.socket,
+        "getaddrinfo",
+        lambda host, port, *, type: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("104.16.0.1", port)),
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2606:4700:4700::1111", port, 0, 0)),
+        ],
+        raising=False,
+    )
+    monkeypatch.setattr(results_module, "urlopen", lambda request, timeout: _FakeResponse(202))
+    monkeypatch.chdir(tmp_path)
+
+    status = publish_results(
+        "https://results.cloudflare.example/ingest",
+        [build_result_envelope(_context(), _solution())],
+    )
+
+    assert status.ok is True
