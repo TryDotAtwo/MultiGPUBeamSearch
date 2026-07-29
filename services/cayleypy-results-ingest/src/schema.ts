@@ -2,6 +2,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import schema from "../../../configs/cayleypy_results_schema_v1.json";
 import { canonicalJson, computeIdempotency, sha256Hex } from "./ids.js";
+import { invertPath, MAX_LOGICAL_STATE_LENGTH, MAX_MOVE_COUNT, MAX_PATH_LENGTH, replayPath } from "./replay.js";
 
 export type State = number[];
 export type TokenPath = string[];
@@ -65,25 +66,18 @@ const validate = ajv.compile(schema);
 function isResultBatchV1(value: unknown): value is ResultBatchV1 { return validate(value); }
 function byteLength(value: unknown): number { return new TextEncoder().encode(canonicalJson(value)).byteLength; }
 function integrityError(path: string, keyword: string): SafeSchemaError { return { path, keyword }; }
-function replay(initial: State, path: TokenPath, generators: Record<string, State>): State | null {
-  let state = [...initial];
-  for (const token of path) {
-    const permutation = generators[token];
-    if (!permutation) return null;
-    state = permutation.map((source) => state[source]);
-  }
-  return state;
-}
 
 /** Deterministic, server-side semantic and proof checks after JSON-schema validation. */
 export async function validateEnvelopeIntegrity(envelope: ResultEnvelopeV1): Promise<SafeSchemaError[]> {
   const errors: SafeSchemaError[] = [];
   const { proof, model, profile, orientation, solution } = envelope;
   const stateLength = model.manifest.state_len;
-  if (stateLength < 1 || stateLength > 120) errors.push(integrityError("/model/manifest/state_len", "stateLength"));
+  if (stateLength < 1 || stateLength > MAX_LOGICAL_STATE_LENGTH) errors.push(integrityError("/model/manifest/state_len", "stateLength"));
   for (const [name, state] of [["initial_state", proof.initial_state], ["central_state", proof.central_state]] as const) {
     if (state.length !== stateLength) errors.push(integrityError(`/proof/${name}`, "stateLength"));
+    if (state.some((value) => !Number.isInteger(value) || value < 0 || value >= stateLength)) errors.push(integrityError(`/proof/${name}`, "stateClasses"));
   }
+  if (model.manifest.num_classes !== stateLength) errors.push(integrityError("/model/manifest/num_classes", "stateClasses"));
   for (const [name, permutation] of Object.entries(proof.generators)) {
     if (permutation.length !== stateLength || new Set(permutation).size !== stateLength || permutation.some((value) => value < 0 || value >= stateLength)) {
       errors.push(integrityError(`/proof/generators/${name}`, "permutation"));
@@ -98,17 +92,30 @@ export async function validateEnvelopeIntegrity(envelope: ResultEnvelopeV1): Pro
     if (await sha256Hex(canonicalJson(value)) !== claimed) errors.push(integrityError(path, "proofHash"));
   }
   if (solution.length !== solution.path.length) errors.push(integrityError("/solution/length", "solutionLength"));
-  const reached = replay(proof.initial_state, solution.path, proof.generators);
-  if (reached === null) errors.push(integrityError("/solution/path", "unknownMove"));
+  if (solution.path.length > MAX_PATH_LENGTH) errors.push(integrityError("/solution/path", "proofBounds"));
+  if (Object.keys(proof.generators).length > MAX_MOVE_COUNT) errors.push(integrityError("/proof/generators", "proofBounds"));
+  const replay = replayPath(proof.initial_state, solution.path, proof.generators, stateLength);
+  if (!replay.ok) errors.push(integrityError("/solution/path", replay.code === "unknown_move" ? "unknownMove" : replay.code === "proof_bounds" ? "proofBounds" : "permutation"));
   else {
-    if (await sha256Hex(canonicalJson(reached)) !== proof.reached_state_sha256) errors.push(integrityError("/proof/reached_state_sha256", "proofHash"));
-    if (canonicalJson(reached) !== canonicalJson(proof.central_state)) errors.push(integrityError("/solution/path", "replayTarget"));
+    if (await sha256Hex(canonicalJson(replay.state)) !== proof.reached_state_sha256) errors.push(integrityError("/proof/reached_state_sha256", "proofHash"));
+    if (canonicalJson(replay.state) !== canonicalJson(proof.central_state)) errors.push(integrityError("/solution/path", "replayTarget"));
   }
   const reflected = orientation.final_orientation === "reflected";
   if (reflected) {
     const source = orientation.reflected_source_path;
     if (!source || !orientation.searched_path || !orientation.reflected_source_sha256) errors.push(integrityError("/orientation", "reflectionProvenance"));
     else if (await sha256Hex(source.join(".")) !== orientation.reflected_source_sha256) errors.push(integrityError("/orientation/reflected_source_sha256", "reflectionHash"));
+    else {
+      const sourceReplay = replayPath(proof.initial_state, source, proof.generators, stateLength);
+      if (!sourceReplay.ok || canonicalJson(sourceReplay.state) !== canonicalJson(proof.central_state)) errors.push(integrityError("/orientation/reflected_source_path", "reflectionReplay"));
+      else {
+        const reflectedState = replayPath(proof.central_state, source, proof.generators, stateLength);
+        const searchedReplay = reflectedState.ok ? replayPath(reflectedState.state, orientation.searched_path, proof.generators, stateLength) : reflectedState;
+        if (!searchedReplay.ok || canonicalJson(searchedReplay.state) !== canonicalJson(proof.central_state)) errors.push(integrityError("/orientation/searched_path", "reflectionReplay"));
+        const inverse = invertPath(orientation.searched_path, proof.generators, stateLength);
+        if (!inverse.ok || canonicalJson(inverse.path) !== canonicalJson(solution.path)) errors.push(integrityError("/solution/path", "reflectionInverse"));
+      }
+    }
   } else if (orientation.searched_path || orientation.reflected_source_path || orientation.reflected_source_sha256) {
     errors.push(integrityError("/orientation", "reflectionProvenance"));
   }

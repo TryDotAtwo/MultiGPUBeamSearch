@@ -15,6 +15,7 @@ import {
   RECOVERY_STALE_MS,
   fetchRequest,
   scheduled,
+  queue,
   resolveIngestMode,
   type WorkerEnv,
 } from "../src/worker.js";
@@ -536,9 +537,11 @@ describe("Cloudflare binding plus load-bearing bounded D1 rate limits", () => {
     const workerEnv = customBindings("store_only", {
       rateLimit: { limit: async () => { bindingCalls += 1; return { success: true }; } },
     });
-    for (let requestIndex = 0; requestIndex < PER_IP_REQUESTS_PER_MINUTE; requestIndex += 1) {
-      const response = await postJson(resultBatch(requestIndex), workerEnv);
-      expect(response.status).toBe(202);
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_001);
+    try {
+      for (let requestIndex = 0; requestIndex < PER_IP_REQUESTS_PER_MINUTE; requestIndex += 1) {
+        const response = await postJson(resultBatch(requestIndex), workerEnv);
+        expect(response.status).toBe(202);
     }
     const limited = await postJson(resultBatch(99), workerEnv);
     expect(limited.status).toBe(429);
@@ -546,8 +549,11 @@ describe("Cloudflare binding plus load-bearing bounded D1 rate limits", () => {
     expect(bindingCalls).toBe(PER_IP_REQUESTS_PER_MINUTE + 1);
     expect(await rowCount()).toBe(PER_IP_REQUESTS_PER_MINUTE);
     expect(await env.RESULTS_DB.prepare("SELECT COUNT(*) AS count FROM ingest_rate_limits").first<number>("count")).toBe(2);
-  });
+    } finally {
+      now.mockRestore();
+    }
 
+  });
   test("resets the bounded per-scope row at a new minute window", async () => {
     const currentWindow = Math.floor(Date.now() / 60_000) * 60_000;
     await env.RESULTS_DB.prepare(
@@ -715,6 +721,18 @@ describe("mode-gated scheduled recovery", () => {
     expect(messages).not.toContain(freshId);
   });
 });
+
+  test.each([undefined, "unknown"])("queue handler parks recoverable delivery for missing or unknown mode %s", async (mode) => {
+    const accepted = await postJson(resultBatch(0), customBindings("store_only"));
+    const submissionId = (await accepted.json() as { receipts: Array<{ submission_id: string }> }).receipts[0].submission_id;
+    let rawReads = 0;
+    let acked = 0;
+    let retried = 0;
+    const batch = { messages: [{ body: { submission_id: submissionId }, attempts: 1, ack: () => { acked += 1; }, retry: () => { retried += 1; } }] } as unknown as MessageBatch<unknown>;
+    await queue(batch, customBindings(mode, { bucket: countedBucket(() => { rawReads += 1; }) }), context());
+    expect({ acked, retried, rawReads }).toEqual({ acked: 1, retried: 0, rawReads: 0 });
+    expect(await env.RESULTS_DB.prepare("SELECT state,safe_error FROM submissions WHERE submission_id = ?").bind(submissionId).first()).toEqual({ state: "retryable", safe_error: "ingest_paused" });
+  });
 
 describe("concurrency and early-reject regression gates", () => {
   test("reject mode returns before consuming the body or invoking rate infrastructure", async () => {

@@ -1,3 +1,4 @@
+import { consumeValidationMessage } from "./consumer.js";
 import { findBySubmissionId } from "./db.js";
 import { MAX_SERIALIZED_BATCH_BYTES, validateBatch, validateBatchIntegrity, type ResultEnvelopeV1 } from "./schema.js";
 import {
@@ -341,4 +342,15 @@ export async function scheduled(
   });
 }
 
-export default { fetch: fetchRequest, scheduled } satisfies ExportedHandler<WorkerEnv>;
+export async function queue(
+  batch: MessageBatch<unknown>,
+  env: WorkerEnv,
+  _ctx: ExecutionContext,
+): Promise<void> {
+  const mode = resolveIngestMode(env.INGEST_MODE);
+  for (const message of batch.messages) {
+    await consumeValidationMessage(message, env, mode);
+  }
+}
+
+export default { fetch: fetchRequest, scheduled, queue } satisfies ExportedHandler<WorkerEnv>;

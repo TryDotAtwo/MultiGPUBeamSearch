@@ -6,8 +6,10 @@
   "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" },
   "d1_databases": [{ "binding": "RESULTS_DB", "database_name": "cayleypy-results-staging" }],
   "r2_buckets": [{ "binding": "RAW_RESULTS", "bucket_name": "cayleypy-results-raw-staging" }],
-  "queues": { "producers": [{ "binding": "VALIDATE_QUEUE", "queue": "cayleypy-validate-staging" }, { "binding": "VALIDATE_DLQ", "queue": "cayleypy-validate-dlq-staging" }] },
-  "durable_objects": { "bindings": [{ "name": "GITHUB_WRITER", "class_name": "GitHubWriter" }] },
+  "queues": {
+    "producers": [{ "binding": "VALIDATE_QUEUE", "queue": "cayleypy-validate-staging" }, { "binding": "VALIDATE_DLQ", "queue": "cayleypy-validate-dlq-staging" }],
+    "consumers": [{ "queue": "cayleypy-validate-staging", "max_batch_size": 10, "max_retries": 8, "dead_letter_queue": "cayleypy-validate-dlq-staging" }]
+  },
   "env": {
     "staging": { "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" } },
     "production": { "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" } }

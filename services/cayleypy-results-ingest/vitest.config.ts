@@ -20,7 +20,7 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ["test/receipt.test.ts", "test/worker.test.ts"],
+    include: ["test/receipt.test.ts", "test/worker.test.ts", "test/consumer.test.ts", "test/replay.test.ts"],
     deps: {
       optimizer: {
         ssr: {

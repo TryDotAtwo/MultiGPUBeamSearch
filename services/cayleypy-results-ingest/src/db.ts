@@ -49,9 +49,9 @@ export async function findStaleRecoverable(
 ): Promise<SubmissionRow[]> {
   const result = await db
     .prepare(
-      "SELECT submission_id, idempotency_key, state, raw_r2_key, safe_error, retry_count, updated_at FROM submissions WHERE state IN (?,?,?) AND updated_at <= ? ORDER BY updated_at, submission_id LIMIT ?",
+      "SELECT submission_id, idempotency_key, state, raw_r2_key, safe_error, retry_count, updated_at FROM submissions WHERE state IN (?,?,?,?) AND updated_at <= ? ORDER BY updated_at, submission_id LIMIT ?",
     )
-    .bind("received", "queued", "retryable", staleBefore, limit)
+    .bind("received", "queued", "retryable", "validating", staleBefore, limit)
     .all<SubmissionRow>();
   return result.results;
 }

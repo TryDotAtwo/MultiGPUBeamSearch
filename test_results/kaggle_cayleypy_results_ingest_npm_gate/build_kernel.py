@@ -27,10 +27,14 @@ FILES = (
     "services/cayleypy-results-ingest/src/db.ts",
     "services/cayleypy-results-ingest/src/storage.ts",
     "services/cayleypy-results-ingest/src/worker.ts",
+    "services/cayleypy-results-ingest/src/replay.ts",
+    "services/cayleypy-results-ingest/src/consumer.ts",
     "services/cayleypy-results-ingest/test/schema.test.ts",
     "services/cayleypy-results-ingest/test/apply-migrations.ts",
     "services/cayleypy-results-ingest/test/receipt.test.ts",
     "services/cayleypy-results-ingest/test/worker.test.ts",
+    "services/cayleypy-results-ingest/test/consumer.test.ts",
+    "services/cayleypy-results-ingest/test/replay.test.ts",
     "services/cayleypy-results-ingest/test/node-crypto.d.ts",
 )
 
@@ -365,7 +369,7 @@ def main() -> None:
                 "metadata": {},
                 "source": [
                     "# Private CayleyPy Results Ingest npm gate\n",
-                    "CPU-only dependency, test, and TypeScript verification. No deployment.\n",
+                    "CPU-only exact-stack Task 4 Queue/replay verification. No deployment.\n",
                 ],
             },
             {

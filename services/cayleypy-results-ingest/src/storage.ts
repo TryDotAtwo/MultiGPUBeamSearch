@@ -321,7 +321,26 @@ export async function recoverStaleSubmissions(
   const summary: RecoverySummary = { scanned: rows.length, queued: 0, retryable: 0, failed: 0 };
   for (const row of rows) {
     try {
-      const receipt = await resendExisting(env, row, true);
+      let recoverable = row;
+      if (row.state === "validating") {
+        const released = await transition(
+          env.RESULTS_DB,
+          row.submission_id,
+          ["validating"],
+          "retryable",
+          { safeError: "validation_lease_expired", incrementRetryCount: true },
+        );
+        if (!released) {
+          const current = await safeReadSubmission(env.RESULTS_DB, row.submission_id);
+          if (current.state === "validating" || !["received", "queued", "retryable"].includes(current.state)) {
+            continue;
+          }
+          recoverable = current;
+        } else {
+          recoverable = await safeReadSubmission(env.RESULTS_DB, row.submission_id);
+        }
+      }
+      const receipt = await resendExisting(env, recoverable, true);
       summary[receipt.state] += 1;
     } catch {
       summary.failed += 1;
