@@ -413,11 +413,18 @@ export async function receiveEnvelope(
     {
       submission_id: submissionId,
       idempotency_key: idempotencyKey,
+      run_id: envelope.run_id,
+      author_name: envelope.author.name,
+      competition: envelope.competition,
+      puzzle_type: envelope.puzzle_type,
+      puzzle_id: envelope.puzzle_id,
       state: "received",
       raw_r2_key: key,
       safe_error: null,
       retry_count: 0,
       updated_at: timestamp,
+      github_path: null,
+      github_commit_sha: null,
     },
     false,
   );

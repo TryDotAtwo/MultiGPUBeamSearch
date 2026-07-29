@@ -341,24 +341,24 @@ git commit -m "feat: replay and validate queued CayleyPy results"
 - Produces Durable Object RPC: `enqueueValidated(submissionId: string) -> Promise<void>` and alarm-driven `flush() -> Promise<FlushResult>`.
 - Reuses the exact mode resolver and performs a final `normal` guard immediately before external GitHub authentication or mutation.
 
-- [ ] **Step 1: Write failing GitHub JWT/token tests**
+- [x] **Step 1: Write failing GitHub JWT/token tests**
 
 Mock GitHub endpoints. Assert JWT `iss`, `iat`, `exp <= 10m`, installation-only token request, repository-scoped permissions, cache refresh before expiry, and no private-key/token material in thrown errors/logs.
 
-- [ ] **Step 2: Write failing writer batching/conflict tests**
+- [x] **Step 2: Write failing writer batching/conflict tests**
 
 Queue 100 unique validated ids and first assert they are committed to Durable Object storage before the final mode guard. Assert a bounded batch creates unique paths, one tree/commit/ref update, and marks D1 rows staged. Inject Git ref `422` conflict twice; writer refetches head and retries without losing/duplicating files. Existing different content at a target path is terminal corruption. For `store_only`, `reject`, missing, and unknown modes at the final guard, assert zero token/GitHub requests, zero `staged|published` transitions, durable retained validated ids, a bounded re-armed alarm, and no payload/raw-mode logs; inject `setAlarm` failure and assert the operation throws/retries without silently stranding ids, then switch to `normal` and prove the retained batch publishes.
 
-- [ ] **Step 3: Run and verify RED**
+- [x] **Step 3: Run and verify RED**
 
 Run: `npm test -- github-app.test.ts github-writer.test.ts`
 Expected: FAIL with missing modules.
 
-- [ ] **Step 4: Implement secret-only GitHub App authentication**
+- [x] **Step 4: Implement secret-only GitHub App authentication**
 
 Bindings/secrets: `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_PRIVATE_KEY`. Normalize escaped newlines in memory only. Never return secrets from methods or health endpoints.
 
-- [ ] **Step 5: Implement append-only path and batch commit**
+- [x] **Step 5: Implement append-only path and batch commit**
 
 ```ts
 function resultPath(r: ResultEnvelopeV1): string {
@@ -373,7 +373,7 @@ Only `safe()`-normalized identifiers from allowlisted fields affect paths. File 
 
 Persist validated ids durably before the final mode guard. Immediately before requesting a GitHub installation token or making any external ref/tree/commit call, re-resolve `INGEST_MODE`. Unless it is `normal`, retain those durable ids, make no external request or publication transition, and re-arm the Durable Object alarm with a bounded delay. Await `setAlarm`; if it fails, throw so the caller/runtime retries and never silently strands pending ids. This is a final defense against a mode change after validation.
 
-- [ ] **Step 6: Test and commit**
+- [x] **Step 6: Test and commit**
 
 Run: `npm test -- github-app.test.ts github-writer.test.ts && npm run typecheck`
 Expected: PASS.
@@ -382,6 +382,8 @@ Expected: PASS.
 git add services/cayleypy-results-ingest/src/{github-app,github-writer}.ts services/cayleypy-results-ingest/test/{github-app,github-writer}.test.ts
 git commit -m "feat: stage validated results through GitHub App"
 ```
+
+Verification: private exact Kaggle v9 passed TypeScript typecheck, schema/config 16/16, and the full Worker pool 119/119 twice. See `test_results/cayleypy_results_ingest_task5_2026-07-29.md`.
 
 ### Task 6: Results Repository Validation, Indexes, and Auto-Merge Gate
 

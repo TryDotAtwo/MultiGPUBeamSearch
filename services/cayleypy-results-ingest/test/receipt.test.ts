@@ -624,7 +624,7 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
       { safeError: "ingest_paused", retryCount: 8 },
     );
 
-    await expect(parkPausedSubmission(dbWithTransitionNoop(), submissionId)).resolves.toEqual({
+    await expect(parkPausedSubmission(dbWithTransitionNoop(), submissionId)).resolves.toMatchObject({
       submission_id: submissionId,
       idempotency_key: "5".repeat(64),
       state: "retryable",

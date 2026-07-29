@@ -2,16 +2,103 @@
   "name": "cayleypy-results-ingest",
   "main": "src/worker.ts",
   "compatibility_date": "2026-07-28",
+  "durable_objects": {
+    "bindings": [{ "name": "GITHUB_WRITER", "class_name": "GitHubWriter" }]
+  },
+  "exports": {
+    "GitHubWriter": { "type": "durable-object", "storage": "sqlite" }
+  },
   "triggers": { "crons": ["*/1 * * * *"] },
-  "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" },
-  "d1_databases": [{ "binding": "RESULTS_DB", "database_name": "cayleypy-results-staging" }],
-  "r2_buckets": [{ "binding": "RAW_RESULTS", "bucket_name": "cayleypy-results-raw-staging" }],
+  "vars": {
+    "INGEST_MODE": "reject",
+    "REPO_OWNER": "TryDotAtwo",
+    "REPO_NAME": "cayleypy-beam-results",
+    "STAGING_BRANCH": "ingest/staging"
+  },
+  "d1_databases": [
+    { "binding": "RESULTS_DB", "database_name": "cayleypy-results-staging" }
+  ],
+  "r2_buckets": [
+    { "binding": "RAW_RESULTS", "bucket_name": "cayleypy-results-raw-staging" }
+  ],
   "queues": {
-    "producers": [{ "binding": "VALIDATE_QUEUE", "queue": "cayleypy-validate-staging" }, { "binding": "VALIDATE_DLQ", "queue": "cayleypy-validate-dlq-staging" }],
-    "consumers": [{ "queue": "cayleypy-validate-staging", "max_batch_size": 10, "max_retries": 8, "dead_letter_queue": "cayleypy-validate-dlq-staging" }]
+    "producers": [
+      { "binding": "VALIDATE_QUEUE", "queue": "cayleypy-validate-staging" },
+      { "binding": "VALIDATE_DLQ", "queue": "cayleypy-validate-dlq-staging" }
+    ],
+    "consumers": [
+      {
+        "queue": "cayleypy-validate-staging",
+        "max_batch_size": 10,
+        "max_retries": 8,
+        "dead_letter_queue": "cayleypy-validate-dlq-staging"
+      }
+    ]
   },
   "env": {
-    "staging": { "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" } },
-    "production": { "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" } }
+    "staging": {
+      "durable_objects": {
+        "bindings": [{ "name": "GITHUB_WRITER", "class_name": "GitHubWriter" }]
+      },
+      "triggers": { "crons": ["*/1 * * * *"] },
+      "vars": {
+        "INGEST_MODE": "store_only",
+        "REPO_OWNER": "TryDotAtwo",
+        "REPO_NAME": "cayleypy-beam-results",
+        "STAGING_BRANCH": "ingest/staging"
+      },
+      "d1_databases": [
+        { "binding": "RESULTS_DB", "database_name": "cayleypy-results-staging" }
+      ],
+      "r2_buckets": [
+        { "binding": "RAW_RESULTS", "bucket_name": "cayleypy-results-raw-staging" }
+      ],
+      "queues": {
+        "producers": [
+          { "binding": "VALIDATE_QUEUE", "queue": "cayleypy-validate-staging" },
+          { "binding": "VALIDATE_DLQ", "queue": "cayleypy-validate-dlq-staging" }
+        ],
+        "consumers": [
+          {
+            "queue": "cayleypy-validate-staging",
+            "max_batch_size": 10,
+            "max_retries": 8,
+            "dead_letter_queue": "cayleypy-validate-dlq-staging"
+          }
+        ]
+      }
+    },
+    "production": {
+      "durable_objects": {
+        "bindings": [{ "name": "GITHUB_WRITER", "class_name": "GitHubWriter" }]
+      },
+      "triggers": { "crons": ["*/1 * * * *"] },
+      "vars": {
+        "INGEST_MODE": "reject",
+        "REPO_OWNER": "TryDotAtwo",
+        "REPO_NAME": "cayleypy-beam-results",
+        "STAGING_BRANCH": "ingest/staging"
+      },
+      "d1_databases": [
+        { "binding": "RESULTS_DB", "database_name": "cayleypy-results-production" }
+      ],
+      "r2_buckets": [
+        { "binding": "RAW_RESULTS", "bucket_name": "cayleypy-results-raw-production" }
+      ],
+      "queues": {
+        "producers": [
+          { "binding": "VALIDATE_QUEUE", "queue": "cayleypy-validate-production" },
+          { "binding": "VALIDATE_DLQ", "queue": "cayleypy-validate-dlq-production" }
+        ],
+        "consumers": [
+          {
+            "queue": "cayleypy-validate-production",
+            "max_batch_size": 10,
+            "max_retries": 8,
+            "dead_letter_queue": "cayleypy-validate-dlq-production"
+          }
+        ]
+      }
+    }
   }
 }

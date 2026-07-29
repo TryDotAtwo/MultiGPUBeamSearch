@@ -1,4 +1,7 @@
 import { consumeValidationMessage } from "./consumer.js";
+export { resolveIngestMode, type IngestMode } from "./mode.js";
+import { resolveIngestMode, type IngestMode } from "./mode.js";
+export { GitHubWriter } from "./github-writer.js";
 import { findBySubmissionId } from "./db.js";
 import { MAX_SERIALIZED_BATCH_BYTES, validateBatch, validateBatchIntegrity, type ResultEnvelopeV1 } from "./schema.js";
 import {
@@ -8,8 +11,6 @@ import {
   recoverStaleSubmissions,
   type IngestEnv,
 } from "./storage.js";
-
-export type IngestMode = "normal" | "store_only" | "reject";
 
 export interface IngestRateLimit {
   limit(input: { key: string }): Promise<{ success: boolean }>;
@@ -35,11 +36,6 @@ class SafeHttpError extends Error {
   constructor(readonly status: number, readonly code: string) {
     super(code);
   }
-}
-
-export function resolveIngestMode(value: unknown): IngestMode {
-  if (value === "normal" || value === "store_only" || value === "reject") return value;
-  return "reject";
 }
 
 function jsonResponse(value: unknown, status = 200, headers: HeadersInit = {}): Response {

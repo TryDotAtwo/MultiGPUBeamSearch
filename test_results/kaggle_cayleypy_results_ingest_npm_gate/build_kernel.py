@@ -20,6 +20,11 @@ FILES = (
     "services/cayleypy-results-ingest/wrangler.jsonc",
     "services/cayleypy-results-ingest/vitest.config.ts",
     "services/cayleypy-results-ingest/vitest.schema.config.ts",
+    "services/cayleypy-results-ingest/src/mode.ts",
+    "services/cayleypy-results-ingest/src/github-app.ts",
+    "services/cayleypy-results-ingest/src/github-writer.ts",
+    "services/cayleypy-results-ingest/test/github-app.test.ts",
+    "services/cayleypy-results-ingest/test/github-writer.test.ts",
     "services/cayleypy-results-ingest/migrations/0001_initial.sql",
     "services/cayleypy-results-ingest/migrations/0002_ingest_rate_limits.sql",
     "services/cayleypy-results-ingest/src/schema.ts",
@@ -36,6 +41,7 @@ FILES = (
     "services/cayleypy-results-ingest/test/consumer.test.ts",
     "services/cayleypy-results-ingest/test/replay.test.ts",
     "services/cayleypy-results-ingest/test/node-crypto.d.ts",
+    "services/cayleypy-results-ingest/test/wrangler-config.test.ts",
 )
 
 
@@ -369,7 +375,7 @@ def main() -> None:
                 "metadata": {},
                 "source": [
                     "# Private CayleyPy Results Ingest npm gate\n",
-                    "CPU-only exact-stack Task 4 Queue/replay verification. No deployment.\n",
+                    "CPU-only exact-stack Task 5 GitHub App and Durable Object writer verification. No deployment.\n",
                 ],
             },
             {

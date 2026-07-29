@@ -442,3 +442,5 @@
 - User authorized porting the corrected public canonical schema into results-ingest with independent server verification of semantic idempotency, proof/replay/reflection, model-head and size limits; preserve Task2/3 durability and exact Cloudflare stack, with no Task4 consumer/deployment/CUDA/beam work.
 
 - User authorized continuing the public notebook and Cloudflare results-service implementation, including the previously discussed non-beam work. The only standing restriction is that the beam-search architecture/CUDA algorithms must not be changed without explicit user agreement.
+
+- CayleyPy results-ingest Task 5 must serialize GitHub App writes through one Durable Object, preserve raw R2 and forensic D1 provenance, remain idempotent under at-least-once delivery and GitHub reference races, retain/rearm work across failures and eviction, avoid early-pending starvation, support at least 100 concurrent publishers, use current declarative SQLite Durable Object exports, and pass an exact private Kaggle dependency/type/runtime gate before any Cloudflare deployment.
