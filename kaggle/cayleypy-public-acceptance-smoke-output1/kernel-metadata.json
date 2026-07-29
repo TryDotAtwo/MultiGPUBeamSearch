@@ -1,0 +1,19 @@
+{
+  "id": "trydotatwo/cayleypy-public-acceptance-smoke-output1",
+  "title": "CayleyPy Public Acceptance Smoke output1",
+  "code_file": "smoke-output1.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [
+    "cayley-py-megaminx"
+  ],
+  "kernel_sources": [],
+  "model_sources": [
+    "arabidopsisthalian/megaminx2048-512-8-e4000/PyTorch/default/1"
+  ]
+}
