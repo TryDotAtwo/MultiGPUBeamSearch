@@ -1,6 +1,21 @@
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Literal, Mapping
+
+
+_ALLOWED_KEYS = frozenset({
+    "author_name", "checkpoint_path", "puzzle_info_json", "test_csv",
+    "sample_submission_csv", "puzzle_id_start", "puzzle_id_end", "beam_width",
+    "max_depth", "reflect_mode", "reflect_source_csv", "solution_mode",
+    "collect_until_depth", "max_collected_solutions", "touch_bfs_radius",
+    "publish_results", "results_ingest_url", "competition", "kaggle_owner",
+    "kaggle_slug", "kaggle_version", "kaggle_username", "solver_commit",
+    "kaggle_notebook_sha256",
+})
+_FORBIDDEN_PUBLIC_KEYS = frozenset({"model_source", "model_dtype", "checkpoint_format"})
+_HEX_40 = re.compile(r"^[0-9a-f]{40}$")
+_HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -23,6 +38,13 @@ class PublicRunConfig:
     publish_results: bool
     results_ingest_url: str
     model_dtype: Literal["fp16"] = "fp16"
+    competition: str | None = None
+    kaggle_owner: str | None = None
+    kaggle_slug: str | None = None
+    kaggle_version: int | None = None
+    kaggle_username: str | None = None
+    solver_commit: str | None = None
+    kaggle_notebook_sha256: str | None = None
 
     @property
     def puzzle_ids(self) -> tuple[int, ...]:
@@ -30,11 +52,31 @@ class PublicRunConfig:
 
     @classmethod
     def from_mapping(cls, values: Mapping[str, object]) -> "PublicRunConfig":
+        if not isinstance(values, Mapping):
+            raise ValueError("config must be an object")
+        unknown = set(values).difference(_ALLOWED_KEYS)
+        if unknown:
+            forbidden = sorted(unknown.intersection(_FORBIDDEN_PUBLIC_KEYS))
+            if forbidden:
+                raise ValueError(
+                    "public checkpoint-only config does not accept "
+                    + ", ".join(name.upper() for name in forbidden)
+                )
+            raise ValueError("unknown config fields: " + ", ".join(sorted(unknown)))
+
         def required(name: str) -> object:
             try:
                 return values[name]
             except KeyError as error:
                 raise ValueError(f"missing required config field {name.upper()}") from error
+
+        def nonempty_string(name: str, *, optional: bool = False) -> str | None:
+            value = values.get(name) if optional else required(name)
+            if value is None and optional:
+                return None
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name.upper()} must be a non-empty string")
+            return value.strip()
 
         def integer(name: str) -> int:
             value = required(name)
@@ -54,7 +96,10 @@ class PublicRunConfig:
         if start > end:
             raise ValueError("PUZZLE_ID range must be inclusive and non-empty")
 
-        positive_values = {name: integer(name) for name in ("beam_width", "max_depth", "max_collected_solutions")}
+        positive_values = {
+            name: integer(name)
+            for name in ("beam_width", "max_depth", "max_collected_solutions")
+        }
         for name, value in positive_values.items():
             if value <= 0:
                 raise ValueError(f"{name.upper()} must be positive")
@@ -76,9 +121,56 @@ class PublicRunConfig:
         publish_results = required("publish_results")
         if not isinstance(publish_results, bool):
             raise ValueError("PUBLISH_RESULTS must be a bool")
+        raw_ingest_url = values.get("results_ingest_url")
+        if raw_ingest_url is None or raw_ingest_url == "":
+            ingest_url = None
+        elif not isinstance(raw_ingest_url, str):
+            raise ValueError("RESULTS_INGEST_URL must be a non-empty string")
+        else:
+            ingest_url = raw_ingest_url.strip() or None
+        if publish_results and ingest_url is None:
+            raise ValueError(
+                "RESULTS_INGEST_URL must be a non-empty string when PUBLISH_RESULTS is true"
+            )
 
+        competition = nonempty_string("competition", optional=True)
+        kaggle_owner = nonempty_string("kaggle_owner", optional=True)
+        kaggle_slug = nonempty_string("kaggle_slug", optional=True)
+        kaggle_username = nonempty_string("kaggle_username", optional=True)
+        solver_commit = nonempty_string("solver_commit", optional=True)
+        notebook_sha256 = nonempty_string("kaggle_notebook_sha256", optional=True)
+        kaggle_version = values.get("kaggle_version")
+        if kaggle_version is not None and (
+            not isinstance(kaggle_version, int)
+            or isinstance(kaggle_version, bool)
+            or kaggle_version <= 0
+        ):
+            raise ValueError("KAGGLE_VERSION must be a positive integer or null")
+        if solver_commit is not None and _HEX_40.fullmatch(solver_commit) is None:
+            raise ValueError("SOLVER_COMMIT must be 40 lowercase hexadecimal characters")
+        if notebook_sha256 is not None and _HEX_64.fullmatch(notebook_sha256) is None:
+            raise ValueError(
+                "KAGGLE_NOTEBOOK_SHA256 must be 64 lowercase hexadecimal characters"
+            )
+        if publish_results:
+            provenance = {
+                "COMPETITION": competition,
+                "KAGGLE_OWNER": kaggle_owner,
+                "KAGGLE_SLUG": kaggle_slug,
+                "KAGGLE_VERSION": kaggle_version,
+                "SOLVER_COMMIT": solver_commit,
+                "KAGGLE_NOTEBOOK_SHA256": notebook_sha256,
+            }
+            missing = sorted(name for name, value in provenance.items() if value in {None, ""})
+            if missing:
+                raise ValueError(
+                    "publication provenance is required: " + ", ".join(missing)
+                )
+
+        author_name = nonempty_string("author_name")
+        assert author_name is not None
         return cls(
-            author_name=str(required("author_name")),
+            author_name=author_name,
             checkpoint_path=Path(str(required("checkpoint_path"))),
             puzzle_info_json=Path(str(required("puzzle_info_json"))),
             test_csv=Path(str(required("test_csv"))),
@@ -94,5 +186,12 @@ class PublicRunConfig:
             max_collected_solutions=positive_values["max_collected_solutions"],
             touch_bfs_radius=touch_bfs_radius,
             publish_results=publish_results,
-            results_ingest_url=str(required("results_ingest_url")),
+            results_ingest_url=ingest_url or "",
+            competition=competition,
+            kaggle_owner=kaggle_owner,
+            kaggle_slug=kaggle_slug,
+            kaggle_version=kaggle_version,
+            kaggle_username=kaggle_username,
+            solver_commit=solver_commit,
+            kaggle_notebook_sha256=notebook_sha256,
         )

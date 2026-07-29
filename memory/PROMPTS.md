@@ -426,6 +426,7 @@
 
 - User requested public CayleyPy Task 3: measured 2xT4 profile selection plus move-count-aware runtime preflight; retain exact requested/effective beam semantics, support move counts 18 and 24, enforce capacity/history/tmp guards, and do not change CUDA/C++ algorithms.
 
+- User finalized the public runtime boundary: all implementation, private Kaggle, Cloudflare, GitHub, notebook, and deployment work is authorized, but beam-search architecture changes require explicit prior approval. The public notebook must expose checkpoint paths only, automatically detect batchnorm-folded or resmlp-layernorm format, always export FP16, accept only output_dim 1 or move_count, keep an inclusive strict puzzle range, choose the nearest measured p16..p25 runtime profile for the user beam, support reflection/collection/touch-radius controls, and publish results best-effort without a public write token.
 - Reviewer requested Task 3 hardening: fail closed unless the public runtime uses exactly two T4 ranks, and prevent post-derivation mutation of RuntimePlan runtime values.
 
 ## 2026-07-28

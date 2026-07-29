@@ -243,3 +243,40 @@ def test_export_checkpoint_creates_nested_output_parent(tmp_path: Path) -> None:
 
     assert exported.manifest["source_weights"] == path.name
     assert (out_dir / "manifest.json").is_file()
+
+def test_checkpoint_detection_uses_safe_weights_only_load(monkeypatch, tmp_path: Path) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_load(path: Path, **kwargs: object) -> dict[str, object]:
+        observed.update(path=path, **kwargs)
+        return {"model": batchnorm_schema()}
+
+    monkeypatch.setattr(torch, "load", fake_load)
+    assert detect_checkpoint_format(tmp_path / "checkpoint.pt") == "batchnorm-folded"
+    assert observed["weights_only"] is True
+
+
+def test_public_exporters_never_disable_weights_only(monkeypatch, tmp_path: Path) -> None:
+    from tools import export_stream1_mlp
+
+    observed: list[dict[str, object]] = []
+
+    def fake_load(path: Path, **kwargs: object) -> dict[str, object]:
+        observed.append(dict(kwargs))
+        state = (
+            _exportable_batchnorm_state()
+            if Path(path).name.startswith("batchnorm")
+            else _exportable_resmlp_state()
+        )
+        return {"model": state}
+
+    monkeypatch.setattr(torch, "load", fake_load)
+    export_stream1_mlp.export_batchnorm_folded(
+        tmp_path / "batchnorm.pt", tmp_path / "batchnorm-export", "fp16", 3,
+    )
+    export_stream1_mlp.export_resmlp_layernorm(
+        tmp_path / "resmlp.pt", tmp_path / "resmlp-export", "fp16",
+    )
+
+    assert len(observed) == 2
+    assert all(call.get("weights_only") is True for call in observed)

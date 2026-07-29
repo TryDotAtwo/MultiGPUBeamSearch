@@ -109,7 +109,7 @@ def infer_residual_count(sd: TensorDict) -> int:
 
 
 def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDType, num_classes: int) -> None:
-    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=False)
+    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=True)
     sd = strip_orig_mod(unwrap_state_dict(checkpoint))
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = weight_suffix(dtype)
@@ -229,7 +229,7 @@ def linear_ln(sd: TensorDict, linear: str, ln: str) -> tuple[torch.Tensor, torch
 
 
 def export_resmlp_layernorm(weights_path: Path, out_dir: Path, dtype: ExportDType) -> None:
-    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=False)
+    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=True)
     sd = strip_orig_mod(unwrap_state_dict(checkpoint))
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = weight_suffix(dtype)

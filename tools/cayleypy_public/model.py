@@ -40,7 +40,7 @@ class ExportedModel:
 
 
 def _state_dict(path: Path) -> dict[str, torch.Tensor]:
-    return strip_orig_mod(unwrap_state_dict(torch.load(path, map_location="cpu", weights_only=False)))
+    return strip_orig_mod(unwrap_state_dict(torch.load(path, map_location="cpu", weights_only=True)))
 
 
 def _has_residual_key(state_dict: Mapping[str, torch.Tensor], pattern: str) -> bool:
