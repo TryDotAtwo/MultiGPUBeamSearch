@@ -1158,3 +1158,44 @@ def test_collection_stop_contract_syncs_host_reason_and_explicit_depth_beats_leg
     assert "local_selected_records" in source
     assert "collection_status=depth_reached" in source
     assert "solve bucket overflow: increase BEAM_SOLVED_RESULT_CAPACITY" in source
+
+
+def test_runtime_log_sanitizer_covers_live_combined_rank_and_redirect_logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    invocation = runner.build_runner_invocation(
+        _config(tmp_path), _plan(local_beam=128), 2, 7, "original", tmp_path / "weights", tmp_path / "artifacts",
+    )
+    private_path = "/private/checkpoints/model.pth"
+    token = "ghp_" + "x" * 40
+
+    def popen(command: tuple[str, ...], **_: object) -> SimpleNamespace:
+        for rank in (0, 1):
+            rank_dir = invocation.torchrun_log_dir / "run" / "attempt_0" / str(rank)
+            rank_dir.mkdir(parents=True)
+            (rank_dir / "stdout.log").write_text(
+                f"rank={rank} {private_path} {token}\n", encoding="utf-8"
+            )
+            (rank_dir / "stderr.log").write_text(
+                f"stderr={rank} {private_path} {token}\n", encoding="utf-8"
+            )
+        return SimpleNamespace(
+            stdout=iter((
+                f"live {private_path} {token}\n",
+                "puzzle_solved=1 puzzle_id=7 seconds=0.1 solution_length=1 found_depth=1 touch_depth=0 solution=counterclockwise\n",
+            )),
+            wait=lambda: 0,
+        )
+
+    monkeypatch.setattr(runner.subprocess, "Popen", popen)
+    sanitizer = lambda text: text.replace(private_path, "<redacted-path>").replace(token, "<redacted-secret>")
+    execution = runner._run_one(invocation, log_sanitizer=sanitizer)
+    parsed = runner.parse_runner_output(execution.output, None, 7, "original")
+
+    assert [record.path for record in parsed.records] == ["counterclockwise"]
+    assert private_path not in capsys.readouterr().out
+    for path in (
+        invocation.combined_log, *invocation.rank_logs,
+        *invocation.torchrun_log_dir.rglob("stdout.log"), *invocation.torchrun_log_dir.rglob("stderr.log"),
+    ):
+        text = path.read_text(encoding="utf-8")
+        assert private_path not in text and token not in text
+        assert "<redacted-" in text or "puzzle_solved=1" in text

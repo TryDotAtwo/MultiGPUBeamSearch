@@ -594,18 +594,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         preflight["output_dim"] = output_dim
         _write_json(output_dir / "preflight.json", preflight)
         runner = locate_or_build_runner(output_dir, config.puzzle_info_json)
+        log_redactions = tuple(path for path in (
+            arguments.config_json, config.checkpoint_path, config.puzzle_info_json,
+            config.test_csv, config.sample_submission_csv, config.reflect_source_csv,
+            output_dir, export_dir, _REPO_ROOT, Path.home(),
+        ) if path is not None)
+        log_sanitizer = lambda text: _sanitize_log(text, log_redactions)
         try:
             artifacts = run_public_search(
                 config, contract, model, plan, export_dir, output_dir / "logs",
-                runner_path=str(runner),
+                runner_path=str(runner), log_sanitizer=log_sanitizer,
             )
         except PublicSearchRunError as error:
             artifact_summary = _materialize_run_artifacts(error.partial_artifacts, output_dir)
+            wall_seconds = time.perf_counter() - started
+            publish_status = _publish_best_effort(
+                config, contract, model, profile, plan, hardware_names,
+                error.partial_artifacts, output_dir, wall_seconds,
+            )
             summary = {
                 "status": "failed", "safe_error": _public_error(error, config),
                 **_summary_base(config, hardware_names, model, plan), **artifact_summary,
-                "wall_seconds": time.perf_counter() - started,
-                "publish_status": {"state": "skipped", "reason": "solve_failed"},
+                "wall_seconds": wall_seconds, "publish_status": publish_status,
             }
             _write_json(output_dir / "run_summary.json", summary)
             return 2

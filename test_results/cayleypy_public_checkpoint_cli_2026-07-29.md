@@ -27,3 +27,6 @@
 - `py -m pytest -q`: 209 passed.
 - `py -m compileall -q tools/cayleypy_public tools/run_cayleypy_public.py tools/export_stream1_mlp.py`: passed.
 - `git diff --check`: passed.
+
+- Runtime logs are now sanitized before live output, combined/rank materialization, and atomic replacement of torchrun redirects; sanitizer failures replace raw redirects with a withheld marker. On a PublicSearchRunError, valid partial solutions are materialized and passed to the same best-effort publisher; the run still exits failed and always writes publish_status.json.
+- Follow-up verification: py -m pytest tests/cayleypy_public -q: 182 passed; py -m pytest -q: 215 passed; compileall and git diff --check: passed. Synthetic private-path/token regression covers live, combined, rank, and redirect logs while preserving release-line parsing.

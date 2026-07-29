@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 import uuid
-from typing import Literal
+from typing import Callable, Literal
 
 import pandas as pd
 
@@ -30,6 +30,7 @@ from tools.cayleypy_public.profile import RuntimePlan
 
 Variant = Literal["original", "reflected"]
 CollectionStatus = Literal["first_solution", "depth_reached", "capacity_reached", "not_collected"]
+LogSanitizer = Callable[[str], str]
 _UINT32_MAX = 2**32 - 1
 _SOLVED_RECORD_BYTES = 32 + 4 + 4
 _T4_DEVICE_BYTES = 16 * 1024**3
@@ -524,7 +525,49 @@ def _read_rank_streams(log_dir: Path, rank: int) -> tuple[str, str]:
     return stdout, stderr
 
 
-def collect_torchrun_rank_logs(invocation: RunnerInvocation) -> None:
+def _withhold_raw_log(path: Path) -> None:
+    """Replace a suspect log atomically; never leave raw diagnostics public."""
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.withheld")
+    try:
+        temporary.write_text("[log withheld: sanitization failed]\n", encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink(missing_ok=True)
+
+
+def _sanitize_log_file(path: Path, sanitizer: LogSanitizer | None) -> None:
+    """Sanitize a redirect log line-by-line and atomically replace the raw source."""
+    if sanitizer is None or not path.exists():
+        return
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.sanitized")
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as source, temporary.open("w", encoding="utf-8", newline="") as destination:
+            for line in source:
+                destination.write(sanitizer(line))
+        os.replace(temporary, path)
+    except Exception as error:
+        try:
+            _withhold_raw_log(path)
+        except Exception as withhold_error:
+            raise RuntimeError(f"log sanitization failed and raw log could not be withheld: {withhold_error}") from error
+        raise RuntimeError("log sanitization failed; raw log was withheld") from error
+    finally:
+        if temporary.exists():
+            temporary.unlink(missing_ok=True)
+
+
+def sanitize_torchrun_redirect_logs(invocation: RunnerInvocation, sanitizer: LogSanitizer | None) -> None:
+    """Remove private paths from torchrun redirect files before public copies exist."""
+    if sanitizer is None or not invocation.torchrun_log_dir.exists():
+        return
+    for path in sorted(invocation.torchrun_log_dir.rglob("stdout.log")):
+        _sanitize_log_file(path, sanitizer)
+    for path in sorted(invocation.torchrun_log_dir.rglob("stderr.log")):
+        _sanitize_log_file(path, sanitizer)
+
+
+def collect_torchrun_rank_logs(invocation: RunnerInvocation, sanitizer: LogSanitizer | None = None) -> None:
     """Materialize readable per-rank files exclusively from torchrun redirects."""
     captured: list[tuple[Path, str]] = []
     for rank, output_path in enumerate(invocation.rank_logs):
@@ -533,12 +576,13 @@ def collect_torchrun_rank_logs(invocation: RunnerInvocation) -> None:
             stdout += "\n"
         if stderr and not stderr.endswith("\n"):
             stderr += "\n"
-        captured.append((output_path, f"[stdout]\n{stdout}[stderr]\n{stderr}"))
+        text = f"[stdout]\n{stdout}[stderr]\n{stderr}"
+        captured.append((output_path, sanitizer(text) if sanitizer is not None else text))
     for output_path, text in captured:
         output_path.write_text(text, encoding="utf-8")
 
 
-def collect_available_torchrun_rank_logs(invocation: RunnerInvocation) -> tuple[str, ...]:
+def collect_available_torchrun_rank_logs(invocation: RunnerInvocation, sanitizer: LogSanitizer | None = None) -> tuple[str, ...]:
     """Best-effort materialization for ranks whose redirected streams are already complete."""
     errors: list[str] = []
     for rank, output_path in enumerate(invocation.rank_logs):
@@ -548,7 +592,8 @@ def collect_available_torchrun_rank_logs(invocation: RunnerInvocation) -> tuple[
                 stdout += "\n"
             if stderr and not stderr.endswith("\n"):
                 stderr += "\n"
-            output_path.write_text(f"[stdout]\n{stdout}[stderr]\n{stderr}", encoding="utf-8")
+            text = f"[stdout]\n{stdout}[stderr]\n{stderr}"
+            output_path.write_text(sanitizer(text) if sanitizer is not None else text, encoding="utf-8")
         except (OSError, RuntimeError, UnicodeError) as error:
             errors.append(f"rank {rank}: {error}")
     return tuple(errors)
@@ -608,6 +653,7 @@ def stream_process_output(
     *,
     live_stream: object | None = None,
     max_tail_chars: int = 4 * 1024 * 1024,
+    log_sanitizer: LogSanitizer | None = None,
 ) -> tuple[int, str]:
     """Stream rank-0 tee output live and retain only a bounded parser tail in RAM."""
     if isinstance(max_tail_chars, bool) or not isinstance(max_tail_chars, int) or max_tail_chars <= 0:
@@ -620,15 +666,16 @@ def stream_process_output(
     tail = ""
     with combined_log.open("w", encoding="utf-8") as log:
         for chunk in stdout:
-            live_stream.write(chunk)
+            safe_chunk = log_sanitizer(chunk) if log_sanitizer is not None else chunk
+            live_stream.write(safe_chunk)
             live_stream.flush()
-            log.write(chunk)
+            log.write(safe_chunk)
             log.flush()
-            tail = (tail + chunk)[-max_tail_chars:]
+            tail = (tail + safe_chunk)[-max_tail_chars:]
     return int(process.wait()), tail
 
 
-def _run_one(invocation: RunnerInvocation) -> InvocationExecution:
+def _run_one(invocation: RunnerInvocation, *, log_sanitizer: LogSanitizer | None = None) -> InvocationExecution:
     environment = {
         key: value
         for key, value in os.environ.items()
@@ -660,11 +707,12 @@ def _run_one(invocation: RunnerInvocation) -> InvocationExecution:
 
     execution: InvocationExecution | None = None
     try:
-        return_code, output_tail = stream_process_output(process, invocation.combined_log)
+        return_code, output_tail = stream_process_output(process, invocation.combined_log, log_sanitizer=log_sanitizer)
         elapsed = time.monotonic() - started
         execution = InvocationExecution(invocation, return_code, elapsed, output_tail)
         try:
-            collect_torchrun_rank_logs(invocation)
+            sanitize_torchrun_redirect_logs(invocation, log_sanitizer)
+            collect_torchrun_rank_logs(invocation, log_sanitizer)
         except (OSError, RuntimeError, UnicodeError) as error:
             raise InvocationLogCaptureError(
                 execution, f"torchrun log capture failed: {error}"
@@ -689,7 +737,11 @@ def _run_one(invocation: RunnerInvocation) -> InvocationExecution:
         except (AttributeError, TypeError):
             _add_exception_note(primary_error, "partial invocation execution could not be attached")
         try:
-            diagnostic_errors = collect_available_torchrun_rank_logs(invocation)
+            try:
+                sanitize_torchrun_redirect_logs(invocation, log_sanitizer)
+            except Exception as sanitize_error:
+                _add_exception_note(primary_error, f"partial torchrun log sanitization failed: {sanitize_error}")
+            diagnostic_errors = collect_available_torchrun_rank_logs(invocation, log_sanitizer)
         except Exception as diagnostic_failure:
             diagnostic_errors = ()
             _add_exception_note(
@@ -841,6 +893,7 @@ def run_public_search(
     artifact_dir: Path,
     *,
     runner_path: str = "production_runner",
+    log_sanitizer: LogSanitizer | None = None,
 ) -> RunArtifacts:
     """Run requested variants and retain only CPU-validated original-oriented paths."""
     del model
@@ -872,7 +925,7 @@ def run_public_search(
 
     def execute(invocation: RunnerInvocation) -> ParsedRunnerOutput:
         try:
-            execution = _run_one(invocation)
+            execution = _run_one(invocation, log_sanitizer=log_sanitizer) if log_sanitizer is not None else _run_one(invocation)
         except Exception as error:
             execution = getattr(error, "execution", None)
             if not isinstance(execution, InvocationExecution):

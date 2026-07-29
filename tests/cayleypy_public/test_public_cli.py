@@ -157,3 +157,60 @@ def test_public_search_error_retains_partial_artifacts(tmp_path: Path) -> None:
     assert (tmp_path / "submission.csv").is_file()
     assert (tmp_path / "beam_run_results.csv").is_file()
     assert (tmp_path / "solutions" / "solutions.csv").is_file()
+
+
+@pytest.mark.parametrize("publish_enabled", (False, True))
+def test_main_failed_search_materializes_partial_and_always_writes_publish_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, publish_enabled: bool,
+) -> None:
+    config_data = {
+        "author_name": "alice", "checkpoint_path": str(tmp_path / "model.pth"),
+        "puzzle_info_json": str(tmp_path / "puzzle_info.json"), "test_csv": str(tmp_path / "test.csv"),
+        "sample_submission_csv": str(tmp_path / "sample_submission.csv"), "puzzle_id_start": 7,
+        "puzzle_id_end": 7, "beam_width": 2**16, "max_depth": 4, "reflect_mode": "off",
+        "reflect_source_csv": None, "solution_mode": "first", "collect_until_depth": 4,
+        "max_collected_solutions": 2, "touch_bfs_radius": 1, "publish_results": publish_enabled,
+        "results_ingest_url": "https://ingest.example.test/results" if publish_enabled else "",
+    }
+    if publish_enabled:
+        config_data.update({"competition": "comp", "kaggle_owner": "owner", "kaggle_slug": "slug",
+                            "kaggle_version": 1, "solver_commit": "a" * 40,
+                            "kaggle_notebook_sha256": "b" * 64})
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+    contract = type("Contract", (), {"state_len": 3, "num_classes": 3, "move_count": 2,
+        "central_state": (0, 1, 2), "generators": {"a": (0, 1, 2), "b": (0, 1, 2)},
+        "initial_states": {7: (0, 1, 2)}})()
+    model = type("Model", (), {"format": "batchnorm-folded", "dtype": "fp16", "checkpoint_sha256": "a" * 64,
+        "manifest": {"state_len": 3, "num_classes": 3, "output_dim": 1}})()
+    plan = type("Plan", (), {"requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0,
+        "profile_power": 16, "model_class": "output1", "runtime": {"b_micro": 2}, "local_beam": 2**15,
+        "parent_batch": 1, "stream3_batch_candidates": 2, "shard_capacity_candidates": 1024,
+        "cross_puzzle_profile_note": ""})()
+    partial = _one_solution_artifacts()
+    monkeypatch.setattr(public_cli, "validate_t4_hardware", lambda: ["Tesla T4", "Tesla T4"])
+    monkeypatch.setattr(public_cli, "load_puzzle_contract", lambda *args: contract)
+    monkeypatch.setattr(public_cli, "export_checkpoint", lambda *args, **kwargs: model)
+    monkeypatch.setattr(public_cli, "select_profile", lambda *args: {"profile_power": 16, "validation_status": "measured", "hardware": "kaggle_2xt4", "runtime": {}})
+    monkeypatch.setattr(public_cli, "derive_runtime", lambda *args: plan)
+    monkeypatch.setattr(public_cli, "serialize_preflight", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr(public_cli, "locate_or_build_runner", lambda *_: tmp_path / "production_runner")
+    monkeypatch.setattr(public_cli, "run_public_search", lambda *args, **kwargs: (_ for _ in ()).throw(PublicSearchRunError("rank failed", partial)))
+    if publish_enabled:
+        monkeypatch.setattr(public_cli, "_publication_envelopes", lambda *args, **kwargs: [{"client_submission_id": "partial"}])
+        monkeypatch.setattr(public_cli, "publish_results", lambda *args, **kwargs: PublishStatus(True, False, None, 202, 1, False, "https://ingest.example.test"))
+    calls: list[RunArtifacts] = []
+    original_publish = public_cli._publish_best_effort
+    def observe_publish(*args, **kwargs):
+        calls.append(args[6])
+        return original_publish(*args, **kwargs)
+    monkeypatch.setattr(public_cli, "_publish_best_effort", observe_publish)
+
+    output = tmp_path / "out"
+    assert public_cli.main(["--config-json", str(config_path), "--output-dir", str(output)]) == 2
+    summary = json.loads((output / "run_summary.json").read_text(encoding="utf-8"))
+    status = json.loads((output / "publish_status.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "failed" and summary["solution_count"] == 1
+    assert calls == [partial]
+    assert status["state"] == ("published" if publish_enabled else "skipped")
+    assert status["reason"] == "disabled" if not publish_enabled else status["result_count"] == 1
