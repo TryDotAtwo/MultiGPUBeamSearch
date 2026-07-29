@@ -808,6 +808,8 @@
 - Closed the public publisher endpoint redirect/SSRF boundary without changing
   beam/CUDA: config rejects localhost, `.localhost`, and non-global IP literals;
   the HTTP client does not follow any 3xx redirect. Added negative and global-host
-  controls and regenerated the thin notebook. Release remains blocked until these
-  uncommitted controls are committed, pushed, and `SOLVER_COMMIT` is repinned to
-  that exact public revision.
+  controls and regenerated the thin notebook. Committed these controls as
+  `bb505484a839d3b78819f86aa28e76b842faab09` and repinned the generated notebook
+  to that exact revision. Public release remains blocked until the revision is
+  reachable from the official GitHub repository and the private 2xT4 release
+  smoke passes.

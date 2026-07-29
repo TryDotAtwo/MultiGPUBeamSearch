@@ -63,15 +63,16 @@ Final observed gates after the State128 header update: focused notebook tests `5
 - Publication installs a no-redirect handler. The first 3xx is persisted as a
   bounded safe failure and no `Location` request is issued, including redirects
   toward private HTTPS or plaintext HTTP.
-- Release gate remains OPEN: the generated notebook still pins `6e078447...`,
-  which predates these working-tree controls. Do not publish this notebook until
-  the hardening is committed and pushed, `SOLVER_COMMIT` is repinned to that exact
-  public revision, and the generated notebook is rerun through the same gates.
+- The hardening was committed locally as
+  `bb505484a839d3b78819f86aa28e76b842faab09`; `SOLVER_COMMIT` and its focused
+  assertion now pin that exact revision, and the notebook was regenerated.
+  Release gate remains OPEN until this commit is reachable from the official
+  GitHub repository and the private 2xT4 release smoke passes.
 - Observed GREEN after the fix: focused config/results/notebook-builder tests
   `98 passed`; the full public package `221 passed`; `compileall` and
   `git diff --check` passed.
 - Generated notebook validation passed JSON load, AST parsing of all code cells,
   exactly six cells, and empty execution outputs. The bounded credential-pattern
-  scan was clean. Current generated notebook SHA-256 is
-  `926b189735b95a1c61576a621e35985a4931913a82cf277c312676867ae48830`.
+  scan was clean. After repinning, current generated notebook SHA-256 is
+  `d1f235e64185af33e02cadfd04a47ef4e18dcc8639c22084d4e0497cef7fe20d`.
 - No GPU execution, Kaggle push, ingest request, beam-search, or CUDA change occurred.
