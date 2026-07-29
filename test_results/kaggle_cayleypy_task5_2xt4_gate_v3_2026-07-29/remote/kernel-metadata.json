@@ -1,0 +1,21 @@
+{
+  "id": "trydotatwo/cayleypy-public-task-5-2xt4-gate",
+  "id_no": 128988574,
+  "title": "CayleyPy Public Task 5 2xT4 Gate",
+  "code_file": "cayleypy-public-task-5-2xt4-gate.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [],
+  "kernel_sources": [],
+  "competition_sources": [],
+  "model_sources": [],
+  "docker_image": "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461",
+  "machine_shape": "NvidiaTeslaT4"
+}

@@ -1,0 +1,2 @@
+Warning: Looks like you're using an outdated `kaggle` version (installed: 2.1.2), please consider upgrading to the latest version (2.2.2)
+trydotatwo/cayleypy-public-task-5-2xt4-gate has status "KernelWorkerStatus.COMPLETE"

@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import base64
 import csv
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -18,6 +19,7 @@ BASE_GIT_REV = "6f95bd6bdb32b5f6ef7cca32b96967bce6036503"
 REVIEWED_COMMIT = "6830401ed2086921d2563c2bc3c11faf6c5a0741"
 CUTLASS_GIT_REV = "afa1772203677c5118fcd82537a9c8fefbcc7008"
 KERNEL_SLUG = "trydotatwo/cayleypy-public-task-5-2xt4-gate"
+KERNEL_VERSION = 3
 OUT_DIR = Path("kaggle_cayleypy_task5_gate")
 OUT_NOTEBOOK = OUT_DIR / "cayleypy-task5-2xt4-gate.ipynb"
 SOURCE_PATH = Path(__file__).resolve().with_name("production_runner.cu")
@@ -399,6 +401,30 @@ def discover_rank_logs(torchrun_dir, run_dir):
     return copied
 
 
+def append_bounded_output(combined, combined_bytes, line):
+    next_bytes = combined_bytes + len(line.encode("utf-8"))
+    if next_bytes > MAX_COMBINED_LOG_BYTES:
+        raise RuntimeError("combined rank-0 tee log exceeded bounded capture")
+    combined.append(line)
+    return next_bytes
+
+
+def stop_process_group_and_reap(proc):
+    if proc.poll() is None:
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    try:
+        return proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        return proc.wait(timeout=10)
+
+
 def run_solver(name, mode):
     run_dir = RUNS_DIR / name
     history_dir = HISTORY_ROOT / name
@@ -434,50 +460,55 @@ def run_solver(name, mode):
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1, start_new_session=True,
     )
-    assert proc.stdout is not None
-    selector = selectors.DefaultSelector()
-    selector.register(proc.stdout, selectors.EVENT_READ)
-    combined = []
-    combined_bytes = 0
-    timed_out = False
-    peak_rss = 0
-    sample_count = 0
-    samples = deque(maxlen=PROCESS_RSS_MAX_SAMPLES)
-    gpu_before = gpu_snapshot()
     try:
-        while proc.poll() is None:
-            for key, _ in selector.select(timeout=0.10):
-                line = key.fileobj.readline()
-                if line:
-                    combined_bytes += len(line.encode("utf-8"))
-                    if combined_bytes > MAX_COMBINED_LOG_BYTES:
-                        raise RuntimeError("combined rank-0 tee log exceeded bounded capture")
-                    combined.append(line)
-                    if any(marker in line for marker in (
-                        "depth_done=", "puzzle_solved=", "collection_status=", "solve_bucket_stop=",
-                    )):
-                        print(line, end="", flush=True)
-            rss, process_count = process_tree_rss(proc.pid)
-            peak_rss = max(peak_rss, rss)
-            sample_count += 1
-            samples.append({
-                "elapsed_sec": time.perf_counter() - started,
-                "rss_bytes": rss,
-                "process_count": process_count,
-            })
-            if time.monotonic() >= deadline:
-                timed_out = True
-                os.killpg(proc.pid, signal.SIGTERM)
-                try:
-                    proc.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                    proc.wait(timeout=10)
-                break
-        combined.extend(proc.stdout.readlines())
-    finally:
-        selector.close()
-    return_code = proc.wait()
+        assert proc.stdout is not None
+        selector = selectors.DefaultSelector()
+        try:
+            selector.register(proc.stdout, selectors.EVENT_READ)
+            combined = []
+            combined_bytes = 0
+            timed_out = False
+            peak_rss = 0
+            sample_count = 0
+            samples = deque(maxlen=PROCESS_RSS_MAX_SAMPLES)
+            gpu_before = gpu_snapshot()
+            while proc.poll() is None:
+                for key, _ in selector.select(timeout=0.10):
+                    line = key.fileobj.readline()
+                    if line:
+                        combined_bytes = append_bounded_output(
+                            combined, combined_bytes, line
+                        )
+                        if any(marker in line for marker in (
+                            "depth_done=", "puzzle_solved=", "collection_status=", "solve_bucket_stop=",
+                        )):
+                            print(line, end="", flush=True)
+                rss, process_count = process_tree_rss(proc.pid)
+                peak_rss = max(peak_rss, rss)
+                sample_count += 1
+                samples.append({
+                    "elapsed_sec": time.perf_counter() - started,
+                    "rss_bytes": rss,
+                    "process_count": process_count,
+                })
+                if time.monotonic() >= deadline:
+                    timed_out = True
+                    stop_process_group_and_reap(proc)
+                    break
+            while True:
+                line = proc.stdout.readline()
+                if not line:
+                    break
+                combined_bytes = append_bounded_output(combined, combined_bytes, line)
+            return_code = proc.wait(timeout=10)
+        finally:
+            selector.close()
+    except BaseException as error:
+        try:
+            stop_process_group_and_reap(proc)
+        except BaseException as cleanup_error:
+            error.add_note(f"process-group cleanup failed: {cleanup_error!r}")
+        raise
     elapsed = time.perf_counter() - started
     combined_text = "".join(combined)
     (run_dir / "combined.log").write_text(
@@ -800,9 +831,146 @@ def _parse_release_line(line: str) -> dict[str, Any]:
     return release
 
 
+def _validate_remote_attestation(root: Path) -> dict[str, Any]:
+    remote = root / "remote"
+    raw_names = (
+        "push_receipt.txt", "status.txt", "list.csv", "kernel-metadata.json",
+        "pulled-notebook.ipynb",
+    )
+    raw = {name: (remote / name).read_bytes() for name in raw_names}
+    capture = _read_json(remote / "capture_manifest.json")
+    expected_hashes = {name: _digest(payload) for name, payload in raw.items()}
+    if capture.get("sha256") != expected_hashes:
+        raise ValueError("raw remote evidence hashes do not match the capture manifest")
+
+    push_lines = [
+        line for line in raw["push_receipt.txt"].decode("utf-8").splitlines()
+        if line
+    ]
+    push_pattern = re.compile(
+        r"Kernel version (?P<version>\d+) successfully pushed\.\s+Please check progress at "
+        rf"https://www\.kaggle\.com/code/{re.escape(KERNEL_SLUG)}",
+    )
+    warning_pattern = re.compile(
+        r"Warning: Looks like you're using an outdated `kaggle` version "
+        r"\(installed: [0-9.]+\), please consider upgrading to the latest version \([0-9.]+\)"
+    )
+    push_matches = [push_pattern.fullmatch(line) for line in push_lines]
+    push_matches = [match for match in push_matches if match is not None]
+    non_success = [line for line in push_lines if push_pattern.fullmatch(line) is None]
+    if (
+        len(push_matches) != 1
+        or int(push_matches[0].group("version")) != KERNEL_VERSION
+        or any(warning_pattern.fullmatch(line) is None for line in non_success)
+    ):
+        raise ValueError("push receipt lacks the exact slug and pushed version")
+
+    expected_status = f'{KERNEL_SLUG} has status "KernelWorkerStatus.COMPLETE"'
+    status_lines = [
+        line for line in raw["status.txt"].decode("utf-8").splitlines()
+        if line
+    ]
+    status_matches = [line for line in status_lines if line == expected_status]
+    status_other = [line for line in status_lines if line != expected_status]
+    if (
+        status_matches != [expected_status]
+        or any(warning_pattern.fullmatch(line) is None for line in status_other)
+    ):
+        raise ValueError("status receipt is not exact COMPLETE for the expected slug")
+
+    raw_list_lines = raw["list.csv"].decode("utf-8").splitlines()
+    list_lines = [
+        line for line in raw_list_lines
+        if line and warning_pattern.fullmatch(line) is None
+    ]
+    if any(
+        warning_pattern.fullmatch(line) is None
+        for line in raw_list_lines if line and line not in list_lines
+    ):
+        raise ValueError("kernels-list output contains an unexpected non-CSV line")
+    reader = csv.DictReader(list_lines)
+    if tuple(reader.fieldnames or ()) != (
+        "ref", "title", "author", "lastRunTime", "totalVotes"
+    ):
+        raise ValueError("kernels-list CSV has an unexpected schema")
+    list_rows = list(reader)
+    if len(list_rows) != 1 or list_rows[0].get("ref") != KERNEL_SLUG:
+        raise ValueError("kernels-list CSV does not contain exactly the expected slug")
+    try:
+        last_run = datetime.strptime(
+            list_rows[0]["lastRunTime"], "%Y-%m-%d %H:%M:%S.%f"
+        ).replace(tzinfo=timezone.utc)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("kernels-list lastRunTime is missing or malformed") from exc
+
+    pulled = json.loads(raw["kernel-metadata.json"].decode("utf-8"))
+    expected_pulled = {
+        "id": KERNEL_SLUG,
+        "title": "CayleyPy Public Task 5 2xT4 Gate",
+        "language": "python",
+        "kernel_type": "notebook",
+        "is_private": True,
+        "enable_gpu": True,
+        "machine_shape": "NvidiaTeslaT4",
+    }
+    if any(pulled.get(key) != value for key, value in expected_pulled.items()):
+        raise ValueError("pulled metadata lacks the exact private 2xT4 slug contract")
+    if not str(pulled.get("code_file", "")).endswith(".ipynb"):
+        raise ValueError("pulled metadata lacks a notebook code_file")
+
+    pushed_path = SOURCE_PATH.parents[1] / OUT_NOTEBOOK
+    pushed_notebook = json.loads(pushed_path.read_text(encoding="utf-8"))
+    pulled_notebook = json.loads(raw["pulled-notebook.ipynb"].decode("utf-8"))
+
+    def normalize_notebook(notebook):
+        normalized = json.loads(json.dumps(notebook))
+        for cell in normalized.get("cells", []):
+            source = cell.get("source")
+            if isinstance(source, list):
+                cell["source"] = "".join(source)
+        return normalized
+
+    if normalize_notebook(pulled_notebook) != normalize_notebook(pushed_notebook):
+        raise ValueError("pulled notebook is not semantically equal to the pushed package")
+    pushed_notebook_sha = _digest(pushed_path.read_bytes())
+    pulled_notebook_sha = _digest(raw["pulled-notebook.ipynb"])
+
+    observed: dict[str, datetime] = {}
+    for key in ("push_observed_at_utc", "completion_observed_at_utc"):
+        try:
+            value = datetime.fromisoformat(str(capture[key]).replace("Z", "+00:00"))
+        except (KeyError, ValueError) as exc:
+            raise ValueError(f"capture manifest lacks {key}") from exc
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError(f"capture manifest {key} is not timezone-aware")
+        observed[key] = value.astimezone(timezone.utc)
+    if not (
+        observed["push_observed_at_utc"]
+        <= last_run
+        <= observed["completion_observed_at_utc"]
+    ):
+        raise ValueError("remote lastRunTime is outside the push/completion observation window")
+
+    return {
+        "slug": KERNEL_SLUG,
+        "private": True,
+        "pushed_version": KERNEL_VERSION,
+        "status": "COMPLETE",
+        "last_run_time_utc": last_run.isoformat(),
+        "completion_observed_at_utc": observed["completion_observed_at_utc"].isoformat(),
+        "pushed_notebook_sha256": pushed_notebook_sha,
+        "pulled_notebook_sha256": pulled_notebook_sha,
+        "pulled_notebook_semantic_match": True,
+    }
+
+
 def validate_gate_output(root: Path) -> dict[str, Any]:
     """Independently validate downloaded raw Kaggle evidence."""
     root = Path(root)
+    try:
+        remote_attestation = _validate_remote_attestation(root)
+    except Exception as exc:
+        raise ValueError(f"remote Kaggle attestation is invalid: {exc}") from exc
     manifest = _read_json(root / "source_manifest.json")
     summary = _read_json(root / "gate_summary.json")
     expected_source_sha = _digest(SOURCE_PATH.read_bytes())
@@ -1032,6 +1200,7 @@ def validate_gate_output(root: Path) -> dict[str, Any]:
         "collect_tsv_rows": len(rows),
         "source_sha256": expected_source_sha,
         "binary_sha256": manifest["binary_sha256"],
+        "remote_attestation": remote_attestation,
     }
 
 

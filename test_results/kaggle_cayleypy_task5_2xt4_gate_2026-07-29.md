@@ -4,25 +4,38 @@ Date: 2026-07-29
 
 ## Outcome
 
-Private Kaggle kernel `trydotatwo/cayleypy-public-task-5-2xt4-gate`, version 2, completed successfully and passed the independent downloaded-evidence validator. The accepted run used exactly two Tesla T4 GPUs, the tracked output-dimension-24 fp16 weights, beam 65,536, depth limit 8, puzzle 1, and zero K1/K2 radii. It ran first mode once and collect mode twice with fresh run/history directories.
+Private Kaggle kernel `trydotatwo/cayleypy-public-task-5-2xt4-gate`, version 3, completed successfully and passed the independent downloaded-evidence plus remote-attestation validator. The accepted run used exactly two Tesla T4 GPUs, the tracked output-dimension-24 fp16 weights, beam 65,536, depth limit 8, puzzle 1, and zero K1/K2 radii. It ran first mode once and collect mode twice with fresh run/history directories.
 
-Version 1 was a diagnostic-only run. Kaggle normalized the title to a slug containing `task-5`, while the initial embedded metadata omitted that hyphen. Its runtime was otherwise healthy, but the independent provenance validator correctly rejected it. Version 2 embeds and attests the actual private slug and is the sole acceptance result.
+Version 1 was diagnostic-only and failed the exact-slug provenance gate. Version 2 was the first green residual acceptance. Version 3 supersedes it after closing two independent-review P2s in notebook/gate-only scope: EOF-tail output now uses the same byte cap as live capture, every capture/read failure performs bounded process-group termination and reap with kill fallback, and acceptance now requires external Kaggle push/status/list/pull evidence instead of notebook self-attestation.
+
+## Review-P2 closure and remote attestation
+
+- Capture TDD RED: two focused failures (`DID NOT RAISE` for an oversized EOF tail; no TERM/KILL calls after a read exception). GREEN: both adversarial generated-cell tests pass and assert bounded waits, selector closure, kill fallback, and reap.
+- Remote-attestation TDD RED: the validator accepted drifted external evidence. GREEN: one adversarial test rejects wrong slug, pushed v2, public metadata, non-COMPLETE status, invalid `lastRunTime` ordering, and a semantically different pulled notebook.
+- Full raw remote evidence is SHA-256 bound in `remote/capture_manifest.json`: push receipt, status output, list CSV, pulled metadata, and pulled notebook. Known Kaggle CLI warning/blank lines are tolerated only around exactly one success/status/CSV record.
+- Exact remote facts: pushed version 3; private `true`; status `COMPLETE`; remote `lastRunTime=2026-07-29T01:28:46.683000Z`; completion observed `2026-07-29T01:31:29.760778Z`.
+- Kaggle rewrote notebook cell `source` arrays as strings on pull. Raw hashes differ, but after only that representation normalization the pulled notebook is JSON-identical to the pushed package.
 
 ## Package and provenance
 
-- Private kernel version: 2 (`COMPLETE`; latest run UTC `2026-07-29T00:36:10.427Z`).
-- Generated notebook SHA-256: `9ec24174ca48838e3215f8c159eb4db5bdf1884bf5c13902fa27f98e6d1e0c6f`.
+- Private kernel version: 3 (`COMPLETE`; remote last run UTC `2026-07-29T01:28:46.683000Z`).
+- Generated/pushed notebook: 85,360 bytes, SHA-256 `f817a7be1a848918b685e9cb23a0b6c3d5508eeb498c178a1fa7ca08c151fd7a`.
 - Kernel metadata SHA-256: `b9a22006ac26a28127cf0f1f1c162acf41350369ac0159bc0ffc5def97b9bc32`.
+- Pulled notebook: 80,030 bytes, SHA-256 `4f7562f59ecc66355a9c885c3095de1921735072309a64a047298433d0175753`; semantic equality after source-array normalization passed.
+- Pulled metadata SHA-256: `ca9203096b537f8969c7cfa1d1c8cbbc13f1e0a639b17cf9f1dd6af05536184c`.
+- Raw push receipt SHA-256: `350210f15d60f73c345bce5736b0eeaf65876646e5118db241b2fd655db1af1f`.
+- Raw COMPLETE status SHA-256: `7f8321806701934d01dec5f3deaaa76fba5709b882ebb4d9ff3c982254f3195a`.
+- Raw list CSV SHA-256: `bbfa98519960931958b88d86a2f757be956b68ba29021dd6cef14d6fe0966295`.
 - Public base `origin/main`: `6f95bd6bdb32b5f6ef7cca32b96967bce6036503`.
 - Reviewed source commit: `6830401ed2086921d2563c2bc3c11faf6c5a0741`.
 - Embedded/overlaid `production_runner.cu`: 242,054 bytes, SHA-256 `f7d20a2fdec5748052b09804a2b2878cb13f854b8dd29e05db92d6828c223774`.
 - CUTLASS checkout: `afa1772203677c5118fcd82537a9c8fefbcc7008`.
-- Release SM75 binary: 6,100,856 bytes, SHA-256 `c86919b8994ef38f735e6b6159c68198530767bf42a22d17d9bd907c30d6a0ac`.
+- Release SM75 binary: 6,100,856 bytes, SHA-256 `8dd39f5539fbf88f1d47128834f16e3d66760ef7ce74047758d4d6579b57d53e`.
 - Build attestation: `Release`, CUDA architecture `75`, NCCL dynamically linked.
-- Build times: base clone 4.146392 s, CUTLASS clone 2.871753 s, configure 4.507312 s, compile 64.314610 s.
-- Raw build log SHA-256: `4bbf3ab10ca642cc5ea18833feb2f829f04a2ec929bef52d257c43cd892bf334`.
-- Raw source manifest SHA-256: `9264cee58c071e83ab9bf30cb451516ecad86d44571ac3575013ec3f154fa9f2`.
-- Raw gate summary SHA-256: `43903d4fa0e6f8fff7eb7da881207c537ffdcd16b1423dc8f3a1dd54f878afa7`.
+- Build times: base clone 4.433524 s, CUTLASS clone 2.745559 s, configure 4.440432 s, compile 67.783181 s.
+- Raw build log SHA-256: `822d7688f302b6042654123c93d3053fd03fec4fa821c5db43f86b8cd6ea442e`.
+- Raw source manifest SHA-256: `36eda978eba823880abd75a39b4e90775f6b6710fac6d4c9a8bf70358c6d20f7`.
+- Raw gate summary SHA-256: `37554994172f765319502eb9bff318d525cfa7ad4b5aae7d7260a6d601a2c551`.
 
 ## Hardware, model, and exact run contract
 
@@ -38,16 +51,16 @@ Version 1 was a diagnostic-only run. Kaggle normalized the title to a slug conta
 
 | Run | Wall time | Return codes | Peak process-tree RSS | RSS samples | Rank logs | Completion |
 | --- | ---: | --- | ---: | ---: | --- | --- |
-| first | 6.498522 s | torchrun 0; ranks 0/0 | 1,560,637,440 B | 556 total; 512 retained | stdout/stderr for ranks 0 and 1 | normal |
-| collect A | 4.521576 s | torchrun 0; ranks 0/0 | 1,564,635,136 B | 235 total/retained | stdout/stderr for ranks 0 and 1 | `capacity_reached` |
-| collect B | 4.463731 s | torchrun 0; ranks 0/0 | 1,564,192,768 B | 199 total/retained | stdout/stderr for ranks 0 and 1 | `capacity_reached` |
+| first | 6.529306 s | torchrun 0; ranks 0/0 | 1,565,368,320 B | 491 total/retained | stdout/stderr for ranks 0 and 1 | normal |
+| collect A | 4.720228 s | torchrun 0; ranks 0/0 | 1,564,393,472 B | 203 total/retained | stdout/stderr for ranks 0 and 1 | `capacity_reached` |
+| collect B | 4.741107 s | torchrun 0; ranks 0/0 | 1,567,088,640 B | 174 total/retained | stdout/stderr for ranks 0 and 1 | `capacity_reached` |
 
-All before/after GPU snapshots contained exactly two Tesla T4 devices. The bounded combined logs were 719, 3,850, and 3,850 bytes. There was no overflow, OOM, timeout, collective hang, fatal runtime marker, traceback, or exception.
+All before/after GPU snapshots contained exactly two Tesla T4 devices. The bounded combined logs were 720, 3,850, and 3,850 bytes. There was no overflow, OOM, timeout, collective hang, fatal runtime marker, traceback, or exception.
 
 The real first-mode release record was:
 
 ```text
-[default0]:puzzle_solved=1 puzzle_id=1 seconds=0.108281 solution_length=1 found_depth=1 touch_depth=0 solution=BR
+[default0]:puzzle_solved=1 puzzle_id=1 seconds=0.095335 solution_length=1 found_depth=1 touch_depth=0 solution=BR
 ```
 
 The independent local replay against checked-in `data/test.csv` and `data/puzzle_info.json` confirms `BR` solves puzzle 1. Its token count is 1 and its depth decomposition is exactly `1 = 1 + 0`.
@@ -64,17 +77,18 @@ Each emitted 16 distinct, independently replayed valid paths. The two raw TSV fi
 
 ## Independent verification
 
-- `python -m pytest tests/test_build_kaggle_cayleypy_task5_gate.py -q` -> `6 passed`.
-- `python -m pytest -q` -> `134 passed`.
+- `python -m pytest tests/test_build_kaggle_cayleypy_task5_gate.py -q` -> `9 passed`.
+- `python -m pytest -q` -> `137 passed`.
 - Generated code-cell AST parsing, payload decompression, byte count, source SHA, private metadata, and package scan passed before push.
-- `validate_gate_output(test_results/kaggle_cayleypy_task5_2xt4_gate_v2_2026-07-29)` -> `status=ok` with source, binary, and collection hashes above.
+- `validate_gate_output(test_results/kaggle_cayleypy_task5_2xt4_gate_v3_2026-07-29)` -> `status=ok` with source, binary, collection, external remote, and pulled-notebook attestations above.
 - A negative regression changes a remotely claimed CPU-valid path from `BR` to invalid `U`; the independent validator rejects it as CPU-invalid.
-- A second explicit scan found no Windows private paths, feature-branch name, checkpoint source path, user name, credential prefix, API key, or authorization bearer field in the accepted evidence.
+- A second explicit scan found no Windows private paths, feature-branch name, checkpoint source path, credential prefix, API key, or authorization bearer field in the accepted evidence; only the expected Kaggle ref/title/author metadata remains.
 - Rank-0 failure injection remains `source-test-only-no-safe-runtime-hook`; no runtime hook or C++ algorithm was added.
 
 ## Evidence locations
 
-- Accepted raw version-2 output: `test_results/kaggle_cayleypy_task5_2xt4_gate_v2_2026-07-29/`.
+- Accepted raw version-3 output and sanitized remote evidence: `test_results/kaggle_cayleypy_task5_2xt4_gate_v3_2026-07-29/`.
+- Superseded green version-2 output: `test_results/kaggle_cayleypy_task5_2xt4_gate_v2_2026-07-29/`.
 - Excluded version-1 diagnostic output: `test_results/kaggle_cayleypy_task5_2xt4_gate_v1_diagnostic_2026-07-29/`.
 - Generated private package: `kaggle_cayleypy_task5_gate/`.
 - Builder and independent validator: `tools/build_kaggle_cayleypy_task5_gate.py`.

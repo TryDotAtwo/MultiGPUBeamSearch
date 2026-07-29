@@ -1,0 +1,20 @@
+{
+  "base_git_rev": "6f95bd6bdb32b5f6ef7cca32b96967bce6036503",
+  "base_production_runner_sha256": "4b6c1f5d1bf9b21479ed7f1f8786612a29daa036357a7f3133a739a13f2287c8",
+  "binary_bytes": 6100856,
+  "binary_sha256": "8dd39f5539fbf88f1d47128834f16e3d66760ef7ce74047758d4d6579b57d53e",
+  "build_type": "Release",
+  "cuda_architectures": "75",
+  "cutlass_git_rev": "afa1772203677c5118fcd82537a9c8fefbcc7008",
+  "kernel_slug": "trydotatwo/cayleypy-public-task-5-2xt4-gate",
+  "nccl_linked": true,
+  "production_runner_bytes": 242054,
+  "production_runner_sha256": "f7d20a2fdec5748052b09804a2b2878cb13f854b8dd29e05db92d6828c223774",
+  "reviewed_commit": "6830401ed2086921d2563c2bc3c11faf6c5a0741",
+  "timings_sec": {
+    "base_clone": 4.433523832999981,
+    "compile": 67.783181033,
+    "configure": 4.440432428999998,
+    "cutlass_clone": 2.745559141000058
+  }
+}
