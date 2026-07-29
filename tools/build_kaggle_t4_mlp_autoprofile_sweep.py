@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -10,9 +11,12 @@ from typing import Any
 
 OUT_DIR = Path("kaggle_t4_mlp_autoprofile_sweep")
 OUT_NOTEBOOK = OUT_DIR / "t4-mlp-autoprofile-sweep.ipynb"
+PROFILE_REGISTRY_PATH = Path("configs/kaggle_t4_mlp_profiles.json")
 
 
 CONFIG_CELL = r'''
+import hashlib
+import json
 from pathlib import Path
 
 # Fixed real-hardware sweep contract.
@@ -24,14 +28,9 @@ SHARD_CANDIDATES_BY_POWER = {
     19: (4, 8), 20: (4, 8), 21: (4, 8),
     22: (8, 16), 23: (8, 16),
     24: (16, 32), 25: (32, 64),
-}# v5 focused completion sweep: v4 already measured every other anchor.
-FOCUSED_TARGETS = {
-    "output1": {19: (2, 16)},
-    "output_move_count": {
-        16: (2, 4), 17: (2, 4), 18: (2, 4),
-        19: (4, 8), 20: (4, 8), 21: (4, 8),
-    },
 }
+# v6 never repeats an anchor already backed by a valid depth-8 record. The
+# embedded canonical v4/v5 evidence supplies the seed; only gaps are run.
 TORCHRUN_NNODES = 1
 TORCHRUN_NPROC_PER_NODE = 2
 TORCHRUN_NODE_RANK = 0
@@ -429,10 +428,33 @@ def run_attempt(model_class, beam_power, runtime, phase, ordinal):
 
 
 SWEEP_CELL = r'''
+canonical_registry_bytes = CANONICAL_PROFILE_REGISTRY_JSON.encode("utf-8")
+actual_registry_sha256 = hashlib.sha256(canonical_registry_bytes).hexdigest()
+if actual_registry_sha256 != CANONICAL_PROFILE_REGISTRY_SHA256:
+    raise RuntimeError("embedded canonical profile registry SHA256 mismatch")
+canonical_payload = json.loads(CANONICAL_PROFILE_REGISTRY_JSON)
+if canonical_payload.get("hardware") != "kaggle_2xt4":
+    raise RuntimeError(f"unexpected canonical hardware: {canonical_payload.get('hardware')!r}")
+canonical_profiles = canonical_payload.get("profiles", {})
+if set(canonical_profiles) != set(OUTPUT_CLASSES):
+    raise RuntimeError("canonical profile model classes mismatch")
+expected_anchor_keys = {str(power) for power in BEAM_POWERS}
+for model_class in OUTPUT_CLASSES:
+    if set(canonical_profiles[model_class]) != expected_anchor_keys:
+        raise RuntimeError(f"canonical profile anchors mismatch for {model_class}")
+missing_targets = {}
+for model_class in OUTPUT_CLASSES:
+    model_profiles = canonical_profiles.get(model_class, {})
+    for beam_power in BEAM_POWERS:
+        profile = model_profiles.get(str(beam_power), {})
+        evidence, runtime = profile.get("evidence"), profile.get("runtime")
+        if not (profile.get("validation_status") == "measured" and isinstance(runtime, dict) and isinstance(evidence, dict) and evidence.get("depth") == 8 and isinstance(evidence.get("depth_sec"), (int, float)) and evidence["depth_sec"] > 0 and isinstance(evidence.get("kernel_version"), int) and evidence["kernel_version"] >= 1):
+            missing_targets.setdefault(model_class, []).append(beam_power)
+
 attempts = []
-# Complete only the seven anchors left unmeasured by v4.
-for model_class, powers in FOCUSED_TARGETS.items():
-    for beam_power, shard_candidates in powers.items():
+for model_class, powers in missing_targets.items():
+    for beam_power in powers:
+        shard_candidates = SHARD_CANDIDATES_BY_POWER[beam_power]
         for ordinal, shard_count in enumerate(shard_candidates):
             try:
                 attempts.append(run_attempt(model_class, beam_power, runtime_seed(model_class, shard_count), phase="depth8", ordinal=ordinal))
@@ -469,17 +491,17 @@ with attempts_csv.open("w", newline="", encoding="utf-8") as handle:
         serialized["depth_timings"] = json.dumps(serialized.get("depth_timings"))
         writer.writerow(serialized)
 
-selected = {"schema_version": 1, "hardware": "kaggle_2xt4",
-            "selection_metric": "depth_done=8 depth_sec",
-            "profiles": {"output1": {}, "output_move_count": {}}}
+selected = {
+    "schema_version": 1,
+    "hardware": "kaggle_2xt4",
+    "selection_metric": "depth_done=8 depth_sec",
+    "profile_source": "canonical_v4_v5_seed_plus_new_depth8_attempts",
+    "profiles": {model_class: dict(canonical_profiles[model_class]) for model_class in OUTPUT_CLASSES},
+}
 for model_class in OUTPUT_CLASSES:
     for beam_power in BEAM_POWERS:
         rows = successful_rows(model_class, beam_power)
         if not rows:
-            selected["profiles"][model_class][str(beam_power)] = {
-                "validation_status": "unvalidated",
-                "reason": "no successful row completed depth 8",
-            }
             continue
         winner = min(rows, key=lambda row: row["steady_state_sec"])
         runtime = {key: winner[key] for key in (
@@ -504,6 +526,9 @@ summary = {
     "hardware": gpu_rows,
     "torchrun_world_size": TORCHRUN_NNODES * TORCHRUN_NPROC_PER_NODE,
     "selection_depth": 8, "attempt_count": len(attempts),
+    "missing_anchor_count": sum(len(powers) for powers in missing_targets.values()),
+    "sweep_status": "no_missing_anchors" if not missing_targets else "completed_missing_anchor_sweep",
+    "canonical_profile_source": f"embedded_sha256:{CANONICAL_PROFILE_REGISTRY_SHA256}",
     "successful_count": sum(row.get("status") == "ok" for row in attempts),
     "failed_count": sum(row.get("status") != "ok" for row in attempts),
     "repository_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_DIR, text=True).strip(),
@@ -528,9 +553,24 @@ def build_notebook(out_dir: Path = OUT_DIR) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     notebook_path = out_dir / OUT_NOTEBOOK.name
     metadata_path = out_dir / "kernel-metadata.json"
+    registry_text = PROFILE_REGISTRY_PATH.read_text(encoding="utf-8")
+    registry_payload = json.loads(registry_text)
+    if registry_payload.get("hardware") != "kaggle_2xt4":
+        raise ValueError("profile registry hardware must be kaggle_2xt4")
+    registry_profiles = registry_payload.get("profiles", {})
+    if set(registry_profiles) != {"output1", "output_move_count"}:
+        raise ValueError("profile registry must contain exactly both model classes")
+    expected_anchor_keys = {str(power) for power in range(16, 26)}
+    for model_class in ("output1", "output_move_count"):
+        if set(registry_profiles[model_class]) != expected_anchor_keys:
+            raise ValueError(f"profile registry anchors mismatch for {model_class}")
+    registry_sha256 = hashlib.sha256(registry_text.encode("utf-8")).hexdigest()
+    config_source = CONFIG_CELL.rstrip() + "\n"
+    config_source += f"CANONICAL_PROFILE_REGISTRY_JSON = {registry_text!r}\n"
+    config_source += f"CANONICAL_PROFILE_REGISTRY_SHA256 = {registry_sha256!r}\n"
     notebook = {
         "cells": [
-            _code_cell(CONFIG_CELL, "config"),
+            _code_cell(config_source, "config"),
             _code_cell(SETUP_CELL, "setup"),
             _code_cell(RUNNER_CELL, "runner"),
             _code_cell(SWEEP_CELL, "sweep"),

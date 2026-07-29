@@ -759,3 +759,18 @@
 - Universal private Kaggle MLP acceptance v2 completed on two Tesla T4 GPUs using the repository-exported output_dim=24 model, puzzle 0, requested/effective beam 2**21, and max depth 100. Both rank logs contain 56 completed depths; rank 0 found and the notebook independently validated a length-57 solution at solved depth 57 in 162.181s using measured p21 profile sh8/B_MICRO=2048. Both required output_dim=1 and output_dim=24 acceptance runs are now complete.
 
 - Polished the universal Megaminx 2xT4 notebook for other users: the header now has a Quick start, exact supported architecture/output contract, explicit checkpoint attachment instructions, nearest-profile/alignment behavior, and artifact descriptions. Added contract tests for these user-facing sections; runtime and solver algorithms are unchanged.
+
+- Made the private Kaggle 2xT4 MLP autoprofile v6 sweep seed its output from
+  the canonical measured v4/v5 registry and schedule only anchors that fail a
+  strict depth-8 evidence check. With all 20 anchors currently validated, v6
+  preflight expected `no_missing_anchors`; however the pushed v6 package was
+  stale and reran 14 old focused attempts. Corrected v7 generation now embeds
+  the exact 20-anchor registry plus SHA256, validates both heads and p16..p25
+  at runtime, and content-gates the regenerated `.ipynb` before private push.
+  v6 is not accepted as the no-op validation, and no v6 timings replace v4/v5.
+  CUDA/C++ and beam-search algorithms remain unchanged.
+
+- Private Kaggle autoprofile v7 completed on two Tesla T4 GPUs and accepted the
+  embedded canonical registry: zero missing anchors, zero attempts,
+  `no_missing_anchors`, and 20/20 measured profiles retained. The v7 run is a
+  registry/package validation only; timing provenance remains versions 4/5.

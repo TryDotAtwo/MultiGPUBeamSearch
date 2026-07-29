@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 from pathlib import Path
 
@@ -45,10 +46,36 @@ def test_builder_emits_private_two_t4_notebook(tmp_path: Path) -> None:
     assert "BEAM_STREAM3_BATCH_CANDIDATES" in source
     assert "RANK_PREFIX_RE" in source
     assert "DEPTH_RE.finditer" in source
-    assert '"output1": {19: (2, 16)}' in source
-    assert '"output_move_count": {' in source
-    assert "16: (2, 4)" in source
+    assert "CANONICAL_PROFILE_REGISTRY_JSON" in source
+    assert "CANONICAL_PROFILE_REGISTRY_SHA256" in source
+    assert "actual_registry_sha256" in source
+    assert "expected_anchor_keys" in source
+    assert "missing_targets" in source
+    assert "no_missing_anchors" in source
+    assert "canonical_v4_v5_seed_plus_new_depth8_attempts" in source
+    assert "kernel_version" in source
     assert '"stream3_batch_candidates": 196608' in source
+
+def test_generated_notebook_embeds_exact_twenty_anchor_registry(tmp_path: Path) -> None:
+    notebook_path, _ = build_notebook(tmp_path / OUT_DIR.name)
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    config_source = "".join(notebook["cells"][0]["source"])
+    sweep_source = "".join(notebook["cells"][3]["source"])
+
+    namespace: dict[str, object] = {}
+    exec(config_source, namespace)
+    registry_text = namespace["CANONICAL_PROFILE_REGISTRY_JSON"]
+    registry_sha256 = namespace["CANONICAL_PROFILE_REGISTRY_SHA256"]
+    assert isinstance(registry_text, str)
+    assert hashlib.sha256(registry_text.encode("utf-8")).hexdigest() == registry_sha256
+
+    registry = json.loads(registry_text)
+    assert set(registry["profiles"]) == {"output1", "output_move_count"}
+    assert sum(len(rows) for rows in registry["profiles"].values()) == 20
+    assert all(row["validation_status"] == "measured"
+               for rows in registry["profiles"].values() for row in rows.values())
+    assert "REPO_DIR / CANONICAL" not in sweep_source
+
 
 
 def test_generated_code_cells_parse(tmp_path: Path) -> None:

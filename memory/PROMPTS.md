@@ -418,3 +418,7 @@
 
 - User requested a public standard-CayleyPy Kaggle notebook for real 2xT4 MultiGPUBeamSearch. It must accept the standard puzzle_info.json/test.csv/sample_submission.csv structure, one supported checkpoint with automatic batchnorm-folded or resmlp-layernorm detection and automatic fp16 on T4, output_dim exactly 1 or move_count, inclusive puzzle range, reflection modes off/after_original/only, first or bounded collect-until-depth solution modes, configurable solved-neighborhood BFS touch radius, nearest measured beam profile selection, independent path validation, and maximal reproducibility artifacts.
 - User requested automatic best-effort result publication without a user GitHub token through a Cloudflare service backed by a GitHub App. It must support at least 100 concurrent publishers without loss or git conflicts, retain author/puzzle/model/run provenance, preserve accepted raw payloads, validate paths, deduplicate idempotently, and publish append-only records to TryDotAtwo/cayleypy-beam-results through a staging/CI gate.
+
+- User authorized a next efficient private depth-8 2xT4 autoprofile sweep only
+  for genuinely missing anchors, explicitly requiring reuse of sufficient
+  measurements, fail-fast evidence capture, exact requested beam aside from
