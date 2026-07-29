@@ -42,7 +42,7 @@ PHASES = {
         },
         "schema_summary": "Tests  12 passed (12)",
         "worker_summary": "Tests  70 passed (70)",
-        "compare_current": True,
+        "compare_current": False,
     },
 }
 CONTROL_FILES = (

@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, test } from "vitest";
 
 import { canonicalJson, computeIdempotency } from "../src/ids.js";

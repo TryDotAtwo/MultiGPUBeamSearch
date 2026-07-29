@@ -1,0 +1,165 @@
+{
+    "schema_version":  1,
+    "kernel_ref":  "trydotatwo/cayleypy-results-ingest-npm-gate",
+    "kernel_version":  26,
+    "phase":  "diagnostic-red",
+    "pull_provenance":  "stale source pull after the next push; excluded from v26 run identity",
+    "push_observed_utc":  "2026-07-29T11:30:36.7175189Z",
+    "terminal_status":  "KernelWorkerStatus.COMPLETE",
+    "status_captured_utc":  "2026-07-29T11:33:48.9851930Z",
+    "pull_captured_utc":  "2026-07-29T11:54:21.2735141Z",
+    "evidence_policy":  "list-free; no identity-bearing kernel list capture",
+    "semantic_validation":  {
+                                "all_commands_passed":  false,
+                                "schema":  "12 passed, 12 total",
+                                "worker_pool":  "startup configuration failure",
+                                "explicit_worker_pool":  "startup configuration failure",
+                                "typecheck_exit_code":  2,
+                                "payload_files":  18,
+                                "post_install_payload_mismatches":  1,
+                                "pulled_notebook_payload_matches_run":  false,
+                                "pulled_notebook_payload_mismatches":  3,
+                                "registry_versions_exact":  false,
+                                "compatibility_warning_hits":  0
+                            },
+    "files":  [
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/push_receipt.txt",
+                      "bytes":  556,
+                      "sha256":  "236b71526456cb0e86fc43b07c7db23cc49bc4fcbbc58b0d7e4df4a5f840977a",
+                      "last_write_utc":  "2026-07-29T11:30:42.0511979Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/push_observed_utc.txt",
+                      "bytes":  62,
+                      "sha256":  "f3c43832409a94c9c2445a11f6e1d9cd09e574a259a05fa8bab23d0e35b818a6",
+                      "last_write_utc":  "2026-07-29T11:30:42.1270556Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/status_receipt.txt",
+                      "bytes":  452,
+                      "sha256":  "6d1304b4caa8a1a5165a7c3d31a5a9fadaea1aef73be8e9d941570f234a83a75",
+                      "last_write_utc":  "2026-07-29T11:33:50.3280648Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/status_observed_utc.txt",
+                      "bytes":  33,
+                      "sha256":  "634c82505c9ecbe7874ac9677312e78650a473400d3a847303fd73133acd47b2",
+                      "last_write_utc":  "2026-07-29T11:33:49.0224857Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/output_receipt.txt",
+                      "bytes":  5954,
+                      "sha256":  "adf6d8950db59ff001199fd976406931333db64686070e4e6fa0598b8e13eea0",
+                      "last_write_utc":  "2026-07-29T11:34:18.0427052Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/pull_receipt.txt",
+                      "bytes":  512,
+                      "sha256":  "bdefbfa040ac879a4d2f54dba59b6b9c9675f5c63ed8a80d3d1f7c1f2685f57a",
+                      "last_write_utc":  "2026-07-29T11:54:21.2735141Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/pull/kernel-metadata.json",
+                      "bytes":  616,
+                      "sha256":  "572d93ed4dd74d3aeabba1951ab4e098cbf6d217219c5b9edddab17bdbb35ae0",
+                      "last_write_utc":  "2026-07-29T11:54:21.2534677Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/pull/cayleypy-results-ingest-npm-gate.ipynb",
+                      "bytes":  94816,
+                      "sha256":  "b0233f93da8847d81cc52a5ef2613b28f2465454273abe40685eae88f9c90394",
+                      "last_write_utc":  "2026-07-29T11:54:21.2534677Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/node-bootstrap.json",
+                      "bytes":  155,
+                      "sha256":  "b72b008d2d073ebe8b9a3baa752cc0b52f4568ab2cf614a46ec89525fdadb104",
+                      "last_write_utc":  "2026-07-29T11:33:55.4108409Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/node-version.log",
+                      "bytes":  9,
+                      "sha256":  "b8139b18707113247bd3eba5bff8ee50ed8f6bfd5076113805af4e414abfdf23",
+                      "last_write_utc":  "2026-07-29T11:33:56.2966299Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/npm-version.log",
+                      "bytes":  7,
+                      "sha256":  "7eeb2f42ee0d10d4e00355252af2e7468bbff992af43b511355feb76da5c7cfb",
+                      "last_write_utc":  "2026-07-29T11:34:07.5502719Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/gate-assertions.log",
+                      "bytes":  250,
+                      "sha256":  "bb8bd8164bc34d6493be068c3c639f1df2790891fdc0740224dec009cb02dc1c",
+                      "last_write_utc":  "2026-07-29T11:33:53.0252341Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/npm-gate-results.json",
+                      "bytes":  9241,
+                      "sha256":  "b0dbc5ea2a153dca314b11b87d6d8ceffaa50ae4ba49a70d94dbf9335424d244",
+                      "last_write_utc":  "2026-07-29T11:33:59.6087690Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/payload-sha256.json",
+                      "bytes":  2236,
+                      "sha256":  "2a5cffd6f90fefb68d132db4879a134533b4d2732dcfd077b4bac1e765dee45d",
+                      "last_write_utc":  "2026-07-29T11:34:14.8236214Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/post-install-payload-sha256.json",
+                      "bytes":  2236,
+                      "sha256":  "2e682b879fdb3b02621ee40f2361137f251038eb458a0c86e94cb7eec5516cc8",
+                      "last_write_utc":  "2026-07-29T11:34:15.6509199Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/registry-metadata.json",
+                      "bytes":  3336,
+                      "sha256":  "5462c13611a74dbe70b1886b4ac197c5652fd260db55d95981f6a0f7888a1847",
+                      "last_write_utc":  "2026-07-29T11:34:16.5727436Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/resolved-stack.json",
+                      "bytes":  605,
+                      "sha256":  "808cc13d5c2bff04dc09bf8755b77b11142db3b0f1addadd643018f38e92dfd7",
+                      "last_write_utc":  "2026-07-29T11:34:18.0134001Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/compatibility-warning-scan.json",
+                      "bytes":  240,
+                      "sha256":  "54f2f50b739fea2d8fc93c927c2bc2a29bb4a9520d2881d6d6ce7e396bbe137b",
+                      "last_write_utc":  "2026-07-29T11:33:51.3042399Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/npm-ls-critical.log",
+                      "bytes":  1971,
+                      "sha256":  "538af8c7ab1550e45649df48fe30b73fd7d2b2a03cb6f03cd2ee13b278c96d46",
+                      "last_write_utc":  "2026-07-29T11:34:02.5844534Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/npm-test.log",
+                      "bytes":  4382,
+                      "sha256":  "70c17f02083b9a8b21d147f576645a79238d59da9a479c6ed466b3cc760557aa",
+                      "last_write_utc":  "2026-07-29T11:34:04.2288673Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/npm-test-worker.log",
+                      "bytes":  3776,
+                      "sha256":  "0ab13b330b89cfd7126b3e17e8b05d3c82acfb3999d759f152aa352df482007e",
+                      "last_write_utc":  "2026-07-29T11:34:03.3722508Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/npm-typecheck.log",
+                      "bytes":  983,
+                      "sha256":  "6dd82f50c3fe14f9278952ab305b65676f039d51c39b6e45412866d4abd0e155",
+                      "last_write_utc":  "2026-07-29T11:34:06.4936073Z"
+                  },
+                  {
+                      "path":  "test_results/kaggle_cayleypy_results_ingest_npm_gate/outputs_v26_probe/npm-ci.log",
+                      "bytes":  25,
+                      "sha256":  "70cd109eb5f4a2309dfcee528c2c0c36ed5c93176e6874cf95333428588d0b91",
+                      "last_write_utc":  "2026-07-29T11:33:58.7695089Z"
+                  }
+              ]
+}

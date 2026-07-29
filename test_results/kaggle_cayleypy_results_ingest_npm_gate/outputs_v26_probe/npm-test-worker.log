@@ -1,0 +1,32 @@
+failed to load config from /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/vitest.config.ts
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Startup Error [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯⎯[39m
+Error: Build failed with 1 error:
+
+[plugin externalize-deps]
+Error: Missing "./config" specifier in "@cloudflare/vitest-pool-workers" package
+    at e (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:3836:8)
+    at n$1 (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:3848:14)
+    at o (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:3876:10)
+    at resolveExportsOrImports (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:32436:45)
+    at resolveDeepImport (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:32450:22)
+    at tryNodeResolve (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:32317:70)
+    at nodeResolveWithVite (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:32526:9)
+    at PluginContextImpl.handler (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:36082:18)
+    at plugin (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/rolldown/dist/shared/bindingify-input-options-XPJLJOD0.mjs:1418:30)
+    at plugin.<computed> (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/rolldown/dist/shared/bindingify-input-options-XPJLJOD0.mjs:1959:18)
+    at aggregateBindingErrorsIntoJsError (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/rolldown/dist/shared/error-BHRSI0R7.mjs:48:18)
+    at unwrapBindingResult (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/rolldown/dist/shared/error-BHRSI0R7.mjs:18:128)
+    at #build (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/rolldown/dist/shared/rolldown-build-CtPvmZgJ.mjs:3276:34)
+    at async bundleConfigFile (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:36132:17)
+    at async bundleAndLoadConfigFile (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:36040:18)
+    at async loadConfigFromFile (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:36001:42)
+    at async resolveConfig (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:35617:22)
+    at async _createServer (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vite/dist/node/chunks/node.js:25777:65)
+    at async createViteServer (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vitest/dist/chunks/cli-api.BK8pd4xc.js:8835:17)
+    at async createVitest (file:///kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest/node_modules/vitest/dist/chunks/cli-api.BK8pd4xc.js:14221:18) {
+  errors: [Getter/Setter]
+}
+
+
+

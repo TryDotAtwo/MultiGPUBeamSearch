@@ -1,7 +1,7 @@
 {
   "name": "cayleypy-results-ingest",
   "main": "src/worker.ts",
-  "compatibility_date": "2025-07-12",
+  "compatibility_date": "2026-07-28",
   "triggers": { "crons": ["*/1 * * * *"] },
   "vars": { "REPO_OWNER": "TryDotAtwo", "REPO_NAME": "cayleypy-beam-results", "STAGING_BRANCH": "ingest/staging" },
   "d1_databases": [{ "binding": "RESULTS_DB", "database_name": "cayleypy-results-staging" }],

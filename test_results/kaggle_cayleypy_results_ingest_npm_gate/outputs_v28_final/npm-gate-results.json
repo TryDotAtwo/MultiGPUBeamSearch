@@ -1,0 +1,257 @@
+{
+  "all_commands_passed": false,
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "--version"
+      ],
+      "exit_code": 0,
+      "label": "node-version"
+    },
+    {
+      "argv": [
+        "npm",
+        "--version"
+      ],
+      "exit_code": 0,
+      "label": "npm-version"
+    },
+    {
+      "argv": [
+        "npm",
+        "view",
+        "@cloudflare/vitest-pool-workers@0.19.0",
+        "version",
+        "dist-tags",
+        "dependencies",
+        "peerDependencies",
+        "engines",
+        "dist.integrity",
+        "--json"
+      ],
+      "exit_code": 0,
+      "label": "npm-view-vitest-pool"
+    },
+    {
+      "argv": [
+        "npm",
+        "view",
+        "wrangler@4.115.0",
+        "version",
+        "dist-tags",
+        "dependencies",
+        "engines",
+        "dist.integrity",
+        "--json"
+      ],
+      "exit_code": 0,
+      "label": "npm-view-wrangler"
+    },
+    {
+      "argv": [
+        "npm",
+        "view",
+        "@cloudflare/workers-types@5.20260729.1",
+        "version",
+        "dist-tags",
+        "dependencies",
+        "engines",
+        "dist.integrity",
+        "--json"
+      ],
+      "exit_code": 0,
+      "label": "npm-view-workers-types"
+    },
+    {
+      "argv": [
+        "npm",
+        "view",
+        "vitest@4.1.10",
+        "version",
+        "dist-tags",
+        "dependencies",
+        "peerDependencies",
+        "engines",
+        "dist.integrity",
+        "--json"
+      ],
+      "exit_code": 0,
+      "label": "npm-view-vitest"
+    },
+    {
+      "argv": [
+        "npm",
+        "view",
+        "workerd@1.20260729.1",
+        "version",
+        "dist-tags",
+        "dependencies",
+        "engines",
+        "dist.integrity",
+        "--json"
+      ],
+      "exit_code": 0,
+      "label": "npm-view-workerd"
+    },
+    {
+      "argv": [
+        "npm",
+        "install",
+        "--package-lock-only",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit_code": 0,
+      "label": "npm-install-package-lock-only"
+    },
+    {
+      "argv": [
+        "npm",
+        "ci",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit_code": 0,
+      "label": "npm-ci"
+    },
+    {
+      "argv": [
+        "npm",
+        "ls",
+        "@cloudflare/vitest-pool-workers",
+        "@cloudflare/workers-types",
+        "vitest",
+        "wrangler",
+        "miniflare",
+        "workerd",
+        "--json"
+      ],
+      "exit_code": 0,
+      "label": "npm-ls-critical"
+    },
+    {
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "exit_code": 0,
+      "label": "npm-test"
+    },
+    {
+      "argv": [
+        "npm",
+        "exec",
+        "--",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.config.ts"
+      ],
+      "exit_code": 0,
+      "label": "npm-test-worker"
+    },
+    {
+      "argv": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 2,
+      "label": "npm-typecheck"
+    },
+    {
+      "argv": [],
+      "exit_code": 1,
+      "label": "gate-assertions"
+    }
+  ],
+  "compatibility_warning_scan": {
+    "compatibility_date": "2026-07-28",
+    "hits": [],
+    "markers": [
+      "newer than the latest supported date",
+      "falling back to",
+      "unsupported compatibility date",
+      "does not support compatibility date"
+    ],
+    "passed": true
+  },
+  "gate_assertions": {
+    "compatibility_warning_scan_clean": true,
+    "lockfile_present": true,
+    "post_install_payload_exact": true,
+    "prior_commands_passed": false,
+    "registry_versions_exact": true,
+    "resolved_stack_exact": true,
+    "workerd_override_exact": true
+  },
+  "lockfile_present": true,
+  "payload_sha256": {
+    "configs/cayleypy_results_schema_v1.json": "5dc4888c70836229e0fb31508cf967082a186e472091d58826450368c2a9f126",
+    "services/cayleypy-results-ingest/migrations/0001_initial.sql": "8c3fe6fdc4381e123a901593962194f90aae7bfc484e6a6f5685195d05cb0ba6",
+    "services/cayleypy-results-ingest/migrations/0002_ingest_rate_limits.sql": "803e8b3af0dc4e1af2ddd32301a14fdba9d543cf9d5512a934f2d581f85e28f4",
+    "services/cayleypy-results-ingest/package-lock.json": "bf087c2dad9320ebb0091990eacded9dd751e4d3b3eb8f1c1ad8c99b12f571e3",
+    "services/cayleypy-results-ingest/package.json": "80e59683dc86dbeb7d12fb1200da52a1bfd40573c084acee55b41e61fb816929",
+    "services/cayleypy-results-ingest/src/db.ts": "d46481ee7eb8a7d2cbc3673f305566b31b6605eb4c6cae1d7547cfbec72a6609",
+    "services/cayleypy-results-ingest/src/ids.ts": "beec2434b4d4c96eaf7aeef3258f938f2e1ca6c123389096987365ff8e6727a6",
+    "services/cayleypy-results-ingest/src/schema.ts": "5b2d0cdc1736bb5af720624d6f069567975d06991821e6a22776eacc3199126f",
+    "services/cayleypy-results-ingest/src/storage.ts": "929a71468e5f5773e1c6aad8416360a93e46213b5f715819dd8bdd9fc9338c8b",
+    "services/cayleypy-results-ingest/src/worker.ts": "f45a1fb11fb80c93a872e20645faa3c7e822075b640347b64f3be8a93259dc11",
+    "services/cayleypy-results-ingest/test/apply-migrations.ts": "29e5ad77aced3a506683d6c9a76e6c13666d3f9b35c8c5b722151e417032496a",
+    "services/cayleypy-results-ingest/test/receipt.test.ts": "6841682dbb4d7e03760e6331eca5c614c2c92f9047239bcdb49cf89bfe0efc72",
+    "services/cayleypy-results-ingest/test/schema.test.ts": "28ff4675db6dc1be505e9d9591f0491e84dab8d4cf6b7fad24895fab79f4900c",
+    "services/cayleypy-results-ingest/test/worker.test.ts": "99f0b764682379e2ff16aabc606ce35722f7cea39b716203e0283271d126a4c1",
+    "services/cayleypy-results-ingest/tsconfig.json": "68f0b9d9dcfcb08ab1d2164b5463cbd670ab6f8ad62f8623a7bb7434d35ea8fa",
+    "services/cayleypy-results-ingest/vitest.config.ts": "81f596085ac0467e05bf8b99976aa1ff17475271151d4725d9a0b7c183084e21",
+    "services/cayleypy-results-ingest/vitest.schema.config.ts": "e06f4a73c0c2a9a662c2a9e2485e0fda83fcdae435efa0b7207960fa7fdc2d9a",
+    "services/cayleypy-results-ingest/wrangler.jsonc": "21018636ac49a9836762f03aa28160e53a9b50cbf4e9e850a5579ca7845a770c"
+  },
+  "post_install_payload_mismatches": {},
+  "post_install_payload_sha256": {
+    "configs/cayleypy_results_schema_v1.json": "5dc4888c70836229e0fb31508cf967082a186e472091d58826450368c2a9f126",
+    "services/cayleypy-results-ingest/migrations/0001_initial.sql": "8c3fe6fdc4381e123a901593962194f90aae7bfc484e6a6f5685195d05cb0ba6",
+    "services/cayleypy-results-ingest/migrations/0002_ingest_rate_limits.sql": "803e8b3af0dc4e1af2ddd32301a14fdba9d543cf9d5512a934f2d581f85e28f4",
+    "services/cayleypy-results-ingest/package-lock.json": "bf087c2dad9320ebb0091990eacded9dd751e4d3b3eb8f1c1ad8c99b12f571e3",
+    "services/cayleypy-results-ingest/package.json": "80e59683dc86dbeb7d12fb1200da52a1bfd40573c084acee55b41e61fb816929",
+    "services/cayleypy-results-ingest/src/db.ts": "d46481ee7eb8a7d2cbc3673f305566b31b6605eb4c6cae1d7547cfbec72a6609",
+    "services/cayleypy-results-ingest/src/ids.ts": "beec2434b4d4c96eaf7aeef3258f938f2e1ca6c123389096987365ff8e6727a6",
+    "services/cayleypy-results-ingest/src/schema.ts": "5b2d0cdc1736bb5af720624d6f069567975d06991821e6a22776eacc3199126f",
+    "services/cayleypy-results-ingest/src/storage.ts": "929a71468e5f5773e1c6aad8416360a93e46213b5f715819dd8bdd9fc9338c8b",
+    "services/cayleypy-results-ingest/src/worker.ts": "f45a1fb11fb80c93a872e20645faa3c7e822075b640347b64f3be8a93259dc11",
+    "services/cayleypy-results-ingest/test/apply-migrations.ts": "29e5ad77aced3a506683d6c9a76e6c13666d3f9b35c8c5b722151e417032496a",
+    "services/cayleypy-results-ingest/test/receipt.test.ts": "6841682dbb4d7e03760e6331eca5c614c2c92f9047239bcdb49cf89bfe0efc72",
+    "services/cayleypy-results-ingest/test/schema.test.ts": "28ff4675db6dc1be505e9d9591f0491e84dab8d4cf6b7fad24895fab79f4900c",
+    "services/cayleypy-results-ingest/test/worker.test.ts": "99f0b764682379e2ff16aabc606ce35722f7cea39b716203e0283271d126a4c1",
+    "services/cayleypy-results-ingest/tsconfig.json": "68f0b9d9dcfcb08ab1d2164b5463cbd670ab6f8ad62f8623a7bb7434d35ea8fa",
+    "services/cayleypy-results-ingest/vitest.config.ts": "81f596085ac0467e05bf8b99976aa1ff17475271151d4725d9a0b7c183084e21",
+    "services/cayleypy-results-ingest/vitest.schema.config.ts": "e06f4a73c0c2a9a662c2a9e2485e0fda83fcdae435efa0b7207960fa7fdc2d9a",
+    "services/cayleypy-results-ingest/wrangler.jsonc": "21018636ac49a9836762f03aa28160e53a9b50cbf4e9e850a5579ca7845a770c"
+  },
+  "registry_versions_exact": true,
+  "resolved_stack": {
+    "exact": true,
+    "expected": {
+      "@cloudflare/vitest-pool-workers": "0.19.0",
+      "@cloudflare/workers-types": "5.20260729.1",
+      "miniflare": "4.20260722.1",
+      "vitest": "4.1.10",
+      "workerd": "1.20260729.1",
+      "wrangler": "4.115.0"
+    },
+    "lockfile_workerd_paths": [
+      "node_modules/workerd"
+    ],
+    "lockfile_workerd_versions": [
+      "1.20260729.1"
+    ],
+    "resolved": {
+      "@cloudflare/vitest-pool-workers": "0.19.0",
+      "@cloudflare/workers-types": "5.20260729.1",
+      "miniflare": "4.20260722.1",
+      "vitest": "4.1.10",
+      "workerd": "1.20260729.1",
+      "wrangler": "4.115.0"
+    }
+  }
+}

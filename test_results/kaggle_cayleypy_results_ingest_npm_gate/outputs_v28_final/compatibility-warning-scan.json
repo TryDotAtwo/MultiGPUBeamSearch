@@ -1,0 +1,11 @@
+{
+  "compatibility_date": "2026-07-28",
+  "hits": [],
+  "markers": [
+    "newer than the latest supported date",
+    "falling back to",
+    "unsupported compatibility date",
+    "does not support compatibility date"
+  ],
+  "passed": true
+}

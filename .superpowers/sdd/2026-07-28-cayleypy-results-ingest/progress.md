@@ -18,4 +18,6 @@ Task 3: implementation complete (this standalone commit; private Kaggle v21 payl
 Task 3: review hardening round 1/3 (v22 schema RED valid; Worker harness typo superseded)
 Task 3: review hardening round 2/3 (corrected private v23 exact RED: schema 3/12 and Worker 6/70 failures; typecheck clean)
 Task 3: review hardening round 3/3 (monotonic rate clock, streaming 4 MiB parser, bounded concurrency/budget, safe status decode, exact compatibility date; v24 test-oracle diagnosis)
-Task 3: review hardening complete (this standalone fix commit; private v25 exact GREEN and 18/18 semantic payload match; bounded v23/v25 raw evidence committed; parent review pending)
+Task 3: review hardening complete (this standalone fix commit; private v25 exact GREEN and 18/18 semantic payload match; bounded v23/v25 raw evidence committed; parent review pending)Task 3: compatibility restoration round 1/3 (private v26 diagnostic RED: obsolete pool config API, registry stdout/stderr parse defect, lock regeneration mismatch, and type surface failure isolated)
+Task 3: compatibility restoration round 2/3 (private v28 exact runtime GREEN: schema 12/12 and Worker 70/70 twice; type-only RED isolated to Cloudflare.Env binding augmentation)
+Task 3: compatibility restoration complete (required date 2026-07-28; exact current Cloudflare stack; private v29 all 14 commands GREEN, 18/18 pre/post/pull hashes, zero fallback warnings; bounded list-free v26/v28/v29 evidence; parent review pending)
