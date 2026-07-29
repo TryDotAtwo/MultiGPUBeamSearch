@@ -1,0 +1,3 @@
+stream1_mode=model
+depth_start=0 frontier_size=0 depth_limit=8
+depth_global_solved=0 depth_sec=0.105708 controller_rank=0 local_rank=1 solved_depth=1 stop_requested=1

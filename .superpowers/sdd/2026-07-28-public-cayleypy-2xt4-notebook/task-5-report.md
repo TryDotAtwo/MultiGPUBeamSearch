@@ -44,3 +44,15 @@ No CUDA kernel, Stream 1-5 algorithm, device struct, or device-buffer contract w
 - `git diff --check`
 
 The local Windows checkout has CUDA toolkits but no `cl.exe` or configured NCCL build toolchain, so this round makes no local `production_runner` compile or GPU-run claim. The C++ host-only changes are covered by executable Python contract mirrors and focused source-contract regressions; a real 2xT4 build/run remains the downstream notebook acceptance gate.
+
+## Private real-2xT4 residual acceptance
+
+The downstream acceptance gate is now complete on private Kaggle kernel `trydotatwo/cayleypy-public-task-5-2xt4-gate`, version 2 (`COMPLETE`). Version 1 is excluded because Kaggle title normalization produced a `task-5` slug while the first notebook embedded the pre-normalization slug; the independent provenance validator rejected that mismatch. A notebook/metadata-only correction embedded the actual private slug in version 2.
+
+Version 2 cloned public `origin/main` at exact SHA `6f95bd6bdb32b5f6ef7cca32b96967bce6036503`, overlaid the full reviewed `tools/production_runner.cu` from commit `6830401ed2086921d2563c2bc3c11faf6c5a0741`, and verified its 242,054-byte SHA-256 as `f7d20a2fdec5748052b09804a2b2878cb13f854b8dd29e05db92d6828c223774`. It checked out CUTLASS `afa1772203677c5118fcd82537a9c8fefbcc7008`, built Release for SM75, linked NCCL, and produced binary SHA-256 `c86919b8994ef38f735e6b6159c68198530767bf42a22d17d9bd907c30d6a0ac`.
+
+The gate observed exactly two Tesla T4 GPUs with 15,360 MiB each and used the tracked output-dimension-24 fp16 model. The exact run contract was puzzle 1, beam 65,536, depth limit 8, K1=K2=0, maximum 16 unique paths, solved-result capacity 786,432, and the measured output-move-count p16 profile. First mode returned the real rank-0 release line `solution_length=1 found_depth=1 touch_depth=0 solution=BR` at 0.108281 solver seconds, and independent local replay validated the path.
+
+Collect A and B both completed normally with `capacity_reached`, emitted 16 unique independently valid paths, and produced byte-identical 449-byte TSVs with SHA-256 `74c12063c3f7cd6399546d6dd865d537e966bf8d9b935510174f9d46a92c748e`. Torchrun and both ranks returned zero in all three invocations; all rank stdout/stderr logs, bounded process-tree RSS samples, GPU snapshots, build logs, and source/binary manifests were downloaded. No overflow, OOM, timeout, hang, fatal runtime marker, or secret/private-path scan hit was observed.
+
+The downloaded raw evidence is under `test_results/kaggle_cayleypy_task5_2xt4_gate_v2_2026-07-29/`; the compact verification report is `test_results/kaggle_cayleypy_task5_2xt4_gate_2026-07-29.md`. The independent downloaded-output validator passed, focused builder/validator tests passed 6/6, and the full local suite passed 134/134. Injected rank-0 failure coverage remains source-test-only because no existing safe runtime hook exists. No C++ hook, CUDA kernel, Stream 1-5 algorithm, public publication, Task 6, or Task 7 work was added.

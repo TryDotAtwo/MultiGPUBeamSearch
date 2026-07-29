@@ -1,0 +1,33 @@
+
+*****************************************
+Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+*****************************************
+[W729 00:35:00.325356034 socket.cpp:207] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+[default0]:stream1_mode=model
+[default0]:depth_start=0 frontier_size=1 depth_limit=8
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=0 found_depth=1 solution_length=1 owner_rank=0 solution=BR
+[default0]:depth_done=0 depth_sec=0.170797 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=3 stream4_slots_used=3 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=12 final_request_count=24 next_frontier_size=12 history_bytes_received=384 history_bytes_stored=192 history_bytes_stored_ram=0 history_bytes_stored_disk=0 history_bytes_pruned=0
+[default0]:depth_start=1 frontier_size=12 depth_limit=8
+[default0]:depth_done=1 depth_sec=0.0817798 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=4 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=205 final_request_count=205 next_frontier_size=205 history_bytes_received=6944 history_bytes_stored=3472 history_bytes_stored_ram=0 history_bytes_stored_disk=192 history_bytes_pruned=0
+[default0]:depth_start=2 frontier_size=205 depth_limit=8
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.-BL.BL
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=-D.BR.D
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.-R.R
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=FL.BR.-FL
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=R.-R.BR
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=-FL.BR.FL
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=-L.BR.L
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.U.-U
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.-DR.DR
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.DR.-DR
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.-B.B
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=1 solution=BR.BR.-BR
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=1 solution=L.BR.-L
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=1 solution=BR.-U.U
+[default0]:solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=1 solution=-F.BR.F
+[default0]:collection_status=capacity_reached
+[default0]:solve_bucket_stop=1 puzzle_id=1 depth_index=2 first_found_depth_index=0 extra_depths=1 records=16 depth_sec=0.0239249
+[default0]:solve_bucket_summary=1 puzzle_id=1 records=16 best_length=1 known_length=1 result_tsv=/kaggle/working/runs/collect_b/solutions.tsv
+[default0]:solve_bucket_length_count puzzle_id=1 length=1 count=1
+[default0]:solve_bucket_length_count puzzle_id=1 length=3 count=15
+[default0]:puzzle_solved=1 puzzle_id=1 seconds=0.278982 solution_length=1 solution=BR

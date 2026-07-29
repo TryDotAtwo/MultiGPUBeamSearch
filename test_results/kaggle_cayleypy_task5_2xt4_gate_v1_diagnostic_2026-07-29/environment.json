@@ -1,0 +1,12 @@
+{
+  "cmake": "cmake version 3.31.10",
+  "gpu_rows": [
+    "0, Tesla T4, 15360, 14912",
+    "1, Tesla T4, 15360, 14912"
+  ],
+  "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+  "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0",
+  "psutil": "5.9.5",
+  "python": "3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]",
+  "torch": "2.10.0+cu128"
+}

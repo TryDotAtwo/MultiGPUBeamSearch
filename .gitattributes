@@ -6,3 +6,6 @@
 *.png binary
 *.nsys-rep binary
 *.sqlite binary
+test_results/kaggle_cayleypy_task5_2xt4_gate_v*/CMakeCache.txt binary
+test_results/kaggle_cayleypy_task5_2xt4_gate_v*/cayleypy-public-task-5-2xt4-gate.log binary
+test_results/kaggle_cayleypy_task5_2xt4_gate_v*/runs/*/combined.log binary
