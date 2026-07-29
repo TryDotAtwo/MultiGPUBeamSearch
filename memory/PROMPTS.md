@@ -454,3 +454,4 @@
 - User authorized implementation, testing, private Kaggle work, and service/notebook integration autonomously, while reserving any beam-search architecture change for explicit prior approval.
 
 - Reviewer requested two narrow public CLI fixes: sanitize every public runtime log surface including torchrun redirects before persistence or live printing, fail closed by withholding raw logs on sanitizer failure, preserve solution parsing, and on PublicSearchRunError materialize/publish valid partial artifacts best-effort while retaining failed solve status and always writing publish_status.json. No beam-search architecture, CUDA/C++, or notebook edits.
+- User requested review fixes for the thin public notebook: remove mojibake, hard-code the official solver repository, pin solver commit `3bbbe50`, preserve/display artifacts on nonzero CLI exit before raising, regenerate and validate without changing beam/CUDA/CLI schema or pushing.
