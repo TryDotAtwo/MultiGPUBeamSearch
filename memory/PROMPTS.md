@@ -1,3 +1,5 @@
+- Before staging deploy, rerun the exact private Kaggle npm gate over every
+  newly hardened ingest source, migration, runbook test, and TypeScript file.
 - Independent review found a P1 in the staging deployment helper: generated
   config lived outside the service while `migrations_dir` was absent, so Wrangler
   could not resolve D1 migrations. Fix via TDD in a separate commit, exercise a

@@ -1,8 +1,14 @@
+- Refreshed the private Kaggle npm gate payload for the status-rate-limit,
+  operator-replay, migration-0003, and staging deployment-helper changes.
+  The generated gate remains private, CPU-only, and non-deploying.
 - Fixed the staging deployment helper migration resolver: the generated private
   Wrangler config now gives `RESULTS_DB` an absolute `migrations_dir` pointing
   to the service's tracked migrations before remote apply/deploy. A real
   PowerShell integration test preserved the missing-property RED, verifies
-  Wrangler command ordering, and applies 0001 then 0002 to a seeded SQLite DB.
+  Wrangler command ordering, and applies 0001, 0002, then 0003 to a seeded
+  SQLite DB while preserving current numeric status-bucket rows. The staging
+  audit runbook now uses the implemented `/healthz` and
+  `/v1/submissions/{submission_id}` routes.
   No deploy, resource/secret mutation, production activation, or beam/CUDA change occurred.
 - Added a fail-closed CayleyPy results-ingest staging deployment runbook and
   helper. It pins the existing Wrangler toolchain, accepts a D1 ID only from a
