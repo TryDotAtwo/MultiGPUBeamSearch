@@ -70,13 +70,13 @@ assert names == ['0001_initial.sql', '0002_ingest_rate_limits.sql', '0003_remove
 conn.executescript((root / names[0]).read_text(encoding='utf-8'))
 conn.execute('INSERT INTO submissions (submission_id,idempotency_key,run_id,author_name,competition,puzzle_type,puzzle_id,state,raw_r2_key,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)', ('s','i','r','a','c','p',1,'received','raw','t','t'))
 conn.executescript((root / names[1]).read_text(encoding='utf-8'))
-scopes = [('status-ip:198.51.100.7', 1, 1), ('global', 1, 2), ('ip:198.51.100.7', 1, 3), ('status-bucket:198.51.100.0/24', 1, 4)]
+scopes = [('status-ip:198.51.100.7', 1, 1), ('global', 1, 2), ('ip:198.51.100.7', 1, 3), ('status-bucket:7', 1, 4)]
 conn.executemany('INSERT INTO ingest_rate_limits (scope,window_start,count) VALUES (?,?,?)', scopes)
 conn.executescript((root / names[2]).read_text(encoding='utf-8'))
 assert conn.execute('SELECT COUNT(*) FROM submissions WHERE submission_id=?', ('s',)).fetchone()[0] == 1
 assert conn.execute('SELECT COUNT(*) FROM sqlite_master WHERE type=? AND name=?', ('table','ingest_rate_limits')).fetchone()[0] == 1
 assert conn.execute('SELECT COUNT(*) FROM sqlite_master WHERE type=? AND name=?', ('index','submissions_recovery')).fetchone()[0] == 1
-assert conn.execute('SELECT scope FROM ingest_rate_limits ORDER BY scope').fetchall() == [('global',), ('ip:198.51.100.7',), ('status-bucket:198.51.100.0/24',)]
+assert conn.execute('SELECT scope FROM ingest_rate_limits ORDER BY scope').fetchall() == [('global',), ('ip:198.51.100.7',), ('status-bucket:7',)]
 conn.close()
 '@
   & py -c $python $expectedMigrations $seedDb

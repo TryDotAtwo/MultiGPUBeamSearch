@@ -67,8 +67,8 @@ Install the three GitHub App values only after the store-only deploy is healthy.
 
 At this stage the App secrets must remain unused because `store_only` forbids Queue and GitHub publication. Use one canonical valid envelope, then verify:
 
-1. `/health` succeeds and reports the expected safe mode;
-2. POST receipt is durable and `/v1/status/{submission_id}` is `received`;
+1. `/healthz` succeeds and reports the expected safe mode;
+2. POST receipt is durable and `/v1/submissions/{submission_id}` is `received`;
 3. exact immutable raw object metadata and one D1 row exist;
 4. Queue metrics show no sent message and GitHub has no new staging commit.
 
