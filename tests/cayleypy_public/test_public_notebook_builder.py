@@ -99,3 +99,30 @@ def test_notebook_uses_explicit_or_environment_publish_endpoint_without_shipping
     assert "CAYLEYPY_RESULTS_INGEST_URL" in CONFIG
     assert "results.example" not in CONFIG
     assert "workers.dev" not in CONFIG
+
+
+def test_display_cell_renders_zero_byte_solutions_csv_without_failing_success(
+    tmp_path: Path,
+) -> None:
+    notebook_path, _ = build_notebook(tmp_path / "notebook")
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    display_source = _source(
+        next(cell for cell in notebook["cells"] if cell["id"] == "artifacts")
+    )
+    output_dir = tmp_path / "output"
+    solutions_dir = output_dir / "solutions"
+    solutions_dir.mkdir(parents=True)
+    (solutions_dir / "solutions.csv").write_bytes(b"")
+    displayed: list[object] = []
+
+    exec(
+        compile(display_source, "generated-display-cell", "exec"),
+        {
+            "OUTPUT_DIR": output_dir,
+            "RUN_RETURN_CODE": 0,
+            "display": displayed.append,
+        },
+    )
+
+    assert len(displayed) == 1
+    assert getattr(displayed[0], "empty") is True

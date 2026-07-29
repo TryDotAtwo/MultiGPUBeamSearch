@@ -216,7 +216,11 @@ for name in ("beam_run_results.csv", "solutions/solutions.csv", "submission.csv"
     path = OUTPUT_DIR / name
     print(f"\n== {name} ==")
     if path.is_file():
-        display(pd.read_csv(path).head(20))
+        try:
+            preview = pd.read_csv(path).head(20)
+        except pd.errors.EmptyDataError:
+            preview = pd.DataFrame()
+        display(preview)
     else:
         print("missing")
 
