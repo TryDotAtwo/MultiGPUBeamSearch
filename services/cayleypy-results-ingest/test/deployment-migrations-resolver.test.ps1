@@ -53,6 +53,7 @@ exit /b 0
   Assert-True ($actualMigrations -ceq $expectedMigrations) "generated migrations_dir does not resolve to service migrations: $actualMigrations"
   Assert-True (Test-Path -LiteralPath (Join-Path $actualMigrations '0001_initial.sql')) '0001 missing through generated resolver'
   Assert-True (Test-Path -LiteralPath (Join-Path $actualMigrations '0002_ingest_rate_limits.sql')) '0002 missing through generated resolver'
+  Assert-True (Test-Path -LiteralPath (Join-Path $actualMigrations '0003_remove_legacy_status_ip_limits.sql')) '0003 missing through generated resolver'
 
   $recorded = @(Get-Content -LiteralPath $calls -Encoding UTF8)
   Assert-True ($recorded.Count -eq 5) 'unexpected fake Wrangler command count'
@@ -64,12 +65,18 @@ import pathlib, sqlite3, sys
 root = pathlib.Path(sys.argv[1])
 db_path = sys.argv[2]
 conn = sqlite3.connect(db_path)
-conn.executescript((root / '0001_initial.sql').read_text(encoding='utf-8'))
+names = [path.name for path in sorted(root.glob('*.sql'))]
+assert names == ['0001_initial.sql', '0002_ingest_rate_limits.sql', '0003_remove_legacy_status_ip_limits.sql']
+conn.executescript((root / names[0]).read_text(encoding='utf-8'))
 conn.execute('INSERT INTO submissions (submission_id,idempotency_key,run_id,author_name,competition,puzzle_type,puzzle_id,state,raw_r2_key,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)', ('s','i','r','a','c','p',1,'received','raw','t','t'))
-conn.executescript((root / '0002_ingest_rate_limits.sql').read_text(encoding='utf-8'))
+conn.executescript((root / names[1]).read_text(encoding='utf-8'))
+scopes = [('status-ip:198.51.100.7', 1, 1), ('global', 1, 2), ('ip:198.51.100.7', 1, 3), ('status-bucket:198.51.100.0/24', 1, 4)]
+conn.executemany('INSERT INTO ingest_rate_limits (scope,window_start,count) VALUES (?,?,?)', scopes)
+conn.executescript((root / names[2]).read_text(encoding='utf-8'))
 assert conn.execute('SELECT COUNT(*) FROM submissions WHERE submission_id=?', ('s',)).fetchone()[0] == 1
 assert conn.execute('SELECT COUNT(*) FROM sqlite_master WHERE type=? AND name=?', ('table','ingest_rate_limits')).fetchone()[0] == 1
 assert conn.execute('SELECT COUNT(*) FROM sqlite_master WHERE type=? AND name=?', ('index','submissions_recovery')).fetchone()[0] == 1
+assert conn.execute('SELECT scope FROM ingest_rate_limits ORDER BY scope').fetchall() == [('global',), ('ip:198.51.100.7',), ('status-bucket:198.51.100.0/24',)]
 conn.close()
 '@
   & py -c $python $expectedMigrations $seedDb

@@ -54,7 +54,7 @@ The helper rejects placeholder values, foreign names, non-UUID D1 ids, missing f
 & .\scripts\invoke-staging-deployment.ps1 -Phase store_only -ResourceManifest .\staging-resources.private.json
 ```
 
-The helper performs: local pinned-Wrangler version/config checks, renders a temporary config with the exact supplied D1 id and an absolute `migrations_dir` resolving to this service's tracked `migrations/`, applies `0001_initial.sql` and `0002_ingest_rate_limits.sql` with `wrangler d1 migrations apply ... --remote`, and deploys it with `INGEST_MODE=store_only`. It does not manufacture an endpoint: read the Worker URL only from the successful `wrangler deploy` output and place it in the private shell session for the following checks.
+The helper performs: local pinned-Wrangler version/config checks, renders a temporary config with the exact supplied D1 id and an absolute `migrations_dir` resolving to this service's tracked `migrations/`, applies every pending migration in Wrangler order (currently `0001_initial.sql`, `0002_ingest_rate_limits.sql`, then `0003_remove_legacy_status_ip_limits.sql`) with `wrangler d1 migrations apply ... --remote`, and deploys it with `INGEST_MODE=store_only`. It does not manufacture an endpoint: read the Worker URL only from the successful `wrangler deploy` output and place it in the private shell session for the following checks.
 
 Install the three GitHub App values only after the store-only deploy is healthy. The values must be created for the staging named environment and are never printed by this runbook:
 
