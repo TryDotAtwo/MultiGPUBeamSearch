@@ -233,38 +233,43 @@ git commit -m "feat: persist CayleyPy result receipts durably"
 ### Task 3: Public HTTP API, Status, and Abuse Limits
 
 **Files:**
+- Create: `services/cayleypy-results-ingest/migrations/0002_ingest_rate_limits.sql`
 - Create: `services/cayleypy-results-ingest/src/worker.ts`
 - Create: `services/cayleypy-results-ingest/test/worker.test.ts`
+- Modify: `services/cayleypy-results-ingest/src/storage.ts` with an explicit Queue-free store-only persistence path.
+- Modify: `services/cayleypy-results-ingest/vitest.config.ts` with exact deep-entry optimization for the pinned Worker pool.
 - Modify: `services/cayleypy-results-ingest/wrangler.jsonc` with a bounded recovery cron trigger.
 
 **Interfaces:**
 - Produces routes: `POST /v1/results`, `GET /v1/submissions/:id`, `GET /healthz`.
 - `POST` returns `202 { receipts: [{ submission_id, idempotency_key, status_url }] }`.
+- Produces `receiveEnvelopeStoreOnly(env, envelope, requestMeta) -> Promise<StoredReceipt>`; it preserves the Task 2 R2-before-D1/idempotency contract while its environment type has no Queue binding and its implementation performs zero Queue access.
 - Produces `type IngestMode = "normal" | "store_only" | "reject"` and one resolver that returns only those values. It accepts only exact case-sensitive matches and resolves missing, empty, mixed-case, or unknown input to `reject` without exposing the raw input.
 - Produces `scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void>` with `RECOVERY_STALE_MS = 60_000` and `RECOVERY_LIMIT = 50`. It returns before touching recovery unless the resolved mode is `normal`; otherwise it computes `staleBefore = new Date(controller.scheduledTime - RECOVERY_STALE_MS)` and calls `recoverStaleSubmissions(env, { staleBefore, limit: RECOVERY_LIMIT })`.
+- Uses one atomic conditional D1 UPSERT per IP/global scope as the authoritative fixed-minute counter. The optional Cloudflare Rate Limiting binding is an additional per-location fast rejection path; it is not treated as the global source of truth and no binding/resource is provisioned in Task 3.
 
-- [ ] **Step 1: Write failing route tests**
+- [x] **Step 1: Write failing route tests**
 
 Assert method/content-type/body-size/schema failures; per-IP `429` with `Retry-After`; accepted batch receipts; duplicate receipt; safe `404`; and health response without binding/secret detail. Cover each mode explicitly: `normal` persists R2/D1 and sends Queue work; `store_only` persists R2/D1 as `received` and sends no Queue work; exact `reject`, missing, empty, mixed-case, and arbitrary unknown values accept nothing and write nothing to R2/D1/Queue.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `npm test -- worker.test.ts`
 Expected: FAIL because `worker.ts` does not exist.
 
-- [ ] **Step 3: Implement bounded body parsing and receipts**
+- [x] **Step 3: Implement bounded body parsing and receipts**
 
 Read `Content-Length` before body, then stream/count with a 25 MiB hard limit. Accept only `application/json`. In `normal`, persist/enqueue each result independently and return mixed receipt status without echoing result content. Keep persistence and Queue publication separate so `store_only` can leave accepted rows in `received`; reject fail-closed modes before any persistence.
 
-- [ ] **Step 4: Implement rate limiting and emergency modes**
+- [x] **Step 4: Implement rate limiting and emergency modes**
 
-Use a Cloudflare Rate Limiting binding when available plus a D1/global fallback counter. Start with 30 requests/minute/IP, 100 envelopes/request, and 2,000 envelopes/minute globally; expose exact limits in `/healthz` but no infrastructure ids. Resolve the mode once through the exact allowlist: `normal` persists and queues, `store_only` persists raw R2 plus a D1 `received` row with zero Queue sends, and `reject`/missing/unknown returns a safe disabled response with zero R2/D1/Queue writes. Never echo or log the raw mode value.
+Use a Cloudflare Rate Limiting binding when available plus an authoritative D1 per-IP/global counter. Start with 30 requests/minute/IP, 100 envelopes/request, and 2,000 envelopes/minute globally; expose exact limits in `/healthz` but no infrastructure ids. Resolve the mode once through the exact allowlist: `normal` persists and queues, `store_only` persists raw R2 plus a D1 `received` row with zero Queue sends, and `reject`/missing/unknown returns a safe disabled response with zero R2/D1/Queue writes. Never echo or log the raw mode value. Each D1 scope update must be one conditional UPSERT so concurrent requests cannot pass through a read-then-write race. Do not configure or create a Rate Limiting binding until the pinned Wrangler supports its documented configuration and an operator provisions the resource.
 
-- [ ] **Step 5: Implement and test the scheduled recovery entry point**
+- [x] **Step 5: Implement and test the scheduled recovery entry point**
 
 Add the exact `scheduled(controller, env, ctx)` interface above and configure the cron. Its normal-mode test seeds stale and fresh `received|queued|retryable` rows, proves only the bounded eligible page is resent with the same submission ids, proves successful `queued -> queued` refresh/clearing, and proves failures advance retry metadata without deleting raw R2. Additional tests prove `store_only`, `reject`, missing, and unknown modes are strict no-ops; specifically, a `store_only` row older than 60 seconds remains `received` with zero Queue sends, then switching to `normal` lets scheduled recovery enqueue that same id. Record only bounded counts, never payloads, raw mode values, or binding identifiers.
 
-- [ ] **Step 6: Test and commit**
+- [x] **Step 6: Test and commit**
 
 Run: `npm test -- worker.test.ts receipt.test.ts && npm run typecheck`
 Expected: PASS.

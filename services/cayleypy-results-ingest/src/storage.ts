@@ -15,6 +15,11 @@ export interface IngestEnv {
   VALIDATE_QUEUE: Queue;
 }
 
+export interface PersistenceEnv {
+  RESULTS_DB: D1Database;
+  RAW_RESULTS: R2Bucket;
+}
+
 export interface RequestMeta {
   receivedAt?: Date;
   duplicatePollAttempts?: number;
@@ -25,6 +30,13 @@ export interface Receipt {
   submission_id: string;
   idempotency_key: string;
   state: "queued" | "retryable";
+  duplicate: boolean;
+}
+
+export interface StoredReceipt {
+  submission_id: string;
+  idempotency_key: string;
+  state: "received" | "queued" | "retryable";
   duplicate: boolean;
 }
 
@@ -388,4 +400,91 @@ export async function receiveEnvelope(
     },
     false,
   );
+}
+
+function storedReceipt(row: SubmissionRow, duplicate: boolean): StoredReceipt {
+  if (row.state === "received" || row.state === "retryable") {
+    return {
+      submission_id: row.submission_id,
+      idempotency_key: row.idempotency_key,
+      state: row.state,
+      duplicate,
+    };
+  }
+  if (QUEUED_OR_LATER.has(row.state)) {
+    return {
+      submission_id: row.submission_id,
+      idempotency_key: row.idempotency_key,
+      state: "queued",
+      duplicate,
+    };
+  }
+  throw new SafeIngestError("state_transition_conflict");
+}
+
+/** Persist an accepted envelope without touching Queue publication. */
+export async function receiveEnvelopeStoreOnly(
+  env: PersistenceEnv,
+  envelope: ResultEnvelopeV1,
+  meta: Pick<RequestMeta, "receivedAt"> = {},
+): Promise<StoredReceipt> {
+  const idempotencyKey = await computeIdempotency(envelope);
+  let prior: SubmissionRow | null;
+  try {
+    prior = await findByIdempotency(env.RESULTS_DB, idempotencyKey);
+  } catch {
+    throw new SafeIngestError("submission_lookup_failed");
+  }
+  if (prior) return storedReceipt(prior, true);
+
+  const now = meta.receivedAt ?? new Date();
+  const submissionId = newSubmissionId(now);
+  const key = rawObjectKey(submissionId, now);
+  const rawBody = canonicalJson(envelope);
+  await putRaw(env.RAW_RESULTS, key, rawBody, await sha256Hex(rawBody));
+
+  const timestamp = now.toISOString();
+  let inserted: boolean;
+  try {
+    const result = await env.RESULTS_DB.prepare(
+      "INSERT INTO submissions (submission_id,idempotency_key,run_id,author_name,competition,puzzle_type,puzzle_id,state,raw_r2_key,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(idempotency_key) DO NOTHING",
+    )
+      .bind(
+        submissionId,
+        idempotencyKey,
+        envelope.run_id,
+        envelope.author.name,
+        envelope.competition,
+        envelope.puzzle_type,
+        envelope.puzzle_id,
+        "received",
+        key,
+        timestamp,
+        timestamp,
+      )
+      .run();
+    inserted = result.meta.changes === 1;
+  } catch {
+    throw new SafeIngestError("submission_persist_failed");
+  }
+
+  if (!inserted) {
+    let winner: SubmissionRow | null;
+    try {
+      winner = await findByIdempotency(env.RESULTS_DB, idempotencyKey);
+    } catch {
+      await cleanupDuplicateRaw(env.RAW_RESULTS, key);
+      throw new SafeIngestError("submission_lookup_failed");
+    }
+    await cleanupDuplicateRaw(env.RAW_RESULTS, key);
+    if (!winner) throw new SafeIngestError("duplicate_resolution_failed");
+    return storedReceipt(winner, true);
+  }
+
+  return {
+    submission_id: submissionId,
+    idempotency_key: idempotencyKey,
+    state: "received",
+    duplicate: false,
+  };
 }

@@ -8,7 +8,15 @@ export default defineWorkersConfig(async () => {
 
   return {
     test: {
-      include: ["test/receipt.test.ts"],
+      include: ["test/receipt.test.ts", "test/worker.test.ts"],
+      deps: {
+        optimizer: {
+          ssr: {
+            enabled: true,
+            include: ["ajv/dist/2020.js", "ajv-formats"],
+          },
+        },
+      },
       setupFiles: ["./test/apply-migrations.ts"],
       poolOptions: {
         workers: {
