@@ -444,3 +444,13 @@
 - User authorized continuing the public notebook and Cloudflare results-service implementation, including the previously discussed non-beam work. The only standing restriction is that the beam-search architecture/CUDA algorithms must not be changed without explicit user agreement.
 
 - CayleyPy results-ingest Task 5 must serialize GitHub App writes through one Durable Object, preserve raw R2 and forensic D1 provenance, remain idempotent under at-least-once delivery and GitHub reference races, retain/rearm work across failures and eviction, avoid early-pending starvation, support at least 100 concurrent publishers, use current declarative SQLite Durable Object exports, and pass an exact private Kaggle dependency/type/runtime gate before any Cloudflare deployment.
+
+- User authorized all non-beam implementation work and reiterated that only
+  beam-search/CUDA architecture changes require separate approval.
+- CayleyPy results-ingest Task 8 must prepare a deterministic 100-publisher
+  staging gate with 80 unique valid results, 10 exact semantic duplicates, and
+  10 invalid proof results; bounded jitter and `429` retry; the exact k6
+  thresholds; no token or envelope logging; endpoint configuration through the
+  environment; and a bounded recovery audit over receipt, D1, R2, status, and
+  GitHub evidence. No external run, commit, push, deployment, or beam/CUDA
+  change is authorized during preparation.

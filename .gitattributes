@@ -24,3 +24,7 @@ test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v29_final/pull/kern
 test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v26_probe/pull/cayleypy-results-ingest-npm-gate.ipynb binary
 test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v28_final/pull/cayleypy-results-ingest-npm-gate.ipynb binary
 test_results/kaggle_cayleypy_results_ingest_npm_gate/control_v29_final/pull/cayleypy-results-ingest-npm-gate.ipynb binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/task8_v35/*.log binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/task8_v35/outputs/*.log binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/task8_v35/pull/kernel-metadata.json binary
+test_results/kaggle_cayleypy_results_ingest_npm_gate/task8_v35/pull/cayleypy-results-ingest-npm-gate.ipynb binary

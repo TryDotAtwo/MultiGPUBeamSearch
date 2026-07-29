@@ -1,0 +1,41 @@
+
+> test
+> vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts
+
+
+ RUN  v4.1.10 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+ ✓ test/wrangler-config.test.ts (6 tests) 10ms
+ ✓ test/load-recovery-gate.test.ts (12 tests) 70ms
+ ✓ test/schema.test.ts (10 tests) 48ms
+
+ Test Files  3 passed (3)
+      Tests  28 passed (28)
+   Start at  21:09:30
+   Duration  742ms (transform 308ms, setup 0ms, import 678ms, tests 128ms, environment 1ms)
+
+
+ RUN  v4.1.10 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+ ✓ test/consumer.test.ts (21 tests) 3065ms
+     ✓ paused modes park received, queued, and retryable source states  311ms
+ ✓ test/receipt.test.ts (23 tests) 4065ms
+     ✓ duplicate pause deliveries beyond a max-retries-equivalent remain one parked row  2158ms
+ ✓ test/github-app.test.ts (8 tests) 210ms
+ ✓ test/replay.test.ts (6 tests) 11ms
+ ✓ test/github-writer.test.ts (12 tests) 5150ms
+     ✓ 100 concurrent duplicate RPC enqueues collapse to 100 durable records  1053ms
+     ✓ tampered real R2 raw is terminalized and retained for forensics  337ms
+   ✓ drops 100 stale poison keys so a later validated record is eventually reachable  2641ms
+ ✓ test/worker.test.ts (49 tests) 15545ms
+     ✓ keeps D1 per-IP accounting active even when the binding allows  1648ms
+     ✓ normal recovery bounds stale pages, refreshes queued rows, and advances failures fairly  1227ms
+     ✓ bounds per-envelope storage concurrency while preserving receipt order  3005ms
+     ✓ keeps one hundred received duplicates below one thousand internal binding calls  5662ms
+     ✓ atomic D1 per-IP accounting admits exactly 30 concurrent requests  877ms
+
+ Test Files  6 passed (6)
+      Tests  119 passed (119)
+   Start at  21:09:33
+   Duration  20.39s (transform 2.28s, setup 8.15s, import 639ms, tests 28.05s, environment 1ms)
+

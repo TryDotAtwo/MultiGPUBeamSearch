@@ -1,0 +1,23 @@
+
+ RUN  v4.1.10 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+ ✓ test/receipt.test.ts (23 tests) 3967ms
+     ✓ duplicate pause deliveries beyond a max-retries-equivalent remain one parked row  2020ms
+ ✓ test/github-writer.test.ts (12 tests) 5399ms
+     ✓ 100 concurrent duplicate RPC enqueues collapse to 100 durable records  1182ms
+   ✓ drops 100 stale poison keys so a later validated record is eventually reachable  2922ms
+ ✓ test/github-app.test.ts (8 tests) 140ms
+ ✓ test/consumer.test.ts (21 tests) 2688ms
+ ✓ test/replay.test.ts (6 tests) 10ms
+ ✓ test/worker.test.ts (49 tests) 14694ms
+     ✓ keeps D1 per-IP accounting active even when the binding allows  1536ms
+     ✓ normal recovery bounds stale pages, refreshes queued rows, and advances failures fairly  1465ms
+     ✓ bounds per-envelope storage concurrency while preserving receipt order  2867ms
+     ✓ keeps one hundred received duplicates below one thousand internal binding calls  4887ms
+     ✓ atomic D1 per-IP accounting admits exactly 30 concurrent requests  842ms
+
+ Test Files  6 passed (6)
+      Tests  119 passed (119)
+   Start at  21:09:56
+   Duration  18.31s (transform 2.41s, setup 8.08s, import 676ms, tests 26.90s, environment 2ms)
+

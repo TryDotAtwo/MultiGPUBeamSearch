@@ -786,3 +786,16 @@
 - Completed CayleyPy results-ingest Task 4 Queue validation/replay. The consumer now verifies immutable R2 SHA-256 metadata and byte bounds before parsing, independently revalidates the canonical envelope and bounded permutation/reflection replay, uses idempotent D1 validating/validated/retryable/dead-letter transitions, parks all non-normal modes durably before ACK, and hands validated ids to the future serialized GitHub writer. Private CPU Kaggle exact gate v2 preserved one contract-correct test-fixture RED; v3 passed after the fixture-only correction, and final LF-normalized v4 passed schema 10/10, the 99-test Worker pool twice, typecheck, exact registry/resolved-stack/workerd checks, 22/22 pre/post-install payload hashes, and a clean compatibility-warning scan on Node 22.23.1/npm 10.9.8. No deployment, Cloudflare resource/secret creation, GitHub mutation, CUDA change, or beam-search architecture change was performed.
 
 - Completed CayleyPy results-ingest Task 5 with a GitHub App token client and one SQLite-backed Durable Object that serializes append-only publication to `ingest/staging`. The writer persists pending ids before work, rechecks the exact fail-closed mode before token acquisition and every GitHub request, validates immutable R2 bytes and D1 provenance again, batches at most 100 records/5 MiB, converges identical retries, terminalizes content conflicts without overwrite, retries non-force reference races, prevents stale pending-key starvation, and force-rearms retries from an executing alarm. Current declarative Wrangler `exports` defines the new SQLite namespace; legacy `migrations` is intentionally absent. Exact private CPU Kaggle v9 passed all 14 commands, typecheck, schema/config 16/16, Worker pool 119/119 twice, exact pre/post-install hashes, and a clean compatibility-warning scan on Node 22.23.1/npm 10.9.8. No Cloudflare resource/secret/deployment, GitHub mutation, CUDA change, or beam-search architecture change occurred.
+
+- Completed the CayleyPy results-ingest Task 8 load/recovery implementation and
+  its exact private CPU Kaggle runtime gate. The k6 workload deterministically
+  maps global iterations to 80 unique valid envelopes, 10 transport-only
+  semantic duplicates, and 10 invalid-proof envelopes, with exact thresholds,
+  bounded jitter, bounded `429` retry, and safe receipt-only logs. The recovery
+  audit bounds all input, fetches each unique receipt from the configured
+  ingest endpoint, and checks D1/status/R2/GitHub durability and uniqueness.
+  Private kernel `trydotatwo/cayleypy-results-ingest-npm-gate` v35 passed the
+  12-test Task 8 suite, 28/28 schema/config tests, the 119-test Worker pool
+  twice, typecheck, exact registry/resolved stack checks, and 33/33 pre/post
+  payload hashes. No live k6 staging load, deployment, GitHub mutation, token,
+  CUDA change, or beam-search architecture change was performed.

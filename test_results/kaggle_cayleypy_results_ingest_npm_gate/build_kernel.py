@@ -42,6 +42,9 @@ FILES = (
     "services/cayleypy-results-ingest/test/replay.test.ts",
     "services/cayleypy-results-ingest/test/node-crypto.d.ts",
     "services/cayleypy-results-ingest/test/wrangler-config.test.ts",
+    "services/cayleypy-results-ingest/load/k6-100-publishers.js",
+    "services/cayleypy-results-ingest/test/load-recovery-gate.test.ts",
+    "services/cayleypy-results-ingest/test/recovery-audit.ts",
 )
 
 
@@ -375,7 +378,7 @@ def main() -> None:
                 "metadata": {},
                 "source": [
                     "# Private CayleyPy Results Ingest npm gate\n",
-                    "CPU-only exact-stack Task 5 GitHub App and Durable Object writer verification. No deployment.\n",
+                    "CPU-only exact-stack Task 8 load/recovery static and unit verification. No deployment or external load.\n",
                 ],
             },
             {
