@@ -54,6 +54,13 @@ CUDA/C++ algorithm knobs are deliberately absent.
 Publishing is best effort: valid local solutions and `submission.csv` remain even
 if the ingest service is unavailable. The status is saved in `publish_status.json`.
 No token or secret belongs in this notebook.
+Publishing remains explicit opt-in. Set an HTTPS endpoint in the config or leave
+it blank to use `CAYLEYPY_RESULTS_INGEST_URL`; no endpoint is bundled. Publishing
+fails closed before solve if author or competition/Kaggle provenance still uses
+the supplied `replace-with-*` placeholders.
+The endpoint must be a public HTTPS host: localhost and non-global IP literals are
+rejected. Redirects are never followed, so a configured origin cannot redirect
+the publisher to a private or plaintext destination.
 
 ### Provenance hash rule
 
@@ -87,8 +94,9 @@ MAX_COLLECTED_SOLUTIONS = 100
 TOUCH_BFS_RADIUS = 0
 
 AUTHOR_NAME = "replace-with-author"
-PUBLISH_RESULTS = False              # failures never discard local artifacts
-RESULTS_INGEST_URL = ""              # public HTTPS endpoint; no tokens/secrets
+PUBLISH_RESULTS = False              # explicit opt-in; failures keep local artifacts
+# Explicit HTTPS endpoint wins; blank falls back to CAYLEYPY_RESULTS_INGEST_URL.
+RESULTS_INGEST_URL = ""              # no endpoint, token, or secret is bundled
 COMPETITION = "replace-with-competition"
 KAGGLE_OWNER = "replace-with-kaggle-owner"
 KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"

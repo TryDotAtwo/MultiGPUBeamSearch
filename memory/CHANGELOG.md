@@ -800,3 +800,14 @@
 - Hardened the thin public CayleyPy 2xT4 notebook package after independent review: reader-facing cells are ASCII-clean; the checkout origin is hard-coded to the official TryDotAtwo repository and the user-visible pinned solver commit is `3bbbe50a9460695507aee58bf443c1d3b0bd5032`; a nonzero CLI exit now preserves and displays bounded artifacts/status before explicit failure. No beam/CUDA/CLI-schema change, commit, push, or external execution occurred.
 - Added the missing reader-facing State128 bound to the thin public CayleyPy notebook header: the fixed public runner explicitly requires `1 <= state_len <= 120`. Regenerated the notebook and added an exact contract assertion; no CLI schema, beam, or CUDA change occurred.
 - Hardened the public checkpoint-only permutation contract before publication: puzzle inputs and result replay now require exact integer labels in `0..state_len-1`, `num_classes=state_len`, and reject boolean/float, negative, overflow, or truncated generator values. The thin notebook header states this limitation explicitly; no beam-search, CUDA/C++, profile, or model-family change was made. Focused public gates pass 54/54.
+- Release-hardened the thin public CayleyPy notebook without changing beam/CUDA:
+  enabled publication now rejects sentinel author/Kaggle provenance, resolves
+  its endpoint from explicit config or `CAYLEYPY_RESULTS_INGEST_URL` with strict
+  credential-free HTTPS validation, and remains explicit opt-in/best-effort with
+  no bundled URL. Regenerated the notebook and updated current-pin evidence.
+- Closed the public publisher endpoint redirect/SSRF boundary without changing
+  beam/CUDA: config rejects localhost, `.localhost`, and non-global IP literals;
+  the HTTP client does not follow any 3xx redirect. Added negative and global-host
+  controls and regenerated the thin notebook. Release remains blocked until these
+  uncommitted controls are committed, pushed, and `SOLVER_COMMIT` is repinned to
+  that exact public revision.

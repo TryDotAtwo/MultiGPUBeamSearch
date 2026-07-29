@@ -505,6 +505,52 @@ def test_publish_results_treats_http_200_as_duplicate_success(monkeypatch, tmp_p
 
 
 @pytest.mark.parametrize(
+    "location",
+    [
+        "https://127.0.0.1/private",
+        "http://results.example/private",
+    ],
+)
+def test_publish_results_does_not_follow_redirects(
+    monkeypatch, tmp_path: Path, location: str,
+) -> None:
+    class RedirectingOpener:
+        calls = 0
+
+        def open(self, request, timeout):
+            self.calls += 1
+            raise HTTPError(
+                request.full_url,
+                302,
+                "redirect blocked",
+                {"Location": location},
+                None,
+            )
+
+    opener = RedirectingOpener()
+
+    def fake_build_opener(*handlers):
+        assert any(
+            isinstance(handler, results_module._NoRedirectHandler)
+            for handler in handlers
+        )
+        return opener
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(results_module, "build_opener", fake_build_opener)
+    status = publish_results(
+        "https://results.example/ingest",
+        [build_result_envelope(_context(), _solution())],
+    )
+
+    assert opener.calls == 1
+    assert status.ok is False
+    assert status.retryable is False
+    assert status.status_code == 302
+    assert status.safe_error == "results endpoint returned HTTP 302"
+
+
+@pytest.mark.parametrize(
     ("error", "expected_status_code"),
     [
         (TimeoutError("endpoint-password query-secret timeout"), None),

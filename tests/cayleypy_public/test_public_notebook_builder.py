@@ -49,7 +49,8 @@ def test_public_notebook_contract_and_no_hidden_model_or_secret_controls(tmp_pat
         "output_dim=1", "output_dim=move_count", "1 <= state_len <= 120", "num_classes=state_len", "0..state_len-1",
         "PUZZLE_ID_START..PUZZLE_ID_END",
         "off`, `after_original`, or `only", "first", "collect", "touch-BFS",
-        "best effort", "2**16..2**25",
+        "best effort", "2**16..2**25", "public HTTPS host",
+        "Redirects are never followed",
     )
     for phrase in required:
         assert phrase in rendered
@@ -88,3 +89,11 @@ def test_reader_facing_notebook_source_is_ascii_clean(tmp_path: Path) -> None:
     rendered = notebook_path.read_text(encoding="utf-8")
     rendered.encode("ascii")
     assert "2xT4" in rendered
+
+
+def test_notebook_uses_explicit_or_environment_publish_endpoint_without_shipping_one() -> None:
+    assert "PUBLISH_RESULTS = False" in CONFIG
+    assert 'RESULTS_INGEST_URL = ""' in CONFIG
+    assert "CAYLEYPY_RESULTS_INGEST_URL" in CONFIG
+    assert "results.example" not in CONFIG
+    assert "workers.dev" not in CONFIG

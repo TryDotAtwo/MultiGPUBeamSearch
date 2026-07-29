@@ -72,11 +72,82 @@ def test_public_identity_fields_are_strict(field, value):
         PublicRunConfig.from_mapping({**BASE, field: value})
 
 
-def test_blank_endpoint_is_only_allowed_when_publishing_disabled():
+def test_blank_endpoint_is_only_allowed_when_publishing_disabled(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("CAYLEYPY_RESULTS_INGEST_URL", raising=False)
     with pytest.raises(ValueError, match="RESULTS_INGEST_URL"):
         PublicRunConfig.from_mapping({**BASE, "results_ingest_url": ""})
     config = PublicRunConfig.from_mapping({**BASE, "publish_results": False, "results_ingest_url": ""})
     assert config.results_ingest_url == ""
+
+
+def test_publish_endpoint_falls_back_to_namespaced_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "CAYLEYPY_RESULTS_INGEST_URL",
+        "  https://results.example/ingest  ",
+    )
+    config = PublicRunConfig.from_mapping({**BASE, "results_ingest_url": ""})
+    assert config.results_ingest_url == "https://results.example/ingest"
+
+
+def test_explicit_publish_endpoint_takes_precedence_over_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "CAYLEYPY_RESULTS_INGEST_URL",
+        "https://environment.example/ingest",
+    )
+    config = PublicRunConfig.from_mapping(
+        {**BASE, "results_ingest_url": "https://configured.example/ingest"}
+    )
+    assert config.results_ingest_url == "https://configured.example/ingest"
+
+
+def test_environment_endpoint_does_not_enable_disabled_publication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "CAYLEYPY_RESULTS_INGEST_URL",
+        "https://environment.example/ingest",
+    )
+    config = PublicRunConfig.from_mapping(
+        {**BASE, "publish_results": False, "results_ingest_url": ""}
+    )
+    assert config.publish_results is False
+    assert config.results_ingest_url == ""
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://results.example/ingest",
+        "https://user:password@results.example/ingest",
+        "https://results.example/ingest?token=secret",
+        "https://results.example/ingest#fragment",
+        "https://127.0.0.1/ingest",
+        "https://[::1]/ingest",
+        "https://169.254.169.254/ingest",
+        "https://localhost/ingest",
+        "https://worker.localhost/ingest",
+        "not-a-url",
+    ],
+)
+def test_publish_endpoint_must_be_safe_public_https(endpoint: str) -> None:
+    with pytest.raises(ValueError, match="RESULTS_INGEST_URL"):
+        PublicRunConfig.from_mapping({**BASE, "results_ingest_url": endpoint})
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "https://results.example/ingest",
+        "https://8.8.8.8/ingest",
+        "https://[2606:4700:4700::1111]/ingest",
+    ],
+)
+def test_publish_endpoint_accepts_public_domain_and_global_ip(endpoint: str) -> None:
+    config = PublicRunConfig.from_mapping({**BASE, "results_ingest_url": endpoint})
+    assert config.results_ingest_url == endpoint
+
 
 @pytest.mark.parametrize("field", ["model_source", "model_dtype", "checkpoint_format", "unknown_key"])
 def test_public_config_rejects_hidden_or_unknown_controls(field: str) -> None:
@@ -108,6 +179,36 @@ def test_nonpublishing_run_may_omit_external_provenance() -> None:
     config = PublicRunConfig.from_mapping(values)
     assert config.competition is None
     assert config.kaggle_notebook_sha256 is None
+
+
+@pytest.mark.parametrize(
+    ("field", "sentinel"),
+    [
+        ("author_name", "replace-with-author"),
+        ("competition", " replace-with-competition "),
+        ("kaggle_owner", "REPLACE_WITH_KAGGLE_OWNER"),
+        ("kaggle_slug", "replace_with_kaggle_notebook_slug"),
+        ("kaggle_username", "replace-with-kaggle-username"),
+    ],
+)
+def test_publication_rejects_identity_and_provenance_placeholders(
+    field: str,
+    sentinel: str,
+) -> None:
+    with pytest.raises(ValueError, match=field.upper()):
+        PublicRunConfig.from_mapping({**BASE, field: sentinel})
+
+
+def test_nonpublishing_run_may_retain_author_placeholder() -> None:
+    config = PublicRunConfig.from_mapping(
+        {
+            **BASE,
+            "author_name": "replace-with-author",
+            "publish_results": False,
+            "results_ingest_url": "",
+        }
+    )
+    assert config.author_name == "replace-with-author"
 
 
 @pytest.mark.parametrize(

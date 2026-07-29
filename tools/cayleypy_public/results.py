@@ -18,7 +18,7 @@ import uuid
 from jsonschema import Draft202012Validator, ValidationError
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from tools.cayleypy_public.paths import invert_path, tokenize_path
 
@@ -27,6 +27,18 @@ SCHEMA_VERSION = 1
 MAX_ENVELOPE_BYTES = 256 * 1024
 MAX_PUBLISH_REQUEST_BYTES = 4 * 1024 * 1024
 MAX_RESULTS_PER_REQUEST = 100
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Return the first 3xx response as an HTTPError without following Location."""
+
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        return None
+
+
+def urlopen(request: Request, timeout: float):
+    """Open exactly one configured endpoint; redirects are deliberately disabled."""
+    return build_opener(_NoRedirectHandler()).open(request, timeout=timeout)
+
 _SCHEMA_PATH = Path(__file__).resolve().parents[2] / "configs/cayleypy_results_schema_v1.json"
 
 _AUTHOR_FIELDS = ("name", "kaggle_username")
