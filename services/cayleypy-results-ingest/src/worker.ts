@@ -25,6 +25,8 @@ export const MAX_REQUEST_BYTES = MAX_SERIALIZED_BATCH_BYTES;
 export const MAX_RESULTS_PER_REQUEST = 100;
 export const PER_IP_REQUESTS_PER_MINUTE = 30;
 export const PER_IP_STATUS_REQUESTS_PER_MINUTE = 30;
+/** Fixed D1 scope cardinality; distinct public IPs can share a status budget. */
+export const STATUS_RATE_BUCKET_COUNT = 256;
 export const GLOBAL_ENVELOPES_PER_MINUTE = 2_000;
 export const RECOVERY_STALE_MS = 60_000;
 export const RECOVERY_LIMIT = 50;
@@ -267,9 +269,17 @@ async function handlePostResults(request: Request, env: WorkerEnv): Promise<Resp
   return jsonResponse(errors.length === 0 ? { receipts } : { receipts, errors }, 202);
 }
 
+export function statusRateScope(ip: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < ip.length; index += 1) {
+    hash ^= ip.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return "status-bucket:" + ((hash >>> 0) % STATUS_RATE_BUCKET_COUNT);
+}
 async function allowStatusRequest(request: Request, env: WorkerEnv): Promise<boolean> {
   const ip = request.headers.get("CF-Connecting-IP")?.trim() || "unknown";
-  return consumeD1Limit(env.RESULTS_DB, `status-ip:${ip}`, 1, PER_IP_STATUS_REQUESTS_PER_MINUTE);
+  return consumeD1Limit(env.RESULTS_DB, statusRateScope(ip), 1, PER_IP_STATUS_REQUESTS_PER_MINUTE);
 }
 
 async function handleStatus(request: Request, submissionId: string, env: WorkerEnv): Promise<Response> {

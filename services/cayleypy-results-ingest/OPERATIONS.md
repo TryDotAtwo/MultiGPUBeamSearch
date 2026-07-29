@@ -19,3 +19,4 @@ The operator-only replayDeadLetters(env, options) primitive has this contract:
 5. The normal scheduled recovery later requeues eligible retryable rows. This prevents an automatic DLQ loop.
 
 Before apply, snapshot the selected D1 rows and R2 keys; alert on skipped raw objects or any remaining dead letters. Do not use a public HTTP endpoint for replay.
+The GET status limiter uses 256 deterministic FNV-1a hash buckets in D1, so its stored scope cardinality is at most 256. Different IPs can collide and share a 30-request/minute status budget; this conservative false-positive tradeoff prevents unbounded D1 rows from an anonymous endpoint.

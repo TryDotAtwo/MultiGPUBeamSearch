@@ -14,6 +14,8 @@ import {
   PER_IP_REQUESTS_PER_MINUTE,
   RECOVERY_LIMIT,
   RECOVERY_STALE_MS,
+  STATUS_RATE_BUCKET_COUNT,
+  statusRateScope,
   fetchRequest,
   scheduled,
   queue,
@@ -463,7 +465,7 @@ describe("durable receipts, status, health, and logging safety", () => {
     const receipt = (await accepted.json() as { receipts: Array<{ submission_id: string }> }).receipts[0];
     const windowStart = Math.floor(Date.now() / 60_000) * 60_000;
     await env.RESULTS_DB.prepare("INSERT INTO ingest_rate_limits (scope,window_start,count) VALUES (?,?,?)")
-      .bind(`status-ip:${TEST_IP}`, windowStart, 30).run();
+      .bind(statusRateScope(TEST_IP), windowStart, 30).run();
     const response = await fetchRequest(
       new Request(`${URL}/v1/submissions/${receipt.submission_id}`, { headers: { "CF-Connecting-IP": TEST_IP } }),
       bindings(), context(),
@@ -475,6 +477,25 @@ describe("durable receipts, status, health, and logging safety", () => {
     expect(body).not.toContain(receipt.submission_id);
   });
 
+  test("status rate scopes stay within the fixed bucket cardinality for many distinct IPs", async () => {
+    const scopes = new Set<string>();
+    for (let index = 0; index < STATUS_RATE_BUCKET_COUNT * 3; index += 1) {
+      const ip = "198.51." + Math.floor(index / 256) + "." + (index % 256);
+      scopes.add(statusRateScope(ip));
+      await fetchRequest(
+        new Request(URL + "/v1/submissions/019cffff-ffff-7fff-8fff-ffffffffffff", {
+          headers: { "CF-Connecting-IP": ip },
+        }),
+        bindings(),
+        context(),
+      );
+    }
+    expect(scopes.size).toBeLessThanOrEqual(STATUS_RATE_BUCKET_COUNT);
+    const persisted = await env.RESULTS_DB.prepare(
+      "SELECT COUNT(*) AS count FROM ingest_rate_limits WHERE scope LIKE 'status-bucket:%'",
+    ).first<number>("count");
+    expect(persisted).toBeLessThanOrEqual(STATUS_RATE_BUCKET_COUNT);
+  });
   test("operator dead-letter replay is dry-run by default and retains raw before a bounded apply", async () => {
     const first = await seedSubmission(801, "dead_letter", "2000-01-01T00:00:00.000Z", "publisher_unavailable");
     const second = await seedSubmission(802, "dead_letter", "2000-01-02T00:00:00.000Z", "publisher_unavailable");

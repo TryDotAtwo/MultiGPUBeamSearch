@@ -809,3 +809,5 @@
   CUDA change, or beam-search architecture change was performed.
 
 - 2026-07-30: Added D1-backed status GET rate limiting and explicit dry-run, bounded dead-letter operator replay with retained-R2 verification; production remains reject.
+
+- 2026-07-30: Replaced unbounded status-IP D1 scopes with 256 deterministic hash buckets; collisions conservatively share the status request budget.
