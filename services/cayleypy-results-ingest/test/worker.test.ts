@@ -1,7 +1,10 @@
+import { createHash } from "node:crypto";
 import { env } from "cloudflare:workers";
+import canonicalGolden from "../../../configs/cayleypy_results_v1_golden.json";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { canonicalJson, computeIdempotency } from "../src/ids.js";
+import type { ResultEnvelopeV1 } from "../src/schema.js";
 
 import {
   GLOBAL_ENVELOPES_PER_MINUTE,
@@ -18,26 +21,24 @@ import {
 
 const URL = "https://ingest.example.test";
 
-function validEnvelope(index = 0) {
-  return {
-    schema_version: 1 as const,
-    submission_id: `018f7a24-8f6b-7c8e-9d1b-${(0x2a3b4c5d6e7fn + BigInt(index)).toString(16).padStart(12, "0")}`,
-    run_id: `run-20260729-${index}`,
-    idempotency_key: (index % 16).toString(16).repeat(64),
-    author: { name: `Ada-${index}`, verification: "claimed" as const },
-    kaggle: { owner: "ada", slug: "run", version: 1 },
-    competition: "santa-2023", puzzle_type: "cube", puzzle_id: 42 + index,
-    proof: { initial_state: [0, 1, 2], central_state: [1, 2, 0], generators: { r: [1, 2, 0] } },
-    orientation: { search_mode: "off" as const, final_orientation: "original" as const },
-    solution: { path: ["r"], length: 1, solved_depth: 1, validation: "valid" as const },
-    profile: { requested_beam: 1024, effective_beam: 1024, alignment_delta: 0, evidence: "t4-v1" },
-    runtime: { touch_bfs_radius: 1, solution_mode: "first" as const, max_depth: 10, max_collected_solutions: 1 },
-    model: { filename: "model.pth", sha256: "b".repeat(64), format: "batchnorm-folded" as const, manifest: { output_dim: 1 } },
-    hardware: { gpu_names: ["Tesla T4"], world_size: 2, total_runtime_ms: 1 },
-    solver_commit: "c".repeat(40), submitted_at: "2026-07-29T10:00:00.000Z",
-  };
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
 }
-
+function semanticHash(envelope: ResultEnvelopeV1): string {
+  const { client_submission_id: _client, idempotency_key: _key, submitted_at: _at, run_id: _run, ...semantic } = envelope;
+  return createHash("sha256").update(stableJson(semantic), "utf8").digest("hex");
+}
+function validEnvelope(index = 0) {
+  const envelope = structuredClone(canonicalGolden.cases[0].envelope) as unknown as ResultEnvelopeV1;
+  envelope.client_submission_id = `018f7a24-8f6b-7c8e-9d1b-${(0x2a3b4c5d6e7fn + BigInt(index)).toString(16).padStart(12, "0")}`;
+  envelope.run_id = `run-20260729-${index}`;
+  envelope.puzzle_id = 42 + index;
+  envelope.idempotency_key = semanticHash(envelope);
+  return envelope;
+}
 function bindings(mode: string | undefined = "normal"): WorkerEnv {
   const result: WorkerEnv = {
     RESULTS_DB: env.RESULTS_DB,
@@ -123,16 +124,7 @@ function resultBatch(...indexes: number[]) {
 }
 
 function uniqueResultBatch(count: number, offset = 0) {
-  return {
-    schema_version: 1 as const,
-    results: Array.from({ length: count }, (_, index) => {
-      const envelope = validEnvelope(offset + index);
-      return {
-        ...envelope,
-        idempotency_key: (offset + index + 1).toString(16).padStart(64, "0"),
-      };
-    }),
-  };
+  return { schema_version: 1 as const, results: Array.from({ length: count }, (_, index) => validEnvelope(offset + index)) };
 }
 
 function postRequest(body: BodyInit | null, contentType = "application/json", extraHeaders: HeadersInit = {}): Request {
@@ -321,7 +313,8 @@ describe("fail-closed modes and bounded request parsing", () => {
   });
 
   test("accepts an exact four MiB chunked JSON body with UTF-8 split across chunks", async () => {
-    const envelope = { ...validEnvelope(0), author: { name: "Ada-😀", verification: "claimed" as const } };
+    const envelope = { ...validEnvelope(0), author: { name: "Ada-😀", verification: "claimed" as const } } as ResultEnvelopeV1;
+    envelope.idempotency_key = semanticHash(envelope);
     const encoded = new TextEncoder().encode(JSON.stringify({ schema_version: 1, results: [envelope] }));
     const body = new Uint8Array(4 * 1024 * 1024);
     body.fill(0x20);
@@ -744,14 +737,16 @@ describe("concurrency and early-reject regression gates", () => {
     const firstEnvelope = validEnvelope(0);
     const sameSemanticEnvelope = {
       ...firstEnvelope,
-      submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70",
-      idempotency_key: "d".repeat(64),
+      client_submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70",
+      idempotency_key: firstEnvelope.idempotency_key,
       submitted_at: "2026-07-29T11:00:00.000Z",
-    };
+    } as ResultEnvelopeV1;
     const [first, second] = await Promise.all([
       postJson({ schema_version: 1, results: [firstEnvelope] }, workerEnv),
       postJson({ schema_version: 1, results: [sameSemanticEnvelope] }, workerEnv),
     ]);
+    expect(first.status).toBe(202);
+    expect(second.status).toBe(202);
     const firstReceipt = (await first.json() as { receipts: Array<{ submission_id: string }> }).receipts[0];
     const secondReceipt = (await second.json() as { receipts: Array<{ submission_id: string }> }).receipts[0];
     expect(firstReceipt).toEqual(secondReceipt);

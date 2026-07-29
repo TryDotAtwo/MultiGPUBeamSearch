@@ -7,7 +7,7 @@ import {
   type SubmissionState,
 } from "./db.js";
 import { canonicalJson, computeIdempotency, newSubmissionId, rawObjectKey, sha256Hex } from "./ids.js";
-import type { ResultEnvelopeV1 } from "./schema.js";
+import { validateEnvelopeIntegrity, type ResultEnvelopeV1 } from "./schema.js";
 
 export interface IngestEnv {
   RESULTS_DB: D1Database;
@@ -60,7 +60,8 @@ export type SafeIngestErrorCode =
   | "duplicate_raw_cleanup_failed"
   | "state_transition_failed"
   | "state_transition_conflict"
-  | "recovery_query_failed";
+  | "recovery_query_failed"
+  | "invalid_envelope";
 
 export class SafeIngestError extends Error {
   constructor(readonly code: SafeIngestErrorCode) {
@@ -334,6 +335,7 @@ export async function receiveEnvelope(
   envelope: ResultEnvelopeV1,
   meta: RequestMeta = {},
 ): Promise<Receipt> {
+  if ((await validateEnvelopeIntegrity(envelope)).length !== 0) throw new SafeIngestError("invalid_envelope");
   const idempotencyKey = await computeIdempotency(envelope);
   let prior: SubmissionRow | null;
   try {
@@ -428,6 +430,7 @@ export async function receiveEnvelopeStoreOnly(
   envelope: ResultEnvelopeV1,
   meta: Pick<RequestMeta, "receivedAt"> = {},
 ): Promise<StoredReceipt> {
+  if ((await validateEnvelopeIntegrity(envelope)).length !== 0) throw new SafeIngestError("invalid_envelope");
   const idempotencyKey = await computeIdempotency(envelope);
   let prior: SubmissionRow | null;
   try {

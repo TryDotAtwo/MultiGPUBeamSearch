@@ -1,5 +1,5 @@
 import { findBySubmissionId } from "./db.js";
-import { MAX_SERIALIZED_BATCH_BYTES, validateBatch, type ResultEnvelopeV1 } from "./schema.js";
+import { MAX_SERIALIZED_BATCH_BYTES, validateBatch, validateBatchIntegrity, type ResultEnvelopeV1 } from "./schema.js";
 import {
   SafeIngestError,
   receiveEnvelope,
@@ -143,6 +143,10 @@ async function parseBatch(request: Request): Promise<{ value: ResultEnvelopeV1[]
   const validation = validateBatch(parsed, body.rawByteLength);
   if (!validation.ok) {
     return jsonResponse({ error: "invalid_schema", errors: validation.errors }, 400);
+  }
+  const integrityErrors = await validateBatchIntegrity(validation.value.results);
+  if (integrityErrors.length !== 0) {
+    return jsonResponse({ error: "invalid_schema", errors: integrityErrors }, 400);
   }
   return { value: validation.value.results, rawByteLength: body.rawByteLength };
 }

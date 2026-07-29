@@ -32,8 +32,8 @@ export function canonicalJson(value: unknown): string {
   return encode(value);
 }
 
-function semanticEnvelope(envelope: ResultEnvelopeV1): Omit<ResultEnvelopeV1, "submission_id" | "idempotency_key" | "submitted_at"> {
-  const { submission_id: _submissionId, idempotency_key: _idempotencyKey, submitted_at: _submittedAt, ...semantic } = envelope;
+function semanticEnvelope(envelope: ResultEnvelopeV1): Omit<ResultEnvelopeV1, "client_submission_id" | "run_id" | "idempotency_key" | "submitted_at"> {
+  const { client_submission_id: _clientSubmissionId, run_id: _runId, idempotency_key: _idempotencyKey, submitted_at: _submittedAt, ...semantic } = envelope;
   return semantic;
 }
 

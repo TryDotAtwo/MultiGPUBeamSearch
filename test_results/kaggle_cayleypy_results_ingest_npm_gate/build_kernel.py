@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = Path(__file__).resolve().parent / "kernel"
 FILES = (
     "configs/cayleypy_results_schema_v1.json",
+    "configs/cayleypy_results_v1_golden.json",
     "services/cayleypy-results-ingest/package.json",
     "services/cayleypy-results-ingest/package-lock.json",
     "services/cayleypy-results-ingest/tsconfig.json",
@@ -30,6 +31,7 @@ FILES = (
     "services/cayleypy-results-ingest/test/apply-migrations.ts",
     "services/cayleypy-results-ingest/test/receipt.test.ts",
     "services/cayleypy-results-ingest/test/worker.test.ts",
+    "services/cayleypy-results-ingest/test/node-crypto.d.ts",
 )
 
 

@@ -1,18 +1,13 @@
 import { env } from "cloudflare:workers";
+import canonicalGolden from "../../../configs/cayleypy_results_v1_golden.json";
 import { beforeEach, describe, expect, test } from "vitest";
 
 import { canonicalJson, computeIdempotency } from "../src/ids.js";
+import type { ResultEnvelopeV1 } from "../src/schema.js";
 import { transition } from "../src/db.js";
 import { parkPausedSubmission, receiveEnvelope, recoverStaleSubmissions, SafeIngestError, type IngestEnv } from "../src/storage.js";
 
-const validEnvelope = () => ({
-  schema_version: 1 as const, submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e7f", run_id: "run-20260728-001", idempotency_key: "a".repeat(64),
-  author: { name: "Ada", verification: "claimed" as const }, kaggle: { owner: "ada", slug: "run", version: 1 }, competition: "santa-2023", puzzle_type: "cube", puzzle_id: 42,
-  proof: { initial_state: [0, 1, 2], central_state: [1, 2, 0], generators: { r: [1, 2, 0] } },
-  orientation: { search_mode: "off" as const, final_orientation: "original" as const }, solution: { path: ["r"], length: 1, solved_depth: 1, validation: "valid" as const },
-  profile: { requested_beam: 1024, effective_beam: 1024, alignment_delta: 0, evidence: "t4-v1" }, runtime: { touch_bfs_radius: 1, solution_mode: "first" as const, max_depth: 10, max_collected_solutions: 1 },
-  model: { filename: "model.pth", sha256: "b".repeat(64), format: "batchnorm-folded" as const, manifest: { output_dim: 1 } }, hardware: { gpu_names: ["Tesla T4"], world_size: 2, total_runtime_ms: 1 }, solver_commit: "c".repeat(40), submitted_at: "2026-07-28T10:00:00.000Z",
-});
+const validEnvelope = (): ResultEnvelopeV1 => structuredClone(canonicalGolden.cases[0].envelope) as unknown as ResultEnvelopeV1;
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve: (() => void) | undefined;
@@ -171,7 +166,7 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
   });
   test("canonical JSON is key-order stable and semantic idempotency excludes transport ids", async () => {
     expect(canonicalJson({ z: [true, null], a: 1 })).toBe('{"a":1,"z":[true,null]}');
-    const changedTransport = { ...validEnvelope(), submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70", idempotency_key: "d".repeat(64), submitted_at: "2026-07-28T11:00:00.000Z" };
+    const changedTransport = { ...validEnvelope(), client_submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70", idempotency_key: "d".repeat(64), submitted_at: "2026-07-28T11:00:00.000Z" };
     await expect(computeIdempotency(validEnvelope())).resolves.toBe(await computeIdempotency(changedTransport));
   });
 
@@ -213,7 +208,7 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
     let duplicateSettled = false;
     const duplicatePending = receiveEnvelope(
       bindings,
-      { ...validEnvelope(), submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70" },
+      { ...validEnvelope(), client_submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70" },
       { duplicatePollAttempts: 100, duplicatePollDelayMs: 1 },
     ).then((receipt) => { duplicateSettled = true; return receipt; });
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -345,7 +340,7 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
     const first = receiveEnvelope(bindings, validEnvelope());
     const second = receiveEnvelope(bindings, {
       ...validEnvelope(),
-      submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70",
+      client_submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70",
     });
     await bothPutsStarted.promise;
     releasePuts.resolve();
@@ -379,7 +374,7 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
     const first = receiveEnvelope(bindings, validEnvelope());
     const second = receiveEnvelope(bindings, {
       ...validEnvelope(),
-      submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70",
+      client_submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70",
     });
     await bothPutsStarted.promise;
     releasePuts.resolve();
@@ -402,7 +397,7 @@ describe("receipt durability with Miniflare D1 and R2 bindings", () => {
     expect(raw?.customMetadata?.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(await raw?.text()).toBe(canonicalJson(validEnvelope()));
 
-    const duplicate = await receiveEnvelope(bindings, { ...validEnvelope(), submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70" });
+    const duplicate = await receiveEnvelope(bindings, { ...validEnvelope(), client_submission_id: "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e70" });
     expect(duplicate).toMatchObject({ submission_id: first.submission_id, duplicate: true });
     expect(messages).toHaveLength(1);
   });
