@@ -465,3 +465,5 @@
 - Acceptance follow-up required a thin-notebook-only fix so a zero-byte or otherwise empty solutions CSV renders as an empty result without turning a successful solver run into a notebook failure; the three private packages must be regenerated and fully validated before a scoped commit/push, with no Kaggle push or beam/CUDA/search-architecture change.
 
 - User explicitly requested publishing and sharing the public Kaggle notebook so anyone can copy it, run standard CayleyPy puzzle competitions on 2xT4, and submit token-free best-effort results.
+
+- User clarified public GitHub result publication semantics: first mode must send only the best solution found for each puzzle, while collect mode must send every validated solution found by beam search.

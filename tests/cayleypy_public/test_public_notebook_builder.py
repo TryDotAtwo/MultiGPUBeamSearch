@@ -79,7 +79,7 @@ def test_notebook_pins_official_repository_and_preserves_artifacts_on_cli_failur
 
     assert "SOLVER_REPOSITORY" not in config_source
     assert "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git" in setup_source
-    assert "bb505484a839d3b78819f86aa28e76b842faab09" in config_source
+    assert "737b25667a9a3d90645bc80351ea48f7fd3a3c1f" in config_source
     assert "check=False" in run_source
     assert '["python", "-m", "tools.run_cayleypy_public"' in run_source
     assert 'str(REPO / "tools" / "run_cayleypy_public.py")' not in run_source
