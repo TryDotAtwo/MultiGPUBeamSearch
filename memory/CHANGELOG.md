@@ -940,3 +940,5 @@
 
 - Added a public Cube4 Transformer 2xT4 notebook package with the exact p002/output-24/ReLU checkpoint contract, arbitrary requested beam selection against nearest 2^10..2^25 profiles, 28 GiB RAM plus 50 GiB disk history budgets, PyTorch-compatible NCCL selection, and the verified generator schema. Private Kaggle evidence includes a 4-move beam-1024 solve in 1.27 s and a 12-move beam-2^16 solve in 8.74 s; the 2^25 depth-8 fit run remains under terminal monitoring. No beam/CUDA algorithm changed.
 
+
+- 2026-07-30: Extended the public Cube4 2xT4 notebook with explicit first/collect modes. Collect mode finishes the hit depth plus a configurable number of extra depths, allocates a fail-closed per-rank solution bucket (default 2000), gathers and CPU-validates solutions from both ranks, and writes full TSV/CSV plus a separate best-solution CSV. Static-hybrid history now correctly preflights the configured 28 GiB RAM and 50 GiB disk budgets.

@@ -544,3 +544,5 @@ User reported that an interactive game had been running during part of the recen
 
 - User explicitly authorized publishing the complete Cube4 inference bundle and public notebook, requested a normal-beam run followed by the largest beam fitting 2xT4, required history budgets to use 28-29 GiB RAM plus 50 GiB disk, and required collect mode to preserve every found solution up to user limits around 1000-2000.
 
+
+- User required the public Cube4 notebook to always use the maximum practical history budgets (28-29 GiB host RAM and 50 GiB disk) and to retain every found solution when collection mode is selected, commonly 1000-2000 solutions.
