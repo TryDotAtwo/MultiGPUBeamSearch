@@ -414,6 +414,7 @@ def test_publish_results_posts_canonical_request_and_persists_202_status(
     assert observed["timeout"] == 2.5
     assert request.get_method() == "POST"
     assert request.get_header("Content-type") == "application/json"
+    assert request.get_header("User-agent") == "CayleyPy-Kaggle-Publisher/1.0"
     assert request.data == _canonical_bytes({"schema_version": 1, "results": [envelope]})
     persisted = json.loads(Path("publish_status.json").read_text(encoding="utf-8"))
     assert persisted == {

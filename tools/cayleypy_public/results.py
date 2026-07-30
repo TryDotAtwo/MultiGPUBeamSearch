@@ -562,7 +562,7 @@ def publish_results(
         request = Request(
             url,
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "User-Agent": "CayleyPy-Kaggle-Publisher/1.0"},
             method="POST",
         )
         with urlopen(request, timeout=timeout) as response:
