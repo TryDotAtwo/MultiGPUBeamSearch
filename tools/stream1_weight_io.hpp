@@ -343,20 +343,31 @@ inline void validate_transformer_model_config(
         throw std::runtime_error(context + ": stream1 piece_transformer dtype must be fp16 or bf16");
     }
     require_manifest_u32(model.state_len, static_cast<std::uint32_t>(STATE_LEN), "state_len", context);
-    require_manifest_u32(model.num_classes, TRANSFORMER_NUM_CLASSES, "num_classes", context);
     require_manifest_u32(model.output_dim, static_cast<std::uint32_t>(MOVE_COUNT), "output_dim", context);
-    require_manifest_u32(model.num_pieces, TRANSFORMER_NUM_PIECES, "num_pieces", context);
-    require_manifest_u32(model.max_piece_size, TRANSFORMER_MAX_PIECE_SIZE, "max_piece_size", context);
-    require_manifest_u32(model.seq_len, TRANSFORMER_SEQ_LEN, "seq_len", context);
+    require_manifest_u32(model.max_piece_size, 3U, "max_piece_size", context);
     require_manifest_u32(model.d_model, TRANSFORMER_D_MODEL, "d_model", context);
     require_manifest_u32(model.nhead, TRANSFORMER_NHEAD, "nhead", context);
     require_manifest_u32(model.head_dim, TRANSFORMER_HEAD_DIM, "head_dim", context);
     require_manifest_u32(model.transformer_layers, TRANSFORMER_LAYERS, "transformer_layers", context);
     require_manifest_u32(model.ff_dim, TRANSFORMER_FF_DIM, "ff_dim", context);
-    require_manifest_string(activation, "silu", "activation", context);
     require_manifest_string(pooling, "cls", "pooling", context);
-    require_manifest_string(piece_layout, "p900", "piece_layout", context);
-    require_manifest_string(piece_embed_mode, "full_s120", "piece_embed_mode", context);
+    if (piece_layout == "p900") {
+        require_manifest_u32(model.num_classes, 120U, "num_classes", context);
+        require_manifest_u32(model.num_pieces, 50U, "num_pieces", context);
+        require_manifest_u32(model.seq_len, 51U, "seq_len", context);
+        require_manifest_string(activation, "silu", "activation", context);
+        require_manifest_string(piece_embed_mode, "full_s120", "piece_embed_mode", context);
+        return;
+    }
+    if (piece_layout == "cube4") {
+        require_manifest_u32(model.num_classes, 6U, "num_classes", context);
+        require_manifest_u32(model.num_pieces, 56U, "num_pieces", context);
+        require_manifest_u32(model.seq_len, 57U, "seq_len", context);
+        require_manifest_string(activation, "relu", "activation", context);
+        require_manifest_string(piece_embed_mode, "piece_local", "piece_embed_mode", context);
+        return;
+    }
+    throw std::runtime_error(context + ": unsupported stream1 piece_transformer piece_layout " + piece_layout);
 }
 
 inline Stream1ModelConfig load_stream1_manifest(const std::filesystem::path& dir) {

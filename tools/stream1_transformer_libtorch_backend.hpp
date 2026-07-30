@@ -1,6 +1,7 @@
 #pragma once
 #include <ATen/ops/linear.h>
 #include <ATen/ops/scaled_dot_product_attention.h>
+#include <ATen/ops/relu.h>
 #include <ATen/ops/silu.h>
 #include <torch/cuda.h>
 #include <torch/torch.h>
@@ -160,6 +161,7 @@ struct PieceTransformerLibTorch {
     torch::Device device;
     torch::ScalarType dtype = torch::kFloat16;
     std::string dtype_suffix;
+    std::string activation;
     std::uint32_t state_len = 0;
     std::uint32_t num_classes = 0;
     std::uint32_t move_count = 0;
@@ -220,10 +222,12 @@ struct PieceTransformerLibTorch {
         if (seq_len != num_pieces + 1U || d_model != nhead * head_dim || output_dim != move_count) {
             throw std::runtime_error("invalid piece_transformer manifest dimensions");
         }
-        if (manifest_string(manifest, "activation") != "silu" ||
-            manifest_string(manifest, "pooling") != "cls" ||
-            manifest_string(manifest, "piece_layout") != "p900" ||
-            manifest_string(manifest, "piece_embed_mode") != "full_s120") {
+        activation = manifest_string(manifest, "activation");
+        const std::string piece_layout = manifest_string(manifest, "piece_layout");
+        const std::string piece_embed_mode = manifest_string(manifest, "piece_embed_mode");
+        const bool p900 = piece_layout == "p900" && piece_embed_mode == "full_s120" && activation == "silu";
+        const bool cube4 = piece_layout == "cube4" && piece_embed_mode == "piece_local" && activation == "relu";
+        if (manifest_string(manifest, "pooling") != "cls" || (!p900 && !cube4)) {
             throw std::runtime_error("unsupported piece_transformer manifest contract");
         }
 
@@ -344,7 +348,12 @@ struct PieceTransformerLibTorch {
             x = x + linear_kxh(context, block.attn_out_weight_kxh, block.attn_out_bias);
 
             y = layer_norm(x, block.ln2_gamma, block.ln2_beta);
-            y = at::silu(linear_kxh(y, block.ff1_weight_kxh, block.ff1_bias));
+            y = linear_kxh(y, block.ff1_weight_kxh, block.ff1_bias);
+            if (activation == "relu") {
+                y = at::relu(y);
+            } else {
+                y = at::silu(y);
+            }
             x = x + linear_kxh(y, block.ff2_weight_kxh, block.ff2_bias);
         }
         torch::Tensor cls = layer_norm(x.index({torch::indexing::Slice(), 0, torch::indexing::Slice()}), output_ln_gamma, output_ln_beta);

@@ -62,6 +62,31 @@ def load_checkpoint_state(weights_path: Path) -> TensorDict:
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
+def normalize_metadata(raw: Mapping[str, Any]) -> dict[str, Any]:
+    metadata = dict(raw)
+    model = raw.get("model")
+    if not isinstance(model, Mapping):
+        model = raw.get("config", {}).get("model", {})
+    if isinstance(model, Mapping):
+        kwargs = model.get("kwargs", {})
+        if isinstance(kwargs, Mapping):
+            for key, value in kwargs.items():
+                metadata.setdefault(str(key), value)
+        provider = str(model.get("provider", metadata.get("model_arch", "")))
+        layout = str(model.get("layout", metadata.get("piece_layout", "")))
+        metadata.setdefault("model_arch", provider)
+        metadata.setdefault("piece_layout", layout)
+    layout = str(metadata.get("piece_layout", "")).lower()
+    if layout == "cube4":
+        metadata.setdefault("piece_embed_mode", "piece_local")
+        metadata.setdefault("num_pieces", 56)
+        metadata.setdefault("max_piece_size", 3)
+    if raw.get("num_actions") is not None:
+        metadata.setdefault("n_gens", raw["num_actions"])
+    return metadata
+
+
+
 
 def nearby_roots(weights_path: Path) -> list[Path]:
     roots: list[Path] = []
@@ -132,6 +157,9 @@ def locate_source_root(weights_path: Path, metadata_path: Path | None, explicit:
 
 
 def load_move_names(generator: Mapping[str, Any]) -> list[str]:
+    move_names = generator.get("move_names")
+    if isinstance(move_names, list) and all(isinstance(name, str) for name in move_names):
+        return list(move_names)
     names = generator.get("names")
     if isinstance(names, list) and all(isinstance(name, str) for name in names):
         return list(names)
@@ -154,9 +182,17 @@ def import_model_module(source_root: Path):
     return importlib.import_module("pilgrim.model")
 
 
-def load_piece_layout(source_root: Path) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def load_piece_layout(source_root: Path, piece_layout: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     model_module = import_model_module(source_root)
-    piece_positions, piece_mask, piece_types = model_module.make_p900_piece_layout()
+    layout_functions = {
+        "p900": "make_p900_piece_layout",
+        "cube4": "make_cube4_piece_layout",
+    }
+    try:
+        function_name = layout_functions[piece_layout]
+    except KeyError as exc:
+        raise ValueError(f"unsupported piece_layout: {piece_layout}") from exc
+    piece_positions, piece_mask, piece_types = getattr(model_module, function_name)()
     return piece_positions.cpu(), piece_mask.cpu(), piece_types.cpu()
 
 
@@ -199,10 +235,21 @@ def infer_architecture(
     if model_arch != "piece_transformer":
         raise ValueError(f"metadata model_arch must be piece_transformer, got {model_arch!r}")
     state_len = metadata_int(metadata, "state_size")
-    if state_len != 120:
-        raise ValueError(f"piece_transformer export requires state_len=120, got {state_len}")
-    if num_classes != 120:
-        raise ValueError(f"piece_transformer export requires num_classes=120, got {num_classes}")
+    piece_layout = str(metadata.get("piece_layout", "")).lower()
+    piece_embed_mode = str(metadata.get("piece_embed_mode", "")).lower()
+    contracts = {
+        "p900": (120, 120, 50, 2, "full_s120"),
+        "cube4": (96, 6, 56, 3, "piece_local"),
+    }
+    if piece_layout not in contracts:
+        raise ValueError(f"unsupported piece_layout: {piece_layout}")
+    expected_state_len, expected_classes, expected_pieces, expected_types, expected_embed = contracts[piece_layout]
+    if state_len != expected_state_len:
+        raise ValueError(f"{piece_layout} piece_transformer requires state_len={expected_state_len}, got {state_len}")
+    if num_classes != expected_classes:
+        raise ValueError(f"{piece_layout} piece_transformer requires num_classes={expected_classes}, got {num_classes}")
+    if piece_embed_mode != expected_embed:
+        raise ValueError(f"{piece_layout} piece_embed_mode must be {expected_embed}")
 
     local_rows, d_model = sd["local_value_embedding.weight"].shape
     projection_out, projection_in = sd["piece_projection.weight"].shape
@@ -215,8 +262,8 @@ def infer_architecture(
         raise ValueError(f"metadata transformer_d_model={metadata_d_model} does not match tensors={int(d_model)}")
     if max_piece_size != 3:
         raise ValueError(f"piece_transformer export requires max_piece_size=3, got {max_piece_size}")
-    if num_pieces != 50:
-        raise ValueError(f"piece_transformer export requires num_pieces=50, got {num_pieces}")
+    if num_pieces != expected_pieces:
+        raise ValueError(f"{piece_layout} piece_transformer requires num_pieces={expected_pieces}, got {num_pieces}")
     if local_rows != max_piece_size * num_classes:
         raise ValueError("local_value_embedding rows must equal max_piece_size * num_classes")
     if projection_out != d_model or projection_in != max_piece_size * d_model:
@@ -224,7 +271,7 @@ def infer_architecture(
 
     require_shape(sd, "piece_projection.bias", (d_model,))
     require_shape(sd, "piece_position_embedding.weight", (num_pieces, d_model))
-    require_shape(sd, "piece_type_embedding.weight", (2, d_model))
+    require_shape(sd, "piece_type_embedding.weight", (expected_types, d_model))
     require_shape(sd, "cls_token", (1, 1, d_model))
     require_shape(sd, "input_norm.weight", (d_model,))
     require_shape(sd, "input_norm.bias", (d_model,))
@@ -283,10 +330,6 @@ def infer_architecture(
         raise ValueError(f"unsupported activation metadata: {activation}")
     if pooling != "cls":
         raise ValueError(f"runtime piece_transformer export requires cls pooling, got {pooling}")
-    if str(metadata.get("piece_layout", "")).lower() != "p900":
-        raise ValueError("piece_layout must be p900")
-    if str(metadata.get("piece_embed_mode", "")).lower() != "full_s120":
-        raise ValueError("piece_embed_mode must be full_s120")
 
     return {
         "backend": "piece_transformer",
@@ -297,6 +340,7 @@ def infer_architecture(
         "output_dim": int(output_dim),
         "num_pieces": num_pieces,
         "max_piece_size": max_piece_size,
+        "num_piece_types": expected_types,
         "seq_len": num_pieces + 1,
         "d_model": int(d_model),
         "nhead": nhead,
@@ -305,8 +349,8 @@ def infer_architecture(
         "ff_dim": ff_dim,
         "activation": activation,
         "pooling": pooling,
-        "piece_layout": "p900",
-        "piece_embed_mode": "full_s120",
+        "piece_layout": piece_layout,
+        "piece_embed_mode": piece_embed_mode,
         "input_embedding": "fast_slot_projected",
         "move_names": move_names,
     }
@@ -484,13 +528,13 @@ def export_piece_transformer(
     weights_path = Path(weights_path)
     sd = load_checkpoint_state(weights_path)
     metadata_path = locate_metadata(weights_path, metadata_path)
-    metadata = read_json(metadata_path)
+    metadata = normalize_metadata(read_json(metadata_path))
     generator_path = locate_generator(weights_path, metadata, generator_path)
     generator = read_json(generator_path)
     move_names = load_move_names(generator)
     source_root = locate_source_root(weights_path, metadata_path, source_root)
-    piece_positions, piece_mask, piece_types = load_piece_layout(source_root)
     arch = infer_architecture(sd, metadata, move_names, num_classes)
+    piece_positions, piece_mask, piece_types = load_piece_layout(source_root, str(arch["piece_layout"]))
     if tuple(piece_positions.shape) != (arch["num_pieces"], arch["max_piece_size"]):
         raise ValueError(f"piece layout shape mismatch: {tuple(piece_positions.shape)}")
     if tuple(piece_mask.shape) != tuple(piece_positions.shape):

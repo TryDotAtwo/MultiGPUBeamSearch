@@ -7,6 +7,7 @@ from tools.export_stream1 import detect_format_from_state_dict
 from tools.export_stream1_transformer import (
     build_fast_input_tables,
     infer_architecture,
+    normalize_metadata,
     strip_state_prefixes,
 )
 
@@ -63,7 +64,41 @@ def make_metadata(transformer_layers=4, transformer_ff_dim=1024, n_gens=24):
     }
 
 
+
+def make_cube4_state():
+    sd = make_piece_transformer_state()
+    sd["local_value_embedding.weight"] = torch.randn(18, 256)
+    sd["piece_position_embedding.weight"] = torch.randn(56, 256)
+    sd["piece_type_embedding.weight"] = torch.randn(3, 256)
+    return sd
+
+
+def make_cube4_metadata():
+    metadata = make_metadata()
+    metadata.update({"state_size": 96, "transformer_activation": "relu",
+                     "piece_layout": "cube4", "piece_embed_mode": "piece_local",
+                     "num_pieces": 56})
+    return metadata
+
+
+
 class Stream1TransformerExporterTests(unittest.TestCase):
+    def test_normalizes_bundle_cube4_metadata(self):
+        raw = {
+            "model": {"provider": "piece_transformer", "layout": "cube4", "kwargs": {
+                "transformer_d_model": 256, "transformer_heads": 8,
+                "transformer_layers": 4, "transformer_ff_dim": 1024,
+                "transformer_activation": "relu", "transformer_pooling": "cls"}},
+            "state_size": 96, "num_actions": 24,
+        }
+        metadata = normalize_metadata(raw)
+        self.assertEqual(metadata["model_arch"], "piece_transformer")
+        self.assertEqual(metadata["piece_layout"], "cube4")
+        self.assertEqual(metadata["piece_embed_mode"], "piece_local")
+        self.assertEqual(metadata["num_pieces"], 56)
+        self.assertEqual(metadata["max_piece_size"], 3)
+
+
     def test_detects_piece_transformer_from_marker_keys_after_prefix_strip(self):
         sd = {f"module._orig_mod.{key}": value for key, value in make_piece_transformer_state().items()}
         self.assertEqual(detect_format_from_state_dict(sd), "piece-transformer")
@@ -91,6 +126,23 @@ class Stream1TransformerExporterTests(unittest.TestCase):
         self.assertEqual(arch["ff_dim"], 1024)
         self.assertEqual(arch["activation"], "silu")
         self.assertEqual(arch["pooling"], "cls")
+
+    def test_infers_cube4_piece_transformer_architecture(self):
+        arch = infer_architecture(
+            make_cube4_state(), make_cube4_metadata(),
+            move_names=[f"m{i}" for i in range(24)], num_classes=6)
+        self.assertEqual(arch["state_len"], 96)
+        self.assertEqual(arch["num_classes"], 6)
+        self.assertEqual(arch["num_pieces"], 56)
+        self.assertEqual(arch["num_piece_types"], 3)
+        self.assertEqual(arch["seq_len"], 57)
+        self.assertEqual(arch["activation"], "relu")
+        self.assertEqual(arch["piece_layout"], "cube4")
+        self.assertEqual(arch["piece_embed_mode"], "piece_local")
+
+
+
+
 
     def test_rejects_consistent_non_24_move_piece_transformer(self):
         with self.assertRaisesRegex(ValueError, "requires move_count=24"):
