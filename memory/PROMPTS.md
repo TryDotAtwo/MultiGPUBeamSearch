@@ -491,3 +491,6 @@
 - 2026-07-30: Fix bounded cardinality for anonymous status GET rate-limit storage; preserve production reject.
 
 - 2026-07-30: Add fail-safe legacy status-ip cleanup migration and correct fixed-bucket documentation.
+
+- User instructed the agent to continue autonomously, authorized Cloudflare staging deployment and GitHub App creation, and kept only beam-search/CUDA architecture changes behind a separate approval boundary.
+- User explicitly asked to continue after the network interruption.

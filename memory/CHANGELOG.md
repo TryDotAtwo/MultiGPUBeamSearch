@@ -852,3 +852,7 @@
 - 2026-07-30: Replaced unbounded status-IP D1 scopes with 256 deterministic hash buckets; collisions conservatively share the status request budget.
 
 - 2026-07-30: Added 0003 migration to remove only legacy status-ip rate-limit scopes before bounded bucket rollout.
+
+- 2026-07-30: Provisioned isolated Cloudflare staging D1/R2/Queue/DLQ resources and deployed `cayleypy-results-ingest-staging` in fail-closed `store_only` mode. Applied migrations 0001..0003, created the declarative SQLite Durable Object, verified live health and an empty secret inventory, and completed the exact GitHub App bootstrap dry-run. GitHub App creation is paused only at GitHub sudo/2FA; no App secret exists yet.
+
+- 2026-07-30: Fixed two deployment-only defects found by the live gate: generated private Wrangler configs now pin an absolute Worker entry point, and the obsolete no-op `wrangler check` gate is replaced with an actual `wrangler deploy --dry-run` build. The GitHub App helper now honors standard proxy environment variables through a pinned `undici` dispatcher. Full local tests pass 55 schema/config and 122 Worker assertions plus typecheck; beam/CUDA code is unchanged.

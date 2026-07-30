@@ -1,4 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { decodeJwt, decodeProtectedHeader } from "jose";
 import { describe, expect, test, vi } from "vitest";
 import {
@@ -22,6 +23,7 @@ import {
   waitForInstallation,
 } from "../scripts/github-app-bootstrap.mjs";
 
+const bootstrapSource = readFileSync(new URL("../scripts/github-app-bootstrap.mjs", import.meta.url), "utf8");
 const CONFIG_PATH = "D:\\safe root\\services\\cayleypy-results-ingest\\.staging-deploy-private\\wrangler.generated.json";
 const SERVICE_ROOT = "D:\\safe root\\services\\cayleypy-results-ingest";
 const D1_ID = "11111111-2222-4333-8444-555555555555";
@@ -490,5 +492,10 @@ describe("GitHub App manifest bootstrap contracts", () => {
 
   test("pins owner, repository, version, and IPv4 loopback", () => {
     expect(CONTRACT).toMatchObject({ loopbackHost: "127.0.0.1", wranglerVersion: "4.115.0", owner: "TryDotAtwo", repository: "cayleypy-beam-results", repositoryId: 1_281_329_788, environment: "staging" });
+  });
+
+  test("uses the standard environment proxy for bounded GitHub and staging fetches", () => {
+    expect(bootstrapSource).toContain("new EnvHttpProxyAgent()");
+    expect(bootstrapSource).toContain("process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.ALL_PROXY");
   });
 });

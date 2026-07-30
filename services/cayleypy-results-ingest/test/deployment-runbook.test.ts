@@ -36,5 +36,7 @@ describe("staging deployment runbook contract", () => {
   });
   test("has a fail-closed mode transition and performs migrations before first deploy", () => {
     expect(script).toContain("ValidateSet('preflight', 'store_only', 'activate_normal', 'rollback_store_only')"); expect(script).toContain("$targetMode = if ($Phase -eq 'activate_normal') { 'normal' } else { 'store_only' }"); expect(script).toContain("'d1', 'migrations', 'apply'"); expect(script).toContain("if ($Phase -eq 'store_only')"); expect(script).toContain("Require-CommandResult @('deploy'");
+    expect(script).toContain("'deploy', '--dry-run', '--outdir'");
+    expect(script).toContain("$base.main = $entryPoint");
   });
 });

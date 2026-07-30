@@ -19,6 +19,12 @@ function Require-CommandResult([string[]]$Arguments) {
   if ($LASTEXITCODE -ne 0) { throw "wrangler command failed: $($Arguments -join ' ')" }
 }
 
+function Require-ValidConfig([string]$ConfigPath) {
+  $validationDir = Join-Path $serviceRoot '.staging-deploy-private/dry-run'
+  New-Item -ItemType Directory -Force -Path $validationDir | Out-Null
+  Require-CommandResult @('deploy', '--dry-run', '--outdir', $validationDir, '--config', $ConfigPath, '--env', 'staging')
+}
+
 function Read-ResourceManifest([string]$Path) {
   $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
   $value = (Get-Content -LiteralPath $resolved -Raw -Encoding UTF8) | ConvertFrom-Json
@@ -42,6 +48,9 @@ function Read-ResourceManifest([string]$Path) {
 
 function New-GeneratedConfig($Resources, [string]$Mode) {
   $base = (Get-Content -LiteralPath $baseConfig -Raw -Encoding UTF8) | ConvertFrom-Json
+  $entryPoint = [System.IO.Path]::GetFullPath((Join-Path $serviceRoot ([string]$base.main)))
+  if (-not (Test-Path -LiteralPath $entryPoint -PathType Leaf)) { throw "Worker entry point is missing: $entryPoint" }
+  $base.main = $entryPoint
   $staging = $base.env.staging
   if ($null -eq $staging) { throw 'staging environment missing from tracked config' }
   $d1 = @($staging.d1_databases | Where-Object { $_.binding -eq 'RESULTS_DB' })
@@ -69,11 +78,11 @@ if (-not [string]::IsNullOrWhiteSpace($accountOverride) -and $accountOverride.To
 }
 Require-CommandResult @('--version')
 Require-CommandResult @('whoami', '--account', [string]$resources.cloudflare_account_id, '--json')
-Require-CommandResult @('check', '--config', $baseConfig, '--env', 'staging')
+Require-ValidConfig $baseConfig
 if ($Phase -eq 'preflight') { Write-Output 'PREFLIGHT_OK: no Cloudflare resource or Worker mutation was attempted'; exit 0 }
 $targetMode = if ($Phase -eq 'activate_normal') { 'normal' } else { 'store_only' }
 $generatedConfig = New-GeneratedConfig $resources $targetMode
-Require-CommandResult @('check', '--config', $generatedConfig, '--env', 'staging')
+Require-ValidConfig $generatedConfig
 if ($Phase -eq 'store_only') { Require-CommandResult @('d1', 'migrations', 'apply', $resources.d1_database_name, '--remote', '--config', $generatedConfig, '--env', 'staging') }
 Require-CommandResult @('deploy', '--config', $generatedConfig, '--env', 'staging')
 Write-Output "DEPLOYED_MODE=$targetMode"

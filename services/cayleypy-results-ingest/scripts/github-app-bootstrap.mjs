@@ -4,6 +4,7 @@ import { lstat, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 
 import {
   CONTRACT,
@@ -22,6 +23,10 @@ import {
 } from "./github-app-bootstrap-core.mjs";
 
 export * from "./github-app-bootstrap-core.mjs";
+
+if (process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.ALL_PROXY) {
+  setGlobalDispatcher(new EnvHttpProxyAgent());
+}
 
 const SERVICE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GENERATED_CONFIG = path.join(SERVICE_ROOT, ".staging-deploy-private", "wrangler.generated.json");

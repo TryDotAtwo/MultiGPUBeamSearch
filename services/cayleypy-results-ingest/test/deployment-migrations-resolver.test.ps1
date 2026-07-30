@@ -51,6 +51,8 @@ exit /b 0
   Assert-True (-not $hasUtf8Bom) 'generated config must be BOM-free UTF-8 for the Node bootstrap parser'
   $config = Get-Content -LiteralPath $generated -Raw -Encoding UTF8 | ConvertFrom-Json
   Assert-True ([string]$config.account_id -ceq '0123456789abcdef0123456789abcdef') 'generated config lost exact Cloudflare account id'
+  $expectedEntryPoint = [System.IO.Path]::GetFullPath((Join-Path $serviceRoot 'src/worker.ts'))
+  Assert-True ([string]$config.main -ceq $expectedEntryPoint) 'generated config must keep an absolute Worker entry point when moved into the private directory'
   $binding = @($config.env.staging.d1_databases | Where-Object binding -eq 'RESULTS_DB')
   Assert-True ($binding.Count -eq 1) 'generated config lost RESULTS_DB'
   $actualMigrations = [System.IO.Path]::GetFullPath([string]$binding[0].migrations_dir)
@@ -63,6 +65,8 @@ exit /b 0
   $recorded = @(Get-Content -LiteralPath $calls -Encoding UTF8)
   Assert-True ($recorded.Count -eq 6) 'unexpected fake Wrangler command count'
   Assert-True ($recorded[1] -ceq 'whoami --account 0123456789abcdef0123456789abcdef --json') 'exact account membership check missing or reordered'
+  Assert-True ($recorded[2] -match '^deploy --dry-run --outdir ') 'tracked config must be validated by a real dry-run build'
+  Assert-True ($recorded[3] -match '^deploy --dry-run --outdir ') 'generated config must be validated by a real dry-run build'
   Assert-True ($recorded[4] -match '^d1 migrations apply cayleypy-results-staging --remote --config ') 'migration command missing or reordered'
   Assert-True ($recorded[5] -match '^deploy --config ') 'deploy did not follow migration apply'
 
