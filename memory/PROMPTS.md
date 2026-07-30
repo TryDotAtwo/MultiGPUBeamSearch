@@ -1,4 +1,4 @@
-# Prompt History
+﻿# Prompt History
 
 ## 2026-07-22
 - User explicitly approved launching the updated private Kaggle 2xT4 pipeline gate for the SM75 transformer follow-up; correctness remains complete byte-exact score comparison and performance changes are accepted only after the integrated repeated gate.
@@ -474,7 +474,7 @@
 - User requested making the LibTorch Stream1 transformer CUDA Graph question explicit so graph replay works, continuing performance work, using a profiler, and spawning a subagent to research acceleration options. No fallbacks or MLP disruption are allowed.
 
 ## 2026-07-04
-- User required Docker-based profiling after Kaggle lacked Nsight: "� ������ ������ ������ �������, ���� Nsight ��� � ����������". Requirement: make/use a Docker image with Nsight available, run profiler locally, and use the result to guide Stream1 transformer performance work.
+- User required Docker-based profiling after Kaggle lacked Nsight: "пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ Nsight пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ". Requirement: make/use a Docker image with Nsight available, run profiler locally, and use the result to guide Stream1 transformer performance work.
 
 - User asked whether cuBLAS can be replaced by CUTLASS for the Stream1 transformer and requested installing/using a compatible profiler build in Docker to understand the bottleneck and keep improving. Requirements: no fallbacks or distillation, preserve MLP/default path, use Nsight profiling evidence, and do not keep bad CUTLASS experiments if they regress.
 - User requested running the Stream1 transformer backend comparison both locally and on Kaggle 2xT4 to determine which path is actually fastest under the same workload. Required comparison: Python Torch exported weights, original PyTorch `batch_process` where available, C++ LibTorch eager/CUDA Graph, and native CUTLASS eager/CUDA Graph, with logs and summaries stored in `test_results/`.
@@ -532,11 +532,15 @@ User requested continuing with native CUTLASS after Docker recovery and disk cle
 
 User approved optimizing native transformer inference around memory-system efficiency rather than ALU throughput. Scope includes FlashAttention-2-style register/shared-memory/L2 reuse, coalesced Q/K/V movement, async copies, shape-specific GEMM and attention policies, layout/fusion experiments, exact full-dump correctness gates, local RTX 3070 validation first, and independent A100 tuning afterward. This is hardware reuse within one fixed-sequence inference, not autoregressive KV caching.
 
-## 2026-07-22 — Long-running transformer inference optimization goal
+## 2026-07-22 вЂ” Long-running transformer inference optimization goal
 
 - Work sequentially on transformer inference performance on the local RTX 3070 first.
 - Use the profiler-enabled Docker environment to guide optimization, with exact mathematical comparisons and real speed measurements.
 - Continue until further meaningful RTX 3070 improvements are exhausted by evidence, then move to independent optimization on 2xT4; do not transfer SM86 policies blindly.
-## 2026-07-22 — RTX 3070 benchmark validity
+## 2026-07-22 вЂ” RTX 3070 benchmark validity
 
 User reported that an interactive game had been running during part of the recent transformer tuning and required checking that the GPU is free for every performance measurement. Suspect overlapping timings must be discarded. Accepted local RTX 3070 performance series require an immediate utilization/process idle check, and longer acceptance series should be bookended by another idle check; correctness dumps remain independently gated by the canonical full-score SHA.
+- User requested a ready-to-run public Kaggle example with attached puzzle data and checkpoint, solving easy puzzle 10 quickly at approximately beam 1024, with real result publication.
+
+- User explicitly authorized publishing the complete Cube4 inference bundle and public notebook, requested a normal-beam run followed by the largest beam fitting 2xT4, required history budgets to use 28-29 GiB RAM plus 50 GiB disk, and required collect mode to preserve every found solution up to user limits around 1000-2000.
+
