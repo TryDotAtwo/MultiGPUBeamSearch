@@ -945,3 +945,5 @@
 
 
 - 2026-07-30: Kaggle acceptance v3 completed on real 2xT4. At beam 2^16 and depth 100, collect mode found and CPU-validated 8 distinct length-10 solutions across both ranks and wrote full TSV/CSV plus best CSV. The auto history budget selected 27,497,660,672 bytes from 28,997,660,672 available, reserving 1.5 GB. Separate v13 proved the 2^25 profile fits 2xT4 through depth 8 in 1697.60 seconds, peaking at 7107 MiB per GPU with mean utilization 98.43%/99.16% and no OOM/overflow.
+
+- 2026-07-30: Published Kaggle notebook `trydotatwo/cube4-transformer-2xt4-beam-search`. Public v1 completed on 2xT4: solve time 18.376 seconds at beam 2^16/depth 100, collect mode preserved 8 CPU-validated length-10 solutions (6 from rank 0, 2 from rank 1), and exported full TSV/CSV plus best CSV. Effective history RAM was auto-sized to 27,469,635,840 bytes with 1.5 GB reserved; disk budget was 50 GiB.
