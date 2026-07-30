@@ -943,3 +943,5 @@
 
 - 2026-07-30: Extended the public Cube4 2xT4 notebook with explicit first/collect modes. Collect mode finishes the hit depth plus a configurable number of extra depths, allocates a fail-closed per-rank solution bucket (default 2000), gathers and CPU-validates solutions from both ranks, and writes full TSV/CSV plus a separate best-solution CSV. Static-hybrid history now correctly preflights an automatic practical maximum: up to 29.0 GB host RAM while reserving 1.5 GB for Python/LibTorch, plus 50 GiB disk.
 
+
+- 2026-07-30: Kaggle acceptance v3 completed on real 2xT4. At beam 2^16 and depth 100, collect mode found and CPU-validated 8 distinct length-10 solutions across both ranks and wrote full TSV/CSV plus best CSV. The auto history budget selected 27,497,660,672 bytes from 28,997,660,672 available, reserving 1.5 GB. Separate v13 proved the 2^25 profile fits 2xT4 through depth 8 in 1697.60 seconds, peaking at 7107 MiB per GPU with mean utilization 98.43%/99.16% and no OOM/overflow.
