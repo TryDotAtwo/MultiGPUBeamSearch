@@ -494,3 +494,5 @@
 
 - User instructed the agent to continue autonomously, authorized Cloudflare staging deployment and GitHub App creation, and kept only beam-search/CUDA architecture changes behind a separate approval boundary.
 - User explicitly asked to continue after the network interruption.
+
+- User confirmed the GitHub App installation on exactly TryDotAtwo/cayleypy-beam-results and asked the agent to keep trying. All infrastructure must stay free, 100 concurrent publishers must not lose results, and beam-search/CUDA architecture changes still require separate approval.
