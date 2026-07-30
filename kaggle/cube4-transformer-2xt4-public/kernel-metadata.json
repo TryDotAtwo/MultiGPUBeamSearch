@@ -11,5 +11,6 @@
     "trydotatwo/cube4-full-transformer-inference"
   ],
   "competition_sources": [],
-  "kernel_sources": []
+  "kernel_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
 }
