@@ -463,3 +463,5 @@
 - User requested preparing a private Kaggle acceptance builder for the new public checkpoint-only notebook: run bounded p0/depth8/beam2**16 smoke first, then make p0/depth100/beam2**21 output1 and output24 configurations available; reuse proven Megaminx checkpoints/data, pin exact source, disable publication, validate generated notebook JSON/AST/metadata/config, and do not push before review.
 - User's standing request is to continue iterating until the private real-2xT4 acceptance gates pass, allowing notebook and packaging fixes while requiring prior agreement for any beam-search architecture or CUDA change.
 - Acceptance follow-up required a thin-notebook-only fix so a zero-byte or otherwise empty solutions CSV renders as an empty result without turning a successful solver run into a notebook failure; the three private packages must be regenerated and fully validated before a scoped commit/push, with no Kaggle push or beam/CUDA/search-architecture change.
+
+- User explicitly requested publishing and sharing the public Kaggle notebook so anyone can copy it, run standard CayleyPy puzzle competitions on 2xT4, and submit token-free best-effort results.
