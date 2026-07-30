@@ -214,3 +214,40 @@ def test_main_failed_search_materializes_partial_and_always_writes_publish_statu
     assert calls == [partial]
     assert status["state"] == ("published" if publish_enabled else "skipped")
     assert status["reason"] == "disabled" if not publish_enabled else status["result_count"] == 1
+
+
+def _publication_record(puzzle_id: int, path: str, *, variant: str = "original", valid: bool = True) -> SolutionRecord:
+    tokens = tuple(token for token in path.split(".") if token)
+    return SolutionRecord(
+        puzzle_id, variant, path, path, len(tokens), 0, None, valid, (0, 1, 2)
+    )
+
+
+def test_first_mode_publishes_only_shortest_valid_solution_per_puzzle() -> None:
+    records = (
+        _publication_record(7, "a.a"),
+        _publication_record(7, "b"),
+        _publication_record(7, "", variant="source"),
+        _publication_record(7, "a", valid=False),
+        _publication_record(8, "a.b"),
+    )
+
+    selected = public_cli._publication_records("first", records)
+
+    assert [(record.puzzle_id, record.path) for record in selected] == [(7, "b"), (8, "a.b")]
+
+
+def test_collect_mode_publishes_every_valid_discovered_solution() -> None:
+    records = (
+        _publication_record(7, "a.a"),
+        _publication_record(7, "b"),
+        _publication_record(7, "", variant="source"),
+        _publication_record(7, "a", valid=False),
+        _publication_record(8, "a.b"),
+    )
+
+    selected = public_cli._publication_records("collect", records)
+
+    assert [(record.puzzle_id, record.path) for record in selected] == [
+        (7, "a.a"), (7, "b"), (8, "a.b"),
+    ]

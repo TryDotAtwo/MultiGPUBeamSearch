@@ -400,6 +400,35 @@ def _publication_context(
     }
 
 
+def _publication_records(
+    solution_mode: str,
+    records: Sequence[SolutionRecord],
+) -> tuple[SolutionRecord, ...]:
+    eligible = tuple(record for record in records if record.valid and record.variant != "source")
+    if solution_mode == "collect":
+        return eligible
+    if solution_mode != "first":
+        raise ValueError(f"unsupported solution mode: {solution_mode}")
+    best: dict[int, SolutionRecord] = {}
+    for record in eligible:
+        key = (
+            len(tokenize_path(record.original_oriented_path)),
+            record.original_oriented_path,
+            record.variant,
+            record.found_depth,
+            record.touch_depth,
+        )
+        current = best.get(record.puzzle_id)
+        if current is None or key < (
+            len(tokenize_path(current.original_oriented_path)),
+            current.original_oriented_path,
+            current.variant,
+            current.found_depth,
+            current.touch_depth,
+        ):
+            best[record.puzzle_id] = record
+    return tuple(best[puzzle_id] for puzzle_id in sorted(best))
+
 def _publication_envelopes(
     config: PublicRunConfig,
     contract: PuzzleContract,

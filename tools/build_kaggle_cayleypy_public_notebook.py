@@ -51,6 +51,8 @@ CUDA/C++ algorithm knobs are deliberately absent.
 
 ## Results publishing
 
+The mode controls what is sent: `first publishes one best solution per puzzle; collect publishes every validated solution`. The local `submission.csv` always uses the best solution per puzzle.
+
 Publishing is best effort: valid local solutions and `submission.csv` remain even
 if the ingest service is unavailable. The status is saved in `publish_status.json`.
 No token or secret belongs in this notebook.
@@ -282,7 +284,7 @@ def build_notebook(out_dir: Path = OUT_DIR) -> tuple[Path, Path]:
     metadata_path = out_dir / OUT_METADATA.name
     notebook_path.write_text(json.dumps(_notebook(), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     metadata = {
-        "id": "trydotatwo/cayleypy-2xt4-checkpoint-public",
+        "id": "trydotatwo/cayleypy-2xt4-checkpoint-beam-search",
         "title": "CayleyPy 2xT4 Checkpoint Beam Search",
         "code_file": notebook_path.name,
         "language": "python",

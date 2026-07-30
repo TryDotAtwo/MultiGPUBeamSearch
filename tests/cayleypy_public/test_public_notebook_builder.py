@@ -36,6 +36,7 @@ def test_public_notebook_is_thin_valid_and_idempotent(tmp_path: Path) -> None:
             assert cell["execution_count"] is None
             assert cell["outputs"] == []
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["id"] == "trydotatwo/cayleypy-2xt4-checkpoint-beam-search"
     assert metadata["is_private"] is False
     assert metadata["machine_shape"] == "NvidiaTeslaT4"
 
@@ -51,6 +52,7 @@ def test_public_notebook_contract_and_no_hidden_model_or_secret_controls(tmp_pat
         "off`, `after_original`, or `only", "first", "collect", "touch-BFS",
         "best effort", "2**16..2**25", "public HTTPS host",
         "Redirects are never followed",
+        "first publishes one best solution per puzzle; collect publishes every validated solution",
     )
     for phrase in required:
         assert phrase in rendered
