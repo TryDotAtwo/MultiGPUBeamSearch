@@ -105,12 +105,12 @@ def _config_source(scenario: AcceptanceScenario) -> str:
     source = _replace_once(source, 'MAX_DEPTH = 100', f'MAX_DEPTH = {scenario.max_depth}')
     source = _replace_once(source, 'AUTHOR_NAME = "replace-with-author"', 'AUTHOR_NAME = "acceptance-test"')
     source = _replace_once(source, 'PUBLISH_RESULTS = True', 'PUBLISH_RESULTS = False')
-    source = _replace_once(source, 'RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev"', 'RESULTS_INGEST_URL = ""')
+    source = _replace_once(source, 'RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results"', 'RESULTS_INGEST_URL = ""')
     source = _replace_once(source, 'COMPETITION = "replace-with-competition"', f'COMPETITION = "{COMPETITION}"')
     source = _replace_once(source, 'KAGGLE_OWNER = "replace-with-kaggle-owner"', 'KAGGLE_OWNER = "trydotatwo"')
     source = _replace_once(source, 'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"', f'KAGGLE_SLUG = "cayleypy-public-acceptance-{scenario.name}"')
     source = _replace_once(source, 'KAGGLE_USERNAME = None', 'KAGGLE_USERNAME = "trydotatwo"')
-    source = _replace_once(source, 'SOLVER_COMMIT = "737b25667a9a3d90645bc80351ea48f7fd3a3c1f"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
+    source = _replace_once(source, 'SOLVER_COMMIT = "f312265d63cfc563b90c79a2fd70d1307d28d4bb"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
     return source
 
 

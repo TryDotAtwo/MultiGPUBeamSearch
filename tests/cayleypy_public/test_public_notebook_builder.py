@@ -79,7 +79,10 @@ def test_notebook_pins_official_repository_and_preserves_artifacts_on_cli_failur
 
     assert "SOLVER_REPOSITORY" not in config_source
     assert "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git" in setup_source
-    assert "737b25667a9a3d90645bc80351ea48f7fd3a3c1f" in config_source
+    assert 'SCRATCH = Path("/tmp/cayleypy_public")' in setup_source
+    assert "SCRATCH.mkdir(parents=True, exist_ok=True)" in setup_source
+    assert 'OUTPUT_DIR = Path("/kaggle/working/cayleypy_public/output")' in setup_source
+    assert "f312265d63cfc563b90c79a2fd70d1307d28d4bb" in config_source
     assert "check=False" in run_source
     assert '["python", "-m", "tools.run_cayleypy_public"' in run_source
     assert 'str(REPO / "tools" / "run_cayleypy_public.py")' not in run_source
@@ -111,7 +114,7 @@ def test_reader_facing_notebook_source_is_ascii_clean(tmp_path: Path) -> None:
 
 def test_notebook_ships_token_free_public_publish_endpoint() -> None:
     assert "PUBLISH_RESULTS = True" in CONFIG
-    assert 'RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev"' in CONFIG
+    assert 'RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results"' in CONFIG
     assert "results.example" not in CONFIG
     assert "cayleypy-results-ingest-staging.tupa-expert.workers.dev" in CONFIG
 

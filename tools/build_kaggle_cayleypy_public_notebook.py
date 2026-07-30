@@ -98,7 +98,7 @@ TOUCH_BFS_RADIUS = 0
 AUTHOR_NAME = "replace-with-author"
 PUBLISH_RESULTS = True               # best effort; set False to disable publishing
 # Public token-free endpoint; valid local results survive every publishing failure.
-RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev"
+RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results"
 COMPETITION = "replace-with-competition"
 KAGGLE_OWNER = "replace-with-kaggle-owner"
 KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"
@@ -107,7 +107,7 @@ KAGGLE_USERNAME = None
 
 # Official repository revision. Keep this 40-character commit pinned for a
 # reproducible solve; SOLVER_COMMIT always refers to TryDotAtwo/MultiGPUBeamSearch.
-SOLVER_COMMIT = "737b25667a9a3d90645bc80351ea48f7fd3a3c1f"
+SOLVER_COMMIT = "f312265d63cfc563b90c79a2fd70d1307d28d4bb"
 '''
 
 
@@ -118,10 +118,11 @@ from pathlib import Path
 import shutil
 import subprocess
 
+SCRATCH = Path("/tmp/cayleypy_public")
 WORK = Path("/kaggle/working/cayleypy_public")
-REPO = WORK / "MultiGPUBeamSearch"
-CONFIG_PATH = WORK / "run_config.json"
-OUTPUT_DIR = WORK / "output"
+REPO = SCRATCH / "MultiGPUBeamSearch"
+CONFIG_PATH = SCRATCH / "run_config.json"
+OUTPUT_DIR = Path("/kaggle/working/cayleypy_public/output")
 OFFICIAL_SOLVER_REPOSITORY = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
 
 if SOLVER_COMMIT == "0" * 40:
@@ -136,6 +137,7 @@ else:
         if not required_path.is_file():
             raise FileNotFoundError(required_path)
 
+    SCRATCH.mkdir(parents=True, exist_ok=True)
     WORK.mkdir(parents=True, exist_ok=True)
     if REPO.exists():
         shutil.rmtree(REPO)

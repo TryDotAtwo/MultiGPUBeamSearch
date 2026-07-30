@@ -467,3 +467,5 @@
 - User explicitly requested publishing and sharing the public Kaggle notebook so anyone can copy it, run standard CayleyPy puzzle competitions on 2xT4, and submit token-free best-effort results.
 
 - User clarified public GitHub result publication semantics: first mode must send only the best solution found for each puzzle, while collect mode must send every validated solution found by beam search.
+
+- User requested a ready-to-run public Kaggle example with attached puzzle data and checkpoint, solving easy puzzle 10 quickly at approximately beam 1024, with real result publication.
