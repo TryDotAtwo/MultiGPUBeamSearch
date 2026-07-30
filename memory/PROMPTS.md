@@ -1,3 +1,17 @@
+- User authorized implementing and publishing all remaining non-beam work,
+  including the GitHub App/Cloudflare bootstrap; only beam-search/CUDA
+  architecture changes still require separate agreement.
+- Harden the private personal-account GitHub App bootstrap with TDD: one
+  127.0.0.1 manifest callback with random exact state validation, fixed
+  contents-write/metadata-read access to only
+  TryDotAtwo/cayleypy-beam-results, in-memory PKCS#1-to-PKCS#8 conversion,
+  one pinned-Wrangler `secret bulk` stdin operation against a verified live
+  store-only staging sink, account-pinned resource creation plus exact private-
+  manifest/generated-config targeting with Windows case-insensitive env handling,
+  zero pre-existing staging secrets, exact post-upload secret names/types, and a
+  mutation-free dry-run. Document the single-operator boundary because Cloudflare
+  exposes no atomic secret-list/bulk compare-and-set. Do not create the App,
+  key, Cloudflare resource, secret, version, or deployment during preparation.
 - Private Kaggle npm gate v36 completed with exactly two non-beam failures:
   fix operator-replay `undefined` narrowing and the invalid Vitest matcher
   chain, use focused TDD/static gates, update memory, commit/push only scoped

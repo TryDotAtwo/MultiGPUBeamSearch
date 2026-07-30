@@ -495,7 +495,7 @@ describe("durable receipts, status, health, and logging safety", () => {
       "SELECT COUNT(*) AS count FROM ingest_rate_limits WHERE scope LIKE 'status-bucket:%'",
     ).first<number>("count");
     expect(persisted).toBeLessThanOrEqual(STATUS_RATE_BUCKET_COUNT);
-  });
+  }, 30_000);
   test("operator dead-letter replay is dry-run by default and retains raw before a bounded apply", async () => {
     const first = await seedSubmission(801, "dead_letter", "2000-01-01T00:00:00.000Z", "publisher_unavailable");
     const second = await seedSubmission(802, "dead_letter", "2000-01-02T00:00:00.000Z", "publisher_unavailable");

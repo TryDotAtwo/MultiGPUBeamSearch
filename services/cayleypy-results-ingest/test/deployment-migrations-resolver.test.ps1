@@ -34,6 +34,7 @@ exit /b 0
   @'
 {
   "account_label": "test-only",
+  "cloudflare_account_id": "0123456789abcdef0123456789abcdef",
   "d1_database_name": "cayleypy-results-staging",
   "d1_database_id": "11111111-2222-4333-8444-555555555555",
   "r2_bucket_name": "cayleypy-results-raw-staging",
@@ -45,7 +46,11 @@ exit /b 0
   & $helper -Phase store_only -ResourceManifest $manifest | Out-Null
   $generated = Join-Path $deployDir 'wrangler.generated.json'
   Assert-True (Test-Path -LiteralPath $generated) 'helper did not generate a staging config'
+  $generatedBytes = [System.IO.File]::ReadAllBytes($generated)
+  $hasUtf8Bom = $generatedBytes.Length -ge 3 -and $generatedBytes[0] -eq 0xEF -and $generatedBytes[1] -eq 0xBB -and $generatedBytes[2] -eq 0xBF
+  Assert-True (-not $hasUtf8Bom) 'generated config must be BOM-free UTF-8 for the Node bootstrap parser'
   $config = Get-Content -LiteralPath $generated -Raw -Encoding UTF8 | ConvertFrom-Json
+  Assert-True ([string]$config.account_id -ceq '0123456789abcdef0123456789abcdef') 'generated config lost exact Cloudflare account id'
   $binding = @($config.env.staging.d1_databases | Where-Object binding -eq 'RESULTS_DB')
   Assert-True ($binding.Count -eq 1) 'generated config lost RESULTS_DB'
   $actualMigrations = [System.IO.Path]::GetFullPath([string]$binding[0].migrations_dir)
@@ -56,9 +61,10 @@ exit /b 0
   Assert-True (Test-Path -LiteralPath (Join-Path $actualMigrations '0003_remove_legacy_status_ip_limits.sql')) '0003 missing through generated resolver'
 
   $recorded = @(Get-Content -LiteralPath $calls -Encoding UTF8)
-  Assert-True ($recorded.Count -eq 5) 'unexpected fake Wrangler command count'
-  Assert-True ($recorded[3] -match '^d1 migrations apply cayleypy-results-staging --remote --config ') 'migration command missing or reordered'
-  Assert-True ($recorded[4] -match '^deploy --config ') 'deploy did not follow migration apply'
+  Assert-True ($recorded.Count -eq 6) 'unexpected fake Wrangler command count'
+  Assert-True ($recorded[1] -ceq 'whoami --account 0123456789abcdef0123456789abcdef --json') 'exact account membership check missing or reordered'
+  Assert-True ($recorded[4] -match '^d1 migrations apply cayleypy-results-staging --remote --config ') 'migration command missing or reordered'
+  Assert-True ($recorded[5] -match '^deploy --config ') 'deploy did not follow migration apply'
 
   $python = @'
 import pathlib, sqlite3, sys

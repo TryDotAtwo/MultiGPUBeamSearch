@@ -5,6 +5,8 @@
     "test": "vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "dev": "wrangler dev --env staging",
+    "bootstrap:github-app": "node ./scripts/github-app-bootstrap.mjs",
+    "bootstrap:github-app:dry-run": "node ./scripts/github-app-bootstrap.mjs --dry-run",
     "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy --env production"
   },

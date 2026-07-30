@@ -1,3 +1,25 @@
+- Added a fail-closed, one-shot GitHub App manifest bootstrap for staging.
+  It verifies the fixed generated config, pinned Wrangler, Cloudflare auth,
+  exact GitHub CLI user/repository admin state, and live `store_only` health;
+  binds only `127.0.0.1`; enforces random state and exact callback semantics;
+  fixes the GitHub PKCS#1 versus Worker PKCS#8 mismatch entirely in memory;
+  verifies one private personal-account installation and repository id 1281329788
+  through an in-memory App JWT plus an immediately revoked read-only installation
+  token, while requiring only contents-write/metadata-read on the App; pins the exact
+  Cloudflare account in the private manifest/generated config and account-scoped
+  `whoami`; pins resource creation to the same id and makes every documented
+  native account/resource command fail closed on `$LASTEXITCODE`; rejects every
+  conflicting case-insensitive account environment alias and any pre-existing
+  staging secret; repeats the empty-list check immediately before one pinned
+  Wrangler `secret bulk` stdin operation; and verifies exactly three
+  `secret_text` names afterward. The unavoidable Cloudflare list/bulk TOCTOU is
+  documented as a single-operator deployment boundary. The dry-run is
+  mutation-free. The normal-mode runbook now uses the implemented
+  `INGEST_BASE_URL` contract and all four required bounded recovery-audit
+  snapshots/arguments. Generated config is BOM-free UTF-8 for Node parsing. The v37
+  gate-only fixes move migration 0003 inspection to
+  Node Vitest and give the exact 256-bucket cardinality test a bounded 30 s.
+  No App, key, Cloudflare resource/secret/version/deploy, or beam/CUDA change occurred.
 - Fixed the two exact private npm gate v36 TypeScript/test failures: explicit
   `undefined` narrowing before the bounded operator-replay limit clamp, and a
   standalone negative Vitest assertion for secret-free deployment config.
