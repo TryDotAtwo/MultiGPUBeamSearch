@@ -469,3 +469,5 @@
 - User clarified public GitHub result publication semantics: first mode must send only the best solution found for each puzzle, while collect mode must send every validated solution found by beam search.
 
 - User requested a ready-to-run public Kaggle example with attached puzzle data and checkpoint, solving easy puzzle 10 quickly at approximately beam 1024, with real result publication.
+
+- User explicitly authorized publishing the complete Cube4 inference bundle and public notebook, requested a normal-beam run followed by the largest beam fitting 2xT4, required history budgets to use 28-29 GiB RAM plus 50 GiB disk, and required collect mode to preserve every found solution up to user limits around 1000-2000.
