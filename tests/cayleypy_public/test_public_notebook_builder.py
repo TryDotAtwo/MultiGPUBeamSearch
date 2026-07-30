@@ -36,7 +36,7 @@ def test_public_notebook_is_thin_valid_and_idempotent(tmp_path: Path) -> None:
             assert cell["execution_count"] is None
             assert cell["outputs"] == []
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert metadata["is_private"] is True
+    assert metadata["is_private"] is False
     assert metadata["machine_shape"] == "NvidiaTeslaT4"
 
 
@@ -82,9 +82,23 @@ def test_notebook_pins_official_repository_and_preserves_artifacts_on_cli_failur
     assert '["python", "-m", "tools.run_cayleypy_public"' in run_source
     assert 'str(REPO / "tools" / "run_cayleypy_public.py")' not in run_source
     assert "RUN_RETURN_CODE = run_process.returncode" in run_source
-    assert "if RUN_RETURN_CODE != 0:" in display_source
+    assert "if RUN_RETURN_CODE not in (None, 0):" in display_source
     assert "artifacts above were retained" in display_source
 
+
+def test_unconfigured_public_template_finishes_with_setup_required(tmp_path: Path) -> None:
+    notebook_path, _ = build_notebook(tmp_path)
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    sources = {
+        cell["id"]: _source(cell)
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code"
+    }
+    namespace: dict[str, object] = {"display": lambda value: None}
+    for cell_id in ("user-config", "setup", "preflight", "run", "artifacts"):
+        exec(compile(sources[cell_id], f"generated-{cell_id}-cell", "exec"), namespace)
+    assert namespace["SETUP_REQUIRED"] is True
+    assert namespace["RUN_RETURN_CODE"] is None
 
 def test_reader_facing_notebook_source_is_ascii_clean(tmp_path: Path) -> None:
     notebook_path, _ = build_notebook(tmp_path)
@@ -93,12 +107,11 @@ def test_reader_facing_notebook_source_is_ascii_clean(tmp_path: Path) -> None:
     assert "2xT4" in rendered
 
 
-def test_notebook_uses_explicit_or_environment_publish_endpoint_without_shipping_one() -> None:
-    assert "PUBLISH_RESULTS = False" in CONFIG
-    assert 'RESULTS_INGEST_URL = ""' in CONFIG
-    assert "CAYLEYPY_RESULTS_INGEST_URL" in CONFIG
+def test_notebook_ships_token_free_public_publish_endpoint() -> None:
+    assert "PUBLISH_RESULTS = True" in CONFIG
+    assert 'RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev"' in CONFIG
     assert "results.example" not in CONFIG
-    assert "workers.dev" not in CONFIG
+    assert "cayleypy-results-ingest-staging.tupa-expert.workers.dev" in CONFIG
 
 
 def test_display_cell_renders_zero_byte_solutions_csv_without_failing_success(
@@ -120,6 +133,7 @@ def test_display_cell_renders_zero_byte_solutions_csv_without_failing_success(
         {
             "OUTPUT_DIR": output_dir,
             "RUN_RETURN_CODE": 0,
+            "SETUP_REQUIRED": False,
             "display": displayed.append,
         },
     )

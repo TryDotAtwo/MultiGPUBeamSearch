@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Build private, pinned Kaggle acceptance packages for the public CayleyPy launcher.
 
 The packages deliberately reuse the public notebook's config/setup/run/display
@@ -104,6 +104,8 @@ def _config_source(scenario: AcceptanceScenario) -> str:
     source = _replace_once(source, 'BEAM_WIDTH = 2**21', f'BEAM_WIDTH = {scenario.beam_width}')
     source = _replace_once(source, 'MAX_DEPTH = 100', f'MAX_DEPTH = {scenario.max_depth}')
     source = _replace_once(source, 'AUTHOR_NAME = "replace-with-author"', 'AUTHOR_NAME = "acceptance-test"')
+    source = _replace_once(source, 'PUBLISH_RESULTS = True', 'PUBLISH_RESULTS = False')
+    source = _replace_once(source, 'RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev"', 'RESULTS_INGEST_URL = ""')
     source = _replace_once(source, 'COMPETITION = "replace-with-competition"', f'COMPETITION = "{COMPETITION}"')
     source = _replace_once(source, 'KAGGLE_OWNER = "replace-with-kaggle-owner"', 'KAGGLE_OWNER = "trydotatwo"')
     source = _replace_once(source, 'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"', f'KAGGLE_SLUG = "cayleypy-public-acceptance-{scenario.name}"')

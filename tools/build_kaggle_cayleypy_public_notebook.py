@@ -54,8 +54,8 @@ CUDA/C++ algorithm knobs are deliberately absent.
 Publishing is best effort: valid local solutions and `submission.csv` remain even
 if the ingest service is unavailable. The status is saved in `publish_status.json`.
 No token or secret belongs in this notebook.
-Publishing remains explicit opt-in. Set an HTTPS endpoint in the config or leave
-it blank to use `CAYLEYPY_RESULTS_INGEST_URL`; no endpoint is bundled. Publishing
+Publishing uses the bundled free HTTPS ingest endpoint by default. Set
+`PUBLISH_RESULTS=False` to disable it, or override `RESULTS_INGEST_URL`. Publishing
 fails closed before solve if author or competition/Kaggle provenance still uses
 the supplied `replace-with-*` placeholders.
 The endpoint must be a public HTTPS host: localhost and non-global IP literals are
@@ -94,9 +94,9 @@ MAX_COLLECTED_SOLUTIONS = 100
 TOUCH_BFS_RADIUS = 0
 
 AUTHOR_NAME = "replace-with-author"
-PUBLISH_RESULTS = False              # explicit opt-in; failures keep local artifacts
-# Explicit HTTPS endpoint wins; blank falls back to CAYLEYPY_RESULTS_INGEST_URL.
-RESULTS_INGEST_URL = ""              # no endpoint, token, or secret is bundled
+PUBLISH_RESULTS = True               # best effort; set False to disable publishing
+# Public token-free endpoint; valid local results survive every publishing failure.
+RESULTS_INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev"
 COMPETITION = "replace-with-competition"
 KAGGLE_OWNER = "replace-with-kaggle-owner"
 KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"
@@ -124,21 +124,25 @@ OFFICIAL_SOLVER_REPOSITORY = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.g
 
 if SOLVER_COMMIT == "0" * 40:
     raise ValueError("set SOLVER_COMMIT to a real 40-character public commit")
-for required_path in (CHECKPOINT_PATH, PUZZLE_INFO_JSON, TEST_CSV, SAMPLE_SUBMISSION_CSV):
-    if "REPLACE_WITH_" in str(required_path):
-        raise ValueError(f"replace the explicit Kaggle path: {required_path}")
-    if not required_path.is_file():
-        raise FileNotFoundError(required_path)
+required_paths = (CHECKPOINT_PATH, PUZZLE_INFO_JSON, TEST_CSV, SAMPLE_SUBMISSION_CSV)
+SETUP_REQUIRED = any("REPLACE_WITH_" in str(path) for path in required_paths)
+if SETUP_REQUIRED:
+    print("SETUP_REQUIRED: Copy & Edit this notebook, attach competition data and a supported checkpoint, then replace every REPLACE_WITH_* path in USER CONFIG.")
+    checked_commit = SOLVER_COMMIT
+else:
+    for required_path in required_paths:
+        if not required_path.is_file():
+            raise FileNotFoundError(required_path)
 
-WORK.mkdir(parents=True, exist_ok=True)
-if REPO.exists():
-    shutil.rmtree(REPO)
-subprocess.run(["git", "clone", "--filter=blob:none", "--no-checkout", OFFICIAL_SOLVER_REPOSITORY, str(REPO)], check=True)
-subprocess.run(["git", "fetch", "--depth", "1", "origin", SOLVER_COMMIT], cwd=REPO, check=True)
-subprocess.run(["git", "checkout", "--detach", "FETCH_HEAD"], cwd=REPO, check=True)
-checked_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
-if checked_commit != SOLVER_COMMIT:
-    raise RuntimeError(f"pinned commit mismatch: expected={SOLVER_COMMIT} got={checked_commit}")
+    WORK.mkdir(parents=True, exist_ok=True)
+    if REPO.exists():
+        shutil.rmtree(REPO)
+    subprocess.run(["git", "clone", "--filter=blob:none", "--no-checkout", OFFICIAL_SOLVER_REPOSITORY, str(REPO)], check=True)
+    subprocess.run(["git", "fetch", "--depth", "1", "origin", SOLVER_COMMIT], cwd=REPO, check=True)
+    subprocess.run(["git", "checkout", "--detach", "FETCH_HEAD"], cwd=REPO, check=True)
+    checked_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
+    if checked_commit != SOLVER_COMMIT:
+        raise RuntimeError(f"pinned commit mismatch: expected={SOLVER_COMMIT} got={checked_commit}")
 
 # Canonical notebook-source hash: immutable cells only (not user config/setup).
 NOTEBOOK_CELL_SOURCES = __CANONICAL_SOURCES__
@@ -154,15 +158,17 @@ print({"solver_commit": checked_commit, "notebook_source_sha256": KAGGLE_NOTEBOO
 PREFLIGHT = r'''# Validate the fixed public runtime before compiling or solving.
 import subprocess
 
-gpu_names = [line.strip() for line in subprocess.check_output(
-    ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], text=True
-).splitlines() if line.strip()]
-if len(gpu_names) != 2 or any(name not in {"Tesla T4", "NVIDIA T4"} for name in gpu_names):
-    raise RuntimeError(f"this launcher requires exactly two T4 GPUs; observed={gpu_names!r}")
-print("preflight_ok", {"gpu_names": gpu_names, "requested_beam": BEAM_WIDTH,
-                       "puzzle_ids": [PUZZLE_ID_START, PUZZLE_ID_END]})
+if SETUP_REQUIRED:
+    print("preflight_skipped", {"reason": "SETUP_REQUIRED"})
+else:
+    gpu_names = [line.strip() for line in subprocess.check_output(
+        ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], text=True
+    ).splitlines() if line.strip()]
+    if len(gpu_names) != 2 or any(name not in {"Tesla T4", "NVIDIA T4"} for name in gpu_names):
+        raise RuntimeError(f"this launcher requires exactly two T4 GPUs; observed={gpu_names!r}")
+    print("preflight_ok", {"gpu_names": gpu_names, "requested_beam": BEAM_WIDTH,
+                           "puzzle_ids": [PUZZLE_ID_START, PUZZLE_ID_END]})
 '''
-
 
 RUN = r'''# The repository CLI owns model detection/export, profile selection, build, solve and validation.
 run_config = {
@@ -191,14 +197,18 @@ run_config = {
     "solver_commit": SOLVER_COMMIT,
     "kaggle_notebook_sha256": KAGGLE_NOTEBOOK_SHA256,
 }
-CONFIG_PATH.write_text(json.dumps(run_config, sort_keys=True) + "\n", encoding="utf-8")
-run_process = subprocess.run(
-    ["python", "-m", "tools.run_cayleypy_public",
-     "--config-json", str(CONFIG_PATH), "--output-dir", str(OUTPUT_DIR)],
-    cwd=REPO,
-    check=False,
-)
-RUN_RETURN_CODE = run_process.returncode
+if SETUP_REQUIRED:
+    RUN_RETURN_CODE = None
+    print("run_skipped", {"reason": "SETUP_REQUIRED"})
+else:
+    CONFIG_PATH.write_text(json.dumps(run_config, sort_keys=True) + "\n", encoding="utf-8")
+    run_process = subprocess.run(
+        ["python", "-m", "tools.run_cayleypy_public",
+         "--config-json", str(CONFIG_PATH), "--output-dir", str(OUTPUT_DIR)],
+        cwd=REPO,
+        check=False,
+    )
+    RUN_RETURN_CODE = run_process.returncode
 print({"cli_return_code": RUN_RETURN_CODE})
 '''
 
@@ -206,6 +216,9 @@ print({"cli_return_code": RUN_RETURN_CODE})
 DISPLAY = r'''# Bounded handoff: show machine-readable statuses and a small solution preview.
 import json
 import pandas as pd
+
+if SETUP_REQUIRED:
+    print("SETUP_REQUIRED: no solve was attempted. Use Copy & Edit, attach inputs, edit USER CONFIG, and Run All.")
 
 for name in ("selected_profile.json", "preflight.json", "publish_status.json", "run_summary.json"):
     path = OUTPUT_DIR / name
@@ -224,7 +237,7 @@ for name in ("beam_run_results.csv", "solutions/solutions.csv", "submission.csv"
     else:
         print("missing")
 
-if RUN_RETURN_CODE != 0:
+if RUN_RETURN_CODE not in (None, 0):
     raise RuntimeError(f"public CLI failed with return code {RUN_RETURN_CODE}; artifacts above were retained")
 '''
 
@@ -274,7 +287,7 @@ def build_notebook(out_dir: Path = OUT_DIR) -> tuple[Path, Path]:
         "code_file": notebook_path.name,
         "language": "python",
         "kernel_type": "notebook",
-        "is_private": True,
+        "is_private": False,
         "enable_gpu": True,
         "machine_shape": "NvidiaTeslaT4",
         "enable_internet": True,

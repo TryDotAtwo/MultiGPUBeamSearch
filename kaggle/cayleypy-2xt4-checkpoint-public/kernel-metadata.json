@@ -4,7 +4,7 @@
   "code_file": "cayleypy-2xt4-checkpoint-public.ipynb",
   "language": "python",
   "kernel_type": "notebook",
-  "is_private": true,
+  "is_private": false,
   "enable_gpu": true,
   "machine_shape": "NvidiaTeslaT4",
   "enable_internet": true,
