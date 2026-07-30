@@ -16,3 +16,11 @@
 - `git diff --check`: clean.
 - Public artifact secret scan: clean.
 
+
+## Public Kaggle release
+
+- Kernel: `trydotatwo/cayleypy-2xt4-checkpoint-beam-search` version 2.
+- Terminal status: `KernelWorkerStatus.COMPLETE`.
+- Downloaded log confirms pinned solver commit `737b25667a9a3d90645bc80351ea48f7fd3a3c1f` and clean `SETUP_REQUIRED` template handoff with no traceback.
+- Log: `test_results/kaggle_public_cayleypy_result_modes_v2/cayleypy-2xt4-checkpoint-beam-search.log`.
+
