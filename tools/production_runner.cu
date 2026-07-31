@@ -5,6 +5,14 @@
 #include "../src/hash.hpp"
 #include "../src/state.hpp"
 
+#ifndef BEAM_HAS_LIBTORCH_STREAM1
+#define BEAM_HAS_LIBTORCH_STREAM1 0
+#endif
+
+#if BEAM_HAS_LIBTORCH_STREAM1
+#include "stream1_libtorch_ring_slot_launcher.hpp"
+#endif
+
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
@@ -4139,13 +4147,59 @@ int main(int argc, char** argv) {
     std::size_t total_before = 0;
     BEAM_CUDA_CHECK(cudaMemGetInfo(&free_before, &total_before));
 
+    const char* stream1_executor_env = std::getenv("BEAM_STREAM1_EXECUTOR");
+    const std::string stream1_executor =
+        stream1_executor_env == nullptr || stream1_executor_env[0] == '\0'
+            ? std::string("native_cuda_graph")
+            : std::string(stream1_executor_env);
+    const bool use_libtorch_stream1_executor = stream1_executor == "libtorch_eager";
+    const bool use_native_eager_stream1_executor =
+        stream1_executor == "native_eager" || stream1_executor == "native_no_graph";
+    if (!use_libtorch_stream1_executor && !use_native_eager_stream1_executor &&
+        stream1_executor != "native_cuda_graph" && stream1_executor != "cuda_graph") {
+        throw std::runtime_error("BEAM_STREAM1_EXECUTOR must be native_cuda_graph, cuda_graph, native_eager, native_no_graph, or libtorch_eager");
+    }
+#if !BEAM_HAS_LIBTORCH_STREAM1
+    if (use_libtorch_stream1_executor) {
+        throw std::runtime_error("BEAM_STREAM1_EXECUTOR=libtorch_eager requires production_runner_libtorch_stream1 built with BEAM_ENABLE_LIBTORCH_STREAM1=ON");
+    }
+#endif
+#if BEAM_DEBUG_INFERENCE_TRACE
+    if (use_libtorch_stream1_executor) {
+        throw std::runtime_error("BEAM_DEBUG_INFERENCE_TRACE is not implemented for LibTorch Stream1 executor");
+    }
+#endif
+
     const std::filesystem::path weight_dir = env_path("BEAM_WEIGHT_DIR", "stream1_weights");
-    const stream1_weights::HostWeightBytes host_weights =
-        stream1_weights::load_stream1_weights(weight_dir);
-    const Stream1ModelConfig& stream1_model = host_weights.model;
+    stream1_weights::HostWeightBytes host_weights;
+    Stream1ModelConfig stream1_manifest_only{};
+    if (use_libtorch_stream1_executor) {
+        stream1_manifest_only = stream1_weights::load_stream1_manifest(weight_dir);
+    } else {
+        host_weights = stream1_weights::load_stream1_weights(weight_dir);
+    }
+    const Stream1ModelConfig& stream1_model = use_libtorch_stream1_executor ? stream1_manifest_only : host_weights.model;
+    if (use_libtorch_stream1_executor) {
+        if (stream1_model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
+            throw std::runtime_error("BEAM_STREAM1_EXECUTOR=libtorch_eager requires stream1 backend piece_transformer");
+        }
+        if (stream1_model.output_dim != MOVE_COUNT) {
+            throw std::runtime_error("BEAM_STREAM1_EXECUTOR=libtorch_eager requires output_dim == MOVE_COUNT; single-output transformer row mode is not implemented");
+        }
+    }
     const RuntimeConfigBuild config_build =
         build_runtime_config_from_budget(beam, world_size, rank, stream1_model, free_before);
     const RuntimeConfig config = config_build.config;
+    const std::uint32_t stream1_transformer_micro =
+        stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER
+            ? env_u32("BEAM_STREAM1_TRANSFORMER_MICRO", config.b_micro)
+            : config.b_micro;
+    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER &&
+        (stream1_transformer_micro == 0U || stream1_transformer_micro > config.b_micro)) {
+        throw std::runtime_error("BEAM_STREAM1_TRANSFORMER_MICRO must be in [1, B_MICRO]");
+    }
+    const StaticMemoryPlan plan = config_build.plan;
+#if BEAM_ENABLE_DEBUG_LOGS
     const StaticMemoryPlan plan = config_build.plan;
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "puzzle_id=" << cli_puzzle_id << "\n";
@@ -4383,9 +4437,15 @@ int main(int argc, char** argv) {
     BEAM_CUDA_CHECK(cudaMemcpy(generators, host_generators.data(), host_generators.size(), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(central_state, &host_target, sizeof(State128), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(zobrist, &host_zobrist[0][0], STATE_STORAGE_LEN * STATE_VALUE_PAD * sizeof(Hash128), cudaMemcpyHostToDevice));
-    stream1_weights::DeviceWeights device_weights = stream1_weights::upload_weights(host_weights);
-    stream1_weights::ScratchAllocation stream1_scratch =
-        stream1_weights::alloc_stream1_scratch(stream1_model, config.b_micro, config.inference_parallelism);
+    stream1_weights::DeviceWeights device_weights;
+    stream1_weights::ScratchAllocation stream1_scratch;
+    if (!use_libtorch_stream1_executor) {
+        device_weights = stream1_weights::upload_weights(host_weights);
+        const std::uint32_t scratch_b_micro =
+            stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? stream1_transformer_micro : config.b_micro;
+        stream1_scratch =
+            stream1_weights::alloc_stream1_scratch(stream1_model, scratch_b_micro, config.inference_parallelism);
+    }
     TrackedSolutionPrefix tracked_solution;
 #if BEAM_DEBUG_PATH_TRACE
     tracked_solution.initialize(cli_puzzle_id, host_initial, host_generators, host_zobrist, host_move_names);
@@ -4425,7 +4485,6 @@ int main(int argc, char** argv) {
     CudaGraphJobTemplates graphs;
     create_dispatcher_streams(streams);
     create_dispatcher_events(events);
-    const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
     const char* stream1_mode_env = std::getenv("BEAM_STREAM1_MODE");
     const bool stream1_uniform_score =
         stream1_mode_env != nullptr && std::strcmp(stream1_mode_env, "uniform") == 0;
@@ -4434,19 +4493,58 @@ int main(int argc, char** argv) {
         std::strcmp(stream1_mode_env, "model") != 0) {
         throw std::runtime_error("BEAM_STREAM1_MODE must be model or uniform");
     }
-    std::cout << "stream1_mode=" << (stream1_uniform_score ? "uniform" : "model") << "\n";
-    std::vector<Stream1CutlassScratch> stream1_scratch_lanes;
-    stream1_scratch_lanes.reserve(config.inference_parallelism);
-    const std::uint64_t stream1_rows_per_lane = stream1_inference_rows(config.b_micro, stream1_model);
-    for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
-        stream1_scratch_lanes.push_back(Stream1CutlassScratch{
-            stream1_scratch.hidden1 + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden1,
-            stream1_scratch.hidden2 + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden2,
-            stream1_scratch.residual + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden2,
-            stream1_scratch.output + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.output_dim});
+    if (use_libtorch_stream1_executor && stream1_uniform_score) {
+        throw std::runtime_error("BEAM_STREAM1_MODE=uniform is incompatible with BEAM_STREAM1_EXECUTOR=libtorch_eager");
     }
-    DispatcherNetwork network{
-        Stream1NetworkView{
+    std::cout << "stream1_mode=" << (stream1_uniform_score ? "uniform" : "model") << "\n";
+    std::cout << "stream1_executor=" << stream1_executor << "\n";
+    const std::uint64_t runtime_ring_slot_physical_jobs =
+        static_cast<std::uint64_t>(config.ring_count) * plan.derived.ring_slot_count;
+    std::cout << "runtime_ring_count=" << config.ring_count << "\n";
+    std::cout << "runtime_ring_slot_count=" << plan.derived.ring_slot_count << "\n";
+    const char* ring_graph_execs_per_lane_requested = std::getenv("BEAM_RING_GRAPH_EXECS_PER_LANE");
+    const char* ring_graph_debug_sync = std::getenv("BEAM_DEBUG_RING_GRAPH_SYNC");
+    std::cout << "runtime_ring_slot_physical_jobs=" << runtime_ring_slot_physical_jobs << "\n";
+    std::cout << "runtime_ring_graph_execs_per_lane_requested="
+              << (ring_graph_execs_per_lane_requested == nullptr ? "" : ring_graph_execs_per_lane_requested) << "\n";
+    std::cout << "runtime_ring_graph_debug_sync="
+              << (ring_graph_debug_sync == nullptr ? "" : ring_graph_debug_sync) << "\n";
+    std::cout << "stream1_backend="
+              << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
+    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        std::cout << "stream1_transformer_micro=" << stream1_transformer_micro << "\n";
+        std::cout << "stream1_transformer_dims"
+                  << " seq_len=" << stream1_model.seq_len
+                  << " d_model=" << stream1_model.d_model
+                  << " nhead=" << stream1_model.nhead
+                  << " head_dim=" << stream1_model.head_dim
+                  << " layers=" << stream1_model.transformer_layers
+                  << " ff_dim=" << stream1_model.ff_dim
+                  << " output_dim=" << stream1_model.output_dim
+                  << "\n";
+        const char* block51_env = std::getenv("BEAM_STREAM1_TRANSFORMER_BLOCK51");
+        const char* final_cls_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY");
+        const char* final_cls_attention_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION");
+        std::cout << "stream1_transformer_block51="
+                  << (block51_env != nullptr && std::strcmp(block51_env, "1") == 0 ? 1 : 0)
+                  << " raw=" << (block51_env == nullptr ? "" : block51_env) << "\n";
+        std::cout << "stream1_transformer_final_cls_only="
+                  << (final_cls_env != nullptr && std::strcmp(final_cls_env, "1") == 0 ? 1 : 0)
+                  << " raw=" << (final_cls_env == nullptr ? "" : final_cls_env) << "\n";
+        std::cout << "stream1_transformer_final_cls_attention="
+                  << (final_cls_attention_env != nullptr && std::strcmp(final_cls_attention_env, "1") == 0 ? 1 : 0)
+                  << " raw=" << (final_cls_attention_env == nullptr ? "" : final_cls_attention_env) << "\n";
+    }
+
+    DispatcherNetwork network{};
+    network.uniform_score = stream1_uniform_score;
+    stream1_weights::TransformerNetworkViewHolder transformer_view_holder;
+    if (use_libtorch_stream1_executor) {
+        network.backend = DispatcherStream1Backend::PieceTransformer;
+    } else if (stream1_model.backend == STREAM1_BACKEND_MLP) {
+        const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
+        network.backend = DispatcherStream1Backend::Mlp;
+        network.mlp_view = Stream1NetworkView{
             device_weights.input_weight,
             device_weights.input_bias,
             device_weights.input_ln_gamma,
@@ -4465,9 +4563,26 @@ int main(int argc, char** argv) {
             reinterpret_cast<const half* const*>(device_weights.residual_fc2_ln_beta_table),
             device_weights.output_weight,
             device_weights.output_bias,
-            dims},
-        stream1_scratch_lanes,
-        stream1_uniform_score};
+            dims};
+        network.mlp_scratch_lanes.reserve(config.inference_parallelism);
+        for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
+            network.mlp_scratch_lanes.push_back(
+                stream1_weights::mlp_scratch_view(stream1_scratch, stream1_model, config.b_micro, lane));
+        }
+    } else if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        transformer_view_holder =
+            stream1_weights::transformer_network_view(device_weights.transformer, stream1_model);
+        network.backend = DispatcherStream1Backend::PieceTransformer;
+        network.transformer_view = transformer_view_holder.view;
+        network.transformer_micro = stream1_transformer_micro;
+        network.transformer_scratch_lanes.reserve(config.inference_parallelism);
+        for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
+            network.transformer_scratch_lanes.push_back(
+                stream1_weights::transformer_scratch_view(stream1_scratch, stream1_model, stream1_transformer_micro, lane));
+        }
+    } else {
+        throw std::runtime_error("unsupported Stream1 backend in production runner");
+    }
     DispatcherDeviceTables tables{generators, central_state, zobrist};
     Stream2SolvedBuffers solved{
         memory.solved_flag,
@@ -4482,7 +4597,65 @@ int main(int argc, char** argv) {
         stream2_suffix.device_table(),
         memory.solved_suffix_list,
         solve_bucket_mode ? 0U : 1U};
-    instantiate_cuda_graph_job_templates(plan, memory, tables, network, solved, streams, events, graphs);
+    const bool skip_native_ring_slot_templates = use_libtorch_stream1_executor || use_native_eager_stream1_executor;
+#if BEAM_HAS_LIBTORCH_STREAM1
+    std::unique_ptr<stream1_libtorch::RingSlotLauncher> libtorch_stream1_launcher;
+#endif
+    NativeEagerRingSlotLauncherState native_eager_launcher_state;
+    DispatcherRingSlotLauncher native_eager_ring_slot_launcher{};
+    const DispatcherRingSlotLauncher* ring_slot_launcher = nullptr;
+    if (use_libtorch_stream1_executor) {
+#if BEAM_HAS_LIBTORCH_STREAM1
+        stream1_libtorch::RingSlotLauncherConfig launcher_config{};
+        launcher_config.weight_dir = weight_dir;
+        launcher_config.device_index = static_cast<int>(device_local_rank);
+        launcher_config.inference_parallelism = config.inference_parallelism;
+        launcher_config.local_rank = config.local_rank;
+        launcher_config.b_micro = config.b_micro;
+        launcher_config.move_count = static_cast<std::uint32_t>(MOVE_COUNT);
+        launcher_config.current_frontier_states = memory.current_frontier_states;
+        launcher_config.parent_base = memory.streams.parent_base;
+        launcher_config.count = memory.streams.count;
+        launcher_config.score_ring = memory.streams.score_ring;
+        launcher_config.hash_ring = memory.streams.hash_ring;
+        launcher_config.generators = generators;
+        launcher_config.central_state = central_state;
+        launcher_config.zobrist = zobrist;
+        launcher_config.solved = solved;
+        libtorch_stream1_launcher = std::make_unique<stream1_libtorch::RingSlotLauncher>(std::move(launcher_config));
+        ring_slot_launcher = &libtorch_stream1_launcher->dispatcher_launcher();
+#else
+        throw std::runtime_error("internal build error: LibTorch Stream1 executor selected without BEAM_HAS_LIBTORCH_STREAM1");
+#endif
+    }
+    if (use_native_eager_stream1_executor) {
+        native_eager_launcher_state.memory = &memory;
+        native_eager_launcher_state.tables = tables;
+        native_eager_launcher_state.network = &network;
+        native_eager_launcher_state.solved = solved;
+        native_eager_launcher_state.config = config;
+        native_eager_launcher_state.reset_events(config.inference_parallelism);
+        native_eager_ring_slot_launcher.launch = &launch_native_eager_ring_slot;
+        native_eager_ring_slot_launcher.user = &native_eager_launcher_state;
+        native_eager_ring_slot_launcher.name = "native_eager";
+        ring_slot_launcher = &native_eager_ring_slot_launcher;
+    }
+    instantiate_cuda_graph_job_templates(
+        plan,
+        memory,
+        tables,
+        network,
+        solved,
+        streams,
+        events,
+        graphs,
+        skip_native_ring_slot_templates);
+    std::cout << "runtime_ring_slot_graph_windowed=" << (graphs.ring_slot_windowed ? 1 : 0) << "\n";
+    std::cout << "runtime_ring_slot_graph_window_rings=" << graphs.ring_slot_window_rings << "\n";
+    std::cout << "runtime_ring_slot_graph_window_jobs=" << graphs.ring_slot_window_jobs << "\n";
+    std::cout << "runtime_ring_slot_graph_physical_jobs=" << graphs.ring_slot_physical_jobs << "\n";
+#if BEAM_ENABLE_DEBUG_LOGS
+    std::cout << "runner_phase=graphs_instantiated\n";
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "runner_phase=graphs_instantiated\n";
 #endif
@@ -4678,8 +4851,15 @@ int main(int argc, char** argv) {
 #if BEAM_DEBUG_PATH_TRACE
         generated_track_request = tracked_solution.generated_request_for_depth(depth);
 #endif
-        const DepthDispatchState state =
-            run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size, generated_track_request, collective_ptr);
+        const DepthDispatchState state = run_depth_cuda_graphs(
+            plan,
+            memory,
+            graphs,
+            streams,
+            frontier_size,
+            generated_track_request,
+            collective_ptr,
+            ring_slot_launcher);
         if (!state.depth_drained) {
             throw std::runtime_error("depth did not drain");
         }
