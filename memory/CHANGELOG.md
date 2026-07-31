@@ -963,3 +963,5 @@
 - 2026-07-31: Universal checkpoint notebook private Cube4 acceptance v10 completed successfully on exactly 2xT4. It auto-discovered/exported the 96-position, 6-class, output-24 Transformer to fp16, compiled the reconciled LibTorch runner, selected the measured 2^16 Transformer profile, ran both ranks through depth 8 with return code 0, and emitted the complete artifact set. Solve orchestration took 15.483 s; rank depth processing took about 6.336 s. No OOM/overflow/fatal errors occurred.
 
 - 2026-07-31: Published universal Kaggle notebook version 4 at `trydotatwo/cayleypy-2xt4-checkpoint-beam-search`. The public landing run completed cleanly via `SETUP_REQUIRED` with solver pin `2639bce6800c03753591dbbc7e85805442228068`; the identical configured launcher was privately accepted on real Cube4 2xT4 in version 10.
+
+- 2026-07-31: Unified all 31 Kaggle 2xT4 MLP and Piece Transformer profile records on explicit `final_materialize_chunk_candidates=88,064`. Added a registry-wide regression test so no output1/output-move-count or beam anchor can silently fall back to a larger default. This is a config-contract change only; CUDA/C++ beam architecture is unchanged.

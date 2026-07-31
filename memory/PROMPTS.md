@@ -552,3 +552,5 @@ User reported that an interactive game had been running during part of the recen
 - User required the universal public 2xT4 checkpoint notebook to recognize that Transformer and MLP have different best runtime configurations and to select only the matching backend-specific profile family automatically.
 
 - User approved the measured 2xT4 Transformer `2**26` profile after depth-8 A/B: keep the logical Stream3 accumulator large (`192 * 384 * 24 = 1,769,472` candidates), reuse two physical rings, and decouple final materialization at `88,064` candidates. The public universal notebook must expose anchors through `2**26`, preserve backend-specific MLP/Transformer profiles, and derive the practical history RAM budget before preflight while keeping 1.5 GB host headroom and 50 GiB disk.
+
+- 2026-07-31: User required one bounded final-materialization policy across all Kaggle 2xT4 profiles: set `final_materialize_chunk_candidates=88,064` explicitly for both MLP model families and Piece Transformer, including small beam anchors.

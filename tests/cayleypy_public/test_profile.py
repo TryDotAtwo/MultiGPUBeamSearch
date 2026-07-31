@@ -136,3 +136,19 @@ def test_transformer_2p26_profile_records_measured_accumulator_contract():
     assert plan.stream3_batch_candidates == 1_769_472
     assert plan.runtime["ring_count"] == 2
     assert plan.runtime["final_materialize_chunk_candidates"] == 88_064
+
+
+def test_all_kaggle_2xt4_profiles_use_bounded_final_materialization_chunk() -> None:
+    root = Path(__file__).resolve().parents[2]
+    for registry_name in (
+        "kaggle_t4_mlp_profiles.json",
+        "kaggle_t4_transformer_profiles.json",
+    ):
+        registry = json.loads((root / "configs" / registry_name).read_text(encoding="utf-8"))
+        for model_family, anchors in registry["profiles"].items():
+            for anchor, record in anchors.items():
+                assert record["runtime"]["final_materialize_chunk_candidates"] == 88_064, (
+                    registry_name,
+                    model_family,
+                    anchor,
+                )
