@@ -1,0 +1,19 @@
+{
+  "id": "trydotatwo/cayleypy-2xt4-444-example",
+  "title": "cayleypy-2xt4-444-example",
+  "code_file": "444.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "trydotatwo/cube4-full-transformer-inference"
+  ],
+  "competition_sources": [
+    "cayley-py-444-cube"
+  ],
+  "kernel_sources": [],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

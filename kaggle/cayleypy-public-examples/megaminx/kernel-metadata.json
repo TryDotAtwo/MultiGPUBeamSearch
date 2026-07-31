@@ -1,0 +1,19 @@
+{
+  "id": "trydotatwo/cayleypy-2xt4-megaminx-example",
+  "title": "cayleypy-2xt4-megaminx-example",
+  "code_file": "megaminx.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [
+    "cayley-py-megaminx"
+  ],
+  "kernel_sources": [],
+  "model_sources": [
+    "trydotatwo/megaminx-output24-p900-t000-q-sym/PyTorch/default/1"
+  ],
+  "machine_shape": "NvidiaTeslaT4"
+}
