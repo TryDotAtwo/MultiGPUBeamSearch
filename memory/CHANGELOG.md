@@ -965,3 +965,5 @@
 - 2026-07-31: Published universal Kaggle notebook version 4 at `trydotatwo/cayleypy-2xt4-checkpoint-beam-search`. The public landing run completed cleanly via `SETUP_REQUIRED` with solver pin `2639bce6800c03753591dbbc7e85805442228068`; the identical configured launcher was privately accepted on real Cube4 2xT4 in version 10.
 
 - 2026-07-31: Unified all 31 Kaggle 2xT4 MLP and Piece Transformer profile records on explicit `final_materialize_chunk_candidates=88,064`. Added a registry-wide regression test so no output1/output-move-count or beam anchor can silently fall back to a larger default. This is a config-contract change only; CUDA/C++ beam architecture is unchanged.
+
+- 2026-07-31: Real Kaggle 2xT4 acceptance v11 validated the unified `88,064` final-materialization chunk on the smallest Transformer anchor (`2^16`, output-24, depth 8): both Tesla T4 ranks returned 0 in about 6.19 s of depth processing, with no OOM/overflow/fatal errors. Published universal notebook v5 completed its clean `SETUP_REQUIRED` landing with solver pin `a1db0e6d9bb5458c8a842b37dfa99572d3025667`.
