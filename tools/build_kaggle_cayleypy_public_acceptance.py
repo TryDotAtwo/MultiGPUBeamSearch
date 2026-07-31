@@ -23,7 +23,7 @@ from tools import build_kaggle_cayleypy_public_notebook as public_notebook
 
 
 OUT_ROOT = REPOSITORY_ROOT / "kaggle"
-SOLVER_COMMIT = "65aecb1b0946a81a0386d6c1d7509de2d859216a"
+SOLVER_COMMIT = "65aecb16346691a4154a804b019264b6cf94ebae"
 COMPETITION = "cayley-py-megaminx"
 COMPETITION_ROOT = Path(f"/kaggle/input/competitions/{COMPETITION}")
 OUTPUT1_MODEL_SOURCE = "arabidopsisthalian/megaminx2048-512-8-e4000/PyTorch/default/1"
@@ -110,7 +110,7 @@ def _config_source(scenario: AcceptanceScenario) -> str:
     source = _replace_once(source, 'KAGGLE_OWNER = "replace-with-kaggle-owner"', 'KAGGLE_OWNER = "trydotatwo"')
     source = _replace_once(source, 'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"', f'KAGGLE_SLUG = "cayleypy-public-acceptance-{scenario.name}"')
     source = _replace_once(source, 'KAGGLE_USERNAME = None', 'KAGGLE_USERNAME = "trydotatwo"')
-    source = _replace_once(source, 'SOLVER_COMMIT = "65aecb1b0946a81a0386d6c1d7509de2d859216a"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
+    source = _replace_once(source, 'SOLVER_COMMIT = "65aecb16346691a4154a804b019264b6cf94ebae"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
     return source
 
 
