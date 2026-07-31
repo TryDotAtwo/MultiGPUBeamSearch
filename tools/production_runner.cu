@@ -480,20 +480,20 @@ std::string read_text_file(const std::filesystem::path& path) {
 std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path) {
     const std::string text = read_text_file(path);
     std::size_t pos = text.find("\"actions\"");
-    const bool actions_format = pos != std::string::npos;
-    if (!actions_format) {
+    bool array_format = pos != std::string::npos;
+    if (!array_format) {
+        pos = text.find("\"moves\"");
+        array_format = pos != std::string::npos;
+    }
+    if (!array_format) {
         pos = text.find("\"generators\"");
         if (pos == std::string::npos) {
-            throw std::runtime_error("generator json missing actions/generators");
+            throw std::runtime_error("generator json missing actions/moves/generators");
         }
     }
-    if (actions_format) {
-        pos = text.find('[', pos);
-    } else {
-        pos = text.find('{', text.find("\"generators\""));
-    }
+    pos = array_format ? text.find('[', pos) : text.find('{', pos);
     if (pos == std::string::npos) {
-        throw std::runtime_error("generator json malformed actions/generators");
+        throw std::runtime_error("generator json malformed actions/moves/generators");
     }
     std::vector<std::uint8_t> generators(MOVE_COUNT * STATE_STORAGE_LEN);
     for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
@@ -515,16 +515,20 @@ std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path
 std::vector<std::string> load_p900_move_names(const std::filesystem::path& path) {
     const std::string text = read_text_file(path);
     std::size_t pos = text.find("\"names\"");
-    const bool names_format = pos != std::string::npos;
+    bool names_format = pos != std::string::npos;
+    if (!names_format) {
+        pos = text.find("\"move_names\"");
+        names_format = pos != std::string::npos;
+    }
     if (names_format) {
         pos = text.find('[', pos);
         if (pos == std::string::npos) {
-            throw std::runtime_error("generator json malformed names");
+            throw std::runtime_error("generator json malformed names/move_names");
         }
     } else {
         pos = text.find("\"generators\"");
         if (pos == std::string::npos) {
-            throw std::runtime_error("generator json missing names/generators");
+            throw std::runtime_error("generator json missing names/move_names/generators");
         }
         pos = text.find('{', pos);
         if (pos == std::string::npos) {
