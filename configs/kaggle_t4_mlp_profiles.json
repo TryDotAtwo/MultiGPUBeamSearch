@@ -1,0 +1,533 @@
+{
+    "schema_version":  1,
+    "hardware":  "kaggle_2xt4",
+    "description":  "Measured depth-8 runtime profiles on real Kaggle 2xTesla T4, torchrun world size 2.",
+    "selection_metric":  "depth_done=8 depth_sec",
+    "profiles":  {
+                     "output1":  {
+                                     "16":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  4,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p16_sh4_b49152_1",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  1.58289,
+                                                                 "elapsed_sec":  12.858801503999985,
+                                                                 "requested_beam":  65536,
+                                                                 "effective_beam":  65536,
+                                                                 "local_beam":  32768,
+                                                                 "shard_capacity_candidates":  196608,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p16_sh4_b49152_1.log"
+                                                             }
+                                            },
+                                     "17":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  2,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p17_sh2_b49152_0",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  3.27966,
+                                                                 "elapsed_sec":  20.278488371999856,
+                                                                 "requested_beam":  131072,
+                                                                 "effective_beam":  131072,
+                                                                 "local_beam":  65536,
+                                                                 "shard_capacity_candidates":  196608,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p17_sh2_b49152_0.log"
+                                                             }
+                                            },
+                                     "18":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  2,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p18_sh2_b49152_0",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  8.19263,
+                                                                 "elapsed_sec":  38.60986584299985,
+                                                                 "requested_beam":  262144,
+                                                                 "effective_beam":  262144,
+                                                                 "local_beam":  131072,
+                                                                 "shard_capacity_candidates":  196608,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p18_sh2_b49152_0.log"
+                                                             }
+                                            },
+                                     "19":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  16,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  5,
+                                                                 "config_id":  "depth8_output1_p19_sh16_b49152_1",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  14.7407,
+                                                                 "elapsed_sec":  61.975680290000014,
+                                                                 "requested_beam":  524288,
+                                                                 "effective_beam":  524288,
+                                                                 "local_beam":  262144,
+                                                                 "shard_capacity_candidates":  196608,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p19_sh16_b49152_1.log"
+                                                             }
+                                            },
+                                     "20":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  4,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p20_sh4_b49152_0",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  32.9155,
+                                                                 "elapsed_sec":  148.15458667899998,
+                                                                 "requested_beam":  1048576,
+                                                                 "effective_beam":  1048576,
+                                                                 "local_beam":  524288,
+                                                                 "shard_capacity_candidates":  196608,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p20_sh4_b49152_0.log"
+                                                             }
+                                            },
+                                     "21":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  8,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p21_sh8_b49152_1",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  67.5632,
+                                                                 "elapsed_sec":  266.9840683289999,
+                                                                 "requested_beam":  2097152,
+                                                                 "effective_beam":  2097152,
+                                                                 "local_beam":  1048576,
+                                                                 "shard_capacity_candidates":  196608,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p21_sh8_b49152_1.log"
+                                                             }
+                                            },
+                                     "22":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  8,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p22_sh8_b49152_0",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  134.068,
+                                                                 "elapsed_sec":  458.91890888199987,
+                                                                 "requested_beam":  4194304,
+                                                                 "effective_beam":  4194304,
+                                                                 "local_beam":  2097152,
+                                                                 "shard_capacity_candidates":  275456,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p22_sh8_b49152_0.log"
+                                                             }
+                                            },
+                                     "23":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  16,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p23_sh16_b49152_1",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  267.705,
+                                                                 "elapsed_sec":  855.3601237130001,
+                                                                 "requested_beam":  8388608,
+                                                                 "effective_beam":  8388608,
+                                                                 "local_beam":  4194304,
+                                                                 "shard_capacity_candidates":  275456,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p23_sh16_b49152_1.log"
+                                                             }
+                                            },
+                                     "24":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  32,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p24_sh32_b49152_1",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  545.556,
+                                                                 "elapsed_sec":  1700.324722894,
+                                                                 "requested_beam":  16777216,
+                                                                 "effective_beam":  16777216,
+                                                                 "local_beam":  8388608,
+                                                                 "shard_capacity_candidates":  275456,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p24_sh32_b49152_1.log"
+                                                             }
+                                            },
+                                     "25":  {
+                                                "validation_status":  "measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  64,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4
+                                                            },
+                                                "evidence":  {
+                                                                 "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                 "kernel_version":  4,
+                                                                 "config_id":  "depth8_output1_p25_sh64_b49152_1",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  1075.92,
+                                                                 "elapsed_sec":  2955.6978476349996,
+                                                                 "requested_beam":  33554432,
+                                                                 "effective_beam":  33554432,
+                                                                 "local_beam":  16777216,
+                                                                 "shard_capacity_candidates":  275456,
+                                                                 "log_path":  "/kaggle/working/depth8_output1_p25_sh64_b49152_1.log"
+                                                             }
+                                            }
+                                 },
+                     "output_move_count":  {
+                                               "16":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  4,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  5,
+                                                                           "config_id":  "depth8_output_move_count_p16_sh4_b2048_1",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  0.127134,
+                                                                           "elapsed_sec":  5.127961788999983,
+                                                                           "requested_beam":  65536,
+                                                                           "effective_beam":  65536,
+                                                                           "local_beam":  32768,
+                                                                           "shard_capacity_candidates":  196608,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p16_sh4_b2048_1.log"
+                                                                       }
+                                                      },
+                                               "17":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  2,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  5,
+                                                                           "config_id":  "depth8_output_move_count_p17_sh2_b2048_0",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  0.218896,
+                                                                           "elapsed_sec":  5.366073476999986,
+                                                                           "requested_beam":  131072,
+                                                                           "effective_beam":  131072,
+                                                                           "local_beam":  65536,
+                                                                           "shard_capacity_candidates":  196608,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p17_sh2_b2048_0.log"
+                                                                       }
+                                                      },
+                                               "18":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  4,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  5,
+                                                                           "config_id":  "depth8_output_move_count_p18_sh4_b2048_1",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  0.428607,
+                                                                           "elapsed_sec":  6.316682030000038,
+                                                                           "requested_beam":  262144,
+                                                                           "effective_beam":  262144,
+                                                                           "local_beam":  131072,
+                                                                           "shard_capacity_candidates":  196608,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p18_sh4_b2048_1.log"
+                                                                       }
+                                                      },
+                                               "19":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  4,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  5,
+                                                                           "config_id":  "depth8_output_move_count_p19_sh4_b2048_0",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  0.818961,
+                                                                           "elapsed_sec":  7.716590973999928,
+                                                                           "requested_beam":  524288,
+                                                                           "effective_beam":  524288,
+                                                                           "local_beam":  262144,
+                                                                           "shard_capacity_candidates":  196608,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p19_sh4_b2048_0.log"
+                                                                       }
+                                                      },
+                                               "20":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  8,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  5,
+                                                                           "config_id":  "depth8_output_move_count_p20_sh8_b2048_1",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  1.57199,
+                                                                           "elapsed_sec":  10.908675904999996,
+                                                                           "requested_beam":  1048576,
+                                                                           "effective_beam":  1048576,
+                                                                           "local_beam":  524288,
+                                                                           "shard_capacity_candidates":  196608,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p20_sh8_b2048_1.log"
+                                                                       }
+                                                      },
+                                               "21":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  8,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  5,
+                                                                           "config_id":  "depth8_output_move_count_p21_sh8_b2048_1",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  3.07554,
+                                                                           "elapsed_sec":  16.252607025999964,
+                                                                           "requested_beam":  2097152,
+                                                                           "effective_beam":  2097152,
+                                                                           "local_beam":  1048576,
+                                                                           "shard_capacity_candidates":  196608,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p21_sh8_b2048_1.log"
+                                                                       }
+                                                      },
+                                               "22":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  8,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  4,
+                                                                           "config_id":  "depth8_output_move_count_p22_sh8_b2048_0",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  6.53251,
+                                                                           "elapsed_sec":  27.1252658049998,
+                                                                           "requested_beam":  4194304,
+                                                                           "effective_beam":  4194304,
+                                                                           "local_beam":  2097152,
+                                                                           "shard_capacity_candidates":  275456,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p22_sh8_b2048_0.log"
+                                                                       }
+                                                      },
+                                               "23":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  16,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  4,
+                                                                           "config_id":  "depth8_output_move_count_p23_sh16_b2048_1",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  11.6406,
+                                                                           "elapsed_sec":  42.474008713999865,
+                                                                           "requested_beam":  8388608,
+                                                                           "effective_beam":  8388608,
+                                                                           "local_beam":  4194304,
+                                                                           "shard_capacity_candidates":  275456,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p23_sh16_b2048_1.log"
+                                                                       }
+                                                      },
+                                               "24":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  32,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  4,
+                                                                           "config_id":  "depth8_output_move_count_p24_sh32_b2048_1",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  23.7042,
+                                                                           "elapsed_sec":  82.47656338900015,
+                                                                           "requested_beam":  16777216,
+                                                                           "effective_beam":  16777216,
+                                                                           "local_beam":  8388608,
+                                                                           "shard_capacity_candidates":  275456,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p24_sh32_b2048_1.log"
+                                                                       }
+                                                      },
+                                               "25":  {
+                                                          "validation_status":  "measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  32,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  98304,
+                                                                          "stream4_trigger_candidates":  98304,
+                                                                          "stream4_active_sort_slots":  4
+                                                                      },
+                                                          "evidence":  {
+                                                                           "kernel_slug":  "trydotatwo/cayley-beam-2xt4-mlp-autoprofiles",
+                                                                           "kernel_version":  4,
+                                                                           "config_id":  "depth8_output_move_count_p25_sh32_b2048_0",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  51.535,
+                                                                           "elapsed_sec":  151.60844314400128,
+                                                                           "requested_beam":  33554432,
+                                                                           "effective_beam":  33554432,
+                                                                           "local_beam":  16777216,
+                                                                           "shard_capacity_candidates":  550912,
+                                                                           "log_path":  "/kaggle/working/depth8_output_move_count_p25_sh32_b2048_0.log"
+                                                                       }
+                                                      }
+                                           }
+                 },
+    "backend":  "mlp"
+}

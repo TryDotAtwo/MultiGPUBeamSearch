@@ -1,0 +1,394 @@
+{
+  "fixture_version": 1,
+  "canonicalization": "UTF-8 JSON with recursively sorted object keys, compact separators, and integer numeric fields",
+  "semantic_excludes": [
+    "client_submission_id",
+    "idempotency_key",
+    "submitted_at",
+    "run_id"
+  ],
+  "cases": [
+    {
+      "name": "original_unicode_author",
+      "envelope": {
+        "schema_version": 1,
+        "author": {
+          "name": "Алиса Δ",
+          "kaggle_username": "alice-k",
+          "verification": "claimed"
+        },
+        "kaggle": {
+          "owner": "alice-k",
+          "slug": "cayleypy-public",
+          "version": 7,
+          "run_url": "https://www.kaggle.com/code/alice-k/cayleypy-public",
+          "notebook_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "competition": "toy-cayley",
+        "puzzle_type": "cube_3/3/3",
+        "profile": {
+          "requested_beam": 65536,
+          "effective_beam": 65536,
+          "alignment_delta": 0,
+          "selected_profile": "p16-output_move_count",
+          "evidence": "measured-kaggle-2xt4",
+          "profile_evidence_version": 1,
+          "profile_power": 16,
+          "model_class": "output_move_count",
+          "world_size": 2
+        },
+        "runtime": {
+          "touch_bfs_radius": 0,
+          "solution_mode": "first",
+          "max_depth": 8,
+          "max_collected_solutions": 16,
+          "b_micro": 2048,
+          "stream1_concurrency": 4,
+          "stream3_ring_slots": 4,
+          "shard_count": 4,
+          "shard_capacity_scale_ppm": 1050000,
+          "stream4_batch_candidates": 98304,
+          "stream4_trigger_candidates": 98304,
+          "stream4_active_sort_slots": 4
+        },
+        "model": {
+          "filename": "toy-model.pt",
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "format": "resmlp-layernorm",
+          "manifest": {
+            "state_len": 3,
+            "num_classes": 3,
+            "hd1": 256,
+            "hd2": 256,
+            "nrd": 4,
+            "output_dim": 2,
+            "dtype": "fp16",
+            "normalization": "layernorm",
+            "layout": "row-major input activations times weight_hxk"
+          }
+        },
+        "hardware": {
+          "platform": "kaggle",
+          "gpu_names": [
+            "Tesla T4",
+            "Tesla T4"
+          ],
+          "accelerator_count": 2,
+          "world_size": 2
+        },
+        "timings": {
+          "solve_us": 95335,
+          "wall_us": 4720000
+        },
+        "solver_commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "client_submission_id": "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e7f",
+        "run_id": "run-20260729-original",
+        "idempotency_key": "f02c871a385f8f53870f56e7dfa283d62cc3fa2d0dfd3e0051c036db7aad9694",
+        "submitted_at": "2026-07-29T09:30:00.000Z",
+        "puzzle_id": 1,
+        "proof": {
+          "initial_state": [
+            2,
+            0,
+            1
+          ],
+          "central_state": [
+            0,
+            1,
+            2
+          ],
+          "generators": {
+            "clockwise": [
+              1,
+              2,
+              0
+            ],
+            "counterclockwise": [
+              2,
+              0,
+              1
+            ]
+          },
+          "initial_state_sha256": "a50c12ec8e20411bc79e811c15b13a8ea16e58f08d1c8015c257f83f6bc1c3fd",
+          "central_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5",
+          "generators_sha256": "340adb1a099141be943f423279014724f1fffb0251a5f96547eb8bcb32297f48",
+          "reached_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5"
+        },
+        "orientation": {
+          "search_mode": "off",
+          "final_orientation": "original"
+        },
+        "solution": {
+          "path": [
+            "clockwise"
+          ],
+          "length": 1,
+          "solved_depth": 1,
+          "touch_depth": 0,
+          "validation": "valid",
+          "collection_index": 0,
+          "collection_status": "first_solution"
+        }
+      },
+      "canonical_json": "{\"author\":{\"kaggle_username\":\"alice-k\",\"name\":\"Алиса Δ\",\"verification\":\"claimed\"},\"client_submission_id\":\"018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e7f\",\"competition\":\"toy-cayley\",\"hardware\":{\"accelerator_count\":2,\"gpu_names\":[\"Tesla T4\",\"Tesla T4\"],\"platform\":\"kaggle\",\"world_size\":2},\"idempotency_key\":\"f02c871a385f8f53870f56e7dfa283d62cc3fa2d0dfd3e0051c036db7aad9694\",\"kaggle\":{\"notebook_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"alice-k\",\"run_url\":\"https://www.kaggle.com/code/alice-k/cayleypy-public\",\"slug\":\"cayleypy-public\",\"version\":7},\"model\":{\"filename\":\"toy-model.pt\",\"format\":\"resmlp-layernorm\",\"manifest\":{\"dtype\":\"fp16\",\"hd1\":256,\"hd2\":256,\"layout\":\"row-major input activations times weight_hxk\",\"normalization\":\"layernorm\",\"nrd\":4,\"num_classes\":3,\"output_dim\":2,\"state_len\":3},\"sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"},\"orientation\":{\"final_orientation\":\"original\",\"search_mode\":\"off\"},\"profile\":{\"alignment_delta\":0,\"effective_beam\":65536,\"evidence\":\"measured-kaggle-2xt4\",\"model_class\":\"output_move_count\",\"profile_evidence_version\":1,\"profile_power\":16,\"requested_beam\":65536,\"selected_profile\":\"p16-output_move_count\",\"world_size\":2},\"proof\":{\"central_state\":[0,1,2],\"central_state_sha256\":\"434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5\",\"generators\":{\"clockwise\":[1,2,0],\"counterclockwise\":[2,0,1]},\"generators_sha256\":\"340adb1a099141be943f423279014724f1fffb0251a5f96547eb8bcb32297f48\",\"initial_state\":[2,0,1],\"initial_state_sha256\":\"a50c12ec8e20411bc79e811c15b13a8ea16e58f08d1c8015c257f83f6bc1c3fd\",\"reached_state_sha256\":\"434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5\"},\"puzzle_id\":1,\"puzzle_type\":\"cube_3/3/3\",\"run_id\":\"run-20260729-original\",\"runtime\":{\"b_micro\":2048,\"max_collected_solutions\":16,\"max_depth\":8,\"shard_capacity_scale_ppm\":1050000,\"shard_count\":4,\"solution_mode\":\"first\",\"stream1_concurrency\":4,\"stream3_ring_slots\":4,\"stream4_active_sort_slots\":4,\"stream4_batch_candidates\":98304,\"stream4_trigger_candidates\":98304,\"touch_bfs_radius\":0},\"schema_version\":1,\"solution\":{\"collection_index\":0,\"collection_status\":\"first_solution\",\"length\":1,\"path\":[\"clockwise\"],\"solved_depth\":1,\"touch_depth\":0,\"validation\":\"valid\"},\"solver_commit\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"submitted_at\":\"2026-07-29T09:30:00.000Z\",\"timings\":{\"solve_us\":95335,\"wall_us\":4720000}}",
+      "canonical_sha256": "098def251326d17c0f0e573f5ce330fb1f0f79eba8ba271487d7ec928e189316",
+      "semantic_sha256": "f02c871a385f8f53870f56e7dfa283d62cc3fa2d0dfd3e0051c036db7aad9694"
+    },
+    {
+      "name": "reflected",
+      "envelope": {
+        "schema_version": 1,
+        "author": {
+          "name": "Алиса Δ",
+          "kaggle_username": "alice-k",
+          "verification": "claimed"
+        },
+        "kaggle": {
+          "owner": "alice-k",
+          "slug": "cayleypy-public",
+          "version": 7,
+          "run_url": "https://www.kaggle.com/code/alice-k/cayleypy-public",
+          "notebook_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "competition": "toy-cayley",
+        "puzzle_type": "cycle-3",
+        "profile": {
+          "requested_beam": 65536,
+          "effective_beam": 65536,
+          "alignment_delta": 0,
+          "selected_profile": "p16-output_move_count",
+          "evidence": "measured-kaggle-2xt4",
+          "profile_evidence_version": 1,
+          "profile_power": 16,
+          "model_class": "output_move_count",
+          "world_size": 2
+        },
+        "runtime": {
+          "touch_bfs_radius": 0,
+          "solution_mode": "first",
+          "max_depth": 8,
+          "max_collected_solutions": 16,
+          "b_micro": 2048,
+          "stream1_concurrency": 4,
+          "stream3_ring_slots": 4,
+          "shard_count": 4,
+          "shard_capacity_scale_ppm": 1050000,
+          "stream4_batch_candidates": 98304,
+          "stream4_trigger_candidates": 98304,
+          "stream4_active_sort_slots": 4
+        },
+        "model": {
+          "filename": "toy-model.pt",
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "format": "resmlp-layernorm",
+          "manifest": {
+            "state_len": 3,
+            "num_classes": 3,
+            "hd1": 256,
+            "hd2": 256,
+            "nrd": 4,
+            "output_dim": 2,
+            "dtype": "fp16",
+            "normalization": "layernorm",
+            "layout": "row-major input activations times weight_hxk"
+          }
+        },
+        "hardware": {
+          "platform": "kaggle",
+          "gpu_names": [
+            "Tesla T4",
+            "Tesla T4"
+          ],
+          "accelerator_count": 2,
+          "world_size": 2
+        },
+        "timings": {
+          "solve_us": 95335,
+          "wall_us": 4720000
+        },
+        "solver_commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "client_submission_id": "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e80",
+        "run_id": "run-20260729-reflected",
+        "idempotency_key": "4b1efbf6115be64665a3be1baa3cef261bbb41e8e3f80400c4496f99351c9633",
+        "submitted_at": "2026-07-29T09:31:00.000Z",
+        "puzzle_id": 1,
+        "proof": {
+          "initial_state": [
+            2,
+            0,
+            1
+          ],
+          "central_state": [
+            0,
+            1,
+            2
+          ],
+          "generators": {
+            "clockwise": [
+              1,
+              2,
+              0
+            ],
+            "counterclockwise": [
+              2,
+              0,
+              1
+            ]
+          },
+          "initial_state_sha256": "a50c12ec8e20411bc79e811c15b13a8ea16e58f08d1c8015c257f83f6bc1c3fd",
+          "central_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5",
+          "generators_sha256": "340adb1a099141be943f423279014724f1fffb0251a5f96547eb8bcb32297f48",
+          "reached_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5"
+        },
+        "orientation": {
+          "search_mode": "after_original",
+          "final_orientation": "reflected",
+          "searched_path": [
+            "counterclockwise"
+          ],
+          "reflected_source_path": [
+            "clockwise"
+          ],
+          "reflected_source_sha256": "469baa511b0da92ee2936c2499429a1ad4b3b24a5d16e26a66722d382ad67cec"
+        },
+        "solution": {
+          "path": [
+            "clockwise"
+          ],
+          "length": 1,
+          "solved_depth": 1,
+          "touch_depth": 0,
+          "validation": "valid",
+          "collection_index": 1,
+          "collection_status": "depth_reached"
+        }
+      },
+      "canonical_json": "{\"author\":{\"kaggle_username\":\"alice-k\",\"name\":\"Алиса Δ\",\"verification\":\"claimed\"},\"client_submission_id\":\"018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e80\",\"competition\":\"toy-cayley\",\"hardware\":{\"accelerator_count\":2,\"gpu_names\":[\"Tesla T4\",\"Tesla T4\"],\"platform\":\"kaggle\",\"world_size\":2},\"idempotency_key\":\"4b1efbf6115be64665a3be1baa3cef261bbb41e8e3f80400c4496f99351c9633\",\"kaggle\":{\"notebook_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"alice-k\",\"run_url\":\"https://www.kaggle.com/code/alice-k/cayleypy-public\",\"slug\":\"cayleypy-public\",\"version\":7},\"model\":{\"filename\":\"toy-model.pt\",\"format\":\"resmlp-layernorm\",\"manifest\":{\"dtype\":\"fp16\",\"hd1\":256,\"hd2\":256,\"layout\":\"row-major input activations times weight_hxk\",\"normalization\":\"layernorm\",\"nrd\":4,\"num_classes\":3,\"output_dim\":2,\"state_len\":3},\"sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"},\"orientation\":{\"final_orientation\":\"reflected\",\"reflected_source_path\":[\"clockwise\"],\"reflected_source_sha256\":\"469baa511b0da92ee2936c2499429a1ad4b3b24a5d16e26a66722d382ad67cec\",\"search_mode\":\"after_original\",\"searched_path\":[\"counterclockwise\"]},\"profile\":{\"alignment_delta\":0,\"effective_beam\":65536,\"evidence\":\"measured-kaggle-2xt4\",\"model_class\":\"output_move_count\",\"profile_evidence_version\":1,\"profile_power\":16,\"requested_beam\":65536,\"selected_profile\":\"p16-output_move_count\",\"world_size\":2},\"proof\":{\"central_state\":[0,1,2],\"central_state_sha256\":\"434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5\",\"generators\":{\"clockwise\":[1,2,0],\"counterclockwise\":[2,0,1]},\"generators_sha256\":\"340adb1a099141be943f423279014724f1fffb0251a5f96547eb8bcb32297f48\",\"initial_state\":[2,0,1],\"initial_state_sha256\":\"a50c12ec8e20411bc79e811c15b13a8ea16e58f08d1c8015c257f83f6bc1c3fd\",\"reached_state_sha256\":\"434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5\"},\"puzzle_id\":1,\"puzzle_type\":\"cycle-3\",\"run_id\":\"run-20260729-reflected\",\"runtime\":{\"b_micro\":2048,\"max_collected_solutions\":16,\"max_depth\":8,\"shard_capacity_scale_ppm\":1050000,\"shard_count\":4,\"solution_mode\":\"first\",\"stream1_concurrency\":4,\"stream3_ring_slots\":4,\"stream4_active_sort_slots\":4,\"stream4_batch_candidates\":98304,\"stream4_trigger_candidates\":98304,\"touch_bfs_radius\":0},\"schema_version\":1,\"solution\":{\"collection_index\":1,\"collection_status\":\"depth_reached\",\"length\":1,\"path\":[\"clockwise\"],\"solved_depth\":1,\"touch_depth\":0,\"validation\":\"valid\"},\"solver_commit\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"submitted_at\":\"2026-07-29T09:31:00.000Z\",\"timings\":{\"solve_us\":95335,\"wall_us\":4720000}}",
+      "canonical_sha256": "97e23e5d46bba41402974940f61eb14dd8bc6150a81dc95e3ccbf6bff60e256b",
+      "semantic_sha256": "4b1efbf6115be64665a3be1baa3cef261bbb41e8e3f80400c4496f99351c9633"
+    },
+    {
+      "name": "empty_path_source",
+      "envelope": {
+        "schema_version": 1,
+        "author": {
+          "name": "Алиса Δ",
+          "kaggle_username": "alice-k",
+          "verification": "claimed"
+        },
+        "kaggle": {
+          "owner": "alice-k",
+          "slug": "cayleypy-public",
+          "version": 7,
+          "run_url": "https://www.kaggle.com/code/alice-k/cayleypy-public",
+          "notebook_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "competition": "toy-cayley",
+        "puzzle_type": "cycle-3",
+        "profile": {
+          "requested_beam": 65536,
+          "effective_beam": 65536,
+          "alignment_delta": 0,
+          "selected_profile": "p16-output_move_count",
+          "evidence": "measured-kaggle-2xt4",
+          "profile_evidence_version": 1,
+          "profile_power": 16,
+          "model_class": "output_move_count",
+          "world_size": 2
+        },
+        "runtime": {
+          "touch_bfs_radius": 0,
+          "solution_mode": "first",
+          "max_depth": 8,
+          "max_collected_solutions": 16,
+          "b_micro": 2048,
+          "stream1_concurrency": 4,
+          "stream3_ring_slots": 4,
+          "shard_count": 4,
+          "shard_capacity_scale_ppm": 1050000,
+          "stream4_batch_candidates": 98304,
+          "stream4_trigger_candidates": 98304,
+          "stream4_active_sort_slots": 4
+        },
+        "model": {
+          "filename": "toy-model.pt",
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "format": "resmlp-layernorm",
+          "manifest": {
+            "state_len": 3,
+            "num_classes": 3,
+            "hd1": 256,
+            "hd2": 256,
+            "nrd": 4,
+            "output_dim": 2,
+            "dtype": "fp16",
+            "normalization": "layernorm",
+            "layout": "row-major input activations times weight_hxk"
+          }
+        },
+        "hardware": {
+          "platform": "kaggle",
+          "gpu_names": [
+            "Tesla T4",
+            "Tesla T4"
+          ],
+          "accelerator_count": 2,
+          "world_size": 2
+        },
+        "timings": {
+          "solve_us": 95335,
+          "wall_us": 4720000
+        },
+        "solver_commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "client_submission_id": "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e81",
+        "run_id": "run-20260729-source",
+        "idempotency_key": "640d81cce0ef107dd9b746e12cc3ac600496b92e027e0a41ff5e894d62749549",
+        "submitted_at": "2026-07-29T09:32:00.000Z",
+        "puzzle_id": 2,
+        "proof": {
+          "initial_state": [
+            0,
+            1,
+            2
+          ],
+          "central_state": [
+            0,
+            1,
+            2
+          ],
+          "generators": {
+            "clockwise": [
+              1,
+              2,
+              0
+            ],
+            "counterclockwise": [
+              2,
+              0,
+              1
+            ]
+          },
+          "initial_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5",
+          "central_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5",
+          "generators_sha256": "340adb1a099141be943f423279014724f1fffb0251a5f96547eb8bcb32297f48",
+          "reached_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5"
+        },
+        "orientation": {
+          "search_mode": "only",
+          "final_orientation": "source"
+        },
+        "solution": {
+          "path": [],
+          "length": 0,
+          "solved_depth": 0,
+          "touch_depth": 0,
+          "validation": "valid",
+          "collection_status": "not_collected"
+        }
+      },
+      "canonical_json": "{\"author\":{\"kaggle_username\":\"alice-k\",\"name\":\"Алиса Δ\",\"verification\":\"claimed\"},\"client_submission_id\":\"018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e81\",\"competition\":\"toy-cayley\",\"hardware\":{\"accelerator_count\":2,\"gpu_names\":[\"Tesla T4\",\"Tesla T4\"],\"platform\":\"kaggle\",\"world_size\":2},\"idempotency_key\":\"640d81cce0ef107dd9b746e12cc3ac600496b92e027e0a41ff5e894d62749549\",\"kaggle\":{\"notebook_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"alice-k\",\"run_url\":\"https://www.kaggle.com/code/alice-k/cayleypy-public\",\"slug\":\"cayleypy-public\",\"version\":7},\"model\":{\"filename\":\"toy-model.pt\",\"format\":\"resmlp-layernorm\",\"manifest\":{\"dtype\":\"fp16\",\"hd1\":256,\"hd2\":256,\"layout\":\"row-major input activations times weight_hxk\",\"normalization\":\"layernorm\",\"nrd\":4,\"num_classes\":3,\"output_dim\":2,\"state_len\":3},\"sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"},\"orientation\":{\"final_orientation\":\"source\",\"search_mode\":\"only\"},\"profile\":{\"alignment_delta\":0,\"effective_beam\":65536,\"evidence\":\"measured-kaggle-2xt4\",\"model_class\":\"output_move_count\",\"profile_evidence_version\":1,\"profile_power\":16,\"requested_beam\":65536,\"selected_profile\":\"p16-output_move_count\",\"world_size\":2},\"proof\":{\"central_state\":[0,1,2],\"central_state_sha256\":\"434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5\",\"generators\":{\"clockwise\":[1,2,0],\"counterclockwise\":[2,0,1]},\"generators_sha256\":\"340adb1a099141be943f423279014724f1fffb0251a5f96547eb8bcb32297f48\",\"initial_state\":[0,1,2],\"initial_state_sha256\":\"434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5\",\"reached_state_sha256\":\"434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5\"},\"puzzle_id\":2,\"puzzle_type\":\"cycle-3\",\"run_id\":\"run-20260729-source\",\"runtime\":{\"b_micro\":2048,\"max_collected_solutions\":16,\"max_depth\":8,\"shard_capacity_scale_ppm\":1050000,\"shard_count\":4,\"solution_mode\":\"first\",\"stream1_concurrency\":4,\"stream3_ring_slots\":4,\"stream4_active_sort_slots\":4,\"stream4_batch_candidates\":98304,\"stream4_trigger_candidates\":98304,\"touch_bfs_radius\":0},\"schema_version\":1,\"solution\":{\"collection_status\":\"not_collected\",\"length\":0,\"path\":[],\"solved_depth\":0,\"touch_depth\":0,\"validation\":\"valid\"},\"solver_commit\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"submitted_at\":\"2026-07-29T09:32:00.000Z\",\"timings\":{\"solve_us\":95335,\"wall_us\":4720000}}",
+      "canonical_sha256": "01542b08d9d8587503dab17fa18aad94169782bcf500c344a1ba499f7c9d3c31",
+      "semantic_sha256": "640d81cce0ef107dd9b746e12cc3ac600496b92e027e0a41ff5e894d62749549"
+    }
+  ]
+}

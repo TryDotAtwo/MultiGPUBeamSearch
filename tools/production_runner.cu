@@ -5,13 +5,6 @@
 #include "../src/hash.hpp"
 #include "../src/state.hpp"
 
-#ifndef BEAM_HAS_LIBTORCH_STREAM1
-#define BEAM_HAS_LIBTORCH_STREAM1 0
-#endif
-
-#if BEAM_HAS_LIBTORCH_STREAM1
-#include "stream1_libtorch_ring_slot_launcher.hpp"
-#endif
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
@@ -23,17 +16,21 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <future>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <numeric>
 #include <map>
+#include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -68,131 +65,6 @@ using namespace beam;
 #endif
 
 namespace {
-
-struct NativeEagerRingSlotLauncherState {
-    StaticDeviceMemory* memory = nullptr;
-    DispatcherDeviceTables tables{};
-    const DispatcherNetwork* network = nullptr;
-    Stream2SolvedBuffers solved{};
-    RuntimeConfig config{};
-    std::vector<cudaEvent_t> score_ready;
-    std::vector<cudaEvent_t> hash_ready;
-
-    ~NativeEagerRingSlotLauncherState() {
-        destroy_events();
-    }
-
-    void reset_events(std::uint32_t inference_parallelism) {
-        destroy_events();
-        score_ready.assign(inference_parallelism, nullptr);
-        hash_ready.assign(inference_parallelism, nullptr);
-        for (std::uint32_t lane = 0; lane < inference_parallelism; ++lane) {
-            BEAM_CUDA_CHECK(cudaEventCreateWithFlags(&score_ready[lane], cudaEventDisableTiming));
-            BEAM_CUDA_CHECK(cudaEventCreateWithFlags(&hash_ready[lane], cudaEventDisableTiming));
-        }
-    }
-
-    void destroy_events() noexcept {
-        for (cudaEvent_t& event : score_ready) {
-            if (event != nullptr) {
-                cudaEventDestroy(event);
-                event = nullptr;
-            }
-        }
-        for (cudaEvent_t& event : hash_ready) {
-            if (event != nullptr) {
-                cudaEventDestroy(event);
-                event = nullptr;
-            }
-        }
-    }
-};
-
-void launch_native_eager_ring_slot(const DispatcherRingSlotLaunchContext& context, void* user) {
-    if (user == nullptr) {
-        throw std::invalid_argument("native_eager Stream1 launcher missing user pointer");
-    }
-    auto* state = static_cast<NativeEagerRingSlotLauncherState*>(user);
-    if (state->memory == nullptr || state->network == nullptr) {
-        throw std::invalid_argument("native_eager Stream1 launcher is not initialized");
-    }
-    if (context.lane >= state->config.inference_parallelism) {
-        throw std::invalid_argument("native_eager Stream1 launcher lane exceeds inference_parallelism");
-    }
-    if (context.count > state->config.b_micro || context.b_micro != state->config.b_micro) {
-        throw std::invalid_argument("native_eager Stream1 launcher b_micro/count mismatch");
-    }
-
-    StaticDeviceMemory& memory = *state->memory;
-    const DispatcherNetwork& network = *state->network;
-    const cudaEvent_t score_ready = state->score_ready.at(context.lane);
-    const cudaEvent_t hash_ready = state->hash_ready.at(context.lane);
-    const std::uint64_t candidates_per_slot =
-        static_cast<std::uint64_t>(state->config.b_micro) * MOVE_COUNT;
-    const std::uint64_t candidate_offset = context.candidate_offset;
-
-    BEAM_CUDA_CHECK(cudaEventRecord(score_ready, context.stream1_lane));
-    BEAM_CUDA_CHECK(cudaStreamWaitEvent(context.stream2_lane, score_ready, 0));
-    if (network.uniform_score) {
-        BEAM_CUDA_CHECK(cudaMemsetAsync(
-            memory.streams.score_ring + candidate_offset,
-            0,
-            candidates_per_slot * sizeof(std::uint32_t),
-            context.stream1_lane));
-    } else if (network.backend == DispatcherStream1Backend::Mlp) {
-        stream1_inference_cutlass_cuda(
-            memory.current_frontier_states,
-            memory.streams.parent_base + context.job,
-            memory.streams.count + context.job,
-            state->tables.generators,
-            network.mlp_view,
-            network.mlp_scratch_lanes.at(context.lane),
-            memory.streams.score_ring + candidate_offset,
-            state->config.b_micro,
-            context.stream1_lane);
-    } else if (network.backend == DispatcherStream1Backend::PieceTransformer) {
-        const std::uint32_t transformer_micro =
-            network.transformer_micro == 0U ? state->config.b_micro : network.transformer_micro;
-        if (transformer_micro == 0U || transformer_micro > state->config.b_micro) {
-            throw std::invalid_argument("native_eager Stream1 transformer micro must be in [1, B_MICRO]");
-        }
-        for (std::uint32_t parent_offset = 0; parent_offset < state->config.b_micro;
-             parent_offset += transformer_micro) {
-            const std::uint32_t chunk = std::min(transformer_micro, state->config.b_micro - parent_offset);
-            stream1_transformer_inference_cuda(
-                memory.current_frontier_states,
-                memory.streams.parent_base + context.job,
-                memory.streams.count + context.job,
-                network.transformer_view,
-                network.transformer_scratch_lanes.at(context.lane),
-                memory.streams.score_ring + candidate_offset +
-                    static_cast<std::uint64_t>(parent_offset) * MOVE_COUNT,
-                chunk,
-                parent_offset,
-                context.stream1_lane);
-        }
-    } else {
-        throw std::invalid_argument("unknown native_eager Stream1 dispatcher backend");
-    }
-
-    stream2_hash_goal_cuda(
-        memory.current_frontier_states,
-        memory.streams.parent_base + context.job,
-        memory.streams.count + context.job,
-        state->tables.generators,
-        state->tables.central_state,
-        state->tables.zobrist,
-        memory.streams.hash_ring + candidate_offset,
-        0,
-        0,
-        state->config.b_micro,
-        0,
-        state->config.local_rank,
-        state->solved,
-        context.stream2_lane);
-    BEAM_CUDA_CHECK(cudaEventRecord(hash_ready, context.stream2_lane));
-    BEAM_CUDA_CHECK(cudaStreamWaitEvent(context.stream1_lane, hash_ready, 0));
-}
 
 std::uint64_t parse_u64(const char* text, const char* name) {
     char* end = nullptr;
@@ -475,20 +347,20 @@ std::string read_text_file(const std::filesystem::path& path) {
 std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path) {
     const std::string text = read_text_file(path);
     std::size_t pos = text.find("\"actions\"");
-    bool array_format = pos != std::string::npos;
-    if (!array_format) {
-        pos = text.find("\"moves\"");
-        array_format = pos != std::string::npos;
-    }
-    if (!array_format) {
+    const bool actions_format = pos != std::string::npos;
+    if (!actions_format) {
         pos = text.find("\"generators\"");
         if (pos == std::string::npos) {
-            throw std::runtime_error("generator json missing actions/moves/generators");
+            throw std::runtime_error("generator json missing actions/generators");
         }
     }
-    pos = array_format ? text.find('[', pos) : text.find('{', pos);
+    if (actions_format) {
+        pos = text.find('[', pos);
+    } else {
+        pos = text.find('{', text.find("\"generators\""));
+    }
     if (pos == std::string::npos) {
-        throw std::runtime_error("generator json malformed actions/moves/generators");
+        throw std::runtime_error("generator json malformed actions/generators");
     }
     std::vector<std::uint8_t> generators(MOVE_COUNT * STATE_STORAGE_LEN);
     for (std::uint32_t move = 0; move < MOVE_COUNT; ++move) {
@@ -510,20 +382,16 @@ std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path
 std::vector<std::string> load_p900_move_names(const std::filesystem::path& path) {
     const std::string text = read_text_file(path);
     std::size_t pos = text.find("\"names\"");
-    bool names_format = pos != std::string::npos;
-    if (!names_format) {
-        pos = text.find("\"move_names\"");
-        names_format = pos != std::string::npos;
-    }
+    const bool names_format = pos != std::string::npos;
     if (names_format) {
         pos = text.find('[', pos);
         if (pos == std::string::npos) {
-            throw std::runtime_error("generator json malformed names/move_names");
+            throw std::runtime_error("generator json malformed names");
         }
     } else {
         pos = text.find("\"generators\"");
         if (pos == std::string::npos) {
-            throw std::runtime_error("generator json missing names/move_names/generators");
+            throw std::runtime_error("generator json missing names/generators");
         }
         pos = text.find('{', pos);
         if (pos == std::string::npos) {
@@ -649,6 +517,14 @@ std::filesystem::path make_history_dir(
     std::uint64_t beam,
     std::uint32_t rank,
     std::uint32_t world_size) {
+    if (env_present("BEAM_HISTORY_DIR")) {
+        std::filesystem::path dir = env_path("BEAM_HISTORY_DIR", "");
+        if (world_size > 1U) {
+            dir /= "rank-" + std::to_string(rank);
+        }
+        std::filesystem::create_directories(dir);
+        return dir;
+    }
     std::filesystem::path dir = "test_results";
     std::string name = "candidate_history_p" + std::to_string(puzzle_id) +
         "_d" + std::to_string(depth_limit) +
@@ -3103,6 +2979,12 @@ State128 apply_solution_moves(
     return state;
 }
 
+struct SolvedSnapshotHeader {
+    bool found = false;
+    std::uint32_t count = 0;
+    std::uint32_t overflow = 0;
+};
+
 struct SolvedSnapshot {
     bool found = false;
     std::uint32_t count = 0;
@@ -3119,6 +3001,24 @@ struct SolveBucketRecord {
     CandidateMeta meta{};
     std::uint32_t suffix_id = 0;
     std::string path;
+};
+
+struct SolveBucketRecordLess {
+    bool operator()(const SolveBucketRecord& a, const SolveBucketRecord& b) const {
+        if (a.total_depth != b.total_depth) return a.total_depth < b.total_depth;
+        if (a.owner_rank != b.owner_rank) return a.owner_rank < b.owner_rank;
+        if (a.found_depth != b.found_depth) return a.found_depth < b.found_depth;
+        if (a.meta.parent_idx != b.meta.parent_idx) return a.meta.parent_idx < b.meta.parent_idx;
+        if (a.meta.route_packed != b.meta.route_packed) return a.meta.route_packed < b.meta.route_packed;
+        if (a.meta.hash.lo != b.meta.hash.lo) return a.meta.hash.lo < b.meta.hash.lo;
+        if (a.meta.hash.hi != b.meta.hash.hi) return a.meta.hash.hi < b.meta.hash.hi;
+        return a.suffix_id < b.suffix_id;
+    }
+};
+
+struct SolveBucketRecordBatch {
+    std::vector<SolveBucketRecord> records;
+    bool may_have_more = false;
 };
 
 std::uint32_t solved_total_depth(
@@ -3209,16 +3109,36 @@ void append_solution_suffixes(
 
 void require_nccl(ncclResult_t status, const char* op);
 
-SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint32_t capacity) {
-    SolvedSnapshot snapshot;
+SolvedSnapshotHeader read_solved_snapshot_header(const StaticDeviceMemory& memory) {
+    SolvedSnapshotHeader header;
     std::uint32_t flag = 0;
     BEAM_CUDA_CHECK(cudaMemcpy(&flag, memory.solved_flag, sizeof(flag), cudaMemcpyDeviceToHost));
-    snapshot.found = flag != 0U;
+    header.found = flag != 0U;
+    if (!header.found) {
+        return header;
+    }
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &header.count,
+        memory.solved_count,
+        sizeof(header.count),
+        cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &header.overflow,
+        memory.solved_overflow,
+        sizeof(header.overflow),
+        cudaMemcpyDeviceToHost));
+    return header;
+}
+
+SolvedSnapshot read_solved_snapshot(const StaticDeviceMemory& memory, std::uint32_t capacity) {
+    const SolvedSnapshotHeader header = read_solved_snapshot_header(memory);
+    SolvedSnapshot snapshot;
+    snapshot.found = header.found;
+    snapshot.count = header.count;
+    snapshot.overflow = header.overflow;
     if (!snapshot.found) {
         return snapshot;
     }
-    BEAM_CUDA_CHECK(cudaMemcpy(&snapshot.count, memory.solved_count, sizeof(snapshot.count), cudaMemcpyDeviceToHost));
-    BEAM_CUDA_CHECK(cudaMemcpy(&snapshot.overflow, memory.solved_overflow, sizeof(snapshot.overflow), cudaMemcpyDeviceToHost));
     const std::uint32_t stored = std::min(snapshot.count, capacity);
     snapshot.meta.resize(stored);
     snapshot.depth.resize(stored);
@@ -3251,8 +3171,23 @@ void reset_solved_buffers(const StaticDeviceMemory& memory) {
     BEAM_CUDA_CHECK(cudaMemcpy(memory.solved_overflow, &zero, sizeof(zero), cudaMemcpyHostToDevice));
 }
 
-std::vector<SolveBucketRecord> gather_solve_bucket_records_distributed(
-    const SolvedSnapshot& local_solved,
+std::uint64_t solve_bucket_gather_records_per_chunk(
+    std::uint64_t scratch_words,
+    std::uint32_t world_size) {
+    constexpr std::uint64_t packet_words = 8ULL;
+    if (world_size == 0U) {
+        throw std::invalid_argument("solve bucket gather world_size must be positive");
+    }
+    constexpr std::uint64_t max_host_records_per_chunk = 65'536ULL;
+    const std::uint64_t words_per_record_group =
+        packet_words * (static_cast<std::uint64_t>(world_size) + 1ULL);
+    return std::min<std::uint64_t>(
+        scratch_words / words_per_record_group,
+        max_host_records_per_chunk);
+}
+
+SolveBucketRecordBatch gather_solve_bucket_record_batch_distributed(
+    const SolvedSnapshotHeader& local_solved_header,
     const SolvedNeighborhoodRuntime& solved_neighborhood,
     const Stream2SuffixRuntime& stream2_suffix,
     const StaticMemoryPlan& plan,
@@ -3261,107 +3196,175 @@ std::vector<SolveBucketRecord> gather_solve_bucket_records_distributed(
     ncclComm_t comm,
     std::uint32_t world_size,
     std::uint32_t rank,
-    std::uint32_t capacity) {
-    constexpr std::uint32_t packet_words = 8;
+    std::uint32_t capacity,
+    const SolveBucketRecord* cursor,
+    std::size_t batch_limit) {
+    constexpr std::uint64_t packet_words = 8ULL;
+    constexpr std::size_t max_selection_batch_records = 65'536ULL;
+    constexpr std::uint64_t max_host_records_per_chunk = 65'536ULL;
+    if (batch_limit == 0ULL || batch_limit > max_selection_batch_records) {
+        throw std::invalid_argument("solve bucket selection batch limit must be in [1,65536]");
+    }
+    if (memory.final.next_frontier_states_tmp == nullptr) {
+        throw std::runtime_error("solve bucket distributed gather scratch buffer is unavailable");
+    }
     const std::uint64_t scratch_words =
-        memory.scratch_pool_bytes / sizeof(std::uint64_t);
-    const std::uint64_t records_per_rank = static_cast<std::uint64_t>(capacity);
-    const std::uint64_t send_words = records_per_rank * packet_words;
-    const std::uint64_t recv_words = send_words * static_cast<std::uint64_t>(world_size);
-    if (scratch_words < send_words + recv_words || memory.scratch_pool == nullptr) {
-        throw std::runtime_error("solve bucket distributed gather scratch buffer is too small");
+        (plan.frontier_states * sizeof(State128)) / sizeof(std::uint64_t);
+    const std::uint64_t exchange_records_per_chunk =
+        solve_bucket_gather_records_per_chunk(scratch_words, world_size);
+    if (exchange_records_per_chunk == 0ULL) {
+        throw std::runtime_error("solve bucket distributed gather scratch cannot fit one record chunk");
     }
-    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.scratch_pool);
-    std::uint64_t* send_device = scratch;
-    std::uint64_t* recv_device = scratch + send_words;
 
-    std::vector<std::uint64_t> send(static_cast<std::size_t>(send_words), 0ULL);
-    const std::uint32_t stored = std::min<std::uint32_t>(
-        static_cast<std::uint32_t>(local_solved.meta.size()), capacity);
-    for (std::uint32_t i = 0; i < stored; ++i) {
-        const std::uint32_t suffix_id =
-            i < local_solved.suffix.size() ? local_solved.suffix[i] : 0U;
-        const CandidateMeta& candidate = local_solved.meta[i];
-        std::uint64_t* packet = send.data() + static_cast<std::uint64_t>(i) * packet_words;
-        packet[0] = 1ULL;
-        packet[1] = rank;
-        packet[2] = i < local_solved.depth.size() ? local_solved.depth[i] : 0ULL;
-        packet[3] = candidate.parent_idx;
-        packet[4] = candidate.route_packed;
-        packet[5] = candidate.hash.lo;
-        packet[6] = candidate.hash.hi;
-        packet[7] = suffix_id;
-    }
-    BEAM_CUDA_CHECK(cudaMemcpyAsync(
-        send_device,
-        send.data(),
-        send.size() * sizeof(std::uint64_t),
-        cudaMemcpyHostToDevice,
-        streams.stream5));
-    require_nccl(ncclAllGather(
-        send_device,
-        recv_device,
-        static_cast<std::size_t>(send_words),
-        ncclUint64,
-        comm,
-        streams.stream5), "ncclAllGather solve bucket records");
-    std::vector<std::uint64_t> recv(static_cast<std::size_t>(recv_words), 0ULL);
-    BEAM_CUDA_CHECK(cudaMemcpyAsync(
-        recv.data(),
-        recv_device,
-        recv.size() * sizeof(std::uint64_t),
-        cudaMemcpyDeviceToHost,
-        streams.stream5));
-    BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+    const SolveBucketRecordLess less;
+    const std::uint32_t stored = std::min(local_solved_header.count, capacity);
+    std::set<SolveBucketRecord, SolveBucketRecordLess> local_selected_records;
+    for (std::uint64_t base = 0ULL; base < stored; base += max_host_records_per_chunk) {
+        const std::uint64_t local_chunk_records = std::min<std::uint64_t>(
+            max_host_records_per_chunk,
+            static_cast<std::uint64_t>(stored) - base);
+        std::vector<CandidateMeta> local_meta(static_cast<std::size_t>(local_chunk_records));
+        std::vector<std::uint32_t> local_depth(static_cast<std::size_t>(local_chunk_records));
+        std::vector<std::uint32_t> local_suffix(static_cast<std::size_t>(local_chunk_records));
+        BEAM_CUDA_CHECK(cudaMemcpyAsync(
+            local_meta.data(),
+            memory.solved_meta_list + base,
+            local_chunk_records * sizeof(CandidateMeta),
+            cudaMemcpyDeviceToHost,
+            streams.stream5));
+        BEAM_CUDA_CHECK(cudaMemcpyAsync(
+            local_depth.data(),
+            memory.solved_depth_list + base,
+            local_chunk_records * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost,
+            streams.stream5));
+        BEAM_CUDA_CHECK(cudaMemcpyAsync(
+            local_suffix.data(),
+            memory.solved_suffix_list + base,
+            local_chunk_records * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost,
+            streams.stream5));
+        BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
 
-    std::vector<SolveBucketRecord> records;
-    for (std::uint32_t peer = 0; peer < world_size; ++peer) {
-        const std::uint64_t* peer_packets =
-            recv.data() + static_cast<std::uint64_t>(peer) * send_words;
-        for (std::uint32_t i = 0; i < capacity; ++i) {
-            const std::uint64_t* packet =
-                peer_packets + static_cast<std::uint64_t>(i) * packet_words;
-            if (packet[0] == 0ULL) {
+        for (std::uint64_t offset = 0ULL; offset < local_chunk_records; ++offset) {
+            SolveBucketRecord record;
+            record.owner_rank = rank;
+            record.found_depth = local_depth[static_cast<std::size_t>(offset)];
+            record.meta = local_meta[static_cast<std::size_t>(offset)];
+            record.suffix_id = local_suffix[static_cast<std::size_t>(offset)];
+            record.total_depth = solved_total_depth(
+                solved_neighborhood,
+                stream2_suffix,
+                record.meta,
+                record.found_depth,
+                record.suffix_id);
+            if (cursor != nullptr && !less(*cursor, record)) {
                 continue;
             }
-            SolveBucketRecord record;
-            record.owner_rank = static_cast<std::uint32_t>(packet[1]);
-            record.found_depth = static_cast<std::uint32_t>(packet[2]);
-            record.meta.parent_idx = packet[3];
-            record.meta.route_packed = static_cast<std::uint32_t>(packet[4]);
-            record.meta.hash = Hash128{packet[5], packet[6]};
-            record.meta.score_key = GOAL_SCORE_KEY;
-            record.suffix_id = static_cast<std::uint32_t>(packet[7]);
-            record.total_depth =
-                solved_total_depth(
-                    solved_neighborhood,
-                    stream2_suffix,
-                    record.meta,
-                    record.found_depth,
-                    record.suffix_id);
-            records.push_back(record);
+            local_selected_records.insert(record);
+            if (local_selected_records.size() > batch_limit) {
+                local_selected_records.erase(std::prev(local_selected_records.end()));
+            }
         }
     }
-    std::sort(records.begin(), records.end(), [](const SolveBucketRecord& a, const SolveBucketRecord& b) {
-        if (a.total_depth != b.total_depth) return a.total_depth < b.total_depth;
-        if (a.owner_rank != b.owner_rank) return a.owner_rank < b.owner_rank;
-        if (a.meta.parent_idx != b.meta.parent_idx) return a.meta.parent_idx < b.meta.parent_idx;
-        if (a.meta.route_packed != b.meta.route_packed) return a.meta.route_packed < b.meta.route_packed;
-        if (a.meta.hash.lo != b.meta.hash.lo) return a.meta.hash.lo < b.meta.hash.lo;
-        if (a.meta.hash.hi != b.meta.hash.hi) return a.meta.hash.hi < b.meta.hash.hi;
-        return a.suffix_id < b.suffix_id;
-    });
-    records.erase(
-        std::unique(records.begin(), records.end(), [](const SolveBucketRecord& a, const SolveBucketRecord& b) {
-            return a.owner_rank == b.owner_rank &&
-                a.found_depth == b.found_depth &&
-                a.meta.parent_idx == b.meta.parent_idx &&
-                a.meta.route_packed == b.meta.route_packed &&
-                a.meta.hash == b.meta.hash &&
-                a.suffix_id == b.suffix_id;
-        }),
-        records.end());
-    return records;
+    std::vector<SolveBucketRecord> local_selected_vector(
+        local_selected_records.begin(), local_selected_records.end());
+
+    // Exactness: every global next-K record is in its rank-local next-K; otherwise K
+    // smaller eligible records on that same rank would precede it globally.
+    std::set<SolveBucketRecord, SolveBucketRecordLess> selected_records;
+    if (world_size <= 1U) {
+        selected_records = local_selected_records;
+    } else {
+        std::uint64_t* scratch =
+            reinterpret_cast<std::uint64_t*>(memory.final.next_frontier_states_tmp);
+        for (std::uint64_t base = 0ULL; base < batch_limit; base += exchange_records_per_chunk) {
+            const std::uint64_t chunk_records = std::min<std::uint64_t>(
+                exchange_records_per_chunk,
+                static_cast<std::uint64_t>(batch_limit) - base);
+            const std::uint64_t send_words = chunk_records * packet_words;
+            const std::uint64_t recv_words = send_words * static_cast<std::uint64_t>(world_size);
+            if (send_words + recv_words > scratch_words) {
+                throw std::runtime_error("solve bucket distributed gather chunk exceeds fixed scratch");
+            }
+            std::vector<std::uint64_t> send(static_cast<std::size_t>(send_words), 0ULL);
+            for (std::uint64_t offset = 0ULL; offset < chunk_records; ++offset) {
+                const std::uint64_t local_index = base + offset;
+                if (local_index >= local_selected_vector.size()) {
+                    continue;
+                }
+                const SolveBucketRecord& record =
+                    local_selected_vector[static_cast<std::size_t>(local_index)];
+                std::uint64_t* packet = send.data() + offset * packet_words;
+                packet[0] = 1ULL;
+                packet[1] = record.owner_rank;
+                packet[2] = record.found_depth;
+                packet[3] = record.meta.parent_idx;
+                packet[4] = record.meta.route_packed;
+                packet[5] = record.meta.hash.lo;
+                packet[6] = record.meta.hash.hi;
+                packet[7] = record.suffix_id;
+            }
+
+            std::uint64_t* send_device = scratch;
+            std::uint64_t* recv_device = scratch + send_words;
+            BEAM_CUDA_CHECK(cudaMemcpyAsync(
+                send_device,
+                send.data(),
+                send.size() * sizeof(std::uint64_t),
+                cudaMemcpyHostToDevice,
+                streams.stream5));
+            require_nccl(ncclAllGather(
+                send_device,
+                recv_device,
+                static_cast<std::size_t>(send_words),
+                ncclUint64,
+                comm,
+                streams.stream5), "ncclAllGather solve bucket rank-local next-K");
+            std::vector<std::uint64_t> recv(static_cast<std::size_t>(recv_words), 0ULL);
+            BEAM_CUDA_CHECK(cudaMemcpyAsync(
+                recv.data(),
+                recv_device,
+                recv.size() * sizeof(std::uint64_t),
+                cudaMemcpyDeviceToHost,
+                streams.stream5));
+            BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+
+            for (std::uint32_t peer = 0; peer < world_size; ++peer) {
+                const std::uint64_t* peer_packets =
+                    recv.data() + static_cast<std::uint64_t>(peer) * send_words;
+                for (std::uint64_t offset = 0ULL; offset < chunk_records; ++offset) {
+                    const std::uint64_t* packet = peer_packets + offset * packet_words;
+                    if (packet[0] == 0ULL) {
+                        continue;
+                    }
+                    SolveBucketRecord record;
+                    record.owner_rank = static_cast<std::uint32_t>(packet[1]);
+                    record.found_depth = static_cast<std::uint32_t>(packet[2]);
+                    record.meta.parent_idx = packet[3];
+                    record.meta.route_packed = static_cast<std::uint32_t>(packet[4]);
+                    record.meta.hash = Hash128{packet[5], packet[6]};
+                    record.meta.score_key = GOAL_SCORE_KEY;
+                    record.suffix_id = static_cast<std::uint32_t>(packet[7]);
+                    record.total_depth = solved_total_depth(
+                        solved_neighborhood,
+                        stream2_suffix,
+                        record.meta,
+                        record.found_depth,
+                        record.suffix_id);
+                    selected_records.insert(record);
+                    if (selected_records.size() > batch_limit) {
+                        selected_records.erase(std::prev(selected_records.end()));
+                    }
+                }
+            }
+        }
+    }
+
+    SolveBucketRecordBatch batch;
+    batch.records.assign(selected_records.begin(), selected_records.end());
+    batch.may_have_more = batch.records.size() == batch_limit;
+    return batch;
 }
 
 std::uint32_t propagate_solved_flag(
@@ -4031,6 +4034,58 @@ std::uint32_t propagate_stop_flag(
     return stop_value;
 }
 
+std::uint32_t propagate_host_stop_value(
+    std::uint32_t local_value,
+    StaticDeviceMemory& memory,
+    DispatcherStreams& streams,
+    ncclComm_t comm,
+    std::uint32_t world_size) {
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        memory.stop_flag,
+        &local_value,
+        sizeof(local_value),
+        cudaMemcpyHostToDevice));
+    return propagate_stop_flag(memory, streams, comm, world_size);
+}
+
+std::uint64_t synchronize_rank0_accepted_count(
+    std::uint64_t rank0_count,
+    StaticDeviceMemory& memory,
+    DispatcherStreams& streams,
+    ncclComm_t comm,
+    std::uint32_t world_size,
+    std::uint32_t rank) {
+    if (world_size <= 1U) {
+        return rank0_count;
+    }
+    if (memory.final.next_frontier_states_tmp == nullptr) {
+        throw std::runtime_error("solve bucket accepted-count broadcast scratch is unavailable");
+    }
+    std::uint64_t synchronized_count = rank == 0U ? rank0_count : 0ULL;
+    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.final.next_frontier_states_tmp);
+    BEAM_CUDA_CHECK(cudaMemcpyAsync(
+        scratch,
+        &synchronized_count,
+        sizeof(synchronized_count),
+        cudaMemcpyHostToDevice,
+        streams.stream5));
+    require_nccl(ncclBroadcast(
+        scratch,
+        scratch,
+        1,
+        ncclUint64,
+        0,
+        comm,
+        streams.stream5), "ncclBroadcast solve bucket accepted count");
+    BEAM_CUDA_CHECK(cudaMemcpyAsync(
+        &synchronized_count,
+        scratch,
+        sizeof(synchronized_count),
+        cudaMemcpyDeviceToHost,
+        streams.stream5));
+    BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+    return synchronized_count;
+}
 void reset_static_memory_for_task(
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
@@ -4084,57 +4139,13 @@ int main(int argc, char** argv) {
     std::size_t total_before = 0;
     BEAM_CUDA_CHECK(cudaMemGetInfo(&free_before, &total_before));
 
-    const char* stream1_executor_env = std::getenv("BEAM_STREAM1_EXECUTOR");
-    const std::string stream1_executor =
-        stream1_executor_env == nullptr || stream1_executor_env[0] == '\0'
-            ? std::string("native_cuda_graph")
-            : std::string(stream1_executor_env);
-    const bool use_libtorch_stream1_executor = stream1_executor == "libtorch_eager";
-    const bool use_native_eager_stream1_executor =
-        stream1_executor == "native_eager" || stream1_executor == "native_no_graph";
-    if (!use_libtorch_stream1_executor && !use_native_eager_stream1_executor &&
-        stream1_executor != "native_cuda_graph" && stream1_executor != "cuda_graph") {
-        throw std::runtime_error("BEAM_STREAM1_EXECUTOR must be native_cuda_graph, cuda_graph, native_eager, native_no_graph, or libtorch_eager");
-    }
-#if !BEAM_HAS_LIBTORCH_STREAM1
-    if (use_libtorch_stream1_executor) {
-        throw std::runtime_error("BEAM_STREAM1_EXECUTOR=libtorch_eager requires production_runner_libtorch_stream1 built with BEAM_ENABLE_LIBTORCH_STREAM1=ON");
-    }
-#endif
-#if BEAM_DEBUG_INFERENCE_TRACE
-    if (use_libtorch_stream1_executor) {
-        throw std::runtime_error("BEAM_DEBUG_INFERENCE_TRACE is not implemented for LibTorch Stream1 executor");
-    }
-#endif
-
     const std::filesystem::path weight_dir = env_path("BEAM_WEIGHT_DIR", "stream1_weights");
-    stream1_weights::HostWeightBytes host_weights;
-    Stream1ModelConfig stream1_manifest_only{};
-    if (use_libtorch_stream1_executor) {
-        stream1_manifest_only = stream1_weights::load_stream1_manifest(weight_dir);
-    } else {
-        host_weights = stream1_weights::load_stream1_weights(weight_dir);
-    }
-    const Stream1ModelConfig& stream1_model = use_libtorch_stream1_executor ? stream1_manifest_only : host_weights.model;
-    if (use_libtorch_stream1_executor) {
-        if (stream1_model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
-            throw std::runtime_error("BEAM_STREAM1_EXECUTOR=libtorch_eager requires stream1 backend piece_transformer");
-        }
-        if (stream1_model.output_dim != MOVE_COUNT) {
-            throw std::runtime_error("BEAM_STREAM1_EXECUTOR=libtorch_eager requires output_dim == MOVE_COUNT; single-output transformer row mode is not implemented");
-        }
-    }
+    const stream1_weights::HostWeightBytes host_weights =
+        stream1_weights::load_stream1_weights(weight_dir);
+    const Stream1ModelConfig& stream1_model = host_weights.model;
     const RuntimeConfigBuild config_build =
         build_runtime_config_from_budget(beam, world_size, rank, stream1_model, free_before);
     const RuntimeConfig config = config_build.config;
-    const std::uint32_t stream1_transformer_micro =
-        stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER
-            ? env_u32("BEAM_STREAM1_TRANSFORMER_MICRO", config.b_micro)
-            : config.b_micro;
-    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER &&
-        (stream1_transformer_micro == 0U || stream1_transformer_micro > config.b_micro)) {
-        throw std::runtime_error("BEAM_STREAM1_TRANSFORMER_MICRO must be in [1, B_MICRO]");
-    }
     const StaticMemoryPlan plan = config_build.plan;
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "puzzle_id=" << cli_puzzle_id << "\n";
@@ -4146,11 +4157,6 @@ int main(int argc, char** argv) {
     std::cout << "CUDA_DEVICE_LOCAL_RANK=" << device_local_rank << "\n";
     std::cout << "B_MICRO=" << config.b_micro << "\n";
     std::cout << "STREAM1_ROWS_PER_JOB=" << stream1_inference_rows(config.b_micro, stream1_model) << "\n";
-    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
-        std::cout << "STREAM1_TRANSFORMER_MICRO=" << stream1_transformer_micro << "\n";
-        std::cout << "STREAM1_TRANSFORMER_MICRO_ROWS="
-                  << stream1_inference_rows(stream1_transformer_micro, stream1_model) << "\n";
-    }
     std::cout << "STREAM1_CONCURRENCY=" << config.inference_parallelism << "\n";
     std::cout << "STREAM3_RING_SLOTS=" << config_build.stream3_ring_slots << "\n";
     std::cout << "RING_COUNT=" << config.ring_count << "\n";
@@ -4193,7 +4199,6 @@ int main(int argc, char** argv) {
     std::cout << "SCORE_MAX_KEY=" << SCORE_MAX_KEY << "\n";
     std::cout << "SCORE_BIN_COUNT=" << SCORE_BIN_COUNT << "\n";
     std::cout << "SOLVED_RESULT_CAPACITY=" << config.solved_result_capacity << "\n";
-    std::cout << "SOLVE_BUCKET_GATHER_SCRATCH_BYTES=" << config.solve_bucket_gather_scratch_bytes << "\n";
     std::cout << "gpu_total_bytes=" << total_before << "\n";
     std::cout << "gpu_free_before_bytes=" << free_before << "\n";
     std::cout << "gpu_headroom_bytes=" << config_build.gpu_headroom_bytes << "\n";
@@ -4226,6 +4231,10 @@ int main(int argc, char** argv) {
     const bool solve_bucket_mode = env_bool("BEAM_SOLVE_BUCKET_MODE", false);
     const std::uint32_t solve_bucket_extra_depths =
         env_u32("BEAM_SOLVE_BUCKET_EXTRA_DEPTHS", 1U);
+    const std::uint32_t solve_bucket_stop_depth =
+        env_u32("BEAM_SOLVE_BUCKET_STOP_DEPTH", 0U);
+    const std::uint64_t solve_bucket_max_solutions =
+        env_u64("BEAM_SOLVE_BUCKET_MAX_SOLUTIONS", 0U);
     const std::uint32_t solve_bucket_known_length =
         env_u32("BEAM_SOLVE_BUCKET_KNOWN_LENGTH", 0U);
     const std::filesystem::path solve_bucket_result_path =
@@ -4321,31 +4330,16 @@ int main(int argc, char** argv) {
         std::cout << "solve_bucket_result_tsv=" << solve_bucket_result_path.string() << "\n";
     }
     std::cout << "weight_dir=" << weight_dir.string() << "\n";
-    std::cout << "stream1_executor=" << stream1_executor << "\n";
-    std::cout << "stream1_model_backend="
-              << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
     std::cout << "stream1_model_state_len=" << stream1_model.state_len << "\n";
     std::cout << "stream1_model_num_classes=" << stream1_model.num_classes << "\n";
-    if (stream1_model.backend == STREAM1_BACKEND_MLP) {
-        std::cout << "stream1_model_hidden1=" << stream1_model.hidden1 << "\n";
-        std::cout << "stream1_model_hidden2=" << stream1_model.hidden2 << "\n";
-        std::cout << "stream1_model_residual_count=" << stream1_model.residual_count << "\n";
-        std::cout << "stream1_model_normalization="
-                  << (stream1_model.normalization == STREAM1_NORM_LAYERNORM ? "layernorm" : "none") << "\n";
-    } else if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
-        std::cout << "stream1_model_num_pieces=" << stream1_model.num_pieces << "\n";
-        std::cout << "stream1_model_max_piece_size=" << stream1_model.max_piece_size << "\n";
-        std::cout << "stream1_model_seq_len=" << stream1_model.seq_len << "\n";
-        std::cout << "stream1_model_d_model=" << stream1_model.d_model << "\n";
-        std::cout << "stream1_model_nhead=" << stream1_model.nhead << "\n";
-        std::cout << "stream1_model_head_dim=" << stream1_model.head_dim << "\n";
-        std::cout << "stream1_model_transformer_layers=" << stream1_model.transformer_layers << "\n";
-        std::cout << "stream1_model_ff_dim=" << stream1_model.ff_dim << "\n";
-    }
+    std::cout << "stream1_model_hidden1=" << stream1_model.hidden1 << "\n";
+    std::cout << "stream1_model_hidden2=" << stream1_model.hidden2 << "\n";
+    std::cout << "stream1_model_residual_count=" << stream1_model.residual_count << "\n";
     std::cout << "stream1_model_output_dim=" << stream1_model.output_dim << "\n";
     std::cout << "stream1_model_dtype=" << (stream1_model.dtype == STREAM1_DTYPE_BF16 ? "bf16" : "fp16") << "\n";
-    std::cout << "stream1_model_weight_bytes="
-              << (use_libtorch_stream1_executor ? 0ULL : stream1_weights::total_host_weight_bytes(host_weights)) << "\n";
+    std::cout << "stream1_model_normalization="
+              << (stream1_model.normalization == STREAM1_NORM_LAYERNORM ? "layernorm" : "none") << "\n";
+    std::cout << "stream1_model_weight_bytes=" << stream1_weights::total_host_weight_bytes(host_weights) << "\n";
     std::cout << "solved_neighborhood_radius=" << solved_neighborhood.radius << "\n";
     std::cout << "solved_neighborhood_entries=" << solved_neighborhood.entry_count << "\n";
     std::cout << "solved_neighborhood_bucket_count=" << solved_neighborhood.bucket_count << "\n";
@@ -4389,15 +4383,9 @@ int main(int argc, char** argv) {
     BEAM_CUDA_CHECK(cudaMemcpy(generators, host_generators.data(), host_generators.size(), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(central_state, &host_target, sizeof(State128), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(zobrist, &host_zobrist[0][0], STATE_STORAGE_LEN * STATE_VALUE_PAD * sizeof(Hash128), cudaMemcpyHostToDevice));
-    stream1_weights::DeviceWeights device_weights;
-    stream1_weights::ScratchAllocation stream1_scratch;
-    if (!use_libtorch_stream1_executor) {
-        device_weights = stream1_weights::upload_weights(host_weights);
-        const std::uint32_t scratch_b_micro =
-            stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? stream1_transformer_micro : config.b_micro;
-        stream1_scratch =
-            stream1_weights::alloc_stream1_scratch(stream1_model, scratch_b_micro, config.inference_parallelism);
-    }
+    stream1_weights::DeviceWeights device_weights = stream1_weights::upload_weights(host_weights);
+    stream1_weights::ScratchAllocation stream1_scratch =
+        stream1_weights::alloc_stream1_scratch(stream1_model, config.b_micro, config.inference_parallelism);
     TrackedSolutionPrefix tracked_solution;
 #if BEAM_DEBUG_PATH_TRACE
     tracked_solution.initialize(cli_puzzle_id, host_initial, host_generators, host_zobrist, host_move_names);
@@ -4437,6 +4425,7 @@ int main(int argc, char** argv) {
     CudaGraphJobTemplates graphs;
     create_dispatcher_streams(streams);
     create_dispatcher_events(events);
+    const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
     const char* stream1_mode_env = std::getenv("BEAM_STREAM1_MODE");
     const bool stream1_uniform_score =
         stream1_mode_env != nullptr && std::strcmp(stream1_mode_env, "uniform") == 0;
@@ -4445,58 +4434,19 @@ int main(int argc, char** argv) {
         std::strcmp(stream1_mode_env, "model") != 0) {
         throw std::runtime_error("BEAM_STREAM1_MODE must be model or uniform");
     }
-    if (use_libtorch_stream1_executor && stream1_uniform_score) {
-        throw std::runtime_error("BEAM_STREAM1_MODE=uniform is incompatible with BEAM_STREAM1_EXECUTOR=libtorch_eager");
-    }
     std::cout << "stream1_mode=" << (stream1_uniform_score ? "uniform" : "model") << "\n";
-    std::cout << "stream1_executor=" << stream1_executor << "\n";
-    const std::uint64_t runtime_ring_slot_physical_jobs =
-        static_cast<std::uint64_t>(config.ring_count) * plan.derived.ring_slot_count;
-    std::cout << "runtime_ring_count=" << config.ring_count << "\n";
-    std::cout << "runtime_ring_slot_count=" << plan.derived.ring_slot_count << "\n";
-    const char* ring_graph_execs_per_lane_requested = std::getenv("BEAM_RING_GRAPH_EXECS_PER_LANE");
-    const char* ring_graph_debug_sync = std::getenv("BEAM_DEBUG_RING_GRAPH_SYNC");
-    std::cout << "runtime_ring_slot_physical_jobs=" << runtime_ring_slot_physical_jobs << "\n";
-    std::cout << "runtime_ring_graph_execs_per_lane_requested="
-              << (ring_graph_execs_per_lane_requested == nullptr ? "" : ring_graph_execs_per_lane_requested) << "\n";
-    std::cout << "runtime_ring_graph_debug_sync="
-              << (ring_graph_debug_sync == nullptr ? "" : ring_graph_debug_sync) << "\n";
-    std::cout << "stream1_backend="
-              << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
-    if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
-        std::cout << "stream1_transformer_micro=" << stream1_transformer_micro << "\n";
-        std::cout << "stream1_transformer_dims"
-                  << " seq_len=" << stream1_model.seq_len
-                  << " d_model=" << stream1_model.d_model
-                  << " nhead=" << stream1_model.nhead
-                  << " head_dim=" << stream1_model.head_dim
-                  << " layers=" << stream1_model.transformer_layers
-                  << " ff_dim=" << stream1_model.ff_dim
-                  << " output_dim=" << stream1_model.output_dim
-                  << "\n";
-        const char* block51_env = std::getenv("BEAM_STREAM1_TRANSFORMER_BLOCK51");
-        const char* final_cls_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY");
-        const char* final_cls_attention_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION");
-        std::cout << "stream1_transformer_block51="
-                  << (block51_env != nullptr && std::strcmp(block51_env, "1") == 0 ? 1 : 0)
-                  << " raw=" << (block51_env == nullptr ? "" : block51_env) << "\n";
-        std::cout << "stream1_transformer_final_cls_only="
-                  << (final_cls_env != nullptr && std::strcmp(final_cls_env, "1") == 0 ? 1 : 0)
-                  << " raw=" << (final_cls_env == nullptr ? "" : final_cls_env) << "\n";
-        std::cout << "stream1_transformer_final_cls_attention="
-                  << (final_cls_attention_env != nullptr && std::strcmp(final_cls_attention_env, "1") == 0 ? 1 : 0)
-                  << " raw=" << (final_cls_attention_env == nullptr ? "" : final_cls_attention_env) << "\n";
+    std::vector<Stream1CutlassScratch> stream1_scratch_lanes;
+    stream1_scratch_lanes.reserve(config.inference_parallelism);
+    const std::uint64_t stream1_rows_per_lane = stream1_inference_rows(config.b_micro, stream1_model);
+    for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
+        stream1_scratch_lanes.push_back(Stream1CutlassScratch{
+            stream1_scratch.hidden1 + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden1,
+            stream1_scratch.hidden2 + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden2,
+            stream1_scratch.residual + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.hidden2,
+            stream1_scratch.output + static_cast<std::uint64_t>(lane) * stream1_rows_per_lane * stream1_model.output_dim});
     }
-
-    DispatcherNetwork network{};
-    network.uniform_score = stream1_uniform_score;
-    stream1_weights::TransformerNetworkViewHolder transformer_view_holder;
-    if (use_libtorch_stream1_executor) {
-        network.backend = DispatcherStream1Backend::PieceTransformer;
-    } else if (stream1_model.backend == STREAM1_BACKEND_MLP) {
-        const Stream1NetworkDims dims = stream1_weights::network_dims(stream1_model);
-        network.backend = DispatcherStream1Backend::Mlp;
-        network.mlp_view = Stream1NetworkView{
+    DispatcherNetwork network{
+        Stream1NetworkView{
             device_weights.input_weight,
             device_weights.input_bias,
             device_weights.input_ln_gamma,
@@ -4515,26 +4465,9 @@ int main(int argc, char** argv) {
             reinterpret_cast<const half* const*>(device_weights.residual_fc2_ln_beta_table),
             device_weights.output_weight,
             device_weights.output_bias,
-            dims};
-        network.mlp_scratch_lanes.reserve(config.inference_parallelism);
-        for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
-            network.mlp_scratch_lanes.push_back(
-                stream1_weights::mlp_scratch_view(stream1_scratch, stream1_model, config.b_micro, lane));
-        }
-    } else if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
-        transformer_view_holder =
-            stream1_weights::transformer_network_view(device_weights.transformer, stream1_model);
-        network.backend = DispatcherStream1Backend::PieceTransformer;
-        network.transformer_view = transformer_view_holder.view;
-        network.transformer_micro = stream1_transformer_micro;
-        network.transformer_scratch_lanes.reserve(config.inference_parallelism);
-        for (std::uint32_t lane = 0; lane < config.inference_parallelism; ++lane) {
-            network.transformer_scratch_lanes.push_back(
-                stream1_weights::transformer_scratch_view(stream1_scratch, stream1_model, stream1_transformer_micro, lane));
-        }
-    } else {
-        throw std::runtime_error("unsupported Stream1 backend in production runner");
-    }
+            dims},
+        stream1_scratch_lanes,
+        stream1_uniform_score};
     DispatcherDeviceTables tables{generators, central_state, zobrist};
     Stream2SolvedBuffers solved{
         memory.solved_flag,
@@ -4549,63 +4482,7 @@ int main(int argc, char** argv) {
         stream2_suffix.device_table(),
         memory.solved_suffix_list,
         solve_bucket_mode ? 0U : 1U};
-    const bool skip_native_ring_slot_templates = use_libtorch_stream1_executor || use_native_eager_stream1_executor;
-#if BEAM_HAS_LIBTORCH_STREAM1
-    std::unique_ptr<stream1_libtorch::RingSlotLauncher> libtorch_stream1_launcher;
-#endif
-    NativeEagerRingSlotLauncherState native_eager_launcher_state;
-    DispatcherRingSlotLauncher native_eager_ring_slot_launcher{};
-    const DispatcherRingSlotLauncher* ring_slot_launcher = nullptr;
-    if (use_libtorch_stream1_executor) {
-#if BEAM_HAS_LIBTORCH_STREAM1
-        stream1_libtorch::RingSlotLauncherConfig launcher_config{};
-        launcher_config.weight_dir = weight_dir;
-        launcher_config.device_index = static_cast<int>(device_local_rank);
-        launcher_config.inference_parallelism = config.inference_parallelism;
-        launcher_config.local_rank = config.local_rank;
-        launcher_config.b_micro = config.b_micro;
-        launcher_config.move_count = static_cast<std::uint32_t>(MOVE_COUNT);
-        launcher_config.current_frontier_states = memory.current_frontier_states;
-        launcher_config.parent_base = memory.streams.parent_base;
-        launcher_config.count = memory.streams.count;
-        launcher_config.score_ring = memory.streams.score_ring;
-        launcher_config.hash_ring = memory.streams.hash_ring;
-        launcher_config.generators = generators;
-        launcher_config.central_state = central_state;
-        launcher_config.zobrist = zobrist;
-        launcher_config.solved = solved;
-        libtorch_stream1_launcher = std::make_unique<stream1_libtorch::RingSlotLauncher>(std::move(launcher_config));
-        ring_slot_launcher = &libtorch_stream1_launcher->dispatcher_launcher();
-#else
-        throw std::runtime_error("internal build error: LibTorch Stream1 executor selected without BEAM_HAS_LIBTORCH_STREAM1");
-#endif
-    }
-    if (use_native_eager_stream1_executor) {
-        native_eager_launcher_state.memory = &memory;
-        native_eager_launcher_state.tables = tables;
-        native_eager_launcher_state.network = &network;
-        native_eager_launcher_state.solved = solved;
-        native_eager_launcher_state.config = config;
-        native_eager_launcher_state.reset_events(config.inference_parallelism);
-        native_eager_ring_slot_launcher.launch = &launch_native_eager_ring_slot;
-        native_eager_ring_slot_launcher.user = &native_eager_launcher_state;
-        native_eager_ring_slot_launcher.name = "native_eager";
-        ring_slot_launcher = &native_eager_ring_slot_launcher;
-    }
-    instantiate_cuda_graph_job_templates(
-        plan,
-        memory,
-        tables,
-        network,
-        solved,
-        streams,
-        events,
-        graphs,
-        skip_native_ring_slot_templates);
-    std::cout << "runtime_ring_slot_graph_windowed=" << (graphs.ring_slot_windowed ? 1 : 0) << "\n";
-    std::cout << "runtime_ring_slot_graph_window_rings=" << graphs.ring_slot_window_rings << "\n";
-    std::cout << "runtime_ring_slot_graph_window_jobs=" << graphs.ring_slot_window_jobs << "\n";
-    std::cout << "runtime_ring_slot_graph_physical_jobs=" << graphs.ring_slot_physical_jobs << "\n";
+    instantiate_cuda_graph_job_templates(plan, memory, tables, network, solved, streams, events, graphs);
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "runner_phase=graphs_instantiated\n";
 #endif
@@ -4775,7 +4652,9 @@ int main(int argc, char** argv) {
     bool solution_found = false;
     std::string task_solution_path;
     std::int64_t task_solution_length = -1;
-    std::vector<SolveBucketRecord> solve_bucket_records;
+    std::uint64_t solve_bucket_record_count = 0ULL;
+    std::map<std::uint32_t, std::uint64_t> solve_bucket_counts_by_length;
+    std::set<std::string> solve_bucket_unique_paths;
     bool solve_bucket_found_any = false;
     std::uint32_t solve_bucket_first_found_depth_index = 0;
     for (std::uint32_t depth = 0; depth < depth_limit; ++depth) {
@@ -4799,15 +4678,8 @@ int main(int argc, char** argv) {
 #if BEAM_DEBUG_PATH_TRACE
         generated_track_request = tracked_solution.generated_request_for_depth(depth);
 #endif
-        const DepthDispatchState state = run_depth_cuda_graphs(
-            plan,
-            memory,
-            graphs,
-            streams,
-            frontier_size,
-            generated_track_request,
-            collective_ptr,
-            ring_slot_launcher);
+        const DepthDispatchState state =
+            run_depth_cuda_graphs(plan, memory, graphs, streams, frontier_size, generated_track_request, collective_ptr);
         if (!state.depth_drained) {
             throw std::runtime_error("depth did not drain");
         }
@@ -4856,8 +4728,12 @@ int main(int argc, char** argv) {
         const std::uint32_t global_solved_value = solve_bucket_mode
             ? propagate_solved_flag(memory, streams, nccl_runtime.comm, world_size)
             : global_stop_value;
+        const SolvedSnapshotHeader solved_header =
+            solve_bucket_mode && global_solved_value != 0U
+                ? read_solved_snapshot_header(memory)
+                : SolvedSnapshotHeader{};
         const SolvedSnapshot solved_snapshot =
-            global_solved_value != 0U
+            !solve_bucket_mode && global_solved_value != 0U
                 ? read_solved_snapshot(memory, config.solved_result_capacity)
                 : SolvedSnapshot{};
         const SolvedSnapshot selected_solved_snapshot =
@@ -4865,51 +4741,66 @@ int main(int argc, char** argv) {
                 ? SolvedSnapshot{}
                 : select_best_solved_snapshot(solved_snapshot, solved_neighborhood, stream2_suffix);
         if (solve_bucket_mode) {
-            std::vector<SolveBucketRecord> depth_records;
-            if (global_solved_value != 0U && world_size > 1U) {
-                depth_records = gather_solve_bucket_records_distributed(
-                    solved_snapshot,
-                    solved_neighborhood,
-                    stream2_suffix,
-                    plan,
+            const std::uint32_t global_solved_overflow = propagate_host_stop_value(
+                solved_header.overflow != 0U ? 1U : 0U,
+                memory,
+                streams,
+                nccl_runtime.comm,
+                world_size);
+            if (global_solved_overflow != 0U) {
+                throw std::runtime_error(
+                    "solve bucket overflow: increase BEAM_SOLVED_RESULT_CAPACITY for this run");
+            }
+
+            if (global_solved_value != 0U) {
+                history.finish_all();
+            }
+            std::optional<SolveBucketRecord> scan_cursor;
+            bool scan_more = global_solved_value != 0U;
+            std::uint64_t synchronized_accepted_count = 0ULL;
+            while (true) {
+                synchronized_accepted_count = synchronize_rank0_accepted_count(
+                    solve_bucket_record_count,
                     memory,
                     streams,
                     nccl_runtime.comm,
                     world_size,
-                    rank,
-                    config.solved_result_capacity);
-            } else if (global_solved_value != 0U && solved_snapshot.found) {
-                const std::uint32_t stored =
-                    std::min<std::uint32_t>(
-                        static_cast<std::uint32_t>(solved_snapshot.meta.size()),
-                        config.solved_result_capacity);
-                for (std::uint32_t i = 0; i < stored; ++i) {
-                    SolveBucketRecord record;
-                    record.owner_rank = rank;
-                    record.found_depth = i < solved_snapshot.depth.size() ? solved_snapshot.depth[i] : 0U;
-                    record.meta = solved_snapshot.meta[i];
-                    record.suffix_id = i < solved_snapshot.suffix.size() ? solved_snapshot.suffix[i] : 0U;
-                    record.total_depth =
-                        solved_total_depth(
-                            solved_neighborhood,
-                            stream2_suffix,
-                            record.meta,
-                            record.found_depth,
-                            record.suffix_id);
-                    depth_records.push_back(record);
+                    rank);
+                if (!scan_more ||
+                    (solve_bucket_max_solutions != 0ULL &&
+                     synchronized_accepted_count >= solve_bucket_max_solutions)) {
+                    break;
                 }
-            }
-            if (solved_snapshot.overflow != 0U) {
-                throw std::runtime_error(
-                    "solve bucket overflow: increase BEAM_SOLVED_RESULT_CAPACITY for this run");
-            }
-            if (!depth_records.empty()) {
-                history.finish_all();
+                constexpr std::uint64_t max_selection_batch_records = 65'536ULL;
+                const std::uint64_t remaining = solve_bucket_max_solutions == 0ULL
+                    ? max_selection_batch_records
+                    : solve_bucket_max_solutions - synchronized_accepted_count;
+                const std::size_t batch_limit = static_cast<std::size_t>(
+                    std::min<std::uint64_t>(remaining, max_selection_batch_records));
+                const SolveBucketRecordBatch batch =
+                    gather_solve_bucket_record_batch_distributed(
+                        solved_header,
+                        solved_neighborhood,
+                        stream2_suffix,
+                        plan,
+                        memory,
+                        streams,
+                        nccl_runtime.comm,
+                        world_size,
+                        rank,
+                        config.solved_result_capacity,
+                        scan_cursor ? &*scan_cursor : nullptr,
+                        batch_limit);
+                if (batch.records.empty()) {
+                    scan_more = false;
+                    continue;
+                }
                 if (!solve_bucket_found_any) {
                     solve_bucket_found_any = true;
                     solve_bucket_first_found_depth_index = depth;
                 }
-                for (SolveBucketRecord& record : depth_records) {
+                for (SolveBucketRecord record : batch.records) {
+                    std::exception_ptr rank0_processing_exception;
                     ReconstructedSolution solution;
                     if (world_size > 1U) {
                         SolvedSnapshot local_record;
@@ -4920,7 +4811,7 @@ int main(int argc, char** argv) {
                             local_record.depth.push_back(record.found_depth);
                             local_record.suffix.push_back(record.suffix_id);
                         }
-                        const DistributedReconstructionResult distributed_solution =
+                        DistributedReconstructionResult distributed_solution =
                             reconstruct_solution_distributed(
                                 history,
                                 local_record,
@@ -4933,13 +4824,21 @@ int main(int argc, char** argv) {
                                 world_size,
                                 rank);
                         if (!distributed_solution.has_solution) {
-                            throw std::runtime_error("solve bucket reconstruction did not receive selected record");
+                            throw std::runtime_error(
+                                "solve bucket reconstruction did not receive selected record");
                         }
                         if (distributed_solution.controller_rank) {
-                            solution = distributed_solution.solution;
+                            try {
+                                solution = std::move(distributed_solution.solution);
+                            } catch (...) {
+                                rank0_processing_exception = std::current_exception();
+                            }
                         }
                     } else {
-                        solution = reconstruct_solution_from_history(history, record.meta, record.found_depth);
+                        solution = reconstruct_solution_from_history(
+                            history,
+                            record.meta,
+                            record.found_depth);
                         append_solution_suffixes(
                             solution,
                             stream2_suffix,
@@ -4947,59 +4846,115 @@ int main(int argc, char** argv) {
                             solved_neighborhood,
                             record.meta.hash);
                     }
-                    if (rank == 0U) {
-                        const State128 final_state = apply_solution_moves(host_initial, solution.moves, host_generators);
-                        const bool valid = states_equal_storage(final_state, host_target);
-                        if (!valid) {
-                            throw std::runtime_error("solve bucket CPU solution validation failed");
+                    if (rank == 0U && !rank0_processing_exception) {
+                        try {
+                            const State128 final_state =
+                                apply_solution_moves(host_initial, solution.moves, host_generators);
+                            const bool valid = states_equal_storage(final_state, host_target);
+                            if (!valid) {
+                                throw std::runtime_error(
+                                    "solve bucket CPU solution validation failed");
+                            }
+                            record.path = moves_to_path_text(solution.moves, host_move_names);
+                            record.total_depth = static_cast<std::uint32_t>(solution.moves.size());
+                            const std::int64_t delta =
+                                solve_bucket_known_length == 0U
+                                    ? 0
+                                    : static_cast<std::int64_t>(record.total_depth) -
+                                          static_cast<std::int64_t>(solve_bucket_known_length);
+                            const bool unique_record =
+                                solve_bucket_unique_paths.insert(record.path).second;
+                            const bool capacity_available =
+                                solve_bucket_max_solutions == 0ULL ||
+                                solve_bucket_record_count < solve_bucket_max_solutions;
+                            if (unique_record && capacity_available) {
+                                if (solve_bucket_result) {
+                                    solve_bucket_result
+                                        << repair_task.puzzle_id << '\t'
+                                        << depth << '\t'
+                                        << record.found_depth << '\t'
+                                        << record.total_depth << '\t'
+                                        << solve_bucket_known_length << '\t'
+                                        << delta << '\t'
+                                        << record.owner_rank << '\t'
+                                        << record.path << '\n';
+                                    solve_bucket_result.flush();
+                                }
+                                std::cout << "solve_bucket_solution=1"
+                                          << " puzzle_id=" << repair_task.puzzle_id
+                                          << " depth_index=" << depth
+                                          << " found_depth=" << record.found_depth
+                                          << " solution_length=" << record.total_depth
+                                          << " owner_rank=" << record.owner_rank
+                                          << " solution=" << record.path << "\n";
+                                if (task_solution_length < 0 ||
+                                    static_cast<std::int64_t>(record.total_depth) <
+                                        task_solution_length) {
+                                    task_solution_length =
+                                        static_cast<std::int64_t>(record.total_depth);
+                                    task_solution_path = record.path;
+                                }
+                                ++solve_bucket_record_count;
+                                ++solve_bucket_counts_by_length[record.total_depth];
+                            }
+                        } catch (...) {
+                            rank0_processing_exception = std::current_exception();
                         }
-                        record.path = moves_to_path_text(solution.moves, host_move_names);
-                        record.total_depth = static_cast<std::uint32_t>(solution.moves.size());
-                        const std::int64_t delta =
-                            solve_bucket_known_length == 0U
-                                ? 0
-                                : static_cast<std::int64_t>(record.total_depth) -
-                                      static_cast<std::int64_t>(solve_bucket_known_length);
-                        if (solve_bucket_result) {
-                            solve_bucket_result
-                                << repair_task.puzzle_id << '\t'
-                                << depth << '\t'
-                                << record.found_depth << '\t'
-                                << record.total_depth << '\t'
-                                << solve_bucket_known_length << '\t'
-                                << delta << '\t'
-                                << record.owner_rank << '\t'
-                                << record.path << '\n';
-                            solve_bucket_result.flush();
+                    }
+                    const std::uint32_t global_processing_error = propagate_host_stop_value(
+                        rank0_processing_exception ? 1U : 0U,
+                        memory,
+                        streams,
+                        nccl_runtime.comm,
+                        world_size);
+                    if (global_processing_error != 0U) {
+                        if (rank == 0U && rank0_processing_exception) {
+                            std::rethrow_exception(rank0_processing_exception);
                         }
-                        std::cout << "solve_bucket_solution=1"
-                                  << " puzzle_id=" << repair_task.puzzle_id
-                                  << " depth_index=" << depth
-                                  << " found_depth=" << record.found_depth
-                                  << " solution_length=" << record.total_depth
-                                  << " owner_rank=" << record.owner_rank
-                                  << " solution=" << record.path << "\n";
-                        if (task_solution_length < 0 ||
-                            static_cast<std::int64_t>(record.total_depth) < task_solution_length) {
-                            task_solution_length = static_cast<std::int64_t>(record.total_depth);
-                            task_solution_path = record.path;
-                        }
-                        solve_bucket_records.push_back(std::move(record));
+                        throw std::runtime_error(
+                            "rank 0 solve bucket record processing failed");
                     }
                 }
+                scan_cursor = batch.records.back();
+                scan_more = batch.may_have_more;
             }
+
             reset_solved_buffers(memory);
-            if (solve_bucket_found_any && depth >= solve_bucket_first_found_depth_index + solve_bucket_extra_depths) {
+            const bool bucket_capacity_reached = solve_bucket_max_solutions != 0ULL &&
+                synchronized_accepted_count >= solve_bucket_max_solutions;
+            const bool bucket_depth_reached = solve_bucket_stop_depth != 0U &&
+                completed_depths >= solve_bucket_stop_depth;
+            const bool bucket_legacy_window_reached =
+                solve_bucket_stop_depth == 0U &&
+                solve_bucket_found_any &&
+                depth >= solve_bucket_first_found_depth_index + solve_bucket_extra_depths;
+            const std::uint32_t bucket_local_stop_reason =
+                bucket_capacity_reached ? 2U :
+                ((bucket_depth_reached || bucket_legacy_window_reached) ? 1U : 0U);
+            const std::uint32_t bucket_global_stop_reason = propagate_host_stop_value(
+                bucket_local_stop_reason,
+                memory,
+                streams,
+                nccl_runtime.comm,
+                world_size);
+            if (bucket_global_stop_reason != 0U) {
                 solution_found = solve_bucket_found_any;
                 const auto depth_end = std::chrono::steady_clock::now();
-                const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
+                const double depth_sec =
+                    std::chrono::duration<double>(depth_end - depth_start).count();
                 if (rank == 0U) {
+                    if (bucket_global_stop_reason == 2U) {
+                        std::cout << "collection_status=capacity_reached\n";
+                    } else if (solve_bucket_stop_depth != 0U) {
+                        std::cout << "collection_status=depth_reached\n";
+                    }
                     std::cout << "solve_bucket_stop=1"
                               << " puzzle_id=" << repair_task.puzzle_id
                               << " depth_index=" << depth
-                              << " first_found_depth_index=" << solve_bucket_first_found_depth_index
+                              << " first_found_depth_index="
+                              << solve_bucket_first_found_depth_index
                               << " extra_depths=" << solve_bucket_extra_depths
-                              << " records=" << solve_bucket_records.size()
+                              << " records=" << synchronized_accepted_count
                               << " depth_sec=" << depth_sec << "\n";
                 }
                 break;
@@ -5063,6 +5018,9 @@ int main(int argc, char** argv) {
                           << " puzzle_id=" << puzzle_id
                           << " seconds=" << solved_elapsed_sec
                           << " solution_length=" << task_solution_length
+                          << " found_depth=" << distributed_solution.solved_depth
+                          << " touch_depth="
+                          << (distributed_solution.solution.moves.size() - distributed_solution.solved_depth)
                           << " solution=" << task_solution_path
                           << "\n";
             }
@@ -5121,6 +5079,8 @@ int main(int argc, char** argv) {
                       << " puzzle_id=" << puzzle_id
                       << " seconds=" << solved_elapsed_sec
                       << " solution_length=" << task_solution_length
+                      << " found_depth=" << solved_depth
+                      << " touch_depth=" << (solution.moves.size() - solved_depth)
                       << " solution=" << task_solution_path
                       << "\n";
             solution_found = true;
@@ -5367,18 +5327,14 @@ int main(int argc, char** argv) {
     std::cout << "history_flush_sec=" << history_flush_sec << "\n";
 #endif
     if (solve_bucket_mode && rank == 0U) {
-        std::map<std::uint32_t, std::uint64_t> counts_by_length;
-        for (const SolveBucketRecord& record : solve_bucket_records) {
-            ++counts_by_length[record.total_depth];
-        }
         std::cout << "solve_bucket_summary=1"
                   << " puzzle_id=" << repair_task.puzzle_id
-                  << " records=" << solve_bucket_records.size()
+                  << " records=" << solve_bucket_record_count
                   << " best_length=" << task_solution_length
                   << " known_length=" << solve_bucket_known_length
                   << " result_tsv=" << solve_bucket_result_path.string()
                   << "\n";
-        for (const auto& [length, count] : counts_by_length) {
+        for (const auto& [length, count] : solve_bucket_counts_by_length) {
             std::cout << "solve_bucket_length_count"
                       << " puzzle_id=" << repair_task.puzzle_id
                       << " length=" << length

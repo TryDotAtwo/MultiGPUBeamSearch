@@ -1,4 +1,4 @@
-﻿# Prompt History
+# Prompt History
 
 ## 2026-07-22
 - User explicitly approved launching the updated private Kaggle 2xT4 pipeline gate for the SM75 transformer follow-up; correctness remains complete byte-exact score comparison and performance changes are accepted only after the integrated repeated gate.
@@ -546,3 +546,9 @@ User reported that an interactive game had been running during part of the recen
 
 
 - User required the public Cube4 notebook to always use the maximum practical history budgets (28-29 GiB host RAM and 50 GiB disk) and to retain every found solution when collection mode is selected, commonly 1000-2000 solutions.
+
+- User clarified the large-beam pipeline tuning target: let Stream1 fill many ring slots before Stream3, size Stream3 batches to roughly 400-500 jobs per full depth as in the cluster workflow, and expose a separate public-notebook debug/logging cell with all requested build/runtime flags and DEPTH_LOG_EVERY/PUZZLE_LOG_EVERY.
+
+- User required the universal public 2xT4 checkpoint notebook to recognize that Transformer and MLP have different best runtime configurations and to select only the matching backend-specific profile family automatically.
+
+- User approved the measured 2xT4 Transformer `2**26` profile after depth-8 A/B: keep the logical Stream3 accumulator large (`192 * 384 * 24 = 1,769,472` candidates), reuse two physical rings, and decouple final materialization at `88,064` candidates. The public universal notebook must expose anchors through `2**26`, preserve backend-specific MLP/Transformer profiles, and derive the practical history RAM budget before preflight while keeping 1.5 GB host headroom and 50 GiB disk.
