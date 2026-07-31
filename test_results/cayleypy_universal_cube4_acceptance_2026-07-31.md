@@ -13,3 +13,9 @@
 - Safety scan: no OOM, overflow, fatal error, or runner error in the successful rank logs. Publishing was disabled for acceptance.
 
 Earlier private versions intentionally retained diagnostic evidence for mount timing, metadata discovery, state/value-class separation, runner reconciliation, compile boundaries, native helper linkage, and Cube4 `moves`/`move_names` generator schema restoration.
+
+## Public release
+
+- Public Kaggle notebook `trydotatwo/cayleypy-2xt4-checkpoint-beam-search`, version 4, status `COMPLETE`.
+- The no-input landing run exited cleanly through the documented `SETUP_REQUIRED` path and printed solver pin `2639bce6800c03753591dbbc7e85805442228068`.
+- Users can Copy & Edit, attach a standard CayleyPy competition plus a supported checkpoint, and run the same privately accepted seven-cell launcher.
