@@ -540,3 +540,7 @@ User approved optimizing native transformer inference around memory-system effic
 ## 2026-07-22 — RTX 3070 benchmark validity
 
 User reported that an interactive game had been running during part of the recent transformer tuning and required checking that the GPU is free for every performance measurement. Suspect overlapping timings must be discarded. Accepted local RTX 3070 performance series require an immediate utilization/process idle check, and longer acceptance series should be bookended by another idle check; correctness dumps remain independently gated by the canonical full-score SHA.
+
+## 2026-07-31 Stream1 Transformer accumulator contract
+
+User required Task 1 of the decoupled Transformer accumulator: test-first runtime/profile and static-memory contract for B_MICRO=384, macro batch 1,769,472, two physical accumulator/exchange buffers, legacy MLP compatibility, and fail-closed invalid settings. Dispatcher scheduling is explicitly deferred to Task 2.

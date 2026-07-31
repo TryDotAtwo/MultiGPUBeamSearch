@@ -65,6 +65,8 @@ struct RuntimeConfig {
     std::uint32_t stream4_batch_alignment = 1024;
     std::uint32_t stream4_active_sort_slots = 1;
     std::uint32_t ring_count = 4;
+    std::uint32_t accumulator_buffer_count = 0;
+    std::uint32_t stream5_exchange_buffer_count = 0;
     std::uint32_t world_size = 1;
     std::uint32_t local_rank = 0;
     std::uint32_t shard_count = 64;

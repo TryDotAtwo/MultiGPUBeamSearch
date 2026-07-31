@@ -22,6 +22,8 @@ struct StaticMemoryPlan {
     std::uint64_t hash_ring_count = 0;
     std::uint64_t parent_base_count = 0;
     std::uint64_t ring_count_count = 0;
+    std::uint32_t accumulator_buffer_count = 0;
+    std::uint32_t stream5_exchange_buffer_count = 0;
     std::uint64_t stream3_count = 0;
     std::uint64_t stream5_slot_count = 0;
     std::uint64_t stream5_send_slot_capacity = 0;

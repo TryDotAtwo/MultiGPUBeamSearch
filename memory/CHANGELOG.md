@@ -936,3 +936,4 @@
 - Full FMHA is register-limited (125 registers/thread, 33.33% theoretical occupancy) and has 188,347 shared-store bank conflicts; NCU estimates 5.249% shared-store opportunity.
 - Added exact tensor-core CLS q32k64 policy. All c1/c2 outputs matched complete baseline dumps.
 - Q=1 improved isolated c1 Stream1 by 5.05% but regressed c2 and c1 Stream1-to-2-to-3, so it was not selected. Removed a scalar-warp experiment after its complete dump differed.
+- 2026-07-31: Added Task 1 runtime/static-memory contract fields for bounded Stream1 accumulator and Stream5 exchange buffers. Unset fields retain legacy ring_count sizing; Stream3 scratch remains macro-batch sized. Added focused static-memory contract coverage for the 384 / 1,769,472 / 2-buffer shape and fail-closed divisibility/zero cases. Dispatcher rebinding remains deferred to Task 2.

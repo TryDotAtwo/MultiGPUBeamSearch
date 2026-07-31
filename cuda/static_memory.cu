@@ -360,10 +360,14 @@ std::size_t bytes_final_materialize(const RuntimeConfig& config, const DerivedCo
 
 std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& derived) {
     const std::uint32_t storage_shard_count = storage_shard_count_for(config);
-    const std::uint64_t ring_slots = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
+    const std::uint64_t accumulator_buffers =
+        config.accumulator_buffer_count == 0U ? config.ring_count : config.accumulator_buffer_count;
+    const std::uint64_t exchange_buffers =
+        config.stream5_exchange_buffer_count == 0U ? config.ring_count : config.stream5_exchange_buffer_count;
+    const std::uint64_t ring_slots = accumulator_buffers;
     const std::uint64_t ring_candidates = ring_slots * config.b_micro * MOVE_COUNT;
     const std::uint64_t stream3 = config.stream3_batch_candidates;
-    const std::uint64_t stream5_slots = config.world_size > 1U ? config.ring_count : 1U;
+    const std::uint64_t stream5_slots = config.world_size > 1U ? exchange_buffers : 1U;
     const std::uint64_t stream5_send = stream3 * stream5_slots;
     const std::uint64_t stream5_recv_slot = std::max<std::uint64_t>(
         stream3,
@@ -574,7 +578,11 @@ std::size_t bytes_solved(const RuntimeConfig& config) {
 
 StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     const DerivedConfig derived = derive_config(config);
-    if (config.b_micro == 0 || config.ring_count == 0 || derived.ring_slot_count == 0 ||
+    const std::uint32_t accumulator_buffers =
+        config.accumulator_buffer_count == 0U ? config.ring_count : config.accumulator_buffer_count;
+    const std::uint32_t exchange_buffers =
+        config.stream5_exchange_buffer_count == 0U ? config.ring_count : config.stream5_exchange_buffer_count;
+    if (config.b_micro == 0 || config.ring_count == 0 || accumulator_buffers == 0 || exchange_buffers == 0 || derived.ring_slot_count == 0 ||
         config.world_size == 0 || config.shard_count == 0 || config.stream4_active_sort_slots == 0 ||
         config.shard_capacity_candidates == 0 || derived.global_beam_width_effective == 0) {
         throw std::invalid_argument("static memory config contains zero-sized architecture dimension");
@@ -588,13 +596,14 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     if (plan.frontier_states > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
         throw std::invalid_argument("local frontier capacity exceeds uint32 final target index range");
     }
-    plan.score_ring_count =
-        static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count * config.b_micro * MOVE_COUNT;
+    plan.accumulator_buffer_count = accumulator_buffers;
+    plan.stream5_exchange_buffer_count = exchange_buffers;
+    plan.score_ring_count = static_cast<std::uint64_t>(accumulator_buffers) * config.b_micro * MOVE_COUNT;
     plan.hash_ring_count = plan.score_ring_count;
-    plan.parent_base_count = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
+    plan.parent_base_count = accumulator_buffers;
     plan.ring_count_count = plan.parent_base_count;
     plan.stream3_count = config.stream3_batch_candidates;
-    plan.stream5_slot_count = config.world_size > 1U ? config.ring_count : 1U;
+    plan.stream5_slot_count = config.world_size > 1U ? exchange_buffers : 1U;
     plan.stream5_send_slot_capacity = plan.stream3_count;
     plan.stream5_recv_slot_capacity = std::max<std::uint64_t>(
         plan.stream3_count,

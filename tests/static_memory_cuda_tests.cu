@@ -124,6 +124,60 @@ void require_final_layout_preserves_persistent_stream_storage(
         sizeof(std::uint32_t),
         "final layout must not overlap persistent threshold request global");
 }
+void run_accumulator_buffer_contract_test(std::ofstream& report) {
+    RuntimeConfig config;
+    config.b_micro = 384;
+    config.stream3_batch_candidates = 1'769'472;
+    config.stream4_batch_candidates = 1024;
+    config.stream4_trigger_candidates = 1024;
+    config.stream4_active_sort_slots = 1;
+    config.ring_count = 456;
+    config.accumulator_buffer_count = 2;
+    config.stream5_exchange_buffer_count = 2;
+    config.world_size = 2;
+    config.shard_count = 1;
+    config.shard_capacity_candidates = 1'769'472;
+    config.global_spill_capacity = 0;
+    config.stream4_batch_alignment = 1;
+    config.user_global_beam_width = 1024;
+
+    const StaticMemoryPlan bounded = make_static_memory_plan(config);
+    const std::uint64_t chunk_candidates = 384ULL * MOVE_COUNT;
+    require(bounded.derived.ring_slot_count == 192, "macro batch must expose 192 logical accumulation chunks");
+    require(bounded.score_ring_count == 2ULL * chunk_candidates, "score storage must use physical accumulator buffers");
+    require(bounded.hash_ring_count == 2ULL * chunk_candidates, "hash storage must use physical accumulator buffers");
+    require(bounded.parent_base_count == 2ULL, "parent storage must use physical accumulator buffers");
+    require(bounded.ring_count_count == 2ULL, "count storage must use physical accumulator buffers");
+    require(bounded.stream3_count == 1'769'472ULL, "Stream3 scratch must remain macro-batch sized");
+    require(bounded.stream5_slot_count == 2ULL, "Stream5 storage must use physical exchange buffers");
+
+    config.accumulator_buffer_count = 0;
+    config.stream5_exchange_buffer_count = 0;
+    const StaticMemoryPlan legacy = make_static_memory_plan(config);
+    require(legacy.score_ring_count == 456ULL * chunk_candidates, "legacy accumulator layout must retain ring-count sizing");
+    require(legacy.stream5_slot_count == 456ULL, "legacy Stream5 layout must retain ring-count sizing");
+    RuntimeConfig invalid_divisibility = config;
+    invalid_divisibility.stream3_batch_candidates = 1'769'473;
+    bool rejected_invalid_divisibility = false;
+    try {
+        static_cast<void>(make_static_memory_plan(invalid_divisibility));
+    } catch (const std::invalid_argument&) {
+        rejected_invalid_divisibility = true;
+    }
+    require(rejected_invalid_divisibility, "non-divisible macro batch must fail closed");
+
+    RuntimeConfig invalid_zero = config;
+    invalid_zero.ring_count = 0;
+    bool rejected_zero_dimension = false;
+    try {
+        static_cast<void>(make_static_memory_plan(invalid_zero));
+    } catch (const std::invalid_argument&) {
+        rejected_zero_dimension = true;
+    }
+    require(rejected_zero_dimension, "zero physical-buffer fallback must fail closed");
+    report << "- accumulator_buffer_contract=pass\n";
+}
+
 } // namespace
 
 int main() {
@@ -132,6 +186,7 @@ int main() {
     report << "# Static Memory CUDA Tests 2026-05-22\n\n";
 
     BEAM_CUDA_CHECK(cudaSetDevice(0));
+    run_accumulator_buffer_contract_test(report);
     RuntimeConfig config;
     config.b_micro = 8;
     config.stream3_batch_candidates = 8 * static_cast<std::uint32_t>(MOVE_COUNT) * 2;

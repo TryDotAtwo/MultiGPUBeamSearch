@@ -229,6 +229,20 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stre
 }
 
 
+void set_physical_buffer_counts_from_env(RuntimeConfig& config) {
+    if (env_present("BEAM_ACCUMULATOR_BUFFER_COUNT")) {
+        config.accumulator_buffer_count = env_u32("BEAM_ACCUMULATOR_BUFFER_COUNT", 0);
+        if (config.accumulator_buffer_count == 0U) {
+            throw std::invalid_argument("BEAM_ACCUMULATOR_BUFFER_COUNT must be nonzero");
+        }
+    }
+    if (env_present("BEAM_STREAM5_EXCHANGE_BUFFER_COUNT")) {
+        config.stream5_exchange_buffer_count = env_u32("BEAM_STREAM5_EXCHANGE_BUFFER_COUNT", 0);
+        if (config.stream5_exchange_buffer_count == 0U) {
+            throw std::invalid_argument("BEAM_STREAM5_EXCHANGE_BUFFER_COUNT must be nonzero");
+        }
+    }
+}
 void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
     const std::uint64_t logical_shard_size = logical_shard_size_for(config);
     const std::uint64_t scaled_capacity =
@@ -411,6 +425,7 @@ bool try_make_candidate(
         return false;
     }
     set_ring_count_from_logical_shard(config, ring_slot_count);
+    set_physical_buffer_counts_from_env(config);
     set_shard_capacity_from_logical_shard(config);
     set_global_spill_capacity(config);
     if (config.stream4_batch_candidates > config.shard_capacity_candidates ||
@@ -563,6 +578,7 @@ RuntimeConfigBuild build_manual_runtime_config(
     } else {
         set_ring_count_from_logical_shard(build.config, requested_stream3_ring_slots);
     }
+    set_physical_buffer_counts_from_env(build.config);
     if (build.config.stream4_batch_candidates % build.config.stream4_batch_alignment != 0U) {
         throw std::invalid_argument("manual BEAM_STREAM4_BATCH_CANDIDATES must be aligned to BEAM_STREAM4_BATCH_ALIGNMENT");
     }
