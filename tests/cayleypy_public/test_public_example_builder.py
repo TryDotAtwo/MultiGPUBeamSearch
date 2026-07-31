@@ -28,7 +28,7 @@ def test_public_megaminx_example_is_fully_configured_and_runnable(tmp_path: Path
     assert 'REFLECT_MODE = "off"' in config
     assert "PUBLISH_RESULTS = True" in config
     assert 'COMPETITION = "cayley-py-megaminx"' in config
-    assert "65aecb16346691a4154a804b019264b6cf94ebae" in config
+    assert "bb8742732dcae86854279cda81406c22083d27e5" in config
 
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert metadata["id"] == "trydotatwo/cayleypy-2xt4-megaminx-puzzle-10-example"
