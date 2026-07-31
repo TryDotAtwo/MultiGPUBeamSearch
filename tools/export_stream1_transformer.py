@@ -100,10 +100,14 @@ def locate_metadata(weights_path: Path, explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit
     candidates: list[Path] = []
+    sibling_metadata = weights_path.with_suffix(".json")
+    if sibling_metadata.is_file():
+        candidates.append(sibling_metadata)
     for root in nearby_roots(weights_path):
         logs = root / "logs"
         if logs.is_dir():
             candidates.extend(sorted(logs.glob("model_*.json")))
+    candidates = list(dict.fromkeys(candidates))
     matching: list[Path] = []
     for candidate in candidates:
         try:

@@ -1,3 +1,5 @@
+from pathlib import Path
+import tempfile
 import unittest
 
 import torch
@@ -7,6 +9,7 @@ from tools.export_stream1 import detect_format_from_state_dict
 from tools.export_stream1_transformer import (
     build_fast_input_tables,
     infer_architecture,
+    locate_metadata,
     normalize_metadata,
     strip_state_prefixes,
 )
@@ -83,6 +86,16 @@ def make_cube4_metadata():
 
 
 class Stream1TransformerExporterTests(unittest.TestCase):
+    def test_locates_bundle_metadata_next_to_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            model_dir = Path(temporary) / "model"
+            model_dir.mkdir()
+            checkpoint = model_dir / "model.pth"
+            checkpoint.write_bytes(b"checkpoint")
+            metadata = model_dir / "model.json"
+            metadata.write_text("{}", encoding="utf-8")
+            self.assertEqual(locate_metadata(checkpoint, None), metadata)
+
     def test_normalizes_bundle_cube4_metadata(self):
         raw = {
             "model": {"provider": "piece_transformer", "layout": "cube4", "kwargs": {
