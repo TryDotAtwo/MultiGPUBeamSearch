@@ -67,6 +67,7 @@ def build_example(out_dir: Path = OUT_DIR) -> tuple[Path, Path]:
         "cells": [
             _cell("markdown", header, "contract"),
             _cell("code", _config_source(), "example-config"),
+            _cell("code", public_notebook.DEBUG_CONFIG, "debug-config"),
             _cell("code", setup, "setup"),
             _cell("code", public_notebook.PREFLIGHT, "preflight"),
             _cell("code", public_notebook.RUN, "run"),

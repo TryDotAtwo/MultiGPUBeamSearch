@@ -17,7 +17,7 @@ def test_public_megaminx_example_is_fully_configured_and_runnable(tmp_path: Path
     for cell in notebook["cells"]:
         if cell["cell_type"] == "code":
             ast.parse(_source(cell))
-    setup = _source(notebook["cells"][2])
+    setup = _source(notebook["cells"][3])
     assert "Ready-to-run example" in setup
     config = _source(notebook["cells"][1])
     assert "REPLACE_WITH_" not in config
@@ -28,7 +28,7 @@ def test_public_megaminx_example_is_fully_configured_and_runnable(tmp_path: Path
     assert 'REFLECT_MODE = "off"' in config
     assert "PUBLISH_RESULTS = True" in config
     assert 'COMPETITION = "cayley-py-megaminx"' in config
-    assert "f312265d63cfc563b90c79a2fd70d1307d28d4bb" in config
+    assert "85e1fbf63c5fb383ffa4b91e22f0f1a3568b62fb" in config
 
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert metadata["id"] == "trydotatwo/cayleypy-2xt4-megaminx-puzzle-10-example"

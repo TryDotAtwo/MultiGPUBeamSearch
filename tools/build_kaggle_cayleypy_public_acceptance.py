@@ -23,7 +23,7 @@ from tools import build_kaggle_cayleypy_public_notebook as public_notebook
 
 
 OUT_ROOT = REPOSITORY_ROOT / "kaggle"
-SOLVER_COMMIT = "d55af018a8f3336e3d0f22bb2d54144abbf262da"
+SOLVER_COMMIT = "85e1fbf63c5fb383ffa4b91e22f0f1a3568b62fb"
 COMPETITION = "cayley-py-megaminx"
 COMPETITION_ROOT = Path(f"/kaggle/input/competitions/{COMPETITION}")
 OUTPUT1_MODEL_SOURCE = "arabidopsisthalian/megaminx2048-512-8-e4000/PyTorch/default/1"
@@ -110,7 +110,7 @@ def _config_source(scenario: AcceptanceScenario) -> str:
     source = _replace_once(source, 'KAGGLE_OWNER = "replace-with-kaggle-owner"', 'KAGGLE_OWNER = "trydotatwo"')
     source = _replace_once(source, 'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"', f'KAGGLE_SLUG = "cayleypy-public-acceptance-{scenario.name}"')
     source = _replace_once(source, 'KAGGLE_USERNAME = None', 'KAGGLE_USERNAME = "trydotatwo"')
-    source = _replace_once(source, 'SOLVER_COMMIT = "f312265d63cfc563b90c79a2fd70d1307d28d4bb"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
+    source = _replace_once(source, 'SOLVER_COMMIT = "85e1fbf63c5fb383ffa4b91e22f0f1a3568b62fb"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
     return source
 
 
@@ -131,6 +131,7 @@ def _notebook(scenario: AcceptanceScenario) -> dict[str, Any]:
         "cells": [
             _cell("markdown", public_notebook.HEADER, "contract"),
             _cell("code", config, "acceptance-config"),
+            _cell("code", public_notebook.DEBUG_CONFIG, "debug-config"),
             _cell("code", setup, "pinned-setup"),
             _cell("code", public_notebook.PREFLIGHT, "preflight"),
             _cell("code", public_notebook.RUN, "run"),

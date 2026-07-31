@@ -39,7 +39,7 @@ def test_acceptance_packages_are_private_pinned_and_parseable(tmp_path: Path) ->
         assert metadata["competition_sources"] == [COMPETITION]
         assert metadata["model_sources"] == [scenario.model_source]
         assert metadata["code_file"] == notebook_path.name
-        assert len(notebook["cells"]) == 6
+        assert len(notebook["cells"]) == 7
         assert all(not cell.get("outputs") for cell in notebook["cells"] if cell["cell_type"] == "code")
         for cell in notebook["cells"]:
             if cell["cell_type"] == "code":
