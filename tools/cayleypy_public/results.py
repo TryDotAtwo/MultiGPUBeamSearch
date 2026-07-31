@@ -194,11 +194,16 @@ def _validate_replay_contract(envelope: Mapping[str, object]) -> None:
     )
     if manifest.get("state_len") != state_len:
         raise ValueError("model manifest state_len must equal proof state_len")
-    if manifest.get("num_classes") != state_len:
-        raise ValueError("model manifest num_classes must equal the supported permutation state_len")
+    if any(value < 0 or value > 255 for value in central_state):
+        raise ValueError("proof.central_state values must fit the State128 uint8 payload")
+    num_classes = max(central_state) + 1
+    if set(central_state) != set(range(num_classes)):
+        raise ValueError("proof.central_state labels must form the contiguous range [0, num_classes)")
+    if manifest.get("num_classes") != num_classes:
+        raise ValueError("model manifest num_classes must equal the proof state alphabet")
 
-    _validate_state_classes(initial_state, state_len, "proof.initial_state")
-    _validate_state_classes(central_state, state_len, "proof.central_state")
+    _validate_state_classes(initial_state, num_classes, "proof.initial_state")
+    _validate_state_classes(central_state, num_classes, "proof.central_state")
     expected_hashes = {
         "initial_state_sha256": _hash_json(list(initial_state)),
         "central_state_sha256": _hash_json(list(central_state)),

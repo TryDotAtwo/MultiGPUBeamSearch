@@ -49,7 +49,7 @@ def test_public_notebook_contract_and_no_hidden_model_or_secret_controls(tmp_pat
         "puzzle_info.json", "test.csv", "sample_submission.csv", "Tesla/NVIDIA T4",
         "checkpoint-only", "batchnorm-folded", "resmlp-layernorm", "piece Transformer", "fp16",
         "separate 2xT4 profile registries", "cross-applying profiles fails closed",
-        "output_dim=1", "output_dim=move_count", "1 <= state_len <= 120", "num_classes=state_len", "0..state_len-1",
+        "output_dim=1", "output_dim=move_count", "1 <= state_len <= 120", "0..num_classes-1",
         "PUZZLE_ID_START..PUZZLE_ID_END",
         "off`, `after_original`, or `only", "first", "collect", "touch-BFS",
         "best effort", "2**16..2**26", "public HTTPS host",

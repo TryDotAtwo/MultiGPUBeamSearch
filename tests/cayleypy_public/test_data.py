@@ -31,6 +31,22 @@ def test_load_contract_derives_standard_dimensions(tmp_path):
     assert contract.sample_submission["initial_state_id"].tolist() == [7, 8, 9]
 
 
+def test_load_contract_derives_value_alphabet_independently_of_state_length(tmp_path):
+    puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path, ids=(7,))
+    central = [value % 6 for value in range(96)]
+    puzzle_info.write_text(json.dumps({
+        "central_state": central,
+        "generators": {"identity": list(range(96))},
+    }), encoding="utf-8")
+    pd.DataFrame({
+        "initial_state_id": [7],
+        "initial_state": [",".join(str(value) for value in central)],
+    }).to_csv(test_csv, index=False)
+    contract = load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 7)
+    assert contract.state_len == 96
+    assert contract.num_classes == 6
+
+
 def test_load_contract_rejects_state_len_above_state128_logical_capacity(tmp_path):
     puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path, ids=(7,))
     oversized_state = list(range(121))
@@ -71,8 +87,8 @@ def test_load_contract_rejects_non_permutation_generator(tmp_path):
 @pytest.mark.parametrize(
     ("value", "message"),
     [
-        ([-1, 1, 2], r"central_state values must be integers in \[0, num_classes\)"),
-        ([0, 1, 3], r"central_state values must be integers in \[0, num_classes\)"),
+        ([-1, 1, 2], r"central_state values must fit the State128 uint8 payload"),
+        ([0, 1, 3], r"central_state labels must form the contiguous range"),
     ],
 )
 def test_load_contract_rejects_negative_or_overflow_central_state(tmp_path, value, message):

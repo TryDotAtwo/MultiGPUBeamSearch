@@ -61,7 +61,11 @@ def load_puzzle_contract(
         raise ValueError(
             "public runner requires 1 <= state_len <= 120 for the State128 logical payload"
         )
-    _validate_state_classes(central_state, state_len, "central_state")
+    if any(value < 0 or value > 255 for value in central_state):
+        raise ValueError("central_state values must fit the State128 uint8 payload")
+    num_classes = max(central_state) + 1
+    if set(central_state) != set(range(num_classes)):
+        raise ValueError("central_state labels must form the contiguous range [0, num_classes)")
 
     generators = {
         name: _strict_json_integer_state(permutation, f"generator {name}")
@@ -86,7 +90,7 @@ def load_puzzle_contract(
         state = _state_from_cell(rows.iloc[0]["initial_state"])
         if len(state) != state_len:
             raise ValueError(f"state for id {puzzle_id} must have state_len {state_len}")
-        _validate_state_classes(state, state_len, f"state for id {puzzle_id}")
+        _validate_state_classes(state, num_classes, f"state for id {puzzle_id}")
         initial_states[puzzle_id] = state
 
     sample_submission = pd.read_csv(sample_submission_csv)
@@ -103,5 +107,5 @@ def load_puzzle_contract(
         initial_states=initial_states,
         sample_submission=sample_submission,
         state_len=state_len,
-        num_classes=state_len,
+        num_classes=num_classes,
     )

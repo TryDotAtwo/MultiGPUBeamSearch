@@ -313,7 +313,7 @@ def test_build_result_envelope_rejects_negative_or_overflow_state_labels(
 
     with pytest.raises(
         ValueError,
-        match=rf"proof\.{state_name} values must be integers in \[0, num_classes\)",
+        match=rf"(proof\.{state_name} values must be integers in \[0, num_classes\)|proof\.central_state (values must fit|labels must form))",
     ):
         results_module._validate_replay_contract(envelope)
 
@@ -324,7 +324,7 @@ def test_build_result_envelope_rejects_manifest_num_classes_mismatch() -> None:
 
     with pytest.raises(
         ValueError,
-        match="model manifest num_classes must equal the supported permutation state_len",
+        match="model manifest num_classes must equal the proof state alphabet",
     ):
         build_result_envelope(context, _solution())
 
