@@ -117,7 +117,7 @@ KAGGLE_USERNAME = None
 
 # Official repository revision. Keep this 40-character commit pinned for a
 # reproducible solve; SOLVER_COMMIT always refers to TryDotAtwo/MultiGPUBeamSearch.
-SOLVER_COMMIT = "df25e9cd5da642463e5504e6a2cebb3215b6a27b"
+SOLVER_COMMIT = "2639bce6800c03753591dbbc7e85805442228068"
 '''
 
 
