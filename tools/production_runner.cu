@@ -4200,8 +4200,6 @@ int main(int argc, char** argv) {
     }
     const StaticMemoryPlan plan = config_build.plan;
 #if BEAM_ENABLE_DEBUG_LOGS
-    const StaticMemoryPlan plan = config_build.plan;
-#if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "puzzle_id=" << cli_puzzle_id << "\n";
     std::cout << "depth_limit=" << cli_depth_limit << "\n";
     std::cout << "RUNTIME_CONFIG_MODE=" << (config_build.manual_config ? "manual" : "auto") << "\n";
@@ -4654,8 +4652,6 @@ int main(int argc, char** argv) {
     std::cout << "runtime_ring_slot_graph_window_rings=" << graphs.ring_slot_window_rings << "\n";
     std::cout << "runtime_ring_slot_graph_window_jobs=" << graphs.ring_slot_window_jobs << "\n";
     std::cout << "runtime_ring_slot_graph_physical_jobs=" << graphs.ring_slot_physical_jobs << "\n";
-#if BEAM_ENABLE_DEBUG_LOGS
-    std::cout << "runner_phase=graphs_instantiated\n";
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "runner_phase=graphs_instantiated\n";
 #endif
