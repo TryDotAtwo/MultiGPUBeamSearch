@@ -548,7 +548,8 @@
             "format": {
               "enum": [
                 "batchnorm-folded",
-                "resmlp-layernorm"
+                "resmlp-layernorm",
+                "piece-transformer"
               ]
             },
             "manifest": {

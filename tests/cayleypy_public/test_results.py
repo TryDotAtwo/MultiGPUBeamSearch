@@ -254,6 +254,15 @@ def test_build_result_envelope_has_deterministic_semantic_idempotency() -> None:
     assert first["idempotency_key"] != changed["idempotency_key"]
 
 
+def test_build_result_envelope_accepts_piece_transformer_format() -> None:
+    context = _context()
+    context["model"]["format"] = "piece-transformer"
+    context["model"]["manifest"]["layout"] = "row-major input activations times weight_hxk"
+
+    envelope = build_result_envelope(context, _solution())
+    assert envelope["model"]["format"] == "piece-transformer"
+
+
 @pytest.mark.parametrize(
     ("model_class", "output_dim", "message"),
     [

@@ -1,5 +1,11 @@
 # Prompt History
 
+## 2026-07-31
+- User requires public Kaggle examples to support both MLP (`batchnorm-folded`/`resmlp-layernorm`) and Transformer (`piece-transformer`) runs under one upload contract; publish envelope must remain schema-valid for both families.
+- User requested public Kaggle examples for IHES, Megaminx, and Cube-444 with first-pass + collect modes plus a verified GitHub Cloudflare upload path.
+- User asked schema errors in publish to be treated as actionable failures, with minimal user-facing failure details and no hardcoded schema workarounds in notebooks.
+
+
 ## 2026-07-22
 - User explicitly approved launching the updated private Kaggle 2xT4 pipeline gate for the SM75 transformer follow-up; correctness remains complete byte-exact score comparison and performance changes are accepted only after the integrated repeated gate.
 - User explicitly approved pushing transformer commit `18e5996` and its reproducible tag to the existing GitHub repository for a private Kaggle 2xT4 run, then asked to launch immediately when the T4 slot became available.
