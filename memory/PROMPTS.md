@@ -4,6 +4,7 @@
 - User requested a separate minimal branch for other people to run the current Megaminx solver on SLURM clusters without compiling there. Releases must use separate native-only `sm75`, `sm80`, `sm86`, `sm89`, `sm90`, and `sm120` archives, with no PTX, JIT, or fallback.
 - The launcher must use SLURM plus one torchrun rank per selected GPU. It accepts `--gpus`, `--beam`, and exactly one mandatory `--puzzle`; missing `--puzzle` must fail before submission and ask the user to specify a puzzle id.
 - The launcher preserves the current one-puzzle original/reflected workflows. Validated results go to the existing Cloudflare Worker for GitHub publication.
+- User required beam-width-specific optimal profiles analogous to the Kaggle notebooks. Profile selection must preserve requested beam while choosing measured hardware-specific parameters; Kaggle T4 results must not be treated as optimal for other GPUs.
 
 ## 2026-06-20
 - User cancelled the segment/frequent-prefix repair direction and requested a

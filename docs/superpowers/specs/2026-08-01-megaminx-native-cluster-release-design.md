@@ -65,7 +65,19 @@ Optional options are:
 - `--publish-only <run-dir>` to retry publication without solving;
 - `--dry-run` to print the validated submission without calling `sbatch`.
 
-Unknown values fail closed. Cluster-specific partition, account, QoS, time, CPU, RAM, and scratch settings live in `cluster.env`; ordinary users select only run inputs. Solver tuning stays in versioned per-architecture profiles.
+Unknown values fail closed. Cluster-specific partition, account, QoS, time, CPU, RAM, and scratch settings live in `cluster.env`; ordinary users select only run inputs.
+
+## Beam-width profile selection
+
+The launcher reuses the validated Kaggle profile-selection idea, generalized for cluster hardware. Profiles are immutable JSON registries keyed by GPU family and VRAM class, native SM, torchrun world size, model backend/class, and power-of-two beam anchor. T4 measurements are evidence only for T4 and are never presented as optimal A100, H100, L4, RTX, or Blackwell settings.
+
+For a supported hardware/world-size tuple, selection uses half-up rounding of `log2(requested_beam)` to the nearest available measured anchor. The requested beam is never replaced by the anchor. It is increased only to the distributed layout quantum `world_size * shard_count * 1024`; requested beam, anchor, effective beam, and alignment delta are all recorded.
+
+After selection, the launcher recomputes local beam, parent batch, Stream3 batch, logical shard size, shard capacity, Stream4 constraints, final exchange capacity, history budgets, and VRAM headroom from the actual beam, move count, output dimension, rank count, and selected profile. A profile whose derived capacities do not pass preflight is rejected rather than adjusted silently.
+
+Registries distinguish `measured`, `bounded_from_measured`, and `unverified`. Supported releases accept only `measured` or explicitly bounded entries on the exact hardware/world-size tuple; `unverified`, wrong-backend, missing-anchor, and cross-hardware entries fail closed. Widths outside a registry's declared supported range also fail with the available range and a request to choose another beam. There is no generic profile fallback.
+
+Release preparation includes repeatable depth-limited sweeps, correctness gates, multiple timing repetitions, and deterministic winner selection for each target family and supported GPU count. The selected profile and its evidence identifier are written to `selected_profile.json` and included in the Worker result envelope.
 
 ## SLURM and torchrun flow
 
@@ -104,6 +116,7 @@ Development occurs on `codex/megaminx-native-cluster-release` in an isolated wor
 ## Verification gates
 
 - CLI tests prove missing `--puzzle` makes zero `sbatch` calls.
+- Profile tests cover half-up `log2` boundaries, exact hardware/world-size/backend matching, requested-beam preservation, distributed alignment, capacity re-derivation, unsupported ranges, and rejection of unverified or cross-hardware profiles.
 - Shell syntax, ShellCheck, and mock-SLURM tests cover GPU count, device mapping, job-id parsing, torchrun world size, and reflection modes.
 - Negative tests cover unknown/mixed SM, resource shortage, corrupt manifests, and missing libraries.
 - `cuobjdump` proves exactly one native SM and no PTX.
@@ -121,6 +134,7 @@ An architecture without a real target-GPU smoke may be an explicitly unverified 
 2. Adapt current one-puzzle/reflection orchestration without data-plane changes.
 3. Reuse the existing envelope publisher and Worker contract.
 4. Add hermetic per-SM build and packaging automation.
-5. Build and inspect all six archives.
-6. Smoke T4, A100, RTX 30, RTX 40/L4, H100, and RTX Blackwell as available.
-7. Publish passing artifacts to a prerelease, verify Worker-to-GitHub, and then promote verified assets.
+5. Measure and register beam-width profiles for each supported hardware and GPU-count tuple.
+6. Build and inspect all six archives.
+7. Smoke T4, A100, RTX 30, RTX 40/L4, H100, and RTX Blackwell as available.
+8. Publish passing artifacts to a prerelease, verify Worker-to-GitHub, and then promote verified assets.

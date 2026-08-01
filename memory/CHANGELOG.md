@@ -2,6 +2,7 @@
 
 ## 2026-08-01
 - Added the approved design for minimal per-architecture native Megaminx cluster releases: mandatory one-puzzle SLURM CLI, torchrun rank-per-GPU, existing reflection behavior, native-only `sm75|sm80|sm86|sm89|sm90|sm120` archives, and validated Cloudflare-to-GitHub publication.
+- Extended the design with Kaggle-style nearest-power beam profile selection, exact hardware/world-size/backend evidence boundaries, requested-beam preservation, capacity re-derivation, and fail-closed behavior for missing or unverified profiles.
 
 ## 2026-06-20
 - Added `BEAM_SOLVE_BUCKET_MODE` for ordinary solve-to-center runs that keep
