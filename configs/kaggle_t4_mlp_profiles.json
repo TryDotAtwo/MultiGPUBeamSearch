@@ -289,18 +289,22 @@
                                                                 "final_materialize_chunk_candidates":  88064
                                                             },
                                                 "evidence":  {
-                                                                 "source":  "trydotatwo/cayleypy-mlp-p26-acceptance-output1",
+                                                                 "source":  "trydotatwo/cayleypy-public-acceptance-limit-p27-output1",
                                                                  "kernel_version":  4,
-                                                                 "solver_commit":  "b8bd6b01db77a0863f11cf7289a528e310dad75f",
+                                                                 "solver_commit":  "61aedda",
                                                                  "depth":  8,
-                                                                 "depth_sec":  1688.03,
-                                                                 "solve_sec":  4009.690965389,
-                                                                 "wall_sec":  4154.400519261,
-                                                                 "requested_beam":  67108864,
-                                                                 "effective_beam":  67108864,
-                                                                 "local_beam":  33554432,
-                                                                 "final_candidate_count":  33554432,
-                                                                 "note":  "Real Kaggle 2xT4 BFS-off acceptance reached and materialized the full p26 frontier through depth 8 with no fatal or overflow; standard 768 MiB GPU headroom retained."
+                                                                 "depth_sec":  1723.45,
+                                                                 "solve_sec":  4087.482456614,
+                                                                 "wall_sec":  4230.653133451,
+                                                                 "requested_beam":  67239936,
+                                                                 "effective_beam":  67239936,
+                                                                 "local_beam":  33619968,
+                                                                 "final_candidate_count":  33619968,
+                                                                 "next_aligned_beam":  67371008,
+                                                                 "next_aligned_required_bytes":  14659469186,
+                                                                 "gpu_budget_bytes":  14638972928,
+                                                                 "headroom_bytes":  805306368,
+                                                                 "note":  "Real Kaggle 2xT4 BFS-off saturation through depth 8; no fatal/overflow. Next 131072-aligned beam step is over budget."
                                                              }
                                             }
                                  },
@@ -589,18 +593,22 @@
                                                                           "final_materialize_chunk_candidates":  88064
                                                                       },
                                                           "evidence":  {
-                                                                           "source":  "trydotatwo/cayleypy-mlp-p26-acceptance-output24",
-                                                                           "kernel_version":  2,
-                                                                           "solver_commit":  "29140098bb6bd1c9b414bb49237c2488717bdc56",
+                                                                           "source":  "trydotatwo/cayleypy-public-acceptance-limit-p27-output24",
+                                                                           "kernel_version":  5,
+                                                                           "solver_commit":  "61aedda",
                                                                            "depth":  8,
-                                                                           "depth_sec":  52.3487,
-                                                                           "solve_sec":  132.710240148,
-                                                                           "wall_sec":  274.270157566,
-                                                                           "requested_beam":  67108864,
-                                                                           "effective_beam":  67108864,
-                                                                           "local_beam":  33554432,
-                                                                           "final_candidate_count":  33554432,
-                                                                           "note":  "Real Kaggle 2xT4 BFS-off acceptance reached and materialized the full p26 frontier through depth 8 with no fatal or overflow; standard 768 MiB GPU headroom retained."
+                                                                           "depth_sec":  54.3726,
+                                                                           "solve_sec":  139.217411077,
+                                                                           "wall_sec":  282.48956613,
+                                                                           "requested_beam":  67633152,
+                                                                           "effective_beam":  67633152,
+                                                                           "local_beam":  33816576,
+                                                                           "final_candidate_count":  33816576,
+                                                                           "next_aligned_beam":  67698688,
+                                                                           "next_aligned_required_bytes":  14640504155,
+                                                                           "gpu_budget_bytes":  14638972928,
+                                                                           "headroom_bytes":  805306368,
+                                                                           "note":  "Real Kaggle 2xT4 BFS-off saturation through depth 8; no fatal/overflow. Next 65536-aligned beam step is over budget."
                                                                        }
                                                       }
                                            }
@@ -613,25 +621,39 @@
     "maximum_validated_beam_evidence":  {
                                             "output1":  {
                                                             "source":  "trydotatwo/cayleypy-public-acceptance-limit-p27-output1",
-                                                            "pass_version":  3,
-                                                            "pass_beam":  67239936,
+                                                            "kernel_version":  4,
+                                                            "solver_commit":  "61aedda",
+                                                            "depth":  8,
+                                                            "depth_sec":  1723.45,
+                                                            "solve_sec":  4087.482456614,
+                                                            "wall_sec":  4230.653133451,
+                                                            "requested_beam":  67239936,
+                                                            "effective_beam":  67239936,
+                                                            "local_beam":  33619968,
+                                                            "final_candidate_count":  33619968,
                                                             "next_aligned_beam":  67371008,
-                                                            "next_aligned_status":  "derived_over_budget",
-                                                            "failed_probe_beam":  67633152,
-                                                            "failed_required_bytes":  14713995138,
+                                                            "next_aligned_required_bytes":  14659469186,
                                                             "gpu_budget_bytes":  14638972928,
-                                                            "headroom_bytes":  805306368
+                                                            "headroom_bytes":  805306368,
+                                                            "note":  "Real Kaggle 2xT4 BFS-off saturation through depth 8; no fatal/overflow. Next 131072-aligned beam step is over budget."
                                                         },
                                             "output_move_count":  {
                                                                       "source":  "trydotatwo/cayleypy-public-acceptance-limit-p27-output24",
-                                                                      "pass_version":  3,
-                                                                      "pass_beam":  67633152,
+                                                                      "kernel_version":  5,
+                                                                      "solver_commit":  "61aedda",
+                                                                      "depth":  8,
+                                                                      "depth_sec":  54.3726,
+                                                                      "solve_sec":  139.217411077,
+                                                                      "wall_sec":  282.48956613,
+                                                                      "requested_beam":  67633152,
+                                                                      "effective_beam":  67633152,
+                                                                      "local_beam":  33816576,
+                                                                      "final_candidate_count":  33816576,
                                                                       "next_aligned_beam":  67698688,
-                                                                      "next_aligned_status":  "derived_over_budget",
-                                                                      "failed_probe_beam":  68157440,
-                                                                      "failed_required_bytes":  14736667312,
+                                                                      "next_aligned_required_bytes":  14640504155,
                                                                       "gpu_budget_bytes":  14638972928,
-                                                                      "headroom_bytes":  805306368
+                                                                      "headroom_bytes":  805306368,
+                                                                      "note":  "Real Kaggle 2xT4 BFS-off saturation through depth 8; no fatal/overflow. Next 65536-aligned beam step is over budget."
                                                                   }
                                         }
 }

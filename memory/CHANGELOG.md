@@ -1014,3 +1014,5 @@
 - 2026-08-01: Located discrete Kaggle 2xT4 MLP memory ceilings with the standard 768 MiB GPU headroom: output1 67,239,936 (131,072 alignment), output_move_count 67,633,152 (65,536 alignment). Added explicit per-model maximum_validated_beam and fail-closed selection above it; removed the experimental p27 anchors. Full depth-8 saturation acceptance is pending.
 
 - 2026-08-01: Added an isolated temporary piece-Transformer p27 maximum envelope for private Kaggle 2xT4 memory probing. Public notebook pins remain on measured p26 until the transformer ceiling is saturated and validated.
+
+- 2026-08-01: Fully saturated both discrete MLP ceilings on real Kaggle 2xT4. output1 max 67,239,936 completed depth 8 in 1723.45 s (v4); output_move_count max 67,633,152 completed depth 8 in 54.3726 s (v5). Both retained 768 MiB GPU headroom and had no fatal/overflow; the next aligned steps are derived over budget.
