@@ -9,6 +9,7 @@ from functools import lru_cache
 from hashlib import sha256
 from ipaddress import ip_address
 import json
+import gzip
 import math
 import os
 from pathlib import Path
@@ -27,6 +28,7 @@ from tools.cayleypy_public.paths import invert_path, tokenize_path
 
 SCHEMA_VERSION = 1
 MAX_ENVELOPE_BYTES = 256 * 1024
+MAX_PUBLISH_ARCHIVE_BYTES = 32 * 1024 * 1024
 MAX_PUBLISH_REQUEST_BYTES = 4 * 1024 * 1024
 MAX_RESULTS_PER_REQUEST = 100
 
@@ -418,6 +420,34 @@ def build_result_envelope(
     return envelope
 
 
+def _gzip_result_batch(envelopes: Sequence[Mapping[str, object]]) -> bytes:
+    payload = {"schema_version": SCHEMA_VERSION, "results": list(envelopes)}
+    return gzip.compress(_canonical_bytes(payload), compresslevel=6, mtime=0)
+
+
+def build_result_archives(
+    envelopes: Sequence[Mapping[str, object]],
+    *,
+    max_archive_bytes: int = MAX_PUBLISH_ARCHIVE_BYTES,
+) -> list[bytes]:
+    """Return deterministic gzip JSON archives, each within the wire-size limit."""
+    if max_archive_bytes < 1:
+        raise ValueError("max archive bytes must be positive")
+    normalized = [_validate_publish_envelope(envelope) for envelope in envelopes]
+    if not normalized:
+        return []
+
+    def pack(items: list[dict[str, object]]) -> list[bytes]:
+        archive = _gzip_result_batch(items)
+        if len(archive) <= max_archive_bytes:
+            return [archive]
+        if len(items) == 1:
+            raise ValueError("one result archive exceeds 32 MiB")
+        middle = len(items) // 2
+        return [*pack(items[:middle]), *pack(items[middle:])]
+
+    return pack(normalized)
+
 @dataclass(frozen=True)
 class PublishStatus:
     ok: bool
@@ -622,3 +652,68 @@ def publish_results(
         retryable=status_code == 429 or status_code >= 500,
         status_code=status_code,
     )
+def publish_result_archive(
+    url: str,
+    archive: bytes,
+    *,
+    result_count: int,
+    archive_index: int,
+    archive_count: int,
+    timeout_s: float = 30.0,
+) -> PublishStatus:
+    """Post exactly one bounded gzip archive and return a safe local status."""
+    endpoint = _safe_endpoint(url)
+    if not isinstance(archive, bytes) or not archive.startswith(b"\x1f\x8b"):
+        return _failure(endpoint, result_count, "publish archive is not gzip", retryable=False)
+    if len(archive) > MAX_PUBLISH_ARCHIVE_BYTES:
+        return _failure(endpoint, result_count, "publish archive exceeds 32 MiB", retryable=False)
+    if result_count < 1 or archive_count < 1 or not 0 <= archive_index < archive_count:
+        return _failure(endpoint, result_count, "publish archive metadata is invalid", retryable=False)
+    if isinstance(timeout_s, bool):
+        return _failure(endpoint, result_count, "publish timeout is invalid", retryable=False)
+    try:
+        timeout = float(timeout_s)
+    except (TypeError, ValueError):
+        return _failure(endpoint, result_count, "publish timeout is invalid", retryable=False)
+    if not math.isfinite(timeout) or timeout <= 0:
+        return _failure(endpoint, result_count, "publish timeout is invalid", retryable=False)
+    try:
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("unsupported results endpoint")
+        if not _endpoint_resolves_only_to_public_addresses(url):
+            return _failure(endpoint, result_count, "results endpoint must resolve only to public IP addresses", retryable=False)
+        request = Request(
+            url,
+            data=archive,
+            headers={
+                "Content-Type": "application/gzip",
+                "User-Agent": "CayleyPy-Kaggle-Publisher/2.0",
+                "X-CayleyPy-Archive-SHA256": sha256(archive).hexdigest(),
+                "X-CayleyPy-Archive-Index": str(archive_index),
+                "X-CayleyPy-Archive-Count": str(archive_count),
+                "X-CayleyPy-Result-Count": str(result_count),
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=timeout) as response:
+            status_code = getattr(response, "status", None)
+            if status_code is None:
+                status_code = response.getcode()
+            status_code = int(status_code)
+    except HTTPError as error:
+        status_code = int(error.code)
+        return _failure(endpoint, result_count, f"results endpoint returned HTTP {status_code}", retryable=status_code == 429 or status_code >= 500, status_code=status_code)
+    except (TimeoutError, URLError, OSError):
+        return _failure(endpoint, result_count, "results endpoint is temporarily unavailable", retryable=True)
+    except (TypeError, ValueError):
+        return _failure(endpoint, result_count, "publish archive failed validation", retryable=False)
+    except Exception:
+        return _failure(endpoint, result_count, "results publish failed safely", retryable=True)
+
+    if status_code in {200, 202}:
+        return _finish(PublishStatus(
+            ok=True, retryable=False, safe_error=None, status_code=status_code,
+            result_count=result_count, duplicate=status_code == 200, endpoint=endpoint,
+        ))
+    return _failure(endpoint, result_count, f"results endpoint returned HTTP {status_code}", retryable=status_code == 429 or status_code >= 500, status_code=status_code)

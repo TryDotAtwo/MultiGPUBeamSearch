@@ -1,3 +1,7 @@
+- 2026-08-01: Replaced notebook-side 100-result/4-MiB JSON request chunking with deterministic gzip archives bounded to 32 MiB. A run normally performs one HTTPS request; oversized compressed runs split recursively and upload sequentially in stable solution order.
+- Added archive request metadata, safe best-effort status aggregation, regenerated the universal public notebook and all four ready-to-run examples, and retained the old JSON publisher only as a compatibility API.
+- Verification: `318 passed` for the complete Python test suite.
+
 # Changelog
 
 ## 2026-07-31

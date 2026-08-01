@@ -198,7 +198,8 @@ def test_main_failed_search_materializes_partial_and_always_writes_publish_statu
     monkeypatch.setattr(public_cli, "run_public_search", lambda *args, **kwargs: (_ for _ in ()).throw(PublicSearchRunError("rank failed", partial)))
     if publish_enabled:
         monkeypatch.setattr(public_cli, "_publication_envelopes", lambda *args, **kwargs: [{"client_submission_id": "partial"}])
-        monkeypatch.setattr(public_cli, "publish_results", lambda *args, **kwargs: PublishStatus(True, False, None, 202, 1, False, "https://ingest.example.test"))
+        monkeypatch.setattr(public_cli, "build_result_archives", lambda items: [b"archive"])
+        monkeypatch.setattr(public_cli, "publish_result_archive", lambda *args, **kwargs: PublishStatus(True, False, None, 202, 1, False, "https://ingest.example.test"))
     calls: list[RunArtifacts] = []
     original_publish = public_cli._publish_best_effort
     def observe_publish(*args, **kwargs):
@@ -266,3 +267,33 @@ def test_history_budget_is_derived_before_preflight_and_keeps_headroom():
             available_ram_bytes=29_257_576_448,
             tmp_free_bytes=50 * 1024**3 - 1,
         )
+
+def test_best_effort_sends_archives_sequentially_with_one_request_each(tmp_path: Path, monkeypatch) -> None:
+    config = _publishing_config(tmp_path)
+    artifacts = _one_solution_artifacts()
+    contract = type("Contract", (), {"state_len": 3, "move_count": 2, "central_state": (0, 1, 2), "generators": {"a": (0, 1, 2), "b": (0, 1, 2)}, "initial_states": {7: (0, 1, 2)}})()
+    model = type("Model", (), {"format": "batchnorm-folded", "checkpoint_sha256": "c" * 64, "manifest": {"state_len": 3, "num_classes": 3, "output_dim": 1}})()
+    plan = type("Plan", (), {"requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0, "profile_power": 16, "model_class": "output1", "runtime": {}})()
+    envelopes = [{"client_submission_id": str(index)} for index in range(3)]
+    calls: list[tuple[bytes, int, int, int]] = []
+
+    monkeypatch.setattr(public_cli, "_publication_envelopes", lambda *args, **kwargs: envelopes)
+    monkeypatch.setattr(public_cli, "build_result_archives", lambda items: [b"archive-0", b"archive-1"], raising=False)
+
+    def publish(url, archive, *, result_count, archive_index, archive_count):
+        calls.append((archive, result_count, archive_index, archive_count))
+        return PublishStatus(True, False, None, 202, result_count, False, "https://ingest.example.test")
+
+    monkeypatch.setattr(public_cli, "publish_result_archive", publish, raising=False)
+
+    status = public_cli._publish_best_effort(
+        config, contract, model, {"profile_registry_schema_version": 1}, plan,
+        ["Tesla T4", "Tesla T4"], artifacts, tmp_path, 0.1,
+    )
+
+    assert calls == [
+        (b"archive-0", 3, 0, 2),
+        (b"archive-1", 3, 1, 2),
+    ]
+    assert status["ok"] is True
+    assert status["archive_count"] == 2

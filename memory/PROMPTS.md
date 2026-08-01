@@ -1,3 +1,5 @@
+- 2026-08-01: User required notebook result publication to package the entire run into one archive and make one Cloudflare request; only archives exceeding 32 MiB may be split, and parts must be sent sequentially without dropping results.
+
 # Prompt History
 
 ## 2026-07-31

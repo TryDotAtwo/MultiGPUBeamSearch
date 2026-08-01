@@ -27,8 +27,10 @@ from tools.cayleypy_public.profile import RuntimePlan, derive_runtime, serialize
 from tools.cayleypy_public.results import (
     MAX_PUBLISH_REQUEST_BYTES,
     MAX_RESULTS_PER_REQUEST,
+    build_result_archives,
     build_result_envelope,
     publish_results,
+    publish_result_archive,
 )
 from tools.cayleypy_public.runner import PublicSearchRunError, RunArtifacts, run_public_search
 from tools.kaggle_t4_mlp_profiles import select_profile
@@ -614,11 +616,17 @@ def _publish_best_effort(
             status = {"state": "skipped", "ok": False, "safe_error": None, "reason": "no_valid_solutions", "result_count": 0}
             _write_json(output_dir / "publish_status.json", status)
             return status
-        chunks = _chunk_envelopes(envelopes)
+        archives = build_result_archives(envelopes)
         statuses = []
         with _working_directory(output_dir):
-            for chunk in chunks:
-                statuses.append(publish_results(config.results_ingest_url, chunk))
+            for archive_index, archive in enumerate(archives):
+                statuses.append(publish_result_archive(
+                    config.results_ingest_url,
+                    archive,
+                    result_count=len(envelopes),
+                    archive_index=archive_index,
+                    archive_count=len(archives),
+                ))
         ok = all(status.ok for status in statuses)
         status_payload = {
             "state": "published" if ok else "failed",
@@ -628,14 +636,14 @@ def _publish_best_effort(
                 sorted({status.safe_error or "publish_failed" for status in statuses if not status.ok})
             )[:2048],
             "result_count": len(envelopes),
-            "chunk_count": len(chunks),
+            "archive_count": len(archives),
             "client_submission_ids": [item["client_submission_id"] for item in envelopes],
-            "chunks": [asdict(status) for status in statuses],
+            "archives": [asdict(status) for status in statuses],
         }
     except Exception as error:
         status_payload = {
             "state": "failed", "ok": False, "retryable": True,
-            "safe_error": _public_error(error, config), "result_count": 0, "chunk_count": 0,
+            "safe_error": _public_error(error, config), "result_count": 0, "archive_count": 0,
         }
     _write_json(output_dir / "publish_status.json", status_payload)
     return status_payload

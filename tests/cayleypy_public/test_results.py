@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from copy import deepcopy
+import gzip
 import hashlib
 import socket
 import json
@@ -855,3 +856,69 @@ def test_publish_results_accepts_global_ipv4_and_ipv6_dns_answers(
     )
 
     assert status.ok is True
+
+
+def test_build_result_archives_keeps_all_results_in_one_gzip_when_it_fits() -> None:
+    envelopes = [
+        build_result_envelope(_context(), {**_solution(), "collection_index": index})
+        for index in range(3)
+    ]
+
+    archives = results_module.build_result_archives(envelopes, max_archive_bytes=32 * 1024 * 1024)
+
+    assert len(archives) == 1
+    assert len(archives[0]) <= 32 * 1024 * 1024
+    decoded = json.loads(gzip.decompress(archives[0]))
+    assert decoded["schema_version"] == 1
+    assert [item["solution"]["collection_index"] for item in decoded["results"]] == [0, 1, 2]
+
+
+
+def test_build_result_archives_splits_only_when_compressed_archive_exceeds_limit() -> None:
+    envelopes = [
+        build_result_envelope(_context(), {**_solution(), "collection_index": index})
+        for index in range(8)
+    ]
+    one_result_size = len(results_module.build_result_archives(envelopes[:1], max_archive_bytes=10**9)[0])
+
+    archives = results_module.build_result_archives(
+        envelopes,
+        max_archive_bytes=one_result_size + 32,
+    )
+
+    assert len(archives) > 1
+    assert all(len(archive) <= one_result_size + 32 for archive in archives)
+    decoded_indexes = [
+        item["solution"]["collection_index"]
+        for archive in archives
+        for item in json.loads(gzip.decompress(archive))["results"]
+    ]
+    assert decoded_indexes == list(range(8))
+
+
+def test_publish_result_archive_posts_one_gzip_request_with_part_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    envelopes = [build_result_envelope(_context(), _solution()) for _ in range(3)]
+    archive = results_module.build_result_archives(envelopes)[0]
+    observed: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout):
+        observed.update(request=request, timeout=timeout)
+        return _FakeResponse(202)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(results_module, "urlopen", fake_urlopen)
+    status = results_module.publish_result_archive(
+        "https://results.example/ingest",
+        archive,
+        result_count=3,
+        archive_index=0,
+        archive_count=1,
+    )
+
+    request = observed["request"]
+    assert status.ok is True
+    assert status.result_count == 3
+    assert request.data == archive
+    assert request.get_header("Content-type") == "application/gzip"

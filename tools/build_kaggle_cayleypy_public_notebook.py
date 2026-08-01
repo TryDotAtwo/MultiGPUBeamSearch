@@ -58,6 +58,10 @@ CUDA/C++ algorithm knobs are deliberately absent.
 ## Results publishing
 
 The mode controls what is sent: `first publishes one best solution per puzzle; collect publishes every validated solution`. The local `submission.csv` always uses the best solution per puzzle.
+One notebook run is packed into one deterministic gzip archive and sent with one
+HTTPS request. Only when the compressed archive would exceed 32 MiB is it split
+into bounded parts, which are uploaded sequentially without dropping solutions.
+
 
 Publishing is best effort: valid local solutions and `submission.csv` remain even
 if the ingest service is unavailable. The status is saved in `publish_status.json`.
