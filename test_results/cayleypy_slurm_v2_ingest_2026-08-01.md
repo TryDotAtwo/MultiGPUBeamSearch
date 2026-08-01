@@ -35,6 +35,11 @@ Starting point: branch `codex/cayleypy-results-ingest`, commit `3df4d9effdecc787
 - `configs/cayleypy_results_v2_example_payload.json`
 - `services/cayleypy-results-ingest/SLURM_V2_CLIENT.md`
 
-## Remaining live evidence
+## Live staging evidence
 
-After commit/push, verify the staging GitOps build, POST the exact example payload to staging, and confirm the immutable v2 record appears on the GitHub ingest branch. Production deployment remains explicitly out of scope.
+- Implementation commit: `765446a`.
+- GitHub/Cloudflare Workers Build `2c649d08-7649-4976-933c-c3a8339cea2b`: `completed / success` for `cayleypy-results-ingest-staging`.
+- Direct Windows clients could not complete the local TLS handshake, so a private, CPU-only Kaggle network probe sent the exact checked-in example without secrets. Smoke notebook v4 completed and received HTTP 202.
+- Receipt submission: `019fbdc0-9347-7639-895c-d27e703694ad`; idempotency: `76e18ada78a88fd4e94fed92a80896ff9564409bc9439b7d7f20c6599a260fde`.
+- GitHub `ingest/staging` contains `data/v2/slurm/toy-cayley/cube_3-3-3/2026-07-29/019fbdc0-9347-7639-895c-d27e703694ad.json` (blob `3583efd574ad3a41abc9c5fc936ec2e1cbf0dc6c`). The fetched record has `schema_version=2`, `provenance.platform=slurm`, `world_size=4`, and `native_sm=90`.
+- Production deployment remains explicitly out of scope and was not performed.
