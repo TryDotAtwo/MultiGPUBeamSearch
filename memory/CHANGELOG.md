@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-08-01
+- Added the approved design for minimal per-architecture native Megaminx cluster releases: mandatory one-puzzle SLURM CLI, torchrun rank-per-GPU, existing reflection behavior, native-only `sm75|sm80|sm86|sm89|sm90|sm120` archives, and validated Cloudflare-to-GitHub publication.
+
 ## 2026-06-20
 - Added `BEAM_SOLVE_BUCKET_MODE` for ordinary solve-to-center runs that keep
   searching after the first hit. Stream2 can now record solved candidates
