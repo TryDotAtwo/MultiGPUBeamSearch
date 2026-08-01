@@ -417,3 +417,23 @@
 - User clarified that all one-puzzle array jobs should use one shared precompiled beam-search binary instead of rebuilding production_runner in every job.
 
 - User showed a completed IHES puzzle 33 run where compute succeeded but GitHub publishing failed because compute nodes could not resolve github.com and index generation crashed on metadata fields variants/source_files; requested continuing to collect and publish all cluster IHES results robustly.
+
+## 2026-08-01 вЂ” Megaminx native cluster release requirements
+
+- Prepare a separate minimal branch that users can download and run on modern
+  Linux clusters without compiling locally or using Docker.
+- Publish one native archive per exact CUDA architecture with no fallback:
+  sm75 (T4), sm80 (A100), sm86 (RTX 30), sm89 (RTX 40/L4), sm90 (H100), and
+  sm120 (RTX PRO 6000 Blackwell 96 GB).
+- Preserve the current cluster workflow: `run.sh` submits through SLURM and the
+  compute job uses torchrun, one rank per listed GPU, solving exactly one
+  puzzle. Required interface:
+  `./run.sh --gpus 0,1,2,3 --beam 1000000000 --puzzle ID`.
+- If `--puzzle` is omitted, fail before `sbatch` and explicitly ask for a
+  puzzle id. Allow choosing whether to solve reflected continuation using the
+  current `off|after|only` behavior.
+- Make beam-width-specific optimal profiles similar to the proven Kaggle
+  notebook approach. Profiles must remain hardware/world-size-specific and
+  must not silently fall back.
+- After independent validation, send results to the repository's Cloudflare
+  Worker and let it publish under the GitHub SLURM v2 namespace.

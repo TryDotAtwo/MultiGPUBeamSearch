@@ -6,7 +6,7 @@ import argparse
 from hashlib import sha256
 import io
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 import subprocess
 import tarfile
@@ -19,24 +19,28 @@ REQUIRED_PATHS = ("bin/production_runner", "lib", "data/test.csv", "data/puzzle_
 FORBIDDEN_NAMES = frozenset({".env", "Dockerfile", "token.txt", "compile.sh"})
 FORBIDDEN_SUFFIXES = frozenset({".cu", ".cuh", ".cpp", ".cc", ".o", ".a", ".ptx"})
 SECRET_PATTERN = re.compile(rb"(?:ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA|OPENSSH) PRIVATE KEY|CLOUDFLARE_API_TOKEN)")
+PRIVATE_PATH_PATTERN = re.compile(rb"(?:[A-Za-z]:\\\\(?:Users|Documents|Downloads)\\\\|/(?:home|Users|mnt)/)[^\x00\r\n\"']+", re.IGNORECASE)
 
 
 def _files(root: Path) -> list[Path]:
-    result: list[Path] = []
+    result = []
     resolved_root = root.resolve()
     for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
         if path.is_symlink():
             raise ValueError(f"symlink payload is forbidden: {path.relative_to(root)}")
-        if path.is_file():
-            if resolved_root not in path.resolve().parents:
-                raise ValueError(f"payload escapes staging root: {path}")
-            relative = path.relative_to(root)
-            if path.name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
-                raise ValueError(f"forbidden payload file: {relative.as_posix()}")
-            data = path.read_bytes()
-            if SECRET_PATTERN.search(data):
-                raise ValueError(f"forbidden secret-like content: {relative.as_posix()}")
-            result.append(path)
+        if not path.is_file():
+            continue
+        if resolved_root not in path.resolve().parents:
+            raise ValueError(f"payload escapes staging root: {path}")
+        relative = path.relative_to(root)
+        if path.name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
+            raise ValueError(f"forbidden payload file: {relative.as_posix()}")
+        data = path.read_bytes()
+        if SECRET_PATTERN.search(data):
+            raise ValueError(f"forbidden secret-like content: {relative.as_posix()}")
+        if PRIVATE_PATH_PATTERN.search(data):
+            raise ValueError(f"private absolute path in payload: {relative.as_posix()}")
+        result.append(path)
     return result
 
 
@@ -48,9 +52,7 @@ def _verify_required(root: Path) -> None:
 
 def _tarinfo(name: str, size: int, executable: bool = False) -> tarfile.TarInfo:
     info = tarfile.TarInfo(name)
-    info.size = size
-    info.mtime = 0
-    info.uid = info.gid = 0
+    info.size, info.mtime, info.uid, info.gid = size, 0, 0, 0
     info.uname = info.gname = ""
     info.mode = 0o755 if executable else 0o644
     return info
@@ -82,10 +84,8 @@ def build_release(stage_root: Path, output_dir: Path, sm: int, cuobjdump: Callab
     stream = io.BytesIO()
     with tarfile.open(fileobj=stream, mode="w", format=tarfile.PAX_FORMAT) as tar:
         for path in files:
-            relative = path.relative_to(root).as_posix()
-            data = path.read_bytes()
-            executable = relative in {"run.sh", "scripts/job.sh", "bin/production_runner"}
-            tar.addfile(_tarinfo(f"{prefix}/{relative}", len(data), executable), io.BytesIO(data))
+            relative, data = path.relative_to(root).as_posix(), path.read_bytes()
+            tar.addfile(_tarinfo(f"{prefix}/{relative}", len(data), relative in {"run.sh", "scripts/job.sh", "bin/production_runner"}), io.BytesIO(data))
         tar.addfile(_tarinfo(f"{prefix}/MANIFEST.json", len(manifest_bytes)), io.BytesIO(manifest_bytes))
         tar.addfile(_tarinfo(f"{prefix}/SHA256SUMS", len(checksum_bytes)), io.BytesIO(checksum_bytes))
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -103,10 +103,8 @@ def _cuobjdump(path: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--sm", type=int, choices=ALLOWED_SMS, required=True)
-    parser.add_argument("--metadata", type=Path)
+    parser.add_argument("--stage", type=Path, required=True); parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--sm", type=int, choices=ALLOWED_SMS, required=True); parser.add_argument("--metadata", type=Path)
     args = parser.parse_args()
     metadata = None if args.metadata is None else json.loads(args.metadata.read_text(encoding="utf-8-sig"))
     print(build_release(args.stage, args.output, args.sm, _cuobjdump, metadata))

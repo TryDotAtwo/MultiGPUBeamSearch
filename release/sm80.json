@@ -1,0 +1,1 @@
+{"backend":"mlp","competition":"santa-2023","gpu_families":["A100"],"history_disk_bytes":1099511627776,"max_collected_solutions":16,"minimum_driver_major":525,"minimum_vram_mib":40000,"model_class":"output_move_count","model_filename":"manifest.json","model_format":"fp16-files","move_count":24,"output_dim":24,"puzzle_type":"megaminx","solution_mode":"first","touch_bfs_radius":0}

@@ -2,6 +2,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ARCHIVE_PARENT="$(cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
-export PYTHONPATH="${ARCHIVE_PARENT}${PYTHONPATH:+:${PYTHONPATH}}"
+if [ -d "${SCRIPT_DIR}/portable/megaminx_cluster" ]; then
+  ARCHIVE_ROOT="${SCRIPT_DIR}"
+else
+  ARCHIVE_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
+fi
+if [ -f "${ARCHIVE_ROOT}/publication.env" ]; then
+  set -a
+  source "${ARCHIVE_ROOT}/publication.env"
+  set +a
+fi
+export PYTHONPATH="${ARCHIVE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 exec python3 -m portable.megaminx_cluster.submit "$@"

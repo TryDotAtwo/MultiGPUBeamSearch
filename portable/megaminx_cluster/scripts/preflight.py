@@ -47,16 +47,7 @@ def inspect_gpus(csv_text: str) -> tuple[GpuInfo, ...]:
         driver_match = re.match(r"([0-9]+)\.", driver)
         if not memory_match or not capability_match or not driver_match:
             raise ValueError(f"invalid nvidia-smi row {line_number}")
-        result.append(
-            GpuInfo(
-                int(index),
-                name,
-                _family(name),
-                int(memory_match.group(1)),
-                int(capability_match.group(1)) * 10 + int(capability_match.group(2)),
-                int(driver_match.group(1)),
-            )
-        )
+        result.append(GpuInfo(int(index), name, _family(name), int(memory_match.group(1)), int(capability_match.group(1)) * 10 + int(capability_match.group(2)), int(driver_match.group(1))))
     if not result:
         raise ValueError("nvidia-smi returned no GPUs")
     return tuple(result)
@@ -72,28 +63,21 @@ def verify_payload_hashes(root: Path, payloads: Mapping[str, str]) -> None:
             raise ValueError(f"sha256 mismatch for {relative}: expected={expected} actual={actual}")
 
 
-def validate_allocation(
-    manifest: Mapping[str, object],
-    plan: Mapping[str, int],
-    gpus: Iterable[GpuInfo],
-    disk_free_bytes: int,
-) -> dict[str, object]:
+def validate_allocation(manifest: Mapping[str, object], plan: Mapping[str, int], gpus: Iterable[GpuInfo], disk_free_bytes: int) -> dict[str, object]:
     rows = tuple(gpus)
     expected_count = int(plan["world_size"])
     if len(rows) != expected_count:
         raise ValueError(f"expected {expected_count} GPUs; observed {len(rows)}")
-    sms = {gpu.sm for gpu in rows}
-    families = {gpu.family for gpu in rows}
-    memories = {gpu.vram_mib for gpu in rows}
-    if len(sms) != 1 or len(families) != 1 or len(memories) != 1:
+    if len({gpu.sm for gpu in rows}) != 1 or len({gpu.family for gpu in rows}) != 1 or len({gpu.vram_mib for gpu in rows}) != 1:
         raise ValueError("mixed GPU architecture or memory class is unsupported")
     archive_sm = int(manifest["archive_sm"])
     observed_sm = rows[0].sm
     if archive_sm != observed_sm:
         raise ValueError(f"archive sm{archive_sm} does not match allocated sm{observed_sm}")
-    expected_family = str(manifest["gpu_family"])
-    if rows[0].family != expected_family:
-        raise ValueError(f"archive GPU family {expected_family} does not match {rows[0].family}")
+    configured = manifest.get("gpu_families")
+    allowed_families = {str(value) for value in configured} if isinstance(configured, list) else {str(manifest["gpu_family"])}
+    if rows[0].family not in allowed_families:
+        raise ValueError(f"archive GPU families {sorted(allowed_families)} do not include {rows[0].family}")
     required_vram = int(plan["required_vram_mib"])
     if any(gpu.vram_mib < required_vram for gpu in rows):
         raise ValueError(f"insufficient VRAM: required {required_vram} MiB per GPU")
@@ -103,14 +87,7 @@ def validate_allocation(
     required_disk = int(plan["history_disk_bytes"])
     if disk_free_bytes < required_disk:
         raise ValueError(f"scratch free bytes {disk_free_bytes} is below required {required_disk}")
-    return {
-        "status": "ok",
-        "archive_sm": archive_sm,
-        "world_size": expected_count,
-        "required_vram_mib": required_vram,
-        "scratch_free_bytes": disk_free_bytes,
-        "gpus": [asdict(gpu) for gpu in rows],
-    }
+    return {"status": "ok", "archive_sm": archive_sm, "world_size": expected_count, "required_vram_mib": required_vram, "scratch_free_bytes": disk_free_bytes, "gpus": [asdict(gpu) for gpu in rows]}
 
 
 def write_record(path: Path, record: Mapping[str, object]) -> None:

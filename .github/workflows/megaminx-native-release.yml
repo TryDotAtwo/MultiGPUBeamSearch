@@ -1,0 +1,74 @@
+name: Megaminx native prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease_tag:
+        description: Existing prerelease tag
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, x64, cuda-12.8]
+    strategy:
+      fail-fast: false
+      matrix:
+        sm: [75, 80, 86, 89, 90, 120]
+    env:
+      CUDA_HOME: /usr/local/cuda-12.8
+      CUDACXX: /usr/local/cuda-12.8/bin/nvcc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require pinned CUDA toolchain
+        run: |
+          set -euo pipefail
+          test "$(${CUDACXX} --version | sed -n 's/.*release \([0-9][0-9.]*\).*/\1/p' | tail -1)" = 12.8
+      - name: Build one native cubin target
+        run: |
+          set -euo pipefail
+          cmake -S . -B "build-sm${{ matrix.sm }}" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBEAM_CUDA_ARCHITECTURES=${{ matrix.sm }} -DCMAKE_CUDA_FLAGS="--cudart=shared"
+          cmake --build "build-sm${{ matrix.sm }}" --target production_runner
+      - name: Stage compiler-free payload
+        run: |
+          set -euo pipefail
+          stage="dist/stage-sm${{ matrix.sm }}"
+          mkdir -p "$stage/bin" "$stage/lib" "$stage/data" "$stage/weights" "$stage/profiles" "$stage/scripts" "$stage/portable/megaminx_cluster"
+          cp "build-sm${{ matrix.sm }}/production_runner" "$stage/bin/"
+          cp portable/megaminx_cluster/run.sh portable/megaminx_cluster/cluster.env.example portable/megaminx_cluster/publication.env.example "$stage/"
+          cp portable/megaminx_cluster/scripts/job.sh "$stage/scripts/"
+          cp portable/megaminx_cluster/*.py "$stage/portable/megaminx_cluster/"
+          cp portable/megaminx_cluster/scripts/*.py "$stage/scripts/"
+          cp portable/megaminx_cluster/profiles/registry.json "$stage/profiles/"
+          cp data/test.csv "$stage/data/test.csv"
+          cp data/puzzle_info.json "$stage/data/puzzle_info.json"
+          cp -a stream1_weights/. "$stage/weights/"
+          cp portable/megaminx_cluster/model_manifest.json "$stage/weights/manifest.json"
+          python3 tools/collect_elf_runtime_closure.py "$stage/bin/production_runner" "$stage/lib"
+          python3 tools/render_megaminx_release_metadata.py --template "release/sm${{ matrix.sm }}.json" --output "dist/sm${{ matrix.sm }}.json" --tag "${{ inputs.prerelease_tag }}" --asset "megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst" --commit "${{ github.sha }}" --model-manifest "$stage/weights/manifest.json" --weights "$stage/weights"
+      - name: Package and enforce one-SM/no-JIT gate
+        run: |
+          set -euo pipefail
+          python3 tools/build_megaminx_native_release.py --stage "dist/stage-sm${{ matrix.sm }}" --output dist --sm ${{ matrix.sm }} --metadata "dist/sm${{ matrix.sm }}.json"
+          python3 tools/check_megaminx_native_archive.py "dist/megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst" --sm ${{ matrix.sm }}
+          sha256sum "dist/megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst" > "dist/megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: megaminx-sm${{ matrix.sm }}-linux-x86_64
+          path: dist/megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst*
+          if-no-files-found: error
+
+  prerelease:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish prerelease assets only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ inputs.prerelease_tag }}" dist/* --prerelease --title "Megaminx native cluster prerelease ${{ inputs.prerelease_tag }}"
