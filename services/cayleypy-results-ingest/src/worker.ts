@@ -1,8 +1,8 @@
-import { consumeValidationMessage } from "./consumer.js";
+import { consumeValidationMessage, type GitHubWriterNamespace } from "./consumer.js";
 export { resolveIngestMode, type IngestMode } from "./mode.js";
 import { resolveIngestMode, type IngestMode } from "./mode.js";
 export { GitHubWriter } from "./github-writer.js";
-import { deleteStagedSubmission, findBySubmissionId, findStagedSubmissions } from "./db.js";
+import { deleteStagedSubmission, findBySubmissionId, findStagedSubmissions, findValidatedSubmissions } from "./db.js";
 import { MAX_SERIALIZED_BATCH_BYTES, validateBatch, validateBatchIntegrity, type ResultEnvelopeV1 } from "./schema.js";
 import {
   SafeIngestError,
@@ -19,6 +19,7 @@ export interface IngestRateLimit {
 export interface WorkerEnv extends IngestEnv {
   INGEST_MODE?: string;
   INGEST_RATE_LIMIT?: IngestRateLimit;
+  GITHUB_WRITER?: GitHubWriterNamespace;
 }
 
 export const MAX_REQUEST_BYTES = MAX_SERIALIZED_BATCH_BYTES;
@@ -358,6 +359,13 @@ export async function scheduled(
     const deleted = await deleteStagedSubmission(env.RESULTS_DB, row.submission_id);
     if (!deleted && await findBySubmissionId(env.RESULTS_DB, row.submission_id)) {
       throw new Error("staged_cleanup_conflict");
+    }
+  }
+  const writer = env.GITHUB_WRITER;
+  if (writer !== undefined) {
+    const target = writer.getByName("cayleypy-results-v1");
+    for (const row of await findValidatedSubmissions(env.RESULTS_DB, 100)) {
+      await target.enqueueValidated(row.submission_id);
     }
   }
   await recoverStaleSubmissions(env, {

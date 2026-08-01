@@ -21,3 +21,5 @@ No CUDA/C++ or beam-search architecture was changed.
 ## Historical backlog
 
 A post-deploy audit found 489 legacy staged rows. Added a normal-mode scheduled cleanup page of 100 rows/minute. Full verification now passes 56 schema/config and 123 Worker tests plus typecheck.
+
+Legacy validated rows are re-enqueued to GitHubWriter in bounded pages of 100/minute; they remain in R2/D1 until GitHub preflight or commit succeeds. Final suite: 56 schema/config + 124 Worker tests and typecheck.

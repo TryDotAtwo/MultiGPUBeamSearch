@@ -73,6 +73,14 @@ export async function findDeadLetters(db: D1Database, limit: number): Promise<Su
     .all<SubmissionRow>();
   return result.results;
 }
+export async function findValidatedSubmissions(db: D1Database, limit: number): Promise<SubmissionRow[]> {
+  const result = await db
+    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE state = ? ORDER BY updated_at, submission_id LIMIT ?")
+    .bind("validated", limit)
+    .all<SubmissionRow>();
+  return result.results;
+}
+
 export async function findStagedSubmissions(db: D1Database, limit: number): Promise<SubmissionRow[]> {
   const result = await db
     .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE state IN (?,?) ORDER BY updated_at, submission_id LIMIT ?")

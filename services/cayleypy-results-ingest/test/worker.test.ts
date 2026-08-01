@@ -111,6 +111,7 @@ function customBindings(
     queue?: Queue;
     bucket?: R2Bucket;
     rateLimit?: { limit(input: { key: string }): Promise<{ success: boolean }> };
+    writer?: { getByName(name: string): { enqueueValidated(submissionId: string): Promise<void> } };
   } = {},
 ): WorkerEnv {
   const value: WorkerEnv = {
@@ -120,6 +121,7 @@ function customBindings(
   };
   if (mode !== undefined) value.INGEST_MODE = mode;
   if (options.rateLimit) value.INGEST_RATE_LIMIT = options.rateLimit;
+  if (options.writer) value.GITHUB_WRITER = options.writer;
   return value;
 }
 
@@ -220,7 +222,7 @@ function controller(scheduledTime = Date.now()): ScheduledController {
 
 async function seedSubmission(
   index: number,
-  state: "received" | "queued" | "retryable" | "dead_letter" | "staged",
+  state: "received" | "queued" | "retryable" | "dead_letter" | "staged" | "validated",
   updatedAt: string,
   safeError: string | null = "stale_error",
   retryCount = 0,
@@ -700,6 +702,19 @@ describe("Cloudflare binding plus load-bearing bounded D1 rate limits", () => {
 });
 
 describe("mode-gated scheduled recovery", () => {
+  test("normal schedule re-enqueues legacy validated rows to the serialized writer", async () => {
+    const submissionId = await seedSubmission(701, "validated", "2000-01-01T00:00:00.000Z", null);
+    const enqueued: string[] = [];
+    const writer = { getByName: () => ({ enqueueValidated: async (id: string) => { enqueued.push(id); } }) };
+
+    await scheduled(controller(), customBindings("normal", { writer }), context());
+
+    expect(enqueued).toEqual([submissionId]);
+    expect(await env.RESULTS_DB.prepare(
+      "SELECT state FROM submissions WHERE submission_id = ?",
+    ).bind(submissionId).first<string>("state")).toBe("validated");
+  });
+
   test("normal schedule removes committed staged rows from R2 and D1", async () => {
     const submissionId = await seedSubmission(700, "staged", "2000-01-01T00:00:00.000Z", null);
     const row = await env.RESULTS_DB.prepare(
