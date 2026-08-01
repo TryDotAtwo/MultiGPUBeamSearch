@@ -36,6 +36,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ninja-build cuda-compiler-12-8 cuda-nvcc-12-8 cuda-cudart-dev-12-8 cuda-nvtx-12-8 libnccl2 libnccl-dev
           python3 -m pip install zstandard==0.23.0
+          echo "/usr/local/cuda-12.8/bin" >> "$GITHUB_PATH"
           git clone --depth 1 --branch v3.6.0 https://github.com/NVIDIA/cutlass.git external/cutlass
       - name: Require pinned CUDA toolchain
         run: |

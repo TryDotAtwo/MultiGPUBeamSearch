@@ -78,3 +78,7 @@ def test_release_invokes_package_tools_as_modules():
     text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
     assert "python3 -m tools.build_megaminx_native_release" in text
     assert "python3 -m tools.check_megaminx_native_archive" in text
+
+def test_release_exposes_cuda_binary_directory_to_later_steps():
+    text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
+    assert 'echo "/usr/local/cuda-12.8/bin" >> "$GITHUB_PATH"' in text
