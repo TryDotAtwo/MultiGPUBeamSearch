@@ -224,5 +224,16 @@
                                                                        }
                                                       }
                                            }
-                 }
+                 },
+    "maximum_validated_beam":  {
+                                   "output_move_count":  134217728
+                               },
+    "maximum_validated_beam_evidence":  {
+                                            "output_move_count":  {
+                                                                      "source":  "private transformer ceiling sweep",
+                                                                      "status":  "pending",
+                                                                      "anchor":  26,
+                                                                      "note":  "Temporary private envelope; public notebooks stay pinned to cec7400."
+                                                                  }
+                                        }
 }

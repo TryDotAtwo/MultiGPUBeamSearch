@@ -1020,3 +1020,5 @@
 - 2026-08-01: Transformer p27 probe v2 ended with DeadKernelError and no preserved runner/preflight evidence. Removed the temporary p27 maximum envelope; transformer selection remains fail-closed at the fully measured p26 anchor (67,108,864).
 
 - 2026-08-01: Repinned and regenerated the main public notebook plus four examples to cec74003f262e9d93d2fc0cc56a5e2d49a5010e0, containing explicit saturated MLP ceilings and transformer fail-closed p26. All five retain TOUCH_BFS_RADIUS=4. Full local suite: 318 passed.
+
+- 2026-08-01: Reopened an isolated transformer ceiling envelope after the user explicitly required equivalent maximum-beam handling for MLP and Transformer across all notebooks. Public pins remain on cec7400 until saturation validation.

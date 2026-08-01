@@ -577,3 +577,5 @@ User reported that an interactive game had been running during part of the recen
 - User: Так сделай профиль
 
 - User: И отдельно найди предельное значение луча и тоже сделай чтоб работало
+
+- User: Нужно это всё как для МЛП, так и для трансформера. Для всех ноутов
