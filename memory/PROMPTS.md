@@ -571,3 +571,5 @@ User reported that an interactive game had been running during part of the recen
 - 2026-08-01: User explicitly authorized pushing the capacity-safe five-notebook work to GitHub and running and testing everything end to end.
 - 2026-08-01: User requested confirmation that every profile, including 2^26, works everywhere and required the maximum reasonable touch-BFS setting in all five notebooks.
 - 2026-08-01: User explicitly required creating the missing 2^26 MLP profiles.
+
+- User: Так сделай профиль

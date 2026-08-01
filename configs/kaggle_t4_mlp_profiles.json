@@ -278,14 +278,14 @@
                                      "26":  {
                                                 "validation_status":  "bounded_from_measured",
                                                 "runtime":  {
-                                                                "b_micro":  49152,
-                                                                "stream1_concurrency":  4,
+                                                                "b_micro":  24576,
+                                                                "stream1_concurrency":  2,
                                                                 "stream3_ring_slots":  4,
                                                                 "shard_count":  64,
                                                                 "shard_capacity_scale_ppm":  1050000,
                                                                 "stream4_batch_candidates":  98304,
                                                                 "stream4_trigger_candidates":  98304,
-                                                                "stream4_active_sort_slots":  4,
+                                                                "stream4_active_sort_slots":  1,
                                                                 "final_materialize_chunk_candidates":  88064
                                                             },
                                                 "evidence":  {
@@ -294,7 +294,7 @@
                                                                  "requested_beam":  67108864,
                                                                  "effective_beam":  67108864,
                                                                  "local_beam":  33554432,
-                                                                 "note":  "Candidate p26 tuple pending current-code real 2xT4 depth-8 acceptance; capacity is derived independently."
+                                                                 "note":  "Memory-bounded p26 candidate: half-size output1 inference batch, concurrency 2, and one Stream 4 sort slot; pending current-code real 2xT4 depth-8 acceptance."
                                                              }
                                             }
                                  },
@@ -573,13 +573,13 @@
                                                           "validation_status":  "bounded_from_measured",
                                                           "runtime":  {
                                                                           "b_micro":  2048,
-                                                                          "stream1_concurrency":  4,
+                                                                          "stream1_concurrency":  2,
                                                                           "stream3_ring_slots":  4,
-                                                                          "shard_count":  64,
+                                                                          "shard_count":  32,
                                                                           "shard_capacity_scale_ppm":  1050000,
                                                                           "stream4_batch_candidates":  196608,
                                                                           "stream4_trigger_candidates":  393216,
-                                                                          "stream4_active_sort_slots":  4,
+                                                                          "stream4_active_sort_slots":  1,
                                                                           "final_materialize_chunk_candidates":  88064
                                                                       },
                                                           "evidence":  {
@@ -591,7 +591,7 @@
                                                                            "requested_beam":  67108864,
                                                                            "effective_beam":  67108864,
                                                                            "local_beam":  33554432,
-                                                                           "note":  "Older real 2xT4 p26 success; candidate pending current-code depth-8 acceptance with the capacity-safe derivation."
+                                                                           "note":  "Older real 2xT4 p26 success; memory-bounded current candidate uses 32 shards, concurrency 2, and one Stream 4 sort slot pending depth-8 acceptance."
                                                                        }
                                                       }
                                            }
