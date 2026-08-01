@@ -565,3 +565,6 @@ User reported that an interactive game had been running during part of the recen
 - User requested examples that are understandable to other users: one shared notebook contract, prefilled competition/model/puzzle configuration, and mode switching in the USER CONFIG cell.
 
 - User requested another public example matching the existing Cube4/444, Megaminx, and IHES notebooks for `cayley-py-professor-tetraminx-solve-optimally`, using the model output from Rokham's `cayleypy-cube-train-and-solve` script version `277456158`, and explicitly instructed not to use temporary artifacts prepared for GPT-5.3 Spark.
+
+- 2026-08-01: User requested checking every Kaggle 2xT4 runtime profile so shard capacity is always sufficient after an output1 p18 run failed with Stream3 double-buffer overflow code 3002.
+- 2026-08-01: User required the capacity fix to be present in all four generated public examples and the main universal notebook, with all profiles checked for sufficient memory, speed, and correctness.

@@ -106,14 +106,17 @@ def derive_runtime(
     local_beam = effective_beam // ranks
     logical_shard = (local_beam + runtime["shard_count"] - 1) // runtime["shard_count"]
     scaled_shard = (logical_shard * runtime["shard_capacity_scale_ppm"] + 999_999) // 1_000_000
-    capacity = _aligned(
-        max(
-            scaled_shard,
-            stream3_batch,
-            runtime["stream4_batch_candidates"],
-            runtime["stream4_trigger_candidates"],
-        )
+    # With double-buffered shards, a writable sibling may already contain one
+    # clean Stream4 batch plus dirty candidates just below the launch trigger.
+    # Reserve one complete incoming Stream3 batch on top of that resident set;
+    # otherwise a legal remote-receive distribution can overflow before the
+    # sibling currently in Stream4 becomes writable again.
+    double_buffer_receive_bound = (
+        stream3_batch
+        + runtime["stream4_batch_candidates"]
+        + runtime["stream4_trigger_candidates"]
     )
+    capacity = _aligned(max(scaled_shard, double_buffer_receive_bound))
     profile_power = _positive_int(profile.get("profile_power"), "profile_power")
     return RuntimePlan(
         requested_beam=requested_beam,
@@ -175,6 +178,12 @@ def serialize_preflight(
             "stream4_batch_candidates": plan.runtime["stream4_batch_candidates"],
             "stream4_trigger_candidates": plan.runtime["stream4_trigger_candidates"],
             "shard_capacity_candidates": plan.shard_capacity_candidates,
+            "double_buffer_receive_bound_candidates": _aligned(
+                plan.stream3_batch_candidates
+                + plan.runtime["stream4_batch_candidates"]
+                + plan.runtime["stream4_trigger_candidates"]
+            ),
+            "safety_formula": "align(stream3_batch + stream4_batch + stream4_trigger)",
             "alignment": 1024,
         },
         "history_budgets": {"ram_bytes": ram_budget, "disk_bytes": disk_budget},

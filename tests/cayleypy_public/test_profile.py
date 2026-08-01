@@ -36,6 +36,37 @@ def test_derive_runtime_uses_move_count_aware_parent_batching(
     assert plan.shard_capacity_candidates >= plan.runtime["stream4_trigger_candidates"]
 
 
+def test_p18_output1_capacity_covers_resident_clean_dirty_and_remote_batch() -> None:
+    profile = select_profile(REGISTRY, 2**18, output_dim=1, move_count=24)
+    plan = derive_runtime(profile, 2**18, output_dim=1, move_count=24)
+    assert plan.stream3_batch_candidates == 196_608
+    assert plan.runtime["stream4_batch_candidates"] == 98_304
+    assert plan.runtime["stream4_trigger_candidates"] == 98_304
+    assert plan.shard_capacity_candidates == 393_216
+
+
+def test_all_profiles_cover_double_buffer_worst_case_receive() -> None:
+    root = Path(__file__).resolve().parents[2]
+    for registry_name in (
+        "kaggle_t4_mlp_profiles.json",
+        "kaggle_t4_transformer_profiles.json",
+    ):
+        registry = json.loads((root / "configs" / registry_name).read_text(encoding="utf-8"))
+        for model_family, anchors in registry["profiles"].items():
+            output_dim = 1 if model_family == "output1" else 24
+            for anchor in anchors:
+                profile = select_profile(registry, 2 ** int(anchor), output_dim, 24)
+                plan = derive_runtime(profile, 2 ** int(anchor), output_dim, 24)
+                required = (
+                    plan.stream3_batch_candidates
+                    + plan.runtime["stream4_batch_candidates"]
+                    + plan.runtime["stream4_trigger_candidates"]
+                )
+                assert plan.shard_capacity_candidates >= required, (
+                    registry_name, model_family, anchor,
+                    plan.shard_capacity_candidates, required,
+                )
+
 def test_derive_runtime_marks_cross_puzzle_18_move_use() -> None:
     profile = select_profile(REGISTRY, 2**20, output_dim=1, move_count=18)
 
@@ -80,6 +111,7 @@ def test_preflight_serialization_records_evidence_budgets_and_tmp_guard() -> Non
     assert payload["alignment_delta"] == plan.alignment_delta
     assert payload["move_count"] == 24
     assert payload["capacity_derivation"]["stream3_batch_candidates"] == plan.stream3_batch_candidates
+    assert payload["capacity_derivation"]["double_buffer_receive_bound_candidates"] == 393_216
     assert payload["history_budgets"] == {
         "ram_bytes": 28 * 1024**3,
         "disk_bytes": 32 * 1024**3,
