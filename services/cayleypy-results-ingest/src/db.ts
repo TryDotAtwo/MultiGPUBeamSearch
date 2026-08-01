@@ -73,6 +73,14 @@ export async function findDeadLetters(db: D1Database, limit: number): Promise<Su
     .all<SubmissionRow>();
   return result.results;
 }
+export async function deleteStagedSubmission(db: D1Database, id: string): Promise<boolean> {
+  const result = await db
+    .prepare("DELETE FROM submissions WHERE submission_id = ? AND state IN (?,?)")
+    .bind(id, "staged", "published")
+    .run();
+  return result.meta.changes === 1;
+}
+
 export async function transition(
   db: D1Database,
   id: string,

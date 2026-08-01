@@ -10,9 +10,16 @@ export type Sha256 = string;
 export type ModelClass = "output1" | "output_move_count";
 
 export interface ModelManifestV1 {
-  state_len: number; num_classes: number; hd1: number; hd2: number; nrd: number;
-  output_dim: number; dtype: "fp16"; normalization: "batchnorm_folded" | "layernorm";
-  layout: string; batchnorm?: string; embeddingbag?: string; embedding?: string;
+  state_len: number; num_classes: number; output_dim: number; dtype: "fp16";
+  hd1?: number; hd2?: number; nrd?: number;
+  normalization?: "batchnorm_folded" | "layernorm"; layout?: string;
+  batchnorm?: string; embeddingbag?: string; embedding?: string;
+  backend?: "piece_transformer"; model_arch?: "piece_transformer";
+  move_count?: number; num_pieces?: number; max_piece_size?: number;
+  num_piece_types?: number; seq_len?: number; d_model?: number;
+  nhead?: number; head_dim?: number; num_layers?: number; ff_dim?: number;
+  activation?: string; pooling?: string; piece_layout?: string;
+  piece_embed_mode?: string; input_embedding?: string; move_names?: string[];
 }
 export interface ResultEnvelopeV1 {
   schema_version: 1;
@@ -47,7 +54,7 @@ export interface ResultEnvelopeV1 {
     b_micro: number; stream1_concurrency: number; stream3_ring_slots: number; shard_count: number;
     shard_capacity_scale_ppm: number; stream4_batch_candidates: number; stream4_trigger_candidates: number; stream4_active_sort_slots: number;
   };
-  model: { filename: string; sha256: Sha256; format: "batchnorm-folded" | "resmlp-layernorm"; manifest: ModelManifestV1 };
+  model: { filename: string; sha256: Sha256; format: "batchnorm-folded" | "resmlp-layernorm" | "piece-transformer"; manifest: ModelManifestV1 };
   hardware: { platform: string; gpu_names: string[]; accelerator_count: number; world_size: 2 };
   timings: { solve_us: number; wall_us: number };
   solver_commit: string;
@@ -73,11 +80,16 @@ export async function validateEnvelopeIntegrity(envelope: ResultEnvelopeV1): Pro
   const { proof, model, profile, orientation, solution } = envelope;
   const stateLength = model.manifest.state_len;
   if (stateLength < 1 || stateLength > MAX_LOGICAL_STATE_LENGTH) errors.push(integrityError("/model/manifest/state_len", "stateLength"));
+  const numClasses = model.manifest.num_classes;
   for (const [name, state] of [["initial_state", proof.initial_state], ["central_state", proof.central_state]] as const) {
     if (state.length !== stateLength) errors.push(integrityError(`/proof/${name}`, "stateLength"));
-    if (state.some((value) => !Number.isInteger(value) || value < 0 || value >= stateLength)) errors.push(integrityError(`/proof/${name}`, "stateClasses"));
+    if (state.some((value) => !Number.isInteger(value) || value < 0 || value >= numClasses)) errors.push(integrityError(`/proof/${name}`, "stateClasses"));
   }
-  if (model.manifest.num_classes !== stateLength) errors.push(integrityError("/model/manifest/num_classes", "stateClasses"));
+  const centralClasses = new Set(proof.central_state.filter((value) => Number.isInteger(value)));
+  if (numClasses < 1 || centralClasses.size !== numClasses ||
+      [...centralClasses].some((value) => value < 0 || value >= numClasses)) {
+    errors.push(integrityError("/model/manifest/num_classes", "stateClasses"));
+  }
   for (const [name, permutation] of Object.entries(proof.generators)) {
     if (permutation.length !== stateLength || new Set(permutation).size !== stateLength || permutation.some((value) => value < 0 || value >= stateLength)) {
       errors.push(integrityError(`/proof/generators/${name}`, "permutation"));

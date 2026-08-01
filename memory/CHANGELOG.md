@@ -1,3 +1,4 @@
+- 2026-08-01: Changed CayleyPy results ingest retention to GitHub-only persistence. Cloudflare R2/D1/Durable Object state is now a transient retry queue: after an identical pre-existing GitHub record or a successful non-force GitHub commit, the serialized writer deletes the raw R2 object, then the staged D1 row, then its pending Durable Object key. GitHub failures retain all three for retry. Targeted and full Miniflare suites pass (56 schema/config + 122 Worker tests) and TypeScript typecheck passes.
 - Added a fail-closed, one-shot GitHub App manifest bootstrap for staging.
   It verifies the fixed generated config, pinned Wrangler, Cloudflare auth,
   exact GitHub CLI user/repository admin state, and live `store_only` health;

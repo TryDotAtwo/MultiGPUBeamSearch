@@ -411,17 +411,10 @@ describe("GitHubWriter real Durable Object harness", () => {
     expect(outcome.pending).toEqual([]);
     expect(
       await env.RESULTS_DB
-        .prepare(
-          "SELECT state, safe_error, github_path, github_commit_sha FROM submissions WHERE submission_id = ?",
-        )
+        .prepare("SELECT submission_id FROM submissions WHERE submission_id = ?")
         .bind(seeded.submissionId)
         .first(),
-    ).toEqual({
-      state: "staged",
-      safe_error: null,
-      github_path: resultPath(seeded.submissionId, seeded.envelope),
-      github_commit_sha: NEW_COMMIT_SHA,
-    });
+    ).toBeNull();
     const tree = outcome.calls.find(
       (call) =>
         call.method === "POST" && call.url.pathname.endsWith("/git/trees"),
@@ -448,7 +441,7 @@ describe("GitHubWriter real Durable Object harness", () => {
       "POST /repos/TryDotAtwo/cayleypy-beam-results/git/commits",
       "PATCH /repos/TryDotAtwo/cayleypy-beam-results/git/refs/heads/ingest/staging",
     ]);
-    expect(await env.RAW_RESULTS.get(seeded.rawKey)).not.toBeNull();
+    expect(await env.RAW_RESULTS.get(seeded.rawKey)).toBeNull();
   });
 
   test("reconciles identical remote content without a GitHub write", async () => {
@@ -458,12 +451,11 @@ describe("GitHubWriter real Durable Object harness", () => {
     expect(outcome.pending).toEqual([]);
     expect(
       await env.RESULTS_DB
-        .prepare(
-          "SELECT state, github_commit_sha FROM submissions WHERE submission_id = ?",
-        )
+        .prepare("SELECT submission_id FROM submissions WHERE submission_id = ?")
         .bind(seeded.submissionId)
         .first(),
-    ).toEqual({ state: "staged", github_commit_sha: HEAD_SHA });
+    ).toBeNull();
+    expect(await env.RAW_RESULTS.get(seeded.rawKey)).toBeNull();
     expect(
       outcome.calls.some(
         (call) =>
@@ -535,7 +527,8 @@ test(
         .prepare("SELECT state FROM submissions WHERE submission_id = ?")
         .bind(seeded.submissionId)
         .first(),
-    ).toMatchObject({ state: "staged" });
+    ).toBeNull();
+    expect(await env.RAW_RESULTS.get(seeded.rawKey)).toBeNull();
   },
   15_000,
 );
@@ -560,4 +553,12 @@ test("transient alarm failure forcibly leaves a future alarm", async () => {
       async (_instance, state) => state.storage.getAlarm(),
     ),
   ).not.toBeNull();
+  expect(
+    await env.RESULTS_DB
+      .prepare("SELECT state FROM submissions WHERE submission_id = ?")
+      .bind(seeded.submissionId)
+      .first(),
+  ).toEqual({ state: "validated" });
+  expect(await env.RAW_RESULTS.get(seeded.rawKey)).not.toBeNull();
+  expect(await pending("retry-alarm")).toEqual([pendingKey(seeded.submissionId)]);
 });

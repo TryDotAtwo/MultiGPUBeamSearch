@@ -76,13 +76,8 @@
       "required": [
         "state_len",
         "num_classes",
-        "hd1",
-        "hd2",
-        "nrd",
         "output_dim",
-        "dtype",
-        "normalization",
-        "layout"
+        "dtype"
       ],
       "properties": {
         "state_len": {
@@ -129,6 +124,75 @@
         "embedding": {
           "type": "string",
           "maxLength": 256
+        },
+        "backend": {
+          "const": "piece_transformer"
+        },
+        "model_arch": {
+          "const": "piece_transformer"
+        },
+        "move_count": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "num_pieces": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "max_piece_size": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "num_piece_types": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "seq_len": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "d_model": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "nhead": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "head_dim": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "num_layers": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "ff_dim": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "activation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "pooling": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "piece_layout": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "piece_embed_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "input_embedding": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "move_names": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/move_token"
+          }
         }
       }
     },
@@ -548,7 +612,8 @@
             "format": {
               "enum": [
                 "batchnorm-folded",
-                "resmlp-layernorm"
+                "resmlp-layernorm",
+                "piece-transformer"
               ]
             },
             "manifest": {

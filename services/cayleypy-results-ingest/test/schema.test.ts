@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import canonicalGolden from "../../../configs/cayleypy_results_v1_golden.json";
 import { validateBatch, validateEnvelopeIntegrity, type ResultEnvelopeV1 } from "../src/schema.js";
 
+import { canonicalJson, computeIdempotency, sha256Hex } from "../src/ids.js";
 const clone = (value: object): ResultEnvelopeV1 => structuredClone(value) as ResultEnvelopeV1;
 
 describe("canonical CayleyPy results v1 schema", () => {
@@ -76,6 +77,54 @@ describe("canonical CayleyPy results v1 schema", () => {
     expect(await validateEnvelopeIntegrity(envelope)).toContainEqual({ path: "/model/manifest/output_dim", keyword: "modelHead" });
   });
 
+
+
+  test("accepts a piece Transformer manifest whose class alphabet is smaller than state length", async () => {
+    const envelope = clone(canonicalGolden.cases[2].envelope);
+    const state = [0, 1, 0];
+    const identity = [0, 1, 2];
+    envelope.proof.initial_state = state;
+    envelope.proof.central_state = state;
+    envelope.proof.generators = { clockwise: identity, counterclockwise: identity };
+    envelope.proof.initial_state_sha256 = await sha256Hex(canonicalJson(state));
+    envelope.proof.central_state_sha256 = await sha256Hex(canonicalJson(state));
+    envelope.proof.generators_sha256 = await sha256Hex(canonicalJson(envelope.proof.generators));
+    envelope.proof.reached_state_sha256 = await sha256Hex(canonicalJson(state));
+    envelope.model = {
+      ...envelope.model,
+      format: "piece-transformer",
+      manifest: {
+        backend: "piece_transformer",
+        model_arch: "piece_transformer",
+        state_len: 3,
+        num_classes: 2,
+        move_count: 2,
+        output_dim: 2,
+        num_pieces: 2,
+        max_piece_size: 2,
+        num_piece_types: 1,
+        seq_len: 3,
+        d_model: 32,
+        nhead: 4,
+        head_dim: 8,
+        num_layers: 2,
+        ff_dim: 64,
+        activation: "relu",
+        pooling: "cls",
+        piece_layout: "test",
+        piece_embed_mode: "piece_local",
+        input_embedding: "fast_slot_projected",
+        move_names: ["clockwise", "counterclockwise"],
+        dtype: "fp16",
+      },
+    };
+    envelope.idempotency_key = await computeIdempotency(envelope);
+
+    const batch = validateBatch({ schema_version: 1, results: [envelope] });
+    if (!batch.ok) throw new Error(JSON.stringify(batch.errors));
+    expect(batch.ok).toBe(true);
+    expect(await validateEnvelopeIntegrity(envelope)).toEqual([]);
+  });
   test("rejects batches above the hard four MiB ingress bound", () => {
     const result = validateBatch({ schema_version: 1, results: [canonicalGolden.cases[0].envelope] }, 4 * 1024 * 1024 + 1);
     expect(result).toEqual({ ok: false, errors: [{ path: "", keyword: "maxBytes" }] });

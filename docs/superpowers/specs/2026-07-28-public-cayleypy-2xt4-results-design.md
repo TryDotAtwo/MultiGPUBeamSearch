@@ -7,7 +7,7 @@ Status: approved design, pending written-spec review
 
 Deliver a public, copy-and-run Kaggle notebook for standard CayleyPy permutation-puzzle competitions on exactly two NVIDIA T4 GPUs. A user attaches the standard `puzzle_info.json`, `test.csv`, and `sample_submission.csv`, supplies one supported MLP checkpoint, chooses a puzzle range and search modes, and runs the existing MultiGPUBeamSearch solver.
 
-Validated results are also submitted best-effort to a public Cloudflare ingestion service. The service must safely accept at least 100 concurrent notebook publishers, preserve every accepted raw payload, validate solutions, retain authorship and run provenance, and publish append-only result records to `TryDotAtwo/cayleypy-beam-results` without exposing a GitHub write token.
+Validated results are also submitted best-effort to a public Cloudflare ingestion service. The service must safely accept at least 100 concurrent notebook publishers, preserve every accepted raw payload only until a confirmed GitHub commit, validate solutions, retain authorship and run provenance in GitHub, and publish append-only result records to `TryDotAtwo/cayleypy-beam-results` without exposing a GitHub write token.
 
 The work is split into two independently testable deliverables:
 
@@ -175,8 +175,8 @@ Field and payload sizes are bounded. Unknown fields are rejected at the public A
 ### 9.1 Components
 
 - Cloudflare Worker: HTTPS API, schema/size validation, rate limiting, idempotency lookup, and immediate receipt.
-- R2: immutable raw request and validation artifacts; source of recovery if later stages fail.
-- D1: submission state machine, idempotency keys, author/run/puzzle indexes, validation outcome, GitHub publication state, and retry counters.
+- R2: temporary immutable transport payload; source of recovery only until GitHub confirms the record commit, then deleted.
+- D1: temporary submission state machine and retry metadata; the successful GitHub writer deletes the row after deleting its R2 object.
 - Cloudflare Queue: at-least-once validation and publication work.
 - Dead-letter queue: exhausted work retained for operator replay.
 - Durable Object GitHub Writer: serializes repository mutations and batches validated records.
@@ -203,7 +203,7 @@ The Worker scheduled handler is a strict no-op unless the resolved mode is `norm
 
 Queue backlog delivery resolves `INGEST_MODE` before inspecting the message body. For every non-`normal` mode, including missing/unknown values, it parses only `submission_id` and conditionally parks D1 `received|queued|retryable -> retryable` with `safe_error=ingest_paused`, unchanged `retry_count`, refreshed `updated_at`, and the raw R2 reference untouched. It rereads and verifies that durable park, then ACKs; a successful park never calls `message.retry()` and therefore consumes no Cloudflare `max_retries` attempt. Before that ACK it performs no R2 read, replay, publisher enqueue, token/GitHub access, payload log, or raw-mode log. A duplicate delivery repeats the same idempotent D1 park and still leaves one row. A D1 exception or unverifiable transition is not ACKed and follows the platform retry/exhaustion path; the unchanged stale row remains recoverable. When mode returns to `normal`, scheduled recovery resends the same parked `retryable` id, and it also rescues a stale `queued` row left after park failures exhausted Queue delivery.
 
-At-least-once delivery cannot duplicate published results because D1 and repository paths use the deterministic idempotency key/submission id. R2 raw payloads and DLQ make accepted work recoverable even during GitHub, DNS, Queue, or consumer outages.
+At-least-once delivery cannot duplicate GitHub records because repository paths use the deterministic submission id and normalized GitHub data retains the idempotency key. R2, D1, Queue/DLQ, and Durable Object state are transient recovery mechanisms: they are retained during GitHub, DNS, Queue, or consumer outages, but the writer deletes the R2 object, D1 row, and pending Durable Object key after a confirmed GitHub commit. GitHub is the only long-term store.
 
 ### 9.4 Abuse controls
 

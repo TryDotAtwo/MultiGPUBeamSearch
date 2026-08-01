@@ -1,3 +1,4 @@
+- User clarified the durable results contract: do not retain a raw full archive; GitHub is the only persistent storage. Cloudflare must keep data only while publication is pending, delete R2/D1/Durable Object state after confirmed GitHub commit, and retain it on GitHub failure for retry.
 - User authorized implementing and publishing all remaining non-beam work,
   including the GitHub App/Cloudflare bootstrap; only beam-search/CUDA
   architecture changes still require separate agreement.
