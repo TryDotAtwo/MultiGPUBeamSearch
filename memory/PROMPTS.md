@@ -570,3 +570,4 @@ User reported that an interactive game had been running during part of the recen
 - 2026-08-01: User required the capacity fix to be present in all four generated public examples and the main universal notebook, with all profiles checked for sufficient memory, speed, and correctness.
 - 2026-08-01: User explicitly authorized pushing the capacity-safe five-notebook work to GitHub and running and testing everything end to end.
 - 2026-08-01: User requested confirmation that every profile, including 2^26, works everywhere and required the maximum reasonable touch-BFS setting in all five notebooks.
+- 2026-08-01: User explicitly required creating the missing 2^26 MLP profiles.

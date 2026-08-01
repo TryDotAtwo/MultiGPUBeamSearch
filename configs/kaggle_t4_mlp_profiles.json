@@ -274,6 +274,28 @@
                                                                  "shard_capacity_candidates":  275456,
                                                                  "log_path":  "/kaggle/working/depth8_output1_p25_sh64_b49152_1.log"
                                                              }
+                                            },
+                                     "26":  {
+                                                "validation_status":  "bounded_from_measured",
+                                                "runtime":  {
+                                                                "b_micro":  49152,
+                                                                "stream1_concurrency":  4,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  64,
+                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  4,
+                                                                "final_materialize_chunk_candidates":  88064
+                                                            },
+                                                "evidence":  {
+                                                                 "source":  "output1 p25 measured tuple",
+                                                                 "anchor":  25,
+                                                                 "requested_beam":  67108864,
+                                                                 "effective_beam":  67108864,
+                                                                 "local_beam":  33554432,
+                                                                 "note":  "Candidate p26 tuple pending current-code real 2xT4 depth-8 acceptance; capacity is derived independently."
+                                                             }
                                             }
                                  },
                      "output_move_count":  {
@@ -545,6 +567,31 @@
                                                                            "local_beam":  16777216,
                                                                            "shard_capacity_candidates":  550912,
                                                                            "log_path":  "/kaggle/working/depth8_output_move_count_p25_sh32_b2048_0.log"
+                                                                       }
+                                                      },
+                                               "26":  {
+                                                          "validation_status":  "bounded_from_measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  4,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  64,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  196608,
+                                                                          "stream4_trigger_candidates":  393216,
+                                                                          "stream4_active_sort_slots":  4,
+                                                                          "final_materialize_chunk_candidates":  88064
+                                                                      },
+                                                          "evidence":  {
+                                                                           "source":  "trydotatwo/cayley-beam-gpu-runner",
+                                                                           "kernel_version":  120,
+                                                                           "config_id":  "beam2p26_output_move_count_sh64_b2048_c4",
+                                                                           "depth":  20,
+                                                                           "elapsed_sec":  262.961,
+                                                                           "requested_beam":  67108864,
+                                                                           "effective_beam":  67108864,
+                                                                           "local_beam":  33554432,
+                                                                           "note":  "Older real 2xT4 p26 success; candidate pending current-code depth-8 acceptance with the capacity-safe derivation."
                                                                        }
                                                       }
                                            }
