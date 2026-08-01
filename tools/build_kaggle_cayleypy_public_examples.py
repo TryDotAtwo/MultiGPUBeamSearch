@@ -62,6 +62,7 @@ EXAMPLES: dict[str, dict[str, Any]] = {
         "model_root": "/kaggle/input/cayleypy-cube-train-and-solve/cayleypy-cube",
         "model_download": None,
         "checkpoint_glob": "p888-t000_1765097793_e01024.pth",
+        "discover_model_root_from_checkpoint": True,
         "metadata": "logs/model_p888-t000_1765097793.json",
         "generators": "generators/p888.json",
         "output_dim": 1,
@@ -88,8 +89,17 @@ def config(spec: dict[str, Any], *, solution_mode: str = "first", slug: str | No
         raise ValueError(f"unsupported solution mode: {solution_mode}")
     checkpoint_glob = spec.get("checkpoint_glob")
     if checkpoint_glob:
-        checkpoint = (f'MODEL_ROOT = Path("{root}")\n'
-                      f'CHECKPOINT_PATH = next(iter(sorted(MODEL_ROOT.rglob("{checkpoint_glob}"))))')
+        if spec.get("discover_model_root_from_checkpoint"):
+            checkpoint = (
+                f'_CHECKPOINT_MATCHES = sorted(Path("/kaggle/input").rglob("{checkpoint_glob}"))\n'
+                f'if len(_CHECKPOINT_MATCHES) != 1:\n'
+                f'    raise RuntimeError("expected exactly one {checkpoint_glob} under /kaggle/input; "\n'
+                f'                       f"observed={{_CHECKPOINT_MATCHES!r}}")\n'
+                f'CHECKPOINT_PATH = _CHECKPOINT_MATCHES[0]\n'
+                f'MODEL_ROOT = CHECKPOINT_PATH.parent.parent')
+        else:
+            checkpoint = (f'MODEL_ROOT = Path("{root}")\n'
+                          f'CHECKPOINT_PATH = next(iter(sorted(MODEL_ROOT.rglob("{checkpoint_glob}"))))')
     else:
         checkpoint = (f'MODEL_ROOT = Path("{root}")\n'
                      f'if not any([*MODEL_ROOT.rglob("*.pth"), *MODEL_ROOT.rglob("*.pt")]):\n'

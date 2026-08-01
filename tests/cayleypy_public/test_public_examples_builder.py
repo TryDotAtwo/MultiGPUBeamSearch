@@ -38,8 +38,10 @@ def test_tetraminx_example_pins_rokham_p888_epoch_1024_artifacts(tmp_path: Path)
     ]
     assert metadata["dataset_sources"] == []
     assert metadata["model_sources"] == []
-    assert 'Path("/kaggle/input/cayleypy-cube-train-and-solve/cayleypy-cube")' in config
-    assert 'rglob("p888-t000_1765097793_e01024.pth")' in config
+    assert 'Path("/kaggle/input").rglob("p888-t000_1765097793_e01024.pth")' in config
+    assert "if len(_CHECKPOINT_MATCHES) != 1:" in config
+    assert "CHECKPOINT_PATH = _CHECKPOINT_MATCHES[0]" in config
+    assert "MODEL_ROOT = CHECKPOINT_PATH.parent.parent" in config
     assert (
         'CHECKPOINT_METADATA_JSON = MODEL_ROOT / "logs" / '
         '"model_p888-t000_1765097793.json"'
