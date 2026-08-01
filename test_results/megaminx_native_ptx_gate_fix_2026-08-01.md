@@ -8,3 +8,5 @@
 - GREEN: `tests/portable/test_megaminx_native_release.py` reached `19 passed, 1 skipped`.
 - Environment note: the local Windows pytest process did not exit after reporting completion and was terminated by the 120-second command timeout.
 - Required final gate: GitHub-hosted CUDA archive build and checker for all six native SM targets.
+- Root build fix: use `-DBEAM_CUDA_ARCHITECTURES=${sm}-real`; the unsuffixed CMake architecture emitted virtual PTX by design.
+- Workflow contract: `11 passed` before the local pytest teardown timeout.

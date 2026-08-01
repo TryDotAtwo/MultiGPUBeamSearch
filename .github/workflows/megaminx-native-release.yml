@@ -45,7 +45,7 @@ jobs:
       - name: Build one native cubin target
         run: |
           set -euo pipefail
-          cmake -S . -B "build-sm${{ matrix.sm }}" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBEAM_CUDA_ARCHITECTURES=${{ matrix.sm }} -DCMAKE_CUDA_FLAGS="--cudart=shared"
+          cmake -S . -B "build-sm${{ matrix.sm }}" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBEAM_CUDA_ARCHITECTURES=${{ matrix.sm }}-real -DCMAKE_CUDA_FLAGS="--cudart=shared"
           cmake --build "build-sm${{ matrix.sm }}" --target production_runner
       - name: Stage compiler-free payload
         run: |

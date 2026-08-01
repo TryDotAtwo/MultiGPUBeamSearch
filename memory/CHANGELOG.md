@@ -770,3 +770,4 @@
 - 2026-08-01: Made the separate native-cluster branch publish a stable `megaminx-native-cluster-latest` prerelease on branch push, enabling clean first-use cluster setup from one precompiled per-SM download without Git or compilation.
 - 2026-08-01: Moved native archive compilation from an unavailable self-hosted runner to GitHub-hosted Ubuntu 22.04 with pinned CUDA 12.8, NCCL, CUTLASS v3.6.0, and Ninja so clean-cluster assets can be produced without cluster-side compilation.
 - 2026-08-01: Corrected the native-image gate to distinguish an empty `cuobjdump` PTX listing header from an actual PTX payload while still rejecting PTX files, `compute_*` images, and `ptxas` evidence.
+- 2026-08-01: Changed native archive compilation to CMake `${sm}-real` architectures so release binaries contain only target SASS and no virtual PTX fallback.
