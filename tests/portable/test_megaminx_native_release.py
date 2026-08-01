@@ -47,7 +47,12 @@ def test_cuda_gate_accepts_exactly_one_sm_without_ptx():
     assert inspect_cuda_image_text("arch = sm_90\n", 90) == (90,)
 
 
-@pytest.mark.parametrize("text", ["arch = sm_80\narch = sm_90", "arch = sm_90\nptxas", "arch = compute_90", "arch = sm_80"])
+def test_cuda_gate_accepts_empty_ptx_listing_header():
+    listing = "Fatbin elf code:\narch = sm_80\nFatbin ptx code:\n"
+    assert inspect_cuda_image_text(listing, 80) == (80,)
+
+
+@pytest.mark.parametrize("text", ["arch = sm_80\narch = sm_90", "arch = sm_90\nptxas", "arch = compute_90", "arch = sm_90\nPTX file 1: kernel.ptx", "arch = sm_80"])
 def test_cuda_gate_rejects_multiple_ptx_or_wrong_sm(text):
     with pytest.raises(ValueError):
         inspect_cuda_image_text(text, 90)
