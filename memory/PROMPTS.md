@@ -437,3 +437,14 @@
   must not silently fall back.
 - After independent validation, send results to the repository's Cloudflare
   Worker and let it publish under the GitHub SLURM v2 namespace.
+
+## 2026-08-01 вЂ” Native cluster profile autotuner
+
+- User requested a separate cluster-side profile picker that automatically
+  tunes all settings and will first be tested on 8x A100 40 GB.
+- The tuner must search from the maximum stable beam down to 30,000,000 within
+  a six-hour budget, using adaptive successive halving and a packaged
+  three-puzzle calibration set.
+- The tuner must also select the touch-BFS boundary radius automatically,
+  explicitly accounting for the multiplicative `move_count ** radius` growth
+  at every step.
