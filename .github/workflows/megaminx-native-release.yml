@@ -74,7 +74,7 @@ jobs:
           set -euo pipefail
           python3 -m tools.build_megaminx_native_release --stage "dist/stage-sm${{ matrix.sm }}" --output dist --sm ${{ matrix.sm }} --metadata "dist/sm${{ matrix.sm }}.json"
           python3 -m tools.check_megaminx_native_archive "dist/megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst" --sm ${{ matrix.sm }}
-          sha256sum "dist/megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst" > "dist/megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst.sha256"
+          (cd dist && sha256sum "megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst" > "megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst.sha256")
       - uses: actions/upload-artifact@v4
         with:
           name: megaminx-sm${{ matrix.sm }}-linux-x86_64

@@ -774,3 +774,4 @@
 - 2026-08-01: Allowed the explicit `cuobjdump` absence diagnostic `No PTX file found`; actual numbered PTX records remain forbidden.
 - 2026-08-01: Removed GitHub build RPATH and mapped C++/CUDA source paths to `.` so native public ELF payloads contain no private runner paths.
 - 2026-08-01: Bound `GH_REPO` in the checkout-free prerelease job so verified native artifacts can be uploaded to the stable release tag.
+- 2026-08-01: Made published `.sha256` sidecars record archive basenames, so `sha256sum -c` works directly after a clean two-file download.
