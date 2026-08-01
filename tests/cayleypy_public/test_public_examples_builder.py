@@ -61,6 +61,7 @@ def test_all_public_examples_share_the_universal_contract(tmp_path: Path) -> Non
                 assert not cell["outputs"]
         config = _source(notebook, "config")
         assert "BEAM_WIDTH = 2**16" in config
+        assert 'SOLVER_COMMIT = "6d4471c4ab03c528fd7ce1e15c0cc9db11774833"' in config
         assert f'PUZZLE_ID_START = {spec["puzzle_id"]}' in config
         assert f'PUZZLE_ID_END = {spec["puzzle_id"]}' in config
         assert 'SOLUTION_MODE = "first"' in config
