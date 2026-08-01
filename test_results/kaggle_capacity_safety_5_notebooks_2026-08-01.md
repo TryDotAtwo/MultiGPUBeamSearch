@@ -34,3 +34,18 @@ The isolated ingest worktree at commit `7b0cab2` already contains transformer-ma
 - Wrangler 4.115.0 staging dry-run: passed.
 
 The live deploy was not performed because this non-interactive session has no `CLOUDFLARE_API_TOKEN`. Wrangler stopped before mutation. A staging deploy of the already-tested ingest revision is required before repeating Cube 4x4 publication and expecting HTTP 202.
+
+## Touch-BFS radius 4 rerun
+
+All five published notebooks were regenerated with `TOUCH_BFS_RADIUS=4`. The universal landing v8 completed with the expected setup-only contract. All four configured examples completed successfully on 2xT4:
+
+| Notebook | Version | Solve | Wall | Capacity | Publish |
+|---|---:|---:|---:|---:|---|
+| Cube 4x4 | 47 | 8.565 s | 184.235 s | 51,200 | endpoint temporarily unavailable |
+| Megaminx | 10 | 7.082 s | 158.989 s | 393,216 | HTTP 202 |
+| IHES | 8 | 6.146 s | 144.605 s | 393,216 | HTTP 202 |
+| Professor Tetraminx | 7 | 6.120 s | 145.490 s | 393,216 | HTTP 202 |
+
+Each run recorded `touch_bfs_radius=4` in `run_summary.json`; focused log scans found no code 3002, overflow, OOM, traceback, or fatal error. Cube 4x4 retained a valid local solution while its best-effort external publisher reported a retryable unavailable endpoint without an HTTP response.
+
+The backend ceiling is now explicit and fail-closed: both MLP families are measured through `2**25`; piece Transformer is measured through `2**26`. An MLP request above its measured maximum raises before runtime-profile derivation instead of silently reusing p25.
