@@ -146,12 +146,15 @@ export async function validateBatchIntegrity(results: readonly ResultEnvelopeV1[
   return all.flatMap((errors, index) => errors.map((error) => ({ path: `/results/${index}${error.path}`, keyword: error.keyword })));
 }
 
-export function validateBatch(value: unknown, rawByteLength?: number): ValidationResult {
+export function validateBatch(
+  value: unknown, rawByteLength?: number,
+  maxBytes = MAX_SERIALIZED_BATCH_BYTES,
+): ValidationResult {
   let length = rawByteLength;
   if (length === undefined) {
     try { length = byteLength(value); } catch { return { ok: false, errors: [integrityError("", "serialization")] }; }
   }
-  if (length === undefined || length > MAX_SERIALIZED_BATCH_BYTES) return { ok: false, errors: [integrityError("", "maxBytes")] };
+  if (length === undefined || length > maxBytes) return { ok: false, errors: [integrityError("", "maxBytes")] };
   if (!isResultBatchV1(value)) return { ok: false, errors: (validate.errors ?? []).map((error) => ({ path: error.instancePath, keyword: error.keyword })) };
   return { ok: true, value };
 }

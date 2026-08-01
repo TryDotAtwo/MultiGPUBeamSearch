@@ -1,3 +1,5 @@
+- 2026-08-01: User required one compressed archive and one Cloudflare request per notebook run; if a compressed archive exceeds 32 MiB, split it and process the parts sequentially.
+
 - User clarified the durable results contract: do not retain a raw full archive; GitHub is the only persistent storage. Cloudflare must keep data only while publication is pending, delete R2/D1/Durable Object state after confirmed GitHub commit, and retain it on GitHub failure for retry.
 - User authorized implementing and publishing all remaining non-beam work,
   including the GitHub App/Cloudflare bootstrap; only beam-search/CUDA

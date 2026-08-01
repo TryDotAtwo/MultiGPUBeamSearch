@@ -356,11 +356,10 @@ describe("fail-closed modes and bounded request parsing", () => {
     expect(parsed.errors.every((error) => Object.keys(error).sort().join(",") === "keyword,path")).toBe(true);
   });
 
-  test("enforces at most 100 envelopes", async () => {
+  test("accepts 101 envelopes after the archive batch-cap increase", async () => {
     const response = await postJson(resultBatch(...Array.from({ length: 101 }, (_, index) => index)), bindings());
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error: "invalid_schema" });
-    expect(await rowCount()).toBe(0);
+    expect(response.status).toBe(202);
+    expect(await rowCount()).toBe(101);
   });
 });
 
@@ -925,4 +924,25 @@ describe("concurrency and early-reject regression gates", () => {
     expect(await env.RESULTS_DB.prepare("SELECT count FROM ingest_rate_limits WHERE scope = ?")
       .bind("global").first<number>("count")).toBe(GLOBAL_ENVELOPES_PER_MINUTE);
   });
+});
+
+test("accepts 101 results in one bounded gzip archive request", async () => {
+  const payload = JSON.stringify(uniqueResultBatch(101));
+  const compressed = await new Response(
+    new Blob([payload]).stream().pipeThrough(new CompressionStream("gzip")),
+  ).arrayBuffer();
+  const response = await fetchRequest(
+    postRequest(compressed, "application/gzip", {
+      "content-length": String(compressed.byteLength),
+      "x-cayleypy-archive-index": "0",
+      "x-cayleypy-archive-count": "1",
+      "x-cayleypy-result-count": "101",
+    }),
+    bindings(),
+    context(),
+  );
+
+  expect(response.status).toBe(202);
+  const body = await response.json() as { receipts: unknown[] };
+  expect(body.receipts).toHaveLength(101);
 });

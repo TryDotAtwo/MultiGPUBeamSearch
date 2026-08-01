@@ -23,7 +23,9 @@ export interface WorkerEnv extends IngestEnv {
 }
 
 export const MAX_REQUEST_BYTES = MAX_SERIALIZED_BATCH_BYTES;
-export const MAX_RESULTS_PER_REQUEST = 100;
+export const MAX_ARCHIVE_REQUEST_BYTES = 32 * 1024 * 1024;
+export const MAX_RESULTS_PER_REQUEST = 2_000;
+export const MAX_DECOMPRESSED_ARCHIVE_BYTES = 64 * 1024 * 1024;
 export const PER_IP_REQUESTS_PER_MINUTE = 30;
 export const PER_IP_STATUS_REQUESTS_PER_MINUTE = 30;
 /** Fixed D1 scope cardinality; distinct public IPs can share a status budget. */
@@ -74,14 +76,18 @@ function declaredBodyLength(request: Request): number | null {
   return length;
 }
 
-async function readBoundedText(request: Request): Promise<{ text: string; rawByteLength: number }> {
-  const declared = declaredBodyLength(request);
-  if (declared !== null && declared > MAX_REQUEST_BYTES) {
+async function readBoundedText(
+  request: Request,
+  maxBytes = MAX_REQUEST_BYTES,
+  stream: ReadableStream<Uint8Array> | null = request.body,
+  declared: number | null = declaredBodyLength(request),
+): Promise<{ text: string; rawByteLength: number }> {
+  if (declared !== null && declared > maxBytes) {
     throw new SafeHttpError(413, "request_too_large");
   }
 
-  if (request.body === null) return { text: "", rawByteLength: 0 };
-  const reader = request.body.getReader();
+  if (stream === null) return { text: "", rawByteLength: 0 };
+  const reader = stream.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let text = "";
   let total = 0;
@@ -95,7 +101,7 @@ async function readBoundedText(request: Request): Promise<{ text: string; rawByt
       }
       if (chunk.done) break;
       total += chunk.value.byteLength;
-      if (total > MAX_REQUEST_BYTES) {
+      if (total > maxBytes) {
         try { await reader.cancel(); } catch { /* Best-effort cancellation after the hard bound. */ }
         throw new SafeHttpError(413, "request_too_large");
       }
@@ -121,13 +127,27 @@ async function readBoundedText(request: Request): Promise<{ text: string; rawByt
 }
 
 async function parseBatch(request: Request): Promise<{ value: ResultEnvelopeV1[]; rawByteLength: number } | Response> {
-  if (mediaType(request) !== "application/json") {
+  const type = mediaType(request);
+  if (type !== "application/json" && type !== "application/gzip") {
     return errorResponse(415, "unsupported_media_type");
   }
 
   let body: { text: string; rawByteLength: number };
   try {
-    body = await readBoundedText(request);
+    if (type === "application/json") {
+      body = await readBoundedText(request);
+    } else {
+      const declared = declaredBodyLength(request);
+      if (declared !== null && declared > MAX_ARCHIVE_REQUEST_BYTES) {
+        throw new SafeHttpError(413, "request_too_large");
+      }
+      if (request.body === null) {
+        body = { text: "", rawByteLength: 0 };
+      } else {
+        const decompressed = request.body.pipeThrough(new DecompressionStream("gzip"));
+        body = await readBoundedText(request, MAX_DECOMPRESSED_ARCHIVE_BYTES, decompressed, null);
+      }
+    }
   } catch (error) {
     if (error instanceof SafeHttpError) return errorResponse(error.status, error.code);
     return errorResponse(400, "invalid_body");
@@ -141,7 +161,7 @@ async function parseBatch(request: Request): Promise<{ value: ResultEnvelopeV1[]
   } finally {
     body.text = "";
   }
-  const validation = validateBatch(parsed, body.rawByteLength);
+  const validation = validateBatch(parsed, body.rawByteLength, type === "application/gzip" ? MAX_DECOMPRESSED_ARCHIVE_BYTES : MAX_REQUEST_BYTES);
   if (!validation.ok) {
     return jsonResponse({ error: "invalid_schema", errors: validation.errors }, 400);
   }
