@@ -282,3 +282,6 @@ def publish_existing(run_dir: Path, url: str) -> PublishResult:
     envelopes = [build_result_envelope(context, {**item, "puzzle_id": validated["puzzle_id"]}) for item in validated["results"]]
     _persist(run_dir / "publication_payload.json", {"schema_version": 2, "results": envelopes})
     return publish_batch(url, envelopes, run_dir / "publish_receipt.json")
+
+# Keep local validation identical to the Worker's documented family inference.
+from portable.megaminx_cluster.hardware_contract import validate_publish_hardware as _validate_hardware

@@ -151,6 +151,13 @@ def _new_run_dir(root: Path, puzzle: int) -> Path:
     return root / "runs" / f"p{puzzle}-{timestamp}-{uuid.uuid4().hex[:8]}"
 
 
+def default_archive_root(module_file: Path) -> Path:
+    resolved = module_file.resolve()
+    if resolved.parent.name == 'megaminx_cluster' and resolved.parent.parent.name == 'portable':
+        return resolved.parents[2]
+    return resolved.parent
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -159,7 +166,7 @@ def main(
 ) -> int:
     try:
         config = parse_args(sys.argv[1:] if argv is None else argv)
-        root = (archive_root or Path(__file__).resolve().parent).resolve()
+        root = (archive_root or default_archive_root(Path(__file__))).resolve()
         run_dir = _new_run_dir(root, config.puzzle)
         cluster = load_cluster_env(root / "cluster.env")
         command = build_sbatch_command(config, root, run_dir, cluster)

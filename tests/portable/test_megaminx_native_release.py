@@ -20,6 +20,8 @@ def stage(tmp_path: Path) -> Path:
     (root / "weights/megaminx.pt").write_bytes(b"weights")
     (root / "profiles/registry.json").write_text('{"schema_version":1,"profiles":[]}')
     (root / "scripts/job.sh").write_text("#!/usr/bin/env bash\n")
+    (root / "scripts/preflight.sh").write_text("#!/usr/bin/env bash\n")
+    (root / "README.md").write_text("Megaminx release\n")
     (root / "run.sh").write_text("#!/usr/bin/env bash\n")
     return root
 

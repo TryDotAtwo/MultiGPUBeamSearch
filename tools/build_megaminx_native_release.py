@@ -15,7 +15,7 @@ from typing import Callable, Mapping
 import zstandard
 
 ALLOWED_SMS = (75, 80, 86, 89, 90, 120)
-REQUIRED_PATHS = ("bin/production_runner", "lib", "data/test.csv", "data/puzzle_info.json", "weights", "profiles/registry.json", "scripts/job.sh", "run.sh")
+REQUIRED_PATHS = ("bin/production_runner", "lib", "data/test.csv", "data/puzzle_info.json", "weights", "profiles/registry.json", "scripts/job.sh", "scripts/preflight.sh", "run.sh", "README.md")
 FORBIDDEN_NAMES = frozenset({".env", "Dockerfile", "token.txt", "compile.sh"})
 FORBIDDEN_SUFFIXES = frozenset({".cu", ".cuh", ".cpp", ".cc", ".o", ".a", ".ptx"})
 SECRET_PATTERN = re.compile(rb"(?:ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA|OPENSSH) PRIVATE KEY|CLOUDFLARE_API_TOKEN)")

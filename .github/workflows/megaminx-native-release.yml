@@ -35,12 +35,14 @@ jobs:
         run: |
           set -euo pipefail
           stage="dist/stage-sm${{ matrix.sm }}"
-          mkdir -p "$stage/bin" "$stage/lib" "$stage/data" "$stage/weights" "$stage/profiles" "$stage/scripts" "$stage/portable/megaminx_cluster"
+          mkdir -p "$stage/bin" "$stage/lib" "$stage/data" "$stage/weights" "$stage/profiles" "$stage/scripts" "$stage/portable/megaminx_cluster" "$stage/portable/megaminx_cluster/scripts"
           cp "build-sm${{ matrix.sm }}/production_runner" "$stage/bin/"
           cp portable/megaminx_cluster/run.sh portable/megaminx_cluster/cluster.env.example portable/megaminx_cluster/publication.env.example "$stage/"
-          cp portable/megaminx_cluster/scripts/job.sh "$stage/scripts/"
+          cp portable/megaminx_cluster/README.md "$stage/README.md"
+          cp portable/megaminx_cluster/scripts/job.sh portable/megaminx_cluster/scripts/preflight.sh "$stage/scripts/"
           cp portable/megaminx_cluster/*.py "$stage/portable/megaminx_cluster/"
-          cp portable/megaminx_cluster/scripts/*.py "$stage/scripts/"
+          cp portable/megaminx_cluster/scripts/job.sh portable/megaminx_cluster/scripts/preflight.sh "$stage/scripts/"
+          cp portable/megaminx_cluster/scripts/*.py "$stage/portable/megaminx_cluster/scripts/"
           cp portable/megaminx_cluster/profiles/registry.json "$stage/profiles/"
           cp data/test.csv "$stage/data/test.csv"
           cp data/puzzle_info.json "$stage/data/puzzle_info.json"

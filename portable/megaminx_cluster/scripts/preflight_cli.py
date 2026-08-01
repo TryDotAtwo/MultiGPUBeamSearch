@@ -6,6 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -33,9 +34,12 @@ def main(argv: list[str] | None = None) -> int:
         registry = json.loads(
             (root / "profiles" / "registry.json").read_text(encoding="utf-8-sig")
         )
+        visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+        if not visible:
+            raise ValueError("CUDA_VISIBLE_DEVICES is empty")
         query = subprocess.run(
             [
-                "nvidia-smi",
+                "nvidia-smi", f"--id={visible}",
                 "--query-gpu=index,name,memory.total,compute_cap,driver_version",
                 "--format=csv,noheader",
             ],

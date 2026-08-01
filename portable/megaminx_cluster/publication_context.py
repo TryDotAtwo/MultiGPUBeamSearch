@@ -4,24 +4,19 @@ from __future__ import annotations
 
 from typing import Mapping
 
+from portable.megaminx_cluster.hardware_contract import publication_family
+
 
 def build_publication_context(manifest: Mapping[str, object], preflight: Mapping[str, object], selected: Mapping[str, object], proof: Mapping[str, object], *, run_id: str, job_id: str, cluster_name: str, author_name: str, search_mode: str, depth: int, solve_us: int, wall_us: int) -> dict[str, object]:
     hardware_key = selected["hardware"]
-    if not isinstance(hardware_key, Mapping):
-        raise ValueError("selected profile hardware is invalid")
+    if not isinstance(hardware_key, Mapping): raise ValueError("selected profile hardware is invalid")
     gpus = preflight["gpus"]
-    if not isinstance(gpus, list) or not gpus or not all(isinstance(gpu, Mapping) for gpu in gpus):
-        raise ValueError("preflight GPU record is invalid")
+    if not isinstance(gpus, list) or not gpus or not all(isinstance(gpu, Mapping) for gpu in gpus): raise ValueError("preflight GPU record is invalid")
     first = gpus[0]
     runtime_source = selected["runtime"]
-    if not isinstance(runtime_source, Mapping):
-        raise ValueError("selected runtime is invalid")
-    profile = {
-        "requested_beam": selected["requested_beam"], "effective_beam": selected["effective_beam"], "alignment_delta": selected["alignment_delta"],
-        "profile_power": selected["profile_power"], "profile_anchor_beam": 1 << int(selected["profile_power"]), "profile_status": selected["status"],
-        "profile_evidence_id": selected["evidence_id"], "gpu_family": hardware_key["gpu_family"], "vram_mib": hardware_key["vram_mib"],
-        "native_sm": hardware_key["sm"], "world_size": hardware_key["world_size"], "backend": selected["backend"], "model_class": selected["model_class"],
-    }
+    if not isinstance(runtime_source, Mapping): raise ValueError("selected runtime is invalid")
+    public_family = publication_family(str(first["name"]), int(first["sm"]))
+    profile = {"requested_beam": selected["requested_beam"], "effective_beam": selected["effective_beam"], "alignment_delta": selected["alignment_delta"], "profile_power": selected["profile_power"], "profile_anchor_beam": 1 << int(selected["profile_power"]), "profile_status": selected["status"], "profile_evidence_id": selected["evidence_id"], "gpu_family": public_family, "vram_mib": hardware_key["vram_mib"], "native_sm": hardware_key["sm"], "world_size": hardware_key["world_size"], "backend": selected["backend"], "model_class": selected["model_class"]}
     runtime_keys = ("b_micro", "stream1_concurrency", "stream3_ring_slots", "shard_count", "shard_capacity_scale_ppm", "stream4_batch_candidates", "stream4_trigger_candidates", "stream4_active_sort_slots")
     runtime = {"touch_bfs_radius": manifest["touch_bfs_radius"], "solution_mode": manifest["solution_mode"], "max_depth": depth, "max_collected_solutions": manifest["max_collected_solutions"], **{key: runtime_source[key] for key in runtime_keys}}
     model = {"filename": manifest["model_filename"], "sha256": manifest["model_sha256"], "format": manifest["model_format"], "manifest": manifest["model_manifest"]}

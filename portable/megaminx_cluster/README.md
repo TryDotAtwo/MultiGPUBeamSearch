@@ -15,6 +15,12 @@ the archive whose SM exactly matches every allocated GPU:
 There is no PTX, JIT, compiler, CUDA toolkit, Docker, architecture fallback, or
 mixed-GPU mode. A mismatch fails during preflight before the solver starts.
 
+Prerelease status: the committed registry currently has runnable measured profiles only
+for 2x T4. The other architecture assets are build targets, not runnable claims;
+they fail closed until a sweep for the exact GPU family, VRAM, world size, backend,
+model class, and beam range is imported. The H100 command below is the intended
+interface after its H100x4 profile evidence is added.
+
 ## Run
 
 ```bash
