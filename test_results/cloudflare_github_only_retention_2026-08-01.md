@@ -18,3 +18,6 @@ The two success tests first failed because the existing implementation retained 
 - TypeScript typecheck: passed.
 
 No CUDA/C++ or beam-search architecture was changed.
+## Historical backlog
+
+A post-deploy audit found 489 legacy staged rows. Added a normal-mode scheduled cleanup page of 100 rows/minute. Full verification now passes 56 schema/config and 123 Worker tests plus typecheck.

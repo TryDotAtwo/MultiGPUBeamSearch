@@ -220,7 +220,7 @@ function controller(scheduledTime = Date.now()): ScheduledController {
 
 async function seedSubmission(
   index: number,
-  state: "received" | "queued" | "retryable" | "dead_letter",
+  state: "received" | "queued" | "retryable" | "dead_letter" | "staged",
   updatedAt: string,
   safeError: string | null = "stale_error",
   retryCount = 0,
@@ -700,6 +700,20 @@ describe("Cloudflare binding plus load-bearing bounded D1 rate limits", () => {
 });
 
 describe("mode-gated scheduled recovery", () => {
+  test("normal schedule removes committed staged rows from R2 and D1", async () => {
+    const submissionId = await seedSubmission(700, "staged", "2000-01-01T00:00:00.000Z", null);
+    const row = await env.RESULTS_DB.prepare(
+      "SELECT raw_r2_key FROM submissions WHERE submission_id = ?",
+    ).bind(submissionId).first<{ raw_r2_key: string }>();
+    expect(await env.RAW_RESULTS.head(row!.raw_r2_key)).not.toBeNull();
+
+    await scheduled(controller(), customBindings("normal"), context());
+
+    expect(await env.RESULTS_DB.prepare(
+      "SELECT submission_id FROM submissions WHERE submission_id = ?",
+    ).bind(submissionId).first()).toBeNull();
+    expect(await env.RAW_RESULTS.head(row!.raw_r2_key)).toBeNull();
+  });
   test.each(["store_only", "reject", undefined, "", "Normal", "unknown"])(
     "mode %s is a strict recovery no-op",
     async (mode) => {

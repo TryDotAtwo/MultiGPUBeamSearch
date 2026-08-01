@@ -2,7 +2,7 @@ import { consumeValidationMessage } from "./consumer.js";
 export { resolveIngestMode, type IngestMode } from "./mode.js";
 import { resolveIngestMode, type IngestMode } from "./mode.js";
 export { GitHubWriter } from "./github-writer.js";
-import { findBySubmissionId } from "./db.js";
+import { deleteStagedSubmission, findBySubmissionId, findStagedSubmissions } from "./db.js";
 import { MAX_SERIALIZED_BATCH_BYTES, validateBatch, validateBatchIntegrity, type ResultEnvelopeV1 } from "./schema.js";
 import {
   SafeIngestError,
@@ -353,6 +353,13 @@ export async function scheduled(
   _ctx: ExecutionContext,
 ): Promise<void> {
   if (resolveIngestMode(env.INGEST_MODE) !== "normal") return;
+  for (const row of await findStagedSubmissions(env.RESULTS_DB, 100)) {
+    await env.RAW_RESULTS.delete(row.raw_r2_key);
+    const deleted = await deleteStagedSubmission(env.RESULTS_DB, row.submission_id);
+    if (!deleted && await findBySubmissionId(env.RESULTS_DB, row.submission_id)) {
+      throw new Error("staged_cleanup_conflict");
+    }
+  }
   await recoverStaleSubmissions(env, {
     staleBefore: new Date(controller.scheduledTime - RECOVERY_STALE_MS),
     limit: RECOVERY_LIMIT,
