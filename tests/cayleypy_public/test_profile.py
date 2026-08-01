@@ -199,6 +199,18 @@ def test_transformer_2p26_profile_records_measured_accumulator_contract():
     assert plan.runtime["ring_count"] == 2
     assert plan.runtime["final_materialize_chunk_candidates"] == 88_064
 
+    maximum = transformer["maximum_validated_beam"]["output_move_count"]
+    assert maximum == 74_203_136
+    maximum_profile = select_profile(transformer, maximum, 24, 24)
+    maximum_plan = derive_runtime(maximum_profile, maximum, 24, 24)
+    assert maximum_profile["profile_power"] == 26
+    assert maximum_profile["maximum_validated_beam"] == maximum
+    assert maximum_plan.effective_beam == maximum
+    assert maximum_plan.local_beam == 37_101_568
+
+    with pytest.raises(ValueError, match="exceeds validated maximum"):
+        select_profile(transformer, maximum + 1, 24, 24)
+
 
 def test_all_kaggle_2xt4_profiles_use_bounded_final_materialization_chunk() -> None:
     root = Path(__file__).resolve().parents[2]

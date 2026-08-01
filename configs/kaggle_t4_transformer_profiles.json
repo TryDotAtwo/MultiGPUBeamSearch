@@ -211,29 +211,49 @@
                                                                           "final_materialize_chunk_candidates":  88064
                                                                       },
                                                           "evidence":  {
-                                                                           "source":  "trydotatwo/cube4-transformer-2xt4-s3-final88k",
-                                                                           "kernel_version":  1,
+                                                                           "source":  "trydotatwo/cayleypy-transformer-p27-limit-probe",
+                                                                           "kernel_version":  8,
+                                                                           "solver_commit":  "1900996e13ca2b1caf9349437e4423b9e4c3eb50",
+                                                                           "status":  "measured",
                                                                            "depth":  8,
-                                                                           "depth_sec":  2765.04,
-                                                                           "requested_beam":  67108864,
-                                                                           "effective_beam":  67108864,
-                                                                           "local_beam":  33554432,
-                                                                           "peak_vram_mib_per_gpu":  13003,
-                                                                           "average_gpu_utilization_pct":  99.6,
-                                                                           "note":  "Measured on real Kaggle 2xTesla T4; large logical accumulator with two physical rings and independently bounded final materialization."
+                                                                           "depth_sec":  1562.95,
+                                                                           "requested_beam":  74203136,
+                                                                           "effective_beam":  74203136,
+                                                                           "local_beam":  37101568,
+                                                                           "solve_seconds":  4676.28476648,
+                                                                           "wall_seconds":  4854.534539286,
+                                                                           "next_aligned_beam":  74219520,
+                                                                           "next_required_bytes":  14639246672,
+                                                                           "budget_bytes":  14638972928,
+                                                                           "next_over_budget_bytes":  273744,
+                                                                           "static_headroom_bytes":  805306368,
+                                                                           "note":  "Measured on real Kaggle 2xTesla T4. Both ranks entered depth 8 with a full 37,101,568-state local frontier; depth 8 completed globally with a valid depth-9 solution and no fatal/overflow."
                                                                        }
                                                       }
                                            }
                  },
     "maximum_validated_beam":  {
-                                   "output_move_count":  134217728
+                                   "output_move_count":  74203136
                                },
     "maximum_validated_beam_evidence":  {
                                             "output_move_count":  {
-                                                                      "source":  "private transformer ceiling sweep",
-                                                                      "status":  "pending",
-                                                                      "anchor":  26,
-                                                                      "note":  "Temporary private envelope; public notebooks stay pinned to cec7400."
+                                                                      "source":  "trydotatwo/cayleypy-transformer-p27-limit-probe",
+                                                                      "kernel_version":  8,
+                                                                      "solver_commit":  "1900996e13ca2b1caf9349437e4423b9e4c3eb50",
+                                                                      "status":  "measured",
+                                                                      "depth":  8,
+                                                                      "depth_sec":  1562.95,
+                                                                      "requested_beam":  74203136,
+                                                                      "effective_beam":  74203136,
+                                                                      "local_beam":  37101568,
+                                                                      "solve_seconds":  4676.28476648,
+                                                                      "wall_seconds":  4854.534539286,
+                                                                      "next_aligned_beam":  74219520,
+                                                                      "next_required_bytes":  14639246672,
+                                                                      "budget_bytes":  14638972928,
+                                                                      "next_over_budget_bytes":  273744,
+                                                                      "static_headroom_bytes":  805306368,
+                                                                      "note":  "Measured on real Kaggle 2xTesla T4. Both ranks entered depth 8 with a full 37,101,568-state local frontier; depth 8 completed globally with a valid depth-9 solution and no fatal/overflow."
                                                                   }
                                         }
 }

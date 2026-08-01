@@ -1022,3 +1022,10 @@
 - 2026-08-01: Repinned and regenerated the main public notebook plus four examples to cec74003f262e9d93d2fc0cc56a5e2d49a5010e0, containing explicit saturated MLP ceilings and transformer fail-closed p26. All five retain TOUCH_BFS_RADIUS=4. Full local suite: 318 passed.
 
 - 2026-08-01: Reopened an isolated transformer ceiling envelope after the user explicitly required equivalent maximum-beam handling for MLP and Transformer across all notebooks. Public pins remain on cec7400 until saturation validation.
+
+## 2026-08-01 - Exact Transformer 2xT4 beam ceiling
+
+- Replaced the temporary Transformer envelope with the measured output_move_count maximum 74,203,136.
+- Kaggle private kernel trydotatwo/cayleypy-transformer-p27-limit-probe v8 ran puzzle 10 with BFS 0: both ranks entered depth 8 at the full local frontier 37,101,568; depth 8 completed globally in 1562.95 s, yielding a valid depth-9 solution.
+- The next aligned beam 74,219,520 requires 14,639,246,672 bytes against the 14,638,972,928-byte budget, exceeding it by 273,744 bytes.
+- Profile selection now fails closed above the measured maximum; targeted profile tests pass.
