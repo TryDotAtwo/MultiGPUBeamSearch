@@ -224,5 +224,16 @@
                                                                        }
                                                       }
                                            }
-                 }
+                 },
+    "maximum_validated_beam":  {
+                                   "output_move_count":  134217728
+                               },
+    "maximum_validated_beam_evidence":  {
+                                            "output_move_count":  {
+                                                                      "source":  "experimental p27 transformer limit probe",
+                                                                      "status":  "pending",
+                                                                      "anchor":  26,
+                                                                      "note":  "Private Kaggle 2xT4 allocation probe only; public notebooks remain pinned to measured p26."
+                                                                  }
+                                        }
 }

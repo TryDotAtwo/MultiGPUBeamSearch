@@ -1012,3 +1012,5 @@
 - 2026-08-01: Added isolated experimental p27 MLP registry envelopes and private depth-1 Kaggle limit probes for output1/output_move_count. Public notebooks remain pinned to the measured p26 commit until an upper bound is validated.
 
 - 2026-08-01: Located discrete Kaggle 2xT4 MLP memory ceilings with the standard 768 MiB GPU headroom: output1 67,239,936 (131,072 alignment), output_move_count 67,633,152 (65,536 alignment). Added explicit per-model maximum_validated_beam and fail-closed selection above it; removed the experimental p27 anchors. Full depth-8 saturation acceptance is pending.
+
+- 2026-08-01: Added an isolated temporary piece-Transformer p27 maximum envelope for private Kaggle 2xT4 memory probing. Public notebook pins remain on measured p26 until the transformer ceiling is saturated and validated.
