@@ -1,0 +1,109 @@
+stream1_transformer_libtorch_backend=1 mode=eager device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1
+stream1_transformer_libtorch_micro mode=eager batch=384 iters=50 elapsed_ms=796.211 parents_per_sec=24114.2 candidates_per_sec=578741 checksum=465948672
+Collecting data...
+Generating '/tmp/nsys-report-74f1.qdstrm'
+[1/8] [0%                          ] eager_b384.nsys-rep[1/8] [0%                          ] eager_b384.nsys-rep[1/8] [========42%                 ] eager_b384.nsys-rep[1/8] [===========50%              ] eager_b384.nsys-rep[1/8] [========================100%] eager_b384.nsys-rep[1/8] [========================100%] eager_b384.nsys-rep
+[2/8] [0%                          ] eager_b384.sqlite[2/8] [1%                          ] eager_b384.sqlite[2/8] [2%                          ] eager_b384.sqlite[2/8] [3%                          ] eager_b384.sqlite[2/8] [4%                          ] eager_b384.sqlite[2/8] [5%                          ] eager_b384.sqlite[2/8] [6%                          ] eager_b384.sqlite[2/8] [7%                          ] eager_b384.sqlite[2/8] [8%                          ] eager_b384.sqlite[2/8] [9%                          ] eager_b384.sqlite[2/8] [10%                         ] eager_b384.sqlite[2/8] [11%                         ] eager_b384.sqlite[2/8] [12%                         ] eager_b384.sqlite[2/8] [13%                         ] eager_b384.sqlite[2/8] [14%                         ] eager_b384.sqlite[2/8] [=15%                        ] eager_b384.sqlite[2/8] [=16%                        ] eager_b384.sqlite[2/8] [=17%                        ] eager_b384.sqlite[2/8] [==18%                       ] eager_b384.sqlite[2/8] [==19%                       ] eager_b384.sqlite[2/8] [==20%                       ] eager_b384.sqlite[2/8] [==21%                       ] eager_b384.sqlite[2/8] [===22%                      ] eager_b384.sqlite[2/8] [===23%                      ] eager_b384.sqlite[2/8] [===24%                      ] eager_b384.sqlite[2/8] [====25%                     ] eager_b384.sqlite[2/8] [====26%                     ] eager_b384.sqlite[2/8] [====27%                     ] eager_b384.sqlite[2/8] [====28%                     ] eager_b384.sqlite[2/8] [=====29%                    ] eager_b384.sqlite[2/8] [=====30%                    ] eager_b384.sqlite[2/8] [=====31%                    ] eager_b384.sqlite[2/8] [=====32%                    ] eager_b384.sqlite[2/8] [======33%                   ] eager_b384.sqlite[2/8] [======34%                   ] eager_b384.sqlite[2/8] [======35%                   ] eager_b384.sqlite[2/8] [=======36%                  ] eager_b384.sqlite[2/8] [=======37%                  ] eager_b384.sqlite[2/8] [=======38%                  ] eager_b384.sqlite[2/8] [=======39%                  ] eager_b384.sqlite[2/8] [========40%                 ] eager_b384.sqlite[2/8] [========41%                 ] eager_b384.sqlite[2/8] [========42%                 ] eager_b384.sqlite[2/8] [=========43%                ] eager_b384.sqlite[2/8] [=========44%                ] eager_b384.sqlite[2/8] [=========45%                ] eager_b384.sqlite[2/8] [=========46%                ] eager_b384.sqlite[2/8] [==========47%               ] eager_b384.sqlite[2/8] [==========48%               ] eager_b384.sqlite[2/8] [==========49%               ] eager_b384.sqlite[2/8] [===========50%              ] eager_b384.sqlite[2/8] [===========51%              ] eager_b384.sqlite[2/8] [===========52%              ] eager_b384.sqlite[2/8] [===========53%              ] eager_b384.sqlite[2/8] [============54%             ] eager_b384.sqlite[2/8] [============55%             ] eager_b384.sqlite[2/8] [============56%             ] eager_b384.sqlite[2/8] [============57%             ] eager_b384.sqlite[2/8] [=============58%            ] eager_b384.sqlite[2/8] [=============59%            ] eager_b384.sqlite[2/8] [=============60%            ] eager_b384.sqlite[2/8] [==============61%           ] eager_b384.sqlite[2/8] [==============62%           ] eager_b384.sqlite[2/8] [==============63%           ] eager_b384.sqlite[2/8] [==============64%           ] eager_b384.sqlite[2/8] [===============65%          ] eager_b384.sqlite[2/8] [===============66%          ] eager_b384.sqlite[2/8] [===============67%          ] eager_b384.sqlite[2/8] [================68%         ] eager_b384.sqlite[2/8] [================69%         ] eager_b384.sqlite[2/8] [================70%         ] eager_b384.sqlite[2/8] [================71%         ] eager_b384.sqlite[2/8] [=================72%        ] eager_b384.sqlite[2/8] [=================73%        ] eager_b384.sqlite[2/8] [=================74%        ] eager_b384.sqlite[2/8] [==================75%       ] eager_b384.sqlite[2/8] [==================76%       ] eager_b384.sqlite[2/8] [==================77%       ] eager_b384.sqlite[2/8] [==================78%       ] eager_b384.sqlite[2/8] [===================79%      ] eager_b384.sqlite[2/8] [===================80%      ] eager_b384.sqlite[2/8] [===================81%      ] eager_b384.sqlite[2/8] [===================82%      ] eager_b384.sqlite[2/8] [====================83%     ] eager_b384.sqlite[2/8] [====================84%     ] eager_b384.sqlite[2/8] [====================85%     ] eager_b384.sqlite[2/8] [=====================86%    ] eager_b384.sqlite[2/8] [=====================87%    ] eager_b384.sqlite[2/8] [=====================88%    ] eager_b384.sqlite[2/8] [=====================89%    ] eager_b384.sqlite[2/8] [======================90%   ] eager_b384.sqlite[2/8] [======================91%   ] eager_b384.sqlite[2/8] [======================92%   ] eager_b384.sqlite[2/8] [=======================93%  ] eager_b384.sqlite[2/8] [=======================94%  ] eager_b384.sqlite[2/8] [=======================95%  ] eager_b384.sqlite[2/8] [=======================96%  ] eager_b384.sqlite[2/8] [========================97% ] eager_b384.sqlite[2/8] [========================98% ] eager_b384.sqlite[2/8] [========================99% ] eager_b384.sqlite[2/8] [========================100%] eager_b384.sqlite[2/8] [========================100%] eager_b384.sqlite
+[3/8] Executing 'nvtx_sum' stats report
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)    Med (ns)   Min (ns)  Max (ns)  StdDev (ns)   Style           Range         
+ --------  ---------------  ---------  ----------  ----------  --------  --------  -----------  -------  ----------------------
+    100.0         15040218          1  15040218.0  15040218.0  15040218  15040218          0.0  PushPop  cuBLAS:cublasCreate_v2
+
+[4/8] Executing 'osrt_sum' stats report
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)    Med (ns)    Min (ns)  Max (ns)   StdDev (ns)          Name         
+ --------  ---------------  ---------  ----------  -----------  --------  ---------  -----------  ---------------------
+     83.5       2006123761         25  80244950.4  100174996.0     58551  100602318   36253482.3  poll                 
+      7.6        182255438       7479     24369.0       2886.0      1000   12542977     249208.0  ioctl                
+      3.6         85592781         60   1426546.4    1313361.5    918260    3785361     552175.3  fopen64              
+      2.9         69550723        148    469937.3     205866.0      1074    5441560     809266.6  read                 
+      1.5         37053001         69    537000.0     474955.0      1243    2280143     398457.9  fclose               
+      0.7         15738375          3   5246125.0     441796.0    373370   14923209    8380670.4  fread                
+      0.1          1509181         10    150918.1     130375.5    107200     252754      49531.5  pthread_create       
+      0.1          1309003         17     77000.2      76298.0     62649      96489      10581.4  sleep                
+      0.1          1290425         24     53767.7       4372.0      1282     648424     155837.5  fopen                
+      0.0           543891         24     22662.1      21975.0      1229      75712      18015.4  mmap                 
+      0.0           276751          4     69187.8      81223.0      1346     112959      49843.2  sem_timedwait        
+      0.0           222290         15     14819.3       6459.0      1321     113505      27915.3  open                 
+      0.0           193585          1    193585.0     193585.0    193585     193585          0.0  pthread_join         
+      0.0           154326         20      7716.3       5490.0      1187      29620       7006.4  fgets                
+      0.0           100808          5     20161.6      20152.0     10269      32469       8045.8  write                
+      0.0            35902          5      7180.4       1505.0      1198      30025      12772.6  fflush               
+      0.0            19352          3      6450.7       8880.0      1580       8892       4218.1  pipe2                
+      0.0            16711          7      2387.3       1760.0      1279       5429       1473.1  close                
+      0.0            13791          4      3447.8       2999.5      1424       6368       2098.7  fwrite               
+      0.0            11603          7      1657.6       1490.0      1055       2309        497.5  fileno               
+      0.0             4849          3      1616.3       1703.0      1427       1719        164.2  fcntl                
+      0.0             3375          2      1687.5       1687.5      1638       1737         70.0  pthread_mutex_trylock
+
+[5/8] Executing 'cuda_api_sum' stats report
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)     Med (ns)    Min (ns)   Max (ns)   StdDev (ns)                Name               
+ --------  ---------------  ---------  -----------  -----------  ---------  ---------  -----------  ---------------------------------
+     46.2        490382026          2  245191013.0  245191013.0  237127307  253254719   11403802.4  cudaDeviceSynchronize            
+     42.4        449709406       3460     129973.8       9116.5       3574   65774236    1357770.4  cudaLaunchKernel                 
+      6.0         63826383       1190      53635.6       9748.5       4020    2027286     145404.8  cudaLaunchKernelExC_v11060       
+      2.8         29638007         14    2117000.5    2159631.0     603683    3923725    1271597.7  cuLibraryLoadData                
+      0.8          8506562         15     567104.1     490292.0      27694    1173474     297853.7  cudaMalloc                       
+      0.8          8206581         60     136776.4      64373.5      23224    3362914     429661.9  cudaStreamSynchronize            
+      0.5          5398703         60      89978.4      79129.0      38643     405123      49911.8  cudaMemcpyAsync                  
+      0.2          2606999          1    2606999.0    2606999.0    2606999    2606999          0.0  cudaFree                         
+      0.2          1855610          1    1855610.0    1855610.0    1855610    1855610          0.0  cudaHostAlloc                    
+      0.0           486755         18      27041.9        247.0        243     472417     111161.7  cudaEventCreateWithFlags         
+      0.0           151522        838        180.8        102.0         53      10895        617.2  cuGetProcAddress_v2              
+      0.0            92342         14       6595.9       6856.0        931      18462       5325.1  cuLibraryGetKernel               
+      0.0            48750         12       4062.5       2630.0       1692      19236       4837.4  cudaStreamIsCapturing_v10000     
+      0.0             9562          3       3187.3       2704.0       1977       4881       1511.1  cuInit                           
+      0.0             3210          1       3210.0       3210.0       3210       3210          0.0  cudaGetDeviceProperties_v2_v12000
+      0.0             2004          2       1002.0       1002.0        286       1718       1012.6  cudaGetDriverEntryPoint_v11030   
+      0.0             1006          3        335.3        245.0         89        672        301.8  cuModuleGetLoadingMode           
+
+[6/8] Executing 'cuda_gpu_kern_sum' stats report
+
+ Time (%)  Total Time (ns)  Instances  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  --------  --------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     30.3        325000216        840  386905.0  393333.0    125030   2634412     267308.1  sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize64x96x32_stage4_warpsize2x2x1_tensor16x8x16_execute_k…
+     17.3        185865525        280  663805.4  599232.0    488954   2686927     346855.1  sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize160x128x32_stage4_warpsize2x2x1_tensor16x8x16_execute…
+     12.7        136376701        280  487059.6  469225.0    383061   1748092     158993.0  void pytorch_flash::flash_fwd_kernel<Flash_fwd_kernel_traits<(int)32, (int)128, (int)128, (int)4, (…
+     10.5        112475109        700  160678.7  167321.0      4704   1132157     112575.4  void at::native::<unnamed>::vectorized_layer_norm_kernel<c10::Half, float>(int, T2, const T1 *, con…
+      9.5        102362804        280  365581.4  330178.0    322705   1604054     177972.3  void at::native::vectorized_elementwise_kernel<(int)4, at::native::BinaryFunctor<c10::Half, c10::Ha…
+      6.3         67870243        770   88143.2   82132.5     80484   1382633      75280.9  void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctor_add<c10::Half>, std:…
+      6.2         66661831        280  238078.0  218540.0    215723   1533682     136254.8  void at::native::vectorized_elementwise_kernel<(int)4, at::native::sigmoid_kernel_cuda(at::TensorIt…
+      3.9         42007824        210  200037.3  173929.5    142568   1053720     151489.6  void at::native::<unnamed>::indexSelectLargeIndex<c10::Half, long, unsigned int, (int)2, (int)2, (i…
+      1.7         18161292        210   86482.3   78692.5     68003   1015606      90181.9  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      0.9          9736646         70  139094.9  135783.5    111046    578783      54282.1  void at::native::<unnamed>::CatArrayBatchedCopy<at::native::<unnamed>::OpaqueType<(unsigned int)2>,…
+      0.4          4663245        157   29702.2    7713.0      3456    914577      74019.6  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::n…
+      0.1          1493908        210    7113.8    7073.0      5600      9184        575.9  void at::native::<unnamed>::indexSelectLargeIndex<long, long, unsigned int, (int)-1, (int)-1, (int)…
+      0.1           731940        210    3485.4    3264.0      2688      5280        493.1  void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl<at::native::…
+      0.0           427346         70    6104.9    6208.0      5024      7744        420.0  sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize32x32x64_stage6_warpsize2x2x1_tensor16x8x16_execute_k…
+      0.0           288528         72    4007.3    4112.5      2304      5152        376.8  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.0             4065          1    4065.0    4065.0      4065      4065          0.0  void at::native::vectorized_elementwise_kernel<(int)2, at::native::BUnaryFunctor<long, long, long, …
+      0.0             3872          1    3872.0    3872.0      3872      3872          0.0  void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<long, at::native::func_wrappe…
+      0.0             3872          1    3872.0    3872.0      3872      3872          0.0  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.0             3584          1    3584.0    3584.0      3584      3584          0.0  void at::native::vectorized_elementwise_kernel<(int)2, at::native::CUDAFunctorOnSelf_add<long>, std…
+      0.0             2784          1    2784.0    2784.0      2784      2784          0.0  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.0             2496          1    2496.0    2496.0      2496      2496          0.0  void at::native::vectorized_elementwise_kernel<(int)2, at::native::AUnaryFunctor<long, long, long, …
+      0.0             2432          1    2432.0    2432.0      2432      2432          0.0  void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIterator…
+      0.0             2336          1    2336.0    2336.0      2336      2336          0.0  void <unnamed>::elementwise_kernel_with_index<int, at::native::arange_cuda_out(const c10::Scalar &,…
+      0.0             2080          1    2080.0    2080.0      2080      2080          0.0  void at::native::vectorized_elementwise_kernel<(int)4, at::native::<unnamed>::launch_clamp_scalar(a…
+      0.0             1440          1    1440.0    1440.0      1440      1440          0.0  void at::native::vectorized_elementwise_kernel<(int)4, at::native::round_kernel_cuda(at::TensorIter…
+      0.0             1408          1    1408.0    1408.0      1408      1408          0.0  void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<float, float, floa…
+
+[7/8] Executing 'cuda_gpu_mem_time_sum' stats report
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Operation          
+ --------  ---------------  -----  --------  --------  --------  --------  -----------  ----------------------------
+     99.6           571615     59    9688.4     608.0       544     42882      15698.5  [CUDA memcpy Host-to-Device]
+      0.4             2304      1    2304.0    2304.0      2304      2304          0.0  [CUDA memcpy Device-to-Host]
+
+[8/8] Executing 'cuda_gpu_mem_size_sum' stats report
+
+ Total (MB)  Count  Avg (MB)  Med (MB)  Min (MB)  Max (MB)  StdDev (MB)           Operation          
+ ----------  -----  --------  --------  --------  --------  -----------  ----------------------------
+      6.543     59     0.111     0.001     0.000     0.524        0.195  [CUDA memcpy Host-to-Device]
+      0.000      1     0.000     0.000     0.000     0.000        0.000  [CUDA memcpy Device-to-Host]
+
+Generated:
+	/workspace/test_results/nsight_libtorch_transformer_2026-07-04/eager_b384.nsys-rep
+	/workspace/test_results/nsight_libtorch_transformer_2026-07-04/eager_b384.sqlite

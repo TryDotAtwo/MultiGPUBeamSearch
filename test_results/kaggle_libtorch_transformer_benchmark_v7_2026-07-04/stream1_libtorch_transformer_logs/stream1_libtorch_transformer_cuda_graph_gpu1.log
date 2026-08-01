@@ -1,0 +1,13 @@
+stream1_transformer_libtorch_backend=1 mode=cuda_graph device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1
+stream1_transformer_libtorch_micro mode=cuda_graph batch=128 iters=100 elapsed_ms=486.997 parents_per_sec=26283.5 candidates_per_sec=630805 checksum=155316224
+stream1_transformer_libtorch_micro mode=cuda_graph batch=192 iters=100 elapsed_ms=733.69 parents_per_sec=26169.1 candidates_per_sec=628058 checksum=232974336
+stream1_transformer_libtorch_micro mode=cuda_graph batch=256 iters=100 elapsed_ms=960.897 parents_per_sec=26641.8 candidates_per_sec=639403 checksum=310632448
+stream1_transformer_libtorch_micro mode=cuda_graph batch=320 iters=100 elapsed_ms=1208.91 parents_per_sec=26470.1 candidates_per_sec=635283 checksum=388290560
+stream1_transformer_libtorch_micro mode=cuda_graph batch=384 iters=100 elapsed_ms=1439.61 parents_per_sec=26673.8 candidates_per_sec=640172 checksum=465948672
+stream1_transformer_libtorch_micro mode=cuda_graph batch=448 iters=100 elapsed_ms=1719.45 parents_per_sec=26054.9 candidates_per_sec=625318 checksum=543606784
+stream1_transformer_libtorch_micro mode=cuda_graph batch=512 iters=100 elapsed_ms=1955.4 parents_per_sec=26183.9 candidates_per_sec=628413 checksum=621264896
+stream1_transformer_libtorch_micro mode=cuda_graph batch=640 iters=100 elapsed_ms=2466.53 parents_per_sec=25947.4 candidates_per_sec=622737 checksum=776581120
+stream1_transformer_libtorch_micro mode=cuda_graph batch=768 iters=100 elapsed_ms=2960.03 parents_per_sec=25945.7 candidates_per_sec=622696 checksum=931897344
+stream1_transformer_libtorch_micro mode=cuda_graph batch=1024 iters=100 elapsed_ms=4058.03 parents_per_sec=25233.9 candidates_per_sec=605613 checksum=1242529792
+stream1_transformer_libtorch_micro mode=cuda_graph batch=1536 iters=100 elapsed_ms=6310.39 parents_per_sec=24340.8 candidates_per_sec=584179 checksum=1863794688
+stream1_transformer_libtorch_micro mode=cuda_graph batch=2048 iters=100 elapsed_ms=8630.88 parents_per_sec=23728.8 candidates_per_sec=569490 checksum=2485059584

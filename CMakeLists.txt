@@ -11,6 +11,9 @@ project(beam_solver_contracts LANGUAGES CXX CUDA)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
 option(BEAM_ENABLE_DEBUG "Master switch for all debug instrumentation" OFF)
 option(BEAM_ENABLE_DEPTH_LOGS "Compile production_runner per-depth logs when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_DEBUG_LOGS "Compile production_runner debug/memory logs when BEAM_ENABLE_DEBUG is ON" OFF)
@@ -22,6 +25,7 @@ option(BEAM_DEBUG_FINAL_EXCHANGE_TRACE "Compile multi-rank final exchange diagno
 option(BEAM_DEBUG_FINAL_HISTOGRAM_TRACE "Compile final histogram-vs-survivor diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
+option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
 
 set(BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE OFF)
 set(BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE OFF)
@@ -103,6 +107,8 @@ target_link_libraries(history_tests PRIVATE beam_core)
 
 add_library(beam_cuda
     cuda/stream1.cu
+    cuda/stream1_transformer.cu
+    cuda/stream1_transformer_fmha.cu
     cuda/stream2.cu
     cuda/stream3.cu
     cuda/stream4.cu
@@ -118,6 +124,12 @@ if(CUTLASS_DIR AND EXISTS "${CUTLASS_DIR}/include")
     target_include_directories(beam_cuda PUBLIC "${CUTLASS_DIR}/include")
     if(EXISTS "${CUTLASS_DIR}/tools/util/include")
         target_include_directories(beam_cuda PUBLIC "${CUTLASS_DIR}/tools/util/include")
+    endif()
+    if(EXISTS "${CUTLASS_DIR}/examples/41_fused_multi_head_attention/kernel_forward.h")
+        target_include_directories(beam_cuda PUBLIC "${CUTLASS_DIR}/examples/41_fused_multi_head_attention")
+        target_compile_definitions(beam_cuda PUBLIC BEAM_HAS_CUTLASS_FMHA=1)
+    else()
+        target_compile_definitions(beam_cuda PUBLIC BEAM_HAS_CUTLASS_FMHA=0)
     endif()
     target_compile_definitions(beam_cuda PUBLIC BEAM_HAS_CUTLASS=1)
 else()
@@ -156,6 +168,28 @@ set_target_properties(stream2_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDA
 add_executable(stream1_cuda_tests tests/stream1_cuda_tests.cu)
 target_link_libraries(stream1_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream1_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(stream1_transformer_cuda_tests tests/stream1_transformer_cuda_tests.cu)
+target_link_libraries(stream1_transformer_cuda_tests PRIVATE beam_cuda)
+set_target_properties(stream1_transformer_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(stream1_transformer_gemm_policy_tests tests/stream1_transformer_gemm_policy_tests.cpp)
+target_include_directories(stream1_transformer_gemm_policy_tests PRIVATE cuda)
+target_compile_features(stream1_transformer_gemm_policy_tests PRIVATE cxx_std_17)
+add_executable(stream1_transformer_attention_policy_tests tests/stream1_transformer_attention_policy_tests.cpp)
+add_executable(stream1_transformer_layernorm_policy_tests tests/stream1_transformer_layernorm_policy_tests.cpp)
+add_executable(stream1_transformer_layernorm_split_slots_policy_tests tests/stream1_transformer_layernorm_policy_tests.cpp)
+add_executable(stream1_transformer_autotune_contract_tests tests/stream1_transformer_autotune_contract_tests.cpp)
+target_include_directories(stream1_transformer_attention_policy_tests PRIVATE cuda)
+target_include_directories(stream1_transformer_layernorm_policy_tests PRIVATE cuda)
+target_include_directories(stream1_transformer_layernorm_split_slots_policy_tests PRIVATE cuda)
+target_compile_definitions(stream1_transformer_layernorm_split_slots_policy_tests PRIVATE STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS=1)
+target_compile_features(stream1_transformer_layernorm_policy_tests PRIVATE cxx_std_17)
+target_compile_features(stream1_transformer_layernorm_split_slots_policy_tests PRIVATE cxx_std_17)
+target_compile_features(stream1_transformer_attention_policy_tests PRIVATE cxx_std_17)
+target_include_directories(stream1_transformer_autotune_contract_tests PRIVATE cuda)
+target_compile_features(stream1_transformer_autotune_contract_tests PRIVATE cxx_std_17)
+
 
 add_executable(stream3_cuda_tests tests/stream3_cuda_tests.cu)
 target_link_libraries(stream3_cuda_tests PRIVATE beam_cuda)
@@ -197,14 +231,59 @@ target_compile_definitions(production_runner PRIVATE
 )
 set_target_properties(production_runner PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
-add_executable(stream_benchmark tools/stream_benchmark.cu)
+add_executable(stream_benchmark
+    tools/stream_benchmark.cu
+    tools/stream_benchmark_mlp.cu
+    tools/stream_benchmark_transformer.cu)
 target_link_libraries(stream_benchmark PRIVATE beam_cuda)
 set_target_properties(stream_benchmark PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(stream_pipeline_benchmark tools/stream_pipeline_benchmark.cu)
+target_link_libraries(stream_pipeline_benchmark PRIVATE beam_cuda)
+set_target_properties(stream_pipeline_benchmark PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+if(BEAM_ENABLE_LIBTORCH_STREAM1)
+    find_package(Torch REQUIRED)
+    add_executable(stream1_transformer_libtorch_benchmark
+        tools/stream1_transformer_libtorch_benchmark.cpp
+        tools/stream1_transformer_libtorch_backend.cpp)
+    target_link_libraries(stream1_transformer_libtorch_benchmark PRIVATE "${TORCH_LIBRARIES}")
+    target_include_directories(stream1_transformer_libtorch_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
+    target_compile_definitions(stream1_transformer_libtorch_benchmark PRIVATE BEAM_HAS_LIBTORCH_STREAM1=1)
+    set_target_properties(stream1_transformer_libtorch_benchmark PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF)
+
+    add_executable(production_runner_libtorch_stream1
+        tools/production_runner.cu
+        tools/stream1_libtorch_ring_slot_launcher.cpp
+        tools/stream1_transformer_libtorch_backend.cpp)
+    target_link_libraries(production_runner_libtorch_stream1 PRIVATE beam_cuda "${TORCH_LIBRARIES}")
+    target_include_directories(production_runner_libtorch_stream1 PRIVATE "${TORCH_INCLUDE_DIRS}")
+    target_compile_definitions(production_runner_libtorch_stream1 PRIVATE
+        BEAM_HAS_LIBTORCH_STREAM1=1
+        BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
+        BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>
+    )
+    set_target_properties(production_runner_libtorch_stream1 PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF)
+endif()
 
 enable_testing()
 add_test(NAME contract_tests COMMAND contract_tests)
 add_test(NAME history_tests COMMAND history_tests)
 add_test(NAME stream1_cuda_tests COMMAND stream1_cuda_tests)
+add_test(NAME stream1_transformer_cuda_tests COMMAND stream1_transformer_cuda_tests)
+add_test(NAME stream1_transformer_gemm_policy_tests COMMAND stream1_transformer_gemm_policy_tests)
+add_test(NAME stream1_transformer_attention_policy_tests COMMAND stream1_transformer_attention_policy_tests)
+add_test(NAME stream1_transformer_layernorm_policy_tests COMMAND stream1_transformer_layernorm_policy_tests)
+add_test(NAME stream1_transformer_layernorm_split_slots_policy_tests COMMAND stream1_transformer_layernorm_split_slots_policy_tests)
+add_test(NAME stream1_transformer_autotune_contract_tests COMMAND stream1_transformer_autotune_contract_tests)
 add_test(NAME stream2_cuda_tests COMMAND stream2_cuda_tests)
 add_test(NAME stream3_cuda_tests COMMAND stream3_cuda_tests)
 add_test(NAME stream4_cuda_tests COMMAND stream4_cuda_tests)

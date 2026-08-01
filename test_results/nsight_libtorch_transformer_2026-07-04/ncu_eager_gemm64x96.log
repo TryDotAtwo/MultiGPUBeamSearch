@@ -1,0 +1,19 @@
+==WARNING== No metrics to collect found in sections.
+
+==ERROR== An error was reported by the driver:
+==ERROR== For more information, see /tmp/nsight-compute-2e4a-22e1.log
+==ERROR== Cuda driver is not compatible with Nsight Compute.
+==ERROR== For more information, see /tmp/nsight-compute-2e4a-22e1.log
+==PROF== Connected to process 252 (/tmp/build-libtorch-nsys/stream1_transformer_libtorch_benchmark)
+
+==WARNING== An error was reported by the driver:
+==WARNING== Failed to load Nsight Compute CUDA modules.
+==PROF== Profiling "sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize64x96x32_stage4_warpsize2x2x1_tensor16x8x16_execute_kernel__5x_cublas": 0%....50%....100% - 1 pass
+==PROF== Profiling "sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize64x96x32_stage4_warpsize2x2x1_tensor16x8x16_execute_kernel__5x_cublas": 0%....50%....100% - 1 pass
+==PROF== Profiling "sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize64x96x32_stage4_warpsize2x2x1_tensor16x8x16_execute_kernel__5x_cublas": 0%....50%....100% - 1 pass
+==PROF== Profiling "sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize64x96x32_stage4_warpsize2x2x1_tensor16x8x16_execute_kernel__5x_cublas": 0%....50%....100% - 1 pass
+==PROF== Profiling "sm80_xmma_gemm_f16f16_f16f32_f32_tn_n_tilesize64x96x32_stage4_warpsize2x2x1_tensor16x8x16_execute_kernel__5x_cublas": 0%....50%....100% - 1 pass
+stream1_transformer_libtorch_backend=1 mode=eager device=cuda:0 dtype=fp16 seq_len=51 d_model=256 nhead=8 layers=4 output_dim=24 transposed_linear_weights=1
+stream1_transformer_libtorch_micro mode=eager batch=384 iters=3 elapsed_ms=196.94 parents_per_sec=5849.51 candidates_per_sec=140388 checksum=465948672
+==PROF== Disconnected from process 252
+==PROF== Report: /workspace/test_results/nsight_libtorch_transformer_2026-07-04/ncu_eager_gemm64x96.ncu-rep

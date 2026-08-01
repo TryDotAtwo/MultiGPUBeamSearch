@@ -1,0 +1,369 @@
+from __future__ import annotations
+
+import csv
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+GITHUB_REPO_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
+GITHUB_BRANCH = "codex/stream1-piece-transformer"
+EXPECTED_COMMIT_PREFIX = os.environ.get("EXPECTED_COMMIT_PREFIX", "")
+KAGGLE_MODEL_SOURCE = "vladkuznetsov266/megaminx-qtransformer-1782210824/PyTorch/default/1"
+MODEL_SOURCE_SLUG = "megaminx-qtransformer-1782210824"
+MODEL_INPUT_ROOTS = [
+    "/kaggle/input/megaminx-qtransformer-1782210824/PyTorch/default/1",
+    "/kaggle/input/megaminx-qtransformer-1782210824/pytorch/default/1",
+]
+WORK_DIR = Path("/kaggle/working")
+TMP_DIR = Path("/tmp")
+REPO_DIR = TMP_DIR / "beam_solver_libtorch_transformer_bench"
+CUTLASS_DIR = TMP_DIR / "cutlass"
+BUILD_DIR = TMP_DIR / "beam_build_libtorch_transformer_bench"
+WEIGHT_OUT_DIR = WORK_DIR / "stream1_transformer_weights_fp16"
+BENCH_LOG_DIR = WORK_DIR / "stream1_libtorch_transformer_logs"
+ROWS_CSV = WORK_DIR / "stream1_libtorch_transformer_rows.csv"
+SUMMARY_JSON = WORK_DIR / "stream1_libtorch_transformer_summary.json"
+CUDA_ARCHITECTURES = "75"
+BENCH_GPUS = [0, 1]
+BENCH_MODES = ["eager", "cuda_graph"]
+BENCH_BATCHES = [80, 256, 320, 384, 448, 512, 640]
+BENCH_WARMUP = 20
+BENCH_ITERS = 100
+BENCH_PASSES = 3
+NSYS_ITERS = 20
+NSYS_WARMUP = 5
+PYTORCH_BATCH_PROCESS_PER_T4_REFERENCE = 710752.75
+PYTORCH_BATCH_PROCESS_2XT4_REFERENCE = 1421505.5
+
+BENCH_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+row_pattern = re.compile(
+    r"stream1_transformer_libtorch_micro\s+"
+    r"mode=(?P<mode>\w+)\s+"
+    r"batch=(?P<batch>\d+)\s+"
+    r"iters=(?P<iters>\d+)\s+"
+    r"elapsed_ms=(?P<elapsed>[0-9.eE+-]+)\s+"
+    r"parents_per_sec=(?P<parents>[0-9.eE+-]+)\s+"
+    r"candidates_per_sec=(?P<candidates>[0-9.eE+-]+)\s+"
+    r"checksum=(?P<checksum>-?\d+)"
+)
+
+def parse_pass_index(line):
+    match = re.search(r"\spass=(\d+)", line)
+    return int(match.group(1)) if match else 0
+
+
+def run_checked(cmd, cwd=None, env=None):
+    cmd = [str(part) for part in cmd]
+    print("+ " + " ".join(cmd), flush=True)
+    subprocess.run(cmd, cwd=cwd, env=env, check=True)
+
+
+def run_capture(cmd, cwd=None, env=None, check=True):
+    cmd = [str(part) for part in cmd]
+    print("+ " + " ".join(cmd), flush=True)
+    result = subprocess.run(cmd, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    print(result.stdout, end="", flush=True)
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(result.returncode, cmd, output=result.stdout)
+    return result
+
+
+def cleanup_path(path: Path):
+    if path.exists():
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+
+def disk_line(path):
+    usage = shutil.disk_usage(path)
+    return f"{path}: free={usage.free} total={usage.total}"
+
+
+def find_model_checkpoint() -> Path:
+    input_root = Path("/kaggle/input")
+    all_pth = sorted(input_root.rglob("*.pth")) if input_root.exists() else []
+    candidate_roots = [Path(path) for path in MODEL_INPUT_ROOTS if Path(path).exists()]
+    if not candidate_roots and input_root.exists():
+        candidate_roots = sorted({path for path in input_root.rglob("*") if path.is_dir() and MODEL_SOURCE_SLUG in str(path)})
+    matches = []
+    for root in candidate_roots:
+        matches.extend(root.rglob("*.pth"))
+    matches = sorted(set(matches))
+    if len(matches) != 1:
+        message = [
+            "expected exactly one transformer .pth under the configured Kaggle model source",
+            f"configured_model_source={KAGGLE_MODEL_SOURCE}",
+            "candidate_roots=" + json.dumps([str(path) for path in candidate_roots], indent=2),
+            "matched_pth=" + json.dumps([str(path) for path in matches], indent=2),
+            "all_discovered_pth=" + json.dumps([str(path) for path in all_pth], indent=2),
+        ]
+        raise RuntimeError("\n".join(message))
+    return matches[0]
+
+
+def preflight():
+    print("KAGGLE_MODEL_SOURCE=", KAGGLE_MODEL_SOURCE, flush=True)
+    print("GITHUB_BRANCH=", GITHUB_BRANCH, flush=True)
+    print("EXPECTED_COMMIT_PREFIX=", EXPECTED_COMMIT_PREFIX, flush=True)
+    print("BENCH_MODES=", BENCH_MODES, flush=True)
+    print("disk_tmp=", disk_line("/tmp"), flush=True)
+    print("disk_working=", disk_line("/kaggle/working"), flush=True)
+    run_capture(["nvidia-smi"], check=False)
+    run_capture(["bash", "-lc", "which nsys && nsys --version || true"], check=False)
+    import torch
+    print("torch_version=", torch.__version__, flush=True)
+    print("torch_cmake_prefix_path=", torch.utils.cmake_prefix_path, flush=True)
+    gpu_count = torch.cuda.device_count()
+    print("torch_cuda_device_count=", gpu_count, flush=True)
+    if gpu_count < len(BENCH_GPUS):
+        raise RuntimeError(f"expected at least {len(BENCH_GPUS)} GPUs, found {gpu_count}")
+    return torch.utils.cmake_prefix_path
+
+
+def prepare_repo_and_weights(torch_cmake_prefix_path: str):
+    for path in (REPO_DIR, BUILD_DIR, WEIGHT_OUT_DIR):
+        cleanup_path(path)
+    run_checked(["git", "clone", "--branch", GITHUB_BRANCH, "--depth", "1", GITHUB_REPO_URL, REPO_DIR])
+    actual = run_capture(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_DIR).stdout.strip()
+    print("checked_out_commit=", actual, flush=True)
+    if EXPECTED_COMMIT_PREFIX and not actual.startswith(EXPECTED_COMMIT_PREFIX):
+        raise RuntimeError(f"expected commit prefix {EXPECTED_COMMIT_PREFIX}, got {actual}")
+    checkpoint_path = find_model_checkpoint()
+    print("selected_transformer_checkpoint=", checkpoint_path, flush=True)
+    run_checked([
+        sys.executable, REPO_DIR / "tools" / "export_stream1.py",
+        "--weights", checkpoint_path,
+        "--out", WEIGHT_OUT_DIR,
+        "--format", "piece-transformer",
+        "--dtype", "fp16",
+        "--num-classes", "120",
+    ], cwd=REPO_DIR)
+    manifest = json.loads((WEIGHT_OUT_DIR / "manifest.json").read_text(encoding="utf-8"))
+    summary = {
+        "checked_out_commit": actual,
+        "backend": manifest.get("backend"),
+        "dtype": manifest.get("dtype"),
+        "seq_len": manifest.get("seq_len"),
+        "d_model": manifest.get("d_model"),
+        "nhead": manifest.get("nhead"),
+        "layers": manifest.get("num_layers"),
+        "output_dim": manifest.get("output_dim"),
+    }
+    print("exported_manifest_summary=", summary, flush=True)
+    if summary["backend"] != "piece_transformer" or summary["dtype"] != "fp16":
+        raise RuntimeError(f"bad exported manifest summary: {summary}")
+
+    if not (CUTLASS_DIR / "include").exists():
+        cleanup_path(CUTLASS_DIR)
+        run_checked(["git", "clone", "--depth", "1", "https://github.com/NVIDIA/cutlass.git", CUTLASS_DIR])
+
+    run_checked([
+        "cmake", "-S", REPO_DIR, "-B", BUILD_DIR, "-GNinja",
+        "-DCMAKE_BUILD_TYPE=Release",
+        f"-DCMAKE_PREFIX_PATH={torch_cmake_prefix_path}",
+        "-DBEAM_ENABLE_LIBTORCH_STREAM1=ON",
+        f"-DBEAM_CUDA_ARCHITECTURES={CUDA_ARCHITECTURES}",
+        f"-DCUTLASS_DIR={CUTLASS_DIR}",
+    ], cwd=REPO_DIR)
+    run_checked(["cmake", "--build", BUILD_DIR, "--target", "stream1_transformer_libtorch_benchmark", "-j", "2"])
+    return actual
+
+
+def run_one_gpu(gpu: int, mode: str):
+    log_path = BENCH_LOG_DIR / f"stream1_libtorch_transformer_{mode}_gpu{gpu}.log"
+    csv_path = BENCH_LOG_DIR / f"stream1_libtorch_transformer_{mode}_gpu{gpu}.csv"
+    env = os.environ.copy()
+    env["CUDA_VISIBLE_DEVICES"] = str(gpu)
+    cmd = [
+        BUILD_DIR / "stream1_transformer_libtorch_benchmark",
+        "--weight-dir", WEIGHT_OUT_DIR,
+        "--device", "cuda:0",
+        "--batches", ",".join(str(x) for x in BENCH_BATCHES),
+        "--warmup", str(BENCH_WARMUP),
+        "--iters", str(BENCH_ITERS),
+        "--passes", str(BENCH_PASSES),
+        "--csv", csv_path,
+    ]
+    if mode == "cuda_graph":
+        cmd.append("--cuda-graph")
+    elif mode != "eager":
+        raise RuntimeError(f"unknown mode {mode}")
+    print("RUN_STREAM1_LIBTORCH_BENCH_START", {"gpu": gpu, "mode": mode, "log": str(log_path), "csv": str(csv_path)}, flush=True)
+    rows = []
+    start = time.time()
+    with log_path.open("w", buffering=1, encoding="utf-8") as log:
+        proc = subprocess.Popen([str(x) for x in cmd], cwd=REPO_DIR, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            log.write(line)
+            print(line, end="", flush=True)
+            match = row_pattern.search(line)
+            if match:
+                group = match.groupdict()
+                rows.append({
+                    "mode": group["mode"],
+                    "gpu": gpu,
+                    "batch": int(group["batch"]),
+                    "pass": parse_pass_index(line),
+                    "iters": int(group["iters"]),
+                    "elapsed_ms": float(group["elapsed"]),
+                    "parents_per_sec": float(group["parents"]),
+                    "candidates_per_sec": float(group["candidates"]),
+                    "checksum": int(group["checksum"]),
+                })
+        rc = proc.wait()
+    elapsed = time.time() - start
+    print("RUN_STREAM1_LIBTORCH_BENCH_DONE", {"gpu": gpu, "mode": mode, "rc": rc, "seconds": elapsed, "rows": len(rows)}, flush=True)
+    if rc != 0:
+        raise subprocess.CalledProcessError(rc, [str(x) for x in cmd])
+    if not rows:
+        raise RuntimeError(f"no libtorch benchmark rows parsed for gpu {gpu} mode {mode}")
+    return rows
+
+
+def maybe_run_nsys_profile(best_graph_row):
+    if not best_graph_row:
+        print("NSYS_PROFILE_SKIPPED=no_graph_row", flush=True)
+        return
+    nsys_path = shutil.which("nsys")
+    if not nsys_path:
+        print("NSYS_PROFILE_UNAVAILABLE=nsys_not_found", flush=True)
+        return
+    gpu = int(best_graph_row["gpu"])
+    batch = int(best_graph_row["batch"])
+    output_base = WORK_DIR / f"stream1_libtorch_cuda_graph_nsys_gpu{gpu}_b{batch}"
+    env = os.environ.copy()
+    env["CUDA_VISIBLE_DEVICES"] = str(gpu)
+    cmd = [
+        nsys_path, "profile",
+        "--trace=cuda,nvtx,osrt,cublas",
+        "--stats=true",
+        "--force-overwrite=true",
+        "-o", output_base,
+        BUILD_DIR / "stream1_transformer_libtorch_benchmark",
+        "--weight-dir", WEIGHT_OUT_DIR,
+        "--device", "cuda:0",
+        "--batches", str(batch),
+        "--warmup", str(NSYS_WARMUP),
+        "--iters", str(NSYS_ITERS),
+        "--cuda-graph",
+    ]
+    result = run_capture(cmd, cwd=REPO_DIR, env=env, check=False)
+    print("NSYS_PROFILE_RC=", result.returncode, flush=True)
+    print("NSYS_PROFILE_OUTPUT_BASE=", output_base, flush=True)
+
+
+
+def summarize_mean_rows(rows):
+    groups = {}
+    for row in rows:
+        key = (row["mode"], row["gpu"], row["batch"])
+        groups.setdefault(key, []).append(row)
+    summaries = []
+    for (mode, gpu, batch), values in sorted(groups.items()):
+        candidates = [float(row["candidates_per_sec"]) for row in values]
+        elapsed = [float(row["elapsed_ms"]) for row in values]
+        summaries.append({
+            "mode": mode,
+            "gpu": gpu,
+            "batch": batch,
+            "passes": len(values),
+            "mean_candidates_per_sec": sum(candidates) / len(candidates),
+            "best_candidates_per_sec": max(candidates),
+            "min_candidates_per_sec": min(candidates),
+            "mean_elapsed_ms": sum(elapsed) / len(elapsed),
+        })
+    return summaries
+
+def main():
+    torch_cmake_prefix_path = preflight()
+    checked_out_commit = prepare_repo_and_weights(torch_cmake_prefix_path)
+    all_rows = []
+    for mode in BENCH_MODES:
+        for gpu in BENCH_GPUS:
+            all_rows.extend(run_one_gpu(gpu, mode))
+    with ROWS_CSV.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=["mode", "gpu", "pass", "batch", "iters", "elapsed_ms", "parents_per_sec", "candidates_per_sec", "checksum"])
+        writer.writeheader()
+        writer.writerows(all_rows)
+    best_by_mode_gpu = {}
+    for row in all_rows:
+        key = (row["mode"], row["gpu"])
+        if key not in best_by_mode_gpu or row["candidates_per_sec"] > best_by_mode_gpu[key]["candidates_per_sec"]:
+            best_by_mode_gpu[key] = row
+    aggregate_by_mode = {}
+    for mode in BENCH_MODES:
+        aggregate_by_mode[mode] = sum(
+            row["candidates_per_sec"]
+            for (row_mode, _gpu), row in best_by_mode_gpu.items()
+            if row_mode == mode
+        )
+    mean_rows = summarize_mean_rows(all_rows)
+    best_mean_by_mode_gpu = {}
+    for row in mean_rows:
+        key = (row["mode"], row["gpu"])
+        if key not in best_mean_by_mode_gpu or row["mean_candidates_per_sec"] > best_mean_by_mode_gpu[key]["mean_candidates_per_sec"]:
+            best_mean_by_mode_gpu[key] = row
+    aggregate_mean_by_mode = {}
+    for mode in BENCH_MODES:
+        aggregate_mean_by_mode[mode] = sum(
+            row["mean_candidates_per_sec"]
+            for (row_mode, _gpu), row in best_mean_by_mode_gpu.items()
+            if row_mode == mode
+        )
+    best_graph_row = None
+    graph_rows = [row for (mode, _gpu), row in best_by_mode_gpu.items() if mode == "cuda_graph"]
+    if graph_rows:
+        best_graph_row = max(graph_rows, key=lambda row: row["candidates_per_sec"])
+    maybe_run_nsys_profile(best_graph_row)
+    summary = {
+        "checked_out_commit": checked_out_commit,
+        "rows_csv": str(ROWS_CSV),
+        "best_by_mode_gpu": {f"{mode}/gpu{gpu}": row for (mode, gpu), row in sorted(best_by_mode_gpu.items())},
+        "aggregate_by_mode_candidates_per_sec": aggregate_by_mode,
+        "mean_by_mode_gpu_batch": mean_rows,
+        "best_mean_by_mode_gpu": {f"{mode}/gpu{gpu}": row for (mode, gpu), row in sorted(best_mean_by_mode_gpu.items())},
+        "aggregate_mean_by_mode_candidates_per_sec": aggregate_mean_by_mode,
+        "pytorch_batch_process_per_t4_reference": PYTORCH_BATCH_PROCESS_PER_T4_REFERENCE,
+        "pytorch_batch_process_2xt4_reference": PYTORCH_BATCH_PROCESS_2XT4_REFERENCE,
+        "libtorch_over_pytorch_2xt4_by_mode": {
+            mode: aggregate / PYTORCH_BATCH_PROCESS_2XT4_REFERENCE
+            for mode, aggregate in aggregate_by_mode.items()
+        },
+        "libtorch_mean_over_pytorch_2xt4_by_mode": {
+            mode: aggregate / PYTORCH_BATCH_PROCESS_2XT4_REFERENCE
+            for mode, aggregate in aggregate_mean_by_mode.items()
+        },
+        "cuda_graph_over_eager": (
+            aggregate_by_mode.get("cuda_graph", 0.0) / aggregate_by_mode.get("eager", 1.0)
+            if aggregate_by_mode.get("eager", 0.0) > 0 else None
+        ),
+    }
+    SUMMARY_JSON.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    cleanup_path(WEIGHT_OUT_DIR)
+    print("STREAM1_LIBTORCH_WEIGHTS_CLEANED=", WEIGHT_OUT_DIR, flush=True)
+    print("STREAM1_LIBTORCH_BENCH_CSV=", ROWS_CSV, flush=True)
+    for (mode, gpu), row in sorted(best_by_mode_gpu.items()):
+        print("STREAM1_LIBTORCH_BEST_MODE_GPU", mode, gpu, row, flush=True)
+    for mode, aggregate in sorted(aggregate_by_mode.items()):
+        print("STREAM1_LIBTORCH_BEST_2XT4_AGG_CANDIDATES_PER_SEC", mode, aggregate, flush=True)
+        print("STREAM1_LIBTORCH_OVER_PYTORCH_2XT4", mode, summary["libtorch_over_pytorch_2xt4_by_mode"][mode], flush=True)
+    for (mode, gpu), row in sorted(best_mean_by_mode_gpu.items()):
+        print("STREAM1_LIBTORCH_BEST_MEAN_MODE_GPU", mode, gpu, row, flush=True)
+    for mode, aggregate in sorted(aggregate_mean_by_mode.items()):
+        print("STREAM1_LIBTORCH_BEST_MEAN_2XT4_AGG_CANDIDATES_PER_SEC", mode, aggregate, flush=True)
+        print("STREAM1_LIBTORCH_MEAN_OVER_PYTORCH_2XT4", mode, summary["libtorch_mean_over_pytorch_2xt4_by_mode"][mode], flush=True)
+    print("STREAM1_LIBTORCH_CUDA_GRAPH_OVER_EAGER=", summary["cuda_graph_over_eager"], flush=True)
+    print("STREAM1_LIBTORCH_SUMMARY_JSON=", SUMMARY_JSON, flush=True)
+
+
+if __name__ == "__main__":
+    main()

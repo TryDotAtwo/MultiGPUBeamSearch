@@ -82,7 +82,7 @@ int main() {
     require(score[0] <= SCORE_MAX_KEY, "stream1 score key range failed");
     require(score[1] != score[0], "stream1 move-dependent score failed");
 
-    const Stream1NetworkDims dims{STATE_LEN, STATE_VALUE_PAD, 16, 8, 1, static_cast<std::uint32_t>(MOVE_COUNT)};
+    const Stream1NetworkDims dims{STATE_LEN, STATE_VALUE_PAD, 16, 8, 1, static_cast<std::uint32_t>(MOVE_COUNT), STREAM1_DTYPE_FP16, STREAM1_NORM_NONE};
     std::vector<half> input_weight(static_cast<std::size_t>(dims.state_len) * dims.num_classes * dims.hidden1, __float2half(0.0f));
     std::vector<half> input_bias(dims.hidden1, __float2half(0.0f));
     std::vector<half> hidden_weight(static_cast<std::size_t>(dims.hidden1) * dims.hidden2, __float2half(0.0f));
@@ -133,12 +133,20 @@ int main() {
     Stream1NetworkView network{
         d_input_weight,
         d_input_bias,
+        nullptr,
+        nullptr,
         d_hidden_weight,
         d_hidden_bias,
+        nullptr,
+        nullptr,
         residual_fc1_weight_ptrs,
         residual_fc1_bias_ptrs,
+        nullptr,
+        nullptr,
         residual_fc2_weight_ptrs,
         residual_fc2_bias_ptrs,
+        nullptr,
+        nullptr,
         d_output_weight,
         d_output_bias,
         dims};
@@ -174,16 +182,26 @@ int main() {
         dims.hidden1,
         dims.hidden2,
         dims.residual_count,
-        STREAM1_SINGLE_SCORE_OUTPUT_DIM};
+        STREAM1_SINGLE_SCORE_OUTPUT_DIM,
+        STREAM1_DTYPE_FP16,
+        STREAM1_NORM_NONE};
     Stream1NetworkView child_network{
         d_input_weight,
         d_input_bias,
+        nullptr,
+        nullptr,
         d_hidden_weight,
         d_hidden_bias,
+        nullptr,
+        nullptr,
         residual_fc1_weight_ptrs,
         residual_fc1_bias_ptrs,
+        nullptr,
+        nullptr,
         residual_fc2_weight_ptrs,
         residual_fc2_bias_ptrs,
+        nullptr,
+        nullptr,
         d_output_weight,
         d_output_bias,
         child_dims};

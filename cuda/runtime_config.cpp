@@ -1,4 +1,6 @@
 #include "runtime_config.hpp"
+#define BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
+#include "../tools/stream1_weight_io.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -89,37 +91,87 @@ std::uint64_t ceil_log2_u64(std::uint64_t value) {
 
 std::uint64_t estimate_stream1_weight_bytes(const Stream1ModelConfig& model) {
     constexpr std::uint64_t fp16 = sizeof(std::uint16_t);
-    std::uint64_t total = 0;
-    total += static_cast<std::uint64_t>(model.state_len) * model.num_classes * model.hidden1 * fp16;
-    total += static_cast<std::uint64_t>(model.hidden1) * fp16;
-    total += static_cast<std::uint64_t>(model.hidden1) * model.hidden2 * fp16;
-    total += static_cast<std::uint64_t>(model.hidden2) * fp16;
-    total += 2ULL * static_cast<std::uint64_t>(model.residual_count) * model.hidden2 * model.hidden2 * fp16;
-    total += 2ULL * static_cast<std::uint64_t>(model.residual_count) * model.hidden2 * fp16;
-    total += static_cast<std::uint64_t>(model.hidden2) * model.output_dim * fp16;
-    total += static_cast<std::uint64_t>(model.output_dim) * fp16;
-    return total;
+    switch (model.backend) {
+    case STREAM1_BACKEND_MLP: {
+        std::uint64_t total = 0;
+        total += static_cast<std::uint64_t>(model.state_len) * model.num_classes * model.hidden1 * fp16;
+        total += static_cast<std::uint64_t>(model.hidden1) * fp16;
+        if (model.normalization == STREAM1_NORM_LAYERNORM) {
+            total += 2ULL * static_cast<std::uint64_t>(model.hidden1) * fp16;
+        }
+        total += static_cast<std::uint64_t>(model.hidden1) * model.hidden2 * fp16;
+        total += static_cast<std::uint64_t>(model.hidden2) * fp16;
+        if (model.normalization == STREAM1_NORM_LAYERNORM) {
+            total += 2ULL * static_cast<std::uint64_t>(model.hidden2) * fp16;
+        }
+        total += 2ULL * static_cast<std::uint64_t>(model.residual_count) * model.hidden2 * model.hidden2 * fp16;
+        total += 2ULL * static_cast<std::uint64_t>(model.residual_count) * model.hidden2 * fp16;
+        if (model.normalization == STREAM1_NORM_LAYERNORM) {
+            total += 4ULL * static_cast<std::uint64_t>(model.residual_count) * model.hidden2 * fp16;
+        }
+        total += static_cast<std::uint64_t>(model.hidden2) * model.output_dim * fp16;
+        total += static_cast<std::uint64_t>(model.output_dim) * fp16;
+        return total;
+    }
+    case STREAM1_BACKEND_PIECE_TRANSFORMER: {
+        std::uint64_t half_values = 0;
+        half_values += static_cast<std::uint64_t>(model.max_piece_size) * model.num_classes * model.d_model;
+        half_values += static_cast<std::uint64_t>(model.num_pieces) * model.d_model;
+        half_values += model.d_model;
+        half_values += 4ULL * model.d_model;
+        for (std::uint32_t layer = 0; layer < model.transformer_layers; ++layer) {
+            half_values += 2ULL * model.d_model;
+            half_values += static_cast<std::uint64_t>(model.d_model) * 3ULL * model.d_model;
+            half_values += 3ULL * model.d_model;
+            half_values += static_cast<std::uint64_t>(model.d_model) * model.d_model;
+            half_values += model.d_model;
+            half_values += 2ULL * model.d_model;
+            half_values += static_cast<std::uint64_t>(model.d_model) * model.ff_dim;
+            half_values += model.ff_dim;
+            half_values += static_cast<std::uint64_t>(model.ff_dim) * model.d_model;
+            half_values += model.d_model;
+        }
+        half_values += static_cast<std::uint64_t>(model.d_model) * model.output_dim;
+        half_values += model.output_dim;
+        const std::uint64_t piece_table_bytes =
+            static_cast<std::uint64_t>(model.num_pieces) * model.max_piece_size * sizeof(std::uint16_t) +
+            static_cast<std::uint64_t>(model.num_pieces) * model.max_piece_size * sizeof(std::uint8_t) +
+            static_cast<std::uint64_t>(model.num_pieces) * sizeof(std::uint8_t);
+        return half_values * fp16 + piece_table_bytes;
+    }
+    default:
+        throw std::invalid_argument("unsupported Stream1 backend in weight byte estimate");
+    }
 }
-
 std::uint64_t estimate_read_only_table_bytes() {
     return static_cast<std::uint64_t>(MOVE_COUNT) * STATE_STORAGE_LEN * sizeof(std::uint8_t) +
            sizeof(State128) +
            static_cast<std::uint64_t>(STATE_STORAGE_LEN) * STATE_VALUE_PAD * sizeof(Hash128);
 }
 
-std::uint64_t estimate_stream1_scratch_bytes(std::uint32_t b_micro, const Stream1ModelConfig& model) {
-    return stream1_inference_rows(b_micro, model) *
-           (static_cast<std::uint64_t>(model.hidden1) + 2ULL * model.hidden2 + model.output_dim) *
-           sizeof(std::uint16_t);
+std::uint64_t estimate_stream1_scratch_b_micro(
+    const RuntimeConfig& config,
+    const Stream1ModelConfig& stream1_model) {
+    if (stream1_model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        return config.b_micro;
+    }
+    const std::uint32_t transformer_micro = env_u32("BEAM_STREAM1_TRANSFORMER_MICRO", config.b_micro);
+    if (transformer_micro == 0U || transformer_micro > config.b_micro) {
+        throw std::invalid_argument("BEAM_STREAM1_TRANSFORMER_MICRO must be in [1, B_MICRO]");
+    }
+    return transformer_micro;
 }
 
 std::uint64_t estimate_non_static_device_bytes(
     const RuntimeConfig& config,
     const Stream1ModelConfig& stream1_model) {
+    const std::uint32_t scratch_b_micro = estimate_stream1_scratch_b_micro(config, stream1_model);
     return estimate_read_only_table_bytes() +
            estimate_stream1_weight_bytes(stream1_model) +
-           static_cast<std::uint64_t>(config.inference_parallelism) *
-               estimate_stream1_scratch_bytes(config.b_micro, stream1_model);
+           stream1_weights::stream1_scratch_bytes(
+               stream1_model,
+               scratch_b_micro,
+               config.inference_parallelism);
 }
 
 std::uint64_t beam_alignment_for(const RuntimeConfig& config) {
@@ -147,15 +199,35 @@ std::uint32_t set_stream3_batch_from_ring_slots(RuntimeConfig& config, std::uint
     return ring_slot_count;
 }
 
-void set_ring_count_from_logical_shard(RuntimeConfig& config) {
+std::uint32_t set_stream3_batch_from_candidates(RuntimeConfig& config, std::uint32_t stream3_batch_candidates) {
     const std::uint64_t slot_candidates = ring_slot_candidate_count(config);
+    if (stream3_batch_candidates == 0U || slot_candidates == 0ULL) {
+        throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be nonzero");
+    }
+    if (static_cast<std::uint64_t>(stream3_batch_candidates) % slot_candidates != 0ULL) {
+        throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be divisible by B_MICRO * MOVE_COUNT");
+    }
+    const std::uint64_t ring_slot_count = static_cast<std::uint64_t>(stream3_batch_candidates) / slot_candidates;
+    if (ring_slot_count == 0ULL) {
+        throw std::invalid_argument("derived RING_SLOT_COUNT must be nonzero");
+    }
+    config.stream3_batch_candidates = stream3_batch_candidates;
+    return checked_u32(ring_slot_count, "stream3_ring_slots");
+}
+
+void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stream3_staging_ring_slots) {
     const std::uint64_t local_capacity = local_frontier_capacity(config);
     const std::uint64_t logical_shard_size = ceil_div_u64(local_capacity, config.shard_count);
-    config.ring_count = checked_u32(ceil_div_u64(logical_shard_size, slot_candidates), "ring_count");
+    const std::uint64_t staging_slots = std::max<std::uint64_t>(1ULL, stream3_staging_ring_slots);
+    const std::uint64_t target_ring_candidates = logical_shard_size * staging_slots;
+    config.ring_count = checked_u32(
+        ceil_div_u64(target_ring_candidates, config.stream3_batch_candidates),
+        "ring_count");
     if (config.ring_count == 0U) {
         throw std::invalid_argument("derived RING_COUNT must be nonzero");
     }
 }
+
 
 void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
     const std::uint64_t logical_shard_size = logical_shard_size_for(config);
@@ -338,7 +410,7 @@ bool try_make_candidate(
     if (config.inference_parallelism > ring_slot_count) {
         return false;
     }
-    set_ring_count_from_logical_shard(config);
+    set_ring_count_from_logical_shard(config, ring_slot_count);
     set_shard_capacity_from_logical_shard(config);
     set_global_spill_capacity(config);
     if (config.stream4_batch_candidates > config.shard_capacity_candidates ||
@@ -465,7 +537,8 @@ RuntimeConfigBuild build_manual_runtime_config(
     build.gpu_headroom_bytes = gpu_headroom_bytes;
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;
-    build.stream3_ring_slots = required_env_u32("BEAM_STREAM3_RING_SLOTS");
+    const std::uint32_t requested_stream3_ring_slots = required_env_u32("BEAM_STREAM3_RING_SLOTS");
+    build.stream3_ring_slots = requested_stream3_ring_slots;
     build.config.shard_count = required_env_u32("BEAM_SHARD_COUNT");
     build.config.shard_buffer_count = env_u32("BEAM_SHARD_BUFFER_COUNT", 2);
     build.config.stream4_batch_candidates = required_env_u32("BEAM_STREAM4_BATCH_CANDIDATES");
@@ -475,14 +548,20 @@ RuntimeConfigBuild build_manual_runtime_config(
     build.config.global_spill_capacity =
         build.config.shard_buffer_count > 1U ? env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 0) :
         required_env_u32("BEAM_GLOBAL_SPILL_CAPACITY");
-    set_stream3_batch_from_ring_slots(build.config, build.stream3_ring_slots);
+    if (env_present("BEAM_STREAM3_BATCH_CANDIDATES")) {
+        build.stream3_ring_slots = set_stream3_batch_from_candidates(
+            build.config,
+            required_env_u32("BEAM_STREAM3_BATCH_CANDIDATES"));
+    } else {
+        set_stream3_batch_from_ring_slots(build.config, build.stream3_ring_slots);
+    }
     if (build.config.inference_parallelism > build.stream3_ring_slots) {
-        throw std::invalid_argument("manual BEAM_STREAM1_CONCURRENCY must be <= BEAM_STREAM3_RING_SLOTS");
+        throw std::invalid_argument("manual BEAM_STREAM1_CONCURRENCY must be <= effective STREAM3 ring slots");
     }
     if (env_present("BEAM_RING_COUNT")) {
         build.config.ring_count = env_u32("BEAM_RING_COUNT", 1);
     } else {
-        set_ring_count_from_logical_shard(build.config);
+        set_ring_count_from_logical_shard(build.config, requested_stream3_ring_slots);
     }
     if (build.config.stream4_batch_candidates % build.config.stream4_batch_alignment != 0U) {
         throw std::invalid_argument("manual BEAM_STREAM4_BATCH_CANDIDATES must be aligned to BEAM_STREAM4_BATCH_ALIGNMENT");
@@ -591,11 +670,15 @@ RuntimeConfigBuild build_runtime_config_from_budget(
     config.global_spill_scale_ppm = env_u32("BEAM_GLOBAL_SPILL_SCALE_PPM", 2'000'000);
     config.stream5_recv_capacity_scale_ppm = env_u32("BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM", 2'000'000);
     config.final_materialize_chunk_candidates = env_u32("BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES", 0);
+    const std::uint32_t default_final_exchange_scale_ppm =
+        world_size > UINT32_MAX / 1'000'000U ? UINT32_MAX : world_size * 1'000'000U;
     config.final_materialize_exchange_scale_ppm =
-        env_u32("BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM", 2'000'000);
+        env_u32("BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM", default_final_exchange_scale_ppm);
     config.global_threshold_update_period_shards =
         env_u32("BEAM_GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS", 64);
     config.solved_result_capacity = env_u32("BEAM_SOLVED_RESULT_CAPACITY", 1024);
+    config.solve_bucket_gather_scratch_bytes =
+        env_u64("BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES", 0);
     build.gpu_headroom_bytes = env_u64("BEAM_GPU_HEADROOM_BYTES", 768ULL * 1024ULL * 1024ULL);
     build.gpu_budget_bytes =
         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;

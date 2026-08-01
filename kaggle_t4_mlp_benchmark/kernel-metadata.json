@@ -1,0 +1,23 @@
+{
+    "id":  "trydotatwo/cayley-beam-mlp-native-vs-torch-2xt4-benchmark",
+    "title":  "Cayley Beam MLP Native vs Torch 2xT4 Benchmark",
+    "code_file":  "t4-mlp-native-vs-torch-benchmark.ipynb",
+    "language":  "python",
+    "kernel_type":  "notebook",
+    "is_private":  true,
+    "enable_gpu":  true,
+    "machine_shape":  "NvidiaTeslaT4",
+    "enable_internet":  true,
+    "dataset_sources":  [
+
+                        ],
+    "competition_sources":  [
+
+                            ],
+    "kernel_sources":  [
+
+                       ],
+    "model_sources":  [
+
+                      ]
+}

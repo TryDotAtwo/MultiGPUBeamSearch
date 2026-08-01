@@ -1,0 +1,307 @@
+[{"stream_name":"stdout","time":0.664275573,"data":"PIPELINE_SMOKE_GITHUB_BRANCH= codex/stream1-piece-transformer\n"}
+,{"stream_name":"stdout","time":0.664346095,"data":"PIPELINE_SMOKE_EXPECTED_COMMIT_PREFIX= \n"}
+,{"stream_name":"stdout","time":0.665131196,"data":"disk_tmp= /tmp: free=1143627427840 total=8656922775552\n"}
+,{"stream_name":"stdout","time":0.665146901,"data":"disk_working= /kaggle/working: free=20940541952 total=20957446144\n"}
+,{"stream_name":"stdout","time":0.665151176,"data":"+ nvidia-smi\n"}
+,{"stream_name":"stdout","time":1.103176513,"data":"Mon Jul  6 14:51:05 2026       \n"}
+,{"stream_name":"stdout","time":1.103222679,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":1.103228208,"data":"| NVIDIA-SMI 580.159.04             Driver Version: 580.159.04     CUDA Version: 13.0     |\n"}
+,{"stream_name":"stdout","time":1.103232519,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":1.103235767,"data":"| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n"}
+,{"stream_name":"stdout","time":1.103240109,"data":"| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n"}
+,{"stream_name":"stdout","time":1.10324429,"data":"|                                         |                        |               MIG M. |\n"}
+,{"stream_name":"stdout","time":1.103248299,"data":"|=========================================+========================+======================|\n"}
+,{"stream_name":"stdout","time":1.103252337,"data":"|   0  Tesla T4                       Off |   00000000:00:04.0 Off |                    0 |\n"}
+,{"stream_name":"stdout","time":1.103256258,"data":"| N/A   51C    P8             12W /   70W |       0MiB /  15360MiB |      0%      Default |\n"}
+,{"stream_name":"stdout","time":1.103260325,"data":"|                                         |                        |                  N/A |\n"}
+,{"stream_name":"stdout","time":1.103264622,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":1.103268939,"data":"|   1  Tesla T4                       Off |   00000000:00:05.0 Off |                    0 |\n"}
+,{"stream_name":"stdout","time":1.103272741,"data":"| N/A   53C    P8             10W /   70W |       0MiB /  15360MiB |      0%      Default |\n"}
+,{"stream_name":"stdout","time":1.103276204,"data":"|                                         |                        |                  N/A |\n"}
+,{"stream_name":"stdout","time":1.103280704,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":1.103284493,"data":"\n"}
+,{"stream_name":"stdout","time":1.103288058,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":1.103291746,"data":"| Processes:                                                                              |\n"}
+,{"stream_name":"stdout","time":1.103295645,"data":"|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n"}
+,{"stream_name":"stdout","time":1.103299358,"data":"|        ID   ID                                                               Usage      |\n"}
+,{"stream_name":"stdout","time":1.103303081,"data":"|=========================================================================================|\n"}
+,{"stream_name":"stdout","time":1.103306845,"data":"|  No running processes found                                                             |\n"}
+,{"stream_name":"stdout","time":1.103323872,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":6.035312096,"data":"torch_version= 2.10.0+cu128\n"}
+,{"stream_name":"stdout","time":6.035371832,"data":"torch_cuda_device_count= 2\n"}
+,{"stream_name":"stdout","time":6.306755701,"data":"torch_cuda_device_0=Tesla T4\n"}
+,{"stream_name":"stdout","time":6.306793567,"data":"torch_cuda_device_1=Tesla T4\n"}
+,{"stream_name":"stdout","time":6.306895081,"data":"+ git clone --branch codex/stream1-piece-transformer --depth 1 https://github.com/TryDotAtwo/MultiGPUBeamSearch.git /tmp/beam_solver_pipeline_smoke\n"}
+,{"stream_name":"stderr","time":6.329496817,"data":"Cloning into '/tmp/beam_solver_pipeline_smoke'...\n"}
+,{"stream_name":"stdout","time":7.938718296,"data":"+ git rev-parse --short HEAD\n"}
+,{"stream_name":"stdout","time":7.942140216,"data":"62c14bb\n"}
+,{"stream_name":"stdout","time":7.942159737,"data":"checked_out_commit= 62c14bb\n"}
+,{"stream_name":"stdout","time":7.942352527,"data":"+ git clone --depth 1 https://github.com/NVIDIA/cutlass.git /tmp/cutlass\n"}
+,{"stream_name":"stderr","time":7.944414905,"data":"Cloning into '/tmp/cutlass'...\n"}
+,{"stream_name":"stdout","time":11.432762063,"data":"+ cmake -S /tmp/beam_solver_pipeline_smoke -B /tmp/beam_build_pipeline_smoke -GNinja -DCMAKE_BUILD_TYPE=Release -DBEAM_CUDA_ARCHITECTURES=75 -DCUTLASS_DIR=/tmp/cutlass\n"}
+,{"stream_name":"stdout","time":11.743214987,"data":"-- Beam state logical bytes: 120\n"}
+,{"stream_name":"stdout","time":11.743245793,"data":"-- Beam state physical bytes: 128\n"}
+,{"stream_name":"stdout","time":11.743250415,"data":"-- Beam state alignment: 16\n"}
+,{"stream_name":"stdout","time":11.743254054,"data":"-- Beam move count: 24\n"}
+,{"stream_name":"stdout","time":12.027628366,"data":"-- The CXX compiler identification is GNU 11.4.0\n"}
+,{"stream_name":"stdout","time":13.873221034,"data":"-- The CUDA compiler identification is NVIDIA 12.8.93 with host compiler GNU 11.4.0\n"}
+,{"stream_name":"stdout","time":13.896500395,"data":"-- Detecting CXX compiler ABI info\n"}
+,{"stream_name":"stdout","time":13.996610517,"data":"-- Detecting CXX compiler ABI info - done\n"}
+,{"stream_name":"stdout","time":14.02480159,"data":"-- Check for working CXX compiler: /usr/bin/c++ - skipped\n"}
+,{"stream_name":"stdout","time":14.025784108,"data":"-- Detecting CXX compile features\n"}
+,{"stream_name":"stdout","time":14.027587711,"data":"-- Detecting CXX compile features - done\n"}
+,{"stream_name":"stdout","time":14.051485296,"data":"-- Detecting CUDA compiler ABI info\n"}
+,{"stream_name":"stdout","time":15.105977328,"data":"-- Detecting CUDA compiler ABI info - done\n"}
+,{"stream_name":"stdout","time":15.169093166,"data":"-- Check for working CUDA compiler: /usr/local/cuda/bin/nvcc - skipped\n"}
+,{"stream_name":"stdout","time":15.247386342,"data":"-- Detecting CUDA compile features\n"}
+,{"stream_name":"stdout","time":15.248072595,"data":"-- Detecting CUDA compile features - done\n"}
+,{"stream_name":"stdout","time":15.272943098,"data":"-- Configuring done (3.5s)\n"}
+,{"stream_name":"stdout","time":15.314837199,"data":"-- Generating done (0.0s)\n"}
+,{"stream_name":"stdout","time":15.315356863,"data":"-- Build files have been written to: /tmp/beam_build_pipeline_smoke\n"}
+,{"stream_name":"stdout","time":15.322121423,"data":"+ cmake --build /tmp/beam_build_pipeline_smoke --target stream_pipeline_benchmark contract_tests -j 2\n"}
+,{"stream_name":"stdout","time":16.119919861,"data":"[1/25] Building CXX object CMakeFiles/beam_core.dir/src/state.cpp.o\n"}
+,{"stream_name":"stdout","time":16.176079907,"data":"[2/25] Building CXX object CMakeFiles/beam_core.dir/src/config.cpp.o\n"}
+,{"stream_name":"stdout","time":16.694221397,"data":"[3/25] Building CXX object CMakeFiles/beam_core.dir/src/history.cpp.o\n"}
+,{"stream_name":"stdout","time":16.700068168,"data":"[4/25] Building CXX object CMakeFiles/beam_core.dir/src/hash.cpp.o\n"}
+,{"stream_name":"stdout","time":17.477257144,"data":"[5/25] Building CXX object CMakeFiles/beam_core.dir/src/stream4.cpp.o\n"}
+,{"stream_name":"stdout","time":17.477288826,"data":"In file included from /usr/include/c++/11/bits/stl_algo.h:61,\n"}
+,{"stream_name":"stdout","time":17.477294622,"data":"                 from /usr/include/c++/11/vector:62,\n"}
+,{"stream_name":"stdout","time":17.477299801,"data":"                 from /tmp/beam_solver_pipeline_smoke/src/stream4.hpp:5,\n"}
+,{"stream_name":"stdout","time":17.477306187,"data":"                 from /tmp/beam_solver_pipeline_smoke/src/stream4.cpp:1:\n"}
+,{"stream_name":"stdout","time":17.477317209,"data":"/usr/include/c++/11/bits/stl_heap.h: In function ‘constexpr void std::__adjust_heap(_RandomAccessIterator, _Distance, _Distance, _Tp, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator\u003cbeam::CandidateMeta*, std::vector\u003cbeam::CandidateMeta\u003e \u003e; _Distance = long int; _Tp = beam::CandidateMeta; _Compare = __gnu_cxx::__ops::_Iter_comp_iter\u003cbeam::stream4_threshold_sort_dedup(const std::vector\u003cbeam::CandidateMeta\u003e\u0026, uint32_t)::\u003clambda(const beam::CandidateMeta\u0026, const beam::CandidateMeta\u0026)\u003e \u003e]’:\n"}
+,{"stream_name":"stdout","time":17.477324795,"data":"/usr/include/c++/11/bits/stl_heap.h:223:5: note: the ABI for passing parameters with 32-byte alignment has changed in GCC 4.6\n"}
+,{"stream_name":"stdout","time":17.477328112,"data":"  223 |     __adjust_heap(_RandomAccessIterator __first, _Distance __holeIndex,\n"}
+,{"stream_name":"stdout","time":17.477331543,"data":"      |     ^~~~~~~~~~~~~\n"}
+,{"stream_name":"stdout","time":17.630749007,"data":"[6/25] Building CXX object CMakeFiles/beam_core.dir/src/stream3.cpp.o\n"}
+,{"stream_name":"stdout","time":18.36364389,"data":"[7/25] Building CXX object CMakeFiles/beam_core.dir/src/frontier_cpu.cpp.o\n"}
+,{"stream_name":"stdout","time":18.363673564,"data":"In file included from /usr/include/c++/11/bits/stl_algo.h:61,\n"}
+,{"stream_name":"stdout","time":18.363677545,"data":"                 from /usr/include/c++/11/vector:62,\n"}
+,{"stream_name":"stdout","time":18.363680702,"data":"                 from /tmp/beam_solver_pipeline_smoke/src/state.hpp:5,\n"}
+,{"stream_name":"stdout","time":18.363684528,"data":"                 from /tmp/beam_solver_pipeline_smoke/src/frontier_cpu.hpp:4,\n"}
+,{"stream_name":"stdout","time":18.363702666000002,"data":"                 from /tmp/beam_solver_pipeline_smoke/src/frontier_cpu.cpp:1:\n"}
+,{"stream_name":"stdout","time":18.363710243,"data":"/usr/include/c++/11/bits/stl_heap.h: In function ‘constexpr void std::__adjust_heap(_RandomAccessIterator, _Distance, _Distance, _Tp, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator\u003cbeam::CandidateMeta*, std::vector\u003cbeam::CandidateMeta\u003e \u003e; _Distance = long int; _Tp = beam::CandidateMeta; _Compare = __gnu_cxx::__ops::_Iter_comp_iter\u003cbeam::expand_depth_cpu_reference(const std::vector\u003cbeam::StatePacked\u003e\u0026, const std::vector\u003cstd::array\u003cunsigned char, 128\u003e \u003e\u0026, const State128\u0026, const ZobristTable\u0026, uint32_t, uint64_t)::\u003clambda(const beam::CandidateMeta\u0026, const beam::CandidateMeta\u0026)\u003e \u003e]’:\n"}
+,{"stream_name":"stdout","time":18.363719885,"data":"/usr/include/c++/11/bits/stl_heap.h:223:5: note: the ABI for passing parameters with 32-byte alignment has changed in GCC 4.6\n"}
+,{"stream_name":"stdout","time":18.36373317,"data":"  223 |     __adjust_heap(_RandomAccessIterator __first, _Distance __holeIndex,\n"}
+,{"stream_name":"stdout","time":18.36373694,"data":"      |     ^~~~~~~~~~~~~\n"}
+,{"stream_name":"stdout","time":18.38297625,"data":"[8/25] Linking CXX static library libbeam_core.a\n"}
+,{"stream_name":"stdout","time":30.604695789,"data":"[9/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1.cu.o\n"}
+,{"stream_name":"stdout","time":30.604728734,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604735424,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":30.604740931,"data":"         ^\n"}
+,{"stream_name":"stdout","time":30.604750617,"data":"\n"}
+,{"stream_name":"stdout","time":30.604754280999998,"data":"Remark: The warnings can be suppressed with \"-diag-suppress \u003cwarning-number\u003e\"\n"}
+,{"stream_name":"stdout","time":30.604757554,"data":"\n"}
+,{"stream_name":"stdout","time":30.604760596,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604764216,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":30.604767434,"data":"                                  ^\n"}
+,{"stream_name":"stdout","time":30.604770295,"data":"\n"}
+,{"stream_name":"stdout","time":30.60477312,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604776499,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":30.604779515,"data":"         ^\n"}
+,{"stream_name":"stdout","time":30.604782897,"data":"\n"}
+,{"stream_name":"stdout","time":30.604807636,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604814233,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":30.604843661,"data":"                                  ^\n"}
+,{"stream_name":"stdout","time":30.604849534,"data":"\n"}
+,{"stream_name":"stdout","time":30.604853864,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(221): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604859156,"data":"      pad_d(std::get\u003c0\u003e(padding)[0]), stride_d(stride[0]), dilation_d(dilation[0])\n"}
+,{"stream_name":"stdout","time":30.604863912,"data":"            ^\n"}
+,{"stream_name":"stdout","time":30.604868224,"data":"\n"}
+,{"stream_name":"stdout","time":30.604882444,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(224): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604887353,"data":"        Z = ((D + pad_d + std::get\u003c1\u003e(padding)[0] - T * dilation_d) / stride_d) + 1;\n"}
+,{"stream_name":"stdout","time":30.604891122,"data":"                          ^\n"}
+,{"stream_name":"stdout","time":30.604900854,"data":"\n"}
+,{"stream_name":"stdout","time":30.604909156,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604924641,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":30.604929276,"data":"                    ^\n"}
+,{"stream_name":"stdout","time":30.604933348,"data":"\n"}
+,{"stream_name":"stdout","time":30.60493725,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604941589,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":30.604945827999998,"data":"                                             ^\n"}
+,{"stream_name":"stdout","time":30.604949944,"data":"\n"}
+,{"stream_name":"stdout","time":30.60495318,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604957309,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":30.604961605,"data":"                    ^\n"}
+,{"stream_name":"stdout","time":30.604964901,"data":"\n"}
+,{"stream_name":"stdout","time":30.604968229,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604972148,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":30.604975761,"data":"                                             ^\n"}
+,{"stream_name":"stdout","time":30.604979091,"data":"\n"}
+,{"stream_name":"stdout","time":30.604982377,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(221): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.604986313,"data":"      pad_d(std::get\u003c0\u003e(padding)[0]), stride_d(stride[0]), dilation_d(dilation[0])\n"}
+,{"stream_name":"stdout","time":30.604989926000002,"data":"                       ^\n"}
+,{"stream_name":"stdout","time":30.604993196,"data":"\n"}
+,{"stream_name":"stdout","time":30.604997101,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(224): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":30.605005973,"data":"        Z = ((D + pad_d + std::get\u003c1\u003e(padding)[0] - T * dilation_d) / stride_d) + 1;\n"}
+,{"stream_name":"stdout","time":30.605010564,"data":"                                     ^\n"}
+,{"stream_name":"stdout","time":30.605014678,"data":"\n"}
+,{"stream_name":"stdout","time":41.970273719,"data":"[10/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_transformer.cu.o\n"}
+,{"stream_name":"stdout","time":41.970363266,"data":"/tmp/cutlass/include/cutlass/gemm/kernel/sm100_static_tile_scheduler.hpp(53): warning #20012-D: __device__ annotation is ignored on a function(\"StaticPersistentTileScheduler100\") that is explicitly defaulted on its first declaration\n"}
+,{"stream_name":"stdout","time":41.970372456,"data":"    __inline__ __attribute__((always_inline)) __attribute__((device)) __attribute__((host))\n"}
+,{"stream_name":"stdout","time":41.970378826,"data":"                                                             ^\n"}
+,{"stream_name":"stdout","time":41.970384368,"data":"\n"}
+,{"stream_name":"stdout","time":41.97038987,"data":"Remark: The warnings can be suppressed with \"-diag-suppress \u003cwarning-number\u003e\"\n"}
+,{"stream_name":"stdout","time":41.970396558,"data":"\n"}
+,{"stream_name":"stdout","time":41.970401766,"data":"/tmp/cutlass/include/cutlass/gemm/kernel/sm100_static_tile_scheduler.hpp(53): warning #20012-D: __host__ annotation is ignored on a function(\"StaticPersistentTileScheduler100\") that is explicitly defaulted on its first declaration\n"}
+,{"stream_name":"stdout","time":41.970408048,"data":"    __inline__ __attribute__((always_inline)) __attribute__((device)) __attribute__((host))\n"}
+,{"stream_name":"stdout","time":41.970413872,"data":"                                                                                     ^\n"}
+,{"stream_name":"stdout","time":41.970437752,"data":"\n"}
+,{"stream_name":"stdout","time":41.970443225,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970449831,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":41.970455824,"data":"         ^\n"}
+,{"stream_name":"stdout","time":41.970461069,"data":"\n"}
+,{"stream_name":"stdout","time":41.970466124,"data":"Remark: The warnings can be suppressed with \"-diag-suppress \u003cwarning-number\u003e\"\n"}
+,{"stream_name":"stdout","time":41.970472047,"data":"\n"}
+,{"stream_name":"stdout","time":41.97047721,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970483614,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":41.970489576,"data":"                                  ^\n"}
+,{"stream_name":"stdout","time":41.970495187,"data":"\n"}
+,{"stream_name":"stdout","time":41.970517246,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970539713,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":41.970545042,"data":"         ^\n"}
+,{"stream_name":"stdout","time":41.97054916,"data":"\n"}
+,{"stream_name":"stdout","time":41.970552989,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970557896,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":41.970562538,"data":"                                  ^\n"}
+,{"stream_name":"stdout","time":41.970566527,"data":"\n"}
+,{"stream_name":"stdout","time":41.970570671,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(221): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970592978,"data":"      pad_d(std::get\u003c0\u003e(padding)[0]), stride_d(stride[0]), dilation_d(dilation[0])\n"}
+,{"stream_name":"stdout","time":41.970597691,"data":"            ^\n"}
+,{"stream_name":"stdout","time":41.970601944,"data":"\n"}
+,{"stream_name":"stdout","time":41.970605919,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(224): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970610993,"data":"        Z = ((D + pad_d + std::get\u003c1\u003e(padding)[0] - T * dilation_d) / stride_d) + 1;\n"}
+,{"stream_name":"stdout","time":41.970614693,"data":"                          ^\n"}
+,{"stream_name":"stdout","time":41.970617985,"data":"\n"}
+,{"stream_name":"stdout","time":41.970621187,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970625175,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":41.970628701,"data":"                    ^\n"}
+,{"stream_name":"stdout","time":41.970631889,"data":"\n"}
+,{"stream_name":"stdout","time":41.970635088,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970639023,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":41.970642691,"data":"                                             ^\n"}
+,{"stream_name":"stdout","time":41.970646311,"data":"\n"}
+,{"stream_name":"stdout","time":41.970650205,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970654227,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":41.970677837,"data":"                    ^\n"}
+,{"stream_name":"stdout","time":41.970681788,"data":"\n"}
+,{"stream_name":"stdout","time":41.970685111,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970689555,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":41.970693551,"data":"                                             ^\n"}
+,{"stream_name":"stdout","time":41.970697127,"data":"\n"}
+,{"stream_name":"stdout","time":41.970713293,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(221): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.970717951,"data":"      pad_d(std::get\u003c0\u003e(padding)[0]), stride_d(stride[0]), dilation_d(dilation[0])\n"}
+,{"stream_name":"stdout","time":41.970726913,"data":"                       ^\n"}
+,{"stream_name":"stdout","time":41.971375212,"data":"\n"}
+,{"stream_name":"stdout","time":41.971381052,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(224): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":41.971385967,"data":"        Z = ((D + pad_d + std::get\u003c1\u003e(padding)[0] - T * dilation_d) / stride_d) + 1;\n"}
+,{"stream_name":"stdout","time":41.971390625,"data":"                                     ^\n"}
+,{"stream_name":"stdout","time":41.971394056,"data":"\n"}
+,{"stream_name":"stdout","time":41.971397274,"data":"/tmp/cutlass/include/cutlass/gemm/kernel/sm100_static_tile_scheduler.hpp(53): warning #20012-D: __device__ annotation is ignored on a function(\"StaticPersistentTileScheduler100\") that is explicitly defaulted on its first declaration\n"}
+,{"stream_name":"stdout","time":41.971401483,"data":"    __inline__ __attribute__((always_inline)) __attribute__((device)) __attribute__((host))\n"}
+,{"stream_name":"stdout","time":41.971405005,"data":"                                                             ^\n"}
+,{"stream_name":"stdout","time":41.971408385,"data":"\n"}
+,{"stream_name":"stdout","time":41.971411483,"data":"/tmp/cutlass/include/cutlass/gemm/kernel/sm100_static_tile_scheduler.hpp(53): warning #20012-D: __host__ annotation is ignored on a function(\"StaticPersistentTileScheduler100\") that is explicitly defaulted on its first declaration\n"}
+,{"stream_name":"stdout","time":41.9714154,"data":"    __inline__ __attribute__((always_inline)) __attribute__((device)) __attribute__((host))\n"}
+,{"stream_name":"stdout","time":41.971418871,"data":"                                                                                     ^\n"}
+,{"stream_name":"stdout","time":41.971422294,"data":"\n"}
+,{"stream_name":"stdout","time":45.121058405,"data":"[11/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_transformer_fmha.cu.o\n"}
+,{"stream_name":"stdout","time":45.121092937,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.121100678,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":45.121116855,"data":"         ^\n"}
+,{"stream_name":"stdout","time":45.121119598,"data":"\n"}
+,{"stream_name":"stdout","time":45.121122075,"data":"Remark: The warnings can be suppressed with \"-diag-suppress \u003cwarning-number\u003e\"\n"}
+,{"stream_name":"stdout","time":45.121124631,"data":"\n"}
+,{"stream_name":"stdout","time":45.121126778,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.121129587,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":45.121131905,"data":"                                  ^\n"}
+,{"stream_name":"stdout","time":45.121134175,"data":"\n"}
+,{"stream_name":"stdout","time":45.121136267,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.121138936,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":45.121141294,"data":"         ^\n"}
+,{"stream_name":"stdout","time":45.121143478,"data":"\n"}
+,{"stream_name":"stdout","time":45.121146455,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.12115963,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":45.121163894,"data":"                                  ^\n"}
+,{"stream_name":"stdout","time":45.121167848,"data":"\n"}
+,{"stream_name":"stdout","time":45.12117165,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(221): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.121176312,"data":"      pad_d(std::get\u003c0\u003e(padding)[0]), stride_d(stride[0]), dilation_d(dilation[0])\n"}
+,{"stream_name":"stdout","time":45.121179995,"data":"            ^\n"}
+,{"stream_name":"stdout","time":45.121183298,"data":"\n"}
+,{"stream_name":"stdout","time":45.121188115,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(224): warning #20013-D: calling a constexpr __host__ function(\"get\") from a __host__ __device__ function(\"Conv3dProblemSize\") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.12119281,"data":"        Z = ((D + pad_d + std::get\u003c1\u003e(padding)[0] - T * dilation_d) / stride_d) + 1;\n"}
+,{"stream_name":"stdout","time":45.12119665,"data":"                          ^\n"}
+,{"stream_name":"stdout","time":45.121200952,"data":"\n"}
+,{"stream_name":"stdout","time":45.121205733,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.121216944,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":45.121223126,"data":"                    ^\n"}
+,{"stream_name":"stdout","time":45.121228039,"data":"\n"}
+,{"stream_name":"stdout","time":45.12123306,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.121237736,"data":"        {std::get\u003c0\u003e(padding)[1], std::get\u003c1\u003e(padding)[1],\n"}
+,{"stream_name":"stdout","time":45.121241587,"data":"                                             ^\n"}
+,{"stream_name":"stdout","time":45.121245544,"data":"\n"}
+,{"stream_name":"stdout","time":45.121249751,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.12125542,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":45.12126063,"data":"                    ^\n"}
+,{"stream_name":"stdout","time":45.121265799,"data":"\n"}
+,{"stream_name":"stdout","time":45.121270478,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.121275175,"data":"         std::get\u003c0\u003e(padding)[2], std::get\u003c1\u003e(padding)[2]},\n"}
+,{"stream_name":"stdout","time":45.121278784,"data":"                                             ^\n"}
+,{"stream_name":"stdout","time":45.12128356,"data":"\n"}
+,{"stream_name":"stdout","time":45.121288684,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(221): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.12129444,"data":"      pad_d(std::get\u003c0\u003e(padding)[0]), stride_d(stride[0]), dilation_d(dilation[0])\n"}
+,{"stream_name":"stdout","time":45.121300043,"data":"                       ^\n"}
+,{"stream_name":"stdout","time":45.121305161,"data":"\n"}
+,{"stream_name":"stdout","time":45.121310427,"data":"/tmp/cutlass/include/cutlass/conv/conv3d_problem_size.h(224): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.\n"}
+,{"stream_name":"stdout","time":45.121316176,"data":"        Z = ((D + pad_d + std::get\u003c1\u003e(padding)[0] - T * dilation_d) / stride_d) + 1;\n"}
+,{"stream_name":"stdout","time":45.121321611,"data":"                                     ^\n"}
+,{"stream_name":"stdout","time":45.121326481,"data":"\n"}
+,{"stream_name":"stdout","time":45.42589315,"data":"[12/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream2.cu.o\n"}
+,{"stream_name":"stdout","time":59.89058176,"data":"[13/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o\n"}
+,{"stream_name":"stdout","time":62.938700129,"data":"[14/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream5.cu.o\n"}
+,{"stream_name":"stdout","time":64.18019159,"data":"[15/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream3.cu.o\n"}
+,{"stream_name":"stdout","time":64.180224653,"data":"/tmp/beam_solver_pipeline_smoke/cuda/stream3.cu(129): warning #177-D: function \"beam::\u003cunnamed\u003e::stream3_debug_store_count_kernel\" was declared but never referenced\n"}
+,{"stream_name":"stdout","time":64.18024595,"data":"  __attribute__((global)) void stream3_debug_store_count_kernel(\n"}
+,{"stream_name":"stdout","time":64.180250491,"data":"                               ^\n"}
+,{"stream_name":"stdout","time":64.180254068,"data":"\n"}
+,{"stream_name":"stdout","time":64.180257369,"data":"Remark: The warnings can be suppressed with \"-diag-suppress \u003cwarning-number\u003e\"\n"}
+,{"stream_name":"stdout","time":64.180261297,"data":"\n"}
+,{"stream_name":"stdout","time":66.351943595,"data":"[16/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/threshold.cu.o\n"}
+,{"stream_name":"stdout","time":73.834679837,"data":"[17/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/final_materialize.cu.o\n"}
+,{"stream_name":"stdout","time":73.916779647,"data":"[18/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/dispatcher.cu.o\n"}
+,{"stream_name":"stdout","time":75.767354455,"data":"[19/25] Building CXX object CMakeFiles/beam_cuda.dir/cuda/runtime_config.cpp.o\n"}
+,{"stream_name":"stdout","time":79.024668999,"data":"[20/25] Building CXX object CMakeFiles/contract_tests.dir/tests/contract_tests.cpp.o\n"}
+,{"stream_name":"stdout","time":86.012147457,"data":"[21/25] Building CUDA object CMakeFiles/stream_pipeline_benchmark.dir/tools/stream_pipeline_benchmark.cu.o\n"}
+,{"stream_name":"stdout","time":86.085228752,"data":"[22/25] Linking CXX executable contract_tests\n"}
+,{"stream_name":"stdout","time":97.732550323,"data":"[23/25] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o\n"}
+,{"stream_name":"stdout","time":97.799030599,"data":"[24/25] Linking CXX static library libbeam_cuda.a\n"}
+,{"stream_name":"stdout","time":97.937131806,"data":"[25/25] Linking CXX executable stream_pipeline_benchmark\n"}
+,{"stream_name":"stdout","time":97.938779969,"data":"+ /tmp/beam_build_pipeline_smoke/contract_tests\n"}
+,{"stream_name":"stdout","time":97.96426845,"data":"contract_tests=pass\n"}
+,{"stream_name":"stdout","time":97.964843149,"data":"+ /tmp/beam_build_pipeline_smoke/stream_pipeline_benchmark 990\n"}
+,{"stream_name":"stdout","time":104.197874397,"data":"stream_pipeline_benchmark mode=stream12 window=16 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=32 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=0 stream4_jobs=0 candidates=3145728 depth_like_ms=5577.97 candidates_per_sec=563956 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":104.198146225,"data":"PIPELINE_SMOKE_ROW mode=stream12 window=16 return_code=0 elapsed_wall_sec=6.233 log=/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream12_w16.log b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=32 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=0 stream4_jobs=0 candidates=3145728 depth_like_ms=5577.97 candidates_per_sec=563956 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":104.198384928,"data":"+ /tmp/beam_build_pipeline_smoke/stream_pipeline_benchmark 990\n"}
+,{"stream_name":"stdout","time":110.523849422,"data":"stream_pipeline_benchmark mode=stream12 window=32 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=64 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=0 stream4_jobs=0 candidates=3145728 depth_like_ms=5749 candidates_per_sec=547178 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":110.524106241,"data":"PIPELINE_SMOKE_ROW mode=stream12 window=32 return_code=0 elapsed_wall_sec=6.325 log=/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream12_w32.log b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=64 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=0 stream4_jobs=0 candidates=3145728 depth_like_ms=5749 candidates_per_sec=547178 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":110.524366814,"data":"+ /tmp/beam_build_pipeline_smoke/stream_pipeline_benchmark 990\n"}
+,{"stream_name":"stdout","time":117.103029623,"data":"stream_pipeline_benchmark mode=stream12 window=64 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=128 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=0 stream4_jobs=0 candidates=3145728 depth_like_ms=5901.71 candidates_per_sec=533020 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":117.103229866,"data":"PIPELINE_SMOKE_ROW mode=stream12 window=64 return_code=0 elapsed_wall_sec=6.579 log=/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream12_w64.log b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=128 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=0 stream4_jobs=0 candidates=3145728 depth_like_ms=5901.71 candidates_per_sec=533020 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":117.103477792,"data":"+ /tmp/beam_build_pipeline_smoke/stream_pipeline_benchmark 990\n"}
+,{"stream_name":"stdout","time":123.656623549,"data":"stream_pipeline_benchmark mode=stream123 window=16 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=32 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=32 stream4_jobs=0 candidates=3145728 depth_like_ms=6006.12 candidates_per_sec=523753 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":123.656866254,"data":"PIPELINE_SMOKE_ROW mode=stream123 window=16 return_code=0 elapsed_wall_sec=6.553 log=/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream123_w16.log b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=32 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=32 stream4_jobs=0 candidates=3145728 depth_like_ms=6006.12 candidates_per_sec=523753 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":123.657119291,"data":"+ /tmp/beam_build_pipeline_smoke/stream_pipeline_benchmark 990\n"}
+,{"stream_name":"stdout","time":130.475952565,"data":"stream_pipeline_benchmark mode=stream123 window=32 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=64 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=32 stream4_jobs=0 candidates=3145728 depth_like_ms=6236.37 candidates_per_sec=504416 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":130.476207731,"data":"PIPELINE_SMOKE_ROW mode=stream123 window=32 return_code=0 elapsed_wall_sec=6.819 log=/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream123_w32.log b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=64 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=32 stream4_jobs=0 candidates=3145728 depth_like_ms=6236.37 candidates_per_sec=504416 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":130.476424482,"data":"+ /tmp/beam_build_pipeline_smoke/stream_pipeline_benchmark 990\n"}
+,{"stream_name":"stdout","time":137.544587438,"data":"stream_pipeline_benchmark mode=stream123 window=64 b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=128 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=32 stream4_jobs=0 candidates=3145728 depth_like_ms=6369.81 candidates_per_sec=493849 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":137.544874822,"data":"PIPELINE_SMOKE_ROW mode=stream123 window=64 return_code=0 elapsed_wall_sec=7.068 log=/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream123_w64.log b_micro=512 concurrency=2 ring_slots=8 stream3_batch=98304 graph_window_jobs=128 physical_jobs=256 frontier_size=131072 ring_slot_jobs=256 stream3_jobs=32 stream4_jobs=0 candidates=3145728 depth_like_ms=6369.81 candidates_per_sec=493849 shard_capacity=1048576 allocation_bytes=3281187584 status=OK\n"}
+,{"stream_name":"stdout","time":137.545625621,"data":"PIPELINE_SMOKE_SUMMARY_JSON= /kaggle/working/stream_pipeline_smoke_summary.json\n"}
+,{"stream_name":"stdout","time":137.54563552,"data":"PIPELINE_SMOKE_ROWS_CSV= /kaggle/working/stream_pipeline_smoke_rows.csv\n"}
+,{"stream_name":"stdout","time":137.545639682,"data":"PIPELINE_SMOKE_FAILURES= 0\n"}
+,{"stream_name":"stderr","time":141.387212279,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":141.387244997,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":141.651478031,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":141.651509683,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":142.335050345,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":143.675802208,"data":"[NbConvertApp] Writing 322381 bytes to __results__.html\n"}
+]

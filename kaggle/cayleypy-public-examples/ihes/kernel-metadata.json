@@ -1,0 +1,19 @@
+{
+  "id": "trydotatwo/cayleypy-2xt4-ihes-example",
+  "title": "cayleypy-2xt4-ihes-example",
+  "code_file": "ihes.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [
+    "cayleypy-ihes-cube"
+  ],
+  "kernel_sources": [],
+  "model_sources": [
+    "arabidopsisthalian/ihes-e08192/PyTorch/default/1"
+  ],
+  "machine_shape": "NvidiaTeslaT4"
+}

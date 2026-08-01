@@ -1,5 +1,47 @@
 # Prompt History
 
+## 2026-07-31
+- User requires public Kaggle examples to support both MLP (`batchnorm-folded`/`resmlp-layernorm`) and Transformer (`piece-transformer`) runs under one upload contract; publish envelope must remain schema-valid for both families.
+- User requested public Kaggle examples for IHES, Megaminx, and Cube-444 with first-pass + collect modes plus a verified GitHub Cloudflare upload path.
+- User asked schema errors in publish to be treated as actionable failures, with minimal user-facing failure details and no hardcoded schema workarounds in notebooks.
+
+
+## 2026-07-22
+- User explicitly approved launching the updated private Kaggle 2xT4 pipeline gate for the SM75 transformer follow-up; correctness remains complete byte-exact score comparison and performance changes are accepted only after the integrated repeated gate.
+- User explicitly approved pushing transformer commit `18e5996` and its reproducible tag to the existing GitHub repository for a private Kaggle 2xT4 run, then asked to launch immediately when the T4 slot became available.
+- User set the persistent goal to optimize native transformer inference sequentially on local RTX 3070 using the profiler-equipped long-lived Docker GPU queue, preserving byte-exact math and measured speed gates; only after 3070 improvements are exhausted should work move to independent 2xT4 profiling and tuning.
+- User reported that an interactive game had contaminated local RTX 3070 timings and required checking that the GPU is free before every performance measurement; suspect or mid-run-contaminated series must be discarded rather than interpreted.
+## 2026-07-18
+- User requested optimizing native transformer inference locally on RTX 3070 through Docker as the Ampere-family development proxy before A100 validation, with every optimization checked against historical math outputs and speed measurements.
+- User required strict deterministic correctness: changed checksum/digest means an implementation defect for this workflow, so a faster candidate must not be accepted when any repeated output differs.
+- User clarified that transformer shapes and inputs vary and approved a shape-aware, hardware-aware autotuner that selects kernels by GPU, dtype, GEMM shapes, concurrency, and fused operation, validates complete outputs, caches only verified winners, and otherwise uses baseline.
+
+## 2026-07-03
+- User requested continuing native Stream1 transformer optimization after strided FMHA, asking what still differs from the PyTorch path and approving further profiler-driven improvements while preserving the no-fallback/no-distillation and MLP-isolation constraints.
+- User requested first making the native Stream1 transformer attention path behave like PyTorch SDPA, then trying to improve beyond that, while preserving the no-fallback/no-distillation rule and not touching the MLP path.
+- User requested continuing the Stream1 transformer optimization toward a fused transformer inference backend using CUTLASS/FlashAttention-style GPU kernels, with separate transformer files/paths, no fallback behavior, no distillation, and no breakage to the existing MLP path.
+## 2026-07-02
+- User requested investigating how PyTorch runs the Kaggle Megaminx transformer fast path and why the native Stream1 piece-transformer implementation is slower, with comparison against existing native/PyTorch MLP evidence and no fallback or distillation direction.
+
+## 2026-07-01
+- User requested rerunning the latest native CUDA Stream1 transformer backend on Kaggle and assessing whether the observed speed is a real limit or can still be improved.
+- User requested running the public Kaggle notebook `vladkuznetsov266/transformer-inference-example` and measuring its inference speed.
+
+## 2026-06-30
+- User requested a plain PyTorch inference benchmark for the Stream1 `piece_transformer` export to measure raw Torch speed against the native CUDA backend.
+- User requested using low-reasoning subagents plus profiler-driven coordination to fix Stream1 transformer speed issues for maximum throughput, while preserving the no-fallback/no-distillation constraint and not breaking the MLP path.
+- User requested running the split Stream1 piece-transformer benchmark on Kaggle 2xT4 and checking speed. Use a separate benchmark package, not the smoke/solve notebooks, so speed logs are clean and compare per-GPU T4 throughput.
+- User clarified during Task 1 quality review that MLP and transformer benchmark code should be split into separate files to avoid confusion; keep transformer work isolated from MLP files/paths where practical.
+- User assigned Task 1 in `D:\100XH100\.worktrees\stream1-piece-transformer`: add a transformer-only Stream1 microbenchmark path to `tools/stream_benchmark.cu`, explicitly branch on `STREAM1_BACKEND_PIECE_TRANSFORMER`, preserve the existing MLP benchmark path, sweep `B_MICRO={512,1024,2048,4096,8192}` and `STREAM1_CONCURRENCY={1,2,4}`, skip memory-exceeding configs with clear report lines, avoid fallback behavior, update project memory/test results, and keep writes limited to the allowed files. Controller later clarified that no distillation direction or fallback path is allowed and the transformer benchmark must remain an explicit backend branch only.
+- User requested solving the same puzzle as the transformer inference example notebook and verifying that the Stream1 `piece_transformer` beam-search run obtains the same solution length. The comparison target is puzzle `991` from the downloaded example output, where the notebook reports length `82` with `B=65536`.
+## 2026-06-29
+- User assigned Task 7 for the Stream1 piece-transformer worktree: create a private Kaggle 2xT4 small-beam smoke package that clones GitHub branch `codex/stream1-piece-transformer`, exports the Kaggle `megaminx-qtransformer-1782210824` `.pth` as fp16 `piece-transformer` weights, builds `production_runner` and `stream1_transformer_cuda_tests` for SM75 with CUTLASS under `/tmp`, runs a tiny two-rank torchrun smoke with `BEAM_WEIGHT_DIR` pointed at the transformer export, fails clearly instead of falling back when model discovery is uncertain, validates notebook JSON/Python locally, records package-only verification, and commits without pushing.
+- User assigned Task 5 quality-fix for the Stream1 piece-transformer worktree: fix only `tools/stream_benchmark.cu` MLP `Stream1NetworkView` construction after LN pointer fields were added, do not change transformer forward semantics, do not wire production transformer dispatch, run a `stream_benchmark` compile check and `stream1_transformer_cuda_tests` if practical, update verification notes, amend the Task 5 commit, and return the final commit SHA.
+- User assigned Task 5 for the Stream1 piece-transformer worktree: implement only the standalone CUDA transformer forward path, keep production dispatcher/runner fail-closed guards, add separate transformer view/scratch API, match exported p900 fast input construction and 4-block pre-norm transformer architecture, use no fallback backend, prepare a fused/tiled attention path for seq_len=51 without adding a new FA2 dependency, verify against the real exported reference where available, and commit the work.
+- User added a later-task requirement for Stream1 piece-transformer forward: use FlashAttention 2 or similar attention speedups where applicable, preserve the exported weight format, and keep the forward path broadly compatible with transformer-style architectures. Task 4 quality fix must only record this requirement, not implement transformer forward.
+- User assigned Task 4 for the Stream1 piece-transformer worktree: implement transformer manifest parsing, exact-size host weight loading, device upload/free containers, and one-lane reusable scratch arena for `backend=piece_transformer`, with no fallback backend, no transformer CUDA forward kernel, no production runner/dispatcher wiring, and no Stream3/Stream4/State128/MLP contract changes.
+- User requested an explicit separate Stream1 `piece_transformer` backend for the Kaggle Megaminx Q-transformer, with no fallback behavior and without breaking the current MLP backend. Manifests must be generated from checkpoint/config metadata, correctness tests come before integration, and target validation is a small 2xT4 Kaggle smoke after correctness tests pass.
+
 ## 2026-06-20
 - User cancelled the segment/frequent-prefix repair direction and requested a
   normal beam-search-to-center mode for puzzles with known solution length 23.
@@ -91,7 +133,7 @@
 
 ## 2026-05-22
 - User required NVIDIA Nsight profiling for bottleneck analysis, depth=20, state id=0 only, beam=2**22, with GPU memory usage and remaining GPU memory printed before start.
-- User explicitly prohibited fallback paths: "РЅРёРєР°РєРёС… С„РѕР»Р±РµРєРѕРІ"; fallback code is considered error masking.
+- User explicitly prohibited fallback paths: "????????????????????????????? ?????????????????????????????????"; fallback code is considered error masking.
 - User requested Docker cleanup: delete excess Docker data, keep only one CayleyBeam100H100-related image if available, then continue architecture-aligned code work.
 - User reiterated continuation requirement: continue project work and do not deviate from architecture.
 - User clarified profiler requirement: use NVIDIA Nsight, understand correct usage, build a new clearly named shared GPU image for GPU projects, and audit remaining atomic operations.
@@ -112,7 +154,7 @@
 - User requested production scheduler work: implement real free-slot management for Stream 4 sort slots, parallelize Stream 3 restore/owner/split, and parallelize Stream 3 collectors.
 - User approved global spill ping-pong implementation: add `global_spill_buffer_a + global_spill_buffer_b` so Stream 3 drain reads one spill buffer and writes still-blocked candidates to the other buffer.
 - User clarified current phase is single-GPU algorithm polishing; multi-rank is not required now. User requested periodic threshold update, final global threshold, final load balancing, and materialize wiring in the production depth loop, followed by `production_runner 0 20 4194304`.
-- User requested connection of real data and neural network assets, with explicit reminder to preserve alignment: "РїРѕРґСЂСѓР±Р°Р№ СЂРёР°Р» РґР°С‚Р° Рё РїСЂРѕС‡РµРµ. РќРµР№СЂРѕРЅРєР° Рё РґР°С‚Р° Сѓ С‚РµР±СЏ РµСЃС‚СЊ. РќРµ Р·Р°Р±РёРІР°Р№ Рѕ Р°Р»Р°Р№РјРµРЅС‚Рµ".
+- User requested connection of real data and neural network assets, with explicit reminder to preserve alignment: "????????????????????????????????? ???????????????? ????????????????? ???? ?????????????????????????. ????????????????????????????????? ???? ????????????????? ???? ????????????????? ?????????????????. ???????? ????????????????????????????? ???? ??????????????????????????????????????".
 - User reported Docker container logs only showed NVIDIA header and `ninja: no work to do`, requiring visible runtime progress logging for local Docker runs.
 - User requested `B_MICRO` around `8192` for RTX 3070 tuning, per-stream isolated speed benchmarks before production runs, Stream 1 TensorOp conversion, and consideration of future T4 testing.
 - User clarified Stream 1 must also be benchmarked with 1/2/3/4 concurrent inference jobs across different batch sizes, with a fixed table recorded in the benchmark document.
@@ -130,7 +172,7 @@
 - User requested implementation of the event-driven scheduler without wave barriers after the Stream1 folded-input optimization.
 - User suggested using `RING_COUNT=4` so Stream1 always has write targets.
 - User asked to discuss why enabling Stream1 before Stream4 broke spill convergence and clarified that Stream3 should announce shard readiness while host should manage less stream/shard state.
-- User approved implementing the Stream3-owned shard-ready handoff: "РќСѓ РґР°, РґРµР»Р°Р№".
+- User approved implementing the Stream3-owned shard-ready handoff: "???????? ????????, ?????????????????????".
 - User clarified score/hash ring ownership architecture: Stream1 is the throughput limiter, Stream2 uses the same `B_MICRO` parent batch and then sleeps, Stream3 consumes a full score/hash ring and immediately frees the ring without cleanup, Stream4 and Stream5 must not block score/hash ring reuse, and Stream5 needs its own ring buffers later for send/recv independence.
 - User approved implementing the ring pipeline policy with `RING_COUNT=4` and Stream4-independent ring reuse.
 - User clarified Stream3 collector architecture: Stream3 should partition input by `shard_id` once, sort by shard id, and write batched transactions into each target shard instead of rescanning every shard over the full input.
@@ -174,7 +216,7 @@
 - User requested fixing the Stream1 CUTLASS residual in-place GEMM issue without adding extra runtime checks, then verifying the fix.
 - User required any Stream3/global-spill overflow or hidden data drop to produce an explicit error and stop execution; hidden loss of candidates is forbidden.
 - User required removing the local uncommitted Stream3 spill backpressure patch and discussing the architecture-level solution before implementing any fix.
-- User accepted the puzzle 0 trace diagnosis after Stream1 fix and stated the remaining issue: `Stream1=РёСЃРїСЂР°РІР»РµРЅ`, path loss is `depth6/prefix7`, `score_key=22288 <= final_threshold=27866`, loss location is after Stream1/2 and before Stream4, likely Stream3 collector/global spill; requested checking generated-candidate writes through Stream3 output/local pending/global spill and final spill-drain at depth 6.
+- User accepted the puzzle 0 trace diagnosis after Stream1 fix and stated the remaining issue: `Stream1=????????????????????????????????????`, path loss is `depth6/prefix7`, `score_key=22288 <= final_threshold=27866`, loss location is after Stream1/2 and before Stream4, likely Stream3 collector/global spill; requested checking generated-candidate writes through Stream3 output/local pending/global spill and final spill-drain at depth 6.
 - User corrected the Stream3/Stream4 sizing model: `GLOBAL_BEAM_WIDTH_MAX_SAFE` must be removed, `GLOBAL_BEAM_WIDTH` is only aligned from the user beam, `STREAM3_BATCH_CANDIDATES = RING_SLOT_COUNT * B_MICRO * MOVE_COUNT`, `RING_COUNT = ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))`, and `SHARD_COUNT/STREAM4_BATCH_CANDIDATES` must be selected by a memory-budget config search.
 - User clarified that Stream4 shard resident capacity must not mean logical shard size. Logical shards are larger than `STREAM4_BATCH_CANDIDATES`; Stream4 processes each logical shard in batches, with stream arrays sized by `SHARD_COUNT` and `STREAM4_BATCH_CANDIDATES`.
 - User rejected an extra per-Stream3-launch `global_spill_free` runtime check because spill capacity should be guaranteed by architecture/config; the existing fatal out-of-bounds guard remains acceptable.
@@ -183,7 +225,7 @@
 - User clarified the spill formula must also multiply by Stream4 worker count if missing; using current config fields, Stream4 worker count is represented by `STREAM4_ACTIVE_SORT_SLOTS`.
 - User requested per-stream speed measurements to derive a stable spill size and make the pipeline run confidently.
 - User required a two-level debug model: master debug flag first, then independent speed/inference/path-trace debug flags; when master debug is off, subflags must not affect runtime and debug instrumentation must not be compiled into the production binary.
-- User approved adding the required final request validation after a Kaggle path-trace run crashed in `cudaStreamSynchronize final materialize` with illegal memory access, then requested launching Kaggle with the validation enabled: "РћРєРµР№, РґРѕР±Р°РІСЊ РЅСѓР¶РЅСѓСЋ РІР°Р»РёРґР°С†РёСЋ Рё Р·Р°РїСѓСЃРєР°Р№ РєР°РіР»".
+- User approved adding the required final request validation after a Kaggle path-trace run crashed in `cudaStreamSynchronize final materialize` with illegal memory access, then requested launching Kaggle with the validation enabled: "?????????????????, ???????????????????????? ???????????????????????? ????????????????????????????????????? ???? ????????????????????????????????? ????????????????".
 - User diagnosed the post-validation Kaggle run as too slow without logs: full-beam depths used `stream3_jobs=2049`, `stream4_jobs~4647`, and depth time about `130s`; user asked why current sizing chose such bad `stream4_jobs`.
 - User proposed deriving config from `stream4_jobs` and `stream3_jobs`, clarified that Stream3 receives `N_LOCAL * 24` generated candidates, and required batch execution time to be part of config reasoning, not just job count.
 - User corrected implementation scope: runtime config and auto-detection must live in a separate config file; `production_runner` must not own the config-search implementation.
@@ -247,8 +289,8 @@
 - User clarified that depth-only logs should not materially slow the code because heavy debug trace flags are compiled off, then requested config-only speed tuning for Kaggle T4x2 through notebook parameters rather than architecture changes.
 - User rejected the assumption that the full/small frontier alternation is normal, stated that the pattern is likely a bug, and requested adding debug only to determine the cause. Architecture changes are forbidden; code additions are allowed only for diagnostics.
 - User stopped Kaggle version 79 manually and requested setting `RUN_TIMEOUT_SEC=300` in the Kaggle config.
-- User approved fixing the Kaggle v80 diagnosis by adding the missing multi-rank final-reset cleanup for stale Stream4 histograms: "РђР°Р°Р°, РІРѕРЅ РѕРЅРѕ С‡Рµ. РўР°РєСЃ, С‚РѕРіРґР° РґР°РІР°Р№ РґРѕР±Р°РІР»СЏС‚СЊ РѕС‡РёСЃС‚РєСѓ, РєРѕРЅРµС‡РЅРѕ".
-- User requested Kaggle T4x2 validation after the reset cleanup fix: "РћРєРµР№, С‚РµСЃС‚РёСЂСѓР№ С‚РµРїРµСЂСЊ РЅР° 2С…Рў4 РєР°РіР»Р°".
+- User approved fixing the Kaggle v80 diagnosis by adding the missing multi-rank final-reset cleanup for stale Stream4 histograms: "????????????????, ???????????? ???????????? ?????????. ????????????????, ????????????????????? ????????????????????? ????????????????????????????????????? ??????????????????????????????, ?????????????????????????????".
+- User requested Kaggle T4x2 validation after the reset cleanup fix: "?????????????????, ??????????????????????????????????? ????????????????????????? ???????? 2?????????4 ????????????????????".
 - User requested a Stream2 solved-neighborhood feature first, with correct naming instead of informal `K_1`: `BEAM_SOLVED_NEIGHBORHOOD_RADIUS`. Required behavior: CPU precomputes the central-state neighborhood by inverse moves, GPU stores only read-only hashes/fingerprints, Stream2 detects candidates that are within the configured radius from the solution, and CPU appends the matching suffix after history reconstruction.
 - User requested preserving the current K2 discussion without implementing K2 yet. Future K2 means Stream2 descendant/suffix expansion from each generated candidate; K2 suffix generators should be precomputed and stored, not generated on the fly inside CUDA kernels.
 - User requested testing the new Stream2 solved-neighborhood behavior on Kaggle T4x2 for puzzle IDs 1 through 10.
@@ -268,7 +310,7 @@
 - User provided new model file `%USERPROFILE%\Downloads\Telegram Desktop\p900-t000-q_1779830329_best.pth` and requested comparison against the current project model: parameter count, architecture differences, runtime implications, and compatibility with the existing Stream1 CUDA runner.
 - User requested implementing a universal MLP model interface where Stream1 model dimensions and residual block count are inferred from/exported with weights, required blocks are duplicated automatically, and the existing optimized CUTLASS inference code remains the execution path.
 - User requested running the new model on Kaggle for puzzle ID `0` with the current large-beam parameters, approximately `2**26 + 16M` and specifically the notebook's current `BEAM_WIDTH=2**26+15_506_660`.
-- User observed new-model puzzle-0 depth `7..8` runtimes around `108..111s` with `stream4_jobsв‰€959..1021`, compared those metrics against previous runs, and requested a Kaggle run with timing debug enabled to identify the bottleneck.
+- User observed new-model puzzle-0 depth `7..8` runtimes around `108..111s` with `stream4_jobs????????959..1021`, compared those metrics against previous runs, and requested a Kaggle run with timing debug enabled to identify the bottleneck.
 - User interrupted the attempted dispatcher timing-code investigation and explicitly required no dispatcher/source-code changes; requested only reducing the Kaggle diagnostic beam by `1,000,000`.
 - User requested measuring Stream1 inference speed and Stream3 speed under the current T4x2 parameters, because Stream3 should not dominate the pipeline. Required Stream1 benchmark table: `B_MICRO=[2048,4096,8192,16384]` and concurrent inference count `[1,2,4,8]`.
 - User accepted that current production bottleneck is Stream1 inference and requested launching puzzle ID `0` on Kaggle T4x2 with the previously working good config, without further optimization work, letting the run continue without timeout.
@@ -332,7 +374,7 @@
   the already found puzzle `991` original solution instead of spending time
   solving the original again.
 - User provided local IHES model file
-  `C:/Users/РРІР°РЅ Р›РёС‚РІР°Рє/Downloads/p888-t000_1778521793_e32692.pth` and requested
+  `C:/Users/???????????????? ??????????????????????????/Downloads/p888-t000_1778521793_e32692.pth` and requested
   launching the IHES cube solver with that model on MEPhI. The model is a
   BatchNorm-folded QMLP-style checkpoint with `input_dim=5184=72*72`,
   `hd1=2556`, `hd2=218`, `nrd=16`, and `output_dim=1`; IHES move count is 18,
@@ -411,3 +453,115 @@
 - User clarified that all one-puzzle array jobs should use one shared precompiled beam-search binary instead of rebuilding production_runner in every job.
 
 - User showed a completed IHES puzzle 33 run where compute succeeded but GitHub publishing failed because compute nodes could not resolve github.com and index generation crashed on metadata fields variants/source_files; requested continuing to collect and publish all cluster IHES results robustly.
+
+- User requested Task 5 spec-fix in `D:\100XH100\.worktrees\stream1-piece-transformer`: make registered `stream1_transformer_cuda_tests` safe in clean checkout by skipping with a clear report line when ignored reference fixture files are absent, preserve the full p900 fixture test when present, document clean-checkout and fixture-present verification, run both paths if feasible, and amend the Task 5 commit without production dispatcher wiring or fallback backend.
+
+- User requested Task 6 in `D:\100XH100\.worktrees\stream1-piece-transformer`: wire Stream1 piece-transformer into dispatcher and production runner with explicit MLP vs piece-transformer backend selection, no fallback backend, uniform mode preserved, transformer scratch-aware runtime sizing, MLP-only benchmark fail-closed unless explicitly wired, dispatcher-level transformer coverage if practical, clear production logs, verification note, and commit.
+- User requested fixing P3 quality-review finding in `D:\100XH100\.worktrees\stream1-piece-transformer`: make `cuda/runtime_config.cpp` estimate piece-transformer `fast_slot_projected` as `max_piece_size * num_classes * d_model`, update `tests/dispatcher_cuda_tests.cu`, keep changes minimal with no fallbacks or architecture changes, run relevant checks including Docker GPU dispatcher tests if available, update project memory/test results, commit, and report SHA/tests.
+- User requested a small portability fix in `D:\100XH100\.worktrees\stream1-piece-transformer`: replace POSIX-only `setenv`/`unsetenv` usage in `tests/dispatcher_cuda_tests.cu` runtime estimate test with a portable scoped environment helper, preserve restore/clear behavior on exceptions, avoid production changes, run a quick dispatcher CUDA test if available, and commit.
+- User noted that the transformer Stream1 backend is far too slow compared with the MLP path: transformer should be roughly comparable and at most about 5x slower, not orders of magnitude slower. User asked to inspect how fast MLP runs and explain/fix the transformer backend without fallback or distillation.
+- User clarified that the ~5x transformer-vs-MLP expectation is empirical from the PyTorch fast path, so the native Stream1 transformer backend should be treated as under-optimized rather than dismissed as intrinsically much heavier.
+- User requested using NVIDIA Nsight to identify where the Stream1 transformer backend is losing performance.
+- User requested rewriting the Stream1 transformer hot path after Nsight showed the implementation was still far from the expected MLP-relative speed: no fallbacks, no distillation, work with the transformer backend directly, keep MLP separate/untouched, and use Nsight/profiling to find the next bottleneck.
+- User requested cleaning and rewriting the Stream1 transformer inference path from scratch after the previous implementation was considered overcomplicated, with no fallbacks or distillation, keeping MLP files/path separate and preserving transformer correctness and speed.
+- User requested running the current clean Stream1 piece-transformer backend on Kaggle 2xT4 "as it will be" and directly answering whether it is still slower than the PyTorch fast path on Kaggle.
+
+- User requested a Kaggle 2xT4 comparison between the native CUTLASS Stream1 MLP benchmark and an equivalent PyTorch MLP inference benchmark, to understand how native vs Torch speeds compare on the same exported MLP weights.
+- User requested the Stream1 transformer backend use CUTLASS FlashAttention-style fused inference immediately, with a correct T4 backend and no fallbacks: attention, epilogues, layout, and launch overhead should be optimized together while preserving the MLP path.
+- User requested continuing the Stream1 transformer optimization after local measurements were inconclusive, with profiling/benchmarking focused on why the native transformer path still lags the PyTorch fast path; changes must keep the MLP path separate and avoid fallbacks or distillation.
+
+- User requested implementing a special fused transformer block for the current `seq=51,d=256,h=8` model and using that structure as the base for other transformer sizes. The implementation should stay transformer-only, avoid fallbacks/distillation, and preserve the MLP path.
+- User requested continuing Stream1 transformer optimization until the native path beats the PyTorch path; changes must keep MLP separate and avoid fallback/distillation.
+- User accepted switching the transformer production direction to C++ LibTorch if native CUDA cannot materially beat PyTorch, and requested archiving all native transformer experiments and ideas. Requirements: keep MLP/CUTLASS path separate, no fallbacks, no distillation, preserve `piece_transformer` model contract, and use LibTorch as an explicit execution backend.
+- User explicitly requested deleting Stream1/Kaggle weights from the repository/worktree because they were wasting disk space and should not be kept permanently.
+- User requested resuming the Stream1 transformer LibTorch backend work from the checkpoint where the report/changelog were written: continue from the already-added opt-in LibTorch benchmark, finish CMake/benchmark verification, keep weights deleted, preserve no-fallback/no-distillation constraints, and do not disturb the MLP/default path.
+- User requested taking the Kaggle-downloaded transformer weights again and measuring real C++ LibTorch Stream1 GPU speed instead of relying on the CPU smoke or build-only checks. Weights should be treated as temporary runtime artifacts, not restored to Git.
+- User requested no deletion while checking disk usage: only list files and inspect `.git`; after confirming disk state was acceptable, user asked to continue Stream1 transformer LibTorch work.
+- User requested making the LibTorch Stream1 transformer CUDA Graph question explicit so graph replay works, continuing performance work, using a profiler, and spawning a subagent to research acceleration options. No fallbacks or MLP disruption are allowed.
+
+## 2026-07-04
+- User required Docker-based profiling after Kaggle lacked Nsight: "пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ Nsight пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ". Requirement: make/use a Docker image with Nsight available, run profiler locally, and use the result to guide Stream1 transformer performance work.
+
+- User asked whether cuBLAS can be replaced by CUTLASS for the Stream1 transformer and requested installing/using a compatible profiler build in Docker to understand the bottleneck and keep improving. Requirements: no fallbacks or distillation, preserve MLP/default path, use Nsight profiling evidence, and do not keep bad CUTLASS experiments if they regress.
+- User requested running the Stream1 transformer backend comparison both locally and on Kaggle 2xT4 to determine which path is actually fastest under the same workload. Required comparison: Python Torch exported weights, original PyTorch `batch_process` where available, C++ LibTorch eager/CUDA Graph, and native CUTLASS eager/CUDA Graph, with logs and summaries stored in `test_results/`.
+- User requested keeping all three Stream1 piece-transformer execution paths as available explicit backends for parallel development: PyTorch, native CUDA/CUTLASS, and C++ LibTorch. These must be selectable backends, not fallbacks.
+## 2026-07-05
+- User approved continuing the Stream1 piece-transformer backend plan: implement correctness parity and a unified benchmark/launcher layer for the explicit `pytorch`, `libtorch`, and `native_cutlass` backends, keep all three selectable for further development, preserve no-fallback/no-distillation policy, and do not disturb the MLP/default path.
+- User requested verifying that the current Stream1 transformer backend work is OK and then improving further. The selected improvement must stay within explicit backend verification/performance work, avoid fallback/distillation, and preserve the MLP/default path.
+- User approved continuing the Stream1 piece-transformer improvement pass after the branch was pushed: verify the current state, keep improving performance/correctness, preserve all three explicit backends, and keep MLP/default behavior separate.
+- User approved running the next Stream1 piece-transformer plan: launch a fresh Kaggle 2xT4 backend comparison on the current branch, verify results, and continue improving based on evidence.
+- User requested continuing Stream1 piece-transformer optimization after the branch push. The follow-up work should keep explicit `pytorch`, `libtorch`, and `native_cutlass` backends, preserve the no-fallback/no-distillation rule, avoid touching MLP/default behavior, and use Kaggle 2xT4 measurements to choose the next LibTorch production candidate.
+- User requested continuing after the LibTorch 2xT4 sweep. The next work should stabilize measurements before production wiring: repeated benchmark passes, mean-best selection, no fallback/distillation, and no MLP/default runtime changes.
+- User requested wiring the explicit LibTorch Stream1 transformer backend into production runner, while answering compatibility for arbitrary transformers and output dimensions. Requirements: keep MLP/default native path separate, no fallbacks or distillation, make 1-output/18-output/24-output semantics explicit, and preserve fail-closed behavior for unsupported transformer contracts.
+- User requested taking useful ideas from MLP training/inference work and applying them to both native CUTLASS and C++ LibTorch Stream1 transformer paths, with strict correctness and speed verification locally and on Kaggle 2xT4. Requirements: keep explicit backends, no fallbacks or distillation, do not disturb MLP/default behavior, and report real measured speed instead of assuming improvement.
+- User requested continuing the Stream1 transformer optimization after the first MLP-inspired checks: use what is actually useful, verify correctness and speed locally and on Kaggle 2xT4, keep all three explicit backends available, preserve no-fallback/no-distillation behavior, and avoid disturbing the MLP/default path.
+- User decided to stop transformer speed tuning for now and requested trying Vlad Kuznetsov's Megaminx transformer on the MEPhI cluster with beam search around 900M. Requirements: use the explicit transformer/LibTorch path, route compute through `sbatch` on `basis:kaf12`, preserve existing MLP/native paths, and make the weight/export expectations clear.
+- User did not know where the transformer weights were located and requested bundling them on GitHub plus ready-to-run MEPhI cluster commands. Requirements: include the exported Vlad Megaminx transformer weights in the repo, make the launcher discover them automatically, and keep sbatch commands simple.
+- User clarified the MEPhI target is 8xA100 40GB and requested benchmarking Stream1 backends plus beam-search parameters before launching a large Megaminx transformer solve around 900M. Requirements: run through sbatch on kaf12, compare production backends on equal configs, record memory/speed/failures, and produce a best env for the later solve.
+## 2026-07-06
+- User clarified the MEPhI Megaminx transformer benchmark order: first test only Stream1 inference backends and choose backend plus `B_MICRO`/concurrency from measured throughput; then run 900M using the same 24-output MLP-style pipeline parameters as before, changing only the selected Stream1 backend, `BEAM_B_MICRO`, and `BEAM_STREAM1_CONCURRENCY`.
+- User required full MEPhI Stream1 transformer benchmarking across all three backend families, with `B_MICRO=512 1024 2048 4096 8192 12288 16384` and concurrency `1 2 4 8`, instead of only running the full grid for native CUTLASS.
+- User selected the measured best Megaminx transformer Stream1 config `native_cutlass graph`, `B_MICRO=512`, `concurrency=2`, requested a 900M test on puzzle 990, then original+reflected runs for puzzles 990 through 1000 if the test is clean.
+- User diagnosed the 700M Megaminx transformer production OOM as excessive ring-slot CUDA Graph instantiation for the tiny measured-best `B_MICRO=512`, suggested bounded graph accumulation, and accepted an explicit no-graph native path as the immediate fix. Requirements: no fallback behavior, keep native kernels, preserve MLP/default graph path, and use this to retest puzzle 990 before launching 990-1000 original+reflected.- 2026-07-06: User requested continuing after native eager transformer solved the graph OOM but was slower, asking to implement `16-32 graph execs on lane` with windowed reuse/reinstantiation so CUDA Graph speed is retained without the uncapped VRAM footprint.
+- 2026-07-06: User clarified that `BEAM_RING_GRAPH_EXECS_PER_LANE` must not change Stream3 slots or physical `ring_count`; the graph should be built only 16-32 steps/templates ahead and reused while the depth step continues.
+
+- User requested implementing a Stream1+2+3 graph smoke benchmark in `D:\100XH100\.worktrees\stream1-piece-transformer`: add a real dispatcher/static-memory based `tools/stream_pipeline_benchmark.cu`, add explicit dispatcher stop stages `AfterStream12` and `AfterStream3` while keeping production default `Full`, extend `hpc/bench_8xa100_megaminx_transformer.sh` with `RUN_PIPELINE_SMOKE=1`, and write TSV rows for `stream12/stream123` across `BEAM_RING_GRAPH_EXECS_PER_LANE=16/32/64` at `B_MICRO=512`, `STREAM1_CONCURRENCY=2`. Requirements: no fallback modes, single-process cuda:0 smoke, no NCCL/Stream5/history/full solve, do not change Stream3 slots, compare against isolated Stream1 native CUTLASS graph baseline ~4.476M candidates/s.
+- 2026-07-06: User requested validation order for the Stream1+2+3 pipeline smoke fix: test locally first, then on Kaggle 2xT4, then inspect/run on the MEPhI A100 cluster. Requirements: preserve production behavior, use measured runtime evidence, and do not move to cluster until local/Kaggle smoke is clean.
+- 2026-07-06: For transformer full runs, count effective full-depth throughput by `final_request_count`. Decouple Stream3 aggregation from transformer Stream1 microbatching: keep `B_MICRO=512` for transformer inference, but allow a larger explicit `BEAM_STREAM3_BATCH_CANDIDATES` (for example `1572864`, matching the old `8192 * 24 * 8` candidate volume) so Stream3 works at its own batch size instead of creating too many small Stream3 jobs.
+- 2026-07-06: User corrected the Stream1 transformer integration direction: the external dispatcher/ring-slot architecture should stay exactly like the MLP path. `B_MICRO` must remain the large parent batch used by Stream2/3; the transformer may only slice internally through a separate microbatch variable. Requirements: do not change Stream3 slots/physical ring-count to compensate for transformer speed, keep MLP path untouched, no fallbacks, and verify with real dispatcher Stream1+2+3 smoke before rerunning cluster jobs.
+- 2026-07-07: User showed Megaminx transformer full-run guard failure after macro/micro fix. Requirement clarified by the failure: memory budget estimation must match actual transformer allocation. PieceTransformer scratch estimates must use internal `BEAM_STREAM1_TRANSFORMER_MICRO`; external `B_MICRO` remains the Stream2/3 dispatcher slot size.
+- 2026-07-07: User requested continuing transformer speed work after the 700M Megaminx full run solved but remained too slow. Requirement: make the transformer Stream1 pipeline behave like the MLP path, keep MLP separate, no fallbacks/distillation, and only enable speed optimizations when correctness is proven against the full transformer path.
+
+## 2026-07-08
+
+User provided MEPhI 8xA100 Megaminx transformer windowed graph logs: `runtime_ring_slot_graph_windowed=1`, `BEAM_RING_GRAPH_EXECS_PER_LANE=8`, but the run aborted at depth 7 with only torchrun `SIGABRT`. Requirement: stop guessing and add diagnostics to expose the exact CUDA failure/context in the windowed graph path without changing production behavior or MLP path.
+
+User clarified the final materialize exchange capacity policy after the 700M Megaminx transformer run failed on rank 7 with `exchange recv total exceeds device capacity`: `BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM` should default to `WORLD_SIZE_EFFECTIVE * 1000000`; smaller values such as 2x are not reliable.
+- 2026-07-08: User requested optimizing native Stream1 transformer inference so it actually loads tensor cores and uses A100-class GPUs properly. Requirements: keep MLP path separate, no fallbacks/distillation, use real profiling/benchmark evidence, preserve correctness, and make the transformer hot path behave like the proven MLP-style pipeline.
+
+## 2026-07-08 Stream1 Transformer BF16 / CLS Attention
+
+User asked to continue optimizing Stream1 transformer inference, including BF16 for A100 and RTX 3070. Requirements captured:
+
+- Keep MLP path safe and separate.
+- Add BF16 support for modern GPUs, including A100 and 3070.
+- Continue optimizing native transformer inference, but do not force a slower or numerically risky path.
+- Use measured correctness and speed, not assumptions.
+
+## 2026-07-19 Backend determinism and MLP benchmark
+
+User requested checking determinism across PyTorch, LibTorch, and native CUTLASS transformer backends, plus MLP, to identify the source of changing score digests. User clarified that the real MLP production path was already working and required limiting the fix to the eager benchmark. `CUDA_LAUNCH_BLOCKING` is diagnostic-only and undesirable as a solution; do not add fallback paths.
+
+User requested continuing with native CUTLASS after Docker recovery and disk cleanup. Requirements: diagnose and fix the real native cause, keep mathematical correctness gated by comparison with prior/full score results, validate eager and CUDA Graph independently, use normal asynchronous execution rather than `CUDA_LAUNCH_BLOCKING`, add no fallback, and leave production MLP untouched.
+
+## 2026-07-19 Native transformer hardware-memory optimization
+
+User approved optimizing native transformer inference around memory-system efficiency rather than ALU throughput. Scope includes FlashAttention-2-style register/shared-memory/L2 reuse, coalesced Q/K/V movement, async copies, shape-specific GEMM and attention policies, layout/fusion experiments, exact full-dump correctness gates, local RTX 3070 validation first, and independent A100 tuning afterward. This is hardware reuse within one fixed-sequence inference, not autoregressive KV caching.
+
+## 2026-07-22 вЂ” Long-running transformer inference optimization goal
+
+- Work sequentially on transformer inference performance on the local RTX 3070 first.
+- Use the profiler-enabled Docker environment to guide optimization, with exact mathematical comparisons and real speed measurements.
+- Continue until further meaningful RTX 3070 improvements are exhausted by evidence, then move to independent optimization on 2xT4; do not transfer SM86 policies blindly.
+## 2026-07-22 вЂ” RTX 3070 benchmark validity
+
+User reported that an interactive game had been running during part of the recent transformer tuning and required checking that the GPU is free for every performance measurement. Suspect overlapping timings must be discarded. Accepted local RTX 3070 performance series require an immediate utilization/process idle check, and longer acceptance series should be bookended by another idle check; correctness dumps remain independently gated by the canonical full-score SHA.
+- User requested a ready-to-run public Kaggle example with attached puzzle data and checkpoint, solving easy puzzle 10 quickly at approximately beam 1024, with real result publication.
+
+- User explicitly authorized publishing the complete Cube4 inference bundle and public notebook, requested a normal-beam run followed by the largest beam fitting 2xT4, required history budgets to use 28-29 GiB RAM plus 50 GiB disk, and required collect mode to preserve every found solution up to user limits around 1000-2000.
+
+
+- User required the public Cube4 notebook to always use the maximum practical history budgets (28-29 GiB host RAM and 50 GiB disk) and to retain every found solution when collection mode is selected, commonly 1000-2000 solutions.
+
+- User clarified the large-beam pipeline tuning target: let Stream1 fill many ring slots before Stream3, size Stream3 batches to roughly 400-500 jobs per full depth as in the cluster workflow, and expose a separate public-notebook debug/logging cell with all requested build/runtime flags and DEPTH_LOG_EVERY/PUZZLE_LOG_EVERY.
+
+- User required the universal public 2xT4 checkpoint notebook to recognize that Transformer and MLP have different best runtime configurations and to select only the matching backend-specific profile family automatically.
+
+- User approved the measured 2xT4 Transformer `2**26` profile after depth-8 A/B: keep the logical Stream3 accumulator large (`192 * 384 * 24 = 1,769,472` candidates), reuse two physical rings, and decouple final materialization at `88,064` candidates. The public universal notebook must expose anchors through `2**26`, preserve backend-specific MLP/Transformer profiles, and derive the practical history RAM budget before preflight while keeping 1.5 GB host headroom and 50 GiB disk.
+
+- 2026-07-31: User required one bounded final-materialization policy across all Kaggle 2xT4 profiles: set `final_materialize_chunk_candidates=88,064` explicitly for both MLP model families and Piece Transformer, including small beam anchors.
+- User requested three named public examples generated from one universal notebook: Cube4/444, Megaminx, and IHES. Each must run on exactly 2xT4 with beam `2**16`, demonstrate both `first` and `collect` solution modes, publish through the free Cloudflare ingest to GitHub, and be reported with real-run evidence and links.
+- User required the Cube4/444 example to use the already supported piece-Transformer bundle rather than an unsupported legacy `layers.* + skip.*` MLP checkpoint.
+- User requested examples that are understandable to other users: one shared notebook contract, prefilled competition/model/puzzle configuration, and mode switching in the USER CONFIG cell.
+
+- User requested another public example matching the existing Cube4/444, Megaminx, and IHES notebooks for `cayley-py-professor-tetraminx-solve-optimally`, using the model output from Rokham's `cayleypy-cube-train-and-solve` script version `277456158`, and explicitly instructed not to use temporary artifacts prepared for GPT-5.3 Spark.

@@ -19,3 +19,8 @@ __pycache__/
 .ipynb_checkpoints/
 FullBeamNice/weights/
 FullBeamNice/generators.zip
+# Generated Stream1 model weights and push snapshots; fetch/export them on demand.
+/stream1_weights/
+/stream1_weights_*/
+/_push_final_chunk/
+/_push_staged_tuner/

@@ -1,0 +1,15 @@
+{
+  "id": "trydotatwo/cayleypy-2xt4-checkpoint-beam-search",
+  "title": "CayleyPy 2xT4 Checkpoint Beam Search",
+  "code_file": "cayleypy-2xt4-checkpoint-public.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

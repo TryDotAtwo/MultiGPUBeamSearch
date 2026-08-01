@@ -1,0 +1,27 @@
+{
+  "rows_csv": "/kaggle/working/stream1_libtorch_transformer_rows.csv",
+  "best_by_gpu": {
+    "0": {
+      "gpu": 0,
+      "batch": 320,
+      "iters": 100,
+      "elapsed_ms": 1584.62,
+      "parents_per_sec": 20194.2,
+      "candidates_per_sec": 484660.0,
+      "checksum": 388218880
+    },
+    "1": {
+      "gpu": 1,
+      "batch": 384,
+      "iters": 100,
+      "elapsed_ms": 1892.61,
+      "parents_per_sec": 20289.5,
+      "candidates_per_sec": 486948.0,
+      "checksum": 465862656
+    }
+  },
+  "aggregate_candidates_per_sec": 971608.0,
+  "pytorch_batch_process_per_t4_reference": 630697.0,
+  "pytorch_batch_process_2xt4_reference": 1261394.0,
+  "libtorch_over_pytorch_2xt4": 0.7702652779385347
+}

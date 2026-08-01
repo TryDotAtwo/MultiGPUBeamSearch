@@ -1,6 +1,7 @@
 #include "stream1.hpp"
 
 #include "config.hpp"
+#include "cuda_check.hpp"
 #include "nvtx_ranges.hpp"
 
 #include <cuda_runtime.h>
@@ -12,6 +13,7 @@
 #include <cutlass/gemm/device/gemm.h>
 #include <cutlass/epilogue/thread/linear_combination_relu.h>
 #include <cutlass/layout/matrix.h>
+
 #endif
 
 #include <stdexcept>
@@ -77,6 +79,21 @@ void stream1_score_contract_cuda(
 
 __device__ float relu_device(float x) {
     return x > 0.0f ? x : 0.0f;
+}
+__device__ float stream1_warp_reduce_sum_device(float value) {
+    constexpr unsigned mask = 0xffffffffU;
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        value += __shfl_down_sync(mask, value, offset);
+    }
+    return __shfl_sync(mask, value, 0);
+}
+
+__device__ float stream1_warp_reduce_max_device(float value) {
+    constexpr unsigned mask = 0xffffffffU;
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        value = fmaxf(value, __shfl_down_sync(mask, value, offset));
+    }
+    return __shfl_sync(mask, value, 0);
 }
 
 __device__ std::uint32_t score_key_from_float_device(float q) {

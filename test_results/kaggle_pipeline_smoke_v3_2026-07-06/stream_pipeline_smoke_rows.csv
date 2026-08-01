@@ -1,0 +1,7 @@
+mode,window,return_code,status,b_micro,concurrency,ring_slots,stream3_batch,graph_window_jobs,physical_jobs,frontier_size,ring_slot_jobs,stream3_jobs,stream4_jobs,candidates,depth_like_ms,candidates_per_sec,shard_capacity,allocation_bytes,elapsed_wall_sec,log
+stream12,16,0,OK,512,2,8,98304,32,256,131072,256,0,0,3145728,5577.97,563956,1048576,3281187584,6.233,/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream12_w16.log
+stream12,32,0,OK,512,2,8,98304,64,256,131072,256,0,0,3145728,5749,547178,1048576,3281187584,6.325,/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream12_w32.log
+stream12,64,0,OK,512,2,8,98304,128,256,131072,256,0,0,3145728,5901.71,533020,1048576,3281187584,6.579,/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream12_w64.log
+stream123,16,0,OK,512,2,8,98304,32,256,131072,256,32,0,3145728,6006.12,523753,1048576,3281187584,6.553,/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream123_w16.log
+stream123,32,0,OK,512,2,8,98304,64,256,131072,256,32,0,3145728,6236.37,504416,1048576,3281187584,6.819,/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream123_w32.log
+stream123,64,0,OK,512,2,8,98304,128,256,131072,256,32,0,3145728,6369.81,493849,1048576,3281187584,7.068,/kaggle/working/stream_pipeline_smoke_logs/pipeline_stream123_w64.log

@@ -110,6 +110,12 @@ beam_configure_build() {
   if [ -n "${BEAM_PUZZLE_INFO_JSON:-}" ]; then
     cmake_args+=(-DBEAM_PUZZLE_INFO_JSON="${BEAM_PUZZLE_INFO_JSON}")
   fi
+  if [ -n "${CMAKE_PREFIX_PATH:-}" ]; then
+    cmake_args+=(-DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}")
+  fi
+  if [ "${BEAM_ENABLE_LIBTORCH_STREAM1:-OFF}" = "ON" ]; then
+    cmake_args+=(-DBEAM_ENABLE_LIBTORCH_STREAM1=ON)
+  fi
   cmake "${cmake_args[@]}"
   cmake --build "${BUILD_DIR}" --target "${target}" -j "${SLURM_CPUS_PER_TASK:-8}"
 }
@@ -118,6 +124,11 @@ beam_round_up() {
   local value="$1"
   local alignment="$2"
   echo $(( ((value + alignment - 1) / alignment) * alignment ))
+}
+
+beam_default_final_exchange_scale_ppm() {
+  local world_size="${WORLD_SIZE_EFFECTIVE:-${TORCHRUN_NPROC_PER_NODE:-1}}"
+  echo $((world_size * 1000000))
 }
 
 beam_stream1_output_dim() {
@@ -180,7 +191,10 @@ beam_derive_shard_capacity() {
   LOGICAL_SHARD_SIZE=$(( (LOCAL_BEAM_WIDTH + SHARD_COUNT - 1) / SHARD_COUNT ))
   SHARD_CAPACITY_RAW=$(( (LOGICAL_SHARD_SIZE * SHARD_CAPACITY_SCALE_PPM + 999999) / 1000000 ))
   SHARD_CAPACITY_CANDIDATES="$(beam_round_up "${SHARD_CAPACITY_RAW}" "${STREAM4_BATCH_ALIGNMENT}")"
-  STREAM3_BATCH_CANDIDATES=$((BEAM_STREAM3_RING_SLOTS * BEAM_PARENT_BATCH_EFFECTIVE * BEAM_MOVE_COUNT_EFFECTIVE))
+  STREAM3_SLOT_CANDIDATES=$((BEAM_PARENT_BATCH_EFFECTIVE * BEAM_MOVE_COUNT_EFFECTIVE))
+  STREAM3_BATCH_CANDIDATES_DEFAULT=$((BEAM_STREAM3_RING_SLOTS * STREAM3_SLOT_CANDIDATES))
+  STREAM3_BATCH_CANDIDATES="${BEAM_STREAM3_BATCH_CANDIDATES:-${STREAM3_BATCH_CANDIDATES_DEFAULT}}"
+  STREAM3_EFFECTIVE_RING_SLOTS=$((STREAM3_BATCH_CANDIDATES / STREAM3_SLOT_CANDIDATES))
 }
 
 beam_validate_manual_config() {
@@ -200,8 +214,17 @@ beam_validate_manual_config() {
     echo "invalid_stream3_batch=${STREAM3_BATCH_CANDIDATES} shard_capacity=${SHARD_CAPACITY_CANDIDATES}"
     return 2
   fi
-  if [ "${BEAM_STREAM1_CONCURRENCY}" -gt "${BEAM_STREAM3_RING_SLOTS}" ]; then
-    echo "invalid_stream1_concurrency=${BEAM_STREAM1_CONCURRENCY} stream3_ring_slots=${BEAM_STREAM3_RING_SLOTS}"
+  if [ "${STREAM3_BATCH_CANDIDATES}" -le 0 ]; then
+    echo "invalid_stream3_batch=${STREAM3_BATCH_CANDIDATES}"
+    return 2
+  fi
+  if [ $((STREAM3_BATCH_CANDIDATES % STREAM3_SLOT_CANDIDATES)) -ne 0 ]; then
+    echo "invalid_stream3_batch=${STREAM3_BATCH_CANDIDATES} slot_candidates=${STREAM3_SLOT_CANDIDATES}"
+    return 2
+  fi
+  STREAM3_EFFECTIVE_RING_SLOTS=$((STREAM3_BATCH_CANDIDATES / STREAM3_SLOT_CANDIDATES))
+  if [ "${BEAM_STREAM1_CONCURRENCY}" -gt "${STREAM3_EFFECTIVE_RING_SLOTS}" ]; then
+    echo "invalid_stream1_concurrency=${BEAM_STREAM1_CONCURRENCY} stream3_effective_ring_slots=${STREAM3_EFFECTIVE_RING_SLOTS}"
     return 2
   fi
 }
@@ -234,11 +257,12 @@ beam_export_manual_config() {
   export BEAM_STREAM4_TRIGGER_CANDIDATES="${STREAM4_TRIGGER_CANDIDATES}"
   export BEAM_SHARD_CAPACITY_CANDIDATES="${SHARD_CAPACITY_CANDIDATES}"
   export BEAM_SHARD_CAPACITY_SCALE_PPM="${SHARD_CAPACITY_SCALE_PPM}"
+  export BEAM_STREAM3_BATCH_CANDIDATES="${STREAM3_BATCH_CANDIDATES}"
   export BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS}"
   export BEAM_GLOBAL_SPILL_CAPACITY="${BEAM_GLOBAL_SPILL_CAPACITY:-0}"
   export BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM="${BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM:-1200000}"
   export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-0}"
-  export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-1200000}"
+  export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
   export BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-$((3 * 1024 * 1024 * 1024))}"
 }
 
@@ -258,9 +282,11 @@ beam_torchrun_production() {
   export BEAM_RANK_LOG_DIR="${rank_log_dir}"
   echo "run_tag=${run_tag}"
   echo "run_log=${run_log}"
+  local runner_path="${BEAM_PRODUCTION_RUNNER_PATH:-${BUILD_DIR}/production_runner}"
   echo "rank_log_dir=${BEAM_RANK_LOG_DIR}"
   echo "beam_nccl_id_file=${BEAM_NCCL_ID_FILE}"
   echo "gpu_monitor_log=${gpu_log}"
+  echo "production_runner_path=${runner_path}"
   (
     while true; do
       date -Is
@@ -279,7 +305,7 @@ beam_torchrun_production() {
     --rdzv-id="beam8a100_${SLURM_JOB_ID:-manual}_${run_tag}" \
     --no-python \
     /bin/bash -lc 'if [ "${RANK:-0}" = "0" ]; then exec "$@"; else exec "$@" > "${BEAM_RANK_LOG_DIR}/rank${RANK}.log" 2>&1; fi' \
-    bash "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}" 2>&1 | tee "${run_log}"
+    bash "${runner_path}" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}" 2>&1 | tee "${run_log}"
   local torchrun_rc=${PIPESTATUS[0]}
   set -e
   if [ -n "${gpu_monitor_pid}" ]; then
@@ -296,6 +322,7 @@ beam_native_production() {
   local gpu_log="${TUNING_DIR}/nvidia_smi_${run_tag}.log"
   local gpu_monitor_pid=""
   local world_size="${WORLD_SIZE_EFFECTIVE:-${TORCHRUN_NPROC_PER_NODE:-8}}"
+  local runner_path="${BEAM_PRODUCTION_RUNNER_PATH:-${BUILD_DIR}/production_runner}"
   mkdir -p "${rank_log_dir}"
   export BEAM_RANK_LOG_DIR="${rank_log_dir}"
   echo "run_tag=${run_tag}"
@@ -305,6 +332,7 @@ beam_native_production() {
   echo "gpu_monitor_log=${gpu_log}"
   echo "production_launcher=native"
   echo "production_world_size=${world_size}"
+  echo "production_runner_path=${runner_path}"
   (
     while true; do
       date -Is
@@ -323,7 +351,7 @@ beam_native_production() {
         export LOCAL_RANK=0
         export WORLD_SIZE="${world_size}"
         export LOCAL_WORLD_SIZE="${world_size}"
-        exec "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
+        exec "${runner_path}" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
       ) 2>&1 | tee "${run_log}" &
       pids+=("$!")
     else
@@ -332,7 +360,7 @@ beam_native_production() {
         export LOCAL_RANK="${rank}"
         export WORLD_SIZE="${world_size}"
         export LOCAL_WORLD_SIZE="${world_size}"
-        exec "${BUILD_DIR}/production_runner" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
+        exec "${runner_path}" "${PUZZLE_ID}" "${DEPTH_LIMIT}" "${BEAM_WIDTH}"
       ) > "${rank_log_dir}/rank${rank}.log" 2>&1 &
       pids+=("$!")
     fi
