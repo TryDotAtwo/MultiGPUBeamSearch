@@ -262,6 +262,38 @@ def test_build_result_envelope_accepts_piece_transformer_format() -> None:
     envelope = build_result_envelope(context, _solution())
     assert envelope["model"]["format"] == "piece-transformer"
 
+def test_build_result_envelope_accepts_real_piece_transformer_manifest() -> None:
+    context = _context()
+    context["model"]["format"] = "piece-transformer"
+    context["model"]["manifest"] = {
+        "backend": "piece_transformer",
+        "model_arch": "piece_transformer",
+        "state_len": 3,
+        "num_classes": 3,
+        "move_count": 2,
+        "output_dim": 2,
+        "num_pieces": 56,
+        "max_piece_size": 3,
+        "num_piece_types": 3,
+        "seq_len": 57,
+        "d_model": 256,
+        "nhead": 8,
+        "head_dim": 32,
+        "num_layers": 4,
+        "ff_dim": 1024,
+        "activation": "relu",
+        "pooling": "cls",
+        "piece_layout": "cube4",
+        "piece_embed_mode": "piece_local",
+        "input_embedding": "fast_slot_projected",
+        "dtype": "fp16",
+    }
+
+    envelope = build_result_envelope(context, _solution())
+
+    assert envelope["model"]["manifest"]["model_arch"] == "piece_transformer"
+    assert envelope["model"]["manifest"]["d_model"] == 256
+
 
 @pytest.mark.parametrize(
     ("model_class", "output_dim", "message"),

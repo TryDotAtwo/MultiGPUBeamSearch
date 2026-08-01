@@ -92,6 +92,10 @@ _RUNTIME_FIELDS = (
 _MANIFEST_FIELDS = (
     "state_len", "num_classes", "hd1", "hd2", "nrd", "output_dim", "dtype",
     "normalization", "layout", "batchnorm", "embeddingbag", "embedding",
+    "backend", "model_arch", "move_count", "num_pieces", "max_piece_size",
+    "num_piece_types", "seq_len", "d_model", "nhead", "head_dim",
+    "num_layers", "ff_dim", "activation", "pooling", "piece_layout",
+    "piece_embed_mode", "input_embedding",
 )
 _MODEL_FIELDS = ("filename", "sha256", "format")
 _HARDWARE_FIELDS = ("platform", "gpu_names", "accelerator_count", "world_size")

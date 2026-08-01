@@ -76,13 +76,21 @@
       "required": [
         "state_len",
         "num_classes",
-        "hd1",
-        "hd2",
-        "nrd",
         "output_dim",
-        "dtype",
-        "normalization",
-        "layout"
+        "dtype"
+      ],
+      "oneOf": [
+        {
+          "required": ["hd1", "hd2", "nrd", "normalization", "layout"]
+        },
+        {
+          "required": [
+            "backend", "model_arch", "move_count", "num_pieces",
+            "max_piece_size", "num_piece_types", "seq_len", "d_model",
+            "nhead", "head_dim", "num_layers", "ff_dim", "activation",
+            "pooling", "piece_layout", "piece_embed_mode", "input_embedding"
+          ]
+        }
       ],
       "properties": {
         "state_len": {
@@ -129,6 +137,43 @@
         "embedding": {
           "type": "string",
           "maxLength": 256
+        },
+        "backend": { "const": "piece_transformer" },
+        "model_arch": { "const": "piece_transformer" },
+        "move_count": { "$ref": "#/$defs/positive_integer" },
+        "num_pieces": { "$ref": "#/$defs/positive_integer" },
+        "max_piece_size": { "$ref": "#/$defs/positive_integer" },
+        "num_piece_types": { "$ref": "#/$defs/positive_integer" },
+        "seq_len": { "$ref": "#/$defs/positive_integer" },
+        "d_model": { "$ref": "#/$defs/positive_integer" },
+        "nhead": { "$ref": "#/$defs/positive_integer" },
+        "head_dim": { "$ref": "#/$defs/positive_integer" },
+        "num_layers": { "$ref": "#/$defs/positive_integer" },
+        "ff_dim": { "$ref": "#/$defs/positive_integer" },
+        "activation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "pooling": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "piece_layout": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "piece_embed_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "input_embedding": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
         }
       }
     },
