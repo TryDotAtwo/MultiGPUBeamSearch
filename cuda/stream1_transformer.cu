@@ -26,6 +26,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -76,10 +77,15 @@ __global__ void stream1_transformer_build_input_kernel(
     std::uint32_t parent_offset) {
     const std::uint32_t row_token = blockIdx.x;
     const std::uint32_t dim = blockIdx.y * blockDim.x + threadIdx.x;
-    const std::uint32_t row = row_token / network.dims.seq_len;
-    const std::uint32_t token = row_token % network.dims.seq_len;
+    const std::uint32_t row = row_token / network.dims.padded_seq_len;
+    const std::uint32_t token = row_token % network.dims.padded_seq_len;
     const std::uint32_t active_count = *count;
-    if (row >= b_micro || parent_offset + row >= active_count || dim >= network.dims.d_model) {
+    if (row >= b_micro || dim >= network.dims.d_model) {
+        return;
+    }
+    if (parent_offset + row >= active_count || token >= network.dims.seq_len) {
+        const std::uint64_t out_idx = static_cast<std::uint64_t>(row_token) * network.dims.d_model + dim;
+        stream1_transformer_store_scalar_device(tokens, out_idx, 0.0f, network.dims.dtype);
         return;
     }
     float value = 0.0f;
@@ -109,6 +115,38 @@ __global__ void stream1_transformer_build_input_kernel(
     stream1_transformer_store_scalar_device(tokens, out_idx, value, network.dims.dtype);
 }
 
+__global__ void stream1_transformer_zero_padded_rows_kernel(
+    half* values,
+    Stream1TransformerDims dims,
+    std::uint32_t rows) {
+    const std::uint64_t idx = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::uint64_t total = static_cast<std::uint64_t>(rows) * dims.padded_seq_len * dims.d_model;
+    if (idx >= total) {
+        return;
+    }
+    const std::uint32_t token = static_cast<std::uint32_t>((idx / dims.d_model) % dims.padded_seq_len);
+    if (token >= dims.seq_len) {
+        stream1_transformer_store_scalar_device(values, idx, 0.0f, dims.dtype);
+    }
+}
+
+void stream1_transformer_zero_padded_rows_launch(
+    half* values,
+    Stream1TransformerDims dims,
+    std::uint32_t rows,
+    cudaStream_t stream) {
+    if (dims.padded_seq_len == dims.seq_len || rows == 0U) {
+        return;
+    }
+    const std::uint64_t total = static_cast<std::uint64_t>(rows) * dims.padded_seq_len * dims.d_model;
+    constexpr std::uint32_t threads = 256U;
+    const std::uint64_t blocks = (total + threads - 1U) / threads;
+    if (blocks > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("Stream1 transformer zero-tail launch grid overflow");
+    }
+    stream1_transformer_zero_padded_rows_kernel<<<static_cast<std::uint32_t>(blocks), threads, 0, stream>>>(
+        values, dims, rows);
+}
 __device__ float stream1_transformer_input_token_value51x256_device(
     const State128* __restrict__ current_frontier_states,
     const std::uint64_t* __restrict__ parent_base,
@@ -255,11 +293,16 @@ __global__ void stream1_transformer_build_input_kernel_graph_job(
     std::uint32_t parent_offset) {
     const std::uint32_t row_token = blockIdx.x;
     const std::uint32_t dim = blockIdx.y * blockDim.x + threadIdx.x;
-    const std::uint32_t row = row_token / network.dims.seq_len;
-    const std::uint32_t token = row_token % network.dims.seq_len;
+    const std::uint32_t row = row_token / network.dims.padded_seq_len;
+    const std::uint32_t token = row_token % network.dims.padded_seq_len;
     const std::uint32_t job = *graph_job_index;
     const std::uint32_t active_count = count[job];
-    if (row >= b_micro || parent_offset + row >= active_count || dim >= network.dims.d_model) {
+    if (row >= b_micro || dim >= network.dims.d_model) {
+        return;
+    }
+    if (parent_offset + row >= active_count || token >= network.dims.seq_len) {
+        const std::uint64_t out_idx = static_cast<std::uint64_t>(row_token) * network.dims.d_model + dim;
+        stream1_transformer_store_scalar_device(tokens, out_idx, 0.0f, network.dims.dtype);
         return;
     }
     float value = 0.0f;
@@ -2348,7 +2391,7 @@ __global__ void stream1_transformer_cls_layernorm_kernel(
         return;
     }
     extern __shared__ float reduce[];
-    const std::uint64_t in_base = static_cast<std::uint64_t>(row) * dims.seq_len * dims.d_model;
+    const std::uint64_t in_base = static_cast<std::uint64_t>(row) * dims.padded_seq_len * dims.d_model;
     const std::uint64_t out_base = static_cast<std::uint64_t>(row) * dims.d_model;
     float sum = 0.0f;
     for (std::uint32_t col = threadIdx.x; col < dims.d_model; col += blockDim.x) {
@@ -2401,7 +2444,7 @@ __global__ void stream1_transformer_cls_bias_layernorm_kernel(
         return;
     }
     extern __shared__ float reduce[];
-    const std::uint64_t in_base = static_cast<std::uint64_t>(row) * dims.seq_len * dims.d_model;
+    const std::uint64_t in_base = static_cast<std::uint64_t>(row) * dims.padded_seq_len * dims.d_model;
     const std::uint64_t out_base = static_cast<std::uint64_t>(row) * dims.d_model;
     float sum = 0.0f;
     for (std::uint32_t col = threadIdx.x; col < dims.d_model; col += blockDim.x) {
@@ -2942,10 +2985,12 @@ void stream1_transformer_inference_graph_job_cuda(
         dims.d_model != dims.nhead * dims.head_dim) {
         throw std::invalid_argument("Stream1 piece_transformer d_model must equal nhead * head_dim");
     }
-    if (dims.seq_len != dims.num_pieces + 1U || dims.max_piece_size == 0U) {
-        throw std::invalid_argument("Stream1 piece_transformer sequence/piece dimensions are inconsistent");
+    if (dims.seq_len != dims.num_pieces + 1U || dims.max_piece_size == 0U ||
+        dims.padded_seq_len < dims.seq_len || dims.sequence_alignment == 0U ||
+        dims.padded_seq_len % dims.sequence_alignment != 0U) {
+        throw std::invalid_argument("Stream1 piece_transformer logical/padded sequence dimensions are inconsistent");
     }
-    if (dims.seq_len > 64U || dims.head_dim > 64U) {
+    if (dims.padded_seq_len > 64U || dims.head_dim > 64U) {
         throw std::invalid_argument("Stream1 piece_transformer fused attention tile requires seq_len<=64 and head_dim<=64");
     }
     const Stream1TransformerAttentionBackend attention_backend =
@@ -2953,7 +2998,7 @@ void stream1_transformer_inference_graph_job_cuda(
     if (b_micro == 0U) {
         return;
     }
-    if (stream1_transformer_block51_requested()) {
+    if (stream1_transformer_block51_requested() && dims.seq_len == 51U && dims.padded_seq_len >= 51U) {
         stream1_transformer_inference_block51_graph_job_cuda(
             current_frontier_states,
             parent_base,
@@ -2970,7 +3015,7 @@ void stream1_transformer_inference_graph_job_cuda(
         return;
     }
 #if BEAM_HAS_CUTLASS
-    const std::uint32_t token_rows = b_micro * dims.seq_len;
+    const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
     const dim3 token_block(128);
     const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
     stream1_transformer_build_input_kernel_graph_job<<<token_grid, token_block, 0, stream>>>(
@@ -2992,6 +3037,7 @@ void stream1_transformer_inference_graph_job_cuda(
         dims.d_model,
         dims.dtype,
         stream);
+    stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
 
     for (std::uint32_t layer = 0; layer < dims.transformer_layers; ++layer) {
         const Stream1TransformerBlockView block = network.blocks[layer];
@@ -3073,6 +3119,7 @@ void stream1_transformer_inference_graph_job_cuda(
             dims.d_model,
             dims.dtype,
             stream);
+        stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
     }
 
     if (dims.transformer_layers > 0U) {
@@ -3145,10 +3192,12 @@ void stream1_transformer_inference_cuda(
         dims.d_model != dims.nhead * dims.head_dim) {
         throw std::invalid_argument("Stream1 piece_transformer d_model must equal nhead * head_dim");
     }
-    if (dims.seq_len != dims.num_pieces + 1U || dims.max_piece_size == 0U) {
-        throw std::invalid_argument("Stream1 piece_transformer sequence/piece dimensions are inconsistent");
+    if (dims.seq_len != dims.num_pieces + 1U || dims.max_piece_size == 0U ||
+        dims.padded_seq_len < dims.seq_len || dims.sequence_alignment == 0U ||
+        dims.padded_seq_len % dims.sequence_alignment != 0U) {
+        throw std::invalid_argument("Stream1 piece_transformer logical/padded sequence dimensions are inconsistent");
     }
-    if (dims.seq_len > 64U || dims.head_dim > 64U) {
+    if (dims.padded_seq_len > 64U || dims.head_dim > 64U) {
         throw std::invalid_argument("Stream1 piece_transformer fused attention tile requires seq_len<=64 and head_dim<=64");
     }
     const Stream1TransformerAttentionBackend attention_backend =
@@ -3156,7 +3205,7 @@ void stream1_transformer_inference_cuda(
     if (b_micro == 0U) {
         return;
     }
-    if (stream1_transformer_block51_requested()) {
+    if (stream1_transformer_block51_requested() && dims.seq_len == 51U && dims.padded_seq_len >= 51U) {
         stream1_transformer_inference_block51_cuda(
             current_frontier_states,
             parent_base,
@@ -3171,7 +3220,7 @@ void stream1_transformer_inference_cuda(
         return;
     }
 #if BEAM_HAS_CUTLASS
-    const std::uint32_t token_rows = b_micro * dims.seq_len;
+    const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
     const dim3 token_block(128);
     const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
     stream1_transformer_build_input_kernel<<<token_grid, token_block, 0, stream>>>(
@@ -3192,6 +3241,7 @@ void stream1_transformer_inference_cuda(
         dims.d_model,
         dims.dtype,
         stream);
+    stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
 
 
     for (std::uint32_t layer = 0; layer < dims.transformer_layers; ++layer) {
@@ -3274,6 +3324,7 @@ void stream1_transformer_inference_cuda(
             dims.d_model,
             dims.dtype,
             stream);
+        stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
 
     }
 
