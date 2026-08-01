@@ -2349,11 +2349,10 @@ void stream1_transformer_attention_launch(
     std::uint32_t b_micro,
     Stream1TransformerAttentionBackend attention_backend,
     cudaStream_t stream) {
-    if (dims.seq_len != STREAM1_TRANSFORMER_SEQ51 ||
-        dims.d_model != STREAM1_TRANSFORMER_DMODEL256 ||
-        dims.nhead != STREAM1_TRANSFORMER_NHEAD8 ||
-        dims.head_dim != STREAM1_TRANSFORMER_HEAD_DIM32) {
-        throw std::invalid_argument("Stream1 piece_transformer tensor attention requires seq_len=51 d_model=256 nhead=8 head_dim=32");
+    if (dims.seq_len == 0U || dims.padded_seq_len < dims.seq_len ||
+        dims.padded_seq_len > 64U || dims.d_model == 0U ||
+        dims.d_model != dims.nhead * dims.head_dim) {
+        throw std::invalid_argument("Stream1 piece_transformer tensor attention received unsupported logical/padded dimensions");
     }
     if (qkv == nullptr || scratch.attention_scores_probs == nullptr ||
         scratch.attention_context == nullptr) {
@@ -3081,6 +3080,7 @@ void stream1_transformer_inference_graph_job_cuda(
             b_micro,
             attention_backend,
             stream);
+        stream1_transformer_zero_padded_rows_launch(scratch.attention_context, dims, b_micro, stream);
         stream1_transformer_linear_residual_cuda(
             scratch.attention_context,
             block.attn_out_weight,
@@ -3286,6 +3286,7 @@ void stream1_transformer_inference_cuda(
             b_micro,
             attention_backend,
             stream);
+        stream1_transformer_zero_padded_rows_launch(scratch.attention_context, dims, b_micro, stream);
         stream1_transformer_linear_residual_cuda(
             scratch.attention_context,
             block.attn_out_weight,
