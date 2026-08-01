@@ -73,3 +73,8 @@ def test_release_tag_is_bound_in_build_and_publish_jobs():
 def test_release_runner_installs_archive_python_dependency():
     text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
     assert "python3 -m pip install zstandard==" in text
+
+def test_release_invokes_package_tools_as_modules():
+    text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
+    assert "python3 -m tools.build_megaminx_native_release" in text
+    assert "python3 -m tools.check_megaminx_native_archive" in text
