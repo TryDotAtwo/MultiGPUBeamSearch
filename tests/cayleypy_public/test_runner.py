@@ -206,6 +206,22 @@ def test_history_defaults_preflight_budget_and_tmp_space(tmp_path: Path) -> None
         )
 
 
+def test_history_budget_depth_cap_matches_tetraminx_p26(tmp_path: Path) -> None:
+    assert runner.maximum_history_depth(
+        _plan(local_beam=2**25),
+        move_count=24,
+        touch_bfs_radius=4,
+        history_ram_bytes=29_000_000_000,
+        history_disk_bytes=50 * 1024**3,
+    ) == 81
+    assert runner.maximum_history_depth(
+        _plan(local_beam=2**24),
+        move_count=24,
+        touch_bfs_radius=4,
+        history_ram_bytes=29_000_000_000,
+        history_disk_bytes=50 * 1024**3,
+    ) > 81
+
 def test_child_environment_drops_inherited_beam_and_torchrun_controls(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

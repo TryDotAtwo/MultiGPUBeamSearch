@@ -102,7 +102,7 @@ SAMPLE_SUBMISSION_CSV = Path("/kaggle/input/REPLACE_WITH_COMPETITION/sample_subm
 PUZZLE_ID_START = 0                 # inclusive
 PUZZLE_ID_END = 0                   # inclusive
 BEAM_WIDTH = 2**21                  # requested value; only alignment may increase it
-MAX_DEPTH = 100
+MAX_DEPTH = 100                      # requested upper bound; runtime caps to history budget
 REFLECT_MODE = "off"                # off | after_original | only
 REFLECT_SOURCE_CSV = None            # required only for REFLECT_MODE == "only"
 SOLUTION_MODE = "first"             # first | collect

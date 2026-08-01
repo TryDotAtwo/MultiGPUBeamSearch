@@ -48,6 +48,7 @@ def test_tetraminx_example_pins_rokham_p888_epoch_1024_artifacts(tmp_path: Path)
     ) in config
     assert 'CHECKPOINT_GENERATOR_JSON = MODEL_ROOT / "generators" / "p888.json"' in config
     assert 'CHECKPOINT_SOURCE_ROOT = MODEL_ROOT' in config
+    assert "MAX_DEPTH = 60" in config
 
 
 def test_all_public_examples_share_the_universal_contract(tmp_path: Path) -> None:

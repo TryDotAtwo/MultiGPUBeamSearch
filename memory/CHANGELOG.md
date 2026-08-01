@@ -1035,3 +1035,4 @@
 - All five public notebooks retain touch BFS radius 4.
 - Builder/profile tests pass 31/31 and the full local suite passes 318/318.
 - 2026-08-01: Final Kaggle rerun passed for all five public notebooks: main v14, 444 v54, Megaminx v14, IHES v14, and Tetraminx v11 all COMPLETE. The four attached-data examples report status=success and touch_bfs_radius=4; the generic main launcher correctly reports SETUP_REQUIRED without user inputs.
+- Added beam-specific static-history MAX_DEPTH capping for all public Kaggle notebooks. The cap uses the selected aligned per-rank beam, move count, touch-BFS radius, and effective RAM/disk budgets; preflight records requested, budget, and effective depths. Tetraminx defaults to MAX_DEPTH=60 for beam 2**26 although its measured budget ceiling is 81.

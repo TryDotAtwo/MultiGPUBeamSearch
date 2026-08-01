@@ -579,3 +579,5 @@ User reported that an interactive game had been running during part of the recen
 - User: И отдельно найди предельное значение луча и тоже сделай чтоб работало
 
 - User: Нужно это всё как для МЛП, так и для трансформера. Для всех ноутов
+
+- User required every public notebook to keep MAX_DEPTH within the history budget computed separately for its actual beam; explicitly selected MAX_DEPTH=60 for Tetraminx beam 2**26.

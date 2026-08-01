@@ -271,6 +271,52 @@ def cleanup_history_runtime(history_dir: Path) -> None:
     shutil.rmtree(resolved)
 
 
+def maximum_history_depth(
+    plan: RuntimePlan,
+    move_count: int,
+    touch_bfs_radius: int,
+    history_ram_bytes: int,
+    history_disk_bytes: int,
+) -> int:
+    """Return the largest MAX_DEPTH admitted by the static-history budget."""
+    values = (move_count, touch_bfs_radius, history_ram_bytes, history_disk_bytes)
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in values):
+        raise ValueError("history depth inputs must be integers")
+    if move_count <= 0 or touch_bfs_radius < 0:
+        raise ValueError("move_count must be positive and touch_bfs_radius nonnegative")
+    if history_ram_bytes <= 0 or history_disk_bytes <= 0:
+        raise ValueError("history budgets must be positive")
+    per_rank_ram = history_ram_bytes // 2
+    per_rank_disk = history_disk_bytes // 2
+    pinned_slot_bytes = _HISTORY_SLOT_COUNT * plan.local_beam * _CANDIDATE_META_BYTES
+    staging_bytes = (
+        _HISTORY_SLOT_COUNT
+        * min(plan.local_beam, _HISTORY_STAGING_ENTRIES)
+        * _HISTORY_ENTRY_BYTES
+    )
+    if per_rank_ram <= pinned_slot_bytes + staging_bytes:
+        raise ValueError("history RAM budget cannot fit pinned slots and staging")
+    usable_entries = (
+        per_rank_ram - pinned_slot_bytes - staging_bytes + per_rank_disk
+    ) // _HISTORY_ENTRY_BYTES
+    frontier_bound = 1
+    states_before_target = 0
+    saturation_depth = 0
+    while frontier_bound < plan.local_beam:
+        frontier_bound = min(plan.local_beam, frontier_bound * move_count)
+        if frontier_bound >= plan.local_beam:
+            break
+        states_before_target += frontier_bound
+        saturation_depth += 1
+    if frontier_bound < plan.local_beam:
+        max_effective_depth = usable_entries
+    elif usable_entries < states_before_target:
+        max_effective_depth = saturation_depth
+    else:
+        full_depths = (usable_entries - states_before_target) // plan.local_beam
+        max_effective_depth = saturation_depth + full_depths
+    return int(min(max_effective_depth + touch_bfs_radius, 2**32 - 1))
+
 def preflight_history_runtime(
     config: PublicRunConfig,
     plan: RuntimePlan,

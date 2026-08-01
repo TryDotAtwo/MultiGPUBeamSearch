@@ -66,6 +66,7 @@ EXAMPLES: dict[str, dict[str, Any]] = {
         "metadata": "logs/model_p888-t000_1765097793.json",
         "generators": "generators/p888.json",
         "output_dim": 1,
+        "max_depth": 60,
         "description": (
             "Ready-to-run Professor Tetraminx output-1 MLP example using "
             "Rokham's p888 epoch-1024 checkpoint; edit only the USER CONFIG cell."
@@ -112,7 +113,7 @@ def config(spec: dict[str, Any], *, solution_mode: str = "first", slug: str | No
         'TEST_CSV = Path("/kaggle/input/REPLACE_WITH_COMPETITION/test.csv")': 'TEST_CSV = COMPETITION_ROOT / "test.csv"',
         'SAMPLE_SUBMISSION_CSV = Path("/kaggle/input/REPLACE_WITH_COMPETITION/sample_submission.csv")': 'SAMPLE_SUBMISSION_CSV = COMPETITION_ROOT / "sample_submission.csv"',
         'BEAM_WIDTH = 2**21': 'BEAM_WIDTH = 2**16',
-        'MAX_DEPTH = 100': 'MAX_DEPTH = 100',
+        'MAX_DEPTH = 100': f'MAX_DEPTH = {spec.get("max_depth", 100)}',
         'SOLUTION_MODE = "first"': f'SOLUTION_MODE = "{solution_mode}"',
         'AUTHOR_NAME = "replace-with-author"': f'AUTHOR_NAME = "public-example-{slug}"',
         'COMPETITION = "replace-with-competition"': f'COMPETITION = "{spec["competition"]}"',

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from hashlib import sha256
 import json
 import os
@@ -32,7 +32,9 @@ from tools.cayleypy_public.results import (
     publish_results,
     publish_result_archive,
 )
-from tools.cayleypy_public.runner import PublicSearchRunError, RunArtifacts, run_public_search
+from tools.cayleypy_public.runner import (
+    PublicSearchRunError, RunArtifacts, maximum_history_depth, run_public_search,
+)
 from tools.kaggle_t4_mlp_profiles import select_profile
 
 
@@ -724,10 +726,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         history_ram_bytes, history_disk_bytes = _derive_history_budgets(
             _available_ram_bytes(), tmp_free_bytes,
         )
+        requested_max_depth = config.max_depth
+        budget_max_depth = maximum_history_depth(
+            plan,
+            contract.move_count,
+            config.touch_bfs_radius,
+            history_ram_bytes,
+            history_disk_bytes,
+        )
+        if config.max_depth > budget_max_depth:
+            config = replace(
+                config,
+                max_depth=budget_max_depth,
+                collect_until_depth=min(config.collect_until_depth, budget_max_depth),
+            )
         preflight = serialize_preflight(
             plan, profile, contract.move_count,
             history_ram_bytes, history_disk_bytes, tmp_free_bytes,
         )
+        preflight["requested_max_depth"] = requested_max_depth
+        preflight["budget_max_depth"] = budget_max_depth
+        preflight["effective_max_depth"] = config.max_depth
         preflight["gpu_names"] = hardware_names
         preflight["model_format"] = model.format
         preflight["model_backend"] = model.backend
