@@ -25,6 +25,7 @@ jobs:
     env:
       CUDA_HOME: /usr/local/cuda-12.8
       CUDACXX: /usr/local/cuda-12.8/bin/nvcc
+      PRERELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease_tag || 'megaminx-native-cluster-latest' }}
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned CUDA, NCCL, CUTLASS, and build tools
@@ -89,6 +90,7 @@ jobs:
       - name: Publish prerelease assets only
         env:
           GH_TOKEN: ${{ github.token }}
+          PRERELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease_tag || 'megaminx-native-cluster-latest' }}
         run: |
           set -euo pipefail
           if ! gh release view "${PRERELEASE_TAG}" >/dev/null 2>&1; then

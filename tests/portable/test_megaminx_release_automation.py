@@ -63,3 +63,9 @@ def test_release_build_bootstraps_cuda_on_github_hosted_linux():
     assert "cuda-nvcc-12-8" in text
     assert "libnccl-dev" in text
     assert "NVIDIA/cutlass" in text
+
+def test_release_tag_is_bound_in_build_and_publish_jobs():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/megaminx-native-release.yml").read_text())
+    assert "PRERELEASE_TAG" in workflow["jobs"]["build"]["env"]
+    publish = next(step for step in workflow["jobs"]["prerelease"]["steps"] if step.get("name") == "Publish prerelease assets only")
+    assert "PRERELEASE_TAG" in publish["env"]
