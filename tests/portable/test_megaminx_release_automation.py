@@ -69,3 +69,7 @@ def test_release_tag_is_bound_in_build_and_publish_jobs():
     assert "PRERELEASE_TAG" in workflow["jobs"]["build"]["env"]
     publish = next(step for step in workflow["jobs"]["prerelease"]["steps"] if step.get("name") == "Publish prerelease assets only")
     assert "PRERELEASE_TAG" in publish["env"]
+
+def test_release_runner_installs_archive_python_dependency():
+    text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
+    assert "python3-zstandard" in text

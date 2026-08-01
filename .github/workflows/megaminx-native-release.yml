@@ -34,7 +34,7 @@ jobs:
           curl -fsSLO https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build cuda-compiler-12-8 cuda-nvcc-12-8 cuda-cudart-dev-12-8 cuda-nvtx-12-8 libnccl2 libnccl-dev
+          sudo apt-get install -y --no-install-recommends ninja-build python3-zstandard cuda-compiler-12-8 cuda-nvcc-12-8 cuda-cudart-dev-12-8 cuda-nvtx-12-8 libnccl2 libnccl-dev
           git clone --depth 1 --branch v3.6.0 https://github.com/NVIDIA/cutlass.git external/cutlass
       - name: Require pinned CUDA toolchain
         run: |
