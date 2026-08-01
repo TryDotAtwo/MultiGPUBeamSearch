@@ -156,7 +156,7 @@ def test_transformer_registry_cannot_select_output1_profile():
 
 @pytest.mark.parametrize(
     ("output_dim", "expected_capacity"),
-    [(1, 550_912), (24, 1_101_824)],
+    [(1, 524_288), (24, 1_101_824)],
 )
 def test_mlp_2p26_candidates_are_capacity_safe(
     output_dim: int, expected_capacity: int,

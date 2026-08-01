@@ -278,11 +278,11 @@
                                      "26":  {
                                                 "validation_status":  "bounded_from_measured",
                                                 "runtime":  {
-                                                                "b_micro":  12288,
+                                                                "b_micro":  6144,
                                                                 "stream1_concurrency":  1,
                                                                 "stream3_ring_slots":  4,
                                                                 "shard_count":  64,
-                                                                "shard_capacity_scale_ppm":  1050000,
+                                                                "shard_capacity_scale_ppm":  1000000,
                                                                 "stream4_batch_candidates":  98304,
                                                                 "stream4_trigger_candidates":  98304,
                                                                 "stream4_active_sort_slots":  1,
@@ -294,7 +294,7 @@
                                                                  "requested_beam":  67108864,
                                                                  "effective_beam":  67108864,
                                                                  "local_beam":  33554432,
-                                                                 "note":  "Memory-bounded p26 candidate: output1 inference batch 12288, concurrency 1, and one Stream 4 sort slot; pending current-code real 2xT4 depth-8 acceptance after 24576/concurrency-2 exceeded budget by 339 MB."
+                                                                 "note":  "Memory-bounded p26 candidate: output1 inference batch 6144, concurrency 1, one Stream 4 sort slot, exact logical-shard capacity (scale 1.0); preserves the independently derived double-buffer receive bound and the 768 MiB T4 headroom."
                                                              }
                                             }
                                  },
