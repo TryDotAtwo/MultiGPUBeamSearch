@@ -86,7 +86,7 @@ def test_notebook_pins_official_repository_and_preserves_artifacts_on_cli_failur
     assert 'SCRATCH = Path("/tmp/cayleypy_public")' in setup_source
     assert "SCRATCH.mkdir(parents=True, exist_ok=True)" in setup_source
     assert 'OUTPUT_DIR = Path("/kaggle/working/cayleypy_public/output")' in setup_source
-    assert "78565a7cf0b89c394e957dc8ca59ae55b1280f27" in config_source
+    assert "78565a76f06c6a7c1d98a9e871d81cb64df71ee1" in config_source
     assert "check=False" in run_source
     assert '["python", "-m", "tools.run_cayleypy_public"' in run_source
     assert 'str(REPO / "tools" / "run_cayleypy_public.py")' not in run_source
