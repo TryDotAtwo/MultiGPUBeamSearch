@@ -1010,3 +1010,5 @@
 - 2026-08-01: Published and reran all five public Kaggle notebooks after the measured MLP p26 pin. Main v9, 4x4x4 v48, Megaminx v11, IHES v9, and Tetraminx v8 all completed; the four configured examples reported success with BFS radius 4 and no fatal/overflow. Final local suite: 318 passed.
 
 - 2026-08-01: Added isolated experimental p27 MLP registry envelopes and private depth-1 Kaggle limit probes for output1/output_move_count. Public notebooks remain pinned to the measured p26 commit until an upper bound is validated.
+
+- 2026-08-01: Located discrete Kaggle 2xT4 MLP memory ceilings with the standard 768 MiB GPU headroom: output1 67,239,936 (131,072 alignment), output_move_count 67,633,152 (65,536 alignment). Added explicit per-model maximum_validated_beam and fail-closed selection above it; removed the experimental p27 anchors. Full depth-8 saturation acceptance is pending.

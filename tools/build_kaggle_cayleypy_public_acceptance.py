@@ -80,11 +80,11 @@ SCENARIOS = {
     ),
     "limit-p27-output1": AcceptanceScenario(
         "limit-p27-output1", "CayleyPy MLP p27 Limit Probe output1",
-        OUTPUT1_CHECKPOINT, OUTPUT1_MODEL_SOURCE, 1, 2**27, 1,
+        OUTPUT1_CHECKPOINT, OUTPUT1_MODEL_SOURCE, 1, 2**26 + 2**17, 9,
     ),
     "limit-p27-output24": AcceptanceScenario(
         "limit-p27-output24", "CayleyPy MLP p27 Limit Probe output24",
-        OUTPUT24_CHECKPOINT, OUTPUT24_MODEL_SOURCE, 24, 2**27, 1,
+        OUTPUT24_CHECKPOINT, OUTPUT24_MODEL_SOURCE, 24, 2**26 + 2**19, 9,
     ),
 }
 

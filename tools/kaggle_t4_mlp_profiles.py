@@ -76,7 +76,21 @@ def select_profile(
         raise ValueError(f"invalid profile anchors for model_class={model_class}") from exc
     if not available_powers:
         raise ValueError(f"missing profiles for model_class={model_class}")
-    maximum_validated_beam = 2 ** available_powers[-1]
+    configured_maxima = profiles.get("maximum_validated_beam", {})
+    if configured_maxima is None:
+        configured_maxima = {}
+    if not isinstance(configured_maxima, dict):
+        raise ValueError("maximum_validated_beam must be an object")
+    maximum_validated_beam = configured_maxima.get(model_class, 2 ** available_powers[-1])
+    if (
+        isinstance(maximum_validated_beam, bool)
+        or not isinstance(maximum_validated_beam, int)
+        or maximum_validated_beam < 2 ** available_powers[-1]
+    ):
+        raise ValueError(
+            f"invalid maximum_validated_beam for model_class={model_class}: "
+            f"{maximum_validated_beam!r}"
+        )
     if beam_width > maximum_validated_beam:
         raise ValueError(
             f"requested beam exceeds validated maximum for model_class={model_class}: "
@@ -109,6 +123,7 @@ def select_profile(
         "alignment_delta": effective_beam - beam_width,
         "profile_power": profile_power,
         "profile_anchor_beam": 2**profile_power,
+        "maximum_validated_beam": maximum_validated_beam,
         "model_class": model_class,
         "hardware": profiles["hardware"],
         "backend": profiles.get("backend", "mlp"),

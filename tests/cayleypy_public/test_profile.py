@@ -172,14 +172,16 @@ def test_mlp_2p26_candidates_are_capacity_safe(
     assert profile["validation_status"] == "measured"
     assert plan.shard_capacity_candidates == expected_capacity
 
-    p27 = select_profile(mlp, 2**27, output_dim, 24)
-    p27_plan = derive_runtime(p27, 2**27, output_dim, 24)
-    assert p27["profile_power"] == 27
-    assert p27["validation_status"] == "bounded_from_measured"
-    assert p27_plan.shard_capacity_candidates == (1_048_576 if output_dim == 1 else 2_202_624)
+    maximum = mlp["maximum_validated_beam"][profile["model_class"]]
+    maximum_profile = select_profile(mlp, maximum, output_dim, 24)
+    maximum_plan = derive_runtime(maximum_profile, maximum, output_dim, 24)
+    assert maximum_profile["profile_power"] == 26
+    assert maximum_profile["maximum_validated_beam"] == maximum
+    assert maximum_plan.effective_beam == maximum
+    assert maximum_plan.shard_capacity_candidates >= maximum_plan.local_beam // maximum_plan.runtime["shard_count"]
 
     with pytest.raises(ValueError, match="exceeds validated maximum"):
-        select_profile(mlp, 2**27 + 1, output_dim, 24)
+        select_profile(mlp, maximum + 1, output_dim, 24)
 
 
 def test_transformer_2p26_profile_records_measured_accumulator_contract():
