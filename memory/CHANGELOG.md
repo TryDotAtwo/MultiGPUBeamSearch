@@ -999,3 +999,5 @@
 - 2026-08-01: Retuned both MLP p26 Kaggle 2xT4 candidates after real current-code preflight rejected the first tuples (15.66/15.88 GB required vs 14.64 GB budget): output1 now uses b_micro=24576, concurrency=2, one Stream4 slot; output_move_count now uses 32 shards, concurrency=2, one Stream4 slot while preserving the derived double-buffer receive bound.
 
 - 2026-08-01: Measured both MLP p26 profiles on real Kaggle 2xT4 through saturated depth 8. output1 v4 used b_micro=6144/concurrency1 and completed depth 8 in 1688.03 s; output_move_count v2 used 32 shards/concurrency2 and completed depth 8 in 52.3487 s. Both retained the 768 MiB GPU headroom and full 33,554,432-state local frontier without fatal/overflow.
+
+- 2026-08-01: Repinned and regenerated the main public notebook plus all four public examples to solver commit cb9e911914bdb4ac63c2b5306f554e5a76b9884e, which contains the measured MLP p26 registry. Public TOUCH_BFS_RADIUS remains 4 in all five notebooks.

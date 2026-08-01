@@ -23,7 +23,7 @@ from tools import build_kaggle_cayleypy_public_notebook as public_notebook
 
 
 OUT_ROOT = REPOSITORY_ROOT / "kaggle"
-SOLVER_COMMIT = "b8bd6b01db77a0863f11cf7289a528e310dad75f"
+SOLVER_COMMIT = "cb9e911914bdb4ac63c2b5306f554e5a76b9884e"
 COMPETITION = "cayley-py-megaminx"
 COMPETITION_ROOT = Path(f"/kaggle/input/competitions/{COMPETITION}")
 OUTPUT1_MODEL_SOURCE = "arabidopsisthalian/megaminx2048-512-8-e4000/PyTorch/default/1"
@@ -118,7 +118,7 @@ def _config_source(scenario: AcceptanceScenario) -> str:
     source = _replace_once(source, 'KAGGLE_OWNER = "replace-with-kaggle-owner"', 'KAGGLE_OWNER = "trydotatwo"')
     source = _replace_once(source, 'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"', f'KAGGLE_SLUG = "cayleypy-public-acceptance-{scenario.name}"')
     source = _replace_once(source, 'KAGGLE_USERNAME = None', 'KAGGLE_USERNAME = "trydotatwo"')
-    source = _replace_once(source, 'SOLVER_COMMIT = "039a4fb9c699bda644efbb0f8ee7a5b51efbb5d2"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
+    source = _replace_once(source, 'SOLVER_COMMIT = "cb9e911914bdb4ac63c2b5306f554e5a76b9884e"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
     if scenario.beam_width == 2**26:
         source = _replace_once(source, "TOUCH_BFS_RADIUS = 4", "TOUCH_BFS_RADIUS = 0")
     return source
