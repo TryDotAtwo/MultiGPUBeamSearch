@@ -90,6 +90,11 @@ def test_release_strips_private_build_paths_and_rpath():
     assert text.count("-ffile-prefix-map=") >= 2
 
 
+def test_release_publish_job_binds_repository_without_checkout():
+    text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
+    assert "GH_REPO: ${{ github.repository }}" in text
+
+
 def test_release_exposes_cuda_binary_directory_to_later_steps():
     text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
     assert 'echo "/usr/local/cuda-12.8/bin" >> "$GITHUB_PATH"' in text

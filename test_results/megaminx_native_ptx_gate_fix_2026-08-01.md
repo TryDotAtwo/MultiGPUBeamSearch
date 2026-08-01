@@ -12,3 +12,4 @@
 - Workflow contract: `11 passed` before the local pytest teardown timeout.
 - Parser refinement: accept `No PTX file found`; reject only numbered `PTX file N:` records and other payload evidence.
 - Public-path fix: `CMAKE_SKIP_RPATH=TRUE` plus C++/CUDA `-ffile-prefix-map`; focused workflow test passed.
+- Run 30714675525: all six build/gate jobs passed; publish failed only because checkout-free `gh release` lacked repository context. Added `GH_REPO`.

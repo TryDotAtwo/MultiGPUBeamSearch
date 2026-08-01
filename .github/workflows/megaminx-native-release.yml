@@ -92,6 +92,7 @@ jobs:
       - name: Publish prerelease assets only
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           PRERELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease_tag || 'megaminx-native-cluster-latest' }}
         run: |
           set -euo pipefail

@@ -773,3 +773,4 @@
 - 2026-08-01: Changed native archive compilation to CMake `${sm}-real` architectures so release binaries contain only target SASS and no virtual PTX fallback.
 - 2026-08-01: Allowed the explicit `cuobjdump` absence diagnostic `No PTX file found`; actual numbered PTX records remain forbidden.
 - 2026-08-01: Removed GitHub build RPATH and mapped C++/CUDA source paths to `.` so native public ELF payloads contain no private runner paths.
+- 2026-08-01: Bound `GH_REPO` in the checkout-free prerelease job so verified native artifacts can be uploaded to the stable release tag.
