@@ -276,7 +276,7 @@
                                                              }
                                             },
                                      "26":  {
-                                                "validation_status":  "bounded_from_measured",
+                                                "validation_status":  "measured",
                                                 "runtime":  {
                                                                 "b_micro":  6144,
                                                                 "stream1_concurrency":  1,
@@ -289,12 +289,18 @@
                                                                 "final_materialize_chunk_candidates":  88064
                                                             },
                                                 "evidence":  {
-                                                                 "source":  "output1 p25 measured tuple",
-                                                                 "anchor":  25,
+                                                                 "source":  "trydotatwo/cayleypy-mlp-p26-acceptance-output1",
+                                                                 "kernel_version":  4,
+                                                                 "solver_commit":  "b8bd6b01db77a0863f11cf7289a528e310dad75f",
+                                                                 "depth":  8,
+                                                                 "depth_sec":  1688.03,
+                                                                 "solve_sec":  4009.690965389,
+                                                                 "wall_sec":  4154.400519261,
                                                                  "requested_beam":  67108864,
                                                                  "effective_beam":  67108864,
                                                                  "local_beam":  33554432,
-                                                                 "note":  "Memory-bounded p26 candidate: output1 inference batch 6144, concurrency 1, one Stream 4 sort slot, exact logical-shard capacity (scale 1.0); preserves the independently derived double-buffer receive bound and the 768 MiB T4 headroom."
+                                                                 "final_candidate_count":  33554432,
+                                                                 "note":  "Real Kaggle 2xT4 BFS-off acceptance reached and materialized the full p26 frontier through depth 8 with no fatal or overflow; standard 768 MiB GPU headroom retained."
                                                              }
                                             }
                                  },
@@ -570,7 +576,7 @@
                                                                        }
                                                       },
                                                "26":  {
-                                                          "validation_status":  "bounded_from_measured",
+                                                          "validation_status":  "measured",
                                                           "runtime":  {
                                                                           "b_micro":  2048,
                                                                           "stream1_concurrency":  2,
@@ -583,15 +589,18 @@
                                                                           "final_materialize_chunk_candidates":  88064
                                                                       },
                                                           "evidence":  {
-                                                                           "source":  "trydotatwo/cayley-beam-gpu-runner",
-                                                                           "kernel_version":  120,
-                                                                           "config_id":  "beam2p26_output_move_count_sh64_b2048_c4",
-                                                                           "depth":  20,
-                                                                           "elapsed_sec":  262.961,
+                                                                           "source":  "trydotatwo/cayleypy-mlp-p26-acceptance-output24",
+                                                                           "kernel_version":  2,
+                                                                           "solver_commit":  "29140098bb6bd1c9b414bb49237c2488717bdc56",
+                                                                           "depth":  8,
+                                                                           "depth_sec":  52.3487,
+                                                                           "solve_sec":  132.710240148,
+                                                                           "wall_sec":  274.270157566,
                                                                            "requested_beam":  67108864,
                                                                            "effective_beam":  67108864,
                                                                            "local_beam":  33554432,
-                                                                           "note":  "Older real 2xT4 p26 success; memory-bounded current candidate uses 32 shards, concurrency 2, and one Stream 4 sort slot pending depth-8 acceptance."
+                                                                           "final_candidate_count":  33554432,
+                                                                           "note":  "Real Kaggle 2xT4 BFS-off acceptance reached and materialized the full p26 frontier through depth 8 with no fatal or overflow; standard 768 MiB GPU headroom retained."
                                                                        }
                                                       }
                                            }

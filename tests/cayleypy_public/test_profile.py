@@ -169,7 +169,7 @@ def test_mlp_2p26_candidates_are_capacity_safe(
     profile = select_profile(mlp, 2**26, output_dim, 24)
     plan = derive_runtime(profile, 2**26, output_dim, 24)
     assert profile["profile_power"] == 26
-    assert profile["validation_status"] == "bounded_from_measured"
+    assert profile["validation_status"] == "measured"
     assert plan.shard_capacity_candidates == expected_capacity
 
     with pytest.raises(ValueError, match="exceeds validated maximum"):
