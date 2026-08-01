@@ -1007,3 +1007,5 @@
 - 2026-08-01: Repinned and regenerated the main public notebook plus all four public examples to solver commit cb9e911914bdb4ac63c2b5306f554e5a76b9884e, which contains the measured MLP p26 registry. Public TOUCH_BFS_RADIUS remains 4 in all five notebooks.
 
 - 2026-08-01: Published and reran all five public Kaggle notebooks after the measured MLP p26 pin. Main v9, 4x4x4 v48, Megaminx v11, IHES v9, and Tetraminx v8 all completed; the four configured examples reported success with BFS radius 4 and no fatal/overflow. Final local suite: 318 passed.
+
+- 2026-08-01: Added isolated experimental p27 MLP registry envelopes and private depth-1 Kaggle limit probes for output1/output_move_count. Public notebooks remain pinned to the measured p26 commit until an upper bound is validated.

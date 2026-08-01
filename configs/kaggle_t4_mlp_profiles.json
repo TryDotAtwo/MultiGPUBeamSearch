@@ -302,6 +302,28 @@
                                                                  "final_candidate_count":  33554432,
                                                                  "note":  "Real Kaggle 2xT4 BFS-off acceptance reached and materialized the full p26 frontier through depth 8 with no fatal or overflow; standard 768 MiB GPU headroom retained."
                                                              }
+                                            },
+                                     "27":  {
+                                                "validation_status":  "bounded_from_measured",
+                                                "runtime":  {
+                                                                "b_micro":  6144,
+                                                                "stream1_concurrency":  1,
+                                                                "stream3_ring_slots":  4,
+                                                                "shard_count":  64,
+                                                                "shard_capacity_scale_ppm":  1000000,
+                                                                "stream4_batch_candidates":  98304,
+                                                                "stream4_trigger_candidates":  98304,
+                                                                "stream4_active_sort_slots":  1,
+                                                                "final_materialize_chunk_candidates":  88064
+                                                            },
+                                                "evidence":  {
+                                                                 "source":  "p26 measured tuple",
+                                                                 "anchor":  26,
+                                                                 "requested_beam":  134217728,
+                                                                 "effective_beam":  134217728,
+                                                                 "local_beam":  67108864,
+                                                                 "note":  "Experimental p27 envelope for isolated Kaggle 2xT4 memory-bound discovery; not public until real acceptance."
+                                                             }
                                             }
                                  },
                      "output_move_count":  {
@@ -601,6 +623,28 @@
                                                                            "local_beam":  33554432,
                                                                            "final_candidate_count":  33554432,
                                                                            "note":  "Real Kaggle 2xT4 BFS-off acceptance reached and materialized the full p26 frontier through depth 8 with no fatal or overflow; standard 768 MiB GPU headroom retained."
+                                                                       }
+                                                      },
+                                               "27":  {
+                                                          "validation_status":  "bounded_from_measured",
+                                                          "runtime":  {
+                                                                          "b_micro":  2048,
+                                                                          "stream1_concurrency":  2,
+                                                                          "stream3_ring_slots":  4,
+                                                                          "shard_count":  32,
+                                                                          "shard_capacity_scale_ppm":  1050000,
+                                                                          "stream4_batch_candidates":  196608,
+                                                                          "stream4_trigger_candidates":  393216,
+                                                                          "stream4_active_sort_slots":  1,
+                                                                          "final_materialize_chunk_candidates":  88064
+                                                                      },
+                                                          "evidence":  {
+                                                                           "source":  "p26 measured tuple",
+                                                                           "anchor":  26,
+                                                                           "requested_beam":  134217728,
+                                                                           "effective_beam":  134217728,
+                                                                           "local_beam":  67108864,
+                                                                           "note":  "Experimental p27 envelope for isolated Kaggle 2xT4 memory-bound discovery; not public until real acceptance."
                                                                        }
                                                       }
                                            }

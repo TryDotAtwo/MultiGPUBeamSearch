@@ -78,6 +78,14 @@ SCENARIOS = {
         "p26-output24", "CayleyPy MLP p26 Acceptance output24",
         OUTPUT24_CHECKPOINT, OUTPUT24_MODEL_SOURCE, 24, 2**26, 9,
     ),
+    "limit-p27-output1": AcceptanceScenario(
+        "limit-p27-output1", "CayleyPy MLP p27 Limit Probe output1",
+        OUTPUT1_CHECKPOINT, OUTPUT1_MODEL_SOURCE, 1, 2**27, 1,
+    ),
+    "limit-p27-output24": AcceptanceScenario(
+        "limit-p27-output24", "CayleyPy MLP p27 Limit Probe output24",
+        OUTPUT24_CHECKPOINT, OUTPUT24_MODEL_SOURCE, 24, 2**27, 1,
+    ),
 }
 
 
@@ -119,7 +127,7 @@ def _config_source(scenario: AcceptanceScenario) -> str:
     source = _replace_once(source, 'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"', f'KAGGLE_SLUG = "cayleypy-public-acceptance-{scenario.name}"')
     source = _replace_once(source, 'KAGGLE_USERNAME = None', 'KAGGLE_USERNAME = "trydotatwo"')
     source = _replace_once(source, 'SOLVER_COMMIT = "cb9e911914bdb4ac63c2b5306f554e5a76b9884e"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
-    if scenario.beam_width == 2**26:
+    if scenario.beam_width >= 2**26:
         source = _replace_once(source, "TOUCH_BFS_RADIUS = 4", "TOUCH_BFS_RADIUS = 0")
     return source
 

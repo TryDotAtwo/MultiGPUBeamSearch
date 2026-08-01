@@ -51,7 +51,7 @@ def test_acceptance_packages_are_private_pinned_and_parseable(tmp_path: Path) ->
         assert config["PUZZLE_ID_START"] == config["PUZZLE_ID_END"] == 0
         assert config["BEAM_WIDTH"] == scenario.beam_width
         assert config["MAX_DEPTH"] == scenario.max_depth
-        assert config["TOUCH_BFS_RADIUS"] == (0 if scenario.beam_width == 2**26 else 4)
+        assert config["TOUCH_BFS_RADIUS"] == (0 if scenario.beam_width >= 2**26 else 4)
         assert config["PUBLISH_RESULTS"] is False
         assert config["RESULTS_INGEST_URL"] == ""
         assert config["SOLVER_COMMIT"] == SOLVER_COMMIT
