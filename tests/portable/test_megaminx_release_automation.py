@@ -17,7 +17,7 @@ def test_release_workflow_has_exact_six_native_targets_and_prerelease_gate():
     assert "--prerelease" in text
     assert "--draft=false" not in text
     assert "compute_" not in text and "PTX" not in text
-    assert "check_megaminx_native_archive.py" in text
+    assert "tools.check_megaminx_native_archive" in text
 
 
 def candidate(power, median_bias, digest="exact", status="measured"):
