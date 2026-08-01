@@ -520,6 +520,7 @@ test(
       configureWriter(writer);
       await writer.flush();
       await writer.flush();
+      await writer.flush();
     });
     expect(await pending(name)).toEqual([]);
     expect(
@@ -529,6 +530,37 @@ test(
         .first(),
     ).toBeNull();
     expect(await env.RAW_RESULTS.get(seeded.rawKey)).toBeNull();
+  },
+  15_000,
+);
+
+test(
+  "keeps one GitHub publication flush within the free Worker subrequest budget",
+  async () => {
+    const name = "free-subrequest-budget";
+    const target = stub(name);
+    const seeded = await Promise.all(
+      Array.from({ length: 41 }, (_, n) => seedValidated(1_000 + n)),
+    );
+    await Promise.all(
+      seeded.map((item) => target.enqueueValidated(item.submissionId)),
+    );
+    const router = githubRouter("absent", "");
+    vi.stubGlobal("fetch", router.fetcher);
+
+    const result = await runInDurableObject(target, async (instance) => {
+      const writer = instance as unknown as GitHubWriter;
+      configureWriter(writer);
+      resetInstallationTokenCacheForTest();
+      return writer.flush();
+    });
+
+    const preflightCalls = router.calls.filter((call) =>
+      call.method === "GET" && call.url.pathname.includes("/contents/results/v1/")
+    );
+    expect(preflightCalls).toHaveLength(40);
+    expect(result).toEqual({ staged: 40, retained: 1 });
+    expect(await pending(name)).toHaveLength(1);
   },
   15_000,
 );

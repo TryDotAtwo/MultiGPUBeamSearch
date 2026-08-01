@@ -13,7 +13,7 @@ interface Pending { submissionId: string; }
 interface Verified { id: string; row: SubmissionRow; envelope: ResultEnvelopeV1; body: string; path: string; }
 interface Target { owner: string; repo: string; branchRoute: string; branchQuery: string; }
 interface CommitResult { sha: string; staged: Verified[]; terminal: TerminalIntegrityError[]; }
-const PENDING_PREFIX = "pending/", MAX_RECORDS = 100, MAX_BYTES = 5 * 1024 * 1024, MAX_DELAY_MS = 30_000, RETAIN_DELAY_MS = 15_000;
+const PENDING_PREFIX = "pending/", MAX_RECORDS = 40, MAX_BYTES = 5 * 1024 * 1024, MAX_DELAY_MS = 30_000, RETAIN_DELAY_MS = 15_000;
 const SHA_RE = /^[0-9a-f]{40,64}$/;
 const REPOSITORY_SEGMENT_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/;
 const BRANCH_SEGMENT_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
