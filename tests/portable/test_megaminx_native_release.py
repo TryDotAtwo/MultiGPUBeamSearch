@@ -48,7 +48,7 @@ def test_cuda_gate_accepts_exactly_one_sm_without_ptx():
 
 
 def test_cuda_gate_accepts_empty_ptx_listing_header():
-    listing = "Fatbin elf code:\narch = sm_80\nFatbin ptx code:\n"
+    listing = "Fatbin elf code:\narch = sm_80\nFatbin ptx code:\ncuobjdump info    : No PTX file found\n"
     assert inspect_cuda_image_text(listing, 80) == (80,)
 
 

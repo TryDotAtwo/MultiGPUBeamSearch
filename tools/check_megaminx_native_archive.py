@@ -13,7 +13,7 @@ FORBIDDEN_CONTENT=re.compile(rb"(?:ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA|OPENSSH) PR
 
 def inspect_cuda_image_text(text:str,expected_sm:int)->tuple[int,...]:
     lowered=text.lower()
-    if re.search(r"\bcompute_[0-9]+\b|\bptxas\b|\bptx\s+file\b|\S+\.ptx\b",lowered): raise ValueError("PTX/JIT image is forbidden")
+    if re.search(r"\bcompute_[0-9]+\b|\bptxas\b|\bptx\s+file\s+[0-9]+\s*:|\S+\.ptx\b",lowered): raise ValueError("PTX/JIT image is forbidden")
     images=tuple(sorted({int(v) for v in re.findall(r"\bsm_([0-9]+)\b",lowered)}))
     if images!=(expected_sm,): raise ValueError(f"expected only sm_{expected_sm}; found {images}")
     return images

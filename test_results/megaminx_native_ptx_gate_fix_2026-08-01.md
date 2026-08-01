@@ -10,3 +10,4 @@
 - Required final gate: GitHub-hosted CUDA archive build and checker for all six native SM targets.
 - Root build fix: use `-DBEAM_CUDA_ARCHITECTURES=${sm}-real`; the unsuffixed CMake architecture emitted virtual PTX by design.
 - Workflow contract: `11 passed` before the local pytest teardown timeout.
+- Parser refinement: accept `No PTX file found`; reject only numbered `PTX file N:` records and other payload evidence.
