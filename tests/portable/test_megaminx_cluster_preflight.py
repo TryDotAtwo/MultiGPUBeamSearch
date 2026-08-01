@@ -72,3 +72,32 @@ def test_hash_verification_detects_corruption(tmp_path):
     (tmp_path / "bin" / "production_runner").write_bytes(b"corrupt")
     with pytest.raises(ValueError, match="sha256 mismatch"):
         verify_payload_hashes(tmp_path, data["payloads"])
+
+def test_hardware_only_cli_skips_missing_profile_registry(tmp_path, monkeypatch):
+    import json
+    import subprocess
+    from portable.megaminx_cluster.scripts import preflight_cli
+
+    root = tmp_path / "archive"
+    run_dir = tmp_path / "run"
+    root.mkdir()
+    run_dir.mkdir()
+    (root / "MANIFEST.json").write_text(json.dumps({
+        "archive_sm": 80,
+        "gpu_family": "A100",
+        "minimum_driver_major": 570,
+        "minimum_vram_mib": 1,
+        "payloads": {},
+    }), encoding="utf-8")
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
+    monkeypatch.setattr(preflight_cli.subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, GPU_CSV, ""))
+
+    rc = preflight_cli.main([
+        "--hardware-only", "--archive-root", str(root), "--run-dir", str(run_dir),
+        "--gpu-count", "2",
+    ])
+
+    assert rc == 0
+    record = json.loads((run_dir / "preflight.json").read_text(encoding="utf-8"))
+    assert record["world_size"] == 2
+    assert not (run_dir / "selected_profile.json").exists()

@@ -1,5 +1,4 @@
 """Compute-node preflight CLI executed before torchrun."""
-
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -25,15 +24,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--archive-root", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--gpu-count", type=int, required=True)
-    parser.add_argument("--beam", type=int, required=True)
+    parser.add_argument("--beam", type=int)
+    parser.add_argument("--hardware-only", action="store_true")
     args = parser.parse_args(argv)
     try:
+        if not args.hardware_only and (args.beam is None or args.beam <= 0):
+            raise ValueError("--beam must be positive unless --hardware-only is used")
         root = args.archive_root.resolve()
         run_dir = args.run_dir.resolve()
         manifest = json.loads((root / "MANIFEST.json").read_text(encoding="utf-8-sig"))
-        registry = json.loads(
-            (root / "profiles" / "registry.json").read_text(encoding="utf-8-sig")
-        )
         visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
         if not visible:
             raise ValueError("CUDA_VISIBLE_DEVICES is empty")
@@ -52,6 +51,21 @@ def main(argv: list[str] | None = None) -> int:
         gpus = inspect_gpus(query.stdout)
         if len(gpus) != args.gpu_count:
             raise ValueError(f"expected {args.gpu_count} GPUs; observed {len(gpus)}")
+        verify_payload_hashes(root, manifest["payloads"])
+
+        if args.hardware_only:
+            allocation_plan = {
+                "world_size": args.gpu_count,
+                "required_vram_mib": int(manifest["minimum_vram_mib"]),
+                "history_disk_bytes": 0,
+            }
+            record = validate_allocation(
+                manifest, allocation_plan, gpus, shutil.disk_usage(run_dir).free
+            )
+            write_record(run_dir / "preflight.json", record)
+            return 0
+
+        registry = json.loads((root / "profiles" / "registry.json").read_text(encoding="utf-8-sig"))
         first = gpus[0]
         selected = select_profile(
             registry,
@@ -66,18 +80,13 @@ def main(argv: list[str] | None = None) -> int:
             int(manifest["move_count"]),
             int(manifest["output_dim"]),
         )
-        verify_payload_hashes(root, manifest["payloads"])
         allocation_plan = {
             "world_size": args.gpu_count,
             "required_vram_mib": int(manifest["minimum_vram_mib"]),
             "history_disk_bytes": int(manifest["history_disk_bytes"]),
         }
-        scratch = Path(str(run_dir))
         record = validate_allocation(
-            manifest,
-            allocation_plan,
-            gpus,
-            shutil.disk_usage(scratch).free,
+            manifest, allocation_plan, gpus, shutil.disk_usage(run_dir).free
         )
         selected_record = {
             **asdict(runtime),
