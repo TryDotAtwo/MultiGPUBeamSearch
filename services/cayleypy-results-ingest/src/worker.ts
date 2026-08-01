@@ -3,7 +3,8 @@ export { resolveIngestMode, type IngestMode } from "./mode.js";
 import { resolveIngestMode, type IngestMode } from "./mode.js";
 export { GitHubWriter } from "./github-writer.js";
 import { deleteStagedSubmission, findBySubmissionId, findStagedSubmissions, findValidatedSubmissions } from "./db.js";
-import { MAX_SERIALIZED_BATCH_BYTES, validateBatch, validateBatchIntegrity, type ResultEnvelopeV1 } from "./schema.js";
+import { MAX_SERIALIZED_BATCH_BYTES } from "./schema.js";
+import { validateVersionedBatch, validateVersionedEnvelope, type ResultEnvelope, type SchemaVersion } from "./schema-dispatch.js";
 import {
   SafeIngestError,
   receiveEnvelope,
@@ -126,7 +127,7 @@ async function readBoundedText(
   }
 }
 
-async function parseBatch(request: Request): Promise<{ value: ResultEnvelopeV1[]; rawByteLength: number } | Response> {
+async function parseBatch(request: Request, version: SchemaVersion): Promise<{ value: ResultEnvelope[]; rawByteLength: number } | Response> {
   const type = mediaType(request);
   if (type !== "application/json" && type !== "application/gzip") {
     return errorResponse(415, "unsupported_media_type");
@@ -161,11 +162,12 @@ async function parseBatch(request: Request): Promise<{ value: ResultEnvelopeV1[]
   } finally {
     body.text = "";
   }
-  const validation = validateBatch(parsed, body.rawByteLength, type === "application/gzip" ? MAX_DECOMPRESSED_ARCHIVE_BYTES : MAX_REQUEST_BYTES);
+  const validation = validateVersionedBatch(parsed, version, body.rawByteLength, type === "application/gzip" ? MAX_DECOMPRESSED_ARCHIVE_BYTES : MAX_REQUEST_BYTES);
   if (!validation.ok) {
     return jsonResponse({ error: "invalid_schema", errors: validation.errors }, 400);
   }
-  const integrityErrors = await validateBatchIntegrity(validation.value.results);
+  const integrityAll = await Promise.all(validation.value.results.map(validateVersionedEnvelope));
+  const integrityErrors = integrityAll.flatMap((items, index) => items.map((item) => ({ path: `/results/${index}${item.path}`, keyword: item.keyword })));
   if (integrityErrors.length !== 0) {
     return jsonResponse({ error: "invalid_schema", errors: integrityErrors }, 400);
   }
@@ -242,7 +244,7 @@ async function mapBounded<T, U>(
   ));
   return output;
 }
-async function handlePostResults(request: Request, env: WorkerEnv): Promise<Response> {
+async function handlePostResults(request: Request, env: WorkerEnv, version: SchemaVersion): Promise<Response> {
   const mode = resolveIngestMode(env.INGEST_MODE);
   if (mode === "reject") return errorResponse(503, "ingest_disabled");
 
@@ -254,7 +256,7 @@ async function handlePostResults(request: Request, env: WorkerEnv): Promise<Resp
   }
   if (!ipAllowed) return rateLimited();
 
-  const parsed = await parseBatch(request);
+  const parsed = await parseBatch(request, version);
   if (parsed instanceof Response) return parsed;
 
   let globallyAllowed: boolean;
@@ -348,7 +350,11 @@ export async function fetchRequest(
   const pathname = new URL(request.url).pathname;
   if (pathname === "/v1/results") {
     if (request.method !== "POST") return methodNotAllowed("POST");
-    return handlePostResults(request, env);
+    return handlePostResults(request, env, 1);
+  }
+  if (pathname === "/v2/results") {
+    if (request.method !== "POST") return methodNotAllowed("POST");
+    return handlePostResults(request, env, 2);
   }
   if (pathname === "/healthz") {
     if (request.method !== "GET") return methodNotAllowed("GET");

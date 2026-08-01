@@ -3,14 +3,16 @@ import { deleteStagedSubmission, findBySubmissionId, transition, type Submission
 import { githubRequest, getInstallationToken, type GitHubAppConfig } from "./github-app.js";
 import { canonicalJson, sha256Hex } from "./ids.js";
 import { resolveIngestMode, type IngestMode } from "./mode.js";
-import { MAX_SERIALIZED_ENVELOPE_BYTES, validateBatch, validateEnvelopeIntegrity, type ResultEnvelopeV1 } from "./schema.js";
+import { MAX_SERIALIZED_ENVELOPE_BYTES, type ResultEnvelopeV1 } from "./schema.js";
+import { validateVersionedBatch, validateVersionedEnvelope, type ResultEnvelope, type SchemaVersion } from "./schema-dispatch.js";
+import type { ResultEnvelopeV2 } from "./schema-v2.js";
 
 export type WriterMode = IngestMode;
 export const resolveWriterMode = resolveIngestMode;
 export interface GitHubWriterEnv extends GitHubAppConfig { RESULTS_DB: D1Database; RAW_RESULTS: R2Bucket; INGEST_MODE?: string; STAGING_BRANCH?: string; }
 export interface FlushResult { staged: number; retained: number; }
 interface Pending { submissionId: string; }
-interface Verified { id: string; row: SubmissionRow; envelope: ResultEnvelopeV1; body: string; path: string; }
+interface Verified { id: string; row: SubmissionRow; envelope: ResultEnvelope; body: string; path: string; }
 interface Target { owner: string; repo: string; branchRoute: string; branchQuery: string; }
 interface CommitResult { sha: string; staged: Verified[]; terminal: TerminalIntegrityError[]; }
 const PENDING_PREFIX = "pending/", MAX_RECORDS = 40, MAX_BYTES = 5 * 1024 * 1024, MAX_DELAY_MS = 30_000, RETAIN_DELAY_MS = 15_000;
@@ -24,7 +26,9 @@ function repositorySegment(value: string | undefined): string { const out = valu
 export function branchRoute(value: string | undefined): string { const branch = value?.trim(); if (!branch || branch.length > 255 || branch.startsWith("/") || branch.endsWith("/")) throw new Error("github_branch_invalid"); const parts = branch.split("/"); if (parts.some((p) => p === "." || p === ".." || !BRANCH_SEGMENT_RE.test(p))) throw new Error("github_branch_invalid"); return parts.map(encodeURIComponent).join("/"); }
 function target(env: GitHubWriterEnv): Target { const branch = env.STAGING_BRANCH?.trim(); const branchRouteValue = branchRoute(branch); if (!branch) throw new Error("github_branch_invalid"); return { owner: repositorySegment(env.REPO_OWNER), repo: repositorySegment(env.REPO_NAME), branchRoute: branchRouteValue, branchQuery: encodeURIComponent(branch) }; }
 export function resultPath(id: string, record: ResultEnvelopeV1): string { const day = record.submitted_at.slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^[0-9a-f-]{36}$/.test(id)) throw new Error("github_path_invalid"); return ["results", "v1", safeSegment(record.competition), safeSegment(record.puzzle_type), String(record.puzzle_id), day, `${id}.json`].join("/"); }
-function recordBody(id: string, envelope: ResultEnvelopeV1): string { return canonicalJson({ submission_id: id, envelope }); }
+export function resultPathV2(id: string, record: ResultEnvelopeV2): string { const day = record.submitted_at.slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^[0-9a-f-]{36}$/.test(id)) throw new Error("github_path_invalid"); return ["data", "v2", "slurm", safeSegment(record.competition), safeSegment(record.puzzle_type), day, `${id}.json`].join("/"); }
+function publicationPath(id: string, record: ResultEnvelope): string { return record.schema_version === 1 ? resultPath(id, record) : resultPathV2(id, record); }
+function recordBody(id: string, envelope: ResultEnvelope): string { return canonicalJson({ submission_id: id, envelope }); }
 async function parseVerified(env: GitHubWriterEnv, id: string): Promise<Verified | null> {
   const row = await findBySubmissionId(env.RESULTS_DB, id);
   if (!row || row.state !== "validated") return null;
@@ -48,9 +52,10 @@ async function parseVerified(env: GitHubWriterEnv, id: string): Promise<Verified
   } catch {
     throw invalid();
   }
-  const batch = validateBatch({ schema_version: 1, results: [candidate] });
+  const version: SchemaVersion = candidate !== null && typeof candidate === "object" && (candidate as Record<string, unknown>).schema_version === 2 ? 2 : 1;
+  const batch = validateVersionedBatch({ schema_version: version, results: [candidate] }, version);
   if (!batch.ok) throw invalid();
-  const envelope = batch.value.results[0] as ResultEnvelopeV1;
+  const envelope = batch.value.results[0] as ResultEnvelope;
   if (
     envelope.idempotency_key !== row.idempotency_key ||
     envelope.run_id !== row.run_id ||
@@ -58,7 +63,7 @@ async function parseVerified(env: GitHubWriterEnv, id: string): Promise<Verified
     envelope.competition !== row.competition ||
     envelope.puzzle_type !== row.puzzle_type ||
     envelope.puzzle_id !== row.puzzle_id ||
-    (await validateEnvelopeIntegrity(envelope)).length !== 0
+    (await validateVersionedEnvelope(envelope)).length !== 0
   ) {
     throw invalid();
   }
@@ -67,7 +72,7 @@ async function parseVerified(env: GitHubWriterEnv, id: string): Promise<Verified
     row,
     envelope,
     body: recordBody(id, envelope),
-    path: resultPath(id, envelope),
+    path: publicationPath(id, envelope),
   };
 }
 function sha(value: unknown): string | null { const candidate = value !== null && typeof value === "object" ? (value as Record<string, unknown>).sha : null; return typeof candidate === "string" && SHA_RE.test(candidate) ? candidate : null; }

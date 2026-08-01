@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: [
       "test/schema.test.ts",
+      "test/schema-v2.test.ts",
       "test/wrangler-config.test.ts",
       "test/load-recovery-gate.test.ts",
       "test/deployment-runbook.test.ts",

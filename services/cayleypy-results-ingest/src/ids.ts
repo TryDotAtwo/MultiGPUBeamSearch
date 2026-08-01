@@ -1,5 +1,3 @@
-import type { ResultEnvelopeV1 } from "./schema.js";
-
 const encoder = new TextEncoder();
 
 /** Stable JSON for hashing. It rejects values that JSON would silently change. */
@@ -32,7 +30,7 @@ export function canonicalJson(value: unknown): string {
   return encode(value);
 }
 
-function semanticEnvelope(envelope: ResultEnvelopeV1): Omit<ResultEnvelopeV1, "client_submission_id" | "run_id" | "idempotency_key" | "submitted_at"> {
+function semanticEnvelope<T extends { client_submission_id: string; run_id: string; idempotency_key: string; submitted_at: string }>(envelope: T): Omit<T, "client_submission_id" | "run_id" | "idempotency_key" | "submitted_at"> {
   const { client_submission_id: _clientSubmissionId, run_id: _runId, idempotency_key: _idempotencyKey, submitted_at: _submittedAt, ...semantic } = envelope;
   return semantic;
 }
@@ -43,7 +41,7 @@ export async function sha256Hex(value: string): Promise<string> {
 }
 
 /** Hashes the result meaning, not client-generated transport identifiers. */
-export async function computeIdempotency(envelope: ResultEnvelopeV1): Promise<string> {
+export async function computeIdempotency<T extends { client_submission_id: string; run_id: string; idempotency_key: string; submitted_at: string }>(envelope: T): Promise<string> {
   return sha256Hex(canonicalJson(semanticEnvelope(envelope)));
 }
 
@@ -58,9 +56,9 @@ export function newSubmissionId(now = new Date(), random = crypto.getRandomValue
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export function rawObjectKey(submissionId: string, now = new Date()): string {
+export function rawObjectKey(submissionId: string, now = new Date(), schemaVersion: 1 | 2 = 1): string {
   const yyyy = String(now.getUTCFullYear());
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(now.getUTCDate()).padStart(2, "0");
-  return `raw/v1/${yyyy}/${mm}/${dd}/${submissionId}.json`;
+  return `raw/v${schemaVersion}/${yyyy}/${mm}/${dd}/${submissionId}.json`;
 }

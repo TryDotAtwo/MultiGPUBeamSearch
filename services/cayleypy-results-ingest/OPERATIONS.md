@@ -1,3 +1,5 @@
+POST /v2/results is the separate anonymous native SLURM API. It accepts only strict schema v2, preserves claimed authorship and real 1..16-rank hardware, and publishes under data/v2/slurm/. See SLURM_V2_CLIENT.md.
+
 # CayleyPy results ingest operations
 
 ## Public boundary

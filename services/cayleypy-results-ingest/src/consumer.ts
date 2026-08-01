@@ -1,6 +1,7 @@
 import { findBySubmissionId, transition, type SubmissionRow } from "./db.js";
 import { canonicalJson, sha256Hex } from "./ids.js";
-import { MAX_SERIALIZED_ENVELOPE_BYTES, validateBatch, validateEnvelopeIntegrity, type ResultEnvelopeV1 } from "./schema.js";
+import { MAX_SERIALIZED_ENVELOPE_BYTES } from "./schema.js";
+import { validateVersionedBatch, validateVersionedEnvelope, type ResultEnvelope, type SchemaVersion } from "./schema-dispatch.js";
 import { parkPausedSubmission, SafeIngestError, type IngestEnv } from "./storage.js";
 
 export type ConsumerMode = "normal" | "store_only" | "reject";
@@ -120,11 +121,12 @@ async function validateRawEnvelope(env: ConsumerEnv, row: SubmissionRow): Promis
   try { candidate = JSON.parse(raw); } catch { return "invalid"; }
   let encoded: number;
   try { encoded = new TextEncoder().encode(canonicalJson({ schema_version: 1, results: [candidate] })).byteLength; } catch { return "invalid"; }
-  const batch = validateBatch({ schema_version: 1, results: [candidate] }, encoded);
+  const version: SchemaVersion = candidate !== null && typeof candidate === "object" && (candidate as Record<string, unknown>).schema_version === 2 ? 2 : 1;
+  const batch = validateVersionedBatch({ schema_version: version, results: [candidate] }, version, encoded);
   if (!batch.ok) return "invalid";
-  const envelope = batch.value.results[0] as ResultEnvelopeV1;
+  const envelope = batch.value.results[0] as ResultEnvelope;
   if (envelope.idempotency_key !== row.idempotency_key) return "invalid";
-  return (await validateEnvelopeIntegrity(envelope)).length === 0 ? "valid" : "invalid";
+  return (await validateVersionedEnvelope(envelope)).length === 0 ? "valid" : "invalid";
 }
 
 async function enqueueValidatedOrRetry(message: QueueMessageLike, env: ConsumerEnv, submissionId: string): Promise<void> {

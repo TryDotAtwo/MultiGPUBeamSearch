@@ -15,15 +15,18 @@ import {
 } from "vitest";
 
 import canonicalGolden from "../../../configs/cayleypy_results_v1_golden.json";
+import canonicalV2 from "../../../configs/cayleypy_results_v2_golden.json";
 import { resetInstallationTokenCacheForTest } from "../src/github-app.js";
 import {
   GitHubWriter,
   branchRoute,
   resultPath,
+  resultPathV2,
   resolveWriterMode,
 } from "../src/github-writer.js";
 import { canonicalJson, computeIdempotency } from "../src/ids.js";
 import type { ResultEnvelopeV1 } from "../src/schema.js";
+import type { ResultEnvelopeV2 } from "../src/schema-v2.js";
 import { receiveEnvelope, type IngestEnv } from "../src/storage.js";
 
 const ID = "01820000-0000-7000-8000-000000000001";
@@ -33,9 +36,9 @@ const BASE_TREE_SHA = "2".repeat(40);
 const NEW_TREE_SHA = "3".repeat(40);
 const NEW_COMMIT_SHA = "4".repeat(40);
 
-interface Seeded {
+interface Seeded<T extends ResultEnvelopeV1 | ResultEnvelopeV2 = ResultEnvelopeV1> {
   submissionId: string;
-  envelope: ResultEnvelopeV1;
+  envelope: T;
   rawKey: string;
 }
 
@@ -127,6 +130,14 @@ async function seedValidated(variant: number): Promise<Seeded> {
   };
 }
 
+async function seedValidatedV2(): Promise<Seeded<ResultEnvelopeV2>> {
+  const envelope = structuredClone(canonicalV2.cases[0].envelope) as unknown as ResultEnvelopeV2;
+  const receipt = await receiveEnvelope({ RESULTS_DB: env.RESULTS_DB, RAW_RESULTS: env.RAW_RESULTS, VALIDATE_QUEUE: { send: async () => undefined } as unknown as Queue } as IngestEnv, envelope);
+  await env.RESULTS_DB.prepare("UPDATE submissions SET state = 'validated' WHERE submission_id = ?").bind(receipt.submission_id).run();
+  const row = await env.RESULTS_DB.prepare("SELECT raw_r2_key FROM submissions WHERE submission_id = ?").bind(receipt.submission_id).first<{raw_r2_key:string}>();
+  if (!row) throw new Error("seed_failed");
+  return { submissionId: receipt.submission_id, envelope, rawKey: row.raw_r2_key };
+}
 async function pending(name: string): Promise<string[]> {
   return runInDurableObject(stub(name), async (_instance, state) => [
     ...(await state.storage.list({ prefix: "pending/" })).keys(),
@@ -190,9 +201,7 @@ function githubRouter(
     }
     if (
       method === "GET" &&
-      url.pathname.startsWith(
-        "/repos/TryDotAtwo/cayleypy-beam-results/contents/results/v1/",
-      )
+      (url.pathname.startsWith("/repos/TryDotAtwo/cayleypy-beam-results/contents/results/v1/") || url.pathname.startsWith("/repos/TryDotAtwo/cayleypy-beam-results/contents/data/v2/slurm/"))
     ) {
       expect(url.searchParams.get("ref")).toBe("ingest/staging");
       if (existing === "absent") return new Response(null, { status: 404 });
@@ -230,7 +239,7 @@ function githubRouter(
 
 async function flushWithRouter(
   name: string,
-  seeded: Seeded,
+  seeded: Seeded<ResultEnvelopeV1 | ResultEnvelopeV2>,
   existing: ExistingMode,
 ) {
   const expectedBody = canonicalJson({
@@ -593,4 +602,27 @@ test("transient alarm failure forcibly leaves a future alarm", async () => {
   ).toEqual({ state: "validated" });
   expect(await env.RAW_RESULTS.get(seeded.rawKey)).not.toBeNull();
   expect(await pending("retry-alarm")).toEqual([pendingKey(seeded.submissionId)]);
+});
+
+test("v2 SLURM records use a separate data/v2/slurm namespace", () => {
+  const path = resultPathV2(ID, canonicalV2.cases[0].envelope as any);
+  expect(path).toMatch(/^data\/v2\/slurm\/toy-cayley\/cube_3-3-3\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]+\.json$/);
+  expect(path).not.toContain("results/v1");
+});
+
+test("publishes a validated v2 envelope through the separate SLURM path", async () => {
+  const seeded = await seedValidatedV2();
+  const outcome = await flushWithRouter("github-v2-add", seeded, "absent");
+  expect(outcome.result).toEqual({ staged: 1, retained: 0 });
+  const tree = outcome.calls.find((call) => call.method === "POST" && call.url.pathname.endsWith("/git/trees"));
+  expect(tree?.body).toMatchObject({ tree: [{ path: resultPathV2(seeded.submissionId, seeded.envelope as ResultEnvelopeV2), content: outcome.expectedBody }] });
+  expect(await env.RAW_RESULTS.get(seeded.rawKey)).toBeNull();
+});
+test("v2 GitHub path conflict is terminal and retains raw evidence", async () => {
+  const seeded = await seedValidatedV2();
+  const outcome = await flushWithRouter("github-v2-conflict", seeded, "different");
+  expect(outcome.result).toEqual({ staged: 0, retained: 0 });
+  const row = await env.RESULTS_DB.prepare("SELECT state,safe_error FROM submissions WHERE submission_id=?").bind(seeded.submissionId).first();
+  expect(row).toMatchObject({state:"dead_letter",safe_error:"publication_path_conflict"});
+  expect(await env.RAW_RESULTS.get(seeded.rawKey)).not.toBeNull();
 });

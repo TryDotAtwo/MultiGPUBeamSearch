@@ -7,7 +7,7 @@ import {
   type SubmissionState,
 } from "./db.js";
 import { canonicalJson, computeIdempotency, newSubmissionId, rawObjectKey, sha256Hex } from "./ids.js";
-import { validateEnvelopeIntegrity, type ResultEnvelopeV1 } from "./schema.js";
+import { validateVersionedEnvelope, type ResultEnvelope } from "./schema-dispatch.js";
 
 export interface IngestEnv {
   RESULTS_DB: D1Database;
@@ -351,10 +351,10 @@ export async function recoverStaleSubmissions(
 
 export async function receiveEnvelope(
   env: IngestEnv,
-  envelope: ResultEnvelopeV1,
+  envelope: ResultEnvelope,
   meta: RequestMeta = {},
 ): Promise<Receipt> {
-  if ((await validateEnvelopeIntegrity(envelope)).length !== 0) throw new SafeIngestError("invalid_envelope");
+  if ((await validateVersionedEnvelope(envelope)).length !== 0) throw new SafeIngestError("invalid_envelope");
   const idempotencyKey = await computeIdempotency(envelope);
   let prior: SubmissionRow | null;
   try {
@@ -366,7 +366,7 @@ export async function receiveEnvelope(
 
   const now = meta.receivedAt ?? new Date();
   const submissionId = newSubmissionId(now);
-  const key = rawObjectKey(submissionId, now);
+  const key = rawObjectKey(submissionId, now, envelope.schema_version);
   const rawBody = canonicalJson(envelope);
   await putRaw(env.RAW_RESULTS, key, rawBody, await sha256Hex(rawBody));
 
@@ -453,10 +453,10 @@ function storedReceipt(row: SubmissionRow, duplicate: boolean): StoredReceipt {
 /** Persist an accepted envelope without touching Queue publication. */
 export async function receiveEnvelopeStoreOnly(
   env: PersistenceEnv,
-  envelope: ResultEnvelopeV1,
+  envelope: ResultEnvelope,
   meta: Pick<RequestMeta, "receivedAt"> = {},
 ): Promise<StoredReceipt> {
-  if ((await validateEnvelopeIntegrity(envelope)).length !== 0) throw new SafeIngestError("invalid_envelope");
+  if ((await validateVersionedEnvelope(envelope)).length !== 0) throw new SafeIngestError("invalid_envelope");
   const idempotencyKey = await computeIdempotency(envelope);
   let prior: SubmissionRow | null;
   try {
@@ -468,7 +468,7 @@ export async function receiveEnvelopeStoreOnly(
 
   const now = meta.receivedAt ?? new Date();
   const submissionId = newSubmissionId(now);
-  const key = rawObjectKey(submissionId, now);
+  const key = rawObjectKey(submissionId, now, envelope.schema_version);
   const rawBody = canonicalJson(envelope);
   await putRaw(env.RAW_RESULTS, key, rawBody, await sha256Hex(rawBody));
 
