@@ -14,6 +14,8 @@ from typing import Callable, Mapping
 
 import zstandard
 
+from tools.megaminx_archive_contract import require_allowed_path
+
 ALLOWED_SMS = (75, 80, 86, 89, 90, 120)
 REQUIRED_PATHS = ("bin/production_runner", "lib", "data/test.csv", "data/puzzle_info.json", "weights", "profiles/registry.json", "scripts/job.sh", "scripts/preflight.sh", "run.sh", "README.md")
 FORBIDDEN_NAMES = frozenset({".env", "Dockerfile", "token.txt", "compile.sh"})
@@ -35,6 +37,7 @@ def _files(root: Path) -> list[Path]:
         relative = path.relative_to(root)
         if path.name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
             raise ValueError(f"forbidden payload file: {relative.as_posix()}")
+        require_allowed_path(relative.as_posix())
         data = path.read_bytes()
         if SECRET_PATTERN.search(data):
             raise ValueError(f"forbidden secret-like content: {relative.as_posix()}")

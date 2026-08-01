@@ -5,6 +5,7 @@ from hashlib import sha256
 from pathlib import Path, PurePosixPath
 from typing import Callable
 import zstandard
+from tools.megaminx_archive_contract import require_allowed_path
 
 FORBIDDEN_NAMES={".env","Dockerfile","token.txt","compile.sh"}
 FORBIDDEN_SUFFIXES={".cu",".cuh",".cpp",".cc",".o",".a",".ptx"}
@@ -24,6 +25,7 @@ def _members(tar:tarfile.TarFile,prefix:str)->dict[str,tarfile.TarInfo]:
         if member.name in result: raise ValueError(f"duplicate archive member: {member.name}")
         if member.issym() or member.islnk() or path.is_absolute() or ".." in path.parts or not path.parts or path.parts[0]!=prefix or not member.isfile(): raise ValueError(f"unsafe archive member: {member.name}")
         relative=PurePosixPath(*path.parts[1:])
+        require_allowed_path(relative.as_posix())
         if relative.name in FORBIDDEN_NAMES or relative.suffix.lower() in FORBIDDEN_SUFFIXES: raise ValueError(f"forbidden archive member: {relative}")
         result[member.name]=member
     return result

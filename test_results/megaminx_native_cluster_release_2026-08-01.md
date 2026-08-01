@@ -1,10 +1,10 @@
-# Megaminx native cluster release verification вЂ” 2026-08-01
+# Megaminx native cluster release verification РІР‚вЂќ 2026-08-01
 
 Branch: `codex/megaminx-native-cluster-release`
 
 ## Implemented contract
 
-- One-puzzle `run.sh` в†’ `sbatch` в†’ `torchrun`, one process per selected GPU.
+- One-puzzle `run.sh` РІвЂ вЂ™ `sbatch` РІвЂ вЂ™ `torchrun`, one process per selected GPU.
 - Mandatory GPU list, beam, and puzzle; missing puzzle never invokes `sbatch`.
 - Reflection modes `off`, `after`, and `only`, with independent CPU replay.
 - Exact hardware, VRAM class, SM, world size, backend/model class, and beam
@@ -21,7 +21,7 @@ Branch: `codex/megaminx-native-cluster-release`
 
 ```text
 py -m pytest tests/portable -q
-109 passed, 2 skipped in 2.04s
+111 passed, 2 skipped in 1.49s
 ```
 
 The two skips are platform-specific: Bash execution and symlink creation are
@@ -61,6 +61,9 @@ family/VRAM/world-size tuples are imported with
 `tools/measure_megaminx_cluster_profiles.py`. This is a release gate, not a
 fallback: those configurations fail before solving instead of borrowing T4 or
 another GPU's settings.
+
+
+Known prerelease limitation: VRAM and history-disk preflight currently uses conservative per-architecture manifest floors; beam-derived capacities configure the runner, but a calibrated beam-specific byte estimator is still required before promoting any new hardware tuple from prerelease to supported.
 
 The GitHub workflow publishes only a prerelease and requires a self-hosted
 Linux CUDA 12.8 build runner. Production release promotion should occur only

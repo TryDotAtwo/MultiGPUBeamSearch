@@ -9,6 +9,7 @@ export PYTHONPATH="${ARCHIVE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 if [ "${1:-}" = "--publish-only" ]; then
   if [ "$#" -ne 2 ]; then echo "usage: ./run.sh --publish-only RUN_DIR" >&2; exit 2; fi
   : "${MEGAMINX_RESULTS_URL:?set MEGAMINX_RESULTS_URL in publication.env}"
+  python3 -m portable.megaminx_cluster.scripts.verify_archive_payloads --archive-root "${ARCHIVE_ROOT}"
   exec python3 -m portable.megaminx_cluster.scripts.validate_and_publish --run-dir "$2" --url "${MEGAMINX_RESULTS_URL}" --poll
 fi
 exec python3 -m portable.megaminx_cluster.submit "$@"
