@@ -37,14 +37,26 @@
         "final_materialize_chunk_candidates": {"$ref": "#/$defs/positive"}
       }
     },
-    "anchor": {
+    "bfs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["radius", "move_count", "hash_bytes", "hash_budget_bytes", "cumulative_states"],
+      "properties": {
+        "radius": {"type": "integer", "minimum": 0},
+        "move_count": {"$ref": "#/$defs/positive"},
+        "hash_bytes": {"$ref": "#/$defs/positive"},
+        "hash_budget_bytes": {"$ref": "#/$defs/positive"},
+        "cumulative_states": {"$ref": "#/$defs/positive"}
+      }
+    },    "anchor": {
       "type": "object",
       "additionalProperties": false,
       "required": ["status", "evidence_id", "runtime"],
       "properties": {
         "status": {"enum": ["measured", "bounded_from_measured", "unverified"]},
         "evidence_id": {"type": "string", "minLength": 1},
-        "runtime": {"$ref": "#/$defs/runtime"}
+        "runtime": {"$ref": "#/$defs/runtime"},
+        "bfs": {"$ref": "#/$defs/bfs"}
       }
     },
     "family": {
