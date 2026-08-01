@@ -69,8 +69,7 @@ Candidate families cover:
 - Stream 1 concurrency;
 - Stream 3 ring slots;
 - shard count and capacity scale;
-- Stream 4 batch, trigger, and active sort slots;
-- touch-BFS boundary radius.
+- Stream 4 batch, trigger, and active sort slots.
 
 Candidates receive one warm-up and one short screening run. Each round retains
 the fastest stable fraction while increasing puzzle coverage and measurement
@@ -78,27 +77,27 @@ duration. Finalists run three measured repetitions on all three calibration
 puzzles. Selection uses robust median end-to-end time, then lower peak VRAM,
 then deterministic configuration id as tie breakers.
 
-## Touch-BFS boundary tuning
+## Touch-BFS boundary formula
 
-Touch-BFS radius is a first-class, beam-specific profile field. Radius search is
-bounded before execution using the branching upper bound
-`move_count ** radius`; the calculation uses checked integers and stops before
-overflow or configured RAM/disk limits. This bound is deliberately pessimistic:
-the tuner also records the actual deduplicated frontier size at every radius.
+Touch-BFS radius is computed once per beam anchor and is not a benchmark axis.
+For move count `m` and aligned effective beam `B`, define the checked geometric
+upper bound
 
-For each beam anchor, the tuner evaluates radii from zero upward. A next radius
-is admitted only if all of the following hold:
+```text
+S(0) = 1
+S(r) = S(r - 1) + m ** r
+radius = max r such that S(r) <= B
+```
 
-- its `move_count ** radius` upper bound fits the candidate budget;
-- actual frontier construction fits host RAM and scratch limits;
-- the boundary artifact passes its digest and replay checks;
-- its construction time can be amortized within the remaining six-hour budget;
-- the preceding radius was stable.
+The implementation multiplies one layer at a time with checked integers and stops
+before overflow, at the solver schema limit, or when the next cumulative bound
+would exceed the effective beam. It does not construct or time alternative BFS
+frontiers during autotuning. For `m = 24`, this gives radius 5 at a 30,000,000
+beam and radius 6 near a 1,000,000,000 beam.
 
-Search stops at the first inadmissible radius; it does not skip over a failed
-radius. The winning radius minimizes total end-to-end time including boundary
-construction and lookup. Precomputation time is never excluded. Different beam
-anchors may select different radii.
+The computed radius is recorded in every candidate for that anchor and copied to
+the emitted runtime profile. Successive halving optimizes only GPU runtime
+parameters.
 
 ## Calibration and correctness
 
@@ -107,7 +106,7 @@ hard Megaminx puzzle. Puzzle order rotates between repetitions. Setup-heavy
 paths and CUDA graphs are warmed before measured work.
 
 Every accepted row records workload ids, requested/effective beam, complete
-runtime configuration, BFS radius and frontier counts, exactness digest, replay
+runtime configuration, computed BFS radius and geometric state bound, exactness digest, replay
 result, per-rank peak VRAM, host RAM, scratch bytes, setup time, solve time,
 wall time, throughput, exit status, driver, CUDA runtime, solver commit, model
 digest, and release-manifest digest.
@@ -147,7 +146,7 @@ modify a signed archive or publish results automatically.
 - `autotune_submit.py`: argument validation, run directory, and allocation.
 - `scripts/autotune_job.sh`: compute-node preflight and torchrun controller.
 - `autotune/controller.py`: deadline, resume, phases, and successive halving.
-- `autotune/search_space.py`: deterministic runtime and BFS candidates.
+- `autotune/search_space.py`: deterministic runtime candidates and the BFS-radius formula.
 - `autotune/evidence.py`: identity, JSONL rows, ranking, and registry emission.
 - `autotune/probe.py`: isolated solver invocation and metrics parsing.
 
@@ -162,8 +161,7 @@ unsupported profiles. Candidate subprocesses have hard timeouts and run-owned
 cleanup paths.
 
 Deterministic tests cover argument validation, deadline reservation, beam-bound
-search, half-up anchors, successive-halving selection, tie breaking, checked
-`move_count ** radius`, BFS stop rules, resume identity, OOM/timeout rows,
+search, half-up anchors, successive-halving selection, tie breaking, checked geometric BFS-radius formula, resume identity, OOM/timeout rows,
 exactness rejection, registry schema, and mock-SLURM end-to-end execution. The
 8xA100 trial additionally records real nvidia-smi, peak-memory, correctness,
 and repeated timing evidence before the profile becomes runnable.

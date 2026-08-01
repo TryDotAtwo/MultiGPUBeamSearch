@@ -448,3 +448,4 @@
 - The tuner must also select the touch-BFS boundary radius automatically,
   explicitly accounting for the multiplicative `move_count ** radius` growth
   at every step.
+- User clarified that BFS radius must not be benchmarked: choose the reasonable boundary only from the checked geometric move-count growth formula.
