@@ -52,7 +52,8 @@ def test_public_notebook_contract_and_no_hidden_model_or_secret_controls(tmp_pat
         "output_dim=1", "output_dim=move_count", "1 <= state_len <= 120", "0..num_classes-1",
         "PUZZLE_ID_START..PUZZLE_ID_END",
         "off`, `after_original`, or `only", "first", "collect", "touch-BFS",
-        "best effort", "2**16..2**26", "public HTTPS host",
+        "best effort", "MLP supports through `2**25`",
+        "piece Transformer supports through measured `2**26`", "public HTTPS host",
         "Redirects are never followed",
         "first publishes one best solution per puzzle; collect publishes every validated solution",
     )
@@ -63,6 +64,7 @@ def test_public_notebook_contract_and_no_hidden_model_or_secret_controls(tmp_pat
         assert value not in CONFIG
     assert "BEAM_STREAM" not in CONFIG
     assert "REPLACE_WITH_COMPETITION" in CONFIG
+    assert "TOUCH_BFS_RADIUS = 4" in CONFIG
 
 
 def test_notebook_provenance_rule_excludes_configuration_cell() -> None:

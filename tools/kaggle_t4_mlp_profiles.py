@@ -76,6 +76,12 @@ def select_profile(
         raise ValueError(f"invalid profile anchors for model_class={model_class}") from exc
     if not available_powers:
         raise ValueError(f"missing profiles for model_class={model_class}")
+    maximum_validated_beam = 2 ** available_powers[-1]
+    if beam_width > maximum_validated_beam:
+        raise ValueError(
+            f"requested beam exceeds validated maximum for model_class={model_class}: "
+            f"requested={beam_width}, maximum={maximum_validated_beam}"
+        )
     profile_power = round_half_up_log2(beam_width, available_powers[0], available_powers[-1])
     try:
         profile = deepcopy(model_profiles[str(profile_power)])

@@ -154,6 +154,17 @@ def test_transformer_registry_cannot_select_output1_profile():
         select_profile(transformer, 2**21, 1, 24)
 
 
+@pytest.mark.parametrize("output_dim", [1, 24])
+def test_mlp_registry_rejects_beam_above_measured_p25(output_dim: int) -> None:
+    root = Path(__file__).resolve().parents[2]
+    mlp = json.loads(
+        (root / "configs/kaggle_t4_mlp_profiles.json").read_text(encoding="utf-8")
+    )
+
+    with pytest.raises(ValueError, match="exceeds validated maximum"):
+        select_profile(mlp, 2**26, output_dim, 24)
+
+
 def test_transformer_2p26_profile_records_measured_accumulator_contract():
     root = Path(__file__).resolve().parents[2]
     transformer = json.loads(

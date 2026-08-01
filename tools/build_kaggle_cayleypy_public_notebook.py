@@ -49,7 +49,8 @@ implementation; this notebook does not contain a second solver.
 ## Search contract
 
 Your requested beam is kept, except for documented two-rank/shard alignment.
-The nearest backend-specific measured/safe 2xT4 profile in `2**16..2**26` is selected automatically.
+The nearest backend-specific measured/safe 2xT4 profile is selected automatically:
+MLP supports through `2**25`, while piece Transformer supports through measured `2**26`.
 You may choose reflection `off`, `after_original`, or `only`; choose either first
 solution or collection through a chosen depth; and set the touch-BFS radius.
 CUDA/C++ algorithm knobs are deliberately absent.
@@ -103,7 +104,9 @@ REFLECT_SOURCE_CSV = None            # required only for REFLECT_MODE == "only"
 SOLUTION_MODE = "first"             # first | collect
 COLLECT_UNTIL_DEPTH = MAX_DEPTH      # meaningful when SOLUTION_MODE == "collect"
 MAX_COLLECTED_SOLUTIONS = 100
-TOUCH_BFS_RADIUS = 0
+# Radius 4 is the measured whole-notebook balance for the supplied <=24-move
+# examples; radius 5 reduces solve depth further but costs more setup time.
+TOUCH_BFS_RADIUS = 4
 
 AUTHOR_NAME = "replace-with-author"
 PUBLISH_RESULTS = True               # best effort; set False to disable publishing
