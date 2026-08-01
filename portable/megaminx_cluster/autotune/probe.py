@@ -94,7 +94,8 @@ def classify_metrics(
     return True, "stable"
 
 
-def _runtime_env(runtime: Mapping[str, int]) -> dict[str, str]:
+def _runtime_env(request: ProbeRequest) -> tuple[dict[str, str], int]:
+    runtime = request.runtime
     names = {
         "b_micro": "BEAM_B_MICRO",
         "stream1_concurrency": "BEAM_STREAM1_CONCURRENCY",
@@ -107,8 +108,20 @@ def _runtime_env(runtime: Mapping[str, int]) -> dict[str, str]:
     }
     values = {"BEAM_RUNTIME_CONFIG_MODE": "manual"}
     values.update({target: str(runtime[source]) for source, target in names.items()})
-    values["BEAM_SHARD_CAPACITY_SCALE_PPM"] = str(runtime["shard_capacity_scale_ppm"])
-    return values
+    quantum = request.world_size * runtime["shard_count"] * 1024
+    effective_beam = ((request.requested_beam + quantum - 1) // quantum) * quantum
+    local_beam = effective_beam // request.world_size
+    logical_shard = (local_beam + runtime["shard_count"] - 1) // runtime["shard_count"]
+    parent_batch = runtime["b_micro"]
+    stream3 = parent_batch * 24 * runtime["stream3_ring_slots"]
+    scaled = (logical_shard * runtime["shard_capacity_scale_ppm"] + 999_999) // 1_000_000
+    capacity = max(
+        scaled, stream3, runtime["stream4_batch_candidates"],
+        runtime["stream4_trigger_candidates"],
+    )
+    capacity = ((capacity + 1023) // 1024) * 1024
+    values["BEAM_SHARD_CAPACITY_CANDIDATES"] = str(capacity)
+    return values, effective_beam
 
 
 def _write(path: Path, value: str | bytes | None) -> None:
@@ -172,7 +185,8 @@ def run_probe(
     (candidate / "history").mkdir()
     command = build_probe_command(request)
     env = dict(os.environ)
-    env.update(_runtime_env(request.runtime))
+    runtime_env, derived_effective_beam = _runtime_env(request)
+    env.update(runtime_env)
     env["BEAM_HISTORY_DISK_PATH"] = str(candidate / "history")
     env["BEAM_RANK_LOG_DIR"] = str(candidate / "logs" / "ranks")
     env["BEAM_NCCL_ID_FILE"] = str(candidate / f"nccl-{request.rendezvous_id}.bin")
@@ -212,7 +226,7 @@ def run_probe(
     )
     canonical = json.dumps(validated, sort_keys=True, separators=(",", ":")).encode("utf-8")
     peaks = tuple(int(value) for value in (peak_vram_mib or ()))
-    actual_effective = int(effective_beam or request.requested_beam)
+    actual_effective = int(effective_beam or derived_effective_beam)
     actual_throughput = throughput or actual_effective * 1_000_000 / wall_us
     metrics: dict[str, object] = {
         "requested_beam": request.requested_beam,

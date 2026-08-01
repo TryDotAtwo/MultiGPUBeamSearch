@@ -145,3 +145,23 @@ def test_default_runner_uses_concurrent_peak_vram_monitor(tmp_path, monkeypatch)
     result = run_probe(request(tmp_path), effective_beam=30_015_488)
     assert result.stable
     assert result.metrics["peak_vram_mib"] == [35000] * 8
+
+def test_probe_derives_effective_beam_and_shard_capacity_env(tmp_path):
+    captured = {}
+
+    def successful_runner(command, **kwargs):
+        captured.update(kwargs["env"])
+        candidate = tmp_path / "candidate"
+        (candidate / "validated_results.json").write_text(json.dumps({
+            "puzzle_id": 900, "reflect": "off",
+            "results": [{"search": "original", "path": ["A"], "valid": True}],
+        }), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, "ok", "")
+
+    result = run_probe(
+        request(tmp_path), run_command=successful_runner,
+        peak_vram_mib=(35000,) * 8,
+    )
+    assert result.metrics["effective_beam"] == 30_015_488
+    assert int(captured["BEAM_SHARD_CAPACITY_CANDIDATES"]) >= 30_015_488 // 8 // 8
+    assert "BEAM_SHARD_CAPACITY_SCALE_PPM" not in captured

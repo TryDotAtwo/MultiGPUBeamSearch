@@ -89,6 +89,17 @@ class EvidenceStore:
             rows.append(value)
         return rows
 
+    def read_rows(self) -> tuple[dict[str, object], ...]:
+        return tuple(self._read_rows())
+
+    def read_checkpoint(self) -> dict[str, object]:
+        path = self.run_dir / "resume.json"
+        if not path.exists():
+            return {}
+        value = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(value, dict):
+            raise ValueError("resume checkpoint must be an object")
+        return value
     def append_trial(self, row: Mapping[str, object]) -> None:
         payload = _canonical(dict(row))
         with self.results_path.open("a", encoding="utf-8", newline="\n") as handle:
