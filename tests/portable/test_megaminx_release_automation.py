@@ -55,3 +55,11 @@ def test_cluster_branch_push_publishes_stable_latest_download_assets():
     assert "megaminx-native-cluster-latest" in text
     assert "gh release upload" in text
     assert "--clobber" in text
+
+def test_release_build_bootstraps_cuda_on_github_hosted_linux():
+    text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
+    assert "runs-on: ubuntu-22.04" in text
+    assert "cuda-keyring" in text
+    assert "cuda-nvcc-12-8" in text
+    assert "libnccl-dev" in text
+    assert "NVIDIA/cutlass" in text

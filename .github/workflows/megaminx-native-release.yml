@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: [self-hosted, linux, x64, cuda-12.8]
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -27,6 +27,14 @@ jobs:
       CUDACXX: /usr/local/cuda-12.8/bin/nvcc
     steps:
       - uses: actions/checkout@v4
+      - name: Install pinned CUDA, NCCL, CUTLASS, and build tools
+        run: |
+          set -euo pipefail
+          curl -fsSLO https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build cuda-compiler-12-8 cuda-nvcc-12-8 cuda-cudart-dev-12-8 cuda-nvtx-12-8 libnccl2 libnccl-dev
+          git clone --depth 1 --branch v3.6.0 https://github.com/NVIDIA/cutlass.git external/cutlass
       - name: Require pinned CUDA toolchain
         run: |
           set -euo pipefail
