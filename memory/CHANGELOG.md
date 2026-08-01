@@ -1029,3 +1029,8 @@
 - Kaggle private kernel trydotatwo/cayleypy-transformer-p27-limit-probe v8 ran puzzle 10 with BFS 0: both ranks entered depth 8 at the full local frontier 37,101,568; depth 8 completed globally in 1562.95 s, yielding a valid depth-9 solution.
 - The next aligned beam 74,219,520 requires 14,639,246,672 bytes against the 14,638,972,928-byte budget, exceeding it by 273,744 bytes.
 - Profile selection now fails closed above the measured maximum; targeted profile tests pass.
+## 2026-08-01 - Publish measured ceilings in all public notebooks
+
+- Regenerated the main launcher plus 444, Megaminx, IHES, and Tetraminx examples at solver commit f2261a81873ea162a0c36ba8874b9173db8d4083.
+- All five public notebooks retain touch BFS radius 4.
+- Builder/profile tests pass 31/31 and the full local suite passes 318/318.
