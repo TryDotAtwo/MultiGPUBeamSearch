@@ -278,8 +278,8 @@
                                      "26":  {
                                                 "validation_status":  "bounded_from_measured",
                                                 "runtime":  {
-                                                                "b_micro":  24576,
-                                                                "stream1_concurrency":  2,
+                                                                "b_micro":  12288,
+                                                                "stream1_concurrency":  1,
                                                                 "stream3_ring_slots":  4,
                                                                 "shard_count":  64,
                                                                 "shard_capacity_scale_ppm":  1050000,
@@ -294,7 +294,7 @@
                                                                  "requested_beam":  67108864,
                                                                  "effective_beam":  67108864,
                                                                  "local_beam":  33554432,
-                                                                 "note":  "Memory-bounded p26 candidate: half-size output1 inference batch, concurrency 2, and one Stream 4 sort slot; pending current-code real 2xT4 depth-8 acceptance."
+                                                                 "note":  "Memory-bounded p26 candidate: output1 inference batch 12288, concurrency 1, and one Stream 4 sort slot; pending current-code real 2xT4 depth-8 acceptance after 24576/concurrency-2 exceeded budget by 339 MB."
                                                              }
                                             }
                                  },
