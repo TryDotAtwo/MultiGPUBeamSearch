@@ -11,3 +11,4 @@
 - Root build fix: use `-DBEAM_CUDA_ARCHITECTURES=${sm}-real`; the unsuffixed CMake architecture emitted virtual PTX by design.
 - Workflow contract: `11 passed` before the local pytest teardown timeout.
 - Parser refinement: accept `No PTX file found`; reject only numbered `PTX file N:` records and other payload evidence.
+- Public-path fix: `CMAKE_SKIP_RPATH=TRUE` plus C++/CUDA `-ffile-prefix-map`; focused workflow test passed.

@@ -84,6 +84,12 @@ def test_release_builds_real_sass_only_without_virtual_ptx():
     assert '-DBEAM_CUDA_ARCHITECTURES=${{ matrix.sm }}-real' in text
 
 
+def test_release_strips_private_build_paths_and_rpath():
+    text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
+    assert "-DCMAKE_SKIP_RPATH=TRUE" in text
+    assert text.count("-ffile-prefix-map=") >= 2
+
+
 def test_release_exposes_cuda_binary_directory_to_later_steps():
     text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
     assert 'echo "/usr/local/cuda-12.8/bin" >> "$GITHUB_PATH"' in text

@@ -772,3 +772,4 @@
 - 2026-08-01: Corrected the native-image gate to distinguish an empty `cuobjdump` PTX listing header from an actual PTX payload while still rejecting PTX files, `compute_*` images, and `ptxas` evidence.
 - 2026-08-01: Changed native archive compilation to CMake `${sm}-real` architectures so release binaries contain only target SASS and no virtual PTX fallback.
 - 2026-08-01: Allowed the explicit `cuobjdump` absence diagnostic `No PTX file found`; actual numbered PTX records remain forbidden.
+- 2026-08-01: Removed GitHub build RPATH and mapped C++/CUDA source paths to `.` so native public ELF payloads contain no private runner paths.
