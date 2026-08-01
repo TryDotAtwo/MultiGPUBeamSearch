@@ -1,0 +1,19 @@
+{
+  "id": "trydotatwo/cayleypy-2xt4-tetraminx-example",
+  "title": "cayleypy-2xt4-tetraminx-example",
+  "code_file": "tetraminx.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [
+    "cayley-py-professor-tetraminx-solve-optimally"
+  ],
+  "kernel_sources": [
+    "rokham/cayleypy-cube-train-and-solve"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

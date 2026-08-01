@@ -53,6 +53,23 @@ EXAMPLES: dict[str, dict[str, Any]] = {
         "output_dim": 1,
         "description": "Ready-to-run IHES cube example; edit only the USER CONFIG cell.",
     },
+    "tetraminx": {
+        "title": "cayleypy-2xt4-tetraminx-example",
+        "slug": "cayleypy-2xt4-tetraminx-example",
+        "competition": "cayley-py-professor-tetraminx-solve-optimally",
+        "kernel_source": "rokham/cayleypy-cube-train-and-solve",
+        "puzzle_id": 0,
+        "model_root": "/kaggle/input/cayleypy-cube-train-and-solve/cayleypy-cube",
+        "model_download": None,
+        "checkpoint_glob": "p888-t000_1765097793_e01024.pth",
+        "metadata": "logs/model_p888-t000_1765097793.json",
+        "generators": "generators/p888.json",
+        "output_dim": 1,
+        "description": (
+            "Ready-to-run Professor Tetraminx output-1 MLP example using "
+            "Rokham's p888 epoch-1024 checkpoint; edit only the USER CONFIG cell."
+        ),
+    },
 }
 
 
@@ -127,7 +144,8 @@ def build(name: str, out_root: Path, *, public: bool = True, solution_mode: str 
     nb_path.write_text(json.dumps(nb, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     dataset_sources = [spec["dataset_source"]] if spec.get("dataset_source") else []
     model_sources = [spec["model_source"]] if spec.get("model_source") else []
-    meta = {"id": f"trydotatwo/{slug}", "title": slug, "code_file": nb_path.name, "language": "python", "kernel_type": "notebook", "is_private": not public, "enable_gpu": True, "enable_internet": True, "dataset_sources": dataset_sources, "competition_sources": [spec["competition"]], "kernel_sources": [], "model_sources": model_sources, "machine_shape": "NvidiaTeslaT4"}
+    kernel_sources = [spec["kernel_source"]] if spec.get("kernel_source") else []
+    meta = {"id": f"trydotatwo/{slug}", "title": slug, "code_file": nb_path.name, "language": "python", "kernel_type": "notebook", "is_private": not public, "enable_gpu": True, "enable_internet": True, "dataset_sources": dataset_sources, "competition_sources": [spec["competition"]], "kernel_sources": kernel_sources, "model_sources": model_sources, "machine_shape": "NvidiaTeslaT4"}
     (out / "kernel-metadata.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     return nb_path
 

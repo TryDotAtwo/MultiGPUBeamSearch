@@ -26,6 +26,28 @@ def test_cube4_example_uses_the_accepted_piece_transformer_bundle(tmp_path: Path
     assert 'CHECKPOINT_SOURCE_ROOT = MODEL_ROOT' in config
 
 
+def test_tetraminx_example_pins_rokham_p888_epoch_1024_artifacts(tmp_path: Path) -> None:
+    notebook_path = build("tetraminx", tmp_path)
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    metadata = json.loads((notebook_path.parent / "kernel-metadata.json").read_text(encoding="utf-8"))
+    config = _source(notebook, "config")
+
+    assert metadata["kernel_sources"] == ["rokham/cayleypy-cube-train-and-solve"]
+    assert metadata["competition_sources"] == [
+        "cayley-py-professor-tetraminx-solve-optimally"
+    ]
+    assert metadata["dataset_sources"] == []
+    assert metadata["model_sources"] == []
+    assert 'Path("/kaggle/input/cayleypy-cube-train-and-solve/cayleypy-cube")' in config
+    assert 'rglob("p888-t000_1765097793_e01024.pth")' in config
+    assert (
+        'CHECKPOINT_METADATA_JSON = MODEL_ROOT / "logs" / '
+        '"model_p888-t000_1765097793.json"'
+    ) in config
+    assert 'CHECKPOINT_GENERATOR_JSON = MODEL_ROOT / "generators" / "p888.json"' in config
+    assert 'CHECKPOINT_SOURCE_ROOT = MODEL_ROOT' in config
+
+
 def test_all_public_examples_share_the_universal_contract(tmp_path: Path) -> None:
     for name, spec in EXAMPLES.items():
         notebook_path = build(name, tmp_path)

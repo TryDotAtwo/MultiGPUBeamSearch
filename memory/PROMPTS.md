@@ -563,3 +563,5 @@ User reported that an interactive game had been running during part of the recen
 - User requested three named public examples generated from one universal notebook: Cube4/444, Megaminx, and IHES. Each must run on exactly 2xT4 with beam `2**16`, demonstrate both `first` and `collect` solution modes, publish through the free Cloudflare ingest to GitHub, and be reported with real-run evidence and links.
 - User required the Cube4/444 example to use the already supported piece-Transformer bundle rather than an unsupported legacy `layers.* + skip.*` MLP checkpoint.
 - User requested examples that are understandable to other users: one shared notebook contract, prefilled competition/model/puzzle configuration, and mode switching in the USER CONFIG cell.
+
+- User requested another public example matching the existing Cube4/444, Megaminx, and IHES notebooks for `cayley-py-professor-tetraminx-solve-optimally`, using the model output from Rokham's `cayleypy-cube-train-and-solve` script version `277456158`, and explicitly instructed not to use temporary artifacts prepared for GPT-5.3 Spark.
