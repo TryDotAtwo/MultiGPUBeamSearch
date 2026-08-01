@@ -28,14 +28,17 @@ python3 -m portable.megaminx_cluster.scripts.preflight_cli \
   --beam "${MEGAMINX_BEAM}"
 source "${MEGAMINX_RUN_DIR}/selected_profile.env"
 
-python3 -m torch.distributed.run \
-  --nnodes=1 \
-  --nproc-per-node="${GPU_COUNT}" \
-  --node-rank=0 \
-  --rdzv-backend=c10d \
-  --rdzv-endpoint=127.0.0.1:29500 \
-  --rdzv-id="megaminx-${SLURM_JOB_ID}" \
-  --no-python \
-  "${MEGAMINX_ARCHIVE_ROOT}/bin/production_runner" \
-  "${MEGAMINX_PUZZLE}" "${MEGAMINX_DEPTH}" "${MEGAMINX_BEAM}" \
-  2>&1 | tee "${MEGAMINX_RUN_DIR}/logs/production.log"
+WORKFLOW_ARGS=(
+  --archive-root "${MEGAMINX_ARCHIVE_ROOT}"
+  --run-dir "${MEGAMINX_RUN_DIR}"
+  --world-size "${GPU_COUNT}"
+  --job-id "${SLURM_JOB_ID}"
+  --puzzle "${MEGAMINX_PUZZLE}"
+  --depth "${MEGAMINX_DEPTH}"
+  --beam "${MEGAMINX_BEAM}"
+  --reflect "${MEGAMINX_REFLECT}"
+)
+if [ -n "${MEGAMINX_ORIGINAL_SOLUTION:-}" ]; then
+  WORKFLOW_ARGS+=(--original-solution "${MEGAMINX_ORIGINAL_SOLUTION}")
+fi
+python3 -m portable.megaminx_cluster.workflow "${WORKFLOW_ARGS[@]}"
