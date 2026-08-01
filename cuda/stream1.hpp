@@ -53,6 +53,8 @@ struct Stream1TransformerDims {
     std::uint32_t num_pieces;
     std::uint32_t max_piece_size;
     std::uint32_t seq_len;
+    std::uint32_t padded_seq_len;
+    std::uint32_t sequence_alignment;
     std::uint32_t d_model;
     std::uint32_t nhead;
     std::uint32_t head_dim;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../src/config.hpp"
+#include "../cuda/stream1_transformer_shape.hpp"
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 #include "cuda_check.hpp"
@@ -584,12 +585,15 @@ inline std::uint64_t total_host_weight_bytes(const HostWeightBytes& weights) {
 }
 
 inline std::uint64_t transformer_attention_score_stride(const Stream1ModelConfig& model) {
-    const std::uint64_t row_stride = ((static_cast<std::uint64_t>(model.seq_len) + 15ULL) / 16ULL) * 16ULL;
-    return static_cast<std::uint64_t>(model.seq_len) * row_stride + row_stride * model.head_dim;
+    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
+    const std::uint64_t row_stride = sequence.padded_seq_len;
+    return row_stride * row_stride + row_stride * model.head_dim;
 }
 
 struct TransformerScratchBytePlan {
     std::uint64_t rows = 0;
+    std::uint32_t logical_seq_len = 0;
+    std::uint32_t padded_seq_len = 0;
     std::uint64_t token_bytes = 0;
     std::uint64_t qkv_bytes = 0;
     std::uint64_t attention_bytes = 0;
@@ -603,13 +607,16 @@ struct TransformerScratchBytePlan {
 };
 
 inline TransformerScratchBytePlan transformer_scratch_byte_plan(const Stream1ModelConfig& model, std::uint64_t rows) {
+    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
     TransformerScratchBytePlan plan;
     plan.rows = rows;
-    plan.token_bytes = fp16_bytes(rows * model.seq_len * model.d_model);
-    plan.qkv_bytes = fp16_bytes(rows * model.seq_len * 3ULL * model.d_model);
+    plan.logical_seq_len = sequence.logical_seq_len;
+    plan.padded_seq_len = sequence.padded_seq_len;
+    plan.token_bytes = fp16_bytes(rows * sequence.padded_seq_len * model.d_model);
+    plan.qkv_bytes = fp16_bytes(rows * sequence.padded_seq_len * 3ULL * model.d_model);
     plan.attention_bytes = fp16_bytes(rows * model.nhead * transformer_attention_score_stride(model));
-    plan.context_bytes = fp16_bytes(rows * model.seq_len * model.d_model);
-    plan.ff_hidden_bytes = fp16_bytes(rows * model.seq_len * model.ff_dim);
+    plan.context_bytes = fp16_bytes(rows * sequence.padded_seq_len * model.d_model);
+    plan.ff_hidden_bytes = fp16_bytes(rows * sequence.padded_seq_len * model.ff_dim);
     plan.logits_bytes = fp16_bytes(rows * model.output_dim);
     return plan;
 }
@@ -921,12 +928,15 @@ inline Stream1TransformerDims transformer_dims(const Stream1ModelConfig& model) 
     if (model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
         throw std::runtime_error("MLP Stream1 model cannot be viewed as a piece_transformer");
     }
+    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
     return Stream1TransformerDims{
         model.state_len,
         model.num_classes,
         model.num_pieces,
         model.max_piece_size,
-        model.seq_len,
+        sequence.logical_seq_len,
+        sequence.padded_seq_len,
+        sequence.alignment,
         model.d_model,
         model.nhead,
         model.head_dim,
@@ -1025,14 +1035,15 @@ inline Stream1TransformerScratchView transformer_scratch_view(
     if (model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
         throw std::runtime_error("MLP Stream1 scratch cannot be viewed as a piece_transformer");
     }
+    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
     const std::uint64_t rows = stream1_inference_rows(b_micro, model);
     const std::uint64_t lane_rows = static_cast<std::uint64_t>(lane) * rows;
     return Stream1TransformerScratchView{
-        scratch.transformer_tokens + lane_rows * model.seq_len * model.d_model,
-        scratch.transformer_qkv + lane_rows * model.seq_len * 3ULL * model.d_model,
+        scratch.transformer_tokens + lane_rows * sequence.padded_seq_len * model.d_model,
+        scratch.transformer_qkv + lane_rows * sequence.padded_seq_len * 3ULL * model.d_model,
         scratch.transformer_attention_scores_probs + lane_rows * model.nhead * transformer_attention_score_stride(model),
-        scratch.transformer_attention_context + lane_rows * model.seq_len * model.d_model,
-        scratch.transformer_ff_hidden + lane_rows * model.seq_len * model.ff_dim,
+        scratch.transformer_attention_context + lane_rows * sequence.padded_seq_len * model.d_model,
+        scratch.transformer_ff_hidden + lane_rows * sequence.padded_seq_len * model.ff_dim,
         scratch.transformer_logits + lane_rows * model.output_dim};
 }
 #endif

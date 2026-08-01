@@ -1,4 +1,6 @@
+#define BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 #include "stream1_transformer_shape.hpp"
+#include "../tools/stream1_weight_io.hpp"
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -21,5 +23,25 @@ int main() {
     bool overflow = false;
     try { (void)beam::make_stream1_transformer_sequence_plan(std::numeric_limits<std::uint32_t>::max(), 16U); } catch (const std::overflow_error&) { overflow = true; }
     require(overflow, "overflow must fail");
+    beam::Stream1ModelConfig model51{};
+    model51.backend = beam::STREAM1_BACKEND_PIECE_TRANSFORMER;
+    model51.seq_len = 51U;
+    model51.d_model = 256U;
+    model51.nhead = 8U;
+    model51.head_dim = 32U;
+    model51.ff_dim = 1024U;
+    model51.output_dim = 24U;
+    const auto scratch51 = beam::stream1_weights::transformer_scratch_byte_plan(model51, 8U);
+    require(scratch51.logical_seq_len == 51U && scratch51.padded_seq_len == 64U, "51 scratch shape");
+    require(scratch51.token_bytes == beam::stream1_weights::fp16_bytes(8ULL * 64ULL * 256ULL), "51 token bytes");
+    auto model57 = model51;
+    model57.seq_len = 57U;
+    const auto scratch57 = beam::stream1_weights::transformer_scratch_byte_plan(model57, 8U);
+    require(scratch57.logical_seq_len == 57U && scratch57.padded_seq_len == 64U, "57 scratch shape");
+    require(scratch57.qkv_bytes == beam::stream1_weights::fp16_bytes(8ULL * 64ULL * 3ULL * 256ULL), "57 qkv bytes");
+    require(beam::stream1_weights::transformer_attention_score_stride(model51) ==
+            beam::stream1_weights::transformer_attention_score_stride(model57), "aligned attention stride");
+    require(scratch51.total_bytes() == scratch57.total_bytes(), "same physical shape must use same scratch bytes");
+
     return 0;
 }
