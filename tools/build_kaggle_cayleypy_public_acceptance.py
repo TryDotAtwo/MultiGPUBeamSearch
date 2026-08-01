@@ -23,7 +23,7 @@ from tools import build_kaggle_cayleypy_public_notebook as public_notebook
 
 
 OUT_ROOT = REPOSITORY_ROOT / "kaggle"
-SOLVER_COMMIT = "039a4fb9c699bda644efbb0f8ee7a5b51efbb5d2"
+SOLVER_COMMIT = "ee2b3d5c52d8fe92ce8af2e235b7ffdd18249c38"
 COMPETITION = "cayley-py-megaminx"
 COMPETITION_ROOT = Path(f"/kaggle/input/competitions/{COMPETITION}")
 OUTPUT1_MODEL_SOURCE = "arabidopsisthalian/megaminx2048-512-8-e4000/PyTorch/default/1"
@@ -70,6 +70,14 @@ SCENARIOS = {
         "final-output24", "CayleyPy Public Acceptance Final output24",
         OUTPUT24_CHECKPOINT, OUTPUT24_MODEL_SOURCE, 24, 2**21, 100,
     ),
+    "p26-output1": AcceptanceScenario(
+        "p26-output1", "CayleyPy MLP p26 Acceptance output1",
+        OUTPUT1_CHECKPOINT, OUTPUT1_MODEL_SOURCE, 1, 2**26, 9,
+    ),
+    "p26-output24": AcceptanceScenario(
+        "p26-output24", "CayleyPy MLP p26 Acceptance output24",
+        OUTPUT24_CHECKPOINT, OUTPUT24_MODEL_SOURCE, 24, 2**26, 9,
+    ),
 }
 
 
@@ -111,6 +119,8 @@ def _config_source(scenario: AcceptanceScenario) -> str:
     source = _replace_once(source, 'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"', f'KAGGLE_SLUG = "cayleypy-public-acceptance-{scenario.name}"')
     source = _replace_once(source, 'KAGGLE_USERNAME = None', 'KAGGLE_USERNAME = "trydotatwo"')
     source = _replace_once(source, 'SOLVER_COMMIT = "039a4fb9c699bda644efbb0f8ee7a5b51efbb5d2"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
+    if scenario.beam_width == 2**26:
+        source = _replace_once(source, "TOUCH_BFS_RADIUS = 4", "TOUCH_BFS_RADIUS = 0")
     return source
 
 

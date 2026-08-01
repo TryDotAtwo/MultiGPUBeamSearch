@@ -51,6 +51,7 @@ def test_acceptance_packages_are_private_pinned_and_parseable(tmp_path: Path) ->
         assert config["PUZZLE_ID_START"] == config["PUZZLE_ID_END"] == 0
         assert config["BEAM_WIDTH"] == scenario.beam_width
         assert config["MAX_DEPTH"] == scenario.max_depth
+        assert config["TOUCH_BFS_RADIUS"] == (0 if scenario.beam_width == 2**26 else 4)
         assert config["PUBLISH_RESULTS"] is False
         assert config["RESULTS_INGEST_URL"] == ""
         assert config["SOLVER_COMMIT"] == SOLVER_COMMIT
@@ -64,9 +65,13 @@ def test_acceptance_scenarios_preserve_evidenced_models_and_stage_order() -> Non
     smoke = SCENARIOS["smoke-output1"]
     output1 = SCENARIOS["final-output1"]
     output24 = SCENARIOS["final-output24"]
+    p26_output1 = SCENARIOS["p26-output1"]
+    p26_output24 = SCENARIOS["p26-output24"]
     assert (smoke.beam_width, smoke.max_depth, smoke.expected_output_dim) == (2**16, 8, 1)
     assert (output1.beam_width, output1.max_depth, output1.expected_output_dim) == (2**21, 100, 1)
     assert (output24.beam_width, output24.max_depth, output24.expected_output_dim) == (2**21, 100, 24)
+    assert (p26_output1.beam_width, p26_output1.max_depth, p26_output1.expected_output_dim) == (2**26, 9, 1)
+    assert (p26_output24.beam_width, p26_output24.max_depth, p26_output24.expected_output_dim) == (2**26, 9, 24)
     assert (smoke.checkpoint, output1.checkpoint) == (OUTPUT1_CHECKPOINT, OUTPUT1_CHECKPOINT)
     assert (smoke.model_source, output1.model_source) == (OUTPUT1_MODEL_SOURCE, OUTPUT1_MODEL_SOURCE)
     assert (output24.checkpoint, output24.model_source) == (OUTPUT24_CHECKPOINT, OUTPUT24_MODEL_SOURCE)
