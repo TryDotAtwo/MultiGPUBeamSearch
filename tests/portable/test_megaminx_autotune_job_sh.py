@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import subprocess
 
 import pytest
@@ -7,7 +8,7 @@ import pytest
 def test_autotune_wrapper_is_thin_and_fail_closed():
     path = Path("portable/megaminx_cluster/autotune.sh")
     result = subprocess.run(["bash", "-n", str(path)], text=True, capture_output=True)
-    if result.returncode != 0 and "CreateProcessCommon" in result.stderr:
+    if result.returncode != 0 and ("CreateProcessCommon" in result.stderr or os.name == "nt"):
         pytest.skip("Linux bash is unavailable on this Windows host")
     assert result.returncode == 0, result.stderr
     text = path.read_text(encoding="utf-8")

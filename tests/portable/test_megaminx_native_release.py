@@ -11,7 +11,7 @@ from tools.check_megaminx_native_archive import check_archive, inspect_cuda_imag
 
 def stage(tmp_path: Path) -> Path:
     root = tmp_path / "stage"
-    for directory in ("bin", "lib", "data", "weights", "profiles", "scripts", "portable/megaminx_cluster"):
+    for directory in ("bin", "lib", "data", "weights", "profiles", "scripts", "portable/megaminx_cluster", "portable/megaminx_cluster/autotune"):
         (root / directory).mkdir(parents=True)
     (root / "bin/production_runner").write_bytes(b"ELF fake sm image")
     (root / "lib/libtorch.so").write_bytes(b"runtime")
@@ -21,8 +21,11 @@ def stage(tmp_path: Path) -> Path:
     (root / "profiles/registry.json").write_text('{"schema_version":1,"profiles":[]}')
     (root / "scripts/job.sh").write_text("#!/usr/bin/env bash\n")
     (root / "scripts/preflight.sh").write_text("#!/usr/bin/env bash\n")
+    (root / "scripts/autotune_job.sh").write_text("#!/usr/bin/env bash\n")
     (root / "README.md").write_text("Megaminx release\n")
     (root / "run.sh").write_text("#!/usr/bin/env bash\n")
+    (root / "autotune.sh").write_text("#!/usr/bin/env bash\n")
+    (root / "portable/megaminx_cluster/autotune/calibration.json").write_text("{}")
     return root
 
 

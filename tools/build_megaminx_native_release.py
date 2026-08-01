@@ -17,7 +17,7 @@ import zstandard
 from tools.megaminx_archive_contract import require_allowed_path
 
 ALLOWED_SMS = (75, 80, 86, 89, 90, 120)
-REQUIRED_PATHS = ("bin/production_runner", "lib", "data/test.csv", "data/puzzle_info.json", "weights", "profiles/registry.json", "scripts/job.sh", "scripts/preflight.sh", "run.sh", "README.md")
+REQUIRED_PATHS = ("bin/production_runner", "lib", "data/test.csv", "data/puzzle_info.json", "weights", "profiles/registry.json", "scripts/job.sh", "scripts/preflight.sh", "scripts/autotune_job.sh", "run.sh", "autotune.sh", "portable/megaminx_cluster/autotune/calibration.json", "README.md")
 FORBIDDEN_NAMES = frozenset({".env", "Dockerfile", "token.txt", "compile.sh"})
 FORBIDDEN_SUFFIXES = frozenset({".cu", ".cuh", ".cpp", ".cc", ".o", ".a", ".ptx"})
 SECRET_PATTERN = re.compile(rb"(?:ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA|OPENSSH) PRIVATE KEY|CLOUDFLARE_API_TOKEN)")
@@ -88,7 +88,7 @@ def build_release(stage_root: Path, output_dir: Path, sm: int, cuobjdump: Callab
     with tarfile.open(fileobj=stream, mode="w", format=tarfile.PAX_FORMAT) as tar:
         for path in files:
             relative, data = path.relative_to(root).as_posix(), path.read_bytes()
-            tar.addfile(_tarinfo(f"{prefix}/{relative}", len(data), relative in {"run.sh", "scripts/job.sh", "bin/production_runner"}), io.BytesIO(data))
+            tar.addfile(_tarinfo(f"{prefix}/{relative}", len(data), relative in {"run.sh", "autotune.sh", "scripts/job.sh", "scripts/autotune_job.sh", "bin/production_runner"}), io.BytesIO(data))
         tar.addfile(_tarinfo(f"{prefix}/MANIFEST.json", len(manifest_bytes)), io.BytesIO(manifest_bytes))
         tar.addfile(_tarinfo(f"{prefix}/SHA256SUMS", len(checksum_bytes)), io.BytesIO(checksum_bytes))
     output_dir.mkdir(parents=True, exist_ok=True)
