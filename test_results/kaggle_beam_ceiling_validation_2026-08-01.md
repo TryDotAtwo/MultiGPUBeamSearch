@@ -20,3 +20,11 @@ The transformer maximum was derived from adjacent failing memory probes at a mea
 Both registries expose per-model-class maximum_validated_beam values and reject max + 1. All five public notebooks retain TOUCH_BFS_RADIUS = 4 and pin solver commit f2261a81873ea162a0c36ba8874b9173db8d4083.
 
 Final local gate: 318 tests passed.
+
+## Final public notebook rerun
+
+- Main launcher v14: COMPLETE; expected SETUP_REQUIRED handoff with no attached user inputs.
+- 444 Transformer v54: COMPLETE, status success, BFS radius 4, maximum_validated_beam 74,203,136.
+- Megaminx MLP v14: COMPLETE, status success, BFS radius 4, maximum_validated_beam 67,633,152.
+- IHES MLP v14: COMPLETE, status success, BFS radius 4, maximum_validated_beam 67,239,936.
+- Tetraminx MLP v11: COMPLETE, status success, BFS radius 4, maximum_validated_beam 67,239,936.

@@ -1034,3 +1034,4 @@
 - Regenerated the main launcher plus 444, Megaminx, IHES, and Tetraminx examples at solver commit f2261a81873ea162a0c36ba8874b9173db8d4083.
 - All five public notebooks retain touch BFS radius 4.
 - Builder/profile tests pass 31/31 and the full local suite passes 318/318.
+- 2026-08-01: Final Kaggle rerun passed for all five public notebooks: main v14, 444 v54, Megaminx v14, IHES v14, and Tetraminx v11 all COMPLETE. The four attached-data examples report status=success and touch_bfs_radius=4; the generic main launcher correctly reports SETUP_REQUIRED without user inputs.
