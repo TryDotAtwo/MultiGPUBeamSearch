@@ -8,8 +8,8 @@
 Add a standalone cluster-side autotuner to each native Megaminx archive. A user
 allocates one homogeneous GPU set and runs one command; the tuner discovers the
 maximum stable beam, tunes beam-specific runtime settings down to 30,000,000,
-selects the touch-BFS boundary radius, and emits an evidence-backed registry
-fragment for that exact hardware tuple.
+derives one memory-bounded touch-BFS radius from the puzzle contract, and emits
+an evidence-backed registry fragment for that exact hardware tuple.
 
 The first validation target is 8x NVIDIA A100 40 GB, native sm80. The default
 wall-clock budget is six hours.
@@ -27,6 +27,11 @@ Optional `--puzzles 900,901,902` replaces the packaged three-puzzle calibration
 set. The tuner submits one SLURM job; that job uses torchrun with one rank per
 scheduler-visible GPU. It preserves the same archive, native-SM, payload-hash,
 and homogeneous-allocation preflight as normal solving.
+
+Optional `--bfs-hash-budget-mib` changes the raw touch-BFS hash budget from its
+default of 256 MiB. The puzzle contract supplies `move_count` and the stored hash
+width in bytes. `Hash128` (16 bytes) remains the preferred/default format, but
+the calculation does not assume that every puzzle family uses it.
 
 The default output directory is a new run-owned path under `autotune-runs/`.
 Every session is resumable and refuses to merge observations from a different
@@ -77,28 +82,27 @@ duration. Finalists run three measured repetitions on all three calibration
 puzzles. Selection uses robust median end-to-end time, then lower peak VRAM,
 then deterministic configuration id as tie breakers.
 
-## Touch-BFS boundary formula
+## Formula-derived Touch-BFS boundary
 
-Touch-BFS radius is computed once per beam anchor and is not a benchmark axis.
-For move count `m` and aligned effective beam `B`, define the checked geometric
-upper bound
+The controller derives the radius once for the session, not per beam anchor,
+and never treats it as a successive-halving axis. Given puzzle `move_count = m`,
+stored hash width `h` bytes, and raw budget `B`, it chooses the greatest schema-
+supported integer `r` satisfying:
 
 ```text
-S(0) = 1
-S(r) = S(r - 1) + m ** r
-radius = max r such that S(r) <= B
+h * sum(m ** i for i = 0..r) <= B
 ```
 
-The implementation multiplies one layer at a time with checked integers and stops
-before overflow, at the solver schema limit, or when the next cumulative bound
-would exceed the effective beam. It does not construct or time alternative BFS
-frontiers during autotuning. For `m = 24`, this gives radius 5 at a 30,000,000
-beam and radius 6 near a 1,000,000,000 beam.
+The default `B` is 256 MiB. Arithmetic is checked and fails closed for missing,
+zero, negative, overflowing, or schema-incompatible contract values. The raw
+budget intentionally covers stored hashes only; normal runtime preflight still
+accounts for table load factor, metadata, allocator overhead, and all other VRAM.
 
-The computed radius is recorded in every candidate for that anchor and copied to
-the emitted runtime profile. Successive halving optimizes only GPU runtime
-parameters.
-
+For Megaminx, `m = 24` and `h = 16` for `Hash128`. Radius 5 has 8,308,825 hashes
+and consumes about 126.8 MiB raw; radius 6 has 199,411,801 hashes and consumes
+about 2.97 GiB raw. Therefore the default calculation deterministically selects
+radius 5. The derived value and all calculation inputs are written into every
+candidate and emitted runtime profile.
 ## Calibration and correctness
 
 The packaged default calibration set contains one short, one medium, and one
@@ -106,13 +110,13 @@ hard Megaminx puzzle. Puzzle order rotates between repetitions. Setup-heavy
 paths and CUDA graphs are warmed before measured work.
 
 Every accepted row records workload ids, requested/effective beam, complete
-runtime configuration, computed BFS radius and geometric state bound, exactness digest, replay
+runtime configuration, derived BFS radius, hash width, hash budget and geometric state bound, exactness digest, replay
 result, per-rank peak VRAM, host RAM, scratch bytes, setup time, solve time,
 wall time, throughput, exit status, driver, CUDA runtime, solver commit, model
 digest, and release-manifest digest.
 
 A mismatch, OOM, timeout, crash, or missing metric is a failed row. There is no
-fallback to another GPU, world size, model class, beam range, or BFS radius.
+fallback to another GPU, world size, model class, beam range, or derived BFS radius.
 
 ## Budgeting and resume
 
@@ -146,7 +150,7 @@ modify a signed archive or publish results automatically.
 - `autotune_submit.py`: argument validation, run directory, and allocation.
 - `scripts/autotune_job.sh`: compute-node preflight and torchrun controller.
 - `autotune/controller.py`: deadline, resume, phases, and successive halving.
-- `autotune/search_space.py`: deterministic runtime candidates and the BFS-radius formula.
+- `autotune/search_space.py`: deterministic runtime candidates and checked BFS derivation.
 - `autotune/evidence.py`: identity, JSONL rows, ranking, and registry emission.
 - `autotune/probe.py`: isolated solver invocation and metrics parsing.
 
@@ -161,7 +165,7 @@ unsupported profiles. Candidate subprocesses have hard timeouts and run-owned
 cleanup paths.
 
 Deterministic tests cover argument validation, deadline reservation, beam-bound
-search, half-up anchors, successive-halving selection, tie breaking, checked geometric BFS-radius formula, resume identity, OOM/timeout rows,
+search, half-up anchors, successive-halving selection, tie breaking, generic hash-width-aware BFS derivation, resume identity, OOM/timeout rows,
 exactness rejection, registry schema, and mock-SLURM end-to-end execution. The
 8xA100 trial additionally records real nvidia-smi, peak-memory, correctness,
 and repeated timing evidence before the profile becomes runnable.

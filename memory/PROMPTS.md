@@ -449,3 +449,4 @@
   explicitly accounting for the multiplicative `move_count ** radius` growth
   at every step.
 - User clarified that BFS radius must not be benchmarked: choose the reasonable boundary only from the checked geometric move-count growth formula.
+- User clarified that puzzle families may use different stored hash widths. Use the puzzle contract actual hash width, with `Hash128` (16 bytes) as the preferred/default format. The approved boundary is the greatest radius whose raw cumulative hashes fit 256 MiB; derive it once for the maximum-beam session, not per anchor. For Megaminx this selects radius 5.
