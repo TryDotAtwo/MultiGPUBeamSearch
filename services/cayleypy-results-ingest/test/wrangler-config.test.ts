@@ -60,4 +60,36 @@ describe("Wrangler named-environment publication bindings", () => {
     expect(config.env?.staging?.vars?.INGEST_MODE).toBe("store_only");
     expect(config.env?.production?.vars?.INGEST_MODE).toBe("reject");
   });
-});
+
+  test("tracks a complete normal-mode config for Cloudflare Git builds", () => {
+    const buildConfigPath = fileURLToPath(
+      new URL("../wrangler.github-staging.jsonc", import.meta.url),
+    );
+    const buildConfig = JSON.parse(readFileSync(buildConfigPath, "utf8")) as {
+      name?: string;
+      account_id?: string;
+      vars?: Record<string, string>;
+      d1_databases?: Binding[];
+    };
+    expect(buildConfig.name).toBe("cayleypy-results-ingest-staging");
+    expect(buildConfig.account_id).toBe("cdcad5aa88fc31bdb1f8508d2593ea88");
+    expect(buildConfig.vars?.INGEST_MODE).toBe("normal");
+    expect(buildConfig.d1_databases).toEqual([
+      expect.objectContaining({
+        binding: "RESULTS_DB",
+        database_name: "cayleypy-results-staging",
+        database_id: "0cbcdbb8-d382-451d-8940-fc33c761fef3",
+        migrations_dir: "migrations",
+      }),
+    ]);
+    expect(JSON.stringify(buildConfig)).not.toContain("GITHUB_APP_PRIVATE_KEY");
+    const packageJson = JSON.parse(
+      readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"),
+    ) as { scripts?: Record<string, string> };
+    expect(packageJson.scripts?.["ci:cloudflare"]).toBe(
+      "npm test && npm run typecheck",
+    );
+    expect(packageJson.scripts?.["deploy:staging:github"]).toBe(
+      "wrangler deploy --config wrangler.github-staging.jsonc",
+    );
+  });});

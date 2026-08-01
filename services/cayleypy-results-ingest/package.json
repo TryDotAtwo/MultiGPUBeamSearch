@@ -4,6 +4,8 @@
   "scripts": {
     "test": "vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit",
+    "ci:cloudflare": "npm test && npm run typecheck",
+    "deploy:staging:github": "wrangler deploy --config wrangler.github-staging.jsonc",
     "dev": "wrangler dev --env staging",
     "bootstrap:github-app": "node ./scripts/github-app-bootstrap.mjs",
     "bootstrap:github-app:dry-run": "node ./scripts/github-app-bootstrap.mjs --dry-run",

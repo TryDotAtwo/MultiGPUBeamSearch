@@ -193,3 +193,16 @@ If the manifest callback has completed but installation or bulk upload fails, do
 ## Current local blocker
 
 This repository previously observed `api.cloudflare.com` timeout / unauthenticated Wrangler access locally, and the local exact dependency tree may not yet contain the Wrangler entrypoint. These are deployment-environment prerequisites, not reasons to substitute guessed account/resource IDs or a global CLI. Record the exact sanitized failure in a private `test_results/` note and stop before resource creation or App creation if dependency restoration, `wrangler whoami`, `gh` authentication, or live store-only health fails.
+
+## GitHub-authoritative continuous deployment
+
+After the initial store-only audit and explicit activation, the live staging Worker is deployed by Cloudflare Workers Builds from `TryDotAtwo/MultiGPUBeamSearch`.
+
+- Root directory: `/services/cayleypy-results-ingest`
+- Production branch: `codex/cayleypy-results-ingest` until the branch is merged to `main`
+- Build command: `npm ci && npm run ci:cloudflare`
+- Deploy command: `npm run deploy:staging:github`
+- Deploy config: `wrangler.github-staging.jsonc`
+- Include watch path: `services/cayleypy-results-ingest/**`
+
+The tracked Git-build config contains only public resource identifiers and normal-mode variables. Runtime GitHub App credentials remain encrypted Worker secrets and are never copied into the repository or GitHub Actions. Cloudflare generates and retains the scoped Workers Builds token. Manual local deploy remains an emergency rollback path, not the normal release path.

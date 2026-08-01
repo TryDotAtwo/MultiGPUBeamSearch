@@ -1,0 +1,44 @@
+{
+  "name": "cayleypy-results-ingest-staging",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-28",
+  "account_id": "cdcad5aa88fc31bdb1f8508d2593ea88",
+  "durable_objects": {
+    "bindings": [{ "name": "GITHUB_WRITER", "class_name": "GitHubWriter" }]
+  },
+  "exports": {
+    "GitHubWriter": { "type": "durable-object", "storage": "sqlite" }
+  },
+  "triggers": { "crons": ["*/1 * * * *"] },
+  "vars": {
+    "INGEST_MODE": "normal",
+    "REPO_OWNER": "TryDotAtwo",
+    "REPO_NAME": "cayleypy-beam-results",
+    "STAGING_BRANCH": "ingest/staging"
+  },
+  "d1_databases": [
+    {
+      "binding": "RESULTS_DB",
+      "database_name": "cayleypy-results-staging",
+      "database_id": "0cbcdbb8-d382-451d-8940-fc33c761fef3",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "RAW_RESULTS", "bucket_name": "cayleypy-results-raw-staging" }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "VALIDATE_QUEUE", "queue": "cayleypy-validate-staging" },
+      { "binding": "VALIDATE_DLQ", "queue": "cayleypy-validate-dlq-staging" }
+    ],
+    "consumers": [
+      {
+        "queue": "cayleypy-validate-staging",
+        "max_batch_size": 10,
+        "max_retries": 8,
+        "dead_letter_queue": "cayleypy-validate-dlq-staging"
+      }
+    ]
+  }
+}

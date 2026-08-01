@@ -497,3 +497,5 @@
 - User explicitly asked to continue after the network interruption.
 
 - User confirmed the GitHub App installation on exactly TryDotAtwo/cayleypy-beam-results and asked the agent to keep trying. All infrastructure must stay free, 100 concurrent publishers must not lose results, and beam-search/CUDA architecture changes still require separate approval.
+
+- 2026-08-01: Keep the Cloudflare results-ingest service deployed from the complete code stored in GitHub; prefer GitHub-connected Cloudflare deployment over operator-local Wrangler deploys.
