@@ -23,7 +23,7 @@ from tools import build_kaggle_cayleypy_public_notebook as public_notebook
 
 
 OUT_ROOT = REPOSITORY_ROOT / "kaggle"
-SOLVER_COMMIT = "29140098bb6bd1c9b414bb49237c2488717bdc56"
+SOLVER_COMMIT = "4cb451269d0c6d4cd0beee66c9cfdcecd8b2576f"
 COMPETITION = "cayley-py-megaminx"
 COMPETITION_ROOT = Path(f"/kaggle/input/competitions/{COMPETITION}")
 OUTPUT1_MODEL_SOURCE = "arabidopsisthalian/megaminx2048-512-8-e4000/PyTorch/default/1"
