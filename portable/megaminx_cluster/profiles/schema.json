@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Megaminx native cluster profile registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profiles"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "profiles": {"type": "array", "items": {"$ref": "#/$defs/family"}}
+  },
+  "$defs": {
+    "positive": {"type": "integer", "minimum": 1},
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gpu_family", "vram_mib", "sm", "world_size"],
+      "properties": {
+        "gpu_family": {"type": "string", "minLength": 1},
+        "vram_mib": {"$ref": "#/$defs/positive"},
+        "sm": {"enum": [75, 80, 86, 89, 90, 120]},
+        "world_size": {"$ref": "#/$defs/positive"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["b_micro", "stream1_concurrency", "stream3_ring_slots", "shard_count", "shard_capacity_scale_ppm", "stream4_batch_candidates", "stream4_trigger_candidates", "stream4_active_sort_slots", "final_materialize_chunk_candidates"],
+      "properties": {
+        "b_micro": {"$ref": "#/$defs/positive"},
+        "stream1_concurrency": {"$ref": "#/$defs/positive"},
+        "stream3_ring_slots": {"$ref": "#/$defs/positive"},
+        "shard_count": {"$ref": "#/$defs/positive"},
+        "shard_capacity_scale_ppm": {"$ref": "#/$defs/positive"},
+        "stream4_batch_candidates": {"$ref": "#/$defs/positive"},
+        "stream4_trigger_candidates": {"$ref": "#/$defs/positive"},
+        "stream4_active_sort_slots": {"$ref": "#/$defs/positive"},
+        "final_materialize_chunk_candidates": {"$ref": "#/$defs/positive"}
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidence_id", "runtime"],
+      "properties": {
+        "status": {"enum": ["measured", "bounded_from_measured", "unverified"]},
+        "evidence_id": {"type": "string", "minLength": 1},
+        "runtime": {"$ref": "#/$defs/runtime"}
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hardware", "backend", "model_class", "min_beam_power", "max_beam_power", "anchors"],
+      "properties": {
+        "hardware": {"$ref": "#/$defs/hardware"},
+        "backend": {"enum": ["mlp", "piece_transformer"]},
+        "model_class": {"enum": ["output1", "output_move_count"]},
+        "min_beam_power": {"type": "integer", "minimum": 1},
+        "max_beam_power": {"type": "integer", "minimum": 1},
+        "anchors": {"type": "object", "additionalProperties": {"$ref": "#/$defs/anchor"}}
+      }
+    }
+  }
+}
