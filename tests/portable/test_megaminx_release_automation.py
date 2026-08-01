@@ -48,3 +48,10 @@ def test_profile_sweep_rejects_wrong_digest_and_insufficient_repeats():
 def test_profile_sweep_is_deterministic_under_input_reordering():
     items = [candidate(30, 2), candidate(29, 0), candidate(29, 5)]
     assert json.dumps(select_winners(items), sort_keys=True) == json.dumps(select_winners(list(reversed(items))), sort_keys=True)
+
+def test_cluster_branch_push_publishes_stable_latest_download_assets():
+    text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
+    assert "codex/megaminx-native-cluster-release" in text
+    assert "megaminx-native-cluster-latest" in text
+    assert "gh release upload" in text
+    assert "--clobber" in text

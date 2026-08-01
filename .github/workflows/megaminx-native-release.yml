@@ -1,11 +1,16 @@
 name: Megaminx native prerelease
 
 on:
+  push:
+    branches:
+      - codex/megaminx-native-cluster-release
   workflow_dispatch:
     inputs:
       prerelease_tag:
-        description: Existing prerelease tag
-        required: true
+        description: Prerelease tag (defaults to stable cluster-latest tag)
+        required: false
+        default: megaminx-native-cluster-latest
+
 
 permissions:
   contents: write
@@ -52,7 +57,7 @@ jobs:
           cp -a stream1_weights/. "$stage/weights/"
           cp portable/megaminx_cluster/model_manifest.json "$stage/weights/manifest.json"
           python3 tools/collect_elf_runtime_closure.py "$stage/bin/production_runner" "$stage/lib"
-          python3 tools/render_megaminx_release_metadata.py --template "release/sm${{ matrix.sm }}.json" --output "dist/sm${{ matrix.sm }}.json" --tag "${{ inputs.prerelease_tag }}" --asset "megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst" --commit "${{ github.sha }}" --model-manifest "$stage/weights/manifest.json" --weights "$stage/weights"
+          python3 tools/render_megaminx_release_metadata.py --template "release/sm${{ matrix.sm }}.json" --output "dist/sm${{ matrix.sm }}.json" --tag "${PRERELEASE_TAG}" --asset "megaminx-sm${{ matrix.sm }}-linux-x86_64.tar.zst" --commit "${{ github.sha }}" --model-manifest "$stage/weights/manifest.json" --weights "$stage/weights"
       - name: Package and enforce one-SM/no-JIT gate
         run: |
           set -euo pipefail
@@ -76,4 +81,9 @@ jobs:
       - name: Publish prerelease assets only
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ inputs.prerelease_tag }}" dist/* --prerelease --title "Megaminx native cluster prerelease ${{ inputs.prerelease_tag }}"
+        run: |
+          set -euo pipefail
+          if ! gh release view "${PRERELEASE_TAG}" >/dev/null 2>&1; then
+            gh release create "${PRERELEASE_TAG}" --prerelease --title "Megaminx native cluster prerelease ${PRERELEASE_TAG}"
+          fi
+          gh release upload "${PRERELEASE_TAG}" dist/* --clobber

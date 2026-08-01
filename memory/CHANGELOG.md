@@ -767,3 +767,4 @@
   deterministic repeated-timing profile winner selection.
 - Verification: `test_results/megaminx_native_cluster_release_2026-08-01.md`.
 - 2026-08-01: Added the standalone native-cluster profile autotuner design and implementation: formula-derived hash-width-aware Touch-BFS radius, maximum stable beam discovery, adaptive successive halving, strict per-rank VRAM/correctness gates, resumable atomic evidence, and fail-closed registry fragments for SLURM/torchrun archives.
+- 2026-08-01: Made the separate native-cluster branch publish a stable `megaminx-native-cluster-latest` prerelease on branch push, enabling clean first-use cluster setup from one precompiled per-SM download without Git or compilation.
