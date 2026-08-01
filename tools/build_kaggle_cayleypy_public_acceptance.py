@@ -126,7 +126,7 @@ def _config_source(scenario: AcceptanceScenario) -> str:
     source = _replace_once(source, 'KAGGLE_OWNER = "replace-with-kaggle-owner"', 'KAGGLE_OWNER = "trydotatwo"')
     source = _replace_once(source, 'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"', f'KAGGLE_SLUG = "cayleypy-public-acceptance-{scenario.name}"')
     source = _replace_once(source, 'KAGGLE_USERNAME = None', 'KAGGLE_USERNAME = "trydotatwo"')
-    source = _replace_once(source, 'SOLVER_COMMIT = "cb9e911914bdb4ac63c2b5306f554e5a76b9884e"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
+    source = _replace_once(source, 'SOLVER_COMMIT = "78565a7cf0b89c394e957dc8ca59ae55b1280f27"', f'SOLVER_COMMIT = "{SOLVER_COMMIT}"')
     if scenario.beam_width >= 2**26:
         source = _replace_once(source, "TOUCH_BFS_RADIUS = 4", "TOUCH_BFS_RADIUS = 0")
     return source

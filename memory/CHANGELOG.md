@@ -1,3 +1,4 @@
+- 2026-08-01: Re-pinned the universal and four example Kaggle notebooks to client commit `78565a7`, ensuring the runtime actually uses the gzip archive publisher rather than the previous JSON chunk client. Full suite: 318 passed.
 - 2026-08-01: Replaced notebook-side 100-result/4-MiB JSON request chunking with deterministic gzip archives bounded to 32 MiB. A run normally performs one HTTPS request; oversized compressed runs split recursively and upload sequentially in stable solution order.
 - Added archive request metadata, safe best-effort status aggregation, regenerated the universal public notebook and all four ready-to-run examples, and retained the old JSON publisher only as a compatibility API.
 - Verification: `318 passed` for the complete Python test suite.

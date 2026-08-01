@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from tools import build_kaggle_cayleypy_public_notebook as public_notebook
 
-SOLVER_COMMIT = "cb9e911914bdb4ac63c2b5306f554e5a76b9884e"
+SOLVER_COMMIT = "78565a7cf0b89c394e957dc8ca59ae55b1280f27"
 INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results"
 EXAMPLES: dict[str, dict[str, Any]] = {
     "444": {
@@ -121,7 +121,7 @@ def config(spec: dict[str, Any], *, solution_mode: str = "first", slug: str | No
         'PUZZLE_ID_END = 0': f'PUZZLE_ID_END = {spec["puzzle_id"]}',
         'KAGGLE_SLUG = "replace-with-kaggle-notebook-slug"': f'KAGGLE_SLUG = "{slug}"',
         'KAGGLE_USERNAME = None': 'KAGGLE_USERNAME = "trydotatwo"',
-        'SOLVER_COMMIT = "cb9e911914bdb4ac63c2b5306f554e5a76b9884e"': f'SOLVER_COMMIT = "{SOLVER_COMMIT}"',
+        'SOLVER_COMMIT = "78565a7cf0b89c394e957dc8ca59ae55b1280f27"': f'SOLVER_COMMIT = "{SOLVER_COMMIT}"',
     }
     for old, new in replacements.items():
         s = replace_once(s, old, new)
