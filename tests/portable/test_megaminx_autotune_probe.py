@@ -227,3 +227,8 @@ def test_capacity_probe_can_measure_up_to_100_percent_gate():
     payload["peak_vram_mib"] = [40140] * 8
     assert classify_metrics(payload, 8, 100, vram_limit_percent=100) == (True, "stable")
     assert classify_metrics(payload, 8, 100) == (False, "vram_margin")
+
+
+def test_manual_static_plan_budget_failure_is_capacity_oom():
+    text = "manual runtime config exceeds GPU budget: required=10 budget=9"
+    assert _failure_status(250, text) == "oom"

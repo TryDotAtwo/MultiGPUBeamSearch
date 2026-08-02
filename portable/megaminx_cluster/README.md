@@ -103,6 +103,11 @@ quantum. Runtime, CUDA, capacity, timeout, full-frontier, or correctness failure
 invalidate the bootstrap and are never accepted as memory boundaries. It then applies
 deterministic successive halving with the normal 15% reserve to select fast,
 memory-efficient production profiles.
+For maximum-capacity discovery, shard capacity scale is exactly `1_000_000` PPM:
+the many large shards provide the distribution reserve without multiplying storage.
+The search starts from the requested large solve beam (or a large standalone estimate),
+moves downward after a real GPU-budget/OOM bound, and then refines the 98% point.
+Higher shard scales remain candidates only for smaller performance anchors down to 30M.
 Both calibration and production set final-materialization exchange scale to exactly
 `1_000_000 * world_size` PPM.
 It derives one Touch-BFS radius for the session from the puzzle move count,

@@ -116,8 +116,8 @@ def test_successive_halving_selects_fastest_survivor(tmp_path):
     assert next(iter(anchors.values()))["runtime"]["stream1_concurrency"] == 4
 
 
-def test_bootstrap_profile_reserves_capacity_for_live_stream3_skew():
-    assert _BOOTSTRAP_RUNTIME['shard_capacity_scale_ppm'] >= 2_500_000
+def test_large_beam_capacity_bootstrap_uses_exact_logical_shard_scale():
+    assert _BOOTSTRAP_RUNTIME["shard_capacity_scale_ppm"] == 1_000_000
 
 
 def test_max_beam_targets_98_percent_vram_not_first_runtime_failure(tmp_path):
@@ -141,3 +141,18 @@ def test_max_beam_rejects_capacity_error_as_memory_boundary(tmp_path):
     import pytest
     with pytest.raises(RuntimeError, match="before 98% VRAM"):
         run_session(ControllerConfig(identity(), RUNTIME, 120_000_000), probe, clock, store)
+
+
+def test_max_search_starts_from_large_requested_beam_then_moves_down(tmp_path):
+    clock = Clock(); seen = []
+    def probe(trial):
+        seen.append(trial.beam); clock.now += 0.01
+        if trial.beam >= 1_000_000_000:
+            return ProbeResult(False, "oom", {"wall_us": 1}, ())
+        peak = int(40960 * trial.beam / 600_000_000)
+        return ProbeResult(True, "stable", {"wall_us": 1, "peak_vram_mib": [peak] * 8}, ())
+    store = EvidenceStore.create_or_resume(tmp_path, identity())
+    result = run_session(ControllerConfig(identity(), RUNTIME, 2_000_000_000, 1_000_000_000), probe, clock, store)
+    assert seen[0] == 1_000_000_000
+    assert seen[1] == 500_000_000
+    assert result.maximum_stable_beam >= 500_000_000

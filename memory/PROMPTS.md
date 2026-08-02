@@ -471,3 +471,5 @@
 - User corrected zero-touch tuning: its upper beam bound must be discovered automatically as the largest width that fits and remains practical, rather than being capped by the requested solve beam. Final materialization exchange scale must be `1_000_000 * world_size`, not a fixed `8_000_000`.
 
 - User specified the authoritative maximum-beam criterion: search by filling the GPU to 98% VRAM. Runtime/capacity failures are not a memory boundary.
+
+- User clarified that large beams use `shard_capacity_scale_ppm = 1` (that is `1_000_000` PPM): many large shards already provide sufficient distribution reserve.

@@ -28,3 +28,8 @@ Follow-up correction:
 - runtime/capacity errors invalidate the bootstrap;
 - binary refinement stops at the distributed layout quantum;
 - the production-profile 85% gate remains separate.
+
+Large-beam shard correction:
+- maximum-capacity seed uses `shard_capacity_scale_ppm=1_000_000`;
+- search begins at requested large beam and descends after true OOM/GPU-budget bounds;
+- high scale factors remain only in the small-anchor tuning grid.

@@ -39,6 +39,7 @@ class ControllerConfig:
     identity: SessionIdentity
     seed_runtime: Mapping[str, int]
     max_beam_limit: int
+    initial_beam: int | None = None
 
 
 @dataclass(frozen=True)
@@ -122,11 +123,12 @@ def run_session(
 
     seed = dict(config.seed_runtime)
     first_puzzle = identity.puzzle_ids[0]
-    low = identity.min_beam
-    high: int | None = None
-    beam = low
     target_vram_percent = 98.0
     quantum = identity.world_size * int(seed["shard_count"]) * 1024
+    initial = config.initial_beam or min(config.max_beam_limit, identity.min_beam * 16)
+    initial = max(identity.min_beam, min(config.max_beam_limit, initial))
+    low: int | None = None
+    high: int | None = None
 
     def vram_percent(result: ProbeResult) -> float:
         peak = _peak_scalar(result)
@@ -144,26 +146,45 @@ def run_session(
             )
         return "above" if vram_percent(result) >= target_vram_percent else "below"
 
-    while True:
-        trial = TrialRequest("max_beam", beam, "seed", seed, first_puzzle, 0, identity.bfs_radius)
-        result = execute(trial)
-        if result is None:
-            break
-        side = capacity_result(result, beam)
-        if side == "above":
-            high = beam
-            break
-        low = beam
-        if beam == config.max_beam_limit:
-            break
-        beam = min(config.max_beam_limit, beam * 2)
-    if high is not None and high > low:
+    def measure(candidate: int) -> str | None:
+        result = execute(TrialRequest(
+            "max_beam", candidate, "seed", seed, first_puzzle, 0, identity.bfs_radius
+        ))
+        return None if result is None else capacity_result(result, candidate)
+
+    side = measure(initial)
+    if side == "below":
+        low = initial
+        while low < config.max_beam_limit:
+            candidate = min(config.max_beam_limit, low * 2)
+            side = measure(candidate)
+            if side is None:
+                break
+            if side == "above":
+                high = candidate
+                break
+            low = candidate
+    elif side == "above":
+        high = initial
+        candidate = initial
+        while candidate > identity.min_beam:
+            candidate = max(identity.min_beam, candidate // 2)
+            side = measure(candidate)
+            if side is None:
+                break
+            if side == "below":
+                low = candidate
+                break
+            high = candidate
+    if low is None:
+        raise RuntimeError("no beam below the 98% VRAM target was found")
+    if high is not None:
         while high - low > quantum:
             candidate = (low + high) // 2
-            result = execute(TrialRequest("max_beam", candidate, "seed", seed, first_puzzle, 0, identity.bfs_radius))
-            if result is None:
+            side = measure(candidate)
+            if side is None:
                 break
-            if capacity_result(result, candidate) == "below":
+            if side == "below":
                 low = candidate
             else:
                 high = candidate
@@ -238,7 +259,7 @@ def run_session(
 
 _BOOTSTRAP_RUNTIME = {
     "b_micro": 8192, "stream1_concurrency": 1, "stream3_ring_slots": 1,
-    "shard_count": 8, "shard_capacity_scale_ppm": 2500000,
+    "shard_count": 8, "shard_capacity_scale_ppm": 1000000,
     "stream4_batch_candidates": 262144, "stream4_trigger_candidates": 524288,
     "stream4_active_sort_slots": 1, "final_materialize_chunk_candidates": 65536,
 }
@@ -287,7 +308,11 @@ def main() -> int:
     max_beam = int(os.environ.get("MEGAMINX_AUTOTUNE_MAX_BEAM", str(2**40)))
     if max_beam < identity.min_beam:
         raise ValueError("MEGAMINX_AUTOTUNE_MAX_BEAM must be >= minimum beam")
-    result = run_session(ControllerConfig(identity, _BOOTSTRAP_RUNTIME, max_beam), real_probe, time.monotonic, store)
+    initial_beam = int(os.environ.get("MEGAMINX_AUTOTUNE_INITIAL_BEAM", str(identity.min_beam * 16)))
+    result = run_session(
+        ControllerConfig(identity, _BOOTSTRAP_RUNTIME, max_beam, initial_beam),
+        real_probe, time.monotonic, store,
+    )
     print(f"maximum_stable_beam={result.maximum_stable_beam} complete={int(result.complete)}")
     return 0 if result.complete else 3
 

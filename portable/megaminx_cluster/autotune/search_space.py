@@ -142,7 +142,7 @@ def candidate_grid(seed_runtime: Mapping[str, int]) -> tuple[RuntimeCandidate, .
         "stream1_concurrency": (1, 2, 4),
         "stream3_ring_slots": (1, 2, 4),
         "shard_count": (2, 4, 8, 16, 32, 64),
-        "shard_capacity_scale_ppm": (1250000, 1500000, 2000000, 2500000),
+        "shard_capacity_scale_ppm": (1000000, 1250000, 1500000, 2000000, 2500000),
         "stream4_batch_candidates": (65536, 98304, 131072, 196608, 262144, 524288),
         "stream4_active_sort_slots": (1, 2, 4),
         "final_materialize_chunk_candidates": _FINAL_CHUNK_VALUES,

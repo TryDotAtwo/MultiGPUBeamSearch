@@ -144,7 +144,8 @@ def _write(path: Path, value: str | bytes | None) -> None:
 
 def _failure_status(returncode: int, text: str) -> str:
     lower = text.lower()
-    if "out of memory" in lower or "cuda_error_out_of_memory" in lower:
+    if ("out of memory" in lower or "cuda_error_out_of_memory" in lower
+            or "exceeds gpu budget" in lower):
         return "oom"
     if re.search(r"(?:ncclcomm|nccl (?:error|warning|internal|system)|unhandled nccl)", lower):
         return "nccl_error"
