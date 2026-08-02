@@ -467,3 +467,5 @@
 - Autotune every performance parameter separately for the actual card because b_micro, concurrency, and other optima may all change across hardware. Tune final_materialize_chunk_candidates but keep it small. Score the fully filled frontier at depth 8; earlier depths are not important and serve only as warmup/fill.
 
 - User finalized zero-touch cluster profile behavior: the program must identify the actual GPU itself, reuse an exact known profile, or automatically prepare and benchmark profiles for an unknown card before solving.
+
+- User corrected zero-touch tuning: its upper beam bound must be discovered automatically as the largest width that fits and remains practical, rather than being capped by the requested solve beam. Final materialization exchange scale must be `1_000_000 * world_size`, not a fixed `8_000_000`.

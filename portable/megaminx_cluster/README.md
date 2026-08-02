@@ -96,8 +96,12 @@ Stream 1 concurrency, Stream 3 ring slots, shard count/capacity, Stream 4 batch,
 trigger and active slots, plus a bounded small final-materialization chunk
 (32K-128K). Profiles never transfer between hardware tuples. Successive halving
 uses all three puzzle tiers, and the final choice is the lowest-memory candidate
-within 3% of the fastest median while retaining at least 15% VRAM reserve. Override it with `--puzzles ID1,ID2,ID3`. The controller first
-discovers the maximum stable beam, then applies deterministic successive halving.
+within 3% of the fastest median while retaining at least 15% VRAM reserve. Override it with `--puzzles ID1,ID2,ID3`. The controller first discovers the maximum stable beam independently of the beam
+requested for the eventual solve: it expands from 30M until the first OOM, timeout,
+VRAM-margin, full-frontier, or correctness failure, then refines the boundary. It
+then applies deterministic successive halving to select fast, memory-efficient profiles.
+Both calibration and production set final-materialization exchange scale to exactly
+`1_000_000 * world_size` PPM.
 It derives one Touch-BFS radius for the session from the puzzle move count,
 stored hash width, and raw hash budget; for Megaminx Hash128 the default is radius 5.
 

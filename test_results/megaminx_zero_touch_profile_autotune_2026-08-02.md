@@ -17,3 +17,7 @@ Verification:
 - `python -m compileall -q portable/megaminx_cluster`: passed.
 - `git diff --check`: passed.
 - No cluster command was executed; live A100x8 validation remains user-operated.
+
+Follow-up correction:
+- automatic maximum-beam discovery is not capped by the requested solve beam;
+- final exchange scale is exactly `1_000_000 * world_size` in probe and solve environments.

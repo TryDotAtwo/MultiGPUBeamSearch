@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         with _exclusive_lock(cache.parent/"locks"/lock_name):
             if available(): print("profile_source=cache_after_wait"); return 0
             tune_dir=run_dir/"autotune"; tune_dir.mkdir(parents=True,exist_ok=True); shutil.copy2(run_dir/"preflight.json",tune_dir/"preflight.json")
-            os.environ.update({"MEGAMINX_AUTOTUNE_RUN_DIR":str(tune_dir),"MEGAMINX_AUTOTUNE_MAX_BEAM":str(args.beam),"MEGAMINX_AUTOTUNE_PUZZLES":os.environ.get("MEGAMINX_AUTOTUNE_PUZZLES","900:950:1000"),"MEGAMINX_AUTOTUNE_MIN_BEAM":os.environ.get("MEGAMINX_AUTOTUNE_MIN_BEAM","30000000"),"MEGAMINX_AUTOTUNE_TIME_BUDGET_SECONDS":os.environ.get("MEGAMINX_AUTOTUNE_TIME_BUDGET_SECONDS","21600"),"MEGAMINX_AUTOTUNE_BFS_HASH_BUDGET_MIB":os.environ.get("MEGAMINX_AUTOTUNE_BFS_HASH_BUDGET_MIB","256")})
+            os.environ.update({"MEGAMINX_AUTOTUNE_RUN_DIR":str(tune_dir),"MEGAMINX_AUTOTUNE_PUZZLES":os.environ.get("MEGAMINX_AUTOTUNE_PUZZLES","900:950:1000"),"MEGAMINX_AUTOTUNE_MIN_BEAM":os.environ.get("MEGAMINX_AUTOTUNE_MIN_BEAM","30000000"),"MEGAMINX_AUTOTUNE_TIME_BUDGET_SECONDS":os.environ.get("MEGAMINX_AUTOTUNE_TIME_BUDGET_SECONDS","21600"),"MEGAMINX_AUTOTUNE_BFS_HASH_BUDGET_MIB":os.environ.get("MEGAMINX_AUTOTUNE_BFS_HASH_BUDGET_MIB","256")})
             from portable.megaminx_cluster.autotune.controller import main as tune
             if tune()!=0: raise ValueError("autotune did not complete; solve was not started")
             fragment=json.loads((tune_dir/"registry.fragment.json").read_text(encoding="utf-8"))

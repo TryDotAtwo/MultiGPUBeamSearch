@@ -110,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
             "BEAM_STREAM4_TRIGGER_CANDIDATES": runtime.runtime["stream4_trigger_candidates"],
             "BEAM_STREAM4_ACTIVE_SORT_SLOTS": runtime.runtime["stream4_active_sort_slots"],
             "BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES": runtime.runtime["final_materialize_chunk_candidates"],
+            "BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM": 1_000_000 * args.gpu_count,
         }
         (run_dir / "selected_profile.env").write_text(
             "".join(f"export {key}={value}\n" for key, value in env_values.items()),

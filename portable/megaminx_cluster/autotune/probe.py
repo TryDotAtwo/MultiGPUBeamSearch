@@ -111,7 +111,10 @@ def _runtime_env(request: ProbeRequest) -> tuple[dict[str, str], int]:
         "stream4_active_sort_slots": "BEAM_STREAM4_ACTIVE_SORT_SLOTS",
         "final_materialize_chunk_candidates": "BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES",
     }
-    values = {"BEAM_RUNTIME_CONFIG_MODE": "manual"}
+    values = {
+        "BEAM_RUNTIME_CONFIG_MODE": "manual",
+        "BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM": str(1_000_000 * request.world_size),
+    }
     values.update({target: str(runtime[source]) for source, target in names.items()})
     quantum = request.world_size * runtime["shard_count"] * 1024
     effective_beam = ((request.requested_beam + quantum - 1) // quantum) * quantum

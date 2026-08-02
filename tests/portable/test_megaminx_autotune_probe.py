@@ -12,6 +12,7 @@ from portable.megaminx_cluster.autotune.probe import (
     classify_metrics,
     run_probe,
     _failure_status,
+    _runtime_env,
 )
 
 
@@ -208,3 +209,14 @@ def test_run_probe_scores_only_depth8_benchmark_metrics(tmp_path):
     assert result.metrics["wall_us"] == 2_000_000
     assert result.metrics["throughput"] == pytest.approx(15_007_744)
     assert result.metrics["frontier_full"] is True
+
+def test_runtime_env_scales_final_exchange_by_world_size(tmp_path):
+    runtime = {
+        "b_micro": 8192, "stream1_concurrency": 1, "stream3_ring_slots": 1,
+        "shard_count": 8, "shard_capacity_scale_ppm": 1250000,
+        "stream4_batch_candidates": 65536, "stream4_trigger_candidates": 131072,
+        "stream4_active_sort_slots": 1, "final_materialize_chunk_candidates": 32768,
+    }
+    request = ProbeRequest(tmp_path, tmp_path / "run", 4, 900, 8, 30_000_000, runtime, 60, "job", (40000,) * 4, 1, {})
+    env, _ = _runtime_env(request)
+    assert env["BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM"] == "4000000"

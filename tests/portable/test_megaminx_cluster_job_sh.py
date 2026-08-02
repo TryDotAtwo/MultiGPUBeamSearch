@@ -22,3 +22,8 @@ def test_job_detects_then_autotunes_unknown_hardware_before_profile_selection():
     autotune = text.index("portable.megaminx_cluster.auto_profile")
     selected = text.index("selected_profile.env")
     assert hardware < autotune < selected
+
+
+def test_auto_profile_does_not_cap_autotune_at_requested_solve_beam():
+    text = Path("portable/megaminx_cluster/auto_profile.py").read_text()
+    assert "MEGAMINX_AUTOTUNE_MAX_BEAM" not in text
