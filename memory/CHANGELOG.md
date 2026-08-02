@@ -785,3 +785,5 @@
 - 2026-08-02: Pinned native cluster archives to NCCL 2.27.7 for CUDA 12.4 after clean-cluster diagnostics found that unversioned packages had bundled NCCL 2.30.7 for CUDA 13.3 on a driver-550 cluster. The release now fails closed unless both installed packages and staged libnccl.so.2 match the approved version.
 
 - 2026-08-02: Added the production runner's required FullBeamNice/generators/p900.json to every native archive and to both build-time and independent archive gates after clean-cluster job 33340 exposed the missing payload. Tightened autotune failure classification so an nccl substring in a directory name cannot be misreported as an NCCL failure.
+
+- 2026-08-02: Raised the autotuner bootstrap shard-capacity reserve from 1.25x to 2.5x after A100x8 job 33343 observed Stream 3 remote-receive overflow at 30M beam (capacity 586752, existing about 581k, zero spill). Probe classification now includes a bounded tail of nested solver logs, so CUDA stream failures are surfaced as cuda_error instead of generic process_error.

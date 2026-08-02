@@ -7,6 +7,7 @@ from portable.megaminx_cluster.autotune.controller import (
     ControllerConfig,
     TrialRequest,
     run_session,
+    _BOOTSTRAP_RUNTIME,
 )
 from portable.megaminx_cluster.autotune.evidence import EvidenceStore, SessionIdentity
 from portable.megaminx_cluster.autotune.probe import ProbeResult
@@ -113,3 +114,7 @@ def test_successive_halving_selects_fastest_survivor(tmp_path):
     result = run_session(ControllerConfig(identity(), RUNTIME, 60_000_000), probe, clock, store)
     anchors = result.registry_fragment["profiles"][0]["anchors"]
     assert next(iter(anchors.values()))["runtime"]["stream1_concurrency"] == 2
+
+
+def test_bootstrap_profile_reserves_capacity_for_live_stream3_skew():
+    assert _BOOTSTRAP_RUNTIME['shard_capacity_scale_ppm'] >= 2_500_000

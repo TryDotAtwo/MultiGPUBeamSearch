@@ -211,7 +211,11 @@ def run_probe(
     wall_us = max(1, int((monotonic() - started) * 1_000_000))
     _write(candidate / "stdout.log", completed.stdout)
     _write(candidate / "stderr.log", completed.stderr)
-    combined = (completed.stdout or "") + (completed.stderr or "")
+    nested_tail = ""
+    for log_path in sorted((candidate / "logs").glob("*.log")):
+        data = log_path.read_bytes()
+        nested_tail += data[-262144:].decode("utf-8", errors="replace")
+    combined = (completed.stdout or "") + (completed.stderr or "") + nested_tail
     if completed.returncode != 0:
         return ProbeResult(
             False, _failure_status(completed.returncode, combined),

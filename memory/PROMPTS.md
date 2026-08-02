@@ -461,3 +461,5 @@
 - Clean-cluster native archives must run on the target driver-550 A100 cluster; do not allow an unversioned NCCL package to silently select a newer CUDA runtime line. Pin and verify the packaged NCCL runtime before publishing.
 
 - The first-time cluster archive must contain every solver runtime input, including FullBeamNice/generators/p900.json; users must not need a repository checkout or manual file copying. Autotune diagnostics must report the actual failure and must not infer NCCL errors from path names.
+
+- The profile picker bootstrap must be stable at the requested 30M minimum before optimization. Reserve enough shard capacity for observed cross-shard skew and concurrent Stream 4 processing; nested solver errors must remain visible in autotune evidence.

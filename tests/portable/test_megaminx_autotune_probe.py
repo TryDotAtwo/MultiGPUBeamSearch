@@ -171,3 +171,16 @@ def test_probe_derives_effective_beam_and_shard_capacity_env(tmp_path):
 def test_failure_status_does_not_treat_nccl_in_directory_name_as_nccl_error():
     assert _failure_status(250, 'workflow_failed=/scratch/megaminx-clean-nccl-20260802/original.log') == 'process_error'
     assert _failure_status(250, 'ncclCommInitRank: unhandled cuda error') == 'nccl_error'
+
+
+def test_run_probe_classifies_nested_solver_cuda_log(tmp_path):
+    def failed_runner(command, **kwargs):
+        candidate = tmp_path / "candidate"
+        (candidate / "logs/original.log").write_text(
+            "cuda stream fatal error: phase=stream3_remote_recv_collect flag=3002",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 250, "", "workflow_failed=original")
+
+    result = run_probe(request(tmp_path), run_command=failed_runner)
+    assert result.status == "cuda_error"

@@ -220,7 +220,7 @@ def run_session(
 
 _BOOTSTRAP_RUNTIME = {
     "b_micro": 8192, "stream1_concurrency": 1, "stream3_ring_slots": 1,
-    "shard_count": 8, "shard_capacity_scale_ppm": 1250000,
+    "shard_count": 8, "shard_capacity_scale_ppm": 2500000,
     "stream4_batch_candidates": 262144, "stream4_trigger_candidates": 524288,
     "stream4_active_sort_slots": 1, "final_materialize_chunk_candidates": 65536,
 }
