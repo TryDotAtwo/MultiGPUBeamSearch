@@ -14,5 +14,5 @@ def require_allowed_path(relative:str)->None:
              (len(path.parts)==2 and path.parts[0]=="lib" and re.fullmatch(r"lib[^/]+\.so(?:\.[0-9]+)*",path.name) is not None) or
              (path.parts[0]=="weights" and (path.name=="manifest.json" or path.suffix in {".fp16",".bf16",".pt"})) or
              (path.parts[:2]==("portable","megaminx_cluster") and path.suffix==".py" and len(path.parts) in {3,4} and (len(path.parts)==3 or path.parts[2] in {"scripts","autotune"})) or
-             text=="portable/megaminx_cluster/autotune/calibration.json")
+             text in {"portable/megaminx_cluster/autotune/calibration.json", "FullBeamNice/generators/p900.json"})
     if not allowed: raise ValueError(f"archive path is outside fixed allowlist: {text}")

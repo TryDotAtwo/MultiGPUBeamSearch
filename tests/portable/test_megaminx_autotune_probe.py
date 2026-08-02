@@ -11,6 +11,7 @@ from portable.megaminx_cluster.autotune.probe import (
     build_probe_command,
     classify_metrics,
     run_probe,
+    _failure_status,
 )
 
 
@@ -165,3 +166,8 @@ def test_probe_derives_effective_beam_and_shard_capacity_env(tmp_path):
     assert result.metrics["effective_beam"] == 30_015_488
     assert int(captured["BEAM_SHARD_CAPACITY_CANDIDATES"]) >= 30_015_488 // 8 // 8
     assert "BEAM_SHARD_CAPACITY_SCALE_PPM" not in captured
+
+
+def test_failure_status_does_not_treat_nccl_in_directory_name_as_nccl_error():
+    assert _failure_status(250, 'workflow_failed=/scratch/megaminx-clean-nccl-20260802/original.log') == 'process_error'
+    assert _failure_status(250, 'ncclCommInitRank: unhandled cuda error') == 'nccl_error'

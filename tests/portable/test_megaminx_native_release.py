@@ -11,12 +11,13 @@ from tools.check_megaminx_native_archive import check_archive, inspect_cuda_imag
 
 def stage(tmp_path: Path) -> Path:
     root = tmp_path / "stage"
-    for directory in ("bin", "lib", "data", "weights", "profiles", "scripts", "portable/megaminx_cluster", "portable/megaminx_cluster/autotune"):
+    for directory in ("bin", "lib", "data", "weights", "profiles", "scripts", "portable/megaminx_cluster", "portable/megaminx_cluster/autotune", "FullBeamNice/generators"):
         (root / directory).mkdir(parents=True)
     (root / "bin/production_runner").write_bytes(b"ELF fake sm image")
     (root / "lib/libtorch.so").write_bytes(b"runtime")
     (root / "data/test.csv").write_text("initial_state_id,initial_state\n900,1,0\n")
     (root / "data/puzzle_info.json").write_text("{}")
+    (root / "FullBeamNice/generators/p900.json").write_text('{"actions":{}}')
     (root / "weights/megaminx.pt").write_bytes(b"weights")
     (root / "profiles/registry.json").write_text('{"schema_version":1,"profiles":[]}')
     (root / "scripts/job.sh").write_text("#!/usr/bin/env bash\n")

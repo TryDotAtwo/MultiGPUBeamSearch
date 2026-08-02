@@ -783,3 +783,5 @@
 - 2026-08-02: Fixed the autotune SLURM entrypoint to preserve scheduler-provided CUDA_VISIBLE_DEVICES instead of replacing it with user-facing GPU ids. This aligns autotune with the normal solve path and prevents GRES/cgroup remapping from causing NCCL unhandled CUDA errors.
 
 - 2026-08-02: Pinned native cluster archives to NCCL 2.27.7 for CUDA 12.4 after clean-cluster diagnostics found that unversioned packages had bundled NCCL 2.30.7 for CUDA 13.3 on a driver-550 cluster. The release now fails closed unless both installed packages and staged libnccl.so.2 match the approved version.
+
+- 2026-08-02: Added the production runner's required FullBeamNice/generators/p900.json to every native archive and to both build-time and independent archive gates after clean-cluster job 33340 exposed the missing payload. Tightened autotune failure classification so an nccl substring in a directory name cannot be misreported as an NCCL failure.

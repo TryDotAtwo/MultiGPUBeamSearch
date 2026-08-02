@@ -36,7 +36,7 @@ def check_archive(archive:Path,expected_sm:int,cuobjdump:Callable[[Path],str])->
     raw=zstandard.ZstdDecompressor().decompress(archive.read_bytes(),max_output_size=8*1024**3); prefix=expected_name.removesuffix(".tar.zst")
     with tarfile.open(fileobj=io.BytesIO(raw),mode="r:") as tar:
         members=_members(tar,prefix); blobs={name[len(prefix)+1:]:tar.extractfile(member).read() for name,member in members.items()}
-    for required in ("MANIFEST.json","SHA256SUMS","bin/production_runner"):
+    for required in ("MANIFEST.json","SHA256SUMS","bin/production_runner","FullBeamNice/generators/p900.json"):
         if required not in blobs: raise ValueError("archive lacks manifest, checksums, or runner")
     if any(FORBIDDEN_CONTENT.search(data) for data in blobs.values()): raise ValueError("forbidden private or secret-like archive content")
     manifest=json.loads(blobs["MANIFEST.json"])

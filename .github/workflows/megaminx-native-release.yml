@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           stage="dist/stage-sm${{ matrix.sm }}"
-          mkdir -p "$stage/bin" "$stage/lib" "$stage/data" "$stage/weights" "$stage/profiles" "$stage/scripts" "$stage/portable/megaminx_cluster" "$stage/portable/megaminx_cluster/scripts" "$stage/portable/megaminx_cluster/autotune"
+          mkdir -p "$stage/bin" "$stage/lib" "$stage/data" "$stage/FullBeamNice/generators" "$stage/weights" "$stage/profiles" "$stage/scripts" "$stage/portable/megaminx_cluster" "$stage/portable/megaminx_cluster/scripts" "$stage/portable/megaminx_cluster/autotune"
           cp "build-sm${{ matrix.sm }}/production_runner" "$stage/bin/"
           cp portable/megaminx_cluster/run.sh portable/megaminx_cluster/autotune.sh portable/megaminx_cluster/cluster.env.example portable/megaminx_cluster/publication.env.example "$stage/"
           cp portable/megaminx_cluster/README.md "$stage/README.md"
@@ -69,6 +69,7 @@ jobs:
           cp portable/megaminx_cluster/profiles/registry.json "$stage/profiles/"
           cp data/test.csv "$stage/data/test.csv"
           cp data/puzzle_info.json "$stage/data/puzzle_info.json"
+          cp FullBeamNice/generators/p900.json "$stage/FullBeamNice/generators/"
           cp -a stream1_weights/. "$stage/weights/"
           cp portable/megaminx_cluster/model_manifest.json "$stage/weights/manifest.json"
           python3 tools/collect_elf_runtime_closure.py "$stage/bin/production_runner" "$stage/lib"

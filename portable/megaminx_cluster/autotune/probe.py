@@ -6,6 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -134,7 +135,7 @@ def _failure_status(returncode: int, text: str) -> str:
     lower = text.lower()
     if "out of memory" in lower or "cuda_error_out_of_memory" in lower:
         return "oom"
-    if "nccl" in lower:
+    if re.search(r"(?:ncclcomm|nccl (?:error|warning|internal|system)|unhandled nccl)", lower):
         return "nccl_error"
     if "cuda" in lower:
         return "cuda_error"

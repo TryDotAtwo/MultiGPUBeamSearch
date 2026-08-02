@@ -17,7 +17,7 @@ import zstandard
 from tools.megaminx_archive_contract import require_allowed_path
 
 ALLOWED_SMS = (75, 80, 86, 89, 90, 120)
-REQUIRED_PATHS = ("bin/production_runner", "lib", "data/test.csv", "data/puzzle_info.json", "weights", "profiles/registry.json", "scripts/job.sh", "scripts/preflight.sh", "scripts/autotune_job.sh", "run.sh", "autotune.sh", "portable/megaminx_cluster/autotune/calibration.json", "portable/megaminx_cluster/torchrun.py", "README.md")
+REQUIRED_PATHS = ("bin/production_runner", "lib", "data/test.csv", "data/puzzle_info.json", "FullBeamNice/generators/p900.json", "weights", "profiles/registry.json", "scripts/job.sh", "scripts/preflight.sh", "scripts/autotune_job.sh", "run.sh", "autotune.sh", "portable/megaminx_cluster/autotune/calibration.json", "portable/megaminx_cluster/torchrun.py", "README.md")
 FORBIDDEN_NAMES = frozenset({".env", "Dockerfile", "token.txt", "compile.sh"})
 FORBIDDEN_SUFFIXES = frozenset({".cu", ".cuh", ".cpp", ".cc", ".o", ".a", ".ptx"})
 SECRET_PATTERN = re.compile(rb"(?:ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA|OPENSSH) PRIVATE KEY|CLOUDFLARE_API_TOKEN)")

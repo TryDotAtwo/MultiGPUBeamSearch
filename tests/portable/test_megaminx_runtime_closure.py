@@ -12,6 +12,7 @@ def test_workflow_stages_existing_repository_assets():
     text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
     assert "cp data/test.csv" in text
     assert "cp data/puzzle_info.json" in text
+    assert 'cp FullBeamNice/generators/p900.json "$stage/FullBeamNice/generators/"' in text
     assert "cp -a stream1_weights/." in text
     assert (ROOT / "tools/collect_elf_runtime_closure.py").is_file()
 
