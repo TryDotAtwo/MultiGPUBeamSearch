@@ -1043,3 +1043,10 @@
 
 - Recreated the five public notebooks from the immutable all-five validated baseline at repository commit `f2261a81873ea162a0c36ba8874b9173db8d4083` (solver pin `cec74003f262e9d93d2fc0cc56a5e2d49a5010e0`) under new `*-recommended` slugs, avoiding dependence on mutable legacy `latest` runs shared with other users.
 - New main v1, 4x4x4 v2, Megaminx v1, IHES v1, and Tetraminx v1 all completed. The four configured examples each solved one puzzle on exactly two Tesla T4 GPUs at beam 65,536 with touch BFS radius 4, produced validated solution artifacts, and published one result with HTTP 202. The generic main launcher completed with the expected `SETUP_REQUIRED` handoff.
+
+## 2026-08-02 - Replace recommended notebooks with latest depth-safe build
+
+- Superseded the first `*-recommended` publication that incorrectly used solver `cec7400`. Rebuilt all five recommended notebooks from current branch artifacts pinned to `f679504baddbab3765c91af526e57ec9360cf309`, which computes history depth ceilings from the actual aligned per-rank beam. Tetraminx explicitly requests `MAX_DEPTH=60`; all five retain touch BFS radius 4.
+- Fresh public Kaggle runs completed: main v2 (`SETUP_REQUIRED`), 4x4x4 v8, Megaminx v2, IHES v2, and Tetraminx v7. The four configured examples returned `status=success`, one validated solution, and HTTP 202 publication with no fatal/OOM/overflow/history-budget marker.
+- Private Tetraminx p26 acceptance v1 completed on exactly two T4 GPUs at global beam 67,108,864/local beam 33,554,432. Preflight recorded requested depth 60, beam-specific budget ceiling 81, and effective depth 60; measured output1 p26 profile selected, one solution validated, and no history-budget/OOM/overflow/fatal marker occurred.
+- Local public suite passed 276/276 before publication.

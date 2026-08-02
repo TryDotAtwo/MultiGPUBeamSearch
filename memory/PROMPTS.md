@@ -583,3 +583,5 @@ User reported that an interactive game had been running during part of the recen
 - User required every public notebook to keep MAX_DEPTH within the history budget computed separately for its actual beam; explicitly selected MAX_DEPTH=60 for Tetraminx beam 2**26.
 
 - 2026-08-02: User requested five new public Kaggle notebooks built only from the team's frozen, fully validated versions, with clearly recommended names so concurrent runs by other users on the legacy slugs cannot change which revision should be used.
+
+- 2026-08-02: After a shared user run exposed that the first recommended Tetraminx notebook was frozen before the depth-cap fix, user required replacing all five recommended notebooks only with the newest fully tested depth-safe versions and revalidating every notebook, including a real Tetraminx 2**26 run.
