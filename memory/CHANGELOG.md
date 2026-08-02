@@ -1038,3 +1038,8 @@
 - Added beam-specific static-history MAX_DEPTH capping for all public Kaggle notebooks. The cap uses the selected aligned per-rank beam, move count, touch-BFS radius, and effective RAM/disk budgets; preflight records requested, budget, and effective depths. Tetraminx defaults to MAX_DEPTH=60 for beam 2**26 although its measured budget ceiling is 81.
 
 - Regenerated the universal public launcher and 444, Megaminx, IHES, and Tetraminx notebooks pinned to solver commit f679504baddbab3765c91af526e57ec9360cf309; Tetraminx USER CONFIG now defaults to MAX_DEPTH=60.
+
+## 2026-08-02 - Frozen recommended public Kaggle notebooks
+
+- Recreated the five public notebooks from the immutable all-five validated baseline at repository commit `f2261a81873ea162a0c36ba8874b9173db8d4083` (solver pin `cec74003f262e9d93d2fc0cc56a5e2d49a5010e0`) under new `*-recommended` slugs, avoiding dependence on mutable legacy `latest` runs shared with other users.
+- New main v1, 4x4x4 v2, Megaminx v1, IHES v1, and Tetraminx v1 all completed. The four configured examples each solved one puzzle on exactly two Tesla T4 GPUs at beam 65,536 with touch BFS radius 4, produced validated solution artifacts, and published one result with HTTP 202. The generic main launcher completed with the expected `SETUP_REQUIRED` handoff.

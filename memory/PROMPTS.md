@@ -581,3 +581,5 @@ User reported that an interactive game had been running during part of the recen
 - User: Нужно это всё как для МЛП, так и для трансформера. Для всех ноутов
 
 - User required every public notebook to keep MAX_DEPTH within the history budget computed separately for its actual beam; explicitly selected MAX_DEPTH=60 for Tetraminx beam 2**26.
+
+- 2026-08-02: User requested five new public Kaggle notebooks built only from the team's frozen, fully validated versions, with clearly recommended names so concurrent runs by other users on the legacy slugs cannot change which revision should be used.
