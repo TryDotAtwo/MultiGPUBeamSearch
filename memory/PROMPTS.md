@@ -585,3 +585,5 @@ User reported that an interactive game had been running during part of the recen
 - 2026-08-02: User requested five new public Kaggle notebooks built only from the team's frozen, fully validated versions, with clearly recommended names so concurrent runs by other users on the legacy slugs cannot change which revision should be used.
 
 - 2026-08-02: After a shared user run exposed that the first recommended Tetraminx notebook was frozen before the depth-cap fix, user required replacing all five recommended notebooks only with the newest fully tested depth-safe versions and revalidating every notebook, including a real Tetraminx 2**26 run.
+
+- 2026-08-02: User requested five entirely new public notebooks, rather than further versions of the corrected recommended slugs; new notebooks must visibly identify the depth-safe build and use the latest tested solver.

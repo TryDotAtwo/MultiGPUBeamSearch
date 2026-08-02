@@ -1050,3 +1050,9 @@
 - Fresh public Kaggle runs completed: main v2 (`SETUP_REQUIRED`), 4x4x4 v8, Megaminx v2, IHES v2, and Tetraminx v7. The four configured examples returned `status=success`, one validated solution, and HTTP 202 publication with no fatal/OOM/overflow/history-budget marker.
 - Private Tetraminx p26 acceptance v1 completed on exactly two T4 GPUs at global beam 67,108,864/local beam 33,554,432. Preflight recorded requested depth 60, beam-specific budget ceiling 81, and effective depth 60; measured output1 p26 profile selected, one solution validated, and no history-budget/OOM/overflow/fatal marker occurred.
 - Local public suite passed 276/276 before publication.
+
+## 2026-08-02 - New standalone depth-safe public notebooks
+
+- Created five entirely new public Kaggle notebooks under short unambiguous `*-depthsafe` slugs, all pinned to `f679504baddbab3765c91af526e57ec9360cf309`: main, 444, Megaminx, IHES, and Tetraminx. These are separate Kaggle objects, not versions of the earlier recommended notebooks.
+- All five v1 runs completed. Main produced the expected SETUP_REQUIRED landing. The four configured examples ran on exactly two T4 GPUs, returned status success at beam 65,536 with BFS radius 4, produced one validated solution, and published with HTTP 202. Tetraminx requested/effective depth 60; all examples recorded their beam-specific budget ceiling. No history-budget/OOM/overflow/fatal marker was found.
+- Package JSON/AST/provenance validation passed and the local public suite passed 276/276 before publication. The same solver pin already passed the dedicated Tetraminx p26 gate at requested depth 60, calculated ceiling 81, and effective depth 60.
