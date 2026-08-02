@@ -4,6 +4,8 @@ set -euo pipefail
 : "${MEGAMINX_AUTOTUNE_RUN_DIR:?}"
 : "${MEGAMINX_AUTOTUNE_GPU_IDS:?}"
 export CUDA_VISIBLE_DEVICES="${MEGAMINX_AUTOTUNE_GPU_IDS//:/,}"
+export PYTHONPATH="${MEGAMINX_ARCHIVE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
+export LD_LIBRARY_PATH="${MEGAMINX_ARCHIVE_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 GPU_COUNT=$(awk -F: '{print NF}' <<<"${MEGAMINX_AUTOTUNE_GPU_IDS}")
 cd "${MEGAMINX_ARCHIVE_ROOT}"
 python3 -m portable.megaminx_cluster.scripts.verify_archive_payloads --archive-root "${MEGAMINX_ARCHIVE_ROOT}"

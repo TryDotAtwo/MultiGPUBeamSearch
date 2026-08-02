@@ -24,6 +24,8 @@ def test_autotune_job_verifies_payload_and_runs_one_controller():
     assert "preflight_cli" in text
     assert "--hardware-only" in text
     assert "MEGAMINX_AUTOTUNE_GPU_IDS//:/," in text
+    assert 'export PYTHONPATH="${MEGAMINX_ARCHIVE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"' in text
+    assert 'export LD_LIBRARY_PATH="${MEGAMINX_ARCHIVE_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"' in text
     assert text.count("-m portable.megaminx_cluster.autotune.controller") == 1
     assert "cmake" not in text
     assert "nvcc" not in text

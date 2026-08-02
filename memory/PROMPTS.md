@@ -453,3 +453,5 @@
 - User clarified the cluster acceptance test must start from a completely clean cluster directory, as for a first-time user: no discovery or reuse of old repositories, virtual environments, or binaries. The intended flow is download one precompiled native-SM archive, extract it, set minimal SLURM values, and run the public wrapper.
 - Clean-cluster acceptance exposed that system PyTorch must not be assumed: the native archive itself must provide the torchrun-compatible launcher needed by SLURM probes and solves.
 - Clean-cluster archives must preserve every ELF dependency SONAME requested by `ldd` (for example `libnccl.so.2`), not only the resolved fully-versioned filename.
+
+- Live clean-cluster autotune must actually consume the bundled runtime libraries; a library being present and passing direct ldd is insufficient unless the packaged autotune SLURM entrypoint exports its lib directory to every probe.
