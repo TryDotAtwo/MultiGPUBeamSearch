@@ -53,7 +53,7 @@ if [ ! -f "${WEIGHTS}/manifest.json" ]; then
     --num-classes 6 --metadata "${METADATA}" --generators "${GENERATORS}" \
     --source-root "${MODEL_ROOT}"
 fi
-LAUNCHER_REPO="$(cd "$(dirname "${SCRIPT_SOURCE}")/.." && pwd)"
+LAUNCHER_REPO="${LAUNCHER_REPO:-$(cd "$(dirname "${SCRIPT_SOURCE}")/.." && pwd)}"
 source "${LAUNCHER_REPO}/hpc/mephi_8xa100_common.sh"
 export JOB_DIR="${ROOT}" REPO_DIR="${SOURCE}" BUILD_DIR="${ROOT}/build-a100-fp16"
 export HISTORY_DIR="${ROOT}/history" LOG_DIR="${ROOT}/logs"
