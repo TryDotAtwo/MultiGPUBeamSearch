@@ -465,3 +465,5 @@
 - The profile picker bootstrap must be stable at the requested 30M minimum before optimization. Reserve enough shard capacity for observed cross-shard skew and concurrent Stream 4 processing; nested solver errors must remain visible in autotune evidence.
 
 - Autotune every performance parameter separately for the actual card because b_micro, concurrency, and other optima may all change across hardware. Tune final_materialize_chunk_candidates but keep it small. Score the fully filled frontier at depth 8; earlier depths are not important and serve only as warmup/fill.
+
+- User finalized zero-touch cluster profile behavior: the program must identify the actual GPU itself, reuse an exact known profile, or automatically prepare and benchmark profiles for an unknown card before solving.

@@ -11,6 +11,7 @@ import subprocess
 import sys
 
 from portable.megaminx_cluster.profile import HardwareKey, derive_capacities, select_profile
+from portable.megaminx_cluster.profile_cache import load_registry
 from portable.megaminx_cluster.scripts.preflight import (
     inspect_gpus,
     validate_allocation,
@@ -65,7 +66,8 @@ def main(argv: list[str] | None = None) -> int:
             write_record(run_dir / "preflight.json", record)
             return 0
 
-        registry = json.loads((root / "profiles" / "registry.json").read_text(encoding="utf-8-sig"))
+        cache = Path(os.environ.get("MEGAMINX_PROFILE_CACHE", root / "profile-cache" / "registry.json"))
+        registry = load_registry(root / "profiles" / "registry.json", cache)
         first = gpus[0]
         selected = select_profile(
             registry,

@@ -46,7 +46,9 @@ Reflection modes:
 The requested beam is retained. Only the documented distributed-layout
 alignment may increase the effective beam. The package chooses an exact
 hardware/world-size/backend/model profile at the nearest half-up `log2` beam
-power. Unknown or unmeasured tuples fail closed.
+power. If the exact measured tuple is absent, the same SLURM allocation automatically
+runs depth-8 successive-halving calibration, atomically caches the resulting profile,
+and only then starts the solve. Unknown or incomplete measurements fail closed.
 
 ## Publication
 
@@ -103,5 +105,8 @@ Every probe is checkpointed under `autotune-runs/`. Rerun the same generated
 SLURM job environment to resume; identity drift fails closed. Inspect
 `leaderboard.tsv`, `profile_candidate.json`, and `registry.fragment.json`.
 A fragment is runnable only when every anchor says `measured`; partial or failed
-sessions remain `unverified`. Installing the fragment into `profiles/registry.json`
-is an explicit local action and the tuner never publishes results automatically.
+sessions remain `unverified`. Normal `./run.sh` jobs install completed measurements
+automatically into the user-writable `profile-cache/registry.json`; the signed bundled
+registry is never modified. The cache is reused only for matching GPU/VRAM/SM/world
+size plus driver, solver and model provenance. A per-hardware lock prevents duplicate
+calibration when concurrent jobs encounter the same unknown tuple.

@@ -265,7 +265,10 @@ def main() -> int:
         )
         return run_probe(request)
 
-    result = run_session(ControllerConfig(identity, _BOOTSTRAP_RUNTIME, 2**40), real_probe, time.monotonic, store)
+    max_beam = int(os.environ.get("MEGAMINX_AUTOTUNE_MAX_BEAM", str(2**40)))
+    if max_beam < identity.min_beam:
+        raise ValueError("MEGAMINX_AUTOTUNE_MAX_BEAM must be >= minimum beam")
+    result = run_session(ControllerConfig(identity, _BOOTSTRAP_RUNTIME, max_beam), real_probe, time.monotonic, store)
     print(f"maximum_stable_beam={result.maximum_stable_beam} complete={int(result.complete)}")
     return 0 if result.complete else 3
 

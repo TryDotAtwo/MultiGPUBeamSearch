@@ -28,6 +28,8 @@ export BEAM_RANK_LOG_DIR="${MEGAMINX_RUN_DIR}/logs/ranks"
 export BEAM_NCCL_ID_FILE="${MEGAMINX_RUN_DIR}/nccl-${SLURM_JOB_ID:?missing SLURM_JOB_ID}.bin"
 export BEAM_HISTORY_DISK_PATH="${MEGAMINX_RUN_DIR}/history"
 
+python3 -m portable.megaminx_cluster.scripts.preflight_cli --hardware-only --archive-root "${MEGAMINX_ARCHIVE_ROOT}" --run-dir "${MEGAMINX_RUN_DIR}" --gpu-count "${GPU_COUNT}"
+python3 -m portable.megaminx_cluster.auto_profile --archive-root "${MEGAMINX_ARCHIVE_ROOT}" --run-dir "${MEGAMINX_RUN_DIR}" --beam "${MEGAMINX_BEAM}"
 python3 -m portable.megaminx_cluster.scripts.preflight_cli --archive-root "${MEGAMINX_ARCHIVE_ROOT}" --run-dir "${MEGAMINX_RUN_DIR}" --gpu-count "${GPU_COUNT}" --beam "${MEGAMINX_BEAM}"
 source "${MEGAMINX_RUN_DIR}/selected_profile.env"
 

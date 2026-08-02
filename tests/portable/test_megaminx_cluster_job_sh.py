@@ -14,3 +14,11 @@ def test_job_payload_is_fail_closed_and_uses_one_rank_per_gpu():
     assert "nvcc" not in text
     assert "git clone" not in text
     assert "CUDA_FORCE_PTX_JIT" not in text
+
+
+def test_job_detects_then_autotunes_unknown_hardware_before_profile_selection():
+    text = Path("portable/megaminx_cluster/scripts/job.sh").read_text()
+    hardware = text.index("--hardware-only")
+    autotune = text.index("portable.megaminx_cluster.auto_profile")
+    selected = text.index("selected_profile.env")
+    assert hardware < autotune < selected
