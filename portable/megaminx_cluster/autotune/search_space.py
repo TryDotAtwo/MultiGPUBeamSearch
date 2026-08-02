@@ -67,7 +67,7 @@ def beam_anchors(max_beam: int, min_beam: int) -> tuple[int, ...]:
     while power <= maximum:
         anchors.add(power)
         power <<= 1
-    return tuple(sorted(anchors))
+    return tuple(sorted(anchors, reverse=True))
 
 
 def refine_max_stable(
@@ -117,8 +117,10 @@ _TUNED_KEYS = (
     "stream4_batch_candidates",
     "stream4_trigger_candidates",
     "stream4_active_sort_slots",
+    "final_materialize_chunk_candidates",
 )
 
+_FINAL_CHUNK_VALUES = (32768, 65536, 98304, 131072)
 
 def _candidate_id(runtime: Mapping[str, int]) -> str:
     payload = json.dumps(dict(sorted(runtime.items())), separators=(",", ":"), sort_keys=True)
@@ -126,31 +128,49 @@ def _candidate_id(runtime: Mapping[str, int]) -> str:
 
 
 def candidate_grid(seed_runtime: Mapping[str, int]) -> tuple[RuntimeCandidate, ...]:
+    """Broad deterministic mixed grid; measurements remain hardware-tuple specific."""
     from portable.megaminx_cluster.profile import RUNTIME_KEYS
 
     if set(seed_runtime) != set(RUNTIME_KEYS):
         raise ValueError("runtime keys must exactly match the production contract")
     seed = {key: _positive_int(seed_runtime[key], f"runtime.{key}") for key in sorted(RUNTIME_KEYS)}
-    configs: list[dict[str, int]] = [seed]
-    for key in _TUNED_KEYS:
-        value = seed[key]
-        values = {max(1, value // 2), value, value * 2}
-        for candidate_value in sorted(values):
-            if candidate_value == value:
-                continue
-            config = dict(seed)
-            config[key] = candidate_value
-            if config["stream4_trigger_candidates"] < config["stream4_batch_candidates"]:
-                continue
-            configs.append(config)
-    unique = {_candidate_id(config): config for config in configs}
+    if seed["final_materialize_chunk_candidates"] not in _FINAL_CHUNK_VALUES:
+        raise ValueError("final materialize chunk must stay in the bounded small range")
+
+    domains = {
+        "b_micro": (1024, 2048, 4096, 8192, 16384, 32768, 65536),
+        "stream1_concurrency": (1, 2, 4),
+        "stream3_ring_slots": (1, 2, 4),
+        "shard_count": (2, 4, 8, 16, 32, 64),
+        "shard_capacity_scale_ppm": (1250000, 1500000, 2000000, 2500000),
+        "stream4_batch_candidates": (65536, 98304, 131072, 196608, 262144, 524288),
+        "stream4_active_sort_slots": (1, 2, 4),
+        "final_materialize_chunk_candidates": _FINAL_CHUNK_VALUES,
+    }
+    configs: list[dict[str, int]] = [dict(seed)]
+    # Deterministic mixed designs expose cross-parameter interactions without a huge Cartesian grid.
+    keys = tuple(domains)
+    strides = (1, 5, 7, 11, 13, 17, 19, 23)
+    for index in range(24):
+        config = dict(seed)
+        for key, stride in zip(keys, strides):
+            values = domains[key]
+            config[key] = values[(index * stride + stride // 2) % len(values)]
+        batch = config["stream4_batch_candidates"]
+        config["stream4_trigger_candidates"] = batch * (1 + (index % 2))
+        configs.append(config)
+
+    valid = []
+    for config in configs:
+        if config["stream4_trigger_candidates"] < config["stream4_batch_candidates"]:
+            continue
+        if config["final_materialize_chunk_candidates"] > 131072:
+            continue
+        valid.append(config)
+    unique = {_candidate_id(config): config for config in valid}
     seed_id = _candidate_id(seed)
     ordered_ids = (seed_id,) + tuple(sorted(item for item in unique if item != seed_id))
-    return tuple(
-        RuntimeCandidate(config_id, MappingProxyType(unique[config_id]))
-        for config_id in ordered_ids
-    )
-
+    return tuple(RuntimeCandidate(item, MappingProxyType(unique[item])) for item in ordered_ids)
 
 def retain_round(scores: tuple[TrialScore, ...], fraction: float) -> tuple[TrialScore, ...]:
     if not scores:
@@ -158,10 +178,18 @@ def retain_round(scores: tuple[TrialScore, ...], fraction: float) -> tuple[Trial
     if not isinstance(fraction, (int, float)) or isinstance(fraction, bool) or not 0 < fraction <= 1:
         raise ValueError("fraction must be in (0, 1]")
     count = max(1, math.ceil(len(scores) * fraction))
+    stable_times = [
+        item.median_wall_us for item in scores
+        if item.stable and item.median_wall_us is not None
+    ]
+    fastest = min(stable_times) if stable_times else None
+    fast_limit = None if fastest is None else fastest * 1.03
     ordered = sorted(
         scores,
         key=lambda item: (
             not item.stable,
+            fast_limit is None or item.median_wall_us is None or item.median_wall_us > fast_limit,
+            item.peak_vram_mib if fast_limit is not None and item.median_wall_us is not None and item.median_wall_us <= fast_limit and item.peak_vram_mib is not None else math.inf,
             item.median_wall_us if item.median_wall_us is not None else math.inf,
             item.peak_vram_mib if item.peak_vram_mib is not None else math.inf,
             item.config_id,
@@ -176,7 +204,7 @@ def round_schedule(puzzle_ids: tuple[int, ...]) -> tuple[RoundSpec, ...]:
     ):
         raise ValueError("exactly three distinct nonnegative puzzle ids are required")
     return (
-        RoundSpec(puzzle_ids[:1], warmups=1, repetitions=1, retain_fraction=0.5),
-        RoundSpec(puzzle_ids[:2], warmups=0, repetitions=1, retain_fraction=0.5),
+        RoundSpec(puzzle_ids[:1], warmups=0, repetitions=1, retain_fraction=0.375),
+        RoundSpec(puzzle_ids[:2], warmups=0, repetitions=1, retain_fraction=0.34),
         RoundSpec(puzzle_ids, warmups=0, repetitions=3, retain_fraction=1.0),
     )

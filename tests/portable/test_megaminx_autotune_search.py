@@ -61,13 +61,13 @@ def test_checked_u64_overflow_fails_closed():
 
 def test_beam_anchors_include_exact_endpoints_and_half_up_powers():
     assert beam_anchors(1_000_000_000, 30_000_000) == (
-        30_000_000,
-        33_554_432,
-        67_108_864,
-        134_217_728,
-        268_435_456,
-        536_870_912,
         1_000_000_000,
+        536_870_912,
+        268_435_456,
+        134_217_728,
+        67_108_864,
+        33_554_432,
+        30_000_000,
     )
 
 

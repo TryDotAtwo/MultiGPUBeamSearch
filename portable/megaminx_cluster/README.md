@@ -84,7 +84,17 @@ On a homogeneous allocation, submit the standalone adaptive tuner:
 ```
 
 The packaged calibration set uses puzzle IDs `900,950,1000` as short, medium,
-and hard anchors. Override it with `--puzzles ID1,ID2,ID3`. The controller first
+and hard anchors. Every screening probe runs exactly through depth 8 and scores only
+the depth-8 iteration after the frontier is full; depths 1-7 are unscored warmup/fill.
+A probe that solves early or does not fill the requested global frontier is rejected.
+
+The mixed deterministic search is repeated for the exact GPU family, SM, VRAM,
+world size, driver, model, and beam-power tuple. It jointly varies `b_micro`,
+Stream 1 concurrency, Stream 3 ring slots, shard count/capacity, Stream 4 batch,
+trigger and active slots, plus a bounded small final-materialization chunk
+(32K-128K). Profiles never transfer between hardware tuples. Successive halving
+uses all three puzzle tiers, and the final choice is the lowest-memory candidate
+within 3% of the fastest median while retaining at least 15% VRAM reserve. Override it with `--puzzles ID1,ID2,ID3`. The controller first
 discovers the maximum stable beam, then applies deterministic successive halving.
 It derives one Touch-BFS radius for the session from the puzzle move count,
 stored hash width, and raw hash budget; for Megaminx Hash128 the default is radius 5.

@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -81,6 +82,61 @@ def _run_once(
     return parse_solution_line(result.stdout + result.stderr, puzzle_id)
 
 
+def _run_benchmark(
+    archive_root: Path,
+    run_dir: Path,
+    world_size: int,
+    job_id: str,
+    puzzle_id: int,
+    depth: int,
+    beam: int,
+    test_csv: Path,
+) -> dict[str, object]:
+    command = build_torchrun_command(
+        archive_root, world_size, f"megaminx-{job_id}-benchmark", puzzle_id, depth, beam
+    )
+    env = dict(os.environ)
+    env["BEAM_TEST_CSV"] = str(test_csv)
+    env["BEAM_PUZZLE_INFO_JSON"] = str(archive_root / "data" / "puzzle_info.json")
+    env["BEAM_WEIGHT_DIR"] = str(archive_root / "weights")
+    env["BEAM_RANK_LOG_DIR"] = str(run_dir / "logs" / "ranks-benchmark")
+    env["BEAM_NCCL_ID_FILE"] = str(run_dir / f"nccl-{job_id}-benchmark.bin")
+    env["BEAM_AUTOTUNE_DEPTH_METRICS"] = "1"
+    Path(env["BEAM_RANK_LOG_DIR"]).mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(command, env=env, text=True, capture_output=True, check=False)
+    text = result.stdout + result.stderr
+    log_path = run_dir / "logs" / "benchmark.log"
+    log_path.write_text(text, encoding="utf-8")
+    if result.returncode != 0:
+        raise RuntimeError(f"torchrun benchmark failed rc={result.returncode}; log={log_path}")
+    pattern = re.compile(
+        r"autotune_depth_done=([0-9]+) depth_sec=([0-9.eE+-]+) next_frontier_size=([0-9]+)"
+    )
+    rows = [
+        (int(match.group(1)), float(match.group(2)), int(match.group(3)))
+        for match in pattern.finditer(text)
+        if int(match.group(1)) == depth - 1
+    ]
+    if not rows:
+        raise RuntimeError(f"benchmark depth {depth} did not complete on rank 0; log={log_path}")
+    local_frontier = min(row[2] for row in rows)
+    frontier = local_frontier * world_size
+    if frontier < beam:
+        raise RuntimeError(
+            f"benchmark depth {depth} frontier is not full: global_frontier={frontier} beam={beam}; log={log_path}"
+        )
+    depth_sec = max(row[1] for row in rows)
+    if depth_sec <= 0:
+        raise RuntimeError("benchmark depth time must be positive")
+    return {
+        "benchmark_depth": depth,
+        "depth_sec": depth_sec,
+        "frontier_size": frontier,
+        "local_frontier_size": local_frontier,
+        "rank_samples": len(rows),
+        "frontier_full": True,
+    }
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument("--archive-root", type=Path, required=True)
@@ -92,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--beam", type=int, required=True)
     parser.add_argument("--reflect", choices=("off", "after", "only"), required=True)
     parser.add_argument("--original-solution", type=Path)
+    parser.add_argument("--benchmark-depth", action="store_true")
     args = parser.parse_args(argv)
     try:
         root = args.archive_root.resolve()
@@ -105,6 +162,15 @@ def main(argv: list[str] | None = None) -> int:
         supplied = _read_supplied(args.original_solution)
         steps = plan_steps(args.reflect, supplied)
         original = supplied
+        if args.benchmark_depth:
+            metrics = _run_benchmark(
+                root, run_dir, args.world_size, args.job_id,
+                args.puzzle, args.depth, args.beam, run_csv,
+            )
+            (run_dir / "benchmark_metrics.json").write_text(
+                json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            return 0
         results: list[dict[str, object]] = []
         if "original" in steps:
             original = _run_once(root, run_dir, args.world_size, args.job_id, "original", args.puzzle, args.depth, args.beam, run_csv)

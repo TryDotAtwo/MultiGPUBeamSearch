@@ -4394,6 +4394,7 @@ int main(int argc, char** argv) {
             ? std::filesystem::path{}
             : env_path("BEAM_HISTORY_DISK_PATH", "");
     const std::uint32_t depth_log_every = env_u32("BEAM_DEPTH_LOG_EVERY", 1);
+    const bool autotune_depth_metrics = env_u32("BEAM_AUTOTUNE_DEPTH_METRICS", 0) != 0;
     history.dir = make_history_dir(puzzle_id, depth_limit, beam, rank, world_size);
     const std::filesystem::path history_disk_path =
         history_disk_root.empty()
@@ -4921,6 +4922,11 @@ int main(int argc, char** argv) {
 #endif
         const auto depth_end = std::chrono::steady_clock::now();
         const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
+        if (autotune_depth_metrics && rank == 0U) {
+            std::cout << "autotune_depth_done=" << depth
+                      << " depth_sec=" << depth_sec
+                      << " next_frontier_size=" << frontier_size << "\n";
+        }
 #if BEAM_ENABLE_DEPTH_LOGS
         if (emit_depth_log) {
 #if BEAM_DEBUG_STREAM_TIMING

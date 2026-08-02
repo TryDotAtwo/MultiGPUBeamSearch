@@ -50,6 +50,7 @@ def request(tmp_path, **changes):
 def test_builds_validating_workflow_with_one_world_size(tmp_path):
     command = build_probe_command(request(tmp_path))
     assert command[:3] == ["python3", "-m", "portable.megaminx_cluster.workflow"]
+    assert "--benchmark-depth" in command
     assert command[command.index("--world-size") + 1] == "8"
     assert command[command.index("--puzzle") + 1] == "900"
     assert command[command.index("--beam") + 1] == "30000000"
@@ -65,7 +66,7 @@ def valid_metrics():
         "throughput": 1000,
         "host_ram_bytes": 100,
         "scratch_bytes": 100,
-        "peak_vram_mib": [35000] * 8,
+        "peak_vram_mib": [34000] * 8,
         "total_vram_mib": [40960] * 8,
         "replay_ok": True,
         "exactness_digest": "a" * 64,
@@ -88,7 +89,7 @@ def test_classify_metrics_accepts_complete_row_with_ten_percent_margin():
         ({"cuda_ok": False}, "cuda_error"),
         ({"nccl_ok": False}, "nccl_error"),
         ({"scratch_bytes": 99}, "scratch_capacity"),
-        ({"peak_vram_mib": [37000] * 8}, "vram_margin"),
+        ({"peak_vram_mib": [35000] * 8}, "vram_margin"),
         ({"peak_vram_mib": [35000] * 7}, "missing_metric"),
     ],
 )
@@ -121,7 +122,7 @@ def test_run_probe_replays_workflow_result_and_records_digest(tmp_path):
     result = run_probe(
         request(tmp_path),
         run_command=successful_runner,
-        peak_vram_mib=(35000,) * 8,
+        peak_vram_mib=(34000,) * 8,
         effective_beam=30_015_488,
         throughput=1000,
     )
@@ -140,12 +141,12 @@ def test_default_runner_uses_concurrent_peak_vram_monitor(tmp_path, monkeypatch)
             "reflect": "off",
             "results": [{"search": "original", "path": ["A"], "valid": True}],
         }), encoding="utf-8")
-        return subprocess.CompletedProcess(command, 0, "ok", ""), (35000,) * 8
+        return subprocess.CompletedProcess(command, 0, "ok", ""), (34000,) * 8
 
     monkeypatch.setattr(probe_module, "_run_with_vram_monitor", monitored)
     result = run_probe(request(tmp_path), effective_beam=30_015_488)
     assert result.stable
-    assert result.metrics["peak_vram_mib"] == [35000] * 8
+    assert result.metrics["peak_vram_mib"] == [34000] * 8
 
 def test_probe_derives_effective_beam_and_shard_capacity_env(tmp_path):
     captured = {}
@@ -161,7 +162,7 @@ def test_probe_derives_effective_beam_and_shard_capacity_env(tmp_path):
 
     result = run_probe(
         request(tmp_path), run_command=successful_runner,
-        peak_vram_mib=(35000,) * 8,
+        peak_vram_mib=(34000,) * 8,
     )
     assert result.metrics["effective_beam"] == 30_015_488
     assert int(captured["BEAM_SHARD_CAPACITY_CANDIDATES"]) >= 30_015_488 // 8 // 8
@@ -184,3 +185,26 @@ def test_run_probe_classifies_nested_solver_cuda_log(tmp_path):
 
     result = run_probe(request(tmp_path), run_command=failed_runner)
     assert result.status == "cuda_error"
+
+def test_run_probe_scores_only_depth8_benchmark_metrics(tmp_path):
+    def successful_runner(command, **kwargs):
+        candidate = tmp_path / "candidate"
+        (candidate / "benchmark_metrics.json").write_text(json.dumps({
+            "benchmark_depth": 8,
+            "depth_sec": 2.0,
+            "frontier_size": 30_015_488,
+            "rank_samples": 1,
+            "frontier_full": True,
+        }), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, "ok", "")
+
+    result = run_probe(
+        request(tmp_path, depth=8),
+        run_command=successful_runner,
+        peak_vram_mib=(34000,) * 8,
+    )
+    assert result.stable
+    assert result.metrics["benchmark_depth"] == 8
+    assert result.metrics["wall_us"] == 2_000_000
+    assert result.metrics["throughput"] == pytest.approx(15_007_744)
+    assert result.metrics["frontier_full"] is True

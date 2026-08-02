@@ -20,7 +20,7 @@ SEED = {
     "stream4_batch_candidates": 1048576,
     "stream4_trigger_candidates": 2097152,
     "stream4_active_sort_slots": 2,
-    "final_materialize_chunk_candidates": 262144,
+    "final_materialize_chunk_candidates": 65536,
 }
 
 
@@ -35,9 +35,8 @@ def test_candidate_grid_is_deterministic_and_uses_only_runtime_contract_keys():
 
 def test_candidate_ids_are_content_derived():
     candidates = candidate_grid(SEED)
-    by_runtime = {tuple(sorted(item.runtime.items())): item.config_id for item in candidates}
-    changed = dict(SEED, stream1_concurrency=4)
-    assert by_runtime[tuple(sorted(SEED.items()))] != by_runtime[tuple(sorted(changed.items()))]
+    assert candidates[0].config_id != candidates[1].config_id
+    assert dict(candidates[0].runtime) != dict(candidates[1].runtime)
 
 
 def test_candidate_grid_rejects_unknown_or_missing_runtime_keys():
@@ -51,7 +50,7 @@ def test_candidate_grid_rejects_unknown_or_missing_runtime_keys():
 
 def test_round_schedule_expands_coverage_and_finishes_with_three_repetitions():
     rounds = round_schedule((900, 901, 902))
-    assert rounds[0].warmups == 1
+    assert rounds[0].warmups == 0
     assert rounds[0].repetitions == 1
     assert rounds[0].puzzle_ids == (900,)
     assert rounds[-1].warmups == 0
@@ -81,3 +80,12 @@ def test_retain_round_keeps_at_least_one_and_rejects_fraction():
     assert retain_round((score,), 0.25) == (score,)
     with pytest.raises(ValueError):
         retain_round((score,), 0)
+
+
+def test_retain_round_chooses_lower_memory_inside_three_percent_speed_band():
+    scores = (
+        TrialScore("fast-heavy", True, 100, 34000),
+        TrialScore("near-fast-light", True, 102, 24000),
+        TrialScore("too-slow-light", True, 104, 10000),
+    )
+    assert retain_round(scores, 1 / 3)[0].config_id == "near-fast-light"

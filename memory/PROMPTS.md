@@ -463,3 +463,5 @@
 - The first-time cluster archive must contain every solver runtime input, including FullBeamNice/generators/p900.json; users must not need a repository checkout or manual file copying. Autotune diagnostics must report the actual failure and must not infer NCCL errors from path names.
 
 - The profile picker bootstrap must be stable at the requested 30M minimum before optimization. Reserve enough shard capacity for observed cross-shard skew and concurrent Stream 4 processing; nested solver errors must remain visible in autotune evidence.
+
+- Autotune every performance parameter separately for the actual card because b_micro, concurrency, and other optima may all change across hardware. Tune final_materialize_chunk_candidates but keep it small. Score the fully filled frontier at depth 8; earlier depths are not important and serve only as warmup/fill.

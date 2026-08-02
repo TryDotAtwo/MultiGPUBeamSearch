@@ -113,7 +113,7 @@ def test_successive_halving_selects_fastest_survivor(tmp_path):
     store = EvidenceStore.create_or_resume(tmp_path, identity())
     result = run_session(ControllerConfig(identity(), RUNTIME, 60_000_000), probe, clock, store)
     anchors = result.registry_fragment["profiles"][0]["anchors"]
-    assert next(iter(anchors.values()))["runtime"]["stream1_concurrency"] == 2
+    assert next(iter(anchors.values()))["runtime"]["stream1_concurrency"] == 4
 
 
 def test_bootstrap_profile_reserves_capacity_for_live_stream3_skew():

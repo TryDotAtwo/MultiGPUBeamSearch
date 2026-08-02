@@ -157,7 +157,7 @@ def run_session(
     schedule = round_schedule(identity.puzzle_ids)
     for anchor in anchors:
         survivors = candidates
-        for spec in schedule[:-1]:
+        for spec in schedule:
             scores = []
             for candidate in survivors:
                 results = []
@@ -256,7 +256,7 @@ def main() -> int:
         sequence["value"] += 1
         request = ProbeRequest(
             root, run_dir / "candidates" / f"{sequence['value']:06d}-{trial.key.replace(':', '-')}",
-            identity.world_size, trial.puzzle_id, 120, trial.beam, trial.runtime,
+            identity.world_size, trial.puzzle_id, 8, trial.beam, trial.runtime,
             max(60, int(min(1800, identity.time_budget_seconds / 6))),
             f"{os.environ.get('SLURM_JOB_ID', 'manual')}-{sequence['value']}",
             (identity.vram_mib,) * identity.world_size,

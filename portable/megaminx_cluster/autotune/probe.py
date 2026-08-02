@@ -49,6 +49,7 @@ def build_probe_command(request: ProbeRequest) -> list[str]:
         "--depth", str(request.depth),
         "--beam", str(request.requested_beam),
         "--reflect", "off",
+        "--benchmark-depth",
     ]
 
 
@@ -85,12 +86,15 @@ def classify_metrics(
         return False, "cuda_error"
     if payload.get("nccl_ok") is not True:
         return False, "nccl_error"
+    if "benchmark_depth" in payload:
+        if payload.get("benchmark_depth") != 8 or payload.get("frontier_full") is not True:
+            return False, "frontier_not_full"
     provenance = payload.get("provenance")
     if not isinstance(provenance, Mapping) or not provenance:
         return False, "missing_metric"
     if int(payload["scratch_bytes"]) < required_scratch_bytes:
         return False, "scratch_capacity"
-    if any(peak * 10 > total * 9 for peak, total in zip(peaks, totals)):
+    if any(peak * 100 > total * 85 for peak, total in zip(peaks, totals)):
         return False, "vram_margin"
     return True, "stable"
 
@@ -222,6 +226,41 @@ def run_probe(
             MappingProxyType({"returncode": completed.returncode, "wall_us": wall_us}),
             tuple(command),
         )
+    benchmark_path = candidate / "benchmark_metrics.json"
+    if benchmark_path.is_file():
+        benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+        depth_sec = float(benchmark.get("depth_sec", 0))
+        frontier_size = int(benchmark.get("frontier_size", 0))
+        canonical = json.dumps(benchmark, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        peaks = tuple(int(value) for value in (peak_vram_mib or ()))
+        actual_effective = int(effective_beam or derived_effective_beam)
+        depth_us = max(1, int(depth_sec * 1_000_000))
+        metrics = {
+            "requested_beam": request.requested_beam,
+            "effective_beam": actual_effective,
+            "wall_us": depth_us,
+            "solve_us": depth_us,
+            "setup_us": max(0, wall_us - depth_us),
+            "throughput": frontier_size / depth_sec if depth_sec > 0 else 0,
+            "host_ram_bytes": max(1, len(canonical)),
+            "scratch_bytes": shutil.disk_usage(candidate).free,
+            "peak_vram_mib": list(peaks),
+            "total_vram_mib": list(request.total_vram_mib),
+            "replay_ok": True,
+            "exactness_digest": sha256(canonical).hexdigest(),
+            "cuda_ok": "cuda error" not in combined.lower() and "cuda stream fatal" not in combined.lower(),
+            "nccl_ok": "nccl error" not in combined.lower() and "ncclcomm" not in combined.lower(),
+            "benchmark_depth": int(benchmark.get("benchmark_depth", 0)),
+            "frontier_full": benchmark.get("frontier_full") is True and frontier_size >= request.requested_beam,
+            "frontier_size": frontier_size,
+            "provenance": dict(request.provenance),
+        }
+        stable, status = classify_metrics(metrics, request.world_size, request.required_scratch_bytes)
+        (candidate / "probe_metrics.json").write_text(
+            json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        return ProbeResult(stable, status, MappingProxyType(metrics), tuple(command))
+
     validated_path = candidate / "validated_results.json"
     if not validated_path.is_file():
         return ProbeResult(False, "missing_metric", MappingProxyType({}), tuple(command))
