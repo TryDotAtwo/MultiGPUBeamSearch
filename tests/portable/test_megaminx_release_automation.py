@@ -64,6 +64,18 @@ def test_release_build_bootstraps_cuda_on_github_hosted_linux():
     assert "libnccl-dev" in text
     assert "NVIDIA/cutlass" in text
 
+
+def test_release_pins_nccl_to_cuda_12_4_and_verifies_staged_runtime():
+    text = (ROOT / ".github/workflows/megaminx-native-release.yml").read_text()
+    assert "NCCL_PACKAGE_VERSION: 2.27.7-1+cuda12.4" in text
+    assert "NCCL_RUNTIME_VERSION: 2.27.7+cuda12.4" in text
+    assert 'libnccl2="${NCCL_PACKAGE_VERSION}"' in text
+    assert 'libnccl-dev="${NCCL_PACKAGE_VERSION}"' in text
+    assert "libnccl2 libnccl-dev" not in text
+    assert "dpkg-query -W -f='${Version}' libnccl2" in text
+    assert "dpkg-query -W -f='${Version}' libnccl-dev" in text
+    assert 'strings "$stage/lib/libnccl.so.2" | grep -F "NCCL version ${NCCL_RUNTIME_VERSION}"' in text
+
 def test_release_tag_is_bound_in_build_and_publish_jobs():
     workflow = yaml.safe_load((ROOT / ".github/workflows/megaminx-native-release.yml").read_text())
     assert "PRERELEASE_TAG" in workflow["jobs"]["build"]["env"]

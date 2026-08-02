@@ -781,3 +781,5 @@
 - 2026-08-02: Fixed the packaged autotune SLURM entrypoint to export the archive root on PYTHONPATH and the bundled lib directory on LD_LIBRARY_PATH before preflight and all successive-halving probes. This closes the clean-cluster libnccl.so.2 runtime failure while keeping the ordinary solve entrypoint unchanged.
 
 - 2026-08-02: Fixed the autotune SLURM entrypoint to preserve scheduler-provided CUDA_VISIBLE_DEVICES instead of replacing it with user-facing GPU ids. This aligns autotune with the normal solve path and prevents GRES/cgroup remapping from causing NCCL unhandled CUDA errors.
+
+- 2026-08-02: Pinned native cluster archives to NCCL 2.27.7 for CUDA 12.4 after clean-cluster diagnostics found that unversioned packages had bundled NCCL 2.30.7 for CUDA 13.3 on a driver-550 cluster. The release now fails closed unless both installed packages and staged libnccl.so.2 match the approved version.

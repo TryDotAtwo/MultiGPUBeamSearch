@@ -26,6 +26,8 @@ jobs:
       CUDA_HOME: /usr/local/cuda-12.8
       CUDACXX: /usr/local/cuda-12.8/bin/nvcc
       PRERELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease_tag || 'megaminx-native-cluster-latest' }}
+      NCCL_PACKAGE_VERSION: 2.27.7-1+cuda12.4
+      NCCL_RUNTIME_VERSION: 2.27.7+cuda12.4
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned CUDA, NCCL, CUTLASS, and build tools
@@ -34,7 +36,9 @@ jobs:
           curl -fsSLO https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build cuda-compiler-12-8 cuda-nvcc-12-8 cuda-cudart-dev-12-8 cuda-nvtx-12-8 libnccl2 libnccl-dev
+          sudo apt-get install -y --no-install-recommends ninja-build cuda-compiler-12-8 cuda-nvcc-12-8 cuda-cudart-dev-12-8 cuda-nvtx-12-8 libnccl2="${NCCL_PACKAGE_VERSION}" libnccl-dev="${NCCL_PACKAGE_VERSION}"
+          test "$(dpkg-query -W -f='${Version}' libnccl2)" = "${NCCL_PACKAGE_VERSION}"
+          test "$(dpkg-query -W -f='${Version}' libnccl-dev)" = "${NCCL_PACKAGE_VERSION}"
           python3 -m pip install zstandard==0.23.0
           echo "/usr/local/cuda-12.8/bin" >> "$GITHUB_PATH"
           git clone --depth 1 --branch v3.6.0 https://github.com/NVIDIA/cutlass.git external/cutlass
@@ -68,6 +72,7 @@ jobs:
           cp -a stream1_weights/. "$stage/weights/"
           cp portable/megaminx_cluster/model_manifest.json "$stage/weights/manifest.json"
           python3 tools/collect_elf_runtime_closure.py "$stage/bin/production_runner" "$stage/lib"
+          strings "$stage/lib/libnccl.so.2" | grep -F "NCCL version ${NCCL_RUNTIME_VERSION}"
           runtime_ldd="$(LD_LIBRARY_PATH="$stage/lib" ldd "$stage/bin/production_runner")"
           printf '%s\n' "$runtime_ldd"
           if printf '%s\n' "$runtime_ldd" | grep -F "not found"; then
