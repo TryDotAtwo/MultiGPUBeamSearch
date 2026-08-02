@@ -76,7 +76,21 @@ export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=2000000
 export BEAM_GPU_HEADROOM_BYTES=$((3 * 1024 * 1024 * 1024))
 export BEAM_ENABLE_DEBUG=ON BEAM_ENABLE_DEPTH_LOGS=ON
 beam_preflight
-beam_configure_build production_runner
+TORCH_CMAKE_PREFIX="$("${PY}" -c 'import torch; print(torch.utils.cmake_prefix_path)')"
+cmake -S "${SOURCE}" -B "${BUILD_DIR}" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCUTLASS_DIR="${CUTLASS_DIR}" \
+  -DNCCL_INCLUDE_DIR="${NCCL_INCLUDE_DIR}" \
+  -DNCCL_LIBRARY="${NCCL_LIBRARY}" \
+  -DBEAM_CUDA_ARCHITECTURES=80 \
+  -DBEAM_ENABLE_LIBTORCH_STREAM1=ON \
+  -DCMAKE_PREFIX_PATH="${TORCH_CMAKE_PREFIX}"
+beam_configure_build production_runner_libtorch_stream1
+RUN_BUILD_DIR="${ROOT}/run-bin-a100-fp16"
+mkdir -p "${RUN_BUILD_DIR}"
+ln -sfn "${BUILD_DIR}/production_runner_libtorch_stream1" "${RUN_BUILD_DIR}/production_runner"
+export BUILD_DIR="${RUN_BUILD_DIR}"
+export BEAM_STREAM1_EXECUTOR=libtorch_eager
 beam_derive_shard_capacity
 beam_validate_manual_config
 beam_export_common_runtime
