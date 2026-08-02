@@ -333,6 +333,16 @@ inline void validate_mlp_model_config(const Stream1ModelConfig& model, const std
     }
 }
 
+inline std::uint32_t parse_transformer_activation(const std::string& activation, const std::string& context) {
+    if (activation == "silu") {
+        return STREAM1_ACTIVATION_SILU;
+    }
+    if (activation == "relu") {
+        return STREAM1_ACTIVATION_RELU;
+    }
+    throw std::runtime_error(context + ": unsupported stream1 piece_transformer activation " + activation);
+}
+
 inline void validate_transformer_model_config(
     const Stream1ModelConfig& model,
     const std::string& activation,
@@ -414,9 +424,11 @@ inline Stream1ModelConfig load_stream1_manifest(const std::filesystem::path& dir
         model.head_dim = parse_manifest_u32(text, "head_dim");
         model.transformer_layers = parse_manifest_u32_any(text, "transformer_layers", "num_layers");
         model.ff_dim = parse_manifest_u32(text, "ff_dim");
+        const std::string activation = parse_manifest_string(text, "activation");
+        model.activation = parse_transformer_activation(activation, manifest_path.string());
         validate_transformer_model_config(
             model,
-            parse_manifest_string(text, "activation"),
+            activation,
             parse_manifest_string(text, "pooling"),
             parse_manifest_string(text, "piece_layout"),
             parse_manifest_string(text, "piece_embed_mode"),
@@ -943,7 +955,8 @@ inline Stream1TransformerDims transformer_dims(const Stream1ModelConfig& model) 
         model.transformer_layers,
         model.ff_dim,
         model.output_dim,
-        model.dtype};
+        model.dtype,
+        model.activation};
 }
 
 struct TransformerNetworkViewHolder {

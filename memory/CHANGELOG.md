@@ -1,5 +1,7 @@
 # Changelog
 
+## 2026-08-02
+- Fixed Cube-444 native Stream1 inference parity by making the fused CUTLASS FF1 epilogue activation manifest-driven (`relu` for `cube4`, `silu` for `p900`) and by making the PyTorch parity oracle use the same manifest field. Unknown activation values fail closed. The MLP path is unchanged. Root cause was confirmed on A100 job 33339: LibTorch honored `activation=relu`, while native CUDA and the Python oracle had hardcoded SiLU. Evidence: `test_results/cube444_transformer_activation_parity_fix_2026-08-02.md`.
 ## 2026-07-31
 - Added public-results schema support for `piece-transformer` outputs so 2xT4 public notebooks can publish inference runs that use Kaggle-published Transformer format; updated `configs/cayleypy_results_schema_v1.json` enum and added regression coverage in `tests/cayleypy_public/test_results.py`.
 - Added `test_build_result_envelope_accepts_piece_transformer_format` to verify deterministic envelope building preserves the new `piece-transformer` format and avoids silent schema rejection of public Transformer runs.

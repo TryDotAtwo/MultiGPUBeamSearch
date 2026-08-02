@@ -7,6 +7,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools.stream1_transformer_parity import BackendRun, compare_runs, is_result_line, parse_backend_modes, parse_pairs
+from tools.stream1_transformer_torch_benchmark import apply_transformer_activation
+
+import torch
 
 
 def run(
@@ -32,6 +35,13 @@ def run(
 
 
 class Stream1TransformerParityTests(unittest.TestCase):
+    def test_torch_oracle_dispatches_manifest_activation(self) -> None:
+        values = torch.tensor([-1.0, 0.0, 2.0])
+        self.assertTrue(torch.equal(apply_transformer_activation(values, "relu"), torch.tensor([0.0, 0.0, 2.0])))
+        self.assertLess(float(apply_transformer_activation(values, "silu")[0]), 0.0)
+        with self.assertRaisesRegex(ValueError, "unsupported piece_transformer activation"):
+            apply_transformer_activation(values, "gelu")
+
     def test_parse_pairs_reads_score_key_digest(self) -> None:
         parsed = parse_pairs(
             "stream1_transformer_micro checksum=42 score_key_digest=987 first_score_keys=1,2,3"

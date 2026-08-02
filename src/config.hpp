@@ -27,6 +27,8 @@ inline constexpr std::uint32_t STREAM1_DTYPE_FP16 = 0;
 inline constexpr std::uint32_t STREAM1_DTYPE_BF16 = 1;
 inline constexpr std::uint32_t STREAM1_NORM_NONE = 0;
 inline constexpr std::uint32_t STREAM1_NORM_LAYERNORM = 1;
+inline constexpr std::uint32_t STREAM1_ACTIVATION_SILU = 0;
+inline constexpr std::uint32_t STREAM1_ACTIVATION_RELU = 1;
 inline constexpr float STREAM1_SINGLE_OUTPUT_SCORE_OFFSET = 3.0f;
 
 inline constexpr float SCORE_MAX_Q = 300.0f;
@@ -54,6 +56,7 @@ struct Stream1ModelConfig {
     std::uint32_t head_dim = 0;
     std::uint32_t transformer_layers = 0;
     std::uint32_t ff_dim = 0;
+    std::uint32_t activation = STREAM1_ACTIVATION_SILU;
 };
 
 struct RuntimeConfig {

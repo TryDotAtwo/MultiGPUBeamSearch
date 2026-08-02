@@ -215,6 +215,9 @@ void test_stream1_manifest_backend_parsing() {
     const Stream1ModelConfig transformer = beam::stream1_weights::load_stream1_manifest(
         write_transformer_manifest_fixture("stream1_manifest_backend_piece_transformer"));
     require(transformer.backend == STREAM1_BACKEND_PIECE_TRANSFORMER, "piece_transformer manifest must parse as transformer");
+    require(transformer.activation == STREAM1_ACTIVATION_SILU, "p900 transformer activation must parse as SiLU");
+    require(beam::stream1_weights::parse_transformer_activation("relu", "test") == STREAM1_ACTIVATION_RELU,
+        "cube4 transformer activation must parse as ReLU");
 
     bool unknown_threw = false;
     try {

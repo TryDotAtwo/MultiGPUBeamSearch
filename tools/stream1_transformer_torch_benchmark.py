@@ -73,6 +73,14 @@ def score_key_digest(keys: torch.Tensor) -> int:
     return digest
 
 
+def apply_transformer_activation(values: torch.Tensor, activation: str) -> torch.Tensor:
+    if activation == "relu":
+        return F.relu(values)
+    if activation == "silu":
+        return F.silu(values)
+    raise ValueError(f"unsupported piece_transformer activation: {activation!r}")
+
+
 class PieceTransformerTorch:
     def __init__(
         self,
@@ -112,6 +120,7 @@ class PieceTransformerTorch:
         self.head_dim = int(self.manifest["head_dim"])
         self.num_layers = int(self.manifest["num_layers"])
         self.ff_dim = int(self.manifest["ff_dim"])
+        self.activation = str(self.manifest["activation"])
         if self.seq_len != self.num_pieces + 1:
             raise ValueError("seq_len must equal num_pieces + cls token")
         if self.d_model != self.nhead * self.head_dim:
@@ -262,7 +271,10 @@ class PieceTransformerTorch:
             x = x + self.project(context, block["attn_out_weight"], block["attn_out_weight_linear"], block["attn_out_bias"])
 
             y = self.layer_norm(x, block["ln2_gamma"], block["ln2_beta"])
-            y = F.silu(self.project(y, block["ff1_weight"], block["ff1_weight_linear"], block["ff1_bias"]))
+            y = apply_transformer_activation(
+                self.project(y, block["ff1_weight"], block["ff1_weight_linear"], block["ff1_bias"]),
+                self.activation,
+            )
             x = x + self.project(y, block["ff2_weight"], block["ff2_weight_linear"], block["ff2_bias"])
 
         cls = self.layer_norm(x[:, 0, :], self.output_ln_gamma, self.output_ln_beta)

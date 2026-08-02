@@ -1,5 +1,9 @@
 # Prompt History
 
+## 2026-08-02
+- User required diagnosing the native fast Cube-444 transformer inference against the working Kaggle/LibTorch implementation without further speculation, then approved fixing it.
+- User requires all puzzle transformer layouts to use their manifest-defined activation while preserving the existing fast fused inference path; Cube-444 uses ReLU and p900 keeps SiLU.
+- User runs cluster commands personally; after GitHub push, provide one complete pasteable command for A100 build and parity verification.
 ## 2026-07-31
 - User requires public Kaggle examples to support both MLP (`batchnorm-folded`/`resmlp-layernorm`) and Transformer (`piece-transformer`) runs under one upload contract; publish envelope must remain schema-valid for both families.
 - User requested public Kaggle examples for IHES, Megaminx, and Cube-444 with first-pass + collect modes plus a verified GitHub Cloudflare upload path.
