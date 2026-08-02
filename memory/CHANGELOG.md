@@ -779,3 +779,5 @@
 - 2026-08-02: Fixed the ELF runtime closure collector to preserve requested SONAME basenames such as `libnccl.so.2` and `libcudart.so.12` when copying resolved versioned libraries. Added a staged `LD_LIBRARY_PATH`/`ldd` release gate that fails on any unresolved dependency.
 
 - 2026-08-02: Fixed the packaged autotune SLURM entrypoint to export the archive root on PYTHONPATH and the bundled lib directory on LD_LIBRARY_PATH before preflight and all successive-halving probes. This closes the clean-cluster libnccl.so.2 runtime failure while keeping the ordinary solve entrypoint unchanged.
+
+- 2026-08-02: Fixed the autotune SLURM entrypoint to preserve scheduler-provided CUDA_VISIBLE_DEVICES instead of replacing it with user-facing GPU ids. This aligns autotune with the normal solve path and prevents GRES/cgroup remapping from causing NCCL unhandled CUDA errors.

@@ -23,7 +23,8 @@ def test_autotune_job_verifies_payload_and_runs_one_controller():
     assert "verify_archive_payloads" in text
     assert "preflight_cli" in text
     assert "--hardware-only" in text
-    assert "MEGAMINX_AUTOTUNE_GPU_IDS//:/," in text
+    assert 'CUDA_VISIBLE_DEVICES:?SLURM did not provide GPU visibility' in text
+    assert 'export CUDA_VISIBLE_DEVICES=' not in text
     assert 'export PYTHONPATH="${MEGAMINX_ARCHIVE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"' in text
     assert 'export LD_LIBRARY_PATH="${MEGAMINX_ARCHIVE_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"' in text
     assert text.count("-m portable.megaminx_cluster.autotune.controller") == 1

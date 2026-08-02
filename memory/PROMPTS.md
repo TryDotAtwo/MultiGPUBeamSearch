@@ -455,3 +455,5 @@
 - Clean-cluster archives must preserve every ELF dependency SONAME requested by `ldd` (for example `libnccl.so.2`), not only the resolved fully-versioned filename.
 
 - Live clean-cluster autotune must actually consume the bundled runtime libraries; a library being present and passing direct ldd is insufficient unless the packaged autotune SLURM entrypoint exports its lib directory to every probe.
+
+- Clean-cluster autotune must preserve SLURM-provided CUDA_VISIBLE_DEVICES; --gpus selects requested rank count but must not overwrite scheduler GRES/cgroup device mapping.
