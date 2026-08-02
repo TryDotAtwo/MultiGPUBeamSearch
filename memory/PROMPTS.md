@@ -469,3 +469,5 @@
 - User finalized zero-touch cluster profile behavior: the program must identify the actual GPU itself, reuse an exact known profile, or automatically prepare and benchmark profiles for an unknown card before solving.
 
 - User corrected zero-touch tuning: its upper beam bound must be discovered automatically as the largest width that fits and remains practical, rather than being capped by the requested solve beam. Final materialization exchange scale must be `1_000_000 * world_size`, not a fixed `8_000_000`.
+
+- User specified the authoritative maximum-beam criterion: search by filling the GPU to 98% VRAM. Runtime/capacity failures are not a memory boundary.

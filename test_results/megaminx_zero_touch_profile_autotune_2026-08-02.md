@@ -21,3 +21,10 @@ Verification:
 Follow-up correction:
 - automatic maximum-beam discovery is not capped by the requested solve beam;
 - final exchange scale is exactly `1_000_000 * world_size` in probe and solve environments.
+
+98% capacity correction:
+- maximum beam targets measured 98% peak VRAM;
+- only true OOM is a failure-side memory bound;
+- runtime/capacity errors invalidate the bootstrap;
+- binary refinement stops at the distributed layout quantum;
+- the production-profile 85% gate remains separate.

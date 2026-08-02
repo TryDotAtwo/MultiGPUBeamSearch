@@ -89,7 +89,7 @@ def test_resume_skips_completed_trial_keys(tmp_path):
     clock = Clock()
     store = EvidenceStore.create_or_resume(tmp_path, identity())
     store.write_checkpoint({"completed_keys": ["max_beam:30000000:seed:900:0"]})
-    store.append_trial({"key": "max_beam:30000000:seed:900:0", "phase": "max_beam", "beam": 30000000, "stable": True, "status": "stable", "wall_us": 1000000, "config_id": "seed", "puzzle_id": 900, "repetition": 0})
+    store.append_trial({"key": "max_beam:30000000:seed:900:0", "phase": "max_beam", "beam": 30000000, "stable": True, "status": "stable", "wall_us": 1000000, "peak_vram_mib": 1, "config_id": "seed", "puzzle_id": 900, "repetition": 0})
     seen = []
 
     def probe(trial):
@@ -118,3 +118,26 @@ def test_successive_halving_selects_fastest_survivor(tmp_path):
 
 def test_bootstrap_profile_reserves_capacity_for_live_stream3_skew():
     assert _BOOTSTRAP_RUNTIME['shard_capacity_scale_ppm'] >= 2_500_000
+
+
+def test_max_beam_targets_98_percent_vram_not_first_runtime_failure(tmp_path):
+    clock = Clock()
+    def probe(trial):
+        clock.now += 0.01
+        peak = min(40960, int(40960 * trial.beam / 100_000_000))
+        return ProbeResult(True, "stable", {"wall_us": 1_000_000, "peak_vram_mib": [peak] * 8}, ())
+    store = EvidenceStore.create_or_resume(tmp_path, identity())
+    result = run_session(ControllerConfig(identity(), RUNTIME, 120_000_000), probe, clock, store)
+    assert 97_000_000 <= result.maximum_stable_beam < 98_100_000
+
+def test_max_beam_rejects_capacity_error_as_memory_boundary(tmp_path):
+    clock = Clock()
+    def probe(trial):
+        clock.now += 0.01
+        if trial.beam > 30_000_000:
+            return ProbeResult(False, "cuda_error", {"wall_us": 1, "peak_vram_mib": [1000] * 8}, ())
+        return ProbeResult(True, "stable", {"wall_us": 1, "peak_vram_mib": [1000] * 8}, ())
+    store = EvidenceStore.create_or_resume(tmp_path, identity())
+    import pytest
+    with pytest.raises(RuntimeError, match="before 98% VRAM"):
+        run_session(ControllerConfig(identity(), RUNTIME, 120_000_000), probe, clock, store)

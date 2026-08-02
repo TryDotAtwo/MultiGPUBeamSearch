@@ -125,27 +125,45 @@ def run_session(
     low = identity.min_beam
     high: int | None = None
     beam = low
+    target_vram_percent = 98.0
+    quantum = identity.world_size * int(seed["shard_count"]) * 1024
+
+    def vram_percent(result: ProbeResult) -> float:
+        peak = _peak_scalar(result)
+        if peak is None:
+            raise RuntimeError("max-beam probe did not report peak VRAM")
+        return peak * 100.0 / identity.vram_mib
+
+    def capacity_result(result: ProbeResult, candidate: int) -> str:
+        if not result.stable:
+            if result.status == "oom":
+                return "above"
+            raise RuntimeError(
+                f"max-beam probe failed before 98% VRAM at beam={candidate}: "
+                f"status={result.status}; bootstrap/runtime capacity is invalid"
+            )
+        return "above" if vram_percent(result) >= target_vram_percent else "below"
+
     while True:
         trial = TrialRequest("max_beam", beam, "seed", seed, first_puzzle, 0, identity.bfs_radius)
         result = execute(trial)
         if result is None:
             break
-        if not result.stable:
-            if beam == identity.min_beam:
-                raise RuntimeError("minimum beam is not stable")
+        side = capacity_result(result, beam)
+        if side == "above":
             high = beam
             break
         low = beam
         if beam == config.max_beam_limit:
             break
         beam = min(config.max_beam_limit, beam * 2)
-    if high is not None:
-        while high - low > 1:
+    if high is not None and high > low:
+        while high - low > quantum:
             candidate = (low + high) // 2
             result = execute(TrialRequest("max_beam", candidate, "seed", seed, first_puzzle, 0, identity.bfs_radius))
             if result is None:
                 break
-            if result.stable:
+            if capacity_result(result, candidate) == "below":
                 low = candidate
             else:
                 high = candidate
@@ -262,6 +280,7 @@ def main() -> int:
             (identity.vram_mib,) * identity.world_size,
             int(manifest.get("history_disk_bytes", 1)),
             {"solver_commit": identity.solver_commit, "manifest_digest": identity.release_manifest_digest},
+            100 if trial.phase == "max_beam" else 85,
         )
         return run_probe(request)
 

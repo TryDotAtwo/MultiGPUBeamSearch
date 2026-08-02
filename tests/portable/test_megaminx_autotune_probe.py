@@ -220,3 +220,10 @@ def test_runtime_env_scales_final_exchange_by_world_size(tmp_path):
     request = ProbeRequest(tmp_path, tmp_path / "run", 4, 900, 8, 30_000_000, runtime, 60, "job", (40000,) * 4, 1, {})
     env, _ = _runtime_env(request)
     assert env["BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM"] == "4000000"
+
+
+def test_capacity_probe_can_measure_up_to_100_percent_gate():
+    payload = valid_metrics()
+    payload["peak_vram_mib"] = [40140] * 8
+    assert classify_metrics(payload, 8, 100, vram_limit_percent=100) == (True, "stable")
+    assert classify_metrics(payload, 8, 100) == (False, "vram_margin")

@@ -28,6 +28,7 @@ class ProbeRequest:
     total_vram_mib: tuple[int, ...]
     required_scratch_bytes: int
     provenance: Mapping[str, str]
+    vram_limit_percent: int = 85
 
 
 @dataclass(frozen=True)
@@ -59,7 +60,8 @@ def _positive_number(payload: Mapping[str, object], key: str) -> bool:
 
 
 def classify_metrics(
-    payload: Mapping[str, object], world_size: int, required_scratch_bytes: int
+    payload: Mapping[str, object], world_size: int, required_scratch_bytes: int,
+    vram_limit_percent: int = 85,
 ) -> tuple[bool, str]:
     scalar = (
         "requested_beam", "effective_beam", "wall_us", "solve_us", "throughput",
@@ -94,7 +96,9 @@ def classify_metrics(
         return False, "missing_metric"
     if int(payload["scratch_bytes"]) < required_scratch_bytes:
         return False, "scratch_capacity"
-    if any(peak * 100 > total * 85 for peak, total in zip(peaks, totals)):
+    if not 1 <= vram_limit_percent <= 100:
+        raise ValueError("vram_limit_percent must be 1..100")
+    if any(peak * 100 > total * vram_limit_percent for peak, total in zip(peaks, totals)):
         return False, "vram_margin"
     return True, "stable"
 
@@ -258,7 +262,10 @@ def run_probe(
             "frontier_size": frontier_size,
             "provenance": dict(request.provenance),
         }
-        stable, status = classify_metrics(metrics, request.world_size, request.required_scratch_bytes)
+        stable, status = classify_metrics(
+            metrics, request.world_size, request.required_scratch_bytes,
+            request.vram_limit_percent,
+        )
         (candidate / "probe_metrics.json").write_text(
             json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
@@ -292,7 +299,10 @@ def run_probe(
         "nccl_ok": "nccl error" not in combined.lower(),
         "provenance": dict(request.provenance),
     }
-    stable, status = classify_metrics(metrics, request.world_size, request.required_scratch_bytes)
+    stable, status = classify_metrics(
+        metrics, request.world_size, request.required_scratch_bytes,
+        request.vram_limit_percent,
+    )
     (candidate / "probe_metrics.json").write_text(
         json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
