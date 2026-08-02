@@ -75,6 +75,10 @@ export BEAM_HISTORY_DISK_BYTES=$((1024 * 1024 * 1024 * 1024))
 export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=2000000
 export BEAM_GPU_HEADROOM_BYTES=$((3 * 1024 * 1024 * 1024))
 export BEAM_ENABLE_DEBUG=ON BEAM_ENABLE_DEPTH_LOGS=ON
+export BEAM_DEBUG_INFERENCE_TRACE=ON BEAM_DEBUG_PATH_TRACE=ON
+export BEAM_TRACK_SOLUTION_PATH='-f3.-f0.d1.r3.f1.-f3.-r2.-d0.-r0.d2.f1.-d2.f3.d2.-d0.r0.-f3.-r0.-f3.f0.f0.-r0.-r3.-d3.-d2.r2.-d1.f2.f1.f2.r1.f3.-r0.f0.-d1.-f1.r2.d1.-f2.d1.f2.-r2.f1.d3'
+export BEAM_STOP_AFTER_TRACKED_PATH=1
+export BEAM_STOP_AFTER_TRACKED_MISSING_EXTRA_DEPTHS=0
 beam_preflight
 TORCH_CMAKE_PREFIX="$("${PY}" -c 'import torch; print(torch.utils.cmake_prefix_path)')"
 cmake -S "${SOURCE}" -B "${BUILD_DIR}" -G Ninja \
