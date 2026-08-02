@@ -30,13 +30,14 @@ def collect_closure(executable:Path,destination:Path)->tuple[Path,...]:
         result=subprocess.run(["ldd",str(binary)],text=True,capture_output=True,check=False)
         if result.returncode!=0: raise ValueError(f"ldd failed for {binary.name}")
         for dependency in parse_ldd(result.stdout):
-            resolved=dependency.resolve(); policy=dependency_policy(resolved.name)
+            requested_name=dependency.name
+            resolved=dependency.resolve(); policy=dependency_policy(requested_name)
             if policy=="host": continue
             if not resolved.is_file(): raise ValueError(f"resolved runtime library is missing: {resolved}")
-            prior=copied.get(resolved.name)
-            if prior is not None and prior!=resolved: raise ValueError(f"runtime basename collision: {resolved.name}")
+            prior=copied.get(requested_name)
+            if prior is not None and prior!=resolved: raise ValueError(f"runtime basename collision: {requested_name}")
             if prior is None:
-                shutil.copy2(resolved,destination/resolved.name); copied[resolved.name]=resolved; pending.append(resolved)
+                shutil.copy2(resolved,destination/requested_name); copied[requested_name]=resolved; pending.append(resolved)
     return tuple(copied[name] for name in sorted(copied))
 
 def main()->int:
