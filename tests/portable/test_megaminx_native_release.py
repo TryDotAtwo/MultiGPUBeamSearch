@@ -26,6 +26,7 @@ def stage(tmp_path: Path) -> Path:
     (root / "run.sh").write_text("#!/usr/bin/env bash\n")
     (root / "autotune.sh").write_text("#!/usr/bin/env bash\n")
     (root / "portable/megaminx_cluster/autotune/calibration.json").write_text("{}")
+    (root / "portable/megaminx_cluster/torchrun.py").write_text("# bundled launcher\n")
     return root
 
 

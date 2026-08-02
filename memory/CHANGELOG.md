@@ -775,3 +775,4 @@
 - 2026-08-01: Removed GitHub build RPATH and mapped C++/CUDA source paths to `.` so native public ELF payloads contain no private runner paths.
 - 2026-08-01: Bound `GH_REPO` in the checkout-free prerelease job so verified native artifacts can be uploaded to the stable release tag.
 - 2026-08-01: Made published `.sha256` sidecars record archive basenames, so `sha256sum -c` works directly after a clean two-file download.
+- 2026-08-02: Replaced the clean-cluster dependency on `python3 -m torch.distributed.run` with a bundled single-node static torchrun-compatible launcher. It launches one native rank per GPU using only Python stdlib, propagates rank/world/rendezvous environment, terminates sibling ranks on failure, and is now a required archive payload.

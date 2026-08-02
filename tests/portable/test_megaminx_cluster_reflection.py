@@ -1,4 +1,8 @@
 from pathlib import Path
+import json
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -65,11 +69,33 @@ def test_parses_rank_solution_line():
 
 def test_builds_torchrun_command_with_one_rank_per_gpu(tmp_path):
     command = build_torchrun_command(tmp_path, 4, "job-7-original", 900, 120, 10**9)
-    assert command[:3] == ["python3", "-m", "torch.distributed.run"]
+    assert command[:2] == ["python3", str(tmp_path / "portable" / "megaminx_cluster" / "torchrun.py")]
     assert "--nproc-per-node=4" in command
     assert "--no-python" in command
     assert command[-3:] == ["900", "120", "1000000000"]
 
+
+def test_bundled_torchrun_launches_all_static_ranks_without_pytorch(tmp_path):
+    launcher = Path("portable/megaminx_cluster/torchrun.py")
+    output = tmp_path / "ranks"
+    output.mkdir()
+    code = (
+        "import json,os,pathlib; "
+        "p=pathlib.Path(os.environ['RANK_OUTPUT'])/f\"{os.environ['RANK']}.json\"; "
+        "p.write_text(json.dumps({k:os.environ[k] for k in "
+        "['RANK','LOCAL_RANK','WORLD_SIZE','LOCAL_WORLD_SIZE','TORCHELASTIC_RUN_ID']}))"
+    )
+    env = dict(os.environ, RANK_OUTPUT=str(output))
+    result = subprocess.run([
+        sys.executable, str(launcher), "--nnodes=1", "--nproc-per-node=4",
+        "--node-rank=0", "--rdzv-backend=c10d", "--rdzv-endpoint=127.0.0.1:0",
+        "--rdzv-id=test-static", "--no-python", sys.executable, "-c", code,
+    ], env=env, text=True, capture_output=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    rows = [json.loads((output / f"{rank}.json").read_text()) for rank in range(4)]
+    assert [row["RANK"] for row in rows] == ["0", "1", "2", "3"]
+    assert all(row["WORLD_SIZE"] == "4" and row["LOCAL_WORLD_SIZE"] == "4" for row in rows)
+    assert all(row["TORCHELASTIC_RUN_ID"] == "test-static" for row in rows)
 
 def test_writes_run_owned_synthetic_puzzle(tmp_path):
     source = tmp_path / "source.csv"

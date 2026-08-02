@@ -33,8 +33,8 @@ cp cluster.env.example cluster.env
 
 `--gpus`, `--beam`, and `--puzzle` are mandatory. Omitting `--puzzle` exits
 before `sbatch` and asks for one puzzle id. Each invocation creates one run
-directory and submits exactly one SLURM job. `torchrun` starts one process per
-listed GPU.
+directory and submits exactly one SLURM job. The bundled static torchrun-compatible
+launcher starts one native process per listed GPU; system PyTorch is not required.
 
 Reflection modes:
 

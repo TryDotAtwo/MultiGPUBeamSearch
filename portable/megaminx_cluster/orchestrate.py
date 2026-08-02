@@ -60,9 +60,9 @@ def build_torchrun_command(
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", rendezvous_id):
         raise ValueError("unsafe rendezvous id")
     return [
-        "python3", "-m", "torch.distributed.run",
+        "python3", str(archive_root / "portable" / "megaminx_cluster" / "torchrun.py"),
         "--nnodes=1", f"--nproc-per-node={world_size}", "--node-rank=0",
-        "--rdzv-backend=c10d", "--rdzv-endpoint=127.0.0.1:29500",
+        "--rdzv-backend=c10d", "--rdzv-endpoint=127.0.0.1:0",
         f"--rdzv-id={rendezvous_id}", "--no-python",
         str(archive_root / "bin" / "production_runner"),
         str(puzzle_id), str(depth), str(beam),

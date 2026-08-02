@@ -18,6 +18,7 @@ def test_builder_rejects_private_absolute_paths_in_text_payload(tmp_path: Path):
     (root / "run.sh").write_text("#!/usr/bin/env bash\n")
     (root / "autotune.sh").write_text("#!/usr/bin/env bash\n")
     (root / "portable/megaminx_cluster/autotune/calibration.json").write_text("{}")
+    (root / "portable/megaminx_cluster/torchrun.py").write_text("# bundled launcher\n")
     (root / "README.md").write_text("Megaminx release\n")
     (root / "weights/manifest.json").write_text('{"source_weights":"C:\\\\Users\\\\person\\\\secret.pth"}')
     with pytest.raises(ValueError, match="private"):
