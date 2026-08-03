@@ -96,12 +96,12 @@ Stream 1 concurrency, Stream 3 ring slots, shard count/capacity, Stream 4 batch,
 trigger and active slots, plus a bounded small final-materialization chunk
 (32K-128K). Profiles never transfer between hardware tuples. Successive halving
 uses all three puzzle tiers, and the final choice is the lowest-memory candidate
-within 3% of the fastest median while retaining at least 15% VRAM reserve. Override it with `--puzzles ID1,ID2,ID3`. The controller first discovers the maximum stable beam independently of the beam
+within 3% of the fastest median while remaining stable under the measured 98% capacity boundary. Override it with `--puzzles ID1,ID2,ID3`. The controller first discovers the maximum stable beam independently of the beam
 requested for the eventual solve: it expands from 30M until measured peak allocation
 reaches the 98% VRAM target or a real OOM, then refines to the distributed layout
 quantum. Runtime, CUDA, capacity, timeout, full-frontier, or correctness failures
 invalidate the bootstrap and are never accepted as memory boundaries. It then applies
-deterministic successive halving with the normal 15% reserve to select fast,
+deterministic successive halving up to the measured 98% boundary to select fast,
 memory-efficient production profiles.
 For maximum-capacity discovery, shard capacity scale is exactly `1_000_000` PPM:
 the many large shards provide the distribution reserve without multiplying storage.

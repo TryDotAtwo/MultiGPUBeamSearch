@@ -335,7 +335,7 @@ def main() -> int:
             (identity.vram_mib,) * identity.world_size,
             int(manifest.get("history_disk_bytes", 1)),
             {"solver_commit": identity.solver_commit, "manifest_digest": identity.release_manifest_digest},
-            100 if trial.phase == "max_beam" else 85,
+            100,
         )
         return run_probe(request)
 

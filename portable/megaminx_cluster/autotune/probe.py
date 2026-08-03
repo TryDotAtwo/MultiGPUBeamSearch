@@ -28,7 +28,7 @@ class ProbeRequest:
     total_vram_mib: tuple[int, ...]
     required_scratch_bytes: int
     provenance: Mapping[str, str]
-    vram_limit_percent: int = 85
+    vram_limit_percent: int = 100
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ def _positive_number(payload: Mapping[str, object], key: str) -> bool:
 
 def classify_metrics(
     payload: Mapping[str, object], world_size: int, required_scratch_bytes: int,
-    vram_limit_percent: int = 85,
+    vram_limit_percent: int = 100,
 ) -> tuple[bool, str]:
     scalar = (
         "requested_beam", "effective_beam", "wall_us", "solve_us", "throughput",

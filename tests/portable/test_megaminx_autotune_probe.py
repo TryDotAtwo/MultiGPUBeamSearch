@@ -77,7 +77,7 @@ def valid_metrics():
     }
 
 
-def test_classify_metrics_accepts_complete_row_with_ten_percent_margin():
+def test_classify_metrics_accepts_complete_row_without_artificial_margin():
     result = classify_metrics(valid_metrics(), world_size=8, required_scratch_bytes=100)
     assert result == (True, "stable")
 
@@ -90,7 +90,7 @@ def test_classify_metrics_accepts_complete_row_with_ten_percent_margin():
         ({"cuda_ok": False}, "cuda_error"),
         ({"nccl_ok": False}, "nccl_error"),
         ({"scratch_bytes": 99}, "scratch_capacity"),
-        ({"peak_vram_mib": [35000] * 8}, "vram_margin"),
+        ({"peak_vram_mib": [41000] * 8}, "vram_margin"),
         ({"peak_vram_mib": [35000] * 7}, "missing_metric"),
     ],
 )
@@ -225,8 +225,8 @@ def test_runtime_env_scales_final_exchange_by_world_size(tmp_path):
 def test_capacity_probe_can_measure_up_to_100_percent_gate():
     payload = valid_metrics()
     payload["peak_vram_mib"] = [40140] * 8
-    assert classify_metrics(payload, 8, 100, vram_limit_percent=100) == (True, "stable")
-    assert classify_metrics(payload, 8, 100) == (False, "vram_margin")
+    assert classify_metrics(payload, 8, 100) == (True, "stable")
+    assert classify_metrics(payload, 8, 100, vram_limit_percent=85) == (False, "vram_margin")
 
 
 def test_manual_static_plan_budget_failure_is_capacity_oom():
