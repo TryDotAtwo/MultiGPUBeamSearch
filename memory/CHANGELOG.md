@@ -873,3 +873,5 @@
 - 2026-08-01: Added a secret-free, fully pinned wrangler.github-staging.jsonc plus reproducible ci:cloudflare and deploy:staging:github scripts for Cloudflare Workers Builds from the GitHub monorepo. The tracked config targets the existing staging Worker/resources in normal mode; GitHub App runtime secrets remain only in Cloudflare. Verification: 57 schema/config tests, 125 Worker tests, typecheck, and Wrangler dry-run passed. No CUDA or beam-search code changed.
 
 - 2026-08-03: Designed the public `cayleypy-results-publisher` Codex plugin and dependency-free Python CLI for safe v1 Kaggle and v2 native/SLURM publication through the existing anonymous Cloudflare ingest API. The approved design specifies deterministic bounded gzip batching, resumable receipts, terminal-status polling, human and agent guides, and no embedded credentials; implementation is pending design review.
+
+- 2026-08-03: Refined the publisher design for one-command use: the official Cloudflare origin/routes are pinned, `init` generates a fill-once config, and simple move/CSV/TSV inputs expand deterministically from explicit puzzle contexts while canonical JSON remains supported.
