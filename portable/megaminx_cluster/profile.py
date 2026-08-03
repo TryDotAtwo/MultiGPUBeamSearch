@@ -111,6 +111,13 @@ def select_profile(
     family = matches[0]
     minimum = _positive_int(family.get("min_beam_power"), "min_beam_power")
     maximum = _positive_int(family.get("max_beam_power"), "max_beam_power")
+    exact_maximum = family.get("maximum_stable_beam")
+    if exact_maximum is not None:
+        exact_maximum = _positive_int(exact_maximum, "maximum_stable_beam")
+        if beam > exact_maximum:
+            raise ValueError(
+                f"requested beam {beam} exceeds measured maximum stable beam {exact_maximum}"
+            )
     power = round_half_up_log2(beam)
     if power < minimum or power > maximum:
         raise ValueError(f"supported beam powers are {minimum}..{maximum}; requested maps to {power}")

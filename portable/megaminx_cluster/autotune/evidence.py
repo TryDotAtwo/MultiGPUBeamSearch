@@ -128,10 +128,13 @@ class EvidenceStore:
                     row.get("wall_us", ""), row.get("peak_vram_mib", ""),
                 ))
 
-    def _anchor_measured(self, power: int) -> bool:
+    def _anchor_measured(self, power: int, config_id: str, beam: int) -> bool:
         rows = [
             row for row in self._read_rows()
-            if row.get("phase") == "final" and row.get("profile_power") == power
+            if row.get("phase") == "final"
+            and row.get("profile_power") == power
+            and row.get("config_id") == config_id
+            and row.get("beam") == beam
         ]
         if any(row.get("stable") is not True for row in rows):
             return False
@@ -162,10 +165,14 @@ class EvidenceStore:
         for power, item in sorted(anchors.items()):
             runtime = item.get("runtime")
             evidence_id = item.get("evidence_id")
-            if not isinstance(runtime, Mapping) or not isinstance(evidence_id, str) or not evidence_id:
+            config_id = item.get("config_id")
+            beam = item.get("beam")
+            if (not isinstance(runtime, Mapping) or not isinstance(evidence_id, str)
+                    or not evidence_id or not isinstance(config_id, str)
+                    or not config_id or not isinstance(beam, int) or beam <= 0):
                 raise ValueError(f"invalid anchor {power}")
             anchor_records[str(power)] = {
-                "status": "measured" if self._anchor_measured(power) else "unverified",
+                "status": "measured" if self._anchor_measured(power, config_id, beam) else "unverified",
                 "evidence_id": evidence_id,
                 "runtime": dict(runtime),
                 "bfs": bfs,
@@ -184,6 +191,7 @@ class EvidenceStore:
                 "model_class": self.identity.model_class,
                 "min_beam_power": powers[0],
                 "max_beam_power": powers[-1],
+                "maximum_stable_beam": max(int(item["beam"]) for item in anchors.values()),
                 "anchors": anchor_records,
             }],
         }

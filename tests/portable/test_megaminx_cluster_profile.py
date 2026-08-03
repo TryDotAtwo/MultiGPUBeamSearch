@@ -109,3 +109,12 @@ def test_output_dimension_must_match_model_class():
     )
     with pytest.raises(ValueError, match="output_dim"):
         derive_capacities(selected, 2**28, move_count=24, output_dim=24)
+
+
+def test_rejects_requested_beam_above_exact_measured_maximum():
+    value = registry()
+    value["profiles"][0]["maximum_stable_beam"] = 770_874_022
+    with pytest.raises(ValueError, match="exceeds measured maximum stable beam"):
+        select_profile(
+            value, HardwareKey("A100", 40960, 80, 4), 1_000_000_000, "mlp", "output1"
+        )

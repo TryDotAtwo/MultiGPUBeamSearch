@@ -69,6 +69,7 @@
         "model_class": {"enum": ["output1", "output_move_count"]},
         "min_beam_power": {"type": "integer", "minimum": 1},
         "max_beam_power": {"type": "integer", "minimum": 1},
+        "maximum_stable_beam": {"$ref": "#/$defs/positive"},
         "anchors": {"type": "object", "additionalProperties": {"$ref": "#/$defs/anchor"}}
       }
     }

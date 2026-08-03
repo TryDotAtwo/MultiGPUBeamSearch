@@ -473,3 +473,5 @@
 - User specified the authoritative maximum-beam criterion: search by filling the GPU to 98% VRAM. Runtime/capacity failures are not a memory boundary.
 
 - User clarified that large beams use `shard_capacity_scale_ppm = 1` (that is `1_000_000` PPM): many large shards already provide sufficient distribution reserve.
+
+- User requested restarting the interrupted A100x8 run overnight and required the resumed autotuner to complete end-to-end. Live job 33360 proved that the correct launch must not reuse a finalist that OOMs at the maximum anchor; fix the tuner and preserve the existing checkpoint before giving the next simple run command.

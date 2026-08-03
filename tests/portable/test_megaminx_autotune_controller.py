@@ -153,6 +153,35 @@ def test_max_search_starts_from_large_requested_beam_then_moves_down(tmp_path):
         return ProbeResult(True, "stable", {"wall_us": 1, "peak_vram_mib": [peak] * 8}, ())
     store = EvidenceStore.create_or_resume(tmp_path, identity())
     result = run_session(ControllerConfig(identity(), RUNTIME, 2_000_000_000, 1_000_000_000), probe, clock, store)
-    assert seen[0] == 1_000_000_000
-    assert seen[1] == 500_000_000
+    assert seen[:3] == [1_000_000_000] * 3
+    assert seen[3:6] == [500_000_000] * 3
     assert result.maximum_stable_beam >= 500_000_000
+
+
+def test_final_oom_winner_falls_back_to_measured_seed(tmp_path):
+    clock = Clock()
+    seed_id = None
+
+    def probe(trial):
+        nonlocal seed_id
+        clock.now += 0.01
+        if trial.phase == "max_beam":
+            stable = trial.beam <= 30_000_000
+            return ProbeResult(stable, "stable" if stable else "oom", {
+                "wall_us": 1_000_000, "peak_vram_mib": [35_000] * 8,
+            }, ())
+        if seed_id is None and dict(trial.runtime) == dict(RUNTIME):
+            seed_id = trial.config_id
+        is_seed = dict(trial.runtime) == dict(RUNTIME)
+        stable = trial.phase != "final" or is_seed
+        wall = 2_000_000 if is_seed else 1_000_000
+        return ProbeResult(stable, "stable" if stable else "oom", {
+            "wall_us": wall, "peak_vram_mib": [35_000] * 8,
+        }, ())
+
+    store = EvidenceStore.create_or_resume(tmp_path, identity())
+    result = run_session(ControllerConfig(identity(), RUNTIME, 60_000_000), probe, clock, store)
+    assert result.complete is True
+    anchor = next(iter(result.registry_fragment["profiles"][0]["anchors"].values()))
+    assert anchor["runtime"] == RUNTIME
+    assert anchor["status"] == "measured"

@@ -122,7 +122,6 @@ def run_session(
         return result
 
     seed = dict(config.seed_runtime)
-    first_puzzle = identity.puzzle_ids[0]
     target_vram_percent = 98.0
     quantum = identity.world_size * int(seed["shard_count"]) * 1024
     initial = config.initial_beam or min(config.max_beam_limit, identity.min_beam * 16)
@@ -147,10 +146,15 @@ def run_session(
         return "above" if vram_percent(result) >= target_vram_percent else "below"
 
     def measure(candidate: int) -> str | None:
-        result = execute(TrialRequest(
-            "max_beam", candidate, "seed", seed, first_puzzle, 0, identity.bfs_radius
-        ))
-        return None if result is None else capacity_result(result, candidate)
+        sides: list[str] = []
+        for puzzle_id in identity.puzzle_ids:
+            result = execute(TrialRequest(
+                "max_beam", candidate, "seed", seed, puzzle_id, 0, identity.bfs_radius
+            ))
+            if result is None:
+                return None
+            sides.append(capacity_result(result, candidate))
+        return "above" if "above" in sides else "below"
 
     side = measure(initial)
     if side == "below":
@@ -177,7 +181,9 @@ def run_session(
                 break
             high = candidate
     if low is None:
-        raise RuntimeError("no beam below the 98% VRAM target was found")
+        if complete:
+            raise RuntimeError("no beam below the 98% VRAM target was found")
+        low = identity.min_beam
     if high is not None:
         while high - low > quantum:
             candidate = (low + high) // 2
@@ -223,32 +229,60 @@ def run_session(
                     break
             if not scores:
                 break
-            ranked = retain_round(tuple(scores), spec.retain_fraction)
+            stable_scores = tuple(score for score in scores if score.stable)
+            if not stable_scores:
+                survivors = ()
+                break
+            ranked = retain_round(stable_scores, spec.retain_fraction)
             by_id = {item.config_id: item for item in survivors}
             survivors = tuple(by_id[item.config_id] for item in ranked)
             if not complete:
                 break
-        winner = survivors[0] if survivors else candidates[0]
+        if not survivors:
+            complete = False
+            break
+        winner = survivors[0]
         power = round_half_up_log2(anchor)
-        chosen[power] = {"runtime": dict(winner.runtime), "evidence_id": f"autotune-{winner.config_id}-p{power}"}
         if not complete:
             break
-        for puzzle in identity.puzzle_ids:
-            for repetition in range(3):
-                result = execute(TrialRequest(
-                    "final", anchor, winner.config_id, winner.runtime,
-                    puzzle, repetition, identity.bfs_radius,
-                ), reserve_jobs=max(0, 8 - (identity.puzzle_ids.index(puzzle) * 3 + repetition)))
-                if result is None:
+        finalists = (winner,) if winner.config_id == candidates[0].config_id else (winner, candidates[0])
+        selected = None
+        for finalist in finalists:
+            final_stable = True
+            for puzzle in identity.puzzle_ids:
+                for repetition in range(3):
+                    result = execute(TrialRequest(
+                        "final", anchor, finalist.config_id, finalist.runtime,
+                        puzzle, repetition, identity.bfs_radius,
+                    ), reserve_jobs=max(0, 8 - (identity.puzzle_ids.index(puzzle) * 3 + repetition)))
+                    if result is None:
+                        final_stable = False
+                        break
+                    if not result.stable:
+                        final_stable = False
+                if not complete:
                     break
+            if final_stable:
+                selected = finalist
+                break
             if not complete:
                 break
-        if not complete:
+        if selected is None:
+            complete = False
             break
+        chosen[power] = {
+            "runtime": dict(selected.runtime),
+            "evidence_id": f"autotune-{selected.config_id}-p{power}",
+            "config_id": selected.config_id,
+            "beam": anchor,
+        }
 
     if not chosen:
         power = round_half_up_log2(maximum)
-        chosen[power] = {"runtime": seed, "evidence_id": f"autotune-seed-p{power}"}
+        chosen[power] = {
+            "runtime": seed, "evidence_id": f"autotune-seed-p{power}",
+            "config_id": "seed", "beam": maximum,
+        }
     store.write_leaderboard()
     fragment = store.emit_registry_fragment(chosen)
     statuses = [anchor["status"] for anchor in fragment["profiles"][0]["anchors"].values()]
