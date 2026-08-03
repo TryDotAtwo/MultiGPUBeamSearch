@@ -1,0 +1,16 @@
+{
+  "name": "cayleypy-results-publisher",
+  "version": "0.1.0",
+  "description": "Publish verified CayleyPy solutions from Kaggle, clusters, or local machines through Cloudflare into GitHub.",
+  "author": {"name": "TryDotAtwo"},
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Cayleypy Results Publisher",
+    "shortDescription": "Send CayleyPy solutions safely to the public results repository.",
+    "longDescription": "Prepare, validate, compress, submit, and verify canonical CayleyPy Kaggle v1 or native v2 results without user tokens.",
+    "developerName": "TryDotAtwo",
+    "category": "Developer Tools",
+    "capabilities": [],
+    "defaultPrompt": "Publish my CayleyPy solutions and verify that they reached GitHub."
+  }
+}
