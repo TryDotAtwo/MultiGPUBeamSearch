@@ -70,6 +70,19 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(len(rows[0]["idempotency_key"]), 64)
 
 
+    def test_rejects_secret_like_fields_before_network(self) -> None:
+        path = self.write_json("unsafe.json", {"schema_version": 1, "author": {"api_token": "must-not-send"}})
+        with self.assertRaisesRegex(submit.ClientError, "INPUT_SECRET_FIELD"):
+            submit.load_envelopes(path, None)
+
+    def test_tsv_uses_the_same_exact_contract(self) -> None:
+        source = ROOT / "templates" / "solutions.csv"
+        target = self.root / "solutions.tsv"
+        target.write_text(source.read_text(encoding="utf-8").replace(",", "\t"), encoding="utf-8")
+        config = submit.load_config(ROOT / "templates" / "publisher-config-kaggle.json")
+        version, rows = submit.load_envelopes(target, config)
+        self.assertEqual((version, len(rows)), (1, 1))
+
 class ArchiveTests(unittest.TestCase):
     def test_canonical_and_gzip_are_deterministic(self) -> None:
         value = {"z": "Δ", "a": [2, 1]}
@@ -93,5 +106,137 @@ class ArchiveTests(unittest.TestCase):
             submit.partition_batches(1, [{"schema_version": 1, "padding": "x" * 200}], 60, 100)
 
 
+class FakeTransport:
+    def __init__(self, responses: list[submit.HttpResponse]) -> None:
+        self.responses = list(responses)
+        self.requests: list[tuple[str, str, bytes | None, dict[str, str]]] = []
+
+    def request(self, method: str, url: str, body: bytes | None = None, headers: dict[str, str] | None = None) -> submit.HttpResponse:
+        self.requests.append((method, url, body, dict(headers or {})))
+        if not self.responses:
+            raise AssertionError("unexpected request")
+        return self.responses.pop(0)
+
+
+class TransportTests(unittest.TestCase):
+    def envelope(self, version: int = 1) -> dict[str, object]:
+        return {
+            "schema_version": version,
+            "client_submission_id": "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e7f",
+            "submitted_at": "2026-07-29T09:30:00.000Z",
+            "competition": "toy-cayley",
+            "puzzle_type": "cycle-3",
+            "puzzle_id": 1,
+        }
+
+    def test_submit_uses_pinned_version_route_and_saves_safe_manifest(self) -> None:
+        envelope = self.envelope()
+        envelope["private_marker"] = "DO_NOT_LEAK"
+        parts = submit.partition_batches(1, [envelope])
+        receipt = {
+            "submission_id": envelope["client_submission_id"],
+            "idempotency_key": "d" * 64,
+            "status_url": submit.OFFICIAL_ENDPOINT_BASE + "/v1/submissions/" + str(envelope["client_submission_id"]),
+        }
+        transport = FakeTransport([submit.HttpResponse(202, {}, json.dumps({"receipts": [receipt]}).encode())])
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest_path = Path(tmp) / "receipts.json"
+            manifest = submit.submit_parts(parts, submit.SubmitConfig(manifest_path=manifest_path), transport)
+            saved = manifest_path.read_text(encoding="utf-8")
+        method, url, body, headers = transport.requests[0]
+        self.assertEqual((method, url), ("POST", submit.OFFICIAL_ENDPOINT_BASE + "/v1/results"))
+        self.assertEqual(headers["Content-Type"], "application/gzip")
+        self.assertEqual(headers["X-CayleyPy-Archive-Index"], "0")
+        self.assertEqual(manifest["receipts"][0]["submission_id"], receipt["submission_id"])
+        self.assertNotIn("DO_NOT_LEAK", saved)
+        self.assertIsNotNone(body)
+
+    def test_partial_server_errors_are_persisted_and_fail(self) -> None:
+        parts = submit.partition_batches(1, [self.envelope()])
+        response = {"receipts": [], "errors": [{"index": 0, "code": "schema"}]}
+        transport = FakeTransport([submit.HttpResponse(202, {}, json.dumps(response).encode())])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "receipts.json"
+            with self.assertRaisesRegex(submit.ClientError, "SUBMIT_PARTIAL"):
+                submit.submit_parts(parts, submit.SubmitConfig(manifest_path=path), transport)
+            self.assertTrue(path.is_file())
+
+    def test_poll_accepts_staged_or_github_presence_after_status_cleanup(self) -> None:
+        submission_id = str(self.envelope()["client_submission_id"])
+        manifest = {
+            "manifest_version": 1,
+            "endpoint_origin": submit.OFFICIAL_ENDPOINT_BASE,
+            "receipts": [{
+                "submission_id": submission_id,
+                "idempotency_key": "d" * 64,
+                "status_url": submit.OFFICIAL_ENDPOINT_BASE + "/v1/submissions/" + submission_id,
+                "github_url": "https://raw.githubusercontent.com/TryDotAtwo/cayleypy-beam-results/refs/heads/ingest/staging/results/v1/x.json",
+                "state": "accepted",
+            }],
+            "parts": [],
+        }
+        staged = FakeTransport([submit.HttpResponse(200, {}, json.dumps({"state": "staged"}).encode())])
+        summary = submit.poll_manifest(manifest, submit.PollConfig(timeout_seconds=0), staged)
+        self.assertEqual(summary.published, 1)
+        manifest["receipts"][0]["state"] = "accepted"
+        cleaned = FakeTransport([submit.HttpResponse(404, {}, b"{}"), submit.HttpResponse(200, {}, b"{}")])
+        summary = submit.poll_manifest(manifest, submit.PollConfig(timeout_seconds=0), cleaned)
+        self.assertEqual(summary.published, 1)
+
+    def test_poll_counts_duplicate_as_success(self) -> None:
+        submission_id = str(self.envelope()["client_submission_id"])
+        manifest = {"manifest_version": 1, "endpoint_origin": submit.OFFICIAL_ENDPOINT_BASE, "parts": [], "receipts": [{"submission_id": submission_id, "idempotency_key": "d" * 64, "status_url": submit.OFFICIAL_ENDPOINT_BASE + "/v1/submissions/" + submission_id, "github_url": "https://example.invalid", "state": "accepted"}]}
+        transport = FakeTransport([submit.HttpResponse(200, {}, json.dumps({"state": "duplicate"}).encode())])
+        summary = submit.poll_manifest(manifest, submit.PollConfig(timeout_seconds=0), transport)
+        self.assertEqual((summary.published, summary.duplicate, summary.rejected, summary.unresolved), (0, 1, 0, 0))
+    def test_poll_rejects_cross_origin_status_url(self) -> None:
+        manifest = {"manifest_version": 1, "endpoint_origin": submit.OFFICIAL_ENDPOINT_BASE, "parts": [], "receipts": [{"submission_id": "x", "idempotency_key": "d" * 64, "status_url": "https://evil.example/v1/submissions/x", "github_url": "https://example.invalid", "state": "accepted"}]}
+        with self.assertRaisesRegex(submit.ClientError, "STATUS_URL_UNSAFE"):
+            submit.poll_manifest(manifest, submit.PollConfig(timeout_seconds=0), FakeTransport([]))
+
+
+class TemplateAndResilienceTests(unittest.TestCase):
+    def test_init_copies_valid_kaggle_and_native_templates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for source, version in (("kaggle", 1), ("native", 2)):
+                config_path = root / f"{source}.json"
+                submit.init_config(source, config_path)
+                config = submit.load_config(config_path)
+                self.assertEqual(config.schema_version, version)
+                report = submit.preflight(ROOT / "templates" / "solutions.csv", config_path)
+                self.assertEqual(report.schema_version, version)
+                self.assertEqual(report.envelope_count, 1)
+
+    def test_full_json_templates_preflight_without_config(self) -> None:
+        for name, version in (("kaggle-v1.json", 1), ("native-v2.json", 2)):
+            report = submit.preflight(ROOT / "templates" / name, None)
+            self.assertEqual(report.schema_version, version)
+            self.assertEqual(report.envelope_count, 1)
+
+    def test_retry_uses_same_body_and_then_accepts(self) -> None:
+        envelope = TransportTests().envelope()
+        parts = submit.partition_batches(1, [envelope])
+        receipt = {"submission_id": envelope["client_submission_id"], "idempotency_key": "d" * 64, "status_url": submit.OFFICIAL_ENDPOINT_BASE + "/v1/submissions/" + str(envelope["client_submission_id"])}
+        transport = FakeTransport([submit.HttpResponse(429, {"Retry-After": "0"}, b"{}"), submit.HttpResponse(202, {}, json.dumps({"receipts": [receipt]}).encode())])
+        with tempfile.TemporaryDirectory() as tmp:
+            submit.submit_parts(parts, submit.SubmitConfig(Path(tmp) / "receipts.json", retry_base_seconds=0), transport)
+        self.assertEqual(len(transport.requests), 2)
+        self.assertEqual(transport.requests[0][2], transport.requests[1][2])
+
+    def test_partial_receipt_maps_to_non_error_envelope(self) -> None:
+        first = TransportTests().envelope()
+        second = copy.deepcopy(first)
+        second["puzzle_id"] = 2
+        second["client_submission_id"] = "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e80"
+        parts = submit.partition_batches(1, [first, second])
+        receipt = {"submission_id": second["client_submission_id"], "idempotency_key": "e" * 64, "status_url": submit.OFFICIAL_ENDPOINT_BASE + "/v1/submissions/" + str(second["client_submission_id"])}
+        transport = FakeTransport([submit.HttpResponse(202, {}, json.dumps({"receipts": [receipt], "errors": [{"index": 0, "code": "schema"}]}).encode())])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "receipts.json"
+            with self.assertRaisesRegex(submit.ClientError, "SUBMIT_PARTIAL"):
+                submit.submit_parts(parts, submit.SubmitConfig(path), transport)
+            manifest = submit.load_manifest(path)
+        self.assertIn("/2/", manifest["receipts"][0]["github_url"])
 if __name__ == "__main__":
     unittest.main()

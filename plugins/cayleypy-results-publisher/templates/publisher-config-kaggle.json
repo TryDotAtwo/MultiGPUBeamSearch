@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "common": {
+    "author": {
+      "name": "Example User",
+      "kaggle_username": "alice-k",
+      "verification": "claimed"
+    },
+    "kaggle": {
+      "owner": "alice-k",
+      "slug": "cayleypy-public",
+      "version": 7,
+      "run_url": "https://www.kaggle.com/code/alice-k/cayleypy-public",
+      "notebook_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "competition": "toy-cayley",
+    "profile": {
+      "requested_beam": 65536,
+      "effective_beam": 65536,
+      "alignment_delta": 0,
+      "selected_profile": "p16-output_move_count",
+      "evidence": "measured-kaggle-2xt4",
+      "profile_evidence_version": 1,
+      "profile_power": 16,
+      "model_class": "output_move_count",
+      "world_size": 2
+    },
+    "runtime": {
+      "touch_bfs_radius": 0,
+      "solution_mode": "first",
+      "max_depth": 8,
+      "max_collected_solutions": 16,
+      "b_micro": 2048,
+      "stream1_concurrency": 4,
+      "stream3_ring_slots": 4,
+      "shard_count": 4,
+      "shard_capacity_scale_ppm": 1050000,
+      "stream4_batch_candidates": 98304,
+      "stream4_trigger_candidates": 98304,
+      "stream4_active_sort_slots": 4
+    },
+    "model": {
+      "filename": "toy-model.pt",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "format": "resmlp-layernorm",
+      "manifest": {
+        "state_len": 3,
+        "num_classes": 3,
+        "hd1": 256,
+        "hd2": 256,
+        "nrd": 4,
+        "output_dim": 2,
+        "dtype": "fp16",
+        "normalization": "layernorm",
+        "layout": "row-major input activations times weight_hxk"
+      }
+    },
+    "hardware": {
+      "platform": "kaggle",
+      "gpu_names": [
+        "Tesla T4",
+        "Tesla T4"
+      ],
+      "accelerator_count": 2,
+      "world_size": 2
+    },
+    "timings": {
+      "solve_us": 95335,
+      "wall_us": 4720000
+    },
+    "solver_commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "run_id": "run-20260729-original"
+  },
+  "puzzle_contexts": {
+    "1": {
+      "puzzle_type": "cube_3/3/3",
+      "initial_state": [
+        2,
+        0,
+        1
+      ],
+      "central_state": [
+        0,
+        1,
+        2
+      ],
+      "generators": {
+        "clockwise": [
+          1,
+          2,
+          0
+        ],
+        "counterclockwise": [
+          2,
+          0,
+          1
+        ]
+      }
+    }
+  },
+  "solution_defaults": {
+    "final_orientation": "original",
+    "search_mode": "off",
+    "collection_index": "0",
+    "collection_status": "first_solution",
+    "solved_depth": "1",
+    "touch_depth": "0",
+    "reflected_source_solution": "",
+    "searched_solution": ""
+  }
+}
