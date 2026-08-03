@@ -72,10 +72,10 @@
         "solve_us": 95335,
         "wall_us": 4720000
       },
-      "client_submission_id": "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d7e80",
-      "run_id": "slurm-megaminx-0",
-      "idempotency_key": "76e18ada78a88fd4e94fed92a80896ff9564409bc9439b7d7f20c6599a260fde",
-      "submitted_at": "2026-07-29T09:30:00.000Z",
+      "client_submission_id": "019fc866-0188-7641-9166-fc91d5bef838",
+      "run_id": "public-plugin-template-native",
+      "idempotency_key": "2889cfa3d118c9ce094de3e0e604dbb8564d556db0db5a15cc4de250892d5fdf",
+      "submitted_at": "2026-08-03T16:12:36.104Z",
       "puzzle_id": 1,
       "proof": {
         "initial_state": [

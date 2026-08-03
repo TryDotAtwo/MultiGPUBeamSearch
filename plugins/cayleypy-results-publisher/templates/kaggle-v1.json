@@ -72,10 +72,10 @@
         "wall_us": 4720000
       },
       "solver_commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "client_submission_id": "018f7a24-8f6b-7c8e-9d1b-2a3b4c5d6e7f",
-      "run_id": "run-20260729-original",
-      "idempotency_key": "f02c871a385f8f53870f56e7dfa283d62cc3fa2d0dfd3e0051c036db7aad9694",
-      "submitted_at": "2026-07-29T09:30:00.000Z",
+      "client_submission_id": "019fc866-0187-7c61-983f-52fe896955fc",
+      "run_id": "public-plugin-template-kaggle",
+      "idempotency_key": "6c2765992f27cb02b1ca0578ff61b1b625a0f68525440408e08c189bb5904c33",
+      "submitted_at": "2026-08-03T16:12:36.103Z",
       "puzzle_id": 1,
       "proof": {
         "initial_state": [
