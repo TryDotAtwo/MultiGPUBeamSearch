@@ -22,6 +22,7 @@ from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 OFFICIAL_ENDPOINT_BASE: Final[str] = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev"
+CLIENT_USER_AGENT: Final[str] = "cayleypy-results-publisher/0.1"
 MAX_INPUT_BYTES: Final[int] = 128 * 1024 * 1024
 MAX_ENVELOPES: Final[int] = 100_000
 MAX_COMPRESSED_BYTES: Final[int] = 32 * 1024 * 1024
@@ -36,6 +37,7 @@ SOLUTION_COLUMNS: Final[tuple[str, ...]] = (
 class ClientError(ValueError):
     def __init__(self, code: str, detail: str = "") -> None:
         self.code = code
+        self.detail = detail
         super().__init__(code if not detail else f"{code}: {detail}")
 
 
@@ -406,7 +408,7 @@ class _RejectRedirects(HTTPRedirectHandler):
 
 
 class HttpTransport:
-    def __init__(self, timeout_seconds: float = 30.0, max_response_bytes: int = 1024 * 1024) -> None:
+    def __init__(self, timeout_seconds: float = 60.0, max_response_bytes: int = 1024 * 1024) -> None:
         self.timeout_seconds = timeout_seconds
         self.max_response_bytes = max_response_bytes
         self.opener = build_opener(_RejectRedirects())
@@ -425,8 +427,10 @@ class HttpTransport:
             if len(payload) > self.max_response_bytes:
                 raise ClientError("HTTP_RESPONSE_TOO_LARGE") from None
             return HttpResponse(exc.code, dict(exc.headers.items()), payload)
+        except TimeoutError:
+            raise ClientError("HTTP_TIMEOUT") from None
         except URLError as exc:
-            raise ClientError("HTTP_TRANSPORT", str(exc.reason)) from None
+            raise ClientError("HTTP_TRANSPORT", type(exc.reason).__name__) from None
 
 
 @dataclass(frozen=True)
@@ -500,13 +504,19 @@ def _validate_endpoint(endpoint: str) -> None:
 
 def _request_with_retry(transport: Any, method: str, url: str, body: bytes | None, headers: dict[str, str], config: SubmitConfig) -> HttpResponse:
     for attempt in range(config.max_retries + 1):
-        response = transport.request(method, url, body, headers)
-        if response.status not in {429, 500, 502, 503, 504} or attempt == config.max_retries:
+        try:
+            response = transport.request(method, url, body, headers)
+        except ClientError as exc:
+            if exc.code not in {"HTTP_TIMEOUT", "HTTP_TRANSPORT"} or attempt == config.max_retries:
+                raise
+            response = None
+        if response is not None and (response.status not in {429, 500, 502, 503, 504} or attempt == config.max_retries):
             return response
-        retry_after = response.headers.get("Retry-After", "").strip()
         delay = config.retry_base_seconds * (2 ** attempt)
-        if retry_after.isdigit():
-            delay = min(float(retry_after), 60.0)
+        if response is not None:
+            retry_after = response.headers.get("Retry-After", "").strip()
+            if retry_after.isdigit():
+                delay = min(float(retry_after), 60.0)
         time.sleep(delay)
     raise AssertionError("unreachable")
 
@@ -546,6 +556,7 @@ def submit_parts(parts: list[ArchivePart], config: SubmitConfig, transport: Any)
         envelopes = json.loads(part.raw.decode("utf-8"))["results"]
         response = _request_with_retry(transport, "POST", config.endpoint_base + f"/v{part.version}/results", part.compressed, {
             "Content-Type": "application/gzip", "Accept": "application/json",
+            "User-Agent": CLIENT_USER_AGENT,
             "X-CayleyPy-Archive-Index": str(part.index), "X-CayleyPy-Archive-Count": str(part.count),
         }, config)
         if response.status != 202:
@@ -607,7 +618,7 @@ def poll_manifest(manifest: dict[str, Any], config: PollConfig, transport: Any) 
         for receipt in receipts:
             if receipt.get("state") in {"published", "duplicate", "rejected"}:
                 continue
-            response = transport.request("GET", receipt["status_url"], None, {"Accept": "application/json"})
+            response = transport.request("GET", receipt["status_url"], None, {"Accept": "application/json", "User-Agent": CLIENT_USER_AGENT})
             if response.status == 200:
                 state = _safe_json_response(response).get("state")
                 if state in {"staged", "published"}:
@@ -622,7 +633,7 @@ def poll_manifest(manifest: dict[str, Any], config: PollConfig, transport: Any) 
                 github_url = receipt.get("github_url")
                 if not isinstance(github_url, str) or not github_url.startswith("https://raw.githubusercontent.com/TryDotAtwo/cayleypy-beam-results/"):
                     raise ClientError("GITHUB_URL_UNSAFE")
-                github = transport.request("GET", github_url, None, {"Accept": "application/json"})
+                github = transport.request("GET", github_url, None, {"Accept": "application/json", "User-Agent": CLIENT_USER_AGENT})
                 if github.status == 200:
                     receipt["state"] = "published"
             else:
@@ -639,8 +650,13 @@ def poll_manifest(manifest: dict[str, Any], config: PollConfig, transport: Any) 
 def init_config(source: Literal["kaggle", "native"], output: Path) -> None:
     if output.exists():
         raise ClientError("CONFIG_EXISTS")
-    template = Path(__file__).resolve().parents[1] / "templates" / f"publisher-config-{source}.json"
-    if not template.is_file():
+    script_path = Path(__file__).resolve()
+    candidates = (
+        script_path.parent / "templates" / f"publisher-config-{source}.json",
+        script_path.parents[1] / "templates" / f"publisher-config-{source}.json",
+    )
+    template = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if template is None:
         raise ClientError("TEMPLATE_MISSING")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(template.read_bytes())
@@ -686,7 +702,10 @@ def main(argv: list[str] | None = None) -> int:
         _print_summary({**summary.__dict__, "manifest": str(args.manifest)})
         return 0 if summary.rejected == 0 and summary.unresolved == 0 else 4
     except ClientError as exc:
-        _print_summary({"status": "failed", "code": exc.code})
+        failure = {"status": "failed", "code": exc.code}
+        if exc.code == "SUBMIT_HTTP" and exc.detail.isdigit():
+            failure["http_status"] = int(exc.detail)
+        _print_summary(failure)
         return 3 if exc.code.startswith(("HTTP_", "SUBMIT_")) else 2
 
 

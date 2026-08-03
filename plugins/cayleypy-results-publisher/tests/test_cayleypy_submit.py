@@ -115,7 +115,10 @@ class FakeTransport:
         self.requests.append((method, url, body, dict(headers or {})))
         if not self.responses:
             raise AssertionError("unexpected request")
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 class TransportTests(unittest.TestCase):
@@ -146,6 +149,7 @@ class TransportTests(unittest.TestCase):
         method, url, body, headers = transport.requests[0]
         self.assertEqual((method, url), ("POST", submit.OFFICIAL_ENDPOINT_BASE + "/v1/results"))
         self.assertEqual(headers["Content-Type"], "application/gzip")
+        self.assertEqual(headers["User-Agent"], "cayleypy-results-publisher/0.1")
         self.assertEqual(headers["X-CayleyPy-Archive-Index"], "0")
         self.assertEqual(manifest["receipts"][0]["submission_id"], receipt["submission_id"])
         self.assertNotIn("DO_NOT_LEAK", saved)
@@ -224,6 +228,15 @@ class TemplateAndResilienceTests(unittest.TestCase):
         self.assertEqual(len(transport.requests), 2)
         self.assertEqual(transport.requests[0][2], transport.requests[1][2])
 
+    def test_timeout_is_retried_idempotently(self) -> None:
+        envelope = TransportTests().envelope()
+        parts = submit.partition_batches(1, [envelope])
+        receipt = {"submission_id": envelope["client_submission_id"], "idempotency_key": "d" * 64, "status_url": submit.OFFICIAL_ENDPOINT_BASE + "/v1/submissions/" + str(envelope["client_submission_id"])}
+        transport = FakeTransport([submit.ClientError("HTTP_TIMEOUT"), submit.HttpResponse(202, {}, json.dumps({"receipts": [receipt]}).encode())])
+        with tempfile.TemporaryDirectory() as tmp:
+            submit.submit_parts(parts, submit.SubmitConfig(Path(tmp) / "receipts.json", max_retries=1, retry_base_seconds=0), transport)
+        self.assertEqual(len(transport.requests), 2)
+        self.assertEqual(transport.requests[0][2], transport.requests[1][2])
     def test_partial_receipt_maps_to_non_error_envelope(self) -> None:
         first = TransportTests().envelope()
         second = copy.deepcopy(first)

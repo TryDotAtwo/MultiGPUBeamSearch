@@ -42,3 +42,12 @@ No live receipt was created in this run. Direct Windows TLS to `workers.dev` fai
 - Agent protocol: `plugins/cayleypy-results-publisher/references/AGENT_PROTOCOL.md`
 - CLI: `plugins/cayleypy-results-publisher/scripts/cayleypy_submit.py`
 - Templates: `plugins/cayleypy-results-publisher/templates/`
+# Final Kaggle and GitHub verification
+
+- Private Kaggle kernel: trydotatwo/cayleypy-results-publisher-private-smoke, version 6, status COMPLETE.
+- Kaggle v1 submission: accepted=1, published=1, submission 019fc87f-8be8-7f40-91c0-fc7cd69a4a2a.
+- Native v2 submission: accepted=1, published=1, submission 019fc880-0080-7787-bfb7-98fcad07ccce.
+- GitHub ingest/staging contained the v1 result at results/v1/toy-cayley/cube_3-3-3/1/2026-08-03/019fc87f-8be8-7f40-91c0-fc7cd69a4a2a.json (blob 0fb3fe196d168612a3814902229668523ccd400c).
+- GitHub ingest/staging contained the v2 result at data/v2/slurm/toy-cayley/cube_3-3-3/2026-08-03/019fc880-0080-7787-bfb7-98fcad07ccce.json (blob 15b2464f7377676fbdee3fcbbfee7fcbca36e3d2).
+- Earlier diagnostic versions exposed and fixed two client defects: Cloudflare rejected Python's default urllib signature (1010), and native-v2 run_id did not match provenance.run_id. The client now sends a stable public User-Agent, handles and retries transport timeouts safely, and reports sanitized HTTP status without secrets.
+- Kaggle output and receipts are retained locally under test_results/cayleypy_publisher_kaggle_smoke/output_v6.
