@@ -502,3 +502,5 @@
 - User confirmed the GitHub App installation on exactly TryDotAtwo/cayleypy-beam-results and asked the agent to keep trying. All infrastructure must stay free, 100 concurrent publishers must not lose results, and beam-search/CUDA architecture changes still require separate approval.
 
 - 2026-08-01: Keep the Cloudflare results-ingest service deployed from the complete code stored in GitHub; prefer GitHub-connected Cloudflare deployment over operator-local Wrangler deploys.
+
+- 2026-08-03: Add a public Codex plugin and standalone Python CLI on `codex/cayleypy-results-ingest` so any user can publish complete canonical solutions from Kaggle v1 or native/SLURM v2 through Cloudflare into GitHub. Include detailed human and agent instructions, automatic deterministic gzip splitting at 32 MiB, receipts/polling, and no user token requirement.
