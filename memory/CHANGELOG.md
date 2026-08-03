@@ -875,3 +875,11 @@
 - 2026-08-03: Designed the public `cayleypy-results-publisher` Codex plugin and dependency-free Python CLI for safe v1 Kaggle and v2 native/SLURM publication through the existing anonymous Cloudflare ingest API. The approved design specifies deterministic bounded gzip batching, resumable receipts, terminal-status polling, human and agent guides, and no embedded credentials; implementation is pending design review.
 
 - 2026-08-03: Refined the publisher design for one-command use: the official Cloudflare origin/routes are pinned, `init` generates a fill-once config, and simple move/CSV/TSV inputs expand deterministically from explicit puzzle contexts while canonical JSON remains supported.
+
+## 2026-08-03 — Public CayleyPy results publisher plugin
+
+- Added repository marketplace plugin `cayleypy-results-publisher` and a standalone Python 3 stdlib CLI for zero-token Kaggle v1 and native/SLURM v2 result publication through the pinned Cloudflare ingest origin.
+- Added deterministic 32 MiB compressed/64 MiB raw archive partitioning, replay/proof/idempotency derivation for simple move/CSV/TSV input, safe receipt persistence/resume, retry, same-origin polling, and GitHub-presence verification after Worker cleanup.
+- Added valid canonical JSON and fill-once config templates, Russian human instructions, an agent protocol, and root README discovery.
+- Verification: 17 Python tests, 72 schema/config tests, 138 Worker tests, TypeScript typecheck, plugin validator, skill validator, template/CLI preflights, clean secret scan. Live Windows staging was blocked before HTTP by TLS; a private Kaggle fallback was not uploaded after an egress-policy rejection.
+- Beam-search/CUDA architecture was unchanged.

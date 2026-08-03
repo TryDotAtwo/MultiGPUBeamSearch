@@ -506,3 +506,7 @@
 - 2026-08-03: Add a public Codex plugin and standalone Python CLI on `codex/cayleypy-results-ingest` so any user can publish complete canonical solutions from Kaggle v1 or native/SLURM v2 through Cloudflare into GitHub. Include detailed human and agent instructions, automatic deterministic gzip splitting at 32 MiB, receipts/polling, and no user token requirement.
 
 - 2026-08-03 usability refinement: the normal publisher flow must pin every Cloudflare endpoint, require no endpoint input, generate one fill-once config, and accept a move string or contract-compliant JSON/CSV/TSV so publication is one simple command.
+
+## 2026-08-03 — Public result submission plugin final contract
+
+User required a public Codex plugin plus autonomous Python CLI in the Cloudflare ingest branch. The normal flow must be extremely easy: fill required run/puzzle fields once, provide a move string or contract JSON/CSV/TSV, and submit without entering an endpoint or token. Both Kaggle schema v1 and cluster/local schema v2 must be documented. The CLI must package results locally into sequential archives of at most 32 MiB compressed, preserve full solution/provenance information, support first/best and all-found solution modes, and verify Cloudflare-to-GitHub publication. Endpoint routes are pinned by the implementation; agents must not invent unknown metadata.
