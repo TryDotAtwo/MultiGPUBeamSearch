@@ -983,3 +983,9 @@
 - 2026-08-01: Added a fourth generated public 2xT4 example for Professor Tetraminx. It attaches Rokham's `cayleypy-cube-train-and-solve` output and pins the p888 epoch-1024 output-1 MLP checkpoint, matching metadata, and generator instead of selecting an arbitrary `.pth`. The package keeps the shared beam `2**16`, `first`/`collect`, fp16 export, and best-effort Cloudflare-to-GitHub contract. No CUDA/C++ beam architecture was changed.
 
 - 2026-08-01: Public Tetraminx Kaggle v2 completed successfully on exactly two Tesla T4 GPUs after making the exact checkpoint discovery independent of Kaggle's flattened/nested kernel-output mount layout. The output-1 batchnorm-folded MLP exported to fp16, the measured p16 profile ran puzzle 0 at beam 65,536, both ranks returned cleanly, and the validated one-move solution `-2D` was found in 5.773 solve seconds. Cloudflare accepted the result with HTTP 202 (`client_submission_id=019fbc53-ceb7-7adf-b5ce-e1bd9f6bee57`). Full output and rank logs are stored under `test_results/kaggle_public_tetraminx_v2`.
+
+## 2026-08-03 - Production runner generator path is fail-closed
+- Removed the silent `FullBeamNice/generators/p900.json` fallback from `production_runner`.
+- `BEAM_GENERATOR_PATH` is now mandatory; a missing or empty value throws before generator loading or GPU search.
+- Added a regression contract test. Verified `tests/cayleypy_public/test_runner.py`: 54 passed.
+- Root-cause evidence: Cube4 p1000 failed at 30M and 60M with the hidden p900 fallback, then solved at length 44 with 30M after explicitly setting the Cube4 `puzzle_info.json` generator path.

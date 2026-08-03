@@ -257,6 +257,14 @@ std::filesystem::path env_path(const char* name, const char* default_value) {
     return std::filesystem::path(value);
 }
 
+std::filesystem::path required_env_path(const char* name) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || value[0] == '\0') {
+        throw std::runtime_error(std::string("required environment path is missing: ") + name);
+    }
+    return std::filesystem::path(value);
+}
+
 struct PredictStatsConfig {
     std::uint32_t verbose = 0;
     std::filesystem::path jsonl_path;
@@ -4400,7 +4408,7 @@ int main(int argc, char** argv) {
 #endif
 
     const std::filesystem::path generator_path =
-        env_path("BEAM_GENERATOR_PATH", "FullBeamNice/generators/p900.json");
+        required_env_path("BEAM_GENERATOR_PATH");
     const std::filesystem::path puzzle_info_path =
         env_path("BEAM_PUZZLE_INFO_JSON", "data/puzzle_info.json");
     const std::filesystem::path test_csv_path =

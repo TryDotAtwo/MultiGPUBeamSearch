@@ -1223,6 +1223,13 @@ def test_collection_stop_contract_syncs_host_reason_and_explicit_depth_beats_leg
     assert "solve bucket overflow: increase BEAM_SOLVED_RESULT_CAPACITY" in source
 
 
+def test_production_runner_requires_explicit_generator_path() -> None:
+    source = Path("tools/production_runner.cu").read_text(encoding="utf-8")
+
+    assert 'required_env_path("BEAM_GENERATOR_PATH")' in source
+    assert 'env_path("BEAM_GENERATOR_PATH", "FullBeamNice/generators/p900.json")' not in source
+
+
 def test_runtime_log_sanitizer_covers_live_combined_rank_and_redirect_logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     invocation = runner.build_runner_invocation(
         _config(tmp_path), _plan(local_beam=128), 2, 7, "original", tmp_path / "weights", tmp_path / "artifacts",

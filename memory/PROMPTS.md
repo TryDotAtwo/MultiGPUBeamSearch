@@ -569,3 +569,6 @@ User reported that an interactive game had been running during part of the recen
 - User requested examples that are understandable to other users: one shared notebook contract, prefilled competition/model/puzzle configuration, and mode switching in the USER CONFIG cell.
 
 - User requested another public example matching the existing Cube4/444, Megaminx, and IHES notebooks for `cayley-py-professor-tetraminx-solve-optimally`, using the model output from Rokham's `cayleypy-cube-train-and-solve` script version `277456158`, and explicitly instructed not to use temporary artifacts prepared for GPT-5.3 Spark.
+
+## 2026-08-03 - Fail closed on puzzle generators
+- User requirement: remove generator defaults so a missing puzzle-specific generator path can never silently run a different puzzle's moves; then launch Cube4 puzzles 1001 through 1004 at the established maximum 820M beam.
