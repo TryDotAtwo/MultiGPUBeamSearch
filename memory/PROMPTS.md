@@ -411,3 +411,6 @@
 - User clarified that all one-puzzle array jobs should use one shared precompiled beam-search binary instead of rebuilding production_runner in every job.
 
 - User showed a completed IHES puzzle 33 run where compute succeeded but GitHub publishing failed because compute nodes could not resolve github.com and index generation crashed on metadata fields variants/source_files; requested continuing to collect and publish all cluster IHES results robustly.
+
+## 2026-08-03
+- User requested publishing a separate GitHub branch containing the complete Codex work history for this project: all requests, Codex responses, instructions to commit/push, server-run attempts, error-fix iterations, requested additions, and the original C++/CUDA-without-PyTorch requirement. User clarified that chatgpt.com is out of scope and the source must be Codex history only.
