@@ -10,6 +10,8 @@ import { replayDeadLetters } from "../src/operator-replay.js";
 import {
   GLOBAL_ENVELOPES_PER_MINUTE,
   MAX_REQUEST_BYTES,
+  MAX_ARCHIVE_REQUEST_BYTES,
+  MAX_DECOMPRESSED_ARCHIVE_BYTES,
   MAX_RESULTS_PER_REQUEST,
   PER_IP_REQUESTS_PER_MINUTE,
   RECOVERY_LIMIT,
@@ -93,6 +95,8 @@ describe("Task 3 public ingest contract", () => {
       status: "ok", ingest_mode: "reject",
       limits: {
         max_request_bytes: MAX_REQUEST_BYTES,
+        max_archive_request_bytes: MAX_ARCHIVE_REQUEST_BYTES,
+        max_decompressed_archive_bytes: MAX_DECOMPRESSED_ARCHIVE_BYTES,
         max_results_per_request: MAX_RESULTS_PER_REQUEST,
         per_ip_requests_per_minute: PER_IP_REQUESTS_PER_MINUTE,
         global_envelopes_per_minute: GLOBAL_ENVELOPES_PER_MINUTE,
@@ -319,7 +323,7 @@ describe("fail-closed modes and bounded request parsing", () => {
   });
 
   test("accepts an exact four MiB chunked JSON body with UTF-8 split across chunks", async () => {
-    const envelope = { ...validEnvelope(0), author: { name: "Ada-😀", verification: "claimed" as const } } as ResultEnvelopeV1;
+    const envelope = { ...validEnvelope(0), author: { name: "Ada-рџЂ", verification: "claimed" as const } } as ResultEnvelopeV1;
     envelope.idempotency_key = semanticHash(envelope);
     const encoded = new TextEncoder().encode(JSON.stringify({ schema_version: 1, results: [envelope] }));
     const body = new Uint8Array(4 * 1024 * 1024);
@@ -537,6 +541,8 @@ describe("durable receipts, status, health, and logging safety", () => {
       ingest_mode: "reject",
       limits: {
         max_request_bytes: MAX_REQUEST_BYTES,
+        max_archive_request_bytes: MAX_ARCHIVE_REQUEST_BYTES,
+        max_decompressed_archive_bytes: MAX_DECOMPRESSED_ARCHIVE_BYTES,
         max_results_per_request: MAX_RESULTS_PER_REQUEST,
         per_ip_requests_per_minute: PER_IP_REQUESTS_PER_MINUTE,
         global_envelopes_per_minute: GLOBAL_ENVELOPES_PER_MINUTE,
@@ -714,7 +720,7 @@ describe("mode-gated scheduled recovery", () => {
     ).bind(submissionId).first<string>("state")).toBe("validated");
   });
 
-  test("normal schedule removes committed staged rows from R2 and D1", async () => {
+  test("normal schedule removes staged raw payload but retains the idempotency row", async () => {
     const submissionId = await seedSubmission(700, "staged", "2000-01-01T00:00:00.000Z", null);
     const row = await env.RESULTS_DB.prepare(
       "SELECT raw_r2_key FROM submissions WHERE submission_id = ?",
@@ -724,8 +730,11 @@ describe("mode-gated scheduled recovery", () => {
     await scheduled(controller(), customBindings("normal"), context());
 
     expect(await env.RESULTS_DB.prepare(
-      "SELECT submission_id FROM submissions WHERE submission_id = ?",
-    ).bind(submissionId).first()).toBeNull();
+      "SELECT submission_id, state FROM submissions WHERE submission_id = ?",
+    ).bind(submissionId).first()).toEqual({
+      submission_id: submissionId,
+      state: "staged",
+    });
     expect(await env.RAW_RESULTS.head(row!.raw_r2_key)).toBeNull();
   });
   test.each(["store_only", "reject", undefined, "", "Normal", "unknown"])(

@@ -130,8 +130,10 @@ async function seedValidated(variant: number): Promise<Seeded> {
   };
 }
 
-async function seedValidatedV2(): Promise<Seeded<ResultEnvelopeV2>> {
+async function seedValidatedV2(variant: number): Promise<Seeded<ResultEnvelopeV2>> {
   const envelope = structuredClone(canonicalV2.cases[0].envelope) as unknown as ResultEnvelopeV2;
+  envelope.puzzle_id += variant;
+  envelope.idempotency_key = await computeIdempotency(envelope);
   const receipt = await receiveEnvelope({ RESULTS_DB: env.RESULTS_DB, RAW_RESULTS: env.RAW_RESULTS, VALIDATE_QUEUE: { send: async () => undefined } as unknown as Queue } as IngestEnv, envelope);
   await env.RESULTS_DB.prepare("UPDATE submissions SET state = 'validated' WHERE submission_id = ?").bind(receipt.submission_id).run();
   const row = await env.RESULTS_DB.prepare("SELECT raw_r2_key FROM submissions WHERE submission_id = ?").bind(receipt.submission_id).first<{raw_r2_key:string}>();
@@ -420,10 +422,10 @@ describe("GitHubWriter real Durable Object harness", () => {
     expect(outcome.pending).toEqual([]);
     expect(
       await env.RESULTS_DB
-        .prepare("SELECT submission_id FROM submissions WHERE submission_id = ?")
+        .prepare("SELECT submission_id, state FROM submissions WHERE submission_id = ?")
         .bind(seeded.submissionId)
         .first(),
-    ).toBeNull();
+    ).toEqual({ submission_id: seeded.submissionId, state: "staged" });
     const tree = outcome.calls.find(
       (call) =>
         call.method === "POST" && call.url.pathname.endsWith("/git/trees"),
@@ -460,10 +462,10 @@ describe("GitHubWriter real Durable Object harness", () => {
     expect(outcome.pending).toEqual([]);
     expect(
       await env.RESULTS_DB
-        .prepare("SELECT submission_id FROM submissions WHERE submission_id = ?")
+        .prepare("SELECT submission_id, state FROM submissions WHERE submission_id = ?")
         .bind(seeded.submissionId)
         .first(),
-    ).toBeNull();
+    ).toEqual({ submission_id: seeded.submissionId, state: "staged" });
     expect(await env.RAW_RESULTS.get(seeded.rawKey)).toBeNull();
     expect(
       outcome.calls.some(
@@ -476,6 +478,30 @@ describe("GitHubWriter real Durable Object harness", () => {
     ).toBe(false);
   });
 
+  test("retains staged idempotency so a timeout retry cannot create a second GitHub file", async () => {
+    const seeded = await seedValidated(24);
+    const outcome = await flushWithRouter("github-retained-idempotency", seeded, "absent");
+    expect(outcome.result).toEqual({ staged: 1, retained: 0 });
+    expect(
+      await env.RESULTS_DB
+        .prepare("SELECT submission_id, state FROM submissions WHERE submission_id = ?")
+        .bind(seeded.submissionId)
+        .first(),
+    ).toEqual({ submission_id: seeded.submissionId, state: "staged" });
+
+    const duplicate = await receiveEnvelope(
+      {
+        RESULTS_DB: env.RESULTS_DB,
+        RAW_RESULTS: env.RAW_RESULTS,
+        VALIDATE_QUEUE: { send: async () => undefined } as unknown as Queue,
+      } as IngestEnv,
+      seeded.envelope,
+    );
+    expect(duplicate).toMatchObject({
+      submission_id: seeded.submissionId,
+      duplicate: true,
+    });
+  });
   test("terminalizes different remote content without overwriting it", async () => {
     const seeded = await seedValidated(23);
     const outcome = await flushWithRouter(
@@ -537,7 +563,7 @@ test(
         .prepare("SELECT state FROM submissions WHERE submission_id = ?")
         .bind(seeded.submissionId)
         .first(),
-    ).toBeNull();
+    ).toEqual({ state: "staged" });
     expect(await env.RAW_RESULTS.get(seeded.rawKey)).toBeNull();
   },
   15_000,
@@ -611,7 +637,7 @@ test("v2 SLURM records use a separate data/v2/slurm namespace", () => {
 });
 
 test("publishes a validated v2 envelope through the separate SLURM path", async () => {
-  const seeded = await seedValidatedV2();
+  const seeded = await seedValidatedV2(1);
   const outcome = await flushWithRouter("github-v2-add", seeded, "absent");
   expect(outcome.result).toEqual({ staged: 1, retained: 0 });
   const tree = outcome.calls.find((call) => call.method === "POST" && call.url.pathname.endsWith("/git/trees"));
@@ -619,7 +645,7 @@ test("publishes a validated v2 envelope through the separate SLURM path", async 
   expect(await env.RAW_RESULTS.get(seeded.rawKey)).toBeNull();
 });
 test("v2 GitHub path conflict is terminal and retains raw evidence", async () => {
-  const seeded = await seedValidatedV2();
+  const seeded = await seedValidatedV2(2);
   const outcome = await flushWithRouter("github-v2-conflict", seeded, "different");
   expect(outcome.result).toEqual({ staged: 0, retained: 0 });
   const row = await env.RESULTS_DB.prepare("SELECT state,safe_error FROM submissions WHERE submission_id=?").bind(seeded.submissionId).first();

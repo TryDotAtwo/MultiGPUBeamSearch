@@ -1,8 +1,8 @@
 import { consumeValidationMessage, type GitHubWriterNamespace } from "./consumer.js";
 export { resolveIngestMode, type IngestMode } from "./mode.js";
-import { resolveIngestMode, type IngestMode } from "./mode.js";
 export { GitHubWriter } from "./github-writer.js";
-import { deleteStagedSubmission, findBySubmissionId, findStagedSubmissions, findValidatedSubmissions } from "./db.js";
+import { findBySubmissionId, findStagedSubmissions, findValidatedSubmissions } from "./db.js";
+import { resolveIngestMode, type IngestMode } from "./mode.js";
 import { MAX_SERIALIZED_BATCH_BYTES } from "./schema.js";
 import { validateVersionedBatch, validateVersionedEnvelope, type ResultEnvelope, type SchemaVersion } from "./schema-dispatch.js";
 import {
@@ -334,6 +334,8 @@ function health(env: WorkerEnv): Response {
     ingest_mode: resolveIngestMode(env.INGEST_MODE),
     limits: {
       max_request_bytes: MAX_REQUEST_BYTES,
+      max_archive_request_bytes: MAX_ARCHIVE_REQUEST_BYTES,
+      max_decompressed_archive_bytes: MAX_DECOMPRESSED_ARCHIVE_BYTES,
       max_results_per_request: MAX_RESULTS_PER_REQUEST,
       per_ip_requests_per_minute: PER_IP_REQUESTS_PER_MINUTE,
       global_envelopes_per_minute: GLOBAL_ENVELOPES_PER_MINUTE,
@@ -382,10 +384,6 @@ export async function scheduled(
   if (resolveIngestMode(env.INGEST_MODE) !== "normal") return;
   for (const row of await findStagedSubmissions(env.RESULTS_DB, 100)) {
     await env.RAW_RESULTS.delete(row.raw_r2_key);
-    const deleted = await deleteStagedSubmission(env.RESULTS_DB, row.submission_id);
-    if (!deleted && await findBySubmissionId(env.RESULTS_DB, row.submission_id)) {
-      throw new Error("staged_cleanup_conflict");
-    }
   }
   const writer = env.GITHUB_WRITER;
   if (writer !== undefined) {
