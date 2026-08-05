@@ -1,0 +1,25 @@
+{
+  "exact": true,
+  "expected": {
+    "@cloudflare/vitest-pool-workers": "0.19.0",
+    "@cloudflare/workers-types": "5.20260729.1",
+    "miniflare": "4.20260722.1",
+    "vitest": "4.1.10",
+    "workerd": "1.20260729.1",
+    "wrangler": "4.115.0"
+  },
+  "lockfile_workerd_paths": [
+    "node_modules/workerd"
+  ],
+  "lockfile_workerd_versions": [
+    "1.20260729.1"
+  ],
+  "resolved": {
+    "@cloudflare/vitest-pool-workers": "0.19.0",
+    "@cloudflare/workers-types": "5.20260729.1",
+    "miniflare": "4.20260722.1",
+    "vitest": "4.1.10",
+    "workerd": "1.20260729.1",
+    "wrangler": "4.115.0"
+  }
+}

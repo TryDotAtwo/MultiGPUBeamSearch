@@ -1,0 +1,20 @@
+{
+    "name":  "multigpu-beam-search",
+    "interface":  {
+                      "displayName":  "MultiGPUBeamSearch Plugins"
+                  },
+    "plugins":  [
+                    {
+                        "name":  "cayleypy-results-publisher",
+                        "source":  {
+                                       "source":  "local",
+                                       "path":  "./plugins/cayleypy-results-publisher"
+                                   },
+                        "policy":  {
+                                       "installation":  "AVAILABLE",
+                                       "authentication":  "NONE"
+                                   },
+                        "category":  "Developer Tools"
+                    }
+                ]
+}

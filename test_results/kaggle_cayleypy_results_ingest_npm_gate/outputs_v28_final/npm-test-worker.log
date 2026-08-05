@@ -1,0 +1,17 @@
+
+ RUN  v4.1.10 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+ ✓ test/receipt.test.ts (23 tests) 5636ms
+     ✓ duplicate pause deliveries beyond a max-retries-equivalent remain one parked row  3205ms
+ ✓ test/worker.test.ts (47 tests) 18183ms
+     ✓ keeps D1 per-IP accounting active even when the binding allows  2454ms
+     ✓ normal recovery bounds stale pages, refreshes queued rows, and advances failures fairly  1381ms
+     ✓ bounds per-envelope storage concurrency while preserving receipt order  2581ms
+     ✓ keeps one hundred received duplicates below one thousand internal binding calls  7011ms
+     ✓ atomic D1 per-IP accounting admits exactly 30 concurrent requests  1162ms
+
+ Test Files  2 passed (2)
+      Tests  70 passed (70)
+   Start at  11:59:08
+   Duration  21.03s (transform 685ms, setup 252ms, import 1.19s, tests 23.82s, environment 0ms)
+

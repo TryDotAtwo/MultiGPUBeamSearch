@@ -1,3 +1,39 @@
+- 2026-08-05: Cloudflare results ingest contract update: one notebook request per run may send one archive (split if >32 MiB), and the service reports archive/decompressed size caps through `/healthz` (`max_archive_request_bytes`, `max_decompressed_archive_bytes`). In normal mode retention model, scheduled cleanup no longer deletes staged/published submission rows from D1 to preserve idempotency evidence after successful publish; `GitHubWriter` keeps state-row and only removes pending transient raw evidence on commit.
+- 2026-08-01: Extend `cayleypy-results-ingest` with a backwards-compatible native SLURM/torchrun `POST /v2/results`. Keep all Kaggle `/v1/results` clients unchanged; require exact SLURM/release/solver provenance, real homogeneous native-SM hardware with 1..16 ranks, measured or bounded profiles, strict replay/proofs/reflection, and no logs, weights, tokens, private paths, or Markdown. Reuse the durable D1/R2/Queue/Durable Object/GitHub pipeline, publish separately under `data/v2/slurm/<competition>/<puzzle_type>/<yyyy-mm-dd>/<submission_id>.json`, supply schema/golden examples/docs/tests, validate on staging, and do not deploy production or change beam/CUDA code.
+- 2026-08-01: User required one compressed archive and one Cloudflare request per notebook run; if a compressed archive exceeds 32 MiB, split it and process the parts sequentially.
+
+- User clarified the durable results contract: do not retain a raw full archive; GitHub is the only persistent storage. Cloudflare must keep data only while publication is pending, delete R2/D1/Durable Object state after confirmed GitHub commit, and retain it on GitHub failure for retry.
+- User authorized implementing and publishing all remaining non-beam work,
+  including the GitHub App/Cloudflare bootstrap; only beam-search/CUDA
+  architecture changes still require separate agreement.
+- Harden the private personal-account GitHub App bootstrap with TDD: one
+  127.0.0.1 manifest callback with random exact state validation, fixed
+  contents-write/metadata-read access to only
+  TryDotAtwo/cayleypy-beam-results, in-memory PKCS#1-to-PKCS#8 conversion,
+  one pinned-Wrangler `secret bulk` stdin operation against a verified live
+  store-only staging sink, account-pinned resource creation plus exact private-
+  manifest/generated-config targeting with Windows case-insensitive env handling,
+  zero pre-existing staging secrets, exact post-upload secret names/types, and a
+  mutation-free dry-run. Document the single-operator boundary because Cloudflare
+  exposes no atomic secret-list/bulk compare-and-set. Do not create the App,
+  key, Cloudflare resource, secret, version, or deployment during preparation.
+- Private Kaggle npm gate v36 completed with exactly two non-beam failures:
+  fix operator-replay `undefined` narrowing and the invalid Vitest matcher
+  chain, use focused TDD/static gates, update memory, commit/push only scoped
+  changes, and do not rerun Kaggle or touch beam/CUDA.
+- Before staging deploy, rerun the exact private Kaggle npm gate over every
+  newly hardened ingest source, migration, runbook test, and TypeScript file.
+- Independent review found a P1 in the staging deployment helper: generated
+  config lived outside the service while `migrations_dir` was absent, so Wrangler
+  could not resolve D1 migrations. Fix via TDD in a separate commit, exercise a
+  seeded SQL upgrade if possible, do not push/deploy, and preserve production
+  `INGEST_MODE=reject`.
+- User authorized all non-beam work. Prepare a fail-closed staging Cloudflare
+  deployment runbook/scripts for the CayleyPy results ingest: exact D1/R2/Queue
+  /DLQ/DO inventory, migrations, GitHub App secret install, store-only to
+  normal activation, rollback/recovery, and live k6/recovery audit. Do not
+  deploy, create resources or secrets, invent resource IDs/endpoints/auth, or
+  change beam/CUDA architecture.
 # Prompt History
 
 ## 2026-06-20
@@ -91,7 +127,7 @@
 
 ## 2026-05-22
 - User required NVIDIA Nsight profiling for bottleneck analysis, depth=20, state id=0 only, beam=2**22, with GPU memory usage and remaining GPU memory printed before start.
-- User explicitly prohibited fallback paths: "РЅРёРєР°РєРёС… С„РѕР»Р±РµРєРѕРІ"; fallback code is considered error masking.
+- User explicitly prohibited fallback paths: "Р Р…Р С‘Р С”Р В°Р С”Р С‘РЎвЂ¦ РЎвЂћР С•Р В»Р В±Р ВµР С”Р С•Р Р†"; fallback code is considered error masking.
 - User requested Docker cleanup: delete excess Docker data, keep only one CayleyBeam100H100-related image if available, then continue architecture-aligned code work.
 - User reiterated continuation requirement: continue project work and do not deviate from architecture.
 - User clarified profiler requirement: use NVIDIA Nsight, understand correct usage, build a new clearly named shared GPU image for GPU projects, and audit remaining atomic operations.
@@ -112,7 +148,7 @@
 - User requested production scheduler work: implement real free-slot management for Stream 4 sort slots, parallelize Stream 3 restore/owner/split, and parallelize Stream 3 collectors.
 - User approved global spill ping-pong implementation: add `global_spill_buffer_a + global_spill_buffer_b` so Stream 3 drain reads one spill buffer and writes still-blocked candidates to the other buffer.
 - User clarified current phase is single-GPU algorithm polishing; multi-rank is not required now. User requested periodic threshold update, final global threshold, final load balancing, and materialize wiring in the production depth loop, followed by `production_runner 0 20 4194304`.
-- User requested connection of real data and neural network assets, with explicit reminder to preserve alignment: "РїРѕРґСЂСѓР±Р°Р№ СЂРёР°Р» РґР°С‚Р° Рё РїСЂРѕС‡РµРµ. РќРµР№СЂРѕРЅРєР° Рё РґР°С‚Р° Сѓ С‚РµР±СЏ РµСЃС‚СЊ. РќРµ Р·Р°Р±РёРІР°Р№ Рѕ Р°Р»Р°Р№РјРµРЅС‚Рµ".
+- User requested connection of real data and neural network assets, with explicit reminder to preserve alignment: "Р С—Р С•Р Т‘РЎР‚РЎС“Р В±Р В°Р в„– РЎР‚Р С‘Р В°Р В» Р Т‘Р В°РЎвЂљР В° Р С‘ Р С—РЎР‚Р С•РЎвЂЎР ВµР Вµ. Р СњР ВµР в„–РЎР‚Р С•Р Р…Р С”Р В° Р С‘ Р Т‘Р В°РЎвЂљР В° РЎС“ РЎвЂљР ВµР В±РЎРЏ Р ВµРЎРѓРЎвЂљРЎРЉ. Р СњР Вµ Р В·Р В°Р В±Р С‘Р Р†Р В°Р в„– Р С• Р В°Р В»Р В°Р в„–Р СР ВµР Р…РЎвЂљР Вµ".
 - User reported Docker container logs only showed NVIDIA header and `ninja: no work to do`, requiring visible runtime progress logging for local Docker runs.
 - User requested `B_MICRO` around `8192` for RTX 3070 tuning, per-stream isolated speed benchmarks before production runs, Stream 1 TensorOp conversion, and consideration of future T4 testing.
 - User clarified Stream 1 must also be benchmarked with 1/2/3/4 concurrent inference jobs across different batch sizes, with a fixed table recorded in the benchmark document.
@@ -130,7 +166,7 @@
 - User requested implementation of the event-driven scheduler without wave barriers after the Stream1 folded-input optimization.
 - User suggested using `RING_COUNT=4` so Stream1 always has write targets.
 - User asked to discuss why enabling Stream1 before Stream4 broke spill convergence and clarified that Stream3 should announce shard readiness while host should manage less stream/shard state.
-- User approved implementing the Stream3-owned shard-ready handoff: "РќСѓ РґР°, РґРµР»Р°Р№".
+- User approved implementing the Stream3-owned shard-ready handoff: "Р СњРЎС“ Р Т‘Р В°, Р Т‘Р ВµР В»Р В°Р в„–".
 - User clarified score/hash ring ownership architecture: Stream1 is the throughput limiter, Stream2 uses the same `B_MICRO` parent batch and then sleeps, Stream3 consumes a full score/hash ring and immediately frees the ring without cleanup, Stream4 and Stream5 must not block score/hash ring reuse, and Stream5 needs its own ring buffers later for send/recv independence.
 - User approved implementing the ring pipeline policy with `RING_COUNT=4` and Stream4-independent ring reuse.
 - User clarified Stream3 collector architecture: Stream3 should partition input by `shard_id` once, sort by shard id, and write batched transactions into each target shard instead of rescanning every shard over the full input.
@@ -174,7 +210,7 @@
 - User requested fixing the Stream1 CUTLASS residual in-place GEMM issue without adding extra runtime checks, then verifying the fix.
 - User required any Stream3/global-spill overflow or hidden data drop to produce an explicit error and stop execution; hidden loss of candidates is forbidden.
 - User required removing the local uncommitted Stream3 spill backpressure patch and discussing the architecture-level solution before implementing any fix.
-- User accepted the puzzle 0 trace diagnosis after Stream1 fix and stated the remaining issue: `Stream1=РёСЃРїСЂР°РІР»РµРЅ`, path loss is `depth6/prefix7`, `score_key=22288 <= final_threshold=27866`, loss location is after Stream1/2 and before Stream4, likely Stream3 collector/global spill; requested checking generated-candidate writes through Stream3 output/local pending/global spill and final spill-drain at depth 6.
+- User accepted the puzzle 0 trace diagnosis after Stream1 fix and stated the remaining issue: `Stream1=Р С‘РЎРѓР С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…`, path loss is `depth6/prefix7`, `score_key=22288 <= final_threshold=27866`, loss location is after Stream1/2 and before Stream4, likely Stream3 collector/global spill; requested checking generated-candidate writes through Stream3 output/local pending/global spill and final spill-drain at depth 6.
 - User corrected the Stream3/Stream4 sizing model: `GLOBAL_BEAM_WIDTH_MAX_SAFE` must be removed, `GLOBAL_BEAM_WIDTH` is only aligned from the user beam, `STREAM3_BATCH_CANDIDATES = RING_SLOT_COUNT * B_MICRO * MOVE_COUNT`, `RING_COUNT = ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))`, and `SHARD_COUNT/STREAM4_BATCH_CANDIDATES` must be selected by a memory-budget config search.
 - User clarified that Stream4 shard resident capacity must not mean logical shard size. Logical shards are larger than `STREAM4_BATCH_CANDIDATES`; Stream4 processes each logical shard in batches, with stream arrays sized by `SHARD_COUNT` and `STREAM4_BATCH_CANDIDATES`.
 - User rejected an extra per-Stream3-launch `global_spill_free` runtime check because spill capacity should be guaranteed by architecture/config; the existing fatal out-of-bounds guard remains acceptable.
@@ -183,7 +219,7 @@
 - User clarified the spill formula must also multiply by Stream4 worker count if missing; using current config fields, Stream4 worker count is represented by `STREAM4_ACTIVE_SORT_SLOTS`.
 - User requested per-stream speed measurements to derive a stable spill size and make the pipeline run confidently.
 - User required a two-level debug model: master debug flag first, then independent speed/inference/path-trace debug flags; when master debug is off, subflags must not affect runtime and debug instrumentation must not be compiled into the production binary.
-- User approved adding the required final request validation after a Kaggle path-trace run crashed in `cudaStreamSynchronize final materialize` with illegal memory access, then requested launching Kaggle with the validation enabled: "РћРєРµР№, РґРѕР±Р°РІСЊ РЅСѓР¶РЅСѓСЋ РІР°Р»РёРґР°С†РёСЋ Рё Р·Р°РїСѓСЃРєР°Р№ РєР°РіР»".
+- User approved adding the required final request validation after a Kaggle path-trace run crashed in `cudaStreamSynchronize final materialize` with illegal memory access, then requested launching Kaggle with the validation enabled: "Р С›Р С”Р ВµР в„–, Р Т‘Р С•Р В±Р В°Р Р†РЎРЉ Р Р…РЎС“Р В¶Р Р…РЎС“РЎР‹ Р Р†Р В°Р В»Р С‘Р Т‘Р В°РЎвЂ Р С‘РЎР‹ Р С‘ Р В·Р В°Р С—РЎС“РЎРѓР С”Р В°Р в„– Р С”Р В°Р С–Р В»".
 - User diagnosed the post-validation Kaggle run as too slow without logs: full-beam depths used `stream3_jobs=2049`, `stream4_jobs~4647`, and depth time about `130s`; user asked why current sizing chose such bad `stream4_jobs`.
 - User proposed deriving config from `stream4_jobs` and `stream3_jobs`, clarified that Stream3 receives `N_LOCAL * 24` generated candidates, and required batch execution time to be part of config reasoning, not just job count.
 - User corrected implementation scope: runtime config and auto-detection must live in a separate config file; `production_runner` must not own the config-search implementation.
@@ -247,8 +283,8 @@
 - User clarified that depth-only logs should not materially slow the code because heavy debug trace flags are compiled off, then requested config-only speed tuning for Kaggle T4x2 through notebook parameters rather than architecture changes.
 - User rejected the assumption that the full/small frontier alternation is normal, stated that the pattern is likely a bug, and requested adding debug only to determine the cause. Architecture changes are forbidden; code additions are allowed only for diagnostics.
 - User stopped Kaggle version 79 manually and requested setting `RUN_TIMEOUT_SEC=300` in the Kaggle config.
-- User approved fixing the Kaggle v80 diagnosis by adding the missing multi-rank final-reset cleanup for stale Stream4 histograms: "РђР°Р°Р°, РІРѕРЅ РѕРЅРѕ С‡Рµ. РўР°РєСЃ, С‚РѕРіРґР° РґР°РІР°Р№ РґРѕР±Р°РІР»СЏС‚СЊ РѕС‡РёСЃС‚РєСѓ, РєРѕРЅРµС‡РЅРѕ".
-- User requested Kaggle T4x2 validation after the reset cleanup fix: "РћРєРµР№, С‚РµСЃС‚РёСЂСѓР№ С‚РµРїРµСЂСЊ РЅР° 2С…Рў4 РєР°РіР»Р°".
+- User approved fixing the Kaggle v80 diagnosis by adding the missing multi-rank final-reset cleanup for stale Stream4 histograms: "Р С’Р В°Р В°Р В°, Р Р†Р С•Р Р… Р С•Р Р…Р С• РЎвЂЎР Вµ. Р СћР В°Р С”РЎРѓ, РЎвЂљР С•Р С–Р Т‘Р В° Р Т‘Р В°Р Р†Р В°Р в„– Р Т‘Р С•Р В±Р В°Р Р†Р В»РЎРЏРЎвЂљРЎРЉ Р С•РЎвЂЎР С‘РЎРѓРЎвЂљР С”РЎС“, Р С”Р С•Р Р…Р ВµРЎвЂЎР Р…Р С•".
+- User requested Kaggle T4x2 validation after the reset cleanup fix: "Р С›Р С”Р ВµР в„–, РЎвЂљР ВµРЎРѓРЎвЂљР С‘РЎР‚РЎС“Р в„– РЎвЂљР ВµР С—Р ВµРЎР‚РЎРЉ Р Р…Р В° 2РЎвЂ¦Р Сћ4 Р С”Р В°Р С–Р В»Р В°".
 - User requested a Stream2 solved-neighborhood feature first, with correct naming instead of informal `K_1`: `BEAM_SOLVED_NEIGHBORHOOD_RADIUS`. Required behavior: CPU precomputes the central-state neighborhood by inverse moves, GPU stores only read-only hashes/fingerprints, Stream2 detects candidates that are within the configured radius from the solution, and CPU appends the matching suffix after history reconstruction.
 - User requested preserving the current K2 discussion without implementing K2 yet. Future K2 means Stream2 descendant/suffix expansion from each generated candidate; K2 suffix generators should be precomputed and stored, not generated on the fly inside CUDA kernels.
 - User requested testing the new Stream2 solved-neighborhood behavior on Kaggle T4x2 for puzzle IDs 1 through 10.
@@ -268,7 +304,7 @@
 - User provided new model file `%USERPROFILE%\Downloads\Telegram Desktop\p900-t000-q_1779830329_best.pth` and requested comparison against the current project model: parameter count, architecture differences, runtime implications, and compatibility with the existing Stream1 CUDA runner.
 - User requested implementing a universal MLP model interface where Stream1 model dimensions and residual block count are inferred from/exported with weights, required blocks are duplicated automatically, and the existing optimized CUTLASS inference code remains the execution path.
 - User requested running the new model on Kaggle for puzzle ID `0` with the current large-beam parameters, approximately `2**26 + 16M` and specifically the notebook's current `BEAM_WIDTH=2**26+15_506_660`.
-- User observed new-model puzzle-0 depth `7..8` runtimes around `108..111s` with `stream4_jobsв‰€959..1021`, compared those metrics against previous runs, and requested a Kaggle run with timing debug enabled to identify the bottleneck.
+- User observed new-model puzzle-0 depth `7..8` runtimes around `108..111s` with `stream4_jobsРІвЂ°в‚¬959..1021`, compared those metrics against previous runs, and requested a Kaggle run with timing debug enabled to identify the bottleneck.
 - User interrupted the attempted dispatcher timing-code investigation and explicitly required no dispatcher/source-code changes; requested only reducing the Kaggle diagnostic beam by `1,000,000`.
 - User requested measuring Stream1 inference speed and Stream3 speed under the current T4x2 parameters, because Stream3 should not dominate the pipeline. Required Stream1 benchmark table: `B_MICRO=[2048,4096,8192,16384]` and concurrent inference count `[1,2,4,8]`.
 - User accepted that current production bottleneck is Stream1 inference and requested launching puzzle ID `0` on Kaggle T4x2 with the previously working good config, without further optimization work, letting the run continue without timeout.
@@ -332,7 +368,7 @@
   the already found puzzle `991` original solution instead of spending time
   solving the original again.
 - User provided local IHES model file
-  `C:/Users/РРІР°РЅ Р›РёС‚РІР°Рє/Downloads/p888-t000_1778521793_e32692.pth` and requested
+  `C:/Users/Р ВР Р†Р В°Р Р… Р вЂєР С‘РЎвЂљР Р†Р В°Р С”/Downloads/p888-t000_1778521793_e32692.pth` and requested
   launching the IHES cube solver with that model on MEPhI. The model is a
   BatchNorm-folded QMLP-style checkpoint with `input_dim=5184=72*72`,
   `hd1=2556`, `hd2=218`, `nrd=16`, and `output_dim=1`; IHES move count is 18,
@@ -411,3 +447,67 @@
 - User clarified that all one-puzzle array jobs should use one shared precompiled beam-search binary instead of rebuilding production_runner in every job.
 
 - User showed a completed IHES puzzle 33 run where compute succeeded but GitHub publishing failed because compute nodes could not resolve github.com and index generation crashed on metadata fields variants/source_files; requested continuing to collect and publish all cluster IHES results robustly.
+- User clarified that profile tuning need not solve a puzzle: compare completed
+  `depth_done=8` timings. Once profiles and the notebook are ready, run exactly
+  one output-24 and one output-1 final solve on puzzle 0 with beam `2**21` and
+  maximum depth 100; both models must return valid solutions.
+
+- User requested a public standard-CayleyPy Kaggle notebook for real 2xT4 MultiGPUBeamSearch. It must accept the standard puzzle_info.json/test.csv/sample_submission.csv structure, one supported checkpoint with automatic batchnorm-folded or resmlp-layernorm detection and automatic fp16 on T4, output_dim exactly 1 or move_count, inclusive puzzle range, reflection modes off/after_original/only, first or bounded collect-until-depth solution modes, configurable solved-neighborhood BFS touch radius, nearest measured beam profile selection, independent path validation, and maximal reproducibility artifacts.
+- User requested automatic best-effort result publication without a user GitHub token through a Cloudflare service backed by a GitHub App. It must support at least 100 concurrent publishers without loss or git conflicts, retain author/puzzle/model/run provenance, preserve accepted raw payloads, validate paths, deduplicate idempotently, and publish append-only records to TryDotAtwo/cayleypy-beam-results through a staging/CI gate.
+
+- User requested Task 1 of the CayleyPy Results Ingest plan: build the strict Worker schema/local runtime with exact pinned dependencies, safe Ajv validation, bounded batch/envelope fields, logical staging/production bindings without resource ids, tests, typecheck, and no Cloudflare deployment or external resource creation.
+
+- Review required CayleyPy ingest Task 1 to enforce UUID/date-time/URI formats, use exact ingress raw byte length for the 25 MiB cap, add regression tests, and remove only worktree-local npm caches while retaining the unavailable npm gate as an explicit concern.
+
+- Review required replacing unavailable @cloudflare/workers-types=4.20260728.0 with exact confirmed-published 5.20260727.1, removing only the recreated package-local npm cache, and retaining the npm CONNECT timeout/HTTP 502 gate as an explicit blocker without inventing a lockfile.
+
+- User requested the missing CayleyPy ingest Task 1 dependency/runtime gate on private CPU Kaggle kernel trydotatwo/cayleypy-results-ingest-npm-gate, with committed inputs, npm lock/ci/test/typecheck evidence, exact lockfile integration, bounded config-only reruns, private metadata, GPU disabled, Internet enabled, and no Cloudflare deployment.
+
+- User requested CayleyPy Results Ingest Task 2: exact D1 migration, canonical semantic idempotency, service-generated immutable raw R2 keys with SHA-256 metadata, R2-before-receipt durability, retryable queue-failure persistence, compare-and-transition state updates, real Miniflare bindings, a bounded private Kaggle CPU npm gate, reports, and no Cloudflare deployment/resources/secrets/public push.
+
+- Fresh review required Task 2 to prevent concurrent duplicates from returning queued while the winner is still `received`, bounded-wait through the final reread, remove and verify only the D1 conflict loser's service-generated R2 raw object, clean new raw objects after D1 insert exceptions, never ignore transition booleans, keep Queue and D1 errors distinct, add state-conflict and cleanup tests with real Miniflare bindings, and replace stale v8 evidence with an exact private Kaggle v9+ gate. No deployment, resource creation, secrets, git push, or public publication was authorized.
+- Distributed-failure audit corrected the prior D1 insert cleanup requirement: an INSERT exception has ambiguous commit outcome, so immutable raw must be retained for operator recovery. Raw deletion is allowed only after confirmed `ON CONFLICT ... changes=0` and a found winner, where the service-generated loser key is known unreferenced. The `untracked_raw_cleanup_failed` branch must not exist.
+- Round-2 Task 2 review required closing the D1/Queue crash window with at-least-once semantics: stale `received` duplicates must resend the same submission id after bounded waiting; a bounded scheduled helper must recover stale `received|retryable` rows through a `(state,updated_at)` index; Queue ambiguity must reread consumer progress; the Task 4 consumer must idempotently accept `received|queued|retryable -> validating`; failed retries must refresh retry metadata fairly; successful retries clear stale errors; and real Miniflare plus exact private Kaggle v11+ evidence is mandatory. No deployment, resource creation, git push, or public publication was authorized.
+- Round-3 Task 2 review required two fixes from exact base `dde1cc99`: document `INGEST_MODE` as only `normal|store_only|reject` with missing/unknown fail-closed as reject; define normal/store-only/reject HTTP persistence and Queue behavior; make scheduled recovery a non-normal no-op; park non-normal Task 4 backlog without transitions, validation, publication, or payload logs; add a final non-normal GitHub write guard and explicit resume tests; and never add a fourth mode. Receipt Miniflare tests must execute the actual `migrations/0001_initial.sql` through an appropriate loader, assert the deployable state CHECK and `submissions_recovery(state,updated_at)` index, and include migration bytes in an exact private CPU Kaggle v13-era gate with current hashes, metadata, reports, and no Task 3 implementation, deployment, public push, or publication. The work must use TDD and land as one standalone commit.
+- Round-4 Task 2 review from exact clean base `9a966d5` required lossless non-normal Queue pause semantics without implementing Task 3/4 handlers: resolve mode first, parse only `submission_id`, durably park `received|queued|retryable -> retryable` with `safe_error=ingest_paused`, unchanged retry count/raw, refreshed timestamp, verified reread, and ACK without message retry or prohibited binding access. Normal scheduled recovery must also scan stale `queued`, self-transition it on successful same-id resend, refresh/clear stale errors, and rescue queued rows after D1 park failures exhaust platform delivery. Future writer work must persist ids before the final guard and throw/retry on alarm failure. Real Miniflare TDD, exact private CPU Kaggle v15+ RED/GREEN evidence, current hashes/metadata, reports, memory updates, one standalone commit, and no deployment/resources/secrets/git push/publication were mandatory.
+
+- User requested CayleyPy Results Ingest Task 3 from exact clean `d50d7bb` using TDD and one standalone commit: implement only the bounded public POST/status/health Worker, exact fail-closed `normal|store_only|reject` modes, 25 MiB/100-envelope controls, 30 requests/minute/IP and 2,000 envelopes/minute global limits with optional Cloudflare binding plus load-bearing atomic D1 accounting, explicit store-only R2/D1 persistence with zero Queue access, safe responses/logging, and normal-only 60-second/50-row scheduled recovery. Preserve private Kaggle RED/GREEN evidence, reports, plan/SDD/memory updates, and do not implement Task 4, deploy, create resources/secrets, push git, mutate GitHub, or publish publicly.
+- Task 3 review hardening required TDD from exact `f0c81edf`: sample the rate window at every counter consumption and make D1 UPSERTs monotonic against stale windows; replace the 25 MiB retained-chunk/double-buffer body path with incremental fatal UTF-8 decoding and a defensible 4 MiB limit; skip schema reserialization when raw length is known; bound envelope concurrency to 8 and pass a request-wide duplicate reread budget through `RequestMeta` so 100 received duplicates remain below 1,000 binding calls; return a safe pre-D1 400 for malformed percent encoding; align Wrangler and the pinned Worker pool to exact supported compatibility date `2025-07-12`; preserve corrected private CPU RED and GREEN push/status/pull evidence with semantic payload validation; update plan/reports/memory; and land one standalone fix commit. No Task 4, CUDA/beam architecture change, deployment, resource/secret creation, external git push, or public publication was authorized. Final evidence policy is list-free: retain bounded sanitized v23 RED and v25 GREEN receipts, metadata/notebooks, manifests, logs, hashes, and timestamps; exclude identity-bearing kernel-list output and invalid/partial bulk.
+- Task 3 compatibility follow-up required restoring the exact production date `2026-07-28` instead of downgrading it; researching and pinning the current published Cloudflare/Vitest/workerd stack with a deterministic lock; migrating the Worker test configuration/types to the current API; and proving the result in a private CPU Kaggle RED/GREEN gate with exact registry/resolved-tree/workerd-path, pre/post-install 18-file hashes, typecheck, schema 12/12, Worker 70/70 twice, and a fail-closed no-fallback-warning scan. Preserve list-free push/status/output/pull receipts, explicitly label any stale pull provenance, update reports/SDD/CHANGELOG/PROMPTS, land one standalone commit, and do not implement Task 4, deploy, create resources/secrets, push externally, or change CUDA/beam work.
+
+- User authorized porting the corrected public canonical schema into results-ingest with independent server verification of semantic idempotency, proof/replay/reflection, model-head and size limits; preserve Task2/3 durability and exact Cloudflare stack, with no Task4 consumer/deployment/CUDA/beam work.
+
+- User authorized continuing the public notebook and Cloudflare results-service implementation, including the previously discussed non-beam work. The only standing restriction is that the beam-search architecture/CUDA algorithms must not be changed without explicit user agreement.
+
+- CayleyPy results-ingest Task 5 must serialize GitHub App writes through one Durable Object, preserve raw R2 and forensic D1 provenance, remain idempotent under at-least-once delivery and GitHub reference races, retain/rearm work across failures and eviction, avoid early-pending starvation, support at least 100 concurrent publishers, use current declarative SQLite Durable Object exports, and pass an exact private Kaggle dependency/type/runtime gate before any Cloudflare deployment.
+
+- User authorized all non-beam implementation work and reiterated that only
+  beam-search/CUDA architecture changes require separate approval.
+- CayleyPy results-ingest Task 8 must prepare a deterministic 100-publisher
+  staging gate with 80 unique valid results, 10 exact semantic duplicates, and
+  10 invalid proof results; bounded jitter and `429` retry; the exact k6
+  thresholds; no token or envelope logging; endpoint configuration through the
+  environment; and a bounded recovery audit over receipt, D1, R2, status, and
+  GitHub evidence. No external run, commit, push, deployment, or beam/CUDA
+  change is authorized during preparation.
+
+- 2026-07-30: Implement P1 GET status rate limit and safe bounded dead-letter replay; author verification remains claimed and production mode remains reject.
+
+- 2026-07-30: Fix bounded cardinality for anonymous status GET rate-limit storage; preserve production reject.
+
+- 2026-07-30: Add fail-safe legacy status-ip cleanup migration and correct fixed-bucket documentation.
+
+- User instructed the agent to continue autonomously, authorized Cloudflare staging deployment and GitHub App creation, and kept only beam-search/CUDA architecture changes behind a separate approval boundary.
+- User explicitly asked to continue after the network interruption.
+
+- User confirmed the GitHub App installation on exactly TryDotAtwo/cayleypy-beam-results and asked the agent to keep trying. All infrastructure must stay free, 100 concurrent publishers must not lose results, and beam-search/CUDA architecture changes still require separate approval.
+
+- 2026-08-01: Keep the Cloudflare results-ingest service deployed from the complete code stored in GitHub; prefer GitHub-connected Cloudflare deployment over operator-local Wrangler deploys.
+
+- 2026-08-03: Add a public Codex plugin and standalone Python CLI on `codex/cayleypy-results-ingest` so any user can publish complete canonical solutions from Kaggle v1 or native/SLURM v2 through Cloudflare into GitHub. Include detailed human and agent instructions, automatic deterministic gzip splitting at 32 MiB, receipts/polling, and no user token requirement.
+
+- 2026-08-03 usability refinement: the normal publisher flow must pin every Cloudflare endpoint, require no endpoint input, generate one fill-once config, and accept a move string or contract-compliant JSON/CSV/TSV so publication is one simple command.
+
+## 2026-08-03 вЂ” Public result submission plugin final contract
+
+User required a public Codex plugin plus autonomous Python CLI in the Cloudflare ingest branch. The normal flow must be extremely easy: fill required run/puzzle fields once, provide a move string or contract JSON/CSV/TSV, and submit without entering an endpoint or token. Both Kaggle schema v1 and cluster/local schema v2 must be documented. The CLI must package results locally into sequential archives of at most 32 MiB compressed, preserve full solution/provenance information, support first/best and all-found solution modes, and verify Cloudflare-to-GitHub publication. Endpoint routes are pinned by the implementation; agents must not invent unknown metadata.- 2026-08-03: Test the complete public submission flow, then publish a clean separate branch in the results repository containing only user instructions, the public Codex plugin, and the standalone/GitHub CLI workflow. Full external testing and publishing were authorized; beam-search architecture remains out of scope.

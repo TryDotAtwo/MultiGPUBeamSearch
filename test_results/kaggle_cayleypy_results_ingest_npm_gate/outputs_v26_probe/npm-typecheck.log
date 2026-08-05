@@ -1,0 +1,13 @@
+
+> typecheck
+> tsc --noEmit
+
+test/apply-migrations.ts(1,58): error TS2307: Cannot find module 'cloudflare:test' or its corresponding type declarations.
+test/apply-migrations.ts(5,16): error TS2664: Invalid module name in augmentation, module 'cloudflare:test' cannot be found.
+test/receipt.test.ts(1,21): error TS2307: Cannot find module 'cloudflare:test' or its corresponding type declarations.
+test/receipt.test.ts(151,31): error TS7006: Parameter 'column' implicitly has an 'any' type.
+test/receipt.test.ts(357,29): error TS7006: Parameter 'object' implicitly has an 'any' type.
+test/worker.test.ts(1,21): error TS2307: Cannot find module 'cloudflare:test' or its corresponding type declarations.
+test/worker.test.ts(59,79): error TS7006: Parameter 'object' implicitly has an 'any' type.
+test/worker.test.ts(524,35): error TS7031: Binding element 'name' implicitly has an 'any' type.
+test/worker.test.ts(525,36): error TS7031: Binding element 'name' implicitly has an 'any' type.

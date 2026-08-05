@@ -1,0 +1,33 @@
+
+> test
+> vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts
+
+
+ RUN  v4.1.10 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+ ✓ test/schema.test.ts (12 tests) 75ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  12:03:27
+   Duration  590ms (transform 74ms, setup 0ms, import 292ms, tests 75ms, environment 0ms)
+
+
+ RUN  v4.1.10 /kaggle/working/cayleypy-results-ingest-gate/services/cayleypy-results-ingest
+
+ ✓ test/receipt.test.ts (23 tests) 6471ms
+     ✓ failed recovery advances retry metadata so a bounded page cannot starve its tail  637ms
+     ✓ duplicate pause deliveries beyond a max-retries-equivalent remain one parked row  3450ms
+ ✓ test/worker.test.ts (47 tests) 20164ms
+     ✓ normal mode persists each envelope, sends per-id work, and gives duplicate receipts  629ms
+     ✓ keeps D1 per-IP accounting active even when the binding allows  2589ms
+     ✓ normal recovery bounds stale pages, refreshes queued rows, and advances failures fairly  1541ms
+     ✓ bounds per-envelope storage concurrency while preserving receipt order  2745ms
+     ✓ keeps one hundred received duplicates below one thousand internal binding calls  7617ms
+     ✓ atomic D1 per-IP accounting admits exactly 30 concurrent requests  1372ms
+
+ Test Files  2 passed (2)
+      Tests  70 passed (70)
+   Start at  12:03:30
+   Duration  23.58s (transform 638ms, setup 258ms, import 1.12s, tests 26.64s, environment 1ms)
+

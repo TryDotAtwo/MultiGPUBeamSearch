@@ -1,0 +1,9 @@
+{
+  "compatibility_warning_scan_clean": true,
+  "lockfile_present": true,
+  "post_install_payload_exact": true,
+  "prior_commands_passed": false,
+  "registry_versions_exact": true,
+  "resolved_stack_exact": true,
+  "workerd_override_exact": true
+}

@@ -1,0 +1,66 @@
+{
+  "name": "cayleypy-results-ingest",
+  "dependencies": {
+    "@cloudflare/vitest-pool-workers": {
+      "version": "0.18.8",
+      "resolved": "https://registry.npmjs.org/@cloudflare/vitest-pool-workers/-/vitest-pool-workers-0.18.8.tgz",
+      "overridden": false,
+      "dependencies": {
+        "miniflare": {
+          "version": "4.20260722.0",
+          "resolved": "https://registry.npmjs.org/miniflare/-/miniflare-4.20260722.0.tgz",
+          "overridden": false,
+          "dependencies": {
+            "workerd": {
+              "version": "1.20260728.1"
+            }
+          }
+        },
+        "vitest": {
+          "version": "4.1.10"
+        },
+        "wrangler": {
+          "version": "4.114.0"
+        }
+      }
+    },
+    "@cloudflare/workers-types": {
+      "version": "5.20260727.1",
+      "resolved": "https://registry.npmjs.org/@cloudflare/workers-types/-/workers-types-5.20260727.1.tgz",
+      "overridden": false
+    },
+    "vitest": {
+      "version": "4.1.10",
+      "resolved": "https://registry.npmjs.org/vitest/-/vitest-4.1.10.tgz",
+      "overridden": false
+    },
+    "wrangler": {
+      "version": "4.114.0",
+      "resolved": "https://registry.npmjs.org/wrangler/-/wrangler-4.114.0.tgz",
+      "overridden": false,
+      "dependencies": {
+        "@cloudflare/unenv-preset": {
+          "version": "2.16.1",
+          "resolved": "https://registry.npmjs.org/@cloudflare/unenv-preset/-/unenv-preset-2.16.1.tgz",
+          "overridden": false,
+          "dependencies": {
+            "workerd": {
+              "version": "1.20260728.1"
+            }
+          }
+        },
+        "@cloudflare/workers-types": {
+          "version": "5.20260727.1"
+        },
+        "miniflare": {
+          "version": "4.20260722.0"
+        },
+        "workerd": {
+          "version": "1.20260728.1",
+          "resolved": "https://registry.npmjs.org/workerd/-/workerd-1.20260728.1.tgz",
+          "overridden": true
+        }
+      }
+    }
+  }
+}

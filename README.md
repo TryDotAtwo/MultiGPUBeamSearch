@@ -15,6 +15,7 @@ multiple GPUs through `torchrun`; the same binary is used in both cases.
 - FP16 and BF16 exported weights, depending on target GPU.
 - SLURM examples for large multi-GPU runs.
 - Kaggle notebooks for smaller validation runs.
+- Public zero-token CayleyPy result publisher: [`plugins/cayleypy-results-publisher`](plugins/cayleypy-results-publisher/README.md).
 
 ## Requirements
 

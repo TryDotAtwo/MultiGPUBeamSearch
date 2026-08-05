@@ -1,0 +1,136 @@
+{
+  "schema_version": 2,
+  "results": [
+    {
+      "schema_version": 2,
+      "author": {
+        "name": "Example User",
+        "verification": "claimed"
+      },
+      "competition": "toy-cayley",
+      "puzzle_type": "cube_3/3/3",
+      "profile": {
+        "requested_beam": 1000000000,
+        "effective_beam": 1000013824,
+        "alignment_delta": 13824,
+        "profile_power": 30,
+        "profile_anchor_beam": 1073741824,
+        "profile_status": "measured",
+        "profile_evidence_id": "h100x4-megaminx-p30-v1",
+        "gpu_family": "H100",
+        "vram_mib": 81559,
+        "native_sm": 90,
+        "world_size": 4,
+        "backend": "mlp",
+        "model_class": "output_move_count"
+      },
+      "runtime": {
+        "touch_bfs_radius": 0,
+        "solution_mode": "first",
+        "max_depth": 8,
+        "max_collected_solutions": 16,
+        "b_micro": 2048,
+        "stream1_concurrency": 4,
+        "stream3_ring_slots": 4,
+        "shard_count": 4,
+        "shard_capacity_scale_ppm": 1050000,
+        "stream4_batch_candidates": 98304,
+        "stream4_trigger_candidates": 98304,
+        "stream4_active_sort_slots": 4
+      },
+      "model": {
+        "filename": "toy-model.pt",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "format": "resmlp-layernorm",
+        "manifest": {
+          "state_len": 3,
+          "num_classes": 3,
+          "hd1": 256,
+          "hd2": 256,
+          "nrd": 4,
+          "output_dim": 2,
+          "dtype": "fp16",
+          "normalization": "layernorm",
+          "layout": "row-major input activations times weight_hxk"
+        }
+      },
+      "hardware": {
+        "platform": "slurm",
+        "gpu_names": [
+          "NVIDIA H100 80GB HBM3",
+          "NVIDIA H100 80GB HBM3",
+          "NVIDIA H100 80GB HBM3",
+          "NVIDIA H100 80GB HBM3"
+        ],
+        "accelerator_count": 4,
+        "world_size": 4,
+        "native_sm": 90,
+        "vram_mib_per_gpu": 81559,
+        "driver_version": "570.133.20"
+      },
+      "timings": {
+        "solve_us": 95335,
+        "wall_us": 4720000
+      },
+      "client_submission_id": "019fc87e-ec87-7f54-8005-c9f9d90d7e05",
+      "run_id": "public-plugin-template-native",
+      "idempotency_key": "76be895cea88eb952c5a5be9a00213fc9e16c20a7bdebac4765d2552362f32dc",
+      "submitted_at": "2026-08-03T16:39:49.127Z",
+      "puzzle_id": 1,
+      "proof": {
+        "initial_state": [
+          2,
+          0,
+          1
+        ],
+        "central_state": [
+          0,
+          1,
+          2
+        ],
+        "generators": {
+          "clockwise": [
+            1,
+            2,
+            0
+          ],
+          "counterclockwise": [
+            2,
+            0,
+            1
+          ]
+        },
+        "initial_state_sha256": "a50c12ec8e20411bc79e811c15b13a8ea16e58f08d1c8015c257f83f6bc1c3fd",
+        "central_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5",
+        "generators_sha256": "340adb1a099141be943f423279014724f1fffb0251a5f96547eb8bcb32297f48",
+        "reached_state_sha256": "434026bd98ff2d8a2fb346c89ae9de006d1e2a6862832b6b3cd86e51de36d5c5"
+      },
+      "orientation": {
+        "search_mode": "off",
+        "final_orientation": "original"
+      },
+      "solution": {
+        "path": [
+          "clockwise"
+        ],
+        "length": 1,
+        "solved_depth": 1,
+        "touch_depth": 0,
+        "validation": "valid",
+        "collection_index": 0,
+        "collection_status": "first_solution"
+      },
+      "provenance": {
+        "platform": "slurm",
+        "cluster_name": "basis",
+        "slurm_job_id": "32633",
+        "slurm_array_task_id": null,
+        "run_id": "public-plugin-template-native",
+        "release_tag": "megaminx-native-v1",
+        "release_asset": "megaminx-sm90-linux-x86_64.tar.zst",
+        "release_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "solver_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    }
+  ]
+}
