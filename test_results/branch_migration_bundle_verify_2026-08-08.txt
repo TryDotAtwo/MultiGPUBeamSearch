@@ -1,0 +1,103 @@
+﻿The bundle contains these 90 refs:
+61516233b1c458f24dc99bc59923b39e0c253c3d refs/codex/turn-diffs/checkpoints/475c0a651e4d68f5dd33d50fdb24244c08f87964a9535c29a2114aa440d24d9b/4009ec14bbe96353fe3c7846b73e04c4bc8b68b6cf82b0fa0daa7eda2f3a8591/1785571407783/58f43b01-66aa-4c8e-bf5b-15896ce0bed1
+1c4e2996d8f602dd1bbeabf94ebf9559fd0119d3 refs/codex/turn-diffs/checkpoints/68484d9884193c8a03d8618ed6e5fab6dc9800496cb691f7987f771ace37bbbd/77d75fca4968a19246a6257de637542d4a0323b58d4086e7f0962bb571c70d8c/1785662489587/fedc7ca1-03a5-4c67-9c7f-0ca49151cc46
+2e3f925283cb7f95268d5a012110da07e640ed21 refs/codex/turn-diffs/checkpoints/b8a10d869388921358059213262e52e6ddc7eb1671df3b0063c07c0417f78367/d08dea135bbf2a4748e577626e837d7c211dcbd7589fffee6b24906fd220b672/1785686188146/e60eac14-c6b2-4a32-b148-16149d6db650
+61516233b1c458f24dc99bc59923b39e0c253c3d refs/codex/turn-diffs/checkpoints/c75fea73455e2f1c4048b272010492bcac7466c1edf8ee11a9be9084b5a4a595/5991a6ce3358f7c4120d910eeeb85fa76b18a6de14d1f40e654207b7bb9ab207/1785571638639/0a6db21b-5a8b-4fdc-9d8d-66909011cb36
+7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0 refs/heads/agent/complete-project-work-history
+638fcc90a349f68e01c14dfdca299a87700dadf1 refs/heads/codex/cayleypy-results-ingest
+8dcdafda898b935ec10cc77c50e22a1154a1f285 refs/heads/codex/cube4-fp16-parity
+4f1aa91339f6800e8cb0235b92e4c2139b190f00 refs/heads/codex/cube4-public-collector
+871ba0854db25bcd09ab5b8e8ab94740af3c9dde refs/heads/codex/kaggle-t4-mlp-autoprofiles
+2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c refs/heads/codex/megaminx-native-cluster-release
+a0326407ecc58a0b800f34d217a126ce876a7640 refs/heads/codex/profile-capacity-safety
+38310f89c05cc795b4297b30a853ac158d1a7e4a refs/heads/codex/public-cayleypy-notebook
+06eb962110ce706532f9f3e917977a13563e1508 refs/heads/codex/stream1-generic-seq-align
+d319f6db0540b6ccef0d41258407815cfe163cce refs/heads/codex/stream1-generic-seq-align-impl
+df534ebb1ef624abd42443211778b5588916d6d2 refs/heads/codex/stream1-piece-transformer
+d319f6db0540b6ccef0d41258407815cfe163cce refs/heads/codex/stream1-real-state-rank-parity
+0ca90d1a79aa545c99662e6efe2749e53c5ad717 refs/heads/codex/stream1-transformer-accumulator
+7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0 refs/heads/legacy/2026-08-08/local/agent/complete-project-work-history
+638fcc90a349f68e01c14dfdca299a87700dadf1 refs/heads/legacy/2026-08-08/local/codex/cayleypy-results-ingest
+8dcdafda898b935ec10cc77c50e22a1154a1f285 refs/heads/legacy/2026-08-08/local/codex/cube4-fp16-parity
+4f1aa91339f6800e8cb0235b92e4c2139b190f00 refs/heads/legacy/2026-08-08/local/codex/cube4-public-collector
+871ba0854db25bcd09ab5b8e8ab94740af3c9dde refs/heads/legacy/2026-08-08/local/codex/kaggle-t4-mlp-autoprofiles
+2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c refs/heads/legacy/2026-08-08/local/codex/megaminx-native-cluster-release
+a0326407ecc58a0b800f34d217a126ce876a7640 refs/heads/legacy/2026-08-08/local/codex/profile-capacity-safety
+38310f89c05cc795b4297b30a853ac158d1a7e4a refs/heads/legacy/2026-08-08/local/codex/public-cayleypy-notebook
+06eb962110ce706532f9f3e917977a13563e1508 refs/heads/legacy/2026-08-08/local/codex/stream1-generic-seq-align
+d319f6db0540b6ccef0d41258407815cfe163cce refs/heads/legacy/2026-08-08/local/codex/stream1-generic-seq-align-impl
+df534ebb1ef624abd42443211778b5588916d6d2 refs/heads/legacy/2026-08-08/local/codex/stream1-piece-transformer
+d319f6db0540b6ccef0d41258407815cfe163cce refs/heads/legacy/2026-08-08/local/codex/stream1-real-state-rank-parity
+0ca90d1a79aa545c99662e6efe2749e53c5ad717 refs/heads/legacy/2026-08-08/local/codex/stream1-transformer-accumulator
+b5fcf6b0ee3247a1f189e6da79a1641d2304bd1c refs/heads/legacy/2026-08-08/local/main
+09d66286ac65c627f04b04218df565e569aacdd5 refs/heads/legacy/2026-08-08/local/maintenance/branch-structure
+7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0 refs/heads/legacy/2026-08-08/remote/agent/complete-project-work-history
+638fcc90a349f68e01c14dfdca299a87700dadf1 refs/heads/legacy/2026-08-08/remote/codex/cayleypy-results-ingest
+8dcdafda898b935ec10cc77c50e22a1154a1f285 refs/heads/legacy/2026-08-08/remote/codex/cube4-fp16-parity
+4f1aa91339f6800e8cb0235b92e4c2139b190f00 refs/heads/legacy/2026-08-08/remote/codex/cube4-public-collector
+2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c refs/heads/legacy/2026-08-08/remote/codex/megaminx-native-cluster-release
+a0326407ecc58a0b800f34d217a126ce876a7640 refs/heads/legacy/2026-08-08/remote/codex/profile-capacity-safety
+4ea681f210d49aa1fbb0c889d1d40431470607f4 refs/heads/legacy/2026-08-08/remote/codex/public-cayleypy-notebook
+d319f6db0540b6ccef0d41258407815cfe163cce refs/heads/legacy/2026-08-08/remote/codex/stream1-generic-seq-align-impl
+df534ebb1ef624abd42443211778b5588916d6d2 refs/heads/legacy/2026-08-08/remote/codex/stream1-piece-transformer
+f769e707dcda2b962bbaf99c62b40a1fd88f8108 refs/heads/legacy/2026-08-08/remote/codex/stream1-real-state-rank-parity
+6f95bd6bdb32b5f6ef7cca32b96967bce6036503 refs/heads/legacy/2026-08-08/remote/main
+b5fcf6b0ee3247a1f189e6da79a1641d2304bd1c refs/heads/main
+09d66286ac65c627f04b04218df565e569aacdd5 refs/heads/maintenance/branch-structure
+6f95bd6bdb32b5f6ef7cca32b96967bce6036503 refs/remotes/origin/HEAD
+7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0 refs/remotes/origin/agent/complete-project-work-history
+638fcc90a349f68e01c14dfdca299a87700dadf1 refs/remotes/origin/codex/cayleypy-results-ingest
+8dcdafda898b935ec10cc77c50e22a1154a1f285 refs/remotes/origin/codex/cube4-fp16-parity
+4f1aa91339f6800e8cb0235b92e4c2139b190f00 refs/remotes/origin/codex/cube4-public-collector
+2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c refs/remotes/origin/codex/megaminx-native-cluster-release
+a0326407ecc58a0b800f34d217a126ce876a7640 refs/remotes/origin/codex/profile-capacity-safety
+4ea681f210d49aa1fbb0c889d1d40431470607f4 refs/remotes/origin/codex/public-cayleypy-notebook
+d319f6db0540b6ccef0d41258407815cfe163cce refs/remotes/origin/codex/stream1-generic-seq-align-impl
+df534ebb1ef624abd42443211778b5588916d6d2 refs/remotes/origin/codex/stream1-piece-transformer
+f769e707dcda2b962bbaf99c62b40a1fd88f8108 refs/remotes/origin/codex/stream1-real-state-rank-parity
+6f95bd6bdb32b5f6ef7cca32b96967bce6036503 refs/remotes/origin/main
+6f95bd6bdb32b5f6ef7cca32b96967bce6036503 refs/tags/cube444-data-2026-08-01
+b74181aca772b66093e5b456b6217d266f98d525 refs/tags/ihes-p888-model
+4055bb970ca59324b770aad62b82bf134746e140 refs/tags/stream1-mlp-torch-kaggle-v1-code
+cc90a3d769c983f7969b36631883aa8b6447f5cc refs/tags/stream1-mlp-torch-kaggle-v2-code
+65bf43de9d3f1e470096115694be6fb0a7f30179 refs/tags/stream1-transformer-bias-ln-65bf43d
+b34bf7c187c6b9e0de024376646781b970cca185 refs/tags/stream1-transformer-biasadd256-b34bf7c
+0d8611535aa2b4ace6eeb9b181de9a5fab22c819 refs/tags/stream1-transformer-block51-0d86115
+7adbe145e691beff4636fc6fd30318a3c8c9cb8f refs/tags/stream1-transformer-block51-optin-7adbe14
+2ac637346a31fc2c310054d80d5ab2a0061df7f0 refs/tags/stream1-transformer-extended-sweep-2ac6373
+44352f182b3a5370f5f34f5a174413be1b9c14b5 refs/tags/stream1-transformer-fmha-44352f1
+e35432dc475e3eb5b900b0470fe57f72e07f3d18 refs/tags/stream1-transformer-graph-bench-e35432d
+78052c591a22b1dc01817e8aa58efcc31c73ef91 refs/tags/stream1-transformer-kaggle-v5-code
+0d32be5a613d1443edaf943fc07e1f31cdfdf0e3 refs/tags/stream1-transformer-ln128-0d32be5
+18e5996743e7a695a4f855542ddb195b47e04c37 refs/tags/stream1-transformer-rtx3070-final-18e5996
+edbcb96ac6ed19ba7dc3640e0badf8a2cf4a385b refs/tags/stream1-transformer-sm75-final-42326b3
+9f85da846661087fe8ef0bea2cd421bf867713ae refs/tags/stream1-transformer-sm75-gemm-v21-fe3cb95
+6d29ac41e1729ba764f60fa0fc93ba9d2816b3da refs/tags/stream1-transformer-strided-fmha-6d29ac4
+09d66286ac65c627f04b04218df565e569aacdd5 HEAD
+b5fcf6b0ee3247a1f189e6da79a1641d2304bd1c main-worktree/HEAD
+06eb962110ce706532f9f3e917977a13563e1508 worktrees/beam-seq-align/HEAD
+638fcc90a349f68e01c14dfdca299a87700dadf1 worktrees/cayleypy-results-ingest/HEAD
+7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0 worktrees/complete-project-work-history/HEAD
+871ba0854db25bcd09ab5b8e8ab94740af3c9dde worktrees/kaggle-t4-mlp-autoprofiles/HEAD
+847fe2a46fcf2135155ca9c368f5813f73ab9f75 worktrees/megaminx-native-cluster-fix/HEAD
+2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c worktrees/megaminx-native-cluster-release/HEAD
+a0326407ecc58a0b800f34d217a126ce876a7640 worktrees/profile-capacity-safety/HEAD
+4f1aa91339f6800e8cb0235b92e4c2139b190f00 worktrees/public-cayleypy-notebook/HEAD
+d319f6db0540b6ccef0d41258407815cfe163cce worktrees/stream1-generic-seq-align/HEAD
+df534ebb1ef624abd42443211778b5588916d6d2 worktrees/stream1-piece-transformer/HEAD
+d319f6db0540b6ccef0d41258407815cfe163cce worktrees/stream1-real-state-rank-parity/HEAD
+0ca90d1a79aa545c99662e6efe2749e53c5ad717 worktrees/stream1-transformer-accumulator/HEAD
+550cc59f0575c659aa1023f856ac6a10294bf3e2 worktrees/_push_final_chunk/HEAD
+4effc1cf8bf35d00bf08aea17fb3eead02a2a2e2 worktrees/_push_staged_tuner/HEAD
+The bundle records a complete history.
+The bundle uses this hash algorithm: sha1
+D:/100XH100-backups/MultiGPUBeamSearch-before-branch-migration-2026-08-08.bundle is okay
+main	b5fcf6b0ee3247a1f189e6da79a1641d2304bd1c	OK
+codex/stream1-piece-transformer	df534ebb1ef624abd42443211778b5588916d6d2	OK
+codex/megaminx-native-cluster-release	2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c	OK
+
+bundle_path=D:\100XH100-backups\MultiGPUBeamSearch-before-branch-migration-2026-08-08.bundle
+bundle_bytes=365612545
+bundle_sha256=d41673dd47f3bdf678c35428129ff93795b62b21d2984172369e48c8020039a7
+bundle_verify_exit=0
+representative_clone_cleanup=OK
