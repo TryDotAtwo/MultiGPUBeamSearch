@@ -411,3 +411,5 @@
 - User clarified that all one-puzzle array jobs should use one shared precompiled beam-search binary instead of rebuilding production_runner in every job.
 
 - User showed a completed IHES puzzle 33 run where compute succeeded but GitHub publishing failed because compute nodes could not resolve github.com and index generation crashed on metadata fields variants/source_files; requested continuing to collect and publish all cluster IHES results robustly.
+
+- User requested safely reorganizing the crowded local and GitHub branch/worktree graph without breaking cluster workflows, Kaggle notebooks, Stream 1 architecture support, or publishing. Stream 1 should have one long-lived integration branch supporting simultaneous MLP, Transformer, common-contract, and future-architecture development through short task branches. The `codex/` branch prefix should be removed from the canonical structure, while new Codex-implemented commits and repository documentation must clearly attribute primary implementation work to OpenAI Codex running GPT-5.6 Sol.
