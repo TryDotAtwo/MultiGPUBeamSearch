@@ -1,0 +1,4 @@
+stream1_mode=model
+depth_start=0 frontier_size=1 depth_limit=8
+puzzle_solved=1 puzzle_id=1 seconds=0.108281 solution_length=1 found_depth=1 touch_depth=0 solution=BR
+depth_global_solved=0 depth_sec=0.105168 controller_rank=0 local_rank=0 solved_depth=1 stop_requested=1

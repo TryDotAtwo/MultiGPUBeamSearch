@@ -1,0 +1,2 @@
+invocation_index,puzzle_id,variant,return_code,seconds,collection_status,combined_log,rank0_log,rank1_log
+0,10,original,0,8.528350792000083,first_solution,logs/puzzle-10/original/c2acdb1cbbc44f31855ac7c0eb5014aa/combined.log,logs/puzzle-10/original/c2acdb1cbbc44f31855ac7c0eb5014aa/rank-0.log,logs/puzzle-10/original/c2acdb1cbbc44f31855ac7c0eb5014aa/rank-1.log

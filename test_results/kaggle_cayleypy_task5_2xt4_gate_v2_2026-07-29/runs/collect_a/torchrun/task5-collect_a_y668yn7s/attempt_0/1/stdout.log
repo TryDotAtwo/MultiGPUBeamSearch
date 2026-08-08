@@ -1,0 +1,6 @@
+stream1_mode=model
+depth_start=0 frontier_size=0 depth_limit=8
+depth_done=0 depth_sec=0.168331 ring_slot_jobs=0 stream3_jobs=0 stream4_jobs=4 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=12 final_request_count=0 next_frontier_size=12 history_bytes_received=384 history_bytes_stored=192 history_bytes_stored_ram=0 history_bytes_stored_disk=0 history_bytes_pruned=0
+depth_start=1 frontier_size=12 depth_limit=8
+depth_done=1 depth_sec=0.0814772 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=4 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=204 final_request_count=204 next_frontier_size=204 history_bytes_received=6912 history_bytes_stored=3456 history_bytes_stored_ram=0 history_bytes_stored_disk=192 history_bytes_pruned=0
+depth_start=2 frontier_size=204 depth_limit=8

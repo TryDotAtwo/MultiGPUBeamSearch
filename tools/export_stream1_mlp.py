@@ -109,7 +109,7 @@ def infer_residual_count(sd: TensorDict) -> int:
 
 
 def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDType, num_classes: int) -> None:
-    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=False)
+    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=True)
     sd = strip_orig_mod(unwrap_state_dict(checkpoint))
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = weight_suffix(dtype)
@@ -179,7 +179,7 @@ def export_batchnorm_folded(weights_path: Path, out_dir: Path, dtype: ExportDTyp
         "layout": "row-major input activations times weight_hxk",
         "batchnorm": "folded into preceding linear weights",
         "embeddingbag": "removed from runtime; input layer exported as position-class table",
-        "source_weights": str(weights_path),
+        "source_weights": weights_path.name,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(
@@ -229,7 +229,7 @@ def linear_ln(sd: TensorDict, linear: str, ln: str) -> tuple[torch.Tensor, torch
 
 
 def export_resmlp_layernorm(weights_path: Path, out_dir: Path, dtype: ExportDType) -> None:
-    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=False)
+    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=True)
     sd = strip_orig_mod(unwrap_state_dict(checkpoint))
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = weight_suffix(dtype)
@@ -286,7 +286,7 @@ def export_resmlp_layernorm(weights_path: Path, out_dir: Path, dtype: ExportDTyp
         "normalization": "layernorm",
         "layout": "row-major input activations times weight_hxk",
         "embedding": "folded into position-class input table",
-        "source_weights": str(weights_path),
+        "source_weights": weights_path.name,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(
@@ -305,15 +305,30 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--weights", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--format", choices=["batchnorm-folded", "resmlp-layernorm"], default="batchnorm-folded")
+    parser.add_argument("--format", choices=["auto", "batchnorm-folded", "resmlp-layernorm"], default="auto")
     parser.add_argument("--dtype", choices=["fp16", "bf16"], default="fp16")
     parser.add_argument("--num-classes", type=int, default=120)
+    parser.add_argument("--state-len", type=int)
+    parser.add_argument("--move-count", type=int)
     args = parser.parse_args()
-    if args.format == "batchnorm-folded":
+    if args.format == "auto":
+        if args.dtype != "fp16":
+            parser.error("--format auto requires --dtype fp16")
+        if args.state_len is None or args.move_count is None:
+            parser.error("--format auto requires --state-len and --move-count")
+        from tools.cayleypy_public.model import export_checkpoint
+
+        export_checkpoint(
+            args.weights,
+            args.out,
+            args.num_classes,
+            state_len=args.state_len,
+            move_count=args.move_count,
+        )
+    elif args.format == "batchnorm-folded":
         export_batchnorm_folded(args.weights, args.out, args.dtype, args.num_classes)
     else:
         export_resmlp_layernorm(args.weights, args.out, args.dtype)
-
 
 if __name__ == "__main__":
     main()

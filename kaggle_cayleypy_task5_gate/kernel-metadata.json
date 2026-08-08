@@ -1,0 +1,15 @@
+{
+  "id": "trydotatwo/cayleypy-public-task-5-2xt4-gate",
+  "title": "CayleyPy Public Task 5 2xT4 Gate",
+  "code_file": "cayleypy-task5-2xt4-gate.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

@@ -1,0 +1,28 @@
+stream1_mode=model
+depth_start=0 frontier_size=1 depth_limit=8
+solve_bucket_solution=1 puzzle_id=1 depth_index=0 found_depth=1 solution_length=1 owner_rank=0 solution=BR
+depth_done=0 depth_sec=0.172782 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=3 stream4_slots_used=3 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=12 final_request_count=24 next_frontier_size=12 history_bytes_received=384 history_bytes_stored=192 history_bytes_stored_ram=0 history_bytes_stored_disk=0 history_bytes_pruned=0
+depth_start=1 frontier_size=12 depth_limit=8
+depth_done=1 depth_sec=0.0817263 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=4 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=205 final_request_count=205 next_frontier_size=205 history_bytes_received=6944 history_bytes_stored=3472 history_bytes_stored_ram=0 history_bytes_stored_disk=192 history_bytes_pruned=0
+depth_start=2 frontier_size=205 depth_limit=8
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.-BL.BL
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=-D.BR.D
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.-R.R
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=FL.BR.-FL
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=R.-R.BR
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=-FL.BR.FL
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=-L.BR.L
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.U.-U
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.-DR.DR
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.DR.-DR
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=0 solution=BR.-B.B
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=1 solution=BR.BR.-BR
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=1 solution=L.BR.-L
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=1 solution=BR.-U.U
+solve_bucket_solution=1 puzzle_id=1 depth_index=2 found_depth=3 solution_length=3 owner_rank=1 solution=-F.BR.F
+collection_status=capacity_reached
+solve_bucket_stop=1 puzzle_id=1 depth_index=2 first_found_depth_index=0 extra_depths=1 records=16 depth_sec=0.0245181
+solve_bucket_summary=1 puzzle_id=1 records=16 best_length=1 known_length=1 result_tsv=/kaggle/working/runs/collect_a/solutions.tsv
+solve_bucket_length_count puzzle_id=1 length=1 count=1
+solve_bucket_length_count puzzle_id=1 length=3 count=15
+puzzle_solved=1 puzzle_id=1 seconds=0.281636 solution_length=1 solution=BR

@@ -1,0 +1,44 @@
+[{"stream_name":"stderr","time":7.291370532,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":7.291442168,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":7.29145971,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":7.291463478,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":7.934185111,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":7.934220111,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":7.934225445,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":7.93422934,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stdout","time":9.070167444,"data":"SETUP_REQUIRED: Copy \u0026 Edit this notebook, attach competition data and a supported checkpoint, then replace every REPLACE_WITH_* path in USER CONFIG.\n"}
+,{"stream_name":"stdout","time":9.070215133,"data":"{'solver_commit': 'bb505484a839d3b78819f86aa28e76b842faab09', 'notebook_source_sha256': '993ffd0359c2b74215f3d90850eab0c24eae5b92d10712b0b2a7f521788cd64c'}\n"}
+,{"stream_name":"stdout","time":9.080719753,"data":"preflight_skipped {'reason': 'SETUP_REQUIRED'}\n"}
+,{"stream_name":"stdout","time":9.093124959,"data":"run_skipped {'reason': 'SETUP_REQUIRED'}\n"}
+,{"stream_name":"stdout","time":9.09314734,"data":"{'cli_return_code': None}\n"}
+,{"stream_name":"stdout","time":9.963979726,"data":"SETUP_REQUIRED: no solve was attempted. Use Copy \u0026 Edit, attach inputs, edit USER CONFIG, and Run All.\n"}
+,{"stream_name":"stdout","time":9.964018787,"data":"\n"}
+,{"stream_name":"stdout","time":9.964028468,"data":"== selected_profile.json ==\n"}
+,{"stream_name":"stdout","time":9.964031211,"data":"missing\n"}
+,{"stream_name":"stdout","time":9.964033533,"data":"\n"}
+,{"stream_name":"stdout","time":9.964035844,"data":"== preflight.json ==\n"}
+,{"stream_name":"stdout","time":9.964038149,"data":"missing\n"}
+,{"stream_name":"stdout","time":9.964040391,"data":"\n"}
+,{"stream_name":"stdout","time":9.964042599999999,"data":"== publish_status.json ==\n"}
+,{"stream_name":"stdout","time":9.964045077,"data":"missing\n"}
+,{"stream_name":"stdout","time":9.964047277,"data":"\n"}
+,{"stream_name":"stdout","time":9.964049467,"data":"== run_summary.json ==\n"}
+,{"stream_name":"stdout","time":9.964051729,"data":"missing\n"}
+,{"stream_name":"stdout","time":9.964053969,"data":"\n"}
+,{"stream_name":"stdout","time":9.964056131,"data":"== beam_run_results.csv ==\n"}
+,{"stream_name":"stdout","time":9.964058387,"data":"missing\n"}
+,{"stream_name":"stdout","time":9.964060583,"data":"\n"}
+,{"stream_name":"stdout","time":9.964097319,"data":"== solutions/solutions.csv ==\n"}
+,{"stream_name":"stdout","time":9.964102317,"data":"missing\n"}
+,{"stream_name":"stdout","time":9.964106023,"data":"\n"}
+,{"stream_name":"stdout","time":9.964110027,"data":"== submission.csv ==\n"}
+,{"stream_name":"stdout","time":9.964114085,"data":"missing\n"}
+,{"stream_name":"stderr","time":12.65747852,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":12.657516589,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":12.815561449,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":12.815605999,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":13.441799925,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":13.761191859,"data":"[NbConvertApp] Writing 24061 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":16.234062512,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":17.115466188,"data":"[NbConvertApp] Writing 321462 bytes to __results__.html\n"}
+]

@@ -1,0 +1,19 @@
+{
+  "id": "trydotatwo/cayleypy-2xt4-megaminx-puzzle-10-example",
+  "title": "CayleyPy 2xT4 Megaminx Puzzle 10 Example",
+  "code_file": "cayleypy-2xt4-megaminx-puzzle-10-example.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [
+    "cayley-py-megaminx"
+  ],
+  "kernel_sources": [],
+  "model_sources": [
+    "arabidopsisthalian/megaminx2048-512-8-e4000/PyTorch/default/1"
+  ]
+}

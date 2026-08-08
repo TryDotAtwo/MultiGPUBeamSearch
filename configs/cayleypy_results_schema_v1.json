@@ -1,0 +1,616 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trydotatwo.github.io/cayleypy-results/result-batch-v1.schema.json",
+  "title": "Canonical CayleyPy Result Batch v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "results"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/result"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "puzzle_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._/-]+$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "positive_integer": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "nonnegative_integer": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "state": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 120,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    },
+    "move_token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[\\u0021-\\u002d\\u002f-\\u007e]+$"
+    },
+    "token_path": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/move_token"
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_len",
+        "num_classes",
+        "hd1",
+        "hd2",
+        "nrd",
+        "output_dim",
+        "dtype",
+        "normalization",
+        "layout"
+      ],
+      "properties": {
+        "state_len": {
+          "$ref": "#/$defs/positive_integer",
+          "maximum": 120
+        },
+        "num_classes": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "hd1": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "hd2": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "nrd": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "output_dim": {
+          "$ref": "#/$defs/positive_integer"
+        },
+        "dtype": {
+          "const": "fp16"
+        },
+        "normalization": {
+          "enum": [
+            "batchnorm_folded",
+            "layernorm"
+          ]
+        },
+        "layout": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "batchnorm": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "embeddingbag": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "embedding": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "client_submission_id",
+        "run_id",
+        "idempotency_key",
+        "submitted_at",
+        "author",
+        "kaggle",
+        "competition",
+        "puzzle_type",
+        "puzzle_id",
+        "proof",
+        "orientation",
+        "solution",
+        "profile",
+        "runtime",
+        "model",
+        "hardware",
+        "timings",
+        "solver_commit"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "client_submission_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "run_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/sha256"
+        },
+        "submitted_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$"
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "verification"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "kaggle_username": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "verification": {
+              "const": "claimed"
+            }
+          }
+        },
+        "kaggle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "slug",
+            "version",
+            "notebook_sha256"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "slug": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "version": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "run_url": {
+              "type": "string",
+              "maxLength": 2048,
+              "format": "uri"
+            },
+            "notebook_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "competition": {
+          "$ref": "#/$defs/identifier"
+        },
+        "puzzle_type": {
+          "$ref": "#/$defs/puzzle_type"
+        },
+        "puzzle_id": {
+          "$ref": "#/$defs/nonnegative_integer"
+        },
+        "proof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "initial_state",
+            "central_state",
+            "generators",
+            "initial_state_sha256",
+            "central_state_sha256",
+            "generators_sha256",
+            "reached_state_sha256"
+          ],
+          "properties": {
+            "initial_state": {
+              "$ref": "#/$defs/state"
+            },
+            "central_state": {
+              "$ref": "#/$defs/state"
+            },
+            "generators": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 256,
+              "additionalProperties": {
+                "$ref": "#/$defs/state"
+              },
+              "propertyNames": {
+                "$ref": "#/$defs/move_token"
+              }
+            },
+            "initial_state_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "central_state_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "generators_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "reached_state_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "orientation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "search_mode",
+            "final_orientation"
+          ],
+          "properties": {
+            "search_mode": {
+              "enum": [
+                "off",
+                "after_original",
+                "only"
+              ]
+            },
+            "final_orientation": {
+              "enum": [
+                "original",
+                "reflected",
+                "source"
+              ]
+            },
+            "searched_path": {
+              "$ref": "#/$defs/token_path"
+            },
+            "reflected_source_path": {
+              "$ref": "#/$defs/token_path"
+            },
+            "reflected_source_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "final_orientation": {
+                    "const": "reflected"
+                  }
+                },
+                "required": [
+                  "final_orientation"
+                ]
+              },
+              "then": {
+                "required": [
+                  "searched_path",
+                  "reflected_source_path",
+                  "reflected_source_sha256"
+                ]
+              },
+              "else": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "searched_path"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "reflected_source_path"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "reflected_source_sha256"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "solution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "length",
+            "solved_depth",
+            "validation",
+            "collection_status"
+          ],
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/token_path"
+            },
+            "length": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4096
+            },
+            "solved_depth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4096
+            },
+            "touch_depth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4096
+            },
+            "validation": {
+              "const": "valid"
+            },
+            "collection_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "collection_status": {
+              "enum": [
+                "first_solution",
+                "depth_reached",
+                "capacity_reached",
+                "not_collected"
+              ]
+            }
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requested_beam",
+            "effective_beam",
+            "alignment_delta",
+            "selected_profile",
+            "evidence",
+            "profile_evidence_version",
+            "profile_power",
+            "model_class",
+            "world_size"
+          ],
+          "properties": {
+            "requested_beam": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "effective_beam": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "alignment_delta": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "selected_profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "profile_evidence_version": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "profile_power": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "model_class": {
+              "enum": [
+                "output1",
+                "output_move_count"
+              ]
+            },
+            "world_size": {
+              "type": "integer",
+              "const": 2
+            }
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "touch_bfs_radius",
+            "solution_mode",
+            "max_depth",
+            "max_collected_solutions",
+            "b_micro",
+            "stream1_concurrency",
+            "stream3_ring_slots",
+            "shard_count",
+            "shard_capacity_scale_ppm",
+            "stream4_batch_candidates",
+            "stream4_trigger_candidates",
+            "stream4_active_sort_slots"
+          ],
+          "properties": {
+            "touch_bfs_radius": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "solution_mode": {
+              "enum": [
+                "first",
+                "collect"
+              ]
+            },
+            "max_depth": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "max_collected_solutions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "b_micro": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "stream1_concurrency": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "stream3_ring_slots": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "shard_count": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "shard_capacity_scale_ppm": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "stream4_batch_candidates": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "stream4_trigger_candidates": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "stream4_active_sort_slots": {
+              "$ref": "#/$defs/positive_integer"
+            }
+          }
+        },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "filename",
+            "sha256",
+            "format",
+            "manifest"
+          ],
+          "properties": {
+            "filename": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[^/\\\\]+$"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "format": {
+              "enum": [
+                "batchnorm-folded",
+                "resmlp-layernorm"
+              ]
+            },
+            "manifest": {
+              "$ref": "#/$defs/manifest"
+            }
+          }
+        },
+        "hardware": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "platform",
+            "gpu_names",
+            "accelerator_count",
+            "world_size"
+          ],
+          "properties": {
+            "platform": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "gpu_names": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "accelerator_count": {
+              "$ref": "#/$defs/positive_integer"
+            },
+            "world_size": {
+              "type": "integer",
+              "const": 2
+            }
+          }
+        },
+        "timings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "solve_us",
+            "wall_us"
+          ],
+          "properties": {
+            "solve_us": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "wall_us": {
+              "$ref": "#/$defs/nonnegative_integer"
+            }
+          }
+        },
+        "solver_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    }
+  }
+}

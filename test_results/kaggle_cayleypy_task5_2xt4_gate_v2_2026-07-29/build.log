@@ -1,0 +1,170 @@
++ git clone --no-checkout --depth=1 --branch main https://github.com/TryDotAtwo/MultiGPUBeamSearch.git /tmp/cayleypy_task5_gate_repo
+return_code=0 elapsed_sec=4.146392
+Cloning into '/tmp/cayleypy_task5_gate_repo'...
++ git -C /tmp/cayleypy_task5_gate_repo checkout --detach 6f95bd6bdb32b5f6ef7cca32b96967bce6036503
+return_code=0 elapsed_sec=2.005791
+HEAD is now at 6f95bd6 Update IHES release model asset
++ git clone --no-checkout --depth=1 --branch v3.8.0 https://github.com/NVIDIA/cutlass.git /tmp/cayleypy_task5_gate_cutlass
+return_code=0 elapsed_sec=2.871753
+Cloning into '/tmp/cayleypy_task5_gate_cutlass'...
++ git -C /tmp/cayleypy_task5_gate_cutlass checkout --detach afa1772203677c5118fcd82537a9c8fefbcc7008
+return_code=0 elapsed_sec=0.724293
+HEAD is now at afa1772 truncate name for cutlass profiler (#2124)
++ cmake -S /tmp/cayleypy_task5_gate_repo -B /tmp/cayleypy_task5_gate_build -GNinja -DCMAKE_BUILD_TYPE=Release -DBEAM_CUDA_ARCHITECTURES=75 -DCUTLASS_DIR=/tmp/cayleypy_task5_gate_cutlass -DBEAM_ENABLE_DEBUG=ON -DBEAM_ENABLE_DEPTH_LOGS=ON -DBEAM_ENABLE_DEBUG_LOGS=OFF -DBEAM_DEBUG_PIPELINE_STATS=OFF
+return_code=0 elapsed_sec=4.507312
+-- Beam state logical bytes: 120
+-- Beam state physical bytes: 128
+-- Beam state alignment: 16
+-- Beam move count: 24
+-- The CXX compiler identification is GNU 11.4.0
+-- The CUDA compiler identification is NVIDIA 12.8.93 with host compiler GNU 11.4.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /usr/local/cuda/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Configuring done (4.3s)
+-- Generating done (0.0s)
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    BEAM_DEBUG_PIPELINE_STATS
+
+
+-- Build files have been written to: /tmp/cayleypy_task5_gate_build
++ cmake --build /tmp/cayleypy_task5_gate_build --target production_runner -j 2
+return_code=0 elapsed_sec=64.314610
+[1/21] Building CXX object CMakeFiles/beam_core.dir/src/state.cpp.o
+[2/21] Building CXX object CMakeFiles/beam_core.dir/src/config.cpp.o
+[3/21] Building CXX object CMakeFiles/beam_core.dir/src/history.cpp.o
+[4/21] Building CXX object CMakeFiles/beam_core.dir/src/hash.cpp.o
+[5/21] Building CXX object CMakeFiles/beam_core.dir/src/stream4.cpp.o
+In file included from /usr/include/c++/11/bits/stl_algo.h:61,
+                 from /usr/include/c++/11/vector:62,
+                 from /tmp/cayleypy_task5_gate_repo/src/stream4.hpp:5,
+                 from /tmp/cayleypy_task5_gate_repo/src/stream4.cpp:1:
+/usr/include/c++/11/bits/stl_heap.h: In function ‘constexpr void std::__adjust_heap(_RandomAccessIterator, _Distance, _Distance, _Tp, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<beam::CandidateMeta*, std::vector<beam::CandidateMeta> >; _Distance = long int; _Tp = beam::CandidateMeta; _Compare = __gnu_cxx::__ops::_Iter_comp_iter<beam::stream4_threshold_sort_dedup(const std::vector<beam::CandidateMeta>&, uint32_t)::<lambda(const beam::CandidateMeta&, const beam::CandidateMeta&)> >]’:
+/usr/include/c++/11/bits/stl_heap.h:223:5: note: the ABI for passing parameters with 32-byte alignment has changed in GCC 4.6
+  223 |     __adjust_heap(_RandomAccessIterator __first, _Distance __holeIndex,
+      |     ^~~~~~~~~~~~~
+[6/21] Building CXX object CMakeFiles/beam_core.dir/src/stream3.cpp.o
+[7/21] Building CXX object CMakeFiles/beam_core.dir/src/frontier_cpu.cpp.o
+In file included from /usr/include/c++/11/bits/stl_algo.h:61,
+                 from /usr/include/c++/11/vector:62,
+                 from /tmp/cayleypy_task5_gate_repo/src/state.hpp:5,
+                 from /tmp/cayleypy_task5_gate_repo/src/frontier_cpu.hpp:4,
+                 from /tmp/cayleypy_task5_gate_repo/src/frontier_cpu.cpp:1:
+/usr/include/c++/11/bits/stl_heap.h: In function ‘constexpr void std::__adjust_heap(_RandomAccessIterator, _Distance, _Distance, _Tp, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<beam::CandidateMeta*, std::vector<beam::CandidateMeta> >; _Distance = long int; _Tp = beam::CandidateMeta; _Compare = __gnu_cxx::__ops::_Iter_comp_iter<beam::expand_depth_cpu_reference(const std::vector<beam::StatePacked>&, const std::vector<std::array<unsigned char, 128> >&, const State128&, const ZobristTable&, uint32_t, uint64_t)::<lambda(const beam::CandidateMeta&, const beam::CandidateMeta&)> >]’:
+/usr/include/c++/11/bits/stl_heap.h:223:5: note: the ABI for passing parameters with 32-byte alignment has changed in GCC 4.6
+  223 |     __adjust_heap(_RandomAccessIterator __first, _Distance __holeIndex,
+      |     ^~~~~~~~~~~~~
+[8/21] Linking CXX static library libbeam_core.a
+[9/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream2.cu.o
+[10/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1.cu.o
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20013-D: calling a constexpr __host__ function("get") from a __host__ __device__ function("Conv3dProblemSize") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+        {std::get<0>(padding)[1], std::get<1>(padding)[1],
+         ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20013-D: calling a constexpr __host__ function("get") from a __host__ __device__ function("Conv3dProblemSize") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+        {std::get<0>(padding)[1], std::get<1>(padding)[1],
+                                  ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20013-D: calling a constexpr __host__ function("get") from a __host__ __device__ function("Conv3dProblemSize") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+         std::get<0>(padding)[2], std::get<1>(padding)[2]},
+         ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20013-D: calling a constexpr __host__ function("get") from a __host__ __device__ function("Conv3dProblemSize") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+         std::get<0>(padding)[2], std::get<1>(padding)[2]},
+                                  ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(221): warning #20013-D: calling a constexpr __host__ function("get") from a __host__ __device__ function("Conv3dProblemSize") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+      pad_d(std::get<0>(padding)[0]), stride_d(stride[0]), dilation_d(dilation[0])
+            ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(224): warning #20013-D: calling a constexpr __host__ function("get") from a __host__ __device__ function("Conv3dProblemSize") is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+        Z = ((D + pad_d + std::get<1>(padding)[0] - T * dilation_d) / stride_d) + 1;
+                          ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+        {std::get<0>(padding)[1], std::get<1>(padding)[1],
+                    ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(215): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+        {std::get<0>(padding)[1], std::get<1>(padding)[1],
+                                             ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+         std::get<0>(padding)[2], std::get<1>(padding)[2]},
+                    ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(216): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+         std::get<0>(padding)[2], std::get<1>(padding)[2]},
+                                             ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(221): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+      pad_d(std::get<0>(padding)[0]), stride_d(stride[0]), dilation_d(dilation[0])
+                       ^
+
+/tmp/cayleypy_task5_gate_cutlass/include/cutlass/conv/conv3d_problem_size.h(224): warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+        Z = ((D + pad_d + std::get<1>(padding)[0] - T * dilation_d) / stride_d) + 1;
+                                     ^
+
+[11/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream3.cu.o
+/tmp/cayleypy_task5_gate_repo/cuda/stream3.cu(129): warning #177-D: function "beam::<unnamed>::stream3_debug_store_count_kernel" was declared but never referenced
+  __attribute__((global)) void stream3_debug_store_count_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[12/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream5.cu.o
+[13/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+[14/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/threshold.cu.o
+[15/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/dispatcher.cu.o
+[16/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/final_materialize.cu.o
+[17/21] Building CXX object CMakeFiles/beam_cuda.dir/cuda/runtime_config.cpp.o
+[18/21] Building CUDA object CMakeFiles/production_runner.dir/tools/production_runner.cu.o
+/tmp/cayleypy_task5_gate_repo/tools/production_runner.cu(4389): warning #177-D: variable "tracked_solution" was declared but never referenced
+      TrackedSolutionPrefix tracked_solution;
+                            ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/cayleypy_task5_gate_repo/tools/production_runner.cu(1252): warning #177-D: function "<unnamed>::build_solved_neighborhood_runtime" was declared but never referenced
+  SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
+                            ^
+
+/tmp/cayleypy_task5_gate_repo/tools/production_runner.cu(1295): warning #177-D: function "<unnamed>::RepairSolvedNeighborhoodPrefetch::enabled" was declared but never referenced
+      bool enabled() const {
+           ^
+
+/tmp/cayleypy_task5_gate_repo/tools/production_runner.cu(1551): warning #177-D: function "<unnamed>::track_location_name" was declared but never referenced
+  const char* track_location_name(std::uint32_t location) {
+              ^
+
+/tmp/cayleypy_task5_gate_repo/tools/production_runner.cu(1568): warning #177-D: function "<unnamed>::track_stream4_phase_name" was declared but never referenced
+  const char* track_stream4_phase_name(std::uint32_t phase) {
+              ^
+
+/tmp/cayleypy_task5_gate_repo/tools/production_runner.cu(3945): warning #177-D: function "<unnamed>::NcclRuntime::operator=(<unnamed>::NcclRuntime &&) noexcept" was declared but never referenced
+      NcclRuntime& operator=(NcclRuntime&& other) noexcept {
+                   ^
+
+[19/21] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+[20/21] Linking CXX static library libbeam_cuda.a
+[21/21] Linking CXX executable production_runner
++ ldd /tmp/cayleypy_task5_gate_build/production_runner
+return_code=0 elapsed_sec=0.007427
+	linux-vdso.so.1 (0x00007ddee9c04000)
+	libnccl.so.2 => /lib/x86_64-linux-gnu/libnccl.so.2 (0x00007dded2894000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007dded2668000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007dded2581000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007dded2561000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007dded2338000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007ddee9c06000)
