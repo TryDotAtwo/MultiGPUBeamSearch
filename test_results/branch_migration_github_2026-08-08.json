@@ -1,0 +1,263 @@
+﻿{
+    "repository":  "TryDotAtwo/MultiGPUBeamSearch",
+    "captured_at":  "2026-08-08T20:14:29.0746891Z",
+    "branches":  [
+                     {
+                         "name":  "agent/complete-project-work-history",
+                         "commit":  {
+                                        "sha":  "7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/agent/complete-project-work-history/protection"
+                     },
+                     {
+                         "name":  "codex/cayleypy-results-ingest",
+                         "commit":  {
+                                        "sha":  "638fcc90a349f68e01c14dfdca299a87700dadf1",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/638fcc90a349f68e01c14dfdca299a87700dadf1"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/cayleypy-results-ingest/protection"
+                     },
+                     {
+                         "name":  "codex/cube4-fp16-parity",
+                         "commit":  {
+                                        "sha":  "8dcdafda898b935ec10cc77c50e22a1154a1f285",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/8dcdafda898b935ec10cc77c50e22a1154a1f285"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/cube4-fp16-parity/protection"
+                     },
+                     {
+                         "name":  "codex/cube4-public-collector",
+                         "commit":  {
+                                        "sha":  "4f1aa91339f6800e8cb0235b92e4c2139b190f00",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/4f1aa91339f6800e8cb0235b92e4c2139b190f00"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/cube4-public-collector/protection"
+                     },
+                     {
+                         "name":  "codex/megaminx-native-cluster-release",
+                         "commit":  {
+                                        "sha":  "2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/megaminx-native-cluster-release/protection"
+                     },
+                     {
+                         "name":  "codex/profile-capacity-safety",
+                         "commit":  {
+                                        "sha":  "a0326407ecc58a0b800f34d217a126ce876a7640",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/a0326407ecc58a0b800f34d217a126ce876a7640"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/profile-capacity-safety/protection"
+                     },
+                     {
+                         "name":  "codex/public-cayleypy-notebook",
+                         "commit":  {
+                                        "sha":  "4ea681f210d49aa1fbb0c889d1d40431470607f4",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/4ea681f210d49aa1fbb0c889d1d40431470607f4"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/public-cayleypy-notebook/protection"
+                     },
+                     {
+                         "name":  "codex/stream1-generic-seq-align-impl",
+                         "commit":  {
+                                        "sha":  "d319f6db0540b6ccef0d41258407815cfe163cce",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/d319f6db0540b6ccef0d41258407815cfe163cce"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/stream1-generic-seq-align-impl/protection"
+                     },
+                     {
+                         "name":  "codex/stream1-piece-transformer",
+                         "commit":  {
+                                        "sha":  "df534ebb1ef624abd42443211778b5588916d6d2",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/df534ebb1ef624abd42443211778b5588916d6d2"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/stream1-piece-transformer/protection"
+                     },
+                     {
+                         "name":  "codex/stream1-real-state-rank-parity",
+                         "commit":  {
+                                        "sha":  "f769e707dcda2b962bbaf99c62b40a1fd88f8108",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/f769e707dcda2b962bbaf99c62b40a1fd88f8108"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/codex/stream1-real-state-rank-parity/protection"
+                     },
+                     {
+                         "name":  "main",
+                         "commit":  {
+                                        "sha":  "6f95bd6bdb32b5f6ef7cca32b96967bce6036503",
+                                        "url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/6f95bd6bdb32b5f6ef7cca32b96967bce6036503"
+                                    },
+                         "protected":  false,
+                         "protection":  {
+                                            "enabled":  false,
+                                            "required_status_checks":  {
+                                                                           "enforcement_level":  "off",
+                                                                           "contexts":  [
+
+                                                                                        ],
+                                                                           "checks":  [
+
+                                                                                      ]
+                                                                       }
+                                        },
+                         "protection_url":  "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/branches/main/protection"
+                     }
+                 ],
+    "pulls":  [
+                  {
+                      "baseRefName":  "main",
+                      "closedAt":  null,
+                      "headRefName":  "codex/public-cayleypy-notebook",
+                      "isDraft":  true,
+                      "mergedAt":  null,
+                      "number":  2,
+                      "state":  "OPEN",
+                      "title":  "Add universal CayleyPy 2xT4 checkpoint notebook",
+                      "updatedAt":  "2026-07-30T17:27:10Z",
+                      "url":  "https://github.com/TryDotAtwo/MultiGPUBeamSearch/pull/2"
+                  },
+                  {
+                      "baseRefName":  "main",
+                      "closedAt":  null,
+                      "headRefName":  "codex/cayleypy-results-ingest",
+                      "isDraft":  true,
+                      "mergedAt":  null,
+                      "number":  1,
+                      "state":  "OPEN",
+                      "title":  "Add CayleyPy Cloudflare results ingest service",
+                      "updatedAt":  "2026-08-05T20:12:09Z",
+                      "url":  "https://github.com/TryDotAtwo/MultiGPUBeamSearch/pull/1"
+                  }
+              ]
+}
