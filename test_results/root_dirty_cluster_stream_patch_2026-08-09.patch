@@ -1,0 +1,288 @@
+diff --git a/cuda/runtime_config.cpp b/cuda/runtime_config.cpp
+index cb0dcf9c..c9a62a79 100644
+--- a/cuda/runtime_config.cpp
++++ b/cuda/runtime_config.cpp
+@@ -596,6 +596,8 @@ RuntimeConfigBuild build_runtime_config_from_budget(
+     config.global_threshold_update_period_shards =
+         env_u32("BEAM_GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS", 64);
+     config.solved_result_capacity = env_u32("BEAM_SOLVED_RESULT_CAPACITY", 1024);
++    config.solve_bucket_gather_scratch_bytes =
++        env_u64("BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES", 0);
+     build.gpu_headroom_bytes = env_u64("BEAM_GPU_HEADROOM_BYTES", 768ULL * 1024ULL * 1024ULL);
+     build.gpu_budget_bytes =
+         free_before_bytes > build.gpu_headroom_bytes ? free_before_bytes - build.gpu_headroom_bytes : 0ULL;
+diff --git a/cuda/static_memory.cu b/cuda/static_memory.cu
+index 29d489a4..9946df7e 100644
+--- a/cuda/static_memory.cu
++++ b/cuda/static_memory.cu
+@@ -639,6 +639,7 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
+         plan.layout_phase1_streams_bytes,
+         plan.layout_phase2_select_bytes,
+         plan.layout_phase3_materialize_bytes,
++        static_cast<std::size_t>(config.solve_bucket_gather_scratch_bytes),
+     });
+     plan.total_device_bytes =
+         align_up_size(plan.current_frontier_bytes, 256) +
+diff --git a/hpc/ihes_cube_model/ihes_solution_repair.sh b/hpc/ihes_cube_model/ihes_solution_repair.sh
+index 81b28342..4e9e49b3 100644
+--- a/hpc/ihes_cube_model/ihes_solution_repair.sh
++++ b/hpc/ihes_cube_model/ihes_solution_repair.sh
+@@ -159,7 +159,7 @@ BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS:-8}"
+ BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}"
+ BEAM_SHARD_BUFFER_COUNT="${BEAM_SHARD_BUFFER_COUNT:-2}"
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-98304}"
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-8000000}"
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+ BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-134217728}"
+ BEAM_HISTORY_RAM_BYTES="${BEAM_HISTORY_RAM_BYTES:-68719476736}"
+ BEAM_HISTORY_DISK_BYTES="${BEAM_HISTORY_DISK_BYTES:-4398046511104}"
+diff --git a/hpc/ihes_cube_model/ihes_solve_bucket.sh b/hpc/ihes_cube_model/ihes_solve_bucket.sh
+index 190448ed..38e7902c 100644
+--- a/hpc/ihes_cube_model/ihes_solve_bucket.sh
++++ b/hpc/ihes_cube_model/ihes_solve_bucket.sh
+@@ -152,11 +152,12 @@ BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS:-8}"
+ BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}"
+ BEAM_SHARD_BUFFER_COUNT="${BEAM_SHARD_BUFFER_COUNT:-2}"
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-98304}"
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-8000000}"
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+ BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-134217728}"
+ BEAM_HISTORY_RAM_BYTES="${BEAM_HISTORY_RAM_BYTES:-68719476736}"
+ BEAM_HISTORY_DISK_BYTES="${BEAM_HISTORY_DISK_BYTES:-4398046511104}"
+ BEAM_SOLVED_RESULT_CAPACITY="${BEAM_SOLVED_RESULT_CAPACITY:-1048576}"
++BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES="${BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES:-2147483648}"
+ 
+ export BEAM_PUZZLE_INFO_JSON="${WORK_DATA_DIR}/puzzle_info.json"
+ export BEAM_GENERATOR_PATH="${WORK_DATA_DIR}/puzzle_info.json"
+@@ -187,6 +188,7 @@ export BEAM_SOLVE_BUCKET_EXTRA_DEPTHS="${BEAM_SOLVE_BUCKET_EXTRA_DEPTHS:-1}"
+ export BEAM_SOLVE_BUCKET_KNOWN_LENGTH="${KNOWN_LENGTH}"
+ export BEAM_HISTORY_DISK_PATH="${HISTORY_DIR}"
+ export BEAM_SOLVED_RESULT_CAPACITY
++export BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES
+ 
+ echo "solve_bucket_mode=1"
+ echo "known_length=${KNOWN_LENGTH}"
+@@ -197,6 +199,7 @@ echo "local_beam_width=${LOCAL_BEAM_WIDTH}"
+ echo "shard_count=${SHARD_COUNT}"
+ echo "k1_radius=${BEAM_SOLVED_NEIGHBORHOOD_RADIUS}"
+ echo "solved_result_capacity=${BEAM_SOLVED_RESULT_CAPACITY}"
++echo "solve_bucket_gather_scratch_bytes=${BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES}"
+ 
+ invert_path_python='
+ import sys
+diff --git a/hpc/ihes_cube_model/ihes_solve_bucket_from_scratch.sh b/hpc/ihes_cube_model/ihes_solve_bucket_from_scratch.sh
+index 4b301e9f..16dc03e5 100644
+--- a/hpc/ihes_cube_model/ihes_solve_bucket_from_scratch.sh
++++ b/hpc/ihes_cube_model/ihes_solve_bucket_from_scratch.sh
+@@ -155,11 +155,12 @@ BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS:-8}"
+ BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}"
+ BEAM_SHARD_BUFFER_COUNT="${BEAM_SHARD_BUFFER_COUNT:-2}"
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-98304}"
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-8000000}"
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+ BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-134217728}"
+ BEAM_HISTORY_RAM_BYTES="${BEAM_HISTORY_RAM_BYTES:-68719476736}"
+ BEAM_HISTORY_DISK_BYTES="${BEAM_HISTORY_DISK_BYTES:-4398046511104}"
+ BEAM_SOLVED_RESULT_CAPACITY="${BEAM_SOLVED_RESULT_CAPACITY:-1048576}"
++BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES="${BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES:-2147483648}"
+ PUBLISH_RESULTS_REPO_URL="${PUBLISH_RESULTS_REPO_URL:-}"
+ PUBLISH_RESULTS_DIR="${PUBLISH_RESULTS_DIR:-${RUN_DIR}/public-results}"
+ PUBLISH_RESULTS_BRANCH="${PUBLISH_RESULTS_BRANCH:-main}"
+@@ -194,6 +195,7 @@ export BEAM_SOLVE_BUCKET_MODE=1
+ export BEAM_SOLVE_BUCKET_EXTRA_DEPTHS="${BEAM_SOLVE_BUCKET_EXTRA_DEPTHS:-1}"
+ export BEAM_HISTORY_DISK_PATH="${HISTORY_DIR}"
+ export BEAM_SOLVED_RESULT_CAPACITY
++export BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES
+ 
+ echo "solve_bucket_mode=1"
+ echo "solve_bucket_fresh_original_reflect=1"
+@@ -205,6 +207,7 @@ echo "local_beam_width=${LOCAL_BEAM_WIDTH}"
+ echo "shard_count=${SHARD_COUNT}"
+ echo "k1_radius=${BEAM_SOLVED_NEIGHBORHOOD_RADIUS}"
+ echo "solved_result_capacity=${BEAM_SOLVED_RESULT_CAPACITY}"
++echo "solve_bucket_gather_scratch_bytes=${BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES}"
+ echo "publish_results_repo_url=${PUBLISH_RESULTS_REPO_URL:-disabled}"
+ echo "publish_results_dir=${PUBLISH_RESULTS_DIR}"
+ 
+diff --git a/hpc/ihes_cube_model/ihes_solve_then_reflect.sh b/hpc/ihes_cube_model/ihes_solve_then_reflect.sh
+index f33bb92b..cd68cba4 100644
+--- a/hpc/ihes_cube_model/ihes_solve_then_reflect.sh
++++ b/hpc/ihes_cube_model/ihes_solve_then_reflect.sh
+@@ -49,7 +49,7 @@ fi
+ BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}"
+ BEAM_SHARD_BUFFER_COUNT="${BEAM_SHARD_BUFFER_COUNT:-2}"
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-98304}"
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-8000000}"
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+ BEAM_SOLVED_NEIGHBORHOOD_RADIUS="${BEAM_SOLVED_NEIGHBORHOOD_RADIUS:-4}"
+ BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-134217728}"
+ BEAM_HISTORY_RAM_BYTES="${BEAM_HISTORY_RAM_BYTES:-68719476736}"
+diff --git a/hpc/mephi_8xa100_common.sh b/hpc/mephi_8xa100_common.sh
+index 269c605a..c1cee353 100644
+--- a/hpc/mephi_8xa100_common.sh
++++ b/hpc/mephi_8xa100_common.sh
+@@ -26,6 +26,11 @@ beam_setup_paths() {
+   WORLD_SIZE_EFFECTIVE=$((TORCHRUN_NNODES * TORCHRUN_NPROC_PER_NODE))
+ }
+ 
++beam_default_final_exchange_scale_ppm() {
++  local world_size="${WORLD_SIZE_EFFECTIVE:-$((TORCHRUN_NNODES * TORCHRUN_NPROC_PER_NODE))}"
++  echo $((world_size * 1000000))
++}
++
+ beam_preflight() {
+   mkdir -p "${JOB_DIR}" "${BUILD_DIR}" "${HISTORY_DIR}" "${LOG_DIR}" "${TUNING_DIR}"
+   if [ -f "${NINJA_VENV_DIR}/bin/activate" ]; then
+@@ -238,7 +243,7 @@ beam_export_manual_config() {
+   export BEAM_GLOBAL_SPILL_CAPACITY="${BEAM_GLOBAL_SPILL_CAPACITY:-0}"
+   export BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM="${BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM:-1200000}"
+   export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-0}"
+-  export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-1200000}"
++  export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+   export BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-$((3 * 1024 * 1024 * 1024))}"
+ }
+ 
+diff --git a/hpc/portable_8xa100_80gb/README.md b/hpc/portable_8xa100_80gb/README.md
+index 838b2050..febb7f05 100644
+--- a/hpc/portable_8xa100_80gb/README.md
++++ b/hpc/portable_8xa100_80gb/README.md
+@@ -56,7 +56,7 @@ BEAM_STREAM3_RING_SLOTS=8
+ STREAM4_BATCH_CANDIDATES=262144
+ STREAM4_TRIGGER_CANDIDATES=524288
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES=88064
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=8000000
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=WORLD_SIZE_EFFECTIVE*1000000
+ BEAM_HISTORY_DISK_BYTES=2199023255552
+ ```
+ 
+diff --git a/hpc/portable_8xa100_80gb/run_1p4b_8xa100_80gb.sh b/hpc/portable_8xa100_80gb/run_1p4b_8xa100_80gb.sh
+index 22ec44d4..4b008bdc 100755
+--- a/hpc/portable_8xa100_80gb/run_1p4b_8xa100_80gb.sh
++++ b/hpc/portable_8xa100_80gb/run_1p4b_8xa100_80gb.sh
+@@ -50,6 +50,10 @@ export DEPTH_LIMIT="${DEPTH_LIMIT:-80}"
+ export BEAM_WIDTH="${BEAM_WIDTH:-1400000000}"
+ export BEAM_WEIGHT_DIR="${BEAM_WEIGHT_DIR:-${REPO_DIR}/stream1_weights_artgor_bf16}"
+ 
++export TORCHRUN_NNODES="${TORCHRUN_NNODES:-1}"
++export TORCHRUN_NPROC_PER_NODE="${TORCHRUN_NPROC_PER_NODE:-8}"
++WORLD_SIZE_EFFECTIVE=$((TORCHRUN_NNODES * TORCHRUN_NPROC_PER_NODE))
++
+ export BEAM_B_MICRO="${BEAM_B_MICRO:-8192}"
+ export BEAM_STREAM1_CONCURRENCY="${BEAM_STREAM1_CONCURRENCY:-8}"
+ export BEAM_STREAM3_RING_SLOTS="${BEAM_STREAM3_RING_SLOTS:-8}"
+@@ -62,7 +66,7 @@ export SHARD_CAPACITY_SCALE_PPM="${SHARD_CAPACITY_SCALE_PPM:-1150000}"
+ export STREAM4_BATCH_CANDIDATES="${STREAM4_BATCH_CANDIDATES:-262144}"
+ export STREAM4_TRIGGER_CANDIDATES="${STREAM4_TRIGGER_CANDIDATES:-524288}"
+ export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-88064}"
+-export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-8000000}"
++export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$((WORLD_SIZE_EFFECTIVE * 1000000))}"
+ 
+ export BEAM_SOLVED_NEIGHBORHOOD_RADIUS="${BEAM_SOLVED_NEIGHBORHOOD_RADIUS:-4}"
+ export BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-268435456}"
+diff --git a/hpc/solve_reflected_only.sh b/hpc/solve_reflected_only.sh
+index 63879392..a1c9c02a 100644
+--- a/hpc/solve_reflected_only.sh
++++ b/hpc/solve_reflected_only.sh
+@@ -42,7 +42,7 @@ fi
+ BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}"
+ BEAM_SHARD_BUFFER_COUNT="${BEAM_SHARD_BUFFER_COUNT:-2}"
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-98304}"
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-8000000}"
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+ BEAM_SOLVED_NEIGHBORHOOD_RADIUS="${BEAM_SOLVED_NEIGHBORHOOD_RADIUS:-4}"
+ BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-268435456}"
+ BEAM_HISTORY_RAM_BYTES="${BEAM_HISTORY_RAM_BYTES:-257698037760}"
+diff --git a/hpc/solve_then_reflect.sh b/hpc/solve_then_reflect.sh
+index bb9846bc..1b2a36c8 100644
+--- a/hpc/solve_then_reflect.sh
++++ b/hpc/solve_then_reflect.sh
+@@ -42,7 +42,7 @@ fi
+ BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}"
+ BEAM_SHARD_BUFFER_COUNT="${BEAM_SHARD_BUFFER_COUNT:-2}"
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-98304}"
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-8000000}"
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+ BEAM_SOLVED_NEIGHBORHOOD_RADIUS="${BEAM_SOLVED_NEIGHBORHOOD_RADIUS:-4}"
+ BEAM_GPU_HEADROOM_BYTES="${BEAM_GPU_HEADROOM_BYTES:-268435456}"
+ BEAM_HISTORY_RAM_BYTES="${BEAM_HISTORY_RAM_BYTES:-257698037760}"
+diff --git a/hpc/start_8xa100_beamsearch.sh b/hpc/start_8xa100_beamsearch.sh
+index 7a4bafe0..95ac288a 100644
+--- a/hpc/start_8xa100_beamsearch.sh
++++ b/hpc/start_8xa100_beamsearch.sh
+@@ -217,7 +217,7 @@ export BEAM_SHARD_CAPACITY_SCALE_PPM="${SHARD_CAPACITY_SCALE_PPM}"
+ export BEAM_STREAM4_ACTIVE_SORT_SLOTS=4
+ export BEAM_GLOBAL_SPILL_CAPACITY=0
+ export BEAM_STREAM5_RECV_CAPACITY_SCALE_PPM=1200000
+-export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=1200000
++export BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$((WORLD_SIZE_EFFECTIVE * 1000000))}"
+ export BEAM_GPU_HEADROOM_BYTES=$((3 * 1024 * 1024 * 1024))
+ 
+ RUN_LOG="${LOG_DIR}/production_runner_p${PUZZLE_ID}_d${DEPTH_LIMIT}_b${BEAM_WIDTH}_${SLURM_JOB_ID:-manual}.log"
+diff --git a/hpc/tune_8xa100_pipeline.sh b/hpc/tune_8xa100_pipeline.sh
+index a0ea9c7d..073fde27 100644
+--- a/hpc/tune_8xa100_pipeline.sh
++++ b/hpc/tune_8xa100_pipeline.sh
+@@ -20,7 +20,7 @@ SHARD_CAPACITY_SCALE_PPM="${SHARD_CAPACITY_SCALE_PPM:-1250000}"
+ BEAM_STREAM4_ACTIVE_SORT_SLOTS="${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}"
+ BEAM_SHARD_BUFFER_COUNT="${BEAM_SHARD_BUFFER_COUNT:-2}"
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-0}"
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-1200000}"
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+ 
+ STREAM1_CONFIG_ENV="${STREAM1_CONFIG_ENV:-${LOG_DIR}/best_stream1.env}"
+ if [ -f "${STREAM1_CONFIG_ENV}" ]; then
+diff --git a/hpc/tune_8xa100_staged.sh b/hpc/tune_8xa100_staged.sh
+index 21be8509..a79375b1 100644
+--- a/hpc/tune_8xa100_staged.sh
++++ b/hpc/tune_8xa100_staged.sh
+@@ -36,7 +36,7 @@ STREAM4_BATCH_CANDIDATES="${STREAM4_BATCH_CANDIDATES:-524288}"
+ STREAM4_TRIGGER_MULT="${STREAM4_TRIGGER_MULT:-2}"
+ STREAM4_TRIGGER_CANDIDATES="${STREAM4_TRIGGER_CANDIDATES:-$((STREAM4_BATCH_CANDIDATES * STREAM4_TRIGGER_MULT))}"
+ BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES="${BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES:-262144}"
+-BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-1200000}"
++BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM="${BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM:-$(beam_default_final_exchange_scale_ppm)}"
+ 
+ cleanup_done=0
+ cleanup() {
+diff --git a/src/config.hpp b/src/config.hpp
+index 43b5857d..3423eb3a 100644
+--- a/src/config.hpp
++++ b/src/config.hpp
+@@ -68,6 +68,7 @@ struct RuntimeConfig {
+     std::uint64_t user_global_beam_width = 1'000'000;
+     std::uint32_t global_threshold_update_period_shards = 64;
+     std::uint32_t solved_result_capacity = 1024;
++    std::uint64_t solve_bucket_gather_scratch_bytes = 0;
+ };
+ 
+ struct DerivedConfig {
+diff --git a/tools/production_runner.cu b/tools/production_runner.cu
+index 6c2838b8..c597d785 100644
+--- a/tools/production_runner.cu
++++ b/tools/production_runner.cu
+@@ -3128,14 +3128,14 @@ std::vector<SolveBucketRecord> gather_solve_bucket_records_distributed(
+     std::uint32_t capacity) {
+     constexpr std::uint32_t packet_words = 8;
+     const std::uint64_t scratch_words =
+-        (plan.frontier_states * sizeof(State128)) / sizeof(std::uint64_t);
++        memory.scratch_pool_bytes / sizeof(std::uint64_t);
+     const std::uint64_t records_per_rank = static_cast<std::uint64_t>(capacity);
+     const std::uint64_t send_words = records_per_rank * packet_words;
+     const std::uint64_t recv_words = send_words * static_cast<std::uint64_t>(world_size);
+-    if (scratch_words < send_words + recv_words || memory.final.next_frontier_states_tmp == nullptr) {
++    if (scratch_words < send_words + recv_words || memory.scratch_pool == nullptr) {
+         throw std::runtime_error("solve bucket distributed gather scratch buffer is too small");
+     }
+-    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.final.next_frontier_states_tmp);
++    std::uint64_t* scratch = reinterpret_cast<std::uint64_t*>(memory.scratch_pool);
+     std::uint64_t* send_device = scratch;
+     std::uint64_t* recv_device = scratch + send_words;
+ 
+@@ -4008,6 +4008,7 @@ int main(int argc, char** argv) {
+     std::cout << "SCORE_MAX_KEY=" << SCORE_MAX_KEY << "\n";
+     std::cout << "SCORE_BIN_COUNT=" << SCORE_BIN_COUNT << "\n";
+     std::cout << "SOLVED_RESULT_CAPACITY=" << config.solved_result_capacity << "\n";
++    std::cout << "SOLVE_BUCKET_GATHER_SCRATCH_BYTES=" << config.solve_bucket_gather_scratch_bytes << "\n";
+     std::cout << "gpu_total_bytes=" << total_before << "\n";
+     std::cout << "gpu_free_before_bytes=" << free_before << "\n";
+     std::cout << "gpu_headroom_bytes=" << config_build.gpu_headroom_bytes << "\n";
