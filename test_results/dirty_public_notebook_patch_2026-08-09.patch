@@ -1,0 +1,393 @@
+diff --git a/configs/cayleypy_results_schema_v1.json b/configs/cayleypy_results_schema_v1.json
+index 57f4dcf9..8b8e5b3a 100644
+--- a/configs/cayleypy_results_schema_v1.json
++++ b/configs/cayleypy_results_schema_v1.json
+@@ -76,13 +76,8 @@
+       "required": [
+         "state_len",
+         "num_classes",
+-        "hd1",
+-        "hd2",
+-        "nrd",
+         "output_dim",
+-        "dtype",
+-        "normalization",
+-        "layout"
++        "dtype"
+       ],
+       "properties": {
+         "state_len": {
+@@ -129,6 +124,75 @@
+         "embedding": {
+           "type": "string",
+           "maxLength": 256
++        },
++        "backend": {
++          "const": "piece_transformer"
++        },
++        "model_arch": {
++          "const": "piece_transformer"
++        },
++        "move_count": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "num_pieces": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "max_piece_size": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "num_piece_types": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "seq_len": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "d_model": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "nhead": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "head_dim": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "num_layers": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "ff_dim": {
++          "$ref": "#/$defs/positive_integer"
++        },
++        "activation": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 64
++        },
++        "pooling": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 64
++        },
++        "piece_layout": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 128
++        },
++        "piece_embed_mode": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 128
++        },
++        "input_embedding": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 128
++        },
++        "move_names": {
++          "type": "array",
++          "minItems": 1,
++          "maxItems": 256,
++          "items": {
++            "$ref": "#/$defs/move_token"
++          }
+         }
+       }
+     },
+diff --git a/kaggle/cayleypy-public-examples/444/444.ipynb b/kaggle/cayleypy-public-examples/444/444.ipynb
+index db4a5db2..da616ada 100644
+--- a/kaggle/cayleypy-public-examples/444/444.ipynb
++++ b/kaggle/cayleypy-public-examples/444/444.ipynb
+@@ -72,8 +72,10 @@
+   },
+   {
+    "cell_type": "code",
++   "execution_count": null,
+    "id": "config",
+    "metadata": {},
++   "outputs": [],
+    "source": [
+     "from pathlib import Path\n",
+     "\n",
+@@ -94,9 +96,9 @@
+     "TEST_CSV = COMPETITION_ROOT / \"test.csv\"\n",
+     "SAMPLE_SUBMISSION_CSV = COMPETITION_ROOT / \"sample_submission.csv\"\n",
+     "\n",
+-    "PUZZLE_ID_START = 0                 # inclusive\n",
+-    "PUZZLE_ID_END = 0                   # inclusive\n",
+-    "BEAM_WIDTH = 2**16                  # requested value; only alignment may increase it\n",
++    "PUZZLE_ID_START = 1000                 # inclusive\n",
++    "PUZZLE_ID_END = 1000                   # inclusive\n",
++    "BEAM_WIDTH = 2**25                  # requested value; only alignment may increase it\n",
+     "MAX_DEPTH = 100\n",
+     "REFLECT_MODE = \"off\"                # off | after_original | only\n",
+     "REFLECT_SOURCE_CSV = None            # required only for REFLECT_MODE == \"only\"\n",
+@@ -106,7 +108,7 @@
+     "TOUCH_BFS_RADIUS = 0\n",
+     "\n",
+     "AUTHOR_NAME = \"public-example-cayleypy-2xt4-444-example\"\n",
+-    "PUBLISH_RESULTS = True               # best effort; set False to disable publishing\n",
++    "PUBLISH_RESULTS = False               # best effort; set False to disable publishing\n",
+     "# Public token-free endpoint; valid local results survive every publishing failure.\n",
+     "RESULTS_INGEST_URL = \"https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results\"\n",
+     "COMPETITION = \"cayley-py-444-cube\"\n",
+@@ -118,14 +120,14 @@
+     "# Official repository revision. Keep this 40-character commit pinned for a\n",
+     "# reproducible solve; SOLVER_COMMIT always refers to TryDotAtwo/MultiGPUBeamSearch.\n",
+     "SOLVER_COMMIT = \"a1db0e6d9bb5458c8a842b37dfa99572d3025667\""
+-   ],
+-   "execution_count": null,
+-   "outputs": []
++   ]
+   },
+   {
+    "cell_type": "code",
++   "execution_count": null,
+    "id": "debug",
+    "metadata": {},
++   "outputs": [],
+    "source": [
+     "# OPTIONAL DEBUG / LOGGING -- safe defaults; enable only what you need.\n",
+     "ENABLE_DEBUG = True\n",
+@@ -143,14 +145,14 @@
+     "\n",
+     "DEPTH_LOG_EVERY = 1\n",
+     "PUZZLE_LOG_EVERY = 1"
+-   ],
+-   "execution_count": null,
+-   "outputs": []
++   ]
+   },
+   {
+    "cell_type": "code",
++   "execution_count": null,
+    "id": "setup",
+    "metadata": {},
++   "outputs": [],
+    "source": [
+     "# Checkout only the pinned public solver revision and derive notebook provenance.\n",
+     "from hashlib import sha256\n",
+@@ -202,14 +204,14 @@
+     "    \"\\n\".join(canonical_cell_source(source) for source in NOTEBOOK_CELL_SOURCES).encode(\"utf-8\")\n",
+     ").hexdigest()\n",
+     "print({\"solver_commit\": checked_commit, \"notebook_source_sha256\": KAGGLE_NOTEBOOK_SHA256})"
+-   ],
+-   "execution_count": null,
+-   "outputs": []
++   ]
+   },
+   {
+    "cell_type": "code",
++   "execution_count": null,
+    "id": "preflight",
+    "metadata": {},
++   "outputs": [],
+    "source": [
+     "# Validate the fixed public runtime before compiling or solving.\n",
+     "import subprocess\n",
+@@ -224,14 +226,14 @@
+     "        raise RuntimeError(f\"this launcher requires exactly two T4 GPUs; observed={gpu_names!r}\")\n",
+     "    print(\"preflight_ok\", {\"gpu_names\": gpu_names, \"requested_beam\": BEAM_WIDTH,\n",
+     "                           \"puzzle_ids\": [PUZZLE_ID_START, PUZZLE_ID_END]})"
+-   ],
+-   "execution_count": null,
+-   "outputs": []
++   ]
+   },
+   {
+    "cell_type": "code",
++   "execution_count": null,
+    "id": "run",
+    "metadata": {},
++   "outputs": [],
+    "source": [
+     "# The repository CLI owns model detection/export, profile selection, build, solve and validation.\n",
+     "run_config = {\n",
+@@ -290,14 +292,14 @@
+     "    )\n",
+     "    RUN_RETURN_CODE = run_process.returncode\n",
+     "print({\"cli_return_code\": RUN_RETURN_CODE})"
+-   ],
+-   "execution_count": null,
+-   "outputs": []
++   ]
+   },
+   {
+    "cell_type": "code",
++   "execution_count": null,
+    "id": "display",
+    "metadata": {},
++   "outputs": [],
+    "source": [
+     "# Bounded handoff: show machine-readable statuses and a small solution preview.\n",
+     "import json\n",
+@@ -325,9 +327,7 @@
+     "\n",
+     "if RUN_RETURN_CODE not in (None, 0):\n",
+     "    raise RuntimeError(f\"public CLI failed with return code {RUN_RETURN_CODE}; artifacts above were retained\")"
+-   ],
+-   "execution_count": null,
+-   "outputs": []
++   ]
+   }
+  ],
+  "metadata": {
+diff --git a/tests/cayleypy_public/test_config.py b/tests/cayleypy_public/test_config.py
+index 92065327..0e0f4174 100644
+--- a/tests/cayleypy_public/test_config.py
++++ b/tests/cayleypy_public/test_config.py
+@@ -37,12 +37,22 @@ def test_only_requires_reflection_source():
+         PublicRunConfig.from_mapping({**BASE, "reflect_mode": "only"})
+ 
+ 
+-@pytest.mark.parametrize("field,value", [("beam_width", 0), ("max_depth", 0), ("max_collected_solutions", 0)])
++@pytest.mark.parametrize("field,value", [("beam_width", 0), ("max_depth", 0)])
+ def test_positive_config_fields_reject_zero(field, value):
+     with pytest.raises(ValueError, match=field.upper()):
+         PublicRunConfig.from_mapping({**BASE, field: value})
+ 
+ 
++def test_collect_zero_max_solutions_means_unbounded_collection() -> None:
++    config = PublicRunConfig.from_mapping({
++        **BASE,
++        "solution_mode": "collect",
++        "max_collected_solutions": 0,
++    })
++
++    assert config.max_collected_solutions == 0
++
++
+ def test_touch_radius_rejects_out_of_range_value():
+     with pytest.raises(ValueError, match="TOUCH_BFS_RADIUS"):
+         PublicRunConfig.from_mapping({**BASE, "touch_bfs_radius": 13})
+diff --git a/tests/cayleypy_public/test_public_examples_builder.py b/tests/cayleypy_public/test_public_examples_builder.py
+index e1ecdf56..4e7507cd 100644
+--- a/tests/cayleypy_public/test_public_examples_builder.py
++++ b/tests/cayleypy_public/test_public_examples_builder.py
+@@ -64,6 +64,7 @@ def test_all_public_examples_share_the_universal_contract(tmp_path: Path) -> Non
+         assert f'PUZZLE_ID_START = {spec["puzzle_id"]}' in config
+         assert f'PUZZLE_ID_END = {spec["puzzle_id"]}' in config
+         assert 'SOLUTION_MODE = "first"' in config
++        assert "MAX_COLLECTED_SOLUTIONS = 0" in config
+         assert f'COMPETITION = "{spec["competition"]}"' in config
+         assert metadata["id"] == f'trydotatwo/{spec["slug"]}'
+         assert 'Path("/kaggle/input").rglob("puzzle_info.json")' in config
+diff --git a/tests/cayleypy_public/test_results.py b/tests/cayleypy_public/test_results.py
+index c55be428..f57a8535 100644
+--- a/tests/cayleypy_public/test_results.py
++++ b/tests/cayleypy_public/test_results.py
+@@ -263,6 +263,58 @@ def test_build_result_envelope_accepts_piece_transformer_format() -> None:
+     assert envelope["model"]["format"] == "piece-transformer"
+ 
+ 
++
++def test_build_result_envelope_preserves_supported_piece_transformer_manifest() -> None:
++    central_state = list(range(6)) * 16
++    identity = list(range(96))
++    context = _context()
++    context["model"] = {
++        **context["model"],
++        "format": "piece-transformer",
++        "manifest": {
++            "backend": "piece_transformer",
++            "model_arch": "piece_transformer",
++            "state_len": 96,
++            "num_classes": 6,
++            "move_count": 24,
++            "output_dim": 24,
++            "num_pieces": 56,
++            "max_piece_size": 3,
++            "num_piece_types": 3,
++            "seq_len": 57,
++            "d_model": 256,
++            "nhead": 8,
++            "head_dim": 32,
++            "num_layers": 4,
++            "ff_dim": 1024,
++            "activation": "relu",
++            "pooling": "cls",
++            "piece_layout": "cube4",
++            "piece_embed_mode": "piece_local",
++            "input_embedding": "fast_slot_projected",
++            "move_names": [f"m{index}" for index in range(24)],
++            "dtype": "fp16",
++        },
++    }
++    context["proof"] = {
++        "initial_state": central_state,
++        "central_state": central_state,
++        "generators": {f"m{index}": identity for index in range(24)},
++    }
++    context["profile"] = {**context["profile"], "model_class": "output_move_count"}
++    solution = {
++        **_solution(),
++        "path": "",
++        "original_oriented_path": "",
++        "reached_state": central_state,
++    }
++
++    envelope = build_result_envelope(context, solution)
++
++    assert envelope["model"]["manifest"]["seq_len"] == 57
++    assert envelope["model"]["manifest"]["num_layers"] == 4
++    assert envelope["model"]["manifest"]["move_names"] == [f"m{index}" for index in range(24)]
++
+ @pytest.mark.parametrize(
+     ("model_class", "output_dim", "message"),
+     [
+diff --git a/tools/build_kaggle_cayleypy_public_notebook.py b/tools/build_kaggle_cayleypy_public_notebook.py
+index eef167d2..0b4d578e 100644
+--- a/tools/build_kaggle_cayleypy_public_notebook.py
++++ b/tools/build_kaggle_cayleypy_public_notebook.py
+@@ -102,7 +102,7 @@ REFLECT_MODE = "off"                # off | after_original | only
+ REFLECT_SOURCE_CSV = None            # required only for REFLECT_MODE == "only"
+ SOLUTION_MODE = "first"             # first | collect
+ COLLECT_UNTIL_DEPTH = MAX_DEPTH      # meaningful when SOLUTION_MODE == "collect"
+-MAX_COLLECTED_SOLUTIONS = 100
++MAX_COLLECTED_SOLUTIONS = 0          # 0 = collect every validated solution available
+ TOUCH_BFS_RADIUS = 0
+ 
+ AUTHOR_NAME = "replace-with-author"
+diff --git a/tools/cayleypy_public/config.py b/tools/cayleypy_public/config.py
+index 61a45ed2..e48b5afe 100644
+--- a/tools/cayleypy_public/config.py
++++ b/tools/cayleypy_public/config.py
+@@ -176,11 +176,14 @@ class PublicRunConfig:
+ 
+         positive_values = {
+             name: integer(name)
+-            for name in ("beam_width", "max_depth", "max_collected_solutions")
++            for name in ("beam_width", "max_depth")
+         }
+         for name, value in positive_values.items():
+             if value <= 0:
+                 raise ValueError(f"{name.upper()} must be positive")
++        max_collected_solutions = integer("max_collected_solutions")
++        if max_collected_solutions < 0:
++            raise ValueError("MAX_COLLECTED_SOLUTIONS must be non-negative")
+ 
+         collect_until_depth = integer("collect_until_depth")
+         if collect_until_depth < 0 or collect_until_depth > positive_values["max_depth"]:
+@@ -284,7 +287,7 @@ class PublicRunConfig:
+             reflect_source_csv=Path(reflect_source) if reflect_source is not None else None,
+             solution_mode=solution_mode,
+             collect_until_depth=collect_until_depth,
+-            max_collected_solutions=positive_values["max_collected_solutions"],
++            max_collected_solutions=max_collected_solutions,
+             touch_bfs_radius=touch_bfs_radius,
+             publish_results=publish_results,
+             results_ingest_url=ingest_url or "",
+diff --git a/tools/cayleypy_public/results.py b/tools/cayleypy_public/results.py
+index 021c966d..87b4c191 100644
+--- a/tools/cayleypy_public/results.py
++++ b/tools/cayleypy_public/results.py
+@@ -92,6 +92,10 @@ _RUNTIME_FIELDS = (
+ _MANIFEST_FIELDS = (
+     "state_len", "num_classes", "hd1", "hd2", "nrd", "output_dim", "dtype",
+     "normalization", "layout", "batchnorm", "embeddingbag", "embedding",
++    "backend", "model_arch", "move_count", "num_pieces", "max_piece_size",
++    "num_piece_types", "seq_len", "d_model", "nhead", "head_dim",
++    "num_layers", "ff_dim", "activation", "pooling", "piece_layout",
++    "piece_embed_mode", "input_embedding", "move_names",
+ )
+ _MODEL_FIELDS = ("filename", "sha256", "format")
+ _HARDWARE_FIELDS = ("platform", "gpu_names", "accelerator_count", "world_size")
