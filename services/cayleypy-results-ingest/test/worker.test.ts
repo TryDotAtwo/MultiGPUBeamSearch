@@ -323,7 +323,7 @@ describe("fail-closed modes and bounded request parsing", () => {
   });
 
   test("accepts an exact four MiB chunked JSON body with UTF-8 split across chunks", async () => {
-    const envelope = { ...validEnvelope(0), author: { name: "Ada-рџЂ", verification: "claimed" as const } } as ResultEnvelopeV1;
+    const envelope = { ...validEnvelope(0), author: { name: "Ada-\u{1F600}", verification: "claimed" as const } } as ResultEnvelopeV1;
     envelope.idempotency_key = semanticHash(envelope);
     const encoded = new TextEncoder().encode(JSON.stringify({ schema_version: 1, results: [envelope] }));
     const body = new Uint8Array(4 * 1024 * 1024);

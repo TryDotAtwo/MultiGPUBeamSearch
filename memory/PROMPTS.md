@@ -511,3 +511,7 @@
 ## 2026-08-03 вЂ” Public result submission plugin final contract
 
 User required a public Codex plugin plus autonomous Python CLI in the Cloudflare ingest branch. The normal flow must be extremely easy: fill required run/puzzle fields once, provide a move string or contract JSON/CSV/TSV, and submit without entering an endpoint or token. Both Kaggle schema v1 and cluster/local schema v2 must be documented. The CLI must package results locally into sequential archives of at most 32 MiB compressed, preserve full solution/provenance information, support first/best and all-found solution modes, and verify Cloudflare-to-GitHub publication. Endpoint routes are pinned by the implementation; agents must not invent unknown metadata.- 2026-08-03: Test the complete public submission flow, then publish a clean separate branch in the results repository containing only user instructions, the public Codex plugin, and the standalone/GitHub CLI workflow. Full external testing and publishing were authorized; beam-search architecture remains out of scope.
+
+
+## 2026-08-09 - Canonical publishing branch
+- User requested a safe canonical results-publishing branch during repository cleanup without breaking the Cloudflare ingest service, public publisher plugin, cluster workflows, Kaggle notebooks, or Stream 1. New implementation commits must visibly attribute OpenAI Codex running GPT-5.6 Sol.

@@ -884,3 +884,7 @@
 - Added valid canonical JSON and fill-once config templates, Russian human instructions, an agent protocol, and root README discovery.
 - Verification: 17 Python tests, 72 schema/config tests, 138 Worker tests, TypeScript typecheck, plugin validator, skill validator, template/CLI preflights, clean secret scan. Live Windows staging was blocked before HTTP by TLS; a private Kaggle fallback was not uploaded after an egress-policy rejection.
 - Beam-search/CUDA architecture was unchanged.- 2026-08-03: Finalized the public result-publisher client after live Kaggle validation. Added a stable non-bot User-Agent for Cloudflare, bounded 60-second HTTP timeout handling with idempotent transport retries, sanitized HTTP status diagnostics, portable template discovery for both plugin and standalone CLI layouts, and a corrected native-v2 template with matching envelope/provenance run IDs. Private Kaggle smoke v6 completed and published one v1 and one native-v2 result to the GitHub staging branch. Beam-search/CUDA architecture was unchanged.
+
+
+## 2026-08-09 - Canonical publishing branch
+- Established publishing/results at the exact published ingest tip 638fcc90 without rewriting source history. Fixed one pre-existing mojibake UTF-8 test fixture using the ASCII escape U+1F600; full local gates passed: 72 schema tests, 139 Worker tests, TypeScript typecheck, and 18 publisher-plugin tests. No deploy or live state mutation occurred.
