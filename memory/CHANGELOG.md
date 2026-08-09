@@ -1056,3 +1056,7 @@
 - Created five entirely new public Kaggle notebooks under short unambiguous `*-depthsafe` slugs, all pinned to `f679504baddbab3765c91af526e57ec9360cf309`: main, 444, Megaminx, IHES, and Tetraminx. These are separate Kaggle objects, not versions of the earlier recommended notebooks.
 - All five v1 runs completed. Main produced the expected SETUP_REQUIRED landing. The four configured examples ran on exactly two T4 GPUs, returned status success at beam 65,536 with BFS radius 4, produced one validated solution, and published with HTTP 202. Tetraminx requested/effective depth 60; all examples recorded their beam-specific budget ceiling. No history-budget/OOM/overflow/fatal marker was found.
 - Package JSON/AST/provenance validation passed and the local public suite passed 276/276 before publication. The same solver pin already passed the dedicated Tetraminx p26 gate at requested depth 60, calculated ceiling 81, and effective depth 60.
+
+
+## 2026-08-09 - Canonical Kaggle branch
+- Established kaggle/notebooks at the exact published depth-safe notebook tip a0326407 without rewriting source history. All 21 tracked notebooks and 16 metadata files parsed as JSON, 88 Python code cells compiled, and the public suite passed 276/276. Dirty open-PR notebook changes and 99 MB of generated output/export/log artifacts remain unapplied and were preserved separately.

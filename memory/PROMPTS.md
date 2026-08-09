@@ -587,3 +587,7 @@ User reported that an interactive game had been running during part of the recen
 - 2026-08-02: After a shared user run exposed that the first recommended Tetraminx notebook was frozen before the depth-cap fix, user required replacing all five recommended notebooks only with the newest fully tested depth-safe versions and revalidating every notebook, including a real Tetraminx 2**26 run.
 
 - 2026-08-02: User requested five entirely new public notebooks, rather than further versions of the corrected recommended slugs; new notebooks must visibly identify the depth-safe build and use the latest tested solver.
+
+
+## 2026-08-09 - Canonical Kaggle branch
+- User requested a safe canonical Kaggle notebook branch during repository cleanup without breaking published notebooks, cluster workflows, or Stream 1. Dirty work from the open public-notebook PR must be preserved separately instead of silently applied, and new implementation commits must visibly attribute OpenAI Codex running GPT-5.6 Sol.
