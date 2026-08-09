@@ -477,3 +477,5 @@
 - User requested restarting the interrupted A100x8 run overnight and required the resumed autotuner to complete end-to-end. Live job 33360 proved that the correct launch must not reuse a finalist that OOMs at the maximum anchor; fix the tuner and preserve the existing checkpoint before giving the next simple run command.
 
 - User rejected the separate 15% VRAM reserve for Megaminx: real cluster runs deliberately fill VRAM, so a configuration that is stable near 97% must remain eligible. Use the measured 98% capacity boundary rather than an additional 85% profile gate.
+
+- User requested a safe canonical cluster branch during repository cleanup without breaking SLURM launchers, Kaggle notebooks, or Stream 1. Dirty root-checkout HPC work must be preserved separately instead of silently applied, and new implementation commits must visibly attribute OpenAI Codex running GPT-5.6 Sol.
