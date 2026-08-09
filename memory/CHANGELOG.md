@@ -989,3 +989,6 @@
 - `BEAM_GENERATOR_PATH` is now mandatory; a missing or empty value throws before generator loading or GPU search.
 - Added a regression contract test. Verified `tests/cayleypy_public/test_runner.py`: 54 passed.
 - Root-cause evidence: Cube4 p1000 failed at 30M and 60M with the hidden p900 fallback, then solved at length 44 with 30M after explicitly setting the Cube4 `puzzle_info.json` generator path.
+
+## 2026-08-08 - Canonical Stream 1 branch
+- Established `stream1` as the long-lived Stream 1 integration branch at the exact preserved GitHub tip `f769e707`, retaining the complete MLP, Transformer, shared-contract, cluster, and notebook tree without history rewriting. Added branch policy and GPT-5.6 Sol Codex attribution documentation only after the unchanged baseline passed 311 Python tests and all 19 CTest targets on local sm86 CUDA.
