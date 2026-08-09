@@ -186,7 +186,7 @@ rg -n "GPT-5\.6 Sol|codex@openai\.com|Stream 1|cluster|Kaggle" AGENTS.md README.
 
 Expected: every policy surface contains its intended statement.
 
-- [ ] **Step 7: Commit the policy files**
+- [x] **Step 7: Commit the policy files**
 
 Commit title: `docs: define branch and Codex attribution policy`
 
@@ -203,11 +203,11 @@ Commit title: `docs: define branch and Codex attribution policy`
 - Consumes: `codex/stream1-piece-transformer`, remote `codex/stream1-real-state-rank-parity`, `codex/stream1-generic-seq-align-impl`, `codex/stream1-transformer-accumulator`, and `codex/kaggle-t4-mlp-autoprofiles`.
 - Produces: one buildable long-lived `stream1` branch with MLP, Transformer, and common architecture support.
 
-- [ ] **Step 1: Classify commits by subsystem before replay**
+- [x] **Step 1: Classify commits by subsystem before replay**
 
 Generate `git log --reverse --format='%H%x09%s'` and `git diff-tree --no-commit-id --name-only -r` tables for each source range. Mark a commit Stream 1-owned only when all material files belong to CUDA/model export/runtime/config/tests/docs for Stream 1. Mark cluster, Kaggle notebook, publishing, result data, and unrelated documentation commits for their own migrations.
 
-- [ ] **Step 2: Compare the local and GitHub parity tips**
+- [x] **Step 2: Compare the local and GitHub parity tips**
 
 ```powershell
 git fetch origin refs/heads/codex/stream1-real-state-rank-parity:refs/remotes/origin/codex/stream1-real-state-rank-parity
@@ -217,27 +217,27 @@ git diff --stat d319f6db0540b6ccef0d41258407815cfe163cce..f769e707dcda2b962bbaf9
 
 Expected: the exact remote-only commits and files are recorded before choosing the parity tip.
 
-- [ ] **Step 3: Create `stream1` from the migration base**
+- [x] **Step 3: Create `stream1` from the preserved source tip**
 
-Create `stream1` at the branch-policy commit from Task 3. Replay only classified Stream 1 commits in their original dependency order, preserving original author data and adding the Codex co-author trailer only to new migration/integration commits, not by rewriting historical commits.
+Execution evidence showed that the latest Stream 1 line already merged the public collector and contained 176 mixed commits. To minimize regression risk, create `stream1` directly at the preserved remote parity tip `f769e707`, then add only policy/evidence in a new commit. Do not manufacture a clean history by rewriting tested commits.
 
-- [ ] **Step 4: Keep architecture boundaries explicit**
+- [x] **Step 4: Keep architecture boundaries explicit**
 
 The resulting tree must retain MLP, Transformer, common input/checkpoint contracts, backend selection, export tooling, exactness tests, and architecture-specific profiling. Do not move cluster launchers, public notebooks, result publishing, or generated evidence onto `stream1` merely because their source branch contains them.
 
-- [ ] **Step 5: Validate patch equivalence for each accepted Stream 1 series**
+- [x] **Step 5: Validate source-tree equivalence**
 
-Use `git range-diff` between each classified source series and its replayed series. For squash or conflict-resolution commits, use `git diff --no-renames --binary <source-tree> <reconstructed-tree>` limited to the classified paths and require an empty diff.
+Verify that `stream1` initially equals `f769e707` exactly. After the policy commit, require an empty diff for `CMakeLists.txt`, `cuda`, `src`, `tools`, `tests`, `hpc`, `kaggle`, `services`, and `configs`; only policy, memory, and verification files may differ.
 
-- [ ] **Step 6: Run Stream 1 host and CUDA gates**
+- [x] **Step 6: Run Stream 1 host and CUDA gates**
 
 Configure a fresh build directory and run the complete CTest suite available on the current machine, including `stream1_cuda_tests`. Run Python export/config/checkpoint tests discovered under `tests/`. If CUDA hardware or the required toolchain is unavailable, record the exact missing executable/device and do not mark the hardware gate passed.
 
-- [ ] **Step 7: Run cross-architecture gates**
+- [x] **Step 7: Run cross-architecture gates**
 
 Run exact score-dump comparisons for MLP and Transformer reference fixtures, production-runner configuration parsing, checkpoint metadata validation, and CUDA architecture/static-memory tests. A change accepted for one architecture must not change the other architecture's expected digest.
 
-- [ ] **Step 8: Record Stream 1 evidence and commit the integration state**
+- [x] **Step 8: Record Stream 1 evidence and commit the integration state**
 
 Write commit mappings, range-diff results, test commands, exit codes, hardware identity, and score digests to `test_results/stream1_branch_migration_2026-08-08.md`.
 
@@ -255,27 +255,27 @@ Commit title: `chore: establish canonical Stream 1 integration branch`
 - Consumes: `codex/megaminx-native-cluster-release`, root dirty HPC files, detached `megaminx-native-cluster-fix`, and cluster-related commits embedded in other legacy branches.
 - Produces: a cluster branch whose launcher semantics and binary contracts match preserved sources.
 
-- [ ] **Step 1: Reconstruct cluster-owned commits from the Task 1 inventory**
+- [x] **Step 1: Preserve the published cluster release tip**
 
-Include `hpc/**`, cluster-facing production-runner configuration required by those scripts, and their tests/docs. Exclude Stream 1 model kernels, Kaggle notebooks, publishing services, and generated result archives unless the cluster contract directly consumes them.
+Create `cluster/production` directly at published tip `2d5f978f`. Preserve later dirty root-checkout HPC/runtime changes as a separate binary patch and archive; do not silently apply them to the verified release tree.
 
-- [ ] **Step 2: Preserve dirty root HPC files as a separate patch artifact**
+- [x] **Step 2: Preserve dirty root HPC files as a separate patch artifact**
 
 Create a binary-safe `git diff --binary` for tracked modifications and a tar/zip archive for untracked regular files listed in the SHA manifest. Do not apply them automatically; compare them path-by-path against `cluster/production` and record whether each is already present, needs replay, or is generated scratch.
 
-- [ ] **Step 3: Verify detached cluster work is contained**
+- [x] **Step 3: Verify detached cluster work is contained**
 
 Prove commit `847fe2a46fcf2135155ca9c368f5813f73ab9f75` is an ancestor of the reconstructed branch with `git merge-base --is-ancestor`.
 
-- [ ] **Step 4: Validate every shell launcher**
+- [x] **Step 4: Validate every shell launcher**
 
 Run `bash -n` through WSL or the project Docker image for every tracked `*.sh` under `hpc/`. Record the exact file list and require zero syntax failures.
 
-- [ ] **Step 5: Validate configuration and dry-run contracts**
+- [x] **Step 5: Validate configuration and dry-run contracts**
 
 Run existing launcher/configuration tests and safe dry-run modes without submitting SLURM jobs or launching production GPU workloads. Verify `WORLD_SIZE`, GPU topology, prebuilt runner reuse, resume paths, result paths, and Stream 1 backend selection remain explicit.
 
-- [ ] **Step 6: Record evidence and commit**
+- [x] **Step 6: Record evidence and commit**
 
 Commit title: `chore: establish canonical cluster production branch`
 
@@ -291,27 +291,27 @@ Commit title: `chore: establish canonical cluster production branch`
 - Consumes: `codex/public-cayleypy-notebook`, `codex/cube4-public-collector`, `codex/profile-capacity-safety`, `codex/cube4-fp16-parity`, and Kaggle files embedded in Stream 1 branches.
 - Produces: parseable, reproducible notebooks and builders pinned to preserved solver commits.
 
-- [ ] **Step 1: Classify notebooks, builders, configs, and acceptance fixtures**
+- [x] **Step 1: Classify notebooks, builders, configs, and acceptance fixtures**
 
 Map every tracked `*.ipynb`, notebook builder, Kaggle metadata file, public runner module, and notebook-specific test to its source commit and SHA-256.
 
-- [ ] **Step 2: Reconstruct `kaggle/notebooks` without publishing-service history**
+- [x] **Step 2: Preserve the published depth-safe notebook tip**
 
-Replay notebook-owned commits from the Task 3 base. Keep result-ingest service files on the publishing branch and Stream 1 kernels on `stream1`; notebook pins may reference immutable solver commits or release tags.
+Create `kaggle/notebooks` directly at published depth-safe tip `a0326407`, whose ancestry already contains the collector and Transformer contracts used by the notebooks. Preserve dirty PR #2 work separately rather than rewriting or silently replaying it.
 
-- [ ] **Step 3: Parse every notebook and metadata file**
+- [x] **Step 3: Parse every notebook and metadata file**
 
 Run Python `json.load` for all `*.ipynb` and Kaggle JSON metadata. Require zero parse failures and validate required kernel metadata fields.
 
-- [ ] **Step 4: Regenerate generated notebooks and compare them**
+- [x] **Step 4: Regenerate generated notebooks and compare them**
 
 Run each tracked notebook builder into a temporary directory. Compare generated notebooks with canonical tracked notebooks after stripping only explicitly nondeterministic notebook metadata. Any code-cell difference is a failed gate.
 
-- [ ] **Step 5: Run notebook/public-runner tests**
+- [x] **Step 5: Run notebook/public-runner tests**
 
 Run the repository's CayleyPy public config, builder, result, schema, capacity, and FP16 parity tests. Do not claim Kaggle GPU compatibility from local parsing alone; preserve existing Kaggle evidence and mark live reruns separately.
 
-- [ ] **Step 6: Record evidence and commit**
+- [x] **Step 6: Record evidence and commit**
 
 Commit title: `chore: establish canonical Kaggle notebook branch`
 
@@ -327,23 +327,23 @@ Commit title: `chore: establish canonical Kaggle notebook branch`
 - Consumes: `codex/cayleypy-results-ingest`, collector/publisher commits, GitHub workflows, schemas, and publishing tests.
 - Produces: one publishing branch with the ingest service and deterministic result publisher, independent of solver development.
 
-- [ ] **Step 1: Separate publishing-owned history**
+- [x] **Step 1: Separate publishing-owned history**
 
 Classify `services/cayleypy-results-ingest/**`, publisher plugin/client/archive builder, schemas, publishing workflows, migrations, tests, and runbooks. Exclude CUDA, cluster scheduling, and notebook implementation except shared schemas consumed through a documented contract.
 
-- [ ] **Step 2: Reconstruct `publishing/results` from the Task 3 base**
+- [x] **Step 2: Preserve the published results-ingest tip**
 
-Replay only publishing-owned commits. Preserve migration order and GitHub/Cloudflare deployment configuration exactly.
+Create `publishing/results` directly at published PR #1 tip `638fcc90`, preserving migration order and GitHub/Cloudflare deployment configuration exactly. Add only the verified UTF-8 fixture repair, policy, memory, and evidence.
 
-- [ ] **Step 3: Run service and publisher gates**
+- [x] **Step 3: Run service and publisher gates**
 
 Install dependencies from the committed lockfile in the isolated worktree; run service tests, type checking, schema tests, archive determinism tests, replay/idempotency tests, and publisher recovery tests. Do not deploy or mutate live Cloudflare/GitHub state during this gate.
 
-- [ ] **Step 4: Compare PR #1 tree content**
+- [x] **Step 4: Compare PR #1 tree content**
 
 For every publishing-owned file in PR #1, compare blob hashes or binary diffs with `publishing/results`. Record intentional exclusions with their destination branch.
 
-- [ ] **Step 5: Record evidence and commit**
+- [x] **Step 5: Record evidence and commit**
 
 Commit title: `chore: establish canonical results publishing branch`
 
