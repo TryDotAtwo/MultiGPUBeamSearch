@@ -572,3 +572,6 @@ User reported that an interactive game had been running during part of the recen
 
 ## 2026-08-03 - Fail closed on puzzle generators
 - User requirement: remove generator defaults so a missing puzzle-specific generator path can never silently run a different puzzle's moves; then launch Cube4 puzzles 1001 through 1004 at the established maximum 820M beam.
+
+## 2026-08-08 - Canonical Stream 1 branch
+- User requested reorganizing Stream 1 development around one long-lived `stream1` integration branch that supports simultaneous MLP, Transformer, common-contract, and future-architecture work through short task branches, while preserving cluster and Kaggle behavior. Canonical branch names should not use the `codex/` prefix, and new implementation work must visibly attribute OpenAI Codex running GPT-5.6 Sol.

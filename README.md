@@ -5,6 +5,15 @@ CUDA/C++ multi-GPU beam search runner for Cayley graph puzzle searches.
 The production executable is `production_runner`. It can run on one GPU or on
 multiple GPUs through `torchrun`; the same binary is used in both cases.
 
+## Development
+
+This project is developed primarily by OpenAI Codex running GPT-5.6 Sol,
+under the direction, infrastructure decisions, review, and acceptance of Ivan
+Litvak. Codex performs the primary architecture, implementation, testing,
+profiling support, and technical documentation work. New Codex-implemented
+commits record this collaboration through Git co-author attribution; see
+[`CONTRIBUTORS.md`](CONTRIBUTORS.md) for roles and attribution policy.
+
 ## What Is Included
 
 - CUDA beam-search runtime with Stream1 neural scoring, Stream2 move/hash work,
