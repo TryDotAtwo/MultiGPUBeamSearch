@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import sys
 from typing import Any, Callable
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 import zipfile
 
 
@@ -48,6 +50,39 @@ def _optional_exact_glob(root: Path, pattern: str | None, label: str) -> Path | 
     return None if pattern is None else _exact_glob(root, pattern, label)
 
 
+def _public_archive_url(kind: str, reference: str) -> str:
+    routes = {
+        "kaggle_competition": "https://www.kaggle.com/api/v1/competitions/data/download-all/",
+        "kaggle_dataset": "https://www.kaggle.com/api/v1/datasets/download/",
+        "kaggle_model": "https://www.kaggle.com/api/v1/models/",
+        "kaggle_notebook_output": "https://www.kaggle.com/api/v1/kernels/output/",
+    }
+    suffix = "/download" if kind == "kaggle_model" else ""
+    return routes[kind] + reference + suffix
+
+
+def _download_public_archive(kind: str, reference: str, cache_root: Path) -> Path:
+    safe_name = sha256(f"{kind}:{reference}".encode("utf-8")).hexdigest()[:16]
+    archive_path = cache_root / f"{safe_name}.zip"
+    if not archive_path.exists():
+        request = Request(
+            _public_archive_url(kind, reference),
+            headers={"User-Agent": "cayleypy-molab/1.0"},
+        )
+        try:
+            with urlopen(request, timeout=120) as response, archive_path.open("wb") as output:
+                shutil.copyfileobj(response, output)
+        except (HTTPError, URLError) as error:
+            archive_path.unlink(missing_ok=True)
+            code = getattr(error, "code", "network_error")
+            raise RuntimeError(
+                "SETUP_REQUIRED: Kaggle rejected the public asset download "
+                f"({kind} {reference!r}, status={code}). If this competition requires "
+                "rules acceptance, add Kaggle credentials to the Molab Secrets panel."
+            ) from error
+    return _unpack_if_needed(archive_path, cache_root / safe_name)
+
+
 def _download(kind: str, reference: str, cache_root: Path) -> Path:
     hub = _kagglehub()
     downloaders: dict[str, Callable[[str], str]] = {
@@ -60,7 +95,12 @@ def _download(kind: str, reference: str, cache_root: Path) -> Path:
         downloader = downloaders[kind]
     except KeyError as error:
         raise ValueError(f"unsupported Molab asset kind: {kind!r}") from error
-    downloaded = Path(downloader(reference))
+    try:
+        downloaded = Path(downloader(reference))
+    except Exception as error:
+        if error.__class__.__name__ not in {"UnauthenticatedError", "KaggleApiHTTPError"}:
+            raise
+        return _download_public_archive(kind, reference, cache_root)
     safe_name = sha256(f"{kind}:{reference}".encode("utf-8")).hexdigest()[:16]
     return _unpack_if_needed(downloaded, cache_root / safe_name)
 

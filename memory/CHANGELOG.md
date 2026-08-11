@@ -1072,3 +1072,4 @@
 
 - Replaced `dict(locals())` in generated Molab notebooks with an explicit allowlist of user-facing configuration fields.
 - Real Molab execution exposed that marimo injects callable objects into cell locals; those objects are not JSON serializable and previously stopped the run before asset download.
+- Added a token-free Kaggle public-archive fallback for Molab because an authenticated Molab account does not automatically authenticate `kagglehub`; protected competitions now fail with an explicit `SETUP_REQUIRED` message.
