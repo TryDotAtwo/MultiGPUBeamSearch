@@ -597,3 +597,8 @@ User reported that an interactive game had been running during part of the recen
 - Provide one universal checkpoint-only Molab notebook and four examples matching Cube 4x4x4, Megaminx, IHES, and Tetraminx.
 - Do not treat local notebook tests as acceptance evidence; test all five notebooks on Molab itself.
 - Preserve the beam-search CUDA/C++ architecture.
+## 2026-08-11 — Validate only on Molab
+
+> Не нужно ниче на ноуте тестировать. Тестируй все на молабе
+
+Acceptance must come from real Molab-side execution and artifacts, not from local notebook execution.

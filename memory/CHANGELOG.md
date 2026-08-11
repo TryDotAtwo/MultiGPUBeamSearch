@@ -1068,3 +1068,7 @@
 - Generalized host orchestration to explicit portable world size and CUDA compute capability while preserving Kaggle 2xT4 defaults.
 - Added a Molab CLI with GPU detection, dynamic history budgets, checkpoint export, solve/collect/reflection, artifact materialization, and best-effort Cloudflare publication.
 - Real acceptance remains gated on Molab GPU execution of all five notebooks.
+## 2026-08-11 — Molab explicit notebook config contract
+
+- Replaced `dict(locals())` in generated Molab notebooks with an explicit allowlist of user-facing configuration fields.
+- Real Molab execution exposed that marimo injects callable objects into cell locals; those objects are not JSON serializable and previously stopped the run before asset download.

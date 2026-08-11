@@ -84,7 +84,25 @@ def _():
 
     OUTPUT_DIR = Path("/tmp/cayleypy_molab/output")
     LOG_PATH = Path("/tmp/cayleypy_molab/molab-run.log")
-    molab_user_config = dict(locals())
+    config_names = (
+        "PLATFORM", "REPOSITORY_URL", "REPOSITORY_BRANCH", "SOLVER_COMMIT",
+        "MODEL_SOURCE_KIND", "MODEL_DTYPE", "CHECKPOINT_FORMAT",
+        "COMPETITION", "COMPETITION_SOURCE_KIND", "COMPETITION_SOURCE",
+        "MODEL_ASSET_KIND", "MODEL_ASSET_REF", "CHECKPOINT_GLOB",
+        "CHECKPOINT_METADATA_GLOB", "CHECKPOINT_GENERATOR_GLOB",
+        "PUZZLE_ID_START", "PUZZLE_ID_END", "BEAM_WIDTH", "MAX_DEPTH",
+        "REFLECT_MODE", "REFLECT_SOURCE_CSV", "SOLUTION_MODE",
+        "COLLECT_UNTIL_DEPTH", "MAX_COLLECTED_SOLUTIONS", "TOUCH_BFS_RADIUS",
+        "AUTHOR_NAME", "PUBLISH_RESULTS", "RESULTS_INGEST_URL",
+        "ENABLE_DEBUG", "ENABLE_DEPTH_LOGS", "ENABLE_DEBUG_LOGS",
+        "DEBUG_STREAM_TIMING", "DEBUG_INFERENCE_TRACE", "DEBUG_PATH_TRACE",
+        "DEBUG_FINAL_VALIDATE", "DEBUG_FINAL_EXCHANGE_TRACE",
+        "DEBUG_FINAL_HISTOGRAM_TRACE", "DEBUG_STREAM4_HISTOGRAM_TRACE",
+        "DEBUG_DEPTH_FLOW_TRACE", "DEBUG_PIPELINE_STATS", "DEPTH_LOG_EVERY",
+        "PUZZLE_LOG_EVERY", "OUTPUT_DIR", "LOG_PATH",
+    )
+    config_scope = locals()
+    molab_user_config = {name: config_scope[name] for name in config_names}
     return (molab_user_config,)
 
 
