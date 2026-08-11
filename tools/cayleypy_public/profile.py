@@ -41,6 +41,8 @@ class RuntimePlan:
     shard_capacity_candidates: int
     runtime: Mapping[str, int]
     cross_puzzle_profile_note: str
+    world_size: int = 2
+    hardware: str = "kaggle_2xt4"
 
 
 def _positive_int(value: object, name: str) -> int:
@@ -76,11 +78,33 @@ def derive_runtime(
     world_size: int = 2,
 ) -> RuntimePlan:
     """Derive move-count-aware batches without replacing the requested beam."""
+    if world_size != 2:
+        raise ValueError("world_size must be exactly 2 for kaggle_2xt4")
+    return derive_portable_runtime(
+        profile, beam_width, output_dim, move_count,
+        world_size=world_size, hardware="kaggle_2xt4",
+    )
+
+
+def derive_portable_runtime(
+    profile: Mapping[str, Any],
+    beam_width: int,
+    output_dim: int,
+    move_count: int,
+    *,
+    world_size: int,
+    hardware: str,
+) -> RuntimePlan:
+    """Derive the same runtime contract for a declared portable GPU topology."""
     requested_beam = _positive_int(beam_width, "beam_width")
     moves = _positive_int(move_count, "move_count")
     ranks = _positive_int(world_size, "world_size")
-    if ranks != 2:
-        raise ValueError("world_size must be exactly 2 for kaggle_2xt4")
+    if not isinstance(hardware, str) or not hardware.strip():
+        raise ValueError("hardware must be a non-empty string")
+    if profile.get("hardware") != hardware:
+        raise ValueError(
+            f"profile hardware must be {hardware!r}; got {profile.get('hardware')!r}"
+        )
     if profile.get("validation_status") not in {"measured", "bounded_from_measured"}:
         raise ValueError("profile validation_status must be measured or bounded_from_measured")
 
@@ -130,6 +154,8 @@ def derive_runtime(
         shard_capacity_candidates=capacity,
         runtime=MappingProxyType(dict(runtime)),
         cross_puzzle_profile_note="measured_24_move_seed" if moves != 24 else "",
+        world_size=ranks,
+        hardware=hardware,
     )
 
 
@@ -142,6 +168,22 @@ def serialize_preflight(
     tmp_free_bytes: int,
 ) -> dict[str, Any]:
     """Return a JSON-ready, fail-closed preflight record for one public run."""
+    if plan.world_size != 2 or plan.hardware != "kaggle_2xt4":
+        raise ValueError("serialize_preflight requires kaggle_2xt4 world_size=2")
+    return serialize_portable_preflight(
+        plan, profile, move_count, history_ram_bytes, history_disk_bytes, tmp_free_bytes,
+    )
+
+
+def serialize_portable_preflight(
+    plan: RuntimePlan,
+    profile: Mapping[str, Any],
+    move_count: int,
+    history_ram_bytes: int,
+    history_disk_bytes: int,
+    tmp_free_bytes: int,
+) -> dict[str, Any]:
+    """Return a JSON-ready preflight record for the plan's declared topology."""
     if profile.get("validation_status") not in {"measured", "bounded_from_measured"}:
         raise ValueError("profile validation_status must be measured or bounded_from_measured")
     moves = _positive_int(move_count, "move_count")
@@ -154,13 +196,14 @@ def serialize_preflight(
     if not isinstance(evidence, Mapping):
         raise ValueError("profile evidence must be an object")
     hardware = profile.get("hardware")
-    if hardware != "kaggle_2xt4":
-        raise ValueError(f"profile hardware must be 'kaggle_2xt4'; got {hardware!r}")
+    if hardware != plan.hardware:
+        raise ValueError(f"profile hardware must be {plan.hardware!r}; got {hardware!r}")
     evidence_version = _positive_int(profile.get("profile_registry_schema_version"), "profile_registry_schema_version")
     return {
         "profile_evidence_version": evidence_version,
         "profile_evidence": dict(evidence),
         "hardware": hardware,
+        "world_size": plan.world_size,
         "move_count": moves,
         "requested_beam": plan.requested_beam,
         "effective_beam": plan.effective_beam,

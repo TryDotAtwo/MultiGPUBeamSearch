@@ -1060,3 +1060,11 @@
 
 ## 2026-08-09 - Canonical Kaggle branch
 - Established kaggle/notebooks at the exact published depth-safe notebook tip a0326407 without rewriting source history. All 21 tracked notebooks and 16 metadata files parsed as JSON, 88 Python code cells compiled, and the public suite passed 276/276. Dirty open-PR notebook changes and 99 MB of generated output/export/log artifacts remain unapplied and were preserved separately.
+# 2026-08-11 — Molab-native checkpoint notebook suite
+
+- Created isolated `molab/notebooks` branch from canonical `kaggle/notebooks`.
+- Added a marimo generator for one universal launcher and four public examples.
+- Added Molab asset resolution for Kaggle competition, dataset, model, and notebook-output sources.
+- Generalized host orchestration to explicit portable world size and CUDA compute capability while preserving Kaggle 2xT4 defaults.
+- Added a Molab CLI with GPU detection, dynamic history budgets, checkpoint export, solve/collect/reflection, artifact materialization, and best-effort Cloudflare publication.
+- Real acceptance remains gated on Molab GPU execution of all five notebooks.

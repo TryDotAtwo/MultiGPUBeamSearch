@@ -191,11 +191,23 @@ def _git_stdout(arguments: Sequence[object], *, cwd: Path) -> str:
     return completed.stdout.strip()
 
 
-def locate_or_build_runner(output_dir: Path, puzzle_info_json: Path | None = None, *, backend: str = "mlp", config: PublicRunConfig | None = None) -> Path:
-    """Build the existing runner in Release mode for T4 (SM75), without source edits."""
+def locate_or_build_runner(
+    output_dir: Path,
+    puzzle_info_json: Path | None = None,
+    *,
+    backend: str = "mlp",
+    config: PublicRunConfig | None = None,
+    cuda_arch: str = "75",
+    build_tag: str = "kaggle",
+) -> Path:
+    """Build the existing runner for one explicit CUDA architecture."""
+    if not re.fullmatch(r"[0-9]{2,3}", cuda_arch):
+        raise ValueError(f"invalid CUDA architecture: {cuda_arch!r}")
+    if not re.fullmatch(r"[a-z0-9_-]+", build_tag):
+        raise ValueError(f"invalid build tag: {build_tag!r}")
     logs = output_dir / "logs"
     cutlass = Path(os.environ.get("CAYLEYPY_CUTLASS_DIR", "/tmp/cayleypy_public_cutlass"))
-    default_build = f"/tmp/cayleypy_public_build_sm75_{backend}"
+    default_build = f"/tmp/cayleypy_public_build_{build_tag}_sm{cuda_arch}_{backend}"
     build = Path(os.environ.get("CAYLEYPY_BUILD_DIR", default_build))
     private_paths = tuple(path for path in (cutlass, build, puzzle_info_json) if path is not None)
     if not cutlass.exists():
@@ -226,7 +238,7 @@ def locate_or_build_runner(output_dir: Path, puzzle_info_json: Path | None = Non
     target = "production_runner" if backend == "mlp" else "production_runner_libtorch_stream1"
     configure: list[object] = [
         "cmake", "-S", _REPO_ROOT, "-B", build, "-GNinja",
-        "-DCMAKE_BUILD_TYPE=Release", "-DBEAM_CUDA_ARCHITECTURES=75",
+        "-DCMAKE_BUILD_TYPE=Release", f"-DBEAM_CUDA_ARCHITECTURES={cuda_arch}",
         f"-DCUTLASS_DIR={cutlass}",
         f"-DBEAM_ENABLE_DEBUG={'ON' if config is None or config.enable_debug else 'OFF'}",
         f"-DBEAM_ENABLE_DEPTH_LOGS={'ON' if config is None or config.enable_depth_logs else 'OFF'}",
@@ -264,7 +276,7 @@ def locate_or_build_runner(output_dir: Path, puzzle_info_json: Path | None = Non
     )
     runner = (build / target).resolve()
     if not runner.is_file() or not runner.is_absolute():
-        raise RuntimeError("Release SM75 runner was not materialized")
+        raise RuntimeError(f"Release SM{cuda_arch} runner was not materialized")
     return runner
 
 
@@ -400,6 +412,7 @@ def _publication_context(
     wall_seconds: float,
     solve_seconds: float,
 ) -> dict[str, object]:
+    platform = "molab" if plan.hardware.startswith("molab_") else "kaggle"
     notebook_sha256 = config.kaggle_notebook_sha256
     required = {
         "competition": config.competition,
@@ -427,11 +440,11 @@ def _publication_context(
         "effective_beam": plan.effective_beam,
         "alignment_delta": plan.alignment_delta,
         "selected_profile": f"p{plan.profile_power}-{plan.model_class}",
-        "evidence": "measured-kaggle-2xt4",
+        "evidence": str(profile.get("evidence_origin", "measured-kaggle-2xt4")),
         "profile_evidence_version": profile.get("profile_registry_schema_version"),
         "profile_power": plan.profile_power,
         "model_class": plan.model_class,
-        "world_size": 2,
+        "world_size": plan.world_size,
     }
     return {
         "run_id": f"run-{uuid.uuid4().hex}",
@@ -440,7 +453,10 @@ def _publication_context(
             "owner": config.kaggle_owner,
             "slug": config.kaggle_slug,
             "version": config.kaggle_version,
-            "run_url": f"https://www.kaggle.com/code/{config.kaggle_owner}/{config.kaggle_slug}",
+            "run_url": (
+                f"https://www.kaggle.com/code/{config.kaggle_owner}/{config.kaggle_slug}"
+                if platform == "kaggle" else "https://molab.marimo.io/"
+            ),
             "notebook_sha256": notebook_sha256,
         },
         "competition": config.competition,
@@ -459,8 +475,8 @@ def _publication_context(
             "manifest": dict(model.manifest),
         },
         "hardware": {
-            "platform": "kaggle", "gpu_names": list(hardware_names),
-            "accelerator_count": 2, "world_size": 2,
+            "platform": platform, "gpu_names": list(hardware_names),
+            "accelerator_count": plan.world_size, "world_size": plan.world_size,
         },
         "timings": {
             "solve_us": max(0, round(solve_seconds * 1_000_000)),
@@ -658,7 +674,10 @@ def _summary_base(
     plan: RuntimePlan,
 ) -> dict[str, object]:
     return {
-        "hardware": {"gpu_names": list(hardware_names), "world_size": 2},
+        "hardware": {
+            "platform": "molab" if plan.hardware.startswith("molab_") else "kaggle",
+            "gpu_names": list(hardware_names), "world_size": plan.world_size,
+        },
         "model": {
             "format": model.format, "dtype": model.dtype,
             "checkpoint_sha256": model.checkpoint_sha256,

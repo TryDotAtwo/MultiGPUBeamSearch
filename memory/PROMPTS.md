@@ -574,11 +574,11 @@ User reported that an interactive game had been running during part of the recen
 - 2026-08-01: User requested confirmation that every profile, including 2^26, works everywhere and required the maximum reasonable touch-BFS setting in all five notebooks.
 - 2026-08-01: User explicitly required creating the missing 2^26 MLP profiles.
 
-- User: Так сделай профиль
+- User: РўР°Рє СЃРґРµР»Р°Р№ РїСЂРѕС„РёР»СЊ
 
-- User: И отдельно найди предельное значение луча и тоже сделай чтоб работало
+- User: Р РѕС‚РґРµР»СЊРЅРѕ РЅР°Р№РґРё РїСЂРµРґРµР»СЊРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ Р»СѓС‡Р° Рё С‚РѕР¶Рµ СЃРґРµР»Р°Р№ С‡С‚РѕР± СЂР°Р±РѕС‚Р°Р»Рѕ
 
-- User: Нужно это всё как для МЛП, так и для трансформера. Для всех ноутов
+- User: РќСѓР¶РЅРѕ СЌС‚Рѕ РІСЃС‘ РєР°Рє РґР»СЏ РњР›Рџ, С‚Р°Рє Рё РґР»СЏ С‚СЂР°РЅСЃС„РѕСЂРјРµСЂР°. Р”Р»СЏ РІСЃРµС… РЅРѕСѓС‚РѕРІ
 
 - User required every public notebook to keep MAX_DEPTH within the history budget computed separately for its actual beam; explicitly selected MAX_DEPTH=60 for Tetraminx beam 2**26.
 
@@ -591,3 +591,9 @@ User reported that an interactive game had been running during part of the recen
 
 ## 2026-08-09 - Canonical Kaggle branch
 - User requested a safe canonical Kaggle notebook branch during repository cleanup without breaking published notebooks, cluster workflows, or Stream 1. Dirty work from the open public-notebook PR must be preserved separately instead of silently applied, and new implementation commits must visibly attribute OpenAI Codex running GPT-5.6 Sol.
+# 2026-08-11 вЂ” Separate Molab notebook branch
+
+- Inspect the cleaned Kaggle notebook repository and create a separate Molab branch.
+- Provide one universal checkpoint-only Molab notebook and four examples matching Cube 4x4x4, Megaminx, IHES, and Tetraminx.
+- Do not treat local notebook tests as acceptance evidence; test all five notebooks on Molab itself.
+- Preserve the beam-search CUDA/C++ architecture.

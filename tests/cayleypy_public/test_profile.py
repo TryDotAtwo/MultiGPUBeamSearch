@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from tools.cayleypy_public.profile import derive_runtime, serialize_preflight
+from tools.cayleypy_public.profile import (
+    derive_portable_runtime,
+    derive_runtime,
+    serialize_portable_preflight,
+    serialize_preflight,
+)
 from tools.kaggle_t4_mlp_profiles import select_profile
 
 
@@ -82,6 +87,23 @@ def test_derive_runtime_rejects_non_2xt4_world_sizes(world_size: int) -> None:
 
     with pytest.raises(ValueError, match="world_size"):
         derive_runtime(profile, 2**20, output_dim=1, move_count=24, world_size=world_size)
+
+
+def test_molab_portable_runtime_supports_one_gpu_without_changing_requested_beam() -> None:
+    profile = select_profile(REGISTRY, 2**16, output_dim=1, move_count=24)
+    profile["hardware"] = "molab_1xgpu"
+
+    plan = derive_portable_runtime(
+        profile, 2**16, output_dim=1, move_count=24,
+        world_size=1, hardware="molab_1xgpu",
+    )
+
+    assert plan.world_size == 1
+    assert plan.hardware == "molab_1xgpu"
+    assert plan.local_beam == plan.effective_beam
+    payload = serialize_portable_preflight(plan, profile, 24, 1, 100, 100)
+    assert payload["hardware"] == "molab_1xgpu"
+    assert payload["world_size"] == 1
 
 
 def test_runtime_mapping_cannot_be_mutated_after_derivation() -> None:

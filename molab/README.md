@@ -1,35 +1,52 @@
-# Molab Workspace
+# CayleyPy Beam Search on Molab
 
-This directory holds molab-specific notebooks and run notes. It is separate from
-the Kaggle notebooks because molab has different paths, authentication, and
-runtime constraints.
+This branch contains a Molab-native marimo launcher and four ready-to-run
+examples. It reuses the production CUDA/C++ solver; the notebooks contain no
+second beam-search implementation.
 
-## Files
-- `molab_probe.py`: marimo notebook/script that probes the molab runtime,
-  checks GPU availability, runs a small GPU task, and optionally clones/builds
-  this repository for a tiny CUDA sanity run.
-- `probe_cell.py`: single-cell version of the same probe, useful when pasting
-  into a fresh molab notebook.
+## Notebooks
 
-## Intended Molab Flow
-1. Open molab in the Codex in-app browser and sign in.
-2. Create a new notebook or fork/import a notebook.
-3. Paste `probe_cell.py` into one Python cell and run it.
-4. Save the output under `test_results/` in this repository.
+| File | Purpose | Default workload |
+|---|---|---|
+| `cayleypy-notebooks/cayleypy_molab.py` | Universal checkpoint-only launcher | User-supplied competition and checkpoint |
+| `cayleypy-notebooks/cayleypy_molab_444.py` | Piece Transformer example | Cube 4x4x4, puzzle 0, beam `2**16` |
+| `cayleypy-notebooks/cayleypy_molab_megaminx.py` | Output-24 MLP example | Megaminx, puzzle 10, beam `2**16` |
+| `cayleypy-notebooks/cayleypy_molab_ihes.py` | Output-1 MLP example | IHES Cube, puzzle 1, beam `2**16` |
+| `cayleypy-notebooks/cayleypy_molab_tetraminx.py` | Output-1 MLP example | Professor Tetraminx, puzzle 0, beam `2**16` |
 
-Molab cannot see local uncommitted files unless they are uploaded/imported or
-pushed to a remote Git repository. The probe therefore clones the public GitHub
-repository when it attempts a project build.
+## Model contract
 
-## 2026-06-03 Probe Result
-- The signed-in notebook runtime was CPU-only by default: `nvidia-smi`, `nvcc`,
-  `cmake`, and `ninja` were missing, and `torch.cuda.device_count()` was `0`.
-- cgroup quota reported `20` CPU cores and `160 GiB` memory, although host-level
-  `free -h` reported `1.0 TiB`.
-- Official molab public preview documentation says GPU can be attached from the
-  compute/specs control: one NVIDIA RTX Pro 6000 Blackwell GPU with 96 GB VRAM.
-  A 2-GPU option was not verified in the current session.
-- CPU-side project checks did run on molab from the public GitHub clone:
-  `contract_tests=pass` and `history_tests=pass`.
+`MODEL_SOURCE_KIND` is fixed to `checkpoint`. Automatic export supports
+batchnorm-folded MLP, resmlp-layernorm MLP, and the supported piece Transformer
+bundle. The head must be `output_dim=1` or `output_dim=move_count`. Model dtype
+is automatically FP16 and checkpoint format is detected automatically.
 
-See `test_results/molab_runtime_probe_2026-06-03.md` for the detailed run log.
+## Use
+
+1. Open Molab and attach a GPU compute spec.
+2. Import one `.py` notebook from this directory.
+3. For the universal notebook, upload/expose a standard CayleyPy competition
+   directory and a supported checkpoint, then edit only `USER CONFIG`.
+4. Run the notebook. Examples download their public Kaggle assets through
+   `kagglehub`; Kaggle credentials/rules acceptance can still be required.
+5. Read `/tmp/cayleypy_molab/output/run_summary.json`. Solutions,
+   `submission.csv`, logs, preflight, and `publish_status.json` remain there.
+
+The inclusive puzzle range, beam, `first`/`collect`, reflection, collection
+depth/capacity, touch-BFS radius, debug switches, and result publication are
+configurable. Publication is best effort and token-free.
+
+## Runtime differences from Kaggle
+
+- Molab notebooks are marimo `.py` notebooks.
+- GPU count and compute capability come from the attached Molab spec.
+- CMake builds for that compute capability and torchrun uses the actual count.
+- History RAM/disk budgets come from the live sandbox.
+
+## Regeneration
+
+```bash
+python tools/build_molab_cayleypy_notebooks.py
+```
+
+Acceptance requires real Molab GPU runs of the main launcher and all examples.

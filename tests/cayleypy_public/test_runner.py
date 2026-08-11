@@ -180,6 +180,25 @@ def test_first_invocation_uses_exact_two_rank_torchrun_and_runtime_contract(tmp_
         "BEAM_HISTORY_DISK_PATH": invocation.env["BEAM_HISTORY_DIR"],
         "BEAM_STREAM2_SUFFIX_RADIUS": "0",
     }
+
+
+def test_molab_one_gpu_plan_builds_one_rank_torchrun_and_one_rank_log(tmp_path: Path) -> None:
+    base = _plan(local_beam=2**16)
+    plan = RuntimePlan(
+        base.requested_beam, base.effective_beam, base.alignment_delta,
+        base.profile_power, base.model_class, base.local_beam, base.parent_batch,
+        base.stream3_batch_candidates, base.shard_capacity_candidates, base.runtime,
+        base.cross_puzzle_profile_note, world_size=1, hardware="molab_1xgpu",
+    )
+
+    invocation = runner.build_runner_invocation(
+        _config(tmp_path), plan, 24, 7, "original", tmp_path / "weights", tmp_path
+    )
+
+    assert invocation.command[:4] == (
+        "python", "-m", "torch.distributed.run", "--nproc-per-node=1"
+    )
+    assert len(invocation.rank_logs) == 1
     assert invocation.env["BEAM_HISTORY_DIR"].startswith("/tmp/beam_history_public/")
     assert not {"WORLD_SIZE", "RANK", "LOCAL_RANK"}.intersection(invocation.env)
 
