@@ -38,7 +38,7 @@ def _():
     PLATFORM = "molab"
     REPOSITORY_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
     REPOSITORY_BRANCH = "molab/notebooks"
-    SOLVER_COMMIT = "141311a55fe5fbcf23a8b60fbea85dace95e15cb"
+    SOLVER_COMMIT = "d156c4a1c62e5c49d9db78c0b37a216aeb1db460"
     MODEL_SOURCE_KIND = "checkpoint"
     MODEL_DTYPE = "auto"
     CHECKPOINT_FORMAT = "auto"

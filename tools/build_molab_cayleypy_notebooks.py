@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = ROOT / "molab" / "cayleypy-notebooks"
 REPOSITORY = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
 REPOSITORY_BRANCH = "molab/notebooks"
-SOLVER_COMMIT = "141311a55fe5fbcf23a8b60fbea85dace95e15cb"
+SOLVER_COMMIT = "d156c4a1c62e5c49d9db78c0b37a216aeb1db460"
 INGEST_URL = "https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results"
 
 EXAMPLES: dict[str, dict[str, Any]] = {
