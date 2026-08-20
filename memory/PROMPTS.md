@@ -602,3 +602,9 @@ User reported that an interactive game had been running during part of the recen
 > Не нужно ниче на ноуте тестировать. Тестируй все на молабе
 
 Acceptance must come from real Molab-side execution and artifacts, not from local notebook execution.
+
+## 2026-08-20 — Native Molab pairing authorization
+
+- User supplied a private Molab pair URL/token and explicitly requested using `marimo-pair` and `execute-code.sh` to operate the live notebook kernel.
+- User previously explicitly authorized transferring the existing local Kaggle API credential into the private Molab sandbox for notebook validation.
+- Continue real Molab acceptance autonomously; do not modify the beam-search CUDA/C++ architecture.

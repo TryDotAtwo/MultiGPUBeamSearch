@@ -30,3 +30,13 @@ build target, export manifest, validated solution, `run_summary.json`,
   `SETUP_REQUIRED ... kaggle_competition 'cayley-py-444-cube', status=401`.
 - The Molab account session does not propagate Kaggle credentials to `kagglehub`. Full build/export/solve remains pending until `KAGGLE_USERNAME` and `KAGGLE_KEY` are added through Molab Secrets. Credentials were deliberately not pasted into a notebook cell or log.
 - Runtime/notebook branch at verification: `molab/notebooks`, `f98fe746`.
+
+# Native pair verification update — 2026-08-20
+
+- Connected through the official `marimo-pair` HTTP execution protocol; session discovery and code execution returned HTTP 200.
+- Hardware: one `NVIDIA RTX PRO 6000 Blackwell Server Edition`, 97,887 MiB VRAM, compute capability 12.0 (`sm_120`), driver 580.126.20, driver CUDA 13.0, PyTorch 2.11.0+cu130.
+- The explicitly authorized Kaggle credential was installed in the private sandbox with mode 0600 and was not printed. Protected 444 competition data (501 KiB) and the Transformer dataset (12.1 MiB) downloaded successfully.
+- Model export succeeded: `piece_transformer`, FP16, sequence length 57, d_model 256, four layers, output_dim 24.
+- Live failures diagnosed in order: missing CMake; hidden system nvcc; mixed nvcc 13.3 versus headers/runtime 13.0; incomplete CUDA wheel namespace; missing CCCL `nv/target`; missing NVTX header. A fully matching CUDA 13.0 toolkit (nvcc/crt/nvvm 13.0.88, runtime 13.0.96, CCCL 13.0.85) reached actual `sm_120` CUDA compilation.
+- The sandbox returned HTTP 410 `sandbox terminated` during the next long rebuild. No final solver result or Cloudflare publication can be claimed from this session.
+- Targeted local regression for the new bootstrap: 10/10 Molab tests passed. Combined Molab/public suite: 267 passed and 21 failed solely because the Windows host had only 27.7 GB free under `/tmp` against pre-existing 32/50 GB history-budget tests; those failures are unrelated to the Molab toolchain change.

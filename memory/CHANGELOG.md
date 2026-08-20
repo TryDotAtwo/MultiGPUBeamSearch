@@ -1073,3 +1073,10 @@
 - Replaced `dict(locals())` in generated Molab notebooks with an explicit allowlist of user-facing configuration fields.
 - Real Molab execution exposed that marimo injects callable objects into cell locals; those objects are not JSON serializable and previously stopped the run before asset download.
 - Added a token-free Kaggle public-archive fallback for Molab because an authenticated Molab account does not automatically authenticate `kagglehub`; protected competitions now fail with an explicit `SETUP_REQUIRED` message.
+
+## 2026-08-20 — Molab native pair and CUDA 13 bootstrap
+
+- Connected to a live RTX PRO 6000 Blackwell Molab kernel through `marimo-pair` and verified the private Kaggle credential handoff without printing the credential.
+- Real Cube 4x4x4 execution downloaded the protected competition and Transformer assets, detected `sm_120`, and exported the 24-output piece Transformer.
+- The Molab image exposed no `cmake`/`ninja` on `PATH` and a mixed CUDA toolchain (`torch`/headers 13.0 versus system `nvcc` 13.3). Added a tested Molab-only bootstrap for build tools and a fully pinned CUDA 13.0 wheel family with CCCL, CRT, NVVM, runtime, and an isolated toolkit overlay.
+- CUDA configuration and compilation reached the solver source for `sm_120`; the original sandbox terminated during the subsequent long rebuild, so final solve acceptance still requires a fresh Molab pair session.

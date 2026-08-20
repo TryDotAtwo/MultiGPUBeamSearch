@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import time
 
 from tools.cayleypy_public.config import PublicRunConfig
@@ -24,6 +26,7 @@ from tools.cayleypy_public.runner import (
 )
 from tools.kaggle_t4_mlp_profiles import align_beam, select_profile
 from tools.molab_assets import prepare_molab_public_config
+from tools.molab_toolchain import prepare_molab_build_environment
 import tools.run_cayleypy_public as public_runtime
 
 
@@ -108,9 +111,18 @@ def main(argv: list[str] | None = None) -> int:
         gpu_names, cuda_arch = detect_molab_hardware()
         world_size = len(gpu_names)
         hardware = f"molab_{world_size}xgpu"
+        import torch
+        torch_cuda = torch.version.cuda
+        if not isinstance(torch_cuda, str) or not torch_cuda:
+            raise RuntimeError("Molab PyTorch build does not report a CUDA toolkit version")
+        toolchain_environment = prepare_molab_build_environment(
+            workspace, torch_cuda, sys.executable,
+        )
+        os.environ.update(toolchain_environment)
         print("molab_preflight=" + json.dumps({
             "gpu_names": gpu_names, "cuda_arch": cuda_arch,
             "world_size": world_size, "requested_beam": config.beam_width,
+            "torch_cuda": torch_cuda,
         }, sort_keys=True), flush=True)
 
         contract = load_puzzle_contract(
