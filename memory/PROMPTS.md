@@ -622,3 +622,5 @@ Acceptance must come from real Molab-side execution and artifacts, not from loca
 ## 2026-08-21 — Benchmark before capacity sweep
 
 - First validate and benchmark one example, including actual search speed; only then tune runtime profiles and find the maximum stable beam boundary.
+- Benchmark materially larger beams, at least `2**22`, and select Molab profiles from measured search speed as was done for Kaggle.
+- Treat the profile row-budget `B_MICRO`, the derived output-1 parent batch, and the Transformer-specific inference microbatch as distinct controls; inspect the implementation before tuning them.
