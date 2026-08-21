@@ -37,6 +37,18 @@ void set_final_cls_only(bool enabled) {
 #endif
 }
 
+void set_final_cls_attention(bool enabled) {
+#if defined(_WIN32)
+    if (_putenv_s("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION", enabled ? "1" : "0") != 0) {
+        throw std::runtime_error("failed to set final CLS-attention test environment");
+    }
+#else
+    if (setenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION", enabled ? "1" : "0", 1) != 0) {
+        throw std::runtime_error("failed to set final CLS-attention test environment");
+    }
+#endif
+}
+
 void set_legacy_padding_zero(bool enabled) {
 #if defined(_WIN32)
     if (_putenv_s("BEAM_STREAM1_TRANSFORMER_LEGACY_PADDING_ZERO", enabled ? "1" : "0") != 0) {
@@ -200,11 +212,17 @@ int main() {
     set_legacy_padding_zero(false);
     const std::vector<std::uint32_t> baseline = run_scores(
         false, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
+    set_final_cls_attention(false);
     const std::vector<std::uint32_t> optimized = run_scores(
         true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
+    set_final_cls_attention(true);
+    const std::vector<std::uint32_t> cls_attention = run_scores(
+        true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
+    set_final_cls_attention(false);
     set_final_cls_only(false);
     require(baseline == legacy_padding, "tail-only padding zero must preserve every score key");
     require(optimized == baseline, "generic final CLS-only score keys must be byte exact");
+    require(cls_attention == baseline, "generic final CLS-attention score keys must be byte exact");
 
     const char* benchmark_iterations_env = std::getenv("BEAM_STREAM1_FINAL_CLS_BENCH_ITERATIONS");
     if (benchmark_iterations_env != nullptr && benchmark_iterations_env[0] != '\0') {
@@ -217,6 +235,10 @@ int main() {
             false, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows, iterations);
         const float optimized_ms = time_graph_ms(
             true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows, iterations);
+        set_final_cls_attention(true);
+        const float cls_attention_ms = time_graph_ms(
+            true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows, iterations);
+        set_final_cls_attention(false);
         std::cout << "stream1_transformer_final_cls_benchmark"
                   << " rows=" << rows
                   << " iterations=" << iterations
@@ -226,9 +248,12 @@ int main() {
                   << " baseline_ms=" << baseline_ms
                   << " optimized_ms=" << optimized_ms
                   << " speedup=" << (baseline_ms / optimized_ms)
+                  << " cls_attention_ms=" << cls_attention_ms
+                  << " cls_attention_speedup=" << (optimized_ms / cls_attention_ms)
                   << "\n";
     }
     set_final_cls_only(false);
+    set_final_cls_attention(false);
     set_legacy_padding_zero(false);
 
     cudaFree(d_frontier);
