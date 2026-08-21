@@ -1345,19 +1345,23 @@ Stream1TransformerAttentionBackend stream1_transformer_select_attention_backend(
 }
 
 #if BEAM_HAS_CUTLASS
-bool stream1_transformer_current_device_sm80_or_newer() {
+int stream1_transformer_current_device_sm() {
     int device = 0;
     BEAM_CUDA_CHECK(cudaGetDevice(&device));
     static thread_local int cached_device = -1;
-    static thread_local bool cached_sm80 = false;
+    static thread_local int cached_sm = 0;
     if (cached_device == device) {
-        return cached_sm80;
+        return cached_sm;
     }
     cudaDeviceProp prop{};
     BEAM_CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
     cached_device = device;
-    cached_sm80 = prop.major >= 8;
-    return cached_sm80;
+    cached_sm = prop.major * 10 + prop.minor;
+    return cached_sm;
+}
+
+bool stream1_transformer_current_device_sm80_or_newer() {
+    return stream1_transformer_current_device_sm() >= 80;
 }
 
 template <
@@ -1436,8 +1440,8 @@ void stream1_transformer_linear_residual_cuda(
             const char* env_name = is_ff2
                 ? "BEAM_STREAM1_TRANSFORMER_FF2_POLICY"
                 : "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_POLICY";
-            const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
-                family, std::getenv(env_name));
+            const Stream1TransformerGemmPolicy policy = select_stream1_transformer_gemm_policy(
+                family, std::getenv(env_name), stream1_transformer_current_device_sm());
             if (policy == Stream1TransformerGemmPolicy::M64N64) {
                 stream1_transformer_linear_residual_typed<
                     cutlass::half_t, cutlass::arch::Sm80,
@@ -1819,13 +1823,18 @@ void stream1_transformer_linear_bias_cuda(
     }
     if (dtype == STREAM1_DTYPE_FP16) {
         if (stream1_transformer_current_device_sm80_or_newer()) {
-            const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
+            const Stream1TransformerGemmPolicy policy = select_stream1_transformer_gemm_policy(
                 Stream1TransformerGemmFamily::Qkv,
-                std::getenv("BEAM_STREAM1_TRANSFORMER_QKV_POLICY"));
+                std::getenv("BEAM_STREAM1_TRANSFORMER_QKV_POLICY"),
+                stream1_transformer_current_device_sm());
 
             const Stream1TransformerGemmSwizzlePolicy swizzle_policy =
-                parse_stream1_transformer_gemm_swizzle_policy(
-                    std::getenv("BEAM_STREAM1_TRANSFORMER_QKV_SWIZZLE"));
+                select_stream1_transformer_gemm_swizzle_policy(
+                    Stream1TransformerGemmFamily::Qkv,
+                    policy,
+                    Stream1TransformerGemmStagePolicy::Stages3,
+                    std::getenv("BEAM_STREAM1_TRANSFORMER_QKV_SWIZZLE"),
+                    stream1_transformer_current_device_sm());
             if (!stream1_transformer_gemm_swizzle_allowed(
                     Stream1TransformerGemmFamily::Qkv,
                     policy,
@@ -2097,14 +2106,19 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
     }
     if (dtype == STREAM1_DTYPE_FP16) {
         if (stream1_transformer_current_device_sm80_or_newer()) {
-            const Stream1TransformerGemmPolicy policy = parse_stream1_transformer_gemm_policy(
+            const Stream1TransformerGemmPolicy policy = select_stream1_transformer_gemm_policy(
                 Stream1TransformerGemmFamily::Ff1,
-                std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_POLICY"));
+                std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_POLICY"),
+                stream1_transformer_current_device_sm());
             const Stream1TransformerGemmStagePolicy stage_policy = parse_stream1_transformer_gemm_stage_policy(
                 std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_STAGES"));
             const Stream1TransformerGemmSwizzlePolicy swizzle_policy =
-                parse_stream1_transformer_gemm_swizzle_policy(
-                    std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_SWIZZLE"));
+                select_stream1_transformer_gemm_swizzle_policy(
+                    Stream1TransformerGemmFamily::Ff1,
+                    policy,
+                    stage_policy,
+                    std::getenv("BEAM_STREAM1_TRANSFORMER_FF1_SWIZZLE"),
+                    stream1_transformer_current_device_sm());
             if (!stream1_transformer_gemm_swizzle_allowed(
                     Stream1TransformerGemmFamily::Ff1, policy, stage_policy, swizzle_policy)) {
                 throw std::invalid_argument("FF1 swizzle is not compiled for this policy and stage count");

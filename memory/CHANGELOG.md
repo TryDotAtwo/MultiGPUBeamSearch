@@ -981,3 +981,19 @@
 - 2026-08-01: Added a fourth generated public 2xT4 example for Professor Tetraminx. It attaches Rokham's `cayleypy-cube-train-and-solve` output and pins the p888 epoch-1024 output-1 MLP checkpoint, matching metadata, and generator instead of selecting an arbitrary `.pth`. The package keeps the shared beam `2**16`, `first`/`collect`, fp16 export, and best-effort Cloudflare-to-GitHub contract. No CUDA/C++ beam architecture was changed.
 
 - 2026-08-01: Public Tetraminx Kaggle v2 completed successfully on exactly two Tesla T4 GPUs after making the exact checkpoint discovery independent of Kaggle's flattened/nested kernel-output mount layout. The output-1 batchnorm-folded MLP exported to fp16, the measured p16 profile ran puzzle 0 at beam 65,536, both ranks returned cleanly, and the validated one-move solution `-2D` was found in 5.773 solve seconds. Cloudflare accepted the result with HTTP 202 (`client_submission_id=019fbc53-ceb7-7adf-b5ce-e1bd9f6bee57`). Full output and rank logs are stored under `test_results/kaggle_public_tetraminx_v2`.
+
+## 2026-08-21 - SM120 Cube4 CUDA Transformer GEMM auto-policy
+
+- Starting point: `d319f6db0540b6ccef0d41258407815cfe163cce` on
+  `codex/stream1-generic-seq-align-impl`.
+- Added the production Transformer microbatch 896 to the isolated CUDA Graph
+  benchmark grid and profiled real `output_dim=24` Cube4 inference on Molab.
+- Selected checksum-identical SM120 defaults: `m128n128` for QKV, FF1, FF2, and
+  attention-out, with identity-4 FF1 swizzle. Explicit env values retain priority;
+  SM75/80/90 defaults remain unchanged.
+- Isolated median Stream1 latency improved from 13.3594 to 11.8302 ms. Full
+  `2**25` search improved exact depth 8 from 124.367 to 111.024 seconds (10.73%)
+  with two inference rings, 391 Stream3 jobs, return code 0, and no OOM/overflow.
+- TDD RED/GREEN was observed; the SM120 auto/default override tests and all four
+  relevant Transformer policy/shape suites pass. Full evidence is in
+  `test_results/molab_cube4_sm120_cuda_gemm_auto_2026-08-21.md`.

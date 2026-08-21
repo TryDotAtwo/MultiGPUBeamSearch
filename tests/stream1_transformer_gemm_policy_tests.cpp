@@ -26,6 +26,35 @@ int main() {
     using Family = Stream1TransformerGemmFamily;
     using Policy = Stream1TransformerGemmPolicy;
 
+    require(select_stream1_transformer_gemm_policy(Family::Qkv, nullptr, 120) == Policy::M128N128,
+            "SM120 unset QKV policy must select measured m128n128 default");
+    require(select_stream1_transformer_gemm_policy(Family::AttentionOut, nullptr, 120) == Policy::M128N128,
+            "SM120 unset attention-out policy must select measured m128n128 default");
+    require(select_stream1_transformer_gemm_policy(Family::Ff1, nullptr, 120) == Policy::M128N128,
+            "SM120 unset FF1 policy must select measured m128n128 default");
+    require(select_stream1_transformer_gemm_policy(Family::Ff2, nullptr, 120) == Policy::M128N128,
+            "SM120 unset FF2 policy must select measured m128n128 default");
+    require(select_stream1_transformer_gemm_policy(Family::Cls, nullptr, 120) == Policy::Baseline,
+            "SM120 CLS must retain baseline without an independently measured policy");
+    require(select_stream1_transformer_gemm_policy(Family::Qkv, nullptr, 90) == Policy::Baseline,
+            "unmeasured SM90 must retain baseline QKV policy");
+    require(select_stream1_transformer_gemm_policy(Family::Qkv, "baseline", 120) == Policy::Baseline,
+            "explicit baseline must override the SM120 default");
+    require(select_stream1_transformer_gemm_policy(Family::Qkv, "m64n128", 120) == Policy::M64N128,
+            "explicit SM120 QKV policy must override the measured default");
+    require(select_stream1_transformer_gemm_swizzle_policy(
+                Family::Ff1, Policy::M128N128, Stream1TransformerGemmStagePolicy::Stages3, nullptr, 120) ==
+                Stream1TransformerGemmSwizzlePolicy::Identity4,
+            "SM120 unset FF1 swizzle must select measured identity4 default");
+    require(select_stream1_transformer_gemm_swizzle_policy(
+                Family::Qkv, Policy::M128N128, Stream1TransformerGemmStagePolicy::Stages3, nullptr, 120) ==
+                Stream1TransformerGemmSwizzlePolicy::Identity1,
+            "SM120 non-FF1 swizzle must retain identity1");
+    require(select_stream1_transformer_gemm_swizzle_policy(
+                Family::Ff1, Policy::M128N128, Stream1TransformerGemmStagePolicy::Stages3, "1", 120) ==
+                Stream1TransformerGemmSwizzlePolicy::Identity1,
+            "explicit identity1 must override the SM120 FF1 swizzle default");
+
     require(parse_stream1_transformer_gemm_swizzle_policy(nullptr) == Stream1TransformerGemmSwizzlePolicy::Identity1,
             "unset GEMM swizzle policy must select identity1");
     require(parse_stream1_transformer_gemm_swizzle_policy("") == Stream1TransformerGemmSwizzlePolicy::Identity1,

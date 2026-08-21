@@ -565,3 +565,9 @@ User reported that an interactive game had been running during part of the recen
 - User requested examples that are understandable to other users: one shared notebook contract, prefilled competition/model/puzzle configuration, and mode switching in the USER CONFIG cell.
 
 - User requested another public example matching the existing Cube4/444, Megaminx, and IHES notebooks for `cayley-py-professor-tetraminx-solve-optimally`, using the model output from Rokham's `cayleypy-cube-train-and-solve` script version `277456158`, and explicitly instructed not to use temporary artifacts prepared for GPT-5.3 Spark.
+
+## 2026-08-21 - Molab CUDA inference optimization
+
+- Optimize inference in the beam search's own CUDA code, not only notebook
+  configuration. Keep Cube4 `output_dim=24`, beam `2**25`, two or more inference
+  rings, and about 400 Stream3 jobs. Compare using exactly `depth_done=8`.
