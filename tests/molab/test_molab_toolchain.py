@@ -82,7 +82,7 @@ def test_prepare_environment_reuses_complete_cached_toolkit(tmp_path: Path) -> N
     assert Path(environment["CUDACXX"]) == tmp_path / ".molab_toolchain" / "cuda" / "bin" / "nvcc"
     assert Path(environment["CUDAToolkit_ROOT"]) == tmp_path / ".molab_toolchain" / "cuda"
     assert Path(environment["CAYLEYPY_BUILD_DIR"]) == tmp_path / ".molab_toolchain" / "build"
-    assert environment["CAYLEYPY_BUILD_JOBS"] == "1"
+    assert environment["CAYLEYPY_BUILD_JOBS"] == "4"
     assert environment["CAYLEYPY_DISABLE_NATIVE_TRANSFORMER"] == "1"
     assert environment["LD_LIBRARY_PATH"].endswith(":/base/lib")
 
@@ -125,5 +125,5 @@ def test_prepare_environment_installs_missing_tools_and_cuda_atomically(tmp_path
     ]
     assert calls[1][7:] == list(cuda_packages_for("13.0"))
     assert environment["PATH"].startswith(str(Path.home() / ".local" / "bin"))
-    assert environment["CAYLEYPY_BUILD_JOBS"] == "1"
+    assert environment["CAYLEYPY_BUILD_JOBS"] == "4"
     assert environment["CAYLEYPY_DISABLE_NATIVE_TRANSFORMER"] == "1"
