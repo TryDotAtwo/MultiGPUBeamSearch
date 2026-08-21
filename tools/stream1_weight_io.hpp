@@ -1062,7 +1062,8 @@ inline Stream1TransformerScratchView transformer_scratch_view(
     if (model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
         throw std::runtime_error("MLP Stream1 scratch cannot be viewed as a piece_transformer");
     }
-    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
+    const auto sequence = make_stream1_transformer_sequence_plan(
+        model.seq_len, transformer_sequence_alignment(model));
     const std::uint64_t rows = stream1_inference_rows(b_micro, model);
     const std::uint64_t lane_rows = static_cast<std::uint64_t>(lane) * rows;
     return Stream1TransformerScratchView{
