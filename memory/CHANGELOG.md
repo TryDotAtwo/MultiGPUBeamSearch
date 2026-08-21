@@ -1093,3 +1093,4 @@
 - Real IHES execution showed that the published checkpoint is `*.pt`, not `*.pth`; corrected the generated example and added a regression assertion against the real asset suffix.
 - The MLP exported successfully on Molab but configuration failed because the common CUDA target requires NCCL and Molab exposes it only inside the PyTorch installation. The host builder now passes PyTorch-bundled NCCL paths for both MLP and Transformer when available, while retaining system NCCL fallback outside Molab.
 - Targeted generator/toolchain/build-command tests pass 12/12. Solver CUDA/C++ source and runtime architecture remain unchanged.
+- The next live build reached `stream1_transformer_fmha.cu` and exposed the remaining CUDA-overlay dependency, `curand_kernel.h`. Added the Molab-installed CUDA 13-compatible `nvidia-curand==10.4.0.35` package and made both its header and library part of the cache completeness gate.

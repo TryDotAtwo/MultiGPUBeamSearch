@@ -19,6 +19,7 @@ def test_cuda_13_0_uses_one_matching_wheel_family() -> None:
         "nvidia-cuda-runtime==13.0.96",
         "nvidia-cuda-cccl==13.0.85",
         "nvidia-nvtx==13.0.85",
+        "nvidia-curand==10.4.0.35",
     )
 
 
@@ -38,13 +39,16 @@ def test_materialize_cuda_overlay_adds_unversioned_cudart(tmp_path: Path) -> Non
     (package_root / "bin" / "crt" / "link.stub").write_text("stub", encoding="utf-8")
     (package_root / "include" / "nv" / "target").write_text("target", encoding="utf-8")
     (package_root / "include" / "nvtx3" / "nvToolsExt.h").write_text("nvtx", encoding="utf-8")
+    (package_root / "include" / "curand_kernel.h").write_text("curand", encoding="utf-8")
     (package_root / "lib" / "libcudart.so.13").write_text("runtime", encoding="utf-8")
+    (package_root / "lib" / "libcurand.so.10").write_text("curand", encoding="utf-8")
 
     overlay = materialize_cuda_overlay(package_root, tmp_path / "overlay")
 
     assert (overlay / "bin" / "crt" / "link.stub").is_file()
     assert (overlay / "include" / "nv" / "target").is_file()
     assert (overlay / "include" / "nvtx3" / "nvToolsExt.h").is_file()
+    assert (overlay / "include" / "curand_kernel.h").is_file()
     assert (overlay / "lib" / "libcudart.so").read_text() == "runtime"
     assert (overlay / "lib64" / "libcudart.so").read_text() == "runtime"
 
@@ -60,7 +64,9 @@ def test_prepare_environment_reuses_complete_cached_toolkit(tmp_path: Path) -> N
     (package_root / "bin" / "crt" / "link.stub").write_text("stub", encoding="utf-8")
     (package_root / "include" / "nv" / "target").write_text("target", encoding="utf-8")
     (package_root / "include" / "nvtx3" / "nvToolsExt.h").write_text("nvtx", encoding="utf-8")
+    (package_root / "include" / "curand_kernel.h").write_text("curand", encoding="utf-8")
     (package_root / "lib" / "libcudart.so.13").write_text("runtime", encoding="utf-8")
+    (package_root / "lib" / "libcurand.so.10").write_text("curand", encoding="utf-8")
     calls: list[list[str]] = []
 
     environment = prepare_molab_build_environment(
@@ -96,7 +102,9 @@ def test_prepare_environment_installs_missing_tools_and_cuda_atomically(tmp_path
             (target / "bin" / "crt" / "link.stub").write_text("stub", encoding="utf-8")
             (target / "include" / "nv" / "target").write_text("target", encoding="utf-8")
             (target / "include" / "nvtx3" / "nvToolsExt.h").write_text("nvtx", encoding="utf-8")
+            (target / "include" / "curand_kernel.h").write_text("curand", encoding="utf-8")
             (target / "lib" / "libcudart.so.13").write_text("runtime", encoding="utf-8")
+            (target / "lib" / "libcurand.so.10").write_text("curand", encoding="utf-8")
 
     environment = prepare_molab_build_environment(
         tmp_path,
