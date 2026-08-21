@@ -15,6 +15,7 @@ _CUDA_PACKAGES = {
         "nvidia-nvvm==13.0.88",
         "nvidia-cuda-runtime==13.0.96",
         "nvidia-cuda-cccl==13.0.85",
+        "nvidia-nvtx==13.0.85",
     ),
 }
 
@@ -58,6 +59,7 @@ def _package_root_is_complete(package_root: Path) -> bool:
             package_root / "bin" / "nvcc",
             package_root / "bin" / "crt" / "link.stub",
             package_root / "include" / "nv" / "target",
+            package_root / "include" / "nvtx3" / "nvToolsExt.h",
             package_root / "nvvm" / "libdevice",
             package_root / "lib" / "libcudart.so.13",
         )

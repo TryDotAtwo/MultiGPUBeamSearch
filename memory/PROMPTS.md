@@ -608,3 +608,8 @@ Acceptance must come from real Molab-side execution and artifacts, not from loca
 - User supplied a private Molab pair URL/token and explicitly requested using `marimo-pair` and `execute-code.sh` to operate the live notebook kernel.
 - User previously explicitly authorized transferring the existing local Kaggle API credential into the private Molab sandbox for notebook validation.
 - Continue real Molab acceptance autonomously; do not modify the beam-search CUDA/C++ architecture.
+
+## 2026-08-21 — Continue native Molab acceptance
+
+- User supplied a fresh live Molab sandbox and requested continuing the work through native `marimo-pair`, without Computer Use or subagents.
+- Validate the universal launcher and all four examples on Molab itself; configuration/toolchain fixes are allowed, while beam-search CUDA/C++ architecture remains unchanged.

@@ -18,6 +18,7 @@ def test_cuda_13_0_uses_one_matching_wheel_family() -> None:
         "nvidia-nvvm==13.0.88",
         "nvidia-cuda-runtime==13.0.96",
         "nvidia-cuda-cccl==13.0.85",
+        "nvidia-nvtx==13.0.85",
     )
 
 
@@ -30,17 +31,20 @@ def test_materialize_cuda_overlay_adds_unversioned_cudart(tmp_path: Path) -> Non
     package_root = tmp_path / "packages" / "nvidia" / "cu13"
     (package_root / "bin" / "crt").mkdir(parents=True)
     (package_root / "include" / "nv").mkdir(parents=True)
+    (package_root / "include" / "nvtx3").mkdir(parents=True)
     (package_root / "nvvm" / "libdevice").mkdir(parents=True)
     (package_root / "lib").mkdir(parents=True)
     (package_root / "bin" / "nvcc").write_text("nvcc", encoding="utf-8")
     (package_root / "bin" / "crt" / "link.stub").write_text("stub", encoding="utf-8")
     (package_root / "include" / "nv" / "target").write_text("target", encoding="utf-8")
+    (package_root / "include" / "nvtx3" / "nvToolsExt.h").write_text("nvtx", encoding="utf-8")
     (package_root / "lib" / "libcudart.so.13").write_text("runtime", encoding="utf-8")
 
     overlay = materialize_cuda_overlay(package_root, tmp_path / "overlay")
 
     assert (overlay / "bin" / "crt" / "link.stub").is_file()
     assert (overlay / "include" / "nv" / "target").is_file()
+    assert (overlay / "include" / "nvtx3" / "nvToolsExt.h").is_file()
     assert (overlay / "lib" / "libcudart.so").read_text() == "runtime"
     assert (overlay / "lib64" / "libcudart.so").read_text() == "runtime"
 
@@ -49,11 +53,13 @@ def test_prepare_environment_reuses_complete_cached_toolkit(tmp_path: Path) -> N
     package_root = tmp_path / ".molab_toolchain" / "packages" / "nvidia" / "cu13"
     (package_root / "bin" / "crt").mkdir(parents=True)
     (package_root / "include" / "nv").mkdir(parents=True)
+    (package_root / "include" / "nvtx3").mkdir(parents=True)
     (package_root / "nvvm" / "libdevice").mkdir(parents=True)
     (package_root / "lib").mkdir(parents=True)
     (package_root / "bin" / "nvcc").write_text("nvcc", encoding="utf-8")
     (package_root / "bin" / "crt" / "link.stub").write_text("stub", encoding="utf-8")
     (package_root / "include" / "nv" / "target").write_text("target", encoding="utf-8")
+    (package_root / "include" / "nvtx3" / "nvToolsExt.h").write_text("nvtx", encoding="utf-8")
     (package_root / "lib" / "libcudart.so.13").write_text("runtime", encoding="utf-8")
     calls: list[list[str]] = []
 
@@ -82,11 +88,13 @@ def test_prepare_environment_installs_missing_tools_and_cuda_atomically(tmp_path
             target = Path(command[command.index("--target") + 1]) / "nvidia" / "cu13"
             (target / "bin" / "crt").mkdir(parents=True)
             (target / "include" / "nv").mkdir(parents=True)
+            (target / "include" / "nvtx3").mkdir(parents=True)
             (target / "nvvm" / "libdevice").mkdir(parents=True)
             (target / "lib").mkdir(parents=True)
             (target / "bin" / "nvcc").write_text("nvcc", encoding="utf-8")
             (target / "bin" / "crt" / "link.stub").write_text("stub", encoding="utf-8")
             (target / "include" / "nv" / "target").write_text("target", encoding="utf-8")
+            (target / "include" / "nvtx3" / "nvToolsExt.h").write_text("nvtx", encoding="utf-8")
             (target / "lib" / "libcudart.so.13").write_text("runtime", encoding="utf-8")
 
     environment = prepare_molab_build_environment(

@@ -1080,3 +1080,9 @@
 - Real Cube 4x4x4 execution downloaded the protected competition and Transformer assets, detected `sm_120`, and exported the 24-output piece Transformer.
 - The Molab image exposed no `cmake`/`ninja` on `PATH` and a mixed CUDA toolchain (`torch`/headers 13.0 versus system `nvcc` 13.3). Added a tested Molab-only bootstrap for build tools and a fully pinned CUDA 13.0 wheel family with CCCL, CRT, NVVM, runtime, and an isolated toolkit overlay.
 - CUDA configuration and compilation reached the solver source for `sm_120`; the original sandbox terminated during the subsequent long rebuild, so final solve acceptance still requires a fresh Molab pair session.
+
+## 2026-08-21 — Complete Molab CUDA overlay with NVTX
+
+- A fresh native Molab 444 acceptance run configured CUDA 13.0 and `sm_120` successfully, exported the 24-output piece Transformer, then failed compiling `cuda/stream1.cu` because the isolated CUDA overlay did not contain `nvtx3/nvToolsExt.h`.
+- Added the matching `nvidia-nvtx==13.0.85` wheel to the pinned CUDA 13.0 family and made the NVTX header part of the cached-toolkit completeness gate, so an incomplete prior cache is rebuilt automatically.
+- Molab toolchain tests pass 5/5 and the complete Molab test group passes 10/10. Solver CUDA/C++ architecture is unchanged.
