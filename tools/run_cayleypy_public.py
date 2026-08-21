@@ -381,8 +381,8 @@ def _invocation_rows(artifacts: RunArtifacts, output_dir: Path) -> list[dict[str
                 if index < len(artifacts.collection_statuses) else "not_collected"
             ),
             "combined_log": _relative(combined, output_dir) if combined is not None else None,
-            "rank0_log": _relative(rank_pair[0], output_dir) if rank_pair is not None else None,
-            "rank1_log": _relative(rank_pair[1], output_dir) if rank_pair is not None else None,
+            "rank0_log": _relative(rank_pair[0], output_dir) if rank_pair else None,
+            "rank1_log": _relative(rank_pair[1], output_dir) if rank_pair is not None and len(rank_pair) > 1 else None,
         })
     return rows
 

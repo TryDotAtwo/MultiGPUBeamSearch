@@ -152,6 +152,17 @@ def test_molab_build_can_disable_unused_native_transformer(tmp_path: Path, monke
     assert any(command[:4] == ("cmake", "--build", build, "--target") for command in commands)
 
 
+def test_invocation_rows_support_one_rank_molab_runs(tmp_path: Path) -> None:
+    combined = tmp_path / "logs" / "puzzle-1" / "original" / "run" / "combined.log"
+    rank0 = combined.parent / "rank-0.log"
+    artifacts = RunArtifacts((), pd.DataFrame(), (combined,), ((rank0,),), (0,), (0.25,), ("first_solution",))  # type: ignore[arg-type]
+
+    rows = public_cli._invocation_rows(artifacts, tmp_path)
+
+    assert rows[0]["rank0_log"] == "logs/puzzle-1/original/run/rank-0.log"
+    assert rows[0]["rank1_log"] is None
+
+
 def test_build_parallel_jobs_defaults_and_validates_environment(monkeypatch) -> None:
     monkeypatch.delenv("CAYLEYPY_BUILD_JOBS", raising=False)
     assert public_cli._build_parallel_jobs() == 2
