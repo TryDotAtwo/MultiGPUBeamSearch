@@ -1026,3 +1026,16 @@
   dispatch code was removed. Bundled CUTLASS Blackwell FMHA targets
   SM100a/SM103a rather than Molab SM120, and the current FMHA path already reads
   interleaved Q/K/V by stride without a separate packing launch.
+
+## 2026-08-22 - Warm Transformer stage profiler on Molab SM120
+
+- Added an opt-in eager-only CUDA-event stage profiler with one warm-up launch
+  skipped by default. It fails closed under CUDA Graph capture and leaves the
+  production path unchanged when its environment flag is absent.
+- The real Cube4 output-24 compact57/final-CLS workload measured 1.97635 ms of
+  CUDA stages at microbatch 896. FF1+FF2 was the largest group at 0.739168 ms
+  (37.40%), ahead of attention at 0.351008 ms (17.76%).
+- Molab controls passed: graph plus profiler was explicitly rejected, while the
+  normal graph run returned zero at 1.9911 ms with the expected checksum and
+  score-key digest. Future optimization should prioritize FFN epilogues and
+  dataflow rather than further attention tile permutations.

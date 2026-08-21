@@ -73,3 +73,30 @@ The first attempt intentionally demonstrated the fail-closed graph window
 guard: `2` was incorrectly interpreted as templates per lane and rejected
 because one 24-slot ring needs `ceil(24/4)=6` templates per lane. The accepted
 value `12` therefore represents exactly two inference windows.
+
+## Warm stage profile
+
+An opt-in, eager-only CUDA-event profiler measured the second launch after one
+warm-up call, avoiding CUTLASS lazy-initialization noise. The production graph
+path is unchanged; enabling the profiler during CUDA Graph capture fails closed
+with an explicit error.
+
+| Stage group | Three full layers | Share of 1.97635 ms |
+|---|---:|---:|
+| LN1 + LN2 | 0.272384 ms | 13.78% |
+| QKV GEMM | 0.238848 ms | 12.09% |
+| attention | 0.351008 ms | 17.76% |
+| attention output | 0.133952 ms | 6.78% |
+| FF1 + FF2 | **0.739168 ms** | **37.40%** |
+| final CLS layer | 0.240992 ms | 12.19% |
+
+The measured total was 1.97635 ms. The surrounding eager benchmark reported
+2.2435 ms; the normal no-profiler CUDA Graph control reported 1.9911 ms,
+10,800,096.7 candidates/s, checksum `402305984`, and score-key digest
+`2176418464504111356`. Therefore the next optimization target is the FFN and
+its epilogue/dataflow rather than another attention tile sweep.
+
+The negative control returned non-zero as designed with
+`BEAM_STREAM1_TRANSFORMER_STAGE_PROFILE requires eager execution; CUDA Graph
+capture is active`. The no-profiler graph control returned zero and retained
+the expected checksum and digest.
