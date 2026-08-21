@@ -997,3 +997,9 @@
 - TDD RED/GREEN was observed; the SM120 auto/default override tests and all four
   relevant Transformer policy/shape suites pass. Full evidence is in
   `test_results/molab_cube4_sm120_cuda_gemm_auto_2026-08-21.md`.
+- Follow-up CUDA A/B rejected larger FF1 `m256n128` and `m128n256`, FF2
+  `m256n128`, and attention-out `m256n128` tiles. All dumps were identical to
+  the accepted profile, but medians regressed by 0.44%-3.22%; experimental
+  dispatch code was removed. Bundled CUTLASS Blackwell FMHA targets
+  SM100a/SM103a rather than Molab SM120, and the current FMHA path already reads
+  interleaved Q/K/V by stride without a separate packing launch.

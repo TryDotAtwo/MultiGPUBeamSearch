@@ -571,3 +571,5 @@ User reported that an interactive game had been running during part of the recen
 - Optimize inference in the beam search's own CUDA code, not only notebook
   configuration. Keep Cube4 `output_dim=24`, beam `2**25`, two or more inference
   rings, and about 400 Stream3 jobs. Compare using exactly `depth_done=8`.
+- Continue improving the native CUDA inference path, retaining only changes
+  that beat the accepted SM120 profile under the same depth-8 workload.

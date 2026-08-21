@@ -48,3 +48,22 @@ selection, and architectures below SM120 retain the previous baseline defaults.
   `layernorm_policy`).
 - New no-env benchmark checksum equals explicit baseline checksum.
 
+## CUDA tile follow-up
+
+After accepting the production profile, two larger-tile families were compiled
+as opt-in experiments and measured in fresh processes against the new automatic
+SM120 control. Every score dump had SHA-256
+`e8ac4498552f6108f5f86b32687e6f46ecc8958c0a65d04236442ff44183aa26`.
+
+| Candidate | Control median | Candidate median | Decision |
+|---|---:|---:|---|
+| FF1 `m256n128` | 11.8427 ms | 12.2236 ms | reject (+3.22%) |
+| FF2 `m256n128` | 11.8427 ms | 11.9025 ms | reject (+0.50%) |
+| attention-out `m256n128` | 11.8427 ms | 11.8945 ms | reject (+0.44%) |
+| FF1 `m128n256` | 11.8534 ms | 12.1685 ms | reject (+2.66%) |
+
+The rejected dispatches were removed, so production code contains only the
+measured winner. CUTLASS example 77 cannot be substituted as an SM120 FMHA
+fast path: its build contract targets `SM100a/SM103a`, while the Molab GPU is
+SM120. The current example-41 FMHA already consumes interleaved Q/K/V through
+explicit strides and does not execute a separate QKV packing kernel.
