@@ -573,3 +573,8 @@ User reported that an interactive game had been running during part of the recen
   rings, and about 400 Stream3 jobs. Compare using exactly `depth_done=8`.
 - Continue improving the native CUDA inference path, retaining only changes
   that beat the accepted SM120 profile under the same depth-8 workload.
+- Run every CUDA build, correctness check, isolated benchmark, and integrated
+  search strictly on Molab; local work is limited to source edits and Git.
+- For Cube4 Transformer tuning, use `output_dim=24`, benchmark real beam
+  `2**25`, keep at least two inference graph windows, reduce full-depth Stream3
+  work to about 400 jobs, and compare the exact `depth_done=8` timing.

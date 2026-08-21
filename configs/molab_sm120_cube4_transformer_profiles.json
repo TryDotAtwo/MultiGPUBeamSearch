@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "hardware": {
+    "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+    "compute_capability": 120,
+    "gpu_count": 1
+  },
+  "model": {
+    "backend": "piece_transformer",
+    "dtype": "fp16",
+    "seq_len": 57,
+    "d_model": 256,
+    "layers": 4,
+    "ff_dim": 1024,
+    "output_dim": 24
+  },
+  "profiles": {
+    "25": {
+      "beam_width": 33554432,
+      "b_micro": 3584,
+      "stream1_transformer_micro": 896,
+      "stream1_concurrency": 4,
+      "stream3_ring_slots": 24,
+      "ring_graph_execs_per_lane": 12,
+      "graph_window_rings": 2,
+      "final_materialize_chunk_candidates": 88064,
+      "compact_sequence57": true,
+      "final_cls_only": true,
+      "final_cls_attention": true,
+      "cls_attention_policy": "q32k64",
+      "measured_depth": 8,
+      "measured_depth_seconds": 84.2199,
+      "measured_stream3_jobs": 391,
+      "measured_frontier_size": 33554432,
+      "measured_vram_gib_approx": 19.4
+    }
+  }
+}

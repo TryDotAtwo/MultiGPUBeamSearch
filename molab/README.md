@@ -4,6 +4,12 @@ This directory holds molab-specific notebooks and run notes. It is separate from
 the Kaggle notebooks because molab has different paths, authentication, and
 runtime constraints.
 
+The measured single-GPU SM120 Cube4 Transformer profile is stored in
+`../configs/molab_sm120_cube4_transformer_profiles.json`. Profile key `25`
+means beam `2**25`; it is valid only for the exact hardware/model contract in
+that file. In particular, `ring_graph_execs_per_lane=12` means two graph-window
+rings for 24 accumulation slots and four inference lanes, not twelve rings.
+
 ## Files
 - `molab_probe.py`: marimo notebook/script that probes the molab runtime,
   checks GPU availability, runs a small GPU task, and optionally clones/builds

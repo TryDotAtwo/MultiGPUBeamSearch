@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-08-22
+- Connected the existing opt-in final-layer CLS-only CUTLASS FMHA path to the
+  generic piece-Transformer final-CLS implementation. The default remains the
+  byte-identical full-query attention path unless
+  `BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION=1` is set. Molab SM120 testing
+  with the real Cube4 fp16 `output_dim=24` weights passed byte-exact comparison
+  at 896 parents. Nine independent graph-replay processes selected CLS policy
+  `q32k64`: median 8.4919 ms versus 8.6331 ms for full final-layer attention
+  (1.0166x), with identical score-key digests in every run.
+- Re-ran the compact57 GEMM/attention policy sweep on Molab SM120. Larger QKV,
+  FF1, attention-output, and FF2 alternatives regressed; attention `exact32`
+  did not reproduce its quick-run advantage in a 9-process gate. Production
+  GEMM/SDPA defaults therefore remain unchanged.
+- Validated the accepted combination end to end on Molab with Cube4 puzzle 0,
+  beam `2**25`, and exactly `depth_done=8`. The profile uses external parent
+  batch 3584, Transformer microbatch 896, concurrency 4, 24 Stream3 slots, two
+  graph-window rings (12 templates/lane), and final chunk 88,064. Depth 8 took
+  84.2199 seconds with 391 Stream3 jobs and full 33,554,432 frontier, versus
+  111.024 seconds for the prior accepted SM120 profile (1.3183x). The run ended
+  normally in 221.081 seconds; steady VRAM was about 19.4 GiB and logs contained
+  no OOM, overflow, fatal, or illegal-access evidence. Evidence:
+  `test_results/molab_cube4_compact57_cls_attention_2026-08-22.md`.
+
 ## 2026-07-31
 - Added public-results schema support for `piece-transformer` outputs so 2xT4 public notebooks can publish inference runs that use Kaggle-published Transformer format; updated `configs/cayleypy_results_schema_v1.json` enum and added regression coverage in `tests/cayleypy_public/test_results.py`.
 - Added `test_build_result_envelope_accepts_piece_transformer_format` to verify deterministic envelope building preserves the new `piece-transformer` format and avoids silent schema rejection of public Transformer runs.
