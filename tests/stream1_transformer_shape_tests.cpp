@@ -55,6 +55,21 @@ int main() {
         !beam::stream1_transformer_supports_generic_final_cls_only(
             65U, 80U, 256U, 8U, 32U, 4U, 1024U, 24U),
         "sequence longer than the fused attention limit must not enter generic final CLS-only");
+    require(
+        beam::stream1_transformer_supports_compact_sequence57(
+            57U, 256U, 8U, 32U, 4U, 1024U, 24U),
+        "exact Cube4 output24 shape must support compact sequence57");
+    require(
+        !beam::stream1_transformer_supports_compact_sequence57(
+            51U, 256U, 8U, 32U, 4U, 1024U, 24U),
+        "Megaminx sequence must not enter the Cube4 compact sequence57 path");
+    require(
+        !beam::stream1_transformer_supports_compact_sequence57(
+            57U, 256U, 8U, 32U, 4U, 1024U, 1U),
+        "output1 must not enter the output24 compact sequence57 path");
+
+    const auto compact57 = beam::make_stream1_transformer_sequence_plan(57U, 1U);
+    require(compact57.padded_seq_len == 57U, "compact sequence57 must not allocate padded token rows");
 
     const auto tail57 = beam::make_stream1_transformer_padding_tail_plan(8U, 57U, 64U, 256U);
     require(tail57.row_count == 8U, "tail plan rows");

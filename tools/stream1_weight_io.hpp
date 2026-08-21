@@ -13,6 +13,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -32,6 +34,28 @@ inline constexpr std::uint32_t TRANSFORMER_NHEAD = 8;
 inline constexpr std::uint32_t TRANSFORMER_HEAD_DIM = 32;
 inline constexpr std::uint32_t TRANSFORMER_LAYERS = 4;
 inline constexpr std::uint32_t TRANSFORMER_FF_DIM = 1024;
+
+inline std::uint32_t transformer_sequence_alignment(const Stream1ModelConfig& model) {
+    const char* compact = std::getenv("BEAM_STREAM1_TRANSFORMER_COMPACT_SEQUENCE57");
+    if (compact == nullptr || compact[0] == '\0' || std::strcmp(compact, "0") == 0) {
+        return 16U;
+    }
+    if (std::strcmp(compact, "1") != 0) {
+        throw std::invalid_argument("BEAM_STREAM1_TRANSFORMER_COMPACT_SEQUENCE57 must be 0 or 1");
+    }
+    if (!stream1_transformer_supports_compact_sequence57(
+            model.seq_len,
+            model.d_model,
+            model.nhead,
+            model.head_dim,
+            model.transformer_layers,
+            model.ff_dim,
+            model.output_dim)) {
+        throw std::invalid_argument(
+            "BEAM_STREAM1_TRANSFORMER_COMPACT_SEQUENCE57 requires the exact Cube4 output24 transformer shape");
+    }
+    return 1U;
+}
 
 struct HostTransformerBlockBytes {
     std::vector<std::byte> ln1_gamma;
@@ -585,7 +609,8 @@ inline std::uint64_t total_host_weight_bytes(const HostWeightBytes& weights) {
 }
 
 inline std::uint64_t transformer_attention_score_stride(const Stream1ModelConfig& model) {
-    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
+    const auto sequence = make_stream1_transformer_sequence_plan(
+        model.seq_len, transformer_sequence_alignment(model));
     const std::uint64_t row_stride = sequence.padded_seq_len;
     return row_stride * row_stride + row_stride * model.head_dim;
 }
@@ -607,7 +632,8 @@ struct TransformerScratchBytePlan {
 };
 
 inline TransformerScratchBytePlan transformer_scratch_byte_plan(const Stream1ModelConfig& model, std::uint64_t rows) {
-    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
+    const auto sequence = make_stream1_transformer_sequence_plan(
+        model.seq_len, transformer_sequence_alignment(model));
     TransformerScratchBytePlan plan;
     plan.rows = rows;
     plan.logical_seq_len = sequence.logical_seq_len;
@@ -928,7 +954,8 @@ inline Stream1TransformerDims transformer_dims(const Stream1ModelConfig& model) 
     if (model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
         throw std::runtime_error("MLP Stream1 model cannot be viewed as a piece_transformer");
     }
-    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
+    const auto sequence = make_stream1_transformer_sequence_plan(
+        model.seq_len, transformer_sequence_alignment(model));
     return Stream1TransformerDims{
         model.state_len,
         model.num_classes,

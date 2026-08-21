@@ -57,6 +57,24 @@ inline bool stream1_transformer_supports_generic_final_cls_only(
         output_dim == 24U;
 }
 
+inline bool stream1_transformer_supports_compact_sequence57(
+    std::uint32_t logical_seq_len,
+    std::uint32_t d_model,
+    std::uint32_t nhead,
+    std::uint32_t head_dim,
+    std::uint32_t transformer_layers,
+    std::uint32_t ff_dim,
+    std::uint32_t output_dim) {
+    return logical_seq_len == 57U &&
+        d_model == 256U &&
+        nhead == 8U &&
+        head_dim == 32U &&
+        d_model == nhead * head_dim &&
+        transformer_layers == 4U &&
+        ff_dim == 1024U &&
+        output_dim == 24U;
+}
+
 inline Stream1TransformerPaddingTailPlan make_stream1_transformer_padding_tail_plan(
     std::uint32_t row_count,
     std::uint32_t logical_seq_len,
