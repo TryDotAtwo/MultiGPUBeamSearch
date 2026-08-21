@@ -26,6 +26,7 @@ option(BEAM_DEBUG_FINAL_HISTOGRAM_TRACE "Compile final histogram-vs-survivor dia
 option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
+option(BEAM_ENABLE_NATIVE_TRANSFORMER "Build the native CUTLASS Stream1 transformer backend" ON)
 
 set(BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE OFF)
 set(BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE OFF)
@@ -105,10 +106,8 @@ target_link_libraries(contract_tests PRIVATE beam_core)
 add_executable(history_tests tests/history_tests.cpp)
 target_link_libraries(history_tests PRIVATE beam_core)
 
-add_library(beam_cuda
+set(BEAM_CUDA_SOURCES
     cuda/stream1.cu
-    cuda/stream1_transformer.cu
-    cuda/stream1_transformer_fmha.cu
     cuda/stream2.cu
     cuda/stream3.cu
     cuda/stream4.cu
@@ -119,6 +118,14 @@ add_library(beam_cuda
     cuda/static_memory.cu
     cuda/runtime_config.cpp
 )
+if(BEAM_ENABLE_NATIVE_TRANSFORMER)
+    list(APPEND BEAM_CUDA_SOURCES
+        cuda/stream1_transformer.cu
+        cuda/stream1_transformer_fmha.cu)
+else()
+    list(APPEND BEAM_CUDA_SOURCES cuda/stream1_transformer_stubs.cpp)
+endif()
+add_library(beam_cuda ${BEAM_CUDA_SOURCES})
 target_include_directories(beam_cuda PUBLIC src cuda ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 if(CUTLASS_DIR AND EXISTS "${CUTLASS_DIR}/include")
     target_include_directories(beam_cuda PUBLIC "${CUTLASS_DIR}/include")

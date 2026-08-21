@@ -282,6 +282,7 @@ def locate_or_build_runner(
         f"-DBEAM_DEBUG_STREAM4_HISTOGRAM_TRACE={'ON' if config is not None and config.debug_stream4_histogram_trace else 'OFF'}",
         f"-DBEAM_DEBUG_DEPTH_FLOW_TRACE={'ON' if config is not None and config.debug_depth_flow_trace else 'OFF'}",
         f"-DBEAM_DEBUG_PIPELINE_STATS={'ON' if config is not None and config.debug_pipeline_stats else 'OFF'}",
+        f"-DBEAM_ENABLE_NATIVE_TRANSFORMER={'OFF' if os.environ.get('CAYLEYPY_DISABLE_NATIVE_TRANSFORMER') == '1' else 'ON'}",
     ]
     configure.extend(_pytorch_nccl_cmake_args(required=backend == "piece_transformer"))
     if backend == "piece_transformer":

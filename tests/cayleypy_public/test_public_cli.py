@@ -125,6 +125,30 @@ def test_locate_or_build_runner_pins_cutlass_and_sm75_without_subprocess_build(t
     assert f"-DCUTLASS_DIR={cutlass}" in configure
     assert "-DNCCL_LIBRARY=/torch/nccl/lib/libnccl.so.2" in configure
     assert "-DNCCL_INCLUDE_DIR=/torch/nccl/include" in configure
+    assert "-DBEAM_ENABLE_NATIVE_TRANSFORMER=ON" in configure
+
+
+def test_molab_build_can_disable_unused_native_transformer(tmp_path: Path, monkeypatch) -> None:
+    cutlass = tmp_path / "cutlass"
+    (cutlass / ".git").mkdir(parents=True)
+    build = tmp_path / "build"
+    commands: list[tuple[object, ...]] = []
+    monkeypatch.setenv("CAYLEYPY_CUTLASS_DIR", str(cutlass))
+    monkeypatch.setenv("CAYLEYPY_BUILD_DIR", str(build))
+    monkeypatch.setenv("CAYLEYPY_DISABLE_NATIVE_TRANSFORMER", "1")
+    monkeypatch.setattr(public_cli, "_git_stdout", lambda *args, **kwargs: public_cli._CUTLASS_REV)
+    monkeypatch.setattr(public_cli, "_pytorch_nccl_cmake_args", lambda **_: [])
+
+    def fake_run_logged(command, log_path, **kwargs) -> None:
+        commands.append(tuple(command))
+        if command[:3] == ["cmake", "--build", build]:
+            build.mkdir(parents=True, exist_ok=True)
+            (build / "production_runner").write_text("fake", encoding="utf-8")
+
+    monkeypatch.setattr(public_cli, "_run_logged", fake_run_logged)
+    public_cli.locate_or_build_runner(tmp_path / "out", tmp_path / "puzzle_info.json")
+    configure = next(command for command in commands if command[0] == "cmake" and "-S" in command)
+    assert "-DBEAM_ENABLE_NATIVE_TRANSFORMER=OFF" in configure
     assert any(command[:4] == ("cmake", "--build", build, "--target") for command in commands)
 
 
