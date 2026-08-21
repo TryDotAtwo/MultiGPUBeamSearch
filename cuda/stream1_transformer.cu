@@ -2637,14 +2637,24 @@ bool stream1_transformer_final_cls_attention_requested() {
     return stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION");
 }
 
+std::uint32_t stream1_transformer_stage_profile_skip_calls() {
+    const char* value = std::getenv("BEAM_STREAM1_TRANSFORMER_STAGE_PROFILE_SKIP_CALLS");
+    if (value == nullptr || value[0] == '\0') {
+        return 1U;
+    }
+    char* end = nullptr;
+    const unsigned long parsed = std::strtoul(value, &end, 10);
+    if (end == value || *end != '\0' || parsed > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::invalid_argument(
+            "BEAM_STREAM1_TRANSFORMER_STAGE_PROFILE_SKIP_CALLS must be a uint32");
+    }
+    return static_cast<std::uint32_t>(parsed);
+}
+
 class Stream1TransformerStageProfiler {
 public:
     explicit Stream1TransformerStageProfiler(cudaStream_t stream) : stream_(stream) {
         if (!stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_STAGE_PROFILE")) {
-            return;
-        }
-        static std::atomic<bool> claimed{false};
-        if (claimed.exchange(true, std::memory_order_relaxed)) {
             return;
         }
         cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
@@ -2652,6 +2662,15 @@ public:
         if (capture_status != cudaStreamCaptureStatusNone) {
             throw std::invalid_argument(
                 "BEAM_STREAM1_TRANSFORMER_STAGE_PROFILE requires eager execution; CUDA Graph capture is active");
+        }
+        static std::atomic<std::uint32_t> call_count{0U};
+        const std::uint32_t call_index = call_count.fetch_add(1U, std::memory_order_relaxed);
+        if (call_index < stream1_transformer_stage_profile_skip_calls()) {
+            return;
+        }
+        static std::atomic<bool> claimed{false};
+        if (claimed.exchange(true, std::memory_order_relaxed)) {
+            return;
         }
         enabled_ = true;
         mark("start");
