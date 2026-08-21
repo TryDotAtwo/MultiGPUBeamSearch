@@ -33,6 +33,7 @@ import tools.run_cayleypy_public as public_runtime
 ROOT = Path(__file__).resolve().parents[1]
 MLP_PROFILES = ROOT / "configs" / "kaggle_t4_mlp_profiles.json"
 TRANSFORMER_PROFILES = ROOT / "configs" / "kaggle_t4_transformer_profiles.json"
+DEFAULT_MOLAB_CACHE_ROOT = Path("/tmp/cayleypy_molab")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -82,6 +83,12 @@ def _history_budgets() -> tuple[int, int, int]:
     return ram, disk, tmp_free
 
 
+def _toolchain_workspace() -> Path:
+    configured = os.environ.get("CAYLEYPY_MOLAB_CACHE_ROOT")
+    workspace = Path(configured) if configured else DEFAULT_MOLAB_CACHE_ROOT
+    return workspace.expanduser().resolve()
+
+
 def _portable_profile(registry: dict, beam_width: int, output_dim: int,
                       move_count: int, world_size: int) -> dict:
     profile = select_profile(registry, beam_width, output_dim, move_count)
@@ -116,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         if not isinstance(torch_cuda, str) or not torch_cuda:
             raise RuntimeError("Molab PyTorch build does not report a CUDA toolkit version")
         toolchain_environment = prepare_molab_build_environment(
-            workspace, torch_cuda, sys.executable,
+            _toolchain_workspace(), torch_cuda, sys.executable,
         )
         os.environ.update(toolchain_environment)
         print("molab_preflight=" + json.dumps({

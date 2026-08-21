@@ -618,3 +618,7 @@ Acceptance must come from real Molab-side execution and artifacts, not from loca
 ## 2026-08-21 — Continue after renewed native pair
 
 - Continue autonomously in the supplied Molab sandbox, fix real notebook/asset/toolchain defects, and validate by live Molab execution.
+
+## 2026-08-21 — Benchmark before capacity sweep
+
+- First validate and benchmark one example, including actual search speed; only then tune runtime profiles and find the maximum stable beam boundary.
