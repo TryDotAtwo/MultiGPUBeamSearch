@@ -105,6 +105,10 @@ def test_locate_or_build_runner_pins_cutlass_and_sm75_without_subprocess_build(t
     monkeypatch.setenv("CAYLEYPY_CUTLASS_DIR", str(cutlass))
     monkeypatch.setenv("CAYLEYPY_BUILD_DIR", str(build))
     monkeypatch.setattr(public_cli, "_git_stdout", lambda *args, **kwargs: public_cli._CUTLASS_REV)
+    monkeypatch.setattr(public_cli, "_pytorch_nccl_cmake_args", lambda **_: [
+        "-DNCCL_LIBRARY=/torch/nccl/lib/libnccl.so.2",
+        "-DNCCL_INCLUDE_DIR=/torch/nccl/include",
+    ])
 
     def fake_run_logged(command, log_path, **kwargs) -> None:
         commands.append(tuple(command))
@@ -119,6 +123,8 @@ def test_locate_or_build_runner_pins_cutlass_and_sm75_without_subprocess_build(t
     configure = next(command for command in commands if command[0] == "cmake" and "-S" in command)
     assert "-DBEAM_CUDA_ARCHITECTURES=75" in configure
     assert f"-DCUTLASS_DIR={cutlass}" in configure
+    assert "-DNCCL_LIBRARY=/torch/nccl/lib/libnccl.so.2" in configure
+    assert "-DNCCL_INCLUDE_DIR=/torch/nccl/include" in configure
     assert any(command[:4] == ("cmake", "--build", build, "--target") for command in commands)
 
 

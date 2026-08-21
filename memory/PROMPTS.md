@@ -614,3 +614,7 @@ Acceptance must come from real Molab-side execution and artifacts, not from loca
 - User supplied a fresh live Molab sandbox and requested continuing the work through native `marimo-pair`, without Computer Use or subagents.
 - Validate the universal launcher and all four examples on Molab itself; configuration/toolchain fixes are allowed, while beam-search CUDA/C++ architecture remains unchanged.
 - User does not want to manually forward every renewed Molab pair session. Prefer automatic session bootstrap when an official API becomes available; current public marimo-pair interface can only attach to an already running session.
+
+## 2026-08-21 — Continue after renewed native pair
+
+- Continue autonomously in the supplied Molab sandbox, fix real notebook/asset/toolchain defects, and validate by live Molab execution.

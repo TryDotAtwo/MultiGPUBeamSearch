@@ -202,6 +202,25 @@ def _build_parallel_jobs() -> int:
     return jobs
 
 
+def _pytorch_nccl_cmake_args(*, required: bool) -> list[str]:
+    try:
+        import torch
+    except ImportError:
+        if required:
+            raise RuntimeError("PyTorch is required to locate the bundled NCCL runtime")
+        return []
+    nccl_root = Path(torch.__file__).resolve().parents[1] / "nvidia" / "nccl"
+    nccl_candidates = sorted((nccl_root / "lib").glob("libnccl.so*"))
+    nccl_include = nccl_root / "include"
+    if not nccl_candidates or not (nccl_include / "nccl.h").is_file():
+        if required:
+            raise RuntimeError(f"PyTorch-compatible NCCL not found under {nccl_root}")
+        return []
+    nccl_library = next((item for item in nccl_candidates if item.name == "libnccl.so.2"), nccl_candidates[0])
+    os.environ["LD_LIBRARY_PATH"] = f"{nccl_library.parent}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+    return [f"-DNCCL_LIBRARY={nccl_library}", f"-DNCCL_INCLUDE_DIR={nccl_include}"]
+
+
 def locate_or_build_runner(
     output_dir: Path,
     puzzle_info_json: Path | None = None,
@@ -264,20 +283,13 @@ def locate_or_build_runner(
         f"-DBEAM_DEBUG_DEPTH_FLOW_TRACE={'ON' if config is not None and config.debug_depth_flow_trace else 'OFF'}",
         f"-DBEAM_DEBUG_PIPELINE_STATS={'ON' if config is not None and config.debug_pipeline_stats else 'OFF'}",
     ]
+    configure.extend(_pytorch_nccl_cmake_args(required=backend == "piece_transformer"))
     if backend == "piece_transformer":
         import torch
-        nccl_root = Path(torch.__file__).resolve().parents[1] / "nvidia" / "nccl"
-        nccl_candidates = sorted((nccl_root / "lib").glob("libnccl.so*"))
-        nccl_include = nccl_root / "include"
-        if not nccl_candidates or not (nccl_include / "nccl.h").is_file():
-            raise RuntimeError(f"PyTorch-compatible NCCL not found under {nccl_root}")
-        nccl_library = next((item for item in nccl_candidates if item.name == "libnccl.so.2"), nccl_candidates[0])
         configure.extend([
             "-DBEAM_ENABLE_LIBTORCH_STREAM1=ON",
             f"-DCMAKE_PREFIX_PATH={Path(torch.__file__).resolve().parent / 'share' / 'cmake'}",
-            f"-DNCCL_LIBRARY={nccl_library}", f"-DNCCL_INCLUDE_DIR={nccl_include}",
         ])
-        os.environ["LD_LIBRARY_PATH"] = f"{nccl_library.parent}:{os.environ.get('LD_LIBRARY_PATH', '')}"
     if puzzle_info_json is not None:
         configure.append(f"-DBEAM_PUZZLE_INFO_JSON={puzzle_info_json.resolve()}")
     _run_logged(configure, logs / "cmake-configure.log", redactions=private_paths)

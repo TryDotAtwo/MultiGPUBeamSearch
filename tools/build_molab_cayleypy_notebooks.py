@@ -42,7 +42,7 @@ EXAMPLES: dict[str, dict[str, Any]] = {
         "puzzle_id": 1,
         "asset_kind": "kaggle_model",
         "asset_ref": "arabidopsisthalian/ihes-e08192/PyTorch/default/1",
-        "checkpoint_glob": "*.pth",
+        "checkpoint_glob": "*.pt",
         "metadata_glob": None,
         "generator_glob": None,
         "output_dim": 1,

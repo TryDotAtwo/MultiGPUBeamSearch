@@ -45,6 +45,12 @@ def test_examples_pin_the_same_four_public_workloads_as_kaggle(tmp_path: Path) -
         assert spec["asset_ref"] in source
 
 
+def test_ihes_example_matches_the_real_kaggle_model_suffix(tmp_path: Path) -> None:
+    source = build_all(tmp_path)["ihes"].read_text(encoding="utf-8")
+
+    assert 'CHECKPOINT_GLOB = "*.pt"' in source
+
+
 def test_notebooks_use_one_wrapped_execution_cell_and_persistent_outputs(tmp_path: Path) -> None:
     for path in build_all(tmp_path).values():
         source = path.read_text(encoding="utf-8")

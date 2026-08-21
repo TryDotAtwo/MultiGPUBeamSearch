@@ -48,7 +48,7 @@ def _():
     COMPETITION_SOURCE = "cayleypy-ihes-cube" if True else "auto"
     MODEL_ASSET_KIND = "kaggle_model"
     MODEL_ASSET_REF = "arabidopsisthalian/ihes-e08192/PyTorch/default/1"
-    CHECKPOINT_GLOB = "*.pth"
+    CHECKPOINT_GLOB = "*.pt"
     CHECKPOINT_METADATA_GLOB = None
     CHECKPOINT_GENERATOR_GLOB = None
 
