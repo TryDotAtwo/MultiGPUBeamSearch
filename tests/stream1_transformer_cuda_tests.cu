@@ -1,5 +1,6 @@
 #include "cuda_check.hpp"
 #include "../cuda/stream1.hpp"
+#include "../cuda/stream1_transformer_shape.hpp"
 #include "../tools/stream1_weight_io.hpp"
 #include "state.hpp"
 
@@ -87,6 +88,18 @@ std::filesystem::path reference_fixture_root() {
     return std::filesystem::path("test_results/stream1_transformer_reference");
 }
 
+void set_final_cls_only(bool enabled) {
+#if defined(_WIN32)
+    if (_putenv_s("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY", enabled ? "1" : "0") != 0) {
+        throw std::runtime_error("failed to set final CLS-only test environment");
+    }
+#else
+    if (setenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY", enabled ? "1" : "0", 1) != 0) {
+        throw std::runtime_error("failed to set final CLS-only test environment");
+    }
+#endif
+}
+
 } // namespace
 
 int main() {
@@ -154,6 +167,7 @@ int main() {
     const Stream1TransformerScratchView scratch_view =
         stream1_weights::transformer_scratch_view(scratch_allocation);
 
+    set_final_cls_only(false);
     stream1_transformer_inference_cuda(
         d_frontier,
         d_parent_base,
@@ -169,6 +183,42 @@ int main() {
 
     std::vector<std::uint32_t> cuda_scores(reference_count * MOVE_COUNT);
     BEAM_CUDA_CHECK(cudaMemcpy(cuda_scores.data(), d_score, cuda_scores.size() * sizeof(std::uint32_t), cudaMemcpyDeviceToHost));
+
+    const Stream1TransformerDims runtime_dims = view_holder.view.dims;
+    const bool generic_final_cls_shape = stream1_transformer_supports_generic_final_cls_only(
+        runtime_dims.seq_len,
+        runtime_dims.padded_seq_len,
+        runtime_dims.d_model,
+        runtime_dims.nhead,
+        runtime_dims.head_dim,
+        runtime_dims.transformer_layers,
+        runtime_dims.ff_dim,
+        runtime_dims.output_dim);
+    if (generic_final_cls_shape) {
+        BEAM_CUDA_CHECK(cudaMemset(d_score, 0, reference_count * MOVE_COUNT * sizeof(std::uint32_t)));
+        set_final_cls_only(true);
+        stream1_transformer_inference_cuda(
+            d_frontier,
+            d_parent_base,
+            d_count,
+            view_holder.view,
+            scratch_view,
+            d_score,
+            reference_count,
+            0U,
+            0);
+        BEAM_CUDA_CHECK(cudaGetLastError());
+        BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+        std::vector<std::uint32_t> final_cls_scores(reference_count * MOVE_COUNT);
+        BEAM_CUDA_CHECK(cudaMemcpy(
+            final_cls_scores.data(),
+            d_score,
+            final_cls_scores.size() * sizeof(std::uint32_t),
+            cudaMemcpyDeviceToHost));
+        require(final_cls_scores == cuda_scores, "generic final CLS-only score keys must be byte exact");
+        report << "- generic_final_cls_only_exact=pass\n";
+    }
+    set_final_cls_only(false);
 
     std::uint32_t max_abs_error = 0;
     for (std::size_t i = 0; i < cuda_scores.size(); ++i) {

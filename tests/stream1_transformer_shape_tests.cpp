@@ -43,5 +43,26 @@ int main() {
             beam::stream1_weights::transformer_attention_score_stride(model57), "aligned attention stride");
     require(scratch51.total_bytes() == scratch57.total_bytes(), "same physical shape must use same scratch bytes");
 
+    require(
+        beam::stream1_transformer_supports_generic_final_cls_only(
+            57U, 64U, 256U, 8U, 32U, 4U, 1024U, 24U),
+        "cube4 output24 shape must support generic final CLS-only");
+    require(
+        !beam::stream1_transformer_supports_generic_final_cls_only(
+            57U, 64U, 256U, 8U, 32U, 4U, 1024U, 1U),
+        "output1 shape must not enter the output24 generic final CLS-only path");
+    require(
+        !beam::stream1_transformer_supports_generic_final_cls_only(
+            65U, 80U, 256U, 8U, 32U, 4U, 1024U, 24U),
+        "sequence longer than the fused attention limit must not enter generic final CLS-only");
+
+    const auto tail57 = beam::make_stream1_transformer_padding_tail_plan(8U, 57U, 64U, 256U);
+    require(tail57.row_count == 8U, "tail plan rows");
+    require(tail57.tail_tokens_per_row == 7U, "tail plan token count");
+    require(tail57.tail_elements == 14336ULL, "tail plan must launch only logical padding elements");
+    require(tail57.row_stride_elements == 16384ULL, "tail plan must retain padded row stride");
+    const auto no_tail = beam::make_stream1_transformer_padding_tail_plan(8U, 64U, 64U, 256U);
+    require(no_tail.tail_elements == 0ULL, "aligned sequence must not launch a padding kernel");
+
     return 0;
 }
