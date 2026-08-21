@@ -150,6 +150,37 @@ inline bool stream1_transformer_gemm_swizzle_allowed(
     }
     return false;
 }
+
+inline Stream1TransformerGemmPolicy select_stream1_transformer_gemm_policy(
+    Stream1TransformerGemmFamily family,
+    const char* value,
+    int sm) {
+    if (value != nullptr && value[0] != '\0') {
+        return parse_stream1_transformer_gemm_policy(family, value);
+    }
+    if (sm >= 120 && family != Stream1TransformerGemmFamily::Cls) {
+        return Stream1TransformerGemmPolicy::M128N128;
+    }
+    return Stream1TransformerGemmPolicy::Baseline;
+}
+
+inline Stream1TransformerGemmSwizzlePolicy select_stream1_transformer_gemm_swizzle_policy(
+    Stream1TransformerGemmFamily family,
+    Stream1TransformerGemmPolicy gemm_policy,
+    Stream1TransformerGemmStagePolicy stage_policy,
+    const char* value,
+    int sm) {
+    if (value != nullptr && value[0] != '\0') {
+        return parse_stream1_transformer_gemm_swizzle_policy(value);
+    }
+    if (sm >= 120 && family == Stream1TransformerGemmFamily::Ff1 &&
+        gemm_policy == Stream1TransformerGemmPolicy::M128N128 &&
+        stage_policy == Stream1TransformerGemmStagePolicy::Stages3) {
+        return Stream1TransformerGemmSwizzlePolicy::Identity4;
+    }
+    return Stream1TransformerGemmSwizzlePolicy::Identity1;
+}
+
 inline Stream1TransformerGemmStagePolicy parse_stream1_transformer_gemm_stage_policy(const char* value) {
     if (value == nullptr || value[0] == '\0' || std::strcmp(value, "3") == 0) {
         return Stream1TransformerGemmStagePolicy::Stages3;
