@@ -1754,6 +1754,14 @@ void stream1_transformer_residual_bias_round_layernorm_cuda(
         stream);
 }
 
+bool stream1_transformer_fused_residual_epilogue_requested(bool is_ff2) {
+    const char* env_name = is_ff2
+        ? "BEAM_STREAM1_TRANSFORMER_FF2_EPILOGUE"
+        : "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_EPILOGUE";
+    return parse_stream1_transformer_residual_epilogue_policy(std::getenv(env_name)) ==
+        Stream1TransformerResidualEpiloguePolicy::FusedBiasRound;
+}
+
 template <
     typename Element,
     typename ArchTag,
@@ -3130,6 +3138,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
     const Stream1TransformerScratchView& scratch,
     std::uint32_t b_micro,
     Stream1TransformerAttentionBackend attention_backend,
+    bool ln1_precomputed,
     cudaStream_t stream) {
     const Stream1TransformerDims dims = network.dims;
     const std::uint32_t final_layer = dims.transformer_layers - 1U;
@@ -3137,16 +3146,18 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
     const Stream1TransformerBlockView previous_block = network.blocks[final_layer - 1U];
     const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
 
-    stream1_transformer_bias_layernorm_copy_launch(
-        scratch.tokens,
-        scratch.attention_context,
-        previous_block.ff2_bias,
-        block.ln1_gamma,
-        block.ln1_beta,
-        token_rows,
-        dims.d_model,
-        dims.dtype,
-        stream);
+    if (!ln1_precomputed) {
+        stream1_transformer_bias_layernorm_copy_launch(
+            scratch.tokens,
+            scratch.attention_context,
+            previous_block.ff2_bias,
+            block.ln1_gamma,
+            block.ln1_beta,
+            token_rows,
+            dims.d_model,
+            dims.dtype,
+            stream);
+    }
     stream1_transformer_linear_bias_cuda(
         scratch.attention_context,
         block.attn_qkv_weight,
@@ -3187,25 +3198,41 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims,
         b_micro,
         dims.padded_seq_len);
-    stream1_transformer_linear_residual_cuda(
-        scratch.attention_scores_probs,
-        block.attn_out_weight,
-        scratch.qkv,
-        b_micro,
-        dims.d_model,
-        dims.d_model,
-        dims.dtype,
-        stream);
-    stream1_transformer_bias_layernorm_copy_launch(
-        scratch.qkv,
-        scratch.attention_context,
-        block.attn_out_bias,
-        block.ln2_gamma,
-        block.ln2_beta,
-        b_micro,
-        dims.d_model,
-        dims.dtype,
-        stream);
+    if (stream1_transformer_fused_residual_epilogue_requested(false)) {
+        stream1_transformer_residual_bias_round_layernorm_cuda(
+            scratch.attention_scores_probs,
+            block.attn_out_weight,
+            scratch.qkv,
+            block.attn_out_bias,
+            scratch.attention_context,
+            block.ln2_gamma,
+            block.ln2_beta,
+            b_micro,
+            dims.d_model,
+            dims.d_model,
+            dims.dtype,
+            stream);
+    } else {
+        stream1_transformer_linear_residual_cuda(
+            scratch.attention_scores_probs,
+            block.attn_out_weight,
+            scratch.qkv,
+            b_micro,
+            dims.d_model,
+            dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_bias_layernorm_copy_launch(
+            scratch.qkv,
+            scratch.attention_context,
+            block.attn_out_bias,
+            block.ln2_gamma,
+            block.ln2_beta,
+            b_micro,
+            dims.d_model,
+            dims.dtype,
+            stream);
+    }
     stream1_transformer_ff1_linear_bias_silu_cuda(
         scratch.attention_context,
         block.ff1_weight,
@@ -3216,25 +3243,41 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.ff_dim,
         dims.dtype,
         stream);
-    stream1_transformer_linear_residual_cuda(
-        scratch.ff_hidden,
-        block.ff2_weight,
-        scratch.qkv,
-        b_micro,
-        dims.ff_dim,
-        dims.d_model,
-        dims.dtype,
-        stream);
-    stream1_transformer_bias_layernorm_copy_launch(
-        scratch.qkv,
-        scratch.attention_context,
-        block.ff2_bias,
-        network.output_ln_gamma,
-        network.output_ln_beta,
-        b_micro,
-        dims.d_model,
-        dims.dtype,
-        stream);
+    if (stream1_transformer_fused_residual_epilogue_requested(true)) {
+        stream1_transformer_residual_bias_round_layernorm_cuda(
+            scratch.ff_hidden,
+            block.ff2_weight,
+            scratch.qkv,
+            block.ff2_bias,
+            scratch.attention_context,
+            network.output_ln_gamma,
+            network.output_ln_beta,
+            b_micro,
+            dims.ff_dim,
+            dims.d_model,
+            dims.dtype,
+            stream);
+    } else {
+        stream1_transformer_linear_residual_cuda(
+            scratch.ff_hidden,
+            block.ff2_weight,
+            scratch.qkv,
+            b_micro,
+            dims.ff_dim,
+            dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_bias_layernorm_copy_launch(
+            scratch.qkv,
+            scratch.attention_context,
+            block.ff2_bias,
+            network.output_ln_gamma,
+            network.output_ln_beta,
+            b_micro,
+            dims.d_model,
+            dims.dtype,
+            stream);
+    }
 }
 
 void stream1_transformer_generic_run_layers_cuda(
@@ -3250,11 +3293,15 @@ void stream1_transformer_generic_run_layers_cuda(
         ? dims.transformer_layers - 1U
         : dims.transformer_layers;
     Stream1TransformerStageProfiler stage_profiler(stream);
+    bool ln1_precomputed = false;
+    bool final_ln1_precomputed = false;
 
     for (std::uint32_t layer = 0; layer < full_token_layer_count; ++layer) {
         const std::string layer_prefix = "layer" + std::to_string(layer) + "_";
         const Stream1TransformerBlockView block = network.blocks[layer];
-        if (layer == 0U) {
+        if (ln1_precomputed) {
+            ln1_precomputed = false;
+        } else if (layer == 0U) {
             stream1_transformer_layernorm_copy_launch(
                 scratch.tokens,
                 scratch.attention_context,
@@ -3298,26 +3345,44 @@ void stream1_transformer_generic_run_layers_cuda(
             stream);
         stream1_transformer_zero_padded_rows_launch(scratch.attention_context, dims, b_micro, stream);
         stage_profiler.mark(layer_prefix + "attention");
-        stream1_transformer_linear_residual_cuda(
-            scratch.attention_context,
-            block.attn_out_weight,
-            scratch.tokens,
-            token_rows,
-            dims.d_model,
-            dims.d_model,
-            dims.dtype,
-            stream);
+        if (stream1_transformer_fused_residual_epilogue_requested(false)) {
+            stream1_transformer_residual_bias_round_layernorm_cuda(
+                scratch.attention_context,
+                block.attn_out_weight,
+                scratch.tokens,
+                block.attn_out_bias,
+                scratch.attention_context,
+                block.ln2_gamma,
+                block.ln2_beta,
+                token_rows,
+                dims.d_model,
+                dims.d_model,
+                dims.dtype,
+                stream);
+        } else {
+            stream1_transformer_linear_residual_cuda(
+                scratch.attention_context,
+                block.attn_out_weight,
+                scratch.tokens,
+                token_rows,
+                dims.d_model,
+                dims.d_model,
+                dims.dtype,
+                stream);
+        }
         stage_profiler.mark(layer_prefix + "attention_out");
-        stream1_transformer_bias_layernorm_copy_launch(
-            scratch.tokens,
-            scratch.attention_context,
-            block.attn_out_bias,
-            block.ln2_gamma,
-            block.ln2_beta,
-            token_rows,
-            dims.d_model,
-            dims.dtype,
-            stream);
+        if (!stream1_transformer_fused_residual_epilogue_requested(false)) {
+            stream1_transformer_bias_layernorm_copy_launch(
+                scratch.tokens,
+                scratch.attention_context,
+                block.attn_out_bias,
+                block.ln2_gamma,
+                block.ln2_beta,
+                token_rows,
+                dims.d_model,
+                dims.dtype,
+                stream);
+        }
         stage_profiler.mark(layer_prefix + "ln2");
         stream1_transformer_ff1_linear_bias_silu_cuda(
             scratch.attention_context,
@@ -3330,15 +3395,50 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.dtype,
             stream);
         stage_profiler.mark(layer_prefix + "ff1");
-        stream1_transformer_linear_residual_cuda(
-            scratch.ff_hidden,
-            block.ff2_weight,
-            scratch.tokens,
-            token_rows,
-            dims.ff_dim,
-            dims.d_model,
-            dims.dtype,
-            stream);
+        const bool fused_ff2 = stream1_transformer_fused_residual_epilogue_requested(true);
+        if (fused_ff2 && layer + 1U < full_token_layer_count) {
+            const Stream1TransformerBlockView next_block = network.blocks[layer + 1U];
+            stream1_transformer_residual_bias_round_layernorm_cuda(
+                scratch.ff_hidden,
+                block.ff2_weight,
+                scratch.tokens,
+                block.ff2_bias,
+                scratch.attention_context,
+                next_block.ln1_gamma,
+                next_block.ln1_beta,
+                token_rows,
+                dims.ff_dim,
+                dims.d_model,
+                dims.dtype,
+                stream);
+            ln1_precomputed = true;
+        } else if (fused_ff2 && final_cls_only) {
+            const Stream1TransformerBlockView final_block = network.blocks[dims.transformer_layers - 1U];
+            stream1_transformer_residual_bias_round_layernorm_cuda(
+                scratch.ff_hidden,
+                block.ff2_weight,
+                scratch.tokens,
+                block.ff2_bias,
+                scratch.attention_context,
+                final_block.ln1_gamma,
+                final_block.ln1_beta,
+                token_rows,
+                dims.ff_dim,
+                dims.d_model,
+                dims.dtype,
+                stream);
+            final_ln1_precomputed = true;
+        } else {
+            stream1_transformer_linear_residual_cuda(
+                scratch.ff_hidden,
+                block.ff2_weight,
+                scratch.tokens,
+                token_rows,
+                dims.ff_dim,
+                dims.d_model,
+                dims.dtype,
+                stream);
+        }
         stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
         stage_profiler.mark(layer_prefix + "ff2");
     }
@@ -3349,6 +3449,7 @@ void stream1_transformer_generic_run_layers_cuda(
             scratch,
             b_micro,
             attention_backend,
+            final_ln1_precomputed,
             stream);
         stage_profiler.mark("final_cls_layer");
     } else if (dims.transformer_layers > 0U) {
