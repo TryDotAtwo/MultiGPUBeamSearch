@@ -1086,3 +1086,4 @@
 - A fresh native Molab 444 acceptance run configured CUDA 13.0 and `sm_120` successfully, exported the 24-output piece Transformer, then failed compiling `cuda/stream1.cu` because the isolated CUDA overlay did not contain `nvtx3/nvToolsExt.h`.
 - Added the matching `nvidia-nvtx==13.0.85` wheel to the pinned CUDA 13.0 family and made the NVTX header part of the cached-toolkit completeness gate, so an incomplete prior cache is rebuilt automatically.
 - Molab toolchain tests pass 5/5 and the complete Molab test group passes 10/10. Solver CUDA/C++ architecture is unchanged.
+- Live retries showed that the free 32 GiB Molab VM is terminated while `ninja -j2` compiles the large Transformer translation unit. Added a validated `CAYLEYPY_BUILD_JOBS` host-build control, kept the public/Kaggle default at 2, and set only the Molab bootstrap to 1 to bound compiler RAM. No solver CUDA/C++ source or runtime architecture changed.

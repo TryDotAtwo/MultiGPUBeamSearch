@@ -121,6 +121,16 @@ def test_locate_or_build_runner_pins_cutlass_and_sm75_without_subprocess_build(t
     assert f"-DCUTLASS_DIR={cutlass}" in configure
     assert any(command[:4] == ("cmake", "--build", build, "--target") for command in commands)
 
+
+def test_build_parallel_jobs_defaults_and_validates_environment(monkeypatch) -> None:
+    monkeypatch.delenv("CAYLEYPY_BUILD_JOBS", raising=False)
+    assert public_cli._build_parallel_jobs() == 2
+    monkeypatch.setenv("CAYLEYPY_BUILD_JOBS", "1")
+    assert public_cli._build_parallel_jobs() == 1
+    monkeypatch.setenv("CAYLEYPY_BUILD_JOBS", "0")
+    with pytest.raises(ValueError, match="CAYLEYPY_BUILD_JOBS"):
+        public_cli._build_parallel_jobs()
+
 def _publishing_config(tmp_path: Path) -> PublicRunConfig:
     return PublicRunConfig.from_mapping({"author_name": "alice", "checkpoint_path": str(tmp_path / "model.pth"), "puzzle_info_json": str(tmp_path / "puzzle_info.json"), "test_csv": str(tmp_path / "test.csv"), "sample_submission_csv": str(tmp_path / "sample_submission.csv"), "puzzle_id_start": 7, "puzzle_id_end": 7, "beam_width": 2**16, "max_depth": 4, "reflect_mode": "off", "reflect_source_csv": None, "solution_mode": "first", "collect_until_depth": 4, "max_collected_solutions": 2, "touch_bfs_radius": 1, "publish_results": True, "results_ingest_url": "https://ingest.example.test/results", "competition": "comp", "kaggle_owner": "owner", "kaggle_slug": "slug", "kaggle_version": 1, "solver_commit": "a" * 40, "kaggle_notebook_sha256": "b" * 64})
 

@@ -191,6 +191,17 @@ def _git_stdout(arguments: Sequence[object], *, cwd: Path) -> str:
     return completed.stdout.strip()
 
 
+def _build_parallel_jobs() -> int:
+    raw = os.environ.get("CAYLEYPY_BUILD_JOBS", "2").strip()
+    try:
+        jobs = int(raw)
+    except ValueError as error:
+        raise ValueError("CAYLEYPY_BUILD_JOBS must be an integer in 1..64") from error
+    if not 1 <= jobs <= 64:
+        raise ValueError("CAYLEYPY_BUILD_JOBS must be an integer in 1..64")
+    return jobs
+
+
 def locate_or_build_runner(
     output_dir: Path,
     puzzle_info_json: Path | None = None,
@@ -271,7 +282,7 @@ def locate_or_build_runner(
         configure.append(f"-DBEAM_PUZZLE_INFO_JSON={puzzle_info_json.resolve()}")
     _run_logged(configure, logs / "cmake-configure.log", redactions=private_paths)
     _run_logged(
-        ["cmake", "--build", build, "--target", target, "-j", "2"],
+        ["cmake", "--build", build, "--target", target, "-j", str(_build_parallel_jobs())],
         logs / "cmake-build.log", redactions=private_paths,
     )
     runner = (build / target).resolve()

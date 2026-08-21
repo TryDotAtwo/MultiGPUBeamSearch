@@ -118,5 +118,6 @@ def prepare_molab_build_environment(
         "CUDA_HOME": str(overlay),
         "CUDAToolkit_ROOT": str(overlay),
         "CAYLEYPY_BUILD_DIR": str(build),
+        "CAYLEYPY_BUILD_JOBS": "1",
     })
     return environment
