@@ -50,11 +50,13 @@ def selected_operators(profile: dict) -> list[str]:
 
 def package_profile(
     *, encoder: Path, fp16_weight_dir: Path, fp32_checkpoint: Path,
-    profile_json: Path, output_dir: Path,
+    profile_json: Path, output_dir: Path, weight_scale_policy: str = "mse_grid",
 ) -> Path:
     if output_dir.exists():
         raise FileExistsError(f"immutable profile directory already exists: {output_dir}")
     profile = validate_profile(json.loads(profile_json.read_text(encoding="utf-8")))
+    if weight_scale_policy not in {"max_abs", "mse_grid"}:
+        raise ValueError("weight_scale_policy must be max_abs or mse_grid")
     operators = selected_operators(profile)
     checkpoint_sha256 = sha256_file(fp32_checkpoint)
     if profile["fingerprints"]["checkpoint_sha256"] != checkpoint_sha256:
@@ -68,6 +70,7 @@ def package_profile(
         subprocess.run([
             str(encoder), "--weight-dir", str(fp16_weight_dir),
             "--output-dir", str(encoded), "--operators", ",".join(operators),
+            "--weight-scale-policy", weight_scale_policy,
         ], check=True)
         (encoded / "profile.json").write_text(
             json.dumps(profile, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -87,6 +90,7 @@ def package_profile(
                 "weight": "cutlass_float_e4m3",
                 "weight_scale": "fp32",
                 "weight_scale_granularity": {"k": 128, "n": 128},
+                "weight_scale_policy": weight_scale_policy,
                 "activation": "dynamic_cutlass_float_e4m3",
                 "activation_scale": "fp32",
                 "activation_scale_granularity": {"row": 1, "k": 128},
@@ -121,11 +125,12 @@ def main() -> None:
     parser.add_argument("--fp32-checkpoint", type=Path, required=True)
     parser.add_argument("--profile-json", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--weight-scale-policy", choices=("max_abs", "mse_grid"), default="mse_grid")
     args = parser.parse_args()
     result = package_profile(
         encoder=args.encoder, fp16_weight_dir=args.fp16_weight_dir,
         fp32_checkpoint=args.fp32_checkpoint, profile_json=args.profile_json,
-        output_dir=args.output_dir,
+        output_dir=args.output_dir, weight_scale_policy=args.weight_scale_policy,
     )
     print(json.dumps({"output_dir": str(result), "immutable": True}, sort_keys=True))
 

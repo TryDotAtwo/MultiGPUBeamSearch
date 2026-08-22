@@ -76,13 +76,20 @@ static std::string slug(const std::string& name) {
 }
 
 int main(int argc, char** argv) try {
-    if (argc != 7 || std::string(argv[1]) != "--weight-dir" ||
-        std::string(argv[3]) != "--output-dir" || std::string(argv[5]) != "--operators") {
-        throw std::invalid_argument("usage: exporter --weight-dir DIR --output-dir NEW_DIR --operators CSV");
+    if ((argc != 7 && argc != 9) || std::string(argv[1]) != "--weight-dir" ||
+        std::string(argv[3]) != "--output-dir" || std::string(argv[5]) != "--operators" ||
+        (argc == 9 && std::string(argv[7]) != "--weight-scale-policy")) {
+        throw std::invalid_argument(
+            "usage: exporter --weight-dir DIR --output-dir NEW_DIR --operators CSV "
+            "[--weight-scale-policy max_abs|mse_grid]");
     }
     const fs::path weight_dir(argv[2]);
     const fs::path output_dir(argv[4]);
     const std::string operator_csv(argv[6]);
+    const std::string weight_scale_policy = argc == 9 ? argv[8] : "max_abs";
+    if (weight_scale_policy != "max_abs" && weight_scale_policy != "mse_grid") {
+        throw std::invalid_argument("weight scale policy must be max_abs or mse_grid");
+    }
     if (fs::exists(output_dir)) throw std::runtime_error("output directory already exists: " + output_dir.string());
     if (!fs::is_regular_file(weight_dir / "manifest.json")) throw std::runtime_error("missing source manifest.json");
     if (!stream1_transformer_sm120_fp8_supported()) {
@@ -94,6 +101,7 @@ int main(int argc, char** argv) try {
     std::ostringstream manifest;
     manifest << "schema_version=1\n";
     manifest << "operators=" << operator_csv << "\n";
+    manifest << "weight_scale_policy=" << weight_scale_policy << "\n";
     manifest << "source_manifest_sha256=" << beam::sha256::file_hex(weight_dir / "manifest.json") << "\n";
     for (const std::string& name : names) {
         const OperatorSpec spec = resolve(weight_dir, name);
@@ -108,8 +116,13 @@ int main(int argc, char** argv) try {
         BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_quantized), elements));
         BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_scales), scale_elements * sizeof(float)));
         BEAM_CUDA_CHECK(cudaMemcpy(d_source, source.data(), source.size(), cudaMemcpyHostToDevice));
-        stream1_transformer_sm120_fp8_quantize_weight_cuda(
-            d_source, d_quantized, d_scales, spec.input_cols, spec.output_cols, 1.0f, nullptr);
+        if (weight_scale_policy == "mse_grid") {
+            stream1_transformer_sm120_fp8_quantize_weight_mse_cuda(
+                d_source, d_quantized, d_scales, spec.input_cols, spec.output_cols, nullptr);
+        } else {
+            stream1_transformer_sm120_fp8_quantize_weight_cuda(
+                d_source, d_quantized, d_scales, spec.input_cols, spec.output_cols, 1.0f, nullptr);
+        }
         std::vector<std::uint8_t> quantized(elements);
         std::vector<float> scales(scale_elements);
         BEAM_CUDA_CHECK(cudaMemcpy(quantized.data(), d_quantized, elements, cudaMemcpyDeviceToHost));
@@ -134,7 +147,8 @@ int main(int argc, char** argv) try {
     const std::string runtime_manifest = manifest.str();
     write_bytes(output_dir / "runtime_manifest.txt", runtime_manifest.data(), runtime_manifest.size());
     std::cout << "sm120_offline_weight_export_done output_dir=" << output_dir
-              << " operators=" << names.size() << "\n";
+              << " operators=" << names.size()
+              << " weight_scale_policy=" << weight_scale_policy << "\n";
     return 0;
 } catch (const std::exception& error) {
     std::cerr << "sm120_offline_weight_export_error=" << error.what() << "\n";

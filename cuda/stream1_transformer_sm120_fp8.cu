@@ -222,6 +222,69 @@ __global__ void quantize_weight_kernel(
     }
 }
 
+// Offline-only encoder.  Each 128x128 block selects its clipping scale by
+// minimizing reconstruction MSE over a fixed deterministic grid.  Production
+// never executes this kernel: it loads the resulting E4M3 bytes and scales.
+__global__ void quantize_weight_mse_kernel(
+    const half* __restrict__ weight,
+    ElementB* __restrict__ quantized,
+    float* __restrict__ scales,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols) {
+    const std::uint32_t n_block = blockIdx.x;
+    const std::uint32_t k_block = blockIdx.y;
+    constexpr std::uint32_t elements_per_tile = kScaleGranularity * kScaleGranularity;
+    __shared__ float selected_scale;
+    if (threadIdx.x == 0U) {
+        float max_abs = 0.0f;
+        for (std::uint32_t local = 0; local < elements_per_tile; ++local) {
+            const std::uint32_t local_k = local / kScaleGranularity;
+            const std::uint32_t local_n = local % kScaleGranularity;
+            const std::uint32_t k = k_block * kScaleGranularity + local_k;
+            const std::uint32_t n = n_block * kScaleGranularity + local_n;
+            const std::size_t index = static_cast<std::size_t>(k) * output_cols + n;
+            max_abs = fmaxf(max_abs, fabsf(__half2float(weight[index])));
+        }
+        float best_scale = max_abs == 0.0f ? 1.0f : max_abs / kE4m3Max;
+        float best_error = CUDART_INF_F;
+        // 0.25 ... 1.25 includes aggressive clipping and the max-abs baseline.
+        for (std::uint32_t candidate = 0; candidate <= 40U; ++candidate) {
+            const float multiplier = 0.25f + 0.025f * static_cast<float>(candidate);
+            const float scale = max_abs == 0.0f ? 1.0f : (max_abs / kE4m3Max) * multiplier;
+            float error = 0.0f;
+            for (std::uint32_t local = 0; local < elements_per_tile; ++local) {
+                const std::uint32_t local_k = local / kScaleGranularity;
+                const std::uint32_t local_n = local % kScaleGranularity;
+                const std::uint32_t k = k_block * kScaleGranularity + local_k;
+                const std::uint32_t n = n_block * kScaleGranularity + local_n;
+                const std::size_t index = static_cast<std::size_t>(k) * output_cols + n;
+                const float value = __half2float(weight[index]);
+                const ElementB encoded(value / scale);
+                const float reconstructed = static_cast<float>(encoded) * scale;
+                const float delta = reconstructed - value;
+                error = fmaf(delta, delta, error);
+            }
+            if (error < best_error) {
+                best_error = error;
+                best_scale = scale;
+            }
+        }
+        selected_scale = best_scale;
+        const std::uint32_t n_blocks = output_cols / kScaleGranularity;
+        scales[static_cast<std::size_t>(k_block) * n_blocks + n_block] = best_scale;
+    }
+    __syncthreads();
+    const float inverse_scale = 1.0f / selected_scale;
+    for (std::uint32_t local = threadIdx.x; local < elements_per_tile; local += blockDim.x) {
+        const std::uint32_t local_k = local / kScaleGranularity;
+        const std::uint32_t local_n = local % kScaleGranularity;
+        const std::uint32_t k = k_block * kScaleGranularity + local_k;
+        const std::uint32_t n = n_block * kScaleGranularity + local_n;
+        const std::size_t index = static_cast<std::size_t>(k) * output_cols + n;
+        quantized[index] = ElementB(__half2float(weight[index]) * inverse_scale);
+    }
+}
+
 typename Gemm::Arguments make_arguments(
     const ElementA* input,
     const float* input_scales,
@@ -344,6 +407,29 @@ void stream1_transformer_sm120_fp8_quantize_weight_cuda(
         input_cols,
         output_cols,
         scale_multiplier);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+#else
+    (void)stream;
+    throw std::runtime_error("SM120 FP8 support was not compiled for sm_120a");
+#endif
+}
+
+void stream1_transformer_sm120_fp8_quantize_weight_mse_cuda(
+    const half* weight,
+    std::uint8_t* quantized_weight,
+    float* weight_scales,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    cudaStream_t stream) {
+    validate_common_shape(1U, input_cols, output_cols);
+    if (weight == nullptr || quantized_weight == nullptr || weight_scales == nullptr) {
+        throw std::invalid_argument("SM120 FP8 MSE weight quantization received a null pointer");
+    }
+#if BEAM_ENABLE_SM120_FP8 && defined(CUTLASS_ARCH_MMA_SM120_SUPPORTED)
+    const dim3 grid(output_cols / kScaleGranularity, input_cols / kScaleGranularity);
+    quantize_weight_mse_kernel<<<grid, 128, 0, stream>>>(
+        weight, reinterpret_cast<ElementB*>(quantized_weight), weight_scales,
+        input_cols, output_cols);
     BEAM_CUDA_CHECK(cudaGetLastError());
 #else
     (void)stream;
