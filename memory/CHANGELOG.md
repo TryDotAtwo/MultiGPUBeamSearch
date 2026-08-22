@@ -1078,3 +1078,10 @@
   `test_results/cube4_sm120_mxfp8_autotuner_research_2026-08-22.md`.
 - No inference/runtime or beam-search architecture change was made by this
   research step.
+## 2026-08-22 — SM120 Cube4 immutable mixed precision and ReLU correctness
+
+- Corrected native piece-transformer FF1 activation dispatch: Cube4 manifests now execute ReLU; p900 retains SiLU.
+- Added offline deterministic per-block MSE scale selection for immutable SM120 E4M3 weights; production still performs no weight quantization.
+- Added a reconstructed-state frontier gate and public Cube4 generator/CSV schema compatibility.
+- Molab rejected naïve and MSE-scaled one-pass E4M3 on real frontier quality. Two-component E4M3 improved ranking but remained below the 0.999 gate.
+- The prior Cube4 calibration corpus and 80.2952 s baseline are now marked historical because native CUDA had used SiLU. A correct ReLU `2**25` corpus run reached at least depth 5 before the Molab sandbox expired (HTTP 410).
