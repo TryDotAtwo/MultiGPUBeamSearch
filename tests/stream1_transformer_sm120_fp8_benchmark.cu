@@ -94,7 +94,7 @@ void benchmark_shape(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t
             static_cast<const half*>(input.pointer),
             static_cast<const half*>(weight.pointer),
             static_cast<half*>(fp16_output.pointer),
-            rows, input_cols, output_cols, STREAM1_DTYPE_FP16, nullptr);
+            rows, input_cols, output_cols, beam::STREAM1_DTYPE_FP16, nullptr);
     };
     for (int i = 0; i < warmups; ++i) {
         run_fp16_once();
