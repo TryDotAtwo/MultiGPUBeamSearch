@@ -99,10 +99,11 @@ int main(int argc, char** argv) try {
     if (names.empty()) throw std::invalid_argument("offline encoder requires at least one operator");
     fs::create_directories(output_dir / "weights");
     std::ostringstream manifest;
-    manifest << "schema_version=1\n";
+    manifest << "schema_version=2\n";
     manifest << "operators=" << operator_csv << "\n";
     manifest << "weight_scale_policy=" << weight_scale_policy << "\n";
-    manifest << "source_manifest_sha256=" << beam::sha256::file_hex(weight_dir / "manifest.json") << "\n";
+    manifest << "encoding_source_manifest_sha256="
+             << beam::sha256::file_hex(weight_dir / "manifest.json") << "\n";
     for (const std::string& name : names) {
         const OperatorSpec spec = resolve(weight_dir, name);
         const std::size_t elements = static_cast<std::size_t>(spec.input_cols) * spec.output_cols;

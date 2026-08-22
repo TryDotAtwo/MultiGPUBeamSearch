@@ -282,7 +282,7 @@ inline void load_sm120_offline_artifacts(
     const std::filesystem::path profile_dir(raw_profile_dir);
     const std::filesystem::path runtime_manifest = profile_dir / "runtime_manifest.txt";
     const std::string manifest = read_text_exact(runtime_manifest);
-    if (runtime_manifest_value(manifest, "schema_version") != "1") {
+    if (runtime_manifest_value(manifest, "schema_version") != "2") {
         throw std::runtime_error("unsupported SM120 runtime manifest schema");
     }
     const std::string profile_operators = runtime_manifest_value(manifest, "operators");
@@ -291,12 +291,13 @@ inline void load_sm120_offline_artifacts(
         throw std::runtime_error("SM120 runtime profile operators do not match requested operators");
     }
     const std::filesystem::path source_manifest = weight_dir / "manifest.json";
-    require_sha256(source_manifest, runtime_manifest_value(manifest, "source_manifest_sha256"));
+    require_sha256(source_manifest, runtime_manifest_value(manifest, "runtime_base_manifest_sha256"));
     if (weights.model.d_model % 128U != 0U || weights.model.ff_dim % 128U != 0U) {
         throw std::runtime_error("SM120 offline artifacts require dimensions divisible by 128");
     }
     auto load_operator = [&](const std::string& name, std::vector<std::byte>& quantized,
-                             std::vector<std::byte>& scales, std::uint32_t input_cols,
+                             std::vector<std::byte>& scales, std::vector<std::byte>& ln_gamma,
+                             std::vector<std::byte>& ln_beta, std::uint32_t input_cols,
                              std::uint32_t output_cols) {
         const std::string prefix = "operator." + name + ".";
         if (runtime_manifest_value(manifest, prefix + "input_cols") != std::to_string(input_cols) ||
@@ -310,17 +311,32 @@ inline void load_sm120_offline_artifacts(
         quantized = read_binary_exact(weight_path, static_cast<std::uint64_t>(input_cols) * output_cols);
         const std::uint64_t scale_count = static_cast<std::uint64_t>(input_cols / 128U) * (output_cols / 128U);
         scales = read_binary_exact(scale_path, scale_count * sizeof(float));
+        const std::string transform = runtime_manifest_value(manifest, prefix + "transform");
+        if (transform == "none") {
+            return;
+        }
+        if (transform != "layernorm_linear_smoothquant") {
+            throw std::runtime_error("unsupported SM120 offline transform for " + name);
+        }
+        const std::filesystem::path gamma_path = profile_dir / runtime_manifest_value(manifest, prefix + "ln_gamma_file");
+        const std::filesystem::path beta_path = profile_dir / runtime_manifest_value(manifest, prefix + "ln_beta_file");
+        require_sha256(gamma_path, runtime_manifest_value(manifest, prefix + "ln_gamma_sha256"));
+        require_sha256(beta_path, runtime_manifest_value(manifest, prefix + "ln_beta_sha256"));
+        ln_gamma = read_binary_exact(gamma_path, static_cast<std::uint64_t>(input_cols) * sizeof(half));
+        ln_beta = read_binary_exact(beta_path, static_cast<std::uint64_t>(input_cols) * sizeof(half));
     };
     for (std::uint32_t layer = 0; layer < weights.model.transformer_layers; ++layer) {
         auto& block = weights.transformer.blocks.at(layer);
         if ((requested_mask & stream1_sm120_fp8_qkv_bit(layer)) != 0U) {
             load_operator("blocks." + std::to_string(layer) + ".attn.in_proj_weight",
                 block.attn_qkv_weight_fp8, block.attn_qkv_weight_scales,
+                block.ln1_gamma, block.ln1_beta,
                 weights.model.d_model, 3U * weights.model.d_model);
         }
         if ((requested_mask & stream1_sm120_fp8_ff1_bit(layer)) != 0U) {
             load_operator("blocks." + std::to_string(layer) + ".ff.0.weight",
                 block.ff1_weight_fp8, block.ff1_weight_scales,
+                block.ln2_gamma, block.ln2_beta,
                 weights.model.d_model, weights.model.ff_dim);
         }
     }

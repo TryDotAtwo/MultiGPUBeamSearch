@@ -1113,3 +1113,13 @@
   Provenance fingerprints both FP32 and FP16 exports, and the E4M3 packager
   explicitly rejects INT8 layouts rather than routing them through the wrong
   encoder.
+- Closed an immutable-profile reproducibility gap: graph-preserving
+  LayerNorm-to-linear SmoothQuant scales and alpha now travel with the exact
+  candidate through selection and are validated and hashed into profile v2.
+- Split the runtime manifest fingerprints correctly: the FP32 encoding source
+  and FP16 runtime base now have separate SHA-256 fields. The loader verifies
+  the FP16 fallback directory while provenance retains the FP32 source hash.
+- Implemented offline graph-preserving LayerNorm-to-QKV/FF1 equalization:
+  transformed FP32 weights are encoded once, transformed LayerNorm gamma/beta
+  overrides are stored as hashed FP16 artifacts, and the native loader applies
+  only those immutable overrides. Production performs no scale folding.

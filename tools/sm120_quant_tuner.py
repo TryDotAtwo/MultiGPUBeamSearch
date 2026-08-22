@@ -247,11 +247,15 @@ def build_profile(
     gpu_identity: str,
     cutlass_commit: str,
     operator_precision: Mapping[str, str],
+    operator_transforms: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     solver_commit: str = "unknown",
     cuda_version: str = "unknown",
 ) -> dict[str, Any]:
     if set(operator_precision) != set(CORE_OPERATORS):
         raise ValueError("operator_precision must contain exactly the 16 core operators")
+    transforms = operator_transforms or {name: [] for name in CORE_OPERATORS}
+    if set(transforms) != set(CORE_OPERATORS):
+        raise ValueError("operator_transforms must contain exactly the 16 core operators")
     profile = {
         "schema_version": SCHEMA_VERSION,
         "fingerprints": {
@@ -267,7 +271,11 @@ def build_profile(
             "frontend", "layernorm", "bias", "residual", "softmax", "output_layer"
         ],
         "operators": {
-            name: _operator_contract(str(operator_precision[name])) for name in CORE_OPERATORS
+            name: {
+                **_operator_contract(str(operator_precision[name])),
+                "folded_transforms": [dict(item) for item in transforms[name]],
+            }
+            for name in CORE_OPERATORS
         },
     }
     return validate_profile(profile)
@@ -306,6 +314,22 @@ def validate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError(f"operator {name} activation encoding is inconsistent")
         if contract.get("fallback_precision") != "fp16":
             raise ValueError(f"operator {name} must fail closed to fp16")
+        transforms = contract.get("folded_transforms")
+        if not isinstance(transforms, list):
+            raise ValueError(f"operator {name} folded_transforms must be an array")
+        for transform in transforms:
+            if not isinstance(transform, Mapping) or set(transform) != {"type", "alpha", "scales"}:
+                raise ValueError(f"operator {name} has an invalid folded transform")
+            if transform["type"] != "layernorm_linear_smoothquant":
+                raise ValueError(f"operator {name} has an unsupported folded transform")
+            alpha = float(transform["alpha"])
+            scales = transform["scales"]
+            if not np.isfinite(alpha) or not 0.0 <= alpha <= 1.0:
+                raise ValueError(f"operator {name} folded transform alpha is invalid")
+            if not isinstance(scales, list) or len(scales) != 256:
+                raise ValueError(f"operator {name} folded transform requires 256 scales")
+            if any(not np.isfinite(float(value)) or float(value) <= 0.0 for value in scales):
+                raise ValueError(f"operator {name} folded transform scales must be positive")
     return json.loads(json.dumps(profile, sort_keys=True))
 
 

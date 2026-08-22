@@ -72,10 +72,17 @@ def select_profile(
         if not isinstance(policy, Mapping) or set(policy) != set(CORE_OPERATORS):
             missing[name] = ["operator_precision"]
             continue
+        transforms = ranking[name].get("operator_transforms")
+        if transforms is None:
+            transforms = {operator: [] for operator in CORE_OPERATORS}
+        if not isinstance(transforms, Mapping) or set(transforms) != set(CORE_OPERATORS):
+            missing[name] = ["operator_transforms"]
+            continue
         row = dict(ranking[name])
         row["frontier_jaccard"] = _minimum_frontier_jaccard(frontier[name])
         row["latency_ms"] = float(benchmark[name]["latency_ms"])
         row["operator_precision"] = dict(policy)
+        row["operator_transforms"] = {key: list(value) for key, value in transforms.items()}
         complete.append(row)
     decision = pareto_select(complete, thresholds)
     decision["missing_evidence"] = missing
@@ -134,6 +141,7 @@ def main() -> None:
         gpu_identity=args.gpu_identity,
         cutlass_commit=args.cutlass_commit,
         operator_precision=selected["operator_precision"],
+        operator_transforms=selected["operator_transforms"],
         solver_commit=args.solver_commit,
         cuda_version=args.cuda_version,
     )

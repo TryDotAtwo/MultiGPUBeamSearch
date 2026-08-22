@@ -442,11 +442,20 @@ def main() -> None:
             equalized, states, batch_size=args.batch_size, capture_statistics=False
         )
         name = f"smoothquant_alpha_{alpha:g}_all_core_fp8"
+        transforms = {
+            operator: ([{
+                "type": "layernorm_linear_smoothquant",
+                "alpha": alpha,
+                "scales": scales[operator],
+            }] if operator in scales else [])
+            for operator in CORE_OPERATORS
+        }
         row = {
             "name": name,
             "smoothquant_alpha": alpha,
             "folded_operators": sorted(scales),
             "operator_precision": {name: "sm120_block_fp8" for name in CORE_OPERATORS},
+            "operator_transforms": transforms,
             **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed),
         }
         observations.append(row)

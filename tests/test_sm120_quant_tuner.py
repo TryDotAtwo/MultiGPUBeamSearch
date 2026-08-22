@@ -76,6 +76,29 @@ def test_block_int8_profile_records_offline_encoding_contract() -> None:
     assert contract["fallback_precision"] == "fp16"
 
 
+def test_profile_preserves_and_validates_graph_preserving_transforms() -> None:
+    transforms = {name: [] for name in CORE_OPERATORS}
+    transforms[CORE_OPERATORS[0]] = [{
+        "type": "layernorm_linear_smoothquant",
+        "alpha": 0.5,
+        "scales": [1.0] * 256,
+    }]
+    profile = build_profile(
+        checkpoint_sha256="a" * 64,
+        model_metadata_sha256="b" * 64,
+        calibration_sha256="c" * 64,
+        gpu_identity="RTX PRO 6000 Blackwell|sm120",
+        cutlass_commit="d" * 40,
+        operator_precision={name: "sm120_block_fp8" for name in CORE_OPERATORS},
+        operator_transforms=transforms,
+    )
+    assert profile["operators"][CORE_OPERATORS[0]]["folded_transforms"] == transforms[CORE_OPERATORS[0]]
+    broken = json.loads(json.dumps(profile))
+    broken["operators"][CORE_OPERATORS[0]]["folded_transforms"][0]["scales"][3] = 0.0
+    with pytest.raises(ValueError, match="scales must be positive"):
+        validate_profile(broken)
+
+
 def test_pareto_selection_applies_quality_as_hard_gate() -> None:
     thresholds = QualityThresholds(
         top1_agreement=0.999,

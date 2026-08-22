@@ -12,9 +12,12 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+
+import numpy as np
 
 from tools.sm120_quant_tuner import CORE_OPERATORS, validate_profile
 
@@ -57,6 +60,65 @@ def selected_operators(profile: dict) -> list[str]:
     return selected
 
 
+def _operator_files(name: str) -> tuple[str, str, str]:
+    parts = name.split(".")
+    if len(parts) < 4 or parts[0] != "blocks" or not parts[1].isdigit():
+        raise ValueError(f"unsupported transformed operator: {name}")
+    block = int(parts[1])
+    if name.endswith("attn.in_proj_weight"):
+        return (
+            f"block{block}_attn_qkv_weight_hxk.fp32",
+            f"block{block}_ln1_gamma.fp32",
+            f"block{block}_ln1_beta.fp32",
+        )
+    if name.endswith("ff.0.weight"):
+        return (
+            f"block{block}_ff1_weight_hxk.fp32",
+            f"block{block}_ln2_gamma.fp32",
+            f"block{block}_ln2_beta.fp32",
+        )
+    raise ValueError(f"offline transform is not supported for operator: {name}")
+
+
+def _prepare_encoding_source(
+    source_dir: Path,
+    profile: dict,
+    operators: list[str],
+    destination: Path,
+) -> dict[str, dict[str, bytes | str]]:
+    """Materialize transformed FP32 weights and FP16 LN overrides offline."""
+    destination.mkdir()
+    shutil.copyfile(source_dir / "manifest.json", destination / "manifest.json")
+    overrides: dict[str, dict[str, bytes | str]] = {}
+    for name in operators:
+        weight_file, gamma_file, beta_file = _operator_files(name)
+        transforms = profile["operators"][name]["folded_transforms"]
+        source_weight = source_dir / weight_file
+        if not transforms:
+            shutil.copyfile(source_weight, destination / weight_file)
+            overrides[name] = {"transform": "none"}
+            continue
+        if len(transforms) != 1:
+            raise ValueError(f"operator {name} must have exactly one offline transform")
+        transform = transforms[0]
+        scales = np.asarray(transform["scales"], dtype=np.float32)
+        weight = np.fromfile(source_weight, dtype=np.float32)
+        if weight.size % scales.size:
+            raise ValueError(f"operator {name} FP32 weight shape is incompatible with transform")
+        transformed_weight = (weight.reshape(scales.size, -1) / scales[:, None]).astype(np.float32)
+        transformed_weight.tofile(destination / weight_file)
+        gamma = np.fromfile(source_dir / gamma_file, dtype=np.float32)
+        beta = np.fromfile(source_dir / beta_file, dtype=np.float32)
+        if gamma.shape != scales.shape or beta.shape != scales.shape:
+            raise ValueError(f"operator {name} LayerNorm vector shape is incompatible with transform")
+        overrides[name] = {
+            "transform": "layernorm_linear_smoothquant",
+            "gamma": (gamma * scales).astype(np.float16).tobytes(),
+            "beta": (beta * scales).astype(np.float16).tobytes(),
+        }
+    return overrides
+
+
 def package_profile(
     *, encoder: Path, fp16_weight_dir: Path, fp32_weight_dir: Path, fp32_checkpoint: Path,
     profile_json: Path, output_dir: Path, weight_scale_policy: str = "mse_grid",
@@ -75,12 +137,37 @@ def package_profile(
     # The encoder requires a non-existent destination, while mkdtemp reserves
     # the parent name safely.  Its child is atomically promoted on success.
     encoded = temporary / "encoded"
+    encoding_source = temporary / "encoding_source"
     try:
+        overrides = _prepare_encoding_source(
+            fp32_weight_dir, profile, operators, encoding_source
+        )
         subprocess.run([
-            str(encoder), "--weight-dir", str(fp32_weight_dir),
+            str(encoder), "--weight-dir", str(encoding_source),
             "--output-dir", str(encoded), "--operators", ",".join(operators),
             "--weight-scale-policy", weight_scale_policy,
         ], check=True)
+        runtime_manifest_path = encoded / "runtime_manifest.txt"
+        runtime_manifest = runtime_manifest_path.read_text(encoding="utf-8")
+        runtime_manifest += (
+            "runtime_base_manifest_sha256="
+            + sha256_file(fp16_weight_dir / "manifest.json") + "\n"
+        )
+        for name in operators:
+            prefix = f"operator.{name}."
+            override = overrides[name]
+            runtime_manifest += prefix + "transform=" + str(override["transform"]) + "\n"
+            if override["transform"] != "none":
+                slug = name.replace(".", "_")
+                gamma_relative = Path("weights") / f"{slug}.ln_gamma.fp16"
+                beta_relative = Path("weights") / f"{slug}.ln_beta.fp16"
+                (encoded / gamma_relative).write_bytes(bytes(override["gamma"]))
+                (encoded / beta_relative).write_bytes(bytes(override["beta"]))
+                runtime_manifest += prefix + "ln_gamma_file=" + gamma_relative.as_posix() + "\n"
+                runtime_manifest += prefix + "ln_gamma_sha256=" + sha256_file(encoded / gamma_relative) + "\n"
+                runtime_manifest += prefix + "ln_beta_file=" + beta_relative.as_posix() + "\n"
+                runtime_manifest += prefix + "ln_beta_sha256=" + sha256_file(encoded / beta_relative) + "\n"
+        runtime_manifest_path.write_text(runtime_manifest, encoding="utf-8")
         (encoded / "profile.json").write_text(
             json.dumps(profile, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
@@ -125,6 +212,7 @@ def package_profile(
         )
         os.replace(encoded, output_dir)
     finally:
+        shutil.rmtree(encoding_source, ignore_errors=True)
         try:
             temporary.rmdir()
         except OSError:
