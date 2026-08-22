@@ -1,5 +1,5 @@
 #include "stream1_transformer_sm120_fp8.hpp"
-#include "stream1.hpp"
+#include "../cuda/stream1.hpp"
 
 #include "cuda_check.hpp"
 
