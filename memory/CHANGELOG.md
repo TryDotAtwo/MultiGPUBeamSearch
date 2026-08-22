@@ -1,6 +1,15 @@
 # Changelog
 
 ## 2026-08-22
+- Added the opt-in `BEAM_ENABLE_SM120_FP8` CUTLASS SM120 block-scaled E4M3
+  primitive with FP32 per-row/per-128x128-block scales, persistent caller-owned
+  buffers, prequantized weights, and dynamic activation quantization. The
+  Molab RTX PRO 6000 Blackwell correctness gate passed with NMSE 0.000415495
+  and max absolute error 0.0268555. Real Cube4 shapes including activation
+  quantization measured 0.082043-0.286033 ms. This is not yet enabled in the
+  production Transformer; the integrated acceptance baseline remains 80.2952 s
+  at beam `2**25`, depth 8. Evidence:
+  `test_results/molab_sm120_blockscaled_fp8_2026-08-22.md`.
 - Added an opt-in generic final-CLS split-QKV Transformer path via
   `BEAM_STREAM1_TRANSFORMER_FINAL_CLS_SPLIT_QKV=1`. The final layer computes Q
   only for CLS rows and K/V for all sequence rows while preserving the
