@@ -1203,6 +1203,35 @@ __global__ void stream1_transformer_bias_silu_kernel(
     stream1_transformer_store_scalar_device(matrix, i, y, dtype);
 }
 
+__global__ void stream1_transformer_relu_kernel(
+    half* __restrict__ matrix,
+    std::uint32_t count,
+    std::uint32_t dtype) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= count) {
+        return;
+    }
+    const float x = stream1_transformer_load_scalar_device(matrix, i, dtype);
+    stream1_transformer_store_scalar_device(matrix, i, fmaxf(x, 0.0f), dtype);
+}
+
+__global__ void stream1_transformer_bias_relu_kernel(
+    half* __restrict__ matrix,
+    const half* __restrict__ bias,
+    std::uint32_t rows,
+    std::uint32_t cols,
+    std::uint32_t dtype) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t total = rows * cols;
+    if (i >= total) {
+        return;
+    }
+    const std::uint32_t col = i % cols;
+    const float x = stream1_transformer_load_scalar_device(matrix, i, dtype) +
+        stream1_transformer_load_scalar_device(bias, col, dtype);
+    stream1_transformer_store_scalar_device(matrix, i, fmaxf(x, 0.0f), dtype);
+}
+
 __global__ void stream1_transformer_bias_add_kernel(
     half* __restrict__ matrix,
     const half* __restrict__ bias,
@@ -1316,6 +1345,47 @@ void stream1_transformer_ff1_linear_bias_silu_dispatch(
         rows, input_cols, output_cols, 1.0f,
         scratch.fp8_workspace, scratch.fp8_workspace_bytes, stream);
     stream1_transformer_bias_silu_kernel<<<(rows * output_cols + 255U) / 256U, 256, 0, stream>>>(
+        output, block.ff1_bias, rows, output_cols, dtype);
+}
+
+void stream1_transformer_ff1_linear_bias_activation_dispatch(
+    const half* input,
+    const Stream1TransformerBlockView& block,
+    const Stream1TransformerScratchView& scratch,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    std::uint32_t dtype,
+    std::uint32_t activation,
+    cudaStream_t stream) {
+    if (activation == STREAM1_ACTIVATION_SILU) {
+        stream1_transformer_ff1_linear_bias_silu_dispatch(
+            input, block, scratch, output, rows, input_cols, output_cols, dtype, stream);
+        return;
+    }
+    if (activation != STREAM1_ACTIVATION_RELU) {
+        throw std::invalid_argument("native Stream1 transformer activation must be relu or silu");
+    }
+    const std::uint32_t count = rows * output_cols;
+    if (block.ff1_weight_fp8 == nullptr) {
+        stream1_transformer_linear_bias_cuda(
+            input, block.ff1_weight, block.ff1_bias, output,
+            rows, input_cols, output_cols, dtype, stream);
+        stream1_transformer_relu_kernel<<<(count + 255U) / 256U, 256, 0, stream>>>(
+            output, count, dtype);
+        return;
+    }
+    if (dtype != STREAM1_DTYPE_FP16 || scratch.fp8_quantized_input == nullptr ||
+        scratch.fp8_input_scales == nullptr || block.ff1_weight_scales == nullptr) {
+        throw std::runtime_error("SM120 FP8 FF1 profile is missing required fp16 scratch or scales");
+    }
+    stream1_transformer_sm120_fp8_linear_cuda(
+        input, scratch.fp8_quantized_input, scratch.fp8_input_scales,
+        block.ff1_weight_fp8, block.ff1_weight_scales, output,
+        rows, input_cols, output_cols, 1.0f,
+        scratch.fp8_workspace, scratch.fp8_workspace_bytes, stream);
+    stream1_transformer_bias_relu_kernel<<<(count + 255U) / 256U, 256, 0, stream>>>(
         output, block.ff1_bias, rows, output_cols, dtype);
 }
 constexpr std::uint32_t STREAM1_TRANSFORMER_SEQ51 = 51U;
@@ -3438,7 +3508,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.dtype,
         stream);
-    stream1_transformer_ff1_linear_bias_silu_dispatch(
+    stream1_transformer_ff1_linear_bias_activation_dispatch(
         scratch.attention_context,
         block,
         scratch,
@@ -3447,6 +3517,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.ff_dim,
         dims.dtype,
+        dims.activation,
         stream);
     stream1_transformer_linear_residual_cuda(
         scratch.ff_hidden,
@@ -3551,7 +3622,7 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.dtype,
             stream);
         stage_profiler.mark(layer_prefix + "ln2");
-        stream1_transformer_ff1_linear_bias_silu_dispatch(
+        stream1_transformer_ff1_linear_bias_activation_dispatch(
             scratch.attention_context,
             block,
             scratch,
@@ -3560,6 +3631,7 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.d_model,
             dims.ff_dim,
             dims.dtype,
+            dims.activation,
             stream);
         stage_profiler.mark(layer_prefix + "ff1");
         stream1_transformer_linear_residual_cuda(

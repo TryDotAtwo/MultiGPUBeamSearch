@@ -547,9 +547,19 @@ inline Stream1ModelConfig load_stream1_manifest(const std::filesystem::path& dir
         model.head_dim = parse_manifest_u32(text, "head_dim");
         model.transformer_layers = parse_manifest_u32_any(text, "transformer_layers", "num_layers");
         model.ff_dim = parse_manifest_u32(text, "ff_dim");
+        const std::string activation = parse_manifest_string(text, "activation");
+        if (activation == "relu") {
+            model.activation = STREAM1_ACTIVATION_RELU;
+        } else if (activation == "silu") {
+            model.activation = STREAM1_ACTIVATION_SILU;
+        } else if (activation == "gelu") {
+            model.activation = STREAM1_ACTIVATION_GELU;
+        } else {
+            throw std::runtime_error("unsupported stream1 transformer activation: " + activation);
+        }
         validate_transformer_model_config(
             model,
-            parse_manifest_string(text, "activation"),
+            activation,
             parse_manifest_string(text, "pooling"),
             parse_manifest_string(text, "piece_layout"),
             parse_manifest_string(text, "piece_embed_mode"),
@@ -1146,7 +1156,8 @@ inline Stream1TransformerDims transformer_dims(const Stream1ModelConfig& model) 
         model.transformer_layers,
         model.ff_dim,
         model.output_dim,
-        model.dtype};
+        model.dtype,
+        model.activation};
 }
 
 struct TransformerNetworkViewHolder {

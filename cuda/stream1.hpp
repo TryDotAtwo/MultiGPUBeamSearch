@@ -62,6 +62,7 @@ struct Stream1TransformerDims {
     std::uint32_t ff_dim;
     std::uint32_t output_dim;
     std::uint32_t dtype;
+    std::uint32_t activation = STREAM1_ACTIVATION_SILU;
 };
 
 struct Stream1TransformerBlockView {
