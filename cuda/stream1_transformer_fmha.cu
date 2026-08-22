@@ -93,6 +93,7 @@ void stream1_transformer_fmha_launch_policy(
 
 template <typename Element, typename ArchTag, int QueriesPerBlock, int KeysPerBlock>
 void stream1_transformer_fmha_cls_launch_typed(
+    half* cls_query,
     half* qkv,
     half* cls_context,
     Stream1TransformerDims dims,
@@ -108,7 +109,8 @@ void stream1_transformer_fmha_cls_launch_typed(
         false,
         false>;
     typename Attention::Params params{};
-    params.query_ptr = reinterpret_cast<Element*>(qkv);
+    const bool split_query = cls_query != nullptr;
+    params.query_ptr = reinterpret_cast<Element*>(split_query ? cls_query : qkv);
     params.key_ptr = reinterpret_cast<Element*>(qkv + dims.d_model);
     params.value_ptr = reinterpret_cast<Element*>(qkv + 2ULL * dims.d_model);
     params.output_ptr = reinterpret_cast<Element*>(cls_context);
@@ -125,10 +127,11 @@ void stream1_transformer_fmha_cls_launch_typed(
     params.q_strideH = static_cast<int32_t>(dims.head_dim);
     params.k_strideH = static_cast<int32_t>(dims.head_dim);
     params.v_strideH = static_cast<int32_t>(dims.head_dim);
-    params.q_strideM = static_cast<int32_t>((3U * dims.d_model));
+    params.q_strideM = static_cast<int32_t>(split_query ? dims.d_model : (3U * dims.d_model));
     params.k_strideM = static_cast<int32_t>((3U * dims.d_model));
     params.v_strideM = static_cast<int32_t>((3U * dims.d_model));
-    params.q_strideB = static_cast<int64_t>(dims.padded_seq_len * (3U * dims.d_model));
+    params.q_strideB = static_cast<int64_t>(
+        split_query ? dims.d_model : dims.padded_seq_len * (3U * dims.d_model));
     params.k_strideB = static_cast<int64_t>(dims.padded_seq_len * (3U * dims.d_model));
     params.v_strideB = static_cast<int64_t>(dims.padded_seq_len * (3U * dims.d_model));
     params.o_strideM = static_cast<int32_t>(dims.d_model);
@@ -234,26 +237,26 @@ void stream1_transformer_fmha_cls_attention_cuda(
         std::getenv("BEAM_STREAM1_TRANSFORMER_CLS_ATTENTION_POLICY"));
     if (cls_policy == Stream1TransformerClsAttentionPolicy::Q32K64) {
         if (sm75_fp16) {
-            stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm75, 32, 64>(qkv, cls_context, dims, b_micro, stream);
+            stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm75, 32, 64>(nullptr, qkv, cls_context, dims, b_micro, stream);
         } else if (dims.dtype == STREAM1_DTYPE_BF16) {
-            stream1_transformer_fmha_cls_launch_typed<cutlass::bfloat16_t, cutlass::arch::Sm80, 32, 64>(qkv, cls_context, dims, b_micro, stream);
+            stream1_transformer_fmha_cls_launch_typed<cutlass::bfloat16_t, cutlass::arch::Sm80, 32, 64>(nullptr, qkv, cls_context, dims, b_micro, stream);
         } else {
-            stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm80, 32, 64>(qkv, cls_context, dims, b_micro, stream);
+            stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm80, 32, 64>(nullptr, qkv, cls_context, dims, b_micro, stream);
         }
         return;
     }    if (sm75_fp16) {
         if (dims.dtype != STREAM1_DTYPE_FP16) {
             throw std::invalid_argument("Stream1 piece_transformer SM75 CUTLASS CLS FMHA requires fp16");
         }
-        stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm75, 64, 64>(qkv, cls_context, dims, b_micro, stream);
+        stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm75, 64, 64>(nullptr, qkv, cls_context, dims, b_micro, stream);
         return;
     }
     if (dims.dtype == STREAM1_DTYPE_BF16) {
-        stream1_transformer_fmha_cls_launch_typed<cutlass::bfloat16_t, cutlass::arch::Sm80, 64, 64>(qkv, cls_context, dims, b_micro, stream);
+        stream1_transformer_fmha_cls_launch_typed<cutlass::bfloat16_t, cutlass::arch::Sm80, 64, 64>(nullptr, qkv, cls_context, dims, b_micro, stream);
         return;
     }
     if (dims.dtype == STREAM1_DTYPE_FP16) {
-        stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm80, 64, 64>(qkv, cls_context, dims, b_micro, stream);
+        stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm80, 64, 64>(nullptr, qkv, cls_context, dims, b_micro, stream);
         return;
     }
     throw std::invalid_argument("Stream1 piece_transformer CUTLASS CLS FMHA dtype must be fp16 or bf16");
@@ -265,6 +268,51 @@ void stream1_transformer_fmha_cls_attention_cuda(
     (void)b_micro;
     (void)stream;
     throw std::invalid_argument("Stream1 piece_transformer CUTLASS CLS FMHA requires CUTLASS example 41 headers");
+#endif
+}
+
+void stream1_transformer_fmha_cls_attention_split_q_cuda(
+    half* cls_query,
+    half* qkv,
+    half* cls_context,
+    Stream1TransformerDims dims,
+    bool sm75_fp16,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    if (cls_query == nullptr || qkv == nullptr || cls_context == nullptr) {
+        throw std::invalid_argument("Stream1 split-Q CLS FMHA requires query, qkv, and context");
+    }
+#if BEAM_HAS_CUTLASS && BEAM_HAS_CUTLASS_FMHA
+    const auto cls_policy = parse_stream1_transformer_cls_attention_policy(
+        std::getenv("BEAM_STREAM1_TRANSFORMER_CLS_ATTENTION_POLICY"));
+    if (sm75_fp16 && dims.dtype != STREAM1_DTYPE_FP16) {
+        throw std::invalid_argument("Stream1 split-Q SM75 CLS FMHA requires fp16");
+    }
+    if (cls_policy == Stream1TransformerClsAttentionPolicy::Q32K64) {
+        if (sm75_fp16) {
+            stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm75, 32, 64>(cls_query, qkv, cls_context, dims, b_micro, stream);
+        } else if (dims.dtype == STREAM1_DTYPE_BF16) {
+            stream1_transformer_fmha_cls_launch_typed<cutlass::bfloat16_t, cutlass::arch::Sm80, 32, 64>(cls_query, qkv, cls_context, dims, b_micro, stream);
+        } else if (dims.dtype == STREAM1_DTYPE_FP16) {
+            stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm80, 32, 64>(cls_query, qkv, cls_context, dims, b_micro, stream);
+        } else {
+            throw std::invalid_argument("Stream1 split-Q CLS FMHA dtype must be fp16 or bf16");
+        }
+        return;
+    }
+    if (sm75_fp16) {
+        stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm75, 64, 64>(cls_query, qkv, cls_context, dims, b_micro, stream);
+    } else if (dims.dtype == STREAM1_DTYPE_BF16) {
+        stream1_transformer_fmha_cls_launch_typed<cutlass::bfloat16_t, cutlass::arch::Sm80, 64, 64>(cls_query, qkv, cls_context, dims, b_micro, stream);
+    } else if (dims.dtype == STREAM1_DTYPE_FP16) {
+        stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm80, 64, 64>(cls_query, qkv, cls_context, dims, b_micro, stream);
+    } else {
+        throw std::invalid_argument("Stream1 split-Q CLS FMHA dtype must be fp16 or bf16");
+    }
+#else
+    (void)cls_query; (void)qkv; (void)cls_context; (void)dims;
+    (void)sm75_fp16; (void)b_micro; (void)stream;
+    throw std::invalid_argument("Stream1 split-Q CLS FMHA requires CUTLASS example 41 headers");
 #endif
 }
 } // namespace beam
