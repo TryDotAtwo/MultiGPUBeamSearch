@@ -116,9 +116,13 @@ def test_graph_preserving_equalization_transforms() -> None:
     hidden_scales = torch.exp(torch.linspace(-0.5, 0.5, 16))
     baseline = torch.relu(x @ ff1_weight.T + ff1_bias) @ ff2_weight.T
     w1, b1, w2 = fold_ffn_equalization(
-        ff1_weight, ff1_bias, ff2_weight, hidden_scales
+        ff1_weight, ff1_bias, ff2_weight, hidden_scales, activation="relu"
     )
     torch.testing.assert_close(torch.relu(x @ w1.T + b1) @ w2.T, baseline, atol=2e-5, rtol=2e-5)
+    with pytest.raises(ValueError, match="only graph-preserving for ReLU"):
+        fold_ffn_equalization(
+            ff1_weight, ff1_bias, ff2_weight, hidden_scales, activation="silu"
+        )
 
     q = torch.randn(9, 8, generator=generator)
     k = torch.randn(9, 8, generator=generator)

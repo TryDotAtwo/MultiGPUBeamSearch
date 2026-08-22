@@ -174,7 +174,11 @@ def fold_ffn_equalization(
     ff1_bias: torch.Tensor,
     ff2_weight: torch.Tensor,
     scales: torch.Tensor,
+    *,
+    activation: str,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    if activation.lower() != "relu":
+        raise ValueError("FFN diagonal folding is only graph-preserving for ReLU")
     hidden = ff1_weight.shape[0] if ff1_weight.ndim == 2 else -1
     if hidden <= 0 or ff1_bias.shape != (hidden,) or ff2_weight.ndim != 2 or ff2_weight.shape[1] != hidden:
         raise ValueError("FF1-ReLU-FF2 fold shape mismatch")
