@@ -3,6 +3,7 @@
 #include "stream1_transformer_gemm_policy.hpp"
 #include "stream1_transformer_layernorm_policy.hpp"
 #include "stream1_transformer_shape.hpp"
+#include "stream1_transformer_sm120_fp8.hpp"
 
 #include "config.hpp"
 #include "cuda_check.hpp"
@@ -1251,6 +1252,71 @@ void stream1_transformer_bias_add_launch(
         rows,
         cols,
         dtype);
+}
+
+void stream1_transformer_linear_bias_cuda(
+    const half*, const half*, const half*, half*, std::uint32_t, std::uint32_t,
+    std::uint32_t, std::uint32_t, cudaStream_t);
+void stream1_transformer_ff1_linear_bias_silu_cuda(
+    const half*, const half*, const half*, half*, std::uint32_t, std::uint32_t,
+    std::uint32_t, std::uint32_t, cudaStream_t);
+
+void stream1_transformer_qkv_linear_bias_dispatch(
+    const half* input,
+    const Stream1TransformerBlockView& block,
+    const Stream1TransformerScratchView& scratch,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    if (block.attn_qkv_weight_fp8 == nullptr) {
+        stream1_transformer_linear_bias_cuda(
+            input, block.attn_qkv_weight, block.attn_qkv_bias, output,
+            rows, input_cols, output_cols, dtype, stream);
+        return;
+    }
+    if (dtype != STREAM1_DTYPE_FP16 || scratch.fp8_quantized_input == nullptr ||
+        scratch.fp8_input_scales == nullptr || block.attn_qkv_weight_scales == nullptr) {
+        throw std::runtime_error("SM120 FP8 QKV profile is missing required fp16 scratch or scales");
+    }
+    stream1_transformer_sm120_fp8_linear_cuda(
+        input, scratch.fp8_quantized_input, scratch.fp8_input_scales,
+        block.attn_qkv_weight_fp8, block.attn_qkv_weight_scales, output,
+        rows, input_cols, output_cols, 1.0f,
+        scratch.fp8_workspace, scratch.fp8_workspace_bytes, stream);
+    stream1_transformer_bias_add_launch(
+        output, block.attn_qkv_bias, rows, output_cols, dtype, stream);
+}
+
+void stream1_transformer_ff1_linear_bias_silu_dispatch(
+    const half* input,
+    const Stream1TransformerBlockView& block,
+    const Stream1TransformerScratchView& scratch,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    if (block.ff1_weight_fp8 == nullptr) {
+        stream1_transformer_ff1_linear_bias_silu_cuda(
+            input, block.ff1_weight, block.ff1_bias, output,
+            rows, input_cols, output_cols, dtype, stream);
+        return;
+    }
+    if (dtype != STREAM1_DTYPE_FP16 || scratch.fp8_quantized_input == nullptr ||
+        scratch.fp8_input_scales == nullptr || block.ff1_weight_scales == nullptr) {
+        throw std::runtime_error("SM120 FP8 FF1 profile is missing required fp16 scratch or scales");
+    }
+    stream1_transformer_sm120_fp8_linear_cuda(
+        input, scratch.fp8_quantized_input, scratch.fp8_input_scales,
+        block.ff1_weight_fp8, block.ff1_weight_scales, output,
+        rows, input_cols, output_cols, 1.0f,
+        scratch.fp8_workspace, scratch.fp8_workspace_bytes, stream);
+    stream1_transformer_bias_silu_kernel<<<(rows * output_cols + 255U) / 256U, 256, 0, stream>>>(
+        output, block.ff1_bias, rows, output_cols, dtype);
 }
 constexpr std::uint32_t STREAM1_TRANSFORMER_SEQ51 = 51U;
 constexpr std::uint32_t STREAM1_TRANSFORMER_DMODEL256 = 256U;
@@ -3301,10 +3367,10 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
             b_micro,
             stream);
     } else {
-        stream1_transformer_linear_bias_cuda(
+        stream1_transformer_qkv_linear_bias_dispatch(
             scratch.attention_context,
-            block.attn_qkv_weight,
-            block.attn_qkv_bias,
+            block,
+            scratch,
             scratch.qkv,
             token_rows,
             dims.d_model,
@@ -3372,10 +3438,10 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.dtype,
         stream);
-    stream1_transformer_ff1_linear_bias_silu_cuda(
+    stream1_transformer_ff1_linear_bias_silu_dispatch(
         scratch.attention_context,
-        block.ff1_weight,
-        block.ff1_bias,
+        block,
+        scratch,
         scratch.ff_hidden,
         b_micro,
         dims.d_model,
@@ -3444,10 +3510,10 @@ void stream1_transformer_generic_run_layers_cuda(
                 stream);
         }
         stage_profiler.mark(layer_prefix + "ln1");
-        stream1_transformer_linear_bias_cuda(
+        stream1_transformer_qkv_linear_bias_dispatch(
             scratch.attention_context,
-            block.attn_qkv_weight,
-            block.attn_qkv_bias,
+            block,
+            scratch,
             scratch.qkv,
             token_rows,
             dims.d_model,
@@ -3485,10 +3551,10 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.dtype,
             stream);
         stage_profiler.mark(layer_prefix + "ln2");
-        stream1_transformer_ff1_linear_bias_silu_cuda(
+        stream1_transformer_ff1_linear_bias_silu_dispatch(
             scratch.attention_context,
-            block.ff1_weight,
-            block.ff1_bias,
+            block,
+            scratch,
             scratch.ff_hidden,
             token_rows,
             dims.d_model,
