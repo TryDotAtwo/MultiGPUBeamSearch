@@ -282,7 +282,9 @@ def _global_overlap(baseline: np.ndarray, candidate: np.ndarray, keep: int) -> f
 
 
 def _metrics(baseline: np.ndarray, candidate: np.ndarray, elapsed: float) -> dict[str, float]:
-    metrics = ranking_metrics(-baseline, -candidate, top_k=8, threshold_band=0.25)
+    metrics = ranking_metrics(
+        -baseline, -candidate, top_k=min(8, baseline.shape[1]), threshold_band=0.25
+    )
     metrics["global_top_per_state_overlap"] = _global_overlap(baseline, candidate, baseline.shape[0])
     metrics["wall_seconds"] = elapsed
     return metrics
