@@ -5,13 +5,19 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import torch
 
 from tools.sm120_quant_tuner import (
     CORE_OPERATORS,
     QualityThresholds,
     build_profile,
+    fold_ffn_equalization,
+    fold_layernorm_linear_equalization,
+    fold_qk_reciprocal_equalization,
+    fold_v_output_equalization,
     pareto_select,
     ranking_metrics,
+    smoothquant_scales,
     validate_profile,
     write_immutable_profile,
 )
@@ -89,3 +95,49 @@ def test_immutable_writer_hashes_every_artifact(tmp_path: Path) -> None:
     assert set(manifest["files"]) == {"profile.json", "ranking_metrics.json"}
     with pytest.raises(FileExistsError):
         write_immutable_profile(output, profile, artifacts={})
+
+
+def test_graph_preserving_equalization_transforms() -> None:
+    generator = torch.Generator().manual_seed(7)
+    x = torch.randn(9, 8, generator=generator)
+    gamma = torch.randn(8, generator=generator)
+    beta = torch.randn(8, generator=generator)
+    weight = torch.randn(12, 8, generator=generator)
+    scales = torch.exp(torch.linspace(-0.7, 0.7, 8))
+    baseline = (x * gamma + beta) @ weight.T
+    gamma_q, beta_q, weight_q = fold_layernorm_linear_equalization(
+        gamma, beta, weight, scales
+    )
+    torch.testing.assert_close((x * gamma_q + beta_q) @ weight_q.T, baseline)
+
+    ff1_weight = torch.randn(16, 8, generator=generator)
+    ff1_bias = torch.randn(16, generator=generator)
+    ff2_weight = torch.randn(8, 16, generator=generator)
+    hidden_scales = torch.exp(torch.linspace(-0.5, 0.5, 16))
+    baseline = torch.relu(x @ ff1_weight.T + ff1_bias) @ ff2_weight.T
+    w1, b1, w2 = fold_ffn_equalization(
+        ff1_weight, ff1_bias, ff2_weight, hidden_scales
+    )
+    torch.testing.assert_close(torch.relu(x @ w1.T + b1) @ w2.T, baseline, atol=2e-5, rtol=2e-5)
+
+    q = torch.randn(9, 8, generator=generator)
+    k = torch.randn(9, 8, generator=generator)
+    q_scaled, k_scaled = fold_qk_reciprocal_equalization(q, k, scales)
+    torch.testing.assert_close(q_scaled @ k_scaled.T, q @ k.T, atol=2e-5, rtol=2e-5)
+
+    attention = torch.softmax(torch.randn(9, 9, generator=generator), dim=-1)
+    value = torch.randn(9, 8, generator=generator)
+    output_weight = torch.randn(8, 8, generator=generator)
+    baseline = (attention @ value) @ output_weight.T
+    value_q, output_q = fold_v_output_equalization(value, output_weight, scales)
+    torch.testing.assert_close((attention @ value_q) @ output_q.T, baseline, atol=2e-5, rtol=2e-5)
+
+
+def test_smoothquant_scales_are_positive_bounded_and_deterministic() -> None:
+    activation_amax = torch.tensor([1.0, 16.0, 0.0, 4.0])
+    weight_amax = torch.tensor([4.0, 1.0, 2.0, 0.0])
+    scales = smoothquant_scales(
+        activation_amax, weight_amax, alpha=0.5, minimum=0.25, maximum=4.0
+    )
+    torch.testing.assert_close(scales, torch.tensor([0.5, 4.0, 0.25, 2.0]))
+    assert torch.isfinite(scales).all() and torch.all(scales > 0)
