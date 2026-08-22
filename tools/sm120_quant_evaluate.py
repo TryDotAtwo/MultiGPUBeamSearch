@@ -19,7 +19,7 @@ from tools.sm120_quant_calibrate import (
     fake_sm120_activation_quant,
     fake_sm120_weight_quant,
 )
-from tools.sm120_quant_tuner import CORE_OPERATORS, ranking_metrics
+from tools.sm120_quant_tuner import CORE_OPERATORS, ranking_metrics, smoothquant_scales
 from tools.stream1_transformer_torch_benchmark import PieceTransformerTorch
 
 
@@ -110,6 +110,7 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
         self.quantized_weights: dict[str, torch.Tensor] = {}
         self.capture_statistics = False
         self.statistics: dict[str, list[dict[str, float | int]]] = {}
+        self.channel_amax: dict[str, torch.Tensor] = {}
         for block_index, block in enumerate(self.blocks):
             for suffix, key in (
                 ("attn.in_proj_weight", "qkv_weight"),
@@ -120,6 +121,39 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
                 name = f"blocks.{block_index}.{suffix}"
                 quantized, _ = fake_sm120_weight_quant(block[key].float())
                 self.quantized_weights[name] = quantized.to(dtype=self.dtype)
+
+    def refresh_quantized_weight(self, name: str, weight_hxk: torch.Tensor) -> None:
+        quantized, _ = fake_sm120_weight_quant(weight_hxk.float())
+        self.quantized_weights[name] = quantized.to(dtype=self.dtype)
+
+    def apply_layernorm_smoothquant(
+        self,
+        activation_amax: Mapping[str, torch.Tensor],
+        *,
+        alpha: float,
+    ) -> dict[str, list[float]]:
+        """Fold exact positive scales into LN affine and adjacent HxK weights."""
+        applied: dict[str, list[float]] = {}
+        for block_index, block in enumerate(self.blocks):
+            for suffix, weight_key, gamma_key, beta_key in (
+                ("attn.in_proj_weight", "qkv_weight", "ln1_gamma", "ln1_beta"),
+                ("ff.0.weight", "ff1_weight", "ln2_gamma", "ln2_beta"),
+            ):
+                name = f"blocks.{block_index}.{suffix}"
+                if name not in activation_amax:
+                    raise ValueError(f"missing activation amax for {name}")
+                weight = block[weight_key]
+                scales = smoothquant_scales(
+                    activation_amax[name].to(device=weight.device, dtype=torch.float32),
+                    weight.float().abs().amax(dim=1),
+                    alpha=alpha,
+                ).to(dtype=self.dtype)
+                block[gamma_key] = block[gamma_key] * scales
+                block[beta_key] = block[beta_key] * scales
+                block[weight_key] = weight / scales.unsqueeze(1)
+                self.refresh_quantized_weight(name, block[weight_key])
+                applied[name] = scales.float().cpu().tolist()
+        return applied
 
     def set_precision(self, policy: Mapping[str, str]) -> None:
         if set(policy) != set(CORE_OPERATORS):
@@ -137,6 +171,9 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
     ) -> torch.Tensor:
         if self.capture_statistics:
             self.statistics.setdefault(name, []).append(activation_block_statistics(x))
+            batch_amax = x.detach().float().reshape(-1, x.shape[-1]).abs().amax(dim=0)
+            previous = self.channel_amax.get(name)
+            self.channel_amax[name] = batch_amax if previous is None else torch.maximum(previous, batch_amax)
         if self.precision[name] == "sm120_block_fp8":
             x, _ = fake_sm120_activation_quant(x.float())
             x = x.to(dtype=self.dtype)
@@ -185,6 +222,8 @@ def _run_logits(
     outputs = []
     model.capture_statistics = capture_statistics
     model.statistics.clear()
+    if capture_statistics:
+        model.channel_amax.clear()
     torch.cuda.synchronize(model.device)
     started = time.perf_counter()
     with torch.inference_mode():
@@ -234,6 +273,11 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--max-states", type=int, default=4096)
     parser.add_argument("--split", choices=("all", "calibration", "holdout"), default="all")
+    parser.add_argument(
+        "--smoothquant-alpha-grid",
+        default="0.0,0.25,0.5,0.75,1.0",
+        help="comma-separated exact LN-to-QKV/FF1 equalization alpha candidates",
+    )
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     corpus = np.load(args.corpus)
@@ -253,6 +297,7 @@ def main() -> None:
     activation_stats = {
         name: _aggregate_statistics(rows) for name, rows in model.statistics.items()
     }
+    channel_amax = {name: values.detach().clone() for name, values in model.channel_amax.items()}
     np.save(args.output_dir / "baseline_logits.npy", baseline)
     (args.output_dir / "activation_statistics.json").write_text(
         json.dumps(activation_stats, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -286,6 +331,25 @@ def main() -> None:
         }
         observations.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
+    alphas = [float(value) for value in args.smoothquant_alpha_grid.split(",") if value.strip()]
+    equalization_artifacts: dict[str, Any] = {}
+    for alpha in alphas:
+        equalized = QuantObservedPieceTransformer(args.weight_dir, device)
+        scales = equalized.apply_layernorm_smoothquant(channel_amax, alpha=alpha)
+        equalized.set_precision({name: "sm120_block_fp8" for name in CORE_OPERATORS})
+        candidate, elapsed = _run_logits(
+            equalized, states, batch_size=args.batch_size, capture_statistics=False
+        )
+        name = f"smoothquant_alpha_{alpha:g}_all_core_fp8"
+        row = {
+            "name": name,
+            "smoothquant_alpha": alpha,
+            "folded_operators": sorted(scales),
+            **_metrics(baseline, candidate, elapsed),
+        }
+        observations.append(row)
+        equalization_artifacts[name] = scales
+        print(json.dumps(row, sort_keys=True), flush=True)
     payload = {
         "schema_version": 1,
         "states": int(states.shape[0]),
@@ -301,6 +365,9 @@ def main() -> None:
     }
     (args.output_dir / "ranking_metrics.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (args.output_dir / "equalization_scales.json").write_text(
+        json.dumps(equalization_artifacts, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     print(json.dumps({"output_dir": str(args.output_dir), "candidates": len(observations)}))
 
