@@ -66,6 +66,34 @@ def build_initial_mixed_precision_policies() -> list[tuple[str, dict[str, str]]]
     return policies
 
 
+def build_cumulative_rollback_policies(
+    single_rollback_rows: list[Mapping[str, Any]],
+) -> list[tuple[str, dict[str, str]]]:
+    """Build a deterministic quality-first path from all-FP8 to all-FP16."""
+    expected = {"rollback_" + name for name in CORE_OPERATORS}
+    if {str(row.get("name")) for row in single_rollback_rows} != expected:
+        raise ValueError("single rollback observations must cover all core operators")
+    ordered = sorted(
+        single_rollback_rows,
+        key=lambda row: (
+            float(row["top1_agreement"]),
+            float(row["threshold_band_agreement"]),
+            float(row["global_top_per_state_overlap"]),
+            float(row["topk_set_overlap"]),
+            str(row["name"]),
+        ),
+        reverse=True,
+    )
+    policy = {name: "sm120_block_fp8" for name in CORE_OPERATORS}
+    result: list[tuple[str, dict[str, str]]] = []
+    for count, row in enumerate(ordered, start=1):
+        operator = str(row["name"])[len("rollback_") :]
+        policy[operator] = "fp16"
+        if count >= 2:
+            result.append((f"cumulative_{count:02d}_{operator}", dict(policy)))
+    return result
+
+
 class QuantObservedPieceTransformer(PieceTransformerTorch):
     def __init__(self, weight_dir: Path, device: torch.device) -> None:
         super().__init__(weight_dir, device, projection_mode="matmul", qkv_contiguous=True)
@@ -231,6 +259,20 @@ def main() -> None:
             model, states, batch_size=args.batch_size, capture_statistics=False
         )
         row = {"name": name, **_metrics(baseline, candidate, elapsed)}
+        observations.append(row)
+        print(json.dumps(row, sort_keys=True), flush=True)
+    rollback_rows = [row for row in observations if str(row["name"]).startswith("rollback_")]
+    for name, policy in build_cumulative_rollback_policies(rollback_rows):
+        model.set_precision(policy)
+        candidate, elapsed = _run_logits(
+            model, states, batch_size=args.batch_size, capture_statistics=False
+        )
+        row = {
+            "name": name,
+            "fp16_operators": sum(value == "fp16" for value in policy.values()),
+            "operator_precision": policy,
+            **_metrics(baseline, candidate, elapsed),
+        }
         observations.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
     payload = {

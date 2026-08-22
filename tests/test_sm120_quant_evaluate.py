@@ -4,6 +4,7 @@ import numpy as np
 
 from tools.sm120_quant_evaluate import (
     build_initial_mixed_precision_policies,
+    build_cumulative_rollback_policies,
     select_stratified_states,
 )
 from tools.sm120_quant_tuner import CORE_OPERATORS
@@ -33,3 +34,20 @@ def test_initial_mixed_precision_policies_include_fp8_and_each_single_rollback()
         assert name.startswith("rollback_")
         assert list(policy.values()).count("fp16") == 1
         assert list(policy.values()).count("sm120_block_fp8") == len(CORE_OPERATORS) - 1
+
+
+def test_cumulative_rollbacks_prioritize_quality_and_end_at_fp16() -> None:
+    rows = []
+    for index, operator in enumerate(CORE_OPERATORS):
+        rows.append({
+            "name": "rollback_" + operator,
+            "top1_agreement": 0.9 + index * 0.001,
+            "threshold_band_agreement": 0.8,
+            "global_top_per_state_overlap": 0.7,
+            "topk_set_overlap": 0.6,
+        })
+    policies = build_cumulative_rollback_policies(rows)
+    assert policies[0][0].startswith("cumulative_02_")
+    assert list(policies[0][1].values()).count("fp16") == 2
+    assert list(policies[-1][1].values()).count("fp16") == len(CORE_OPERATORS)
+    assert policies[-1][1][CORE_OPERATORS[-1]] == "fp16"
