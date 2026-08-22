@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
+import torch
 
 
 SCHEMA_VERSION = 1
@@ -117,6 +118,90 @@ def frontier_jaccard(baseline_ids: Sequence[int], candidate_ids: Sequence[int]) 
     candidate = set(int(value) for value in candidate_ids)
     union = baseline | candidate
     return len(baseline & candidate) / len(union) if union else 1.0
+
+
+def _positive_scales(scales: torch.Tensor, expected: int) -> torch.Tensor:
+    scales = torch.as_tensor(scales)
+    if scales.ndim != 1 or scales.numel() != expected:
+        raise ValueError(f"equalization scales must contain exactly {expected} values")
+    if not torch.isfinite(scales).all() or torch.any(scales <= 0):
+        raise ValueError("equalization scales must be finite and positive")
+    return scales
+
+
+def smoothquant_scales(
+    activation_amax: torch.Tensor,
+    weight_amax: torch.Tensor,
+    *,
+    alpha: float,
+    minimum: float = 1.0 / 16.0,
+    maximum: float = 16.0,
+) -> torch.Tensor:
+    """Compute bounded positive channel equalization scales.
+
+    Zero activation channels collapse to the lower bound.  A missing/zero
+    weight range is neutralized to one rather than producing infinity.
+    """
+    activation_amax = torch.as_tensor(activation_amax)
+    weight_amax = torch.as_tensor(weight_amax, device=activation_amax.device)
+    if activation_amax.shape != weight_amax.shape or activation_amax.ndim != 1:
+        raise ValueError("activation and weight amax must be equal 1D shapes")
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError("SmoothQuant alpha must be within [0, 1]")
+    if minimum <= 0 or maximum < minimum:
+        raise ValueError("invalid SmoothQuant scale bounds")
+    if torch.any(activation_amax < 0) or torch.any(weight_amax < 0):
+        raise ValueError("amax statistics must be non-negative")
+    safe_weight = torch.where(weight_amax > 0, weight_amax, torch.ones_like(weight_amax))
+    raw = torch.pow(activation_amax, alpha) / torch.pow(safe_weight, 1.0 - alpha)
+    return torch.nan_to_num(raw, nan=minimum, posinf=maximum, neginf=minimum).clamp(minimum, maximum)
+
+
+def fold_layernorm_linear_equalization(
+    gamma: torch.Tensor,
+    beta: torch.Tensor,
+    weight: torch.Tensor,
+    scales: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    if gamma.ndim != 1 or beta.shape != gamma.shape or weight.ndim != 2 or weight.shape[1] != gamma.numel():
+        raise ValueError("LayerNorm-to-linear fold shape mismatch")
+    scales = _positive_scales(scales.to(device=gamma.device, dtype=gamma.dtype), gamma.numel())
+    return gamma * scales, beta * scales, weight / scales.to(weight.dtype).unsqueeze(0)
+
+
+def fold_ffn_equalization(
+    ff1_weight: torch.Tensor,
+    ff1_bias: torch.Tensor,
+    ff2_weight: torch.Tensor,
+    scales: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    hidden = ff1_weight.shape[0] if ff1_weight.ndim == 2 else -1
+    if hidden <= 0 or ff1_bias.shape != (hidden,) or ff2_weight.ndim != 2 or ff2_weight.shape[1] != hidden:
+        raise ValueError("FF1-ReLU-FF2 fold shape mismatch")
+    scales = _positive_scales(scales.to(device=ff1_weight.device, dtype=ff1_weight.dtype), hidden)
+    return (
+        ff1_weight * scales.unsqueeze(1),
+        ff1_bias * scales,
+        ff2_weight / scales.to(ff2_weight.dtype).unsqueeze(0),
+    )
+
+
+def fold_qk_reciprocal_equalization(
+    query: torch.Tensor, key: torch.Tensor, scales: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if query.shape != key.shape or query.ndim < 2:
+        raise ValueError("Q/K equalization requires matching tensors")
+    scales = _positive_scales(scales.to(device=query.device, dtype=query.dtype), query.shape[-1])
+    return query * scales, key / scales.to(key.dtype)
+
+
+def fold_v_output_equalization(
+    value: torch.Tensor, output_weight: torch.Tensor, scales: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if value.ndim < 2 or output_weight.ndim != 2 or output_weight.shape[1] != value.shape[-1]:
+        raise ValueError("V-to-output equalization shape mismatch")
+    scales = _positive_scales(scales.to(device=value.device, dtype=value.dtype), value.shape[-1])
+    return value * scales, output_weight / scales.to(output_weight.dtype).unsqueeze(0)
 
 
 def _operator_contract(precision: str) -> dict[str, Any]:
