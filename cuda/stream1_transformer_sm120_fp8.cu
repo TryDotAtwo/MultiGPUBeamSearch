@@ -21,6 +21,7 @@
 #include <cutlass/gemm/kernel/gemm_universal.hpp>
 #include <cutlass/numeric_conversion.h>
 #include <cutlass/numeric_types.h>
+#include <cutlass/util/packed_stride.hpp>
 #endif
 
 namespace {
