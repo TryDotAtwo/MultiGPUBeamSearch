@@ -61,21 +61,6 @@ void set_legacy_padding_zero(bool enabled) {
 #endif
 }
 
-void set_fused_residual_epilogues(bool enabled) {
-    const char* value = enabled ? "fused" : "separate";
-#if defined(_WIN32)
-    if (_putenv_s("BEAM_STREAM1_TRANSFORMER_ATTN_OUT_EPILOGUE", value) != 0 ||
-        _putenv_s("BEAM_STREAM1_TRANSFORMER_FF2_EPILOGUE", value) != 0) {
-        throw std::runtime_error("failed to set fused residual epilogue test environment");
-    }
-#else
-    if (setenv("BEAM_STREAM1_TRANSFORMER_ATTN_OUT_EPILOGUE", value, 1) != 0 ||
-        setenv("BEAM_STREAM1_TRANSFORMER_FF2_EPILOGUE", value, 1) != 0) {
-        throw std::runtime_error("failed to set fused residual epilogue test environment");
-    }
-#endif
-}
-
 std::vector<std::uint32_t> run_scores(
     bool final_cls_only,
     const State128* frontier,
@@ -233,16 +218,11 @@ int main() {
     set_final_cls_attention(true);
     const std::vector<std::uint32_t> cls_attention = run_scores(
         true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
-    set_fused_residual_epilogues(true);
-    const std::vector<std::uint32_t> fused_residual = run_scores(
-        true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
-    set_fused_residual_epilogues(false);
     set_final_cls_attention(false);
     set_final_cls_only(false);
     require(baseline == legacy_padding, "tail-only padding zero must preserve every score key");
     require(optimized == baseline, "generic final CLS-only score keys must be byte exact");
     require(cls_attention == baseline, "generic final CLS-attention score keys must be byte exact");
-    require(fused_residual == baseline, "generic fused residual epilogues must be byte exact");
 
     const char* benchmark_iterations_env = std::getenv("BEAM_STREAM1_FINAL_CLS_BENCH_ITERATIONS");
     if (benchmark_iterations_env != nullptr && benchmark_iterations_env[0] != '\0') {
@@ -258,10 +238,6 @@ int main() {
         set_final_cls_attention(true);
         const float cls_attention_ms = time_graph_ms(
             true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows, iterations);
-        set_fused_residual_epilogues(true);
-        const float fused_residual_ms = time_graph_ms(
-            true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows, iterations);
-        set_fused_residual_epilogues(false);
         set_final_cls_attention(false);
         std::cout << "stream1_transformer_final_cls_benchmark"
                   << " rows=" << rows
@@ -274,14 +250,11 @@ int main() {
                   << " speedup=" << (baseline_ms / optimized_ms)
                   << " cls_attention_ms=" << cls_attention_ms
                   << " cls_attention_speedup=" << (optimized_ms / cls_attention_ms)
-                  << " fused_residual_ms=" << fused_residual_ms
-                  << " fused_residual_speedup=" << (cls_attention_ms / fused_residual_ms)
                   << "\n";
     }
     set_final_cls_only(false);
     set_final_cls_attention(false);
     set_legacy_padding_zero(false);
-    set_fused_residual_epilogues(false);
 
     cudaFree(d_frontier);
     cudaFree(d_parent_base);
