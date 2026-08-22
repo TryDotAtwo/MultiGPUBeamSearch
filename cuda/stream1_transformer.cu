@@ -1695,10 +1695,8 @@ void stream1_transformer_residual_bias_round_layernorm_cuda(
     const char* gemm_env = is_ff2
         ? "BEAM_STREAM1_TRANSFORMER_FF2_POLICY"
         : "BEAM_STREAM1_TRANSFORMER_ATTN_OUT_POLICY";
-    const Stream1TransformerGemmPolicy gemm_policy = stream1_transformer_current_device_sm80_or_newer()
-        ? select_stream1_transformer_gemm_policy(
-            family, std::getenv(gemm_env), stream1_transformer_current_device_sm())
-        : parse_stream1_transformer_gemm_policy(family, std::getenv(gemm_env));
+    const Stream1TransformerGemmPolicy gemm_policy =
+        parse_stream1_transformer_gemm_policy(family, std::getenv(gemm_env));
     if (gemm_policy != Stream1TransformerGemmPolicy::M128N128) {
         throw std::invalid_argument("fused residual+bias-round epilogue is compiled only for m128n128");
     }
