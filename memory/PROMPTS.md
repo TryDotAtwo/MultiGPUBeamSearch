@@ -613,3 +613,6 @@ User reported that an interactive game had been running during part of the recen
 - The user requires weights to be encoded before runtime; runtime/startup quantization is not allowed.
 - Compare original FP32 weights, the current FP16 export, and the future calibrated mixed scheme (not a naïve FP8-only substitution).
 - All CUDA compilation and GPU validation for this work must run on Molab.
+- Treat original FP32 checkpoint weights as the truth baseline, compare the
+  current FP16 path separately, and compare the proposed calibrated/block-scaled
+  scheme against both. Do not label the proposed scheme as merely "FP8".

@@ -54,6 +54,22 @@ def test_profile_validation_is_fail_closed() -> None:
         validate_profile(broken)
 
 
+def test_block_int8_profile_records_offline_encoding_contract() -> None:
+    profile = build_profile(
+        checkpoint_sha256="a" * 64,
+        model_metadata_sha256="b" * 64,
+        calibration_sha256="c" * 64,
+        gpu_identity="RTX PRO 6000 Blackwell|sm120",
+        cutlass_commit="d" * 40,
+        operator_precision={name: "sm120_block_int8" for name in CORE_OPERATORS},
+    )
+    contract = profile["operators"][CORE_OPERATORS[0]]
+    assert contract["weight_dtype"] == "int8"
+    assert contract["activation_dtype"] == "int8"
+    assert contract["accumulator_dtype"] == "int32"
+    assert contract["fallback_precision"] == "fp16"
+
+
 def test_pareto_selection_applies_quality_as_hard_gate() -> None:
     thresholds = QualityThresholds(
         top1_agreement=0.999,

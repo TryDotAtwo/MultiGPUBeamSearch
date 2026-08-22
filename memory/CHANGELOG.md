@@ -1085,3 +1085,17 @@
 - Added a reconstructed-state frontier gate and public Cube4 generator/CSV schema compatibility.
 - Molab rejected naïve and MSE-scaled one-pass E4M3 on real frontier quality. Two-component E4M3 improved ranking but remained below the 0.999 gate.
 - The prior Cube4 calibration corpus and 80.2952 s baseline are now marked historical because native CUDA had used SiLU. A correct ReLU `2**25` corpus run reached at least depth 5 before the Molab sandbox expired (HTTP 410).
+
+## 2026-08-22 — Explicit FP32/FP16/candidate comparison and block-INT8 exploration
+
+- Made every candidate report expose both `vs_fp32` and `vs_fp16` ranking/logit
+  metrics while retaining FP32-relative flat fields for Pareto compatibility.
+- Added deterministic symmetric block-INT8 fake-quantization for activation
+  K128 rows and offline K128/N128 weights, plus exploratory all-core and
+  single-operator policies.
+- The INT8 candidate records INT8 operands with INT32 accumulation and an FP16
+  fail-closed fallback. It is not runtime-promotable yet: immutable native
+  packaging remains unavailable until Molab quality, frontier, and native
+  kernel gates pass.
+- Added targeted contract tests, intentionally left unexecuted locally because
+  this task's GPU and validation evidence must come strictly from Molab.

@@ -17,6 +17,8 @@ import torch.nn.functional as F
 from tools.sm120_quant_calibrate import (
     activation_block_statistics,
     fake_sm120_activation_quant,
+    fake_sm120_int8_activation_quant,
+    fake_sm120_int8_weight_quant,
     fake_sm120_weight_quant,
 )
 from tools.sm120_quant_tuner import CORE_OPERATORS, ranking_metrics, smoothquant_scales
@@ -78,6 +80,16 @@ def build_initial_mixed_precision_policies() -> list[tuple[str, dict[str, str]]]
     return policies
 
 
+def build_initial_int8_policies() -> list[tuple[str, dict[str, str]]]:
+    all_int8 = {name: "sm120_block_int8" for name in CORE_OPERATORS}
+    policies: list[tuple[str, dict[str, str]]] = [("all_core_int8", all_int8)]
+    for name in CORE_OPERATORS:
+        only = {other: "fp16" for other in CORE_OPERATORS}
+        only[name] = "sm120_block_int8"
+        policies.append(("only_int8_" + name, only))
+    return policies
+
+
 def _quality_order(rows: list[Mapping[str, Any]], prefix: str) -> list[Mapping[str, Any]]:
     return sorted(
         rows,
@@ -131,6 +143,7 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
         super().__init__(weight_dir, device, projection_mode="matmul", qkv_contiguous=True)
         self.precision = {name: "fp16" for name in CORE_OPERATORS}
         self.quantized_weights: dict[str, torch.Tensor] = {}
+        self.quantized_int8_weights: dict[str, torch.Tensor] = {}
         self.capture_statistics = False
         self.statistics: dict[str, list[dict[str, float | int]]] = {}
         self.channel_amax: dict[str, torch.Tensor] = {}
@@ -144,10 +157,14 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
                 name = f"blocks.{block_index}.{suffix}"
                 quantized, _ = fake_sm120_weight_quant(block[key].float())
                 self.quantized_weights[name] = quantized.to(dtype=self.dtype)
+                quantized_int8, _ = fake_sm120_int8_weight_quant(block[key].float())
+                self.quantized_int8_weights[name] = quantized_int8.to(dtype=self.dtype)
 
     def refresh_quantized_weight(self, name: str, weight_hxk: torch.Tensor) -> None:
         quantized, _ = fake_sm120_weight_quant(weight_hxk.float())
         self.quantized_weights[name] = quantized.to(dtype=self.dtype)
+        quantized_int8, _ = fake_sm120_int8_weight_quant(weight_hxk.float())
+        self.quantized_int8_weights[name] = quantized_int8.to(dtype=self.dtype)
 
     def apply_layernorm_smoothquant(
         self,
@@ -181,7 +198,7 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
     def set_precision(self, policy: Mapping[str, str]) -> None:
         if set(policy) != set(CORE_OPERATORS):
             raise ValueError("precision policy must contain all 16 core operators")
-        if any(value not in ("fp16", "sm120_block_fp8") for value in policy.values()):
+        if any(value not in ("fp16", "sm120_block_fp8", "sm120_block_int8") for value in policy.values()):
             raise ValueError("unknown precision policy value")
         self.precision = dict(policy)
 
@@ -201,6 +218,10 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
             x, _ = fake_sm120_activation_quant(x.float())
             x = x.to(dtype=self.dtype)
             weight_hxk = self.quantized_weights[name]
+        elif self.precision[name] == "sm120_block_int8":
+            x, _ = fake_sm120_int8_activation_quant(x.float())
+            x = x.to(dtype=self.dtype)
+            weight_hxk = self.quantized_int8_weights[name]
         return x.matmul(weight_hxk) + bias
 
     def forward(self, states: torch.Tensor) -> torch.Tensor:
@@ -294,8 +315,12 @@ def _three_way_metrics(
     fp32: np.ndarray, fp16: np.ndarray, candidate: np.ndarray, elapsed: float
 ) -> dict[str, Any]:
     """Keep FP32 as truth while isolating incremental mixed-vs-FP16 loss."""
+    versus_fp32 = _metrics(fp32, candidate, elapsed)
     return {
-        **_metrics(fp32, candidate, elapsed),
+        # Keep the flat FP32-relative fields for the Pareto selector and old
+        # reports, but make both comparison axes explicit for human review.
+        **versus_fp32,
+        "vs_fp32": versus_fp32,
         "vs_fp16": _metrics(fp16, candidate, elapsed),
     }
 
@@ -356,6 +381,14 @@ def main() -> None:
     }]
     policies = build_initial_mixed_precision_policies()
     for name, policy in policies:
+        model.set_precision(policy)
+        candidate, elapsed = _run_logits(
+            model, states, batch_size=args.batch_size, capture_statistics=False
+        )
+        row = {"name": name, **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed)}
+        observations.append(row)
+        print(json.dumps(row, sort_keys=True), flush=True)
+    for name, policy in build_initial_int8_policies():
         model.set_precision(policy)
         candidate, elapsed = _run_logits(
             model, states, batch_size=args.batch_size, capture_statistics=False

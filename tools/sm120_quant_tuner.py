@@ -29,7 +29,7 @@ CORE_OPERATORS = tuple(
         "ff.3.weight",
     )
 )
-PRECISIONS = frozenset(("fp16", "sm120_block_fp8"))
+PRECISIONS = frozenset(("fp16", "sm120_block_fp8", "sm120_block_int8"))
 
 
 @dataclass(frozen=True)
@@ -222,10 +222,11 @@ def _operator_contract(precision: str) -> dict[str, Any]:
             "fallback_precision": "fp16",
             "folded_transforms": [],
         }
+    low_dtype = "e4m3" if precision == "sm120_block_fp8" else "int8"
     return {
-        "weight_dtype": "e4m3",
-        "activation_dtype": "e4m3",
-        "accumulator_dtype": "fp32",
+        "weight_dtype": low_dtype,
+        "activation_dtype": low_dtype,
+        "accumulator_dtype": "fp32" if low_dtype == "e4m3" else "int32",
         "output_dtype": "fp16",
         "scale_dtype": "fp32",
         "scale_granularity": {"m": 1, "n": 128, "k": 128},
@@ -286,9 +287,9 @@ def validate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError(f"operator {name} contract must be an object")
         activation = contract.get("activation_dtype")
         weight = contract.get("weight_dtype")
-        if activation not in ("fp16", "e4m3"):
+        if activation not in ("fp16", "e4m3", "int8"):
             raise ValueError(f"unsupported activation dtype for {name}: {activation}")
-        if weight not in ("fp16", "e4m3"):
+        if weight not in ("fp16", "e4m3", "int8"):
             raise ValueError(f"unsupported weight dtype for {name}: {weight}")
         if activation != weight:
             raise ValueError(f"mixed operand dtypes are not supported for {name}")

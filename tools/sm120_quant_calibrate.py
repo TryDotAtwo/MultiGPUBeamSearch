@@ -17,6 +17,7 @@ import torch
 
 HISTORY_ENTRY = struct.Struct("<QII")
 FP8_MAX = 448.0
+INT8_MAX = 127.0
 BLOCK = 128
 
 
@@ -120,6 +121,33 @@ def fake_sm120_weight_quant(weight_hxk: torch.Tensor) -> tuple[torch.Tensor, tor
     scale = torch.where(amax > 0, amax / FP8_MAX, torch.ones_like(amax))
     quantized = _fp8_qdq(grouped, scale).reshape_as(weight_hxk)
     return quantized, scale[:, 0, :, 0]
+
+
+def fake_sm120_int8_activation_quant(tensor: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Symmetric per-row/per-K128 INT8 QDQ with deterministic ties-to-even."""
+    if tensor.shape[-1] % BLOCK:
+        raise ValueError("SM120 INT8 activation K dimension must be divisible by 128")
+    shape = tensor.shape
+    flat = tensor.float().reshape(-1, shape[-1])
+    grouped = flat.reshape(flat.shape[0], flat.shape[1] // BLOCK, BLOCK)
+    amax = grouped.abs().amax(dim=-1, keepdim=True)
+    scale = torch.where(amax > 0, amax / INT8_MAX, torch.ones_like(amax))
+    quantized = torch.round(grouped / scale).clamp(-INT8_MAX, INT8_MAX) * scale
+    return quantized.reshape(shape).to(tensor.dtype), scale.squeeze(-1)
+
+
+def fake_sm120_int8_weight_quant(weight_hxk: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Symmetric per-K128/N128 offline INT8 QDQ."""
+    if weight_hxk.ndim != 2 or weight_hxk.shape[0] % BLOCK or weight_hxk.shape[1] % BLOCK:
+        raise ValueError("SM120 INT8 weight H/O dimensions must be divisible by 128")
+    grouped = weight_hxk.float().reshape(
+        weight_hxk.shape[0] // BLOCK, BLOCK,
+        weight_hxk.shape[1] // BLOCK, BLOCK,
+    )
+    amax = grouped.abs().amax(dim=(1, 3), keepdim=True)
+    scale = torch.where(amax > 0, amax / INT8_MAX, torch.ones_like(amax))
+    quantized = torch.round(grouped / scale).clamp(-INT8_MAX, INT8_MAX) * scale
+    return quantized.reshape_as(weight_hxk).to(weight_hxk.dtype), scale[:, 0, :, 0]
 
 
 def activation_block_statistics(tensor: torch.Tensor) -> dict[str, float | int]:

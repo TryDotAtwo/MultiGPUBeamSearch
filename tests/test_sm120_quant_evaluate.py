@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from tools.sm120_quant_evaluate import (
+    build_initial_int8_policies,
     build_initial_mixed_precision_policies,
     build_cumulative_rollback_policies,
     build_incremental_fp8_policies,
@@ -49,6 +50,17 @@ def test_initial_mixed_precision_policies_include_fp8_and_each_single_rollback()
         assert list(policy.values()).count("sm120_block_fp8") == 1
 
 
+def test_initial_int8_policies_cover_all_core_and_each_single_operator() -> None:
+    policies = build_initial_int8_policies()
+    assert policies[0][0] == "all_core_int8"
+    assert all(value == "sm120_block_int8" for value in policies[0][1].values())
+    assert len(policies) == 1 + len(CORE_OPERATORS)
+    for name, policy in policies[1:]:
+        assert name.startswith("only_int8_")
+        assert list(policy.values()).count("sm120_block_int8") == 1
+        assert list(policy.values()).count("fp16") == len(CORE_OPERATORS) - 1
+
+
 def test_cumulative_rollbacks_prioritize_quality_and_end_at_fp16() -> None:
     rows = []
     for index, operator in enumerate(CORE_OPERATORS):
@@ -85,5 +97,7 @@ def test_three_way_metrics_use_fp32_as_truth_and_report_incremental_fp16_loss() 
     mixed = fp16 + np.array([[0.0, 0.02, 0.0], [0.0, -0.02, 0.0]])
     metrics = _three_way_metrics(fp32, fp16, mixed, 0.5)
     assert metrics["logit_rmse"] > metrics["vs_fp16"]["logit_rmse"]
+    assert metrics["vs_fp32"]["logit_rmse"] == metrics["logit_rmse"]
+    assert metrics["vs_fp32"]["top1_agreement"] == metrics["top1_agreement"]
     assert metrics["wall_seconds"] == 0.5
     assert metrics["vs_fp16"]["wall_seconds"] == 0.5
