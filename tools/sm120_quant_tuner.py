@@ -85,7 +85,9 @@ def ranking_metrics(
                     inversions += int(cand_sign != base_sign)
         inversion_rates.append(inversions / pairs if pairs else 0.0)
 
-        base_cutoff = baseline[row, baseline_order[row, min(top_k, outputs) - 1]]
+        # Per-state sensitivity is measured around the best move.  The global
+        # beam cutoff is evaluated separately from candidate/frontier records.
+        base_cutoff = baseline[row, baseline_order[row, 0]]
         near = np.flatnonzero(np.abs(baseline[row] - base_cutoff) <= threshold_band)
         agree = 0
         comparisons = 0
