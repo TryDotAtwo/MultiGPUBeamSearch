@@ -168,6 +168,7 @@ std::uint64_t estimate_non_static_device_bytes(
     const std::uint32_t scratch_b_micro = estimate_stream1_scratch_b_micro(config, stream1_model);
     return estimate_read_only_table_bytes() +
            estimate_stream1_weight_bytes(stream1_model) +
+           stream1_weights::stream1_sm120_fp8_extra_weight_bytes(stream1_model) +
            stream1_weights::stream1_scratch_bytes(
                stream1_model,
                scratch_b_micro,

@@ -77,6 +77,10 @@ struct Stream1TransformerBlockView {
     const half* ff1_bias;
     const half* ff2_weight;
     const half* ff2_bias;
+    const std::uint8_t* attn_qkv_weight_fp8 = nullptr;
+    const float* attn_qkv_weight_scales = nullptr;
+    const std::uint8_t* ff1_weight_fp8 = nullptr;
+    const float* ff1_weight_scales = nullptr;
 };
 
 struct Stream1TransformerNetworkView {
@@ -103,6 +107,10 @@ struct Stream1TransformerScratchView {
     half* attention_context;
     half* ff_hidden;
     half* logits;
+    std::uint8_t* fp8_quantized_input = nullptr;
+    float* fp8_input_scales = nullptr;
+    void* fp8_workspace = nullptr;
+    std::size_t fp8_workspace_bytes = 0U;
 };
 
 void stream1_score_contract_cuda(

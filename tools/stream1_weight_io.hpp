@@ -2,10 +2,12 @@
 
 #include "../src/config.hpp"
 #include "../cuda/stream1_transformer_shape.hpp"
+#include "../cuda/stream1_transformer_sm120_fp8_policy.hpp"
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 #include "cuda_check.hpp"
 #include "../cuda/stream1.hpp"
+#include "../cuda/stream1_transformer_sm120_fp8.hpp"
 
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
@@ -125,6 +127,10 @@ struct DeviceTransformerBlockWeights {
     half* ff1_bias = nullptr;
     half* ff2_weight = nullptr;
     half* ff2_bias = nullptr;
+    std::uint8_t* attn_qkv_weight_fp8 = nullptr;
+    float* attn_qkv_weight_scales = nullptr;
+    std::uint8_t* ff1_weight_fp8 = nullptr;
+    float* ff1_weight_scales = nullptr;
 };
 
 struct DeviceTransformerWeights {
@@ -184,6 +190,10 @@ struct ScratchAllocation {
     half* transformer_attention_context = nullptr;
     half* transformer_ff_hidden = nullptr;
     half* transformer_logits = nullptr;
+    std::uint8_t* transformer_fp8_quantized_input = nullptr;
+    float* transformer_fp8_input_scales = nullptr;
+    void* transformer_fp8_workspace = nullptr;
+    std::size_t transformer_fp8_workspace_bytes = 0U;
 };
 #endif
 
@@ -625,9 +635,12 @@ struct TransformerScratchBytePlan {
     std::uint64_t context_bytes = 0;
     std::uint64_t ff_hidden_bytes = 0;
     std::uint64_t logits_bytes = 0;
+    std::uint64_t fp8_quantized_input_bytes = 0;
+    std::uint64_t fp8_input_scale_bytes = 0;
 
     std::uint64_t total_bytes() const {
-        return token_bytes + qkv_bytes + attention_bytes + context_bytes + ff_hidden_bytes + logits_bytes;
+        return token_bytes + qkv_bytes + attention_bytes + context_bytes + ff_hidden_bytes + logits_bytes +
+            fp8_quantized_input_bytes + fp8_input_scale_bytes;
     }
 };
 
@@ -644,6 +657,15 @@ inline TransformerScratchBytePlan transformer_scratch_byte_plan(const Stream1Mod
     plan.context_bytes = fp16_bytes(rows * sequence.padded_seq_len * model.d_model);
     plan.ff_hidden_bytes = fp16_bytes(rows * sequence.padded_seq_len * model.ff_dim);
     plan.logits_bytes = fp16_bytes(rows * model.output_dim);
+    const std::uint32_t fp8_mask = parse_stream1_sm120_fp8_operator_policy(
+        std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS"));
+    if (fp8_mask != 0U) {
+        if (model.dtype != STREAM1_DTYPE_FP16 || model.d_model % 128U != 0U) {
+            throw std::invalid_argument("SM120 FP8 operators require fp16 and d_model divisible by 128");
+        }
+        plan.fp8_quantized_input_bytes = rows * sequence.padded_seq_len * model.d_model;
+        plan.fp8_input_scale_bytes = rows * sequence.padded_seq_len * (model.d_model / 128U) * sizeof(float);
+    }
     return plan;
 }
 
@@ -666,8 +688,29 @@ inline std::uint64_t stream1_scratch_bytes(
     }
 }
 
+inline std::uint64_t stream1_sm120_fp8_extra_weight_bytes(const Stream1ModelConfig& model) {
+    std::uint64_t bytes = 0U;
+    if (model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
+        const std::uint32_t mask = parse_stream1_sm120_fp8_operator_policy(
+            std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS"));
+        for (std::uint32_t layer = 0; layer < model.transformer_layers; ++layer) {
+            if ((mask & stream1_sm120_fp8_qkv_bit(layer)) != 0U) {
+                bytes += static_cast<std::uint64_t>(model.d_model) * 3U * model.d_model;
+                bytes += static_cast<std::uint64_t>(model.d_model / 128U) *
+                    (3U * model.d_model / 128U) * sizeof(float);
+            }
+            if ((mask & stream1_sm120_fp8_ff1_bit(layer)) != 0U) {
+                bytes += static_cast<std::uint64_t>(model.d_model) * model.ff_dim;
+                bytes += static_cast<std::uint64_t>(model.d_model / 128U) *
+                    (model.ff_dim / 128U) * sizeof(float);
+            }
+        }
+    }
+    return bytes;
+}
+
 inline std::uint64_t total_device_weight_bytes(const HostWeightBytes& weights) {
-    return total_host_weight_bytes(weights);
+    return total_host_weight_bytes(weights) + stream1_sm120_fp8_extra_weight_bytes(weights.model);
 }
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
@@ -723,6 +766,11 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
     alloc_and_copy(d.output_ln_gamma, h.output_ln_gamma, "output_ln_gamma");
     alloc_and_copy(d.output_ln_beta, h.output_ln_beta, "output_ln_beta");
     d.blocks.resize(h.blocks.size());
+    const std::uint32_t fp8_mask = parse_stream1_sm120_fp8_operator_policy(
+        std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS"));
+    if (fp8_mask != 0U && !stream1_transformer_sm120_fp8_supported()) {
+        throw std::runtime_error("SM120 FP8 operator profile requires a physical sm_120 GPU and sm_120a build");
+    }
     for (std::size_t i = 0; i < h.blocks.size(); ++i) {
         const std::string prefix = "block" + std::to_string(i);
         const HostTransformerBlockBytes& hb = h.blocks[i];
@@ -739,12 +787,35 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
         alloc_and_copy(db.ff1_bias, hb.ff1_bias, (prefix + "_ff1_bias").c_str());
         alloc_and_copy(db.ff2_weight, hb.ff2_weight, (prefix + "_ff2_weight").c_str());
         alloc_and_copy(db.ff2_bias, hb.ff2_bias, (prefix + "_ff2_bias").c_str());
+        if ((fp8_mask & stream1_sm120_fp8_qkv_bit(static_cast<std::uint32_t>(i))) != 0U) {
+            const std::size_t elements = static_cast<std::size_t>(host.model.d_model) * 3U * host.model.d_model;
+            const std::size_t scales = stream1_transformer_sm120_fp8_weight_scale_elements(
+                host.model.d_model, 3U * host.model.d_model);
+            BEAM_CUDA_CHECK(cudaMalloc(&db.attn_qkv_weight_fp8, elements));
+            BEAM_CUDA_CHECK(cudaMalloc(&db.attn_qkv_weight_scales, scales * sizeof(float)));
+            stream1_transformer_sm120_fp8_quantize_weight_cuda(
+                db.attn_qkv_weight, db.attn_qkv_weight_fp8, db.attn_qkv_weight_scales,
+                host.model.d_model, 3U * host.model.d_model, 1.0f, nullptr);
+        }
+        if ((fp8_mask & stream1_sm120_fp8_ff1_bit(static_cast<std::uint32_t>(i))) != 0U) {
+            const std::size_t elements = static_cast<std::size_t>(host.model.d_model) * host.model.ff_dim;
+            const std::size_t scales = stream1_transformer_sm120_fp8_weight_scale_elements(
+                host.model.d_model, host.model.ff_dim);
+            BEAM_CUDA_CHECK(cudaMalloc(&db.ff1_weight_fp8, elements));
+            BEAM_CUDA_CHECK(cudaMalloc(&db.ff1_weight_scales, scales * sizeof(float)));
+            stream1_transformer_sm120_fp8_quantize_weight_cuda(
+                db.ff1_weight, db.ff1_weight_fp8, db.ff1_weight_scales,
+                host.model.d_model, host.model.ff_dim, 1.0f, nullptr);
+        }
     }
     alloc_and_copy(d.output_weight, h.output_weight, "output_weight");
     alloc_and_copy(d.output_bias, h.output_bias, "output_bias");
     alloc_and_copy_typed(d.piece_positions, h.piece_positions, "piece_positions");
     alloc_and_copy_typed(d.piece_mask, h.piece_mask, "piece_mask");
     alloc_and_copy_typed(d.piece_types, h.piece_types, "piece_types");
+    if (fp8_mask != 0U) {
+        BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    }
 }
 
 inline void free_weights(DeviceWeights& device);
@@ -877,6 +948,10 @@ inline void free_weights(DeviceWeights& device) {
         cudaFree(b.ff1_bias);
         cudaFree(b.ff2_weight);
         cudaFree(b.ff2_bias);
+        cudaFree(b.attn_qkv_weight_fp8);
+        cudaFree(b.attn_qkv_weight_scales);
+        cudaFree(b.ff1_weight_fp8);
+        cudaFree(b.ff1_weight_scales);
     }
     cudaFree(t.output_weight);
     cudaFree(t.output_bias);
@@ -910,6 +985,14 @@ inline ScratchAllocation alloc_stream1_scratch(
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_context, plan.context_bytes));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_ff_hidden, plan.ff_hidden_bytes));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_logits, plan.logits_bytes));
+            if (plan.fp8_quantized_input_bytes != 0U) {
+                BEAM_CUDA_CHECK(cudaMalloc(
+                    &scratch.transformer_fp8_quantized_input,
+                    plan.fp8_quantized_input_bytes));
+                BEAM_CUDA_CHECK(cudaMalloc(
+                    &scratch.transformer_fp8_input_scales,
+                    plan.fp8_input_scale_bytes));
+            }
             return scratch;
         }
         throw std::runtime_error("unsupported Stream1 backend in scratch allocation");
@@ -929,6 +1012,9 @@ inline void free_stream1_scratch(ScratchAllocation& scratch) {
     cudaFree(scratch.transformer_attention_context);
     cudaFree(scratch.transformer_ff_hidden);
     cudaFree(scratch.transformer_logits);
+    cudaFree(scratch.transformer_fp8_quantized_input);
+    cudaFree(scratch.transformer_fp8_input_scales);
+    cudaFree(scratch.transformer_fp8_workspace);
     scratch = ScratchAllocation{};
 }
 
@@ -1003,7 +1089,11 @@ inline TransformerNetworkViewHolder transformer_network_view(
             b.ff1_weight,
             b.ff1_bias,
             b.ff2_weight,
-            b.ff2_bias};
+            b.ff2_bias,
+            b.attn_qkv_weight_fp8,
+            b.attn_qkv_weight_scales,
+            b.ff1_weight_fp8,
+            b.ff1_weight_scales};
     }
     holder.view = Stream1TransformerNetworkView{
         weights.fast_slot_projected,
@@ -1051,7 +1141,11 @@ inline Stream1TransformerScratchView transformer_scratch_view(const ScratchAlloc
         scratch.transformer_attention_scores_probs,
         scratch.transformer_attention_context,
         scratch.transformer_ff_hidden,
-        scratch.transformer_logits};
+        scratch.transformer_logits,
+        scratch.transformer_fp8_quantized_input,
+        scratch.transformer_fp8_input_scales,
+        scratch.transformer_fp8_workspace,
+        scratch.transformer_fp8_workspace_bytes};
 }
 
 inline Stream1TransformerScratchView transformer_scratch_view(
@@ -1072,7 +1166,13 @@ inline Stream1TransformerScratchView transformer_scratch_view(
         scratch.transformer_attention_scores_probs + lane_rows * model.nhead * transformer_attention_score_stride(model),
         scratch.transformer_attention_context + lane_rows * sequence.padded_seq_len * model.d_model,
         scratch.transformer_ff_hidden + lane_rows * sequence.padded_seq_len * model.ff_dim,
-        scratch.transformer_logits + lane_rows * model.output_dim};
+        scratch.transformer_logits + lane_rows * model.output_dim,
+        scratch.transformer_fp8_quantized_input == nullptr ? nullptr :
+            scratch.transformer_fp8_quantized_input + lane_rows * sequence.padded_seq_len * model.d_model,
+        scratch.transformer_fp8_input_scales == nullptr ? nullptr :
+            scratch.transformer_fp8_input_scales + lane_rows * sequence.padded_seq_len * (model.d_model / 128U),
+        scratch.transformer_fp8_workspace,
+        scratch.transformer_fp8_workspace_bytes};
 }
 #endif
 
