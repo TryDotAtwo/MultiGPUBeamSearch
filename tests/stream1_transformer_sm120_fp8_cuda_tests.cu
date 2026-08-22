@@ -122,6 +122,10 @@ int main() {
         max_abs_error = std::max(max_abs_error, std::abs(error));
     }
     const double nmse = squared_error / squared_reference;
+    std::cerr << "stream1_transformer_sm120_fp8_metrics"
+              << " nmse=" << nmse
+              << " max_abs_error=" << max_abs_error
+              << "\n";
     require(nmse < 1.0e-3, "SM120 block-scaled FP8 identity GEMM NMSE exceeded 1e-3");
     require(max_abs_error < 0.08f, "SM120 block-scaled FP8 identity GEMM max error exceeded 0.08");
 
