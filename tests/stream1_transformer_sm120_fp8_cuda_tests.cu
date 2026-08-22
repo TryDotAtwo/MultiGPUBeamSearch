@@ -108,6 +108,20 @@ int main() {
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
 
     std::vector<half> output(expected.size());
+    std::vector<std::uint8_t> quantized_input_probe(8);
+    std::vector<std::uint8_t> quantized_weight_probe(8);
+    float input_scale_probe = 0.0f;
+    float weight_scale_probe = 0.0f;
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        quantized_input_probe.data(), d_quantized_input,
+        quantized_input_probe.size(), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        quantized_weight_probe.data(), d_quantized_weight,
+        quantized_weight_probe.size(), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &input_scale_probe, d_input_scales, sizeof(float), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &weight_scale_probe, d_weight_scales, sizeof(float), cudaMemcpyDeviceToHost));
     BEAM_CUDA_CHECK(cudaMemcpy(output.data(), d_output, output.size() * sizeof(half), cudaMemcpyDeviceToHost));
     double squared_error = 0.0;
     double squared_reference = 0.0;
@@ -125,6 +139,11 @@ int main() {
     std::cerr << "stream1_transformer_sm120_fp8_metrics"
               << " nmse=" << nmse
               << " max_abs_error=" << max_abs_error
+              << " input_scale0=" << input_scale_probe
+              << " weight_scale0=" << weight_scale_probe
+              << " qinput0=" << static_cast<unsigned>(quantized_input_probe[0])
+              << " qweight0=" << static_cast<unsigned>(quantized_weight_probe[0])
+              << " output0=" << __half2float(output[0])
               << "\n";
     require(nmse < 1.0e-3, "SM120 block-scaled FP8 identity GEMM NMSE exceeded 1e-3");
     require(max_abs_error < 0.08f, "SM120 block-scaled FP8 identity GEMM max error exceeded 0.08");
