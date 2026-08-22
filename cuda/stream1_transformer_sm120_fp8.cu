@@ -157,7 +157,7 @@ __global__ void quantize_activation_kernel(
     }
     __syncthreads();
     const float scaled = value / warp_maxima[0];
-    quantized[index] = cutlass::NumericConverterClamp<ElementA, float>()(scaled);
+    quantized[index] = ElementA(scaled);
 }
 
 __global__ void quantize_weight_kernel(
@@ -198,7 +198,7 @@ __global__ void quantize_weight_kernel(
         const std::uint32_t n = n_block * kScaleGranularity + local_n;
         const std::size_t index = static_cast<std::size_t>(k) * output_cols + n;
         const float scaled = __half2float(weight[index]) * inverse_scale;
-        quantized[index] = cutlass::NumericConverterClamp<ElementB, float>()(scaled);
+        quantized[index] = ElementB(scaled);
     }
 }
 
