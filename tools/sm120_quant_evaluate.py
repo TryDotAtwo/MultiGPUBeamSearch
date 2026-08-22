@@ -288,9 +288,20 @@ def _metrics(baseline: np.ndarray, candidate: np.ndarray, elapsed: float) -> dic
     return metrics
 
 
+def _three_way_metrics(
+    fp32: np.ndarray, fp16: np.ndarray, candidate: np.ndarray, elapsed: float
+) -> dict[str, Any]:
+    """Keep FP32 as truth while isolating incremental mixed-vs-FP16 loss."""
+    return {
+        **_metrics(fp32, candidate, elapsed),
+        "vs_fp16": _metrics(fp16, candidate, elapsed),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--weight-dir", type=Path, required=True)
+    parser.add_argument("--fp32-weight-dir", type=Path, required=True)
     parser.add_argument("--corpus", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=256)
@@ -311,25 +322,35 @@ def main() -> None:
         split=args.split,
     )
     device = torch.device("cuda")
+    fp32_model = QuantObservedPieceTransformer(args.fp32_weight_dir, device)
+    fp16_policy = {name: "fp16" for name in CORE_OPERATORS}
+    fp32_model.set_precision(fp16_policy)
+    fp32_logits, fp32_sec = _run_logits(
+        fp32_model, states, batch_size=args.batch_size, capture_statistics=False
+    )
     model = QuantObservedPieceTransformer(args.weight_dir, device)
     fp16 = {name: "fp16" for name in CORE_OPERATORS}
     model.set_precision(fp16)
-    baseline, baseline_sec = _run_logits(
+    fp16_logits, baseline_sec = _run_logits(
         model, states, batch_size=args.batch_size, capture_statistics=True
     )
     activation_stats = {
         name: _aggregate_statistics(rows) for name, rows in model.statistics.items()
     }
     channel_amax = {name: values.detach().clone() for name, values in model.channel_amax.items()}
-    np.save(args.output_dir / "baseline_logits.npy", baseline)
+    np.save(args.output_dir / "fp32_reference_logits.npy", fp32_logits)
+    np.save(args.output_dir / "fp16_current_logits.npy", fp16_logits)
     (args.output_dir / "activation_statistics.json").write_text(
         json.dumps(activation_stats, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     observations: list[dict[str, Any]] = [{
-        "name": "all_fp16", "wall_seconds": baseline_sec,
+        "name": "fp32_reference", "wall_seconds": fp32_sec,
         "top1_agreement": 1.0, "topk_set_overlap": 1.0,
         "pair_inversion_rate": 0.0, "threshold_band_agreement": 1.0,
         "global_top_per_state_overlap": 1.0,
+    }, {
+        "name": "current_fp16",
+        **_metrics(fp32_logits, fp16_logits, baseline_sec),
     }]
     policies = build_initial_mixed_precision_policies()
     for name, policy in policies:
@@ -337,7 +358,7 @@ def main() -> None:
         candidate, elapsed = _run_logits(
             model, states, batch_size=args.batch_size, capture_statistics=False
         )
-        row = {"name": name, **_metrics(baseline, candidate, elapsed)}
+        row = {"name": name, **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed)}
         observations.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
     rollback_rows = [row for row in observations if str(row["name"]).startswith("rollback_")]
@@ -350,7 +371,7 @@ def main() -> None:
             "name": name,
             "fp16_operators": sum(value == "fp16" for value in policy.values()),
             "operator_precision": policy,
-            **_metrics(baseline, candidate, elapsed),
+            **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed),
         }
         observations.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
@@ -364,7 +385,7 @@ def main() -> None:
             "name": name,
             "fp8_operators": sum(value == "sm120_block_fp8" for value in policy.values()),
             "operator_precision": policy,
-            **_metrics(baseline, candidate, elapsed),
+            **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed),
         }
         observations.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
@@ -382,7 +403,7 @@ def main() -> None:
             "name": name,
             "smoothquant_alpha": alpha,
             "folded_operators": sorted(scales),
-            **_metrics(baseline, candidate, elapsed),
+            **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed),
         }
         observations.append(row)
         equalization_artifacts[name] = scales

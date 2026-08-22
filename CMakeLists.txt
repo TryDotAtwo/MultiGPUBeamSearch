@@ -195,6 +195,13 @@ if(BEAM_ENABLE_SM120_FP8)
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
     )
+    add_executable(stream1_transformer_sm120_fp8_export tools/stream1_transformer_sm120_fp8_export.cu)
+    target_link_libraries(stream1_transformer_sm120_fp8_export PRIVATE beam_cuda)
+    set_target_properties(stream1_transformer_sm120_fp8_export PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
+    )
     add_executable(stream1_transformer_sm120_fp8_policy_tests
         tests/stream1_transformer_sm120_fp8_policy_tests.cpp)
     target_include_directories(stream1_transformer_sm120_fp8_policy_tests PRIVATE cuda)
@@ -221,6 +228,8 @@ target_compile_features(stream1_transformer_layernorm_policy_tests PRIVATE cxx_s
 target_compile_features(stream1_transformer_layernorm_split_slots_policy_tests PRIVATE cxx_std_17)
 target_compile_features(stream1_transformer_attention_policy_tests PRIVATE cxx_std_17)
 target_compile_features(stream1_transformer_shape_tests PRIVATE cxx_std_17)
+add_executable(sha256_tests tests/sha256_tests.cpp)
+target_compile_features(sha256_tests PRIVATE cxx_std_17)
 target_include_directories(stream1_transformer_autotune_contract_tests PRIVATE cuda)
 target_compile_features(stream1_transformer_autotune_contract_tests PRIVATE cxx_std_17)
 

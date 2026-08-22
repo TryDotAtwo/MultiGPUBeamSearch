@@ -3,6 +3,7 @@
 #include "../src/config.hpp"
 #include "../cuda/stream1_transformer_shape.hpp"
 #include "../cuda/stream1_transformer_sm120_fp8_policy.hpp"
+#include "sha256.hpp"
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 #include "cuda_check.hpp"
@@ -72,6 +73,10 @@ struct HostTransformerBlockBytes {
     std::vector<std::byte> ff1_bias;
     std::vector<std::byte> ff2_weight;
     std::vector<std::byte> ff2_bias;
+    std::vector<std::byte> attn_qkv_weight_fp8;
+    std::vector<std::byte> attn_qkv_weight_scales;
+    std::vector<std::byte> ff1_weight_fp8;
+    std::vector<std::byte> ff1_weight_scales;
 };
 
 struct HostTransformerBytes {
@@ -92,6 +97,7 @@ struct HostTransformerBytes {
 
 struct HostWeightBytes {
     Stream1ModelConfig model;
+    std::uint32_t sm120_fp8_operator_mask = 0U;
     std::vector<std::byte> input_weight;
     std::vector<std::byte> input_bias;
     std::vector<std::byte> input_ln_gamma;
@@ -226,6 +232,99 @@ inline std::vector<std::byte> read_binary_exact(
             " actual_read=" + std::to_string(actual));
     }
     return bytes;
+}
+
+inline std::string trim_ascii(std::string value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return {};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1U);
+}
+
+inline std::string runtime_manifest_value(const std::string& text, const std::string& key) {
+    std::size_t begin = 0U;
+    while (begin <= text.size()) {
+        const std::size_t end = text.find('\n', begin);
+        const std::string line = trim_ascii(text.substr(begin, end == std::string::npos ? end : end - begin));
+        if (!line.empty() && line[0] != '#') {
+            const std::size_t equal = line.find('=');
+            if (equal != std::string::npos && trim_ascii(line.substr(0, equal)) == key) {
+                return trim_ascii(line.substr(equal + 1U));
+            }
+        }
+        if (end == std::string::npos) break;
+        begin = end + 1U;
+    }
+    throw std::runtime_error("missing SM120 runtime manifest key: " + key);
+}
+
+inline void require_sha256(const std::filesystem::path& path, const std::string& expected) {
+    if (expected.size() != 64U || beam::sha256::file_hex(path) != expected) {
+        throw std::runtime_error("SM120 immutable artifact SHA-256 mismatch: " + path.string());
+    }
+}
+
+inline void load_sm120_offline_artifacts(
+    const std::filesystem::path& weight_dir,
+    HostWeightBytes& weights) {
+    const char* raw_operators = std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS");
+    const std::uint32_t requested_mask = parse_stream1_sm120_fp8_operator_policy(raw_operators);
+    const char* raw_profile_dir = std::getenv("BEAM_STREAM1_SM120_FP8_PROFILE_DIR");
+    if (requested_mask == 0U) {
+        if (raw_profile_dir != nullptr && *raw_profile_dir != '\0') {
+            throw std::runtime_error("BEAM_STREAM1_SM120_FP8_PROFILE_DIR requires an explicit operator policy");
+        }
+        return;
+    }
+    if (raw_profile_dir == nullptr || *raw_profile_dir == '\0') {
+        throw std::runtime_error("SM120 operators require BEAM_STREAM1_SM120_FP8_PROFILE_DIR");
+    }
+    const std::filesystem::path profile_dir(raw_profile_dir);
+    const std::filesystem::path runtime_manifest = profile_dir / "runtime_manifest.txt";
+    const std::string manifest = read_text_exact(runtime_manifest);
+    if (runtime_manifest_value(manifest, "schema_version") != "1") {
+        throw std::runtime_error("unsupported SM120 runtime manifest schema");
+    }
+    const std::string profile_operators = runtime_manifest_value(manifest, "operators");
+    const std::uint32_t profile_mask = parse_stream1_sm120_fp8_operator_policy(profile_operators.c_str());
+    if (profile_mask != requested_mask) {
+        throw std::runtime_error("SM120 runtime profile operators do not match requested operators");
+    }
+    const std::filesystem::path source_manifest = weight_dir / "manifest.json";
+    require_sha256(source_manifest, runtime_manifest_value(manifest, "source_manifest_sha256"));
+    if (weights.model.d_model % 128U != 0U || weights.model.ff_dim % 128U != 0U) {
+        throw std::runtime_error("SM120 offline artifacts require dimensions divisible by 128");
+    }
+    auto load_operator = [&](const std::string& name, std::vector<std::byte>& quantized,
+                             std::vector<std::byte>& scales, std::uint32_t input_cols,
+                             std::uint32_t output_cols) {
+        const std::string prefix = "operator." + name + ".";
+        if (runtime_manifest_value(manifest, prefix + "input_cols") != std::to_string(input_cols) ||
+            runtime_manifest_value(manifest, prefix + "output_cols") != std::to_string(output_cols)) {
+            throw std::runtime_error("SM120 artifact shape mismatch for " + name);
+        }
+        const std::filesystem::path weight_path = profile_dir / runtime_manifest_value(manifest, prefix + "weight_file");
+        const std::filesystem::path scale_path = profile_dir / runtime_manifest_value(manifest, prefix + "scale_file");
+        require_sha256(weight_path, runtime_manifest_value(manifest, prefix + "weight_sha256"));
+        require_sha256(scale_path, runtime_manifest_value(manifest, prefix + "scale_sha256"));
+        quantized = read_binary_exact(weight_path, static_cast<std::uint64_t>(input_cols) * output_cols);
+        const std::uint64_t scale_count = static_cast<std::uint64_t>(input_cols / 128U) * (output_cols / 128U);
+        scales = read_binary_exact(scale_path, scale_count * sizeof(float));
+    };
+    for (std::uint32_t layer = 0; layer < weights.model.transformer_layers; ++layer) {
+        auto& block = weights.transformer.blocks.at(layer);
+        if ((requested_mask & stream1_sm120_fp8_qkv_bit(layer)) != 0U) {
+            load_operator("blocks." + std::to_string(layer) + ".attn.in_proj_weight",
+                block.attn_qkv_weight_fp8, block.attn_qkv_weight_scales,
+                weights.model.d_model, 3U * weights.model.d_model);
+        }
+        if ((requested_mask & stream1_sm120_fp8_ff1_bit(layer)) != 0U) {
+            load_operator("blocks." + std::to_string(layer) + ".ff.0.weight",
+                block.ff1_weight_fp8, block.ff1_weight_scales,
+                weights.model.d_model, weights.model.ff_dim);
+        }
+    }
+    weights.sm120_fp8_operator_mask = requested_mask;
 }
 
 inline bool manifest_has_key(const std::string& text, const char* key) {
@@ -587,8 +686,11 @@ inline HostWeightBytes load_stream1_weights(const std::filesystem::path& dir) {
     switch (model.backend) {
     case STREAM1_BACKEND_MLP:
         return load_stream1_mlp_weights(dir, model);
-    case STREAM1_BACKEND_PIECE_TRANSFORMER:
-        return load_stream1_transformer_weights(dir, model);
+    case STREAM1_BACKEND_PIECE_TRANSFORMER: {
+        HostWeightBytes weights = load_stream1_transformer_weights(dir, model);
+        load_sm120_offline_artifacts(dir, weights);
+        return weights;
+    }
     default:
         throw std::runtime_error("unsupported Stream1 backend in weight loader");
     }
@@ -766,8 +868,7 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
     alloc_and_copy(d.output_ln_gamma, h.output_ln_gamma, "output_ln_gamma");
     alloc_and_copy(d.output_ln_beta, h.output_ln_beta, "output_ln_beta");
     d.blocks.resize(h.blocks.size());
-    const std::uint32_t fp8_mask = parse_stream1_sm120_fp8_operator_policy(
-        std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS"));
+    const std::uint32_t fp8_mask = host.sm120_fp8_operator_mask;
     if (fp8_mask != 0U && !stream1_transformer_sm120_fp8_supported()) {
         throw std::runtime_error("SM120 FP8 operator profile requires a physical sm_120 GPU and sm_120a build");
     }
@@ -788,24 +889,16 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
         alloc_and_copy(db.ff2_weight, hb.ff2_weight, (prefix + "_ff2_weight").c_str());
         alloc_and_copy(db.ff2_bias, hb.ff2_bias, (prefix + "_ff2_bias").c_str());
         if ((fp8_mask & stream1_sm120_fp8_qkv_bit(static_cast<std::uint32_t>(i))) != 0U) {
-            const std::size_t elements = static_cast<std::size_t>(host.model.d_model) * 3U * host.model.d_model;
-            const std::size_t scales = stream1_transformer_sm120_fp8_weight_scale_elements(
-                host.model.d_model, 3U * host.model.d_model);
-            BEAM_CUDA_CHECK(cudaMalloc(&db.attn_qkv_weight_fp8, elements));
-            BEAM_CUDA_CHECK(cudaMalloc(&db.attn_qkv_weight_scales, scales * sizeof(float)));
-            stream1_transformer_sm120_fp8_quantize_weight_cuda(
-                db.attn_qkv_weight, db.attn_qkv_weight_fp8, db.attn_qkv_weight_scales,
-                host.model.d_model, 3U * host.model.d_model, 1.0f, nullptr);
+            alloc_and_copy_typed(db.attn_qkv_weight_fp8, hb.attn_qkv_weight_fp8,
+                (prefix + "_attn_qkv_weight_fp8").c_str());
+            alloc_and_copy_typed(db.attn_qkv_weight_scales, hb.attn_qkv_weight_scales,
+                (prefix + "_attn_qkv_weight_scales").c_str());
         }
         if ((fp8_mask & stream1_sm120_fp8_ff1_bit(static_cast<std::uint32_t>(i))) != 0U) {
-            const std::size_t elements = static_cast<std::size_t>(host.model.d_model) * host.model.ff_dim;
-            const std::size_t scales = stream1_transformer_sm120_fp8_weight_scale_elements(
-                host.model.d_model, host.model.ff_dim);
-            BEAM_CUDA_CHECK(cudaMalloc(&db.ff1_weight_fp8, elements));
-            BEAM_CUDA_CHECK(cudaMalloc(&db.ff1_weight_scales, scales * sizeof(float)));
-            stream1_transformer_sm120_fp8_quantize_weight_cuda(
-                db.ff1_weight, db.ff1_weight_fp8, db.ff1_weight_scales,
-                host.model.d_model, host.model.ff_dim, 1.0f, nullptr);
+            alloc_and_copy_typed(db.ff1_weight_fp8, hb.ff1_weight_fp8,
+                (prefix + "_ff1_weight_fp8").c_str());
+            alloc_and_copy_typed(db.ff1_weight_scales, hb.ff1_weight_scales,
+                (prefix + "_ff1_weight_scales").c_str());
         }
     }
     alloc_and_copy(d.output_weight, h.output_weight, "output_weight");
@@ -813,9 +906,6 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
     alloc_and_copy_typed(d.piece_positions, h.piece_positions, "piece_positions");
     alloc_and_copy_typed(d.piece_mask, h.piece_mask, "piece_mask");
     alloc_and_copy_typed(d.piece_types, h.piece_types, "piece_types");
-    if (fp8_mask != 0U) {
-        BEAM_CUDA_CHECK(cudaDeviceSynchronize());
-    }
 }
 
 inline void free_weights(DeviceWeights& device);

@@ -97,8 +97,11 @@ class PieceTransformerTorch:
         elif manifest_dtype == "bf16":
             self.dtype = torch.bfloat16
             self.dtype_suffix = ".bf16"
+        elif manifest_dtype == "fp32":
+            self.dtype = torch.float32
+            self.dtype_suffix = ".fp32"
         else:
-            raise ValueError(f"plain torch benchmark expects exported fp16 or bf16 weights, got {manifest_dtype!r}")
+            raise ValueError(f"plain torch benchmark expects exported fp16, bf16, or fp32 weights, got {manifest_dtype!r}")
 
         self.state_len = int(self.manifest["state_len"])
         self.num_classes = int(self.manifest["num_classes"])

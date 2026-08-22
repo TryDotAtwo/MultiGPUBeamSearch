@@ -13,7 +13,7 @@ import torch
 
 
 TensorDict = Dict[str, torch.Tensor]
-ExportDType = Literal["fp16", "bf16"]
+ExportDType = Literal["fp16", "bf16", "fp32"]
 
 
 def unwrap_state_dict(obj) -> TensorDict:
@@ -61,11 +61,13 @@ def tensor_bytes(tensor: torch.Tensor, dtype: ExportDType) -> bytes:
         return tensor.contiguous().to(torch.float16).cpu().numpy().tobytes()
     if dtype == "bf16":
         return tensor.contiguous().to(torch.bfloat16).view(torch.int16).cpu().numpy().tobytes()
+    if dtype == "fp32":
+        return tensor.contiguous().to(torch.float32).cpu().numpy().tobytes()
     raise ValueError(f"unsupported export dtype: {dtype}")
 
 
 def weight_suffix(dtype: ExportDType) -> str:
-    return ".fp16" if dtype == "fp16" else ".bf16"
+    return {"fp16": ".fp16", "bf16": ".bf16", "fp32": ".fp32"}[dtype]
 
 
 def round_up(value: int, alignment: int) -> int:

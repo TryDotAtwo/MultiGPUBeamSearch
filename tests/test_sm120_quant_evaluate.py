@@ -7,6 +7,7 @@ from tools.sm120_quant_evaluate import (
     build_cumulative_rollback_policies,
     build_incremental_fp8_policies,
     select_stratified_states,
+    _three_way_metrics,
 )
 from tools.sm120_quant_tuner import CORE_OPERATORS
 
@@ -76,3 +77,13 @@ def test_incremental_fp8_path_starts_with_two_and_ends_at_all_fp8() -> None:
     policies = build_incremental_fp8_policies(rows)
     assert list(policies[0][1].values()).count("sm120_block_fp8") == 2
     assert list(policies[-1][1].values()).count("sm120_block_fp8") == len(CORE_OPERATORS)
+
+
+def test_three_way_metrics_use_fp32_as_truth_and_report_incremental_fp16_loss() -> None:
+    fp32 = np.array([[0.0, 1.0, 2.0], [3.0, 2.0, 1.0]])
+    fp16 = fp32 + np.array([[0.0, 0.1, -0.1], [0.1, 0.0, 0.0]])
+    mixed = fp16 + np.array([[0.0, 0.02, 0.0], [0.0, -0.02, 0.0]])
+    metrics = _three_way_metrics(fp32, fp16, mixed, 0.5)
+    assert metrics["logit_rmse"] > metrics["vs_fp16"]["logit_rmse"]
+    assert metrics["wall_seconds"] == 0.5
+    assert metrics["vs_fp16"]["wall_seconds"] == 0.5
