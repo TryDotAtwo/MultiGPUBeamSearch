@@ -1,4 +1,5 @@
 #include "stream1_transformer_sm120_fp8.hpp"
+#include "stream1.hpp"
 
 #include "cuda_check.hpp"
 
@@ -37,6 +38,7 @@ void benchmark_shape(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t
     DeviceBuffer input(input_elements * sizeof(half));
     DeviceBuffer weight(weight_elements * sizeof(half));
     DeviceBuffer output(output_elements * sizeof(half));
+    DeviceBuffer fp16_output(output_elements * sizeof(half));
     DeviceBuffer quantized_input(input_elements);
     DeviceBuffer quantized_weight(weight_elements);
     DeviceBuffer input_scales(
@@ -85,10 +87,33 @@ void benchmark_shape(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t
     const double average_ms = static_cast<double>(elapsed_ms) / iterations;
     const double tflops = 2.0 * static_cast<double>(rows) * input_cols * output_cols /
         (average_ms * 1.0e9);
+
+    auto run_fp16_once = [&]() {
+        stream1_cutlass_linear_cuda(
+            static_cast<const half*>(input.pointer),
+            static_cast<const half*>(weight.pointer),
+            static_cast<half*>(fp16_output.pointer),
+            rows, input_cols, output_cols, STREAM1_DTYPE_FP16, nullptr);
+    };
+    for (int i = 0; i < warmups; ++i) {
+        run_fp16_once();
+    }
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    BEAM_CUDA_CHECK(cudaEventRecord(start));
+    for (int i = 0; i < iterations; ++i) {
+        run_fp16_once();
+    }
+    BEAM_CUDA_CHECK(cudaEventRecord(stop));
+    BEAM_CUDA_CHECK(cudaEventSynchronize(stop));
+    float fp16_elapsed_ms = 0.0f;
+    BEAM_CUDA_CHECK(cudaEventElapsedTime(&fp16_elapsed_ms, start, stop));
+    const double fp16_average_ms = static_cast<double>(fp16_elapsed_ms) / iterations;
     std::cout << "sm120_fp8_shape"
               << " m=" << rows << " n=" << output_cols << " k=" << input_cols
               << " end_to_end_ms=" << std::fixed << std::setprecision(6) << average_ms
               << " effective_tflops=" << std::setprecision(3) << tflops
+              << " fp16_ms=" << std::setprecision(6) << fp16_average_ms
+              << " fp8_speedup=" << std::setprecision(3) << fp16_average_ms / average_ms
               << " workspace_bytes=" << workspace_bytes << "\n";
     cudaEventDestroy(stop);
     cudaEventDestroy(start);
