@@ -72,18 +72,15 @@ def build_initial_mixed_precision_policies() -> list[tuple[str, dict[str, str]]]
         policy = dict(all_fp8)
         policy[name] = "fp16"
         policies.append(("rollback_" + name, policy))
+        only = {other: "fp16" for other in CORE_OPERATORS}
+        only[name] = "sm120_block_fp8"
+        policies.append(("only_fp8_" + name, only))
     return policies
 
 
-def build_cumulative_rollback_policies(
-    single_rollback_rows: list[Mapping[str, Any]],
-) -> list[tuple[str, dict[str, str]]]:
-    """Build a deterministic quality-first path from all-FP8 to all-FP16."""
-    expected = {"rollback_" + name for name in CORE_OPERATORS}
-    if {str(row.get("name")) for row in single_rollback_rows} != expected:
-        raise ValueError("single rollback observations must cover all core operators")
-    ordered = sorted(
-        single_rollback_rows,
+def _quality_order(rows: list[Mapping[str, Any]], prefix: str) -> list[Mapping[str, Any]]:
+    return sorted(
+        rows,
         key=lambda row: (
             float(row["top1_agreement"]),
             float(row["threshold_band_agreement"]),
@@ -93,6 +90,32 @@ def build_cumulative_rollback_policies(
         ),
         reverse=True,
     )
+
+
+def build_incremental_fp8_policies(
+    single_fp8_rows: list[Mapping[str, Any]],
+) -> list[tuple[str, dict[str, str]]]:
+    expected = {"only_fp8_" + name for name in CORE_OPERATORS}
+    if {str(row.get("name")) for row in single_fp8_rows} != expected:
+        raise ValueError("single FP8 observations must cover all core operators")
+    policy = {name: "fp16" for name in CORE_OPERATORS}
+    result: list[tuple[str, dict[str, str]]] = []
+    for count, row in enumerate(_quality_order(single_fp8_rows, "only_fp8_"), start=1):
+        operator = str(row["name"])[len("only_fp8_") :]
+        policy[operator] = "sm120_block_fp8"
+        if count >= 2:
+            result.append((f"incremental_fp8_{count:02d}_{operator}", dict(policy)))
+    return result
+
+
+def build_cumulative_rollback_policies(
+    single_rollback_rows: list[Mapping[str, Any]],
+) -> list[tuple[str, dict[str, str]]]:
+    """Build a deterministic quality-first path from all-FP8 to all-FP16."""
+    expected = {"rollback_" + name for name in CORE_OPERATORS}
+    if {str(row.get("name")) for row in single_rollback_rows} != expected:
+        raise ValueError("single rollback observations must cover all core operators")
+    ordered = _quality_order(single_rollback_rows, "rollback_")
     policy = {name: "sm120_block_fp8" for name in CORE_OPERATORS}
     result: list[tuple[str, dict[str, str]]] = []
     for count, row in enumerate(ordered, start=1):
@@ -326,6 +349,20 @@ def main() -> None:
         row = {
             "name": name,
             "fp16_operators": sum(value == "fp16" for value in policy.values()),
+            "operator_precision": policy,
+            **_metrics(baseline, candidate, elapsed),
+        }
+        observations.append(row)
+        print(json.dumps(row, sort_keys=True), flush=True)
+    single_fp8_rows = [row for row in observations if str(row["name"]).startswith("only_fp8_")]
+    for name, policy in build_incremental_fp8_policies(single_fp8_rows):
+        model.set_precision(policy)
+        candidate, elapsed = _run_logits(
+            model, states, batch_size=args.batch_size, capture_statistics=False
+        )
+        row = {
+            "name": name,
+            "fp8_operators": sum(value == "sm120_block_fp8" for value in policy.values()),
             "operator_precision": policy,
             **_metrics(baseline, candidate, elapsed),
         }

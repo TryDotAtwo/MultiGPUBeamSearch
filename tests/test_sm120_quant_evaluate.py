@@ -5,6 +5,7 @@ import numpy as np
 from tools.sm120_quant_evaluate import (
     build_initial_mixed_precision_policies,
     build_cumulative_rollback_policies,
+    build_incremental_fp8_policies,
     select_stratified_states,
 )
 from tools.sm120_quant_tuner import CORE_OPERATORS
@@ -35,11 +36,16 @@ def test_initial_mixed_precision_policies_include_fp8_and_each_single_rollback()
     policies = build_initial_mixed_precision_policies()
     assert policies[0][0] == "all_core_fp8"
     assert all(value == "sm120_block_fp8" for value in policies[0][1].values())
-    assert len(policies) == 1 + len(CORE_OPERATORS)
-    for name, policy in policies[1:]:
+    assert len(policies) == 1 + 2 * len(CORE_OPERATORS)
+    rollback_policies = [item for item in policies if item[0].startswith("rollback_")]
+    only_policies = [item for item in policies if item[0].startswith("only_fp8_")]
+    for name, policy in rollback_policies:
         assert name.startswith("rollback_")
         assert list(policy.values()).count("fp16") == 1
         assert list(policy.values()).count("sm120_block_fp8") == len(CORE_OPERATORS) - 1
+    for name, policy in only_policies:
+        assert name.startswith("only_fp8_")
+        assert list(policy.values()).count("sm120_block_fp8") == 1
 
 
 def test_cumulative_rollbacks_prioritize_quality_and_end_at_fp16() -> None:
@@ -57,3 +63,16 @@ def test_cumulative_rollbacks_prioritize_quality_and_end_at_fp16() -> None:
     assert list(policies[0][1].values()).count("fp16") == 2
     assert list(policies[-1][1].values()).count("fp16") == len(CORE_OPERATORS)
     assert policies[-1][1][CORE_OPERATORS[-1]] == "fp16"
+
+
+def test_incremental_fp8_path_starts_with_two_and_ends_at_all_fp8() -> None:
+    rows = [{
+        "name": "only_fp8_" + operator,
+        "top1_agreement": 1.0,
+        "threshold_band_agreement": 1.0,
+        "global_top_per_state_overlap": 1.0 - index * 0.001,
+        "topk_set_overlap": 1.0,
+    } for index, operator in enumerate(CORE_OPERATORS)]
+    policies = build_incremental_fp8_policies(rows)
+    assert list(policies[0][1].values()).count("sm120_block_fp8") == 2
+    assert list(policies[-1][1].values()).count("sm120_block_fp8") == len(CORE_OPERATORS)
