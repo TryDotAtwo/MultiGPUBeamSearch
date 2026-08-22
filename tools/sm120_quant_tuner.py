@@ -18,7 +18,7 @@ import numpy as np
 import torch
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 CORE_OPERATORS = tuple(
     f"blocks.{block}.{suffix}"
     for block in range(4)
@@ -214,7 +214,9 @@ def _operator_contract(precision: str) -> dict[str, Any]:
     if precision == "fp16":
         return {
             "weight_dtype": "fp16",
+            "weight_encoding": "offline_immutable",
             "activation_dtype": "fp16",
+            "activation_encoding": "native_dynamic_values",
             "accumulator_dtype": "fp32",
             "output_dtype": "fp16",
             "scale_dtype": None,
@@ -225,7 +227,9 @@ def _operator_contract(precision: str) -> dict[str, Any]:
     low_dtype = "e4m3" if precision == "sm120_block_fp8" else "int8"
     return {
         "weight_dtype": low_dtype,
+        "weight_encoding": "offline_immutable",
         "activation_dtype": low_dtype,
+        "activation_encoding": "dynamic_per_batch",
         "accumulator_dtype": "fp32" if low_dtype == "e4m3" else "int32",
         "output_dtype": "fp16",
         "scale_dtype": "fp32",
@@ -293,6 +297,13 @@ def validate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError(f"unsupported weight dtype for {name}: {weight}")
         if activation != weight:
             raise ValueError(f"mixed operand dtypes are not supported for {name}")
+        if contract.get("weight_encoding") != "offline_immutable":
+            raise ValueError(f"operator {name} weights must be encoded offline")
+        expected_activation_encoding = (
+            "native_dynamic_values" if activation == "fp16" else "dynamic_per_batch"
+        )
+        if contract.get("activation_encoding") != expected_activation_encoding:
+            raise ValueError(f"operator {name} activation encoding is inconsistent")
         if contract.get("fallback_precision") != "fp16":
             raise ValueError(f"operator {name} must fail closed to fp16")
     return json.loads(json.dumps(profile, sort_keys=True))

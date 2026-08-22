@@ -52,6 +52,10 @@ def test_profile_validation_is_fail_closed() -> None:
     broken["operators"][CORE_OPERATORS[0]]["activation_dtype"] = "e5m2"
     with pytest.raises(ValueError, match="unsupported activation dtype"):
         validate_profile(broken)
+    broken = json.loads(json.dumps(profile))
+    broken["operators"][CORE_OPERATORS[0]]["weight_encoding"] = "runtime_quantize"
+    with pytest.raises(ValueError, match="encoded offline"):
+        validate_profile(broken)
 
 
 def test_block_int8_profile_records_offline_encoding_contract() -> None:
@@ -65,7 +69,9 @@ def test_block_int8_profile_records_offline_encoding_contract() -> None:
     )
     contract = profile["operators"][CORE_OPERATORS[0]]
     assert contract["weight_dtype"] == "int8"
+    assert contract["weight_encoding"] == "offline_immutable"
     assert contract["activation_dtype"] == "int8"
+    assert contract["activation_encoding"] == "dynamic_per_batch"
     assert contract["accumulator_dtype"] == "int32"
     assert contract["fallback_precision"] == "fp16"
 

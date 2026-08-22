@@ -1103,3 +1103,8 @@
   reconstructed-state frontier quality, and native Stream1 latency by exact
   candidate name. Missing evidence rejects a candidate; accepted evidence and
   the selected operator policy are sealed into one immutable hashed profile.
+- Precision contracts now distinguish immutable offline weight encoding from
+  unavoidable per-batch activation encoding, and validation rejects any
+  profile that asks production startup to quantize weights.
+- Bumped the precision-profile schema to v2 so older ambiguous profiles cannot
+  be mistaken for artifacts satisfying the new offline-weight contract.
