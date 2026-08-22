@@ -1,5 +1,12 @@
 # Prompt History
 
+## 2026-08-22
+- User approved implementing the proposed Transformer inference improvements
+  and required that every GPU validation run strictly on Molab. Acceptance is
+  Cube4 `output_dim=24` at beam at least `2**25`, measuring exactly
+  `depth_done=8`; preserve exact model semantics and reject changes that do
+  not produce a measured improvement.
+
 ## 2026-07-31
 - User requires public Kaggle examples to support both MLP (`batchnorm-folded`/`resmlp-layernorm`) and Transformer (`piece-transformer`) runs under one upload contract; publish envelope must remain schema-valid for both families.
 - User requested public Kaggle examples for IHES, Megaminx, and Cube-444 with first-pass + collect modes plus a verified GitHub Cloudflare upload path.

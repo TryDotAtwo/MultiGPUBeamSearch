@@ -27,12 +27,15 @@
       "compact_sequence57": true,
       "final_cls_only": true,
       "final_cls_attention": true,
+      "final_cls_split_qkv": true,
       "cls_attention_policy": "q32k64",
       "measured_depth": 8,
-      "measured_depth_seconds": 84.2199,
+      "measured_depth_seconds": 80.2952,
       "measured_stream3_jobs": 391,
       "measured_frontier_size": 33554432,
-      "measured_vram_gib_approx": 19.4
+      "measured_vram_gib_approx": 19.4,
+      "control_depth_seconds": 84.2199,
+      "measured_speedup_vs_control": 1.04888
     }
   }
 }

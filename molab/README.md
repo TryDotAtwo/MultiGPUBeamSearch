@@ -9,6 +9,10 @@ The measured single-GPU SM120 Cube4 Transformer profile is stored in
 means beam `2**25`; it is valid only for the exact hardware/model contract in
 that file. In particular, `ring_graph_execs_per_lane=12` means two graph-window
 rings for 24 accumulation slots and four inference lanes, not twelve rings.
+`final_cls_split_qkv=true` maps to
+`BEAM_STREAM1_TRANSFORMER_FINAL_CLS_SPLIT_QKV=1`; it is part of the measured
+SM120 Cube4 profile and must be used together with compact sequence 57, final
+CLS-only attention, and the recorded `q32k64` policy.
 
 ## Files
 - `molab_probe.py`: marimo notebook/script that probes the molab runtime,

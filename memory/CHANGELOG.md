@@ -1,6 +1,20 @@
 # Changelog
 
 ## 2026-08-22
+- Added an opt-in generic final-CLS split-QKV Transformer path via
+  `BEAM_STREAM1_TRANSFORMER_FINAL_CLS_SPLIT_QKV=1`. The final layer computes Q
+  only for CLS rows and K/V for all sequence rows while preserving the
+  interleaved QKV export. Molab SM120 byte-exact validation passed at 896
+  parents. Eleven isolated CUDA Graph processes improved median latency from
+  8.4660 ms to 8.3784 ms. The integrated Cube4 puzzle-0 beam `2**25` run
+  completed through exactly `depth_done=8` in 80.2952 s with 391 Stream3 jobs,
+  versus the accepted 84.2199 s control (1.04888x), without OOM/overflow/fatal
+  evidence. The Molab profile now enables this path. Evidence:
+  `test_results/molab_cube4_final_cls_split_qkv_2026-08-22.md`.
+- Rejected and reverted a generic fused FF2 residual epilogue because it
+  changed LayerNorm arithmetic by materializing fp16 before statistics were
+  calculated. Also rejected raw cuBLAS FFN replacement after Molab timing
+  showed no advantage over the existing fused CUTLASS stages.
 - Connected the existing opt-in final-layer CLS-only CUTLASS FMHA path to the
   generic piece-Transformer final-CLS implementation. The default remains the
   byte-identical full-query attention path unless
