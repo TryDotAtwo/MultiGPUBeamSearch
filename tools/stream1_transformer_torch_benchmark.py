@@ -115,6 +115,9 @@ class PieceTransformerTorch:
         self.head_dim = int(self.manifest["head_dim"])
         self.num_layers = int(self.manifest["num_layers"])
         self.ff_dim = int(self.manifest["ff_dim"])
+        self.activation = str(self.manifest["activation"]).lower()
+        if self.activation not in {"relu", "silu", "gelu"}:
+            raise ValueError(f"unsupported transformer activation: {self.activation}")
         if self.seq_len != self.num_pieces + 1:
             raise ValueError("seq_len must equal num_pieces + cls token")
         if self.d_model != self.nhead * self.head_dim:
@@ -218,6 +221,13 @@ class PieceTransformerTorch:
     def layer_norm(self, x: torch.Tensor, gamma: torch.Tensor, beta: torch.Tensor) -> torch.Tensor:
         return F.layer_norm(x, (self.d_model,), gamma, beta, eps=1.0e-5)
 
+    def activate(self, x: torch.Tensor) -> torch.Tensor:
+        if self.activation == "relu":
+            return F.relu(x)
+        if self.activation == "gelu":
+            return F.gelu(x)
+        return F.silu(x)
+
     def project(self, x: torch.Tensor, weight_hxk: torch.Tensor, weight_kxh: torch.Tensor, bias: torch.Tensor) -> torch.Tensor:
         if self.projection_mode == "linear":
             return F.linear(x, weight_kxh, bias)
@@ -265,7 +275,7 @@ class PieceTransformerTorch:
             x = x + self.project(context, block["attn_out_weight"], block["attn_out_weight_linear"], block["attn_out_bias"])
 
             y = self.layer_norm(x, block["ln2_gamma"], block["ln2_beta"])
-            y = F.silu(self.project(y, block["ff1_weight"], block["ff1_weight_linear"], block["ff1_bias"]))
+            y = self.activate(self.project(y, block["ff1_weight"], block["ff1_weight_linear"], block["ff1_bias"]))
             x = x + self.project(y, block["ff2_weight"], block["ff2_weight_linear"], block["ff2_bias"])
 
         cls = self.layer_norm(x[:, 0, :], self.output_ln_gamma, self.output_ln_beta)

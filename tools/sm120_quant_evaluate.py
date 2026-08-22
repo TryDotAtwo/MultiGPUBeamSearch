@@ -223,7 +223,7 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
                 context, block["attn_out_weight"], block["attn_out_bias"],
             )
             y = self.layer_norm(x, block["ln2_gamma"], block["ln2_beta"])
-            y = F.silu(self.project_named(
+            y = self.activate(self.project_named(
                 f"blocks.{block_index}.ff.0.weight",
                 y, block["ff1_weight"], block["ff1_bias"],
             ))
