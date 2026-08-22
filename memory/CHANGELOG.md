@@ -1053,3 +1053,19 @@
   normal graph run returned zero at 1.9911 ms with the expected checksum and
   score-key digest. Future optimization should prioritize FFN epilogues and
   dataflow rather than further attention tile permutations.
+
+## 2026-08-22 - Cube4 SM120 MXFP8 autotuner research
+
+- Added a CPU-only reproducible static analysis of the real 3,383,064-parameter
+  Cube4 checkpoint.  It compares E4M3/E5M2, native block-32 E8M0 MXFP8,
+  sparse/column FP16 correction, and best-case low-rank residual correction.
+- Static matrix reconstruction measured 31.568 dB aggregate SNR for native
+  MXFP8 versus 25.600 dB for E5M2.  The weights do not benefit from power-of-two
+  block scaling alone; real frontier activation calibration is the critical
+  unanswered accuracy gate.
+- Documented the proposed ranking-aware autotuner, graph-preserving scaling
+  transforms, mixed-precision search, deterministic artifact contract, and
+  Molab-only acceptance funnel in
+  `test_results/cube4_sm120_mxfp8_autotuner_research_2026-08-22.md`.
+- No inference/runtime or beam-search architecture change was made by this
+  research step.

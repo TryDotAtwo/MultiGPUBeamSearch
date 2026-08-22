@@ -585,3 +585,14 @@ User reported that an interactive game had been running during part of the recen
 - For Cube4 Transformer tuning, use `output_dim=24`, benchmark real beam
   `2**25`, keep at least two inference graph windows, reduce full-depth Stream3
   work to about 400 jobs, and compare the exact `depth_done=8` timing.
+
+## 2026-08-22 - SM120 automatic weight and MXFP8 tuner research
+
+- Research an automatic SM120 weight/precision tuner for the real Cube4
+  Transformer before implementation.  Analyze the checkpoint, compare current
+  industry/SOTA PTQ approaches, and define how to minimize quantization error.
+- Keep the study ranking-aware: the eventual tuner must optimize real 24-output
+  beam ordering, frontier retention, solve quality, and measured Molab speed,
+  rather than accepting tensor MSE alone.
+- This prompt authorizes research and documentation only; it does not by itself
+  promote a lower-precision runtime or alter the beam-search architecture.
