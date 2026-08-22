@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 
 #include <cmath>
+#include <cfloat>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -246,7 +247,7 @@ __global__ void quantize_weight_mse_kernel(
             max_abs = fmaxf(max_abs, fabsf(__half2float(weight[index])));
         }
         float best_scale = max_abs == 0.0f ? 1.0f : max_abs / kE4m3Max;
-        float best_error = CUDART_INF_F;
+        float best_error = FLT_MAX;
         // 0.25 ... 1.25 includes aggressive clipping and the max-abs baseline.
         for (std::uint32_t candidate = 0; candidate <= 40U; ++candidate) {
             const float multiplier = 0.25f + 0.025f * static_cast<float>(candidate);
