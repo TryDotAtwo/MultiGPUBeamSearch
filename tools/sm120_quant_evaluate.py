@@ -23,6 +23,49 @@ from tools.sm120_quant_tuner import CORE_OPERATORS, ranking_metrics
 from tools.stream1_transformer_torch_benchmark import PieceTransformerTorch
 
 
+def select_stratified_states(
+    states: np.ndarray,
+    depths: np.ndarray,
+    *,
+    max_states: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Select deterministic, near-equal quotas from every represented depth."""
+    states = np.asarray(states)
+    depths = np.asarray(depths)
+    if states.shape[0] != depths.shape[0] or states.ndim != 2 or depths.ndim != 1:
+        raise ValueError("states/depths shape mismatch")
+    if max_states <= 0:
+        raise ValueError("max_states must be positive")
+    unique = np.unique(depths)
+    if unique.size == 0:
+        raise ValueError("empty calibration corpus")
+    target = min(max_states, states.shape[0])
+    base, remainder = divmod(target, unique.size)
+    selected: list[np.ndarray] = []
+    for position, depth in enumerate(unique):
+        available = np.flatnonzero(depths == depth)
+        quota = min(available.size, base + int(position < remainder))
+        if quota:
+            # Even spacing avoids a prefix-only bias while remaining reproducible.
+            offsets = np.linspace(0, available.size - 1, quota, dtype=np.int64)
+            selected.append(available[offsets])
+    indices = np.sort(np.concatenate(selected))
+    if indices.size < target:
+        missing = np.setdiff1d(np.arange(states.shape[0]), indices, assume_unique=True)
+        indices = np.sort(np.concatenate((indices, missing[: target - indices.size])))
+    return states[indices], depths[indices], indices
+
+
+def build_initial_mixed_precision_policies() -> list[tuple[str, dict[str, str]]]:
+    all_fp8 = {name: "sm120_block_fp8" for name in CORE_OPERATORS}
+    policies: list[tuple[str, dict[str, str]]] = [("all_core_fp8", all_fp8)]
+    for name in CORE_OPERATORS:
+        policy = dict(all_fp8)
+        policy[name] = "fp16"
+        policies.append(("rollback_" + name, policy))
+    return policies
+
+
 class QuantObservedPieceTransformer(PieceTransformerTorch):
     def __init__(self, weight_dir: Path, device: torch.device) -> None:
         super().__init__(weight_dir, device, projection_mode="matmul", qkv_contiguous=True)
@@ -156,7 +199,11 @@ def main() -> None:
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     corpus = np.load(args.corpus)
-    states = np.asarray(corpus["states"][: args.max_states], dtype=np.uint8)
+    states, selected_depths, selected_indices = select_stratified_states(
+        np.asarray(corpus["states"], dtype=np.uint8),
+        np.asarray(corpus["depths"], dtype=np.int32),
+        max_states=args.max_states,
+    )
     device = torch.device("cuda")
     model = QuantObservedPieceTransformer(args.weight_dir, device)
     fp16 = {name: "fp16" for name in CORE_OPERATORS}
@@ -177,16 +224,7 @@ def main() -> None:
         "pair_inversion_rate": 0.0, "threshold_band_agreement": 1.0,
         "global_top_per_state_overlap": 1.0,
     }]
-    policies: list[tuple[str, dict[str, str]]] = [
-        ("all_core_fp8", {name: "sm120_block_fp8" for name in CORE_OPERATORS})
-    ]
-    policies.extend(
-        (
-            "only_" + name,
-            {other: ("sm120_block_fp8" if other == name else "fp16") for other in CORE_OPERATORS},
-        )
-        for name in CORE_OPERATORS
-    )
+    policies = build_initial_mixed_precision_policies()
     for name, policy in policies:
         model.set_precision(policy)
         candidate, elapsed = _run_logits(
@@ -199,6 +237,11 @@ def main() -> None:
         "schema_version": 1,
         "states": int(states.shape[0]),
         "batch_size": args.batch_size,
+        "depth_counts": {
+            str(int(depth)): int(np.count_nonzero(selected_depths == depth))
+            for depth in np.unique(selected_depths)
+        },
+        "selected_indices_sha256": hashlib.sha256(selected_indices.tobytes()).hexdigest(),
         "corpus_sha256": hashlib.sha256(args.corpus.read_bytes()).hexdigest(),
         "observations": observations,
     }
