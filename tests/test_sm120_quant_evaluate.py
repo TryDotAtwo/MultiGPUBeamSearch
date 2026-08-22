@@ -24,6 +24,12 @@ def test_select_stratified_states_balances_depths_and_is_deterministic() -> None
     np.testing.assert_array_equal(depths2, selected_depths)
     np.testing.assert_array_equal(indices2, indices)
 
+    calibration = select_stratified_states(states, depths, max_states=8, split="calibration")
+    holdout = select_stratified_states(states, depths, max_states=8, split="holdout")
+    assert set(calibration[2]).isdisjoint(set(holdout[2]))
+    assert set(calibration[1]) == {4, 5, 6}
+    assert set(holdout[1]) == {4, 5, 6}
+
 
 def test_initial_mixed_precision_policies_include_fp8_and_each_single_rollback() -> None:
     policies = build_initial_mixed_precision_policies()

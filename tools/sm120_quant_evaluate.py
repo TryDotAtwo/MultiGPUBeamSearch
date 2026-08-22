@@ -28,6 +28,7 @@ def select_stratified_states(
     depths: np.ndarray,
     *,
     max_states: int,
+    split: str = "all",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Select deterministic, near-equal quotas from every represented depth."""
     states = np.asarray(states)
@@ -36,14 +37,22 @@ def select_stratified_states(
         raise ValueError("states/depths shape mismatch")
     if max_states <= 0:
         raise ValueError("max_states must be positive")
+    if split not in ("all", "calibration", "holdout"):
+        raise ValueError("split must be all, calibration, or holdout")
     unique = np.unique(depths)
     if unique.size == 0:
         raise ValueError("empty calibration corpus")
-    target = min(max_states, states.shape[0])
+    eligible_mask = np.ones(states.shape[0], dtype=bool)
+    if split != "all":
+        eligible_mask = np.arange(states.shape[0]) % 2 == (0 if split == "calibration" else 1)
+    target = min(max_states, int(np.count_nonzero(eligible_mask)))
     base, remainder = divmod(target, unique.size)
     selected: list[np.ndarray] = []
     for position, depth in enumerate(unique):
         available = np.flatnonzero(depths == depth)
+        if split != "all":
+            parity = 0 if split == "calibration" else 1
+            available = available[available % 2 == parity]
         quota = min(available.size, base + int(position < remainder))
         if quota:
             # Even spacing avoids a prefix-only bias while remaining reproducible.
@@ -51,7 +60,7 @@ def select_stratified_states(
             selected.append(available[offsets])
     indices = np.sort(np.concatenate(selected))
     if indices.size < target:
-        missing = np.setdiff1d(np.arange(states.shape[0]), indices, assume_unique=True)
+        missing = np.setdiff1d(np.flatnonzero(eligible_mask), indices, assume_unique=True)
         indices = np.sort(np.concatenate((indices, missing[: target - indices.size])))
     return states[indices], depths[indices], indices
 
@@ -224,6 +233,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--max-states", type=int, default=4096)
+    parser.add_argument("--split", choices=("all", "calibration", "holdout"), default="all")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     corpus = np.load(args.corpus)
@@ -231,6 +241,7 @@ def main() -> None:
         np.asarray(corpus["states"], dtype=np.uint8),
         np.asarray(corpus["depths"], dtype=np.int32),
         max_states=args.max_states,
+        split=args.split,
     )
     device = torch.device("cuda")
     model = QuantObservedPieceTransformer(args.weight_dir, device)
@@ -279,6 +290,7 @@ def main() -> None:
         "schema_version": 1,
         "states": int(states.shape[0]),
         "batch_size": args.batch_size,
+        "split": args.split,
         "depth_counts": {
             str(int(depth)): int(np.count_nonzero(selected_depths == depth))
             for depth in np.unique(selected_depths)
