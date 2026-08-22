@@ -163,7 +163,21 @@ def _load_initial_state(test_csv: Path) -> np.ndarray:
         rows = list(csv.DictReader(stream))
     if len(rows) != 1:
         raise ValueError("calibration test.csv must contain exactly one puzzle")
-    return np.asarray([int(value) for value in rows[0]["initial_state"].split(",")], dtype=np.uint8)
+    text = rows[0]["initial_state"]
+    separator = ";" if ";" in text else ","
+    return np.asarray([int(value) for value in text.split(separator)], dtype=np.uint8)
+
+
+def generator_actions(payload: Mapping[str, object]) -> np.ndarray:
+    """Accept both public generator schemas without silently guessing."""
+    has_actions = "actions" in payload
+    has_moves = "moves" in payload
+    if has_actions == has_moves:
+        raise ValueError("generator JSON must contain exactly one of actions or moves")
+    actions = np.asarray(payload["actions" if has_actions else "moves"], dtype=np.int64)
+    if actions.ndim != 2 or actions.shape[0] == 0 or actions.shape[1] == 0:
+        raise ValueError("generator action table must be a non-empty matrix")
+    return actions
 
 
 def main() -> None:
@@ -176,7 +190,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     generator_payload = json.loads(args.generator_json.read_text(encoding="utf-8"))
-    generators = np.asarray(generator_payload["actions"], dtype=np.int64)
+    generators = generator_actions(generator_payload)
     initial = _load_initial_state(args.test_csv)
     frontiers = reconstruct_frontiers(args.history_dir, initial, generators)
     depths = tuple(int(value) for value in args.depths.split(",") if value)
