@@ -596,3 +596,15 @@ User reported that an interactive game had been running during part of the recen
   rather than accepting tensor MSE alone.
 - This prompt authorizes research and documentation only; it does not by itself
   promote a lower-precision runtime or alter the beam-search architecture.
+
+## 2026-08-22 - SM120 automatic weight tuner implementation
+
+- Implement the researched SM120 weight/precision autotuner and try the
+  lower-error block-scaled FP8 pipeline on the real Cube4 output-24
+  Transformer.
+- Run every compile, CUDA correctness test, isolated benchmark, and integrated
+  beam-search acceptance strictly in the user-provided live Molab notebook;
+  do not use the local GPU for evidence.
+- Compare integrated performance against the accepted Molab Cube4 baseline of
+  `80.2952` seconds at exactly `beam=2**25`, `depth_done=8`, and 391 Stream3
+  jobs, while treating ranking/frontier accuracy as a hard acceptance gate.

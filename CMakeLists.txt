@@ -26,6 +26,7 @@ option(BEAM_DEBUG_FINAL_HISTOGRAM_TRACE "Compile final histogram-vs-survivor dia
 option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
+option(BEAM_ENABLE_SM120_FP8 "Build the opt-in SM120 block-scaled FP8 Transformer path" OFF)
 
 set(BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE OFF)
 set(BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE OFF)
@@ -176,6 +177,19 @@ set_target_properties(stream1_transformer_cuda_tests PROPERTIES CUDA_STANDARD 17
 add_executable(stream1_transformer_final_cls_cuda_tests tests/stream1_transformer_final_cls_cuda_tests.cu)
 target_link_libraries(stream1_transformer_final_cls_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream1_transformer_final_cls_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+if(BEAM_ENABLE_SM120_FP8)
+    target_compile_definitions(beam_cuda PUBLIC BEAM_ENABLE_SM120_FP8=1)
+    add_executable(stream1_transformer_sm120_fp8_cuda_tests tests/stream1_transformer_sm120_fp8_cuda_tests.cu)
+    target_link_libraries(stream1_transformer_sm120_fp8_cuda_tests PRIVATE beam_cuda)
+    set_target_properties(stream1_transformer_sm120_fp8_cuda_tests PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
+    )
+else()
+    target_compile_definitions(beam_cuda PUBLIC BEAM_ENABLE_SM120_FP8=0)
+endif()
 
 add_executable(stream1_transformer_gemm_policy_tests tests/stream1_transformer_gemm_policy_tests.cpp)
 target_include_directories(stream1_transformer_gemm_policy_tests PRIVATE cuda)
