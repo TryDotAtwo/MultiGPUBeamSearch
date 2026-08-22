@@ -1108,3 +1108,8 @@
   profile that asks production startup to quantize weights.
 - Bumped the precision-profile schema to v2 so older ambiguous profiles cannot
   be mistaken for artifacts satisfying the new offline-weight contract.
+- Corrected the offline E4M3 encoder input: candidate bytes are now derived
+  directly from the FP32 export instead of the already-rounded FP16 control.
+  Provenance fingerprints both FP32 and FP16 exports, and the E4M3 packager
+  explicitly rejects INT8 layouts rather than routing them through the wrong
+  encoder.

@@ -23,6 +23,17 @@ def _profile(checkpoint_sha256: str, selected: set[str]) -> dict:
     )
 
 
+def _int8_profile(checkpoint_sha256: str) -> dict:
+    return build_profile(
+        checkpoint_sha256=checkpoint_sha256,
+        model_metadata_sha256="b" * 64,
+        calibration_sha256="c" * 64,
+        gpu_identity="RTX PRO 6000 Blackwell|sm120",
+        cutlass_commit="d" * 40,
+        operator_precision={name: "sm120_block_int8" for name in CORE_OPERATORS},
+    )
+
+
 def test_selected_operators_are_canonical_and_fail_closed() -> None:
     selected = {"blocks.0.attn.in_proj_weight", "blocks.2.ff.0.weight"}
     assert selected_operators(_profile("a" * 64, selected)) == [
@@ -32,6 +43,8 @@ def test_selected_operators_are_canonical_and_fail_closed() -> None:
         selected_operators(_profile("a" * 64, {"blocks.0.ff.3.weight"}))
     with pytest.raises(ValueError, match="at least one"):
         selected_operators(_profile("a" * 64, set()))
+    with pytest.raises(ValueError, match="another low-precision layout"):
+        selected_operators(_int8_profile("a" * 64))
 
 
 def test_sha256_file_matches_known_vector(tmp_path: Path) -> None:

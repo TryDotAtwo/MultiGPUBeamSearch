@@ -36,6 +36,15 @@ def sha256_file(path: Path) -> str:
 
 def selected_operators(profile: dict) -> list[str]:
     validated = validate_profile(profile)
+    incompatible = [
+        name for name in CORE_OPERATORS
+        if validated["operators"][name]["weight_dtype"] not in ("fp16", "e4m3")
+    ]
+    if incompatible:
+        raise ValueError(
+            "E4M3 encoder cannot package operators using another low-precision layout: "
+            f"{incompatible}"
+        )
     selected = [
         name for name in CORE_OPERATORS
         if validated["operators"][name]["weight_dtype"] == "e4m3"
@@ -49,7 +58,7 @@ def selected_operators(profile: dict) -> list[str]:
 
 
 def package_profile(
-    *, encoder: Path, fp16_weight_dir: Path, fp32_checkpoint: Path,
+    *, encoder: Path, fp16_weight_dir: Path, fp32_weight_dir: Path, fp32_checkpoint: Path,
     profile_json: Path, output_dir: Path, weight_scale_policy: str = "mse_grid",
 ) -> Path:
     if output_dir.exists():
@@ -68,7 +77,7 @@ def package_profile(
     encoded = temporary / "encoded"
     try:
         subprocess.run([
-            str(encoder), "--weight-dir", str(fp16_weight_dir),
+            str(encoder), "--weight-dir", str(fp32_weight_dir),
             "--output-dir", str(encoded), "--operators", ",".join(operators),
             "--weight-scale-policy", weight_scale_policy,
         ], check=True)
@@ -85,8 +94,13 @@ def package_profile(
                 "manifest_sha256": sha256_file(fp16_weight_dir / "manifest.json"),
                 "directory_name": fp16_weight_dir.name,
             },
+            "fp32_export": {
+                "manifest_sha256": sha256_file(fp32_weight_dir / "manifest.json"),
+                "directory_name": fp32_weight_dir.name,
+            },
             "operators": operators,
             "encoding": {
+                "source_weight": "fp32",
                 "weight": "cutlass_float_e4m3",
                 "weight_scale": "fp32",
                 "weight_scale_granularity": {"k": 128, "n": 128},
@@ -122,6 +136,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--encoder", type=Path, required=True)
     parser.add_argument("--fp16-weight-dir", type=Path, required=True)
+    parser.add_argument("--fp32-weight-dir", type=Path, required=True)
     parser.add_argument("--fp32-checkpoint", type=Path, required=True)
     parser.add_argument("--profile-json", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -129,6 +144,7 @@ def main() -> None:
     args = parser.parse_args()
     result = package_profile(
         encoder=args.encoder, fp16_weight_dir=args.fp16_weight_dir,
+        fp32_weight_dir=args.fp32_weight_dir,
         fp32_checkpoint=args.fp32_checkpoint, profile_json=args.profile_json,
         output_dir=args.output_dir, weight_scale_policy=args.weight_scale_policy,
     )

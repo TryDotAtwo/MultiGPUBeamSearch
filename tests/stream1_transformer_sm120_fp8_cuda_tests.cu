@@ -47,6 +47,7 @@ int main() {
 
     std::vector<half> input(static_cast<std::size_t>(rows) * input_cols);
     std::vector<half> weight(static_cast<std::size_t>(input_cols) * output_cols, __float2half(0.0f));
+    std::vector<float> weight_fp32(static_cast<std::size_t>(input_cols) * output_cols, 0.0f);
     std::vector<half> expected(static_cast<std::size_t>(rows) * output_cols, __float2half(0.0f));
     for (std::uint32_t row = 0; row < rows; ++row) {
         for (std::uint32_t col = 0; col < input_cols; ++col) {
@@ -57,24 +58,31 @@ int main() {
     }
     for (std::uint32_t col = 0; col < input_cols; ++col) {
         weight[static_cast<std::size_t>(col) * output_cols + col] = __float2half(1.0f);
+        weight_fp32[static_cast<std::size_t>(col) * output_cols + col] = 1.0f;
     }
 
     half* d_input = nullptr;
     half* d_weight = nullptr;
+    float* d_weight_fp32 = nullptr;
     half* d_output = nullptr;
     std::uint8_t* d_quantized_input = nullptr;
     std::uint8_t* d_quantized_weight = nullptr;
+    std::uint8_t* d_quantized_weight_fp32 = nullptr;
     float* d_input_scales = nullptr;
     float* d_weight_scales = nullptr;
+    float* d_weight_scales_fp32 = nullptr;
     void* d_workspace = nullptr;
 
     BEAM_CUDA_CHECK(cudaMalloc(&d_input, input.size() * sizeof(half)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_weight, weight.size() * sizeof(half)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_weight_fp32, weight_fp32.size() * sizeof(float)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_output, expected.size() * sizeof(half)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_quantized_input, input.size()));
     BEAM_CUDA_CHECK(cudaMalloc(&d_quantized_weight, weight.size()));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_quantized_weight_fp32, weight_fp32.size()));
     BEAM_CUDA_CHECK(cudaMalloc(&d_input_scales, rows * sizeof(float)));
     BEAM_CUDA_CHECK(cudaMalloc(&d_weight_scales, sizeof(float)));
+    BEAM_CUDA_CHECK(cudaMalloc(&d_weight_scales_fp32, sizeof(float)));
     const std::size_t workspace_bytes =
         stream1_transformer_sm120_fp8_workspace_bytes(rows, input_cols, output_cols);
     if (workspace_bytes != 0U) {
@@ -82,6 +90,8 @@ int main() {
     }
     BEAM_CUDA_CHECK(cudaMemcpy(d_input, input.data(), input.size() * sizeof(half), cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(d_weight, weight.data(), weight.size() * sizeof(half), cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        d_weight_fp32, weight_fp32.data(), weight_fp32.size() * sizeof(float), cudaMemcpyHostToDevice));
 
     stream1_transformer_sm120_fp8_quantize_weight_cuda(
         d_weight,
@@ -91,6 +101,28 @@ int main() {
         output_cols,
         1.0f,
         nullptr);
+    stream1_transformer_sm120_fp8_quantize_weight_from_fp32_cuda(
+        d_weight_fp32,
+        d_quantized_weight_fp32,
+        d_weight_scales_fp32,
+        input_cols,
+        output_cols,
+        1.0f,
+        nullptr);
+    std::vector<std::uint8_t> encoded_half(weight.size());
+    std::vector<std::uint8_t> encoded_fp32(weight_fp32.size());
+    float encoded_half_scale = 0.0f;
+    float encoded_fp32_scale = 0.0f;
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        encoded_half.data(), d_quantized_weight, encoded_half.size(), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        encoded_fp32.data(), d_quantized_weight_fp32, encoded_fp32.size(), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &encoded_half_scale, d_weight_scales, sizeof(float), cudaMemcpyDeviceToHost));
+    BEAM_CUDA_CHECK(cudaMemcpy(
+        &encoded_fp32_scale, d_weight_scales_fp32, sizeof(float), cudaMemcpyDeviceToHost));
+    require(encoded_half == encoded_fp32, "exact FP32 weights must encode identically to FP16 values");
+    require(encoded_half_scale == encoded_fp32_scale, "FP32 and FP16 exact weight scales differ");
     stream1_transformer_sm120_fp8_linear_cuda(
         d_input,
         d_quantized_input,
@@ -176,12 +208,15 @@ int main() {
               << "\n";
 
     cudaFree(d_workspace);
+    cudaFree(d_weight_scales_fp32);
     cudaFree(d_weight_scales);
     cudaFree(d_input_scales);
     cudaFree(d_quantized_weight);
+    cudaFree(d_quantized_weight_fp32);
     cudaFree(d_quantized_input);
     cudaFree(d_output);
     cudaFree(d_weight);
+    cudaFree(d_weight_fp32);
     cudaFree(d_input);
     return 0;
 }

@@ -42,10 +42,10 @@ static OperatorSpec resolve(const fs::path& weight_dir, const std::string& name)
     for (std::uint32_t layer = 0; layer < 4U; ++layer) {
         const std::string prefix = "blocks." + std::to_string(layer) + ".";
         if (name == prefix + "attn.in_proj_weight") {
-            return {name, weight_dir / ("block" + std::to_string(layer) + "_attn_qkv_weight_hxk.fp16"), 256U, 768U};
+            return {name, weight_dir / ("block" + std::to_string(layer) + "_attn_qkv_weight_hxk.fp32"), 256U, 768U};
         }
         if (name == prefix + "ff.0.weight") {
-            return {name, weight_dir / ("block" + std::to_string(layer) + "_ff1_weight_hxk.fp16"), 256U, 1024U};
+            return {name, weight_dir / ("block" + std::to_string(layer) + "_ff1_weight_hxk.fp32"), 256U, 1024U};
         }
     }
     throw std::invalid_argument("offline encoder does not support operator: " + name);
@@ -53,11 +53,11 @@ static OperatorSpec resolve(const fs::path& weight_dir, const std::string& name)
 
 static std::vector<std::byte> read_exact(const fs::path& path, std::size_t bytes) {
     std::ifstream in(path, std::ios::binary);
-    if (!in) throw std::runtime_error("cannot open FP16 source weight: " + path.string());
+    if (!in) throw std::runtime_error("cannot open FP32 source weight: " + path.string());
     std::vector<std::byte> data(bytes);
     in.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(bytes));
     if (static_cast<std::size_t>(in.gcount()) != bytes || in.peek() != std::ifstream::traits_type::eof()) {
-        throw std::runtime_error("FP16 source weight size mismatch: " + path.string());
+        throw std::runtime_error("FP32 source weight size mismatch: " + path.string());
     }
     return data;
 }
@@ -108,8 +108,8 @@ int main(int argc, char** argv) try {
         const std::size_t elements = static_cast<std::size_t>(spec.input_cols) * spec.output_cols;
         const std::size_t scale_elements = stream1_transformer_sm120_fp8_weight_scale_elements(
             spec.input_cols, spec.output_cols);
-        const auto source = read_exact(spec.source_file, elements * sizeof(half));
-        half* d_source = nullptr;
+        const auto source = read_exact(spec.source_file, elements * sizeof(float));
+        float* d_source = nullptr;
         std::uint8_t* d_quantized = nullptr;
         float* d_scales = nullptr;
         BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_source), source.size()));
@@ -117,10 +117,10 @@ int main(int argc, char** argv) try {
         BEAM_CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_scales), scale_elements * sizeof(float)));
         BEAM_CUDA_CHECK(cudaMemcpy(d_source, source.data(), source.size(), cudaMemcpyHostToDevice));
         if (weight_scale_policy == "mse_grid") {
-            stream1_transformer_sm120_fp8_quantize_weight_mse_cuda(
+            stream1_transformer_sm120_fp8_quantize_weight_mse_from_fp32_cuda(
                 d_source, d_quantized, d_scales, spec.input_cols, spec.output_cols, nullptr);
         } else {
-            stream1_transformer_sm120_fp8_quantize_weight_cuda(
+            stream1_transformer_sm120_fp8_quantize_weight_from_fp32_cuda(
                 d_source, d_quantized, d_scales, spec.input_cols, spec.output_cols, 1.0f, nullptr);
         }
         std::vector<std::uint8_t> quantized(elements);
@@ -138,7 +138,7 @@ int main(int argc, char** argv) try {
         const std::string prefix = "operator." + name + ".";
         manifest << prefix << "input_cols=" << spec.input_cols << "\n";
         manifest << prefix << "output_cols=" << spec.output_cols << "\n";
-        manifest << prefix << "source_fp16_sha256=" << beam::sha256::file_hex(spec.source_file) << "\n";
+        manifest << prefix << "source_fp32_sha256=" << beam::sha256::file_hex(spec.source_file) << "\n";
         manifest << prefix << "weight_file=" << weight_relative.generic_string() << "\n";
         manifest << prefix << "weight_sha256=" << beam::sha256::file_hex(output_dir / weight_relative) << "\n";
         manifest << prefix << "scale_file=" << scale_relative.generic_string() << "\n";

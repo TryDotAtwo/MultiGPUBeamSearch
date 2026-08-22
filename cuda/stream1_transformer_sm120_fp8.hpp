@@ -38,6 +38,23 @@ void stream1_transformer_sm120_fp8_quantize_weight_mse_cuda(
     std::uint32_t output_cols,
     cudaStream_t stream);
 
+void stream1_transformer_sm120_fp8_quantize_weight_from_fp32_cuda(
+    const float* weight,
+    std::uint8_t* quantized_weight,
+    float* weight_scales,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    float scale_multiplier,
+    cudaStream_t stream);
+
+void stream1_transformer_sm120_fp8_quantize_weight_mse_from_fp32_cuda(
+    const float* weight,
+    std::uint8_t* quantized_weight,
+    float* weight_scales,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    cudaStream_t stream);
+
 void stream1_transformer_sm120_fp8_linear_cuda(
     const half* input,
     std::uint8_t* quantized_input,
