@@ -17,9 +17,6 @@
 #include <vector>
 
 namespace fs = std::filesystem;
-using beam::stream1_transformer_sm120_fp8_quantize_weight_cuda;
-using beam::stream1_transformer_sm120_fp8_weight_scale_elements;
-
 struct OperatorSpec {
     std::string name;
     fs::path source_file;
@@ -88,7 +85,7 @@ int main(int argc, char** argv) try {
     const std::string operator_csv(argv[6]);
     if (fs::exists(output_dir)) throw std::runtime_error("output directory already exists: " + output_dir.string());
     if (!fs::is_regular_file(weight_dir / "manifest.json")) throw std::runtime_error("missing source manifest.json");
-    if (!beam::stream1_transformer_sm120_fp8_supported()) {
+    if (!stream1_transformer_sm120_fp8_supported()) {
         throw std::runtime_error("offline encoder requires a physical SM120 GPU and sm_120a build");
     }
     const auto names = split(operator_csv);
