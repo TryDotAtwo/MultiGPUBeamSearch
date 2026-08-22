@@ -1,5 +1,6 @@
 #include "stream1_transformer_sm120_fp8.hpp"
 #include "../cuda/stream1.hpp"
+#include "config.hpp"
 
 #include "cuda_check.hpp"
 
@@ -89,7 +90,7 @@ void benchmark_shape(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t
         (average_ms * 1.0e9);
 
     auto run_fp16_once = [&]() {
-        stream1_cutlass_linear_cuda(
+        beam::stream1_cutlass_linear_cuda(
             static_cast<const half*>(input.pointer),
             static_cast<const half*>(weight.pointer),
             static_cast<half*>(fp16_output.pointer),
