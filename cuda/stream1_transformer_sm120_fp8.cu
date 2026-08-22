@@ -141,23 +141,43 @@ __global__ void quantize_activation_kernel(
     std::uint32_t rows,
     std::uint32_t input_cols,
     float scale_multiplier) {
-    const std::uint32_t row = blockIdx.x;
-    const std::uint32_t k_block = blockIdx.y;
-    const std::uint32_t col = k_block * kScaleGranularity + threadIdx.x;
-    __shared__ float warp_maxima[4];
-    const std::size_t index = static_cast<std::size_t>(row) * input_cols + col;
-    const float value = __half2float(input[index]);
-    const float max_abs = block_max(fabsf(value), warp_maxima);
-    if (threadIdx.x == 0U) {
-        const float scale = max_abs == 0.0f
-            ? 1.0f
-            : (max_abs / kE4m3Max) * scale_multiplier;
-        warp_maxima[0] = scale;
+    constexpr std::uint32_t warps_per_block = 4U;
+    const std::uint32_t warp = threadIdx.x >> 5U;
+    const std::uint32_t lane = threadIdx.x & 31U;
+    const std::uint32_t k_blocks = input_cols / kScaleGranularity;
+    const std::uint64_t tile =
+        static_cast<std::uint64_t>(blockIdx.x) * warps_per_block + warp;
+    const std::uint64_t tile_count = static_cast<std::uint64_t>(rows) * k_blocks;
+    if (tile >= tile_count) {
+        return;
+    }
+    const std::uint32_t row = static_cast<std::uint32_t>(tile / k_blocks);
+    const std::uint32_t k_block = static_cast<std::uint32_t>(tile % k_blocks);
+    float values[4];
+    float max_abs = 0.0f;
+#pragma unroll
+    for (std::uint32_t item = 0; item < 4U; ++item) {
+        const std::uint32_t col = k_block * kScaleGranularity + lane + item * 32U;
+        const std::size_t index = static_cast<std::size_t>(row) * input_cols + col;
+        values[item] = __half2float(input[index]);
+        max_abs = fmaxf(max_abs, fabsf(values[item]));
+    }
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        max_abs = fmaxf(max_abs, __shfl_down_sync(0xffffffffU, max_abs, offset));
+    }
+    max_abs = __shfl_sync(0xffffffffU, max_abs, 0);
+    const float scale = max_abs == 0.0f
+        ? 1.0f
+        : (max_abs / kE4m3Max) * scale_multiplier;
+    if (lane == 0U) {
         scales[static_cast<std::size_t>(k_block) * rows + row] = scale;
     }
-    __syncthreads();
-    const float scaled = value / warp_maxima[0];
-    quantized[index] = ElementA(scaled);
+#pragma unroll
+    for (std::uint32_t item = 0; item < 4U; ++item) {
+        const std::uint32_t col = k_block * kScaleGranularity + lane + item * 32U;
+        const std::size_t index = static_cast<std::size_t>(row) * input_cols + col;
+        quantized[index] = ElementA(values[item] / scale);
+    }
 }
 
 __global__ void quantize_weight_kernel(
@@ -358,8 +378,12 @@ void stream1_transformer_sm120_fp8_linear_cuda(
         (required_workspace != 0U && workspace == nullptr)) {
         throw std::invalid_argument("SM120 FP8 linear workspace is smaller than required");
     }
-    const dim3 quantize_grid(rows, input_cols / kScaleGranularity);
-    quantize_activation_kernel<<<quantize_grid, 128, 0, stream>>>(
+    constexpr std::uint32_t warps_per_block = 4U;
+    const std::uint64_t quantize_tiles =
+        static_cast<std::uint64_t>(rows) * (input_cols / kScaleGranularity);
+    const std::uint32_t quantize_blocks = static_cast<std::uint32_t>(
+        (quantize_tiles + warps_per_block - 1U) / warps_per_block);
+    quantize_activation_kernel<<<quantize_blocks, 128, 0, stream>>>(
         input,
         reinterpret_cast<ElementA*>(quantized_input),
         input_scales,
