@@ -1099,3 +1099,7 @@
   kernel gates pass.
 - Added targeted contract tests, intentionally left unexecuted locally because
   this task's GPU and validation evidence must come strictly from Molab.
+- Added a fail-closed automatic selector which joins FP32-relative ranking,
+  reconstructed-state frontier quality, and native Stream1 latency by exact
+  candidate name. Missing evidence rejects a candidate; accepted evidence and
+  the selected operator policy are sealed into one immutable hashed profile.

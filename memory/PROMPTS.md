@@ -616,3 +616,6 @@ User reported that an interactive game had been running during part of the recen
 - Treat original FP32 checkpoint weights as the truth baseline, compare the
   current FP16 path separately, and compare the proposed calibrated/block-scaled
   scheme against both. Do not label the proposed scheme as merely "FP8".
+- Promotion must be automatic but fail closed: ranking alone is insufficient;
+  require reconstructed frontier agreement and measured native Stream1 latency
+  for the exact same candidate before producing an immutable runtime profile.

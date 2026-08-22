@@ -385,7 +385,11 @@ def main() -> None:
         candidate, elapsed = _run_logits(
             model, states, batch_size=args.batch_size, capture_statistics=False
         )
-        row = {"name": name, **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed)}
+        row = {
+            "name": name,
+            "operator_precision": policy,
+            **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed),
+        }
         observations.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
     for name, policy in build_initial_int8_policies():
@@ -393,7 +397,11 @@ def main() -> None:
         candidate, elapsed = _run_logits(
             model, states, batch_size=args.batch_size, capture_statistics=False
         )
-        row = {"name": name, **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed)}
+        row = {
+            "name": name,
+            "operator_precision": policy,
+            **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed),
+        }
         observations.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
     rollback_rows = [row for row in observations if str(row["name"]).startswith("rollback_")]
@@ -438,6 +446,7 @@ def main() -> None:
             "name": name,
             "smoothquant_alpha": alpha,
             "folded_operators": sorted(scales),
+            "operator_precision": {name: "sm120_block_fp8" for name in CORE_OPERATORS},
             **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed),
         }
         observations.append(row)
