@@ -57,9 +57,12 @@ def load_puzzle_contract(
     info = json.loads(puzzle_info_path.read_text(encoding="utf-8"))
     central_state = _strict_json_integer_state(info["central_state"], "central_state")
     state_len = len(central_state)
-    if not 1 <= state_len <= 120:
+    if not 1 <= state_len <= 256:
         raise ValueError(
-            "public runner requires 1 <= state_len <= 120 for the State128 logical payload"
+            "public runner requires 1 <= state_len <= 256; the state payload is sized "
+            "per puzzle at build time (BEAM_STATE_LOGICAL_BYTES is inferred from "
+            "central_state), and 256 is the ceiling set by "
+            "static_assert(STATE_VALUE_PAD <= 256)"
         )
     if any(value < 0 or value > 255 for value in central_state):
         raise ValueError("central_state values must fit the State128 uint8 payload")

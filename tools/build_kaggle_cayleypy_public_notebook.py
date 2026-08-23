@@ -40,9 +40,12 @@ implementation; this notebook does not contain a second solver.
 - MLP and Transformer use separate 2xT4 profile registries. A profile is selected
   only after backend detection, and cross-applying profiles fails closed.
 - Model dtype is automatically **fp16**; users do not select dtype or format.
-- The fixed public State128 runner requires `1 <= state_len <= 120`. The value
-  alphabet is inferred independently from contiguous central-state labels
-  `0..num_classes-1`; every selected initial state must use that same alphabet.
+- The runner requires `1 <= state_len <= 256`. The state payload is sized per
+  puzzle at build time -- `BEAM_STATE_LOGICAL_BYTES` and the Zobrist value pad are
+  both inferred from `central_state` -- so a puzzle wider than the historical
+  128-byte payload builds its own. The value alphabet is inferred independently
+  from contiguous central-state labels `0..num_classes-1`; every selected initial
+  state must use that same alphabet.
 - The inclusive `PUZZLE_ID_START..PUZZLE_ID_END` range is checked strictly:
   a missing ID is a configuration error.
 

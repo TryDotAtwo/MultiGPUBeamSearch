@@ -181,7 +181,7 @@ def _validate_replay_contract(envelope: Mapping[str, object]) -> None:
     initial_state = tuple(_state_list(proof.get("initial_state"), "envelope.proof.initial_state"))
     central_state = tuple(_state_list(proof.get("central_state"), "envelope.proof.central_state"))
     state_len = len(initial_state)
-    if not 1 <= state_len <= 120 or len(central_state) != state_len:
+    if not 1 <= state_len <= 256 or len(central_state) != state_len:
         raise ValueError("proof states must share a State128 logical length in 1..120")
 
     generator_source = _mapping(proof.get("generators"), "envelope.proof.generators")

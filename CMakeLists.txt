@@ -5,6 +5,7 @@ beam_configure_state_sizing()
 message(STATUS "Beam state logical bytes: ${BEAM_STATE_LOGICAL_BYTES}")
 message(STATUS "Beam state physical bytes: ${BEAM_STATE_PHYSICAL_BYTES}")
 message(STATUS "Beam state alignment: ${BEAM_STATE_ALIGNMENT}")
+message(STATUS "Beam state value pad: ${BEAM_STATE_VALUE_PAD}")
 message(STATUS "Beam move count: ${BEAM_MOVE_COUNT}")
 project(beam_solver_contracts LANGUAGES CXX CUDA)
 
@@ -97,6 +98,7 @@ target_compile_definitions(beam_core PUBLIC
     BEAM_STATE_LOGICAL_BYTES=${BEAM_STATE_LOGICAL_BYTES}
     BEAM_STATE_PHYSICAL_BYTES=${BEAM_STATE_PHYSICAL_BYTES}
     BEAM_STATE_ALIGNMENT=${BEAM_STATE_ALIGNMENT}
+    BEAM_STATE_VALUE_PAD=${BEAM_STATE_VALUE_PAD}
     BEAM_MOVE_COUNT=${BEAM_MOVE_COUNT}
 )
 
