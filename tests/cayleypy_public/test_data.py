@@ -47,9 +47,31 @@ def test_load_contract_derives_value_alphabet_independently_of_state_length(tmp_
     assert contract.num_classes == 6
 
 
-def test_load_contract_rejects_state_len_above_state128_logical_capacity(tmp_path):
+def test_load_contract_accepts_state_len_above_the_historical_128_byte_payload(tmp_path):
+    """A 150-slot puzzle (e.g. the 5x5x5 picture cube) is now in contract.
+
+    The payload is sized per puzzle at build time, so the old 120 bound described
+    one particular build rather than a runtime limit.
+    """
     puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path, ids=(7,))
-    oversized_state = list(range(121))
+    wide_state = list(range(150))
+    puzzle_info.write_text(json.dumps({
+        "central_state": wide_state,
+        "generators": {"identity": wide_state},
+    }), encoding="utf-8")
+    pd.DataFrame({
+        "initial_state_id": [7],
+        "initial_state": [",".join(str(value) for value in wide_state)],
+    }).to_csv(test_csv, index=False)
+
+    contract = load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 7)
+    assert contract.state_len == 150
+    assert contract.num_classes == 150
+
+
+def test_load_contract_rejects_state_len_above_the_value_pad_ceiling(tmp_path):
+    puzzle_info, test_csv, submission_csv = write_fixtures(tmp_path, ids=(7,))
+    oversized_state = list(range(257))
     puzzle_info.write_text(json.dumps({
         "central_state": oversized_state,
         "generators": {"identity": oversized_state},
@@ -59,7 +81,7 @@ def test_load_contract_rejects_state_len_above_state128_logical_capacity(tmp_pat
         "initial_state": [",".join(str(value) for value in oversized_state)],
     }).to_csv(test_csv, index=False)
 
-    with pytest.raises(ValueError, match=r"1 <= state_len <= 120.*State128"):
+    with pytest.raises(ValueError, match=r"1 <= state_len <= 256"):
         load_puzzle_contract(puzzle_info, test_csv, submission_csv, 7, 7)
 
 

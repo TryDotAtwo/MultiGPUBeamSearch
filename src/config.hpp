@@ -9,7 +9,7 @@ namespace beam {
 inline constexpr std::size_t STATE_LEN = BEAM_STATE_LOGICAL_BYTES;
 inline constexpr std::size_t STATE_STORAGE_LEN = BEAM_STATE_PHYSICAL_BYTES;
 inline constexpr std::size_t STATE_ALIGNMENT = BEAM_STATE_ALIGNMENT;
-inline constexpr std::size_t STATE_VALUE_PAD = 128;
+inline constexpr std::size_t STATE_VALUE_PAD = BEAM_STATE_VALUE_PAD;
 inline constexpr std::size_t MOVE_COUNT = BEAM_MOVE_COUNT;
 inline constexpr std::size_t FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET = STATE_LEN;
 static_assert(STATE_LEN > 0);
@@ -20,6 +20,12 @@ static_assert(STATE_ALIGNMENT == 16 || STATE_ALIGNMENT == 32 || STATE_ALIGNMENT 
 static_assert(STATE_STORAGE_LEN % STATE_ALIGNMENT == 0);
 static_assert(STATE_STORAGE_LEN >= STATE_LEN + sizeof(std::uint32_t), "FinalResponse requires 4 padding bytes");
 static_assert(STATE_VALUE_PAD <= 256);
+// Zobrist rows are indexed by state value (`zobrist[p * STATE_VALUE_PAD + value]`),
+// and num_classes <= STATE_LEN because central_state must carry every contiguous
+// label 0..num_classes-1. Without this the table silently reads into the next
+// position's row for any puzzle whose alphabet exceeds the pad -- no crash, just
+// wrong hashes. This is the assert that must move in step with the state_len bound.
+static_assert(STATE_VALUE_PAD >= STATE_LEN, "Zobrist value pad must cover num_classes");
 inline constexpr std::uint32_t STREAM1_SINGLE_SCORE_OUTPUT_DIM = 1;
 inline constexpr std::uint32_t STREAM1_BACKEND_MLP = 0;
 inline constexpr std::uint32_t STREAM1_BACKEND_PIECE_TRANSFORMER = 1;

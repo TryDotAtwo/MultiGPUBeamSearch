@@ -12,6 +12,28 @@ endif()
 if(NOT BEAM_MOVE_COUNT STREQUAL "24")
     message(FATAL_ERROR "Expected inferred move count 24, got ${BEAM_MOVE_COUNT}")
 endif()
+if(NOT BEAM_STATE_VALUE_PAD STREQUAL "128")
+    message(FATAL_ERROR "Expected value pad 128, got ${BEAM_STATE_VALUE_PAD}")
+endif()
+
+# A puzzle wider than the historical 128-byte payload: the Zobrist value pad must
+# grow with it, or `zobrist[p * STATE_VALUE_PAD + value]` reads into the next
+# position's row for every value >= 128 -- silently, with no crash.
+set(BEAM_STATE_LOGICAL_BYTES "150" CACHE STRING "" FORCE)
+set(BEAM_STATE_VALUE_PAD "" CACHE STRING "" FORCE)
+set(BEAM_MOVE_COUNT "30" CACHE STRING "" FORCE)
+beam_configure_state_sizing()
+if(NOT BEAM_STATE_PHYSICAL_BYTES STREQUAL "160")
+    message(FATAL_ERROR "Expected physical bytes 160 for logical 150, got ${BEAM_STATE_PHYSICAL_BYTES}")
+endif()
+if(NOT BEAM_STATE_VALUE_PAD STREQUAL "160")
+    message(FATAL_ERROR "Expected value pad 160 for logical 150, got ${BEAM_STATE_VALUE_PAD}")
+endif()
+
+set(BEAM_STATE_LOGICAL_BYTES "" CACHE STRING "" FORCE)
+set(BEAM_STATE_VALUE_PAD "" CACHE STRING "" FORCE)
+set(BEAM_MOVE_COUNT "" CACHE STRING "" FORCE)
+beam_configure_state_sizing()
 
 set(BEAM_STATE_LOGICAL_BYTES "128" CACHE STRING "" FORCE)
 set(BEAM_MOVE_COUNT "24" CACHE STRING "" FORCE)

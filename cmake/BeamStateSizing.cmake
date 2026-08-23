@@ -76,9 +76,21 @@ function(beam_configure_state_sizing)
         math(EXPR BEAM_STATE_PHYSICAL_BYTES "(((${BEAM_STATE_LOGICAL_BYTES} + 4 + ${BEAM_STATE_ALIGNMENT} - 1) / ${BEAM_STATE_ALIGNMENT}) * ${BEAM_STATE_ALIGNMENT})")
     endif()
 
+    # Zobrist rows are indexed by state VALUE, so the pad must cover num_classes.
+    # data.py already enforces contiguous labels 0..num_classes-1 all present in
+    # central_state, so num_classes <= state_len; sizing the pad from state_len is a
+    # safe upper bound without re-parsing the JSON for max(central_state).
+    # Cost is only memory: STATE_STORAGE_LEN * PAD * 16 B = 410 KB at 160/160.
+    math(EXPR BEAM_STATE_VALUE_PAD "(((${BEAM_STATE_LOGICAL_BYTES} + 15) / 16) * 16)")
+    if(BEAM_STATE_VALUE_PAD LESS 128)
+        set(BEAM_STATE_VALUE_PAD 128)
+    endif()
+
     set(BEAM_STATE_PHYSICAL_BYTES "${BEAM_STATE_PHYSICAL_BYTES}" CACHE STRING "Physical state storage bytes" FORCE)
+    set(BEAM_STATE_VALUE_PAD "${BEAM_STATE_VALUE_PAD}" CACHE STRING "Zobrist value-table width" FORCE)
     set(BEAM_STATE_LOGICAL_BYTES "${BEAM_STATE_LOGICAL_BYTES}" PARENT_SCOPE)
     set(BEAM_STATE_PHYSICAL_BYTES "${BEAM_STATE_PHYSICAL_BYTES}" PARENT_SCOPE)
     set(BEAM_STATE_ALIGNMENT "${BEAM_STATE_ALIGNMENT}" PARENT_SCOPE)
+    set(BEAM_STATE_VALUE_PAD "${BEAM_STATE_VALUE_PAD}" PARENT_SCOPE)
     set(BEAM_MOVE_COUNT "${BEAM_MOVE_COUNT}" PARENT_SCOPE)
 endfunction()
