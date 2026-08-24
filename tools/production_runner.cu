@@ -4269,6 +4269,11 @@ int main(int argc, char** argv) {
     std::cout << std::unitbuf;
 
     BEAM_CUDA_CHECK(cudaSetDevice(static_cast<int>(device_local_rank)));
+    cudaDeviceProp runtime_device_prop{};
+    BEAM_CUDA_CHECK(cudaGetDeviceProperties(&runtime_device_prop, static_cast<int>(device_local_rank)));
+    std::cout << "cuda_device_name=" << runtime_device_prop.name << "\n";
+    std::cout << "cuda_device_sm="
+              << runtime_device_prop.major * 10 + runtime_device_prop.minor << "\n";
     NcclRuntime nccl_runtime = create_nccl_runtime(world_size, rank);
     DispatcherCollective collective{nccl_runtime.comm};
     const DispatcherCollective* collective_ptr = world_size > 1U ? &collective : nullptr;
@@ -4640,6 +4645,9 @@ int main(int argc, char** argv) {
               << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
     if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
         std::cout << "stream1_transformer_micro=" << stream1_transformer_micro << "\n";
+        std::cout << "stream1_transformer_activation="
+                  << (stream1_model.activation == STREAM1_ACTIVATION_RELU ? "relu" : "silu")
+                  << "\n";
         std::cout << "stream1_transformer_fp16_gemm_backend="
                   << (host_weights.transformer_fp16_gemm_backend ==
                           stream1_weights::TRANSFORMER_FP16_GEMM_CUBLASLT

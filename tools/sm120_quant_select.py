@@ -74,6 +74,9 @@ def select_profile(
         if not isinstance(policy, Mapping) or set(policy) != set(CORE_OPERATORS):
             missing[name] = ["operator_precision"]
             continue
+        if ranking[name].get("operator_corrections"):
+            missing[name] = ["operator_corrections.native_runtime"]
+            continue
         transforms = ranking[name].get("operator_transforms")
         if transforms is None:
             transforms = {operator: [] for operator in CORE_OPERATORS}

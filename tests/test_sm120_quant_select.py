@@ -64,3 +64,20 @@ def test_selector_rejects_latency_without_native_execution_contract() -> None:
     )
     assert decision["selected"] is None
     assert decision["missing_evidence"]["candidate"] == ["native_execution"]
+
+
+def test_selector_rejects_low_rank_candidate_until_native_runtime_exists() -> None:
+    ranking = _ranking("candidate")
+    ranking["operator_corrections"] = {
+        CORE_OPERATORS[0]: {
+            "type": "activation_weighted_low_rank_residual", "rank": 16,
+        }
+    }
+    decision = select_profile(
+        [ranking], [_frontier("candidate")], [_benchmark("candidate", 1.0)],
+        QualityThresholds(),
+    )
+    assert decision["selected"] is None
+    assert decision["missing_evidence"]["candidate"] == [
+        "operator_corrections.native_runtime"
+    ]

@@ -1154,3 +1154,18 @@
   cuBLASLt handles and plan caches are thread-local so concurrent inference
   lanes are not serialized. CUDA correctness and integrated depth-8 timing are
   intentionally pending a fresh Molab sandbox.
+- Added a fail-closed activation-weighted low-rank residual research family:
+  block-FP8 QKV/FF1 uses weights encoded from the original FP32 export, while
+  a small offline FP16 factorization approximates the remaining error under
+  per-channel RMS measured on real frontier activations. Ranks 4/8/16/32 are
+  emitted as quality candidates. Selection explicitly rejects them until a
+  native runtime and native latency artifact for the correction exist.
+- Added `sm120_native_benchmark_artifact.py` so Pareto timing evidence comes
+  only from comparable completed native logs. It requires physical sm_120,
+  output_dim 24, outer/inner microbatches 3584/896, at least two inference
+  lanes, effective beam `2**25`, exactly depth 8, 391 Stream3 jobs, the expected
+  per-rank frontier, and no fatal/OOM/overflow markers. Production logs now
+  expose device name/SM and the immutable-profile FP16 GEMM backend.
+  The artifact also requires the manifest-correct Cube4 ReLU activation; the
+  historical `80.2952 s` SiLU result remains a performance target, not a valid
+  correctness baseline.

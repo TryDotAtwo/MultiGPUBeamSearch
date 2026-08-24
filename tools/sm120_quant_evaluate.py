@@ -25,6 +25,24 @@ from tools.sm120_quant_tuner import CORE_OPERATORS, ranking_metrics, smoothquant
 from tools.stream1_transformer_torch_benchmark import PieceTransformerTorch
 
 
+def activation_weighted_low_rank_factors(
+    reference_weight: torch.Tensor,
+    quantized_weight: torch.Tensor,
+    activation_rms: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return L,R with L@R approximating W_ref-W_quant under RMS weighting."""
+    if reference_weight.ndim != 2 or quantized_weight.shape != reference_weight.shape:
+        raise ValueError("low-rank residual weight shape mismatch")
+    rms = activation_rms.to(
+        device=reference_weight.device, dtype=torch.float32
+    ).reshape(-1).clamp_min(1.0e-6)
+    if rms.numel() != reference_weight.shape[0]:
+        raise ValueError("low-rank residual activation RMS shape mismatch")
+    error = reference_weight.float() - quantized_weight.float()
+    u, singular, vh = torch.linalg.svd(rms[:, None] * error, full_matrices=False)
+    return (u * singular.unsqueeze(0)) / rms[:, None], vh
+
+
 def select_stratified_states(
     states: np.ndarray,
     depths: np.ndarray,
@@ -147,6 +165,10 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
         self.capture_statistics = False
         self.statistics: dict[str, list[dict[str, float | int]]] = {}
         self.channel_amax: dict[str, torch.Tensor] = {}
+        self.channel_sumsq: dict[str, torch.Tensor] = {}
+        self.channel_count: dict[str, int] = {}
+        self.low_rank_bases: dict[str, tuple[torch.Tensor, torch.Tensor]] = {}
+        self.low_rank_corrections: dict[str, tuple[torch.Tensor, torch.Tensor]] = {}
         for block_index, block in enumerate(self.blocks):
             for suffix, key in (
                 ("attn.in_proj_weight", "qkv_weight"),
@@ -159,6 +181,57 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
                 self.quantized_weights[name] = quantized.to(dtype=self.dtype)
                 quantized_int8, _ = fake_sm120_int8_weight_quant(block[key].float())
                 self.quantized_int8_weights[name] = quantized_int8.to(dtype=self.dtype)
+
+    @staticmethod
+    def _operator_weight(model: "QuantObservedPieceTransformer", name: str) -> torch.Tensor:
+        parts = name.split(".")
+        block = model.blocks[int(parts[1])]
+        suffix = ".".join(parts[2:])
+        keys = {
+            "attn.in_proj_weight": "qkv_weight",
+            "attn.out_proj.weight": "attn_out_weight",
+            "ff.0.weight": "ff1_weight",
+            "ff.3.weight": "ff2_weight",
+        }
+        return block[keys[suffix]]
+
+    def install_fp32_quantization_source(
+        self, reference: "QuantObservedPieceTransformer"
+    ) -> None:
+        """Encode every candidate weight from FP32 truth, never from FP16."""
+        for name in CORE_OPERATORS:
+            self.refresh_quantized_weight(name, self._operator_weight(reference, name).float())
+
+    def prepare_activation_weighted_low_rank_residuals(
+        self,
+        reference: "QuantObservedPieceTransformer",
+        channel_rms: Mapping[str, torch.Tensor],
+    ) -> None:
+        """Factor D*(W_fp32-W_fp8) once; D is real-frontier activation RMS."""
+        supported = tuple(
+            name for name in CORE_OPERATORS
+            if name.endswith("attn.in_proj_weight") or name.endswith("ff.0.weight")
+        )
+        self.low_rank_bases.clear()
+        for name in supported:
+            if name not in channel_rms:
+                raise ValueError(f"missing activation RMS for low-rank residual {name}")
+            reference_weight = self._operator_weight(reference, name).float()
+            quantized_weight = self.quantized_weights[name].float()
+            self.low_rank_bases[name] = activation_weighted_low_rank_factors(
+                reference_weight, quantized_weight, channel_rms[name]
+            )
+
+    def select_low_rank_residual(self, rank: int) -> None:
+        if rank <= 0:
+            raise ValueError("low-rank residual rank must be positive")
+        self.low_rank_corrections = {
+            name: (
+                left[:, : min(rank, left.shape[1])].to(dtype=self.dtype),
+                right[: min(rank, right.shape[0]), :].to(dtype=self.dtype),
+            )
+            for name, (left, right) in self.low_rank_bases.items()
+        }
 
     def refresh_quantized_weight(self, name: str, weight_hxk: torch.Tensor) -> None:
         quantized, _ = fake_sm120_weight_quant(weight_hxk.float())
@@ -214,6 +287,11 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
             batch_amax = x.detach().float().reshape(-1, x.shape[-1]).abs().amax(dim=0)
             previous = self.channel_amax.get(name)
             self.channel_amax[name] = batch_amax if previous is None else torch.maximum(previous, batch_amax)
+            flat = x.detach().float().reshape(-1, x.shape[-1])
+            batch_sumsq = torch.sum(flat * flat, dim=0)
+            self.channel_sumsq[name] = self.channel_sumsq.get(name, torch.zeros_like(batch_sumsq)) + batch_sumsq
+            self.channel_count[name] = self.channel_count.get(name, 0) + flat.shape[0]
+        original_x = x
         if self.precision[name] == "sm120_block_fp8":
             x, _ = fake_sm120_activation_quant(x.float())
             x = x.to(dtype=self.dtype)
@@ -222,7 +300,12 @@ class QuantObservedPieceTransformer(PieceTransformerTorch):
             x, _ = fake_sm120_int8_activation_quant(x.float())
             x = x.to(dtype=self.dtype)
             weight_hxk = self.quantized_int8_weights[name]
-        return x.matmul(weight_hxk) + bias
+        result = x.matmul(weight_hxk) + bias
+        correction = self.low_rank_corrections.get(name)
+        if correction is not None:
+            left, right = correction
+            result = result + original_x.matmul(left).matmul(right)
+        return result
 
     def forward(self, states: torch.Tensor) -> torch.Tensor:
         x = self.layer_norm(self.build_tokens(states), self.input_ln_gamma, self.input_ln_beta)
@@ -268,6 +351,8 @@ def _run_logits(
     model.statistics.clear()
     if capture_statistics:
         model.channel_amax.clear()
+        model.channel_sumsq.clear()
+        model.channel_count.clear()
     torch.cuda.synchronize(model.device)
     started = time.perf_counter()
     with torch.inference_mode():
@@ -339,6 +424,10 @@ def main() -> None:
         default="0.0,0.25,0.5,0.75,1.0",
         help="comma-separated exact LN-to-QKV/FF1 equalization alpha candidates",
     )
+    parser.add_argument(
+        "--lowrank-ranks", default="4,8,16,32",
+        help="comma-separated activation-weighted FP16 residual ranks to evaluate",
+    )
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     corpus = np.load(args.corpus)
@@ -356,6 +445,7 @@ def main() -> None:
         fp32_model, states, batch_size=args.batch_size, capture_statistics=False
     )
     model = QuantObservedPieceTransformer(args.weight_dir, device)
+    model.install_fp32_quantization_source(fp32_model)
     fp16 = {name: "fp16" for name in CORE_OPERATORS}
     model.set_precision(fp16)
     fp16_logits, baseline_sec = _run_logits(
@@ -365,6 +455,10 @@ def main() -> None:
         name: _aggregate_statistics(rows) for name, rows in model.statistics.items()
     }
     channel_amax = {name: values.detach().clone() for name, values in model.channel_amax.items()}
+    channel_rms = {
+        name: torch.sqrt(values / model.channel_count[name])
+        for name, values in model.channel_sumsq.items()
+    }
     np.save(args.output_dir / "fp32_reference_logits.npy", fp32_logits)
     np.save(args.output_dir / "fp16_current_logits.npy", fp16_logits)
     (args.output_dir / "activation_statistics.json").write_text(
@@ -404,6 +498,37 @@ def main() -> None:
         }
         observations.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
+    lowrank_policy = {
+        name: (
+            "sm120_block_fp8"
+            if name.endswith("attn.in_proj_weight") or name.endswith("ff.0.weight")
+            else "fp16"
+        )
+        for name in CORE_OPERATORS
+    }
+    model.prepare_activation_weighted_low_rank_residuals(fp32_model, channel_rms)
+    lowrank_ranks = [int(value) for value in args.lowrank_ranks.split(",") if value.strip()]
+    if not lowrank_ranks or any(rank <= 0 for rank in lowrank_ranks):
+        raise ValueError("lowrank ranks must be positive")
+    for rank in lowrank_ranks:
+        model.set_precision(lowrank_policy)
+        model.select_low_rank_residual(rank)
+        candidate, elapsed = _run_logits(
+            model, states, batch_size=args.batch_size, capture_statistics=False
+        )
+        corrections = {
+            name: {"type": "activation_weighted_low_rank_residual", "rank": rank}
+            for name in model.low_rank_corrections
+        }
+        row = {
+            "name": f"native_scope_fp8_lowrank_r{rank}",
+            "operator_precision": dict(lowrank_policy),
+            "operator_corrections": corrections,
+            **_three_way_metrics(fp32_logits, fp16_logits, candidate, elapsed),
+        }
+        observations.append(row)
+        print(json.dumps(row, sort_keys=True), flush=True)
+    model.low_rank_corrections.clear()
     rollback_rows = [row for row in observations if str(row["name"]).startswith("rollback_")]
     for name, policy in build_cumulative_rollback_policies(rollback_rows):
         model.set_precision(policy)

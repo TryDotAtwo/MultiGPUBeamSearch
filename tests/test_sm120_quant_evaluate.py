@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import torch
 
 from tools.sm120_quant_evaluate import (
     build_initial_int8_policies,
@@ -9,6 +10,7 @@ from tools.sm120_quant_evaluate import (
     build_incremental_fp8_policies,
     select_stratified_states,
     _three_way_metrics,
+    activation_weighted_low_rank_factors,
 )
 from tools.sm120_quant_tuner import CORE_OPERATORS
 
@@ -101,3 +103,12 @@ def test_three_way_metrics_use_fp32_as_truth_and_report_incremental_fp16_loss() 
     assert metrics["vs_fp32"]["top1_agreement"] == metrics["top1_agreement"]
     assert metrics["wall_seconds"] == 0.5
     assert metrics["vs_fp16"]["wall_seconds"] == 0.5
+
+
+def test_activation_weighted_low_rank_full_rank_reconstructs_quant_error() -> None:
+    generator = torch.Generator().manual_seed(23)
+    reference = torch.randn(7, 11, generator=generator)
+    quantized = torch.round(reference * 8.0) / 8.0
+    rms = torch.exp(torch.linspace(-1.0, 1.0, 7))
+    left, right = activation_weighted_low_rank_factors(reference, quantized, rms)
+    torch.testing.assert_close(left @ right, reference - quantized, atol=2e-6, rtol=2e-6)

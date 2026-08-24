@@ -80,3 +80,23 @@ This follow-up has not been compiled or benchmarked locally, by explicit user
 requirement. Required Molab acceptance remains: compile, profile hash negative
 test, CUDA graph correctness, FP32/FP16 ranking equivalence, and the identical
 `2**25` depth-8 A/B against `80.2952 s` with about 391 Stream3 jobs.
+
+### Next mixed candidate: activation-weighted low-rank error correction
+
+The new research candidate computes block-FP8 bytes from FP32 weights and an
+offline factorization of `D * (W_fp32 - W_fp8)`, where diagonal `D` is the
+per-input-channel RMS measured on the real calibration frontier. Runtime math
+would be `FP8(A,Wq) + FP16(A,L) * R`; ranks 4, 8, 16, and 32 are screened.
+This targets roughly 2%-16% extra arithmetic depending on rank/shape instead
+of the roughly 2x-3x work of the rejected three-term dense decomposition.
+It is deliberately non-promotable until Molab proves ranking/frontier quality
+and a native correction kernel proves net latency improvement.
+
+### Comparable native timing artifact
+
+`tools/sm120_native_benchmark_artifact.py` converts completed combined runner
+logs into the exact `native_benchmarks.json` contract consumed by selection.
+It rejects mismatched hardware, output dimension, beam, both microbatch levels,
+inference concurrency, Stream3 job count, per-rank frontier size, missing depth
+8, duplicate depth 8, and any fatal/OOM/overflow marker. This prevents a fast
+microbenchmark or a differently configured solve from promoting a profile.

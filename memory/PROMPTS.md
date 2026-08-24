@@ -637,3 +637,6 @@ User reported that an interactive game had been running during part of the recen
   toggle is not an acceptable production contract.
 - Keep at least two inference lanes capable of progressing concurrently; do
   not serialize every GEMM through a process-global plan-cache lock.
+- Explore calibrated compound encodings rather than calling a raw E4M3 tensor
+  replacement sufficient. Any residual/correction weights must also be
+  computed offline from FP32 truth and remain in the immutable profile.
