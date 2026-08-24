@@ -1,5 +1,12 @@
 # Prompt History
 
+## 2026-08-24
+- User confirmed that Cube4 uses ReLU and that the completed `80.2952 s`
+  result is the correct accepted baseline. Mixed-precision selection must
+  compare the original FP32 weights, the current FP16 export, and the proposed
+  encoded candidate rather than imposing an impossible absolute agreement
+  threshold that rejects the accepted FP16 control.
+
 ## 2026-08-22
 - User approved implementing the proposed Transformer inference improvements
   and required that every GPU validation run strictly on Molab. Acceptance is

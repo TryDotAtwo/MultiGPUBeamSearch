@@ -39,6 +39,10 @@ class QualityThresholds:
     topk_set_overlap: float = 0.999
     frontier_jaccard: float = 0.995
     threshold_band_agreement: float = 0.999
+    # A mixed candidate is compared with both the FP32 truth and the accepted
+    # FP16 control.  This is the maximum additional FP32-relative agreement
+    # loss allowed beyond the current FP16 export.
+    fp32_regression_budget: float = 0.001
 
 
 def _validate_scores(baseline: np.ndarray, candidate: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

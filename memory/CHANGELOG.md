@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-24
+- Corrected the SM120 mixed-precision quality selector to use the accepted
+  Cube4 FP16 execution as a measured quality floor while retaining the
+  original FP32 checkpoint as truth. Candidate-vs-FP16 top-1/top-k/threshold
+  agreement remains a hard incremental gate, candidate-vs-FP32 metrics may
+  regress from the FP16 control only by the explicit
+  `fp32_regression_budget` (default `0.001`), and reconstructed-frontier
+  Jaccard remains independent. The selector now fails closed without exactly
+  one `current_fp16` reference. Targeted SM120 suite: 39 passed.
+
 ## 2026-08-22
 - Added the opt-in `BEAM_ENABLE_SM120_FP8` CUTLASS SM120 block-scaled E4M3
   primitive with FP32 per-row/per-128x128-block scales, persistent caller-owned

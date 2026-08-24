@@ -59,7 +59,7 @@ was 255.026 seconds for this data snapshot.
 ## Rejected alternatives
 
 - Replacing the FFN GEMMs with raw cuBLAS was rejected after Molab screens:
-  FF1 did not include the currently fused bias+SiLU work and FF2 was slower
+  FF1 did not include the currently fused bias+ReLU work and FF2 was slower
   than the CUTLASS path.
 - A fused FF2 residual epilogue was reverted because exactness failed. The
   established path computes LayerNorm statistics from residual+bias before

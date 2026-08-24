@@ -55,12 +55,31 @@ def select_profile(
     benchmark_rows: Sequence[Mapping[str, Any]],
     thresholds: QualityThresholds,
 ) -> dict[str, Any]:
-    ranking = _candidate_map(ranking_rows, "ranking")
+    fp16_rows = [dict(row) for row in ranking_rows if str(row.get("name", "")) == "current_fp16"]
+    if len(fp16_rows) != 1:
+        raise ValueError("ranking must contain exactly one current_fp16 quality reference")
+    fp16_reference = fp16_rows[0]
+    quality_metrics = ("top1_agreement", "topk_set_overlap", "threshold_band_agreement")
+    for metric in quality_metrics:
+        value = float(fp16_reference.get(metric, -1.0))
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"current_fp16 has invalid {metric}")
+    if not 0.0 <= thresholds.fp32_regression_budget <= 1.0:
+        raise ValueError("fp32_regression_budget must be in [0, 1]")
+    fp16_floor = {
+        metric: max(0.0, float(fp16_reference[metric]) - thresholds.fp32_regression_budget)
+        for metric in quality_metrics
+    }
+    ranking = _candidate_map(
+        [row for row in ranking_rows if str(row.get("name", "")) not in {"current_fp16", "fp32_reference"}],
+        "ranking",
+    )
     frontier = _candidate_map(frontier_rows, "frontier")
     benchmark = _candidate_map(benchmark_rows, "benchmark")
     names = sorted(set(ranking) | set(frontier) | set(benchmark))
     complete: list[dict[str, Any]] = []
     missing: dict[str, list[str]] = {}
+    quality_rejected: dict[str, list[str]] = {}
     for name in names:
         absent = [
             source for source, rows in (
@@ -83,6 +102,31 @@ def select_profile(
         if not isinstance(transforms, Mapping) or set(transforms) != set(CORE_OPERATORS):
             missing[name] = ["operator_transforms"]
             continue
+        versus_fp32 = ranking[name].get("vs_fp32")
+        versus_fp16 = ranking[name].get("vs_fp16")
+        if not isinstance(versus_fp32, Mapping) or not isinstance(versus_fp16, Mapping):
+            missing[name] = ["vs_fp32", "vs_fp16"]
+            continue
+        invalid_quality = False
+        for source_name, values in (("vs_fp32", versus_fp32), ("vs_fp16", versus_fp16)):
+            for metric in quality_metrics:
+                value = float(values.get(metric, -1.0))
+                if not 0.0 <= value <= 1.0:
+                    missing[name] = [f"{source_name}.{metric}"]
+                    invalid_quality = True
+                    break
+            if invalid_quality:
+                break
+        if invalid_quality:
+            continue
+        regressions = [
+            f"fp32_{metric.removesuffix('_agreement')}_regression"
+            for metric in quality_metrics
+            if float(versus_fp32[metric]) < fp16_floor[metric]
+        ]
+        if regressions:
+            quality_rejected[name] = regressions
+            continue
         native_execution = benchmark[name].get("native_execution")
         if not isinstance(native_execution, Mapping):
             missing[name] = ["native_execution"]
@@ -101,6 +145,10 @@ def select_profile(
             missing[name] = ["native_execution.workspace_bytes"]
             continue
         row = dict(ranking[name])
+        # Pareto quality thresholds describe incremental deviation from the
+        # accepted FP16 execution.  FP32-relative floors were enforced above.
+        for metric in quality_metrics:
+            row[metric] = float(versus_fp16[metric])
         row["frontier_jaccard"] = _minimum_frontier_jaccard(frontier[name])
         row["latency_ms"] = float(benchmark[name]["latency_ms"])
         row["operator_precision"] = dict(policy)
@@ -108,12 +156,18 @@ def select_profile(
         row["native_execution"] = dict(native_execution)
         complete.append(row)
     decision = pareto_select(complete, thresholds)
+    decision["rejected"].update(quality_rejected)
     decision["missing_evidence"] = missing
+    decision["fp16_quality_reference"] = {
+        metric: float(fp16_reference[metric]) for metric in quality_metrics
+    }
+    decision["fp16_quality_floor"] = fp16_floor
     decision["quality_thresholds"] = {
         "top1_agreement": thresholds.top1_agreement,
         "topk_set_overlap": thresholds.topk_set_overlap,
         "frontier_jaccard": thresholds.frontier_jaccard,
         "threshold_band_agreement": thresholds.threshold_band_agreement,
+        "fp32_regression_budget": thresholds.fp32_regression_budget,
     }
     return decision
 
@@ -143,6 +197,7 @@ def main() -> None:
     parser.add_argument("--topk", type=float, default=0.999)
     parser.add_argument("--frontier-jaccard", type=float, default=0.995)
     parser.add_argument("--threshold-band", type=float, default=0.999)
+    parser.add_argument("--fp32-regression-budget", type=float, default=0.001)
     args = parser.parse_args()
     ranking_rows = _load_rows(args.ranking, "observations")
     frontier_rows = _load_rows(args.frontiers, "candidates")
@@ -152,6 +207,7 @@ def main() -> None:
         topk_set_overlap=args.topk,
         frontier_jaccard=args.frontier_jaccard,
         threshold_band_agreement=args.threshold_band,
+        fp32_regression_budget=args.fp32_regression_budget,
     )
     decision = select_profile(ranking_rows, frontier_rows, benchmark_rows, thresholds)
     selected = decision.get("selected")

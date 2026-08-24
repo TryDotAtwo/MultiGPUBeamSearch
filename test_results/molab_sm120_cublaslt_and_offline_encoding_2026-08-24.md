@@ -125,3 +125,16 @@ It rejects mismatched hardware, output dimension, beam, both microbatch levels,
 inference concurrency, Stream3 job count, per-rank frontier size, missing depth
 8, duplicate depth 8, and any fatal/OOM/overflow marker. This prevents a fast
 microbenchmark or a differently configured solve from promoting a profile.
+
+### Three-way quality gate correction
+
+The selector previously applied the `0.999` top-1/top-k threshold directly to
+candidate-vs-FP32 even though the accepted FP16 control itself measures only
+`0.995605` top-1 agreement with FP32. That made the gate internally
+inconsistent. Selection now requires exactly one `current_fp16` reference,
+uses candidate-vs-FP16 agreement for the hard incremental `0.999` gates, and
+also requires candidate-vs-FP32 quality to remain within the explicit
+`fp32_regression_budget` of the measured FP16 reference. Reconstructed-state
+frontier Jaccard remains a separate hard gate. CPU-only contract verification
+after this change: `39 passed`; CUDA timing and solve acceptance remain Molab
+only.
