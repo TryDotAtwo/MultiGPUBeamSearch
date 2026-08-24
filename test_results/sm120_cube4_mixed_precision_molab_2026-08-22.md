@@ -43,13 +43,19 @@ Two-component E4M3 diagnostics (2048 real holdout states) improved mixed-vs-FP16
 
 ## Correct target corpus
 
-The older depth4–8 corpus came from the former hard-coded SiLU native path and is not authoritative for Cube4. A detached correct-ReLU FP16 `2**25` run was started under
-`/marimo/storage/cayleypy-cube4/relu_fp16_target_2p25/1787395409` and persisted histories through at least depth 5. The Molab sandbox then expired with HTTP 410 before completion/status retrieval. No timing claim is made from the partial run.
+Clarification recorded 2026-08-24: the user confirmed that the completed
+80.2952 s run is a correct ReLU Cube4 result. The earlier attribution of that
+run to SiLU was inferred from commit chronology and is withdrawn; chronology
+did not prove the effective Molab checkout or uncommitted runtime patch. A
+separate detached ReLU FP16 `2**25` run was started under
+`/marimo/storage/cayleypy-cube4/relu_fp16_target_2p25/1787395409` and persisted
+histories through at least depth 5, but the sandbox expired with HTTP 410. That
+partial run does not replace or invalidate the accepted completed baseline.
 
 ## Remaining gate
 
 1. Start a fresh Molab sandbox and regenerate the complete ReLU FP16 target corpus through depth 8.
 2. Complete the block-scaled INT8 diagnostic (higher precision than E4M3 with INT32 accumulation) on that corpus.
 3. Implement only a candidate that passes FP32/FP16 ranking gates and reconstructed-state frontier gate at `2**16`.
-4. Benchmark accepted candidates at `2**25` against the new correct-ReLU FP16 baseline; improvement over the historical `80.2952 s` alone is insufficient because that historical path used SiLU.
-
+4. Benchmark accepted candidates at `2**25` against the accepted correct-ReLU
+   FP16 baseline of 80.2952 s, with exactly `depth_done=8` and 391 Stream3 jobs.

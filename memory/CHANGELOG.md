@@ -1084,7 +1084,11 @@
 - Added offline deterministic per-block MSE scale selection for immutable SM120 E4M3 weights; production still performs no weight quantization.
 - Added a reconstructed-state frontier gate and public Cube4 generator/CSV schema compatibility.
 - Molab rejected naïve and MSE-scaled one-pass E4M3 on real frontier quality. Two-component E4M3 improved ranking but remained below the 0.999 gate.
-- The prior Cube4 calibration corpus and 80.2952 s baseline are now marked historical because native CUDA had used SiLU. A correct ReLU `2**25` corpus run reached at least depth 5 before the Molab sandbox expired (HTTP 410).
+- Clarification (2026-08-24): the user confirmed that the completed 80.2952 s
+  Cube4 run is a correct ReLU result. The earlier SiLU attribution inferred
+  from commit chronology is withdrawn; chronology alone did not establish the
+  effective Molab checkout/runtime. The accepted baseline is therefore ReLU,
+  beam `2**25`, exactly `depth_done=8`, and 391 Stream3 jobs.
 
 ## 2026-08-22 — Explicit FP32/FP16/candidate comparison and block-INT8 exploration
 
@@ -1166,6 +1170,7 @@
   lanes, effective beam `2**25`, exactly depth 8, 391 Stream3 jobs, the expected
   per-rank frontier, and no fatal/OOM/overflow markers. Production logs now
   expose device name/SM and the immutable-profile FP16 GEMM backend.
-  The artifact also requires the manifest-correct Cube4 ReLU activation; the
-  historical `80.2952 s` SiLU result remains a performance target, not a valid
-  correctness baseline.
+  The artifact also requires the manifest-correct Cube4 ReLU activation. Per
+  the 2026-08-24 user clarification, `80.2952 s` is the accepted correct ReLU
+  baseline and remains both the workload/correctness reference and performance
+  target.

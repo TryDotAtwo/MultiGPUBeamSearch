@@ -608,6 +608,9 @@ User reported that an interactive game had been running during part of the recen
 - Compare integrated performance against the accepted Molab Cube4 baseline of
   `80.2952` seconds at exactly `beam=2**25`, `depth_done=8`, and 391 Stream3
   jobs, while treating ranking/frontier accuracy as a hard acceptance gate.
+- User clarification (2026-08-24): Cube4 must use ReLU, and the completed
+  approximately 80-second result is a correct ReLU result. Do not relabel that
+  baseline as SiLU based only on repository commit chronology.
 ## 2026-08-22 — Offline encoding and three-way precision truth
 
 - The user requires weights to be encoded before runtime; runtime/startup quantization is not allowed.

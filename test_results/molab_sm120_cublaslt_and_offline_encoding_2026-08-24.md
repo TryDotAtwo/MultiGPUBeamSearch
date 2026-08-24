@@ -81,6 +81,31 @@ requirement. Required Molab acceptance remains: compile, profile hash negative
 test, CUDA graph correctness, FP32/FP16 ranking equivalence, and the identical
 `2**25` depth-8 A/B against `80.2952 s` with about 391 Stream3 jobs.
 
+Clarification: `80.2952 s` is the user-confirmed correct ReLU result, not a
+SiLU-only historical target. It is the accepted correctness/workload baseline
+as well as the performance target.
+
+### Fresh Molab validation after the clarification
+
+The live Molab SM120 session validated exact solver commit
+`1f21e8118eff3eb9529ac9fe5926c932020c1cd3`:
+
+- targeted Python quality/selector/native-artifact suite: `35 passed`;
+- CUDA toolchain: CUDA 13.3.73, target `sm_120a`;
+- pinned CUTLASS commit:
+  `7107b05535f8977f5ecb9d01ee203205b1fd9bc4`;
+- `stream1_transformer_sm120_fp8_cuda_tests`: pass, NMSE
+  `0.000415495`, max absolute error `0.0268555`;
+- `static_memory_cuda_tests`: pass.
+
+The first production smoke intentionally remained fail-closed because the
+launcher combined the fixed-120 puzzle checkout with a Cube4 export whose
+manifest correctly records `state_len=96`, `piece_layout=cube4`,
+`activation=relu`, and `output_dim=24`. No timing result was accepted from that
+mismatched input. The next integrated run must reproduce the same Cube4 state
+adapter/data contract as the accepted 80.2952 s ReLU baseline before timing is
+compared.
+
 ### Next mixed candidate: activation-weighted low-rank error correction
 
 The new research candidate computes block-FP8 bytes from FP32 weights and an
