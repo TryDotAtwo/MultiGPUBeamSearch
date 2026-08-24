@@ -1127,3 +1127,6 @@
   expressing FP16 artifact width as `std::uint16_t` rather than CUDA's `half`;
   this preserves the exact two-byte file contract without leaking a CUDA type
   into `runtime_config.cpp`.
+## 2026-08-24
+
+- Molab SM120 quantization evaluation now uses the original FP32 checkpoint as truth and explicitly distinguishes current FP16 from future offline-encoded artifacts. A 20,480-state real-frontier probe showed that even weight-only E4M3 encoded directly from FP32 degrades below the FP16 control, while SM120 CUTLASS narrow MMA requires narrow A and B inputs. Native full-FP8 GEMMs delivered 1.03x-1.65x kernel speedups at the production 21,888-row microbatch, but neither ranking quality nor the prior reconstructed frontier is acceptable. A disjoint calibration/holdout 24x24 output correction also failed. No mixed profile was enabled; fail-closed selection remains mandatory. Evidence: `test_results/molab_sm120_fp32_fp16_offline_narrow_comparison_2026-08-24.md`.
