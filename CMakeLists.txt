@@ -179,7 +179,7 @@ target_link_libraries(stream1_transformer_final_cls_cuda_tests PRIVATE beam_cuda
 set_target_properties(stream1_transformer_final_cls_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 if(BEAM_ENABLE_SM120_FP8)
-    target_sources(beam_cuda PRIVATE cuda/stream1_transformer_sm120_fp8.cu)
+    target_sources(beam_cuda PRIVATE cuda/stream1_transformer_sm120_fp8.cu cuda/stream1_transformer_sm120_fp16.cu)
     target_compile_definitions(beam_cuda PUBLIC BEAM_ENABLE_SM120_FP8=1)
     add_executable(stream1_transformer_sm120_fp8_cuda_tests tests/stream1_transformer_sm120_fp8_cuda_tests.cu)
     target_link_libraries(stream1_transformer_sm120_fp8_cuda_tests PRIVATE beam_cuda)
