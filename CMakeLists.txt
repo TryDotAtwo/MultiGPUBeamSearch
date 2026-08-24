@@ -7,6 +7,7 @@ message(STATUS "Beam state physical bytes: ${BEAM_STATE_PHYSICAL_BYTES}")
 message(STATUS "Beam state alignment: ${BEAM_STATE_ALIGNMENT}")
 message(STATUS "Beam move count: ${BEAM_MOVE_COUNT}")
 project(beam_solver_contracts LANGUAGES CXX CUDA)
+find_package(CUDAToolkit REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -136,7 +137,7 @@ if(CUTLASS_DIR AND EXISTS "${CUTLASS_DIR}/include")
 else()
     message(FATAL_ERROR "CUTLASS_DIR is required. Pass -DCUTLASS_DIR=/path/to/cutlass or set CUTLASS_DIR.")
 endif()
-target_link_libraries(beam_cuda PUBLIC beam_core)
+target_link_libraries(beam_cuda PUBLIC beam_core CUDA::cublasLt)
 target_compile_definitions(beam_cuda PUBLIC
     BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
     BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
@@ -179,7 +180,7 @@ target_link_libraries(stream1_transformer_final_cls_cuda_tests PRIVATE beam_cuda
 set_target_properties(stream1_transformer_final_cls_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 if(BEAM_ENABLE_SM120_FP8)
-    target_sources(beam_cuda PRIVATE cuda/stream1_transformer_sm120_fp8.cu cuda/stream1_transformer_sm120_fp16.cu)
+    target_sources(beam_cuda PRIVATE cuda/stream1_transformer_sm120_fp8.cu cuda/stream1_transformer_cublaslt_fp16.cu)
     target_compile_definitions(beam_cuda PUBLIC BEAM_ENABLE_SM120_FP8=1)
     add_executable(stream1_transformer_sm120_fp8_cuda_tests tests/stream1_transformer_sm120_fp8_cuda_tests.cu)
     target_link_libraries(stream1_transformer_sm120_fp8_cuda_tests PRIVATE beam_cuda)

@@ -1,5 +1,5 @@
 #include "stream1_transformer_sm120_fp8.hpp"
-#include "stream1_transformer_sm120_fp16.hpp"
+#include "stream1_transformer_cublaslt_fp16.hpp"
 #include "../cuda/stream1.hpp"
 #include "config.hpp"
 
@@ -123,10 +123,10 @@ void benchmark_shape(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t
     float fp16_elapsed_ms = 0.0f;
     BEAM_CUDA_CHECK(cudaEventElapsedTime(&fp16_elapsed_ms, start, stop));
     const double fp16_average_ms = static_cast<double>(fp16_elapsed_ms) / iterations;
-    const std::size_t sm120_fp16_workspace_bytes=stream1_transformer_sm120_fp16_workspace_bytes(rows,input_cols,output_cols);
-    DeviceBuffer sm120_fp16_workspace(sm120_fp16_workspace_bytes);
-    auto run_sm120_fp16_once=[&](){stream1_transformer_sm120_fp16_linear_cuda(static_cast<const half*>(input.pointer),static_cast<const half*>(weight.pointer),static_cast<half*>(fp16_output.pointer),rows,input_cols,output_cols,sm120_fp16_workspace.pointer,sm120_fp16_workspace_bytes,nullptr);};
-    for(int i=0;i<warmups;++i)run_sm120_fp16_once();BEAM_CUDA_CHECK(cudaDeviceSynchronize());BEAM_CUDA_CHECK(cudaEventRecord(start));for(int i=0;i<iterations;++i)run_sm120_fp16_once();BEAM_CUDA_CHECK(cudaEventRecord(stop));BEAM_CUDA_CHECK(cudaEventSynchronize(stop));float sm120_fp16_elapsed_ms=0;BEAM_CUDA_CHECK(cudaEventElapsedTime(&sm120_fp16_elapsed_ms,start,stop));const double sm120_fp16_average_ms=static_cast<double>(sm120_fp16_elapsed_ms)/iterations;
+    const std::size_t cublaslt_fp16_workspace_bytes=stream1_transformer_cublaslt_fp16_workspace_bytes();
+    DeviceBuffer cublaslt_fp16_workspace(cublaslt_fp16_workspace_bytes);
+    auto run_cublaslt_fp16_once=[&](){stream1_transformer_cublaslt_fp16_linear_cuda(static_cast<const half*>(input.pointer),static_cast<const half*>(weight.pointer),static_cast<half*>(fp16_output.pointer),rows,input_cols,output_cols,cublaslt_fp16_workspace.pointer,cublaslt_fp16_workspace_bytes,nullptr);};
+    for(int i=0;i<warmups;++i)run_cublaslt_fp16_once();BEAM_CUDA_CHECK(cudaDeviceSynchronize());BEAM_CUDA_CHECK(cudaEventRecord(start));for(int i=0;i<iterations;++i)run_cublaslt_fp16_once();BEAM_CUDA_CHECK(cudaEventRecord(stop));BEAM_CUDA_CHECK(cudaEventSynchronize(stop));float cublaslt_fp16_elapsed_ms=0;BEAM_CUDA_CHECK(cudaEventElapsedTime(&cublaslt_fp16_elapsed_ms,start,stop));const double cublaslt_fp16_average_ms=static_cast<double>(cublaslt_fp16_elapsed_ms)/iterations;
     auto run_residual_once = [&]() {
         stream1_transformer_sm120_fp8_residual3_linear_cuda(
             static_cast<const half*>(input.pointer), static_cast<std::uint8_t*>(residual_input.pointer),
@@ -146,8 +146,8 @@ void benchmark_shape(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t
               << " effective_tflops=" << std::setprecision(3) << tflops
               << " fp16_ms=" << std::setprecision(6) << fp16_average_ms
               << " fp8_speedup=" << std::setprecision(3) << fp16_average_ms / average_ms
-              << " sm120_fp16_ms=" << std::setprecision(6) << sm120_fp16_average_ms
-              << " sm120_fp16_speedup=" << std::setprecision(3) << fp16_average_ms/sm120_fp16_average_ms
+              << " cublaslt_fp16_ms=" << std::setprecision(6) << cublaslt_fp16_average_ms
+              << " cublaslt_fp16_speedup=" << std::setprecision(3) << fp16_average_ms/cublaslt_fp16_average_ms
               << " residual3_ms=" << std::setprecision(6) << residual_average_ms
               << " residual3_vs_fp16=" << std::setprecision(3) << fp16_average_ms / residual_average_ms
               << " workspace_bytes=" << workspace_bytes << "\n";
