@@ -178,7 +178,8 @@ __global__ void stream1_transformer_build_input_layernorm256_generic_kernel(
     extern __shared__ float warp_scratch[];
     const std::uint32_t lane = tid & 31U;
     const std::uint32_t warp = tid >> 5U;
-    const std::uint64_t base = static_cast<std::uint64_t>(row_token) * 256ULL;
+    const std::uint64_t base =
+        (static_cast<std::uint64_t>(row) * network.dims.padded_seq_len + token) * 256ULL;
     const std::uint32_t col0 = tid;
     const std::uint32_t col1 = tid + 128U;
     const std::uint32_t job = graph_job_index != nullptr ? *graph_job_index : 0U;
@@ -257,9 +258,9 @@ void stream1_transformer_build_input_layernorm256_generic_launch(
     cudaStream_t stream) {
     const Stream1TransformerDims dims = network.dims;
     if (dims.dtype != STREAM1_DTYPE_FP16 || dims.d_model != 256U ||
-        dims.seq_len != dims.padded_seq_len) {
+        dims.seq_len > dims.padded_seq_len) {
         throw std::invalid_argument(
-            "Stream1 generic fused input LayerNorm requires fp16 d_model=256 and compact sequence");
+            "Stream1 generic fused input LayerNorm requires fp16 d_model=256 and valid sequence padding");
     }
     stream1_transformer_build_input_layernorm256_generic_kernel<<<
         b_micro * dims.seq_len, 128,
@@ -3756,6 +3757,7 @@ void stream1_transformer_inference_graph_job_cuda(
             b_micro,
             parent_offset,
             stream);
+        stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
     } else {
         const dim3 token_block(128);
         const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
@@ -3878,6 +3880,7 @@ void stream1_transformer_inference_cuda(
             b_micro,
             parent_offset,
             stream);
+        stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
     } else {
         const dim3 token_block(128);
         const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
