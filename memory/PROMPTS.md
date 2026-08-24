@@ -622,3 +622,13 @@ User reported that an interactive game had been running during part of the recen
 - Validate all implementation and performance work directly in Molab, and
   compare pre-encoded mixed weights against both original FP32 checkpoint truth
   and the current FP16 runtime export; never quantize weights at startup.
+
+## 2026-08-24 — Maximize SM120 inference throughput with acceptable quality
+
+- Find an offline weight encoding and native inference scheme which materially
+  increases SM120 Tensor Core utilization and delivered TFLOPS.
+- Quality loss must remain comparable to the already accepted FP32-to-FP16
+  conversion; raw FP8 speed without ranking/frontier retention is not useful.
+- Keep the two batching controls distinct: outer pipeline `B_MICRO` and the
+  smaller internal Transformer inference microbatch.
+- Compile and validate all CUDA changes strictly in Molab.

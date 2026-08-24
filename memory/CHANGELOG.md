@@ -1130,3 +1130,16 @@
 ## 2026-08-24
 
 - Molab SM120 quantization evaluation now uses the original FP32 checkpoint as truth and explicitly distinguishes current FP16 from future offline-encoded artifacts. A 20,480-state real-frontier probe showed that even weight-only E4M3 encoded directly from FP32 degrades below the FP16 control, while SM120 CUTLASS narrow MMA requires narrow A and B inputs. Native full-FP8 GEMMs delivered 1.03x-1.65x kernel speedups at the production 21,888-row microbatch, but neither ranking quality nor the prior reconstructed frontier is acceptable. A disjoint calibration/holdout 24x24 output correction also failed. No mixed profile was enabled; fail-closed selection remains mandatory. Evidence: `test_results/molab_sm120_fp32_fp16_offline_narrow_comparison_2026-08-24.md`.
+- Completed the FP32-source residual decomposition study. Three block-scaled
+  products recover FP16-like ranking (`top8=0.992029`, FP16 control
+  `0.992273`) but the packed native GEMM is slower than FP16. MXFP8,
+  SmoothQuant, learned equalization, QAT, one-operator substitution, and dense
+  outlier correction were rejected by quality gates.
+- Replaced an unsupported CUTLASS SM120 FP16 builder experiment with an
+  opt-in workspace-free cuBLASLt path. Exact-shape Molab microbenchmarks show
+  1.262x-1.802x speedup over the old FP16 GEMMs, and a native CUDA graph smoke
+  completed successfully. The corrected `2**25` gate uses outer
+  `B_MICRO=3584`, inner Transformer micro `896`, and targets about 391 Stream3
+  jobs; its terminal depth-8 result remains unverified because the Molab
+  endpoint expired with HTTP 410 during the run. Evidence:
+  `test_results/molab_sm120_cublaslt_and_offline_encoding_2026-08-24.md`.
