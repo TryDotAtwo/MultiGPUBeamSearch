@@ -7,7 +7,6 @@ message(STATUS "Beam state physical bytes: ${BEAM_STATE_PHYSICAL_BYTES}")
 message(STATUS "Beam state alignment: ${BEAM_STATE_ALIGNMENT}")
 message(STATUS "Beam move count: ${BEAM_MOVE_COUNT}")
 project(beam_solver_contracts LANGUAGES CXX CUDA)
-find_package(CUDAToolkit REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -137,7 +136,7 @@ if(CUTLASS_DIR AND EXISTS "${CUTLASS_DIR}/include")
 else()
     message(FATAL_ERROR "CUTLASS_DIR is required. Pass -DCUTLASS_DIR=/path/to/cutlass or set CUTLASS_DIR.")
 endif()
-target_link_libraries(beam_cuda PUBLIC beam_core CUDA::cublasLt)
+target_link_libraries(beam_cuda PUBLIC beam_core cublasLt)
 target_compile_definitions(beam_cuda PUBLIC
     BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
     BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
