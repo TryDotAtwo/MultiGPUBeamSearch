@@ -4660,6 +4660,8 @@ int main(int argc, char** argv) {
         const char* block51_env = std::getenv("BEAM_STREAM1_TRANSFORMER_BLOCK51");
         const char* final_cls_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY");
         const char* final_cls_attention_env = std::getenv("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION");
+        const char* fused_input_layernorm_env =
+            std::getenv("BEAM_STREAM1_TRANSFORMER_FUSED_INPUT_LAYERNORM");
         std::cout << "stream1_transformer_block51="
                   << (block51_env != nullptr && std::strcmp(block51_env, "1") == 0 ? 1 : 0)
                   << " raw=" << (block51_env == nullptr ? "" : block51_env) << "\n";
@@ -4669,6 +4671,14 @@ int main(int argc, char** argv) {
         std::cout << "stream1_transformer_final_cls_attention="
                   << (final_cls_attention_env != nullptr && std::strcmp(final_cls_attention_env, "1") == 0 ? 1 : 0)
                   << " raw=" << (final_cls_attention_env == nullptr ? "" : final_cls_attention_env) << "\n";
+        std::cout << "stream1_transformer_fused_input_layernorm="
+                  << (fused_input_layernorm_env != nullptr &&
+                              std::strcmp(fused_input_layernorm_env, "1") == 0
+                          ? 1
+                          : 0)
+                  << " raw="
+                  << (fused_input_layernorm_env == nullptr ? "" : fused_input_layernorm_env)
+                  << "\n";
     }
 
     DispatcherNetwork network{};
