@@ -17,3 +17,13 @@ void stream1_transformer_cublaslt_fp16_linear_cuda(
     void* workspace,
     std::size_t workspace_bytes,
     cudaStream_t stream);
+void stream1_transformer_cublaslt_fp16_linear_residual_cuda(
+    const half* input,
+    const half* weight,
+    half* residual_inout,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    void* workspace,
+    std::size_t workspace_bytes,
+    cudaStream_t stream);

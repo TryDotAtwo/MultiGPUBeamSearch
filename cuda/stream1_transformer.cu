@@ -4,6 +4,9 @@
 #include "stream1_transformer_layernorm_policy.hpp"
 #include "stream1_transformer_shape.hpp"
 #include "stream1_transformer_sm120_fp8.hpp"
+#if BEAM_ENABLE_SM120_FP8
+#include "stream1_transformer_cublaslt_fp16.hpp"
+#endif
 
 #include "config.hpp"
 #include "cuda_check.hpp"
@@ -1692,6 +1695,15 @@ bool stream1_transformer_current_device_sm80_or_newer() {
     return stream1_transformer_current_device_sm() >= 80;
 }
 
+bool stream1_transformer_use_sm120_cublaslt() {
+#if BEAM_ENABLE_SM120_FP8
+    const char* raw = std::getenv("BEAM_STREAM1_TRANSFORMER_SM120_CUBLASLT");
+    return stream1_transformer_current_device_sm() == 120 && raw && std::strcmp(raw, "1") == 0;
+#else
+    return false;
+#endif
+}
+
 template <
     typename Element,
     typename ArchTag,
@@ -1760,6 +1772,14 @@ void stream1_transformer_linear_residual_cuda(
         return;
     }
     if (dtype == STREAM1_DTYPE_FP16) {
+#if BEAM_ENABLE_SM120_FP8
+        if (stream1_transformer_use_sm120_cublaslt()) {
+            stream1_transformer_cublaslt_fp16_linear_residual_cuda(
+                input, weight, residual_inout, rows, input_cols, output_cols,
+                nullptr, 0U, stream);
+            return;
+        }
+#endif
         if (stream1_transformer_current_device_sm80_or_newer()) {
             const bool is_ff2 = input_cols == 1024U && output_cols == 256U;
             const Stream1TransformerGemmFamily family = is_ff2

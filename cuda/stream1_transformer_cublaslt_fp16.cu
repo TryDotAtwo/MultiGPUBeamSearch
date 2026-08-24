@@ -103,16 +103,14 @@ Plan make_plan(Cache& owner, std::uint32_t m, std::uint32_t k, std::uint32_t n) 
 
 std::size_t stream1_transformer_cublaslt_fp16_workspace_bytes() { return kWorkspaceBytes; }
 
-void stream1_transformer_cublaslt_fp16_linear_cuda(
+void run(
     const half* input, const half* weight, half* output,
     std::uint32_t rows, std::uint32_t input_cols, std::uint32_t output_cols,
-    void* workspace, std::size_t workspace_bytes, cudaStream_t stream) {
+    float beta, void* workspace, std::size_t workspace_bytes, cudaStream_t stream) {
     if (!input || !weight || !output || rows == 0U || input_cols == 0U || output_cols == 0U) {
         throw std::invalid_argument("cublasLt FP16 GEMM received invalid arguments");
     }
-    if (workspace_bytes < kWorkspaceBytes) {
-        throw std::invalid_argument("cublasLt FP16 GEMM workspace is too small");
-    }
+    (void)workspace_bytes;
     auto& owner = cache();
     std::lock_guard<std::mutex> lock(owner.mutex);
     auto it = owner.plans.find(key(rows, input_cols, output_cols));
@@ -121,10 +119,25 @@ void stream1_transformer_cublaslt_fp16_linear_cuda(
                                  make_plan(owner, rows, input_cols, output_cols)).first;
     }
     const float alpha = 1.0f;
-    const float beta = 0.0f;
     check(cublasLtMatmul(owner.handle, it->second.operation, &alpha,
           input, it->second.input, weight, it->second.weight, &beta,
           output, it->second.output, output, it->second.output,
           &it->second.algorithm, workspace, workspace_bytes, stream),
           "cublasLt FP16 matmul failed");
+}
+
+void stream1_transformer_cublaslt_fp16_linear_cuda(
+    const half* input, const half* weight, half* output,
+    std::uint32_t rows, std::uint32_t input_cols, std::uint32_t output_cols,
+    void* workspace, std::size_t workspace_bytes, cudaStream_t stream) {
+    run(input, weight, output, rows, input_cols, output_cols, 0.0f,
+        workspace, workspace_bytes, stream);
+}
+
+void stream1_transformer_cublaslt_fp16_linear_residual_cuda(
+    const half* input, const half* weight, half* residual_inout,
+    std::uint32_t rows, std::uint32_t input_cols, std::uint32_t output_cols,
+    void* workspace, std::size_t workspace_bytes, cudaStream_t stream) {
+    run(input, weight, residual_inout, rows, input_cols, output_cols, 1.0f,
+        workspace, workspace_bytes, stream);
 }
