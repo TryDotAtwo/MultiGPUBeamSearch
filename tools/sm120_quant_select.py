@@ -19,6 +19,7 @@ from typing import Any, Mapping, Sequence
 from tools.sm120_quant_tuner import (
     CORE_OPERATORS,
     FP16_GEMM_BACKENDS,
+    NATIVE_LOW_PRECISION_OPERATORS,
     QualityThresholds,
     build_profile,
     pareto_select,
@@ -92,6 +93,16 @@ def select_profile(
         policy = ranking[name].get("operator_precision")
         if not isinstance(policy, Mapping) or set(policy) != set(CORE_OPERATORS):
             missing[name] = ["operator_precision"]
+            continue
+        unsupported_precision = [
+            operator for operator, precision in policy.items()
+            if precision != "fp16" and (
+                operator not in NATIVE_LOW_PRECISION_OPERATORS
+                or precision != "sm120_block_fp8"
+            )
+        ]
+        if unsupported_precision:
+            missing[name] = ["operator_precision.native_runtime"]
             continue
         if ranking[name].get("operator_corrections"):
             missing[name] = ["operator_corrections.native_runtime"]

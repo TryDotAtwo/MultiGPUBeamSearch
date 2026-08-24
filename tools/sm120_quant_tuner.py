@@ -29,6 +29,11 @@ CORE_OPERATORS = tuple(
         "ff.3.weight",
     )
 )
+NATIVE_LOW_PRECISION_OPERATORS = frozenset(
+    f"blocks.{block}.{suffix}"
+    for block in range(4)
+    for suffix in ("attn.in_proj_weight", "ff.0.weight")
+)
 PRECISIONS = frozenset(("fp16", "sm120_block_fp8", "sm120_block_int8"))
 FP16_GEMM_BACKENDS = frozenset(("cutlass", "cublaslt"))
 

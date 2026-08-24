@@ -135,6 +135,8 @@ inconsistent. Selection now requires exactly one `current_fp16` reference,
 uses candidate-vs-FP16 agreement for the hard incremental `0.999` gates, and
 also requires candidate-vs-FP32 quality to remain within the explicit
 `fp32_regression_budget` of the measured FP16 reference. Reconstructed-state
-frontier Jaccard remains a separate hard gate. CPU-only contract verification
-after this change: `39 passed`; CUDA timing and solve acceptance remain Molab
-only.
+frontier Jaccard remains a separate hard gate. Promotion additionally rejects
+research-only low-precision operators outside the native QKV/FF1 subset and
+INT8 until those execution paths actually exist. CPU-only contract
+verification after this change: `40 passed`; CUDA timing and solve acceptance
+remain Molab only.

@@ -8,7 +8,10 @@
   regress from the FP16 control only by the explicit
   `fp32_regression_budget` (default `0.001`), and reconstructed-frontier
   Jaccard remains independent. The selector now fails closed without exactly
-  one `current_fp16` reference. Targeted SM120 suite: 39 passed.
+  one `current_fp16` reference. Promotion also fails closed when a research
+  policy requests low precision outside the currently implemented native QKV
+  and FF1 subset, or requests INT8 before a native INT8 path exists. Targeted
+  SM120 suite: 40 passed.
 
 ## 2026-08-22
 - Added the opt-in `BEAM_ENABLE_SM120_FP8` CUTLASS SM120 block-scaled E4M3

@@ -19,14 +19,14 @@ from pathlib import Path
 
 import numpy as np
 
-from tools.sm120_quant_tuner import CORE_OPERATORS, validate_profile
-
-
-RUNTIME_SUPPORTED = frozenset(
-    f"blocks.{layer}.{suffix}"
-    for layer in range(4)
-    for suffix in ("attn.in_proj_weight", "ff.0.weight")
+from tools.sm120_quant_tuner import (
+    CORE_OPERATORS,
+    NATIVE_LOW_PRECISION_OPERATORS,
+    validate_profile,
 )
+
+
+RUNTIME_SUPPORTED = NATIVE_LOW_PRECISION_OPERATORS
 
 
 def sha256_file(path: Path) -> str:

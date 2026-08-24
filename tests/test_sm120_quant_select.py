@@ -124,3 +124,16 @@ def test_selector_fails_closed_without_fp16_reference() -> None:
             [_ranking("candidate")], [_frontier("candidate")],
             [_benchmark("candidate", 1.0)], QualityThresholds(),
         )
+
+
+def test_selector_rejects_quality_candidate_outside_native_operator_subset() -> None:
+    ranking = _ranking("unsupported")
+    ranking["operator_precision"]["blocks.0.attn.out_proj.weight"] = "sm120_block_fp8"
+    decision = select_profile(
+        [_fp16_reference(), ranking], [_frontier("unsupported")],
+        [_benchmark("unsupported", 1.0)], QualityThresholds(),
+    )
+    assert decision["selected"] is None
+    assert decision["missing_evidence"]["unsupported"] == [
+        "operator_precision.native_runtime"
+    ]
