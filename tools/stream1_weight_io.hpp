@@ -322,8 +322,8 @@ inline void load_sm120_offline_artifacts(
         const std::filesystem::path beta_path = profile_dir / runtime_manifest_value(manifest, prefix + "ln_beta_file");
         require_sha256(gamma_path, runtime_manifest_value(manifest, prefix + "ln_gamma_sha256"));
         require_sha256(beta_path, runtime_manifest_value(manifest, prefix + "ln_beta_sha256"));
-        ln_gamma = read_binary_exact(gamma_path, static_cast<std::uint64_t>(input_cols) * sizeof(half));
-        ln_beta = read_binary_exact(beta_path, static_cast<std::uint64_t>(input_cols) * sizeof(half));
+        ln_gamma = read_binary_exact(gamma_path, static_cast<std::uint64_t>(input_cols) * sizeof(std::uint16_t));
+        ln_beta = read_binary_exact(beta_path, static_cast<std::uint64_t>(input_cols) * sizeof(std::uint16_t));
     };
     for (std::uint32_t layer = 0; layer < weights.model.transformer_layers; ++layer) {
         auto& block = weights.transformer.blocks.at(layer);

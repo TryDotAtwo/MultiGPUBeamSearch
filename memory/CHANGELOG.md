@@ -1123,3 +1123,7 @@
   transformed FP32 weights are encoded once, transformed LayerNorm gamma/beta
   overrides are stored as hashed FP16 artifacts, and the native loader applies
   only those immutable overrides. Production performs no scale folding.
+- Fixed host-only compilation of the immutable LayerNorm override loader by
+  expressing FP16 artifact width as `std::uint16_t` rather than CUDA's `half`;
+  this preserves the exact two-byte file contract without leaking a CUDA type
+  into `runtime_config.cpp`.

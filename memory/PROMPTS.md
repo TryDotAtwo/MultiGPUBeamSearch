@@ -619,3 +619,6 @@ User reported that an interactive game had been running during part of the recen
 - Promotion must be automatic but fail closed: ranking alone is insufficient;
   require reconstructed frontier agreement and measured native Stream1 latency
   for the exact same candidate before producing an immutable runtime profile.
+- Validate all implementation and performance work directly in Molab, and
+  compare pre-encoded mixed weights against both original FP32 checkpoint truth
+  and the current FP16 runtime export; never quantize weights at startup.
