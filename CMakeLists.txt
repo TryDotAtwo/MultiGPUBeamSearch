@@ -136,7 +136,14 @@ if(CUTLASS_DIR AND EXISTS "${CUTLASS_DIR}/include")
 else()
     message(FATAL_ERROR "CUTLASS_DIR is required. Pass -DCUTLASS_DIR=/path/to/cutlass or set CUTLASS_DIR.")
 endif()
-target_link_libraries(beam_cuda PUBLIC beam_core cublasLt)
+find_library(CUBLASLT_LIBRARY NAMES cublasLt libcublasLt.so.13
+    PATHS /usr/local/lib/python3.13/site-packages/nvidia/cu13/lib
+          /tmp/uv-venv/lib/python3.13/site-packages/nvidia/cu13/lib
+          /usr/local/cuda/lib64)
+if(NOT CUBLASLT_LIBRARY)
+    message(FATAL_ERROR "cuBLASLt is required for the Transformer FP16 benchmark path")
+endif()
+target_link_libraries(beam_cuda PUBLIC beam_core ${CUBLASLT_LIBRARY})
 target_compile_definitions(beam_cuda PUBLIC
     BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
     BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
