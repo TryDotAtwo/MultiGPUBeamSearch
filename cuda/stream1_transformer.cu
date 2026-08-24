@@ -121,6 +121,154 @@ __global__ void stream1_transformer_build_input_kernel(
     stream1_transformer_store_scalar_device(tokens, out_idx, value, network.dims.dtype);
 }
 
+__device__ __forceinline__ float stream1_transformer_input_token_value_generic_device(
+    const State128* __restrict__ current_frontier_states,
+    std::uint64_t parent_base,
+    Stream1TransformerNetworkView network,
+    std::uint32_t parent_offset,
+    std::uint32_t row,
+    std::uint32_t token,
+    std::uint32_t dim) {
+    if (token == 0U) {
+        return stream1_transformer_load_scalar_device(network.cls_token, dim, network.dims.dtype);
+    }
+    const std::uint32_t piece = token - 1U;
+    float value = stream1_transformer_load_scalar_device(
+        network.fast_piece_static,
+        static_cast<std::uint64_t>(piece) * network.dims.d_model + dim,
+        network.dims.dtype);
+    const State128* state = current_frontier_states +
+        parent_base + static_cast<std::uint64_t>(parent_offset + row);
+    for (std::uint32_t slot = 0; slot < network.dims.max_piece_size; ++slot) {
+        const std::uint64_t piece_slot =
+            static_cast<std::uint64_t>(piece) * network.dims.max_piece_size + slot;
+        if (network.piece_mask[piece_slot] == 0U) {
+            continue;
+        }
+        const std::uint32_t pos = static_cast<std::uint32_t>(network.piece_positions[piece_slot]);
+        const std::uint32_t state_value = static_cast<std::uint32_t>(state->v[pos]);
+        const std::uint64_t table_idx =
+            ((static_cast<std::uint64_t>(slot) * network.dims.num_classes + state_value) *
+             network.dims.d_model) + dim;
+        value += stream1_transformer_load_scalar_device(
+            network.fast_slot_projected, table_idx, network.dims.dtype);
+    }
+    return value;
+}
+
+__global__ void stream1_transformer_build_input_layernorm256_generic_kernel(
+    const State128* __restrict__ current_frontier_states,
+    const std::uint64_t* __restrict__ parent_base,
+    const std::uint32_t* __restrict__ count,
+    const std::uint32_t* __restrict__ graph_job_index,
+    Stream1TransformerNetworkView network,
+    half* __restrict__ tokens,
+    std::uint32_t b_micro,
+    std::uint32_t parent_offset) {
+    const std::uint32_t row_token = blockIdx.x;
+    const std::uint32_t tid = threadIdx.x;
+    if (tid >= 128U) {
+        return;
+    }
+    const std::uint32_t row = row_token / network.dims.seq_len;
+    const std::uint32_t token = row_token % network.dims.seq_len;
+    if (row >= b_micro) {
+        return;
+    }
+
+    extern __shared__ float warp_scratch[];
+    const std::uint32_t lane = tid & 31U;
+    const std::uint32_t warp = tid >> 5U;
+    const std::uint64_t base = static_cast<std::uint64_t>(row_token) * 256ULL;
+    const std::uint32_t col0 = tid;
+    const std::uint32_t col1 = tid + 128U;
+    const std::uint32_t job = graph_job_index != nullptr ? *graph_job_index : 0U;
+    const bool active = parent_offset + row < count[job];
+
+    float x0 = 0.0f;
+    float x1 = 0.0f;
+    if (active) {
+        x0 = stream1_transformer_input_token_value_generic_device(
+            current_frontier_states, parent_base[job], network,
+            parent_offset, row, token, col0);
+        x1 = stream1_transformer_input_token_value_generic_device(
+            current_frontier_states, parent_base[job], network,
+            parent_offset, row, token, col1);
+    }
+    // Preserve the exact established dataflow: build_input stores fp16 and
+    // LayerNorm reloads fp16.  The fused path must retain that rounding point.
+    x0 = __half2float(__float2half_rn(x0));
+    x1 = __half2float(__float2half_rn(x1));
+
+    const float warp_sum = stream1_transformer_warp_reduce_sum_device(x0 + x1);
+    if (lane == 0U) {
+        warp_scratch[warp] = warp_sum;
+    }
+    __syncthreads();
+    float block_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+    if (warp == 0U) {
+        block_sum = stream1_transformer_warp_reduce_sum_device(block_sum);
+        if (lane == 0U) {
+            warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = block_sum * (1.0f / 256.0f);
+        }
+    }
+    __syncthreads();
+    const float mean = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+#if !STREAM1_TRANSFORMER_LN256_SPLIT_SLOTS
+    __syncthreads();
+#endif
+
+    const float centered0 = x0 - mean;
+    const float centered1 = x1 - mean;
+    const float warp_var_sum = stream1_transformer_warp_reduce_sum_device(
+        centered0 * centered0 + centered1 * centered1);
+    if (lane == 0U) {
+        warp_scratch[warp] = warp_var_sum;
+    }
+    __syncthreads();
+    float block_var_sum = tid < 4U ? warp_scratch[tid] : 0.0f;
+    if (warp == 0U) {
+        block_var_sum = stream1_transformer_warp_reduce_sum_device(block_var_sum);
+        if (lane == 0U) {
+            warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] =
+                rsqrtf(block_var_sum * (1.0f / 256.0f) + 1.0e-5f);
+        }
+    }
+    __syncthreads();
+    const float inv_std = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
+    const float y0 = centered0 * inv_std *
+        stream1_transformer_load_scalar_device(network.input_ln_gamma, col0, network.dims.dtype) +
+        stream1_transformer_load_scalar_device(network.input_ln_beta, col0, network.dims.dtype);
+    const float y1 = centered1 * inv_std *
+        stream1_transformer_load_scalar_device(network.input_ln_gamma, col1, network.dims.dtype) +
+        stream1_transformer_load_scalar_device(network.input_ln_beta, col1, network.dims.dtype);
+    stream1_transformer_store_scalar_device(tokens, base + col0, y0, network.dims.dtype);
+    stream1_transformer_store_scalar_device(tokens, base + col1, y1, network.dims.dtype);
+}
+
+void stream1_transformer_build_input_layernorm256_generic_launch(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const std::uint32_t* graph_job_index,
+    const Stream1TransformerNetworkView& network,
+    half* tokens,
+    std::uint32_t b_micro,
+    std::uint32_t parent_offset,
+    cudaStream_t stream) {
+    const Stream1TransformerDims dims = network.dims;
+    if (dims.dtype != STREAM1_DTYPE_FP16 || dims.d_model != 256U ||
+        dims.seq_len != dims.padded_seq_len) {
+        throw std::invalid_argument(
+            "Stream1 generic fused input LayerNorm requires fp16 d_model=256 and compact sequence");
+    }
+    stream1_transformer_build_input_layernorm256_generic_kernel<<<
+        b_micro * dims.seq_len, 128,
+        STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float), stream>>>(
+            current_frontier_states, parent_base, count, graph_job_index,
+            network, tokens, b_micro, parent_offset);
+}
+
 __global__ void stream1_transformer_zero_padded_rows_kernel(
     half* values,
     Stream1TransformerDims dims,
@@ -2911,6 +3059,10 @@ bool stream1_transformer_final_cls_split_qkv_requested() {
     return stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_SPLIT_QKV");
 }
 
+bool stream1_transformer_fused_input_layernorm_requested() {
+    return stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_FUSED_INPUT_LAYERNORM");
+}
+
 std::uint32_t stream1_transformer_stage_profile_skip_calls() {
     const char* value = std::getenv("BEAM_STREAM1_TRANSFORMER_STAGE_PROFILE_SKIP_CALLS");
     if (value == nullptr || value[0] == '\0') {
@@ -3731,28 +3883,41 @@ void stream1_transformer_inference_graph_job_cuda(
     }
 #if BEAM_HAS_CUTLASS
     const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
-    const dim3 token_block(128);
-    const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
-    stream1_transformer_build_input_kernel_graph_job<<<token_grid, token_block, 0, stream>>>(
-        current_frontier_states,
-        parent_base,
-        count,
-        graph_job_index,
-        network,
-        scratch.tokens,
-        b_micro,
-        parent_offset);
+    if (stream1_transformer_fused_input_layernorm_requested()) {
+        stream1_transformer_build_input_layernorm256_generic_launch(
+            current_frontier_states,
+            parent_base,
+            count,
+            graph_job_index,
+            network,
+            scratch.tokens,
+            b_micro,
+            parent_offset,
+            stream);
+    } else {
+        const dim3 token_block(128);
+        const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
+        stream1_transformer_build_input_kernel_graph_job<<<token_grid, token_block, 0, stream>>>(
+            current_frontier_states,
+            parent_base,
+            count,
+            graph_job_index,
+            network,
+            scratch.tokens,
+            b_micro,
+            parent_offset);
 
-    stream1_transformer_layernorm_copy_launch(
-        scratch.tokens,
-        scratch.tokens,
-        network.input_ln_gamma,
-        network.input_ln_beta,
-        token_rows,
-        dims.d_model,
-        dims.dtype,
-        stream);
-    stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
+        stream1_transformer_layernorm_copy_launch(
+            scratch.tokens,
+            scratch.tokens,
+            network.input_ln_gamma,
+            network.input_ln_beta,
+            token_rows,
+            dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
+    }
 
     stream1_transformer_generic_run_layers_cuda(
         network,
@@ -3840,27 +4005,40 @@ void stream1_transformer_inference_cuda(
     }
 #if BEAM_HAS_CUTLASS
     const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
-    const dim3 token_block(128);
-    const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
-    stream1_transformer_build_input_kernel<<<token_grid, token_block, 0, stream>>>(
-        current_frontier_states,
-        parent_base,
-        count,
-        network,
-        scratch.tokens,
-        b_micro,
-        parent_offset);
+    if (stream1_transformer_fused_input_layernorm_requested()) {
+        stream1_transformer_build_input_layernorm256_generic_launch(
+            current_frontier_states,
+            parent_base,
+            count,
+            nullptr,
+            network,
+            scratch.tokens,
+            b_micro,
+            parent_offset,
+            stream);
+    } else {
+        const dim3 token_block(128);
+        const dim3 token_grid(token_rows, (dims.d_model + token_block.x - 1U) / token_block.x);
+        stream1_transformer_build_input_kernel<<<token_grid, token_block, 0, stream>>>(
+            current_frontier_states,
+            parent_base,
+            count,
+            network,
+            scratch.tokens,
+            b_micro,
+            parent_offset);
 
-    stream1_transformer_layernorm_copy_launch(
-        scratch.tokens,
-        scratch.tokens,
-        network.input_ln_gamma,
-        network.input_ln_beta,
-        token_rows,
-        dims.d_model,
-        dims.dtype,
-        stream);
-    stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
+        stream1_transformer_layernorm_copy_launch(
+            scratch.tokens,
+            scratch.tokens,
+            network.input_ln_gamma,
+            network.input_ln_beta,
+            token_rows,
+            dims.d_model,
+            dims.dtype,
+            stream);
+        stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
+    }
 
 
     stream1_transformer_generic_run_layers_cuda(

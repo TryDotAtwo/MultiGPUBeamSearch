@@ -73,6 +73,18 @@ void set_legacy_padding_zero(bool enabled) {
 #endif
 }
 
+void set_fused_input_layernorm(bool enabled) {
+#if defined(_WIN32)
+    if (_putenv_s("BEAM_STREAM1_TRANSFORMER_FUSED_INPUT_LAYERNORM", enabled ? "1" : "0") != 0) {
+        throw std::runtime_error("failed to set fused input LayerNorm test environment");
+    }
+#else
+    if (setenv("BEAM_STREAM1_TRANSFORMER_FUSED_INPUT_LAYERNORM", enabled ? "1" : "0", 1) != 0) {
+        throw std::runtime_error("failed to set fused input LayerNorm test environment");
+    }
+#endif
+}
+
 std::vector<std::uint32_t> run_scores(
     bool final_cls_only,
     const State128* frontier,
@@ -233,6 +245,10 @@ int main() {
     set_final_cls_split_qkv(true);
     const std::vector<std::uint32_t> split_qkv = run_scores(
         true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
+    set_fused_input_layernorm(true);
+    const std::vector<std::uint32_t> fused_input_layernorm = run_scores(
+        true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
+    set_fused_input_layernorm(false);
     set_final_cls_split_qkv(false);
     set_final_cls_attention(false);
     set_final_cls_only(false);
@@ -240,6 +256,7 @@ int main() {
     require(optimized == baseline, "generic final CLS-only score keys must be byte exact");
     require(cls_attention == baseline, "generic final CLS-attention score keys must be byte exact");
     require(split_qkv == baseline, "generic final CLS split-QKV score keys must be byte exact");
+    require(fused_input_layernorm == baseline, "generic fused input LayerNorm score keys must be byte exact");
 
     const char* benchmark_iterations_env = std::getenv("BEAM_STREAM1_FINAL_CLS_BENCH_ITERATIONS");
     if (benchmark_iterations_env != nullptr && benchmark_iterations_env[0] != '\0') {
@@ -258,6 +275,10 @@ int main() {
         set_final_cls_split_qkv(true);
         const float split_qkv_ms = time_graph_ms(
             true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows, iterations);
+        set_fused_input_layernorm(true);
+        const float fused_input_layernorm_ms = time_graph_ms(
+            true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows, iterations);
+        set_fused_input_layernorm(false);
         set_final_cls_split_qkv(false);
         set_final_cls_attention(false);
         std::cout << "stream1_transformer_final_cls_benchmark"
@@ -273,11 +294,14 @@ int main() {
                   << " cls_attention_speedup=" << (optimized_ms / cls_attention_ms)
                   << " split_qkv_ms=" << split_qkv_ms
                   << " split_qkv_speedup=" << (cls_attention_ms / split_qkv_ms)
+                  << " fused_input_layernorm_ms=" << fused_input_layernorm_ms
+                  << " fused_input_layernorm_speedup=" << (split_qkv_ms / fused_input_layernorm_ms)
                   << "\n";
     }
     set_final_cls_only(false);
     set_final_cls_attention(false);
     set_final_cls_split_qkv(false);
+    set_fused_input_layernorm(false);
     set_legacy_padding_zero(false);
 
     cudaFree(d_frontier);
