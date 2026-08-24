@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr std::size_t kWorkspaceBytes = 64U * 1024U * 1024U;
+constexpr std::size_t kWorkspaceBytes = 0U;
 
 void check(cublasStatus_t status, const char* what) {
     if (status != CUBLAS_STATUS_SUCCESS) {
@@ -110,8 +110,8 @@ void stream1_transformer_cublaslt_fp16_linear_cuda(
     if (!input || !weight || !output || rows == 0U || input_cols == 0U || output_cols == 0U) {
         throw std::invalid_argument("cublasLt FP16 GEMM received invalid arguments");
     }
-    if (!workspace || workspace_bytes < kWorkspaceBytes) {
-        throw std::invalid_argument("cublasLt FP16 GEMM workspace is smaller than 64 MiB");
+    if (workspace_bytes < kWorkspaceBytes) {
+        throw std::invalid_argument("cublasLt FP16 GEMM workspace is too small");
     }
     auto& owner = cache();
     std::lock_guard<std::mutex> lock(owner.mutex);
