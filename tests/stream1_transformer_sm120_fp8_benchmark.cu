@@ -49,13 +49,26 @@ void benchmark_shape(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t
     const std::size_t workspace_bytes =
         stream1_transformer_sm120_fp8_workspace_bytes(rows, input_cols, output_cols);
     DeviceBuffer workspace(workspace_bytes);
+    DeviceBuffer residual_input(stream1_transformer_sm120_fp8_residual3_input_bytes(rows, input_cols));
+    DeviceBuffer residual_input_scales(stream1_transformer_sm120_fp8_residual3_input_scale_elements(rows, input_cols) * sizeof(float));
+    DeviceBuffer weight_fp32(weight_elements * sizeof(float));
+    DeviceBuffer residual_weight(stream1_transformer_sm120_fp8_residual3_weight_bytes(input_cols, output_cols));
+    DeviceBuffer residual_weight_scales(stream1_transformer_sm120_fp8_residual3_weight_scale_elements(input_cols, output_cols) * sizeof(float));
+    const std::size_t residual_workspace_bytes = stream1_transformer_sm120_fp8_residual3_workspace_bytes(rows, input_cols, output_cols);
+    DeviceBuffer residual_workspace(residual_workspace_bytes);
     BEAM_CUDA_CHECK(cudaMemset(input.pointer, 0x35, input_elements * sizeof(half)));
     BEAM_CUDA_CHECK(cudaMemset(weight.pointer, 0x31, weight_elements * sizeof(half)));
+    std::vector<float> host_weight_fp32(weight_elements, 0.03125f);
+    BEAM_CUDA_CHECK(cudaMemcpy(weight_fp32.pointer, host_weight_fp32.data(), weight_elements * sizeof(float), cudaMemcpyHostToDevice));
     stream1_transformer_sm120_fp8_quantize_weight_cuda(
         static_cast<const half*>(weight.pointer),
         static_cast<std::uint8_t*>(quantized_weight.pointer),
         static_cast<float*>(weight_scales.pointer),
         input_cols, output_cols, 1.0f, nullptr);
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    stream1_transformer_sm120_fp8_residual3_quantize_weight_from_fp32_cuda(
+        static_cast<const float*>(weight_fp32.pointer), static_cast<std::uint8_t*>(residual_weight.pointer),
+        static_cast<float*>(residual_weight_scales.pointer), input_cols, output_cols, nullptr);
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
 
     auto run_once = [&]() {
@@ -109,12 +122,27 @@ void benchmark_shape(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t
     float fp16_elapsed_ms = 0.0f;
     BEAM_CUDA_CHECK(cudaEventElapsedTime(&fp16_elapsed_ms, start, stop));
     const double fp16_average_ms = static_cast<double>(fp16_elapsed_ms) / iterations;
+    auto run_residual_once = [&]() {
+        stream1_transformer_sm120_fp8_residual3_linear_cuda(
+            static_cast<const half*>(input.pointer), static_cast<std::uint8_t*>(residual_input.pointer),
+            static_cast<float*>(residual_input_scales.pointer), static_cast<const std::uint8_t*>(residual_weight.pointer),
+            static_cast<const float*>(residual_weight_scales.pointer), static_cast<half*>(output.pointer),
+            rows, input_cols, output_cols, residual_workspace.pointer, residual_workspace_bytes, nullptr);
+    };
+    for (int i=0;i<warmups;++i) run_residual_once();
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize()); BEAM_CUDA_CHECK(cudaEventRecord(start));
+    for (int i=0;i<iterations;++i) run_residual_once();
+    BEAM_CUDA_CHECK(cudaEventRecord(stop)); BEAM_CUDA_CHECK(cudaEventSynchronize(stop));
+    float residual_elapsed_ms=0.0f; BEAM_CUDA_CHECK(cudaEventElapsedTime(&residual_elapsed_ms,start,stop));
+    const double residual_average_ms=static_cast<double>(residual_elapsed_ms)/iterations;
     std::cout << "sm120_fp8_shape"
               << " m=" << rows << " n=" << output_cols << " k=" << input_cols
               << " end_to_end_ms=" << std::fixed << std::setprecision(6) << average_ms
               << " effective_tflops=" << std::setprecision(3) << tflops
               << " fp16_ms=" << std::setprecision(6) << fp16_average_ms
               << " fp8_speedup=" << std::setprecision(3) << fp16_average_ms / average_ms
+              << " residual3_ms=" << std::setprecision(6) << residual_average_ms
+              << " residual3_vs_fp16=" << std::setprecision(3) << fp16_average_ms / residual_average_ms
               << " workspace_bytes=" << workspace_bytes << "\n";
     cudaEventDestroy(stop);
     cudaEventDestroy(start);

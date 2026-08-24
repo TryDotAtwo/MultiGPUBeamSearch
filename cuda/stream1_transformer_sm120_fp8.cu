@@ -181,6 +181,57 @@ __global__ void quantize_activation_kernel(
     }
 }
 
+__global__ void quantize_activation_residual3_kernel(
+    const half* __restrict__ input,
+    ElementA* __restrict__ packed,
+    float* __restrict__ scales,
+    std::uint32_t rows,
+    std::uint32_t input_cols) {
+    constexpr std::uint32_t warps_per_block = 4U;
+    const std::uint32_t warp = threadIdx.x >> 5U;
+    const std::uint32_t lane = threadIdx.x & 31U;
+    const std::uint32_t k_blocks = input_cols / kScaleGranularity;
+    const std::uint64_t tile = static_cast<std::uint64_t>(blockIdx.x) * warps_per_block + warp;
+    if (tile >= static_cast<std::uint64_t>(rows) * k_blocks) return;
+    const std::uint32_t row = static_cast<std::uint32_t>(tile / k_blocks);
+    const std::uint32_t kb = static_cast<std::uint32_t>(tile % k_blocks);
+    float values[4], high_values[4], residuals[4];
+    float high_amax = 0.0f;
+#pragma unroll
+    for (std::uint32_t item = 0; item < 4U; ++item) {
+        const std::uint32_t col = kb * kScaleGranularity + lane + item * 32U;
+        values[item] = __half2float(input[static_cast<std::size_t>(row) * input_cols + col]);
+        high_amax = fmaxf(high_amax, fabsf(values[item]));
+    }
+    for (int offset = 16; offset > 0; offset >>= 1) high_amax = fmaxf(high_amax, __shfl_down_sync(0xffffffffU, high_amax, offset));
+    high_amax = __shfl_sync(0xffffffffU, high_amax, 0);
+    const float high_scale = high_amax == 0.0f ? 1.0f : high_amax / kE4m3Max;
+    float low_amax = 0.0f;
+#pragma unroll
+    for (std::uint32_t item = 0; item < 4U; ++item) {
+        const ElementA q = ElementA(values[item] / high_scale);
+        high_values[item] = static_cast<float>(q) * high_scale;
+        residuals[item] = values[item] - high_values[item];
+        low_amax = fmaxf(low_amax, fabsf(residuals[item]));
+    }
+    for (int offset = 16; offset > 0; offset >>= 1) low_amax = fmaxf(low_amax, __shfl_down_sync(0xffffffffU, low_amax, offset));
+    low_amax = __shfl_sync(0xffffffffU, low_amax, 0);
+    const float low_scale = low_amax == 0.0f ? 1.0f : low_amax / kE4m3Max;
+    if (lane == 0U) {
+        scales[static_cast<std::size_t>(kb) * rows + row] = high_scale;
+        scales[static_cast<std::size_t>(k_blocks + kb) * rows + row] = low_scale;
+        scales[static_cast<std::size_t>(2U * k_blocks + kb) * rows + row] = high_scale;
+    }
+#pragma unroll
+    for (std::uint32_t item = 0; item < 4U; ++item) {
+        const std::uint32_t col = kb * kScaleGranularity + lane + item * 32U;
+        const std::size_t base = static_cast<std::size_t>(row) * (3U * input_cols) + col;
+        packed[base] = ElementA(values[item] / high_scale);
+        packed[base + input_cols] = ElementA(residuals[item] / low_scale);
+        packed[base + 2U * input_cols] = ElementA(values[item] / high_scale);
+    }
+}
+
 __device__ __forceinline__ float source_weight_value(half value) {
     return __half2float(value);
 }
@@ -229,6 +280,54 @@ __global__ void quantize_weight_kernel(
         const std::size_t index = static_cast<std::size_t>(k) * output_cols + n;
         const float scaled = source_weight_value(weight[index]) * inverse_scale;
         quantized[index] = ElementB(scaled);
+    }
+}
+
+__global__ void quantize_weight_residual3_fp32_kernel(
+    const float* __restrict__ weight,
+    ElementB* __restrict__ packed,
+    float* __restrict__ scales,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols) {
+    const std::uint32_t nb = blockIdx.x, kb = blockIdx.y;
+    __shared__ float scratch[4];
+    float high_amax = 0.0f;
+    constexpr std::uint32_t count = kScaleGranularity * kScaleGranularity;
+    for (std::uint32_t local = threadIdx.x; local < count; local += blockDim.x) {
+        const std::uint32_t lk = local / kScaleGranularity, ln = local % kScaleGranularity;
+        const std::size_t src = static_cast<std::size_t>(kb * kScaleGranularity + lk) * output_cols + nb * kScaleGranularity + ln;
+        high_amax = fmaxf(high_amax, fabsf(weight[src]));
+    }
+    const float high_max = block_max(high_amax, scratch);
+    if (threadIdx.x == 0U) scratch[0] = high_max == 0.0f ? 1.0f : high_max / kE4m3Max;
+    __syncthreads();
+    const float high_scale = scratch[0];
+    float low_amax = 0.0f;
+    for (std::uint32_t local = threadIdx.x; local < count; local += blockDim.x) {
+        const std::uint32_t lk = local / kScaleGranularity, ln = local % kScaleGranularity;
+        const std::size_t src = static_cast<std::size_t>(kb * kScaleGranularity + lk) * output_cols + nb * kScaleGranularity + ln;
+        const ElementB q = ElementB(weight[src] / high_scale);
+        low_amax = fmaxf(low_amax, fabsf(weight[src] - static_cast<float>(q) * high_scale));
+    }
+    const float low_max = block_max(low_amax, scratch);
+    if (threadIdx.x == 0U) {
+        scratch[0] = low_max == 0.0f ? 1.0f : low_max / kE4m3Max;
+        const std::uint32_t nblocks = output_cols / kScaleGranularity;
+        scales[static_cast<std::size_t>(kb) * nblocks + nb] = high_scale;
+        scales[static_cast<std::size_t>(input_cols / kScaleGranularity + kb) * nblocks + nb] = high_scale;
+        scales[static_cast<std::size_t>(2U * input_cols / kScaleGranularity + kb) * nblocks + nb] = scratch[0];
+    }
+    __syncthreads();
+    const float low_scale = scratch[0];
+    for (std::uint32_t local = threadIdx.x; local < count; local += blockDim.x) {
+        const std::uint32_t lk = local / kScaleGranularity, ln = local % kScaleGranularity;
+        const std::uint32_t k = kb * kScaleGranularity + lk, n = nb * kScaleGranularity + ln;
+        const std::size_t src = static_cast<std::size_t>(k) * output_cols + n;
+        const ElementB high = ElementB(weight[src] / high_scale);
+        const ElementB low = ElementB((weight[src] - static_cast<float>(high) * high_scale) / low_scale);
+        packed[src] = high;
+        packed[static_cast<std::size_t>(input_cols + k) * output_cols + n] = high;
+        packed[static_cast<std::size_t>(2U * input_cols + k) * output_cols + n] = low;
     }
 }
 
@@ -394,6 +493,23 @@ std::size_t stream1_transformer_sm120_fp8_workspace_bytes(
 #endif
 }
 
+std::size_t stream1_transformer_sm120_fp8_residual3_input_bytes(std::uint32_t rows, std::uint32_t input_cols) {
+    validate_common_shape(rows, input_cols, 128U);
+    return static_cast<std::size_t>(rows) * 3U * input_cols;
+}
+std::size_t stream1_transformer_sm120_fp8_residual3_input_scale_elements(std::uint32_t rows, std::uint32_t input_cols) {
+    return 3U * stream1_transformer_sm120_fp8_input_scale_elements(rows, input_cols);
+}
+std::size_t stream1_transformer_sm120_fp8_residual3_weight_bytes(std::uint32_t input_cols, std::uint32_t output_cols) {
+    validate_common_shape(1U, input_cols, output_cols); return static_cast<std::size_t>(3U) * input_cols * output_cols;
+}
+std::size_t stream1_transformer_sm120_fp8_residual3_weight_scale_elements(std::uint32_t input_cols, std::uint32_t output_cols) {
+    return 3U * stream1_transformer_sm120_fp8_weight_scale_elements(input_cols, output_cols);
+}
+std::size_t stream1_transformer_sm120_fp8_residual3_workspace_bytes(std::uint32_t rows, std::uint32_t input_cols, std::uint32_t output_cols) {
+    return stream1_transformer_sm120_fp8_workspace_bytes(rows, 3U * input_cols, output_cols);
+}
+
 void stream1_transformer_sm120_fp8_quantize_weight_cuda(
     const half* weight,
     std::uint8_t* quantized_weight,
@@ -496,6 +612,19 @@ void stream1_transformer_sm120_fp8_quantize_weight_mse_from_fp32_cuda(
 #endif
 }
 
+void stream1_transformer_sm120_fp8_residual3_quantize_weight_from_fp32_cuda(
+    const float* weight, std::uint8_t* packed_quantized_weight, float* packed_weight_scales,
+    std::uint32_t input_cols, std::uint32_t output_cols, cudaStream_t stream) {
+    validate_common_shape(1U,input_cols,output_cols);
+    if (!weight || !packed_quantized_weight || !packed_weight_scales) throw std::invalid_argument("SM120 residual3 weight encoding received a null pointer");
+#if BEAM_ENABLE_SM120_FP8 && defined(CUTLASS_ARCH_MMA_SM120_SUPPORTED)
+    quantize_weight_residual3_fp32_kernel<<<dim3(output_cols/kScaleGranularity,input_cols/kScaleGranularity),128,0,stream>>>(weight,reinterpret_cast<ElementB*>(packed_quantized_weight),packed_weight_scales,input_cols,output_cols);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+#else
+    (void)stream; throw std::runtime_error("SM120 FP8 support was not compiled for sm_120a");
+#endif
+}
+
 void stream1_transformer_sm120_fp8_linear_cuda(
     const half* input,
     std::uint8_t* quantized_input,
@@ -560,5 +689,26 @@ void stream1_transformer_sm120_fp8_linear_cuda(
     (void)workspace_bytes;
     (void)stream;
     throw std::runtime_error("SM120 FP8 support was not compiled for sm_120a");
+#endif
+}
+
+void stream1_transformer_sm120_fp8_residual3_linear_cuda(
+    const half* input, std::uint8_t* packed_quantized_input, float* packed_input_scales,
+    const std::uint8_t* packed_quantized_weight, const float* packed_weight_scales, half* output,
+    std::uint32_t rows, std::uint32_t input_cols, std::uint32_t output_cols,
+    void* workspace, std::size_t workspace_bytes, cudaStream_t stream) {
+    validate_common_shape(rows,input_cols,output_cols);
+    if (!input || !packed_quantized_input || !packed_input_scales || !packed_quantized_weight || !packed_weight_scales || !output) throw std::invalid_argument("SM120 residual3 linear received a null pointer");
+#if BEAM_ENABLE_SM120_FP8 && defined(CUTLASS_ARCH_MMA_SM120_SUPPORTED)
+    const std::size_t required=stream1_transformer_sm120_fp8_residual3_workspace_bytes(rows,input_cols,output_cols);
+    if (workspace_bytes<required || (required && !workspace)) throw std::invalid_argument("SM120 residual3 workspace is smaller than required");
+    const std::uint64_t tiles=static_cast<std::uint64_t>(rows)*(input_cols/kScaleGranularity);
+    quantize_activation_residual3_kernel<<<static_cast<std::uint32_t>((tiles+3U)/4U),128,0,stream>>>(input,reinterpret_cast<ElementA*>(packed_quantized_input),packed_input_scales,rows,input_cols);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+    auto args=make_arguments(reinterpret_cast<const ElementA*>(packed_quantized_input),packed_input_scales,reinterpret_cast<const ElementB*>(packed_quantized_weight),packed_weight_scales,reinterpret_cast<ElementD*>(output),rows,3U*input_cols,output_cols);
+    Gemm gemm; if (gemm.can_implement(args)!=cutlass::Status::kSuccess) throw std::runtime_error("SM120 residual3 GEMM cannot implement this shape");
+    if (gemm(args,workspace,stream)!=cutlass::Status::kSuccess) throw std::runtime_error("SM120 residual3 GEMM launch failed");
+#else
+    (void)workspace;(void)workspace_bytes;(void)stream;throw std::runtime_error("SM120 FP8 support was not compiled for sm_120a");
 #endif
 }
