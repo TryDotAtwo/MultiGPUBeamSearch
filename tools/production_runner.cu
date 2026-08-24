@@ -4640,6 +4640,11 @@ int main(int argc, char** argv) {
               << (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? "piece_transformer" : "mlp") << "\n";
     if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
         std::cout << "stream1_transformer_micro=" << stream1_transformer_micro << "\n";
+        std::cout << "stream1_transformer_fp16_gemm_backend="
+                  << (host_weights.transformer_fp16_gemm_backend ==
+                          stream1_weights::TRANSFORMER_FP16_GEMM_CUBLASLT
+                      ? "cublaslt" : "cutlass")
+                  << "\n";
         std::cout << "stream1_transformer_dims"
                   << " seq_len=" << stream1_model.seq_len
                   << " d_model=" << stream1_model.d_model

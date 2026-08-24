@@ -37,6 +37,8 @@ inline constexpr std::uint32_t TRANSFORMER_NHEAD = 8;
 inline constexpr std::uint32_t TRANSFORMER_HEAD_DIM = 32;
 inline constexpr std::uint32_t TRANSFORMER_LAYERS = 4;
 inline constexpr std::uint32_t TRANSFORMER_FF_DIM = 1024;
+inline constexpr std::uint32_t TRANSFORMER_FP16_GEMM_CUTLASS = 0U;
+inline constexpr std::uint32_t TRANSFORMER_FP16_GEMM_CUBLASLT = 1U;
 
 inline std::uint32_t transformer_sequence_alignment(const Stream1ModelConfig& model) {
     const char* compact = std::getenv("BEAM_STREAM1_TRANSFORMER_COMPACT_SEQUENCE57");
@@ -98,6 +100,7 @@ struct HostTransformerBytes {
 struct HostWeightBytes {
     Stream1ModelConfig model;
     std::uint32_t sm120_fp8_operator_mask = 0U;
+    std::uint32_t transformer_fp16_gemm_backend = TRANSFORMER_FP16_GEMM_CUTLASS;
     std::vector<std::byte> input_weight;
     std::vector<std::byte> input_bias;
     std::vector<std::byte> input_ln_gamma;
@@ -153,6 +156,7 @@ struct DeviceTransformerWeights {
     std::uint16_t* piece_positions = nullptr;
     std::uint8_t* piece_mask = nullptr;
     std::uint8_t* piece_types = nullptr;
+    std::uint32_t fp16_gemm_backend = TRANSFORMER_FP16_GEMM_CUTLASS;
 };
 
 struct DeviceWeights {
@@ -264,30 +268,81 @@ inline void require_sha256(const std::filesystem::path& path, const std::string&
     }
 }
 
+inline const char* sm120_profile_dir_environment() {
+    const char* value = std::getenv("BEAM_STREAM1_SM120_PROFILE_DIR");
+    if (value == nullptr || *value == '\0') {
+        value = std::getenv("BEAM_STREAM1_SM120_FP8_PROFILE_DIR");
+    }
+    return value;
+}
+
+inline std::uint32_t effective_sm120_fp8_operator_mask() {
+    const char* raw_operators = std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS");
+    const std::uint32_t explicit_mask = parse_stream1_sm120_fp8_operator_policy(raw_operators);
+    const char* raw_profile_dir = sm120_profile_dir_environment();
+    if (raw_profile_dir == nullptr || *raw_profile_dir == '\0') {
+        return explicit_mask;
+    }
+    const std::filesystem::path manifest_path =
+        std::filesystem::path(raw_profile_dir) / "runtime_manifest.txt";
+    if (!std::filesystem::exists(manifest_path)) {
+        return explicit_mask;
+    }
+    const std::string manifest = read_text_exact(manifest_path);
+    const std::uint32_t profile_mask = parse_stream1_sm120_fp8_operator_policy(
+        runtime_manifest_value(manifest, "operators").c_str());
+    if (explicit_mask != 0U && explicit_mask != profile_mask) {
+        throw std::runtime_error("SM120 runtime profile operators do not match requested operators");
+    }
+    return profile_mask;
+}
+
 inline void load_sm120_offline_artifacts(
     const std::filesystem::path& weight_dir,
     HostWeightBytes& weights) {
-    const char* raw_operators = std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS");
-    const std::uint32_t requested_mask = parse_stream1_sm120_fp8_operator_policy(raw_operators);
-    const char* raw_profile_dir = std::getenv("BEAM_STREAM1_SM120_FP8_PROFILE_DIR");
-    if (requested_mask == 0U) {
-        if (raw_profile_dir != nullptr && *raw_profile_dir != '\0') {
-            throw std::runtime_error("BEAM_STREAM1_SM120_FP8_PROFILE_DIR requires an explicit operator policy");
+    std::uint32_t requested_mask = effective_sm120_fp8_operator_mask();
+    const char* raw_profile_dir = sm120_profile_dir_environment();
+    if (raw_profile_dir == nullptr || *raw_profile_dir == '\0') {
+        if (requested_mask != 0U) {
+            throw std::runtime_error("SM120 operators require BEAM_STREAM1_SM120_PROFILE_DIR");
         }
         return;
     }
-    if (raw_profile_dir == nullptr || *raw_profile_dir == '\0') {
-        throw std::runtime_error("SM120 operators require BEAM_STREAM1_SM120_FP8_PROFILE_DIR");
-    }
     const std::filesystem::path profile_dir(raw_profile_dir);
-    const std::filesystem::path runtime_manifest = profile_dir / "runtime_manifest.txt";
+    const bool has_low_precision_manifest = std::filesystem::exists(profile_dir / "runtime_manifest.txt");
+    const std::filesystem::path runtime_manifest = profile_dir /
+        (has_low_precision_manifest ? "runtime_manifest.txt" : "runtime_execution.txt");
     const std::string manifest = read_text_exact(runtime_manifest);
-    if (runtime_manifest_value(manifest, "schema_version") != "2") {
+    if (runtime_manifest_value(manifest, "schema_version") != "3") {
         throw std::runtime_error("unsupported SM120 runtime manifest schema");
+    }
+    if (runtime_manifest_value(manifest, "target_sm") != "120" ||
+        runtime_manifest_value(manifest, "weights") != "offline_immutable") {
+        throw std::runtime_error("SM120 runtime execution contract is incompatible");
+    }
+    require_sha256(profile_dir / "profile.json", runtime_manifest_value(manifest, "profile_sha256"));
+    if (runtime_manifest_value(manifest, "workspace_bytes") != "0") {
+        throw std::runtime_error("SM120 runtime profile requests unsupported workspace");
+    }
+    const std::string fp16_backend = runtime_manifest_value(manifest, "fp16_gemm_backend");
+    if (fp16_backend == "cutlass") {
+        weights.transformer_fp16_gemm_backend = TRANSFORMER_FP16_GEMM_CUTLASS;
+    } else if (fp16_backend == "cublaslt") {
+        weights.transformer_fp16_gemm_backend = TRANSFORMER_FP16_GEMM_CUBLASLT;
+    } else {
+        throw std::runtime_error("unsupported SM120 fp16 GEMM backend");
+    }
+    if (!has_low_precision_manifest) {
+        if (requested_mask != 0U) {
+            throw std::runtime_error("SM120 execution-only profile cannot satisfy low-precision operators");
+        }
+        return;
     }
     const std::string profile_operators = runtime_manifest_value(manifest, "operators");
     const std::uint32_t profile_mask = parse_stream1_sm120_fp8_operator_policy(profile_operators.c_str());
-    if (profile_mask != requested_mask) {
+    if (requested_mask == 0U) {
+        requested_mask = profile_mask;
+    } else if (profile_mask != requested_mask) {
         throw std::runtime_error("SM120 runtime profile operators do not match requested operators");
     }
     const std::filesystem::path source_manifest = weight_dir / "manifest.json";
@@ -785,8 +840,7 @@ inline TransformerScratchBytePlan transformer_scratch_byte_plan(const Stream1Mod
     plan.context_bytes = fp16_bytes(rows * sequence.padded_seq_len * model.d_model);
     plan.ff_hidden_bytes = fp16_bytes(rows * sequence.padded_seq_len * model.ff_dim);
     plan.logits_bytes = fp16_bytes(rows * model.output_dim);
-    const std::uint32_t fp8_mask = parse_stream1_sm120_fp8_operator_policy(
-        std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS"));
+    const std::uint32_t fp8_mask = effective_sm120_fp8_operator_mask();
     if (fp8_mask != 0U) {
         if (model.dtype != STREAM1_DTYPE_FP16 || model.d_model % 128U != 0U) {
             throw std::invalid_argument("SM120 FP8 operators require fp16 and d_model divisible by 128");
@@ -819,8 +873,7 @@ inline std::uint64_t stream1_scratch_bytes(
 inline std::uint64_t stream1_sm120_fp8_extra_weight_bytes(const Stream1ModelConfig& model) {
     std::uint64_t bytes = 0U;
     if (model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
-        const std::uint32_t mask = parse_stream1_sm120_fp8_operator_policy(
-            std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS"));
+        const std::uint32_t mask = effective_sm120_fp8_operator_mask();
         for (std::uint32_t layer = 0; layer < model.transformer_layers; ++layer) {
             if ((mask & stream1_sm120_fp8_qkv_bit(layer)) != 0U) {
                 bytes += static_cast<std::uint64_t>(model.d_model) * 3U * model.d_model;
@@ -886,6 +939,7 @@ inline void alloc_managed_pointer_table(half**& table, const std::vector<half*>&
 inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeights& device) {
     const HostTransformerBytes& h = host.transformer;
     DeviceTransformerWeights& d = device.transformer;
+    d.fp16_gemm_backend = host.transformer_fp16_gemm_backend;
     alloc_and_copy(d.fast_slot_projected, h.fast_slot_projected, "fast_slot_projected");
     alloc_and_copy(d.fast_piece_static, h.fast_piece_static, "fast_piece_static");
     alloc_and_copy(d.cls_token, h.cls_token, "cls_token");
@@ -1226,7 +1280,8 @@ inline TransformerNetworkViewHolder transformer_network_view(
         weights.piece_positions,
         weights.piece_mask,
         weights.piece_types,
-        transformer_dims(model)};
+        transformer_dims(model),
+        weights.fp16_gemm_backend};
     return holder;
 }
 

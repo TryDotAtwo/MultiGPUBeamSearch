@@ -18,7 +18,7 @@ import numpy as np
 import torch
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 CORE_OPERATORS = tuple(
     f"blocks.{block}.{suffix}"
     for block in range(4)
@@ -30,6 +30,7 @@ CORE_OPERATORS = tuple(
     )
 )
 PRECISIONS = frozenset(("fp16", "sm120_block_fp8", "sm120_block_int8"))
+FP16_GEMM_BACKENDS = frozenset(("cutlass", "cublaslt"))
 
 
 @dataclass(frozen=True)
@@ -250,6 +251,9 @@ def build_profile(
     operator_transforms: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     solver_commit: str = "unknown",
     cuda_version: str = "unknown",
+    fp16_gemm_backend: str = "cutlass",
+    target_sm: int = 120,
+    workspace_bytes: int = 0,
 ) -> dict[str, Any]:
     if set(operator_precision) != set(CORE_OPERATORS):
         raise ValueError("operator_precision must contain exactly the 16 core operators")
@@ -270,6 +274,14 @@ def build_profile(
         "fixed_high_precision": [
             "frontend", "layernorm", "bias", "residual", "softmax", "output_layer"
         ],
+        "native_execution": {
+            "fp16_gemm_backend": str(fp16_gemm_backend),
+            "low_precision_backend": "cutlass_sm120_block_scaled",
+            "target_sm": int(target_sm),
+            "workspace_bytes": int(workspace_bytes),
+            "weights": "offline_immutable",
+            "activations": "native_or_dynamic_per_batch",
+        },
         "operators": {
             name: {
                 **_operator_contract(str(operator_precision[name])),
@@ -291,6 +303,26 @@ def validate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
     }
     if not isinstance(fingerprints, Mapping) or set(fingerprints) != required_fingerprints:
         raise ValueError("profile fingerprint set is incomplete")
+    execution = profile.get("native_execution")
+    required_execution = {
+        "fp16_gemm_backend", "low_precision_backend", "target_sm",
+        "workspace_bytes", "weights", "activations",
+    }
+    if not isinstance(execution, Mapping) or set(execution) != required_execution:
+        raise ValueError("profile native execution contract is incomplete")
+    if execution.get("fp16_gemm_backend") not in FP16_GEMM_BACKENDS:
+        raise ValueError("unsupported fp16 GEMM backend")
+    if execution.get("low_precision_backend") != "cutlass_sm120_block_scaled":
+        raise ValueError("unsupported low precision backend")
+    if execution.get("target_sm") != 120:
+        raise ValueError("SM120 profile must target sm_120")
+    workspace_bytes = execution.get("workspace_bytes")
+    if not isinstance(workspace_bytes, int) or isinstance(workspace_bytes, bool) or workspace_bytes < 0:
+        raise ValueError("native execution workspace_bytes must be a non-negative integer")
+    if execution.get("weights") != "offline_immutable":
+        raise ValueError("native execution weights must be encoded offline")
+    if execution.get("activations") != "native_or_dynamic_per_batch":
+        raise ValueError("unsupported native activation contract")
     operators = profile.get("operators")
     if not isinstance(operators, Mapping) or set(operators) != set(CORE_OPERATORS):
         raise ValueError("profile must contain exactly the 16 core operators")

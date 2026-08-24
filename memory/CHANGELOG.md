@@ -1143,3 +1143,14 @@
   jobs; its terminal depth-8 result remains unverified because the Molab
   endpoint expired with HTTP 410 during the run. Evidence:
   `test_results/molab_sm120_cublaslt_and_offline_encoding_2026-08-24.md`.
+- Promoted the native execution choice into immutable SM120 profile schema v3.
+  Native benchmark evidence must now declare the FP16 GEMM backend, target SM,
+  and workspace; missing/malformed execution evidence rejects the candidate.
+  Stream1 loads and SHA-verifies that contract through
+  `BEAM_STREAM1_SM120_PROFILE_DIR`, derives low-precision operators from the
+  same profile, and no longer needs a manual cuBLASLt enable toggle.
+- Extended the zero-workspace exact FP16 cuBLASLt candidate from residual
+  projections to QKV and FF1 GEMMs with separate exact bias/activation kernels.
+  cuBLASLt handles and plan caches are thread-local so concurrent inference
+  lanes are not serialized. CUDA correctness and integrated depth-8 timing are
+  intentionally pending a fresh Molab sandbox.

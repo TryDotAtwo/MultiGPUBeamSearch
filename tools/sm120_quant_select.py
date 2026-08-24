@@ -11,12 +11,14 @@ quantization or PyTorch timing result.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from tools.sm120_quant_tuner import (
     CORE_OPERATORS,
+    FP16_GEMM_BACKENDS,
     QualityThresholds,
     build_profile,
     pareto_select,
@@ -78,11 +80,29 @@ def select_profile(
         if not isinstance(transforms, Mapping) or set(transforms) != set(CORE_OPERATORS):
             missing[name] = ["operator_transforms"]
             continue
+        native_execution = benchmark[name].get("native_execution")
+        if not isinstance(native_execution, Mapping):
+            missing[name] = ["native_execution"]
+            continue
+        if set(native_execution) != {"fp16_gemm_backend", "target_sm", "workspace_bytes"}:
+            missing[name] = ["native_execution"]
+            continue
+        if native_execution.get("fp16_gemm_backend") not in FP16_GEMM_BACKENDS:
+            missing[name] = ["native_execution.fp16_gemm_backend"]
+            continue
+        if native_execution.get("target_sm") != 120:
+            missing[name] = ["native_execution.target_sm"]
+            continue
+        workspace_bytes = native_execution.get("workspace_bytes")
+        if not isinstance(workspace_bytes, int) or isinstance(workspace_bytes, bool) or workspace_bytes < 0:
+            missing[name] = ["native_execution.workspace_bytes"]
+            continue
         row = dict(ranking[name])
         row["frontier_jaccard"] = _minimum_frontier_jaccard(frontier[name])
         row["latency_ms"] = float(benchmark[name]["latency_ms"])
         row["operator_precision"] = dict(policy)
         row["operator_transforms"] = {key: list(value) for key, value in transforms.items()}
+        row["native_execution"] = dict(native_execution)
         complete.append(row)
     decision = pareto_select(complete, thresholds)
     decision["missing_evidence"] = missing
@@ -144,7 +164,21 @@ def main() -> None:
         operator_transforms=selected["operator_transforms"],
         solver_commit=args.solver_commit,
         cuda_version=args.cuda_version,
+        fp16_gemm_backend=selected["native_execution"]["fp16_gemm_backend"],
+        target_sm=selected["native_execution"]["target_sm"],
+        workspace_bytes=selected["native_execution"]["workspace_bytes"],
     )
+    profile_bytes = (json.dumps(
+        profile, ensure_ascii=False, sort_keys=True, indent=2
+    ) + "\n").encode("utf-8")
+    runtime_execution = (
+        "schema_version=3\n"
+        f"profile_sha256={hashlib.sha256(profile_bytes).hexdigest()}\n"
+        f"fp16_gemm_backend={profile['native_execution']['fp16_gemm_backend']}\n"
+        f"target_sm={profile['native_execution']['target_sm']}\n"
+        f"workspace_bytes={profile['native_execution']['workspace_bytes']}\n"
+        "weights=offline_immutable\n"
+    ).encode("utf-8")
     write_immutable_profile(
         args.output_dir,
         profile,
@@ -153,6 +187,7 @@ def main() -> None:
             "ranking_metrics.json": json.loads(args.ranking.read_text(encoding="utf-8")),
             "frontier_metrics.json": json.loads(args.frontiers.read_text(encoding="utf-8")),
             "native_benchmarks.json": json.loads(args.benchmarks.read_text(encoding="utf-8")),
+            "runtime_execution.txt": runtime_execution,
         },
     )
     print(json.dumps({"selected": selected["name"], "output_dir": str(args.output_dir)}))

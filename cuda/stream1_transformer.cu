@@ -1441,6 +1441,7 @@ void stream1_transformer_linear_bias_cuda(
 void stream1_transformer_ff1_linear_bias_silu_cuda(
     const half*, const half*, const half*, half*, std::uint32_t, std::uint32_t,
     std::uint32_t, std::uint32_t, cudaStream_t);
+bool stream1_transformer_use_sm120_cublaslt();
 
 void stream1_transformer_qkv_linear_bias_dispatch(
     const half* input,
@@ -1453,6 +1454,16 @@ void stream1_transformer_qkv_linear_bias_dispatch(
     std::uint32_t dtype,
     cudaStream_t stream) {
     if (block.attn_qkv_weight_fp8 == nullptr) {
+#if BEAM_ENABLE_SM120_FP8
+        if (dtype == STREAM1_DTYPE_FP16 && stream1_transformer_use_sm120_cublaslt()) {
+            stream1_transformer_cublaslt_fp16_linear_cuda(
+                input, block.attn_qkv_weight, output, rows, input_cols, output_cols,
+                nullptr, 0U, stream);
+            stream1_transformer_bias_add_launch(
+                output, block.attn_qkv_bias, rows, output_cols, dtype, stream);
+            return;
+        }
+#endif
         stream1_transformer_linear_bias_cuda(
             input, block.attn_qkv_weight, block.attn_qkv_bias, output,
             rows, input_cols, output_cols, dtype, stream);
@@ -1482,6 +1493,17 @@ void stream1_transformer_ff1_linear_bias_silu_dispatch(
     std::uint32_t dtype,
     cudaStream_t stream) {
     if (block.ff1_weight_fp8 == nullptr) {
+#if BEAM_ENABLE_SM120_FP8
+        if (dtype == STREAM1_DTYPE_FP16 && stream1_transformer_use_sm120_cublaslt()) {
+            stream1_transformer_cublaslt_fp16_linear_cuda(
+                input, block.ff1_weight, output, rows, input_cols, output_cols,
+                nullptr, 0U, stream);
+            stream1_transformer_bias_silu_kernel<<<
+                (rows * output_cols + 255U) / 256U, 256, 0, stream>>>(
+                    output, block.ff1_bias, rows, output_cols, dtype);
+            return;
+        }
+#endif
         stream1_transformer_ff1_linear_bias_silu_cuda(
             input, block.ff1_weight, block.ff1_bias, output,
             rows, input_cols, output_cols, dtype, stream);
@@ -1521,6 +1543,16 @@ void stream1_transformer_ff1_linear_bias_activation_dispatch(
     }
     const std::uint32_t count = rows * output_cols;
     if (block.ff1_weight_fp8 == nullptr) {
+#if BEAM_ENABLE_SM120_FP8
+        if (dtype == STREAM1_DTYPE_FP16 && stream1_transformer_use_sm120_cublaslt()) {
+            stream1_transformer_cublaslt_fp16_linear_cuda(
+                input, block.ff1_weight, output, rows, input_cols, output_cols,
+                nullptr, 0U, stream);
+            stream1_transformer_bias_relu_kernel<<<(count + 255U) / 256U, 256, 0, stream>>>(
+                output, block.ff1_bias, rows, output_cols, dtype);
+            return;
+        }
+#endif
         stream1_transformer_linear_bias_cuda(
             input, block.ff1_weight, block.ff1_bias, output,
             rows, input_cols, output_cols, dtype, stream);
@@ -1695,10 +1727,35 @@ bool stream1_transformer_current_device_sm80_or_newer() {
     return stream1_transformer_current_device_sm() >= 80;
 }
 
+thread_local std::uint32_t stream1_transformer_active_fp16_gemm_backend = 0U;
+
+class Stream1TransformerFp16BackendScope {
+public:
+    explicit Stream1TransformerFp16BackendScope(std::uint32_t backend)
+        : previous_(stream1_transformer_active_fp16_gemm_backend) {
+        if (backend > 1U) {
+            throw std::invalid_argument("unsupported Stream1 Transformer fp16 GEMM backend");
+        }
+#if !BEAM_ENABLE_SM120_FP8
+        if (backend == 1U) {
+            throw std::invalid_argument("cuBLASLt SM120 profile requires BEAM_ENABLE_SM120_FP8 build");
+        }
+#endif
+        if (backend == 1U && stream1_transformer_current_device_sm() != 120) {
+            throw std::invalid_argument("cuBLASLt SM120 profile requires a physical sm_120 GPU");
+        }
+        stream1_transformer_active_fp16_gemm_backend = backend;
+    }
+    ~Stream1TransformerFp16BackendScope() {
+        stream1_transformer_active_fp16_gemm_backend = previous_;
+    }
+private:
+    std::uint32_t previous_;
+};
+
 bool stream1_transformer_use_sm120_cublaslt() {
 #if BEAM_ENABLE_SM120_FP8
-    const char* raw = std::getenv("BEAM_STREAM1_TRANSFORMER_SM120_CUBLASLT");
-    return stream1_transformer_current_device_sm() == 120 && raw && std::strcmp(raw, "1") == 0;
+    return stream1_transformer_active_fp16_gemm_backend == 1U;
 #else
     return false;
 #endif
@@ -3865,6 +3922,7 @@ void stream1_transformer_inference_graph_job_cuda(
     std::uint32_t parent_offset,
     cudaStream_t stream) {
     NvtxRange range("Stream1_transformer_graph_job_inference_launch");
+    Stream1TransformerFp16BackendScope fp16_backend_scope(network.fp16_gemm_backend);
     const Stream1TransformerDims dims = network.dims;
     if (dims.output_dim != MOVE_COUNT) {
         throw std::invalid_argument("Stream1 piece_transformer output_dim must equal MOVE_COUNT");
@@ -3990,6 +4048,7 @@ void stream1_transformer_inference_cuda(
     std::uint32_t parent_offset,
     cudaStream_t stream) {
     NvtxRange range("Stream1_transformer_inference_launch");
+    Stream1TransformerFp16BackendScope fp16_backend_scope(network.fp16_gemm_backend);
     const Stream1TransformerDims dims = network.dims;
     if (dims.output_dim != MOVE_COUNT) {
         throw std::invalid_argument("Stream1 piece_transformer output_dim must equal MOVE_COUNT");

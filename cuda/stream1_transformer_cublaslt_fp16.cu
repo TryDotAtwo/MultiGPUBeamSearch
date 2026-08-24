@@ -2,7 +2,6 @@
 
 #include <cublasLt.h>
 
-#include <mutex>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -45,7 +44,6 @@ struct Plan {
 
 struct Cache {
     cublasLtHandle_t handle = nullptr;
-    std::mutex mutex;
     std::unordered_map<std::uint64_t, Plan> plans;
 
     Cache() { check(cublasLtCreate(&handle), "cublasLtCreate failed"); }
@@ -53,7 +51,7 @@ struct Cache {
 };
 
 Cache& cache() {
-    static Cache value;
+    static thread_local Cache value;
     return value;
 }
 
@@ -112,7 +110,6 @@ void run(
     }
     (void)workspace_bytes;
     auto& owner = cache();
-    std::lock_guard<std::mutex> lock(owner.mutex);
     auto it = owner.plans.find(key(rows, input_cols, output_cols));
     if (it == owner.plans.end()) {
         it = owner.plans.emplace(key(rows, input_cols, output_cols),

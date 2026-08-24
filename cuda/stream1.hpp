@@ -99,6 +99,7 @@ struct Stream1TransformerNetworkView {
     const std::uint8_t* piece_mask;
     const std::uint8_t* piece_types;
     Stream1TransformerDims dims;
+    std::uint32_t fp16_gemm_backend = 0U;
 };
 
 struct Stream1TransformerScratchView {

@@ -62,3 +62,21 @@ correct profile was started.
 
 Commits: `a2d673ff`, `f9d8393e`, `09c3c9b4`, `f4908750`, `bf9998c4`,
 `1b360595` on `codex/stream1-generic-seq-align-impl`.
+
+## Profile-native execution follow-up (implementation pending Molab gate)
+
+- SM120 profile schema v3 now records `fp16_gemm_backend`, `target_sm`, and
+  zero-workspace requirements alongside the per-operator offline encoding.
+- Selection rejects native latency rows without that exact execution contract.
+- Runtime SHA-verifies `profile.json`, derives any low-precision operator mask
+  from the immutable profile, and propagates the selected FP16 backend into the
+  Transformer network view. The prior manual
+  `BEAM_STREAM1_TRANSFORMER_SM120_CUBLASLT=1` switch is no longer used.
+- Exact cuBLASLt execution now covers QKV, FF1, attention-out, and FF2 GEMMs;
+  bias and activation remain separate exact kernels for graph compatibility.
+- Plan caches are thread-local, preserving two-lane launch concurrency.
+
+This follow-up has not been compiled or benchmarked locally, by explicit user
+requirement. Required Molab acceptance remains: compile, profile hash negative
+test, CUDA graph correctness, FP32/FP16 ranking equivalence, and the identical
+`2**25` depth-8 A/B against `80.2952 s` with about 391 Stream3 jobs.

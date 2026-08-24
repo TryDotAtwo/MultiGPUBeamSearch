@@ -149,9 +149,18 @@ def package_profile(
         ], check=True)
         runtime_manifest_path = encoded / "runtime_manifest.txt"
         runtime_manifest = runtime_manifest_path.read_text(encoding="utf-8")
+        runtime_manifest = runtime_manifest.replace("schema_version=2\n", "schema_version=3\n", 1)
         runtime_manifest += (
             "runtime_base_manifest_sha256="
             + sha256_file(fp16_weight_dir / "manifest.json") + "\n"
+        )
+        profile_bytes = (json.dumps(profile, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        runtime_manifest += (
+            "fp16_gemm_backend=" + profile["native_execution"]["fp16_gemm_backend"] + "\n"
+            "target_sm=" + str(profile["native_execution"]["target_sm"]) + "\n"
+            "workspace_bytes=" + str(profile["native_execution"]["workspace_bytes"]) + "\n"
+            "weights=offline_immutable\n"
+            "profile_sha256=" + hashlib.sha256(profile_bytes).hexdigest() + "\n"
         )
         for name in operators:
             prefix = f"operator.{name}."
@@ -168,9 +177,7 @@ def package_profile(
                 runtime_manifest += prefix + "ln_beta_file=" + beta_relative.as_posix() + "\n"
                 runtime_manifest += prefix + "ln_beta_sha256=" + sha256_file(encoded / beta_relative) + "\n"
         runtime_manifest_path.write_text(runtime_manifest, encoding="utf-8")
-        (encoded / "profile.json").write_text(
-            json.dumps(profile, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        (encoded / "profile.json").write_bytes(profile_bytes)
         provenance = {
             "schema_version": 1,
             "fp32_checkpoint": {

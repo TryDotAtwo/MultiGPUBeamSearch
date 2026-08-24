@@ -44,6 +44,7 @@ def test_profile_validation_is_fail_closed() -> None:
         operator_precision={name: "sm120_block_fp8" for name in CORE_OPERATORS},
     )
     assert validate_profile(profile) == profile
+    assert profile["native_execution"]["fp16_gemm_backend"] == "cutlass"
     broken = json.loads(json.dumps(profile))
     del broken["operators"][CORE_OPERATORS[0]]
     with pytest.raises(ValueError, match="exactly the 16 core operators"):
@@ -55,6 +56,10 @@ def test_profile_validation_is_fail_closed() -> None:
     broken = json.loads(json.dumps(profile))
     broken["operators"][CORE_OPERATORS[0]]["weight_encoding"] = "runtime_quantize"
     with pytest.raises(ValueError, match="encoded offline"):
+        validate_profile(broken)
+    broken = json.loads(json.dumps(profile))
+    broken["native_execution"]["fp16_gemm_backend"] = "environment"
+    with pytest.raises(ValueError, match="unsupported fp16 GEMM backend"):
         validate_profile(broken)
 
 

@@ -632,3 +632,8 @@ User reported that an interactive game had been running during part of the recen
 - Keep the two batching controls distinct: outer pipeline `B_MICRO` and the
   smaller internal Transformer inference microbatch.
 - Compile and validate all CUDA changes strictly in Molab.
+- The selected implementation must be encoded in one immutable profile and
+  loaded by native Stream1 automatically; a hidden/manual backend environment
+  toggle is not an acceptable production contract.
+- Keep at least two inference lanes capable of progressing concurrently; do
+  not serialize every GEMM through a process-global plan-cache lock.
