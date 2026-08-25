@@ -156,6 +156,44 @@ __global__ void quantize_a_kernel(
     }
 }
 
+__global__ void quantize_a_four_groups_kernel(
+    const half* __restrict__ source,
+    ElementA* __restrict__ encoded,
+    ElementSFA* __restrict__ scales,
+    std::uint32_t rows,
+    std::uint32_t cols) {
+    constexpr std::uint32_t warps_per_block = 4U;
+    constexpr std::uint32_t groups_per_warp = 4U;
+    const std::uint32_t warp = threadIdx.x >> 5U;
+    const std::uint32_t lane = threadIdx.x & 31U;
+    const std::uint32_t groups_per_row = cols / kScaleVector;
+    const std::uint32_t warp_groups_per_row = groups_per_row / groups_per_warp;
+    const std::uint64_t task =
+        static_cast<std::uint64_t>(blockIdx.x) * warps_per_block + warp;
+    if (task >= static_cast<std::uint64_t>(rows) * warp_groups_per_row) return;
+    const std::uint32_t row = static_cast<std::uint32_t>(task / warp_groups_per_row);
+    const std::uint32_t k0 =
+        static_cast<std::uint32_t>(task % warp_groups_per_row) * groups_per_warp * kScaleVector;
+    float values[groups_per_warp];
+    float scales_local[groups_per_warp];
+#pragma unroll
+    for (std::uint32_t group = 0; group < groups_per_warp; ++group) {
+        const std::size_t index = static_cast<std::size_t>(row) * cols +
+            k0 + group * kScaleVector + lane;
+        values[group] = __half2float(source[index]);
+        scales_local[group] = safe_ue8m0_scale(warp_max(fabsf(values[group])));
+    }
+#pragma unroll
+    for (std::uint32_t group = 0; group < groups_per_warp; ++group) {
+        const std::uint32_t group_k = k0 + group * kScaleVector;
+        const std::size_t index = static_cast<std::size_t>(row) * cols + group_k + lane;
+        encoded[index] = ElementA(values[group] / scales_local[group]);
+        if (lane == 0U) {
+            scales[sm120_scale_offset(row, group_k, cols)] = ElementSFA(scales_local[group]);
+        }
+    }
+}
+
 __global__ void quantize_b_kernel(
     const half* __restrict__ source_kxn,
     ElementB* __restrict__ encoded_kxn,
@@ -194,6 +232,19 @@ void quantize_a(
     std::uint32_t rows, std::uint32_t cols, cudaStream_t stream) {
     const std::uint64_t groups = static_cast<std::uint64_t>(rows) * cols / kScaleVector;
     quantize_a_kernel<<<static_cast<unsigned>((groups + 3U) / 4U), 128, 0, stream>>>(
+        source, encoded, scales, rows, cols);
+    BEAM_CUDA_CHECK(cudaGetLastError());
+}
+
+void quantize_a_four_groups(
+    const half* source, ElementA* encoded, ElementSFA* scales,
+    std::uint32_t rows, std::uint32_t cols, cudaStream_t stream) {
+    const std::uint32_t groups_per_row = cols / kScaleVector;
+    if (groups_per_row % 4U != 0U) {
+        throw std::invalid_argument("four-group MXFP8 encoder requires K32 group count divisible by four");
+    }
+    const std::uint64_t tasks = static_cast<std::uint64_t>(rows) * groups_per_row / 4U;
+    quantize_a_four_groups_kernel<<<static_cast<unsigned>((tasks + 3U) / 4U), 128, 0, stream>>>(
         source, encoded, scales, rows, cols);
     BEAM_CUDA_CHECK(cudaGetLastError());
 }
@@ -247,8 +298,10 @@ void launch_gemm(
 
 struct Result {
     double encode_ms = 0.0;
+    double encode_four_groups_ms = 0.0;
     double gemm_ms = 0.0;
     double end_to_end_ms = 0.0;
+    double end_to_end_four_groups_ms = 0.0;
     double gemm_tflops = 0.0;
     double end_to_end_tflops = 0.0;
 };
@@ -283,8 +336,9 @@ CorrectnessResult validate_correctness() {
                                cudaMemcpyHostToDevice));
     BEAM_CUDA_CHECK(cudaMemcpy(source_b.pointer, host_b.data(), host_b.size() * sizeof(half),
                                cudaMemcpyHostToDevice));
-    quantize_a(static_cast<const half*>(source_a.pointer), static_cast<ElementA*>(encoded_a.pointer),
-               static_cast<ElementSFA*>(sfa.pointer), m, k, nullptr);
+    quantize_a_four_groups(static_cast<const half*>(source_a.pointer),
+                           static_cast<ElementA*>(encoded_a.pointer),
+                           static_cast<ElementSFA*>(sfa.pointer), m, k, nullptr);
     quantize_b(static_cast<const half*>(source_b.pointer), static_cast<ElementB*>(encoded_b.pointer),
                static_cast<ElementSFB*>(sfb.pointer), k, n, nullptr);
     auto arguments = make_arguments(
@@ -372,6 +426,11 @@ Result benchmark(std::uint32_t m, std::uint32_t n, std::uint32_t k) {
                    static_cast<ElementA*>(encoded_a.pointer),
                    static_cast<ElementSFA*>(sfa.pointer), m, k, nullptr);
     };
+    auto run_encode_four_groups = [&]() {
+        quantize_a_four_groups(static_cast<const half*>(source_a.pointer),
+                               static_cast<ElementA*>(encoded_a.pointer),
+                               static_cast<ElementSFA*>(sfa.pointer), m, k, nullptr);
+    };
     auto run_gemm = [&]() {
         launch_gemm(
             static_cast<const ElementA*>(encoded_a.pointer), static_cast<const ElementSFA*>(sfa.pointer),
@@ -395,8 +454,10 @@ Result benchmark(std::uint32_t m, std::uint32_t n, std::uint32_t k) {
     };
     Result result;
     result.encode_ms = measure(run_encode);
+    result.encode_four_groups_ms = measure(run_encode_four_groups);
     result.gemm_ms = measure(run_gemm);
     result.end_to_end_ms = measure([&]() { run_encode(); run_gemm(); });
+    result.end_to_end_four_groups_ms = measure([&]() { run_encode_four_groups(); run_gemm(); });
     const double flops = 2.0 * static_cast<double>(m) * n * k;
     result.gemm_tflops = flops / (result.gemm_ms * 1.0e9);
     result.end_to_end_tflops = flops / (result.end_to_end_ms * 1.0e9);
@@ -430,8 +491,10 @@ int main(int argc, char** argv) {
         std::cout << "sm120_native_mxfp8"
                   << " name=" << name << " m=" << m << " n=" << n << " k=" << k
                   << " encode_ms=" << std::fixed << std::setprecision(6) << result.encode_ms
+                  << " encode_four_groups_ms=" << result.encode_four_groups_ms
                   << " gemm_ms=" << result.gemm_ms
                   << " end_to_end_ms=" << result.end_to_end_ms
+                  << " end_to_end_four_groups_ms=" << result.end_to_end_four_groups_ms
                   << " gemm_tflops=" << std::setprecision(3) << result.gemm_tflops
                   << " end_to_end_tflops=" << result.end_to_end_tflops << "\n";
     }
