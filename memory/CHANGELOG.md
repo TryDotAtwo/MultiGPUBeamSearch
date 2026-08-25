@@ -1278,3 +1278,14 @@
   482.039 TFLOP/s for FF2. These isolated numbers exclude activation encoding
   and therefore prove the hardware ceiling; end-to-end Stream1 integration is
   still pending.
+# 2026-08-25 — Native SM120 MXFP8 activation encoder and FP32 oracle
+
+- Added a CUTLASS SM120a MXFP8 benchmark for the four Cube4 Transformer GEMM
+  shapes with separate activation-encode, GEMM, and end-to-end timing.
+- Fixed the immutable weight layout to `N x K` row-major, equivalent to the
+  logical CUTLASS `K x N` column-major operand, and added a deterministic FP32
+  matmul oracle.
+- Molab RTX PRO 6000 Blackwell validation passed: relative RMSE `0.032576885`,
+  top-1 agreement `0.984375`, and native GEMM throughput from `361.590` to
+  `547.825` TFLOP/s. Production enablement remains fail-closed pending real
+  Cube4 frontier and full depth-8 gates.

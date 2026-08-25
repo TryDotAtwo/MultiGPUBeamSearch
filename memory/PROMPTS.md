@@ -682,3 +682,10 @@ User reported that an interactive game had been running during part of the recen
 - Discover and reconnect to the already-open Molab notebook without asking the
   user to copy a fresh sandbox link. Keep CUDA compilation and execution in the
   live Molab kernel.
+# 2026-08-25 — Continue native SM120 MXFP8 production work
+
+- Continue implementing the SM120 path on Molab only.
+- The objective is hardware acceleration of the RTX PRO 6000 Blackwell card;
+  compare alternative 8-bit encodings separately on speed and model quality.
+- Weights must already be stored in the chosen encoding rather than quantized
+  in the inference hot path.
