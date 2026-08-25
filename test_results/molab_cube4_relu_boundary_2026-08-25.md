@@ -42,6 +42,20 @@ headroom. The launch and poll scripts are parameterized by
 
 ## Current blocker
 
-The supplied Molab endpoint no longer accepts `marimo-pair` connections. No
-local GPU run was substituted. A fresh live Molab URL/token is required to
-execute the prepared sweep.
+The replacement Molab session successfully ran the first two anchors with the
+saved SM120 runner (SHA-256
+`51a790190f66783d809042933f78d0b35ab04003607febbb1f128f40e441c71e`).
+The persistent filesystem is `noexec`, so the launcher now copies the runner
+to `/tmp` and marks that copy executable before starting it.
+
+| Beam | Depth | Seconds | Stream 3 jobs | Stream 4 jobs | Result |
+|---:|---:|---:|---:|---:|---|
+| `2**22` | 8 | 14.2836 | 293 | 345 | rc=0 |
+| `2**24` | 6 | 56.3178 | 391 | 362 | complete |
+| `2**24` | 7 | 56.4880 | 391 | 378 | complete |
+
+The `2**24` run began depth 8 at 100% GPU utilization and 7,375 MiB device
+memory, after which the marimo endpoint stopped accepting connections. Its
+persistent run log may contain the final depth/status and must be inspected in
+the next Molab session before classifying the termination. No local GPU run
+was substituted, and `2**25` was not launched without this evidence.

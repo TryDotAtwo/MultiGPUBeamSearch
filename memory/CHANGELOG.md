@@ -1,6 +1,14 @@
 # Changelog
 
 ## 2026-08-25
+- Executed the fail-forward boundary sweep on a replacement Molab SM120
+  sandbox. Beam `2**22` completed through depth 8 with rc=0: 14.2836 s,
+  293 Stream 3 jobs, and 345 Stream 4 jobs. Beam `2**24` completed saturated
+  depths 6 and 7 in 56.3178 and 56.4880 s with 391 Stream 3 jobs, 362/378
+  Stream 4 jobs, 100% reported GPU utilization, and 7,375 MiB device memory.
+  The endpoint disappeared after depth 8 started; persistent logs must be read
+  before classifying the final state or advancing to `2**25`. The launcher now
+  copies the persisted runner from the `noexec` storage mount into `/tmp`.
 - Diagnosed the Molab Cube4 ReLU `2**25` depth-8 launch boundary without
   changing the beam-search architecture. Decoupling the physical pipeline to
   two rings allowed the run to survive through saturated depth 6, but the
