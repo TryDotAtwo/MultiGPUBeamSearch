@@ -670,3 +670,15 @@ User reported that an interactive game had been running during part of the recen
 - Run compilation, correctness tests, and performance benchmarks strictly on Molab.
 - Keep long work foreground/in-process; do not use detached subprocess jobs or subagents.
 - Reject faster results that change the model activation or other semantics.
+
+## 2026-08-25 — Native SM120 hardware path is the primary objective
+
+- The immediate objective is to exercise the RTX PRO 6000 Blackwell SM120
+  hardware acceleration itself, not to reject hardware candidates before they
+  are measured because of a quality threshold.
+- Benchmark native OCP MXFP8 E4M3 plus UE8M0 block scales through
+  `OpClassBlockScaledTensorOp` and an `sm_120a` binary. Keep quality and
+  frontier retention as a separate Pareto axis for the later production gate.
+- Discover and reconnect to the already-open Molab notebook without asking the
+  user to copy a fresh sandbox link. Keep CUDA compilation and execution in the
+  live Molab kernel.

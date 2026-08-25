@@ -1260,3 +1260,21 @@
 - In-process ReLU beam `2**25` reached depth 8 in 83.4427 s versus 103.374 s
   unfused (19.28% lower wall time), while matching frontier 33,554,432,
   Stream3 jobs 391, and final threshold 10,294 exactly.
+
+## 2026-08-25 — Prove native SM120 MXFP8 MMA throughput
+
+- Recovered the live `444cubCayleyPy (Copy)` Molab notebook from its stable
+  notebook URL, restarted the expired runtime, and obtained the fresh sandbox
+  endpoint without requiring a user-supplied pairing link.
+- Root-caused the earlier native CUTLASS assertion: the executable was built
+  for ordinary `sm_120`, while architecture-accelerated MXFP8 MMA requires
+  `compute_120a` plus `sm_120a`.
+- Built CUTLASS `7107b05535f8977f5ecb9d01ee203205b1fd9bc4`
+  with E4M3 MXFP8 operands on both sides, UE8M0 scale factors with vector size
+  32, and `OpClassBlockScaledTensorOp`. All four production Cube4 GEMM shapes
+  passed CUTLASS reference verification on the RTX PRO 6000 Blackwell.
+- Measured native kernel throughput of 361.574 TFLOP/s for QKV,
+  372.345 TFLOP/s for FF1, 270.603 TFLOP/s for 256x256 projection, and
+  482.039 TFLOP/s for FF2. These isolated numbers exclude activation encoding
+  and therefore prove the hardware ceiling; end-to-end Stream1 integration is
+  still pending.
