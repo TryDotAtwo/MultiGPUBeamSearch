@@ -1,6 +1,14 @@
 # Changelog
 
 ## 2026-08-25
+- Confirmed the Molab endpoint losses were partly caused by detached execution:
+  an identical foreground heartbeat run completed beam `2**24` with rc=0 and
+  depth-8 latency 56.4112 s (391 Stream 3 jobs, 372 Stream 4 jobs). Beam
+  `2**25` then reached the full frontier at depth 5 with 12,819 MiB device
+  memory and 100% GPU, but the whole sandbox disappeared during saturated
+  depth 6 without a CUDA fatal line. The next diagnostic keeps history under
+  local `/tmp` rather than persistent/FUSE storage and records host available
+  memory plus `/tmp` free space in every foreground heartbeat.
 - Executed the fail-forward boundary sweep on a replacement Molab SM120
   sandbox. Beam `2**22` completed through depth 8 with rc=0: 14.2836 s,
   293 Stream 3 jobs, and 345 Stream 4 jobs. Beam `2**24` completed saturated

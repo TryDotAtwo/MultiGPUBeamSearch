@@ -53,9 +53,16 @@ to `/tmp` and marks that copy executable before starting it.
 | `2**22` | 8 | 14.2836 | 293 | 345 | rc=0 |
 | `2**24` | 6 | 56.3178 | 391 | 362 | complete |
 | `2**24` | 7 | 56.4880 | 391 | 378 | complete |
+| `2**24` | 8 | 56.4112 | 391 | 372 | rc=0 |
 
-The `2**24` run began depth 8 at 100% GPU utilization and 7,375 MiB device
-memory, after which the marimo endpoint stopped accepting connections. Its
-persistent run log may contain the final depth/status and must be inspected in
-the next Molab session before classifying the termination. No local GPU run
-was substituted, and `2**25` was not launched without this evidence.
+The apparent `2**24` failure was a detached/idle-lifetime problem. Re-running
+the identical profile as one foreground marimo execution with a heartbeat
+completed in 190.86 s wall time and produced the rc=0 depth-8 row above.
+
+The subsequent foreground `2**25` run reached the full 33,554,432 frontier at
+depth 5 in 11.5007 s, using 12,819 MiB device memory and 100% reported GPU.
+The whole sandbox then disappeared during saturated depth 6 before a terminal
+status was written. No CUDA fatal line was observed before endpoint loss. The
+next run will move disk history from the persistent/FUSE mount to `/tmp` and
+record host available memory and `/tmp` free space in every heartbeat so the
+remaining host/storage boundary can be classified.
