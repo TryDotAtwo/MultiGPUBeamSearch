@@ -1,6 +1,19 @@
 # Changelog
 
 ## 2026-08-25
+- Built commit `4dd0c41838e71463f0db855b189470ecf66c2675` natively on
+  Molab CUDA 13.0 / RTX PRO 6000 as `libbeam_production_runner.so` and
+  exercised the production solver entirely in the marimo process through the
+  new C ABI. An in-process Cube4 `2**16` smoke returned `rc=0`; two in-process
+  Cube4 `2**25` runs then completed through exactly `depth_done=8` without a
+  worker or detached solver. The incomplete CUTLASS profile measured
+  `128.046 s` at depth 8 and the immutable cuBLASLt execution profile regressed
+  to `150.125 s`; both produced 391 Stream3 jobs. The accepted `80.2952 s`
+  profile was then traced to the missing final-CLS flags plus a two-ring graph
+  window (`FINAL_CLS_ONLY`, `FINAL_CLS_ATTENTION`, `FINAL_CLS_SPLIT_QKV`,
+  `q32k64`, and 12 graph execs per lane). Its exact in-process rerun was
+  prepared, but the supplied Molab endpoint terminated before launch. Evidence:
+  `test_results/molab_cube4_inprocess_abi_2026-08-25.md`.
 - Added an opt-in `BEAM_BUILD_PRODUCTION_RUNNER_SHARED` target that builds the
   unchanged production runner algorithm as `libbeam_production_runner.so`.
   Its C ABI exposes `beam_production_runner` and
