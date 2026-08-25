@@ -52,3 +52,32 @@ profile as CUTLASS with:
 The exact in-process rerun was prepared after identifying these omissions, but
 the Molab endpoint stopped accepting connections before it could start. No
 claim is made that commit `4dd0c418` has yet reproduced 80.2952 s in-process.
+
+## Follow-up on the recovered Molab session
+
+The same endpoint was later recovered and the exact profile completed
+in-process three times.  All runs returned `rc=0`, reached exactly
+`depth_done=8`, retained frontier `33,554,432`, Stream3 jobs `391`, and final
+threshold `10,294`, with no OOM or CUDA error.  The measured depth-8 times were:
+
+- original shared runner with RAM history: `103.374 s`;
+- original shared runner with disk history: `103.441 s`;
+- Release build without compile-time debug, requested through a second shared
+  object: `103.427 s`.
+
+The disk A/B proved that pruning/history placement was not the performance
+difference.  Binary inspection then proved that the original debug shared
+object contained the `depth_done=` logging string while the new nodebug object
+did not (`SHA-256 50096b...` versus `cfb747...`).  Nevertheless the second
+run still emitted depth logs: the first `RTLD_GLOBAL` production library had
+interposed the duplicate C++/CUDA symbols in the long-lived Python process, so
+that apparent nodebug timing was not an isolated binary A/B.
+
+`RTLD_DEEPBIND` was insufficient.  A follow-up `dlmopen(LM_ID_NEWLM, ...)`
+smoke was rejected because duplicating the CUDA runtime into a new linker
+namespace hung during initialization.  The scratchpad was stopped through the
+official marimo kernel interrupt endpoint; the Molab sandbox, persistent
+weights, libraries, build logs, and solve logs were preserved.  The marimo
+server then reported kernel state `stopped`; a browser reconnect is required
+before further in-process work.  Do not use `dlmopen` for CUDA production
+libraries.  A clean kernel must load exactly one production shared object.

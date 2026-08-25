@@ -1,5 +1,18 @@
 # Changelog
 
+- Recovered the Molab marimo endpoint and completed the exact Cube4 `2**25`
+  in-process profile through `depth_done=8`. Three semantically matching runs
+  measured about `103.4 s` with frontier `33,554,432`, Stream3 jobs `391`, and
+  final threshold `10,294`; RAM versus disk history did not affect the CUDA
+  timing. Diagnosed invalid same-kernel shared-library A/B caused by the first
+  runner being loaded `RTLD_GLOBAL`: a later nodebug library was distinct on
+  disk but duplicate C++/CUDA symbols remained interposed. `RTLD_DEEPBIND` did
+  not isolate the runtime, while `dlmopen` hung because CUDA cannot safely be
+  duplicated into a new linker namespace. The hung scratchpad was stopped via
+  marimo's kernel interrupt API without deleting the sandbox or persistent
+  artifacts. Future binary A/B runs must start from a clean kernel and load
+  exactly one production shared object.
+
 ## 2026-08-25
 - Built commit `4dd0c41838e71463f0db855b189470ecf66c2675` natively on
   Molab CUDA 13.0 / RTX PRO 6000 as `libbeam_production_runner.so` and
