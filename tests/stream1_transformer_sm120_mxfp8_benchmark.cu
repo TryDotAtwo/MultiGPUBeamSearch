@@ -484,9 +484,13 @@ int main(int argc, char** argv) {
               << " relative_rmse=" << correctness.relative_rmse
               << " max_abs_error=" << correctness.max_abs_error
               << " top1_agreement=" << correctness.top1_agreement << "\n";
-    for (const auto [name, n, k] : std::vector<std::tuple<std::string, std::uint32_t, std::uint32_t>>{
-             {"qkv", 768U, 256U}, {"ff1", 1024U, 256U},
-             {"projection", 256U, 256U}, {"ff2", 256U, 1024U}}) {
+    std::vector<std::tuple<std::string, std::uint32_t, std::uint32_t>> shapes{
+        {"qkv", 768U, 256U}, {"ff1", 1024U, 256U},
+        {"projection", 256U, 256U}, {"ff2", 256U, 1024U}};
+    if (argc > 2 && std::string(argv[2]) == "peak") {
+        shapes.emplace_back("peak_square", 8192U, 8192U);
+    }
+    for (const auto [name, n, k] : shapes) {
         const Result result = benchmark(m, n, k);
         std::cout << "sm120_native_mxfp8"
                   << " name=" << name << " m=" << m << " n=" << n << " k=" << k
