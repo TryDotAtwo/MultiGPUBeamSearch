@@ -1289,3 +1289,12 @@
   top-1 agreement `0.984375`, and native GEMM throughput from `361.590` to
   `547.825` TFLOP/s. Production enablement remains fail-closed pending real
   Cube4 frontier and full depth-8 gates.
+# 2026-08-26 - SM120 structured-sparse narrow-precision roofline
+
+- Added standalone CUTLASS SM120 structured-sparse MXFP8/NVFP4 benchmark
+  targets with a Stream-K scheduler.
+- Molab-only foreground measurements reached 1.936--1.937 PFLOP/s
+  dense-equivalent for NVFP4 2:4 sparse GEMM at 8192^3; MXFP8 sparse reached
+  0.952 PFLOP/s and did not satisfy the 1.5 PFLOP/s gate.
+- Kept this as an isolated roofline benchmark. Production Transformer model
+  selection still requires accuracy calibration and real-shape validation.

@@ -689,3 +689,11 @@ User reported that an interactive game had been running during part of the recen
   compare alternative 8-bit encodings separately on speed and model quality.
 - Weights must already be stored in the chosen encoding rather than quantized
   in the inference hot path.
+# 2026-08-26
+
+- User required at least 1.5 PFLOP/s on the Molab SM120 GPU before continuing
+  with model integration.
+- All CUDA compilation and performance tests must run in Molab foreground
+  notebook cells; detached subprocess jobs and local CUDA tests are forbidden.
+- The speedup must exercise the card's hardware narrow-precision path, with
+  later comparison against FP32 and FP16 model quality.
