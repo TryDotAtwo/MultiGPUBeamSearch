@@ -1254,4 +1254,9 @@
 - Root-caused the correct ReLU slowdown to an extra FF1 activation kernel and full-tensor memory pass absent from the fused SiLU path.
 - Generalized the existing CUTLASS FF1 broadcast epilogue over the activation functor and routed non-FP8 ReLU through fused GEMM+bias+ReLU.
 - Added a source contract regression test; Molab RED evidence recorded in `test_results/molab_cube4_fused_relu_2026-08-25.md`.
-- Molab build, CUDA reference, and beam `2**25` depth-8 A/B remain pending.
+- Molab `sm_120a` build and source GREEN test passed. The optional standalone
+  CUDA reference fixture was absent, so that binary skipped rather than
+  providing a score comparison.
+- In-process ReLU beam `2**25` reached depth 8 in 83.4427 s versus 103.374 s
+  unfused (19.28% lower wall time), while matching frontier 33,554,432,
+  Stream3 jobs 391, and final threshold 10,294 exactly.
