@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-25
+- Diagnosed the Molab Cube4 ReLU `2**25` depth-8 launch boundary without
+  changing the beam-search architecture. Decoupling the physical pipeline to
+  two rings allowed the run to survive through saturated depth 6, but the
+  accidental use of the 88,064 final-materialization chunk as the Stream 4
+  batch produced 1,659 Stream 4 jobs and a 107.929 s depth. A second run with
+  a larger Stream 4 batch still lost the Molab sandbox before a terminal log
+  could be recovered, so it is recorded as an unclassified sandbox loss, not
+  as a confirmed CUDA OOM. Prepared a fail-forward boundary sweep at beams
+  `2**22`, `2**24`, and `2**25` using two rings, Stream 4 batch/trigger
+  196,608/393,216, and final materialization 88,064. The sweep is blocked only
+  by expiry of the supplied Molab endpoint.
+
 ## 2026-08-24
 - Corrected the SM120 mixed-precision quality selector to use the accepted
   Cube4 FP16 execution as a measured quality floor while retaining the

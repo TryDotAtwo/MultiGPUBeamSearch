@@ -1,5 +1,13 @@
 # Prompt History
 
+## 2026-08-25
+- User instructed the agent to continue the Cube4 SM120 work, benchmark larger
+  beams on Molab only, and optimize against the exact `depth_done=8` latency.
+  The `output_dim=24`, ReLU semantics, two-level Transformer microbatching,
+  continuous inference with at least two rings, and roughly 400 Stream 3 jobs
+  remain required. The 88,064 value applies to final materialization rather
+  than the main Stream 4 batching path.
+
 ## 2026-08-24
 - User confirmed that Cube4 uses ReLU and that the completed `80.2952 s`
   result is the correct accepted baseline. Mixed-precision selection must

@@ -30,6 +30,7 @@ def parse_native_runner_log(
     expected_beam: int = 2**25,
     expected_depth: int = 8,
     expected_stream3_jobs: int = 391,
+    expected_world_size: int = 1,
 ) -> dict[str, Any]:
     failures = [marker for marker in FATAL_MARKERS if marker.lower() in text.lower()]
     if failures:
@@ -40,6 +41,9 @@ def parse_native_runner_log(
         raise ValueError("native benchmark must use piece_transformer Stream1")
     if int(_last_value(text, "GLOBAL_BEAM_WIDTH_EFFECTIVE")) != expected_beam:
         raise ValueError("native benchmark effective beam does not match the acceptance workload")
+    world_size = int(_last_value(text, "WORLD_SIZE"))
+    if world_size != expected_world_size or world_size <= 0:
+        raise ValueError("native benchmark world size does not match the acceptance workload")
     if int(_last_value(text, "B_MICRO")) != 3584:
         raise ValueError("native benchmark outer B_MICRO must be 3584")
     if int(_last_value(text, "stream1_transformer_micro")) != 896:
@@ -62,8 +66,9 @@ def parse_native_runner_log(
     _, seconds, stream3_jobs, frontier_size = matches[0]
     if int(stream3_jobs) != expected_stream3_jobs:
         raise ValueError("native benchmark Stream3 job count is not comparable")
-    if int(frontier_size) != expected_beam // 2:
-        raise ValueError("per-rank frontier does not match the two-GPU effective beam")
+    expected_frontier = expected_beam // expected_world_size
+    if expected_beam % expected_world_size != 0 or int(frontier_size) != expected_frontier:
+        raise ValueError("per-rank frontier does not match effective beam and world size")
     backend = _last_value(text, "stream1_transformer_fp16_gemm_backend")
     if backend not in {"cutlass", "cublaslt"}:
         raise ValueError("native runner log contains an unsupported FP16 GEMM backend")
@@ -73,6 +78,7 @@ def parse_native_runner_log(
         "depth": expected_depth,
         "effective_beam": expected_beam,
         "per_rank_frontier": int(frontier_size),
+        "world_size": world_size,
         "stream3_jobs": int(stream3_jobs),
         "device_name": _last_value(text, "cuda_device_name"),
         "native_execution": {

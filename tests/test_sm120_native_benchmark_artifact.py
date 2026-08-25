@@ -12,12 +12,13 @@ cuda_device_sm=120
 B_MICRO=3584
 STREAM1_CONCURRENCY=2
 GLOBAL_BEAM_WIDTH_EFFECTIVE=33554432
+WORLD_SIZE=1
 stream1_backend=piece_transformer
 stream1_transformer_micro=896
 stream1_transformer_activation=relu
 stream1_transformer_fp16_gemm_backend={backend}
 stream1_transformer_dims seq_len=57 d_model=256 nhead=8 head_dim=32 layers=4 ff_dim=1024 output_dim=24
-[default0]:depth_done=8 depth_sec={seconds} ring_slot_jobs=782 stream3_jobs=391 stream4_jobs=51 next_frontier_size=16777216
+[default0]:depth_done=8 depth_sec={seconds} ring_slot_jobs=9363 stream3_jobs=391 stream4_jobs=51 next_frontier_size=33554432
 """
 
 
@@ -25,6 +26,8 @@ def test_parser_emits_selector_native_execution_contract() -> None:
     row = parse_native_runner_log(_log(), name="exact_cublaslt")
     assert row["latency_ms"] == 79000.0
     assert row["effective_beam"] == 2**25
+    assert row["world_size"] == 1
+    assert row["per_rank_frontier"] == 2**25
     assert row["native_execution"] == {
         "fp16_gemm_backend": "cublaslt", "target_sm": 120, "workspace_bytes": 0,
     }
@@ -41,6 +44,24 @@ def test_parser_rejects_non_comparable_workload(bad: str) -> None:
         parse_native_runner_log(text, name="bad")
 
 
+def test_parser_rejects_wrong_world_size() -> None:
+    with pytest.raises(ValueError, match="world size"):
+        parse_native_runner_log(
+            _log().replace("WORLD_SIZE=1", "WORLD_SIZE=2"), name="bad"
+        )
+
+
 def test_parser_rejects_fatal_markers() -> None:
     with pytest.raises(ValueError, match="fatal markers"):
         parse_native_runner_log(_log() + "CUDA error: illegal memory access\n", name="bad")
+
+
+def test_parser_supports_explicit_two_rank_contract_only_when_all_counts_match() -> None:
+    text = _log().replace("WORLD_SIZE=1", "WORLD_SIZE=2")
+    text = text.replace("stream3_jobs=391", "stream3_jobs=196")
+    text = text.replace("next_frontier_size=33554432", "next_frontier_size=16777216")
+    row = parse_native_runner_log(
+        text, name="two_rank", expected_world_size=2, expected_stream3_jobs=196,
+    )
+    assert row["world_size"] == 2
+    assert row["per_rank_frontier"] == 2**24
