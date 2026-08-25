@@ -1,5 +1,11 @@
 # Prompt History
 
+## 2026-08-25 - Molab in-process runner requirement
+- User rejected subprocess-based Molab execution and required the long Cube4
+  solve to run correctly inside the notebook session. The solver must therefore
+  expose an in-process callable entrypoint; detached workers are forbidden and
+  the marimo/SSE execution must remain active for the full run.
+
 ## 2026-08-25
 - User instructed the agent to continue the Cube4 SM120 work, benchmark larger
   beams on Molab only, and optimize against the exact `depth_done=8` latency.

@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-08-25
+- Added an opt-in `BEAM_BUILD_PRODUCTION_RUNNER_SHARED` target that builds the
+  unchanged production runner algorithm as `libbeam_production_runner.so`.
+  Its C ABI exposes `beam_production_runner` and
+  `beam_production_runner_to_log`, allowing Molab to invoke the solver in the
+  marimo kernel through `ctypes` without spawning a worker process. The normal
+  executable keeps its existing `main` and behavior; shared-runner exceptions
+  are contained at the C boundary and reported as return code 1.
 - Confirmed the Molab endpoint losses were partly caused by detached execution:
   an identical foreground heartbeat run completed beam `2**24` with rc=0 and
   depth-8 latency 56.4112 s (391 Stream 3 jobs, 372 Stream 4 jobs). Beam

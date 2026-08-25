@@ -4250,7 +4250,7 @@ void reset_static_memory_for_task(
 
 } // namespace
 
-int main(int argc, char** argv) {
+int production_runner_impl(int argc, char** argv) {
     if (argc != 4 && argc != 6) {
         std::cerr << "usage: production_runner <puzzle_id> <depth> <beam> [world_size] [local_rank]\n";
         return 2;
@@ -5737,3 +5737,43 @@ int main(int argc, char** argv) {
     stream1_weights::free_stream1_scratch(stream1_scratch);
     return 0;
 }
+
+extern "C" int beam_production_runner(int argc, char** argv) noexcept {
+    try {
+        return production_runner_impl(argc, argv);
+    } catch (const std::exception& ex) {
+        std::cerr << "production_runner_exception=" << ex.what() << "\n";
+        return 1;
+    } catch (...) {
+        std::cerr << "production_runner_exception=unknown\n";
+        return 1;
+    }
+}
+
+extern "C" int beam_production_runner_to_log(
+    int argc,
+    char** argv,
+    const char* log_path) noexcept {
+    if (log_path == nullptr || log_path[0] == '\0') {
+        return beam_production_runner(argc, argv);
+    }
+    std::ofstream log(log_path, std::ios::out | std::ios::trunc);
+    if (!log) {
+        std::cerr << "production_runner_exception=failed_to_open_log path=" << log_path << "\n";
+        return 1;
+    }
+    std::streambuf* const old_out = std::cout.rdbuf(log.rdbuf());
+    std::streambuf* const old_err = std::cerr.rdbuf(log.rdbuf());
+    const int result = beam_production_runner(argc, argv);
+    std::cout.flush();
+    std::cerr.flush();
+    std::cout.rdbuf(old_out);
+    std::cerr.rdbuf(old_err);
+    return result;
+}
+
+#if !defined(BEAM_PRODUCTION_RUNNER_NO_MAIN)
+int main(int argc, char** argv) {
+    return production_runner_impl(argc, argv);
+}
+#endif

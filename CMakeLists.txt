@@ -27,6 +27,7 @@ option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnos
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
 option(BEAM_ENABLE_SM120_FP8 "Build the opt-in SM120 block-scaled FP8 Transformer path" OFF)
+option(BEAM_BUILD_PRODUCTION_RUNNER_SHARED "Build the in-process production runner C ABI" OFF)
 
 set(BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE OFF)
 set(BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE OFF)
@@ -280,6 +281,23 @@ target_compile_definitions(production_runner PRIVATE
     BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>
 )
 set_target_properties(production_runner PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+if(BEAM_BUILD_PRODUCTION_RUNNER_SHARED)
+    set_target_properties(beam_core beam_cuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    add_library(production_runner_shared SHARED tools/production_runner.cu)
+    target_link_libraries(production_runner_shared PRIVATE beam_cuda)
+    target_compile_definitions(production_runner_shared PRIVATE
+        BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
+        BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>
+        BEAM_PRODUCTION_RUNNER_NO_MAIN=1
+    )
+    set_target_properties(production_runner_shared PROPERTIES
+        OUTPUT_NAME beam_production_runner
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
+    )
+endif()
 
 add_executable(stream_benchmark
     tools/stream_benchmark.cu
