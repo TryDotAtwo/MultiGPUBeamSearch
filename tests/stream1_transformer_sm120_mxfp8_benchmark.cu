@@ -25,7 +25,7 @@
 #include <tuple>
 #include <vector>
 
-namespace {
+namespace sm120_mxfp8_bench {
 
 using namespace cute;
 
@@ -315,7 +315,9 @@ Result benchmark(std::uint32_t m, std::uint32_t n, std::uint32_t k) {
     return result;
 }
 
-}  // namespace
+}  // namespace sm120_mxfp8_bench
+
+using namespace sm120_mxfp8_bench;
 
 int main(int argc, char** argv) {
     cudaDeviceProp properties{};
