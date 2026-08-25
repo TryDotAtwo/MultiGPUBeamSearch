@@ -1249,3 +1249,9 @@
   the 2026-08-24 user clarification, `80.2952 s` is the accepted correct ReLU
   baseline and remains both the workload/correctness reference and performance
   target.
+## 2026-08-25 — Fuse Cube4 Transformer FF1 ReLU epilogue
+
+- Root-caused the correct ReLU slowdown to an extra FF1 activation kernel and full-tensor memory pass absent from the fused SiLU path.
+- Generalized the existing CUTLASS FF1 broadcast epilogue over the activation functor and routed non-FP8 ReLU through fused GEMM+bias+ReLU.
+- Added a source contract regression test; Molab RED evidence recorded in `test_results/molab_cube4_fused_relu_2026-08-25.md`.
+- Molab build, CUDA reference, and beam `2**25` depth-8 A/B remain pending.

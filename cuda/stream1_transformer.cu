@@ -22,6 +22,7 @@
 #include <cutlass/epilogue/thread/linear_combination_bias_elementwise.h>
 #include <cutlass/epilogue/thread/linear_combination.h>
 #include <cutlass/epilogue/thread/linear_combination_silu.h>
+#include <cutlass/epilogue/thread/activation.h>
 #include <cutlass/gemm/device/gemm.h>
 #include <cutlass/gemm/device/gemm_batched.h>
 #include <cutlass/gemm/device/gemm_universal_with_broadcast.h>
@@ -1441,6 +1442,9 @@ void stream1_transformer_linear_bias_cuda(
 void stream1_transformer_ff1_linear_bias_silu_cuda(
     const half*, const half*, const half*, half*, std::uint32_t, std::uint32_t,
     std::uint32_t, std::uint32_t, cudaStream_t);
+void stream1_transformer_ff1_linear_bias_relu_cuda(
+    const half*, const half*, const half*, half*, std::uint32_t, std::uint32_t,
+    std::uint32_t, std::uint32_t, cudaStream_t);
 bool stream1_transformer_use_sm120_cublaslt();
 
 void stream1_transformer_qkv_linear_bias_dispatch(
@@ -1553,11 +1557,9 @@ void stream1_transformer_ff1_linear_bias_activation_dispatch(
             return;
         }
 #endif
-        stream1_transformer_linear_bias_cuda(
+        stream1_transformer_ff1_linear_bias_relu_cuda(
             input, block.ff1_weight, block.ff1_bias, output,
             rows, input_cols, output_cols, dtype, stream);
-        stream1_transformer_relu_kernel<<<(count + 255U) / 256U, 256, 0, stream>>>(
-            output, count, dtype);
         return;
     }
     if (dtype != STREAM1_DTYPE_FP16 || scratch.fp8_quantized_input == nullptr ||
@@ -2447,7 +2449,7 @@ void stream1_transformer_linear_bias_cuda(
     throw std::invalid_argument("Stream1 piece_transformer linear+bias GEMM dtype must be fp16 or bf16");
 }
 template <
-
+    typename ElementwiseOp,
     typename Element,
     typename ArchTag,
     typename InstructionShape,
@@ -2455,7 +2457,7 @@ template <
     typename WarpShape,
     int Stages,
     int Swizzle = 1>
-void stream1_transformer_ff1_linear_bias_silu_typed(
+void stream1_transformer_ff1_linear_bias_activation_typed(
     const half* input,
     const half* weight,
     const half* bias,
@@ -2472,7 +2474,7 @@ void stream1_transformer_ff1_linear_bias_silu_typed(
         Element,
         Element,
         elements_per_access,
-        cutlass::epilogue::thread::SiLu<float>,
+        ElementwiseOp,
         cutlass::plus<float>,
         false,
         Element>;
@@ -2534,12 +2536,13 @@ void stream1_transformer_ff1_linear_bias_silu_typed(
 }
 
 template <
+    typename ElementwiseOp,
     typename Element,
     typename ArchTag,
     typename InstructionShape,
     typename ThreadblockShape,
     typename WarpShape>
-void stream1_transformer_ff1_linear_bias_silu_policy(
+void stream1_transformer_ff1_linear_bias_activation_policy(
     const half* input,
     const half* weight,
     const half* bias,
@@ -2551,17 +2554,18 @@ void stream1_transformer_ff1_linear_bias_silu_policy(
     Stream1TransformerGemmStagePolicy stage_policy) {
 
     if (stage_policy == Stream1TransformerGemmStagePolicy::Stages2) {
-        stream1_transformer_ff1_linear_bias_silu_typed<
-            Element, ArchTag, InstructionShape, ThreadblockShape, WarpShape, 2>(
+        stream1_transformer_ff1_linear_bias_activation_typed<
+            ElementwiseOp, Element, ArchTag, InstructionShape, ThreadblockShape, WarpShape, 2>(
                 input, weight, bias, output, rows, input_cols, output_cols, stream);
         return;
     }
-    stream1_transformer_ff1_linear_bias_silu_typed<
-        Element, ArchTag, InstructionShape, ThreadblockShape, WarpShape, 3>(
+    stream1_transformer_ff1_linear_bias_activation_typed<
+        ElementwiseOp, Element, ArchTag, InstructionShape, ThreadblockShape, WarpShape, 3>(
             input, weight, bias, output, rows, input_cols, output_cols, stream);
 }
 
-void stream1_transformer_ff1_linear_bias_silu_cuda(
+template <typename ElementwiseOp>
+void stream1_transformer_ff1_linear_bias_activation_cuda(
     const half* input,
     const half* weight,
     const half* bias,
@@ -2579,7 +2583,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
         if (prop.major < 8) {
             throw std::invalid_argument("Stream1 piece_transformer bf16 FF1 fused GEMM requires SM80+");
         }
-        stream1_transformer_ff1_linear_bias_silu_typed<
+        stream1_transformer_ff1_linear_bias_activation_typed<
+            ElementwiseOp,
             cutlass::bfloat16_t,
             cutlass::arch::Sm80,
             cutlass::gemm::GemmShape<16, 8, 16>,
@@ -2608,7 +2613,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
             }
 
             if (policy == Stream1TransformerGemmPolicy::M64N128) {
-                stream1_transformer_ff1_linear_bias_silu_policy<
+                stream1_transformer_ff1_linear_bias_activation_policy<
+                    ElementwiseOp,
                     cutlass::half_t,
                     cutlass::arch::Sm80,
                     cutlass::gemm::GemmShape<16, 8, 16>,
@@ -2618,7 +2624,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
                 return;
             }
             if (policy == Stream1TransformerGemmPolicy::M128N128W64N32) {
-                stream1_transformer_ff1_linear_bias_silu_policy<
+                stream1_transformer_ff1_linear_bias_activation_policy<
+                    ElementwiseOp,
                     cutlass::half_t,
                     cutlass::arch::Sm80,
                     cutlass::gemm::GemmShape<16, 8, 16>,
@@ -2629,7 +2636,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
             }
             if (policy == Stream1TransformerGemmPolicy::M128N128) {
                 if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity4) {
-                    stream1_transformer_ff1_linear_bias_silu_typed<
+                    stream1_transformer_ff1_linear_bias_activation_typed<
+                        ElementwiseOp,
                         cutlass::half_t,
                         cutlass::arch::Sm80,
                         cutlass::gemm::GemmShape<16, 8, 16>,
@@ -2640,7 +2648,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
                     return;
                 }
                 if (swizzle_policy == Stream1TransformerGemmSwizzlePolicy::Identity8) {
-                    stream1_transformer_ff1_linear_bias_silu_typed<
+                    stream1_transformer_ff1_linear_bias_activation_typed<
+                        ElementwiseOp,
                         cutlass::half_t,
                         cutlass::arch::Sm80,
                         cutlass::gemm::GemmShape<16, 8, 16>,
@@ -2650,7 +2659,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
                         8>(input, weight, bias, output, rows, input_cols, output_cols, stream);
                     return;
                 }
-                stream1_transformer_ff1_linear_bias_silu_policy<
+                stream1_transformer_ff1_linear_bias_activation_policy<
+                    ElementwiseOp,
                     cutlass::half_t,
                     cutlass::arch::Sm80,
                     cutlass::gemm::GemmShape<16, 8, 16>,
@@ -2659,7 +2669,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
                         input, weight, bias, output, rows, input_cols, output_cols, stream, stage_policy);
                 return;
             }
-            stream1_transformer_ff1_linear_bias_silu_policy<
+            stream1_transformer_ff1_linear_bias_activation_policy<
+                ElementwiseOp,
                 cutlass::half_t,
                 cutlass::arch::Sm80,
                 cutlass::gemm::GemmShape<16, 8, 16>,
@@ -2687,7 +2698,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
             throw std::invalid_argument("FF1 policy requires stages=2 and swizzle=1 on SM75");
         }
         if (policy == Stream1TransformerGemmPolicy::M64N128) {
-            stream1_transformer_ff1_linear_bias_silu_typed<
+            stream1_transformer_ff1_linear_bias_activation_typed<
+                ElementwiseOp,
                 cutlass::half_t,
                 cutlass::arch::Sm75,
                 cutlass::gemm::GemmShape<16, 8, 8>,
@@ -2697,7 +2709,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
             return;
         }
         if (policy == Stream1TransformerGemmPolicy::M128N128W64N32) {
-            stream1_transformer_ff1_linear_bias_silu_typed<
+            stream1_transformer_ff1_linear_bias_activation_typed<
+                ElementwiseOp,
                 cutlass::half_t,
                 cutlass::arch::Sm75,
                 cutlass::gemm::GemmShape<16, 8, 8>,
@@ -2707,7 +2720,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
             return;
         }
         if (policy == Stream1TransformerGemmPolicy::M128N128) {
-            stream1_transformer_ff1_linear_bias_silu_typed<
+            stream1_transformer_ff1_linear_bias_activation_typed<
+                ElementwiseOp,
                 cutlass::half_t,
                 cutlass::arch::Sm75,
                 cutlass::gemm::GemmShape<16, 8, 8>,
@@ -2716,7 +2730,8 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
                 2>(input, weight, bias, output, rows, input_cols, output_cols, stream);
             return;
         }
-        stream1_transformer_ff1_linear_bias_silu_typed<
+        stream1_transformer_ff1_linear_bias_activation_typed<
+            ElementwiseOp,
             cutlass::half_t,
             cutlass::arch::Sm75,
             cutlass::gemm::GemmShape<16, 8, 8>,
@@ -2726,6 +2741,36 @@ void stream1_transformer_ff1_linear_bias_silu_cuda(
         return;
     }
     throw std::invalid_argument("Stream1 piece_transformer FF1 fused GEMM dtype must be fp16 or bf16");
+}
+
+void stream1_transformer_ff1_linear_bias_silu_cuda(
+    const half* input,
+    const half* weight,
+    const half* bias,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    stream1_transformer_ff1_linear_bias_activation_cuda<
+        cutlass::epilogue::thread::SiLu<float>>(
+            input, weight, bias, output, rows, input_cols, output_cols, dtype, stream);
+}
+
+void stream1_transformer_ff1_linear_bias_relu_cuda(
+    const half* input,
+    const half* weight,
+    const half* bias,
+    half* output,
+    std::uint32_t rows,
+    std::uint32_t input_cols,
+    std::uint32_t output_cols,
+    std::uint32_t dtype,
+    cudaStream_t stream) {
+    stream1_transformer_ff1_linear_bias_activation_cuda<
+        cutlass::epilogue::thread::ReLu<float>>(
+            input, weight, bias, output, rows, input_cols, output_cols, dtype, stream);
 }
 
 template <typename Element, typename ArchTag, typename InstructionShape>

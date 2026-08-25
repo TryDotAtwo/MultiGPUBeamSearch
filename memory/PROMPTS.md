@@ -664,3 +664,9 @@ User reported that an interactive game had been running during part of the recen
 - Explore calibrated compound encodings rather than calling a raw E4M3 tensor
   replacement sufficient. Any residual/correction weights must also be
   computed offline from FP32 truth and remain in the immutable profile.
+## 2026-08-25 — Molab Cube4 ReLU inference fix
+
+- Fix and continue optimizing the correct Cube4 Transformer ReLU inference path.
+- Run compilation, correctness tests, and performance benchmarks strictly on Molab.
+- Keep long work foreground/in-process; do not use detached subprocess jobs or subagents.
+- Reject faster results that change the model activation or other semantics.
