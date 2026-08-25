@@ -171,7 +171,9 @@ __global__ void quantize_b_kernel(
     if (group >= static_cast<std::uint64_t>(output_cols) * groups_per_col) return;
     const std::uint32_t column = static_cast<std::uint32_t>(group / groups_per_col);
     const std::uint32_t k0 = static_cast<std::uint32_t>(group % groups_per_col) * kScaleVector;
-    const std::size_t index = static_cast<std::size_t>(k0 + lane) * output_cols + column;
+    // CUTLASS consumes B as logical KxN column-major. Production weights are
+    // exported as NxK row-major, which is the identical physical layout.
+    const std::size_t index = static_cast<std::size_t>(column) * input_cols + k0 + lane;
     const float value = __half2float(source_kxn[index]);
     const float scale = safe_ue8m0_scale(warp_max(fabsf(value)));
     encoded_kxn[index] = ElementB(value / scale);
@@ -251,6 +253,94 @@ struct Result {
     double end_to_end_tflops = 0.0;
 };
 
+struct CorrectnessResult {
+    double rmse = 0.0;
+    double relative_rmse = 0.0;
+    double max_abs_error = 0.0;
+    double top1_agreement = 0.0;
+};
+
+CorrectnessResult validate_correctness() {
+    constexpr std::uint32_t m = 128U;
+    constexpr std::uint32_t n = 128U;
+    constexpr std::uint32_t k = 128U;
+    std::mt19937 generator(0x120U);
+    std::uniform_real_distribution<float> activation_distribution(-1.0f, 1.0f);
+    std::uniform_real_distribution<float> weight_distribution(-0.125f, 0.125f);
+    std::vector<half> host_a(static_cast<std::size_t>(m) * k);
+    std::vector<half> host_b(static_cast<std::size_t>(n) * k);
+    for (half& value : host_a) value = __float2half(activation_distribution(generator));
+    for (half& value : host_b) value = __float2half(weight_distribution(generator));
+
+    DeviceBuffer source_a(host_a.size() * sizeof(half));
+    DeviceBuffer source_b(host_b.size() * sizeof(half));
+    DeviceBuffer encoded_a(host_a.size() * sizeof(ElementA));
+    DeviceBuffer encoded_b(host_b.size() * sizeof(ElementB));
+    DeviceBuffer sfa(scale_elements(m, k) * sizeof(ElementSFA));
+    DeviceBuffer sfb(scale_elements(n, k) * sizeof(ElementSFB));
+    DeviceBuffer output(static_cast<std::size_t>(m) * n * sizeof(ElementD));
+    BEAM_CUDA_CHECK(cudaMemcpy(source_a.pointer, host_a.data(), host_a.size() * sizeof(half),
+                               cudaMemcpyHostToDevice));
+    BEAM_CUDA_CHECK(cudaMemcpy(source_b.pointer, host_b.data(), host_b.size() * sizeof(half),
+                               cudaMemcpyHostToDevice));
+    quantize_a(static_cast<const half*>(source_a.pointer), static_cast<ElementA*>(encoded_a.pointer),
+               static_cast<ElementSFA*>(sfa.pointer), m, k, nullptr);
+    quantize_b(static_cast<const half*>(source_b.pointer), static_cast<ElementB*>(encoded_b.pointer),
+               static_cast<ElementSFB*>(sfb.pointer), k, n, nullptr);
+    auto arguments = make_arguments(
+        static_cast<const ElementA*>(encoded_a.pointer), static_cast<const ElementSFA*>(sfa.pointer),
+        static_cast<const ElementB*>(encoded_b.pointer), static_cast<const ElementSFB*>(sfb.pointer),
+        static_cast<ElementD*>(output.pointer), m, n, k);
+    DeviceBuffer workspace(Gemm::get_workspace_size(arguments));
+    launch_gemm(
+        static_cast<const ElementA*>(encoded_a.pointer), static_cast<const ElementSFA*>(sfa.pointer),
+        static_cast<const ElementB*>(encoded_b.pointer), static_cast<const ElementSFB*>(sfb.pointer),
+        static_cast<ElementD*>(output.pointer), m, n, k, workspace.pointer,
+        Gemm::get_workspace_size(arguments), nullptr);
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    std::vector<half> host_output(static_cast<std::size_t>(m) * n);
+    BEAM_CUDA_CHECK(cudaMemcpy(host_output.data(), output.pointer,
+                               host_output.size() * sizeof(half), cudaMemcpyDeviceToHost));
+
+    double squared_error = 0.0;
+    double squared_reference = 0.0;
+    double max_abs_error = 0.0;
+    std::uint32_t top1_matches = 0U;
+    for (std::uint32_t row = 0; row < m; ++row) {
+        float best_reference = -INFINITY;
+        float best_actual = -INFINITY;
+        std::uint32_t best_reference_index = 0U;
+        std::uint32_t best_actual_index = 0U;
+        for (std::uint32_t column = 0; column < n; ++column) {
+            float reference = 0.0f;
+            for (std::uint32_t inner = 0; inner < k; ++inner) {
+                reference += __half2float(host_a[static_cast<std::size_t>(row) * k + inner]) *
+                    __half2float(host_b[static_cast<std::size_t>(column) * k + inner]);
+            }
+            const float actual = __half2float(host_output[static_cast<std::size_t>(row) * n + column]);
+            const double error = static_cast<double>(actual) - reference;
+            squared_error += error * error;
+            squared_reference += static_cast<double>(reference) * reference;
+            max_abs_error = std::max(max_abs_error, std::abs(error));
+            if (reference > best_reference) {
+                best_reference = reference;
+                best_reference_index = column;
+            }
+            if (actual > best_actual) {
+                best_actual = actual;
+                best_actual_index = column;
+            }
+        }
+        top1_matches += best_reference_index == best_actual_index ? 1U : 0U;
+    }
+    CorrectnessResult result;
+    result.rmse = std::sqrt(squared_error / host_output.size());
+    result.relative_rmse = std::sqrt(squared_error / squared_reference);
+    result.max_abs_error = max_abs_error;
+    result.top1_agreement = static_cast<double>(top1_matches) / m;
+    return result;
+}
+
 Result benchmark(std::uint32_t m, std::uint32_t n, std::uint32_t k) {
     constexpr int warmups = 10;
     constexpr int iterations = 100;
@@ -327,6 +417,12 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
     const std::uint32_t m = argc > 1 ? static_cast<std::uint32_t>(std::stoul(argv[1])) : 51072U;
+    const CorrectnessResult correctness = validate_correctness();
+    std::cout << "sm120_native_mxfp8_correctness"
+              << " rmse=" << std::setprecision(8) << correctness.rmse
+              << " relative_rmse=" << correctness.relative_rmse
+              << " max_abs_error=" << correctness.max_abs_error
+              << " top1_agreement=" << correctness.top1_agreement << "\n";
     for (const auto [name, n, k] : std::vector<std::tuple<std::string, std::uint32_t, std::uint32_t>>{
              {"qkv", 768U, 256U}, {"ff1", 1024U, 256U},
              {"projection", 256U, 256U}, {"ff2", 256U, 1024U}}) {
