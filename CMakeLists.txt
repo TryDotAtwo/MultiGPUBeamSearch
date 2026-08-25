@@ -203,6 +203,14 @@ if(BEAM_ENABLE_SM120_FP8)
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
     )
+    add_executable(stream1_transformer_sm120_mxfp8_benchmark
+        tests/stream1_transformer_sm120_mxfp8_benchmark.cu)
+    target_link_libraries(stream1_transformer_sm120_mxfp8_benchmark PRIVATE beam_cuda)
+    set_target_properties(stream1_transformer_sm120_mxfp8_benchmark PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
+    )
     add_executable(stream1_transformer_sm120_fp8_export tools/stream1_transformer_sm120_fp8_export.cu)
     target_link_libraries(stream1_transformer_sm120_fp8_export PRIVATE beam_cuda)
     set_target_properties(stream1_transformer_sm120_fp8_export PROPERTIES
