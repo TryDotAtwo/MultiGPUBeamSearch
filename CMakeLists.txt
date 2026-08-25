@@ -206,6 +206,8 @@ if(BEAM_ENABLE_SM120_FP8)
     add_executable(stream1_transformer_sm120_mxfp8_benchmark
         tests/stream1_transformer_sm120_mxfp8_benchmark.cu)
     target_link_libraries(stream1_transformer_sm120_mxfp8_benchmark PRIVATE beam_cuda)
+    target_compile_options(stream1_transformer_sm120_mxfp8_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
     set_target_properties(stream1_transformer_sm120_mxfp8_benchmark PROPERTIES
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
