@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -413,6 +414,7 @@ Result benchmark(std::uint32_t m, std::uint32_t n, std::uint32_t k) {
     quantize_b(static_cast<const half*>(source_b.pointer),
                static_cast<ElementB*>(encoded_b.pointer),
                static_cast<ElementSFB*>(sfb.pointer), k, n, nullptr);
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
     quantize_a(static_cast<const half*>(source_a.pointer),
                static_cast<ElementA*>(encoded_a.pointer),
                static_cast<ElementSFA*>(sfa.pointer), m, k, nullptr);
@@ -466,6 +468,96 @@ Result benchmark(std::uint32_t m, std::uint32_t n, std::uint32_t k) {
     return result;
 }
 
+double benchmark_concurrent_gemm(
+    std::uint32_t m, std::uint32_t n, std::uint32_t k, std::uint32_t lane_count) {
+    constexpr int warmups = 10;
+    constexpr int iterations = 100;
+    const std::size_t a_elements = static_cast<std::size_t>(m) * k;
+    const std::size_t b_elements = static_cast<std::size_t>(k) * n;
+    const std::size_t d_elements = static_cast<std::size_t>(m) * n;
+    DeviceBuffer source_b(b_elements * sizeof(half));
+    DeviceBuffer encoded_b(b_elements * sizeof(ElementB));
+    DeviceBuffer sfb(scale_elements(n, k) * sizeof(ElementSFB));
+    BEAM_CUDA_CHECK(cudaMemset(source_b.pointer, 0x2d, b_elements * sizeof(half)));
+    quantize_b(static_cast<const half*>(source_b.pointer),
+               static_cast<ElementB*>(encoded_b.pointer),
+               static_cast<ElementSFB*>(sfb.pointer), k, n, nullptr);
+
+    struct Lane {
+        std::unique_ptr<DeviceBuffer> source_a;
+        std::unique_ptr<DeviceBuffer> encoded_a;
+        std::unique_ptr<DeviceBuffer> sfa;
+        std::unique_ptr<DeviceBuffer> output;
+        std::unique_ptr<DeviceBuffer> workspace;
+        cudaStream_t stream = nullptr;
+        cudaEvent_t stop = nullptr;
+    };
+    std::vector<Lane> lanes(lane_count);
+    for (Lane& lane : lanes) {
+        lane.source_a = std::make_unique<DeviceBuffer>(a_elements * sizeof(half));
+        lane.encoded_a = std::make_unique<DeviceBuffer>(a_elements * sizeof(ElementA));
+        lane.sfa = std::make_unique<DeviceBuffer>(scale_elements(m, k) * sizeof(ElementSFA));
+        lane.output = std::make_unique<DeviceBuffer>(d_elements * sizeof(ElementD));
+        BEAM_CUDA_CHECK(cudaStreamCreateWithFlags(&lane.stream, cudaStreamNonBlocking));
+        BEAM_CUDA_CHECK(cudaEventCreate(&lane.stop));
+        BEAM_CUDA_CHECK(cudaMemsetAsync(lane.source_a->pointer, 0x31,
+                                       a_elements * sizeof(half), lane.stream));
+        quantize_a_four_groups(static_cast<const half*>(lane.source_a->pointer),
+                               static_cast<ElementA*>(lane.encoded_a->pointer),
+                               static_cast<ElementSFA*>(lane.sfa->pointer), m, k, lane.stream);
+        auto arguments = make_arguments(
+            static_cast<const ElementA*>(lane.encoded_a->pointer),
+            static_cast<const ElementSFA*>(lane.sfa->pointer),
+            static_cast<const ElementB*>(encoded_b.pointer),
+            static_cast<const ElementSFB*>(sfb.pointer),
+            static_cast<ElementD*>(lane.output->pointer), m, n, k);
+        lane.workspace = std::make_unique<DeviceBuffer>(Gemm::get_workspace_size(arguments));
+    }
+    auto launch_lane = [&](Lane& lane) {
+        launch_gemm(
+            static_cast<const ElementA*>(lane.encoded_a->pointer),
+            static_cast<const ElementSFA*>(lane.sfa->pointer),
+            static_cast<const ElementB*>(encoded_b.pointer),
+            static_cast<const ElementSFB*>(sfb.pointer),
+            static_cast<ElementD*>(lane.output->pointer), m, n, k,
+            lane.workspace->pointer, lane.workspace->pointer == nullptr ? 0U :
+                Gemm::get_workspace_size(make_arguments(
+                    static_cast<const ElementA*>(lane.encoded_a->pointer),
+                    static_cast<const ElementSFA*>(lane.sfa->pointer),
+                    static_cast<const ElementB*>(encoded_b.pointer),
+                    static_cast<const ElementSFB*>(sfb.pointer),
+                    static_cast<ElementD*>(lane.output->pointer), m, n, k)),
+            lane.stream);
+    };
+    for (int warmup = 0; warmup < warmups; ++warmup) {
+        for (Lane& lane : lanes) launch_lane(lane);
+    }
+    BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+    cudaEvent_t start{};
+    BEAM_CUDA_CHECK(cudaEventCreate(&start));
+    BEAM_CUDA_CHECK(cudaEventRecord(start));
+    for (Lane& lane : lanes) BEAM_CUDA_CHECK(cudaStreamWaitEvent(lane.stream, start));
+    for (int iteration = 0; iteration < iterations; ++iteration) {
+        for (Lane& lane : lanes) launch_lane(lane);
+    }
+    for (Lane& lane : lanes) BEAM_CUDA_CHECK(cudaEventRecord(lane.stop, lane.stream));
+    double max_elapsed_ms = 0.0;
+    for (Lane& lane : lanes) {
+        BEAM_CUDA_CHECK(cudaEventSynchronize(lane.stop));
+        float elapsed_ms = 0.0f;
+        BEAM_CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, start, lane.stop));
+        max_elapsed_ms = std::max(max_elapsed_ms, static_cast<double>(elapsed_ms));
+    }
+    const double aggregate_flops = 2.0 * static_cast<double>(m) * n * k *
+        iterations * lane_count;
+    for (Lane& lane : lanes) {
+        cudaEventDestroy(lane.stop);
+        cudaStreamDestroy(lane.stream);
+    }
+    cudaEventDestroy(start);
+    return aggregate_flops / (max_elapsed_ms * 1.0e9);
+}
+
 }  // namespace sm120_mxfp8_bench
 
 using namespace sm120_mxfp8_bench;
@@ -501,6 +593,15 @@ int main(int argc, char** argv) {
                   << " end_to_end_four_groups_ms=" << result.end_to_end_four_groups_ms
                   << " gemm_tflops=" << std::setprecision(3) << result.gemm_tflops
                   << " end_to_end_tflops=" << result.end_to_end_tflops << "\n";
+        if (argc > 2 && std::string(argv[2]) == "concurrent" && name != "projection") {
+            for (const std::uint32_t lanes : {2U, 4U, 8U}) {
+                std::cout << "sm120_native_mxfp8_concurrent"
+                          << " name=" << name << " m=" << m << " n=" << n << " k=" << k
+                          << " lanes=" << lanes
+                          << " aggregate_tflops=" << benchmark_concurrent_gemm(m, n, k, lanes)
+                          << "\n";
+            }
+        }
     }
     return EXIT_SUCCESS;
 }
