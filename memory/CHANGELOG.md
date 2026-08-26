@@ -1308,3 +1308,15 @@
 - Confirmed that parent batching cannot remove fixed K/N narrowness. The next
   optimization boundary is end-to-end epilogue fusion and narrow intermediate
   storage, especially between FF1 and FF2.
+# 2026-08-26 — dense NVFP4 FFN transport prototype
+
+- Added `stream1_transformer_sm120_dense_nvfp4_ffn_pipeline_benchmark`, a
+  CUTLASS `sm_120a` benchmark in which FF1 fuses bias, ReLU, NVFP4 conversion,
+  and block-scale emission, while FF2 consumes the emitted NVFP4 tensor and
+  scales directly. The prototype does not materialize a BF16 `ff_hidden`.
+- Molab RTX PRO 6000 verification passed: median `0.102888 ms` at `M=51,072`
+  and `0.413433 ms` at `M=204,288`, with five stable repetitions each.
+- Verification caught the expected accelerated-architecture requirement:
+  `sm_120` binaries fail closed for these MMA instructions; `sm_120a` is
+  mandatory. Evidence is in
+  `test_results/molab_sm120_dense_nvfp4_ffn_transport_2026-08-26.md`.

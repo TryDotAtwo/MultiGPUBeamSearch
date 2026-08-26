@@ -702,3 +702,9 @@ User reported that an interactive game had been running during part of the recen
 - User requested investigation of what makes the Transformer layers narrow
   and whether the limitation can be bypassed while moving the dense model to
   NVFP4 without structured sparsity.
+# 2026-08-26 — eliminate Transformer intermediate traffic
+
+- "Окей, значит нужно устранить промежуточный трафик"
+- Implement and benchmark the dense NVFP4 Transformer path on Molab so FF1
+  emits the next GEMM's native NVFP4 tensor and scale factors directly, rather
+  than writing a large BF16 activation and requantizing it in a separate pass.
