@@ -16,7 +16,9 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
+#include <vector>
 
 namespace sm120_sparse_mxfp8_bench {
 
@@ -47,7 +49,10 @@ using ElementAccumulator = float;
 using ElementCompute = float;
 using ProblemShape = Shape<int, int, int, int>;
 using ClusterShape = Shape<_1, _1, _1>;
-#if defined(BEAM_BENCH_TILE_N256)
+#if defined(BEAM_BENCH_TILE_M256)
+using MainloopTileShape = Shape<_256, _128, _128>;
+using EpilogueTileShape = Shape<_256, _128, _128>;
+#elif defined(BEAM_BENCH_TILE_N256)
 using MainloopTileShape = Shape<_128, _256, _128>;
 using EpilogueTileShape = Shape<_128, _256, _128>;
 #elif defined(BEAM_BENCH_TILE_K128)
@@ -375,6 +380,104 @@ double benchmark(int m, int n, int k, int iterations) {
     return tflops;
 }
 
+#if defined(BEAM_BENCH_CONCURRENT_SLOTS)
+double benchmark_concurrent(int m, int n, int k, int iterations, int slots) {
+    if (slots < 1 || slots > 8) {
+        throw std::runtime_error("concurrent slots must be in [1, 8]");
+    }
+    ProblemShape problem{m, n, k, 1};
+    cutlass::KernelHardwareInfo hw_info;
+    hw_info.device_id = 0;
+    hw_info.sm_count = cutlass::KernelHardwareInfo::query_device_multiprocessor_count(0);
+
+    std::vector<std::unique_ptr<Testbed>> testbeds;
+    std::vector<std::unique_ptr<Gemm>> gemms;
+    std::vector<std::unique_ptr<cutlass::device_memory::allocation<std::uint8_t>>> workspaces;
+    std::vector<cudaStream_t> streams(static_cast<std::size_t>(slots));
+    testbeds.reserve(static_cast<std::size_t>(slots));
+    gemms.reserve(static_cast<std::size_t>(slots));
+    workspaces.reserve(static_cast<std::size_t>(slots));
+
+    for (int slot = 0; slot < slots; ++slot) {
+        testbeds.push_back(std::make_unique<Testbed>());
+        auto& impl = testbeds.back()->impl_;
+        if (!impl.sufficient() || !impl.initialize(problem, 1.0f, 0.0f)) {
+            throw std::runtime_error("concurrent NVFP4 fixture initialization failed");
+        }
+        typename GemmKernel::TileScheduler::Arguments scheduler_args{};
+        typename Gemm::Arguments arguments{
+            cutlass::gemm::GemmUniversalMode::kGemm,
+            problem,
+            impl.collective_mma_inputs.to_args(),
+            impl.collective_epilogue.to_args(problem),
+            hw_info,
+            scheduler_args};
+        auto workspace = std::make_unique<cutlass::device_memory::allocation<std::uint8_t>>(
+            Gemm::get_workspace_size(arguments));
+        auto gemm = std::make_unique<Gemm>();
+        if (gemm->can_implement(arguments) != cutlass::Status::kSuccess ||
+            gemm->initialize(arguments, workspace->get()) != cutlass::Status::kSuccess) {
+            throw std::runtime_error("concurrent NVFP4 GEMM initialization failed");
+        }
+        cudaStreamCreateWithFlags(&streams[static_cast<std::size_t>(slot)], cudaStreamNonBlocking);
+        workspaces.push_back(std::move(workspace));
+        gemms.push_back(std::move(gemm));
+    }
+
+    for (int warmup = 0; warmup < 10; ++warmup) {
+        for (int slot = 0; slot < slots; ++slot) {
+            if (gemms[static_cast<std::size_t>(slot)]->run(
+                    streams[static_cast<std::size_t>(slot)]) != cutlass::Status::kSuccess) {
+                throw std::runtime_error("concurrent NVFP4 warmup launch failed");
+            }
+        }
+    }
+    cudaDeviceSynchronize();
+
+    cudaEvent_t start{}, stop{};
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
+    for (cudaStream_t stream : streams) {
+        cudaStreamWaitEvent(stream, start, 0);
+    }
+    for (int iteration = 0; iteration < iterations; ++iteration) {
+        for (int slot = 0; slot < slots; ++slot) {
+            if (gemms[static_cast<std::size_t>(slot)]->run(
+                    streams[static_cast<std::size_t>(slot)]) != cutlass::Status::kSuccess) {
+                throw std::runtime_error("concurrent NVFP4 timed launch failed");
+            }
+        }
+    }
+    std::vector<cudaEvent_t> done(static_cast<std::size_t>(slots));
+    for (int slot = 0; slot < slots; ++slot) {
+        cudaEventCreateWithFlags(&done[static_cast<std::size_t>(slot)], cudaEventDisableTiming);
+        cudaEventRecord(done[static_cast<std::size_t>(slot)], streams[static_cast<std::size_t>(slot)]);
+        cudaStreamWaitEvent(0, done[static_cast<std::size_t>(slot)], 0);
+    }
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    float total_ms = 0.0F;
+    cudaEventElapsedTime(&total_ms, start, stop);
+
+    for (int slot = 0; slot < slots; ++slot) {
+        cudaEventDestroy(done[static_cast<std::size_t>(slot)]);
+        cudaStreamDestroy(streams[static_cast<std::size_t>(slot)]);
+    }
+    cudaEventDestroy(stop);
+    cudaEventDestroy(start);
+    const double ms = static_cast<double>(total_ms) / iterations;
+    const double flops = 2.0 * static_cast<double>(m) * n * k * slots;
+    const double tflops = flops / (ms * 1.0e9);
+    std::cout << "sm120_dense_nvfp4_concurrent"
+              << " m=" << m << " n=" << n << " k=" << k
+              << " slots=" << slots << " iterations=" << iterations
+              << " aggregate_ms=" << std::fixed << std::setprecision(6) << ms
+              << " aggregate_tflops=" << std::setprecision(3) << tflops << '\n';
+    return tflops;
+}
+#endif
+
 }  // namespace sm120_sparse_mxfp8_bench
 
 int main(int argc, char** argv) {
@@ -401,6 +504,9 @@ int main(int argc, char** argv) {
 #if defined(BEAM_BENCH_DENSE_NVFP4_PIPELINE)
         const int pipeline_iterations = argc > 2 ? std::atoi(argv[2]) : 100;
         sm120_sparse_mxfp8_bench::benchmark_ffn_pipeline(m, pipeline_iterations);
+#elif defined(BEAM_BENCH_CONCURRENT_SLOTS)
+        const int slots = argc > 5 ? std::atoi(argv[5]) : 1;
+        sm120_sparse_mxfp8_bench::benchmark_concurrent(m, n, k, iterations, slots);
 #else
         sm120_sparse_mxfp8_bench::benchmark(m, n, k, iterations);
 #endif

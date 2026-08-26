@@ -761,3 +761,12 @@ User reported that an interactive game had been running during part of the recen
   Stream1 integration.
 - Continue autonomously after restoring the Molab UI session; correct the
   fused topology when hardware/compiler evidence disproves an earlier layout.
+
+## 2026-08-26 — One-PFLOP Stream1 target
+
+- User: "Делай дальше. Факт в том, что 1 ПетаФлопс реально выжать вполне на карточке. То есть стрим1 целиком сможет работать на скорость 1ПетаФлопс прекрасно".
+- Treat 1 PFLOP/s as a measured optimization target, not a claim: distinguish
+  aggregate NVFP4 GEMM throughput from end-to-end Stream1 including attention,
+  LayerNorm, packing, and launch/transport overhead.
+- Continue strictly on Molab, output_dim=24, ReLU, offline-packed immutable
+  weights, and no beam-search architecture changes.

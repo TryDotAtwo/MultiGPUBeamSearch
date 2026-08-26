@@ -354,6 +354,43 @@ if(BEAM_ENABLE_SM120_FP8)
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_concurrent_slots_benchmark
+        tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
+    target_link_libraries(stream1_transformer_sm120_nvfp4_concurrent_slots_benchmark PRIVATE beam_cuda)
+    target_include_directories(stream1_transformer_sm120_nvfp4_concurrent_slots_benchmark PRIVATE
+        "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
+        "${CUTLASS_DIR}/test/unit/gemm/device"
+        "${CUTLASS_DIR}/test/unit/common")
+    target_compile_definitions(stream1_transformer_sm120_nvfp4_concurrent_slots_benchmark PRIVATE
+        BEAM_BENCH_DENSE_NVFP4=1
+        BEAM_BENCH_DENSE_NVFP4_OUTPUT=1
+        BEAM_BENCH_STATIC_SCHEDULER=1
+        BEAM_BENCH_TILE_K128=1
+        BEAM_BENCH_CONCURRENT_SLOTS=1)
+    target_compile_options(stream1_transformer_sm120_nvfp4_concurrent_slots_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_nvfp4_concurrent_slots_benchmark PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_dense_nvfp4_ff1_m256_benchmark
+        tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
+    target_link_libraries(stream1_transformer_sm120_dense_nvfp4_ff1_m256_benchmark PRIVATE beam_cuda)
+    target_include_directories(stream1_transformer_sm120_dense_nvfp4_ff1_m256_benchmark PRIVATE
+        "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
+        "${CUTLASS_DIR}/test/unit/gemm/device"
+        "${CUTLASS_DIR}/test/unit/common")
+    target_compile_definitions(stream1_transformer_sm120_dense_nvfp4_ff1_m256_benchmark PRIVATE
+        BEAM_BENCH_DENSE_NVFP4=1
+        BEAM_BENCH_DENSE_NVFP4_OUTPUT=1
+        BEAM_BENCH_STATIC_SCHEDULER=1
+        BEAM_BENCH_TILE_M256=1)
+    target_compile_options(stream1_transformer_sm120_dense_nvfp4_ff1_m256_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=32>)
+    set_target_properties(stream1_transformer_sm120_dense_nvfp4_ff1_m256_benchmark PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
     add_executable(stream1_transformer_sm120_dense_nvfp4_ff2_n256_benchmark
         tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
     target_link_libraries(stream1_transformer_sm120_dense_nvfp4_ff2_n256_benchmark PRIVATE beam_cuda)

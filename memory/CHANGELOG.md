@@ -1408,3 +1408,22 @@
   shared-memory carveout. It compiles at three TMA stages, preserves the full
   M=51,072/N=1,024/K=256 producer rate, and ran about 2.4% faster than the
   exact four-stage control in three paired Molab samples.
+
+## 2026-08-26 — SM120 FF1 saturation and tile-shape audit
+
+- Added a foreground-only concurrent-slot NVFP4 benchmark with independent
+  immutable weights, workspaces, and CUDA streams. Aggregate throughput is
+  385.227/412.121/405.385/397.793 TFLOP/s for 1/2/3/4 slots at the exact
+  Cube4 FF1 shape, proving that extra Stream1 slots do not approach 1 PFLOP/s.
+- Measured N256 and M256 CTA shapes on the same Molab GPU. Both regress versus
+  M128/N128: about 391 and 383 TFLOP/s versus 397-398 TFLOP/s.
+- Proved by real SM120 compilation that programmatic cluster multicast is not
+  supported for the block-scaled builder (`no programmatic multicast on this
+  arch`); removed the rejected experimental target.
+- Found a small positive producer result: the K256 mainloop reaches
+  406.753-407.192 TFLOP/s versus 397.529-398.057 for K128. The fused producer
+  should therefore consume the complete d_model=256 reduction in one K256
+  tile while retaining the M128/N128 ownership plan.
+- Long Molab CUDA builds remain foreground and now emit a ten-second heartbeat
+  while synchronously waiting for the compiler, preventing scratchpad SSE idle
+  disconnects without leaving detached processes.
