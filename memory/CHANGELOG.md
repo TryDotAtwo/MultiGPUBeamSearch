@@ -1320,3 +1320,15 @@
   `sm_120` binaries fail closed for these MMA instructions; `sm_120a` is
   mandatory. Evidence is in
   `test_results/molab_sm120_dense_nvfp4_ffn_transport_2026-08-26.md`.
+
+# 2026-08-26 — SM120 full-row FF2 prerequisite
+
+- Added an isolated dense NVFP4 FF2 `N=256` benchmark variant to test the
+  full-row ownership prerequisite for a fused residual/LayerNorm/NVFP4
+  epilogue. Molab `sm_120a` compilation and CUTLASS verification passed at
+  `M=51,072,N=256,K=1,024`, but the generic `128x256x128` tile reached only
+  117.566 TFLOP/s (0.227757 ms), so it is explicitly rejected for production.
+  The next implementation keeps two fast N=128 MMA consumer groups inside one
+  fixed-shape row-owner CTA rather than using grouped FF1 or the slow generic
+  N=256 builder. Evidence is recorded in
+  `test_results/molab_sm120_ff2_row_owner_prerequisite_2026-08-26.md`.

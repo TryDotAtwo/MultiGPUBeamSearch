@@ -47,7 +47,10 @@ using ElementAccumulator = float;
 using ElementCompute = float;
 using ProblemShape = Shape<int, int, int, int>;
 using ClusterShape = Shape<_1, _1, _1>;
-#if defined(BEAM_BENCH_TILE_K128)
+#if defined(BEAM_BENCH_TILE_N256)
+using MainloopTileShape = Shape<_128, _256, _128>;
+using EpilogueTileShape = Shape<_128, _256, _128>;
+#elif defined(BEAM_BENCH_TILE_K128)
 using MainloopTileShape = Shape<_128, _128, _128>;
 using EpilogueTileShape = Shape<_128, _128, _128>;
 #else

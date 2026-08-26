@@ -708,3 +708,13 @@ User reported that an interactive game had been running during part of the recen
 - Implement and benchmark the dense NVFP4 Transformer path on Molab so FF1
   emits the next GEMM's native NVFP4 tensor and scale factors directly, rather
   than writing a large BF16 activation and requantizing it in a separate pass.
+
+# 2026-08-26 — skip grouped FF1; implement fused stages 3 and 4
+
+- Do not spend implementation time on grouped FF1; it does not remove the
+  important intermediate traffic.
+- Implement the fixed Cube4 `256 -> 1024 -> 256` SM120 FFN directly, keeping
+  hidden activation transport on-chip, and combine FF2 bias/residual/LayerNorm
+  with emission of the next layer's native NVFP4 tensor and scale factors.
+- Keep the path opt-in and fail closed until Molab correctness, ranking,
+  reconstructed-frontier, and end-to-end depth-8 gates pass.
