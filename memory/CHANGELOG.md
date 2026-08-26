@@ -1427,3 +1427,13 @@
 - Long Molab CUDA builds remain foreground and now emit a ten-second heartbeat
   while synchronously waiting for the compiler, preventing scratchpad SSE idle
   disconnects without leaving detached processes.
+- Established a correct Cube4 96/112, output-24 ReLU end-to-end Stream1
+  baseline on Molab. The exact final-CLS CUTLASS control reaches 169.182
+  dense-equivalent TFLOP/s at `B_micro=384`, concurrency 2; CUDA Graph replay
+  alone is neutral and larger microbatches regress toward 99.5 TFLOP/s.
+- Added an experimental SM120 dense-NVFP4 ping-pong benchmark target using the
+  only compatible static persistent scheduler. On exact 21,888-row Cube4
+  shapes it improves QKV from 465.638 to 523.243 TFLOP/s and FF1 from 466.525
+  to 559.328 TFLOP/s; N256 attention-out and FF2 remain about 279 and 700
+  TFLOP/s. This is evidence for the back-to-back kernel schedule, not a
+  production promotion.

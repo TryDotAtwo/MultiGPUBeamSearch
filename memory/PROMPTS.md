@@ -1,5 +1,16 @@
 # Prompt History
 
+## 2026-08-26 - One-PFLOP end-to-end Stream1 objective
+
+- Treat reproducible 1 PFLOP/s dense-equivalent for the complete Cube4
+  Transformer Stream1 on Molab SM120 as the project objective, not isolated or
+  summed GEMM throughput.
+- Preserve output dimension 24, ReLU, FP32/FP16 correctness references,
+  immutable offline packing, and the existing beam-search architecture.
+- Explore and measure bottlenecks autonomously, communicate material findings,
+  and use experiments to guide back-to-back NVFP4 fusion, packing, epilogues,
+  and whole-block traffic removal.
+
 ## 2026-08-26 - Continue full automatic SM120 tuning goal
 
 - Continue until native Stream1 on Molab improves the accepted 80.2952 s

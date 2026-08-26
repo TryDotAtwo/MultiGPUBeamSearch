@@ -66,7 +66,11 @@ using ArchTag = cutlass::arch::Sm120;
 #if defined(BEAM_BENCH_DENSE_NVFP4)
 using MainloopOpClass = cutlass::arch::OpClassBlockScaledTensorOp;
 using EpilogueSchedule = cutlass::epilogue::collective::EpilogueScheduleAuto;
+#if defined(BEAM_BENCH_PINGPONG)
+using KernelSchedule = cutlass::gemm::KernelTmaWarpSpecializedPingpongNvf4Sm120;
+#else
 using KernelSchedule = cutlass::gemm::KernelTmaWarpSpecializedCooperative;
+#endif
 constexpr int kAlignmentA = 32;
 constexpr int kAlignmentB = 32;
 #elif defined(BEAM_BENCH_NVFP4)

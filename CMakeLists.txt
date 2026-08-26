@@ -259,6 +259,23 @@ if(BEAM_ENABLE_SM120_FP8)
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
     )
+    add_executable(stream1_transformer_sm120_dense_nvfp4_pingpong_benchmark
+        tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
+    target_link_libraries(stream1_transformer_sm120_dense_nvfp4_pingpong_benchmark PRIVATE beam_cuda)
+    target_include_directories(stream1_transformer_sm120_dense_nvfp4_pingpong_benchmark PRIVATE
+        "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
+        "${CUTLASS_DIR}/test/unit/gemm/device"
+        "${CUTLASS_DIR}/test/unit/common")
+    target_compile_definitions(stream1_transformer_sm120_dense_nvfp4_pingpong_benchmark PRIVATE
+        BEAM_BENCH_DENSE_NVFP4=1
+        BEAM_BENCH_PINGPONG=1
+        BEAM_BENCH_STATIC_SCHEDULER=1)
+    target_compile_options(stream1_transformer_sm120_dense_nvfp4_pingpong_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_dense_nvfp4_pingpong_benchmark PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
     foreach(_dense_variant IN ITEMS static_k256 streamk_k128 static_k128)
         set(_dense_target "stream1_transformer_sm120_dense_nvfp4_${_dense_variant}_benchmark")
         add_executable(${_dense_target}
