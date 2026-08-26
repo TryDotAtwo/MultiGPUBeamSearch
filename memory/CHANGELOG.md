@@ -1397,3 +1397,6 @@
 - Recorded the incompatibility between CUTLASS `7107b055` Python examples and
   the installed Molab CuTe DSL wheel. Production fusion stays on the supported
   C++ CUTLASS path.
+- Recovered the marimo kernel through the notebook UI and verified the new
+  shared-pipeline probe through its actual CMake target on Molab; configure,
+  compile, link, and both repeat executions succeeded.
