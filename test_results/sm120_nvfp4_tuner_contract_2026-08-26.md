@@ -263,3 +263,51 @@ The gain is material for QKV (+12.4%) and FF1 (+19.9%), while both N256
 projections remain unchanged.  This schedule is retained as an experimental
 building block; it is not promoted to production before whole-block fusion and
 quality gates.
+
+## Native SM120 instruction ceiling and shared-handoff budget
+
+Direct inspection of the working SM120 CUTLASS backend corrected an important
+assumption: GeForce/RTX SM120 does not use the SM100 datacenter TMEM mainloop.
+The SM100 CuTe tutorial compiled for SM120 but correctly failed closed at the
+TMEM allocator.  The working SM120 backend instead uses register-accumulating
+`mma.sync.aligned...kind::mxf4nvf4.block_scale` instructions plus shared-memory
+staging.  The fused FFN must therefore use a register/shared handoff, not a
+TMEM-to-TMEM design.
+
+The exact `compute_120a` target matters.  The shorthand `-arch=sm_120a` emitted
+plain `sm_120` PTX in this CUDA 13.3 package and ptxas rejected block-scaled
+MMA.  The repository form
+`--generate-code=arch=compute_120a,code=[compute_120a,sm_120a]` compiled and ran
+the native instruction.
+
+A committed raw-MMA benchmark measured the actual hardware headroom on the
+Molab RTX PRO 6000 (188 SMs).  Eight independent accumulators per warp were
+used to avoid reporting a latency-chain artifact:
+
+| resident blocks per SM | native NVFP4 MMA throughput |
+|---:|---:|
+| 1 | 1.004-1.019 PFLOP/s |
+| 2 | 1.217 PFLOP/s |
+| 4 | 1.536 PFLOP/s |
+| 8 | 1.641 PFLOP/s |
+
+A structural FF1->shared->FF2 probe then executed the exact FFN instruction
+count, eight K128 slices, a 9,216-byte packed hidden+scale handoff per slice,
+and no global hidden tensor.  It is a scheduling/traffic probe rather than a
+numerical implementation, but it establishes the available budget:
+
+| row tile | CTAs for 21,888 rows | throughput |
+|---:|---:|---:|
+| M128 | 171 | 1.245 PFLOP/s |
+| M64 | 342 | 1.401 PFLOP/s |
+
+Thus the end-to-end 1-PFLOP/s target is physically reachable, but an M128
+implementation has only about 20% scheduling/epilogue budget.  M64 supplies
+roughly 29% and is the preferred custom-kernel direction even though the stock
+CUTLASS builder previously rejected M64.  The custom SM120 register MMA atom
+does not have that builder restriction.
+
+The real two-kernel ping-pong FFN pipeline measured 486.155 TFLOP/s with one
+slot.  Independent pipelines saturated at only 571.3-571.8 TFLOP/s for two to
+four slots and regressed beyond that.  This rules out concurrency as a route to
+1 PFLOP/s and confirms that global NVFP4 hidden materialization must be removed.

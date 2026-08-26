@@ -308,6 +308,134 @@ double benchmark_ffn_pipeline(int m, int iterations) {
               << " intermediate_format=nvfp4_relu intermediate_bf16_bytes=0\n";
     return tflops;
 }
+
+#if defined(BEAM_BENCH_PIPELINE_CONCURRENT)
+double benchmark_ffn_pipeline_concurrent(int m, int iterations, int slots) {
+    if (slots < 1 || slots > 8) {
+        throw std::runtime_error("concurrent FFN slots must be in [1, 8]");
+    }
+    constexpr int d_model = 256;
+    constexpr int ff_dim = 1024;
+    ProblemShape ff1_problem{m, ff_dim, d_model, 1};
+    ProblemShape ff2_problem{m, d_model, ff_dim, 1};
+    cutlass::KernelHardwareInfo hw_info;
+    hw_info.device_id = 0;
+    hw_info.sm_count = cutlass::KernelHardwareInfo::query_device_multiprocessor_count(0);
+
+    std::vector<std::unique_ptr<Testbed>> ff1_testbeds;
+    std::vector<std::unique_ptr<Ff2Testbed>> ff2_testbeds;
+    std::vector<std::unique_ptr<Gemm>> ff1_gemms;
+    std::vector<std::unique_ptr<Ff2Gemm>> ff2_gemms;
+    std::vector<std::unique_ptr<cutlass::device_memory::allocation<std::uint8_t>>> ff1_workspaces;
+    std::vector<std::unique_ptr<cutlass::device_memory::allocation<std::uint8_t>>> ff2_workspaces;
+    std::vector<cudaStream_t> streams(static_cast<std::size_t>(slots));
+
+    for (int slot = 0; slot < slots; ++slot) {
+        ff1_testbeds.push_back(std::make_unique<Testbed>());
+        ff2_testbeds.push_back(std::make_unique<Ff2Testbed>());
+        auto& ff1 = ff1_testbeds.back()->impl_;
+        auto& ff2 = ff2_testbeds.back()->impl_;
+        if (!ff1.sufficient() || !ff2.sufficient() ||
+            !ff1.initialize(ff1_problem, 1.0f, 0.0f) ||
+            !ff2.initialize(ff2_problem, 1.0f, 0.0f)) {
+            throw std::runtime_error("concurrent FFN fixture initialization failed");
+        }
+        typename GemmKernel::TileScheduler::Arguments ff1_scheduler_args{};
+        typename Gemm::Arguments ff1_arguments{
+            cutlass::gemm::GemmUniversalMode::kGemm, ff1_problem,
+            ff1.collective_mma_inputs.to_args(),
+            ff1.collective_epilogue.to_args(ff1_problem),
+            hw_info, ff1_scheduler_args};
+        using Ff2ArrayElementA = typename Ff2Kernel::CollectiveMainloop::ArrayElementA;
+        using Ff2ArrayElementB = typename Ff2Kernel::CollectiveMainloop::ArrayElementB;
+        typename Ff2Kernel::MainloopArguments ff2_mainloop_args{
+            reinterpret_cast<Ff2ArrayElementA*>(ff1.collective_epilogue.tensor_D.device_data()),
+            ff2.collective_mma_inputs.stride_a,
+            reinterpret_cast<Ff2ArrayElementB*>(ff2.collective_mma_inputs.tensor_B.device_data()),
+            ff2.collective_mma_inputs.stride_b,
+            ff1.collective_epilogue.tensor_SFD.device_data(),
+            ff2.collective_mma_inputs.layout_sfa,
+            ff2.collective_mma_inputs.tensor_SFB.device_data(),
+            ff2.collective_mma_inputs.layout_sfb};
+        typename Ff2Kernel::TileScheduler::Arguments ff2_scheduler_args{};
+        typename Ff2Gemm::Arguments ff2_arguments{
+            cutlass::gemm::GemmUniversalMode::kGemm, ff2_problem,
+            ff2_mainloop_args, ff2.collective_epilogue.to_args(ff2_problem),
+            hw_info, ff2_scheduler_args};
+        auto ff1_workspace = std::make_unique<cutlass::device_memory::allocation<std::uint8_t>>(
+            Gemm::get_workspace_size(ff1_arguments));
+        auto ff2_workspace = std::make_unique<cutlass::device_memory::allocation<std::uint8_t>>(
+            Ff2Gemm::get_workspace_size(ff2_arguments));
+        auto ff1_gemm = std::make_unique<Gemm>();
+        auto ff2_gemm = std::make_unique<Ff2Gemm>();
+        if (ff1_gemm->can_implement(ff1_arguments) != cutlass::Status::kSuccess ||
+            ff2_gemm->can_implement(ff2_arguments) != cutlass::Status::kSuccess ||
+            ff1_gemm->initialize(ff1_arguments, ff1_workspace->get()) != cutlass::Status::kSuccess ||
+            ff2_gemm->initialize(ff2_arguments, ff2_workspace->get()) != cutlass::Status::kSuccess) {
+            throw std::runtime_error("concurrent FFN GEMM initialization failed");
+        }
+        cudaStreamCreateWithFlags(&streams[static_cast<std::size_t>(slot)], cudaStreamNonBlocking);
+        ff1_workspaces.push_back(std::move(ff1_workspace));
+        ff2_workspaces.push_back(std::move(ff2_workspace));
+        ff1_gemms.push_back(std::move(ff1_gemm));
+        ff2_gemms.push_back(std::move(ff2_gemm));
+    }
+
+    for (int warmup = 0; warmup < 10; ++warmup) {
+        for (int slot = 0; slot < slots; ++slot) {
+            auto stream = streams[static_cast<std::size_t>(slot)];
+            if (ff1_gemms[static_cast<std::size_t>(slot)]->run(stream) != cutlass::Status::kSuccess ||
+                ff2_gemms[static_cast<std::size_t>(slot)]->run(stream) != cutlass::Status::kSuccess) {
+                throw std::runtime_error("concurrent FFN warmup failed");
+            }
+        }
+    }
+    cudaDeviceSynchronize();
+
+    cudaEvent_t start{}, stop{};
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
+    for (auto stream : streams) {
+        cudaStreamWaitEvent(stream, start, 0);
+    }
+    for (int iteration = 0; iteration < iterations; ++iteration) {
+        for (int slot = 0; slot < slots; ++slot) {
+            auto stream = streams[static_cast<std::size_t>(slot)];
+            if (ff1_gemms[static_cast<std::size_t>(slot)]->run(stream) != cutlass::Status::kSuccess ||
+                ff2_gemms[static_cast<std::size_t>(slot)]->run(stream) != cutlass::Status::kSuccess) {
+                throw std::runtime_error("concurrent FFN timed launch failed");
+            }
+        }
+    }
+    std::vector<cudaEvent_t> done(static_cast<std::size_t>(slots));
+    for (int slot = 0; slot < slots; ++slot) {
+        cudaEventCreateWithFlags(&done[static_cast<std::size_t>(slot)], cudaEventDisableTiming);
+        cudaEventRecord(done[static_cast<std::size_t>(slot)], streams[static_cast<std::size_t>(slot)]);
+        cudaStreamWaitEvent(0, done[static_cast<std::size_t>(slot)], 0);
+    }
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    float total_ms = 0.0f;
+    cudaEventElapsedTime(&total_ms, start, stop);
+    for (int slot = 0; slot < slots; ++slot) {
+        cudaEventDestroy(done[static_cast<std::size_t>(slot)]);
+        cudaStreamDestroy(streams[static_cast<std::size_t>(slot)]);
+    }
+    cudaEventDestroy(stop);
+    cudaEventDestroy(start);
+
+    const double ms = static_cast<double>(total_ms) / iterations;
+    const double flops = 4.0 * static_cast<double>(m) * d_model * ff_dim * slots;
+    const double tflops = flops / (ms * 1.0e9);
+    std::cout << "sm120_dense_nvfp4_ffn_concurrent"
+              << " m=" << m << " slots=" << slots << " iterations=" << iterations
+              << " aggregate_ms=" << std::fixed << std::setprecision(6) << ms
+              << " aggregate_tflops=" << std::setprecision(3) << tflops
+              << " intermediate_format=nvfp4_relu\n";
+    return tflops;
+}
+#endif
 #endif
 
 double benchmark(int m, int n, int k, int iterations) {
@@ -505,7 +633,12 @@ int main(int argc, char** argv) {
                   << " reserved_hidden_bytes="
                   << sm120_sparse_mxfp8_bench::kFusedHiddenBytes << '\n';
 #endif
-#if defined(BEAM_BENCH_DENSE_NVFP4_PIPELINE)
+#if defined(BEAM_BENCH_PIPELINE_CONCURRENT)
+        const int pipeline_iterations = argc > 2 ? std::atoi(argv[2]) : 100;
+        const int slots = argc > 3 ? std::atoi(argv[3]) : 2;
+        sm120_sparse_mxfp8_bench::benchmark_ffn_pipeline_concurrent(
+            m, pipeline_iterations, slots);
+#elif defined(BEAM_BENCH_DENSE_NVFP4_PIPELINE)
         const int pipeline_iterations = argc > 2 ? std::atoi(argv[2]) : 100;
         sm120_sparse_mxfp8_bench::benchmark_ffn_pipeline(m, pipeline_iterations);
 #elif defined(BEAM_BENCH_CONCURRENT_SLOTS)

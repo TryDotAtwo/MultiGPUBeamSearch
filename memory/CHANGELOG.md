@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-08-26 — SM120 native 1-PFLOP instruction and handoff proof
+
+- Added a reproducible native NVFP4 MMA benchmark for SM120a. Molab measured
+  1.004 PFLOP/s with one resident block per SM and 1.641 PFLOP/s with eight.
+- Added an FFN-shaped register/shared scheduling probe with eight K128 slices
+  and an exact 9 KiB local hidden handoff. It reached 1.245 PFLOP/s at M128 and
+  1.401 PFLOP/s at M64, proving that the requested end-to-end target has real
+  hardware headroom once the numerical back-to-back kernel is wired.
+- Added and measured a concurrent ping-pong two-kernel FFN control. It plateaus
+  near 572 TFLOP/s, so extra slots cannot replace removal of global hidden
+  materialization.
+- Corrected the implementation direction: SM120 uses register-accumulating
+  block-scaled `mma.sync`, not the SM100 TMEM path. Exact `compute_120a` codegen
+  is required; shorthand compilation silently loses the `a` feature target.
+
 ## 2026-08-26 — Depth-8 evidence binding and fused NVFP4 FFN contract
 
 - Hardened `tools/sm120_quant_select.py`: selection now requires at least
