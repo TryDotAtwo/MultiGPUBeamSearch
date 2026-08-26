@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-08-26 — Numerical NVFP4 handoff and topology sweep
+
+- Corrected the native peak probe from UE8M0 to the production NVFP4 UE4M3
+  scale encoding. The measured ceiling remained 1.643 PFLOP/s, so the earlier
+  hardware headroom is valid for the intended format.
+- Added a bit-exact ReLU + K16 UE4M3/E2M1 quantizer. On the full
+  `21888 x 1024` FF1 output it processes 22.4 million values in 0.176 ms,
+  matches a device scalar reference exactly, and has 0.007368 NMSE on the
+  deterministic stress distribution.
+- Replaced scalar FP4 conversion in the fused scheduling probe with CUTLASS's
+  packed four-value converter. Repeated numerical handoff settles near 368
+  TFLOP/s at M128 and 372 TFLOP/s at true M64, versus 123 TFLOP/s before the
+  packed converter; ptxas reports zero spills.
+- Measured DSM cluster topologies. Structural throughput was 109/304/800
+  TFLOP/s for cluster sizes 8/4/2; M256 cluster-2 regressed to 751 TFLOP/s.
+  Large clusters and DSM barriers are therefore not the primary fusion path.
+- Tested stock CUTLASS N64 ping-pong tiles: FF2 regressed from about 700 to
+  672 TFLOP/s and QKV to 420 TFLOP/s. M64 is rejected by the SM120 TMA scale
+  layout. Unsupported targets were removed so the default build remains clean.
+- A three-stage FF1/quantize/FF2 overlap prototype used 76 registers with zero
+  spills but reached only 138 TFLOP/s; instruction interference, not register
+  spilling, is the limiting mechanism for that schedule.
+
 ## 2026-08-26 — SM120 native 1-PFLOP instruction and handoff proof
 
 - Added a reproducible native NVFP4 MMA benchmark for SM120a. Molab measured

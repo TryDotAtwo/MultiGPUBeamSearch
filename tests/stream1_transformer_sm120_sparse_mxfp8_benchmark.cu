@@ -55,6 +55,9 @@ using EpilogueTileShape = Shape<_256, _128, _128>;
 #elif defined(BEAM_BENCH_TILE_N256)
 using MainloopTileShape = Shape<_128, _256, _128>;
 using EpilogueTileShape = Shape<_128, _256, _128>;
+#elif defined(BEAM_BENCH_TILE_N64)
+using MainloopTileShape = Shape<_128, _64, _128>;
+using EpilogueTileShape = Shape<_128, _64, _128>;
 #elif defined(BEAM_BENCH_TILE_K128)
 using MainloopTileShape = Shape<_128, _128, _128>;
 using EpilogueTileShape = Shape<_128, _128, _128>;

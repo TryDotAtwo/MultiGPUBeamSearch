@@ -311,3 +311,38 @@ The real two-kernel ping-pong FFN pipeline measured 486.155 TFLOP/s with one
 slot.  Independent pipelines saturated at only 571.3-571.8 TFLOP/s for two to
 four slots and regressed beyond that.  This rules out concurrency as a route to
 1 PFLOP/s and confirms that global NVFP4 hidden materialization must be removed.
+
+## Numerical handoff and topology correction
+
+The raw instruction probe was corrected to instantiate the production UE4M3
+scale atom rather than UE8M0. It still measured 1.643 PFLOP/s, confirming the
+same native NVFP4 ceiling.
+
+A committed numerical K16 handoff benchmark now performs exact ReLU, K16 amax,
+UE4M3 scale generation, packed E2M1 conversion, and reconstruction checks. On
+the full `21888 x 1024` FF1 output it measured 0.175675 ms, 510.3 GB/s of FP32
+input traffic, zero device-reference mismatches, and 0.007368 NMSE. The first
+scalar E2M1 implementation was much slower; CUTLASS's four-value packed
+converter raised repeated numerical FFN-shaped throughput from 122.9 to about
+368 TFLOP/s at M128 and 372 TFLOP/s at true M64. A one-off 466.8 TFLOP/s sample
+was not repeatable and is not accepted as the baseline.
+
+The earlier synthetic M64 row was a saturation probe that duplicated M128 work
+at twice the CTA count; it was not a true M64 implementation. A corrected true
+M64 numerical tile halves the MMA count and handoff bytes per CTA and reaches
+about 372 TFLOP/s, only one percent above M128 and far below the target. It
+does not justify an M64 production path, especially because the stock TMA
+builder rejects it.
+
+DSM was tested rather than assumed. Structural cluster throughput was 109.0,
+304.2, and 799.7 TFLOP/s for cluster sizes 8, 4, and 2 respectively. Increasing
+cluster-2 to M256 so that 172 CTAs fit in one scheduling wave regressed to
+750.8 TFLOP/s. The cluster barrier/scheduling cost is too large for the primary
+path on this RTX PRO 6000.
+
+The three-stage single-CTA FF1/quantize/FF2 overlap prototype compiled with 76
+registers, 27,648 bytes shared memory, and zero spills, yet reached only 138.2
+TFLOP/s. Thus its loss is instruction interference rather than register spill.
+Stock CUTLASS N64 also regressed: FF2 `21888x256x1024` reached 672.1 TFLOP/s and
+QKV `21888x768x256` reached 419.7 TFLOP/s. Stock M64 remains rejected by the
+SM120 TMA scale layout.
