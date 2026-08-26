@@ -1400,3 +1400,11 @@
 - Recovered the marimo kernel through the notebook UI and verified the new
   shared-pipeline probe through its actual CMake target on Molab; configure,
   compile, link, and both repeat executions succeeded.
+- Replaced the non-implementable M64/full-hidden plan after the real SM120
+  CUTLASS compile proved cooperative MMA requires M128. The fused contract now
+  ping-pongs two M128xK128 NVFP4 slices (18,432 bytes) into two 256-thread FF2
+  consumer groups.
+- Added and benchmarked a derived CUTLASS GemmUniversal scaffold with honest
+  shared-memory carveout. It compiles at three TMA stages, preserves the full
+  M=51,072/N=1,024/K=256 producer rate, and ran about 2.4% faster than the
+  exact four-stage control in three paired Molab samples.

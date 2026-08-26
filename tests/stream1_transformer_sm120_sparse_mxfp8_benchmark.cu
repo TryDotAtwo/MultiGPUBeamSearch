@@ -80,6 +80,13 @@ constexpr int kAlignmentB = 16;
 constexpr int kAlignmentC = 1;
 constexpr int kAlignmentD = 128 / cutlass::sizeof_bits<ElementD>::value;
 constexpr int kScaleVector = 64;
+#if defined(BEAM_BENCH_FUSED_KERNEL_SCAFFOLD)
+constexpr int kFusedHiddenValueBytes = 2 * (128 * 128 / 2);
+constexpr int kFusedHiddenScaleBytes = 2 * (128 * (128 / 16));
+constexpr int kFusedHiddenBytes = kFusedHiddenValueBytes + kFusedHiddenScaleBytes;
+#else
+constexpr int kFusedHiddenBytes = 0;
+#endif
 
 #if defined(BEAM_BENCH_DENSE_NVFP4_OUTPUT)
 using FusionOperation = cutlass::epilogue::fusion::LinCombPerRowBiasEltActBlockScaleFactor<
@@ -114,7 +121,8 @@ using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBui
     >::CollectiveOp;
 
 using StageCount = cutlass::gemm::collective::StageCountAutoCarveout<
-    static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))>;
+    static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage)) +
+    kFusedHiddenBytes>;
 
 using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
     ArchTag,
@@ -136,8 +144,32 @@ using TileScheduler = void;
 #else
 using TileScheduler = cutlass::gemm::StreamKScheduler;
 #endif
-using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
+using BaseGemmKernel = cutlass::gemm::kernel::GemmUniversal<
     ProblemShape, CollectiveMainloop, CollectiveEpilogue, TileScheduler>;
+#if defined(BEAM_BENCH_FUSED_KERNEL_SCAFFOLD)
+struct FusedFfnKernelScaffold : BaseGemmKernel {
+    using Base = BaseGemmKernel;
+    using Params = typename Base::Params;
+
+    struct SharedStorage {
+        alignas(128) typename Base::SharedStorage base;
+        alignas(128) std::uint8_t hidden_values[kFusedHiddenValueBytes];
+        alignas(128) std::uint8_t hidden_scales[kFusedHiddenScaleBytes];
+    };
+
+    static constexpr int SharedStorageSize = sizeof(SharedStorage);
+    static_assert(SharedStorageSize <= ArchTag::kSharedMemoryCapacityBytes,
+                  "fused FFN scaffold exceeds SM120 shared-memory capacity");
+
+    CUTLASS_DEVICE void operator()(Params const& params, char* smem_buf) {
+        auto& storage = *reinterpret_cast<SharedStorage*>(smem_buf);
+        Base::operator()(params, reinterpret_cast<char*>(&storage.base));
+    }
+};
+using GemmKernel = FusedFfnKernelScaffold;
+#else
+using GemmKernel = BaseGemmKernel;
+#endif
 using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
 using Testbed = test::gemm::device::Testbed3x<Gemm>;
 
@@ -357,6 +389,15 @@ int main(int argc, char** argv) {
     const int k = argc > 3 ? std::atoi(argv[3]) : 8192;
     const int iterations = argc > 4 ? std::atoi(argv[4]) : 100;
     try {
+#if defined(BEAM_BENCH_DENSE_NVFP4_OUTPUT) && defined(BEAM_BENCH_TILE_K128)
+        std::cout << "sm120_nvfp4_kernel_plan"
+                  << " stages="
+                  << sm120_sparse_mxfp8_bench::CollectiveMainloop::DispatchPolicy::Stages
+                  << " shared_bytes="
+                  << sm120_sparse_mxfp8_bench::GemmKernel::SharedStorageSize
+                  << " reserved_hidden_bytes="
+                  << sm120_sparse_mxfp8_bench::kFusedHiddenBytes << '\n';
+#endif
 #if defined(BEAM_BENCH_DENSE_NVFP4_PIPELINE)
         const int pipeline_iterations = argc > 2 ? std::atoi(argv[2]) : 100;
         sm120_sparse_mxfp8_bench::benchmark_ffn_pipeline(m, pipeline_iterations);

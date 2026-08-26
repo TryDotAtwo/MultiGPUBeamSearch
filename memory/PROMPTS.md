@@ -759,3 +759,5 @@ User reported that an interactive game had been running during part of the recen
 - Continue native SM120 NVFP4 Transformer inference work in Molab, preserving
   beam-search architecture and validating each fusion prerequisite before
   Stream1 integration.
+- Continue autonomously after restoring the Molab UI session; correct the
+  fused topology when hardware/compiler evidence disproves an earlier layout.

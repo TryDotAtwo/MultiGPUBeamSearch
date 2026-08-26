@@ -45,11 +45,16 @@ int main() {
             Stream1Sm120Nvfp4FfnPolicy::kFfDim,
         "eight sequential N128 producer tiles must own the complete hidden row");
     require(
-        Stream1Sm120Nvfp4FfnPolicy::kSharedHiddenValueBytes == 32768U,
-        "M64 packed E2M1 hidden tile must use 32 KiB shared memory");
+        Stream1Sm120Nvfp4FfnPolicy::kProducerTileBuffers == 2U,
+        "producer and consumers require ping-pong hidden slices");
     require(
-        Stream1Sm120Nvfp4FfnPolicy::kSharedHiddenScaleBytes == 4096U,
-        "M64 K16 UE4M3 hidden scales must use 4 KiB shared memory");
+        Stream1Sm120Nvfp4FfnPolicy::kSharedHiddenValueBytesPerTile == 8192U &&
+            Stream1Sm120Nvfp4FfnPolicy::kSharedHiddenScaleBytesPerTile == 1024U,
+        "one M128xK128 NVFP4 hidden slice must use 9 KiB shared memory");
+    require(
+        Stream1Sm120Nvfp4FfnPolicy::kSharedHiddenValueBytes == 16384U &&
+            Stream1Sm120Nvfp4FfnPolicy::kSharedHiddenScaleBytes == 2048U,
+        "double-buffered M128xK128 hidden slices must use 18 KiB shared memory");
     require(
         Stream1Sm120Nvfp4FfnPolicy::kConsumerGroups *
             Stream1Sm120Nvfp4FfnPolicy::kColumnsPerConsumer ==

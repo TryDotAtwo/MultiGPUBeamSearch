@@ -39,13 +39,18 @@ struct Stream1Sm120Nvfp4FfnPolicy {
     static constexpr std::uint32_t kScaleVector = 16U;
     static constexpr std::uint32_t kProducerTiles = 8U;
     static constexpr std::uint32_t kColumnsPerProducerTile = 128U;
+    static constexpr std::uint32_t kProducerTileBuffers = 2U;
     static constexpr std::uint32_t kConsumerGroups = 2U;
     static constexpr std::uint32_t kColumnsPerConsumer = 128U;
-    static constexpr std::uint32_t kInitialRowsPerCta = 64U;
+    static constexpr std::uint32_t kInitialRowsPerCta = 128U;
+    static constexpr std::uint32_t kSharedHiddenValueBytesPerTile =
+        kInitialRowsPerCta * kColumnsPerProducerTile / 2U;
+    static constexpr std::uint32_t kSharedHiddenScaleBytesPerTile =
+        kInitialRowsPerCta * (kColumnsPerProducerTile / kScaleVector);
     static constexpr std::uint32_t kSharedHiddenValueBytes =
-        kInitialRowsPerCta * kFfDim / 2U;
+        kProducerTileBuffers * kSharedHiddenValueBytesPerTile;
     static constexpr std::uint32_t kSharedHiddenScaleBytes =
-        kInitialRowsPerCta * (kFfDim / kScaleVector);
+        kProducerTileBuffers * kSharedHiddenScaleBytesPerTile;
 
     static constexpr Stream1Sm120Nvfp4FfnRejectReason reject_reason(
         const Stream1Sm120Nvfp4FfnContract& contract) {
