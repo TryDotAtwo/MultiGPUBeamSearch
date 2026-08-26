@@ -697,3 +697,8 @@ User reported that an interactive game had been running during part of the recen
   notebook cells; detached subprocess jobs and local CUDA tests are forbidden.
 - The speedup must exercise the card's hardware narrow-precision path, with
   later comparison against FP32 and FP16 model quality.
+# 2026-08-26 - Dense NVFP4 narrow-layer requirement
+
+- User requested investigation of what makes the Transformer layers narrow
+  and whether the limitation can be bypassed while moving the dense model to
+  NVFP4 without structured sparsity.

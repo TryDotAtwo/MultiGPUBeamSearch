@@ -1298,3 +1298,13 @@
   0.952 PFLOP/s and did not satisfy the 1.5 PFLOP/s gate.
 - Kept this as an isolated roofline benchmark. Production Transformer model
   selection still requires accuracy calibration and real-shape validation.
+# 2026-08-26 - Dense NVFP4 Cube4 shape study
+
+- Added dense SM120 NVFP4 Stream-K/static and tile-K benchmark variants plus a
+  fused ReLU-to-NVFP4 output epilogue variant.
+- Molab measurements showed 1.431 PFLOP/s on square 8192^3 but 0.362--0.871
+  PFLOP/s on actual Cube4 linear shapes. Static scheduling improved the four
+  linear operations' weighted aggregate by 10.5% over Stream-K.
+- Confirmed that parent batching cannot remove fixed K/N narrowness. The next
+  optimization boundary is end-to-end epilogue fusion and narrow intermediate
+  storage, especially between FF1 and FF2.

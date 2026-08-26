@@ -27,7 +27,7 @@ using LayoutBTag = cutlass::layout::ColumnMajor;
 using LayoutCTag = cutlass::layout::RowMajor;
 using LayoutDTag = cutlass::layout::RowMajor;
 using LayoutSFDTag = cutlass::layout::RowMajor;
-#if defined(BEAM_BENCH_NVFP4)
+#if defined(BEAM_BENCH_NVFP4) || defined(BEAM_BENCH_DENSE_NVFP4)
 using ElementA = cutlass::nv_float4_t<cutlass::float_e2m1_t>;
 using ElementB = cutlass::nv_float4_t<cutlass::float_e2m1_t>;
 #else
@@ -35,28 +35,60 @@ using ElementA = cutlass::mx_float8_t<cutlass::float_e4m3_t>;
 using ElementB = cutlass::mx_float8_t<cutlass::float_e4m3_t>;
 #endif
 using ElementC = cutlass::bfloat16_t;
+#if defined(BEAM_BENCH_DENSE_NVFP4_OUTPUT)
+using ElementD = cutlass::float_e2m1_t;
+using ElementSF = cutlass::float_ue4m3_t;
+#else
 using ElementD = cutlass::bfloat16_t;
 using ElementSF = cutlass::float_ue8m0_t;
+#endif
+using ElementBias = cutlass::bfloat16_t;
 using ElementAccumulator = float;
 using ElementCompute = float;
 using ProblemShape = Shape<int, int, int, int>;
 using ClusterShape = Shape<_1, _1, _1>;
+#if defined(BEAM_BENCH_TILE_K128)
+using MainloopTileShape = Shape<_128, _128, _128>;
+using EpilogueTileShape = Shape<_128, _128, _128>;
+#else
 using MainloopTileShape = Shape<_128, _128, _256>;
 using EpilogueTileShape = Shape<_128, _128, _256>;
+#endif
 using ArchTag = cutlass::arch::Sm120;
+#if defined(BEAM_BENCH_DENSE_NVFP4)
+using MainloopOpClass = cutlass::arch::OpClassBlockScaledTensorOp;
+using EpilogueSchedule = cutlass::epilogue::collective::EpilogueScheduleAuto;
+using KernelSchedule = cutlass::gemm::KernelTmaWarpSpecializedCooperative;
+constexpr int kAlignmentA = 32;
+constexpr int kAlignmentB = 32;
+#elif defined(BEAM_BENCH_NVFP4)
+using MainloopOpClass = cutlass::arch::OpClassBlockScaledSparseTensorOp;
 using EpilogueSchedule = cutlass::epilogue::SparseTmaWarpSpecializedCooperativeSm120;
-#if defined(BEAM_BENCH_NVFP4)
 using KernelSchedule = cutlass::gemm::KernelSparseTmaWarpSpecializedNvf4Sm120;
 constexpr int kAlignmentA = 256;
 constexpr int kAlignmentB = 128;
 #else
+using MainloopOpClass = cutlass::arch::OpClassBlockScaledSparseTensorOp;
+using EpilogueSchedule = cutlass::epilogue::SparseTmaWarpSpecializedCooperativeSm120;
 using KernelSchedule = cutlass::gemm::KernelSparseTmaWarpSpecializedMxf8f6f4Acc2x4Sm120;
 constexpr int kAlignmentA = 32;
 constexpr int kAlignmentB = 16;
 #endif
 constexpr int kAlignmentC = 1;
-constexpr int kAlignmentD = 4;
+constexpr int kAlignmentD = 128 / cutlass::sizeof_bits<ElementD>::value;
 constexpr int kScaleVector = 64;
+
+#if defined(BEAM_BENCH_DENSE_NVFP4_OUTPUT)
+using FusionOperation = cutlass::epilogue::fusion::LinCombPerRowBiasEltActBlockScaleFactor<
+    cutlass::epilogue::thread::ReLU,
+    16,
+    ElementD,
+    ElementCompute,
+    ElementSF,
+    LayoutSFDTag,
+    ElementBias,
+    ElementC>;
+#endif
 
 using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
     ArchTag,
@@ -72,14 +104,18 @@ using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBui
     ElementD,
     LayoutDTag,
     kAlignmentD,
-    EpilogueSchedule>::CollectiveOp;
+    EpilogueSchedule
+#if defined(BEAM_BENCH_DENSE_NVFP4_OUTPUT)
+    , FusionOperation
+#endif
+    >::CollectiveOp;
 
 using StageCount = cutlass::gemm::collective::StageCountAutoCarveout<
     static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))>;
 
 using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
     ArchTag,
-    cutlass::arch::OpClassBlockScaledSparseTensorOp,
+    MainloopOpClass,
     ElementA,
     LayoutATag,
     kAlignmentA,
@@ -92,8 +128,13 @@ using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder
     StageCount,
     KernelSchedule>::CollectiveOp;
 
+#if defined(BEAM_BENCH_STATIC_SCHEDULER)
+using TileScheduler = void;
+#else
+using TileScheduler = cutlass::gemm::StreamKScheduler;
+#endif
 using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
-    ProblemShape, CollectiveMainloop, CollectiveEpilogue, cutlass::gemm::StreamKScheduler>;
+    ProblemShape, CollectiveMainloop, CollectiveEpilogue, TileScheduler>;
 using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
 using Testbed = test::gemm::device::Testbed3x<Gemm>;
 
@@ -153,7 +194,13 @@ double benchmark(int m, int n, int k, int iterations) {
     const double dense_equivalent_flops = 2.0 * static_cast<double>(m) * n * k;
     const double tflops = dense_equivalent_flops / (ms * 1.0e9);
     std::cout <<
-#if defined(BEAM_BENCH_NVFP4)
+#if defined(BEAM_BENCH_DENSE_NVFP4)
+#if defined(BEAM_BENCH_DENSE_NVFP4_OUTPUT)
+        "sm120_dense_nvfp4_relu_nvfp4_out"
+#else
+        "sm120_dense_nvfp4"
+#endif
+#elif defined(BEAM_BENCH_NVFP4)
         "sm120_sparse_nvfp4"
 #else
         "sm120_sparse_mxfp8"
