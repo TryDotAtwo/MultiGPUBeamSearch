@@ -1,5 +1,31 @@
 # Prompt History
 
+## 2026-08-26 - Continue full automatic SM120 tuning goal
+
+- Continue until native Stream1 on Molab improves the accepted 80.2952 s
+  Cube4 depth-8 baseline without correctness loss; output_dim=24 only.
+- Bind selection to real frontier calibration, graph-preserving equalization,
+  ranking and reconstructed-frontier gates, immutable profiles, and repeated
+  native measurements of the same workload.
+- The fixed fused `256 -> 1024 -> 256` FFN must not materialize a global hidden
+  tensor. Its FF2 epilogue must fuse residual, exact LayerNorm semantics, and
+  next-layer NVFP4/UE4M3 output. CUDA validation is strictly on Molab.
+
+## 2026-08-26 - Direct fused SM120 FFN 3+4 path
+
+- Do not spend further effort on grouped FF1; implement the two material
+  inference changes directly: a fixed Cube4 `256 -> 1024 -> 256` SM120 NVFP4
+  FFN without a global hidden intermediate, followed by an FF2 epilogue fused
+  with residual, the exact established LayerNorm semantics, and NVFP4/UE4M3
+  emission for the next layer.
+- Preserve ReLU and output dimension 24. Keep the path opt-in and fail closed
+  until the original FP32 checkpoint, accepted FP16 execution, ranking,
+  reconstructed frontier, and identical `beam=2**25`, `depth_done=8` Molab
+  gates pass and beat the accepted 80.2952-second baseline.
+- All CUDA compilation, correctness tests, and performance measurements must
+  run in the live Molab runtime in foreground; do not use detached subprocess
+  jobs and do not substitute local GPU evidence.
+
 ## 2026-08-25 - Molab in-process runner requirement
 - User rejected subprocess-based Molab execution and required the long Cube4
   solve to run correctly inside the notebook session. The solver must therefore
@@ -718,3 +744,18 @@ User reported that an interactive game had been running during part of the recen
   with emission of the next layer's native NVFP4 tensor and scale factors.
 - Keep the path opt-in and fail closed until Molab correctness, ranking,
   reconstructed-frontier, and end-to-end depth-8 gates pass.
+
+# 2026-08-26 — authorized private Molab source transfer and continuation
+
+- User explicitly authorized uploading the 22.6 KiB current-branch patch
+  bundle to the private Molab sandbox for compilation and testing.
+- Continue all CUDA compilation and validation foreground in Molab; do not use
+  detached subprocess jobs, do not alter beam-search architecture, and do not
+  claim the transport control as the final fused kernel.
+## 2026-08-26 — Continue authorized private Molab implementation
+
+- User: "Разрешаю загрузить 22.6 КБ patch bundle текущей ветки в приватный Molab sandbox для сборки и тестирования".
+- User: "Делай дальше".
+- Continue native SM120 NVFP4 Transformer inference work in Molab, preserving
+  beam-search architecture and validating each fusion prerequisite before
+  Stream1 integration.

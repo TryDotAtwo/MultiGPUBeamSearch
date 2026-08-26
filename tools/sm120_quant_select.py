@@ -16,6 +16,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import numpy as np
+
 from tools.sm120_quant_tuner import (
     CORE_OPERATORS,
     FP16_GEMM_BACKENDS,
@@ -25,6 +27,15 @@ from tools.sm120_quant_tuner import (
     pareto_select,
     write_immutable_profile,
 )
+
+
+DEPTH8_BASELINE_SECONDS = 80.2952
+REQUIRED_NATIVE_WORKLOAD = {
+    "puzzle_family": "cube4",
+    "output_dim": 24,
+    "depth_start": 0,
+    "depth_limit": 8,
+}
 
 
 def _candidate_map(rows: Sequence[Mapping[str, Any]], source: str) -> dict[str, dict[str, Any]]:
@@ -40,14 +51,80 @@ def _candidate_map(rows: Sequence[Mapping[str, Any]], source: str) -> dict[str, 
     return result
 
 
-def _minimum_frontier_jaccard(payload: Mapping[str, Any]) -> float:
+def _minimum_frontier_jaccard(
+    payload: Mapping[str, Any], *, expected_fixture_sha256: str
+) -> float:
+    if payload.get("fixture_sha256") != expected_fixture_sha256:
+        raise ValueError("frontier.fixture_sha256")
     depths = payload.get("depths")
     if not isinstance(depths, list) or not depths:
         raise ValueError("frontier artifact must contain non-empty depths")
+    depth_ids = [int(row["depth"]) for row in depths]
+    if len(depth_ids) != len(set(depth_ids)) or 8 not in depth_ids:
+        raise ValueError("frontier artifact must contain depth 8 exactly once")
     values = [float(row["jaccard"]) for row in depths]
     if any(not 0.0 <= value <= 1.0 for value in values):
         raise ValueError("frontier Jaccard must be in [0, 1]")
     return min(values)
+
+
+def _validate_native_benchmark(
+    row: Mapping[str, Any], *, expected_workload_sha256: str | None = None
+) -> tuple[float, dict[str, Any]]:
+    """Require real, repeated native depth-8 evidence on one exact fixture."""
+    native_execution = row.get("native_execution")
+    if not isinstance(native_execution, Mapping):
+        raise ValueError("native_execution")
+    required_execution = {
+        "fp16_gemm_backend", "target_sm", "workspace_bytes",
+        "kernel_contract", "kernel_sha256",
+    }
+    if set(native_execution) != required_execution:
+        raise ValueError("native_execution")
+    if native_execution.get("fp16_gemm_backend") not in FP16_GEMM_BACKENDS:
+        raise ValueError("native_execution.fp16_gemm_backend")
+    if native_execution.get("target_sm") != 120:
+        raise ValueError("native_execution.target_sm")
+    workspace_bytes = native_execution.get("workspace_bytes")
+    if not isinstance(workspace_bytes, int) or isinstance(workspace_bytes, bool) or workspace_bytes < 0:
+        raise ValueError("native_execution.workspace_bytes")
+    if native_execution.get("kernel_contract") not in {
+        "stream1_fp16_control_v1", "stream1_sm120_nvfp4_fused_ffn_v1",
+    }:
+        raise ValueError("native_execution.kernel_contract")
+    kernel_sha256 = native_execution.get("kernel_sha256")
+    if not isinstance(kernel_sha256, str) or len(kernel_sha256) != 64:
+        raise ValueError("native_execution.kernel_sha256")
+
+    workload = row.get("workload")
+    if not isinstance(workload, Mapping):
+        raise ValueError("workload")
+    for key, value in REQUIRED_NATIVE_WORKLOAD.items():
+        if workload.get(key) != value:
+            raise ValueError(f"workload.{key}")
+    if not isinstance(workload.get("beam_width"), int) or workload["beam_width"] <= 0:
+        raise ValueError("workload.beam_width")
+    workload_sha256 = workload.get("fixture_sha256")
+    if not isinstance(workload_sha256, str) or len(workload_sha256) != 64:
+        raise ValueError("workload.fixture_sha256")
+    if expected_workload_sha256 is not None and workload_sha256 != expected_workload_sha256:
+        raise ValueError("workload.fixture_sha256")
+
+    timing = row.get("timing")
+    if not isinstance(timing, Mapping) or set(timing) != {
+        "depth8_seconds", "depth8_samples", "statistic",
+    }:
+        raise ValueError("timing")
+    latency = float(timing.get("depth8_seconds", float("inf")))
+    samples = timing.get("depth8_samples")
+    if not isinstance(samples, list) or len(samples) < 3:
+        raise ValueError("timing.depth8_samples")
+    values = [float(value) for value in samples]
+    if any(not np.isfinite(value) or value <= 0 for value in values):
+        raise ValueError("timing.depth8_samples")
+    if timing.get("statistic") != "median" or not np.isclose(latency, np.median(values)):
+        raise ValueError("timing.depth8_seconds")
+    return latency, dict(native_execution)
 
 
 def select_profile(
@@ -71,12 +148,27 @@ def select_profile(
         metric: max(0.0, float(fp16_reference[metric]) - thresholds.fp32_regression_budget)
         for metric in quality_metrics
     }
+    benchmark_fp16_rows = [
+        dict(row) for row in benchmark_rows if str(row.get("name", "")) == "current_fp16"
+    ]
+    if len(benchmark_fp16_rows) != 1:
+        raise ValueError("benchmark must contain exactly one current_fp16 depth-8 control")
+    try:
+        fp16_depth8_seconds, fp16_native_execution = _validate_native_benchmark(
+            benchmark_fp16_rows[0]
+        )
+    except ValueError as error:
+        raise ValueError(f"invalid current_fp16 benchmark: {error}") from error
+    fp16_fixture_sha256 = str(benchmark_fp16_rows[0]["workload"]["fixture_sha256"])
     ranking = _candidate_map(
         [row for row in ranking_rows if str(row.get("name", "")) not in {"current_fp16", "fp32_reference"}],
         "ranking",
     )
     frontier = _candidate_map(frontier_rows, "frontier")
-    benchmark = _candidate_map(benchmark_rows, "benchmark")
+    benchmark = _candidate_map(
+        [row for row in benchmark_rows if str(row.get("name", "")) != "current_fp16"],
+        "benchmark",
+    )
     names = sorted(set(ranking) | set(frontier) | set(benchmark))
     complete: list[dict[str, Any]] = []
     missing: dict[str, list[str]] = {}
@@ -138,30 +230,35 @@ def select_profile(
         if regressions:
             quality_rejected[name] = regressions
             continue
-        native_execution = benchmark[name].get("native_execution")
-        if not isinstance(native_execution, Mapping):
-            missing[name] = ["native_execution"]
+        try:
+            latency, native_execution = _validate_native_benchmark(
+                benchmark[name], expected_workload_sha256=fp16_fixture_sha256
+            )
+        except ValueError as error:
+            missing[name] = [str(error)]
             continue
-        if set(native_execution) != {"fp16_gemm_backend", "target_sm", "workspace_bytes"}:
-            missing[name] = ["native_execution"]
+        if latency >= fp16_depth8_seconds:
+            quality_rejected[name] = ["not_faster_than_current_fp16"]
             continue
-        if native_execution.get("fp16_gemm_backend") not in FP16_GEMM_BACKENDS:
-            missing[name] = ["native_execution.fp16_gemm_backend"]
-            continue
-        if native_execution.get("target_sm") != 120:
-            missing[name] = ["native_execution.target_sm"]
-            continue
-        workspace_bytes = native_execution.get("workspace_bytes")
-        if not isinstance(workspace_bytes, int) or isinstance(workspace_bytes, bool) or workspace_bytes < 0:
-            missing[name] = ["native_execution.workspace_bytes"]
+        if latency >= DEPTH8_BASELINE_SECONDS:
+            quality_rejected[name] = ["not_faster_than_accepted_80_2952s_baseline"]
             continue
         row = dict(ranking[name])
         # Pareto quality thresholds describe incremental deviation from the
         # accepted FP16 execution.  FP32-relative floors were enforced above.
         for metric in quality_metrics:
             row[metric] = float(versus_fp16[metric])
-        row["frontier_jaccard"] = _minimum_frontier_jaccard(frontier[name])
-        row["latency_ms"] = float(benchmark[name]["latency_ms"])
+        try:
+            row["frontier_jaccard"] = _minimum_frontier_jaccard(
+                frontier[name], expected_fixture_sha256=fp16_fixture_sha256
+            )
+        except ValueError as error:
+            missing[name] = [str(error)]
+            continue
+        # pareto_select retains its historical millisecond field; the full
+        # search wall time remains explicit in seconds for human auditing.
+        row["latency_ms"] = latency * 1000.0
+        row["depth8_seconds"] = latency
         row["operator_precision"] = dict(policy)
         row["operator_transforms"] = {key: list(value) for key, value in transforms.items()}
         row["native_execution"] = dict(native_execution)
@@ -173,6 +270,12 @@ def select_profile(
         metric: float(fp16_reference[metric]) for metric in quality_metrics
     }
     decision["fp16_quality_floor"] = fp16_floor
+    decision["native_depth8_control"] = {
+        "depth8_seconds": fp16_depth8_seconds,
+        "accepted_baseline_seconds": DEPTH8_BASELINE_SECONDS,
+        "fixture_sha256": fp16_fixture_sha256,
+        "native_execution": fp16_native_execution,
+    }
     decision["quality_thresholds"] = {
         "top1_agreement": thresholds.top1_agreement,
         "topk_set_overlap": thresholds.topk_set_overlap,

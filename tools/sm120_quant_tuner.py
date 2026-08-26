@@ -34,7 +34,9 @@ NATIVE_LOW_PRECISION_OPERATORS = frozenset(
     for block in range(4)
     for suffix in ("attn.in_proj_weight", "ff.0.weight")
 )
-PRECISIONS = frozenset(("fp16", "sm120_block_fp8", "sm120_block_int8"))
+PRECISIONS = frozenset((
+    "fp16", "sm120_block_fp8", "sm120_block_int8", "sm120_nvfp4",
+))
 FP16_GEMM_BACKENDS = frozenset(("cutlass", "cublaslt"))
 
 
@@ -200,6 +202,29 @@ def fold_ffn_equalization(
     )
 
 
+def build_ffn_equalization_transforms(
+    block: int, scales: Sequence[float]
+) -> dict[str, list[dict[str, Any]]]:
+    """Serialize one immutable, paired ReLU-preserving FFN transform."""
+    if not 0 <= int(block) < 4:
+        raise ValueError("Cube4 transformer block must be within [0, 3]")
+    values = [float(value) for value in scales]
+    if len(values) != 1024 or any(not np.isfinite(value) or value <= 0 for value in values):
+        raise ValueError("FFN equalization requires 1024 finite positive scales")
+    ff1 = f"blocks.{block}.ff.0.weight"
+    ff2 = f"blocks.{block}.ff.3.weight"
+    return {
+        ff1: [{
+            "type": "ffn_relu_diagonal", "role": "producer",
+            "partner": ff2, "scales": values,
+        }],
+        ff2: [{
+            "type": "ffn_relu_diagonal", "role": "consumer_reciprocal",
+            "partner": ff1, "scales": values,
+        }],
+    }
+
+
 def fold_qk_reciprocal_equalization(
     query: torch.Tensor, key: torch.Tensor, scales: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -231,6 +256,22 @@ def _operator_contract(precision: str) -> dict[str, Any]:
             "output_dtype": "fp16",
             "scale_dtype": None,
             "scale_granularity": None,
+            "fallback_precision": "fp16",
+            "folded_transforms": [],
+        }
+    if precision == "sm120_nvfp4":
+        return {
+            "weight_dtype": "e2m1",
+            "weight_encoding": "offline_immutable",
+            "activation_dtype": "e2m1",
+            "activation_encoding": "dynamic_per_batch",
+            "accumulator_dtype": "fp32",
+            "output_dtype": "fp16",
+            "scale_dtype": "ue4m3",
+            "scale_granularity": {
+                "activation": {"row": 1, "k": 16},
+                "weight": {"n": 1, "k": 16},
+            },
             "fallback_precision": "fp16",
             "folded_transforms": [],
         }
@@ -340,9 +381,9 @@ def validate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError(f"operator {name} contract must be an object")
         activation = contract.get("activation_dtype")
         weight = contract.get("weight_dtype")
-        if activation not in ("fp16", "e4m3", "int8"):
+        if activation not in ("fp16", "e4m3", "e2m1", "int8"):
             raise ValueError(f"unsupported activation dtype for {name}: {activation}")
-        if weight not in ("fp16", "e4m3", "int8"):
+        if weight not in ("fp16", "e4m3", "e2m1", "int8"):
             raise ValueError(f"unsupported weight dtype for {name}: {weight}")
         if activation != weight:
             raise ValueError(f"mixed operand dtypes are not supported for {name}")
@@ -359,18 +400,54 @@ def validate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(transforms, list):
             raise ValueError(f"operator {name} folded_transforms must be an array")
         for transform in transforms:
-            if not isinstance(transform, Mapping) or set(transform) != {"type", "alpha", "scales"}:
+            if not isinstance(transform, Mapping):
                 raise ValueError(f"operator {name} has an invalid folded transform")
-            if transform["type"] != "layernorm_linear_smoothquant":
+            transform_type = transform.get("type")
+            if transform_type == "layernorm_linear_smoothquant":
+                if set(transform) != {"type", "alpha", "scales"}:
+                    raise ValueError(f"operator {name} has an invalid LayerNorm transform")
+                alpha = float(transform["alpha"])
+                scales = transform["scales"]
+                if not np.isfinite(alpha) or not 0.0 <= alpha <= 1.0:
+                    raise ValueError(f"operator {name} folded transform alpha is invalid")
+                expected_scales = 256
+            elif transform_type == "ffn_relu_diagonal":
+                if set(transform) != {"type", "role", "partner", "scales"}:
+                    raise ValueError(f"operator {name} has an invalid FFN transform")
+                if name.endswith("ff.0.weight"):
+                    expected_role = "producer"
+                    expected_partner = name.replace("ff.0.weight", "ff.3.weight")
+                elif name.endswith("ff.3.weight"):
+                    expected_role = "consumer_reciprocal"
+                    expected_partner = name.replace("ff.3.weight", "ff.0.weight")
+                else:
+                    raise ValueError(f"operator {name} cannot carry an FFN transform")
+                if transform["role"] != expected_role:
+                    raise ValueError(f"operator {name} has an invalid FFN transform role")
+                partner = str(transform["partner"])
+                if partner != expected_partner:
+                    raise ValueError(f"operator {name} has an invalid FFN transform partner")
+                scales = transform["scales"]
+                expected_scales = 1024
+            else:
                 raise ValueError(f"operator {name} has an unsupported folded transform")
-            alpha = float(transform["alpha"])
-            scales = transform["scales"]
-            if not np.isfinite(alpha) or not 0.0 <= alpha <= 1.0:
-                raise ValueError(f"operator {name} folded transform alpha is invalid")
-            if not isinstance(scales, list) or len(scales) != 256:
-                raise ValueError(f"operator {name} folded transform requires 256 scales")
+            if not isinstance(scales, list) or len(scales) != expected_scales:
+                raise ValueError(
+                    f"operator {name} folded transform requires {expected_scales} scales"
+                )
             if any(not np.isfinite(float(value)) or float(value) <= 0.0 for value in scales):
                 raise ValueError(f"operator {name} folded transform scales must be positive")
+    for name, contract in operators.items():
+        for transform in contract["folded_transforms"]:
+            if transform.get("type") != "ffn_relu_diagonal":
+                continue
+            partner = transform["partner"]
+            matching = [
+                item for item in operators[partner]["folded_transforms"]
+                if item.get("type") == "ffn_relu_diagonal" and item.get("partner") == name
+            ]
+            if len(matching) != 1 or matching[0]["scales"] != transform["scales"]:
+                raise ValueError(f"operator {name} has an unpaired FFN transform")
     return json.loads(json.dumps(profile, sort_keys=True))
 
 

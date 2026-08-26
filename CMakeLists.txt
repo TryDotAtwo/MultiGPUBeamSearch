@@ -345,6 +345,17 @@ if(BEAM_ENABLE_SM120_FP8)
         tests/stream1_transformer_sm120_fp8_policy_tests.cpp)
     target_include_directories(stream1_transformer_sm120_fp8_policy_tests PRIVATE cuda)
     target_compile_features(stream1_transformer_sm120_fp8_policy_tests PRIVATE cxx_std_17)
+    add_executable(stream1_transformer_sm120_nvfp4_ffn_policy_tests
+        tests/stream1_transformer_sm120_nvfp4_ffn_policy_tests.cpp)
+    target_link_libraries(stream1_transformer_sm120_nvfp4_ffn_policy_tests PRIVATE beam_core)
+    target_include_directories(stream1_transformer_sm120_nvfp4_ffn_policy_tests PRIVATE cuda)
+    target_compile_features(stream1_transformer_sm120_nvfp4_ffn_policy_tests PRIVATE cxx_std_17)
+    add_executable(stream1_transformer_sm120_nvfp4_ffn_shared_pipeline_probe
+        tests/stream1_transformer_sm120_nvfp4_ffn_shared_pipeline_probe.cu)
+    set_target_properties(stream1_transformer_sm120_nvfp4_ffn_shared_pipeline_probe PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 else()
     target_compile_definitions(beam_cuda PUBLIC BEAM_ENABLE_SM120_FP8=0)
 endif()

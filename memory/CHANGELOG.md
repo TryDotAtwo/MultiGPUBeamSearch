@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-08-26 — Depth-8 evidence binding and fused NVFP4 FFN contract
+
+- Hardened `tools/sm120_quant_select.py`: selection now requires at least
+  three native Cube4 depth-8 samples on the exact fingerprinted fixture used by
+  the FP16 control. A candidate must beat both that control and 80.2952 s.
+- Added immutable paired `ffn_relu_diagonal` records. FF1 and FF2 must carry
+  identical 1024-channel scales with reciprocal roles; partial exports fail.
+- Added a fixed Cube4 fused-FFN API with no global FF1-hidden pointer and an
+  exact unrounded-FP32 residual/LayerNorm/next-NVFP4 epilogue contract.
+- This turn produced no Molab runtime evidence: the supplied endpoint returned
+  HTTP 410. Per user instruction, no local tests or CUDA benchmarks were run.
+
+## 2026-08-26
+- Extended the fail-closed SM120 quality tuner with a distinct logical NVFP4
+  candidate (`sm120_nvfp4`) instead of relabeling the existing block-E4M3
+  path. Calibration now models E2M1 values with UE4M3 scale factors at the
+  native dense NVFP4 vector size of 16: activations use per-row/K16 scales and
+  immutable HxO weights use per-output/K16 scales. The evaluator emits
+  all-core and one-operator NVFP4 probes and retains the original FP32 and
+  accepted FP16 references. The immutable schema records E2M1, UE4M3, FP32
+  accumulation, and exact scale granularity. Native selection/export remains
+  deliberately fail-closed until the fused SM120 runtime, Molab ranking gate,
+  reconstructed-frontier gate, and depth-8 benchmark pass. The supplied Molab
+  sandbox returned HTTP 410 before these new tests could run; no local CUDA
+  evidence was substituted.
+- Added the fixed-shape fused-FFN eligibility contract used by the upcoming
+  native kernel: SM120, FP16 source model, ReLU, `d_model=256`, `ff_dim=1024`,
+  `output_dim=24`, sequence padded to at most 64, immutable offline weights,
+  and a non-final layer. The contract fixes two N128 consumer groups, NVFP4
+  scale vector 16, and an initial M64 CTA tile; unsupported shapes, SiLU,
+  output-1 heads, final blocks, and mutable weights fail closed.
+
 - Recovered the Molab marimo endpoint and completed the exact Cube4 `2**25`
   in-process profile through `depth_done=8`. Three semantically matching runs
   measured about `103.4 s` with frontier `33,554,432`, Stream3 jobs `391`, and
@@ -1332,3 +1364,36 @@
   fixed-shape row-owner CTA rather than using grouped FF1 or the slow generic
   N=256 builder. Evidence is recorded in
   `test_results/molab_sm120_ff2_row_owner_prerequisite_2026-08-26.md`.
+
+# 2026-08-26 — Molab WIP reproduction and fused-FFN topology correction
+
+- Reproduced the exact local WIP in the private Molab sandbox from a 22,645-byte
+  patch bundle after explicit user authorization. Configured with CUDA 13.3,
+  CUTLASS `7107b055`, and `sm_120a`; the policy and both control benchmarks
+  build and run foreground.
+- Fixed the NVFP4 FFN policy test wiring (`beam::` constants and inherited
+  generated state/move compile definitions).
+- Fresh three-run medians are 522.394 TFLOP/s at M=51,072 and 522.857 TFLOP/s
+  at M=204,288 for the two-GEMM NVFP4 transport control. The isolated N=256
+  FF2 reaches 677.613 and 691.716 TFLOP/s respectively, superseding the older
+  low-throughput prerequisite measurement.
+- Molab compile probes established two SM120 constraints: block-scaled MMA
+  cannot use an N=1024 CTA tile through the stock builder, and SM120
+  block-scaled collectives reject cluster multicast. The production topology
+  is therefore one M64 CTA, eight sequential N128 FF1 producer tiles into
+  32 KiB packed E2M1 plus 4 KiB UE4M3 shared storage, followed by two N128 FF2
+  consumer passes. Invalid N1024/cluster benchmark targets were removed.
+- Fixed missing NumPy/pytest imports exposed by the first Molab-only tuner
+  regression run. The selected calibration/evaluation/selection/tuner suite now
+  passes 34/34 on Molab; the native policy executable also passes.
+## 2026-08-26 — SM120 CTA-local NVFP4 FFN storage probe
+
+- Added a fixed-shape SM120 shared-pipeline probe for the planned fused Cube4
+  Transformer FFN path.
+- Verified in Molab that the 32 KiB packed E2M1 hidden values plus 4 KiB K16
+  UE4M3 scales fit at two 288-thread CTAs per SM.
+- Measured 3.77–4.21 TiB/s effective shared producer/consumer traffic with
+  successful checksums; no global hidden buffer is used by the probe.
+- Recorded the incompatibility between CUTLASS `7107b055` Python examples and
+  the installed Molab CuTe DSL wheel. Production fusion stays on the supported
+  C++ CUTLASS path.

@@ -4,6 +4,7 @@ import struct
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
 from tools.sm120_quant_calibrate import (
@@ -12,9 +13,31 @@ from tools.sm120_quant_calibrate import (
     fake_sm120_int8_activation_quant,
     fake_sm120_int8_weight_quant,
     fake_sm120_weight_quant,
+    fake_sm120_nvfp4_activation_quant,
+    fake_sm120_nvfp4_weight_quant,
     reconstruct_frontiers,
     stratified_reservoir,
 )
+
+
+def test_fake_nvfp4_uses_k16_blocks_and_ue4m3_scales() -> None:
+    values = torch.tensor([
+        [0.0, 0.5, -1.0, 1.5, -2.0, 3.0, -4.0, 6.0] * 4,
+        [0.0] * 32,
+    ], dtype=torch.float32)
+    quantized, scales = fake_sm120_nvfp4_activation_quant(values)
+    assert quantized.shape == values.shape
+    assert scales.shape == (2, 2)
+    assert torch.isfinite(scales).all() and torch.all(scales > 0)
+    assert torch.count_nonzero(quantized[1]) == 0
+    with pytest.raises(ValueError, match="divisible by 16"):
+        fake_sm120_nvfp4_activation_quant(torch.ones(2, 17))
+
+    weight = torch.linspace(-3.0, 3.0, 32 * 3).reshape(32, 3)
+    quantized_weight, weight_scales = fake_sm120_nvfp4_weight_quant(weight)
+    assert quantized_weight.shape == weight.shape
+    assert weight_scales.shape == (2, 3)
+    assert torch.isfinite(quantized_weight).all()
 
 
 def _write_history(path: Path, entries: list[tuple[int, int]]) -> None:

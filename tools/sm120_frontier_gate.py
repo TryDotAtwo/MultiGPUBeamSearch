@@ -57,10 +57,18 @@ def main() -> None:
     parser.add_argument("--generator-json", type=Path, required=True)
     parser.add_argument("--test-csv", type=Path, required=True)
     parser.add_argument("--minimum-jaccard", type=float, default=0.995)
+    parser.add_argument(
+        "--fixture-sha256", required=True,
+        help="SHA-256 of the exact puzzle/beam/depth/native-run fixture",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if not 0.0 <= args.minimum_jaccard <= 1.0:
         raise ValueError("minimum_jaccard must be in [0, 1]")
+    if len(args.fixture_sha256) != 64 or any(
+        char not in "0123456789abcdef" for char in args.fixture_sha256.lower()
+    ):
+        raise ValueError("fixture_sha256 must contain 64 hexadecimal characters")
     depths = compare_frontiers(
         args.baseline_history, args.candidate_history,
         args.generator_json, args.test_csv,
@@ -68,6 +76,7 @@ def main() -> None:
     failures = [row["depth"] for row in depths if float(row["jaccard"]) < args.minimum_jaccard]
     payload = {
         "schema_version": 1,
+        "fixture_sha256": args.fixture_sha256.lower(),
         "minimum_jaccard": args.minimum_jaccard,
         "accepted": not failures,
         "failed_depths": failures,

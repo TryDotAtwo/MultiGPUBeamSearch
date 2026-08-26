@@ -3,16 +3,25 @@ from __future__ import annotations
 import numpy as np
 import torch
 
+from tools.sm120_quant_tuner import CORE_OPERATORS
 from tools.sm120_quant_evaluate import (
     build_initial_int8_policies,
     build_initial_mixed_precision_policies,
+    build_initial_nvfp4_policies,
     build_cumulative_rollback_policies,
     build_incremental_fp8_policies,
     select_stratified_states,
     _three_way_metrics,
     activation_weighted_low_rank_factors,
 )
-from tools.sm120_quant_tuner import CORE_OPERATORS
+
+
+def test_initial_nvfp4_policies_cover_all_core_operators() -> None:
+    policies = build_initial_nvfp4_policies()
+    assert len(policies) == 1 + len(CORE_OPERATORS)
+    assert all(value == "sm120_nvfp4" for value in policies[0][1].values())
+    for _, policy in policies[1:]:
+        assert list(policy.values()).count("sm120_nvfp4") == 1
 
 
 def test_select_stratified_states_balances_depths_and_is_deterministic() -> None:

@@ -10,6 +10,7 @@ import torch
 from tools.sm120_quant_tuner import (
     CORE_OPERATORS,
     QualityThresholds,
+    build_ffn_equalization_transforms,
     build_profile,
     fold_ffn_equalization,
     fold_layernorm_linear_equalization,
@@ -81,6 +82,27 @@ def test_block_int8_profile_records_offline_encoding_contract() -> None:
     assert contract["fallback_precision"] == "fp16"
 
 
+def test_nvfp4_profile_records_hardware_encoding_contract() -> None:
+    profile = build_profile(
+        checkpoint_sha256="a" * 64,
+        model_metadata_sha256="b" * 64,
+        calibration_sha256="c" * 64,
+        gpu_identity="RTX PRO 6000 Blackwell|sm120",
+        cutlass_commit="d" * 40,
+        operator_precision={name: "sm120_nvfp4" for name in CORE_OPERATORS},
+    )
+    contract = profile["operators"][CORE_OPERATORS[0]]
+    assert contract["weight_dtype"] == "e2m1"
+    assert contract["activation_dtype"] == "e2m1"
+    assert contract["scale_dtype"] == "ue4m3"
+    assert contract["scale_granularity"] == {
+        "activation": {"row": 1, "k": 16},
+        "weight": {"n": 1, "k": 16},
+    }
+    assert contract["accumulator_dtype"] == "fp32"
+    assert contract["weight_encoding"] == "offline_immutable"
+
+
 def test_profile_preserves_and_validates_graph_preserving_transforms() -> None:
     transforms = {name: [] for name in CORE_OPERATORS}
     transforms[CORE_OPERATORS[0]] = [{
@@ -101,6 +123,28 @@ def test_profile_preserves_and_validates_graph_preserving_transforms() -> None:
     broken = json.loads(json.dumps(profile))
     broken["operators"][CORE_OPERATORS[0]]["folded_transforms"][0]["scales"][3] = 0.0
     with pytest.raises(ValueError, match="scales must be positive"):
+        validate_profile(broken)
+
+
+def test_profile_requires_paired_relu_ffn_equalization() -> None:
+    transforms = {name: [] for name in CORE_OPERATORS}
+    transforms.update(build_ffn_equalization_transforms(0, [1.25] * 1024))
+    profile = build_profile(
+        checkpoint_sha256="a" * 64,
+        model_metadata_sha256="b" * 64,
+        calibration_sha256="c" * 64,
+        gpu_identity="RTX PRO 6000 Blackwell|sm120",
+        cutlass_commit="d" * 40,
+        operator_precision={name: "fp16" for name in CORE_OPERATORS},
+        operator_transforms=transforms,
+    )
+    assert profile["operators"]["blocks.0.ff.0.weight"]["folded_transforms"][0][
+        "role"
+    ] == "producer"
+
+    broken = json.loads(json.dumps(profile))
+    broken["operators"]["blocks.0.ff.3.weight"]["folded_transforms"] = []
+    with pytest.raises(ValueError, match="unpaired FFN transform"):
         validate_profile(broken)
 
 

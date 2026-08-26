@@ -19,6 +19,10 @@ HISTORY_ENTRY = struct.Struct("<QII")
 FP8_MAX = 448.0
 INT8_MAX = 127.0
 BLOCK = 128
+NVFP4_MAX = 6.0
+NVFP4_BLOCK = 16
+NVFP4_SCALE_MIN = 2.0 ** -9
+_NVFP4_POSITIVE_LEVELS = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0)
 
 
 def _read_history(path: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -121,6 +125,64 @@ def fake_sm120_weight_quant(weight_hxk: torch.Tensor) -> tuple[torch.Tensor, tor
     scale = torch.where(amax > 0, amax / FP8_MAX, torch.ones_like(amax))
     quantized = _fp8_qdq(grouped, scale).reshape_as(weight_hxk)
     return quantized, scale[:, 0, :, 0]
+
+
+def _ue4m3_scale_qdq(raw_scale: torch.Tensor) -> torch.Tensor:
+    """Round positive NVFP4 scales to the hardware UE4M3 value set.
+
+    Positive E4M3FN and UE4M3 have the same finite encoding.  The explicit
+    lower clamp prevents a non-zero block from acquiring a zero scale after
+    conversion.  Zero blocks are represented with the neutral scale one.
+    """
+    finite = torch.nan_to_num(
+        raw_scale.float(), nan=1.0, posinf=448.0, neginf=NVFP4_SCALE_MIN
+    )
+    finite = finite.clamp(NVFP4_SCALE_MIN, 448.0)
+    return finite.to(torch.float8_e4m3fn).float()
+
+
+def _e2m1_qdq(values: torch.Tensor) -> torch.Tensor:
+    """Deterministic nearest-value emulation of CUTLASS float_e2m1_t."""
+    levels = values.new_tensor(_NVFP4_POSITIVE_LEVELS)
+    magnitude = values.abs().unsqueeze(-1)
+    indices = torch.argmin((magnitude - levels).abs(), dim=-1)
+    return torch.copysign(levels[indices], values)
+
+
+def fake_sm120_nvfp4_activation_quant(
+    tensor: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Logical NVFP4 QDQ: per-row/K16 E2M1 values with UE4M3 scales."""
+    if tensor.shape[-1] % NVFP4_BLOCK:
+        raise ValueError("SM120 NVFP4 activation K dimension must be divisible by 16")
+    shape = tensor.shape
+    flat = tensor.float().reshape(-1, shape[-1])
+    grouped = flat.reshape(flat.shape[0], flat.shape[1] // NVFP4_BLOCK, NVFP4_BLOCK)
+    amax = grouped.abs().amax(dim=-1, keepdim=True)
+    raw_scale = torch.where(amax > 0, amax / NVFP4_MAX, torch.ones_like(amax))
+    scale = _ue4m3_scale_qdq(raw_scale)
+    quantized = _e2m1_qdq((grouped / scale).clamp(-NVFP4_MAX, NVFP4_MAX)) * scale
+    return quantized.reshape(shape).to(tensor.dtype), scale.squeeze(-1)
+
+
+def fake_sm120_nvfp4_weight_quant(
+    weight_hxk: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Logical offline NVFP4 QDQ: per-output/K16 E2M1 + UE4M3 scale."""
+    if weight_hxk.ndim != 2 or weight_hxk.shape[0] % NVFP4_BLOCK:
+        raise ValueError("SM120 NVFP4 weight K dimension must be divisible by 16")
+    weight = weight_hxk.float()
+    # Runtime HxO weights are GEMM B[K,N].  Every output column owns one
+    # UE4M3 scale for each contiguous K16 vector.
+    grouped = weight.reshape(
+        weight.shape[0] // NVFP4_BLOCK, NVFP4_BLOCK, weight.shape[1]
+    ).permute(0, 2, 1)
+    amax = grouped.abs().amax(dim=-1, keepdim=True)
+    raw_scale = torch.where(amax > 0, amax / NVFP4_MAX, torch.ones_like(amax))
+    scale = _ue4m3_scale_qdq(raw_scale)
+    quantized = _e2m1_qdq((grouped / scale).clamp(-NVFP4_MAX, NVFP4_MAX)) * scale
+    restored = quantized.permute(0, 2, 1).reshape_as(weight_hxk)
+    return restored.to(weight_hxk.dtype), scale.squeeze(-1)
 
 
 def fake_sm120_int8_activation_quant(tensor: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
