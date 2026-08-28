@@ -1,5 +1,75 @@
 # Changelog
 
+## 2026-08-28 - CUTLASS A/SFA bulk-DSM producer gate on SM120
+
+- Added a real CUTLASS FF2 collective seam in
+  `cuda/stream1_transformer_sm120_nvfp4_cutlass_dsm_fused.cuh`: A/SFA arrive
+  through `cp.async.bulk.shared::cluster` while B/SFB retain CUTLASS TMA, and
+  both complete the same 18,432-byte CUTLASS transaction mbarrier.
+- Added `stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_tests`: the unchanged
+  `Ff2Mainloop::mma()` consumed all eight Cube4 K128 slices with identical
+  rank checksums (`4.1943e+06`), zero global hidden bytes, and no hot-loop
+  `cluster.sync()`.
+- Molab saturation reached 179.421 FF2 TFLOP/s at 256 clusters. The exact stock
+  CUTLASS control reached 762.679 TFLOP/s, proving the transport seam correct
+  but rejecting the one-consumer-warpgroup test orchestration. Next work is to
+  insert the seam into CUTLASS's persistent DMA plus two-math-warpgroup
+  ping-pong scheduler, not tune the oracle launch.
+- Evidence: `test_results/sm120_cutlass_bulk_dsm_collective_2026-08-28.md`.
+
+## 2026-08-27 - SM120 DSM A/SFA handoff reaches CUTLASS FF2
+
+- Added a B/SFB-only CUTLASS TMA collective and a two-CTA DSM-to-local A/SFA
+  handoff feeding the existing SM120 NVFP4 FF2 MMA copy atoms without a global
+  hidden tensor.
+- Fixed a two-CTA `PipelineTmaAsync` deadlock: construct the pipeline with the
+  real 2x1x1 cluster shape and wait for cluster-wide mbarrier initialization
+  before producer acquisition.
+- Molab correctness gates now pass independently for B/SFB TMA, DSM copy,
+  local FF2 MMA, two-CTA local FF2, and full DSM-to-local-to-FF2 on both ranks.
+- Measured the single-slice transport gate over 2,000 launches: 4.10451 us for
+  cluster-local A/SFA and 8.19149 us for DSM handoff. This is deliberately not
+  reported as full-Stream1 throughput; the next implementation amortizes fixed
+  cluster costs across all eight FF2 K128 slices.
+- Added a persistent eight-slice FF2 gate with alternating CTA ownership and
+  exact 8x accumulation on both ranks. A 384-thread version exceeded launch
+  resources; the exact one-producer/one-consumer contract passes at 256 threads
+  without adding a non-participant warpgroup.
+- Replaced scalar DSM staging with hardware
+  `cp.async.bulk.shared::cluster.shared::cta` plus transaction mbarriers. Full
+  eight-slice remote latency improved from 47.1031 us to 32.7694 us, then to
+  31.6010 us after elected-thread cluster barriers; the local control is
+  16.3956 us.
+- A 32/64/128/256-cluster Molab sweep peaks at 280.84 TFLOP/s local and
+  175.92 TFLOP/s remote. This rejects the manual contract as production compute
+  and leaves it as a transport oracle; the verified bulk-DSM seam now moves
+  into the retained approximately 660-TFLOP/s CUTLASS ping-pong lineage.
+
+## 2026-08-27 - Preserve CUTLASS 660-TFLOP/s path for fused DSM handoff
+
+- Corrected the implementation direction: the custom raw-MMA kernels remain
+  numerical/ownership oracles; production work now retains the proven CUTLASS
+  SM120 TMA ping-pong mainloops.
+- Added a typed two-CTA M128 cluster design. FF1 slice ownership alternates
+  between ranks, while both CTAs consume separate N128 FF2 halves through a
+  two-slot DSM hidden ring, with no global hidden tensor.
+- Molab compile/runtime gate passed: 89,088 shared bytes/CTA, 18,432-byte ring,
+  three stages for both collectives, eight alternating slices and zero DSM
+  ownership violations.
+
+## 2026-08-27 - Molab SM120 persistent FFN CTA topology gate
+
+- Added executable shared-only NVFP4 fused FFN CTA variants and validated them
+  against the exact M16 numerical oracle on Molab.
+- Rejected the original M128 8+16 ownership: 142 registers/thread limits the
+  kernel to 384 threads and a 768-thread launch cannot run without spilling.
+- Measured at 51,072 rows: M16 control 328.61 TFLOP/s, M64 8-consumer 203.40,
+  M64 16-consumer 140.28, and balanced M32 307.45 TFLOP/s. All executable
+  larger variants matched the M16 output exactly.
+- Selected phased M128 ownership as the next implementation: 8 FF1 producer
+  warps followed by reuse of all 24 warps for FF2, keeping hidden data in
+  shared memory and reducing persistent FF2 accumulators to 44 FP32 values.
+
 ## 2026-08-26 — Numerical NVFP4 handoff and topology sweep
 
 - Corrected the native peak probe from UE8M0 to the production NVFP4 UE4M3
@@ -1475,3 +1545,262 @@
   to 559.328 TFLOP/s; N256 attention-out and FF2 remain about 279 and 700
   TFLOP/s. This is evidence for the back-to-back kernel schedule, not a
   production promotion.
+
+## 2026-08-26 — numerical NVFP4 B2B warp-specialization diagnostics
+
+- Added an experimental two-slot shared-memory FF1-to-FF2 warp-specialized
+  probe to `stream1_sm120_nvfp4_mma_peak_benchmark`: producer warps execute
+  FF1 plus ReLU/K16 scaling/E2M1 packing while consumer warps execute the
+  preceding slice's FF2 MMA without a global hidden tensor.
+- The first 4/4 split compiled for SM120 with 64 registers, 18,432 bytes of
+  shared memory, and zero register spills. On the exact 21,888-row projection
+  workload it reached 431-487 TFLOP/s, below the 466.9 TFLOP/s sequential
+  numerical handoff control.
+- Added compile-time diagnostic modes. The same pipeline measured 1.868
+  PFLOP/s for MMA-only, 658 TFLOP/s for ReLU+amax+scale, 699 TFLOP/s for
+  ReLU+fixed-scale packing, and 487 TFLOP/s for the complete dynamic-scale
+  packing path. This localizes the remaining loss to scalar block-scale plus
+  E2M1 conversion/packing rather than MMA, shared memory, occupancy, or spills.
+- A scalar per-value E2M1 constructor experiment regressed to 66-108 TFLOP/s
+  because it lost CUTLASS vectorized `F2FP`; it was rejected and reverted.
+- Added 5/3 and 6/2 producer/consumer balance variants for the next Molab
+  measurement. They compiled successfully, but the ephemeral sandbox ended
+  before execution; no performance claim is made for those variants yet.
+
+## 2026-08-27 — immutable NVFP4 package and solution-quality acceptance
+
+- Added the exact CUTLASS SM120 E2M1/K16 UE4M3-SFB host packer and a native
+  exporter for complete non-final Cube4 FF1/FF2 pairs. The physical SFB layout
+  is sized with the CUTLASS 128-column/4-byte atom rather than the smaller
+  logical scale matrix.
+- Verified the exporter foreground on Molab: six operators across blocks 0–2,
+  131,072 value bytes plus 65,536 scale bytes per operator, 1,179,648 bytes in
+  the weight package, matching SHA-256 checks, and 0.0474071801 maximum FP32
+  round-trip error on deterministic test weights.
+- Added an atomic Python package layer that fails closed unless the source is
+  the exact FP32 Cube4 ReLU/output-24 Transformer and records both precision
+  profile and source/runtime fingerprints. Molab verification: 4 tests passed.
+- Added the primary quality comparison contract for small-beam 10–100-state
+  sweeps. It compares only identical state/beam/depth workloads and reports
+  replay-valid solved rate, same-length rate, and solution-length deltas. Logit
+  and frontier metrics remain diagnostic filters rather than acceptance gates.
+- The active Molab endpoint returned HTTP 410 before the new solution-quality
+  test could be uploaded; that test remains pending a fresh native pair session.
+- Added an opt-in, fingerprinted NVFP4 runtime loader distinct from the legacy
+  FP8 schema. It accepts only layers 0–2, exact Cube4/ReLU/output-24/FP16 shape,
+  exact E2M1/SFB byte sizes and SHA-256 hashes, and a checkpoint fingerprint
+  shared with the FP32 and FP16 exports. Device upload/free/network views now
+  carry the four native FF1/FF2 value/scale pointers per selected layer.
+- Added an official-CUTLASS PDL two-kernel control target. This does not claim
+  fusion or remove the global NVFP4 handoff; it measures how much prologue
+  overlap is recoverable before committing to the custom CTA-local B2B kernel.
+  Compilation and measurement remain pending the next Molab session.
+- Audited the production Transformer loop and documented the exact integration
+  seam: replace the non-final-layer FF1/global-hidden/FF2/next-LN1 sequence,
+  preserve the FP16 residual, and emit the next QKV input directly as K16
+  NVFP4. The existing FP8 artifact schema is explicitly unsuitable for this
+  path and must receive separate immutable E2M1/UE4M3 layout metadata.
+## 2026-08-27 — SM120 NVFP4 K16 fused FFN checkpoint
+
+- Corrected the experimental raw SM120 block-scaled MMA path to the real NVFP4 K16 scale contract and verified exact raw and fused numerical oracles on Molab.
+- Added offline instruction-fragment packing, direct register ReLU/E2M1 packing, hardware packed E2M1 conversion, and removed full FP32 hidden shared-memory materialization from the fused FFN prototype.
+- Selected FF1 group batch 2 after A/B testing batch 2 versus 4; rejected lane-0 UE4M3 encode/reciprocal broadcast because it slowed the real kernel.
+- Established sustained M32768 fused baseline of 182.80 TFLOP/s and measured SM120 controls up to 1.210 PFLOP/s MMA-only / 0.864 PFLOP/s with calibrated ReLU+pack.
+- Recorded full Molab evidence and the next producer/consumer pipeline decision in `test_results/molab_sm120_nvfp4_fused_ffn_2026-08-27.md`.
+- Rejected FF1 batch 8 after it increased register use to 128, halved occupancy, and slowed M32768 to 174.79 TFLOP/s.
+- Added exact CTA-local input-fragment/scales staging in the existing shared union; it preserved correctness and improved sustained M32768 fused throughput to 187.12 TFLOP/s.
+- Added a compact fixed-shape CUTLASS SM120 cooperative TMA benchmark target to measure the real-memory FF1 ceiling without the compile cost of NVIDIA's grouped/reference examples.
+- Fixed long Molab compile orchestration: foreground compiler executions now emit five-second SSE heartbeats instead of buffering all output until completion; no detached jobs are used.
+- Measured the real-memory CUTLASS NVFP4 TMA FF1 path at 417.55 TFLOP/s and the fused FF1→ReLU/NVFP4→FF2 path up to 660.03 TFLOP/s at the true Cube4 `M=51072` with two concurrent slots.
+- Added PDL support to the concurrent FFN benchmark; PDL improved one-slot throughput but two slots remained the measured optimum. Four/eight slots and `M=65536` were rejected as slower.
+- Started an `N=256` CTA-tile experiment, but Molab destroyed the live sandbox during its foreground heartbeat compilation (HTTP 410); no unverified tile selection was retained.
+- Implemented and Molab-verified the first real-weight persistent FFN kernel: 4 producer and 4 consumer warps stream eight K128 hidden slices through two CTA-local barrier-owned buffers with zero global hidden bytes. The numerical oracle is exact and M51072 reaches 328.16 TFLOP/s.
+- Rejected a direct warp-shuffle native-fragment handoff because it reduced M32768 from 313.9 to 305.9 TFLOP/s despite saving 2 KiB shared memory; restored the faster shared transpose.
+- Rebuilt the CUTLASS L2/global-handoff control. It peaks at 638.60 TFLOP/s for M51072/two slots and drops to 559.05 TFLOP/s at M204288/two slots, confirming that larger batches do not solve the remaining gap. The selected next architecture is M128 TMA/UMMA with a two-slot CTA-local handoff.
+- Added and Molab-compiled the M128 TMA/UMMA persistent FFN type/arena contract: two CTA-local NVFP4 value/scale buffers, zero global hidden bytes, 89,088 bytes shared storage, and three TMA stages for each GEMM.
+- Measured CUDA persisting-L2 policy as neutral at M51072 (+0.19%) and harmful at M204288 (-2.03%); retained it only as an opt-in diagnostic and did not promote it to production.
+- Confirmed from the CUTLASS SM120 callback implementation that block-scale generation is already on chip, while the stock epilogue necessarily TMA-stores D/SFD to global memory. The next implementation seam is a custom TMEM-to-register consumer epilogue feeding the CTA-local ring directly.
+- Proved that the SM120 ReLU/K16 callback itself can be instantiated with a 128-thread no-smem TMEM consumer, but rejected stock `GemmUniversal` composition after a runtime-level compile exposed incompatible SM90-mainloop versus SM100-no-smem kernel ABIs. The executable path now explicitly requires custom fixed-row orchestration around the reusable callback; no invalid adapter alias is retained.
+- Corrected the production model from UMMA/TMEM to the actual SM120 NVFP4 warp-level MMA plus TMA/shared staging path. Added and Molab-verified the fixed-row M128 ownership/storage contract: 8 FF1 producer warps, 16 FF2 consumer warps, 768 threads, two ring slots, and 55,424 bytes shared storage.
+- Added the concrete CUTLASS collective type probe and verified on Molab that the 660-TFLOP/s lineage selects the SM120 three-stage ping-pong block-scaled mainloop with the SM90-family two-stage fused epilogue ABI.
+- Added and Molab-verified a two-CTA DSM operand gate for native SM120 NVFP4 MMA. Both CTA ranks consumed rank 0's remote packed values/scales directly and produced identical output (`max_rank_error=0`), proving that FF2 does not require global hidden materialization or an intermediate DSM-to-local copy.
+- Added the first FlashAttention-4-inspired CUTLASS/DSM schedule gate. The
+  contract now has nine current/previous stages for eight K128 hidden slices:
+  producer warps create slice N while both CTA consumer groups read slice N-1,
+  then one cluster fence publishes, releases, and advances the two-slot ring.
+  The production topology is explicitly separated from the 256-thread test
+  oracle: it preserves CUTLASS's 384-thread composition of one DMA warpgroup,
+  one FF1-current math warpgroup, and one FF2-previous math warpgroup. CUDA
+  verification is pending because the previous Molab sandbox is terminal
+  (HTTP 410); no local GPU result is substituted for Molab evidence.
+- Reconnected to Molab and verified that schedule on the real SM120 target:
+  CUDA compile succeeded and the DSM addressing plus current/previous overlap
+  oracles passed for all eight slices with zero violations. Corrected the DSM
+  A/SFA storage contract to one CUTLASS stage (9,216 bytes) after a deliberate
+  typed-overlay compile gate proved that full `TensorStorage` contains three
+  stages and exceeds the shared-memory budget. Added exact one-stage CUTLASS
+  swizzle/layout size checks for the upcoming FF2 remote A/SFA consumer.
+- Added a requests/OpenSSL transport and explicit single-file upload mode to
+  the local marimo pair helper for Windows hosts where WSL bash or Schannel
+  cannot reach the sandbox. Uploads remain explicit, private, and execute via
+  the same authenticated foreground SSE path; no detached Molab jobs are used.
+# 2026-08-28 — Persistent CUTLASS ping-pong DSM producer compiles on SM120
+
+- Added `PersistentBulkDsmFf2Collective`, a drop-in FF2 mainloop wrapper that
+  preserves CUTLASS's 384-thread persistent kernel and two MMA warpgroups while
+  replacing A/SFA TMA with rank-0 bulk DSM into the existing transaction
+  barrier. B/SFB remain per-CTA TMA loads.
+- Molab RED exposed the SM120 builder restriction `no programmatic multicast
+  on this arch` for block-scaled `ClusterShape > 1`. The resolved design builds
+  the supported single-CTA collective and promotes only the wrapper/kernel
+  launch shape to a two-CTA cluster; no TMA multicast is requested.
+- Added a compile contract that instantiates the full
+  `PersistentFf2Kernel::operator()`. It compiles and executes on the Molab
+  RTX PRO 6000 SM120 target (`PERSISTENT_OPERATOR_RC=0`).
+- Added `Ff1HiddenRingWriter`, the shared typed-layout boundary through which
+  the FF1 fused epilogue writes values and scales directly into FF2's native
+  CUTLASS shared layout. Its full persistent operator contract compiles and
+  executes on Molab (`WRITER_RUN_RC=0`) without a global hidden tensor.
+- Added and ran a GPU round-trip for direct logical-group writes into the
+  native CUTLASS shared layout. The initial RED caught an invalid assumption
+  that one DSM slot spans all 1024 FF1 columns; a slot is one K128 slice and
+  therefore contains eight scale groups. The corrected SM120 test passes
+  (`ff1_hidden_writer_roundtrip=pass`, CUDA `no error`).
+- Corrected the full-slot writer to interpret `SmemLayoutA::cosize=16384` in
+  four-bit elements and pack explicit nibble offsets into the 8,192-byte A
+  buffer; SFA uses its direct 1,024-byte physical layout. The isolated Molab
+  SM120 writer now fills all 128x128 values plus scales without CUDA errors.
+  Correctness passed and the launch-inclusive single-CTA microbenchmark was
+  4.09461 us per 9,216-byte slot (2.25076 effective GB/s). This is an overhead
+  baseline, not an end-to-end FFN throughput claim.
+- Added the actual four-lane FF1 epilogue adapter. The first shuffle/gather
+  implementation was correct but regressed slot time to 6.14737 us, so it was
+  rejected. The final path lets each lane store its two already-packed pairs
+  directly and lets lane 0 store the scale. It remained bit/layout-correct and
+  measured 4.09937 us (2.24815 effective GB/s), restoring the launch-limited
+  scalar baseline while matching the real FF1 lane ownership.
+- Added a launch-independent repeated in-kernel A/B measurement. Correctness
+  passed, but the manual nibble-addressed writer cost 375.373 us for 128 slots
+  (2.9326 us/slot, 3.1426 effective GB/s). This rejects manual byte/nibble RMW
+  as the production FF1 epilogue. The next implementation must reuse CUTLASS's
+  vectorized epilogue copy atom/partition to emit the native shared layout.
+- This is not yet a numerical/performance result: the next gate must connect
+  the wrapper's typed hidden ring to the real FF1 epilogue before launching the
+  persistent kernel.
+## 2026-08-28 - SM120 FF1 -> FF2 native shared values and scales
+
+- Added a CUTLASS FF1 epilogue callback that preserves the stock ReLU/NVFP4
+  quantization path while writing values directly into FF2's native shared A
+  layout.
+- Added direct mirroring of the stock row-scale registers into FF2's native
+  shared SFA ring slot; global D/SFD stores remain enabled as a temporary
+  numerical oracle.
+- Re-verified the 768-run shared permutation on Molab SM120 at 0.315779 us per
+  128x128 tile with zero errors.
+- Recompiled the complete custom `GemmUniversal::operator()` on Molab SM120;
+  compile gate passed with 86,016 bytes of kernel shared storage.
+- Added a direct `Kernel::Params` numerical test launcher and foreground Molab
+  helpers. Full stock/custom numerical A/B remains pending because the pair
+  endpoint interrupts the heavy translation unit after about one minute.
+
+## 2026-08-28 - SM120 shared-only FF1 compile and runtime diagnosis
+
+- Added a compile-time void-D FF1 epilogue/kernel that preserves the verified
+  ReLU, row scaling and NVFP4 fusion visitor while removing the global D type.
+- Verified full SM120 operator compile, link and ABI gate in Molab.
+- Added split device/host numeric benchmark drivers that stay within Molab's
+  foreground execution window.
+- Runtime tracing localized the first shared-only fault before the custom
+  fusion reduction. Audited CUTLASS and identified unguarded empty TMA-D tensor
+  construction plus missing fusion workspace in its nominal void-D path.
+- Prepared an idempotent Molab compatibility patch and trace tooling. The
+  sandbox expired before the patched runtime gate; no performance claim was
+  promoted.
+## 2026-08-28 — Docker-to-Molab SM120 artifact workflow
+
+- Added `test_results/docker_build_ff1_shared_handoff_objects.sh` for pinned
+  CUDA 13.3 / `sm_120a` split compilation of the FF1 shared-only kernel and
+  host harness. Kernel and host stages can be rebuilt independently.
+- Parameterized `test_results/molab_patch_cutlass_void_d_epilogue.py` with
+  `CUTLASS_ROOT`, so the same compatibility patch can be applied to the pinned
+  local CUTLASS worktree and the Molab checkout.
+- Parameterized the numeric harness warmup and measurement counts to permit a
+  single-launch fault-localization run without queuing hundreds of failing
+  kernels.
+- Verified local Docker objects upload to Molab, link with Molab CUDA 13.3 in
+  about 0.3 seconds, and execute on the real SM120 GPU. Current shared-only
+  specialization still fails before pipeline construction; tracing localized
+  the first observed fault to TMA descriptor prefetch. Epilogue-only prefetch
+  suppression was insufficient; the next prepared A/B disables both optional
+  prefetch hints for the void-D specialization.
+## 2026-08-28 — fixed split CUDA kernel Params ABI
+
+- Fixed `instantiate_ff1_shared_only_operator` to define the same
+  `CUTLASS_GRID_CONSTANT Params const` signature declared by the host launch
+  translation unit. The previous mutable by-value definition linked across
+  split objects but caused the device kernel to read corrupted TMA descriptors.
+- Added a monolithic compile contract TU; NVCC exposed the incompatible
+  redeclaration immediately, turning the silent runtime fault into a compile
+  failure.
+- Molab correctness is now GREEN for the shared-only FF1 epilogue. Optimized
+  O3 timing is 41.0318 us with no global hidden-D materialization and the
+  expected SFD hash. This matches the prior dual-store custom callback timing,
+  so deleting global D alone does not remove the current callback overhead.
+- Resource audit: stock FF1 uses 168 registers and 32 bytes stack per thread;
+  shared-only uses 168 registers and 64 bytes stack per thread. The next hot
+  path should reuse CUTLASS's native quantized sD tile directly for FF2 rather
+  than mirror it through a second custom visitor conversion/copy.
+## 2026-08-28 — zero-cost native register-D handoff
+
+- Replaced the custom callback's duplicate NVFP4 conversion/register tensor
+  with a narrow CUTLASS `register_d_ready()` extension point immediately after
+  the stock epilogue creates `tRS_rD`.
+- The callback now performs only the required row-scale reduction plus a copy
+  of CUTLASS's already converted NVFP4 registers into the DSM ring.
+- Resource usage returned from 168 registers / 64-byte stack to the stock 168
+  registers / 32-byte stack.
+- Molab O3 benchmark: **8.23056 us**, versus stock **8.23648 us**, with
+  `d_nonzero=0` and the oracle SFD hash `5428121410781643651`. The global-D-free
+  handoff is therefore cost-neutral at isolated FF1 level.
+
+## 2026-08-28 — fused FF1/FF2 physical-cluster contract
+
+- Added the first reduced numeric FF1 -> DSM -> FF2 fused kernel and explicit
+  stage gates.
+- Molab localized the initial launch failure to executing the static-1x1 FF1
+  universal wrapper concurrently in a physical 2-CTA cluster; rank 0 alone
+  completed, so the already verified FF2 DSM consumer was not the source.
+- Confirmed that CUTLASS's SM120 block-scaled builder forbids a dynamic or
+  multicast cluster at compile time.
+- Added a guarded CUTLASS logical-singleton hook: each FF1 CTA retains static
+  1x1 pipeline/scheduler semantics while the wrapper keeps the physical 2-CTA
+  cluster needed by the following DSM handoff. Normal builds are unaffected.
+- Docker CUDA 13.3 compiled the corrected artifact with SHA256
+  `7022a2d9b11d0bcc9f379d112e85abd446d25ec83855f7a32146a4ba9faee9ec`.
+  Molab execution remains pending because the prior failing control terminated
+  the sandbox (HTTP 410); no runtime or performance claim is made yet.
+
+## 2026-08-28 — isolate rank-1 FF1 scheduler state
+
+- Added diagnostic stage modes for physical-cluster-only, rank-0 FF1-only, and
+  rank-1 FF1-only execution.
+- Molab measured cluster-only and rank-0 FF1 as passing, while rank-1 FF1 alone
+  timed out and poisoned the GPU context.
+- Logical-singleton CTA-rank and TMA-partition overrides were insufficient.
+- Added a diagnostic-only persistent-scheduler worker-0 oracle and compiled
+  SHA256 `2da68d1a08b297ce1846c7c883d01c0bbb259af68c6c4263588deb1a3bd819e3`.
+- The next GPU action is one foreground rank-1-only run in a newly provisioned
+  Molab sandbox; the current 100%-utilization/no-process device is invalid for
+  further measurement.
+
+## 2026-08-28 — exclude scheduler and patch AtomThrID rank leak
+
+- Ran the scheduler worker-0 oracle once in a fresh Molab sandbox; the verified
+  artifact still timed out at 15.12 seconds in rank-1-only mode.
+- Excluded `StaticPersistentTileScheduler` worker seeding as the primary hang.
+- Found two independent physical `blockIdx.x` uses selecting the main MMA and
+  SFB MMA AtomThrID slices inside the SM120 block-scaled array collective.
+- Added an idempotent, macro-guarded logical-singleton AtomThrID-0 patch for
+  the embedded FF1 diagnostic path.
+- Local compile-only validation is pending because Docker Desktop's Linux
+  engine stopped during compilation; the new path has not been run on Molab.

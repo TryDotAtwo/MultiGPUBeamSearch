@@ -1,5 +1,32 @@
 # Prompt History
 
+## 2026-08-28 - Integrate verified DSM primitives into fast CUTLASS
+
+- User approved embedding the verified bulk-DSM and mbarrier primitives
+  directly into the fast CUTLASS collective.
+- Preserve the large outer inference ring, but use a small internal FF1/FF2
+  slot ring with explicit ready/reuse phases; do not rely on timing distance.
+- Keep B/SFB on TMA, eliminate the global hidden tensor, retain CUTLASS MMA and
+  its fast persistent ping-pong scheduler, and validate only on Molab.
+
+## 2026-08-27 - Connect remote DSM A/SFA directly to FF2
+
+- Implement the next fused hot-path stage: FF2 consumes the FF1-produced
+  A/SFA through remote DSM while B/SFB retain their TMA path. Treat expert
+  advice as non-authoritative and verify the design on Molab SM120.
+
+## 2026-08-27 - Reuse the proven fast implementation
+
+- Do not replace the existing approximately 660-TFLOP/s CUTLASS TMA path with
+  a slower raw-MMA implementation. Reuse it and integrate the required fused
+  FF1-to-FF2 handoff into that pipeline.
+
+## 2026-08-27 - Continue SM120 Stream1 speed work
+
+- Report measured speed, then continue to the next optimization stage.
+- The target remains end-to-end Stream1 acceleration on Molab, with no local
+  GPU testing and no acceptance based only on synthetic MMA peak.
+
 ## 2026-08-26 - One-PFLOP end-to-end Stream1 objective
 
 - Treat reproducible 1 PFLOP/s dense-equivalent for the complete Cube4
@@ -781,3 +808,84 @@ User reported that an interactive game had been running during part of the recen
   LayerNorm, packing, and launch/transport overhead.
 - Continue strictly on Molab, output_dim=24, ReLU, offline-packed immutable
   weights, and no beam-search architecture changes.
+
+## 2026-08-26 — blanket authorization for private Molab uploads
+
+- User explicitly authorized uploading the modified approximately 29 KiB
+  benchmark source and CMake patch to the user's private Molab sandbox for
+  MXFP4/NVFP4 compilation and testing.
+- The authorization also covers subsequent project-source, patch, benchmark,
+  and test-artifact uploads needed for this private Molab optimization work.
+- CUDA compilation and execution remain Molab-only and foreground; this
+  permission does not relax the ban on unapproved beam-search architecture
+  changes.
+
+## 2026-08-27 — primary quality metric and cheap scaling sweeps
+
+- User clarified that exact state/logit equality is not the target because
+  FP32-to-FP16 already changes internal values. The final quality target is a
+  replay-valid solution of the same length as the FP32/FP16 baseline.
+- Indirect score/ranking/frontier errors are useful for locating clearly bad
+  quantization choices and directing fixes, but are not the final acceptance
+  criterion.
+- Use affordable scaling experiments over 10–100 states at small beams and
+  plot quality/performance curves; reserve expensive large-beam solves for the
+  final Pareto candidates.
+## 2026-08-27 — Molab SM120 NVFP4 Stream1 continuation
+
+- Continue all SM120 build and benchmark work strictly in the live Molab notebook, using foreground execution rather than detached jobs.
+- Optimize output-dimension-24 Cube4 Transformer Stream1 toward real end-to-end 1 PFLOP/s on SM120.
+- Preserve the final quality objective: replay-valid solutions of the same length as FP32/FP16; numerical state comparisons are diagnostic gates rather than the final acceptance metric.
+- Use small-beam solve samples of 10-100 states for quality/scaling curves when the native NVFP4 execution path is ready.
+- Minimize all VRAM traffic during Stream1 computation; keep transient data in registers, shared memory or L2 whenever possible. A persistent back-to-back FF1→ReLU/NVFP4→FF2 kernel is required, with two inference rings minimum and no global hidden materialization.
+- Keep long Molab builds in the visible foreground with regular notebook heartbeats; do not use detached subprocess jobs. Tune the true Cube4 Transformer shape and at least two inference rings, while judging final acceptance by same-length replay-valid solves.
+- Reuse the previously measured fast CUTLASS/TMA path instead of replacing it with the slower raw-MMA prototype; embed only the on-chip FF1-to-FF2 handoff needed to remove global hidden traffic.
+
+## 2026-08-27 — apply FlashAttention-4 pipeline principles
+
+- User requested studying FlashAttention-4 because its asymmetric-hardware and
+  kernel-pipelining techniques are directly relevant to the SM120 Stream1
+  optimization, then explicitly approved implementation.
+- Preserve the measured CUTLASS SM120 mainloop. Apply the transferable FA4
+  mechanisms: current/previous ping-pong, fixed DMA/FF1/FF2 warp roles,
+  lifetime-scoped two-slot DSM storage, and overlap of FF1 slice N with FF2
+  slice N-1. Do not assume SM100 TMEM or 2-CTA UMMA exists on SM120.
+- CUDA build, runtime correctness, and performance selection remain strictly
+  Molab-only. The primary acceptance gate remains same-length replay-valid
+  solutions versus FP32/FP16, not exact intermediate-state equality.
+# 2026-08-28
+
+- "встроить проверенные bulk-DSM и mbarrier-примитивы непосредственно в этот быстрый CUTLASS collective - делай."
+- "Делай"
+- "Бенчмаркай всё пж в процессе работы и убеждайся в корректности"
+## 2026-08-28 - Continue SM120 fused FF1 -> FF2 work in Molab
+
+- Continue the direct remote-DSM A/SFA handoff work and benchmark correctness
+  throughout implementation.
+- Run GPU tests strictly in Molab through native marimo pairing; do not use
+  detached subprocesses that let the sandbox terminate silently.
+- Preserve the end goal of an end-to-end Stream 1 hot path approaching one
+  PFLOP/s while judging numerical changes primarily by solve length/quality.
+- Continue after each verified micro-gate toward a real end-to-end measurement;
+  do not treat compile success or isolated transport bandwidth as Stream 1
+  throughput.
+## 2026-08-28 — compile SM120 artifacts locally, execute only on Molab
+
+- User approved compiling CUDA/CUTLASS artifacts in local Docker and using
+  Molab only for uploading, linking, correctness runs, and performance
+  measurements.
+- Preserve the earlier rule that GPU validation is strictly Molab; Docker is
+  a compile-only environment and must not be used as performance evidence.
+
+## 2026-08-28 — continue fused end-to-end work
+
+- "Пробуй ещё"
+- Continue from the verified cost-neutral FF1 native-register handoff toward a
+  real fused FF1 -> FF2 end-to-end kernel. Compile locally in Docker when
+  useful, but execute and benchmark GPU code only on Molab.
+
+## 2026-08-28 — recover Molab and continue by the measured strategy
+
+- "Окей, тогда давай действовать по стратегии. Молаб сам возьми из браузера"
+- Recover a clean Molab GPU without asking for a copied sandbox link, then run
+  the bounded scheduler-oracle gate before any further fused-kernel experiment.
