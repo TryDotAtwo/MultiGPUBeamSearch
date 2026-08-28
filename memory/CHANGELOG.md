@@ -1804,3 +1804,16 @@
   the embedded FF1 diagnostic path.
 - Local compile-only validation is pending because Docker Desktop's Linux
   engine stopped during compilation; the new path has not been run on Molab.
+
+## 2026-08-28 — replace nested SM120 GemmUniversal with direct collectives
+
+- Identified the actual FF1 dispatch as the SM120 block-scaled collective in
+  `sm120_blockscaled_mma_tma.hpp`, routed through the SM90 cooperative kernel
+  wrapper; earlier SM100 kernel-level diagnostic patches did not instrument
+  the selected path.
+- Corrected the direct seam to default-construct the stateless SM120 mainloop.
+- Verified on Molab, in foreground, that collective/epilogue construction,
+  descriptor prefetch, mainloop pipeline construction, and block-scaled
+  `load_init` all pass inside the physical two-CTA handoff cluster.
+- The next implementation gate is scheduler-free fixed-tile `load` plus `mma`;
+  no end-to-end correctness or throughput claim is made yet.

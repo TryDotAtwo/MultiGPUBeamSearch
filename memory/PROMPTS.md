@@ -889,3 +889,11 @@ User reported that an interactive game had been running during part of the recen
 - "Окей, тогда давай действовать по стратегии. Молаб сам возьми из браузера"
 - Recover a clean Molab GPU without asking for a copied sandbox link, then run
   the bounded scheduler-oracle gate before any further fused-kernel experiment.
+
+## 2026-08-28 — continue autonomously from measured evidence
+
+- "Сам разберись пж"
+- Proceed without clarification: recover the authenticated Molab notebook,
+  identify the actual CUTLASS specialization selected by the FF1 builder, and
+  advance the fused path only through bounded foreground gates with explicit
+  runtime evidence.

@@ -19,6 +19,74 @@ constexpr int kSlices = kHidden / static_cast<int>(Contract::kSliceColumns);
 using Ff1Storage = typename Ff1SharedOnlyKernel::SharedStorage;
 using Ff2Storage = BulkDsmFf2Collective::SharedStorage;
 
+CUTLASS_DEVICE void invoke_ff1_for_diagnostic(
+    typename Ff1SharedOnlyKernel::Params const& params,
+    char* shared_storage) {
+#if defined(STREAM1_CUTLASS_DIAG_NOOP_FF1_CALL)
+  (void)params;
+  (void)shared_storage;
+  return;
+#elif defined(STREAM1_CUTLASS_DIAG_DIRECT_FF1_COLLECTIVES)
+  auto& storage = *reinterpret_cast<Ff1Storage*>(shared_storage);
+  using NestedMainloop =
+      typename Ff1SharedOnlyKernel::CollectiveMainloop;
+  using NestedEpilogue =
+      typename Ff1SharedOnlyKernel::CollectiveEpilogue;
+  // SM120 block-scaled TMA collectives are stateless.  Their runtime state is
+  // carried explicitly by Params and the pipeline objects owned by the kernel;
+  // unlike the SM100 TMA specialization, this collective is default-created.
+  NestedMainloop mainloop;
+  NestedEpilogue epilogue(
+      params.epilogue, storage.tensors.epilogue);
+  (void)mainloop;
+  (void)epilogue;
+#if defined(STREAM1_CUTLASS_DIAG_DIRECT_FF1_PREFETCH)
+  const int warp_idx = static_cast<int>(threadIdx.x) / 32;
+  const int lane_predicate = cute::elect_one_sync();
+  if (warp_idx == 0 && lane_predicate) {
+    NestedMainloop::prefetch_tma_descriptors(params.mainloop);
+    NestedEpilogue::prefetch_tma_descriptors(params.epilogue);
+  }
+#endif
+#if defined(STREAM1_CUTLASS_DIAG_DIRECT_FF1_PIPELINE_CONSTRUCT)
+  using MainloopPipeline = typename NestedMainloop::MainloopPipeline;
+  typename MainloopPipeline::Params pipeline_params;
+  const int warp_group = static_cast<int>(threadIdx.x) / 128;
+  const int warp_in_group =
+      (static_cast<int>(threadIdx.x) / 32) % 4;
+  if (warp_group == 0 &&
+      (warp_in_group == 0 || warp_in_group == 3)) {
+    pipeline_params.role = MainloopPipeline::ThreadCategory::Producer;
+  }
+  if (warp_group == 1 || warp_group == 2) {
+    pipeline_params.role = MainloopPipeline::ThreadCategory::Consumer;
+  }
+  pipeline_params.is_leader =
+      (static_cast<int>(threadIdx.x) % 128) == 0;
+  pipeline_params.num_consumers = 256;
+  pipeline_params.num_producers = NestedMainloop::NumProducerThreadEvents;
+  pipeline_params.transaction_bytes = params.mainloop.tma_transaction_bytes;
+  MainloopPipeline pipeline(
+      storage.pipelines.mainloop, pipeline_params,
+      typename Ff1SharedOnlyKernel::ClusterShape{});
+  (void)pipeline;
+#if defined(STREAM1_CUTLASS_DIAG_DIRECT_FF1_LOAD_INIT)
+  // The logical FF1 collective is a singleton even though the surrounding
+  // handoff kernel launches a physical two-CTA cluster.  Match CUTLASS' own
+  // singleton visibility fence before materializing the tiled TMA tensors.
+  __syncthreads();
+  auto problem_shape_mnkl =
+      cute::append<4>(params.problem_shape, cute::Int<1>{});
+  auto load_inputs = mainloop.load_init(problem_shape_mnkl, params.mainloop);
+  (void)load_inputs;
+#endif
+#endif
+  return;
+#else
+  Ff1SharedOnlyKernel{}(params, shared_storage);
+#endif
+}
+
 __device__ void move_bytes(
     std::uint8_t* destination, const std::uint8_t* source,
     std::size_t bytes) {
@@ -51,7 +119,7 @@ void ff1_ff2_fused_two_slice_kernel(
   }
 
   if (stop_stage == -3 && rank == 0U) {
-    Ff1SharedOnlyKernel{}(
+    invoke_ff1_for_diagnostic(
         ff1_params, reinterpret_cast<char*>(shared_bytes));
   }
   if (stop_stage == -3) cluster.sync();
@@ -61,9 +129,16 @@ void ff1_ff2_fused_two_slice_kernel(
       (stop_stage == -3 && rank == 1U) ||
       (stop_stage == 11 && rank == 0U) ||
       (stop_stage == 12 && rank == 1U)) {
-    Ff1SharedOnlyKernel{}(
+    invoke_ff1_for_diagnostic(
         ff1_params, reinterpret_cast<char*>(shared_bytes));
   }
+#if defined(STREAM1_CUTLASS_DIAG_OUTER_RETURN_AFTER_FF1)
+  // Pair with an early-return gate inside the nested CUTLASS kernel.  Returning
+  // the complete physical-cluster kernel here prevents the surrounding DSM
+  // handoff synchronization from obscuring whether the CUTLASS gate itself
+  // was reached.  The define is uniform for both CTAs and all threads.
+  return;
+#endif
   __syncthreads();
   cluster.sync();
 
