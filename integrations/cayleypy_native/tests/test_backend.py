@@ -228,6 +228,9 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         return 0.1
 
     monkeypatch.setattr(backend, "run_process", fake_process)
+    # This protocol fixture uses a labelled fake model; real byte rehashing has
+    # its own artifact-backed regression test below.
+    monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     outcome = backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 1000, 4, tmp_path / "run", (0,))
     assert outcome.path == (1,)
@@ -244,6 +247,67 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     monkeypatch.setattr(backend, "run_process", lambda *args, **kwargs: pytest.fail("changed NCCL must prevent launch"))
     with pytest.raises(NativeBackendError, match="NCCL library changed"):
         backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 1000, 4, tmp_path / "run-replaced", (0,))
+
+
+def test_model_bytes_are_rehashed_after_runtime_preparation_before_launch(monkeypatch, tmp_path):
+    import cayleypy_native.backend as backend
+    from cayleypy_native.backend import PreparedRuntime
+    from cayleypy_native.build import file_sha256, shape_contract
+    from cayleypy_native.models import NativeModel, prepare_model
+
+    contract = SimpleNamespace(
+        state_len=2,
+        num_classes=2,
+        move_count=2,
+        start=(1, 0),
+        center=(0, 1),
+        graph_hash="a" * 64,
+        replay=lambda path: tuple(path) == (1,),
+        to_puzzle_info=lambda: {"central_state": [0, 1], "generators": {"m0": [0, 1], "m1": [1, 0]}},
+    )
+    weights = tmp_path / "caller-weights"
+    weights.mkdir()
+    manifest = {
+        "state_len": 2,
+        "num_classes": 2,
+        "hd1": 8,
+        "hd2": 8,
+        "nrd": 1,
+        "output_dim": 1,
+        "dtype": "fp16",
+        "normalization": "batchnorm_folded",
+        "graph_hash": contract.graph_hash,
+    }
+    (weights / "manifest.json").write_text(json.dumps(manifest))
+    counts = {
+        "input_weight_hxk": 32,
+        "input_bias": 8,
+        "hidden_weight_hxk": 64,
+        "hidden_bias": 8,
+        "output_weight_hxk": 8,
+        "output_bias": 1,
+        "residual0_fc1_weight_hxk": 64,
+        "residual0_fc1_bias": 8,
+        "residual0_fc2_weight_hxk": 64,
+        "residual0_fc2_bias": 8,
+    }
+    for name, count in counts.items():
+        (weights / f"{name}.fp16").write_bytes(b"\0" * (count * 2))
+    model = prepare_model(NativeModel(weights, contract.graph_hash), contract, NativeOptions(), tmp_path / "prepare")
+
+    runner = tmp_path / "runner"
+    runner.write_bytes(b"test-only runner")
+    metadata = {
+        "shape": shape_contract(contract),
+        "backend": "mlp",
+        "binary_sha256": file_sha256(runner),
+    }
+    runtime = PreparedRuntime(runner, metadata, (75,))
+    (weights / "output_bias.fp16").write_bytes(b"\x01\x00")  # Same size, different model.
+    monkeypatch.setattr(backend, "run_process", lambda *a, **k: pytest.fail("changed model reached worker launch"))
+
+    with pytest.raises(NativeBackendError, match="model artifact changed before launch"):
+        backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2, tmp_path / "run", (0,), runtime=runtime)
 
 
 def _rank_stream_fixture(root, rank, *, terminal=False):
@@ -285,6 +349,8 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
         return 0.2
 
     monkeypatch.setattr(backend, "run_process", fake_process)
+    # This log-merging fixture uses a labelled fake model rather than weights.
+    monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     if mode == "success":
         result = backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 7, 1, run, (0, 1))
         assert result.path == (1,) and result.metadata["worker_logs_complete"]

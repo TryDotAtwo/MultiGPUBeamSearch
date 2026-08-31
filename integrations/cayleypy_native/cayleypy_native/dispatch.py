@@ -152,14 +152,15 @@ def _search(original, graph, kwargs, options, mode):
     try:
         params = _parameters(kwargs)
         contract = GraphContract.from_graph(graph, params["start_state"])
-        devices = runtime_devices(graph, options)
         run_dir = options.cache_dir / "runs" / uuid.uuid4().hex
         run_dir.mkdir(parents=True, exist_ok=False)
-        model = prepare_model(params["predictor"], contract, options, run_dir)
-        if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
-            raise NativeUnavailable("native Q models require use_child_scores=True")
-        runtime = None
-        if contract.start != contract.center and params["max_steps"] > 0:
+        trivial = contract.start == contract.center or params["max_steps"] == 0
+        devices, model, runtime = (), None, None
+        if not trivial:
+            devices = runtime_devices(graph, options)
+            model = prepare_model(params["predictor"], contract, options, run_dir)
+            if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
+                raise NativeUnavailable("native Q models require use_child_scores=True")
             runtime = prepare_runtime(contract, model, options, run_dir, devices)
     except NativeUnavailable as exc:
         if mode == "native":
@@ -183,11 +184,13 @@ def _search(original, graph, kwargs, options, mode):
         if found and not contract.replay(outcome.path):
             raise NativeBackendError("native solution failed independent graph replay")
         metadata = dict(outcome.metadata)
-        metadata.update({"backend": "native", "graph_hash": contract.graph_hash, "model_hash": model.artifact_hash,
+        metadata.update({"backend": "native", "graph_hash": contract.graph_hash,
+                         "model_hash": None if model is None else model.artifact_hash,
                          "requested_beam_width": params["beam_width"], "effective_beam_width": outcome.effective_beam_width,
                          "devices": list(devices), "elapsed_seconds": outcome.elapsed_seconds,
                          "run_dir": str(outcome.run_dir), "replay_valid": True if found else None,
-                         "scoring": "scalar_children" if model.manifest["output_dim"] == 1 else "parent_q",
+                         "scoring": "not_evaluated" if model is None else (
+                             "scalar_children" if model.manifest["output_dim"] == 1 else "parent_q"),
                          "status": "found" if found else "not_found_within_budget"})
         _write_metadata(run_dir / "adapter-result.json", metadata)
         path = list(outcome.path) if found and (params["return_path"] or not outcome.path) else None

@@ -81,6 +81,9 @@ if result.path_found:
 Automatic export accepts a loaded, unmodified `Pilgrim` BatchNorm model or
 `ResMLPDistance` LayerNorm model matching the native export schema, either directly
 or inside the standard CayleyPy `Predictor`. Models must be in evaluation mode.
+The adapter checks the complete class-level forward graph against the supported
+schema before exporting; a subclass with changed inference logic uses the original
+CayleyPy search in `auto` mode and is rejected in `native` mode.
 Use the standard `Predictor` wrapper when torch fallback is expected; a raw
 module is forwarded unchanged on fallback and must satisfy upstream's interface.
 An upstream CayleyPy MLP, an arbitrary callable, a custom Predictor, or the default
@@ -127,6 +130,10 @@ frontiers or solution lengths to upstream are not promised.
 | `auto` (default) | Prepare a supported native run; otherwise warn with a concrete reason and call the saved original method with the original arguments. |
 | `native` | Reject unsupported graph/model/runtime/options with `NativeUnavailable`. |
 | `torch` | Call the original method without probing CUDA or native compatibility. |
+
+Already-solved states and zero-step budgets return directly after graph/argument
+validation. They do not probe CUDA, inspect a model artifact, compile, or launch a
+worker, so these deterministic boundary cases also work on a CPU-only host.
 
 Importing the package does not activate it. `enable_native(...)` registers `auto`
 and `native` using CayleyPy's public backend hook, without replacing
@@ -291,7 +298,9 @@ Later mutation or retraining of the original model does not update this
 snapshot; prepare explicitly again to use new weights. Prepared model bytes are
 pinned by SHA256, and changing a snapshot artifact raises `NativeBackendError`.
 Each search still checks graph/device compatibility, hashes weights and the
-verified binary, starts fresh native workers, and replays successful paths.
+verified binary, then rehashes every manifest/blob byte after runtime preparation
+and immediately before launching fresh native workers. Successful paths are
+independently replayed.
 It skips exporter subprocesses, compiler/source discovery and source/CUTLASS
 tree scans. This is not a persistent worker or a GPU-resident model cache.
 

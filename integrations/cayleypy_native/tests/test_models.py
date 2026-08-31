@@ -230,6 +230,21 @@ def test_similar_but_semantically_different_model_rejected(tmp_path, contract, m
         prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 
+def test_class_level_forward_override_cannot_hide_beyond_finite_probes(tmp_path, contract):
+    class ClassForwardOverride(Pilgrim):
+        def forward(self, states):
+            score = super().forward(states)
+            unseen = torch.tensor([2, 1, 0, 3], device=states.device)
+            return score + (states == unseen).all(dim=1).to(score.dtype)
+
+    # The adapter selects supported schemas by their public class names. This
+    # class deliberately preserves that name while changing deeper-state scores.
+    ClassForwardOverride.__name__ = "Pilgrim"
+    model = ClassForwardOverride().eval()
+    with pytest.raises(NativeUnavailable, match="class-level forward"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
 class LayerNormBlock(nn.Module):
     def __init__(self):
         super().__init__()

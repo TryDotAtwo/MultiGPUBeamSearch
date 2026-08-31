@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass
 
 from .errors import NativeBackendError, NativeUnavailable
+from .models import verify_prepared_model
 from .options import NativeOutcome
 
 
@@ -368,6 +369,9 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         args += ["1", "0"]
     failure = None
     try:
+        # Runtime preparation may compile for minutes. Rehash the exact model
+        # bytes after that window and immediately before the worker sees them.
+        verify_prepared_model(model, contract)
         elapsed = run_process(args, cwd=run_dir, env=env, timeout=options.timeout_seconds, log_path=process_log)
     except BaseException as error:
         failure = error

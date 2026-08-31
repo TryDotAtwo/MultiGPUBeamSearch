@@ -180,6 +180,33 @@ def test_zero_budget_does_not_build_or_launch(tmp_path, monkeypatch, solved):
     assert result.path == ([] if solved else None)
 
 
+@pytest.mark.parametrize("solved", [False, True])
+def test_trivial_native_result_needs_no_gpu_or_model_artifact(tmp_path, monkeypatch, solved):
+    from cayleypy_native import NativeModel
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("trivial native result must not probe CUDA, prepare a model, build, or launch")
+
+    for name in ("runtime_devices", "prepare_model", "prepare_runtime", "run_native"):
+        monkeypatch.setattr(dispatch, name, forbidden)
+    g = graph()
+    model = NativeModel.for_graph(g, tmp_path / "missing-weights")
+    result = dispatch.beam_search(
+        g,
+        backend="native",
+        native_options=NativeOptions(cache_dir=tmp_path),
+        start_state=[0, 1, 2, 3, 4] if solved else [1, 0, 2, 3, 4],
+        predictor=model,
+        max_steps=4 if solved else 0,
+        return_path=True,
+    )
+    assert result.path_found is solved
+    assert result.path == ([] if solved else None)
+    assert result.native_metadata["devices"] == []
+    assert result.native_metadata["model_hash"] is None
+    assert result.native_metadata["scoring"] == "not_evaluated"
+
+
 def test_auto_preserves_unsupported_upstream_kwargs_and_predictor(tmp_path, monkeypatch):
     monkeypatch.setattr(dispatch, "_registry_api", lambda: None)  # Legacy custom method capture.
     seen = []

@@ -56,6 +56,13 @@ class PreparedModel:
     artifact_hash: str
 
 
+def verify_prepared_model(model: PreparedModel, contract: GraphContract) -> None:
+    """Fail if any manifest/blob byte changed after preparation."""
+    current = _validate_artifact(model.weights_dir, contract, model.backend)
+    if current.artifact_hash != model.artifact_hash:
+        raise NativeBackendError("native model artifact changed before launch")
+
+
 def _manifest_int(manifest: dict, primary: str, alias: str | None = None) -> int:
     value = manifest.get(primary, manifest.get(alias) if alias else None)
     if type(value) is not int or not 0 < value < 2**32:
@@ -228,6 +235,7 @@ def _known_model(model, contract: GraphContract):
             raise NativeUnavailable("native model needs positive residual count, hidden1>=hidden2, and scalar or move-count outputs")
         if fmt == "resmlp-layernorm" and (h1 % 8 or h2 % 8):
             raise NativeUnavailable("native ResMLPDistance hidden dimensions must be multiples of 8")
+        _require_canonical_forward_graph(model, fmt)
         # Use CPU tensors for both sides without moving or changing the original module.
         probes = [contract.center, contract.start]
         probes.extend(tuple(contract.start[j] for j in g) for g in contract.generators[:8])
@@ -246,6 +254,90 @@ def _known_model(model, contract: GraphContract):
         raise
     except (AttributeError, KeyError, TypeError, ValueError, RuntimeError, IndexError) as error:
         raise NativeUnavailable(f"model does not match native export schema: {error}") from error
+
+
+def _fx_signature(module) -> tuple:
+    """Normalize an FX graph, including data flow and concrete module types."""
+    import torch.fx
+
+    traced = torch.fx.symbolic_trace(module)
+    positions, rows = {}, []
+
+    def value(item):
+        if isinstance(item, torch.fx.Node):
+            return ("node", positions[item])
+        if isinstance(item, tuple):
+            return ("tuple", tuple(value(part) for part in item))
+        if isinstance(item, list):
+            return ("list", tuple(value(part) for part in item))
+        if isinstance(item, dict):
+            return ("dict", tuple((str(key), value(item[key])) for key in sorted(item, key=str)))
+        return ("literal", repr(item))
+
+    for node in traced.graph.nodes:
+        positions[node] = len(rows)
+        target = node.target
+        if node.op == "call_module":
+            child = traced.get_submodule(str(target))
+            target = (str(target), type(child).__module__, type(child).__qualname__)
+        elif node.op == "call_function":
+            target = (getattr(target, "__module__", ""),
+                      getattr(target, "__qualname__", getattr(target, "__name__", repr(target))))
+        else:
+            target = str(target)
+        rows.append((node.op, target, value(node.args), value(node.kwargs)))
+    return tuple(rows)
+
+
+def _require_canonical_forward_graph(model, fmt: str) -> None:
+    """Prove the class-level forward graph is the schema exported below."""
+    import torch
+    from torch import nn
+
+    class PilgrimReference(nn.Module):
+        def __init__(self, source, squeeze):
+            super().__init__()
+            self.num_classes = source.num_classes
+            self.input_layer, self.hidden_layer = source.input_layer, source.hidden_layer
+            self.output_layer, self.bn1, self.bn2 = source.output_layer, source.bn1, source.bn2
+            self.relu, self.residual_blocks = source.relu, source.residual_blocks
+            self.squeeze = squeeze
+
+        def forward(self, states):
+            x = nn.functional.one_hot(states.long(), self.num_classes).float().flatten(1)
+            x = self.relu(self.bn1(self.input_layer(x)))
+            x = self.relu(self.bn2(self.hidden_layer(x)))
+            for block in self.residual_blocks:
+                residual = block.bn2(block.fc2(block.dropout(block.relu(block.bn1(block.fc1(x))))))
+                x = block.relu(x + residual)
+            output = self.output_layer(x)
+            return output.squeeze(-1) if self.squeeze else output
+
+    class ResMLPReference(nn.Module):
+        def __init__(self, source, squeeze):
+            super().__init__()
+            self.embedding, self.input_stack = source.embedding, source.input_stack
+            self.res_blocks, self.head = source.res_blocks, source.head
+            self.squeeze = squeeze
+
+        def forward(self, states):
+            x = self.embedding(states.long()).flatten(1)
+            for layer in self.input_stack:
+                x = layer(x)
+            for block in self.res_blocks:
+                residual = block.ln2(block.lin2(torch.relu(block.ln1(block.lin1(x)))))
+                x = torch.relu(x + residual)
+            output = self.head(x)
+            return output.squeeze(-1) if self.squeeze else output
+
+    reference = PilgrimReference if fmt == "batchnorm-folded" else ResMLPReference
+    try:
+        observed = _fx_signature(model)
+        allowed = {_fx_signature(reference(model, squeeze)) for squeeze in (False, True)}
+    except Exception as error:
+        raise NativeUnavailable(f"native auto-export cannot verify class-level forward graph: {error}") from error
+    if observed not in allowed:
+        raise NativeUnavailable("native auto-export rejects a customized class-level forward graph")
 
 
 def _unwrap_predictor(predictor, contract: GraphContract):

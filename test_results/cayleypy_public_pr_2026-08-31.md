@@ -71,3 +71,24 @@ configured proxy and host session. No new GPU run id was obtained, so this note
 does not relabel the earlier native run as fresh validation of the Python hook or
 source downloader. `validation/public_gpu_smoke.py` remains the reproducible
 two-GPU acceptance command for a supported Linux CUDA host.
+
+## 2026-09-01 pre-merge review fixes
+
+Three later review findings were reproduced with regression tests and fixed:
+
+- already-solved and zero-step searches now return before CUDA, model, build, or
+  worker preflight;
+- every model manifest/blob byte is rehashed after runtime preparation and
+  immediately before worker launch;
+- automatic export now compares the class-level Torch FX forward graph with the
+  supported Pilgrim/ResMLPDistance inference schema instead of relying on finite
+  numeric probes alone.
+
+The full Windows adapter suite after these fixes passed:
+
+```text
+173 passed, 2 skipped
+```
+
+The two skips remain the POSIX-only subprocess-permission tests. Public CI and
+the final merged-install smoke are recorded in the merge evidence directory.
