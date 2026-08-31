@@ -54,6 +54,9 @@ class GraphContract:
         if definition is None or not definition.is_permutation_group():
             raise NativeUnavailable("native adapter currently supports permutation generators only")
         size = definition.state_size
+        # Small states intentionally select a shape-specific native build. The
+        # source reserves aligned storage of at least ``size + 4`` bytes, so
+        # FinalResponse metadata never overlaps the logical state.
         if type(size) is not int or not 1 <= size <= 120:
             raise NativeUnavailable("native logical state length must be in [1, 120]")
         center = _integers(definition.central_state, "central_state", size)

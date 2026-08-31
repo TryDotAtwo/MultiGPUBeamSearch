@@ -416,3 +416,9 @@
 - User requested a PR in cayleypy/cayleypy and TryDotAtwo/MultiGPUBeamSearch so other users can install and run the integration without local paths.
 - Preserve CayleyPy convenience and native search behavior; use a minimal optional upstream backend hook and a separately installable adapter.
 - User authorized MIT licensing and requested continuation without subagents.
+
+## 2026-09-01 - Merge native adapter after verification
+- User requested merging the MultiGPUBeamSearch PR if review and verification
+  are clean, while leaving the CayleyPy PR open for upstream maintainers.
+- Verify that the merged public installation works and remains convenient for
+  ordinary CayleyPy users.

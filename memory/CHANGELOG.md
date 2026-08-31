@@ -749,5 +749,14 @@
 - The companion CayleyPy change adds an opt-in callable/registry hook; native/auto dispatch uses it without monkeypatching. Released CayleyPy 0.1.0 retains reversible compatibility dispatch.
 - Kept the CUDA algorithm unchanged. Default source setup pins the native snapshot already validated on two T4 GPUs; it does not follow moving main.
 - Initial verification: 169 adapter tests passed, two POSIX-only skips on Windows; installed wheel CPU replay passed with both released CayleyPy and the public-hook source. Public-source two-T4 acceptance is recorded separately when complete.
-- Detailed local logs: test_results/cayleypy_public_pr_2026-08-31/.
+- Reproducible public-PR verification note:
+  `test_results/cayleypy_public_pr_2026-08-31.md`.
 - Public PR follow-up: all four native CPU CI jobs passed, including installed wheel and public-hook tests. Added real HTTPS source-setup/offline-reuse CI. Fresh Kaggle two-T4 submission is blocked by HTTP 403 on both write and owned-notebook read APIs; no repeat GPU result is claimed. Companion CayleyPy guide uses RST to avoid its legacy Markdown parser failure.
+
+## 2026-09-01 - CayleyPy native PR pre-merge review
+- Reconciled the architecture contract with the compile-time state sizing that
+  has existed since June: `120/128` is the default Megaminx profile, while
+  shape-specialized builds use `STATE_LEN=N` and aligned storage of at least
+  `N+4` bytes. The native algorithm is unchanged.
+- Added a tracked, compact verification note so a clean checkout can inspect the
+  exact CPU, wheel, public CI, source-download and GPU-boundary evidence.
