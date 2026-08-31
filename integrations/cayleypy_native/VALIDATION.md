@@ -13,6 +13,18 @@ registration through CayleyPy's optional public hook. Windows omits POSIX
 executable tests. CI builds a wheel and exercises actual installed imports with
 released CayleyPy 0.1.0 and the pinned development API.
 
+`validation/source_setup_smoke.py` verifies the installed wheel's actual public
+HTTPS downloads, both archive checksums and complete offline cache reuse on a
+CPU-only machine. One Linux CI job runs this in a fresh cache; it performs no
+native compilation or CUDA work.
+
+The initial public PR revision passed all four Linux/Windows CPU CI jobs
+(Python 3.10/3.12), including installed wheel checks and the companion backend
+hook. A fresh two-T4 run of the public PR revisions could not be started because
+Kaggle denied both notebook creation and access to existing owned notebooks
+with HTTP 403. No new GPU success is claimed for these registry/source-setup
+changes; the earlier native acceptance below is separate evidence.
+
 `validation/public_gpu_smoke.py` performs a fresh-source two-GPU check using
 synthetic models and LRX graphs of 8 and 88 positions. It checks strict native
 dispatch, prepared reuse, bounded search outcomes, original-generator replay,

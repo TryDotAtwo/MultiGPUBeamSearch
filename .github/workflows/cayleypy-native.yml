@@ -56,6 +56,9 @@ jobs:
           python -m pip install --force-reinstall --no-deps "git+https://github.com/cayleypy/cayleypy.git@b7f5c90ddff3871a1cd0db46dc6ca41bcd4392d3"
           python -I integrations/cayleypy_native/validation/wheel_smoke.py
           python -B -m pytest integrations/cayleypy_native/tests/test_registry.py integrations/cayleypy_native/tests/test_dispatch.py -q
+      - name: Verify real source downloads and offline reuse without CUDA
+        if: runner.os == 'Linux' && matrix.python == '3.12'
+        run: python -I integrations/cayleypy_native/validation/source_setup_smoke.py --cache-dir "${{ runner.temp }}/native-source-acceptance"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -750,3 +750,4 @@
 - Kept the CUDA algorithm unchanged. Default source setup pins the native snapshot already validated on two T4 GPUs; it does not follow moving main.
 - Initial verification: 169 adapter tests passed, two POSIX-only skips on Windows; installed wheel CPU replay passed with both released CayleyPy and the public-hook source. Public-source two-T4 acceptance is recorded separately when complete.
 - Detailed local logs: test_results/cayleypy_public_pr_2026-08-31/.
+- Public PR follow-up: all four native CPU CI jobs passed, including installed wheel and public-hook tests. Added real HTTPS source-setup/offline-reuse CI. Fresh Kaggle two-T4 submission is blocked by HTTP 403 on both write and owned-notebook read APIs; no repeat GPU result is claimed. Companion CayleyPy guide uses RST to avoid its legacy Markdown parser failure.
