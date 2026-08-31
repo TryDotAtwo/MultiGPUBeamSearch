@@ -411,3 +411,8 @@
 - User clarified that all one-puzzle array jobs should use one shared precompiled beam-search binary instead of rebuilding production_runner in every job.
 
 - User showed a completed IHES puzzle 33 run where compute succeeded but GitHub publishing failed because compute nodes could not resolve github.com and index generation crashed on metadata fields variants/source_files; requested continuing to collect and publish all cluster IHES results robustly.
+
+## 2026-08-31 - Public CayleyPy native backend PRs
+- User requested a PR in cayleypy/cayleypy and TryDotAtwo/MultiGPUBeamSearch so other users can install and run the integration without local paths.
+- Preserve CayleyPy convenience and native search behavior; use a minimal optional upstream backend hook and a separately installable adapter.
+- User authorized MIT licensing and requested continuation without subagents.

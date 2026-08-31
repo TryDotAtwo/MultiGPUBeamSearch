@@ -743,3 +743,10 @@
 - Updated IHES fresh bucket array documentation to use one shared precompiled production_runner. The documented flow submits prepare_ihes_prebuilt_runner.sh first, then submits the puzzle array with --dependency=afterok:<prebuild_job> and BEAM_PREBUILT_RUNNER=/mnt/pool/6/vokirova/beam8a100/ihes_cube_model/prebuilt-a100-ihes/production_runner so each one-puzzle task reuses the same binary instead of rebuilding.
 
 - Fixed IHES live results publishing index generation after raw/backfill metadata added extra keys. The fresh bucket publisher now includes variants/source_files columns in data/ihes_cube/index.tsv and filters metadata rows to declared fields before writing index/improvements, so older per-puzzle metadata cannot crash publishing.
+
+## 2026-08-31 - Portable CayleyPy adapter and public backend hook
+- Added optional installable cayleypy-native package, explicit pinned/checksummed source setup, wheel smoke/CPU CI, public two-GPU smoke, documentation and MIT license.
+- The companion CayleyPy change adds an opt-in callable/registry hook; native/auto dispatch uses it without monkeypatching. Released CayleyPy 0.1.0 retains reversible compatibility dispatch.
+- Kept the CUDA algorithm unchanged. Default source setup pins the native snapshot already validated on two T4 GPUs; it does not follow moving main.
+- Initial verification: 169 adapter tests passed, two POSIX-only skips on Windows; installed wheel CPU replay passed with both released CayleyPy and the public-hook source. Public-source two-T4 acceptance is recorded separately when complete.
+- Detailed local logs: test_results/cayleypy_public_pr_2026-08-31/.
