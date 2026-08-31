@@ -305,6 +305,7 @@ def test_model_bytes_are_rehashed_after_runtime_preparation_before_launch(monkey
     runtime = PreparedRuntime(runner, metadata, (75,))
     (weights / "output_bias.fp16").write_bytes(b"\x01\x00")  # Same size, different model.
     monkeypatch.setattr(backend, "run_process", lambda *a, **k: pytest.fail("changed model reached worker launch"))
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
 
     with pytest.raises(NativeBackendError, match="model artifact changed before launch"):
         backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2, tmp_path / "run", (0,), runtime=runtime)
