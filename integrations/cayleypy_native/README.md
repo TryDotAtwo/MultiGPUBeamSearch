@@ -193,7 +193,7 @@ solution was found within this run's budget, not that the state is unreachable.
 | Moves | Ordered gather permutations, 1–255 generators; touch-BFS additionally requires at most 32. |
 | State specialization | Build uses `STATE_LEN=n`, explicit move count, and storage `ceil((n+4)/16)*16`; small states do not retain a fixed 128-byte stride. |
 | Model runtime | Native MLP artifact, scalar or one output per move, FP16/BF16, supported BatchNorm-folded/LayerNorm schema. FP16 requires SM75+, BF16 SM80+. Current Q GEMM requires the move count divisible by 8; scalar output does not. |
-| MLP dimensions | `num_classes >= max(state_len, max_label+1)`, positive residual count, hidden widths divisible by 8 and hidden1 >= hidden2. This can rule out an otherwise supported colored graph. |
+| MLP dimensions | `num_classes >= max(state_len, max_label+1)`, positive residual count, hidden widths divisible by 8, hidden1 >= hidden2, and square hidden2 residual blocks. This can rule out an otherwise supported colored graph. |
 | Search options | Simple mode, global beam width, strict maximum path length, return path. Native touch-BFS uses `NativeOptions(touch_bfs_radius=...)`; its suffix stays inside `max_steps`. |
 | Device placement | Local Linux CUDA devices, one native rank per selected GPU, up to 128. Graph CUDA devices are used by default; explicit `devices=(0,1)` overrides them. |
 | Not yet supported natively | Matrix graphs, arbitrary models/tokenizers, PieceTransformer artifacts, custom destination, advanced/history taboo policy, reusing an upstream BfsResult, existing torchrun ranks, multi-node launch. |

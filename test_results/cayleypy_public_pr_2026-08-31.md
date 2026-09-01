@@ -151,3 +151,17 @@ complete Windows adapter suite passed:
 ```text
 191 passed, 2 skipped
 ```
+
+## Residual shape fallback contract
+
+Auto-export now validates the dimensions of every emitted Linear,
+BatchNorm and LayerNorm tensor before launching the exporter. Both Pilgrim and
+ResMLPDistance models with bottleneck or expanded residual blocks are classified
+as unsupported with `NativeUnavailable`, so `backend="auto"` can use the
+original CayleyPy search instead of failing on a mismatched exported artifact.
+The regression asserts that no export subprocess starts for all four cases. The
+complete Windows adapter suite passed:
+
+```text
+195 passed, 2 skipped
+```

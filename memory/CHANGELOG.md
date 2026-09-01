@@ -787,3 +787,8 @@
   rejected, while every FP16/BF16 blob is decoded and checked for NaN/Inf after
   export and before launch. The suite passes with 191 tests and 2 POSIX-only
   skips on Windows.
+- Validated every auto-exported linear and normalization width before starting
+  the exporter. ResMLPDistance and Pilgrim bottleneck or expanded residual
+  blocks now produce `NativeUnavailable`, preserving `backend="auto"` fallback,
+  instead of a post-export `NativeBackendError`. The suite passes with 195 tests
+  and 2 POSIX-only skips on Windows.

@@ -238,6 +238,23 @@ def _known_model(model, contract: GraphContract):
         state = {key: value.detach().cpu().contiguous().clone() for key, value in state.items()}
         if any(value.is_floating_point() and not torch.isfinite(value).all().item() for value in state.values()):
             raise NativeUnavailable("native model has non-finite tensor weights")
+
+        def linear_dimensions(name, output_width, input_width):
+            weight = state.get(f"{name}.weight")
+            bias = state.get(f"{name}.bias")
+            return (weight is not None and tuple(weight.shape) == (output_width, input_width)
+                    and (bias is None or tuple(bias.shape) == (output_width,)))
+
+        def affine_dimensions(name, width, *, batchnorm=False):
+            suffixes = ["weight", "bias"]
+            if batchnorm:
+                suffixes.extend(("running_mean", "running_var"))
+            return all(
+                (value := state.get(f"{name}.{suffix}")) is not None
+                and tuple(value.shape) == (width,)
+                for suffix in suffixes
+            )
+
         if model.__class__.__name__ == "Pilgrim":
             fmt = "batchnorm-folded"
             for label, module, expected in (
@@ -271,11 +288,19 @@ def _known_model(model, contract: GraphContract):
             blocks = len(model.residual_blocks)
             if inputs != contract.state_len * classes or h1_in != h1 or h2_in != h2:
                 raise NativeUnavailable("native BatchNorm model has incompatible linear dimensions")
-            if not isinstance(model.bn1, nn.BatchNorm1d) or not isinstance(model.bn2, nn.BatchNorm1d):
-                raise NativeUnavailable("native Pilgrim requires BatchNorm input and hidden layers")
-            for block in model.residual_blocks:
-                if not isinstance(block.bn1, nn.BatchNorm1d) or not isinstance(block.bn2, nn.BatchNorm1d):
-                    raise NativeUnavailable("native Pilgrim requires BatchNorm residual layers")
+            if (not linear_dimensions("input_layer", h1, inputs)
+                    or not linear_dimensions("hidden_layer", h2, h1)
+                    or not linear_dimensions("output_layer", outputs, h2)
+                    or not affine_dimensions("bn1", h1, batchnorm=True)
+                    or not affine_dimensions("bn2", h2, batchnorm=True)):
+                raise NativeUnavailable("native Pilgrim input, hidden, and output dimensions are incompatible")
+            for index, block in enumerate(model.residual_blocks):
+                prefix = f"residual_blocks.{index}"
+                if (not linear_dimensions(f"{prefix}.fc1", h2, h2)
+                        or not linear_dimensions(f"{prefix}.fc2", h2, h2)
+                        or not affine_dimensions(f"{prefix}.bn1", h2, batchnorm=True)
+                        or not affine_dimensions(f"{prefix}.bn2", h2, batchnorm=True)):
+                    raise NativeUnavailable("native Pilgrim residual block dimensions must equal hidden2")
 
             def linear(x, name):
                 bias = state.get(f"{name}.bias")
@@ -324,11 +349,23 @@ def _known_model(model, contract: GraphContract):
                 raise NativeUnavailable("native ResMLPDistance requires embedding_dim=16 and compatible state/hidden shapes")
             if classes < max(contract.state_len, contract.num_classes):
                 raise NativeUnavailable("native ResMLPDistance class table is too small")
-            if not isinstance(model.input_stack[1], nn.LayerNorm) or not isinstance(model.input_stack[4], nn.LayerNorm):
-                raise NativeUnavailable("native ResMLPDistance requires LayerNorm input layers")
-            for block in model.res_blocks:
-                if not isinstance(block.ln1, nn.LayerNorm) or not isinstance(block.ln2, nn.LayerNorm):
-                    raise NativeUnavailable("native ResMLPDistance requires LayerNorm residual layers")
+            if (not linear_dimensions("input_stack.0", h1, inputs)
+                    or not linear_dimensions("input_stack.3", h2, h1)
+                    or not linear_dimensions("head", outputs, h2)
+                    or tuple(model.input_stack[1].normalized_shape) != (h1,)
+                    or tuple(model.input_stack[4].normalized_shape) != (h2,)
+                    or not affine_dimensions("input_stack.1", h1)
+                    or not affine_dimensions("input_stack.4", h2)):
+                raise NativeUnavailable("native ResMLPDistance input, hidden, and output dimensions are incompatible")
+            for index, block in enumerate(model.res_blocks):
+                prefix = f"res_blocks.{index}"
+                if (not linear_dimensions(f"{prefix}.lin1", h2, h2)
+                        or not linear_dimensions(f"{prefix}.lin2", h2, h2)
+                        or tuple(block.ln1.normalized_shape) != (h2,)
+                        or tuple(block.ln2.normalized_shape) != (h2,)
+                        or not affine_dimensions(f"{prefix}.ln1", h2)
+                        or not affine_dimensions(f"{prefix}.ln2", h2)):
+                    raise NativeUnavailable("native ResMLPDistance residual block dimensions must equal hidden2")
 
             def linear(x, name):
                 bias = state.get(f"{name}.bias")

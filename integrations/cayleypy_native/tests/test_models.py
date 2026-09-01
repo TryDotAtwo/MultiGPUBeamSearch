@@ -165,6 +165,25 @@ class Pilgrim(nn.Module):
         return self.output_layer(x).squeeze(-1)
 
 
+@pytest.mark.parametrize("inner_width", [4, 16])
+def test_pilgrim_nonsquare_residual_is_unavailable_before_export(
+        tmp_path, contract, monkeypatch, inner_width):
+    import cayleypy_native.models as module
+
+    model = Pilgrim()
+    block = model.residual_blocks[0]
+    block.fc1 = nn.Linear(8, inner_width)
+    block.bn1 = nn.BatchNorm1d(inner_width)
+    block.fc2 = nn.Linear(inner_width, 8)
+    block.bn2 = nn.BatchNorm1d(8)
+    model.eval()
+    assert tuple(model(torch.tensor([[0, 1, 2, 3]])).shape) == (1,)
+    monkeypatch.setattr(module.subprocess, "run",
+                        lambda *a, **k: pytest.fail("unsupported residual shape launched exporter"))
+    with pytest.raises(NativeUnavailable, match="residual.*dimensions"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
 @pytest.mark.parametrize("customization", ["subclass_call", "subclass_children", "__call__", "score_children", "predict_batched", "_predict_as_tensor", "foreign_wrapper"])
 def test_custom_predictor_scoring_is_not_bypassed(tmp_path, contract, monkeypatch, customization):
     from types import SimpleNamespace
@@ -360,6 +379,25 @@ def test_known_resmlp_q_model_exports_layernorm_and_folded_embedding(tmp_path, c
     assert (prepared.weights_dir / "input_ln_gamma.fp16").stat().st_size == 32
     assert (prepared.weights_dir / "input_weight_hxk.fp16").stat().st_size == 4 * 4 * 16 * 2
     assert (prepared.weights_dir / "output_weight_hxk.fp16").stat().st_size == 8 * 3 * 2
+
+
+@pytest.mark.parametrize("inner_width", [4, 16])
+def test_resmlp_nonsquare_residual_is_unavailable_before_export(
+        tmp_path, contract, monkeypatch, inner_width):
+    import cayleypy_native.models as module
+
+    model = ResMLPDistance()
+    block = model.res_blocks[0]
+    block.lin1 = nn.Linear(8, inner_width)
+    block.ln1 = nn.LayerNorm(inner_width)
+    block.lin2 = nn.Linear(inner_width, 8)
+    block.ln2 = nn.LayerNorm(8)
+    model.eval()
+    assert tuple(model(torch.tensor([[0, 1, 2, 3]])).shape) == (1, 3)
+    monkeypatch.setattr(module.subprocess, "run",
+                        lambda *a, **k: pytest.fail("unsupported residual shape launched exporter"))
+    with pytest.raises(NativeUnavailable, match="residual.*dimensions"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 
 def test_resmlp_bias_free_first_linear_exports_zero_bias(tmp_path, contract):
