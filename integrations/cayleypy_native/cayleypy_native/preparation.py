@@ -8,7 +8,7 @@ import shutil
 import time
 import uuid
 
-from .backend import prepare_runtime, runtime_devices
+from .backend import prepare_runtime, runtime_devices, validate_touch_bfs_contract
 from .build import validate_runner
 from .contracts import GraphContract
 from .errors import NativeBackendError
@@ -47,6 +47,7 @@ def prepare_native(graph, predictor, *, native_options=None, fallback=None) -> P
     if not isinstance(options, NativeOptions):
         raise TypeError("native_options must be NativeOptions")
     contract = GraphContract.from_graph(graph, graph.definition.central_state)
+    validate_touch_bfs_contract(contract, options.touch_bfs_radius, options.touch_bfs_max_entries)
     devices = runtime_devices(graph, options)
     directory = options.cache_dir / "prepared" / uuid.uuid4().hex
     directory.mkdir(parents=True, exist_ok=False)

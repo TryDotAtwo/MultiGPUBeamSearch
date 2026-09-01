@@ -110,6 +110,25 @@ def test_dispatch_clamps_touch_bfs_to_the_requested_step_budget(tmp_path, monkey
     assert observed == [3]
 
 
+def test_dispatch_rejects_touch_bfs_bound_before_cuda_or_model(tmp_path, monkeypatch):
+    contract = SimpleNamespace(start=(1,), center=(0,), move_count=24)
+    monkeypatch.setattr(dispatch.GraphContract, "from_graph", lambda *args: contract)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("unsupported touch-BFS must be rejected before CUDA, model export, build, or launch")
+
+    for name in ("runtime_devices", "prepare_model", "prepare_runtime", "run_native"):
+        monkeypatch.setattr(dispatch, name, forbidden)
+    with pytest.raises(NativeUnavailable, match="worst-case host allocation"):
+        dispatch.beam_search(
+            graph(),
+            backend="native",
+            native_options=NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12),
+            start_state=[1, 0, 2, 3, 4],
+            max_steps=100,
+        )
+
+
 @pytest.mark.parametrize("return_path", [False, True])
 def test_bad_native_replay_is_an_error_even_without_return_path(tmp_path, monkeypatch, return_path):
     fake_native(monkeypatch, tmp_path, path=(0,))

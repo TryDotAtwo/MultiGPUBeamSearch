@@ -829,3 +829,8 @@
   shared prepared runner after the snapshot and confirms the worker still reads
   the original verified bytes. The complete suite remains at 217 passed and 2
   POSIX-only skips on Windows.
+- Moved graph-specific touch-BFS packing and geometric entry-budget validation
+  ahead of CUDA inspection and model preparation in both ordinary dispatch and
+  explicit `prepare_native`. Unsupported graph/radius pairs cannot trigger CUDA,
+  export, build, or worker work; the complete suite passes with 219 tests and 2
+  POSIX-only skips on Windows.

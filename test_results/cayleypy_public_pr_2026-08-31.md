@@ -262,3 +262,16 @@ complete Windows adapter suite passed:
 ```text
 217 passed, 2 skipped
 ```
+
+## Early touch-BFS capability rejection
+
+Graph-specific touch-BFS packing and geometric entry bounds are now checked
+immediately after the graph contract and effective depth budget are known. Both
+ordinary `graph.beam_search(...)` dispatch and explicit `prepare_native(...)`
+reject unsupported graph/radius combinations before CUDA inspection, model
+export, native build, or worker launch. Regressions make every later preflight
+entry point fail if called. The complete Windows adapter suite passed:
+
+```text
+219 passed, 2 skipped
+```

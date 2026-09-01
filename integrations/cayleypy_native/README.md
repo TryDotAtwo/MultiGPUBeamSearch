@@ -150,12 +150,13 @@ and effective budgets are recorded in each run's metadata.
 
 Touch-BFS host expansion is capped at 1,048,576 entries by default. Set a
 different finite positive uint64 budget with
-`NativeOptions(touch_bfs_max_entries=...)`. Before CUDA inspection or a build,
-the adapter requires the duplicate-free geometric worst case for the effective
-radius to fit this budget. This conservative check may reject a neighborhood
-that would fit only because many generated states coincide. The native builder
-also caps each next-frontier reservation to the remaining budget. The entry
-budget and accepted worst-case size are recorded in run metadata.
+`NativeOptions(touch_bfs_max_entries=...)`. Before CUDA inspection, model export
+or a build, both normal search and `prepare_native(...)` require the
+duplicate-free geometric worst case for the effective radius to fit this budget.
+This conservative check may reject a neighborhood that would fit only because
+many generated states coincide. The native builder also caps each next-frontier
+reservation to the remaining budget. The entry budget and accepted worst-case
+size are recorded in run metadata.
 
 ## Backend selection
 

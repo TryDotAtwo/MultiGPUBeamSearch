@@ -89,15 +89,20 @@ def touch_bfs_worst_case_entries(move_count: int, radius: int, max_entries: int)
     return total
 
 
+def validate_touch_bfs_contract(contract, radius: int, max_entries: int) -> int:
+    """Reject graph/radius combinations before any CUDA or model preparation."""
+    if radius and contract.move_count > 32:
+        raise NativeUnavailable("native touch-BFS suffix packing supports at most 32 generators")
+    return touch_bfs_worst_case_entries(contract.move_count, radius, max_entries)
+
+
 def prepare_runtime(contract, model, options, run_dir, devices, *,
                     touch_bfs_radius: int | None = None) -> PreparedRuntime:
     """Resolve/build before dispatch closes its capability fallback window."""
     radius = options.touch_bfs_radius if touch_bfs_radius is None else touch_bfs_radius
     if type(radius) is not int or radius < 0:
         raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
-    if radius and contract.move_count > 32:
-        raise NativeUnavailable("native touch-BFS suffix packing supports at most 32 generators")
-    touch_bfs_worst_case_entries(contract.move_count, radius, options.touch_bfs_max_entries)
+    validate_touch_bfs_contract(contract, radius, options.touch_bfs_max_entries)
     # Stream1's scalar head has a separate kernel. The Q head uses unpadded
     # row-major CUTLASS GEMM with eight-element B/C/D access alignment.
     if model.backend == "mlp" and model.manifest["output_dim"] != 1 and model.manifest["output_dim"] % 8:
@@ -391,10 +396,8 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if max_steps == 0:
         return NativeOutcome(None, 0.0, None, run_dir, {"budget_exhausted": True})
     forward_depth_limit, effective_touch_bfs_radius = native_depth_budget(max_steps, options.touch_bfs_radius)
-    if effective_touch_bfs_radius and contract.move_count > 32:
-        raise NativeUnavailable("native touch-BFS suffix packing supports at most 32 generators")
-    touch_bfs_worst_case = touch_bfs_worst_case_entries(
-        contract.move_count, effective_touch_bfs_radius, options.touch_bfs_max_entries
+    touch_bfs_worst_case = validate_touch_bfs_contract(
+        contract, effective_touch_bfs_radius, options.touch_bfs_max_entries
     )
     if runtime is None:
         runtime = prepare_runtime(contract, model, options, run_dir, devices,

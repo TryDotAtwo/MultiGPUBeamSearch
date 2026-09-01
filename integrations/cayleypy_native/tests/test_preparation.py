@@ -102,6 +102,22 @@ def test_unknown_runtime_is_strict_and_does_not_export(configured, monkeypatch):
     assert not options.cache_dir.exists()
 
 
+def test_prepare_rejects_touch_bfs_bound_before_cuda_or_export(tmp_path, monkeypatch):
+    contract = SimpleNamespace(move_count=24)
+    monkeypatch.setattr(preparation.GraphContract, "from_graph", lambda *args: contract)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("unsupported touch-BFS must be rejected before CUDA, model export, or build")
+
+    for name in ("runtime_devices", "prepare_model", "prepare_runtime"):
+        monkeypatch.setattr(preparation, name, forbidden)
+    options = NativeOptions(cache_dir=tmp_path / "cache", touch_bfs_radius=12)
+    graph = SimpleNamespace(definition=SimpleNamespace(central_state=(0,)))
+    with pytest.raises(NativeUnavailable, match="worst-case host allocation"):
+        prepare_native(graph, object(), native_options=options)
+    assert not options.cache_dir.exists()
+
+
 def test_loaded_model_export_runs_once_and_repeated_validation_uses_snapshot(configured, monkeypatch):
     graph, source_model, options, calls = configured
     loaded_predictor = object()
