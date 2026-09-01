@@ -45,6 +45,37 @@ def test_auto_fallback_preserves_original_result_and_reason(tmp_path, monkeypatc
     assert torch.equal(g.apply_path([1, 0, 2, 3, 4], result.path).reshape(-1), g.central_state)
 
 
+def test_auto_cpu_fallback_does_not_touch_unavailable_cache(tmp_path, monkeypatch):
+    blocked_cache = tmp_path / "cache-is-a-file"
+    blocked_cache.write_text("native cache must not be touched before CUDA preflight")
+    monkeypatch.setattr(
+        dispatch, "runtime_devices",
+        lambda *args: (_ for _ in ()).throw(NativeUnavailable("test: CPU-only host")),
+    )
+    result = dispatch.beam_search(
+        graph(),
+        native_options=NativeOptions(cache_dir=blocked_cache, warn_on_fallback=False),
+        start_state=[1, 0, 2, 3, 4],
+        return_path=True,
+    )
+    assert result.path == [2]
+    assert blocked_cache.is_file()
+
+
+def test_auto_cache_creation_failure_is_a_capability_fallback(tmp_path, monkeypatch):
+    blocked_cache = tmp_path / "cache-is-a-file"
+    blocked_cache.write_text("test-only obstruction")
+    monkeypatch.setattr(dispatch, "runtime_devices", lambda *args: (0,))
+    with pytest.warns(NativeFallbackWarning, match="cache run directory"):
+        result = dispatch.beam_search(
+            graph(),
+            native_options=NativeOptions(cache_dir=blocked_cache),
+            start_state=[1, 0, 2, 3, 4],
+            return_path=True,
+        )
+    assert result.path == [2]
+
+
 def test_strict_native_never_falls_back(tmp_path, monkeypatch):
     def unavailable(*args):
         raise NativeUnavailable("no CUDA")
@@ -191,6 +222,7 @@ def test_unsupported_build_falls_back_before_worker(tmp_path, monkeypatch):
         result = dispatch.beam_search(graph(), native_options=NativeOptions(cache_dir=tmp_path),
                                       start_state=[1, 0, 2, 3, 4], return_path=True)
     assert result.path == [2] and not calls
+    assert not list((tmp_path / "runs").glob("*"))
 
 
 def test_native_unavailable_after_launch_is_not_fallback(tmp_path, monkeypatch):

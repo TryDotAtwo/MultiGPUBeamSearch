@@ -170,6 +170,12 @@ Already-solved states and zero-step budgets return directly after graph/argument
 validation. They do not probe CUDA, inspect a model artifact, compile, or launch a
 worker, so these deterministic boundary cases also work on a CPU-only host.
 
+In `auto` mode, CUDA/runtime viability is checked before creating a cache run
+directory. An unavailable cache is itself a preflight fallback reason, and a
+later unsupported model/build removes its fresh private run directory before the
+original CayleyPy method is called. Strict `native` failures retain any created
+artifacts for diagnosis.
+
 Importing the package does not activate it. `enable_native(...)` registers `auto`
 and `native` using CayleyPy's public backend hook, without replacing
 `CayleyGraph.beam_search`. `disable_native()` restores the previous default and

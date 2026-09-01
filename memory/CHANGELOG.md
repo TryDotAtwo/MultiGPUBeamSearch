@@ -834,3 +834,8 @@
   explicit `prepare_native`. Unsupported graph/radius pairs cannot trigger CUDA,
   export, build, or worker work; the complete suite passes with 219 tests and 2
   POSIX-only skips on Windows.
+- Deferred per-search cache creation until CUDA/runtime capability succeeds.
+  `auto` now falls back cleanly when the cache cannot be created and removes its
+  fresh UUID run directory when later model/build preparation is unsupported;
+  strict `native` retains diagnostic artifacts. The suite passes with 221 tests
+  and 2 POSIX-only skips on Windows.

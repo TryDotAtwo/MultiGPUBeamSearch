@@ -5,6 +5,7 @@ import inspect
 import functools
 import json
 from pathlib import Path
+import shutil
 import threading
 import uuid
 import warnings
@@ -145,22 +146,44 @@ def _write_metadata(path: Path, metadata):
     path.write_text(json.dumps(metadata, indent=2, default=str) + "\n", encoding="utf-8")
 
 
+def _create_run_dir(options: NativeOptions) -> Path:
+    run_dir = options.cache_dir / "runs" / uuid.uuid4().hex
+    try:
+        run_dir.mkdir(parents=True, exist_ok=False)
+    except OSError as error:
+        raise NativeUnavailable(f"native cache run directory is unavailable: {error}") from error
+    return run_dir
+
+
+def _discard_fallback_run(run_dir: Path | None) -> None:
+    if run_dir is None:
+        return
+    try:
+        if run_dir.is_symlink():
+            run_dir.unlink()
+        else:
+            shutil.rmtree(run_dir)
+    except OSError:
+        pass
+
+
 def _search(original, graph, kwargs, options, mode):
     mode = _mode(mode)
     if mode == "torch":
         return _torch_call(original, graph, kwargs)
     # NativeUnavailable is recoverable only inside the capability/preparation phase.
+    run_dir = None
     try:
         params = _parameters(kwargs)
         contract = GraphContract.from_graph(graph, params["start_state"])
-        run_dir = options.cache_dir / "runs" / uuid.uuid4().hex
-        run_dir.mkdir(parents=True, exist_ok=False)
         trivial = contract.start == contract.center or params["max_steps"] == 0
         devices, model, runtime = (), None, None
         if not trivial:
             _, effective_touch_bfs_radius = native_depth_budget(params["max_steps"], options.touch_bfs_radius)
             validate_touch_bfs_contract(contract, effective_touch_bfs_radius, options.touch_bfs_max_entries)
             devices = runtime_devices(graph, options)
+        run_dir = _create_run_dir(options)
+        if not trivial:
             model = prepare_model(params["predictor"], contract, options, run_dir)
             if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
                 raise NativeUnavailable("native Q models require use_child_scores=True")
@@ -169,6 +192,7 @@ def _search(original, graph, kwargs, options, mode):
     except NativeUnavailable as exc:
         if mode == "native":
             raise
+        _discard_fallback_run(run_dir)
         predictor = kwargs.get("predictor")
         if isinstance(predictor, NativeModel) and predictor.fallback is None:
             raise NativeUnavailable(f"{exc}; NativeModel has no fallback predictor") from exc

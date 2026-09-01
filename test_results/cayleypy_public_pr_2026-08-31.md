@@ -275,3 +275,18 @@ entry point fail if called. The complete Windows adapter suite passed:
 ```text
 219 passed, 2 skipped
 ```
+
+## Lazy run-directory creation and fallback cleanup
+
+`backend="auto"` now completes graph and CUDA/runtime capability checks before
+creating a per-search cache directory. A CPU-only or otherwise unsupported
+runtime therefore cannot fail because the native cache is read-only or
+unavailable. Cache-creation errors become explicit preflight fallback reasons,
+and later unsupported model/build preparation removes its own fresh UUID run
+directory before calling the original CayleyPy search. Strict `native` mode
+retains created artifacts for diagnosis. Regressions cover all three paths; the
+complete Windows adapter suite passed:
+
+```text
+221 passed, 2 skipped
+```
