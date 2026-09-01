@@ -264,6 +264,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     nccl_dir.mkdir()
     nccl_library = nccl_dir / "libnccl.so.2"
     nccl_library.write_bytes(b"test-only library bytes")
+    original_nccl = nccl_library.read_bytes()
     nccl_sha = build.file_sha256(nccl_library)
     fake_runner = tmp_path / "test-only-runner"
     fake_runner.write_bytes(b"test-only runner bytes")
@@ -277,6 +278,10 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         assert (kwargs["cwd"] / "test_results").is_dir(), "native solution logging requires private test_results"
         assert Path(command[0]) == kwargs["cwd"] / "production_runner"
         assert Path(command[0]).read_bytes() == b"test-only runner bytes"
+        nccl_library.write_bytes(b"replacement after verified NCCL snapshot")
+        loader_dirs = kwargs["env"]["LD_LIBRARY_PATH"].split(os.pathsep)
+        assert Path(loader_dirs[0]) == kwargs["cwd"] / "runtime-libs"
+        assert (Path(loader_dirs[0]) / "libnccl.so.2").read_bytes() == original_nccl
         observed.update(command=command, **kwargs)
         kwargs["log_path"].write_text("GLOBAL_BEAM_WIDTH_EFFECTIVE=1024\npuzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n")
         return 0.1
@@ -311,8 +316,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     # Its unbounded default of 8192 child rows rejects every candidate.
     assert int(observed["env"]["BEAM_B_MICRO"]) <= 2048
     assert observed["env"]["BEAM_HISTORY_MODE"] == "disk"
-    assert observed["env"]["LD_LIBRARY_PATH"] == str(nccl_dir) + os.pathsep + "/unrelated/library/path"
-    nccl_library.write_bytes(b"test-only replaced library")
+    assert observed["env"]["LD_LIBRARY_PATH"] == str(tmp_path / "run/runtime-libs") + os.pathsep + "/unrelated/library/path"
     monkeypatch.setattr(backend, "run_process", lambda *args, **kwargs: pytest.fail("changed NCCL must prevent launch"))
     with pytest.raises(NativeBackendError, match="NCCL library changed"):
         backend.run_native(contract, model, options, 1000, 4, tmp_path / "run-replaced", (0,))
@@ -366,10 +370,13 @@ def test_worker_uses_private_model_and_runner_snapshots_before_launch(monkeypatc
 
     runner = tmp_path / "runner"
     runner.write_bytes(b"test-only runner")
+    nccl_library = tmp_path / "libnccl.so.2"
+    nccl_library.write_bytes(b"test-only NCCL")
     metadata = {
         "shape": shape_contract(contract),
         "backend": "mlp",
         "binary_sha256": file_sha256(runner),
+        "nccl": {"library": str(nccl_library), "library_sha256": file_sha256(nccl_library)},
     }
     runtime = PreparedRuntime(runner, metadata, (75,))
     original_runner = runner.read_bytes()
@@ -430,8 +437,12 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (7, 5))
     fake_runner = tmp_path / "test-only-runner"
     fake_runner.write_bytes(b"test-only runner bytes")
+    nccl_library = tmp_path / "libnccl.so.2"
+    nccl_library.write_bytes(b"test-only NCCL")
     monkeypatch.setattr(build, "ensure_runner", lambda *args: (
-        fake_runner, {"test_only": True, "binary_sha256": build.file_sha256(fake_runner)}))
+        fake_runner, {"test_only": True, "binary_sha256": build.file_sha256(fake_runner),
+                      "nccl": {"library": str(nccl_library),
+                               "library_sha256": build.file_sha256(nccl_library)}}))
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     run = tmp_path / "run"
 

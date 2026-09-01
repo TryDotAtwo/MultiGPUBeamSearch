@@ -844,3 +844,9 @@
   could retain the old SHA256. Runtime string values must also use the literal
   encoding consumed by the native C++ parser. The suite passes with 224 tests
   and 2 POSIX-only skips on Windows.
+- Closed the NCCL launch dependency race by copying the build-pinned library
+  bytes into each search's private `runtime-libs/libnccl.so.2`, validating that
+  copy against `library_sha256`, and placing only that directory first on the
+  worker's `LD_LIBRARY_PATH`. A regression replaces the installed source after
+  snapshot creation and confirms the private loader target remains unchanged;
+  the suite remains at 224 tests and 2 POSIX-only skips on Windows.

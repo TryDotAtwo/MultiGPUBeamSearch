@@ -240,7 +240,8 @@ unchanged.
 
 Alternatively, set `runner_path` to a trusted existing executable. Its sibling
 `native-build.json` must match schema version 1, shape, backend, CUDA architectures
-and the binary SHA256. The wrapper-generated file is the reference format. Do not
+and the binary SHA256, and must retain the exact NCCL library path and SHA256 used
+for the build. The wrapper-generated file is the reference format. Do not
 manufacture metadata for an unverified binary.
 
 Device indices are relative to PyTorch's current visible devices. An inherited
@@ -343,11 +344,14 @@ snapshot; prepare explicitly again to use new weights. Prepared model bytes,
 including the exact `manifest.json` serialization, are pinned by SHA256, and
 changing a snapshot artifact raises `NativeBackendError`.
 Each search still checks graph/device compatibility, copies the exact prepared
-artifact and verified runner into its private run directory, validates both
-copies against their pinned hashes, then rehashes every private manifest/blob
-byte after runtime preparation and immediately before launching fresh native
-workers. Workers execute only the private runner copy. Successful paths are
-independently replayed.
+artifact, verified runner and build-pinned NCCL shared library into its private
+run directory, and validates every copy against its pinned hash. The private
+NCCL bytes are stored as `runtime-libs/libnccl.so.2`, first on the worker's
+`LD_LIBRARY_PATH`, so a concurrent package upgrade cannot change the loaded
+dependency. The adapter then rehashes every private manifest/blob byte after
+runtime preparation and immediately before launching fresh native workers.
+Workers execute only the private runner copy. Successful paths are independently
+replayed.
 It skips exporter subprocesses, compiler/source discovery and source/CUTLASS
 tree scans. This is not a persistent worker or a GPU-resident model cache.
 

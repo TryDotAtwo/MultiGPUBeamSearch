@@ -21,6 +21,7 @@ from .options import NativeOutcome
 
 _RANK_KEYS = {"RANK", "LOCAL_RANK", "WORLD_SIZE", "LOCAL_WORLD_SIZE", "GROUP_RANK", "ROLE_RANK",
               "ROLE_WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT", "NODE_RANK", "OMP_NUM_THREADS"}
+_NCCL_LOADER_NAME = "libnccl.so.2"
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,53 @@ def snapshot_runtime_runner(runtime: PreparedRuntime, run_dir: Path) -> Path:
                 staging.unlink()
             except OSError:
                 pass
+
+
+def snapshot_runtime_nccl(runtime: PreparedRuntime, run_dir: Path) -> Path:
+    """Copy the build-pinned NCCL bytes under the ELF loader-visible name."""
+    from .build import file_sha256
+
+    run_dir = Path(run_dir).resolve()
+    nccl = runtime.build_metadata.get("nccl")
+    if not isinstance(nccl, dict) or not isinstance(nccl.get("library"), str):
+        raise NativeBackendError("native build metadata has no valid NCCL provenance")
+    expected = nccl.get("library_sha256")
+    if not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}", expected) is None:
+        raise NativeBackendError("native build metadata has no valid NCCL library SHA256")
+
+    source = Path(nccl["library"]).resolve()
+    target_dir = run_dir / "runtime-libs"
+    target = target_dir / _NCCL_LOADER_NAME
+    staging = target_dir / ("." + _NCCL_LOADER_NAME + ".tmp")
+    if target_dir.exists() or target_dir.is_symlink():
+        raise NativeBackendError(f"private native runtime library directory already exists at {target_dir}")
+
+    published = False
+    try:
+        target_dir.mkdir()
+        shutil.copyfile(source, staging)
+        staging.chmod(0o500)
+        if file_sha256(staging) != expected:
+            raise NativeBackendError("native NCCL library changed while its private snapshot was copied")
+        staging.replace(target)
+        published = True
+        return target
+    except NativeBackendError:
+        raise
+    except OSError as error:
+        raise NativeBackendError(f"could not create private native NCCL snapshot: {error}") from error
+    finally:
+        if not published:
+            if staging.exists():
+                try:
+                    staging.unlink()
+                except OSError:
+                    pass
+            if target_dir.exists():
+                try:
+                    target_dir.rmdir()
+                except OSError:
+                    pass
 
 
 def touch_bfs_worst_case_entries(move_count: int, radius: int, max_entries: int) -> int:
@@ -430,22 +478,12 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     (run_dir / "runtime-config.json").write_text(json.dumps(
         {"mode": "auto", "microbatch": microbatch_metadata, "search_budget": search_budget}, indent=2
     ) + "\n", encoding="utf-8")
-    nccl = build_metadata.get("nccl")
-    if nccl is not None:
-        if not isinstance(nccl, dict) or not isinstance(nccl.get("library"), str):
-            raise NativeBackendError("native build metadata contains invalid NCCL provenance")
-        from .build import file_sha256
-        library = Path(nccl["library"])
-        try:
-            if file_sha256(library) != nccl.get("library_sha256"):
-                raise NativeBackendError("native NCCL library changed since build preparation")
-        except OSError as exc:
-            raise NativeBackendError("native NCCL library is unavailable before launch") from exc
-        # LD_LIBRARY_PATH takes precedence over the build RPATH. Keep the
-        # dependency chosen during preparation first in the private child.
-        nccl_dir = str(library.parent)
-        inherited_ld = env.get("LD_LIBRARY_PATH", "")
-        env["LD_LIBRARY_PATH"] = nccl_dir + (os.pathsep + inherited_ld if inherited_ld else "")
+    nccl_library = snapshot_runtime_nccl(runtime, run_dir)
+    # LD_LIBRARY_PATH takes precedence over CMake's build RUNPATH. The runner
+    # therefore loads only the verified private NCCL snapshot under its SONAME.
+    inherited_ld = env.get("LD_LIBRARY_PATH", "")
+    nccl_dir = str(nccl_library.parent)
+    env["LD_LIBRARY_PATH"] = nccl_dir + (os.pathsep + inherited_ld if inherited_ld else "")
     if model.backend == "piece_transformer":
         env["BEAM_STREAM1_EXECUTOR"] = "libtorch_eager"
     # Legacy production_runner writes its solution/no-solution logs here.

@@ -303,3 +303,17 @@ fix and are covered by regressions; the complete Windows adapter suite passed:
 ```text
 224 passed, 2 skipped
 ```
+
+## Private NCCL launch snapshot
+
+The worker no longer searches the mutable installed NCCL directory after its
+library SHA256 is checked. Each search copies the pinned bytes into its private
+`runtime-libs/libnccl.so.2`, validates the copy, and places that directory first
+on `LD_LIBRARY_PATH`. The regression replaces the installed source library after
+snapshot creation but before the fake worker opens its dependency, then confirms
+that the loader path still exposes the original verified bytes. The complete
+Windows adapter suite remains:
+
+```text
+224 passed, 2 skipped
+```
