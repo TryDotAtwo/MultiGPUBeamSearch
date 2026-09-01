@@ -265,13 +265,18 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     nccl_library = nccl_dir / "libnccl.so.2"
     nccl_library.write_bytes(b"test-only library bytes")
     nccl_sha = build.file_sha256(nccl_library)
-    monkeypatch.setattr(build, "ensure_runner", lambda *args: (tmp_path / "test-only-runner",
-                        {"test_only": True, "nccl": {"library": str(nccl_library), "library_sha256": nccl_sha}}))
+    fake_runner = tmp_path / "test-only-runner"
+    fake_runner.write_bytes(b"test-only runner bytes")
+    monkeypatch.setattr(build, "ensure_runner", lambda *args: (fake_runner,
+                        {"test_only": True, "binary_sha256": build.file_sha256(fake_runner),
+                         "nccl": {"library": str(nccl_library), "library_sha256": nccl_sha}}))
     monkeypatch.setenv("LD_LIBRARY_PATH", "/unrelated/library/path")
     observed = {}
 
     def fake_process(command, **kwargs):
         assert (kwargs["cwd"] / "test_results").is_dir(), "native solution logging requires private test_results"
+        assert Path(command[0]) == kwargs["cwd"] / "production_runner"
+        assert Path(command[0]).read_bytes() == b"test-only runner bytes"
         observed.update(command=command, **kwargs)
         kwargs["log_path"].write_text("GLOBAL_BEAM_WIDTH_EFFECTIVE=1024\npuzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n")
         return 0.1
@@ -313,7 +318,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         backend.run_native(contract, model, options, 1000, 4, tmp_path / "run-replaced", (0,))
 
 
-def test_worker_uses_private_model_snapshot_and_rehashes_it_before_launch(monkeypatch, tmp_path):
+def test_worker_uses_private_model_and_runner_snapshots_before_launch(monkeypatch, tmp_path):
     import cayleypy_native.backend as backend
     from cayleypy_native.backend import PreparedRuntime
     from cayleypy_native.build import file_sha256, shape_contract
@@ -367,9 +372,16 @@ def test_worker_uses_private_model_snapshot_and_rehashes_it_before_launch(monkey
         "binary_sha256": file_sha256(runner),
     }
     runtime = PreparedRuntime(runner, metadata, (75,))
+    original_runner = runner.read_bytes()
     (weights / "output_bias.fp16").write_bytes(b"\x01\x00")  # Same-size caller mutation.
 
     def fake_process(command, **kwargs):
+        launched_runner = Path(command[0])
+        assert launched_runner == kwargs["cwd"] / "production_runner"
+        assert launched_runner != runner.resolve()
+        assert launched_runner.read_bytes() == original_runner
+        runner.write_bytes(b"replacement after verified launch snapshot")
+        assert launched_runner.read_bytes() == original_runner
         launched_weights = Path(kwargs["env"]["BEAM_WEIGHT_DIR"])
         assert launched_weights == model.weights_dir
         assert launched_weights != weights.resolve()
@@ -386,6 +398,7 @@ def test_worker_uses_private_model_snapshot_and_rehashes_it_before_launch(monkey
                                  tmp_path / "run", (0,), runtime=runtime)
     assert outcome.path == (1,)
 
+    runner.write_bytes(original_runner)
     (model.weights_dir / "output_bias.fp16").write_bytes(b"\x02\x00")
     monkeypatch.setattr(backend, "run_process",
                         lambda *a, **k: pytest.fail("changed private snapshot reached worker launch"))
@@ -415,7 +428,10 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
     model = SimpleNamespace(weights_dir=tmp_path / "weights", backend="mlp", artifact_hash="model",
                             manifest={"dtype": "fp16", "output_dim": 1})
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (7, 5))
-    monkeypatch.setattr(build, "ensure_runner", lambda *args: (tmp_path / "test-only-runner", {"test_only": True}))
+    fake_runner = tmp_path / "test-only-runner"
+    fake_runner.write_bytes(b"test-only runner bytes")
+    monkeypatch.setattr(build, "ensure_runner", lambda *args: (
+        fake_runner, {"test_only": True, "binary_sha256": build.file_sha256(fake_runner)}))
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     run = tmp_path / "run"
 
@@ -423,6 +439,8 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
         assert (kwargs["cwd"] / "test_results").is_dir()
         assert f"--log-dir={run / 'worker-logs'}" in command
         assert "--redirects=3" in command and "--max-restarts=0" in command
+        assert str(run / "production_runner") in command
+        assert (run / "production_runner").read_bytes() == b"test-only runner bytes"
         assert kwargs["log_path"] == run / "launcher.log"
         kwargs["log_path"].write_text("test-only launcher diagnostic\n")
         _rank_stream_fixture(run / "worker-logs", 0, terminal=True)

@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 import re
 import signal
+import shutil
 import subprocess
 import sys
 import time
@@ -27,6 +28,43 @@ class PreparedRuntime:
     runner: Path
     build_metadata: dict
     architectures: tuple[int, ...]
+
+
+def snapshot_runtime_runner(runtime: PreparedRuntime, run_dir: Path) -> Path:
+    """Copy the verified executable into the fresh run directory before exec."""
+    from .build import file_sha256
+
+    run_dir = Path(run_dir).resolve()
+    source = Path(runtime.runner).resolve()
+    target = run_dir / "production_runner"
+    expected = runtime.build_metadata.get("binary_sha256")
+    if not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}", expected) is None:
+        raise NativeBackendError("native build metadata has no valid runner SHA256")
+    if target.exists() or target.is_symlink():
+        raise NativeBackendError(f"private native runner snapshot already exists at {target}")
+
+    staging = run_dir / ".production_runner.tmp"
+    if staging.exists() or staging.is_symlink():
+        raise NativeBackendError(f"private native runner staging path already exists at {staging}")
+    published = False
+    try:
+        shutil.copyfile(source, staging)
+        staging.chmod(0o700)
+        if file_sha256(staging) != expected:
+            raise NativeBackendError("native runner changed while its private snapshot was copied")
+        staging.replace(target)
+        published = True
+        return target
+    except NativeBackendError:
+        raise
+    except OSError as error:
+        raise NativeBackendError(f"could not create private native runner snapshot: {error}") from error
+    finally:
+        if not published and staging.exists():
+            try:
+                staging.unlink()
+            except OSError:
+                pass
 
 
 def touch_bfs_worst_case_entries(move_count: int, radius: int, max_entries: int) -> int:
@@ -362,14 +400,11 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         runtime = prepare_runtime(contract, model, options, run_dir, devices,
                                   touch_bfs_radius=effective_touch_bfs_radius)
     else:
-        # Fail closed if the verified executable was replaced after preparation.
-        from .build import file_sha256, shape_contract
+        from .build import shape_contract
         if (runtime.build_metadata.get("shape") != shape_contract(contract)
                 or runtime.build_metadata.get("backend") != model.backend):
             raise NativeBackendError("prepared native runner does not match graph/model")
-        if not runtime.runner.is_file() or file_sha256(runtime.runner) != runtime.build_metadata.get("binary_sha256"):
-            raise NativeBackendError("prepared native runner changed before launch")
-    runner, build_metadata = runtime.runner, runtime.build_metadata
+    build_metadata = runtime.build_metadata
     puzzle = run_dir / "puzzle_info.json"
     puzzle.write_text(json.dumps(contract.to_puzzle_info()) + "\n", encoding="utf-8")
     inputs = run_dir / "test.csv"
@@ -415,6 +450,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     legacy_results.mkdir(exist_ok=True)
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
+    runner = snapshot_runtime_runner(runtime, run_dir)
     args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
     log = run_dir / "native.log"
     process_log = log

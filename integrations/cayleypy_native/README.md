@@ -332,9 +332,10 @@ Later mutation or retraining of the original model does not update this
 snapshot; prepare explicitly again to use new weights. Prepared model bytes are
 pinned by SHA256, and changing a snapshot artifact raises `NativeBackendError`.
 Each search still checks graph/device compatibility, copies the exact prepared
-artifact into its private run directory, hashes the verified binary, then
-rehashes every private manifest/blob byte after runtime preparation and
-immediately before launching fresh native workers. Successful paths are
+artifact and verified runner into its private run directory, validates both
+copies against their pinned hashes, then rehashes every private manifest/blob
+byte after runtime preparation and immediately before launching fresh native
+workers. Workers execute only the private runner copy. Successful paths are
 independently replayed.
 It skips exporter subprocesses, compiler/source discovery and source/CUTLASS
 tree scans. This is not a persistent worker or a GPU-resident model cache.

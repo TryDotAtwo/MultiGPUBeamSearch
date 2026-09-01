@@ -823,3 +823,9 @@
   These hooks execute outside each module's local hook dictionaries and cannot
   be preserved by a native artifact. Both public registration paths are covered;
   the complete suite passes with 217 tests and 2 POSIX-only skips on Windows.
+- Closed the prepared-runner launch race by copying the executable into the
+  fresh per-search run directory, checking that private copy against the pinned
+  build SHA256, and launching only the private path. A regression replaces the
+  shared prepared runner after the snapshot and confirms the worker still reads
+  the original verified bytes. The complete suite remains at 217 passed and 2
+  POSIX-only skips on Windows.

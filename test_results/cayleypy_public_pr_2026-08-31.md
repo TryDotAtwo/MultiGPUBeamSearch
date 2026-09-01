@@ -248,3 +248,17 @@ so no process state leaks between tests. The complete suite passed:
 ```text
 217 passed, 2 skipped
 ```
+
+## Private runner launch snapshot
+
+The adapter no longer verifies a shared prepared runner and later opens that
+same mutable path in the worker. Every nontrivial search copies the runner into
+its fresh run directory, checks the private copy against the pinned build
+SHA256, and passes only that private path to direct or `torchrun` workers. The
+regression replaces the shared runner immediately after snapshot creation and
+confirms that the launched private executable retains the verified bytes. The
+complete Windows adapter suite passed:
+
+```text
+217 passed, 2 skipped
+```
