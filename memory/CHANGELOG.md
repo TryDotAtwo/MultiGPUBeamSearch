@@ -818,3 +818,8 @@
   a clean CUDA 12.8 container compiled and linked `production_runner` for SM75,
   and the built MIT-licensed wheel passed installed-package smoke tests against
   both released CayleyPy 0.1.0 and the companion public-hook checkout.
+- Auto-export now rejects process-global PyTorch forward and pre-forward hooks
+  before model inspection and checks the registries again after semantic probes.
+  These hooks execute outside each module's local hook dictionaries and cannot
+  be preserved by a native artifact. Both public registration paths are covered;
+  the complete suite passes with 217 tests and 2 POSIX-only skips on Windows.

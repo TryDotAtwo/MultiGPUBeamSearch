@@ -127,6 +127,9 @@ Runtime manifest keys must be literal, unique and top-level so the adapter and
 the native runner cannot interpret the same artifact differently.
 Every FP16/BF16 weight blob is decoded and checked for finite values before use;
 this also catches overflow introduced by FP16 conversion or BatchNorm folding.
+Auto-export also requires PyTorch's process-global forward/pre-forward hook
+registries to remain empty while inference semantics are validated; global
+hooks cannot be represented by the native artifact.
 For a manually supplied `NativeModel`, the adapter copies only the validated
 manifest and required blobs into the private directory for that search. The
 copy must retain the validated content hash, and only that private snapshot is

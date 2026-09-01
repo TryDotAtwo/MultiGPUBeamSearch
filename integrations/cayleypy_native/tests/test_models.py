@@ -192,6 +192,29 @@ class Pilgrim(nn.Module):
         return self.output_layer(x).squeeze(-1)
 
 
+@pytest.mark.parametrize("kind", ["pre", "post"])
+def test_global_forward_hooks_are_rejected_before_export(tmp_path, contract, monkeypatch, kind):
+    import cayleypy_native.models as module
+    from torch.nn.modules import module as torch_module
+
+    model = Pilgrim().eval()
+    if kind == "pre":
+        handle = torch_module.register_module_forward_pre_hook(
+            lambda _module, inputs: inputs
+        )
+    else:
+        handle = torch_module.register_module_forward_hook(
+            lambda _module, _inputs, output: output
+        )
+    monkeypatch.setattr(module.subprocess, "run",
+                        lambda *a, **k: pytest.fail("global forward hook reached exporter"))
+    try:
+        with pytest.raises(NativeUnavailable, match="global forward hooks"):
+            prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+    finally:
+        handle.remove()
+
+
 @pytest.mark.parametrize("inner_width", [4, 16])
 def test_pilgrim_nonsquare_residual_is_unavailable_before_export(
         tmp_path, contract, monkeypatch, inner_width):

@@ -230,12 +230,26 @@ def _snapshot_artifact(model: PreparedModel, contract: GraphContract, run_dir: P
             shutil.rmtree(staging, ignore_errors=True)
 
 
+def _require_no_global_forward_hooks() -> None:
+    from torch.nn.modules import module as torch_module
+
+    registries = (
+        "_global_forward_pre_hooks",
+        "_global_forward_hooks",
+        "_global_forward_hooks_always_called",
+        "_global_forward_hooks_with_kwargs",
+    )
+    if any(getattr(torch_module, name, None) for name in registries):
+        raise NativeUnavailable("native auto-export does not accept global forward hooks")
+
+
 def _known_model(model, contract: GraphContract):
     """Return exporter format and plain CPU tensors after checking exact inference semantics."""
     import torch
     from torch import nn
     from torch.nn import functional as F
 
+    _require_no_global_forward_hooks()
     if not isinstance(model, nn.Module) or model.__class__.__name__ not in ("Pilgrim", "ResMLPDistance"):
         raise NativeUnavailable("predictor is not a supported Pilgrim/ResMLPDistance native model; use NativeModel for an exported artifact")
     if (model.__class__.__getattribute__ is not nn.Module.__getattribute__
@@ -473,6 +487,7 @@ def _known_model(model, contract: GraphContract):
             raise NativeUnavailable("native model output shape does not match scalar/Q contract")
         if not torch.allclose(observed.float().reshape_as(expected), expected.float(), rtol=2e-4, atol=2e-5):
             raise NativeUnavailable("model forward does not match native exporter inference semantics on CPU probes")
+        _require_no_global_forward_hooks()
         return fmt, state, classes
     except NativeUnavailable:
         raise

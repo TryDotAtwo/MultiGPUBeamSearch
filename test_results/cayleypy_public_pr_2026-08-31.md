@@ -235,3 +235,16 @@ The wheel contains `dist-info/licenses/LICENSE`, was installed into an isolated
 target, and `validation/wheel_smoke.py` passed against both released CayleyPy
 0.1.0 (`public_hook=false`) and the companion checkout (`public_hook=true`). In
 both cases the installed adapter produced and replayed CPU fallback path `[2]`.
+
+## Process-global PyTorch hook boundary
+
+Auto-export rejects nonempty PyTorch global forward and pre-forward hook
+registries before inspecting a model, then checks them again after the semantic
+probes. These hooks are not stored on any child module and cannot be represented
+in the native artifact. Regressions use both public global registration APIs,
+assert rejection before the exporter starts, and remove the hooks in `finally`
+so no process state leaks between tests. The complete suite passed:
+
+```text
+217 passed, 2 skipped
+```
