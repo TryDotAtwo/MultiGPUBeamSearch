@@ -323,11 +323,14 @@ The public two-GPU smoke now gates model artifact, model hash, selected-device,
 worker-log and timing assertions on `native_workers_required`. Its already-goal
 and zero-budget cases instead require `run_dir=None`, `model_hash=None`, no
 devices and `scoring="not_evaluated"`. A regression reproduced the prior
-`Path(None)` failure for both cases. The complete adapter suite plus all 10
-CPU-testable public-smoke checks passed and now run in every CI matrix job:
+`Path(None)` failure for both cases. Cross-call graph/model identity and warm
+build reuse now use only worker-launch cases; a regression confirms shortcuts
+without a model hash cannot make the aggregate fail while divergent worker
+models still do. The complete adapter suite plus all 11 CPU-testable
+public-smoke checks passed and now run in every CI matrix job:
 
 ```text
-238 passed, 2 skipped
+239 passed, 2 skipped
 ```
 
 ## Private NCCL launch snapshot

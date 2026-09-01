@@ -7,8 +7,9 @@ import pytest
 import torch
 from cayleypy import CayleyGraph, PermutationGroups, Predictor
 
-from validation.smoke_cases import (make_cases, make_model, rank_evidence,
-                                    replay, run_acceptance, run_case, exported_weights_evidence)
+from validation.smoke_cases import (_cross_call_checks, exported_weights_evidence,
+                                    make_cases, make_model, rank_evidence, replay,
+                                    run_acceptance, run_case)
 
 
 def test_cases_have_exact_distances_and_no_beam_truncation():
@@ -148,6 +149,29 @@ def test_host_shortcut_acceptance_requires_no_runtime_artifacts(tmp_path, case_n
     assert record["status"] == "passed"
     assert record["checks"]["host_shortcut_has_no_runtime_artifacts"]
     assert not record["exported_weights"]["required"]
+
+
+def test_cross_call_model_identity_excludes_host_shortcuts():
+    def worker(model_hash, configure_ran):
+        return {
+            "backend": "native",
+            "case": {"native_workers_required": True},
+            "native_metadata": {"graph_hash": "g" * 64},
+            "exported_weights": {"numerical_model_sha256": model_hash},
+            "configure_ran_this_call": configure_ran,
+        }
+
+    shortcut = {
+        "backend": "native",
+        "case": {"native_workers_required": False},
+        "native_metadata": {"graph_hash": "g" * 64},
+        "exported_weights": {"required": False},
+    }
+    matching = [shortcut, worker("m" * 64, True), worker("m" * 64, False)]
+    assert all(_cross_call_checks(matching).values())
+
+    divergent = [shortcut, worker("m" * 64, True), worker("x" * 64, False)]
+    assert not _cross_call_checks(divergent)["all_calls_same_graph_and_exported_model"]
 
 
 def test_cpu_preflight_writes_failure_report_without_claiming_gpu(tmp_path, monkeypatch):

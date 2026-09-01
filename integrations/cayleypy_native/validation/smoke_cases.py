@@ -267,6 +267,28 @@ def _version(package):
         return None
 
 
+def _cross_call_checks(native_cases):
+    worker_cases = [
+        case for case in native_cases
+        if case.get("case", {}).get("native_workers_required") is True
+    ]
+    hashes = [
+        (
+            case.get("native_metadata", {}).get("graph_hash"),
+            case.get("exported_weights", {}).get("numerical_model_sha256"),
+        )
+        for case in worker_cases
+    ]
+    return {
+        "all_calls_same_graph_and_exported_model": (
+            bool(hashes) and len(set(hashes)) == 1 and all(all(pair) for pair in hashes)
+        ),
+        "warm_repeat_reused_build": (
+            bool(worker_cases) and worker_cases[-1].get("configure_ran_this_call") is False
+        ),
+    }
+
+
 def run_acceptance(*, source_dir, cutlass_dir, output_dir, devices=(0, 1),
                    timeout_seconds=180, build_timeout_seconds=1800, build_jobs=2, cache_dir=None):
     """Return/save JSON evidence; no automatic fallback and no downloads.
@@ -347,10 +369,7 @@ def run_acceptance(*, source_dir, cutlass_dir, output_dir, devices=(0, 1),
                     "reason": f"stopped after native exception in {case.name}"} for pending, mode in schedule[index + 1:])
                 break
         native = [case for case in report["cases"] if case["backend"] == "native"]
-        hashes = [(case.get("native_metadata", {}).get("graph_hash"),
-                   case.get("exported_weights", {}).get("numerical_model_sha256")) for case in native]
-        report["cross_call_checks"] = {"all_calls_same_graph_and_exported_model": len(set(hashes)) == 1 and all(all(pair) for pair in hashes),
-            "warm_repeat_reused_build": native[-1].get("configure_ran_this_call") is False}
+        report["cross_call_checks"] = _cross_call_checks(native)
         report["passed"] = all(case["status"] == "passed" for case in report["cases"]) and all(report["cross_call_checks"].values())
         report["status"] = "passed" if report["passed"] else "failed"
     except Exception as error:

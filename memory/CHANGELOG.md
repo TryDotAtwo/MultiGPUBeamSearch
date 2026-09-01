@@ -858,5 +858,7 @@
 - Updated the public two-GPU acceptance harness for cache-free host shortcuts:
   model artifacts, model hashes and selected-device checks now apply only when
   native workers are required, while shortcut cases assert `run_dir=None`, no
-  model hash and no devices. Its 10 CPU-testable checks now run in every CI
-  matrix job; the combined suite passes with 238 tests and 2 POSIX-only skips.
+  model hash and no devices. Cross-call graph/model identity and warm-build reuse
+  likewise consider only worker-launch cases, so the two shortcuts cannot poison
+  the aggregate result. Its 11 CPU-testable checks now run in every CI matrix
+  job; the combined suite passes with 239 tests and 2 POSIX-only skips.

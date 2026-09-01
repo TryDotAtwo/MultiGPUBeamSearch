@@ -313,8 +313,10 @@ prepared calls, exhausted budgets, source-cache reuse and two state sizes.
 CPU CI separately checks an installed wheel with released CayleyPy 0.1.0 and
 the development API. The public-hook integration and the public GPU acceptance
 harness, including cache-free host shortcuts, are covered by tests when that API
-is installed. Native CUDA tests require a real compatible machine; CPU protocol
-fixtures are not a GPU performance result.
+is installed. Cross-call graph/model identity is compared only for cases that
+launch native workers; deterministic host shortcuts are checked separately.
+Native CUDA tests require a real compatible machine; CPU protocol fixtures are
+not a GPU performance result.
 
 ## Prepare explicitly for repeated searches
 
