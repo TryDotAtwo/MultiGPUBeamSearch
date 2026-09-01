@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -105,6 +106,48 @@ def test_public_search_exception_is_preserved_without_fallback(tmp_path):
     assert "Traceback" in record["exception"]["traceback"]
     assert record["wall_seconds"] >= 0
     json.dumps(record, allow_nan=False)
+
+
+@pytest.mark.parametrize("case_name", ["already_goal", "zero_budget"])
+def test_host_shortcut_acceptance_requires_no_runtime_artifacts(tmp_path, case_name):
+    class ShortcutGraph:
+        definition = PermutationGroups.lrx(8)
+
+        def beam_search(self, **kwargs):
+            found = tuple(kwargs["start_state"]) == tuple(self.definition.central_state)
+            return SimpleNamespace(
+                path_found=found,
+                path_length=0,
+                path=[] if found else None,
+                graph=self.definition,
+                debug_scores={},
+                native_metadata={
+                    "backend": "native",
+                    "graph_hash": "a" * 64,
+                    "model_hash": None,
+                    "devices": [],
+                    "elapsed_seconds": 0.0,
+                    "run_dir": None,
+                    "execution": "already_at_goal" if found else "zero_depth_budget",
+                    "scoring": "not_evaluated",
+                },
+            )
+
+    graph = ShortcutGraph()
+    case = next(case for case in make_cases(graph.definition)[0] if case.name == case_name)
+    record = run_case(
+        graph,
+        object(),
+        case,
+        backend="native",
+        devices=(0, 1),
+        cache_dir=tmp_path,
+        synchronize=lambda: None,
+    )
+
+    assert record["status"] == "passed"
+    assert record["checks"]["host_shortcut_has_no_runtime_artifacts"]
+    assert not record["exported_weights"]["required"]
 
 
 def test_cpu_preflight_writes_failure_report_without_claiming_gpu(tmp_path, monkeypatch):

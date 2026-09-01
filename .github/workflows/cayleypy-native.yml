@@ -50,7 +50,7 @@ jobs:
       - name: Test installed wheel and adapter contracts
         run: |
           python -I integrations/cayleypy_native/validation/wheel_smoke.py
-          python -B -m pytest integrations/cayleypy_native/tests -q --junitxml=test_results/cayleypy-native-cpu.xml
+          python -B -m pytest integrations/cayleypy_native/tests integrations/cayleypy_native/validation/test_smoke_cases.py -q --junitxml=test_results/cayleypy-native-cpu.xml
       - name: Test the public backend hook with an installed wheel
         run: |
           python -m pip install --force-reinstall --no-deps "git+https://github.com/cayleypy/cayleypy.git@b7f5c90ddff3871a1cd0db46dc6ca41bcd4392d3"

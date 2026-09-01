@@ -317,6 +317,19 @@ Windows adapter suite passed:
 228 passed, 2 skipped
 ```
 
+## Host-shortcut acceptance coverage
+
+The public two-GPU smoke now gates model artifact, model hash, selected-device,
+worker-log and timing assertions on `native_workers_required`. Its already-goal
+and zero-budget cases instead require `run_dir=None`, `model_hash=None`, no
+devices and `scoring="not_evaluated"`. A regression reproduced the prior
+`Path(None)` failure for both cases. The complete adapter suite plus all 10
+CPU-testable public-smoke checks passed and now run in every CI matrix job:
+
+```text
+238 passed, 2 skipped
+```
+
 ## Private NCCL launch snapshot
 
 The worker no longer searches the mutable installed NCCL directory after its

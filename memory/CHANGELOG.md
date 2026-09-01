@@ -855,3 +855,8 @@
   These paths now report `run_dir=None` and work when `cache_dir` is an existing
   file or otherwise unwritable. The suite passes with 228 tests and 2 POSIX-only
   skips on Windows.
+- Updated the public two-GPU acceptance harness for cache-free host shortcuts:
+  model artifacts, model hashes and selected-device checks now apply only when
+  native workers are required, while shortcut cases assert `run_dir=None`, no
+  model hash and no devices. Its 10 CPU-testable checks now run in every CI
+  matrix job; the combined suite passes with 238 tests and 2 POSIX-only skips.

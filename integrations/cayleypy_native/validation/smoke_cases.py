@@ -205,12 +205,14 @@ def run_case(graph, predictor, case, *, backend, devices, cache_dir, synchronize
         if backend == "native":
             metadata = getattr(result, "native_metadata", {})
             record["native_metadata"] = metadata
-            record["exported_weights"] = exported_weights_evidence(Path(metadata["run_dir"]) / "weights")
             checks["strict_native_result"] = metadata.get("backend") == "native"
-            checks["explicit_devices_preserved"] = metadata.get("devices") == list(devices)
-            checks["graph_and_model_hash_present"] = all(isinstance(metadata.get(key), str) and len(metadata[key]) == 64
-                                                         for key in ("graph_hash", "model_hash"))
             if case.native_workers_required:
+                record["exported_weights"] = exported_weights_evidence(Path(metadata["run_dir"]) / "weights")
+                checks["explicit_devices_preserved"] = metadata.get("devices") == list(devices)
+                checks["graph_and_model_hash_present"] = all(
+                    isinstance(metadata.get(key), str) and len(metadata[key]) == 64
+                    for key in ("graph_hash", "model_hash")
+                )
                 log = Path(metadata["log_path"])
                 evidence = rank_evidence(log.read_text(encoding="utf-8", errors="replace"), devices)
                 evidence["log_path"] = str(log)
@@ -223,8 +225,21 @@ def run_case(graph, predictor, case, *, backend, devices, cache_dir, synchronize
                     and metadata[key] >= 0 for key in ("elapsed_seconds", "native_seconds"))
                 record["configure_ran_this_call"] = (Path(metadata["run_dir"]) / "cmake-configure.log").is_file()
             else:
+                record["exported_weights"] = {
+                    "required": False,
+                    "reason": "host shortcut; no model artifact was prepared",
+                }
                 checks["documented_host_shortcut"] = metadata.get("execution") == (
                     "already_at_goal" if case.exact_distance == 0 else "zero_depth_budget")
+                checks["host_shortcut_has_no_runtime_artifacts"] = (
+                    metadata.get("run_dir") is None
+                    and metadata.get("model_hash") is None
+                    and metadata.get("devices") == []
+                    and metadata.get("scoring") == "not_evaluated"
+                )
+                checks["graph_hash_present"] = (
+                    isinstance(metadata.get("graph_hash"), str) and len(metadata["graph_hash"]) == 64
+                )
                 record["rank_evidence"] = {"required": False, "reason": "host shortcut; no worker execution claimed"}
         elif case.name.startswith("multi_step"):
             checks["upstream_model_scoring_exercised"] = bool(result.debug_scores)
