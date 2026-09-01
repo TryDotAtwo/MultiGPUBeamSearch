@@ -99,3 +99,17 @@ installed the wheel, exercised released CayleyPy, ran the adapter contracts and
 tested the public hook. Ubuntu/Python 3.12 additionally repeated the real HTTPS
 downloads, exact pin checks and offline cache reuse shown above. The final
 merged-install smoke is recorded in the local merge evidence directory.
+
+## Strict max_steps with touch-BFS
+
+The final pre-merge review found that the native runner interpreted its depth
+argument as forward-search depth and could then append a touch-BFS suffix. The
+adapter now reserves the effective suffix radius from `max_steps`, clamps a
+configured radius to `max_steps - 1`, passes only the remaining forward depth to
+the runner, and rejects any returned path longer than the requested bound.
+Dispatch, command/environment, metadata and parser regressions cover the full
+API path. The complete Windows adapter suite passed:
+
+```text
+180 passed, 2 skipped
+```

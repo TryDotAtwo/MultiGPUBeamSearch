@@ -62,6 +62,16 @@ def test_bad_protocol_never_looks_like_not_found(tmp_path, record, reason):
         parse_terminal(log, ReplayContract())
 
 
+def test_terminal_solution_cannot_exceed_requested_step_budget(tmp_path):
+    contract = SimpleNamespace(move_count=2, replay=lambda path: tuple(path) == (0, 1))
+    log = invoke_fixture(
+        tmp_path,
+        "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=2 solution=m0.m1",
+    )
+    with pytest.raises(NativeBackendError, match="max_steps"):
+        parse_terminal(log, contract, max_steps=1)
+
+
 def test_timeout_terminates_real_process(tmp_path):
     with pytest.raises(NativeBackendError, match="timed out"):
         run_process([sys.executable, "-c", "import time; print('fake waiting', flush=True); time.sleep(30)"],
@@ -112,6 +122,16 @@ def test_fitting_beam_keeps_native_default_microbatch(moves, outputs, beam):
     assert not metadata["adjusted_for_small_beam"]
 
 
+@pytest.mark.parametrize(
+    "max_steps,radius,expected",
+    [(1, 12, (1, 0)), (4, 12, (1, 3)), (4, 2, (2, 2)), (4, 0, (4, 0))],
+)
+def test_touch_bfs_depth_budget_reserves_suffix_inside_max_steps(max_steps, radius, expected):
+    from cayleypy_native.backend import native_depth_budget
+
+    assert native_depth_budget(max_steps, radius) == expected
+
+
 def test_runtime_unavailable_before_process_creation(monkeypatch, tmp_path):
     import cayleypy_native.backend as backend
     monkeypatch.setattr(backend.platform, "system", lambda: "Windows")
@@ -141,11 +161,21 @@ def test_runtime_devices_supports_pypi_graph_device_and_explicit_override(monkey
                            NativeOptions(cache_dir=tmp_path, devices=(0,))) == (0,)
 
 
-def test_touch_bfs_capability_is_checked_during_preparation(tmp_path):
+def test_touch_bfs_capability_uses_the_effective_radius_during_preparation(monkeypatch, tmp_path):
+    import torch
+    import cayleypy_native.build as build
     from cayleypy_native.backend import prepare_runtime
+
+    contract = SimpleNamespace(move_count=33)
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=1)
     with pytest.raises(NativeUnavailable, match="32 generators"):
-        prepare_runtime(SimpleNamespace(move_count=33), object(),
-                        NativeOptions(cache_dir=tmp_path, touch_bfs_radius=1), tmp_path, (0,))
+        prepare_runtime(contract, object(), options, tmp_path, (0,))
+
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (8, 0))
+    monkeypatch.setattr(build, "ensure_runner", lambda *args: (tmp_path / "runner", {"test_only": True}))
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
+    runtime = prepare_runtime(contract, model, options, tmp_path, (0,), touch_bfs_radius=0)
+    assert runtime.build_metadata == {"test_only": True}
 
 
 def test_bf16_requires_sm80_before_build_or_launch(monkeypatch, tmp_path):
@@ -232,12 +262,24 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     # its own artifact-backed regression test below.
     monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-    outcome = backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 1000, 4, tmp_path / "run", (0,))
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12)
+    outcome = backend.run_native(contract, model, options, 1000, 4, tmp_path / "run", (0,))
     assert outcome.path == (1,)
     assert (tmp_path / "run/test.csv").read_text() == 'initial_state_id,initial_state\n0,"1,0"\n'
     assert list(json.loads((tmp_path / "run/puzzle_info.json").read_text())["generators"]) == ["m0", "m1"]
-    assert observed["command"][-5:] == ["0", "4", "1000", "1", "0"]
+    assert observed["command"][-5:] == ["0", "1", "1000", "1", "0"]
     assert observed["env"]["BEAM_RUNTIME_CONFIG_MODE"] == "auto"
+    assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_RADIUS"] == "3"
+    assert outcome.metadata["requested_max_steps"] == 4
+    assert outcome.metadata["native_forward_depth_limit"] == 1
+    assert outcome.metadata["configured_touch_bfs_radius"] == 12
+    assert outcome.metadata["effective_touch_bfs_radius"] == 3
+    assert json.loads((tmp_path / "run/runtime-config.json").read_text())["search_budget"] == {
+        "requested_max_steps": 4,
+        "native_forward_depth_limit": 1,
+        "configured_touch_bfs_radius": 12,
+        "effective_touch_bfs_radius": 3,
+    }
     # Native auto uses 1024 logical slots and 2048 physical slots at this beam.
     # Its unbounded default of 8192 child rows rejects every candidate.
     assert int(observed["env"]["BEAM_B_MICRO"]) <= 2048
@@ -246,7 +288,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     nccl_library.write_bytes(b"test-only replaced library")
     monkeypatch.setattr(backend, "run_process", lambda *args, **kwargs: pytest.fail("changed NCCL must prevent launch"))
     with pytest.raises(NativeBackendError, match="NCCL library changed"):
-        backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 1000, 4, tmp_path / "run-replaced", (0,))
+        backend.run_native(contract, model, options, 1000, 4, tmp_path / "run-replaced", (0,))
 
 
 def test_model_bytes_are_rehashed_after_runtime_preparation_before_launch(monkeypatch, tmp_path):

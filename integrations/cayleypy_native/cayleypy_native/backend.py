@@ -29,9 +29,13 @@ class PreparedRuntime:
     architectures: tuple[int, ...]
 
 
-def prepare_runtime(contract, model, options, run_dir, devices) -> PreparedRuntime:
+def prepare_runtime(contract, model, options, run_dir, devices, *,
+                    touch_bfs_radius: int | None = None) -> PreparedRuntime:
     """Resolve/build before dispatch closes its capability fallback window."""
-    if options.touch_bfs_radius and contract.move_count > 32:
+    radius = options.touch_bfs_radius if touch_bfs_radius is None else touch_bfs_radius
+    if type(radius) is not int or radius < 0:
+        raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
+    if radius and contract.move_count > 32:
         raise NativeUnavailable("native touch-BFS suffix packing supports at most 32 generators")
     # Stream1's scalar head has a separate kernel. The Q head uses unpadded
     # row-major CUTLASS GEMM with eight-element B/C/D access alignment.
@@ -240,7 +244,10 @@ def collect_worker_logs(log_dir: Path, launcher_log: Path, combined_log: Path,
             "worker_log_diagnostics": issues}
 
 
-def parse_terminal(log_path: Path, contract) -> tuple[tuple[int, ...] | None, int | None, dict]:
+def parse_terminal(log_path: Path, contract, *,
+                   max_steps: int | None = None) -> tuple[tuple[int, ...] | None, int | None, dict]:
+    if max_steps is not None and (type(max_steps) is not int or max_steps < 0):
+        raise ValueError("max_steps must be a nonnegative integer")
     records, effective = [], set()
     terminal = re.compile(r"puzzle_solved=([01])\s+puzzle_id=(\d+)\s+seconds=([^\s]+)\s+solution_length=(-?\d+)(.*?)\s+solution=([^\s]*)\s*$")
     width = re.compile(r"(?:GLOBAL_BEAM_WIDTH_EFFECTIVE|global_beam_width_effective)=(\d+)")
@@ -274,6 +281,8 @@ def parse_terminal(log_path: Path, contract) -> tuple[tuple[int, ...] | None, in
                 parsed = tuple(int(token[1:]) for token in tokens)
                 if len(parsed) != int(length) or any(move >= contract.move_count for move in parsed):
                     raise NativeBackendError("native solution length/generator IDs are invalid")
+                if max_steps is not None and len(parsed) > max_steps:
+                    raise NativeBackendError("native solution exceeds requested max_steps")
                 if not contract.replay(parsed):
                     raise NativeBackendError("native solution failed independent original-graph replay")
             records.append((parsed, elapsed))
@@ -294,6 +303,23 @@ def parse_terminal(log_path: Path, contract) -> tuple[tuple[int, ...] | None, in
     return records[0][0], next(iter(effective), None), metadata
 
 
+def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int]:
+    """Reserve room in max_steps for the suffix returned by touch-BFS.
+
+    The solved start is handled before launch. The runner probes its solved
+    neighborhood after generating children, so every nontrivial run retains at
+    least one forward depth.
+    """
+    if type(max_steps) is not int or max_steps < 0:
+        raise ValueError("max_steps must be a nonnegative integer")
+    if type(touch_bfs_radius) is not int or touch_bfs_radius < 0:
+        raise ValueError("touch_bfs_radius must be a nonnegative integer")
+    if max_steps == 0:
+        return 0, 0
+    effective_radius = min(touch_bfs_radius, max_steps - 1)
+    return max_steps - effective_radius, effective_radius
+
+
 def run_native(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
     run_dir = Path(run_dir).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -303,8 +329,12 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         return NativeOutcome((), 0.0, None, run_dir, {"already_solved": True, "replay_valid": True})
     if max_steps == 0:
         return NativeOutcome(None, 0.0, None, run_dir, {"budget_exhausted": True})
+    forward_depth_limit, effective_touch_bfs_radius = native_depth_budget(max_steps, options.touch_bfs_radius)
+    if effective_touch_bfs_radius and contract.move_count > 32:
+        raise NativeUnavailable("native touch-BFS suffix packing supports at most 32 generators")
     if runtime is None:
-        runtime = prepare_runtime(contract, model, options, run_dir, devices)
+        runtime = prepare_runtime(contract, model, options, run_dir, devices,
+                                  touch_bfs_radius=effective_touch_bfs_radius)
     else:
         # Fail closed if the verified executable was replaced after preparation.
         from .build import file_sha256, shape_contract
@@ -322,12 +352,17 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     env = child_environment(tuple(devices), run_dir)
     env.update({"BEAM_GENERATOR_PATH": str(puzzle), "BEAM_PUZZLE_INFO_JSON": str(puzzle),
                 "BEAM_TEST_CSV": str(inputs), "BEAM_WEIGHT_DIR": str(model.weights_dir),
-                "BEAM_RUNTIME_CONFIG_MODE": "auto", "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(options.touch_bfs_radius),
+                "BEAM_RUNTIME_CONFIG_MODE": "auto", "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(effective_touch_bfs_radius),
                 "BEAM_STREAM2_SUFFIX_RADIUS": "0", "BEAM_SOLVE_BUCKET_MODE": "0", "BEAM_HISTORY_MODE": "disk",
                 "BEAM_HISTORY_DIR": str(run_dir / "history"), "BEAM_HISTORY_DISK_PATH": str(run_dir / "history")})
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices))
     env.update(microbatch_env)
-    (run_dir / "runtime-config.json").write_text(json.dumps({"mode": "auto", "microbatch": microbatch_metadata}, indent=2) + "\n", encoding="utf-8")
+    search_budget = {"requested_max_steps": max_steps, "native_forward_depth_limit": forward_depth_limit,
+                     "configured_touch_bfs_radius": options.touch_bfs_radius,
+                     "effective_touch_bfs_radius": effective_touch_bfs_radius}
+    (run_dir / "runtime-config.json").write_text(json.dumps(
+        {"mode": "auto", "microbatch": microbatch_metadata, "search_budget": search_budget}, indent=2
+    ) + "\n", encoding="utf-8")
     nccl = build_metadata.get("nccl")
     if nccl is not None:
         if not isinstance(nccl, dict) or not isinstance(nccl.get("library"), str):
@@ -351,7 +386,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     legacy_results.mkdir(exist_ok=True)
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
-    args = [str(runner), "0", str(max_steps), str(beam_width)]
+    args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
     log = run_dir / "native.log"
     process_log = log
     log_metadata = {}
@@ -385,12 +420,12 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
                     raise
                 if hasattr(failure, "add_note"):
                     failure.add_note(f"native worker log collection also failed: {log_error}")
-    path, effective, terminal_metadata = parse_terminal(log, contract)
+    path, effective, terminal_metadata = parse_terminal(log, contract, max_steps=max_steps)
     if effective is not None and effective < beam_width:
         raise NativeBackendError("observed effective global beam is smaller than requested")
     metadata = {"build": build_metadata, "model_artifact_hash": model.artifact_hash,
                 "graph_hash": contract.graph_hash, "devices": list(devices), "requested_beam_width": beam_width,
-                "microbatch": microbatch_metadata,
+                "microbatch": microbatch_metadata, **search_budget,
                 "replay_valid": path is not None, "log_path": str(log), **log_metadata, **terminal_metadata}
     (run_dir / "native-outcome.json").write_text(json.dumps({"path": path, "elapsed_seconds": elapsed,
         "effective_beam_width": effective, "metadata": metadata}, indent=2) + "\n", encoding="utf-8")

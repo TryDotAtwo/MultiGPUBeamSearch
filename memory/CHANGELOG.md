@@ -770,3 +770,7 @@
   hooks before auto-export; exact PyTorch child/container types are required for
   both supported schemas. Corrected the tracked source evidence to the shipped
   native/CUTLASS revisions and SHA256 values from CI run 33452889518.
+- Kept touch-BFS suffixes inside CayleyPy's `max_steps` contract. The adapter
+  now clamps the effective radius, reserves suffix space from the native forward
+  depth, records both budgets, and rejects any over-budget native terminal path.
+  The full adapter suite passes with 180 tests and 2 POSIX-only skips on Windows.

@@ -13,7 +13,7 @@ from cayleypy import CayleyGraph
 import cayleypy
 from cayleypy.algo.beam_search import BeamSearchAlgorithm
 
-from .backend import prepare_runtime, run_native, runtime_devices
+from .backend import native_depth_budget, prepare_runtime, run_native, runtime_devices
 from .contracts import GraphContract
 from .errors import NativeBackendError, NativeFallbackWarning, NativeUnavailable
 from .models import NativeModel, prepare_model
@@ -161,7 +161,9 @@ def _search(original, graph, kwargs, options, mode):
             model = prepare_model(params["predictor"], contract, options, run_dir)
             if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
                 raise NativeUnavailable("native Q models require use_child_scores=True")
-            runtime = prepare_runtime(contract, model, options, run_dir, devices)
+            _, effective_touch_bfs_radius = native_depth_budget(params["max_steps"], options.touch_bfs_radius)
+            runtime = prepare_runtime(contract, model, options, run_dir, devices,
+                                      touch_bfs_radius=effective_touch_bfs_radius)
     except NativeUnavailable as exc:
         if mode == "native":
             raise

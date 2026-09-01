@@ -67,7 +67,7 @@ def test_explicit_torch_never_probes_native(tmp_path, monkeypatch):
 def fake_native(monkeypatch, tmp_path, path=(2,)):
     monkeypatch.setattr(dispatch, "runtime_devices", lambda *args: (0,))
     monkeypatch.setattr(dispatch, "prepare_model", lambda *args: SimpleNamespace(artifact_hash="model-sha", manifest={"output_dim": 1}))
-    monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args: SimpleNamespace())
+    monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args, **kwargs: SimpleNamespace())
     calls = []
     def run(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None):
         calls.append((contract, beam_width, max_steps, devices))
@@ -87,6 +87,27 @@ def test_native_result_replays_and_is_upstream_compatible(tmp_path, monkeypatch)
     assert result.native_metadata["requested_beam_width"] == 123
     assert result.native_metadata["effective_beam_width"] == 1024
     assert calls[0][1:] == (123, 4, (0,))
+
+
+def test_dispatch_clamps_touch_bfs_to_the_requested_step_budget(tmp_path, monkeypatch):
+    fake_native(monkeypatch, tmp_path)
+    observed = []
+
+    def prepare(*args, touch_bfs_radius=None):
+        observed.append(touch_bfs_radius)
+        return SimpleNamespace()
+
+    monkeypatch.setattr(dispatch, "prepare_runtime", prepare)
+    result = dispatch.beam_search(
+        graph(),
+        backend="native",
+        native_options=NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12),
+        start_state=[1, 0, 2, 3, 4],
+        max_steps=4,
+        return_path=True,
+    )
+    assert result.path == [2]
+    assert observed == [3]
 
 
 @pytest.mark.parametrize("return_path", [False, True])
@@ -144,7 +165,7 @@ def test_bound_method_survives_disable_and_new_session(tmp_path, monkeypatch):
 
 def test_unsupported_build_falls_back_before_worker(tmp_path, monkeypatch):
     calls = fake_native(monkeypatch, tmp_path)
-    def unsupported(*args):
+    def unsupported(*args, **kwargs):
         raise NativeUnavailable("binary shape mismatch")
     monkeypatch.setattr(dispatch, "prepare_runtime", unsupported)
     with pytest.warns(NativeFallbackWarning, match="shape mismatch"):
