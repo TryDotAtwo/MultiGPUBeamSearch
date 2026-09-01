@@ -49,5 +49,5 @@ class NativeOutcome:
     path: tuple[int, ...] | None
     elapsed_seconds: float
     effective_beam_width: int | None
-    run_dir: Path
+    run_dir: Path | None
     metadata: dict[str, Any] = field(default_factory=dict)

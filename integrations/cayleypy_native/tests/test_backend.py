@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cayleypy_native.backend import child_environment, parse_terminal, run_process, runtime_devices
+from cayleypy_native.backend import child_environment, parse_terminal, run_native, run_process, runtime_devices
 from cayleypy_native.errors import NativeBackendError, NativeUnavailable
 from cayleypy_native.options import NativeOptions
 
@@ -17,6 +17,27 @@ class ReplayContract:
 
     def replay(self, path):
         return tuple(path) == (1,)
+
+
+@pytest.mark.parametrize("solved", [False, True])
+def test_direct_trivial_native_result_does_not_create_run_dir(tmp_path, solved):
+    blocked_cache = tmp_path / "cache-is-a-file"
+    blocked_cache.write_text("must remain untouched")
+    contract = SimpleNamespace(replay=lambda path: solved)
+
+    outcome = run_native(
+        contract,
+        None,
+        NativeOptions(),
+        1,
+        1 if solved else 0,
+        blocked_cache / "run",
+        (),
+    )
+
+    assert outcome.path == (() if solved else None)
+    assert outcome.run_dir is None
+    assert blocked_cache.read_text() == "must remain untouched"
 
 
 def invoke_fixture(tmp_path, text, *, code=0):

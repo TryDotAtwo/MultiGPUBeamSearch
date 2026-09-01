@@ -171,7 +171,9 @@ size are recorded in run metadata.
 
 Already-solved states and zero-step budgets return directly after graph/argument
 validation. They do not probe CUDA, inspect a model artifact, compile, or launch a
-worker, so these deterministic boundary cases also work on a CPU-only host.
+worker, and they do not create or require a writable cache. Their metadata reports
+`run_dir=None` because no runtime artifacts exist. These deterministic boundary
+cases therefore also work on a CPU-only host.
 
 In `auto` mode, CUDA/runtime viability is checked before creating a cache run
 directory. An unavailable cache is itself a preflight fallback reason, and a
@@ -258,7 +260,7 @@ runner. First-call compilation, model export and process startup also have costs
 end-to-end performance must include them. This version does not provide zero-copy
 CUDA tensor sharing or a persistent native worker.
 
-Each run is stored below `<cache_dir>/runs/<id>/` with model export, build and
+Each nontrivial run is stored below `<cache_dir>/runs/<id>/` with model export, build and
 native logs as applicable. These files contain states, paths and possibly model
 weights; they are local artifacts and are not automatically deleted or uploaded.
 The cache can be large. Keep it on a suitable local volume.

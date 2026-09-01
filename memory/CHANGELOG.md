@@ -850,3 +850,8 @@
   worker's `LD_LIBRARY_PATH`. A regression replaces the installed source after
   snapshot creation and confirms the private loader target remains unchanged;
   the suite remains at 224 tests and 2 POSIX-only skips on Windows.
+- Removed cache access from deterministic already-solved and zero-step results
+  in both `native` and `auto` dispatch, including direct `run_native` calls.
+  These paths now report `run_dir=None` and work when `cache_dir` is an existing
+  file or otherwise unwritable. The suite passes with 228 tests and 2 POSIX-only
+  skips on Windows.

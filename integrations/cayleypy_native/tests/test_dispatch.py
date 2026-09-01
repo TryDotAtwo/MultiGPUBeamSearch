@@ -252,8 +252,11 @@ def test_zero_budget_does_not_build_or_launch(tmp_path, monkeypatch, solved):
     assert result.path == ([] if solved else None)
 
 
+@pytest.mark.parametrize("backend", ["native", "auto"])
 @pytest.mark.parametrize("solved", [False, True])
-def test_trivial_native_result_needs_no_gpu_or_model_artifact(tmp_path, monkeypatch, solved):
+def test_trivial_native_result_needs_no_gpu_model_or_cache(
+    tmp_path, monkeypatch, solved, backend
+):
     from cayleypy_native import NativeModel
 
     def forbidden(*args, **kwargs):
@@ -263,10 +266,12 @@ def test_trivial_native_result_needs_no_gpu_or_model_artifact(tmp_path, monkeypa
         monkeypatch.setattr(dispatch, name, forbidden)
     g = graph()
     model = NativeModel.for_graph(g, tmp_path / "missing-weights")
+    blocked_cache = tmp_path / "cache-is-a-file"
+    blocked_cache.write_text("must remain untouched")
     result = dispatch.beam_search(
         g,
-        backend="native",
-        native_options=NativeOptions(cache_dir=tmp_path),
+        backend=backend,
+        native_options=NativeOptions(cache_dir=blocked_cache),
         start_state=[0, 1, 2, 3, 4] if solved else [1, 0, 2, 3, 4],
         predictor=model,
         max_steps=4 if solved else 0,
@@ -277,6 +282,8 @@ def test_trivial_native_result_needs_no_gpu_or_model_artifact(tmp_path, monkeypa
     assert result.native_metadata["devices"] == []
     assert result.native_metadata["model_hash"] is None
     assert result.native_metadata["scoring"] == "not_evaluated"
+    assert result.native_metadata["run_dir"] is None
+    assert blocked_cache.read_text() == "must remain untouched"
 
 
 def test_auto_preserves_unsupported_upstream_kwargs_and_predictor(tmp_path, monkeypatch):

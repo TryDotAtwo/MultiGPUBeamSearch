@@ -304,6 +304,19 @@ fix and are covered by regressions; the complete Windows adapter suite passed:
 224 passed, 2 skipped
 ```
 
+## Cache-free trivial results
+
+Already-solved and zero-step searches now return without allocating a run ID or
+touching `cache_dir`; their metadata explicitly records `run_dir=None`. The
+regression uses an existing file as the configured cache and covers both
+`backend="native"` and `backend="auto"`, including a `NativeModel` with no
+fallback. Direct `run_native` boundary calls are covered as well. The complete
+Windows adapter suite passed:
+
+```text
+228 passed, 2 skipped
+```
+
 ## Private NCCL launch snapshot
 
 The worker no longer searches the mutable installed NCCL directory after its

@@ -435,14 +435,14 @@ def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int
 
 
 def run_native(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
-    run_dir = Path(run_dir).resolve()
-    run_dir.mkdir(parents=True, exist_ok=True)
     if type(beam_width) is not int or beam_width <= 0 or type(max_steps) is not int or max_steps < 0:
         raise NativeUnavailable("native beam_width must be positive and max_steps nonnegative integers")
     if contract.replay(()):
-        return NativeOutcome((), 0.0, None, run_dir, {"already_solved": True, "replay_valid": True})
+        return NativeOutcome((), 0.0, None, None, {"already_solved": True, "replay_valid": True})
     if max_steps == 0:
-        return NativeOutcome(None, 0.0, None, run_dir, {"budget_exhausted": True})
+        return NativeOutcome(None, 0.0, None, None, {"budget_exhausted": True})
+    run_dir = Path(run_dir).resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
     forward_depth_limit, effective_touch_bfs_radius = native_depth_budget(max_steps, options.touch_bfs_radius)
     touch_bfs_worst_case = validate_touch_bfs_contract(
         contract, effective_touch_bfs_radius, options.touch_bfs_max_entries

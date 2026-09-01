@@ -182,8 +182,7 @@ def _search(original, graph, kwargs, options, mode):
             _, effective_touch_bfs_radius = native_depth_budget(params["max_steps"], options.touch_bfs_radius)
             validate_touch_bfs_contract(contract, effective_touch_bfs_radius, options.touch_bfs_max_entries)
             devices = runtime_devices(graph, options)
-        run_dir = _create_run_dir(options)
-        if not trivial:
+            run_dir = _create_run_dir(options)
             model = prepare_model(params["predictor"], contract, options, run_dir)
             if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
                 raise NativeUnavailable("native Q models require use_child_scores=True")
@@ -216,19 +215,22 @@ def _search(original, graph, kwargs, options, mode):
                          "model_hash": None if model is None else model.artifact_hash,
                          "requested_beam_width": params["beam_width"], "effective_beam_width": outcome.effective_beam_width,
                          "devices": list(devices), "elapsed_seconds": outcome.elapsed_seconds,
-                         "run_dir": str(outcome.run_dir), "replay_valid": True if found else None,
+                         "run_dir": None if outcome.run_dir is None else str(outcome.run_dir),
+                         "replay_valid": True if found else None,
                          "scoring": "not_evaluated" if model is None else (
                              "scalar_children" if model.manifest["output_dim"] == 1 else "parent_q"),
                          "status": "found" if found else "not_found_within_budget"})
-        _write_metadata(run_dir / "adapter-result.json", metadata)
+        if run_dir is not None:
+            _write_metadata(run_dir / "adapter-result.json", metadata)
         path = list(outcome.path) if found and (params["return_path"] or not outcome.path) else None
         return NativeBeamSearchResult(found, len(outcome.path) if found else 0, path, {}, graph.definition,
                                       native_metadata=metadata)
     except BaseException as exc:
-        try:
-            _write_metadata(run_dir / "adapter-error.json", {"type": type(exc).__name__, "error": str(exc)})
-        except OSError:
-            pass  # Preserve the original failure, including cancellation.
+        if run_dir is not None:
+            try:
+                _write_metadata(run_dir / "adapter-error.json", {"type": type(exc).__name__, "error": str(exc)})
+            except OSError:
+                pass  # Preserve the original failure, including cancellation.
         raise
 
 
