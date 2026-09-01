@@ -172,6 +172,8 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
                 counts[f"{prefix}_ln_beta"] = width
         digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode("utf-8"))
         digest.update(contract.graph_hash.encode("ascii"))
+        import torch
+        blob_dtype = torch.float16 if dtype == "fp16" else torch.bfloat16
         for name, count in sorted(counts.items()):
             blob = path / f"{name}.{dtype}"
             expected = count * 2
@@ -181,10 +183,13 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
             with blob.open("rb") as source:
                 while chunk := source.read(1024 * 1024):
                     digest.update(chunk)
+                    values = torch.frombuffer(bytearray(chunk), dtype=blob_dtype)
+                    if not torch.isfinite(values).all().item():
+                        raise NativeBackendError(f"native artifact contains non-finite values in {blob.name}")
         return PreparedModel(path, manifest, backend, digest.hexdigest())
     except NativeBackendError:
         raise
-    except (OSError, ValueError, TypeError, OverflowError) as error:
+    except (OSError, ValueError, TypeError, OverflowError, RuntimeError) as error:
         raise NativeBackendError(f"invalid native model artifact {path}: {error}") from error
 
 
@@ -202,6 +207,11 @@ def _known_model(model, contract: GraphContract):
         raise NativeUnavailable("native auto-export does not support shifted input labels")
     if model.__class__.__call__ is not nn.Module.__call__:
         raise NativeUnavailable("native auto-export does not accept a class-level __call__ override")
+    if (model.__class__._call_impl is not nn.Module._call_impl
+            or "_call_impl" in model.__dict__
+            or getattr(model, "_compiled_call_impl", None) is not None
+            or model.__class__.__getattribute__ is not nn.Module.__getattribute__):
+        raise NativeUnavailable("native auto-export does not accept custom nn.Module call dispatch")
     if "forward" in model.__dict__:
         raise NativeUnavailable("native auto-export does not accept an overridden forward callable")
 

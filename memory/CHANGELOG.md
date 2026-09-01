@@ -782,3 +782,8 @@
   keys must now be unique literal top-level JSON keys, matching the native text
   parser, and model classes with a custom `__call__` are rejected before export.
   The full adapter suite passes with 185 tests and 2 POSIX-only skips on Windows.
+- Completed model call-dispatch and numeric artifact validation: custom class or
+  instance `_call_impl`, compiled call paths and custom attribute dispatch are
+  rejected, while every FP16/BF16 blob is decoded and checked for NaN/Inf after
+  export and before launch. The suite passes with 191 tests and 2 POSIX-only
+  skips on Windows.

@@ -38,7 +38,7 @@ def artifact(path, *, normalization="batchnorm_folded", classes=4, **overrides):
             sizes[f"{prefix}_ln_gamma"] = width
             sizes[f"{prefix}_ln_beta"] = width
     for name, count in sizes.items():
-        (path / f"{name}.fp16").write_bytes(b"\x00" * (count * 2))
+        (path / f"{name}.{manifest['dtype']}").write_bytes(b"\x00" * (count * 2))
     return path
 
 
@@ -90,6 +90,17 @@ def test_short_blob_is_backend_error(tmp_path, contract):
     path = artifact(tmp_path / "bad")
     (path / "input_bias.fp16").write_bytes(b"\x00")
     with pytest.raises(NativeBackendError, match="input_bias"):
+        prepare_model(NativeModel(path, contract.graph_hash), contract, NativeOptions(), tmp_path / "run")
+
+
+@pytest.mark.parametrize("dtype,nonfinite", [("fp16", b"\x00\x7c"), ("bf16", b"\x80\x7f")])
+def test_nonfinite_native_weight_blob_is_rejected(tmp_path, contract, dtype, nonfinite):
+    path = artifact(tmp_path / "bad", dtype=dtype)
+    blob = path / f"input_bias.{dtype}"
+    data = bytearray(blob.read_bytes())
+    data[:2] = nonfinite
+    blob.write_bytes(data)
+    with pytest.raises(NativeBackendError, match="non-finite.*input_bias"):
         prepare_model(NativeModel(path, contract.graph_hash), contract, NativeOptions(), tmp_path / "run")
 
 
@@ -274,6 +285,31 @@ def test_class_level_call_override_cannot_hide_beyond_finite_probes(tmp_path, co
         prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 
+@pytest.mark.parametrize("override", ["class", "instance", "compiled"])
+def test_call_impl_override_cannot_hide_beyond_finite_probes(tmp_path, contract, override):
+    def changed(score, states):
+        unseen = torch.tensor([2, 1, 0, 3], device=states.device)
+        return score + (states == unseen).all(dim=1).to(score.dtype)
+
+    if override == "class":
+        class CallImplOverride(Pilgrim):
+            def _call_impl(self, states):
+                return changed(super()._call_impl(states), states)
+
+        CallImplOverride.__name__ = "Pilgrim"
+        model = CallImplOverride().eval()
+    else:
+        model = Pilgrim().eval()
+        original = model._call_impl
+        replacement = lambda states: changed(original(states), states)
+        if override == "instance":
+            model._call_impl = replacement
+        else:
+            model._compiled_call_impl = replacement
+    with pytest.raises(NativeUnavailable, match="call dispatch"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
 def test_custom_child_forward_cannot_hide_beyond_finite_probes(tmp_path, contract):
     class ConditionalLinear(nn.Linear):
         def forward(self, features):
@@ -334,6 +370,14 @@ def test_resmlp_bias_free_first_linear_exports_zero_bias(tmp_path, contract):
     model.input_stack[0] = first
     prepared = prepare_model(model.eval(), contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
     assert (prepared.weights_dir / "input_bias.fp16").read_bytes() == b"\x00" * (16 * 2)
+
+
+def test_fp16_conversion_overflow_is_rejected_after_export(tmp_path, contract):
+    model = Pilgrim().eval()
+    with torch.no_grad():
+        model.input_layer.weight[0, 0] = 70000.0
+    with pytest.raises(NativeBackendError, match="non-finite.*input_weight"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 
 def test_export_process_failure_cannot_fall_back(tmp_path, contract, monkeypatch):

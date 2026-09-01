@@ -138,3 +138,16 @@ adapter suite passed:
 ```text
 185 passed, 2 skipped
 ```
+
+## Call dispatch and finite converted weights
+
+The model preflight now rejects custom class/instance `_call_impl`, compiled
+call dispatch and custom attribute lookup in addition to `__call__`. Artifact
+validation decodes every FP16/BF16 blob and rejects NaN/Inf, including overflow
+created when a finite FP32 tensor or folded BatchNorm value is converted to
+FP16. Imported FP16/BF16 artifacts and full auto-export are covered. The
+complete Windows adapter suite passed:
+
+```text
+191 passed, 2 skipped
+```

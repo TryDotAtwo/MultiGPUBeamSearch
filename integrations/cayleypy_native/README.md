@@ -84,7 +84,7 @@ or inside the standard CayleyPy `Predictor`. Models must be in evaluation mode.
 The adapter checks the complete class-level forward graph against the supported
 schema before exporting. Linear, normalization, activation, embedding and container
 children must be the exact supported PyTorch module types, without forward hooks.
-The model class must retain standard `nn.Module.__call__` dispatch.
+The model must retain standard `nn.Module` call dispatch, including `_call_impl`.
 A supported `nn.Linear(..., bias=False)` is exported with an explicit zero-bias
 blob, preserving its output in the fixed native artifact schema.
 A customized model uses the original CayleyPy search in `auto` mode and is rejected
@@ -124,6 +124,8 @@ The fallback may be the original predictor instead of Hamming; its selection is
 explicit and can affect search quality.
 Runtime manifest keys must be literal, unique and top-level so the adapter and
 the native runner cannot interpret the same artifact differently.
+Every FP16/BF16 weight blob is decoded and checked for finite values before use;
+this also catches overflow introduced by FP16 conversion or BatchNorm folding.
 
 For a Q model with one output per generator, also pass `use_child_scores=True`.
 Scalar models score child states. Generator order is preserved in both cases.
