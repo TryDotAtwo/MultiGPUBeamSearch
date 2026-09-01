@@ -132,6 +132,12 @@ def test_touch_bfs_depth_budget_reserves_suffix_inside_max_steps(max_steps, radi
     assert native_depth_budget(max_steps, radius) == expected
 
 
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_touch_bfs_entry_budget_must_be_a_positive_integer(value):
+    with pytest.raises(ValueError, match="touch_bfs_max_entries"):
+        NativeOptions(touch_bfs_max_entries=value)
+
+
 def test_runtime_unavailable_before_process_creation(monkeypatch, tmp_path):
     import cayleypy_native.backend as backend
     monkeypatch.setattr(backend.platform, "system", lambda: "Windows")
@@ -262,7 +268,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     # its own artifact-backed regression test below.
     monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12)
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12, touch_bfs_max_entries=12345)
     outcome = backend.run_native(contract, model, options, 1000, 4, tmp_path / "run", (0,))
     assert outcome.path == (1,)
     assert (tmp_path / "run/test.csv").read_text() == 'initial_state_id,initial_state\n0,"1,0"\n'
@@ -270,6 +276,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     assert observed["command"][-5:] == ["0", "1", "1000", "1", "0"]
     assert observed["env"]["BEAM_RUNTIME_CONFIG_MODE"] == "auto"
     assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_RADIUS"] == "3"
+    assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES"] == "12345"
     assert outcome.metadata["requested_max_steps"] == 4
     assert outcome.metadata["native_forward_depth_limit"] == 1
     assert outcome.metadata["configured_touch_bfs_radius"] == 12
@@ -279,6 +286,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         "native_forward_depth_limit": 1,
         "configured_touch_bfs_radius": 12,
         "effective_touch_bfs_radius": 3,
+        "touch_bfs_max_entries": 12345,
     }
     # Native auto uses 1024 logical slots and 2048 physical slots at this beam.
     # Its unbounded default of 8192 child rows rejects every candidate.

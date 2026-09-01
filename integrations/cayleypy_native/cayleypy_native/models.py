@@ -201,22 +201,37 @@ def _known_model(model, contract: GraphContract):
 
     if not isinstance(model, nn.Module) or model.__class__.__name__ not in ("Pilgrim", "ResMLPDistance"):
         raise NativeUnavailable("predictor is not a supported Pilgrim/ResMLPDistance native model; use NativeModel for an exported artifact")
-    if any(module.training for module in model.modules()):
-        raise NativeUnavailable("native auto-export requires an inference model in eval mode")
-    if getattr(model, "z_add", 0) != 0:
-        raise NativeUnavailable("native auto-export does not support shifted input labels")
+    if (model.__class__.__getattribute__ is not nn.Module.__getattribute__
+            or model.__class__.__getattr__ is not nn.Module.__getattr__):
+        raise NativeUnavailable("native auto-export does not accept custom nn.Module call dispatch")
     if model.__class__.__call__ is not nn.Module.__call__:
         raise NativeUnavailable("native auto-export does not accept a class-level __call__ override")
     if (model.__class__._call_impl is not nn.Module._call_impl
             or "_call_impl" in model.__dict__
-            or getattr(model, "_compiled_call_impl", None) is not None
-            or model.__class__.__getattribute__ is not nn.Module.__getattribute__
-            or model.__class__.__getattr__ is not nn.Module.__getattr__):
+            or getattr(model, "_compiled_call_impl", None) is not None):
         raise NativeUnavailable("native auto-export does not accept custom nn.Module call dispatch")
     if "forward" in model.__dict__:
         raise NativeUnavailable("native auto-export does not accept an overridden forward callable")
+    if (model.__class__.modules is not nn.Module.modules
+            or model.__class__.named_modules is not nn.Module.named_modules
+            or "modules" in model.__dict__ or "named_modules" in model.__dict__):
+        raise NativeUnavailable("native auto-export does not accept custom module traversal")
     if model.__class__.state_dict is not nn.Module.state_dict or "state_dict" in model.__dict__:
         raise NativeUnavailable("native auto-export does not accept custom state serialization")
+
+    modules, pending, seen = [], [model], set()
+    while pending:
+        module = pending.pop()
+        if id(module) in seen:
+            continue
+        seen.add(id(module))
+        modules.append(module)
+        registered = object.__getattribute__(module, "__dict__").get("_modules", {})
+        pending.extend(child for child in registered.values() if child is not None)
+    if any(module.training for module in modules):
+        raise NativeUnavailable("native auto-export requires an inference model in eval mode")
+    if getattr(model, "z_add", 0) != 0:
+        raise NativeUnavailable("native auto-export does not support shifted input labels")
 
     def require_child(label, module, expected):
         if type(module) is not expected or "forward" in module.__dict__:
@@ -224,14 +239,25 @@ def _known_model(model, contract: GraphContract):
                 f"native auto-export requires exact built-in child module {label} ({expected.__name__})"
             )
 
-    for module in model.modules():
-        if any(getattr(module, name, None) for name in ("_forward_hooks", "_forward_pre_hooks")):
+    for module in modules:
+        attributes = object.__getattribute__(module, "__dict__")
+        if (module.__class__.__getattribute__ is not nn.Module.__getattribute__
+                or module.__class__.__getattr__ is not nn.Module.__getattr__
+                or module.__class__.__call__ is not nn.Module.__call__
+                or module.__class__._call_impl is not nn.Module._call_impl
+                or "_call_impl" in attributes
+                or getattr(module, "_compiled_call_impl", None) is not None):
+            raise NativeUnavailable("native auto-export does not accept custom nn.Module call dispatch")
+        if "forward" in attributes:
+            raise NativeUnavailable("native auto-export does not accept an overridden forward callable")
+        if any(attributes.get(name) for name in ("_forward_hooks", "_forward_pre_hooks")):
             raise NativeUnavailable("native auto-export does not accept forward hooks")
-        if (module.__class__._save_to_state_dict is not nn.Module._save_to_state_dict
-                or any(getattr(module, name, None)
-                       for name in ("_state_dict_pre_hooks", "_state_dict_hooks"))):
+        if (module.__class__.state_dict is not nn.Module.state_dict
+                or module.__class__._save_to_state_dict is not nn.Module._save_to_state_dict
+                or "state_dict" in attributes
+                or any(attributes.get(name) for name in ("_state_dict_pre_hooks", "_state_dict_hooks"))):
             raise NativeUnavailable("native auto-export does not accept custom state serialization")
-    for module in model.modules():
+    for module in modules:
         if isinstance(module, (nn.BatchNorm1d, nn.LayerNorm)):
             affine = module.affine if isinstance(module, nn.BatchNorm1d) else module.elementwise_affine
             if module.eps != 1e-5 or not affine:

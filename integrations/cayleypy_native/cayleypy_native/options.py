@@ -16,6 +16,7 @@ class NativeOptions:
     timeout_seconds: float = 3600.0
     build_timeout_seconds: float = 1800.0
     touch_bfs_radius: int = 0
+    touch_bfs_max_entries: int = 1_048_576
     build_jobs: int = 2
     warn_on_fallback: bool = True
 
@@ -36,6 +37,8 @@ class NativeOptions:
                 raise ValueError(f"{name} must be finite and positive")
         if type(self.touch_bfs_radius) is not int or not 0 <= self.touch_bfs_radius <= 12:
             raise ValueError("touch_bfs_radius must be an integer in [0, 12]")
+        if type(self.touch_bfs_max_entries) is not int or self.touch_bfs_max_entries <= 0:
+            raise ValueError("touch_bfs_max_entries must be a positive integer")
         if type(self.build_jobs) is not int or self.build_jobs <= 0:
             raise ValueError("build_jobs must be a positive integer")
 

@@ -802,3 +802,9 @@
   exporting model weights. Regressions alter a weight column absent from the
   finite probes and confirm the exporter never starts. The suite passes with
   203 tests and 2 POSIX-only skips on Windows.
+- Extended model preflight across the raw registered module tree so custom root
+  traversal cannot hide child hooks, serialization or call dispatch. Added a
+  finite touch-BFS host-neighborhood budget: `touch_bfs_max_entries` defaults to
+  1,048,576, is passed explicitly after inherited `BEAM_*` filtering, and is
+  recorded in runtime metadata. The suite passes with 212 tests and 2
+  POSIX-only skips on Windows.

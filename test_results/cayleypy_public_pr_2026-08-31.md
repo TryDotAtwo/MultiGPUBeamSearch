@@ -185,3 +185,17 @@ complete suite passed:
 ```text
 203 passed, 2 skipped
 ```
+
+The serialization/call checks now traverse the raw registered module tree, so
+a custom root `modules()` implementation cannot hide a child residual block's
+state hooks, `state_dict` implementation or call dispatch.
+
+Touch-BFS host expansion is no longer allowed to inherit the native runner's
+unlimited default. `NativeOptions.touch_bfs_max_entries` defaults to 1,048,576,
+is validated as a positive integer, is always passed as
+`BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES`, and is recorded in runtime metadata.
+The complete suite passed:
+
+```text
+212 passed, 2 skipped
+```

@@ -353,13 +353,15 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     env.update({"BEAM_GENERATOR_PATH": str(puzzle), "BEAM_PUZZLE_INFO_JSON": str(puzzle),
                 "BEAM_TEST_CSV": str(inputs), "BEAM_WEIGHT_DIR": str(model.weights_dir),
                 "BEAM_RUNTIME_CONFIG_MODE": "auto", "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(effective_touch_bfs_radius),
+                "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES": str(options.touch_bfs_max_entries),
                 "BEAM_STREAM2_SUFFIX_RADIUS": "0", "BEAM_SOLVE_BUCKET_MODE": "0", "BEAM_HISTORY_MODE": "disk",
                 "BEAM_HISTORY_DIR": str(run_dir / "history"), "BEAM_HISTORY_DISK_PATH": str(run_dir / "history")})
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices))
     env.update(microbatch_env)
     search_budget = {"requested_max_steps": max_steps, "native_forward_depth_limit": forward_depth_limit,
                      "configured_touch_bfs_radius": options.touch_bfs_radius,
-                     "effective_touch_bfs_radius": effective_touch_bfs_radius}
+                     "effective_touch_bfs_radius": effective_touch_bfs_radius,
+                     "touch_bfs_max_entries": options.touch_bfs_max_entries}
     (run_dir / "runtime-config.json").write_text(json.dumps(
         {"mode": "auto", "microbatch": microbatch_metadata, "search_budget": search_budget}, indent=2
     ) + "\n", encoding="utf-8")

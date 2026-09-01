@@ -140,6 +140,12 @@ the remaining steps for the native forward search. It also rejects malformed
 native output whose complete path exceeds the requested bound. The configured
 and effective budgets are recorded in each run's metadata.
 
+Touch-BFS host expansion is capped at 1,048,576 entries by default. Set a
+different finite positive budget with
+`NativeOptions(touch_bfs_max_entries=...)`; reaching it stops the native run
+before further neighborhood growth. The entry budget is also recorded in run
+metadata.
+
 ## Backend selection
 
 | Selector | Behavior |
@@ -195,7 +201,7 @@ solution was found within this run's budget, not that the state is unreachable.
 | State specialization | Build uses `STATE_LEN=n`, explicit move count, and storage `ceil((n+4)/16)*16`; small states do not retain a fixed 128-byte stride. |
 | Model runtime | Native MLP artifact, scalar or one output per move, FP16/BF16, supported BatchNorm-folded/LayerNorm schema. FP16 requires SM75+, BF16 SM80+. Current Q GEMM requires the move count divisible by 8; scalar output does not. |
 | MLP dimensions | `num_classes >= max(state_len, max_label+1)`, 1–1024 residual blocks, hidden widths divisible by 8, hidden1 >= hidden2, and square hidden2 residual blocks. This can rule out an otherwise supported colored graph. |
-| Search options | Simple mode, global beam width, strict maximum path length, return path. Native touch-BFS uses `NativeOptions(touch_bfs_radius=...)`; its suffix stays inside `max_steps`. |
+| Search options | Simple mode, global beam width, strict maximum path length, return path. Native touch-BFS uses `NativeOptions(touch_bfs_radius=..., touch_bfs_max_entries=...)`; its suffix stays inside `max_steps` and host expansion has a finite entry cap. |
 | Device placement | Local Linux CUDA devices, one native rank per selected GPU, up to 128. Graph CUDA devices are used by default; explicit `devices=(0,1)` overrides them. |
 | Not yet supported natively | Matrix graphs, arbitrary models/tokenizers, PieceTransformer artifacts, custom destination, advanced/history taboo policy, reusing an upstream BfsResult, existing torchrun ranks, multi-node launch. |
 

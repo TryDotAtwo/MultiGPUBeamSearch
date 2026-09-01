@@ -359,7 +359,50 @@ def test_custom_model_attribute_dispatch_is_rejected(tmp_path, contract, method)
                       NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 
-@pytest.mark.parametrize("override", ["class", "instance", "hook"])
+@pytest.mark.parametrize("method", ["modules", "named_modules"])
+def test_custom_model_traversal_is_rejected(tmp_path, contract, monkeypatch, method):
+    import cayleypy_native.models as module
+
+    if method == "modules":
+        class TraversalOverride(Pilgrim):
+            def modules(self):
+                return super().modules()
+    else:
+        class TraversalOverride(Pilgrim):
+            def named_modules(self, *args, **kwargs):
+                return super().named_modules(*args, **kwargs)
+
+    TraversalOverride.__name__ = "Pilgrim"
+    monkeypatch.setattr(module.subprocess, "run",
+                        lambda *a, **k: pytest.fail("custom module traversal launched exporter"))
+    with pytest.raises(NativeUnavailable, match="module traversal"):
+        prepare_model(TraversalOverride().eval(), contract,
+                      NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
+@pytest.mark.parametrize("override", ["class", "instance"])
+def test_residual_block_call_dispatch_is_rejected(tmp_path, contract, monkeypatch, override):
+    import cayleypy_native.models as module
+
+    model = Pilgrim()
+    if override == "class":
+        class DispatchBlock(ResidualBlock):
+            def _call_impl(self, features):
+                return super()._call_impl(features)
+
+        model.residual_blocks[0] = DispatchBlock()
+    else:
+        block = model.residual_blocks[0]
+        original = block._call_impl
+        block._call_impl = lambda features: original(features)
+    model.eval()
+    monkeypatch.setattr(module.subprocess, "run",
+                        lambda *a, **k: pytest.fail("custom child dispatch launched exporter"))
+    with pytest.raises(NativeUnavailable, match="call dispatch"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
+@pytest.mark.parametrize("override", ["class", "instance", "hook", "child"])
 def test_custom_state_serialization_cannot_hide_beyond_finite_probes(
         tmp_path, contract, monkeypatch, override):
     import cayleypy_native.models as module
@@ -382,7 +425,7 @@ def test_custom_state_serialization_cannot_hide_beyond_finite_probes(
 
         StateOverride.__name__ = "Pilgrim"
         model = StateOverride()
-    else:
+    elif override != "child":
         model = Pilgrim()
         if override == "instance":
             original = model.state_dict
@@ -392,6 +435,13 @@ def test_custom_state_serialization_cannot_hide_beyond_finite_probes(
                 changed(state)
 
             model.register_state_dict_post_hook(alter_state)
+    else:
+        class StateBlock(ResidualBlock):
+            def state_dict(self, *args, **kwargs):
+                return super().state_dict(*args, **kwargs)
+
+        model = Pilgrim()
+        model.residual_blocks[0] = StateBlock()
     model.eval()
     monkeypatch.setattr(module.subprocess, "run",
                         lambda *a, **k: pytest.fail("custom serialization launched exporter"))
