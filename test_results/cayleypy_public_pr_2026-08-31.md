@@ -290,3 +290,16 @@ complete Windows adapter suite passed:
 ```text
 221 passed, 2 skipped
 ```
+
+## Exact manifest identity
+
+The native artifact SHA256 now starts from the exact `manifest.json` bytes read
+for validation, rather than a canonicalized Python object. A JSON-equivalent
+byte edit therefore invalidates a prepared private snapshot. The adapter also
+rejects escaped runtime string values whose Python interpretation differs from
+the native runner's literal text parser. Both cases were reproduced before the
+fix and are covered by regressions; the complete Windows adapter suite passed:
+
+```text
+224 passed, 2 skipped
+```

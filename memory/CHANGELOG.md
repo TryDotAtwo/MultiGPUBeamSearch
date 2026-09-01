@@ -839,3 +839,8 @@
   fresh UUID run directory when later model/build preparation is unsupported;
   strict `native` retains diagnostic artifacts. The suite passes with 221 tests
   and 2 POSIX-only skips on Windows.
+- Bound the native artifact identity to the exact `manifest.json` bytes instead
+  of a canonicalized parsed object, eliminating JSON-equivalent mutations that
+  could retain the old SHA256. Runtime string values must also use the literal
+  encoding consumed by the native C++ parser. The suite passes with 224 tests
+  and 2 POSIX-only skips on Windows.

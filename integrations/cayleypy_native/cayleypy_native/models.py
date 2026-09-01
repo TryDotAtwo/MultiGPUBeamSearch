@@ -83,9 +83,10 @@ def _manifest_int(manifest: dict, primary: str, alias: str | None = None) -> int
     return value
 
 
-def _load_unambiguous_manifest(manifest_path: Path) -> dict:
+def _load_unambiguous_manifest(manifest_path: Path) -> tuple[dict, bytes]:
     """Accept only runtime keys the native text parser reads identically."""
-    text = manifest_path.read_text(encoding="utf-8")
+    raw = manifest_path.read_bytes()
+    text = raw.decode("utf-8")
     root = json.loads(text, object_pairs_hook=_ObjectPairs)
     if not isinstance(root, _ObjectPairs):
         raise NativeBackendError("native manifest must be a JSON object")
@@ -121,6 +122,7 @@ def _load_unambiguous_manifest(manifest_path: Path) -> dict:
         return value
 
     validate(root)
+    manifest = materialize(root)
     for key in runtime_keys:
         # The native reader searches raw bytes for an exact quoted key and does
         # not decode JSON key escapes before choosing the first occurrence.
@@ -128,7 +130,25 @@ def _load_unambiguous_manifest(manifest_path: Path) -> dict:
             raise NativeBackendError(
                 f"native manifest runtime key {key!r} must be a unique literal top-level key"
             )
-    return materialize(root)
+    for key in ("dtype", "normalization"):
+        if key not in manifest:
+            continue
+        quoted_key = json.dumps(key)
+        key_pos = text.find(quoted_key)
+        colon_pos = text.find(":", key_pos + len(quoted_key))
+        opening_quote = text.find('"', colon_pos + 1)
+        closing_quote = text.find('"', opening_quote + 1)
+        if (
+            key_pos < 0
+            or colon_pos < 0
+            or opening_quote < 0
+            or closing_quote < 0
+            or text[opening_quote + 1:closing_quote] != manifest[key]
+        ):
+            raise NativeBackendError(
+                f"native manifest {key} string value must use a native-compatible literal encoding"
+            )
+    return manifest, raw
 
 
 def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> PreparedModel:
@@ -136,7 +156,7 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
         raise NativeUnavailable(f"native model backend {backend!r} is not supported by this adapter")
     path = path.resolve()
     try:
-        manifest = _load_unambiguous_manifest(path / "manifest.json")
+        manifest, manifest_bytes = _load_unambiguous_manifest(path / "manifest.json")
         size = _manifest_int(manifest, "state_len")
         classes = _manifest_int(manifest, "num_classes")
         h1 = _manifest_int(manifest, "hidden1", "hd1")
@@ -173,7 +193,7 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
             for prefix, width in norm_layers:
                 counts[f"{prefix}_ln_gamma"] = width
                 counts[f"{prefix}_ln_beta"] = width
-        digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode("utf-8"))
+        digest = hashlib.sha256(manifest_bytes)
         digest.update(contract.graph_hash.encode("ascii"))
         import torch
         blob_dtype = torch.float16 if dtype == "fp16" else torch.bfloat16

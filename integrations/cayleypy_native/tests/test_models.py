@@ -60,6 +60,37 @@ def test_valid_artifact_bound_to_graph_and_content_hash(tmp_path, contract):
     assert prepare_model(model, contract, NativeOptions(), tmp_path / "run2").artifact_hash != before
 
 
+def test_private_manifest_json_equivalent_byte_mutation_is_rejected(tmp_path, contract):
+    weights = artifact(tmp_path / "weights")
+    prepared = prepare_model(
+        NativeModel(weights, contract.graph_hash), contract, NativeOptions(), tmp_path / "run"
+    )
+    manifest_path = prepared.weights_dir / "manifest.json"
+    manifest_path.write_bytes(manifest_path.read_bytes() + b"\n")
+
+    with pytest.raises(NativeBackendError, match="changed before launch"):
+        verify_prepared_model(prepared, contract)
+
+
+@pytest.mark.parametrize(
+    "key,value,escaped",
+    [
+        ("dtype", "fp16", r"\u0066p16"),
+        ("normalization", "batchnorm_folded", r"batchnorm\u005ffolded"),
+    ],
+)
+def test_manifest_string_values_must_match_native_literal_parser(
+    tmp_path, contract, key, value, escaped
+):
+    path = artifact(tmp_path / "escaped")
+    manifest_path = path / "manifest.json"
+    text = manifest_path.read_text(encoding="utf-8")
+    manifest_path.write_text(text.replace(f'"{value}"', f'"{escaped}"'), encoding="utf-8")
+
+    with pytest.raises(NativeBackendError, match=rf"{key}.*literal"):
+        prepare_model(NativeModel(path, contract.graph_hash), contract, NativeOptions(), tmp_path / "run")
+
+
 def test_artifact_mutation_during_private_snapshot_copy_fails_closed(tmp_path, contract, monkeypatch):
     import cayleypy_native.models as models
 

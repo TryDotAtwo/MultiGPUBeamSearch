@@ -125,6 +125,9 @@ The fallback may be the original predictor instead of Hamming; its selection is
 explicit and can affect search quality.
 Runtime manifest keys must be literal, unique and top-level so the adapter and
 the native runner cannot interpret the same artifact differently.
+Runtime string values read by the native text parser must also use literal,
+unescaped JSON strings. The artifact SHA256 includes the exact manifest bytes,
+so even JSON-equivalent serialization changes invalidate a prepared snapshot.
 Every FP16/BF16 weight blob is decoded and checked for finite values before use;
 this also catches overflow introduced by FP16 conversion or BatchNorm folding.
 Auto-export also requires PyTorch's process-global forward/pre-forward hook
@@ -336,8 +339,9 @@ verifies the runner immediately, and stores owned copies under
 the globally configured options.
 
 Later mutation or retraining of the original model does not update this
-snapshot; prepare explicitly again to use new weights. Prepared model bytes are
-pinned by SHA256, and changing a snapshot artifact raises `NativeBackendError`.
+snapshot; prepare explicitly again to use new weights. Prepared model bytes,
+including the exact `manifest.json` serialization, are pinned by SHA256, and
+changing a snapshot artifact raises `NativeBackendError`.
 Each search still checks graph/device compatibility, copies the exact prepared
 artifact and verified runner into its private run directory, validates both
 copies against their pinned hashes, then rehashes every private manifest/blob
