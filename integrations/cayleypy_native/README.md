@@ -84,6 +84,8 @@ or inside the standard CayleyPy `Predictor`. Models must be in evaluation mode.
 The adapter checks the complete class-level forward graph against the supported
 schema before exporting. Linear, normalization, activation, embedding and container
 children must be the exact supported PyTorch module types, without forward hooks.
+A supported `nn.Linear(..., bias=False)` is exported with an explicit zero-bias
+blob, preserving its output in the fixed native artifact schema.
 A customized model uses the original CayleyPy search in `auto` mode and is rejected
 in `native` mode.
 Use the standard `Predictor` wrapper when torch fallback is expected; a raw

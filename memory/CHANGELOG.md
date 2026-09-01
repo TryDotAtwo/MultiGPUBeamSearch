@@ -774,3 +774,7 @@
   now clamps the effective radius, reserves suffix space from the native forward
   depth, records both budgets, and rejects any over-budget native terminal path.
   The full adapter suite passes with 180 tests and 2 POSIX-only skips on Windows.
+- Fixed automatic export of a canonical ResMLPDistance whose first `nn.Linear`
+  has `bias=False`. The shared exporter path now writes the mathematically
+  equivalent zero-bias blob instead of failing after native selection. The full
+  adapter suite passes with 181 tests and 2 POSIX-only skips on Windows.

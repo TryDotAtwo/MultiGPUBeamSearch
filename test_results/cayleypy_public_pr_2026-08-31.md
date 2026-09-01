@@ -113,3 +113,15 @@ API path. The complete Windows adapter suite passed:
 ```text
 180 passed, 2 skipped
 ```
+
+## Bias-free ResMLP input export
+
+Exact built-in `nn.Linear` layers with `bias=False` are valid under the checked
+native inference schema. The first ResMLP input layer now uses the exporter's
+shared zero-bias conversion instead of dereferencing a missing state-dict key.
+A full-process regression verifies the emitted FP16 blob, and the complete
+Windows adapter suite passed:
+
+```text
+181 passed, 2 skipped
+```

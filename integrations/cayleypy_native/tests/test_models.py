@@ -297,6 +297,16 @@ def test_known_resmlp_q_model_exports_layernorm_and_folded_embedding(tmp_path, c
     assert (prepared.weights_dir / "output_weight_hxk.fp16").stat().st_size == 8 * 3 * 2
 
 
+def test_resmlp_bias_free_first_linear_exports_zero_bias(tmp_path, contract):
+    model = ResMLPDistance()
+    first = nn.Linear(64, 16, bias=False)
+    with torch.no_grad():
+        first.weight.copy_(model.input_stack[0].weight)
+    model.input_stack[0] = first
+    prepared = prepare_model(model.eval(), contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+    assert (prepared.weights_dir / "input_bias.fp16").read_bytes() == b"\x00" * (16 * 2)
+
+
 def test_export_process_failure_cannot_fall_back(tmp_path, contract, monkeypatch):
     from types import SimpleNamespace
     import cayleypy_native.models as module
