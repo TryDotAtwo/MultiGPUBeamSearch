@@ -132,7 +132,7 @@ def test_touch_bfs_depth_budget_reserves_suffix_inside_max_steps(max_steps, radi
     assert native_depth_budget(max_steps, radius) == expected
 
 
-@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, 2**64])
 def test_touch_bfs_entry_budget_must_be_a_positive_integer(value):
     with pytest.raises(ValueError, match="touch_bfs_max_entries"):
         NativeOptions(touch_bfs_max_entries=value)
@@ -182,6 +182,19 @@ def test_touch_bfs_capability_uses_the_effective_radius_during_preparation(monke
     model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
     runtime = prepare_runtime(contract, model, options, tmp_path, (0,), touch_bfs_radius=0)
     assert runtime.build_metadata == {"test_only": True}
+
+
+def test_touch_bfs_worst_case_allocation_is_rejected_before_cuda_or_build(monkeypatch, tmp_path):
+    import torch
+    from cayleypy_native.backend import prepare_runtime
+
+    monkeypatch.setattr(torch.cuda, "get_device_capability",
+                        lambda device: pytest.fail("unsafe touch-BFS reached CUDA preparation"))
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=5,
+                            touch_bfs_max_entries=1_048_576)
+    with pytest.raises(NativeUnavailable, match="worst-case.*1,048,576"):
+        prepare_runtime(SimpleNamespace(move_count=24), model, options, tmp_path, (0,))
 
 
 def test_bf16_requires_sm80_before_build_or_launch(monkeypatch, tmp_path):
@@ -287,6 +300,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         "configured_touch_bfs_radius": 12,
         "effective_touch_bfs_radius": 3,
         "touch_bfs_max_entries": 12345,
+        "touch_bfs_worst_case_entries": 15,
     }
     # Native auto uses 1024 logical slots and 2048 physical slots at this beam.
     # Its unbounded default of 8192 child rows rejects every candidate.
@@ -299,7 +313,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         backend.run_native(contract, model, options, 1000, 4, tmp_path / "run-replaced", (0,))
 
 
-def test_model_bytes_are_rehashed_after_runtime_preparation_before_launch(monkeypatch, tmp_path):
+def test_worker_uses_private_model_snapshot_and_rehashes_it_before_launch(monkeypatch, tmp_path):
     import cayleypy_native.backend as backend
     from cayleypy_native.backend import PreparedRuntime
     from cayleypy_native.build import file_sha256, shape_contract
@@ -353,12 +367,31 @@ def test_model_bytes_are_rehashed_after_runtime_preparation_before_launch(monkey
         "binary_sha256": file_sha256(runner),
     }
     runtime = PreparedRuntime(runner, metadata, (75,))
-    (weights / "output_bias.fp16").write_bytes(b"\x01\x00")  # Same size, different model.
-    monkeypatch.setattr(backend, "run_process", lambda *a, **k: pytest.fail("changed model reached worker launch"))
-    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    (weights / "output_bias.fp16").write_bytes(b"\x01\x00")  # Same-size caller mutation.
 
+    def fake_process(command, **kwargs):
+        launched_weights = Path(kwargs["env"]["BEAM_WEIGHT_DIR"])
+        assert launched_weights == model.weights_dir
+        assert launched_weights != weights.resolve()
+        assert (launched_weights / "output_bias.fp16").read_bytes() == b"\x00\x00"
+        kwargs["log_path"].write_text(
+            "GLOBAL_BEAM_WIDTH_EFFECTIVE=16\n"
+            "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n"
+        )
+        return 0.1
+
+    monkeypatch.setattr(backend, "run_process", fake_process)
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    outcome = backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2,
+                                 tmp_path / "run", (0,), runtime=runtime)
+    assert outcome.path == (1,)
+
+    (model.weights_dir / "output_bias.fp16").write_bytes(b"\x02\x00")
+    monkeypatch.setattr(backend, "run_process",
+                        lambda *a, **k: pytest.fail("changed private snapshot reached worker launch"))
     with pytest.raises(NativeBackendError, match="model artifact changed before launch"):
-        backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2, tmp_path / "run", (0,), runtime=runtime)
+        backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2,
+                           tmp_path / "run-tampered", (0,), runtime=runtime)
 
 
 def _rank_stream_fixture(root, rank, *, terminal=False):

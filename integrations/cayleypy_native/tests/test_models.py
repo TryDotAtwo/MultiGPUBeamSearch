@@ -9,7 +9,7 @@ from cayleypy import CayleyGraph, PermutationGroups, Predictor, ModelConfig
 
 from cayleypy_native.contracts import GraphContract
 from cayleypy_native.errors import NativeBackendError, NativeUnavailable
-from cayleypy_native.models import NativeModel, prepare_model
+from cayleypy_native.models import NativeModel, prepare_model, verify_prepared_model
 from cayleypy_native.options import NativeOptions
 
 SOURCE_ROOT = Path(os.environ.get("CAYLEYPY_NATIVE_TEST_SOURCE_DIR", Path(__file__).resolve().parents[3]))
@@ -44,14 +44,41 @@ def artifact(path, *, normalization="batchnorm_folded", classes=4, **overrides):
 
 def test_valid_artifact_bound_to_graph_and_content_hash(tmp_path, contract):
     weights = artifact(tmp_path / "weights")
+    (weights / "caller-note.txt").write_text("must not enter the launch snapshot")
     model = NativeModel(weights, contract.graph_hash, fallback=object())
-    prepared = prepare_model(model, contract, NativeOptions(), tmp_path / "run")
+    run_dir = tmp_path / "run"
+    prepared = prepare_model(model, contract, NativeOptions(), run_dir)
     assert prepared.backend == "mlp"
-    assert prepared.weights_dir == weights.resolve()
+    assert prepared.weights_dir == (run_dir / "weights").resolve()
+    assert prepared.weights_dir != weights.resolve()
+    assert not (prepared.weights_dir / "caller-note.txt").exists()
     assert prepared.manifest["state_len"] == 4
     before = prepared.artifact_hash
     (weights / "output_bias.fp16").write_bytes(b"\x01\x00")
+    verify_prepared_model(prepared, contract)
+    assert (prepared.weights_dir / "output_bias.fp16").read_bytes() == b"\x00\x00"
     assert prepare_model(model, contract, NativeOptions(), tmp_path / "run2").artifact_hash != before
+
+
+def test_artifact_mutation_during_private_snapshot_copy_fails_closed(tmp_path, contract, monkeypatch):
+    import cayleypy_native.models as models
+
+    weights = artifact(tmp_path / "weights")
+    original_copy = models.shutil.copyfile
+
+    def racing_copy(source, destination):
+        result = original_copy(source, destination)
+        if Path(source).name == "manifest.json":
+            (weights / "output_bias.fp16").write_bytes(b"\x01\x00")
+        return result
+
+    monkeypatch.setattr(models.shutil, "copyfile", racing_copy)
+    run_dir = tmp_path / "run"
+    with pytest.raises(NativeBackendError, match="changed while.*snapshot"):
+        prepare_model(NativeModel(weights, contract.graph_hash), contract,
+                      NativeOptions(), run_dir)
+    assert not (run_dir / "weights").exists()
+    assert not list(run_dir.glob(".weights-snapshot-*"))
 
 
 def test_artifact_graph_mismatch_is_prelaunch_unavailable(tmp_path, contract):

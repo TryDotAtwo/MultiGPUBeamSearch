@@ -29,6 +29,28 @@ class PreparedRuntime:
     architectures: tuple[int, ...]
 
 
+def touch_bfs_worst_case_entries(move_count: int, radius: int, max_entries: int) -> int:
+    """Return the geometric allocation bound or reject it before native startup."""
+    if type(move_count) is not int or move_count <= 0:
+        raise NativeUnavailable("native touch-BFS requires a positive generator count")
+    if type(radius) is not int or radius < 0:
+        raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
+    if type(max_entries) is not int or max_entries <= 0:
+        raise ValueError("touch_bfs_max_entries must be a positive integer")
+    total = 1
+    frontier = 1
+    for _ in range(radius):
+        remaining = max_entries - total
+        if remaining < 0 or frontier > remaining // move_count:
+            raise NativeUnavailable(
+                f"native touch-BFS worst-case host allocation exceeds the {max_entries:,}-entry budget; "
+                "reduce touch_bfs_radius or increase touch_bfs_max_entries"
+            )
+        frontier *= move_count
+        total += frontier
+    return total
+
+
 def prepare_runtime(contract, model, options, run_dir, devices, *,
                     touch_bfs_radius: int | None = None) -> PreparedRuntime:
     """Resolve/build before dispatch closes its capability fallback window."""
@@ -37,6 +59,7 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
         raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
     if radius and contract.move_count > 32:
         raise NativeUnavailable("native touch-BFS suffix packing supports at most 32 generators")
+    touch_bfs_worst_case_entries(contract.move_count, radius, options.touch_bfs_max_entries)
     # Stream1's scalar head has a separate kernel. The Q head uses unpadded
     # row-major CUTLASS GEMM with eight-element B/C/D access alignment.
     if model.backend == "mlp" and model.manifest["output_dim"] != 1 and model.manifest["output_dim"] % 8:
@@ -332,6 +355,9 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     forward_depth_limit, effective_touch_bfs_radius = native_depth_budget(max_steps, options.touch_bfs_radius)
     if effective_touch_bfs_radius and contract.move_count > 32:
         raise NativeUnavailable("native touch-BFS suffix packing supports at most 32 generators")
+    touch_bfs_worst_case = touch_bfs_worst_case_entries(
+        contract.move_count, effective_touch_bfs_radius, options.touch_bfs_max_entries
+    )
     if runtime is None:
         runtime = prepare_runtime(contract, model, options, run_dir, devices,
                                   touch_bfs_radius=effective_touch_bfs_radius)
@@ -361,7 +387,8 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     search_budget = {"requested_max_steps": max_steps, "native_forward_depth_limit": forward_depth_limit,
                      "configured_touch_bfs_radius": options.touch_bfs_radius,
                      "effective_touch_bfs_radius": effective_touch_bfs_radius,
-                     "touch_bfs_max_entries": options.touch_bfs_max_entries}
+                     "touch_bfs_max_entries": options.touch_bfs_max_entries,
+                     "touch_bfs_worst_case_entries": touch_bfs_worst_case}
     (run_dir / "runtime-config.json").write_text(json.dumps(
         {"mode": "auto", "microbatch": microbatch_metadata, "search_budget": search_budget}, indent=2
     ) + "\n", encoding="utf-8")

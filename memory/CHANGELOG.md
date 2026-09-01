@@ -808,3 +808,13 @@
   1,048,576, is passed explicitly after inherited `BEAM_*` filtering, and is
   recorded in runtime metadata. The suite passes with 212 tests and 2
   POSIX-only skips on Windows.
+- Closed the final model-artifact TOCTOU window by copying only validated
+  manifest/blob files from a manual `NativeModel` into each search's private
+  run directory, verifying that the copy retains the source hash, and rehashing
+  that private copy immediately before worker launch. Touch-BFS now rejects a
+  geometric worst-case expansion above its host-entry budget before CUDA/build;
+  the native host builders also clamp next-frontier reservation to the remaining
+  entry budget. The suite passes with 215 tests and 2 POSIX-only skips on Windows;
+  a clean CUDA 12.8 container compiled and linked `production_runner` for SM75,
+  and the built MIT-licensed wheel passed installed-package smoke tests against
+  both released CayleyPy 0.1.0 and the companion public-hook checkout.

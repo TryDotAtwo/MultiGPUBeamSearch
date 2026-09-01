@@ -6,8 +6,10 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
+import uuid
 
 from cayleypy import Predictor
 
@@ -62,6 +64,7 @@ class PreparedModel:
     manifest: dict
     backend: str
     artifact_hash: str
+    artifact_files: tuple[str, ...]
 
 
 def verify_prepared_model(model: PreparedModel, contract: GraphContract) -> None:
@@ -174,11 +177,13 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
         digest.update(contract.graph_hash.encode("ascii"))
         import torch
         blob_dtype = torch.float16 if dtype == "fp16" else torch.bfloat16
+        artifact_files = ["manifest.json"]
         for name, count in sorted(counts.items()):
             blob = path / f"{name}.{dtype}"
             expected = count * 2
             if not blob.is_file() or blob.stat().st_size != expected:
                 raise NativeBackendError(f"native blob {blob.name} missing or wrong length (expected {expected} bytes)")
+            artifact_files.append(blob.name)
             digest.update(blob.name.encode("ascii"))
             with blob.open("rb") as source:
                 while chunk := source.read(1024 * 1024):
@@ -186,11 +191,43 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
                     values = torch.frombuffer(bytearray(chunk), dtype=blob_dtype)
                     if not torch.isfinite(values).all().item():
                         raise NativeBackendError(f"native artifact contains non-finite values in {blob.name}")
-        return PreparedModel(path, manifest, backend, digest.hexdigest())
+        return PreparedModel(path, manifest, backend, digest.hexdigest(), tuple(artifact_files))
     except NativeBackendError:
         raise
     except (OSError, ValueError, TypeError, OverflowError, RuntimeError) as error:
         raise NativeBackendError(f"invalid native model artifact {path}: {error}") from error
+
+
+def _snapshot_artifact(model: PreparedModel, contract: GraphContract, run_dir: Path) -> PreparedModel:
+    """Copy only verified runtime inputs into a private, immutable-by-caller run path."""
+    run_dir = Path(run_dir).resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    target = run_dir / "weights"
+    if model.weights_dir == target:
+        return model
+    if target.exists() or target.is_symlink():
+        raise NativeBackendError(f"private native weight snapshot already exists at {target}")
+
+    staging = run_dir / f".weights-snapshot-{uuid.uuid4().hex}"
+    published = False
+    try:
+        staging.mkdir()
+        for name in model.artifact_files:
+            shutil.copyfile(model.weights_dir / name, staging / name)
+        snapshot = _validate_artifact(staging, contract, model.backend)
+        if snapshot.artifact_hash != model.artifact_hash:
+            raise NativeBackendError("native model artifact changed while its private snapshot was copied")
+        staging.replace(target)
+        published = True
+        return PreparedModel(target, snapshot.manifest, snapshot.backend, snapshot.artifact_hash,
+                             snapshot.artifact_files)
+    except NativeBackendError:
+        raise
+    except OSError as error:
+        raise NativeBackendError(f"could not create private native model snapshot: {error}") from error
+    finally:
+        if not published and staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
 
 
 def _known_model(model, contract: GraphContract):
@@ -556,7 +593,7 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
         prepared = _validate_artifact(predictor.weights_dir, contract, predictor.backend)
         if predictor.expected_artifact_hash is not None and predictor.expected_artifact_hash != prepared.artifact_hash:
             raise NativeBackendError("native artifact hash changed after the model snapshot was prepared")
-        return prepared
+        return _snapshot_artifact(prepared, contract, run_dir)
     # Unwrap only the exact unchanged wrapper; arbitrary scoring/preprocessing must not disappear.
     model = _unwrap_predictor(predictor, contract)
     fmt, state, classes = _known_model(model, contract)

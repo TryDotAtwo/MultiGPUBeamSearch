@@ -127,6 +127,11 @@ Runtime manifest keys must be literal, unique and top-level so the adapter and
 the native runner cannot interpret the same artifact differently.
 Every FP16/BF16 weight blob is decoded and checked for finite values before use;
 this also catches overflow introduced by FP16 conversion or BatchNorm folding.
+For a manually supplied `NativeModel`, the adapter copies only the validated
+manifest and required blobs into the private directory for that search. The
+copy must retain the validated content hash, and only that private snapshot is
+passed to native workers. Later changes in the caller's weight directory cannot
+change the model being executed.
 
 For a Q model with one output per generator, also pass `use_child_scores=True`.
 Scalar models score child states. Generator order is preserved in both cases.
@@ -141,10 +146,13 @@ native output whose complete path exceeds the requested bound. The configured
 and effective budgets are recorded in each run's metadata.
 
 Touch-BFS host expansion is capped at 1,048,576 entries by default. Set a
-different finite positive budget with
-`NativeOptions(touch_bfs_max_entries=...)`; reaching it stops the native run
-before further neighborhood growth. The entry budget is also recorded in run
-metadata.
+different finite positive uint64 budget with
+`NativeOptions(touch_bfs_max_entries=...)`. Before CUDA inspection or a build,
+the adapter requires the duplicate-free geometric worst case for the effective
+radius to fit this budget. This conservative check may reject a neighborhood
+that would fit only because many generated states coincide. The native builder
+also caps each next-frontier reservation to the remaining budget. The entry
+budget and accepted worst-case size are recorded in run metadata.
 
 ## Backend selection
 
@@ -320,9 +328,10 @@ the globally configured options.
 Later mutation or retraining of the original model does not update this
 snapshot; prepare explicitly again to use new weights. Prepared model bytes are
 pinned by SHA256, and changing a snapshot artifact raises `NativeBackendError`.
-Each search still checks graph/device compatibility, hashes weights and the
-verified binary, then rehashes every manifest/blob byte after runtime preparation
-and immediately before launching fresh native workers. Successful paths are
+Each search still checks graph/device compatibility, copies the exact prepared
+artifact into its private run directory, hashes the verified binary, then
+rehashes every private manifest/blob byte after runtime preparation and
+immediately before launching fresh native workers. Successful paths are
 independently replayed.
 It skips exporter subprocesses, compiler/source discovery and source/CUTLASS
 tree scans. This is not a persistent worker or a GPU-resident model cache.
@@ -331,4 +340,5 @@ No torch fallback is retained implicitly. To choose one explicitly, pass
 `fallback=predictor` to `prepare_native`; that fallback is the caller's live
 object, while native weights remain the frozen snapshot. Preparation itself
 never falls back. A `NativeModel` constructed manually remains an unpinned
-declaration unless its optional `expected_artifact_hash` is supplied.
+source declaration unless its optional `expected_artifact_hash` is supplied;
+the per-search execution copy is always content-checked and isolated.

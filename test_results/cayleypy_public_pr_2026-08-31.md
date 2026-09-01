@@ -62,8 +62,10 @@ commit `d74c3e1b1e80d7c89910d8c81bf21fded924299b`.
 The pinned native source predates the adapter and had already passed LRX8 and a
 real N88/G24 Tetraminx acceptance run on two Tesla T4 GPUs, including path
 replay, multiple moves, prepared-model reuse, exhausted budgets and a small
-state build (`STATE_LEN=8`, `STATE_STORAGE_LEN=16`). The adapter does not change
-CUDA/native algorithm files.
+state build (`STATE_LEN=8`, `STATE_STORAGE_LEN=16`). The final branch also adds
+a host-only allocation guard to the current native runner; it does not change
+GPU kernels, scoring, deduplication or beam selection. The adapter's default
+download remains the earlier tested immutable source snapshot.
 
 A fresh public-PR two-T4 rerun was attempted through Kaggle, but SaveKernel,
 owned-kernel reads and kernel listing all returned HTTP 403 through both the
@@ -199,3 +201,37 @@ The complete suite passed:
 ```text
 212 passed, 2 skipped
 ```
+
+## Private launch artifacts and bounded host allocation
+
+A manually supplied `NativeModel` no longer leaves native workers reading the
+caller's mutable weight directory. Preparation validates that source, copies
+only the exact runtime manifest/blobs to the search run directory, validates the
+copy against the original content hash, and the existing prelaunch check
+rehashes the private copy. Regressions cover source mutation after preparation,
+mutation during copy, exclusion of unrelated caller files, and direct tampering
+with the private snapshot.
+
+Touch-BFS preparation now computes the duplicate-free geometric upper bound for
+the effective radius and rejects it before CUDA/build when it exceeds
+`touch_bfs_max_entries`. This protects users of the immutable pinned native
+snapshot. The current C++ runner additionally clamps both solved-neighborhood
+and Stream2 suffix next-frontier `reserve` calls to the remaining finite budget
+and avoids multiplication overflow. The complete Windows adapter suite passed:
+
+```text
+215 passed, 2 skipped
+```
+
+The modified runner was configured and built from a read-only checkout in the
+existing CUDA 12.8/CUTLASS container with `BEAM_CUDA_ARCHITECTURES=75`; NVCC
+compiled `tools/production_runner.cu` and linked the `production_runner` target
+successfully. No GPU was exposed to this compile-only container run.
+
+`pip wheel --no-build-isolation --no-deps` produced
+`cayleypy_native-0.1.0.dev0-py3-none-any.whl` with SHA256
+`cf4888f72a46696224939d107bb5396cfd36958029b91385981229583d183a51`.
+The wheel contains `dist-info/licenses/LICENSE`, was installed into an isolated
+target, and `validation/wheel_smoke.py` passed against both released CayleyPy
+0.1.0 (`public_hook=false`) and the companion checkout (`public_hook=true`). In
+both cases the installed adapter produced and replayed CPU fallback path `[2]`.

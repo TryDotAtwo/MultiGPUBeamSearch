@@ -37,8 +37,9 @@ class NativeOptions:
                 raise ValueError(f"{name} must be finite and positive")
         if type(self.touch_bfs_radius) is not int or not 0 <= self.touch_bfs_radius <= 12:
             raise ValueError("touch_bfs_radius must be an integer in [0, 12]")
-        if type(self.touch_bfs_max_entries) is not int or self.touch_bfs_max_entries <= 0:
-            raise ValueError("touch_bfs_max_entries must be a positive integer")
+        if (type(self.touch_bfs_max_entries) is not int
+                or not 0 < self.touch_bfs_max_entries < 2**64):
+            raise ValueError("touch_bfs_max_entries must be a positive uint64")
         if type(self.build_jobs) is not int or self.build_jobs <= 0:
             raise ValueError("build_jobs must be a positive integer")
 
