@@ -184,6 +184,44 @@ def test_pilgrim_nonsquare_residual_is_unavailable_before_export(
         prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 
+@pytest.mark.parametrize("hidden", ["first", "second"])
+def test_pilgrim_unaligned_hidden_width_is_unavailable_before_export(
+        tmp_path, contract, monkeypatch, hidden):
+    import cayleypy_native.models as module
+
+    model = Pilgrim()
+    if hidden == "first":
+        model.input_layer = nn.Linear(16, 12)
+        model.bn1 = nn.BatchNorm1d(12)
+        model.hidden_layer = nn.Linear(12, 8)
+    else:
+        model.hidden_layer = nn.Linear(16, 10)
+        model.bn2 = nn.BatchNorm1d(10)
+        model.residual_blocks = nn.ModuleList([ResidualBlock()])
+        block = model.residual_blocks[0]
+        block.fc1, block.fc2 = nn.Linear(10, 10), nn.Linear(10, 10)
+        block.bn1, block.bn2 = nn.BatchNorm1d(10), nn.BatchNorm1d(10)
+        model.output_layer = nn.Linear(10, 1)
+    model.eval()
+    assert tuple(model(torch.tensor([[0, 1, 2, 3]])).shape) == (1,)
+    monkeypatch.setattr(module.subprocess, "run",
+                        lambda *a, **k: pytest.fail("unaligned hidden width launched exporter"))
+    with pytest.raises(NativeUnavailable, match="multiples of 8"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
+def test_excessive_residual_count_is_unavailable_before_export(tmp_path, contract, monkeypatch):
+    import cayleypy_native.models as module
+
+    model = Pilgrim()
+    model.residual_blocks = nn.ModuleList([ResidualBlock() for _ in range(1025)])
+    model.eval()
+    monkeypatch.setattr(module.subprocess, "run",
+                        lambda *a, **k: pytest.fail("excessive residual count launched exporter"))
+    with pytest.raises(NativeUnavailable, match="at most 1024"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
 @pytest.mark.parametrize("customization", ["subclass_call", "subclass_children", "__call__", "score_children", "predict_batched", "_predict_as_tensor", "foreign_wrapper"])
 def test_custom_predictor_scoring_is_not_bypassed(tmp_path, contract, monkeypatch, customization):
     from types import SimpleNamespace
@@ -301,6 +339,63 @@ def test_class_level_call_override_cannot_hide_beyond_finite_probes(tmp_path, co
     ClassCallOverride.__name__ = "Pilgrim"
     model = ClassCallOverride().eval()
     with pytest.raises(NativeUnavailable, match="class-level __call__"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
+@pytest.mark.parametrize("method", ["__getattribute__", "__getattr__"])
+def test_custom_model_attribute_dispatch_is_rejected(tmp_path, contract, method):
+    if method == "__getattribute__":
+        class AttributeOverride(Pilgrim):
+            def __getattribute__(self, name):
+                return super().__getattribute__(name)
+    else:
+        class AttributeOverride(Pilgrim):
+            def __getattr__(self, name):
+                return super().__getattr__(name)
+
+    AttributeOverride.__name__ = "Pilgrim"
+    with pytest.raises(NativeUnavailable, match="call dispatch"):
+        prepare_model(AttributeOverride().eval(), contract,
+                      NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
+@pytest.mark.parametrize("override", ["class", "instance", "hook"])
+def test_custom_state_serialization_cannot_hide_beyond_finite_probes(
+        tmp_path, contract, monkeypatch, override):
+    import cayleypy_native.models as module
+
+    probes = [contract.center, contract.start]
+    probes.extend(tuple(contract.start[j] for j in generator) for generator in contract.generators[:8])
+    used_columns = {position * 4 + value for state in probes for position, value in enumerate(state)}
+    unseen_column = next(column for column in range(16) if column not in used_columns)
+
+    def changed(state):
+        weight = state["input_layer.weight"].clone()
+        weight[:, unseen_column] += 1.0
+        state["input_layer.weight"] = weight
+        return state
+
+    if override == "class":
+        class StateOverride(Pilgrim):
+            def state_dict(self, *args, **kwargs):
+                return changed(super().state_dict(*args, **kwargs))
+
+        StateOverride.__name__ = "Pilgrim"
+        model = StateOverride()
+    else:
+        model = Pilgrim()
+        if override == "instance":
+            original = model.state_dict
+            model.state_dict = lambda *args, **kwargs: changed(original(*args, **kwargs))
+        else:
+            def alter_state(_module, state, _prefix, _metadata):
+                changed(state)
+
+            model.register_state_dict_post_hook(alter_state)
+    model.eval()
+    monkeypatch.setattr(module.subprocess, "run",
+                        lambda *a, **k: pytest.fail("custom serialization launched exporter"))
+    with pytest.raises(NativeUnavailable, match="state serialization"):
         prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 

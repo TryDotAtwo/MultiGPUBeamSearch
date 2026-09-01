@@ -210,10 +210,13 @@ def _known_model(model, contract: GraphContract):
     if (model.__class__._call_impl is not nn.Module._call_impl
             or "_call_impl" in model.__dict__
             or getattr(model, "_compiled_call_impl", None) is not None
-            or model.__class__.__getattribute__ is not nn.Module.__getattribute__):
+            or model.__class__.__getattribute__ is not nn.Module.__getattribute__
+            or model.__class__.__getattr__ is not nn.Module.__getattr__):
         raise NativeUnavailable("native auto-export does not accept custom nn.Module call dispatch")
     if "forward" in model.__dict__:
         raise NativeUnavailable("native auto-export does not accept an overridden forward callable")
+    if model.__class__.state_dict is not nn.Module.state_dict or "state_dict" in model.__dict__:
+        raise NativeUnavailable("native auto-export does not accept custom state serialization")
 
     def require_child(label, module, expected):
         if type(module) is not expected or "forward" in module.__dict__:
@@ -224,6 +227,10 @@ def _known_model(model, contract: GraphContract):
     for module in model.modules():
         if any(getattr(module, name, None) for name in ("_forward_hooks", "_forward_pre_hooks")):
             raise NativeUnavailable("native auto-export does not accept forward hooks")
+        if (module.__class__._save_to_state_dict is not nn.Module._save_to_state_dict
+                or any(getattr(module, name, None)
+                       for name in ("_state_dict_pre_hooks", "_state_dict_hooks"))):
+            raise NativeUnavailable("native auto-export does not accept custom state serialization")
     for module in model.modules():
         if isinstance(module, (nn.BatchNorm1d, nn.LayerNorm)):
             affine = module.affine if isinstance(module, nn.BatchNorm1d) else module.elementwise_affine
@@ -385,8 +392,10 @@ def _known_model(model, contract: GraphContract):
                 return linear(x, "head")
         if outputs not in (1, contract.move_count) or blocks <= 0 or h1 < h2:
             raise NativeUnavailable("native model needs positive residual count, hidden1>=hidden2, and scalar or move-count outputs")
-        if fmt == "resmlp-layernorm" and (h1 % 8 or h2 % 8):
-            raise NativeUnavailable("native ResMLPDistance hidden dimensions must be multiples of 8")
+        if h1 % 8 or h2 % 8:
+            raise NativeUnavailable("native hidden dimensions must be multiples of 8")
+        if blocks > 1024:
+            raise NativeUnavailable("native adapter supports at most 1024 residual blocks")
         _require_canonical_forward_graph(model, fmt)
         # Use CPU tensors for both sides without moving or changing the original module.
         probes = [contract.center, contract.start]

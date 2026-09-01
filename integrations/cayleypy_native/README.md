@@ -84,7 +84,8 @@ or inside the standard CayleyPy `Predictor`. Models must be in evaluation mode.
 The adapter checks the complete class-level forward graph against the supported
 schema before exporting. Linear, normalization, activation, embedding and container
 children must be the exact supported PyTorch module types, without forward hooks.
-The model must retain standard `nn.Module` call dispatch, including `_call_impl`.
+The model must retain standard `nn.Module` call and attribute dispatch, including
+`_call_impl`, and standard state-dict serialization without hooks.
 A supported `nn.Linear(..., bias=False)` is exported with an explicit zero-bias
 blob, preserving its output in the fixed native artifact schema.
 A customized model uses the original CayleyPy search in `auto` mode and is rejected
@@ -193,7 +194,7 @@ solution was found within this run's budget, not that the state is unreachable.
 | Moves | Ordered gather permutations, 1–255 generators; touch-BFS additionally requires at most 32. |
 | State specialization | Build uses `STATE_LEN=n`, explicit move count, and storage `ceil((n+4)/16)*16`; small states do not retain a fixed 128-byte stride. |
 | Model runtime | Native MLP artifact, scalar or one output per move, FP16/BF16, supported BatchNorm-folded/LayerNorm schema. FP16 requires SM75+, BF16 SM80+. Current Q GEMM requires the move count divisible by 8; scalar output does not. |
-| MLP dimensions | `num_classes >= max(state_len, max_label+1)`, positive residual count, hidden widths divisible by 8, hidden1 >= hidden2, and square hidden2 residual blocks. This can rule out an otherwise supported colored graph. |
+| MLP dimensions | `num_classes >= max(state_len, max_label+1)`, 1–1024 residual blocks, hidden widths divisible by 8, hidden1 >= hidden2, and square hidden2 residual blocks. This can rule out an otherwise supported colored graph. |
 | Search options | Simple mode, global beam width, strict maximum path length, return path. Native touch-BFS uses `NativeOptions(touch_bfs_radius=...)`; its suffix stays inside `max_steps`. |
 | Device placement | Local Linux CUDA devices, one native rank per selected GPU, up to 128. Graph CUDA devices are used by default; explicit `devices=(0,1)` overrides them. |
 | Not yet supported natively | Matrix graphs, arbitrary models/tokenizers, PieceTransformer artifacts, custom destination, advanced/history taboo policy, reusing an upstream BfsResult, existing torchrun ranks, multi-node launch. |

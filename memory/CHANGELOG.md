@@ -792,3 +792,13 @@
   blocks now produce `NativeUnavailable`, preserving `backend="auto"` fallback,
   instead of a post-export `NativeBackendError`. The suite passes with 195 tests
   and 2 POSIX-only skips on Windows.
+- Completed the same early capability classification for Pilgrim hidden widths
+  that are not divisible by 8 and models above the 1024-block runtime limit.
+  Custom model `__getattr__` dispatch is also rejected alongside
+  `__getattribute__`. The suite passes with 200 tests and 2 POSIX-only skips on
+  Windows.
+- Rejected class-level or instance-level `state_dict` overrides, custom
+  `_save_to_state_dict` implementations and state-dict hooks before reading or
+  exporting model weights. Regressions alter a weight column absent from the
+  finite probes and confirm the exporter never starts. The suite passes with
+  203 tests and 2 POSIX-only skips on Windows.

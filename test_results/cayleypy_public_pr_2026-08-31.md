@@ -165,3 +165,23 @@ complete Windows adapter suite passed:
 ```text
 195 passed, 2 skipped
 ```
+
+The final capability preflight also classifies Pilgrim hidden widths that are
+not divisible by 8 and models exceeding the 1024-block runtime limit as
+`NativeUnavailable`, before export. Custom `__getattr__` and `__getattribute__`
+dispatch are both rejected. After these adjacent regressions, the complete
+suite passed:
+
+```text
+200 passed, 2 skipped
+```
+
+Class-level and instance-level `state_dict` overrides, custom
+`_save_to_state_dict` implementations and state-dict hooks are now rejected
+before weight extraction. The regressions alter an input weight column not
+covered by the finite probes and assert that no export subprocess starts. The
+complete suite passed:
+
+```text
+203 passed, 2 skipped
+```
