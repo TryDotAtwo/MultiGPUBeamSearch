@@ -19,6 +19,14 @@ from .options import NativeOptions
 _PREDICTOR_METHODS = {name: getattr(Predictor, name, None) for name in (
     "__init__", "__call__", "score_children", "predict_batched", "_predict_as_tensor",
 )}
+_NATIVE_RUNTIME_MANIFEST_KEYS = frozenset({
+    "state_len", "num_classes", "hidden1", "hd1", "hidden2", "hd2",
+    "residual_count", "nrd", "output_dim", "dtype", "normalization",
+})
+
+
+class _ObjectPairs(list):
+    """JSON object representation that preserves duplicate keys for validation."""
 
 
 @dataclass(frozen=True)
@@ -72,14 +80,60 @@ def _manifest_int(manifest: dict, primary: str, alias: str | None = None) -> int
     return value
 
 
+def _load_unambiguous_manifest(manifest_path: Path) -> dict:
+    """Accept only runtime keys the native text parser reads identically."""
+    text = manifest_path.read_text(encoding="utf-8")
+    root = json.loads(text, object_pairs_hook=_ObjectPairs)
+    if not isinstance(root, _ObjectPairs):
+        raise NativeBackendError("native manifest must be a JSON object")
+    runtime_keys = set()
+
+    def validate(value, depth=0):
+        if isinstance(value, _ObjectPairs):
+            local_keys = set()
+            for key, child in value:
+                if key in local_keys:
+                    if key in _NATIVE_RUNTIME_MANIFEST_KEYS:
+                        raise NativeBackendError(
+                            f"native manifest runtime key {key!r} must be a unique literal top-level key"
+                        )
+                    raise NativeBackendError(f"native manifest contains duplicate JSON key {key!r}")
+                local_keys.add(key)
+                if key in _NATIVE_RUNTIME_MANIFEST_KEYS:
+                    if depth != 0 or key in runtime_keys:
+                        raise NativeBackendError(
+                            f"native manifest runtime key {key!r} must be a unique literal top-level key"
+                        )
+                    runtime_keys.add(key)
+                validate(child, depth + 1)
+        elif isinstance(value, list):
+            for child in value:
+                validate(child, depth)
+
+    def materialize(value):
+        if isinstance(value, _ObjectPairs):
+            return {key: materialize(child) for key, child in value}
+        if isinstance(value, list):
+            return [materialize(child) for child in value]
+        return value
+
+    validate(root)
+    for key in runtime_keys:
+        # The native reader searches raw bytes for an exact quoted key and does
+        # not decode JSON key escapes before choosing the first occurrence.
+        if text.count(json.dumps(key)) != 1:
+            raise NativeBackendError(
+                f"native manifest runtime key {key!r} must be a unique literal top-level key"
+            )
+    return materialize(root)
+
+
 def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> PreparedModel:
     if backend != "mlp":
         raise NativeUnavailable(f"native model backend {backend!r} is not supported by this adapter")
     path = path.resolve()
     try:
-        manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
-        if not isinstance(manifest, dict):
-            raise NativeBackendError("native manifest must be a JSON object")
+        manifest = _load_unambiguous_manifest(path / "manifest.json")
         size = _manifest_int(manifest, "state_len")
         classes = _manifest_int(manifest, "num_classes")
         h1 = _manifest_int(manifest, "hidden1", "hd1")
@@ -146,6 +200,8 @@ def _known_model(model, contract: GraphContract):
         raise NativeUnavailable("native auto-export requires an inference model in eval mode")
     if getattr(model, "z_add", 0) != 0:
         raise NativeUnavailable("native auto-export does not support shifted input labels")
+    if model.__class__.__call__ is not nn.Module.__call__:
+        raise NativeUnavailable("native auto-export does not accept a class-level __call__ override")
     if "forward" in model.__dict__:
         raise NativeUnavailable("native auto-export does not accept an overridden forward callable")
 

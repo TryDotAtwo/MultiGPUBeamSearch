@@ -125,3 +125,16 @@ Windows adapter suite passed:
 ```text
 181 passed, 2 skipped
 ```
+
+## Unambiguous native model semantics
+
+The artifact validator now rejects duplicate, nested or JSON-escaped native
+runtime manifest keys, preventing Python's JSON parser and the runner's literal
+first-match parser from selecting different model configurations. Auto-export
+also rejects a class-level `__call__` override that could bypass the verified
+`forward` graph. Focused regressions reproduce both cases; the complete Windows
+adapter suite passed:
+
+```text
+185 passed, 2 skipped
+```

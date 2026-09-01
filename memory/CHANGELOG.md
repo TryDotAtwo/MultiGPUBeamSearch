@@ -778,3 +778,7 @@
   has `bias=False`. The shared exporter path now writes the mathematically
   equivalent zero-bias blob instead of failing after native selection. The full
   adapter suite passes with 181 tests and 2 POSIX-only skips on Windows.
+- Hardened model equivalence at the Python/native boundary. Runtime manifest
+  keys must now be unique literal top-level JSON keys, matching the native text
+  parser, and model classes with a custom `__call__` are rejected before export.
+  The full adapter suite passes with 185 tests and 2 POSIX-only skips on Windows.

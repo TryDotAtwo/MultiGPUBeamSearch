@@ -101,6 +101,22 @@ def test_layernorm_artifact_requires_norm_blobs(tmp_path, contract):
         prepare_model(NativeModel(path, contract.graph_hash), contract, NativeOptions(), tmp_path / "run2")
 
 
+@pytest.mark.parametrize("variant", ["duplicate", "nested", "escaped"])
+def test_manifest_runtime_keys_must_be_unique_literal_top_level_keys(tmp_path, contract, variant):
+    path = artifact(tmp_path / "ambiguous", normalization="layernorm")
+    manifest_path = path / "manifest.json"
+    text = manifest_path.read_text(encoding="utf-8")
+    if variant == "duplicate":
+        text = '{"normalization":"none",' + text[1:]
+    elif variant == "nested":
+        text = '{"metadata":{"normalization":"none"},' + text[1:]
+    else:
+        text = text.replace('"normalization"', '"normali\\u007aation"')
+    manifest_path.write_text(text, encoding="utf-8")
+    with pytest.raises(NativeBackendError, match="manifest.*runtime key"):
+        prepare_model(NativeModel(path, contract.graph_hash), contract, NativeOptions(), tmp_path / "run")
+
+
 @pytest.mark.parametrize("model", [None, lambda x: x, ModelConfig("MLP", 4, 4, [16, 8]).build_model()])
 def test_unknown_predictors_do_not_launch_export(tmp_path, contract, monkeypatch, model):
     import cayleypy_native.models as module
@@ -242,6 +258,19 @@ def test_class_level_forward_override_cannot_hide_beyond_finite_probes(tmp_path,
     ClassForwardOverride.__name__ = "Pilgrim"
     model = ClassForwardOverride().eval()
     with pytest.raises(NativeUnavailable, match="class-level forward"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
+def test_class_level_call_override_cannot_hide_beyond_finite_probes(tmp_path, contract):
+    class ClassCallOverride(Pilgrim):
+        def __call__(self, states):
+            score = super().__call__(states)
+            unseen = torch.tensor([2, 1, 0, 3], device=states.device)
+            return score + (states == unseen).all(dim=1).to(score.dtype)
+
+    ClassCallOverride.__name__ = "Pilgrim"
+    model = ClassCallOverride().eval()
+    with pytest.raises(NativeUnavailable, match="class-level __call__"):
         prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 
