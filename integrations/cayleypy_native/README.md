@@ -82,8 +82,10 @@ Automatic export accepts a loaded, unmodified `Pilgrim` BatchNorm model or
 `ResMLPDistance` LayerNorm model matching the native export schema, either directly
 or inside the standard CayleyPy `Predictor`. Models must be in evaluation mode.
 The adapter checks the complete class-level forward graph against the supported
-schema before exporting; a subclass with changed inference logic uses the original
-CayleyPy search in `auto` mode and is rejected in `native` mode.
+schema before exporting. Linear, normalization, activation, embedding and container
+children must be the exact supported PyTorch module types, without forward hooks.
+A customized model uses the original CayleyPy search in `auto` mode and is rejected
+in `native` mode.
 Use the standard `Predictor` wrapper when torch fallback is expected; a raw
 module is forwarded unchanged on fallback and must satisfy upstream's interface.
 An upstream CayleyPy MLP, an arbitrary callable, a custom Predictor, or the default

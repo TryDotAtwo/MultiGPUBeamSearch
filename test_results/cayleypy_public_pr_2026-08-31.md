@@ -1,9 +1,9 @@
 # CayleyPy native public-PR verification — 2026-08-31
 
-This note records the reproducible acceptance evidence for
-`TryDotAtwo/MultiGPUBeamSearch#4`. The adapter code under test was commit
-`c40a64d0c33ee3c72d0395b7a28e1c419d4a7c32`; the later review fix only clarifies
-the already implemented compile-time state ABI and adds this tracked report.
+This note records the reproducible acceptance evidence accumulated for
+`TryDotAtwo/MultiGPUBeamSearch#4`. Initial CPU/wheel acceptance was performed at
+commit `c40a64d0c33ee3c72d0395b7a28e1c419d4a7c32`; later pre-merge review fixes and
+their exact-head CI are recorded below.
 
 ## Local CPU and installation acceptance
 
@@ -44,10 +44,10 @@ archives:
 
 ```text
 native revision: a1db0e6d9bb5458c8a842b37dfa99572d3025667
-native SHA256: 53a68eb40275bc0bd50669a5f98e4701cc9f6d1cb12a5fac92506771b41ed073
+native SHA256: 53a68e2261e799aa5421f925c2a70bd23b40dae262092a3a34fea6026bafd6ad
 native archive bytes: 8749964
-CUTLASS revision: afa177415c970c797f700dbf4c73032d3874bcd9
-CUTLASS SHA256: e62fb364e2524c747e5bda3a5fcb57eb22b604d980f1e9c03553c1f6612c9de8
+CUTLASS revision: afa1772203677c5118fcd82537a9c8fefbcc7008
+CUTLASS SHA256: e62fb320c2b61e7e0c7a1163c9c5a58f6dd86025adf7df4d124933152482997f
 CUTLASS archive bytes: 31040140
 offline reuse: pass
 ```
@@ -82,13 +82,20 @@ Three later review findings were reproduced with regression tests and fixed:
   immediately before worker launch;
 - automatic export now compares the class-level Torch FX forward graph with the
   supported Pilgrim/ResMLPDistance inference schema instead of relying on finite
-  numeric probes alone.
+  numeric probes alone, and requires exact supported child module types without
+  forward hooks.
 
 The full Windows adapter suite after these fixes passed:
 
 ```text
-173 passed, 2 skipped
+174 passed, 2 skipped
 ```
 
-The two skips remain the POSIX-only subprocess-permission tests. Public CI and
-the final merged-install smoke are recorded in the merge evidence directory.
+The two skips remain the POSIX-only subprocess-permission tests. Review run
+[`33452889518`](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/33452889518)
+at commit `a4cbf7e13f9a18ff97c73a3d6218926c892aef1c` passed all four
+Ubuntu/Windows and Python 3.10/3.12 jobs. Every job built and
+installed the wheel, exercised released CayleyPy, ran the adapter contracts and
+tested the public hook. Ubuntu/Python 3.12 additionally repeated the real HTTPS
+downloads, exact pin checks and offline cache reuse shown above. The final
+merged-install smoke is recorded in the local merge evidence directory.

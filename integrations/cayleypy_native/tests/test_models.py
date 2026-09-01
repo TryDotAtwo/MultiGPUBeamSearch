@@ -245,6 +245,22 @@ def test_class_level_forward_override_cannot_hide_beyond_finite_probes(tmp_path,
         prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
 
 
+def test_custom_child_forward_cannot_hide_beyond_finite_probes(tmp_path, contract):
+    class ConditionalLinear(nn.Linear):
+        def forward(self, features):
+            output = super().forward(features)
+            unseen = features[:, 2] * features[:, 5] * features[:, 8] * features[:, 15]
+            return output + unseen.unsqueeze(1)
+
+    model = Pilgrim().eval()
+    custom = ConditionalLinear(16, 16)
+    custom.load_state_dict(model.input_layer.state_dict())
+    model.input_layer = custom
+    model.eval()
+    with pytest.raises(NativeUnavailable, match="child module"):
+        prepare_model(model, contract, NativeOptions(source_dir=SOURCE_ROOT), tmp_path / "run")
+
+
 class LayerNormBlock(nn.Module):
     def __init__(self):
         super().__init__()

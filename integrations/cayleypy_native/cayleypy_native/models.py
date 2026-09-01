@@ -148,6 +148,16 @@ def _known_model(model, contract: GraphContract):
         raise NativeUnavailable("native auto-export does not support shifted input labels")
     if "forward" in model.__dict__:
         raise NativeUnavailable("native auto-export does not accept an overridden forward callable")
+
+    def require_child(label, module, expected):
+        if type(module) is not expected or "forward" in module.__dict__:
+            raise NativeUnavailable(
+                f"native auto-export requires exact built-in child module {label} ({expected.__name__})"
+            )
+
+    for module in model.modules():
+        if any(getattr(module, name, None) for name in ("_forward_hooks", "_forward_pre_hooks")):
+            raise NativeUnavailable("native auto-export does not accept forward hooks")
     for module in model.modules():
         if isinstance(module, (nn.BatchNorm1d, nn.LayerNorm)):
             affine = module.affine if isinstance(module, nn.BatchNorm1d) else module.elementwise_affine
@@ -164,6 +174,26 @@ def _known_model(model, contract: GraphContract):
             raise NativeUnavailable("native model has non-finite tensor weights")
         if model.__class__.__name__ == "Pilgrim":
             fmt = "batchnorm-folded"
+            for label, module, expected in (
+                ("input_layer", model.input_layer, nn.Linear),
+                ("hidden_layer", model.hidden_layer, nn.Linear),
+                ("output_layer", model.output_layer, nn.Linear),
+                ("bn1", model.bn1, nn.BatchNorm1d),
+                ("bn2", model.bn2, nn.BatchNorm1d),
+                ("relu", model.relu, nn.ReLU),
+                ("residual_blocks", model.residual_blocks, nn.ModuleList),
+            ):
+                require_child(label, module, expected)
+            for index, block in enumerate(model.residual_blocks):
+                for label, module, expected in (
+                    ("fc1", block.fc1, nn.Linear),
+                    ("fc2", block.fc2, nn.Linear),
+                    ("bn1", block.bn1, nn.BatchNorm1d),
+                    ("bn2", block.bn2, nn.BatchNorm1d),
+                    ("relu", block.relu, nn.ReLU),
+                    ("dropout", block.dropout, nn.Dropout),
+                ):
+                    require_child(f"residual_blocks.{index}.{label}", module, expected)
             classes = getattr(model, "num_classes", None)
             if type(classes) is not int or classes < max(contract.state_len, contract.num_classes):
                 raise NativeUnavailable("native MLP class table must cover state_len and state values")
@@ -200,6 +230,25 @@ def _known_model(model, contract: GraphContract):
                 return linear(x, "output_layer")
         else:
             fmt = "resmlp-layernorm"
+            require_child("embedding", model.embedding, nn.Embedding)
+            require_child("input_stack", model.input_stack, nn.Sequential)
+            require_child("res_blocks", model.res_blocks, nn.ModuleList)
+            require_child("head", model.head, nn.Linear)
+            if len(model.input_stack) != 6:
+                raise NativeUnavailable("native ResMLPDistance requires the canonical six-layer input stack")
+            for index, expected in enumerate((nn.Linear, nn.LayerNorm, nn.ReLU, nn.Linear, nn.LayerNorm, nn.ReLU)):
+                require_child(f"input_stack.{index}", model.input_stack[index], expected)
+            for index, block in enumerate(model.res_blocks):
+                for label, module, expected in (
+                    ("lin1", block.lin1, nn.Linear),
+                    ("lin2", block.lin2, nn.Linear),
+                    ("ln1", block.ln1, nn.LayerNorm),
+                    ("ln2", block.ln2, nn.LayerNorm),
+                ):
+                    require_child(f"res_blocks.{index}.{label}", module, expected)
+            if (model.embedding.padding_idx is not None or model.embedding.max_norm is not None
+                    or model.embedding.scale_grad_by_freq or model.embedding.sparse):
+                raise NativeUnavailable("native ResMLPDistance requires a canonical plain embedding")
             classes, embedding = state["embedding.weight"].shape
             h1, inputs = state["input_stack.0.weight"].shape
             h2, h1_in = state["input_stack.3.weight"].shape

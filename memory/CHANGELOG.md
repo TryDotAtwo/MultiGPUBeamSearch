@@ -764,5 +764,9 @@
   now avoid CUDA/model/build preflight; prepared model bytes are rehashed after
   runtime preparation immediately before launch; and auto-export verifies the
   complete class-level Torch FX graph against the supported inference schema.
-  Added focused regressions; the full adapter suite passes with 173 tests and 2
+  Added focused regressions; the full adapter suite passes with 174 tests and 2
   POSIX-only skips on Windows.
+- Follow-up review now rejects customized child module subclasses and forward
+  hooks before auto-export; exact PyTorch child/container types are required for
+  both supported schemas. Corrected the tracked source evidence to the shipped
+  native/CUTLASS revisions and SHA256 values from CI run 33452889518.
