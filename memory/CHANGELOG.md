@@ -743,3 +743,122 @@
 - Updated IHES fresh bucket array documentation to use one shared precompiled production_runner. The documented flow submits prepare_ihes_prebuilt_runner.sh first, then submits the puzzle array with --dependency=afterok:<prebuild_job> and BEAM_PREBUILT_RUNNER=/mnt/pool/6/vokirova/beam8a100/ihes_cube_model/prebuilt-a100-ihes/production_runner so each one-puzzle task reuses the same binary instead of rebuilding.
 
 - Fixed IHES live results publishing index generation after raw/backfill metadata added extra keys. The fresh bucket publisher now includes variants/source_files columns in data/ihes_cube/index.tsv and filters metadata rows to declared fields before writing index/improvements, so older per-puzzle metadata cannot crash publishing.
+
+## 2026-08-31 - Portable CayleyPy adapter and public backend hook
+- Added optional installable cayleypy-native package, explicit pinned/checksummed source setup, wheel smoke/CPU CI, public two-GPU smoke, documentation and MIT license.
+- The companion CayleyPy change adds an opt-in callable/registry hook; native/auto dispatch uses it without monkeypatching. Released CayleyPy 0.1.0 retains reversible compatibility dispatch.
+- Kept the CUDA algorithm unchanged. Default source setup pins the native snapshot already validated on two T4 GPUs; it does not follow moving main.
+- Initial verification: 169 adapter tests passed, two POSIX-only skips on Windows; installed wheel CPU replay passed with both released CayleyPy and the public-hook source. Public-source two-T4 acceptance is recorded separately when complete.
+- Reproducible public-PR verification note:
+  `test_results/cayleypy_public_pr_2026-08-31.md`.
+- Public PR follow-up: all four native CPU CI jobs passed, including installed wheel and public-hook tests. Added real HTTPS source-setup/offline-reuse CI. Fresh Kaggle two-T4 submission is blocked by HTTP 403 on both write and owned-notebook read APIs; no repeat GPU result is claimed. Companion CayleyPy guide uses RST to avoid its legacy Markdown parser failure.
+
+## 2026-09-01 - CayleyPy native PR pre-merge review
+- Reconciled the architecture contract with the compile-time state sizing that
+  has existed since June: `120/128` is the default Megaminx profile, while
+  shape-specialized builds use `STATE_LEN=N` and aligned storage of at least
+  `N+4` bytes. The native algorithm is unchanged.
+- Added a tracked, compact verification note so a clean checkout can inspect the
+  exact CPU, wheel, public CI, source-download and GPU-boundary evidence.
+- Fixed all three follow-up review findings: trivial solved/zero-depth results
+  now avoid CUDA/model/build preflight; prepared model bytes are rehashed after
+  runtime preparation immediately before launch; and auto-export verifies the
+  complete class-level Torch FX graph against the supported inference schema.
+  Added focused regressions; the full adapter suite passes with 174 tests and 2
+  POSIX-only skips on Windows.
+- Follow-up review now rejects customized child module subclasses and forward
+  hooks before auto-export; exact PyTorch child/container types are required for
+  both supported schemas. Corrected the tracked source evidence to the shipped
+  native/CUTLASS revisions and SHA256 values from CI run 33452889518.
+- Kept touch-BFS suffixes inside CayleyPy's `max_steps` contract. The adapter
+  now clamps the effective radius, reserves suffix space from the native forward
+  depth, records both budgets, and rejects any over-budget native terminal path.
+  The full adapter suite passes with 180 tests and 2 POSIX-only skips on Windows.
+- Fixed automatic export of a canonical ResMLPDistance whose first `nn.Linear`
+  has `bias=False`. The shared exporter path now writes the mathematically
+  equivalent zero-bias blob instead of failing after native selection. The full
+  adapter suite passes with 181 tests and 2 POSIX-only skips on Windows.
+- Hardened model equivalence at the Python/native boundary. Runtime manifest
+  keys must now be unique literal top-level JSON keys, matching the native text
+  parser, and model classes with a custom `__call__` are rejected before export.
+  The full adapter suite passes with 185 tests and 2 POSIX-only skips on Windows.
+- Completed model call-dispatch and numeric artifact validation: custom class or
+  instance `_call_impl`, compiled call paths and custom attribute dispatch are
+  rejected, while every FP16/BF16 blob is decoded and checked for NaN/Inf after
+  export and before launch. The suite passes with 191 tests and 2 POSIX-only
+  skips on Windows.
+- Validated every auto-exported linear and normalization width before starting
+  the exporter. ResMLPDistance and Pilgrim bottleneck or expanded residual
+  blocks now produce `NativeUnavailable`, preserving `backend="auto"` fallback,
+  instead of a post-export `NativeBackendError`. The suite passes with 195 tests
+  and 2 POSIX-only skips on Windows.
+- Completed the same early capability classification for Pilgrim hidden widths
+  that are not divisible by 8 and models above the 1024-block runtime limit.
+  Custom model `__getattr__` dispatch is also rejected alongside
+  `__getattribute__`. The suite passes with 200 tests and 2 POSIX-only skips on
+  Windows.
+- Rejected class-level or instance-level `state_dict` overrides, custom
+  `_save_to_state_dict` implementations and state-dict hooks before reading or
+  exporting model weights. Regressions alter a weight column absent from the
+  finite probes and confirm the exporter never starts. The suite passes with
+  203 tests and 2 POSIX-only skips on Windows.
+- Extended model preflight across the raw registered module tree so custom root
+  traversal cannot hide child hooks, serialization or call dispatch. Added a
+  finite touch-BFS host-neighborhood budget: `touch_bfs_max_entries` defaults to
+  1,048,576, is passed explicitly after inherited `BEAM_*` filtering, and is
+  recorded in runtime metadata. The suite passes with 212 tests and 2
+  POSIX-only skips on Windows.
+- Closed the final model-artifact TOCTOU window by copying only validated
+  manifest/blob files from a manual `NativeModel` into each search's private
+  run directory, verifying that the copy retains the source hash, and rehashing
+  that private copy immediately before worker launch. Touch-BFS now rejects a
+  geometric worst-case expansion above its host-entry budget before CUDA/build;
+  the native host builders also clamp next-frontier reservation to the remaining
+  entry budget. The suite passes with 215 tests and 2 POSIX-only skips on Windows;
+  a clean CUDA 12.8 container compiled and linked `production_runner` for SM75,
+  and the built MIT-licensed wheel passed installed-package smoke tests against
+  both released CayleyPy 0.1.0 and the companion public-hook checkout.
+- Auto-export now rejects process-global PyTorch forward and pre-forward hooks
+  before model inspection and checks the registries again after semantic probes.
+  These hooks execute outside each module's local hook dictionaries and cannot
+  be preserved by a native artifact. Both public registration paths are covered;
+  the complete suite passes with 217 tests and 2 POSIX-only skips on Windows.
+- Closed the prepared-runner launch race by copying the executable into the
+  fresh per-search run directory, checking that private copy against the pinned
+  build SHA256, and launching only the private path. A regression replaces the
+  shared prepared runner after the snapshot and confirms the worker still reads
+  the original verified bytes. The complete suite remains at 217 passed and 2
+  POSIX-only skips on Windows.
+- Moved graph-specific touch-BFS packing and geometric entry-budget validation
+  ahead of CUDA inspection and model preparation in both ordinary dispatch and
+  explicit `prepare_native`. Unsupported graph/radius pairs cannot trigger CUDA,
+  export, build, or worker work; the complete suite passes with 219 tests and 2
+  POSIX-only skips on Windows.
+- Deferred per-search cache creation until CUDA/runtime capability succeeds.
+  `auto` now falls back cleanly when the cache cannot be created and removes its
+  fresh UUID run directory when later model/build preparation is unsupported;
+  strict `native` retains diagnostic artifacts. The suite passes with 221 tests
+  and 2 POSIX-only skips on Windows.
+- Bound the native artifact identity to the exact `manifest.json` bytes instead
+  of a canonicalized parsed object, eliminating JSON-equivalent mutations that
+  could retain the old SHA256. Runtime string values must also use the literal
+  encoding consumed by the native C++ parser. The suite passes with 224 tests
+  and 2 POSIX-only skips on Windows.
+- Closed the NCCL launch dependency race by copying the build-pinned library
+  bytes into each search's private `runtime-libs/libnccl.so.2`, validating that
+  copy against `library_sha256`, and placing only that directory first on the
+  worker's `LD_LIBRARY_PATH`. A regression replaces the installed source after
+  snapshot creation and confirms the private loader target remains unchanged;
+  the suite remains at 224 tests and 2 POSIX-only skips on Windows.
+- Removed cache access from deterministic already-solved and zero-step results
+  in both `native` and `auto` dispatch, including direct `run_native` calls.
+  These paths now report `run_dir=None` and work when `cache_dir` is an existing
+  file or otherwise unwritable. The suite passes with 228 tests and 2 POSIX-only
+  skips on Windows.
+- Updated the public two-GPU acceptance harness for cache-free host shortcuts:
+  model artifacts, model hashes and selected-device checks now apply only when
+  native workers are required, while shortcut cases assert `run_dir=None`, no
+  model hash and no devices. Cross-call graph/model identity and warm-build reuse
+  likewise consider only worker-launch cases, so the two shortcuts cannot poison
+  the aggregate result. Its 11 CPU-testable checks now run in every CI matrix
+  job; the combined suite passes with 239 tests and 2 POSIX-only skips.

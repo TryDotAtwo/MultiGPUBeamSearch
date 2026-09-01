@@ -5,6 +5,22 @@ CUDA/C++ multi-GPU beam search runner for Cayley graph puzzle searches.
 The production executable is `production_runner`. It can run on one GPU or on
 multiple GPUs through `torchrun`; the same binary is used in both cases.
 
+## Use from CayleyPy
+
+The optional [`cayleypy-native` Python package](integrations/cayleypy_native/README.md)
+keeps `graph.beam_search(...)` and CayleyPy result objects while running compatible
+searches through the native CUDA/NCCL backend. Install it from this repository:
+
+```bash
+python -m pip install "git+https://github.com/TryDotAtwo/MultiGPUBeamSearch.git#subdirectory=integrations/cayleypy_native"
+```
+
+See the adapter guide for explicit source setup, single/multi-GPU configuration,
+supported model/graph contracts, CPU fallback and reproducible GPU validation.
+Importing or installing the package does not compile CUDA or download models.
+The project and adapter are provided under the [MIT license](LICENSE); external
+dependencies and model weights retain their own licenses.
+
 ## What Is Included
 
 - CUDA beam-search runtime with Stream1 neural scoring, Stream2 move/hash work,

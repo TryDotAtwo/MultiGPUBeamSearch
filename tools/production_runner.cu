@@ -62,6 +62,27 @@ using namespace beam;
 
 namespace {
 
+std::size_t bounded_child_reserve(
+    std::size_t frontier_size,
+    std::size_t vector_max_size,
+    std::uint64_t current_count,
+    std::uint64_t max_count) {
+    static_assert(MOVE_COUNT > 0, "MOVE_COUNT must be positive");
+    const std::size_t fanout = static_cast<std::size_t>(MOVE_COUNT);
+    std::size_t reserve_count = frontier_size > vector_max_size / fanout
+        ? vector_max_size
+        : frontier_size * fanout;
+    if (max_count != 0ULL) {
+        const std::uint64_t remaining = current_count < max_count
+            ? max_count - current_count
+            : 0ULL;
+        if (remaining < reserve_count) {
+            reserve_count = static_cast<std::size_t>(remaining);
+        }
+    }
+    return reserve_count;
+}
+
 std::uint64_t parse_u64(const char* text, const char* name) {
     char* end = nullptr;
     const unsigned long long value = std::strtoull(text, &end, 10);
@@ -1151,7 +1172,8 @@ HostSolvedNeighborhood build_solved_neighborhood_host(
 
     for (std::uint32_t depth = 0; depth < host.radius && !frontier.empty(); ++depth) {
         std::vector<SolvedNeighborhoodNode> next;
-        next.reserve(frontier.size() * MOVE_COUNT);
+        next.reserve(bounded_child_reserve(
+            frontier.size(), next.max_size(), host.suffix_by_hash.size(), max_entries));
         for (const SolvedNeighborhoodNode& node : frontier) {
             for (std::uint8_t move = 0; move < MOVE_COUNT; ++move) {
                 State128 predecessor = apply_inverse_move_flat_host(node.state, generators, move);
@@ -1430,7 +1452,8 @@ std::vector<PackedSuffix> build_stream2_suffix_list(std::uint32_t radius, std::u
     frontier.push_back(PackedSuffix{});
     for (std::uint32_t depth = 0; depth < radius; ++depth) {
         std::vector<PackedSuffix> next;
-        next.reserve(frontier.size() * MOVE_COUNT);
+        next.reserve(bounded_child_reserve(
+            frontier.size(), next.max_size(), suffixes.size(), max_count));
         for (const PackedSuffix& suffix : frontier) {
             for (std::uint8_t move = 0; move < MOVE_COUNT; ++move) {
                 const PackedSuffix child = append_suffix_move(suffix, move);

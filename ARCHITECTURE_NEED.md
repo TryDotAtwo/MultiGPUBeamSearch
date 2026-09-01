@@ -45,6 +45,26 @@ SOLVED_RESULT_CAPACITY
 threshold_initialized
 ```
 
+## Compile-time state shape contract
+
+The numeric `120`/`128` state examples in this document describe the default
+Megaminx build. Production builds may specialize the same pipeline at CMake
+configure time:
+
+```text
+STATE_LEN = N
+STATE_STORAGE_LEN = round_up_at_least(N + sizeof(uint32_t), STATE_ALIGNMENT)
+STATE_ALIGNMENT = 16 by default
+```
+
+`State128` is retained as a source-compatibility alias for the build-specific
+`StatePacked`; its size is `STATE_STORAGE_LEN`, not an unconditional 128 bytes.
+For every shape, logical state occupies `v[0..STATE_LEN-1]`, persistent padding
+`v[STATE_LEN..STATE_STORAGE_LEN-1]` is zero, and `FinalResponse` may temporarily
+store `target_local_idx` in the first four padding bytes. Unless a section says
+otherwise, literal `120`/`128` ranges below are the default-profile expansion of
+these formulas.
+
 
 ## 2026-05-26 Stream5 threshold update contract
 
@@ -164,23 +184,24 @@ using StateValue = uint8_t;
 ```
 
 ```cpp
-struct alignas(16) State128 {
+struct alignas(STATE_ALIGNMENT) StatePacked {
     StateValue v[STATE_STORAGE_LEN];
 };
+using State128 = StatePacked;
 ```
 
 Контракт `State128`:
 
 ```text
-State128.v[0..119]   = logical_state
-State128.v[120..127] = padding / temporary final metadata
+State128.v[0..STATE_LEN-1]                 = logical_state
+State128.v[STATE_LEN..STATE_STORAGE_LEN-1] = padding / temporary final metadata
 ```
 
 Persistent frontier contract:
 
 ```text
-current_frontier_states[*].v[120..127] = 0
-next_frontier_states_tmp[*].v[120..127] = 0 before persistent write
+current_frontier_states[*].v[STATE_LEN..STATE_STORAGE_LEN-1] = 0
+next_frontier_states_tmp[*].v[STATE_LEN..STATE_STORAGE_LEN-1] = 0 before persistent write
 ```
 
 ```cpp
@@ -1670,19 +1691,19 @@ load balancing
 # Итоговые архитектурные инварианты
 
 ```text
-State128.v[0..119]   = логическое состояние.
-State128.v[120..127] = padding / служебная зона.
+State128.v[0..STATE_LEN-1]                 = логическое состояние.
+State128.v[STATE_LEN..STATE_STORAGE_LEN-1] = padding / служебная зона.
 
 persistent frontier states:
-  v[120..127] = 0
+  v[STATE_LEN..STATE_STORAGE_LEN-1] = 0
 
 FinalResponse = State128.
-FinalResponse.v[120..123] хранит target_local_idx только в финальном обмене.
+FinalResponse.v[STATE_LEN..STATE_LEN+3] хранит target_local_idx только в финальном обмене.
 Перед записью в next_frontier_states_tmp padding очищается.
 
-generators[move][120..127] = 120..127.
-central_state[120..127] = 0.
-zobrist[120..127][*] = Hash128{0, 0}.
+generators[move][STATE_LEN..STATE_STORAGE_LEN-1] = identity padding indices.
+central_state[STATE_LEN..STATE_STORAGE_LEN-1] = 0.
+zobrist[STATE_LEN..STATE_STORAGE_LEN-1][*] = Hash128{0, 0}.
 
 Stream 1/2/3/4/5 не материализуют full next_frontier.
 next_frontier_states_tmp существует только в layout_final внутри scratch_pool.
@@ -1704,8 +1725,8 @@ Stream 2 не считает owner.
 owner_ring отсутствует.
 Stream 2 пишет hash_ring с Hash128.
 Stream 2 материализует child_state локально как State128.
-Stream 2 делает goal-check по STATE_STORAGE_LEN=128.
-Stream 2 делает hash по STATE_STORAGE_LEN=128.
+Stream 2 делает goal-check по compile-time STATE_STORAGE_LEN.
+Stream 2 делает hash по compile-time STATE_STORAGE_LEN.
 Padding не влияет на hash из-за нулевых zobrist-строк.
 
 Hash128 = один логический 128-битный хэш,

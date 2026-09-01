@@ -241,13 +241,13 @@ def export_resmlp_layernorm(weights_path: Path, out_dir: Path, dtype: ExportDTyp
     residual_count = infer_resmlp_residual_count(sd)
 
     embedding = sd["embedding.weight"].detach().float()
-    first_weight = sd["input_stack.0.weight"].detach().float()
+    first_weight, first_bias = linear_weight_bias(sd, "input_stack.0")
     folded = torch.empty((hidden1, state_len * num_classes), dtype=torch.float32)
     for pos in range(state_len):
         block = first_weight[:, pos * embed_dim:(pos + 1) * embed_dim]
         folded[:, pos * num_classes:(pos + 1) * num_classes] = (embedding @ block.t()).t()
     write_hxk(out_dir / f"input_weight_hxk{suffix}", folded, dtype)
-    write_vec(out_dir / f"input_bias{suffix}", sd["input_stack.0.bias"].detach().float(), dtype)
+    write_vec(out_dir / f"input_bias{suffix}", first_bias, dtype)
     write_vec(out_dir / f"input_ln_gamma{suffix}", sd["input_stack.1.weight"].detach().float(), dtype)
     write_vec(out_dir / f"input_ln_beta{suffix}", sd["input_stack.1.bias"].detach().float(), dtype)
 
