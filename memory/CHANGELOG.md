@@ -989,3 +989,8 @@
 - `BEAM_GENERATOR_PATH` is now mandatory; a missing or empty value throws before generator loading or GPU search.
 - Added a regression contract test. Verified `tests/cayleypy_public/test_runner.py`: 54 passed.
 - Root-cause evidence: Cube4 p1000 failed at 30M and 60M with the hidden p900 fallback, then solved at length 44 with 30M after explicitly setting the Cube4 `puzzle_info.json` generator path.
+
+## 2026-09-04 - Single-copy mixed Hopper weight layout
+- Removed the experimental persistent duplicate QKV/FFN weight allocations.
+- In FP16 TMA mode, full-token blocks 0-2 are uploaded directly in the Hopper KxN column-major layout; final CLS block 3 remains in the legacy layout.
+- The loader now fails closed unless final-CLS attention and split-QKV are enabled, and rejects FP8 until its dedicated quantized loader is qualified.

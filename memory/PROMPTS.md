@@ -572,3 +572,6 @@ User reported that an interactive game had been running during part of the recen
 
 ## 2026-08-03 - Fail closed on puzzle generators
 - User requirement: remove generator defaults so a missing puzzle-specific generator path can never silently run a different puzzle's moves; then launch Cube4 puzzles 1001 through 1004 at the established maximum 820M beam.
+
+## 2026-09-04 - Do not duplicate Hopper weights
+- User required one persistent copy per weight tensor: pack the full-token portion for Hopper and keep the final-CLS portion in the ordinary layout instead of storing both layouts.

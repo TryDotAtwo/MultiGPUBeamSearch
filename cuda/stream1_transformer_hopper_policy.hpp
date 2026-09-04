@@ -41,4 +41,14 @@ inline bool stream1_transformer_hopper_large_gemm_allowed(
     return mode != Stream1TransformerHopperMode::Off && sm == 90 && rows >= 4096U;
 }
 
+inline bool stream1_transformer_hopper_uses_packed_full_token_weight(
+    Stream1TransformerHopperMode mode,
+    unsigned layer,
+    unsigned layer_count) {
+    // The last block is intentionally kept in the legacy layout: the
+    // final-CLS path executes only 1/51 of its rows and does not use GMMA.
+    return mode != Stream1TransformerHopperMode::Off &&
+        layer_count > 0U && layer + 1U < layer_count;
+}
+
 }  // namespace beam

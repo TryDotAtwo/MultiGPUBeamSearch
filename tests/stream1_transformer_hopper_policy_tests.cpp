@@ -26,5 +26,13 @@ int main() {
     require(beam::stream1_transformer_hopper_large_gemm_allowed(Stream1TransformerHopperMode::Fp8E4m3, 90, 43776));
     require(!beam::stream1_transformer_hopper_large_gemm_allowed(Stream1TransformerHopperMode::Fp8E4m3, 90, 768));
     require(!beam::stream1_transformer_hopper_large_gemm_allowed(Stream1TransformerHopperMode::Fp8E4m3, 100, 43776));
+    require(beam::stream1_transformer_hopper_uses_packed_full_token_weight(
+        Stream1TransformerHopperMode::Fp16Tma, 0, 4));
+    require(beam::stream1_transformer_hopper_uses_packed_full_token_weight(
+        Stream1TransformerHopperMode::Fp16Tma, 2, 4));
+    require(!beam::stream1_transformer_hopper_uses_packed_full_token_weight(
+        Stream1TransformerHopperMode::Fp16Tma, 3, 4));
+    require(!beam::stream1_transformer_hopper_uses_packed_full_token_weight(
+        Stream1TransformerHopperMode::Off, 0, 4));
     return 0;
 }

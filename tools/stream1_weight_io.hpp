@@ -2,6 +2,7 @@
 
 #include "../src/config.hpp"
 #include "../cuda/stream1_transformer_shape.hpp"
+#include "../cuda/stream1_transformer_hopper_policy.hpp"
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 #include "cuda_check.hpp"
@@ -12,6 +13,7 @@
 #endif
 
 #include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -685,6 +687,26 @@ inline void alloc_and_copy(half*& dst, const std::vector<std::byte>& src, const 
     alloc_and_copy_typed(dst, src, name);
 }
 
+inline std::vector<std::byte> pack_kxn_column_major_2byte(
+    const std::vector<std::byte>& src,
+    std::uint32_t k_count,
+    std::uint32_t n_count) {
+    const std::size_t expected = static_cast<std::size_t>(k_count) * n_count * 2U;
+    if (src.size() != expected) {
+        throw std::runtime_error("Hopper weight pack expects a two-byte KxN tensor");
+    }
+    std::vector<std::byte> dst(expected);
+    for (std::uint32_t k = 0; k < k_count; ++k) {
+        for (std::uint32_t n = 0; n < n_count; ++n) {
+            const std::size_t src_offset = (static_cast<std::size_t>(k) * n_count + n) * 2U;
+            const std::size_t dst_offset = (static_cast<std::size_t>(n) * k_count + k) * 2U;
+            dst[dst_offset] = src[src_offset];
+            dst[dst_offset + 1U] = src[src_offset + 1U];
+        }
+    }
+    return dst;
+}
+
 inline void alloc_managed_pointer_table(half**& table, const std::vector<half*>& ptrs, const char* name) {
     if (ptrs.empty()) {
         table = nullptr;
@@ -709,19 +731,58 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
     alloc_and_copy(d.output_ln_gamma, h.output_ln_gamma, "output_ln_gamma");
     alloc_and_copy(d.output_ln_beta, h.output_ln_beta, "output_ln_beta");
     d.blocks.resize(h.blocks.size());
+    const Stream1TransformerHopperMode qkv_hopper_mode = select_stream1_transformer_hopper_mode(
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"),
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER_QKV"));
+    const Stream1TransformerHopperMode ff1_hopper_mode = select_stream1_transformer_hopper_mode(
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"),
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER_FF1"));
+    const bool hopper_packed_weights =
+        qkv_hopper_mode != Stream1TransformerHopperMode::Off ||
+        ff1_hopper_mode != Stream1TransformerHopperMode::Off;
+    if (qkv_hopper_mode == Stream1TransformerHopperMode::Fp8E4m3 ||
+        ff1_hopper_mode == Stream1TransformerHopperMode::Fp8E4m3) {
+        throw std::runtime_error(
+            "FP8 E4M3 Hopper weights require the dedicated quantized loader; quality is not qualified yet");
+    }
+    if (hopper_packed_weights && host.model.dtype != STREAM1_DTYPE_FP16) {
+        throw std::runtime_error("Hopper packed Stream1 weights currently require FP16 model weights");
+    }
+    const auto env_enabled = [](const char* name) {
+        const char* value = std::getenv(name);
+        return value != nullptr && std::strcmp(value, "1") == 0;
+    };
+    if (hopper_packed_weights &&
+        (!env_enabled("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY") ||
+         !env_enabled("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION") ||
+         !env_enabled("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_SPLIT_QKV"))) {
+        throw std::runtime_error(
+            "Hopper packed Stream1 weights require FINAL_CLS_ONLY=1, "
+            "FINAL_CLS_ATTENTION=1, and FINAL_CLS_SPLIT_QKV=1");
+    }
     for (std::size_t i = 0; i < h.blocks.size(); ++i) {
         const std::string prefix = "block" + std::to_string(i);
         const HostTransformerBlockBytes& hb = h.blocks[i];
         DeviceTransformerBlockWeights& db = d.blocks[i];
         alloc_and_copy(db.ln1_gamma, hb.ln1_gamma, (prefix + "_ln1_gamma").c_str());
         alloc_and_copy(db.ln1_beta, hb.ln1_beta, (prefix + "_ln1_beta").c_str());
-        alloc_and_copy(db.attn_qkv_weight, hb.attn_qkv_weight, (prefix + "_attn_qkv_weight").c_str());
+        const bool pack_qkv = stream1_transformer_hopper_uses_packed_full_token_weight(
+            qkv_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
+        const bool pack_ff1 = stream1_transformer_hopper_uses_packed_full_token_weight(
+            ff1_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
+        const std::vector<std::byte> qkv_packed = pack_qkv
+            ? pack_kxn_column_major_2byte(hb.attn_qkv_weight, host.model.d_model, 3U * host.model.d_model)
+            : std::vector<std::byte>{};
+        const std::vector<std::byte> ff1_packed = pack_ff1
+            ? pack_kxn_column_major_2byte(hb.ff1_weight, host.model.d_model, host.model.ff_dim)
+            : std::vector<std::byte>{};
+        alloc_and_copy(db.attn_qkv_weight, pack_qkv ? qkv_packed : hb.attn_qkv_weight, (prefix + "_attn_qkv_weight").c_str());
         alloc_and_copy(db.attn_qkv_bias, hb.attn_qkv_bias, (prefix + "_attn_qkv_bias").c_str());
         alloc_and_copy(db.attn_out_weight, hb.attn_out_weight, (prefix + "_attn_out_weight").c_str());
         alloc_and_copy(db.attn_out_bias, hb.attn_out_bias, (prefix + "_attn_out_bias").c_str());
         alloc_and_copy(db.ln2_gamma, hb.ln2_gamma, (prefix + "_ln2_gamma").c_str());
         alloc_and_copy(db.ln2_beta, hb.ln2_beta, (prefix + "_ln2_beta").c_str());
-        alloc_and_copy(db.ff1_weight, hb.ff1_weight, (prefix + "_ff1_weight").c_str());
+        alloc_and_copy(db.ff1_weight, pack_ff1 ? ff1_packed : hb.ff1_weight, (prefix + "_ff1_weight").c_str());
         alloc_and_copy(db.ff1_bias, hb.ff1_bias, (prefix + "_ff1_bias").c_str());
         alloc_and_copy(db.ff2_weight, hb.ff2_weight, (prefix + "_ff2_weight").c_str());
         alloc_and_copy(db.ff2_bias, hb.ff2_bias, (prefix + "_ff2_bias").c_str());
