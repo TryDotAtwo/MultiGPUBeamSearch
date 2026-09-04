@@ -995,3 +995,4 @@
 - In FP16 TMA mode, full-token blocks 0-2 are uploaded directly in the Hopper KxN column-major layout; final CLS block 3 remains in the legacy layout.
 - The loader now fails closed unless final-CLS attention and split-QKV are enabled, and rejects FP8 until its dedicated quantized loader is qualified.
 - Added a Vast 8xH200 production launcher for Cube4 puzzle 1000 at a requested 2.6B frontier, pinned to the measured FP16 baseline (`micro=192`, 12 lanes, final-CLS/split-QKV) with Hopper disabled and 512 GiB RAM plus 2 TiB disk history budgets.
+- Corrected its 8-rank NCCL memory margin after the first empty count exchange failed with only 1 GiB free: reserve 4 GiB per GPU and use a still-bounded 1.20x shard candidate capacity while preserving the 2.6B global beam.
