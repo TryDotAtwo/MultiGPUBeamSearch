@@ -3566,7 +3566,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.dtype,
         stream);
-    stream1_transformer_ff1_linear_bias_silu_cuda(
+    stream1_transformer_ff1_linear_bias_activation_cuda(
         scratch.attention_context,
         block.ff1_weight,
         block.ff1_bias,
@@ -3575,6 +3575,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.ff_dim,
         dims.dtype,
+        dims.activation,
         stream);
     stream1_transformer_linear_residual_cuda(
         scratch.ff_hidden,
@@ -3679,7 +3680,7 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.dtype,
             stream);
         stage_profiler.mark(layer_prefix + "ln2");
-        stream1_transformer_ff1_linear_bias_silu_cuda(
+        stream1_transformer_ff1_linear_bias_activation_cuda(
             scratch.attention_context,
             block.ff1_weight,
             block.ff1_bias,
@@ -3688,6 +3689,7 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.d_model,
             dims.ff_dim,
             dims.dtype,
+            dims.activation,
             stream);
         stage_profiler.mark(layer_prefix + "ff1");
         stream1_transformer_linear_residual_cuda(
