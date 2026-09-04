@@ -40,8 +40,8 @@ void stream1_transformer_hopper_fp16_bias_activation(
     using namespace cute;
     using Element = cutlass::half_t;
     using LayoutA = cutlass::layout::RowMajor;
-    // Existing weights are KxN row-major, which is byte-identical to NxK column-major.
-    using LayoutB = cutlass::layout::ColumnMajor;
+    // Exported *_weight_hxk files are physical KxN row-major.
+    using LayoutB = cutlass::layout::RowMajor;
     using LayoutD = cutlass::layout::RowMajor;
     constexpr int Alignment = 128 / cutlass::sizeof_bits<Element>::value;
     using TileShape = Shape<_128, _128, _64>;
