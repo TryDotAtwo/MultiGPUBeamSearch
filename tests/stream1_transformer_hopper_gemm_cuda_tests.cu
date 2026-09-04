@@ -3,6 +3,7 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -96,11 +97,21 @@ int main() {
     check(cudaMemcpy(ff_small_first.data(), dff_small, FF_N * sizeof(half), cudaMemcpyDeviceToHost));
     check(cudaMemcpy(ff_large_first.data(), dff_large, FF_N * sizeof(half), cudaMemcpyDeviceToHost));
     std::uint32_t ff_mismatch = 0U;
+    std::uint32_t ff_oracle_mismatch = 0U;
     for (std::uint32_t n = 0; n < FF_N; ++n) {
         ff_mismatch += __half2float(ff_small_first[n]) != __half2float(ff_large_first[n]);
+        float expected = __half2float(ff_bias[n]);
+        for (std::uint32_t k = 0; k < K; ++k) {
+            expected += __half2float(ff_input[k]) *
+                __half2float(ff_weight[static_cast<std::size_t>(n) * K + k]);
+        }
+        expected = std::max(expected, 0.0f);
+        ff_oracle_mismatch += std::abs(__half2float(ff_small_first[n]) - expected) > 0.01f;
     }
-    std::cout << "hopper_ff1_large_m first_row_mismatch=" << ff_mismatch << "\n";
+    std::cout << "hopper_ff1_large_m first_row_mismatch=" << ff_mismatch
+              << " oracle_mismatch=" << ff_oracle_mismatch << "\n";
     if (ff_mismatch != 0U) throw std::runtime_error("Hopper FF1 output depends on trailing M rows");
+    if (ff_oracle_mismatch != 0U) throw std::runtime_error("Hopper FF1 fused bias orientation is incorrect");
     cudaFree(dff_input); cudaFree(dff_weight); cudaFree(dff_bias);
     cudaFree(dff_small); cudaFree(dff_large);
     return 0;
