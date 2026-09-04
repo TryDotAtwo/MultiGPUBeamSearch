@@ -33,6 +33,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -2388,9 +2389,11 @@ void stream1_transformer_ff1_linear_bias_activation_impl(
     if (dtype == STREAM1_DTYPE_FP16 &&
         stream1_transformer_hopper_large_gemm_allowed(
             hopper_mode, stream1_transformer_current_device_sm(), rows)) {
-        stream1_transformer_hopper_fp16_bias_activation<Activation>(
-            input, weight, bias, output, rows, input_cols, output_cols, stream);
-        return;
+        if constexpr (std::is_same_v<Activation, cutlass::epilogue::thread::ReLu<float>>) {
+            stream1_transformer_hopper_fp16_bias_activation<cutlass::epilogue::thread::ReLu>(
+                input, weight, bias, output, rows, input_cols, output_cols, stream);
+            return;
+        }
     }
 #endif
     if (dtype == STREAM1_DTYPE_BF16) {
