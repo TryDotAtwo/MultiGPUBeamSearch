@@ -1,6 +1,7 @@
 #include "stream1.hpp"
 #include "stream1_transformer_fmha.hpp"
 #include "stream1_transformer_gemm_policy.hpp"
+#include "stream1_transformer_hopper.cuh"
 #include "stream1_transformer_layernorm_policy.hpp"
 #include "stream1_transformer_shape.hpp"
 
@@ -2075,6 +2076,21 @@ void stream1_transformer_linear_bias_cuda(
     std::uint32_t output_cols,
     std::uint32_t dtype,
     cudaStream_t stream) {
+    const Stream1TransformerHopperMode hopper_mode =
+        parse_stream1_transformer_hopper_mode(std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"));
+    if (hopper_mode == Stream1TransformerHopperMode::Fp8E4m3) {
+        throw std::invalid_argument(
+            "Hopper Stream1 fp8_e4m3 is not quality-qualified; use fp16_tma or off");
+    }
+#if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
+    if (dtype == STREAM1_DTYPE_FP16 &&
+        stream1_transformer_hopper_large_gemm_allowed(
+            hopper_mode, stream1_transformer_current_device_sm(), rows)) {
+        stream1_transformer_hopper_fp16_bias_activation<cutlass::epilogue::thread::Identity>(
+            input, weight, bias, output, rows, input_cols, output_cols, stream);
+        return;
+    }
+#endif
     if (dtype == STREAM1_DTYPE_BF16) {
         int device = 0;
         cudaDeviceProp prop{};
@@ -2362,6 +2378,21 @@ void stream1_transformer_ff1_linear_bias_activation_impl(
     std::uint32_t output_cols,
     std::uint32_t dtype,
     cudaStream_t stream) {
+    const Stream1TransformerHopperMode hopper_mode =
+        parse_stream1_transformer_hopper_mode(std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"));
+    if (hopper_mode == Stream1TransformerHopperMode::Fp8E4m3) {
+        throw std::invalid_argument(
+            "Hopper Stream1 fp8_e4m3 is not quality-qualified; use fp16_tma or off");
+    }
+#if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
+    if (dtype == STREAM1_DTYPE_FP16 &&
+        stream1_transformer_hopper_large_gemm_allowed(
+            hopper_mode, stream1_transformer_current_device_sm(), rows)) {
+        stream1_transformer_hopper_fp16_bias_activation<Activation>(
+            input, weight, bias, output, rows, input_cols, output_cols, stream);
+        return;
+    }
+#endif
     if (dtype == STREAM1_DTYPE_BF16) {
         int device = 0;
         cudaDeviceProp prop{};
