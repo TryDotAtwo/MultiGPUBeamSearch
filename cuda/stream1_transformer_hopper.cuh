@@ -19,15 +19,6 @@ namespace beam {
 #if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
 
 template <template <class> class Activation>
-__global__ void stream1_transformer_hopper_bias_activation_kernel(
-    half* output, const half* bias, std::uint64_t elements, std::uint32_t cols) {
-    const std::uint64_t idx = static_cast<std::uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (idx >= elements) return;
-    Activation<float> activation;
-    output[idx] = __float2half(activation(__half2float(output[idx]) + __half2float(bias[idx % cols])));
-}
-
-template <template <class> class Activation>
 void stream1_transformer_hopper_fp16_bias_activation(
     const half* input,
     const half* weight,
@@ -46,7 +37,8 @@ void stream1_transformer_hopper_fp16_bias_activation(
     constexpr int Alignment = 128 / cutlass::sizeof_bits<Element>::value;
     using TileShape = Shape<_128, _128, _64>;
     using ClusterShape = Shape<_1, _2, _1>;
-    using Fusion = cutlass::epilogue::fusion::LinearCombination<Element, float, void, float>;
+    using Fusion = cutlass::epilogue::fusion::LinCombPerRowBiasEltAct<
+        Activation, Element, float, Element, void, float>;
     using Epilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
         cutlass::arch::Sm90, cutlass::arch::OpClassTensorOp,
         TileShape, ClusterShape,
@@ -85,9 +77,12 @@ void stream1_transformer_hopper_fp16_bias_activation(
         shape,
         {reinterpret_cast<Element const*>(input), stride_a,
          reinterpret_cast<Element const*>(weight), stride_b},
-        {{1.0f, 0.0f}, nullptr, stride_d,
+        {{}, nullptr, stride_d,
          reinterpret_cast<Element*>(output), stride_d}
     };
+    args.epilogue.thread.alpha = 1.0f;
+    args.epilogue.thread.beta = 0.0f;
+    args.epilogue.thread.bias_ptr = reinterpret_cast<Element const*>(bias);
     const std::size_t workspace_bytes = Gemm::get_workspace_size(args);
     if (workspace_bytes != 0U) {
         throw std::runtime_error(
@@ -98,9 +93,6 @@ void stream1_transformer_hopper_fp16_bias_activation(
     if (status != cutlass::Status::kSuccess) {
         throw std::runtime_error("Hopper Stream1 FP16 TMA bias+activation GEMM failed");
     }
-    const std::uint64_t elements = static_cast<std::uint64_t>(rows) * output_cols;
-    stream1_transformer_hopper_bias_activation_kernel<Activation>
-        <<<(elements + 255U) / 256U, 256, 0, stream>>>(output, bias, elements, output_cols);
 }
 
 #endif
