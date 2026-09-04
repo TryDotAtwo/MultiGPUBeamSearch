@@ -236,6 +236,10 @@ int main() {
     set_legacy_padding_zero(false);
     const std::vector<std::uint32_t> baseline = run_scores(
         false, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
+    Stream1TransformerNetworkView silu_network = view_holder.view;
+    silu_network.dims.activation = STREAM1_ACTIVATION_SILU;
+    const std::vector<std::uint32_t> silu_scores = run_scores(
+        false, d_frontier, d_parent_base, d_count, silu_network, scratch, d_score, rows);
     set_final_cls_attention(false);
     const std::vector<std::uint32_t> optimized = run_scores(
         true, d_frontier, d_parent_base, d_count, view_holder.view, scratch, d_score, rows);
@@ -253,6 +257,7 @@ int main() {
     set_final_cls_attention(false);
     set_final_cls_only(false);
     require(baseline == legacy_padding, "tail-only padding zero must preserve every score key");
+    require(baseline != silu_scores, "ReLU fixture scores must differ from an explicit SiLU forward");
     require(optimized == baseline, "generic final CLS-only score keys must be byte exact");
     require(cls_attention == baseline, "generic final CLS-attention score keys must be byte exact");
     require(split_qkv == baseline, "generic final CLS split-QKV score keys must be byte exact");
