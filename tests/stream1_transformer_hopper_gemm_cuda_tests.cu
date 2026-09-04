@@ -56,5 +56,52 @@ int main() {
         throw std::runtime_error("exactly one Hopper B packing must match KxN semantics");
     }
     cudaFree(da); cudaFree(db); cudaFree(dbias); cudaFree(dd);
+
+    // Reproduce the production FF1 large-M boundary. Every row has the same
+    // input, so row zero must not depend on how many later rows are launched.
+    constexpr std::uint32_t FF_M_SMALL = 384U * 57U;
+    constexpr std::uint32_t FF_M_LARGE = 4096U * 57U;
+    constexpr std::uint32_t FF_N = 1024U;
+    std::vector<half> ff_weight(static_cast<std::size_t>(K) * FF_N);
+    std::vector<half> ff_bias(FF_N);
+    for (std::uint32_t n = 0; n < FF_N; ++n) {
+        ff_bias[n] = __float2half(static_cast<float>(static_cast<int>(n % 9U) - 4) / 32.0f);
+        for (std::uint32_t k = 0; k < K; ++k) {
+            ff_weight[static_cast<std::size_t>(n) * K + k] =
+                __float2half(static_cast<float>(static_cast<int>((k * 5U + n * 3U) % 17U) - 8) / 64.0f);
+        }
+    }
+    std::vector<half> ff_input(static_cast<std::size_t>(FF_M_LARGE) * K, __float2half(0.0f));
+    for (std::uint32_t m = 0; m < FF_M_LARGE; ++m) {
+        for (std::uint32_t k = 0; k < K; ++k) {
+            ff_input[static_cast<std::size_t>(m) * K + k] =
+                __float2half(static_cast<float>(static_cast<int>(k % 13U) - 6) / 16.0f);
+        }
+    }
+    half *dff_input = nullptr, *dff_weight = nullptr, *dff_bias = nullptr;
+    half *dff_small = nullptr, *dff_large = nullptr;
+    check(cudaMalloc(&dff_input, ff_input.size() * sizeof(half)));
+    check(cudaMalloc(&dff_weight, ff_weight.size() * sizeof(half)));
+    check(cudaMalloc(&dff_bias, ff_bias.size() * sizeof(half)));
+    check(cudaMalloc(&dff_small, static_cast<std::size_t>(FF_M_SMALL) * FF_N * sizeof(half)));
+    check(cudaMalloc(&dff_large, static_cast<std::size_t>(FF_M_LARGE) * FF_N * sizeof(half)));
+    check(cudaMemcpy(dff_input, ff_input.data(), ff_input.size() * sizeof(half), cudaMemcpyHostToDevice));
+    check(cudaMemcpy(dff_weight, ff_weight.data(), ff_weight.size() * sizeof(half), cudaMemcpyHostToDevice));
+    check(cudaMemcpy(dff_bias, ff_bias.data(), ff_bias.size() * sizeof(half), cudaMemcpyHostToDevice));
+    beam::stream1_transformer_hopper_fp16_bias_activation<cutlass::epilogue::thread::ReLu>(
+        dff_input, dff_weight, dff_bias, dff_small, FF_M_SMALL, K, FF_N, nullptr);
+    beam::stream1_transformer_hopper_fp16_bias_activation<cutlass::epilogue::thread::ReLu>(
+        dff_input, dff_weight, dff_bias, dff_large, FF_M_LARGE, K, FF_N, nullptr);
+    std::vector<half> ff_small_first(FF_N), ff_large_first(FF_N);
+    check(cudaMemcpy(ff_small_first.data(), dff_small, FF_N * sizeof(half), cudaMemcpyDeviceToHost));
+    check(cudaMemcpy(ff_large_first.data(), dff_large, FF_N * sizeof(half), cudaMemcpyDeviceToHost));
+    std::uint32_t ff_mismatch = 0U;
+    for (std::uint32_t n = 0; n < FF_N; ++n) {
+        ff_mismatch += __half2float(ff_small_first[n]) != __half2float(ff_large_first[n]);
+    }
+    std::cout << "hopper_ff1_large_m first_row_mismatch=" << ff_mismatch << "\n";
+    if (ff_mismatch != 0U) throw std::runtime_error("Hopper FF1 output depends on trailing M rows");
+    cudaFree(dff_input); cudaFree(dff_weight); cudaFree(dff_bias);
+    cudaFree(dff_small); cudaFree(dff_large);
     return 0;
 }
