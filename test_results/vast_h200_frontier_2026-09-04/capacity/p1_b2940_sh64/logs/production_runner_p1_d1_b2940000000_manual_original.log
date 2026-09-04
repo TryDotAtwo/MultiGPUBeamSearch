@@ -1,0 +1,111 @@
+NCCL version 2.28.9+cuda12.9
+stream1_mode=model
+stream1_executor=native_cuda_graph
+runtime_ring_count=1247
+runtime_ring_slot_count=12
+runtime_ring_slot_physical_jobs=14964
+runtime_ring_graph_execs_per_lane_requested=32
+runtime_ring_graph_debug_sync=
+stream1_backend=piece_transformer
+stream1_transformer_micro=192
+stream1_transformer_dims seq_len=57 d_model=256 nhead=8 head_dim=32 layers=4 ff_dim=1024 output_dim=24
+stream1_transformer_block51=0 raw=
+stream1_transformer_final_cls_only=1 raw=1
+stream1_transformer_final_cls_attention=1 raw=1
+stream1_transformer_fused_input_layernorm=1 raw=1
+runtime_ring_slot_graph_windowed=1
+runtime_ring_slot_graph_window_rings=32
+runtime_ring_slot_graph_window_jobs=384
+runtime_ring_slot_graph_physical_jobs=14964
+depth_start=0 frontier_size=1 depth_limit=1
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  ncclGroupEnd count exchange: unhandled cuda error (run with NCCL_DEBUG=INFO for details)
+W0904 20:32:46.445000 19938 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 19959 closing signal SIGTERM
+W0904 20:32:46.447000 19938 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 19960 closing signal SIGTERM
+W0904 20:32:46.447000 19938 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 19962 closing signal SIGTERM
+W0904 20:32:46.447000 19938 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 19967 closing signal SIGTERM
+W0904 20:32:46.447000 19938 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 19972 closing signal SIGTERM
+W0904 20:32:46.448000 19938 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 19976 closing signal SIGTERM
+W0904 20:32:46.448000 19938 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 19982 closing signal SIGTERM
+E0904 20:32:57.949000 19938 site-packages/torch/distributed/elastic/multiprocessing/api.py:986] failed (exitcode: -6) local_rank: 3 (pid: 19963) of binary: /bin/bash
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/run.py", line 994, in <module>
+    main()
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 362, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/run.py", line 990, in main
+    run(args)
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/run.py", line 981, in run
+    elastic_launch(
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 170, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 317, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+======================================================
+/bin/bash FAILED
+------------------------------------------------------
+Failures:
+[1]:
+  time      : 2026-09-04_20:32:57
+  host      : cf269883b894
+  rank      : 0 (local_rank: 0)
+  exitcode  : -6 (pid: 19959)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 19959
+[2]:
+  time      : 2026-09-04_20:32:57
+  host      : cf269883b894
+  rank      : 1 (local_rank: 1)
+  exitcode  : -6 (pid: 19960)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 19960
+[3]:
+  time      : 2026-09-04_20:32:57
+  host      : cf269883b894
+  rank      : 2 (local_rank: 2)
+  exitcode  : -6 (pid: 19962)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 19962
+[4]:
+  time      : 2026-09-04_20:32:57
+  host      : cf269883b894
+  rank      : 4 (local_rank: 4)
+  exitcode  : -6 (pid: 19967)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 19967
+[5]:
+  time      : 2026-09-04_20:32:57
+  host      : cf269883b894
+  rank      : 5 (local_rank: 5)
+  exitcode  : -6 (pid: 19972)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 19972
+[6]:
+  time      : 2026-09-04_20:32:57
+  host      : cf269883b894
+  rank      : 6 (local_rank: 6)
+  exitcode  : -6 (pid: 19976)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 19976
+[7]:
+  time      : 2026-09-04_20:32:57
+  host      : cf269883b894
+  rank      : 7 (local_rank: 7)
+  exitcode  : -6 (pid: 19982)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 19982
+------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-09-04_20:32:46
+  host      : cf269883b894
+  rank      : 3 (local_rank: 3)
+  exitcode  : -6 (pid: 19963)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 19963
+======================================================

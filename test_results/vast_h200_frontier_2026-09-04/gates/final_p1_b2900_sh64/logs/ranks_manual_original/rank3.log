@@ -1,0 +1,20 @@
+stream1_mode=model
+stream1_executor=native_cuda_graph
+runtime_ring_count=1230
+runtime_ring_slot_count=12
+runtime_ring_slot_physical_jobs=14760
+runtime_ring_graph_execs_per_lane_requested=32
+runtime_ring_graph_debug_sync=
+stream1_backend=piece_transformer
+stream1_transformer_micro=192
+stream1_transformer_dims seq_len=57 d_model=256 nhead=8 head_dim=32 layers=4 ff_dim=1024 output_dim=24
+stream1_transformer_block51=0 raw=
+stream1_transformer_final_cls_only=1 raw=1
+stream1_transformer_final_cls_attention=1 raw=1
+stream1_transformer_fused_input_layernorm=1 raw=1
+runtime_ring_slot_graph_windowed=1
+runtime_ring_slot_graph_window_rings=32
+runtime_ring_slot_graph_window_jobs=384
+runtime_ring_slot_graph_physical_jobs=14760
+depth_start=0 frontier_size=0 depth_limit=50
+depth_global_solved=0 depth_sec=6.89049 controller_rank=0 local_rank=3 solved_depth=1 stop_requested=1

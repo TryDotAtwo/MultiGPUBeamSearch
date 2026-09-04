@@ -1,0 +1,33 @@
+stream1_mode=model
+stream1_executor=native_cuda_graph
+runtime_ring_count=1103
+runtime_ring_slot_count=12
+runtime_ring_slot_physical_jobs=13236
+runtime_ring_graph_execs_per_lane_requested=32
+runtime_ring_graph_debug_sync=
+stream1_backend=piece_transformer
+stream1_transformer_micro=192
+stream1_transformer_dims seq_len=57 d_model=256 nhead=8 head_dim=32 layers=4 ff_dim=1024 output_dim=24
+stream1_transformer_block51=0 raw=
+stream1_transformer_final_cls_only=1 raw=1
+stream1_transformer_final_cls_attention=1 raw=1
+stream1_transformer_fused_input_layernorm=1 raw=1
+runtime_ring_slot_graph_windowed=1
+runtime_ring_slot_graph_window_rings=32
+runtime_ring_slot_graph_window_jobs=384
+runtime_ring_slot_graph_physical_jobs=13236
+depth_start=0 frontier_size=0 depth_limit=7
+depth_done=0 depth_sec=8.41104 ring_slot_jobs=0 stream3_jobs=0 stream4_jobs=3 stream4_slots_used=3 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=3 final_request_count=0 next_frontier_size=3 history_bytes_received=96 history_bytes_stored=48 history_bytes_stored_ram=0 history_bytes_stored_disk=0 history_bytes_pruned=0
+depth_start=1 frontier_size=3 depth_limit=7
+depth_done=1 depth_sec=0.834139 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=37 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=58 final_request_count=51 next_frontier_size=58 history_bytes_received=1952 history_bytes_stored=976 history_bytes_stored_ram=0 history_bytes_stored_disk=48 history_bytes_pruned=0
+depth_start=2 frontier_size=58 depth_limit=7
+depth_done=2 depth_sec=0.986304 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=64 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=1127 final_request_count=1108 next_frontier_size=1127 history_bytes_received=38016 history_bytes_stored=19008 history_bytes_stored_ram=0 history_bytes_stored_disk=976 history_bytes_pruned=0
+depth_start=3 frontier_size=1127 depth_limit=7
+depth_done=3 depth_sec=0.993856 ring_slot_jobs=6 stream3_jobs=1 stream4_jobs=64 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=21665 final_request_count=21657 next_frontier_size=21665 history_bytes_received=731296 history_bytes_stored=365648 history_bytes_stored_ram=0 history_bytes_stored_disk=19008 history_bytes_pruned=0
+depth_start=4 frontier_size=21665 depth_limit=7
+depth_done=4 depth_sec=1.04622 ring_slot_jobs=113 stream3_jobs=10 stream4_jobs=64 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=415522 final_request_count=415749 next_frontier_size=415522 history_bytes_received=14028000 history_bytes_stored=7014000 history_bytes_stored_ram=0 history_bytes_stored_disk=365648 history_bytes_pruned=0
+depth_start=5 frontier_size=415522 depth_limit=7
+depth_done=5 depth_sec=2.12734 ring_slot_jobs=2165 stream3_jobs=181 stream4_jobs=64 stream4_slots_used=4 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=7960961 final_request_count=7959275 next_frontier_size=7960961 history_bytes_received=268778752 history_bytes_stored=134389376 history_bytes_stored_ram=0 history_bytes_stored_disk=7014000 history_bytes_pruned=0
+depth_start=6 frontier_size=7960961 depth_limit=7
+depth_done=6 depth_sec=22.4456 ring_slot_jobs=41464 stream3_jobs=3456 stream4_jobs=192 stream4_slots_used=4 threshold_updates_depth=2 final_threshold=4294967295 final_candidate_count=165248975 final_request_count=165259764 next_frontier_size=165248975 history_bytes_received=5556745952 history_bytes_stored=2778372976 history_bytes_stored_ram=0 history_bytes_stored_disk=134389376 history_bytes_pruned=0
+puzzle_solved=0 puzzle_id=10 seconds=50.2807 solution_length=-1 solution=

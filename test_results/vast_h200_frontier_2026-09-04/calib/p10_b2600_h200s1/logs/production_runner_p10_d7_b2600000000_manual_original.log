@@ -1,0 +1,91 @@
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  manual runtime config exceeds GPU budget: required=126321769808 budget=11337596928 free_before=15632564224 headroom=4294967296
+W0904 20:20:25.847000 17014 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 17032 closing signal SIGTERM
+W0904 20:20:25.848000 17014 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 17033 closing signal SIGTERM
+W0904 20:20:25.849000 17014 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 17035 closing signal SIGTERM
+W0904 20:20:25.849000 17014 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 17040 closing signal SIGTERM
+W0904 20:20:25.849000 17014 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 17043 closing signal SIGTERM
+W0904 20:20:25.849000 17014 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 17047 closing signal SIGTERM
+W0904 20:20:25.849000 17014 site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 17054 closing signal SIGTERM
+E0904 20:20:28.871000 17014 site-packages/torch/distributed/elastic/multiprocessing/api.py:986] failed (exitcode: -6) local_rank: 0 (pid: 17031) of binary: /bin/bash
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/run.py", line 994, in <module>
+    main()
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 362, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/run.py", line 990, in main
+    run(args)
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/run.py", line 981, in run
+    elastic_launch(
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 170, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/venv/main/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 317, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+======================================================
+/bin/bash FAILED
+------------------------------------------------------
+Failures:
+[1]:
+  time      : 2026-09-04_20:20:28
+  host      : cf269883b894
+  rank      : 1 (local_rank: 1)
+  exitcode  : -6 (pid: 17032)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 17032
+[2]:
+  time      : 2026-09-04_20:20:28
+  host      : cf269883b894
+  rank      : 2 (local_rank: 2)
+  exitcode  : -6 (pid: 17033)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 17033
+[3]:
+  time      : 2026-09-04_20:20:28
+  host      : cf269883b894
+  rank      : 3 (local_rank: 3)
+  exitcode  : -6 (pid: 17035)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 17035
+[4]:
+  time      : 2026-09-04_20:20:28
+  host      : cf269883b894
+  rank      : 4 (local_rank: 4)
+  exitcode  : -6 (pid: 17040)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 17040
+[5]:
+  time      : 2026-09-04_20:20:28
+  host      : cf269883b894
+  rank      : 5 (local_rank: 5)
+  exitcode  : -6 (pid: 17043)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 17043
+[6]:
+  time      : 2026-09-04_20:20:28
+  host      : cf269883b894
+  rank      : 6 (local_rank: 6)
+  exitcode  : -6 (pid: 17047)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 17047
+[7]:
+  time      : 2026-09-04_20:20:28
+  host      : cf269883b894
+  rank      : 7 (local_rank: 7)
+  exitcode  : -6 (pid: 17054)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 17054
+------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-09-04_20:20:25
+  host      : cf269883b894
+  rank      : 0 (local_rank: 0)
+  exitcode  : -6 (pid: 17031)
+  error_file: <N/A>
+  traceback : Signal 6 (SIGABRT) received by PID 17031
+======================================================
