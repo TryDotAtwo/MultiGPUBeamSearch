@@ -575,3 +575,4 @@ User reported that an interactive game had been running during part of the recen
 
 ## 2026-09-04 - Do not duplicate Hopper weights
 - User required one persistent copy per weight tensor: pack the full-token portion for Hopper and keep the final-CLS portion in the ordinary layout instead of storing both layouts.
+- User stopped further Hopper optimization and requested immediate execution of the measured ~11M candidates/s FP16 baseline on 8xH200, puzzle 1000, with a 2.6B frontier, reporting seconds per depth from depth 10 onward.
