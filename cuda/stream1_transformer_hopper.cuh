@@ -37,7 +37,9 @@ void stream1_transformer_hopper_fp16_bias_activation(
     constexpr int Alignment = 128 / cutlass::sizeof_bits<Element>::value;
     using TileShape = Shape<_128, _128, _64>;
     using ClusterShape = Shape<_1, _2, _1>;
-    using Fusion = cutlass::epilogue::fusion::LinCombPerRowBiasEltAct<
+    // CUTLASS names the M-varying vector "per-row". Transformer bias is an
+    // N-varying vector for row-major [M,N] output, hence PerColBias here.
+    using Fusion = cutlass::epilogue::fusion::LinCombPerColBiasEltAct<
         Activation, Element, float, Element, void, float>;
     using Epilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
         cutlass::arch::Sm90, cutlass::arch::OpClassTensorOp,
