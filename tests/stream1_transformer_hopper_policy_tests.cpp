@@ -12,6 +12,8 @@ int main() {
     require(beam::parse_stream1_transformer_hopper_mode("") == Stream1TransformerHopperMode::Off);
     require(beam::parse_stream1_transformer_hopper_mode("fp16_tma") == Stream1TransformerHopperMode::Fp16Tma);
     require(beam::parse_stream1_transformer_hopper_mode("fp8_e4m3") == Stream1TransformerHopperMode::Fp8E4m3);
+    require(beam::select_stream1_transformer_hopper_mode("fp16_tma", nullptr) == Stream1TransformerHopperMode::Fp16Tma);
+    require(beam::select_stream1_transformer_hopper_mode("fp16_tma", "off") == Stream1TransformerHopperMode::Off);
 
     bool rejected = false;
     try { (void)beam::parse_stream1_transformer_hopper_mode("mxfp4"); }

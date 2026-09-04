@@ -25,6 +25,13 @@ inline Stream1TransformerHopperMode parse_stream1_transformer_hopper_mode(const 
         "BEAM_STREAM1_TRANSFORMER_HOPPER must be off, fp16_tma, or fp8_e4m3");
 }
 
+inline Stream1TransformerHopperMode select_stream1_transformer_hopper_mode(
+    const char* global_value,
+    const char* family_override) {
+    return parse_stream1_transformer_hopper_mode(
+        family_override != nullptr && family_override[0] != '\0' ? family_override : global_value);
+}
+
 inline bool stream1_transformer_hopper_large_gemm_allowed(
     Stream1TransformerHopperMode mode,
     int sm,

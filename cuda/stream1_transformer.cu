@@ -2077,8 +2077,9 @@ void stream1_transformer_linear_bias_cuda(
     std::uint32_t output_cols,
     std::uint32_t dtype,
     cudaStream_t stream) {
-    const Stream1TransformerHopperMode hopper_mode =
-        parse_stream1_transformer_hopper_mode(std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"));
+    const Stream1TransformerHopperMode hopper_mode = select_stream1_transformer_hopper_mode(
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"),
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER_QKV"));
     if (hopper_mode == Stream1TransformerHopperMode::Fp8E4m3) {
         throw std::invalid_argument(
             "Hopper Stream1 fp8_e4m3 is not quality-qualified; use fp16_tma or off");
@@ -2379,8 +2380,9 @@ void stream1_transformer_ff1_linear_bias_activation_impl(
     std::uint32_t output_cols,
     std::uint32_t dtype,
     cudaStream_t stream) {
-    const Stream1TransformerHopperMode hopper_mode =
-        parse_stream1_transformer_hopper_mode(std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"));
+    const Stream1TransformerHopperMode hopper_mode = select_stream1_transformer_hopper_mode(
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"),
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER_FF1"));
     if (hopper_mode == Stream1TransformerHopperMode::Fp8E4m3) {
         throw std::invalid_argument(
             "Hopper Stream1 fp8_e4m3 is not quality-qualified; use fp16_tma or off");
