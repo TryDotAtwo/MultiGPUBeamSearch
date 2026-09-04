@@ -88,6 +88,11 @@ void stream1_transformer_hopper_fp16_bias_activation(
         {{1.0f, 0.0f}, nullptr, stride_d,
          reinterpret_cast<Element*>(output), stride_d}
     };
+    const std::size_t workspace_bytes = Gemm::get_workspace_size(args);
+    if (workspace_bytes != 0U) {
+        throw std::runtime_error(
+            "Hopper Stream1 FP16 TMA GEMM unexpectedly requires scheduler workspace");
+    }
     Gemm gemm;
     const cutlass::Status status = gemm(args, nullptr, stream);
     if (status != cutlass::Status::kSuccess) {
