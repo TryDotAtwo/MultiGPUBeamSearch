@@ -25,6 +25,7 @@ if [[ -z "$cccl_include" ]]; then
   for candidate in \
     /usr/local/cuda/include/cccl \
     /usr/local/lib/python*/site-packages/nvidia/cu*/include/cccl \
+    /tmp/uv-venv/lib/python*/site-packages/nvidia/cu*/include/cccl \
     /opt/pyvenv/lib/python*/site-packages/nvidia/cu*/include/cccl; do
     if [[ -f "$candidate/cuda/std/utility" ]]; then
       cccl_include=$candidate
