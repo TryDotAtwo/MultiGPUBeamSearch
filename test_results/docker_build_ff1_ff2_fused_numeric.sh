@@ -20,6 +20,23 @@ role_separated_4cta=${FUSED_ROLE_SEPARATED_4CTA:-0}
 role_precompute=${FUSED_ROLE_PRECOMPUTE_FF1:-0}
 role_dual_ff1_math_wg=${FUSED_ROLE_DUAL_FF1_MATH_WG:-0}
 native_epilogue=${FUSED_NATIVE_EPILOGUE:-0}
+cccl_include=${CUDA_CCCL_INCLUDE:-}
+if [[ -z "$cccl_include" ]]; then
+  for candidate in \
+    /usr/local/cuda/include/cccl \
+    /usr/local/lib/python*/site-packages/nvidia/cu*/include/cccl \
+    /opt/pyvenv/lib/python*/site-packages/nvidia/cu*/include/cccl; do
+    if [[ -f "$candidate/cuda/std/utility" ]]; then
+      cccl_include=$candidate
+      break
+    fi
+  done
+fi
+cccl_flags=()
+if [[ -n "$cccl_include" ]]; then
+  cccl_flags+=("-I${cccl_include}")
+  echo "cuda_cccl_include=${cccl_include}"
+fi
 materialize_flags=(-DSTREAM1_CUTLASS_DIAG_DIRECT_FF1_MANUAL_MATERIALIZE=1)
 if [[ "$native_epilogue" == "1" ]]; then
   materialize_flags=(-DSTREAM1_FUSED_NATIVE_EPILOGUE=1
@@ -64,6 +81,7 @@ nvcc -std=c++20 "$opt" -lineinfo --threads=4 --expt-relaxed-constexpr -w \
   --generate-code=arch=compute_120a,code=sm_120a \
   "-I${repo}/cuda" "-I${cutlass}/include" \
   "-I${cutlass}/tools/util/include" \
+  "${cccl_flags[@]}" \
   "${repo}/tests/stream1_transformer_sm120_nvfp4_cutlass_ff1_ff2_fused_numeric_tests.cu" \
   -o "${out}/${binary}"
 sha256sum "${out}/${binary}"
