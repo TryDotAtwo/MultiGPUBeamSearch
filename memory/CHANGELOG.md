@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-15 Native FP8 full-model integration candidate
+- Added runtime lineage verifier and seven-pair full-Stream1 runner; source/checkpoint SHA and all60 artifact files verify on replacement H200. Added CPU loader gate for mandatory explicit opt-in, three one-byte QKV matrices and final FP16 QKV, plus complete piece metadata.
 - Paired same-warp-LN QKV component medians FP16/FP8:40.34/34.99us at21888 rows,73.76/63.69 at43776,136.91/115.32 at87552,260.89/216.25 at175104. Seven alternating trials; not whole-model performance.
 - Fixed offline bundle omission of piece metadata with a failing-then-passing unit test. Added explicit experimental loader opt-in, one-copy E4M3 device weight upload, and generic full-model QKV dispatch reusing context scratch. Bias/LN fusion preserves unrounded normalization and rounded residual output. Integration remains pending GPU build/validation.
 

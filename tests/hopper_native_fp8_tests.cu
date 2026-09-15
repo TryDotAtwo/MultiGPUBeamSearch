@@ -42,14 +42,16 @@ int main(){try{
         // Bias must update the FP16 residual, but LN must see the unrounded
         // FP32 sum. Reuse a nontrivial small bias vector distinct from beta.
         dx.put(x);
-        beam::hopper_ln256_fp8(dx.p,dg.p,db.p,dq.p,M,inv,nullptr,db.p,dx.p);
+        std::vector<half> ib(K);for(int k=0;k<K;++k)ib[k]=__float2half((k%13-6)*.00071f);
+        Buf<half> dib(K);dib.put(ib);
+        beam::hopper_ln256_fp8(dx.p,dg.p,db.p,dq.p,M,inv,nullptr,dib.p,dx.p);
         ck(cudaDeviceSynchronize());q=dq.get();auto residual=dx.get();
         for(int r=0;r<M;++r){double mean=0,var=0;
-            for(int k=0;k<K;++k)mean+=double(__half2float(x[r*K+k]))+__half2float(b[k]);mean/=K;
-            for(int k=0;k<K;++k){double v=double(__half2float(x[r*K+k]))+__half2float(b[k]);var+=(v-mean)*(v-mean);
+            for(int k=0;k<K;++k)mean+=double(__half2float(x[r*K+k]))+__half2float(ib[k]);mean/=K;
+            for(int k=0;k<K;++k){double v=double(__half2float(x[r*K+k]))+__half2float(ib[k]);var+=(v-mean)*(v-mean);
                 if(__half2float(residual[r*K+k])!=__half2float(__float2half(float(v))))throw std::runtime_error("bias residual rounding mismatch");}
             var/=K;
-            for(int k=0;k<K;++k){double v=double(__half2float(x[r*K+k]))+__half2float(b[k]);
+            for(int k=0;k<K;++k){double v=double(__half2float(x[r*K+k]))+__half2float(ib[k]);
                 double ref=(v-mean)/std::sqrt(var+1e-5)*__half2float(g[k])+__half2float(b[k]);
                 if(std::abs(float(q[r*K+k])/inv-ref)>.065*std::abs(ref)+.002)throw std::runtime_error("bias LN FP8 oracle mismatch");}}
         std::cout<<"PASS independent bias/residual/LN M="<<M<<std::endl;
