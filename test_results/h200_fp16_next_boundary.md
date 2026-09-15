@@ -36,4 +36,13 @@ The old h200_single_profile.sh omits the latest compact57/TMA/epilogue profile
 and defaults to micro192 x12. It is not a valid fresh trace command for the
 current fastest FP16 control without explicit correction.
 
-GPU remains stopped. Candidate not implemented, compiled, or benchmarked yet.
+## Isolated prototype gate
+
+Subsequently resumed existing instance51120383 (H200,143771MiB), no new rental.
+Source a6f07347 compiled with nvcc12.8, sm_90a, CUTLASS3.9.2. Independent exact
+dyadic CPU oracle passes every output for rows1/31/128/131, K1024,N256,
+nonzero residual. Physical memcheck and synccheck each report0errors; logs
+fp16_residual_memcheck.log and fp16_residual_synccheck.log are retained.
+These are component correctness gates only: no timing, model integration,
+arbitrary-model numerical qualification or integrated speedup is established.
+Restarted five-hour stop guard PID851 and verified it live after startup.
