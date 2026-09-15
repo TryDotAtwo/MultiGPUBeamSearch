@@ -11,7 +11,9 @@ for rank in 0 1; do
   # 469 unique states split as235/234 (verified against the small-beam control).
   expected=235; if ((rank == 1)); then expected=234; fi
   grep -q "depth_done=1 .*next_frontier_size=$expected " "$dir/rank${rank}.log"
-  # 34,727,439 *32 bytes crosses the first1GiB registered host-region boundary.
-  grep -q 'depth_done=5 .*next_frontier_size=34727439 ' "$dir/rank${rank}.log"
+  # Assert the actual boundary crossing, not an invariant survivor count across profiles.
+  awk '/depth_done=5 / {for(i=1;i<=NF;i++) if($i ~ /^next_frontier_size=/) {
+    split($i,a,"="); if(a[2]>33554432) crossed=1
+  }} END {exit !crossed}' "$dir/rank${rank}.log"
 done
 echo "PASS large history allocation and two-rank D2H: $dir"
