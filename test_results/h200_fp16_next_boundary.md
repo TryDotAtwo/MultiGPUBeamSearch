@@ -83,3 +83,28 @@ must not be treated as effective CLS-reduced arithmetic throughput.
 
 Same-binary100M pipeline pair launched through h200_fp16_ff2_pipeline_pair.sh;
 result remains pending. No production default changed.
+
+## Completed 100M integrated pair
+
+Same binary and settings, original puzzle1000, completed depths0-8:
+
+| Boundary | SM80 FF2 control | SM90 FP16 FF2 |
+|---|---:|---:|
+| depth6,69452694 parents |121.947s|115.297s|
+| depth7,100007936 parents |175.291s|165.351s|
+| depth8,100007936 parents |175.342s|165.364s|
+| total bounded run |483.315s|456.331s|
+
+Depth8 throughput604774.5parents/s, +6.034% versus control;95.743% of measured
+isolated Stream1 candidate throughput. Both runs exit0 and are unsolved at the
+requested depth limit: not a completed puzzle solution or a cost-per-solve.
+Thresholds, candidate/request/frontier counts and job/history counters match
+at every completed depth. This is not a bytewise full-frontier comparison.
+Raw completed logs: fp16_ff2_pipeline_results.tar.gz.
+
+Retained optional profile hpc/h200_fp16_verified.sh, without changing generic
+GPU defaults. User explicitly switched from FP8 to FP16 on2026-09-15; FP8 FFN
+qualification remains experimental and is not claimed complete by this result.
+No architecture, ReLU, training, or persistent frontier changes. Weights packed
+once before inference, single device representation, unchanged scratch capacity.
+Vast accepted stop51120383 after logs were downloaded.
