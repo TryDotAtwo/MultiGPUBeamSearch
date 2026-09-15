@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-09-15 Return to FP16 optimization
+- User: "Да, наверн продуктивнее фп-16 ускорять". Switch active optimization priority to native FP16 after the FP8 performance/quality discussion. Leave FP8 experimental; do not spend GPU budget completing FP8 qualification by default. Preserve architecture, ReLU and unrounded residual/LayerNorm semantics. Compare against the fastest measured native FP16 configuration and validate full Stream1 plus integrated pipeline before promotion. Existing instance and budget constraints remain unchanged.
+
 ## 2026-09-15 Instance cleanup
 - User confirmed adding the existing SSH public key only to51120383, then instructed not to accumulate instances and to remove unnecessary ones immediately. Keep only the active test instance; preserve required artifacts before irreversible destruction.
 
