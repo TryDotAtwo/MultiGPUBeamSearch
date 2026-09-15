@@ -4,6 +4,7 @@
 #include "stream1_transformer_hopper.cuh"
 #if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
 #include "stream1_hopper_native_fp8.cuh"
+#include "stream1_hopper_native_fp8_ffn.cuh"
 #endif
 #include "stream1_transformer_layernorm_policy.hpp"
 #include "stream1_transformer_shape.hpp"
@@ -3794,6 +3795,24 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.dtype,
             stream);
         stage_profiler.mark(layer_prefix + "attention_out");
+        if (block.ff1_e4m3_scale > 0.f) {
+#if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
+            using F8=cutlass::float_e4m3_t;
+            auto* packed=reinterpret_cast<F8*>(scratch.attention_context);
+            auto* hidden=reinterpret_cast<F8*>(scratch.ff_hidden);
+            hopper_ln256_fp8(scratch.tokens,block.ln2_gamma,block.ln2_beta,packed,
+                token_rows,32.f,stream,block.attn_out_bias,scratch.tokens);
+            stage_profiler.mark(layer_prefix + "ln2");
+            hopper_fp8_linear<F8,cutlass::epilogue::thread::ReLu>(packed,
+                reinterpret_cast<const F8*>(block.ff1_weight),block.ff1_bias,hidden,
+                token_rows,256,1024,block.ff1_e4m3_scale*16.f/32.f,stream);
+            stage_profiler.mark(layer_prefix + "ff1");
+            hopper_fp8_residual(hidden,reinterpret_cast<const F8*>(block.ff2_weight),
+                scratch.tokens,token_rows,1024,256,block.ff2_e4m3_scale/16.f,stream);
+#else
+            throw std::runtime_error("Native Hopper FP8 FFN requires SM90 CUTLASS");
+#endif
+        } else {
         stream1_transformer_bias_layernorm_copy_launch(
             scratch.tokens,
             scratch.attention_context,
@@ -3827,6 +3846,7 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.dtype,
             stream);
         stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
+        }
         stage_profiler.mark(layer_prefix + "ff2");
     }
 

@@ -10,7 +10,7 @@ def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def prepare(source,bundle,data,output):
     manifest=json.loads((source/'manifest.json').read_text())
     packed=json.loads((bundle/'manifest.json').read_text())
-    assert packed['schema']=='hopper_native_e4m3_experimental_v1'
+    assert packed['schema'] in ('hopper_native_e4m3_experimental_v1','hopper_native_e4m3_experimental_v2')
     assert packed['source_manifest_sha256']==sha(source/'manifest.json')
     assert packed['model']==manifest
     for name,record in packed['files'].items():

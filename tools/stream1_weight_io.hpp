@@ -38,6 +38,8 @@ inline constexpr std::uint32_t TRANSFORMER_FF_DIM = 1024;
 
 struct HostTransformerBlockBytes {
     float qkv_e4m3_scale = 0.f;
+    float ff1_e4m3_scale = 0.f;
+    float ff2_e4m3_scale = 0.f;
     std::vector<std::byte> ln1_gamma;
     std::vector<std::byte> ln1_beta;
     std::vector<std::byte> attn_qkv_weight;
@@ -94,6 +96,8 @@ struct HostWeightBytes {
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 struct DeviceTransformerBlockWeights {
     float qkv_e4m3_scale = 0.f;
+    float ff1_e4m3_scale = 0.f;
+    float ff2_e4m3_scale = 0.f;
     half* ln1_gamma = nullptr;
     half* ln1_beta = nullptr;
     half* attn_qkv_weight = nullptr;
@@ -510,19 +514,36 @@ inline HostWeightBytes load_stream1_mlp_weights(const std::filesystem::path& dir
     return weights;
 }
 
+inline float hopper_e4m3_scale_record(const std::string& artifact,const std::string& name,unsigned k) {
+    auto start=artifact.find("\""+name+"\"");auto end=artifact.find('}',start);
+    if(start==std::string::npos||end==std::string::npos)throw std::runtime_error("Missing FP8 weight record");
+    const auto record=artifact.substr(start,end-start);
+    if(parse_manifest_string(record,"dtype")!="e4m3fn" || parse_manifest_string(record,"layout")!="column_major_kxn" ||
+       parse_manifest_u32(record,"stride_k")!=1 || parse_manifest_u32(record,"stride_n")!=k)
+        throw std::runtime_error("Invalid native FP8 layout");
+    auto pos=record.find("\"dequant_scale\"");
+    if(pos==std::string::npos)throw std::runtime_error("Missing FP8 scale");
+    float scale=std::stof(record.substr(record.find(':',pos)+1));
+    if(!std::isfinite(scale)||scale<=0)throw std::runtime_error("Invalid FP8 scale");
+    return scale;
+}
+
 inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::path& dir, const Stream1ModelConfig& model) {
     HostWeightBytes weights;
     weights.model = model;
     const std::string suffix = weight_suffix(model);
     const std::string artifact = read_text_exact(dir / "manifest.json");
     const bool native_fp8 = manifest_has_key(artifact, "schema");
+    const bool native_ffn = native_fp8 && parse_manifest_string(artifact,"schema")=="hopper_native_e4m3_experimental_v2";
     if (native_fp8) {
         const char* enabled = std::getenv("BEAM_HOPPER_NATIVE_FP8");
         if (!enabled || std::string(enabled) != "1" ||
-            parse_manifest_string(artifact,"schema") != "hopper_native_e4m3_experimental_v1" ||
+            (!native_ffn && parse_manifest_string(artifact,"schema") != "hopper_native_e4m3_experimental_v1") ||
             model.dtype != STREAM1_DTYPE_FP16 || model.state_len != 96 ||
             model.d_model != 256 || model.ff_dim != 1024 || model.transformer_layers != 4 || model.seq_len != 57)
             throw std::runtime_error("Experimental Hopper artifact requires explicit BEAM_HOPPER_NATIVE_FP8=1 and frozen Cube4 shape");
+        if(native_ffn && parse_manifest_u32(artifact,"ffn_hidden_inverse_scale")!=16)
+            throw std::runtime_error("Native FP8 FFN requires offline hidden inverse scale16");
     }
     HostTransformerBytes& t = weights.transformer;
     t.fast_slot_projected = read_binary_exact(
@@ -543,19 +564,7 @@ inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::p
         b.ln1_gamma = read_binary_exact(dir / (prefix + "_ln1_gamma" + suffix), fp16_bytes(model.d_model));
         b.ln1_beta = read_binary_exact(dir / (prefix + "_ln1_beta" + suffix), fp16_bytes(model.d_model));
         if (native_fp8 && block < 3) {
-            const std::string key = "\"" + prefix + "_attn_qkv_weight_hxk.fp16\"";
-            auto start = artifact.find(key);
-            auto end = artifact.find('}',start);
-            if (start == std::string::npos || end == std::string::npos) throw std::runtime_error("Missing FP8 weight record");
-            const std::string record = artifact.substr(start,end-start);
-            if (parse_manifest_string(record,"dtype") != "e4m3fn" ||
-                parse_manifest_string(record,"layout") != "column_major_kxn" ||
-                parse_manifest_u32(record,"stride_k") != 1 || parse_manifest_u32(record,"stride_n") != 256)
-                throw std::runtime_error("Invalid native FP8 layout");
-            auto pos = record.find("\"dequant_scale\"");
-            if(pos==std::string::npos)throw std::runtime_error("Missing FP8 scale");
-            b.qkv_e4m3_scale = std::stof(record.substr(record.find(':',pos)+1));
-            if(!std::isfinite(b.qkv_e4m3_scale)||b.qkv_e4m3_scale<=0)throw std::runtime_error("Invalid FP8 scale");
+            b.qkv_e4m3_scale=hopper_e4m3_scale_record(artifact,prefix+"_attn_qkv_weight_hxk.fp16",256);
             b.attn_qkv_weight=read_binary_exact(dir/(prefix+"_attn_qkv_weight_hxk.e4m3"),3ULL*256*256);
         } else {
             b.attn_qkv_weight = read_binary_exact(
@@ -569,13 +578,16 @@ inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::p
         b.attn_out_bias = read_binary_exact(dir / (prefix + "_attn_out_bias" + suffix), fp16_bytes(model.d_model));
         b.ln2_gamma = read_binary_exact(dir / (prefix + "_ln2_gamma" + suffix), fp16_bytes(model.d_model));
         b.ln2_beta = read_binary_exact(dir / (prefix + "_ln2_beta" + suffix), fp16_bytes(model.d_model));
-        b.ff1_weight = read_binary_exact(
-            dir / (prefix + "_ff1_weight_hxk" + suffix),
-            fp16_bytes(static_cast<std::uint64_t>(model.ff_dim) * model.d_model));
+        if(native_ffn && block<3){
+            b.ff1_e4m3_scale=hopper_e4m3_scale_record(artifact,prefix+"_ff1_weight_hxk.fp16",256);
+            b.ff2_e4m3_scale=hopper_e4m3_scale_record(artifact,prefix+"_ff2_weight_hxk.fp16",1024);
+            b.ff1_weight=read_binary_exact(dir/(prefix+"_ff1_weight_hxk.e4m3"),256ULL*1024);
+            b.ff2_weight=read_binary_exact(dir/(prefix+"_ff2_weight_hxk.e4m3"),256ULL*1024);
+        }else{
+            b.ff1_weight = read_binary_exact(dir / (prefix + "_ff1_weight_hxk" + suffix),fp16_bytes(static_cast<std::uint64_t>(model.ff_dim) * model.d_model));
+            b.ff2_weight = read_binary_exact(dir / (prefix + "_ff2_weight_hxk" + suffix),fp16_bytes(static_cast<std::uint64_t>(model.d_model) * model.ff_dim));
+        }
         b.ff1_bias = read_binary_exact(dir / (prefix + "_ff1_bias" + suffix), fp16_bytes(model.ff_dim));
-        b.ff2_weight = read_binary_exact(
-            dir / (prefix + "_ff2_weight_hxk" + suffix),
-            fp16_bytes(static_cast<std::uint64_t>(model.d_model) * model.ff_dim));
         b.ff2_bias = read_binary_exact(dir / (prefix + "_ff2_bias" + suffix), fp16_bytes(model.d_model));
     }
     t.output_weight = read_binary_exact(
@@ -802,6 +814,8 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
         const HostTransformerBlockBytes& hb = h.blocks[i];
         DeviceTransformerBlockWeights& db = d.blocks[i];
         db.qkv_e4m3_scale = hb.qkv_e4m3_scale;
+        db.ff1_e4m3_scale = hb.ff1_e4m3_scale;
+        db.ff2_e4m3_scale = hb.ff2_e4m3_scale;
         if (hb.qkv_e4m3_scale > 0) {
             int device=0; cudaDeviceProp props{};
             BEAM_CUDA_CHECK(cudaGetDevice(&device)); BEAM_CUDA_CHECK(cudaGetDeviceProperties(&props,device));
@@ -815,7 +829,7 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
         alloc_and_copy(db.ln1_beta, hb.ln1_beta, (prefix + "_ln1_beta").c_str());
         const bool pack_qkv = hb.qkv_e4m3_scale == 0 && stream1_transformer_hopper_uses_packed_full_token_weight(
             qkv_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
-        const bool pack_ff1 = stream1_transformer_hopper_uses_packed_full_token_weight(
+        const bool pack_ff1 = hb.ff1_e4m3_scale == 0 && stream1_transformer_hopper_uses_packed_full_token_weight(
             ff1_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
         const std::vector<std::byte> qkv_packed = pack_qkv
             ? pack_kxn_column_major_2byte(hb.attn_qkv_weight, host.model.d_model, 3U * host.model.d_model)
@@ -1098,7 +1112,9 @@ inline TransformerNetworkViewHolder transformer_network_view(
             b.ff1_bias,
             b.ff2_weight,
             b.ff2_bias,
-            b.qkv_e4m3_scale};
+            b.qkv_e4m3_scale,
+            b.ff1_e4m3_scale,
+            b.ff2_e4m3_scale};
     }
     holder.view = Stream1TransformerNetworkView{
         weights.fast_slot_projected,

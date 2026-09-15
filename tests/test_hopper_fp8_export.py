@@ -42,5 +42,15 @@ class ExportTest(unittest.TestCase):
             self.assertEqual((out/'block0_attn_qkv_weight_hxk.e4m3').stat().st_size,256*768)
             self.assertEqual((out/'block0_ln1_gamma.fp16').read_bytes(),(source/'block0_ln1_gamma.fp16').read_bytes())
             with self.assertRaises(FileExistsError):export(source,out)
+            for i in range(3):
+                np.ones((256,1024),dtype='<f2').tofile(source/f'block{i}_ff1_weight_hxk.fp16')
+                np.ones((1024,256),dtype='<f2').tofile(source/f'block{i}_ff2_weight_hxk.fp16')
+                np.full(1024,.25,dtype='<f2').tofile(source/f'block{i}_ff1_bias.fp16')
+            ffn=root/'ffn'
+            result=export(source,ffn,quantize_ffn=True)
+            self.assertEqual(sum(r['dtype']=='e4m3fn' for r in result['files'].values()),9)
+            self.assertEqual(result['schema'],'hopper_native_e4m3_experimental_v2')
+            self.assertTrue(np.all(np.fromfile(ffn/'block0_ff1_bias.fp16',dtype='<f2')==4))
+            self.assertFalse((ffn/'block0_ff1_weight_hxk.fp16').exists())
 
 if __name__=='__main__':unittest.main()

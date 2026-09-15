@@ -40,7 +40,7 @@ def pack_weight(weight_kxn):
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def export(source,destination):
+def export(source,destination,quantize_ffn=False):
     manifest=json.loads((source/'manifest.json').read_text())
     required=dict(backend='piece_transformer',dtype='fp16',d_model=256,ff_dim=1024,
                   num_layers=4,seq_len=57,output_dim=24,activation='relu')
@@ -49,6 +49,12 @@ def export(source,destination):
     # First boundary campaign: full-token QKV in blocks0-2. Last CLS block and
     # all other operators retain one original FP16 representation.
     selected={f'block{i}_attn_qkv_weight_hxk.fp16':(256,768) for i in range(3)}
+    scaled_bias=set()
+    if quantize_ffn:
+        for i in range(3):
+            selected[f'block{i}_ff1_weight_hxk.fp16']=(256,1024)
+            selected[f'block{i}_ff2_weight_hxk.fp16']=(1024,256)
+            scaled_bias.add(f'block{i}_ff1_bias.fp16')
     for name,shape in selected.items():
         if (source/name).stat().st_size!=int(np.prod(shape))*2:
             raise ValueError(f'Wrong weight size: {name}')
@@ -66,15 +72,26 @@ def export(source,destination):
                 layout='column_major_kxn',stride_k=1,stride_n=shape[0],
                 dequant_scale=scale,scale_dtype='fp32',source_sha256=sha(path),
                 sha256=sha(target),bytes=target.stat().st_size)
+        elif path.name in scaled_bias:
+            # ReLU(s*(matmul+bias)) == s*ReLU(matmul+bias), s>0.
+            # Scale the immutable bias offline so epilogue emits hidden FP8
+            # directly; no separate activation conversion kernel or bias copy.
+            target=destination/path.name
+            values=(np.fromfile(path,dtype='<f2').astype(np.float32)*16).astype('<f2')
+            if values.size!=1024 or not np.isfinite(values).all():raise ValueError('Invalid scaled FF1 bias')
+            values.tofile(target)
+            records[path.name]=dict(file=path.name,dtype='fp16',value_scale=16.,source_sha256=sha(path),
+                sha256=sha(target),bytes=target.stat().st_size)
         else:
             target=destination/path.name;shutil.copyfile(path,target)
             records[path.name]=dict(file=path.name,dtype=path.suffix[1:],source_sha256=sha(path),
                                    sha256=sha(target),bytes=target.stat().st_size)
-    result=dict(schema='hopper_native_e4m3_experimental_v1',target='sm90a',
+    result=dict(schema='hopper_native_e4m3_experimental_v2' if quantize_ffn else 'hopper_native_e4m3_experimental_v1',target='sm90a',
                 source_manifest_sha256=sha(source/'manifest.json'),model=manifest,
                 activation='relu',accumulation='fp32',gemm_output='fp16',
                 activation_calibration='not_performed',quality_qualified=False,
                 files=records)
+    if quantize_ffn:result['ffn_hidden_inverse_scale']=16.
     (destination/'manifest.json').write_text(json.dumps(result,indent=2)+'\n')
     return result
 
@@ -83,7 +100,8 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--source',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--quantize-ffn',action='store_true')
     args=parser.parse_args()
-    data=export(args.source,args.output)
+    data=export(args.source,args.output,args.quantize_ffn)
     print(json.dumps(dict(files=len(data['files']),packed=sum(v['dtype']=='e4m3fn' for v in data['files'].values()),
                           manifest_sha256=sha(args.output/'manifest.json'))))
