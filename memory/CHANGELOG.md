@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-15 H200 backend comparison
+- Added benchmark-only Python static-token/graph adapter and native control sweep; no production backend changes. Static token/logit equality passed on97 varied inputs, graph/eager equality at every measured batch.
+- On one H200, full-four-block best medians: PyTorch graph390177, LibTorch graph389806, native graph393538 parents/s. Optimized native CLS/Hopper384x8 refreshed at603486. Native versus Torch key difference remains23/1024 on the repeated synthetic state; no broad cross-backend quality claim.
+- Recovered exact-shape Cube4 T4/P100 pipeline logs (23–25k/14k parents/s), verified all57 current exported-file hashes match the saved T4 export, and separated similar Megaminx/RTX3070 rates. Archived raw evidence and stopped GPU; retained disk remains$0.112/hr. See `test_results/h200_backend_comparison_2026-09-15.md`.
+
 ## 2026-09-15 H200 compact57 optimization
 - Added opt-in `BEAM_STREAM1_TRANSFORMER_COMPACT57=1` to use 57 physical token rows for Cube4. Scratch allocation, network dimensions and per-lane offsets share one layout selector; attention auxiliary scratch retains its existing 64-row safety bound. Default layouts are unchanged. Freeze the flag before allocation/capture.
 - Shape regression demonstrated RED before implementation and passed after; CUDA final-CLS test passed, baseline/optimized score dumps matched for CSV-derived inputs p1-10 and p1000, and physical H200 memcheck reported zero errors.

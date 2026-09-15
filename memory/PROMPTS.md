@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-09-15 H200 backend comparison
+- User requested measuring PyTorch, LibTorch and native on H200 and locating prior similar Transformer inference on T4 and other GPUs, with rates expressed in parents/s. Keep model shape, candidate expansion, GPU count, full pipeline and isolated inference distinct.
+
 ## 2026-09-15 H200 optimization continuation
 - User: "Окей, оптимизируй пж. Чета скорость мелкая, разве Т4 не быстрее был?" Continue 1xH200 optimization under the previously approved $50 phase budget; compare T4 only with workload/backend/unit distinctions, and retain logs and verified source changes.
 
