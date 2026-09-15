@@ -36,4 +36,4 @@ export BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES=3000000
 export BEAM_ENABLE_DEBUG=1 BEAM_DEPTH_LOG_EVERY=1
 export WORLD_SIZE=1 RANK=0 LOCAL_RANK=0
 mkdir -p /workspace/results
-exec /workspace/build/production_runner "${PUZZLE_ID:-1000}" "${DEPTH_LIMIT:-9}" "$beam"
+exec "${H200_BUILD_DIR:-/workspace/build}/production_runner" "${PUZZLE_ID:-1000}" "${DEPTH_LIMIT:-9}" "$beam"

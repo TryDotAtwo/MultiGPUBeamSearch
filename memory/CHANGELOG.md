@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-15 Hopper FP16 residual prototype
+- Integrated Stream1 full memcheck/synccheck pass with real supported micro128 forwards. All CSV-seeded puzzles1-10/1000 and seven synthetic paired score files are byte-identical. Seven-pair median597312->631665.4parents/s (+5.75%). Added same-binary100M pipeline pair, pending execution; no default change.
 - Added explicit opt-in HOPPER_FF2=fp16_tma with startup-only single-copy packing and per-block immutable dispatch flags. Restricted to SM90 compact57 Cube4 and retained final CLS layout. Loader integration test first failed for the missing dispatch field. Full build and model verification pending; default stays off.
 - Seven alternating H200 FF2 component pairs at M21888/K1024/N256: SM80 median49.3981us, SM90 median29.6685us; deterministic outputs exact. 1.665x component speedup only; full Stream1/pipeline integration remains pending.
 - Physical H200 component gates passed at a6f07347: independent exact-dyadic oracle rows1/31/128/131, memcheck0errors, synccheck0errors. No performance or model-level acceptance yet.
