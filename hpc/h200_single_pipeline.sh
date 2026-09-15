@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd /workspace/MGBFS
-export BEAM_WEIGHT_DIR=/workspace
+export BEAM_WEIGHT_DIR=${BEAM_WEIGHT_DIR:-/workspace}
 export BEAM_GENERATOR_PATH=/workspace/puzzle_info.json
 export BEAM_PUZZLE_INFO_JSON=/workspace/puzzle_info.json
 export BEAM_TEST_CSV=/workspace/test.csv
