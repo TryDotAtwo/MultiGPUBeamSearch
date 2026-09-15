@@ -7,7 +7,7 @@ int main(int argc,char** argv){try{
     setenv("BEAM_STREAM1_TRANSFORMER_HOPPER_FF2","fp16_tma",1);
     auto h=beam::stream1_weights::load_stream1_weights(argv[1]);
     auto d=beam::stream1_weights::upload_weights(h);
-    auto view=beam::stream1_weights::make_transformer_network_view(d.transformer,h.model);
+    auto view=beam::stream1_weights::transformer_network_view(d.transformer,h.model);
     for(size_t l=0;l<h.transformer.blocks.size();++l){
         bool packed=l+1<h.transformer.blocks.size();
         if(view.blocks[l].ff2_hopper_fp16!=packed)throw std::runtime_error("FF2 layout flag missing or wrong");
