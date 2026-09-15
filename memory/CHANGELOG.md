@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-15 Two-H200 large-beam campaign
+- Dual100M completed, depth8=92.2702s.750M rejected by the exact4GiB-reserve budget gate.740M GPU allocation succeeded but monolithic11.84GB pinned history allocation failed with cudaErrorInvalidValue. Standalone1.60GB succeeds,4/8/10GiB fail;11.84GB contiguous memory registered in1GiB chunks succeeds. Added Linux opt-in startup-only chunked registration and teardown, preserving contiguous history/D2H contract. h200_large_history_smoke.sh reproduced the failure before the patch; rebuilt GPU validation pending.
 - Prepared explicit two-rank FP16 launcher with global/local shard-capacity accounting, unique rendezvous/history paths, fixed4GiB per-GPU reserve and bounded global history budgets. Not yet executed; physical capacity and throughput remain unverified. New Vast51125653 offers2xH200NVL,800GBdisk at$9.112/hr; SSH confirmation requested.
 
 ## 2026-09-15 Hopper FP16 residual prototype

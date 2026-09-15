@@ -2392,6 +2392,7 @@ struct CpuCandidateHistory {
 
     struct Slot {
         CandidateMeta* host = nullptr;
+        std::size_t registered_bytes = 0;
         std::vector<HistoryEntry> staging;
         std::uint32_t capacity = 0;
         std::uint32_t count = 0;
@@ -2552,10 +2553,38 @@ struct CpuCandidateHistory {
         for (Slot& slot : slots) {
             slot.capacity = capacity;
             slot.staging.resize(static_cast<std::size_t>(staging_entries_per_slot));
-            BEAM_CUDA_CHECK(cudaHostAlloc(
-                reinterpret_cast<void**>(&slot.host),
-                static_cast<std::uint64_t>(capacity) * sizeof(CandidateMeta),
-                cudaHostAllocPortable));
+            const std::size_t host_bytes = static_cast<std::size_t>(capacity) * sizeof(CandidateMeta);
+            if (env_u32("BEAM_HISTORY_CHUNKED_PIN", 0) != 0) {
+#if defined(__linux__)
+                // Startup only. Keep one contiguous host address range; some hosts
+                // reject large single cudaHostAlloc calls but accept bounded registrations.
+                constexpr std::size_t page = 4096;
+                constexpr std::size_t chunk = std::size_t{1} << 30;
+                const std::size_t bytes = (host_bytes + page - 1) / page * page;
+                void* base = nullptr;
+                if (posix_memalign(&base, page, bytes) != 0) throw std::bad_alloc();
+                slot.host = static_cast<CandidateMeta*>(base);
+                while (slot.registered_bytes < bytes) {
+                    const std::size_t count = std::min(chunk, bytes - slot.registered_bytes);
+                    const cudaError_t rc = cudaHostRegister(
+                        static_cast<char*>(base) + slot.registered_bytes, count, cudaHostRegisterPortable);
+                    if (rc != cudaSuccess) {
+                        for (std::size_t offset = 0; offset < slot.registered_bytes; offset += chunk)
+                            cudaHostUnregister(static_cast<char*>(base) + offset);
+                        std::free(base);
+                        slot.host = nullptr;
+                        slot.registered_bytes = 0;
+                        BEAM_CUDA_CHECK(rc);
+                    }
+                    slot.registered_bytes += count;
+                }
+#else
+                throw std::runtime_error("BEAM_HISTORY_CHUNKED_PIN requires Linux");
+#endif
+            } else {
+                BEAM_CUDA_CHECK(cudaHostAlloc(
+                    reinterpret_cast<void**>(&slot.host), host_bytes, cudaHostAllocPortable));
+            }
             BEAM_CUDA_CHECK(cudaEventCreateWithFlags(&slot.copy_done, cudaEventDisableTiming));
         }
     }
@@ -3008,7 +3037,15 @@ struct CpuCandidateHistory {
                 slot.copy_done = nullptr;
             }
             if (slot.host != nullptr) {
-                cudaFreeHost(slot.host);
+                if (slot.registered_bytes != 0) {
+                    constexpr std::size_t chunk = std::size_t{1} << 30;
+                    for (std::size_t offset = 0; offset < slot.registered_bytes; offset += chunk)
+                        cudaHostUnregister(reinterpret_cast<char*>(slot.host) + offset);
+                    std::free(slot.host);
+                    slot.registered_bytes = 0;
+                } else {
+                    cudaFreeHost(slot.host);
+                }
                 slot.host = nullptr;
             }
         }
