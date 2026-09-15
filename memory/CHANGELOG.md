@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-15 Native FP8 FFN next boundary
+- Full FFN binary compiled in separate build_ffn; real v2 artifact lineage and CPU loader gate pass with4208736bytes. Added bounded8-profile paired sweep (3trials/config), still unexecuted while QKV-only production pair occupies GPU.
 - FFN component compiled successfully; execution waits for ongoing isolated pipeline timing. Added offline v2 artifact with9 packed matrices and three offline-scaled FF1 biases, ReLU unchanged;5 exporter tests pass. Prepared full-model FFN dispatch using existing scratch, float accumulation and one residual rounding. GPU integration/quality/performance still pending.
 - Added independent FF1 ReLU/direct E4M3 and FF2/FP16-residual oracles; target nvcc RED confirmed missing FFN header. Prepared generic FP8 output/activation epilogue and separate FP8 FF2+residual implementation. Not yet compiled, timed, integrated or promoted; existing QKV-only pipeline binary remains unchanged during its paired run.
 
