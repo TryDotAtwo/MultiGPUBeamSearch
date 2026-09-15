@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-15 Hopper FP16 residual prototype
+- Added an independent exact-dyadic FP32 CPU oracle for in-place FP16 FF2 residual, rows1/31/128/131. Target H200 nvcc first failed on the missing implementation header. Added isolated SM90 TMA/WGMMA FP16 residual prototype with deferred bias and no hot-path allocation. Not integrated or performance-qualified.
+
 ## 2026-09-15 FP16 optimization boundary audit
 - Following the user's switch back to FP16, verified residual FF2/attention-output still dispatch SM80 kernels while QKV/FF1 use SM90 TMA. Recorded exact graph, lifetimes and next SM90 FP16 FF2 candidate in test_results/h200_fp16_next_boundary.md. No new kernel or speedup claim; GPU remains stopped. Flagged stale profiler defaults before reuse.
 
