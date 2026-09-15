@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-15 FP16 optimization boundary audit
+- Following the user's switch back to FP16, verified residual FF2/attention-output still dispatch SM80 kernels while QKV/FF1 use SM90 TMA. Recorded exact graph, lifetimes and next SM90 FP16 FF2 candidate in test_results/h200_fp16_next_boundary.md. No new kernel or speedup claim; GPU remains stopped. Flagged stale profiler defaults before reuse.
+
 ## 2026-09-15 Native FP8 FFN next boundary
 - FFN independent oracles pass M1/31/131 with memcheck0errors. Initial whole-model smoke used unsupported micro32 and executed zero forwards despite a success exit; INVALIDATED that smoke, changed to supported micro128, and added fail-closed benchmark filter validation. Do not count the empty smoke as model evidence. Full384x8 FFN benchmark actually executes and initial result715978parents/s; final analysis pending.
 - Full FFN binary compiled in separate build_ffn; real v2 artifact lineage and CPU loader gate pass with4208736bytes. Added bounded8-profile paired sweep (3trials/config), still unexecuted while QKV-only production pair occupies GPU.
