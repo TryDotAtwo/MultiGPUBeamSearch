@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export BEAM_STREAM1_TRANSFORMER_HOPPER_QKV=fp16_tma
+export BEAM_STREAM1_TRANSFORMER_HOPPER_FF1=fp16_tma
+export BEAM_STREAM1_TRANSFORMER_FF2_POLICY=m128n128
+export BEAM_STREAM1_TRANSFORMER_COMPACT57=1
+export BEAM_B_MICRO=384 BEAM_STREAM1_CONCURRENCY=8
+exec bash /workspace/h200_single_pipeline.sh

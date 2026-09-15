@@ -2,6 +2,7 @@
 #include "stream1_transformer_shape.hpp"
 #include "../tools/stream1_weight_io.hpp"
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <stdexcept>
 
@@ -64,5 +65,24 @@ int main() {
     const auto no_tail = beam::make_stream1_transformer_padding_tail_plan(8U, 64U, 64U, 256U);
     require(no_tail.tail_elements == 0ULL, "aligned sequence must not launch a padding kernel");
 
+#if defined(_WIN32)
+    _putenv_s("BEAM_STREAM1_TRANSFORMER_COMPACT57", "1");
+#else
+    setenv("BEAM_STREAM1_TRANSFORMER_COMPACT57", "1", 1);
+#endif
+    const auto compact57 = beam::stream1_weights::transformer_scratch_byte_plan(model57, 8U);
+    require(compact57.padded_seq_len == 57U, "compact57 must remove physical padding");
+    require(compact57.token_bytes == 233472ULL, "compact57 token allocation must cover exactly 8x57x256 half values");
+    require(compact57.qkv_bytes == 700416ULL, "compact57 QKV allocation must cover three projections");
+    require(compact57.attention_bytes == scratch57.attention_bytes, "attention auxiliary scratch must retain padded safety bound");
+    require(beam::stream1_weights::transformer_scratch_byte_plan(model51, 8U).padded_seq_len == 64U,
+        "compact57 must not change seq51 layout");
+#if defined(_WIN32)
+    _putenv_s("BEAM_STREAM1_TRANSFORMER_COMPACT57", "0");
+#else
+    setenv("BEAM_STREAM1_TRANSFORMER_COMPACT57", "0", 1);
+#endif
+    require(beam::stream1_weights::transformer_scratch_byte_plan(model57, 8U).padded_seq_len == 64U,
+        "disabled compact57 must restore legacy layout");
     return 0;
 }

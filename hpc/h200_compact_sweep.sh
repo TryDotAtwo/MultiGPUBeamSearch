@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd /workspace/MGBFS
+export BEAM_WEIGHT_DIR=/workspace BEAM_STREAM1_SYNTHETIC_STATES=1
+export BEAM_STREAM1_TRANSFORMER_GRAPH_BENCH=1 BEAM_STREAM1_TRANSFORMER_BENCH_ITERS=100
+export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY=1 BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION=1
+export BEAM_STREAM1_TRANSFORMER_FINAL_CLS_SPLIT_QKV=1 BEAM_STREAM1_TRANSFORMER_FUSED_INPUT_LAYERNORM=1
+export BEAM_STREAM1_TRANSFORMER_HOPPER_QKV=fp16_tma BEAM_STREAM1_TRANSFORMER_HOPPER_FF1=fp16_tma
+export BEAM_STREAM1_TRANSFORMER_FF2_POLICY=m128n128 BEAM_STREAM1_TRANSFORMER_COMPACT57=1
+env -u BEAM_STREAM1_TRANSFORMER_HOPPER_QKV -u BEAM_STREAM1_TRANSFORMER_HOPPER_FF1 \
+  BEAM_STREAM1_TRANSFORMER_WEIGHTS_DIR=/workspace BEAM_STREAM1_TRANSFORMER_FINAL_CLS_SPLIT_QKV=0 \
+  /workspace/build/stream1_transformer_final_cls_cuda_tests > /workspace/results/compact57_cuda_test.log 2>&1
+for micro in 128 192 256 384 512 768; do
+  for lanes in 4 8 12; do
+    for rep in 1 2 3; do
+      tag=compact_m${micro}_c${lanes}_${rep}
+      BEAM_STREAM1_TRANSFORMER_B_MICRO=$micro BEAM_STREAM1_TRANSFORMER_CONCURRENCY=$lanes \
+        BEAM_STREAM_BENCH_REPORT=/workspace/results/${tag}.md \
+        BEAM_STREAM1_TRANSFORMER_SCORE_DUMP=/workspace/results/${tag}.bin \
+        /workspace/build/stream_benchmark 1000 > /workspace/results/${tag}.log 2>&1
+    done
+  done
+done

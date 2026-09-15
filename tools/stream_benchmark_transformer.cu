@@ -263,7 +263,15 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
             }
 
 
-            const std::uint32_t iterations = b_micro >= 4096 ? 4U : 6U;
+            const char* iterations_env = std::getenv("BEAM_STREAM1_TRANSFORMER_BENCH_ITERS");
+            const std::uint64_t requested_iterations = iterations_env
+                ? parse_u64(iterations_env, "BEAM_STREAM1_TRANSFORMER_BENCH_ITERS")
+                : (b_micro >= 4096 ? 4U : 6U);
+            if (requested_iterations == 0 || requested_iterations > 100000U) {
+                throw std::invalid_argument("BEAM_STREAM1_TRANSFORMER_BENCH_ITERS must be in [1,100000]");
+            }
+            const auto iterations = static_cast<std::uint32_t>(requested_iterations);
+            std::cout << "stream1_benchmark_iterations=" << iterations << "\n";
             float ms = 0.0f;
             if (graph_bench) {
                 std::vector<cudaGraph_t> graphs(concurrent, nullptr);

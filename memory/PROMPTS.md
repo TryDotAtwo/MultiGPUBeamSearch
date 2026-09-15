@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-09-15 H200 optimization continuation
+- User: "Окей, оптимизируй пж. Чета скорость мелкая, разве Т4 не быстрее был?" Continue 1xH200 optimization under the previously approved $50 phase budget; compare T4 only with workload/backend/unit distinctions, and retain logs and verified source changes.
+
 ## 2026-08-02
 - User required diagnosing the native fast Cube-444 transformer inference against the working Kaggle/LibTorch implementation without further speculation, then approved fixing it.
 - User requires all puzzle transformer layouts to use their manifest-defined activation while preserving the existing fast fused inference path; Cube-444 uses ReLU and p900 keeps SiLU.
@@ -578,3 +581,5 @@ User reported that an interactive game had been running during part of the recen
 - User stopped further Hopper optimization and requested immediate execution of the measured ~11M candidates/s FP16 baseline on 8xH200, puzzle 1000, with a 2.6B frontier, reporting seconds per depth from depth 10 onward.
 - User requested using the recovered 8xA100-40GB 770,883,178-state profile as the basis for selecting the maximum efficient 8xH200 frontier and tuning shard/pipeline parameters, then solving Cube4 puzzles 1-10 as a correctness gate before puzzle 1000. At puzzle 1000 depth 10, report seconds per depth and estimate one-puzzle cost from the live Vast instance rate.
 - User requested stopping the active puzzle-1000 calculation, uploading all reports and useful evidence to GitHub, and shutting down the Vast resources to stop billing. Preserve logs but exclude giant transient history arenas.
+- 2026-09-15: User authorized renting 1xH200 to tune isolated Stream1 and full pipeline buffers/overlap, followed by 2xH200 scaling. Approved $50 total for the current 1-GPU phase and adding their existing public SSH key only to instance 51111383.
+2026-09-15: User requested diagnosis of low Stream1 throughput and whether work units are too small for H200; inspect GEMM dimensions and actual GPU kernel timeline, not GPU-util percentage alone.

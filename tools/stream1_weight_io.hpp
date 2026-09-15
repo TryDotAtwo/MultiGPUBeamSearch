@@ -598,6 +598,13 @@ inline std::uint64_t total_host_weight_bytes(const HostWeightBytes& weights) {
     return total;
 }
 
+// Freeze this process-level layout policy before allocating scratch or capturing graphs.
+inline Stream1TransformerSequencePlan transformer_sequence_plan(const Stream1ModelConfig& model) {
+    const char* compact = std::getenv("BEAM_STREAM1_TRANSFORMER_COMPACT57");
+    const bool compact57 = model.seq_len == 57U && compact != nullptr && std::strcmp(compact, "1") == 0;
+    return make_stream1_transformer_sequence_plan(model.seq_len, compact57 ? 1U : 16U);
+}
+
 inline std::uint64_t transformer_attention_score_stride(const Stream1ModelConfig& model) {
     const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
     const std::uint64_t row_stride = sequence.padded_seq_len;
@@ -621,7 +628,7 @@ struct TransformerScratchBytePlan {
 };
 
 inline TransformerScratchBytePlan transformer_scratch_byte_plan(const Stream1ModelConfig& model, std::uint64_t rows) {
-    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
+    const auto sequence = transformer_sequence_plan(model);
     TransformerScratchBytePlan plan;
     plan.rows = rows;
     plan.logical_seq_len = sequence.logical_seq_len;
@@ -1001,7 +1008,7 @@ inline Stream1TransformerDims transformer_dims(const Stream1ModelConfig& model) 
     if (model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
         throw std::runtime_error("MLP Stream1 model cannot be viewed as a piece_transformer");
     }
-    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
+    const auto sequence = transformer_sequence_plan(model);
     return Stream1TransformerDims{
         model.state_len,
         model.num_classes,
@@ -1109,7 +1116,7 @@ inline Stream1TransformerScratchView transformer_scratch_view(
     if (model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER) {
         throw std::runtime_error("MLP Stream1 scratch cannot be viewed as a piece_transformer");
     }
-    const auto sequence = make_stream1_transformer_sequence_plan(model.seq_len, 16U);
+    const auto sequence = transformer_sequence_plan(model);
     const std::uint64_t rows = stream1_inference_rows(b_micro, model);
     const std::uint64_t lane_rows = static_cast<std::uint64_t>(lane) * rows;
     return Stream1TransformerScratchView{
