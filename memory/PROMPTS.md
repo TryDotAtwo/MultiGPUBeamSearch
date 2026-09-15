@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-09-15 Diagnose dual-H200 pipeline loss
+- User asks to determine the cause of the throughput drop. Diagnosis only: obtain bounded timing evidence, distinguish GPU graph spans from exclusive kernel work and CPU waits, do not implement a production fix or claim a partial-window speedup as full-depth throughput.
+
 ## 2026-09-15 Two-H200 large-beam validation and cleanup
 - User requests2xH200 testing with a beam consuming nearly all usable VRAM, followed by a results table and approximate cost for a length60 puzzle, then instance deletion. Use validated native FP16, retain allocation/NCCL safety reserves, distinguish measured depths from extrapolated60-depth cost and from solve success. Preserve code/evidence before deleting; no duplicate compute rentals. Existing overall$50 phase budget remains the ceiling absent a new limit.
 

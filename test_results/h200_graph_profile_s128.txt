@@ -1,0 +1,65 @@
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+{
+  "file": "/workspace/diag740m_s128_graph.sqlite",
+  "window_seconds": 8.020661367,
+  "gpus": [
+    {
+      "gpu": 0,
+      "parents_per_second": 478236.8715604696,
+      "groups": {
+        "stream12": {
+          "count": 9989,
+          "mean_graph_ms": 4.002071255681249,
+          "median_graph_ms": 4.395226,
+          "union_fraction": 0.9026435530350698,
+          "sum_span_seconds": 39.976689773
+        },
+        "stream3": {
+          "count": 833,
+          "mean_graph_ms": 0.8034372040816327,
+          "median_graph_ms": 0.581703,
+          "union_fraction": 0.08344239463264203,
+          "sum_span_seconds": 0.669263191
+        },
+        "stream4": {
+          "count": 128,
+          "mean_graph_ms": 18.12339978125,
+          "median_graph_ms": 18.693206,
+          "union_fraction": 0.08281291163005909,
+          "sum_span_seconds": 2.319795172
+        },
+        "nccl_stream21_union_fraction": 0.010604657659523403
+      }
+    },
+    {
+      "gpu": 1,
+      "parents_per_second": 478236.8715604696,
+      "groups": {
+        "stream12": {
+          "count": 9989,
+          "mean_graph_ms": 3.9917120699769746,
+          "median_graph_ms": 4.386365,
+          "union_fraction": 0.901736421856345,
+          "sum_span_seconds": 39.873211867
+        },
+        "stream3": {
+          "count": 833,
+          "mean_graph_ms": 0.8410711908763505,
+          "median_graph_ms": 0.581,
+          "union_fraction": 0.08735093902387912,
+          "sum_span_seconds": 0.700612302
+        },
+        "stream4": {
+          "count": 128,
+          "mean_graph_ms": 18.2813385234375,
+          "median_graph_ms": 18.6954405,
+          "union_fraction": 0.07906630126652497,
+          "sum_span_seconds": 2.340011331
+        },
+        "nccl_stream21_union_fraction": 0.013138766640065282
+      }
+    }
+  ]
+}

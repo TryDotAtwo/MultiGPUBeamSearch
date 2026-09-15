@@ -1,6 +1,6 @@
 # Two-H200 native FP16 large-beam campaign — 2026-09-15
 
-Status: 100M completed; 740M run in progress. This is a bounded performance
+Status: 100M completed; 740M depth7 completed, depth8 interrupted and not measured. This is a bounded performance
 experiment on original Cube4 puzzle1000, not a claimed solved puzzle.
 
 ## Identity and reproducibility
@@ -24,7 +24,7 @@ micro384,concurrency8,300 CUDA Graph replays. No FP8.
 |0|549035.3|581102.8|
 |1|549295.7|581534.8|
 
-All36 paired score files (18 per GPU:11 CSV-seeded plus7 synthetic) byte-identical.
+All36 score-file pairs (18 per GPU:11 CSV-seeded plus7 synthetic) byte-identical.
 This is limited numerical evidence, not population solve-quality validation.
 Ignore the report's legacy full-network FLOP count for CLS-reduced inference.
 
@@ -34,7 +34,7 @@ Ignore the report's legacy full-network FLOP count for CLS-reduced inference.
 |---|---:|---:|---:|---:|---:|
 |1xH200SXM,previous FP16 optimized|100007936|165.351|165.364|604774.5|$5.789|
 |2xH200NVL,FP16|100007936|92.3284|92.2702|1083859.5|$9.112|
-|2xH200NVL,large FP16|740032512|pending|pending|pending|$9.112|
+|2xH200NVL,large FP16|740032512|760.371|pending|pending|$9.112|
 
 100M bounded run exit0 on both ranks,unsolved; total255.228s on rank0.
 Dual100M achieves93.22% of the sum of isolated medians. Compared with the previous
@@ -45,6 +45,12 @@ Shared knobs: outer parent batch384,model micro384,concurrency8,ring12,
 32 logical shards per rank,two resident shard buffers,4 active sort slots,
 capacity scale1.0,alignment1024,final chunk65536,exchange scale2.0.
 No semantic shard top-k or cap was introduced.
+
+This is not an exhaustive shard/concurrency sweep or a proof of absolute maximum
+beam capacity. Large-profile prefix survivor counts showed small run-to-run
+differences at depth5 (for example34727436 vs34727462 on rank0), despite matching
+early24/469-state layers. Their cause has not been isolated; no full-frontier
+bitwise determinism or independent large-run path replay claim is made here.
 
 ## Capacity and history
 
@@ -84,4 +90,10 @@ be solved by60 search depths. Large-beam estimate pending actual filled-beam tim
 dual_initial_results.tar.gz SHA256:
 4e9d758fdcaf5ba54f0de6b0abc44e4fe8ac38de047e4c18a01c1d5e92df200e.
 Contains both isolated GPU score/log sets,100M rank logs,and initial capacity failures.
-Final large-beam archive and instance deletion verification pending.
+Large-beam partial logs are preserved in h200_diagnosis_profiles.tar.gz.
+See h200_pipeline_diagnosis.md for the subsequent bounded Nsight investigation.
+Instance deletion is not claimed.
+
+Large-beam depth7 completed at973251.9parents/s (83.71% of isolated aggregate),
+with3335 Stream4 jobs per rank0 vs601 at100M depth7. No causal attribution from
+these counts alone. Depth8 and the post-patch100M full regression did not complete.

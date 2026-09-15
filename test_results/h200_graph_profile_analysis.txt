@@ -1,0 +1,127 @@
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+{
+  "file": "/workspace/diag100m_graph.sqlite",
+  "window_seconds": 9.804410132,
+  "gpus": [
+    {
+      "gpu": 0,
+      "parents_per_second": 530582.4552383178,
+      "groups": {
+        "stream12": {
+          "count": 13547,
+          "mean_graph_ms": 3.9464817435594597,
+          "median_graph_ms": 3.992726,
+          "union_fraction": 0.9367519651206693,
+          "sum_span_seconds": 53.46298818
+        },
+        "stream3": {
+          "count": 1129,
+          "mean_graph_ms": 0.42763647829938,
+          "median_graph_ms": 0.294404,
+          "union_fraction": 0.04924330760340331,
+          "sum_span_seconds": 0.482801584
+        },
+        "stream4": {
+          "count": 32,
+          "mean_graph_ms": 9.27877115625,
+          "median_graph_ms": 9.349134,
+          "union_fraction": 0.018185922722474702,
+          "sum_span_seconds": 0.296920677
+        },
+        "nccl_stream21_union_fraction": 0.011708110274308138
+      }
+    },
+    {
+      "gpu": 1,
+      "parents_per_second": 530582.4552383178,
+      "groups": {
+        "stream12": {
+          "count": 13547,
+          "mean_graph_ms": 3.9381322828670555,
+          "median_graph_ms": 3.996152,
+          "union_fraction": 0.9365401414645758,
+          "sum_span_seconds": 53.349878036
+        },
+        "stream3": {
+          "count": 1129,
+          "mean_graph_ms": 0.4346297245349867,
+          "median_graph_ms": 0.294404,
+          "union_fraction": 0.050048595723106784,
+          "sum_span_seconds": 0.490696959
+        },
+        "stream4": {
+          "count": 32,
+          "mean_graph_ms": 9.403332,
+          "median_graph_ms": 9.548358,
+          "union_fraction": 0.018250652266777287,
+          "sum_span_seconds": 0.300906624
+        },
+        "nccl_stream21_union_fraction": 0.011790635075811412
+      }
+    }
+  ]
+}
+{
+  "file": "/workspace/diag740m_graph.sqlite",
+  "window_seconds": 9.823611188,
+  "gpus": [
+    {
+      "gpu": 0,
+      "parents_per_second": 328156.31017012114,
+      "groups": {
+        "stream12": {
+          "count": 8395,
+          "mean_graph_ms": 4.7105256979154255,
+          "median_graph_ms": 4.006739,
+          "union_fraction": 0.8195659475850176,
+          "sum_span_seconds": 39.544863234
+        },
+        "stream3": {
+          "count": 699,
+          "mean_graph_ms": 1.3545298927038627,
+          "median_graph_ms": 0.736009,
+          "union_fraction": 0.09638170494334919,
+          "sum_span_seconds": 0.946816395
+        },
+        "stream4": {
+          "count": 145,
+          "mean_graph_ms": 39.745397565517244,
+          "median_graph_ms": 38.868437,
+          "union_fraction": 0.3264202059337449,
+          "sum_span_seconds": 5.763082647
+        },
+        "nccl_stream21_union_fraction": 0.11636276386797079
+      }
+    },
+    {
+      "gpu": 1,
+      "parents_per_second": 328234.4891600366,
+      "groups": {
+        "stream12": {
+          "count": 8397,
+          "mean_graph_ms": 4.889388223174944,
+          "median_graph_ms": 4.39382,
+          "union_fraction": 0.8165743467940682,
+          "sum_span_seconds": 41.05619291
+        },
+        "stream3": {
+          "count": 699,
+          "mean_graph_ms": 1.1386961058655223,
+          "median_graph_ms": 0.706857,
+          "union_fraction": 0.08102403105818036,
+          "sum_span_seconds": 0.795948578
+        },
+        "stream4": {
+          "count": 144,
+          "mean_graph_ms": 36.95255790972222,
+          "median_graph_ms": 38.6998175,
+          "union_fraction": 0.329375076240039,
+          "sum_span_seconds": 5.321168339
+        },
+        "nccl_stream21_union_fraction": 0.12363954474131413
+      }
+    }
+  ]
+}

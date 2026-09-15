@@ -1,0 +1,24 @@
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+bd4800bd2a50a4c44b1715c0169f05fdbd10b00a
+c16711fa988918d0b46f4bb5deb2ee94f0cb848bb3fd327dcdf17268f16e412a  /workspace/build/production_runner
+ae046b16acc5e9ff388498807568c402588df6d5cbb871d108744d4a21c4f59c  /workspace/build/stream_benchmark
+index, name, driver_version, memory.total [MiB]
+0, NVIDIA H200 NVL, 580.178.04, 143771 MiB
+1, NVIDIA H200 NVL, 580.178.04, 143771 MiB
+	[4mGPU0	GPU1	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	NV6	0-63,128-191	0		N/A
+GPU1	NV6	 X 	0-63,128-191	0		N/A
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+Filesystem        1B-blocks        Used    Available Use% Mounted on
+overlay        858993459200 21828710400 837164748800   3% /
