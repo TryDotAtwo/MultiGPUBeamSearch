@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-09-15 Instance cleanup
+- User confirmed adding the existing SSH public key only to51120383, then instructed not to accumulate instances and to remove unnecessary ones immediately. Keep only the active test instance; preserve required artifacts before irreversible destruction.
+
 ## 2026-09-15 Offline preparation and H200 relocation
 - User explicitly requires weights and other immutable data converted before the hot path and authorizes moving tests to another 1xH200 if the previous instance is unavailable. Preserve the prior $50 phase budget. Dynamic input activations are separate from offline weight preparation.
 

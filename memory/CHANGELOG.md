@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-15 Replacement H200 numerical gate
+- Instance51120383 SSH authorized and connected at93.91.156.91:42609; H200143771MiB, driver595.71.05, nvcc12.8.93. GitHub HEAD459c1b3d and CUTLASSv3.9.2 built the standalone native FP8 test successfully.
+- Independent LN/FP8 GEMM oracles pass M1/31/128/131. Compute Sanitizer memcheck and synccheck each report zero errors. Raw logs saved under test_results/fp8_*.log. This is a component correctness gate, not full-model integration or a speed result.
+- Added five-hour replacement-instance safety stop; process1261 verified running. Old51111383 remains stopped pending explicit irreversible-deletion confirmation.
+
 ## 2026-09-15 Offline Hopper QKV export
 - Added CPU E4M3FN RN-even encoder and immutable experimental bundle export: blocks0-2 QKV stored directly in physical column-major KxN, other tensors retain one FP16 copy. Stores per-tensor FP32 dequantization scale, source/payload hashes and explicit unqualified schema; no runtime weight conversion.
 - Five unit tests pass; 100000 varied finite values match PyTorch float8_e4m3fn bytes exactly. Exported real Cube4 bundle contains57 tensors,3 packed. Native GPU compilation/performance gates remain pending.

@@ -1,0 +1,6 @@
+========= COMPUTE-SANITIZER
+PASS independent LN/FP8 GEMM M=1
+PASS independent LN/FP8 GEMM M=31
+PASS independent LN/FP8 GEMM M=128
+PASS independent LN/FP8 GEMM M=131
+========= ERROR SUMMARY: 0 errors
