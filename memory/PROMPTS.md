@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-09-15 Two-H200 large-beam validation and cleanup
+- User requests2xH200 testing with a beam consuming nearly all usable VRAM, followed by a results table and approximate cost for a length60 puzzle, then instance deletion. Use validated native FP16, retain allocation/NCCL safety reserves, distinguish measured depths from extrapolated60-depth cost and from solve success. Preserve code/evidence before deleting; no duplicate compute rentals. Existing overall$50 phase budget remains the ceiling absent a new limit.
+
 ## 2026-09-15 Return to FP16 optimization
 - User: "Да, наверн продуктивнее фп-16 ускорять". Switch active optimization priority to native FP16 after the FP8 performance/quality discussion. Leave FP8 experimental; do not spend GPU budget completing FP8 qualification by default. Preserve architecture, ReLU and unrounded residual/LayerNorm semantics. Compare against the fastest measured native FP16 configuration and validate full Stream1 plus integrated pipeline before promotion. Existing instance and budget constraints remain unchanged.
 

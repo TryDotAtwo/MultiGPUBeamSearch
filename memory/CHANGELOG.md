@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-15 Two-H200 large-beam campaign
+- Prepared explicit two-rank FP16 launcher with global/local shard-capacity accounting, unique rendezvous/history paths, fixed4GiB per-GPU reserve and bounded global history budgets. Not yet executed; physical capacity and throughput remain unverified. New Vast51125653 offers2xH200NVL,800GBdisk at$9.112/hr; SSH confirmation requested.
+
 ## 2026-09-15 Hopper FP16 residual prototype
 - Completed same-binary100M pipeline pair: depth7 175.291->165.351s, depth8 175.342->165.364s (+6.034% throughput). All recorded depth counters/thresholds match; both bounded runs unsolved exit0. Archived logs and optional h200_fp16_verified.sh profile; no generic default change. Downloaded results and requested GPU stop.
 - Integrated Stream1 full memcheck/synccheck pass with real supported micro128 forwards. All CSV-seeded puzzles1-10/1000 and seven synthetic paired score files are byte-identical. Seven-pair median597312->631665.4parents/s (+5.75%). Added same-binary100M pipeline pair, pending execution; no default change.
