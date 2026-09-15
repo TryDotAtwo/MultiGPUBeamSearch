@@ -48,7 +48,7 @@ vectors, not3072 independent puzzles. Argmin agrees65/66 variants; puzzle7 has
 one changed best move. Maximum score-key/1024 deviation0.234375. This is a small
 numerical drift diagnostic, **not** solution-quality qualification; no training.
 
-## Still running / not yet established
+## Initial checkpoint (superseded by final results below)
 
 - 100M production pair through completed depth8. FP16 depth6=121.945s for
   69452694parents; depth7=175.276s for100007936parents. Final pair pending.
@@ -62,3 +62,28 @@ numerical drift diagnostic, **not** solution-quality qualification; no training.
 
 Raw initial evidence: fp8_stream1_results.tar.gz (pipeline portion is only an
 incomplete snapshot). Reproduce/parse via tools/summarize_hopper_native_fp8.py.
+
+## Final checkpoint: QKV plus FFN
+
+Seven alternating full-Stream1 pairs, micro384/concurrency8: FP16 median
+594667.7 parents/s; FP8 QKV+FFN median715830.3 parents/s (+20.393%).
+Individual paired gains20.07–20.44%. These are not full-pipeline FFN results.
+Offline weight preparation and fused activation conversion were enabled.
+Attention, attention output and final CLS block remain FP16.
+
+Small ranking diagnostic:64/66 distinct variants retain the same argmin;
+one changed variant each for puzzles1 and7. Maximum score deviation0.390625.
+This does not measure solve success or justify a percentage quality-loss claim.
+FFN component memcheck/synccheck passed. The historical full-model smoke logs
+are INVALID: micro32 selected no supported benchmark batch and ran no forwards.
+The script now uses128 and the benchmark rejects unsupported filters, but the
+fixed smoke has not been rerun. No FFN full-pipeline or sweep was performed.
+
+Completed QKV-only 100M pipeline: FP16 depth7/8=175.276/175.358s;
+FP8 depth7/8=167.415/167.425s; total483.293/461.989s, both unsolved, exit0.
+See fp8_qkv_pipeline_results.tar.gz. Final FFN evidence including explicitly
+invalid historical smoke logs: fp8_ffn_checkpoint.tar.gz.
+
+User questioned precision/performance tradeoff; no further GPU experiments
+started. Native FP16 remains production default. Vast accepted stop for
+instance51120383 after completed evidence download.
