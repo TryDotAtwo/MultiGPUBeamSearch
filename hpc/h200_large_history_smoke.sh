@@ -8,6 +8,8 @@ BEAM_HISTORY_CHUNKED_PIN=1 BEAM_WIDTH=740000000 DEPTH_LIMIT=2 \
 dir=$(sed -n 's/^run_dir=//p' "$log")
 for rank in 0 1; do
   grep -q 'depth_done=0 .*next_frontier_size=12 ' "$dir/rank${rank}.log"
-  grep -q 'depth_done=1 .*next_frontier_size=235 ' "$dir/rank${rank}.log"
+  # 469 unique states split as235/234 (verified against the small-beam control).
+  expected=235; if ((rank == 1)); then expected=234; fi
+  grep -q "depth_done=1 .*next_frontier_size=$expected " "$dir/rank${rank}.log"
 done
 echo "PASS large history allocation and two-rank D2H: $dir"
