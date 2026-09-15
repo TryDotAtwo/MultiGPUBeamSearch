@@ -5,6 +5,7 @@
 #if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
 #include "stream1_hopper_native_fp8.cuh"
 #include "stream1_hopper_native_fp8_ffn.cuh"
+#include "stream1_hopper_fp16_residual.cuh"
 #endif
 #include "stream1_transformer_layernorm_policy.hpp"
 #include "stream1_transformer_shape.hpp"
@@ -3836,6 +3837,14 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.activation,
             stream);
         stage_profiler.mark(layer_prefix + "ff1");
+        if (block.ff2_hopper_fp16) {
+#if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
+            hopper_fp16_residual(scratch.ff_hidden, block.ff2_weight, scratch.tokens,
+                token_rows, dims.ff_dim, dims.d_model, stream);
+#else
+            throw std::runtime_error("Hopper FP16 FF2 requires SM90 CUTLASS build");
+#endif
+        } else {
         stream1_transformer_linear_residual_cuda(
             scratch.ff_hidden,
             block.ff2_weight,
@@ -3845,6 +3854,7 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.d_model,
             dims.dtype,
             stream);
+        }
         stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
         }
         stage_profiler.mark(layer_prefix + "ff2");

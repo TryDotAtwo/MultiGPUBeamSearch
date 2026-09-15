@@ -82,6 +82,7 @@ struct Stream1TransformerBlockView {
     float qkv_e4m3_scale = 0.f;
     float ff1_e4m3_scale = 0.f;
     float ff2_e4m3_scale = 0.f;
+    bool ff2_hopper_fp16 = false;
 };
 
 struct Stream1TransformerNetworkView {

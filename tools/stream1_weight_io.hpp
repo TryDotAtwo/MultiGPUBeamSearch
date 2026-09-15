@@ -95,6 +95,7 @@ struct HostWeightBytes {
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 struct DeviceTransformerBlockWeights {
+    bool ff2_hopper_fp16 = false;
     float qkv_e4m3_scale = 0.f;
     float ff1_e4m3_scale = 0.f;
     float ff2_e4m3_scale = 0.f;
@@ -786,10 +787,14 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
     const Stream1TransformerHopperMode ff1_hopper_mode = select_stream1_transformer_hopper_mode(
         std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER"),
         std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER_FF1"));
+    const auto ff2_hopper_mode = parse_stream1_transformer_hopper_mode(
+        std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER_FF2"));
     const bool hopper_packed_weights =
+        ff2_hopper_mode != Stream1TransformerHopperMode::Off ||
         qkv_hopper_mode != Stream1TransformerHopperMode::Off ||
         ff1_hopper_mode != Stream1TransformerHopperMode::Off;
-    if (qkv_hopper_mode == Stream1TransformerHopperMode::Fp8E4m3 ||
+    if (ff2_hopper_mode == Stream1TransformerHopperMode::Fp8E4m3 ||
+        qkv_hopper_mode == Stream1TransformerHopperMode::Fp8E4m3 ||
         ff1_hopper_mode == Stream1TransformerHopperMode::Fp8E4m3) {
         throw std::runtime_error(
             "FP8 E4M3 Hopper weights require the dedicated quantized loader; quality is not qualified yet");
@@ -801,6 +806,17 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
         const char* value = std::getenv(name);
         return value != nullptr && std::strcmp(value, "1") == 0;
     };
+    if (ff2_hopper_mode != Stream1TransformerHopperMode::Off) {
+        int device=0; cudaDeviceProp props{};
+        BEAM_CUDA_CHECK(cudaGetDevice(&device));
+        BEAM_CUDA_CHECK(cudaGetDeviceProperties(&props,device));
+        if (props.major!=9 || host.model.d_model!=256 || host.model.ff_dim!=1024 ||
+            host.model.num_pieces!=56 || host.model.transformer_layers!=4 ||
+            !env_enabled("BEAM_STREAM1_TRANSFORMER_COMPACT57"))
+            throw std::runtime_error("Hopper FP16 FF2 requires SM90 compact57 Cube4 D256 FF1024 L4");
+        for(const auto& b:h.blocks) if(b.ff2_e4m3_scale>0)
+            throw std::runtime_error("Hopper FP16 FF2 cannot consume an FP8 FFN artifact");
+    }
     if (hopper_packed_weights &&
         (!env_enabled("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY") ||
          !env_enabled("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION") ||
@@ -837,6 +853,11 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
         const std::vector<std::byte> ff1_packed = pack_ff1
             ? pack_kxn_column_major_2byte(hb.ff1_weight, host.model.d_model, host.model.ff_dim)
             : std::vector<std::byte>{};
+        db.ff2_hopper_fp16 = stream1_transformer_hopper_uses_packed_full_token_weight(
+            ff2_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
+        const auto ff2_packed = db.ff2_hopper_fp16
+            ? pack_kxn_column_major_2byte(hb.ff2_weight, host.model.ff_dim, host.model.d_model)
+            : std::vector<std::byte>{};
         alloc_and_copy(db.attn_qkv_weight, pack_qkv ? qkv_packed : hb.attn_qkv_weight, (prefix + "_attn_qkv_weight").c_str());
         alloc_and_copy(db.attn_qkv_bias, hb.attn_qkv_bias, (prefix + "_attn_qkv_bias").c_str());
         alloc_and_copy(db.attn_out_weight, hb.attn_out_weight, (prefix + "_attn_out_weight").c_str());
@@ -845,7 +866,7 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
         alloc_and_copy(db.ln2_beta, hb.ln2_beta, (prefix + "_ln2_beta").c_str());
         alloc_and_copy(db.ff1_weight, pack_ff1 ? ff1_packed : hb.ff1_weight, (prefix + "_ff1_weight").c_str());
         alloc_and_copy(db.ff1_bias, hb.ff1_bias, (prefix + "_ff1_bias").c_str());
-        alloc_and_copy(db.ff2_weight, hb.ff2_weight, (prefix + "_ff2_weight").c_str());
+        alloc_and_copy(db.ff2_weight, db.ff2_hopper_fp16 ? ff2_packed : hb.ff2_weight, (prefix + "_ff2_weight").c_str());
         alloc_and_copy(db.ff2_bias, hb.ff2_bias, (prefix + "_ff2_bias").c_str());
     }
     alloc_and_copy(d.output_weight, h.output_weight, "output_weight");
@@ -1114,7 +1135,8 @@ inline TransformerNetworkViewHolder transformer_network_view(
             b.ff2_bias,
             b.qkv_e4m3_scale,
             b.ff1_e4m3_scale,
-            b.ff2_e4m3_scale};
+            b.ff2_e4m3_scale,
+            b.ff2_hopper_fp16};
     }
     holder.view = Stream1TransformerNetworkView{
         weights.fast_slot_projected,
