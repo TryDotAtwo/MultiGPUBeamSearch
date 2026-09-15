@@ -4948,12 +4948,17 @@ FinalizeDepthState finalize_depth_single_gpu(
                 throw std::invalid_argument("history copy requires history stream and completion event");
             }
             if (local_target_count != 0U) {
-                check_cuda(cudaMemcpyAsync(
-                    history_host_buffer,
-                    memory.final.final_candidate_buffer,
-                    static_cast<std::uint64_t>(local_target_count) * sizeof(CandidateMeta),
-                    cudaMemcpyDeviceToHost,
-                    history_stream), "cudaMemcpyAsync final candidates to host history");
+                // Match the startup history registration granularity. One CUDA
+                // transfer must not straddle independently registered regions.
+                constexpr std::uint64_t chunk = 1ULL << 30;
+                const std::uint64_t bytes = static_cast<std::uint64_t>(local_target_count) * sizeof(CandidateMeta);
+                for (std::uint64_t offset = 0; offset < bytes; offset += chunk) {
+                    check_cuda(cudaMemcpyAsync(
+                        reinterpret_cast<char*>(history_host_buffer) + offset,
+                        reinterpret_cast<const char*>(memory.final.final_candidate_buffer) + offset,
+                        std::min(chunk, bytes - offset), cudaMemcpyDeviceToHost,
+                        history_stream), "cudaMemcpyAsync final candidates to host history");
+                }
             }
             check_cuda(cudaEventRecord(history_copy_done, history_stream), "cudaEventRecord history copy done");
         }
@@ -5130,12 +5135,15 @@ FinalizeDepthState finalize_depth_single_gpu(
             throw std::runtime_error("history host buffer capacity is smaller than final candidate count");
         }
         if (final_candidate_count != 0U) {
-            check_cuda(cudaMemcpyAsync(
-                history_host_buffer,
-                memory.final.final_candidate_buffer,
-                static_cast<std::uint64_t>(final_candidate_count) * sizeof(CandidateMeta),
-                cudaMemcpyDeviceToHost,
-                history_stream), "cudaMemcpyAsync final candidates to host history");
+            constexpr std::uint64_t chunk = 1ULL << 30;
+            const std::uint64_t bytes = static_cast<std::uint64_t>(final_candidate_count) * sizeof(CandidateMeta);
+            for (std::uint64_t offset = 0; offset < bytes; offset += chunk) {
+                check_cuda(cudaMemcpyAsync(
+                    reinterpret_cast<char*>(history_host_buffer) + offset,
+                    reinterpret_cast<const char*>(memory.final.final_candidate_buffer) + offset,
+                    std::min(chunk, bytes - offset), cudaMemcpyDeviceToHost,
+                    history_stream), "cudaMemcpyAsync final candidates to host history");
+            }
         }
         check_cuda(cudaEventRecord(history_copy_done, history_stream), "cudaEventRecord history copy done");
     }

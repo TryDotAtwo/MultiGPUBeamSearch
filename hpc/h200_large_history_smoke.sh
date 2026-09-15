@@ -3,7 +3,7 @@
 set -euo pipefail
 cd /workspace/MGBFS
 log=$(mktemp /workspace/large_history_smoke.XXXXXX)
-BEAM_HISTORY_CHUNKED_PIN=1 BEAM_WIDTH=740000000 DEPTH_LIMIT=2 \
+BEAM_HISTORY_CHUNKED_PIN=1 BEAM_WIDTH=740000000 DEPTH_LIMIT=6 \
   timeout 180 bash hpc/h200_dual_large_beam.sh > "$log" 2>&1
 dir=$(sed -n 's/^run_dir=//p' "$log")
 for rank in 0 1; do
@@ -11,5 +11,7 @@ for rank in 0 1; do
   # 469 unique states split as235/234 (verified against the small-beam control).
   expected=235; if ((rank == 1)); then expected=234; fi
   grep -q "depth_done=1 .*next_frontier_size=$expected " "$dir/rank${rank}.log"
+  # 34,727,439 *32 bytes crosses the first1GiB registered host-region boundary.
+  grep -q 'depth_done=5 .*next_frontier_size=34727439 ' "$dir/rank${rank}.log"
 done
 echo "PASS large history allocation and two-rank D2H: $dir"
