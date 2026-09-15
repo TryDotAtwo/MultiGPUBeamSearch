@@ -13,18 +13,19 @@ def dump(path):
     assert len(raw)==24+lanes*count*4 and count%24==0
     return np.frombuffer(raw,dtype='<u4',offset=24).reshape(-1,24)
 
-def summary(root):
+def summary(root,repeats=7,quality=True):
     result={'timing':{},'quality':[],'pipeline':{}}
-    pairs=[]
     for mode in ('fp16','fp8'):
         rates=[]
-        for rep in range(1,8):
+        for rep in range(1,repeats+1):
             text=(root/f'native_{mode}_{rep}.log').read_text()
             assert 'stream1_transformer_benchmark_done=1' in text
             rates.append(float(re.search(r'parents_per_sec=([\d.]+)',text)[1]))
-        result['timing'][mode]=dict(repeats=7,median=statistics.median(rates),min=min(rates),max=max(rates),rates=rates)
+        result['timing'][mode]=dict(repeats=repeats,median=statistics.median(rates),min=min(rates),max=max(rates),rates=rates,
+            micro=int(re.search(r'b_micro=(\d+)',text)[1]),concurrency=int(re.search(r'concurrency=(\d+)',text)[1]),
+            scratch_bytes=int(re.search(r'scratch_bytes=(\d+)',text)[1]))
     result['timing']['paired_speedups']=[b/a for a,b in zip(result['timing']['fp16']['rates'],result['timing']['fp8']['rates'])]
-    for puzzle in [*range(1,11),1000]:
+    for puzzle in ([*range(1,11),1000] if quality else []):
         a=dump(root/f'quality_p{puzzle}_fp16.bin');b=dump(root/f'quality_p{puzzle}_fp8.bin')
         assert a.shape==b.shape
         delta=(b.astype(np.float64)-a)/1024
@@ -41,5 +42,6 @@ def summary(root):
     return result
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('root',type=Path);a=p.parse_args()
-    print(json.dumps(summary(a.root),indent=2))
+    p=argparse.ArgumentParser();p.add_argument('root',type=Path)
+    p.add_argument('--repeats',type=int,default=7);p.add_argument('--skip-quality',action='store_true');a=p.parse_args()
+    print(json.dumps(summary(a.root,a.repeats,not a.skip_quality),indent=2))

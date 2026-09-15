@@ -4,6 +4,13 @@ Hardware: Vast51120383, H200143771MiB, driver595.71.05, nvcc12.8.93,
 CUTLASSv3.9.2 ad7b2f5. Source branch codex/hopper-stream1-fusion.
 QKV-only full binary built from58bda7c0 (later changes at that point were test/scripts).
 
+Binary SHA256 (read from target after builds):
+- build/stream_benchmark:833288594055aa63c96d8dc47d5d0dfbda37c35e18463141296f3c6f986eca02
+- build/production_runner:7e63690c1a7dbf5219ab9fbfa8a9001b72ab78d3e58dbbb3ff290031105f41ed
+- build_ffn/stream_benchmark:c50f8d0690d8718456d863c56aa8053b39110ff6a91a5b0f1d50b87b307203e3
+- build_ffn/production_runner:c64bdd17f9faf5c040de7e93786af3ee1be3b272c25b0a2622b6a89d14a2cfc7
+FFN build source arithmetic/loader revision:f725efcf; execution gates pending.
+
 ## Completed evidence
 
 - Offline v1 artifact:60 files, three E4M3 column-major QKV matrices, all remaining

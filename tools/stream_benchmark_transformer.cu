@@ -198,6 +198,9 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
     const std::uint32_t only_concurrency = only_concurrency_env != nullptr && only_concurrency_env[0] != '\0'
         ? static_cast<std::uint32_t>(parse_u64(only_concurrency_env, "BEAM_STREAM1_TRANSFORMER_CONCURRENCY"))
         : 0U;
+    if ((only_b_micro && std::find(TRANSFORMER_B_MICRO_SWEEP.begin(),TRANSFORMER_B_MICRO_SWEEP.end(),only_b_micro)==TRANSFORMER_B_MICRO_SWEEP.end()) ||
+        (only_concurrency && std::find(TRANSFORMER_STREAM1_CONCURRENCY_SWEEP.begin(),TRANSFORMER_STREAM1_CONCURRENCY_SWEEP.end(),only_concurrency)==TRANSFORMER_STREAM1_CONCURRENCY_SWEEP.end()))
+        throw std::invalid_argument("Unsupported transformer benchmark filter would run zero forwards");
 
     report << "## Stream1 Piece Transformer\n\n";
     report << "- graph_bench=" << (graph_bench ? 1 : 0) << "\n";
