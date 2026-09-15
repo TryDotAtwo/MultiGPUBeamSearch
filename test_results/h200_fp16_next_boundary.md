@@ -58,3 +58,28 @@ Separate row/column-major weight buffers are benchmark controls only, not a
 production two-copy layout. No transfer or offline packing included in timing.
 Raw results: fp16_residual_benchmark.log. Model-level and pipeline gates remain
 open; this result alone does not change defaults.
+
+## Integrated full Stream1
+
+Full source d10c6775, harness b4f343ea; stream_benchmark SHA256
+d21474b2c2b27d02ead550869e48b22ee83f1adfcf7549d8967b2bac53ab565e;
+production_runner SHA256
+e0404cec88927298c0d9b91249a88d9b166fcb427ceeb95124bf2d306211169f.
+Opt-in BEAM_STREAM1_TRANSFORMER_HOPPER_FF2=fp16_tma, startup-only packing,
+one GPU representation, unchanged final CLS, FP32 accumulation and deferred bias.
+CPU loader test verifies every uploaded FP16 FF2 value and block dispatch flag.
+
+Full-model memcheck and synccheck each execute supported micro128/concurrency1
+forwards and report0errors. These are smoke gates, not exhaustive race proof.
+Score dumps byte-identical for CSV puzzles1-10/1000 and all seven synthetic
+paired runs. CSV inputs contain repeated variants; not a solve-success corpus.
+
+Seven alternating pairs at micro384/concurrency8,300 graph replays:
+control597312.0 parents/s median; candidate631665.4 (+5.7513%).
+Scratch1109016576bytes for both. No FP8, no activation/model changes.
+Raw archive fp16_ff2_results.tar.gz includes full logs and score binaries.
+Printed benchmark TFLOP/s still uses the stale full-layer FLOP estimate and
+must not be treated as effective CLS-reduced arithmetic throughput.
+
+Same-binary100M pipeline pair launched through h200_fp16_ff2_pipeline_pair.sh;
+result remains pending. No production default changed.
