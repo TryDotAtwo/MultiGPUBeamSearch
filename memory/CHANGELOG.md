@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-15 H200 normalization fusion and RTX6000 audit
+- Added default-off dual input/block-0 LayerNorm. Corrected scalar-conversion mismatch using the incumbent helper path; real-weight 97-state intermediates and p1–10/p1000 score dumps match exactly. Final H200 memcheck/synccheck report zero errors.
+- Five paired isolated runs: 593974 -> 598914 parents/s (+0.83%). Full-pipeline validation deferred when user requested RTX6000 campaign review; no default promotion.
+- Tested LN+QKV shared-memory WGMMA prototype: ~632us versus ~44.4us incumbent, rejected and excluded from normal builds. Retained evidence rather than promoting slow fusion.
+- Read the RTX6000 conversation and current SM120 worktree reports/source. Prioritize measured FF1 epilogue/layout work and normalization-to-native-format boundaries; do not repeat rejected manual DSM, larger-tile or metric-inflation paths. Hopper already uses void-C. GPU stopped; disk retained.
+
 ## 2026-09-15 H200 backend comparison
 - Added benchmark-only Python static-token/graph adapter and native control sweep; no production backend changes. Static token/logit equality passed on97 varied inputs, graph/eager equality at every measured batch.
 - On one H200, full-four-block best medians: PyTorch graph390177, LibTorch graph389806, native graph393538 parents/s. Optimized native CLS/Hopper384x8 refreshed at603486. Native versus Torch key difference remains23/1024 on the repeated synthetic state; no broad cross-backend quality claim.

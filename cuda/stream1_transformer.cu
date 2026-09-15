@@ -4,6 +4,7 @@
 #include "stream1_transformer_hopper.cuh"
 #include "stream1_transformer_layernorm_policy.hpp"
 #include "stream1_transformer_shape.hpp"
+#include "stream1_transformer_dual_ln.cuh"
 
 #include "config.hpp"
 #include "cuda_check.hpp"
@@ -157,6 +158,7 @@ __device__ __forceinline__ float stream1_transformer_input_token_value_generic_d
     return value;
 }
 
+template<bool Dual = false>
 __global__ void stream1_transformer_build_input_layernorm256_generic_kernel(
     const State128* __restrict__ current_frontier_states,
     const std::uint64_t* __restrict__ parent_base,
@@ -165,7 +167,10 @@ __global__ void stream1_transformer_build_input_layernorm256_generic_kernel(
     Stream1TransformerNetworkView network,
     half* __restrict__ tokens,
     std::uint32_t b_micro,
-    std::uint32_t parent_offset) {
+    std::uint32_t parent_offset,
+    half* ln1_output,
+    const half* ln1_gamma,
+    const half* ln1_beta) {
     const std::uint32_t row_token = blockIdx.x;
     const std::uint32_t tid = threadIdx.x;
     if (tid >= 128U) {
@@ -246,6 +251,46 @@ __global__ void stream1_transformer_build_input_layernorm256_generic_kernel(
         stream1_transformer_load_scalar_device(network.input_ln_beta, col1, network.dims.dtype);
     stream1_transformer_store_scalar_device(tokens, base + col0, y0, network.dims.dtype);
     stream1_transformer_store_scalar_device(tokens, base + col1, y1, network.dims.dtype);
+    if constexpr (Dual) {
+        // The stored input-LN output is the persistent residual. Preserve its
+        // FP16 rounding boundary, but feed the next LN directly from registers.
+        const float z0 = __half2float(__float2half_rn(y0));
+        const float z1 = __half2float(__float2half_rn(y1));
+        __syncthreads(); // every thread has consumed the preceding inv_std
+        const float ws = stream1_transformer_warp_reduce_sum_device(z0 + z1);
+        if (lane == 0U) warp_scratch[warp] = ws;
+        __syncthreads();
+        float bs = tid < 4U ? warp_scratch[tid] : 0.0f;
+        if (warp == 0U) {
+            bs = stream1_transformer_warp_reduce_sum_device(bs);
+            if (lane == 0U) warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT] = bs * (1.0f / 256.0f);
+        }
+        __syncthreads();
+        const float mean1 = warp_scratch[STREAM1_TRANSFORMER_LN256_MEAN_SLOT];
+        __syncthreads(); // mean slot can alias the per-warp reduction scratch
+        const float c0 = z0 - mean1, c1 = z1 - mean1;
+        const float wv = stream1_transformer_warp_reduce_sum_device(c0 * c0 + c1 * c1);
+        if (lane == 0U) warp_scratch[warp] = wv;
+        __syncthreads();
+        float bv = tid < 4U ? warp_scratch[tid] : 0.0f;
+        if (warp == 0U) {
+            bv = stream1_transformer_warp_reduce_sum_device(bv);
+            if (lane == 0U) warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT] =
+                rsqrtf(bv * (1.0f / 256.0f) + 1.0e-5f);
+        }
+        __syncthreads();
+        const float inv1 = warp_scratch[STREAM1_TRANSFORMER_LN256_INV_STD_SLOT];
+        // Retain the incumbent scalar conversion path. Direct FP16 loads/stores
+        // changed normalized outputs with CUDA 12.8 on real Cube4 weights.
+        const float out0 = c0 * inv1 *
+            stream1_transformer_load_scalar_device(ln1_gamma, col0, network.dims.dtype) +
+            stream1_transformer_load_scalar_device(ln1_beta, col0, network.dims.dtype);
+        const float out1 = c1 * inv1 *
+            stream1_transformer_load_scalar_device(ln1_gamma, col1, network.dims.dtype) +
+            stream1_transformer_load_scalar_device(ln1_beta, col1, network.dims.dtype);
+        stream1_transformer_store_scalar_device(ln1_output, base + col0, out0, network.dims.dtype);
+        stream1_transformer_store_scalar_device(ln1_output, base + col1, out1, network.dims.dtype);
+    }
 }
 
 void stream1_transformer_build_input_layernorm256_generic_launch(
@@ -268,7 +313,23 @@ void stream1_transformer_build_input_layernorm256_generic_launch(
         b_micro * dims.seq_len, 128,
         STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float), stream>>>(
             current_frontier_states, parent_base, count, graph_job_index,
-            network, tokens, b_micro, parent_offset);
+            network, tokens, b_micro, parent_offset, nullptr, nullptr, nullptr);
+}
+
+void stream1_transformer_build_input_dual_ln_cuda(
+    const State128* states, const std::uint64_t* base, const std::uint32_t* count, const std::uint32_t* job,
+    const Stream1TransformerNetworkView& network, half* tokens, half* normalized,
+    std::uint32_t batch, std::uint32_t offset, cudaStream_t stream) {
+    const auto dims = network.dims;
+    if (dims.dtype != STREAM1_DTYPE_FP16 || dims.d_model != 256U ||
+        dims.seq_len != dims.padded_seq_len || dims.transformer_layers == 0U) {
+        throw std::invalid_argument("dual input LN requires FP16 d256, compact tokens, and a transformer block");
+    }
+    if (batch == 0U) return;
+    const auto block = network.blocks[0]; // block descriptors are host-side
+    stream1_transformer_build_input_layernorm256_generic_kernel<true><<<batch * dims.seq_len, 128,
+        STREAM1_TRANSFORMER_LN256_SHARED_FLOATS * sizeof(float), stream>>>(
+            states, base, count, job, network, tokens, batch, offset, normalized, block.ln1_gamma, block.ln1_beta);
 }
 
 __global__ void stream1_transformer_zero_padded_rows_kernel(
@@ -3639,7 +3700,8 @@ void stream1_transformer_generic_run_layers_cuda(
     const Stream1TransformerScratchView& scratch,
     std::uint32_t b_micro,
     Stream1TransformerAttentionBackend attention_backend,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    bool first_ln_ready = false) {
     const Stream1TransformerDims dims = network.dims;
     const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
     const bool final_cls_only = stream1_transformer_generic_final_cls_only_enabled(dims);
@@ -3651,7 +3713,7 @@ void stream1_transformer_generic_run_layers_cuda(
     for (std::uint32_t layer = 0; layer < full_token_layer_count; ++layer) {
         const std::string layer_prefix = "layer" + std::to_string(layer) + "_";
         const Stream1TransformerBlockView block = network.blocks[layer];
-        if (layer == 0U) {
+        if (layer == 0U && !first_ln_ready) {
             stream1_transformer_layernorm_copy_launch(
                 scratch.tokens,
                 scratch.attention_context,
@@ -3661,7 +3723,7 @@ void stream1_transformer_generic_run_layers_cuda(
                 dims.d_model,
                 dims.dtype,
                 stream);
-        } else {
+        } else if (layer != 0U) {
             const Stream1TransformerBlockView previous_block = network.blocks[layer - 1U];
             stream1_transformer_bias_layernorm_copy_launch(
                 scratch.tokens,
@@ -3825,7 +3887,12 @@ void stream1_transformer_inference_graph_job_cuda(
     }
 #if BEAM_HAS_CUTLASS
     const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
-    if (stream1_transformer_fused_input_layernorm_requested()) {
+    const bool dual_input_ln = stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_DUAL_INPUT_LN");
+    if (dual_input_ln) {
+        stream1_transformer_build_input_dual_ln_cuda(
+            current_frontier_states, parent_base, count, graph_job_index, network,
+            scratch.tokens, scratch.attention_context, b_micro, parent_offset, stream);
+    } else if (stream1_transformer_fused_input_layernorm_requested()) {
         stream1_transformer_build_input_layernorm256_generic_launch(
             current_frontier_states,
             parent_base,
@@ -3867,7 +3934,7 @@ void stream1_transformer_inference_graph_job_cuda(
         scratch,
         b_micro,
         attention_backend,
-        stream);
+        stream, dual_input_ln);
     stream1_cutlass_linear_cuda(
         scratch.attention_context,
         network.output_weight,
@@ -3948,7 +4015,12 @@ void stream1_transformer_inference_cuda(
     }
 #if BEAM_HAS_CUTLASS
     const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
-    if (stream1_transformer_fused_input_layernorm_requested()) {
+    const bool dual_input_ln = stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_DUAL_INPUT_LN");
+    if (dual_input_ln) {
+        stream1_transformer_build_input_dual_ln_cuda(
+            current_frontier_states, parent_base, count, nullptr, network,
+            scratch.tokens, scratch.attention_context, b_micro, parent_offset, stream);
+    } else if (stream1_transformer_fused_input_layernorm_requested()) {
         stream1_transformer_build_input_layernorm256_generic_launch(
             current_frontier_states,
             parent_base,
@@ -3990,7 +4062,7 @@ void stream1_transformer_inference_cuda(
         scratch,
         b_micro,
         attention_backend,
-        stream);
+        stream, dual_input_ln);
     stream1_cutlass_linear_cuda(
         scratch.attention_context,
         network.output_weight,
