@@ -18,7 +18,8 @@ namespace beam {
 
 #if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
 
-template <template <class> class Activation>
+template <template <class> class Activation,
+          class EpilogueTile = cutlass::epilogue::collective::EpilogueTileAuto>
 void stream1_transformer_hopper_fp16_bias_activation(
     const half* input,
     const half* weight,
@@ -44,7 +45,7 @@ void stream1_transformer_hopper_fp16_bias_activation(
     using Epilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
         cutlass::arch::Sm90, cutlass::arch::OpClassTensorOp,
         TileShape, ClusterShape,
-        cutlass::epilogue::collective::EpilogueTileAuto,
+        EpilogueTile,
         float, float,
         void, LayoutD, 1,
         Element, LayoutD, Alignment,

@@ -1,5 +1,14 @@
 # Prompt History
 
+## 2026-09-15 Offline preparation and H200 relocation
+- User explicitly requires weights and other immutable data converted before the hot path and authorizes moving tests to another 1xH200 if the previous instance is unavailable. Preserve the prior $50 phase budget. Dynamic input activations are separate from offline weight preparation.
+
+## 2026-09-15 Native Hopper low-precision first
+- User clarified: first optimize native inference in a suitable H200 low-precision format; only afterwards consider same-architecture distillation/training. Do not block performance engineering on teacher-quality recovery, do not change network width/layers, and do not present post-training quantization as distillation. Compare complete Stream1 and pipeline, not just GEMM. First new boundary: direct LayerNorm -> E4M3 input for native QKV, with offline packed weights.
+
+## 2026-09-15 H200 epilogue and Transformer Engine
+- User: "Отлично, делай теперь под H200. Трансформер энжен не забудь". Apply RTX6000 experiment lessons to Hopper without copying unsupported SM120 kernels; benchmark TE and native on physical H200, preserve baseline and distinguish component, Stream1 and integrated solver results.
+
 ## 2026-09-15 H200 backend comparison
 - User requested measuring PyTorch, LibTorch and native on H200 and locating prior similar Transformer inference on T4 and other GPUs, with rates expressed in parents/s. Keep model shape, candidate expansion, GPU count, full pipeline and isolated inference distinct.
 

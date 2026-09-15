@@ -2453,8 +2453,15 @@ void stream1_transformer_ff1_linear_bias_activation_impl(
         stream1_transformer_hopper_large_gemm_allowed(
             hopper_mode, stream1_transformer_current_device_sm(), rows)) {
         if constexpr (std::is_same_v<Activation, cutlass::epilogue::thread::ReLu<float>>) {
-            stream1_transformer_hopper_fp16_bias_activation<cutlass::epilogue::thread::ReLu>(
-                input, weight, bias, output, rows, input_cols, output_cols, stream);
+            if (stream1_transformer_hopper_epilogue_128x64(
+                    std::getenv("BEAM_STREAM1_TRANSFORMER_HOPPER_FF1_EPILOGUE"))) {
+                stream1_transformer_hopper_fp16_bias_activation<cutlass::epilogue::thread::ReLu,
+                    cute::Shape<cute::_128, cute::_64>>(
+                    input, weight, bias, output, rows, input_cols, output_cols, stream);
+            } else {
+                stream1_transformer_hopper_fp16_bias_activation<cutlass::epilogue::thread::ReLu>(
+                    input, weight, bias, output, rows, input_cols, output_cols, stream);
+            }
             return;
         }
     }

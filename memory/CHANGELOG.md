@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-15 Offline Hopper QKV export
+- Added CPU E4M3FN RN-even encoder and immutable experimental bundle export: blocks0-2 QKV stored directly in physical column-major KxN, other tensors retain one FP16 copy. Stores per-tensor FP32 dequantization scale, source/payload hashes and explicit unqualified schema; no runtime weight conversion.
+- Five unit tests pass; 100000 varied finite values match PyTorch float8_e4m3fn bytes exactly. Exported real Cube4 bundle contains57 tensors,3 packed. Native GPU compilation/performance gates remain pending.
+- Previous H20051111383 failed restart again (Scheduling, SSH refused), cancelled and confirmed Inactive. Replacement H200 SXM51120383 rented on machine51172, 300GBdisk, about$5.79/hr. SSH key setup pending at this checkpoint. No 2GPU phase started.
+
+## 2026-09-15 Native Hopper FP8 boundary preparation
+- Added experimental direct warp-local LN256 -> E4M3 emission and SM90 TMA/WGMMA FP8 QKV wrapper with explicit scales and preencoded weights. Not connected to production/default build.
+- Added independent CPU LN/dequantized-GEMM CUDA tests for M1/31/128/131. RED missing-header compile observed; GREEN and GPU performance remain unverified. Local CUDA12.5/CUTLASS compatibility errors prevent a substitute build; target H20051111383 remained Scheduling with SSH refused. See `test_results/hopper_native_fp8_plan_2026-09-15.md`.
+
+## 2026-09-15 H200 epilogue and Transformer Engine experiments
+- Added default-off FF1 epilogue selector `BEAM_STREAM1_TRANSFORMER_HOPPER_FF1_EPILOGUE=128x64`. Hopper cooperative schedule requires M=128; RTX6000's M=64 epilogue does not compile on this schedule. Existing default remains auto.
+- Physical H200 component outputs match bitwise across tails and 21888 rows. FF1 128x64 improves about 2.6%; complete optimized Stream1 improves only 0.30%, 586505 -> 588276 parents/s across seven alternating pairs. CSV p1-10/p1000 score dumps match bitwise; memcheck/synccheck report zero errors. No integrated pipeline speedup claimed or default promotion.
+- Added benchmark-only Transformer Engine 2.19 adapter for ReLU Cube4, full QKV/FFN and optional final CLS attention/MLP. Installed in isolated remote environment preserving PyTorch 2.11+cu128. Compared FP16, E4M3 calibrated delayed scaling and current scaling including activation quantization. TE did not beat optimized native; low-precision quality remains unqualified. See experiment report and archived raw evidence.
+
 ## 2026-09-15 H200 normalization fusion and RTX6000 audit
 - Added default-off dual input/block-0 LayerNorm. Corrected scalar-conversion mismatch using the incumbent helper path; real-weight 97-state intermediates and p1–10/p1000 score dumps match exactly. Final H200 memcheck/synccheck report zero errors.
 - Five paired isolated runs: 593974 -> 598914 parents/s (+0.83%). Full-pipeline validation deferred when user requested RTX6000 campaign review; no default promotion.

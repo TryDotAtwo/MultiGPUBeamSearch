@@ -5,6 +5,12 @@
 
 namespace beam {
 
+inline bool stream1_transformer_hopper_epilogue_128x64(const char* value) {
+    if (value == nullptr || value[0] == '\0' || std::strcmp(value, "auto") == 0) return false;
+    if (std::strcmp(value, "128x64") == 0) return true;
+    throw std::invalid_argument("BEAM_STREAM1_TRANSFORMER_HOPPER_FF1_EPILOGUE must be auto or 128x64");
+}
+
 enum class Stream1TransformerHopperMode {
     Off,
     Fp16Tma,

@@ -19,6 +19,13 @@ int main() {
     try { (void)beam::parse_stream1_transformer_hopper_mode("mxfp4"); }
     catch (const std::invalid_argument&) { rejected = true; }
     require(rejected);
+    require(!beam::stream1_transformer_hopper_epilogue_128x64(nullptr));
+    require(!beam::stream1_transformer_hopper_epilogue_128x64("auto"));
+    require(beam::stream1_transformer_hopper_epilogue_128x64("128x64"));
+    rejected = false;
+    try { (void)beam::stream1_transformer_hopper_epilogue_128x64("64x64"); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected);
 
     require(!beam::stream1_transformer_hopper_large_gemm_allowed(Stream1TransformerHopperMode::Off, 90, 43776));
     require(!beam::stream1_transformer_hopper_large_gemm_allowed(Stream1TransformerHopperMode::Fp16Tma, 89, 43776));

@@ -179,6 +179,10 @@ target_link_libraries(stream1_transformer_final_cls_cuda_tests PRIVATE beam_cuda
 set_target_properties(stream1_transformer_final_cls_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stream1_transformer_hopper_gemm_cuda_tests tests/stream1_transformer_hopper_gemm_cuda_tests.cu)
+add_executable(stream1_hopper_epilogue_tests EXCLUDE_FROM_ALL tests/stream1_hopper_epilogue_tests.cu)
+target_link_libraries(stream1_hopper_epilogue_tests PRIVATE beam_cuda)
+target_compile_options(stream1_hopper_epilogue_tests PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+set_target_properties(stream1_hopper_epilogue_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 # Rejected performance experiment, kept explicitly buildable for reproduction.
 add_executable(stream1_transformer_ln_qkv_fusion_cuda_tests EXCLUDE_FROM_ALL tests/stream1_transformer_ln_qkv_fusion_cuda_tests.cu)
 add_executable(stream1_transformer_dual_ln_cuda_tests tests/stream1_transformer_dual_ln_cuda_tests.cu)
