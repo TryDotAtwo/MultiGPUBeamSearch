@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-15 Native FP8 full-model integration candidate
+- Paired same-warp-LN QKV component medians FP16/FP8:40.34/34.99us at21888 rows,73.76/63.69 at43776,136.91/115.32 at87552,260.89/216.25 at175104. Seven alternating trials; not whole-model performance.
+- Fixed offline bundle omission of piece metadata with a failing-then-passing unit test. Added explicit experimental loader opt-in, one-copy E4M3 device weight upload, and generic full-model QKV dispatch reusing context scratch. Bias/LN fusion preserves unrounded normalization and rounded residual output. Integration remains pending GPU build/validation.
+
 ## 2026-09-15 Replacement H200 numerical gate
 - Instance51120383 SSH authorized and connected at93.91.156.91:42609; H200143771MiB, driver595.71.05, nvcc12.8.93. GitHub HEAD459c1b3d and CUTLASSv3.9.2 built the standalone native FP8 test successfully.
 - Independent LN/FP8 GEMM oracles pass M1/31/128/131. Compute Sanitizer memcheck and synccheck each report zero errors. Raw logs saved under test_results/fp8_*.log. This is a component correctness gate, not full-model integration or a speed result.

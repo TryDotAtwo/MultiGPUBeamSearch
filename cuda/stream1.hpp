@@ -78,6 +78,8 @@ struct Stream1TransformerBlockView {
     const half* ff1_bias;
     const half* ff2_weight;
     const half* ff2_bias;
+    // Zero means ordinary FP16 QKV. Positive scale means offline E4M3 KxN.
+    float qkv_e4m3_scale = 0.f;
 };
 
 struct Stream1TransformerNetworkView {

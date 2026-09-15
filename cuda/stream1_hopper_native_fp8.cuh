@@ -25,12 +25,17 @@ __device__ inline float warp_sum(float x) {
 // reductions; neighboring lanes access neighboring elements. No shared memory.
 template<class Output>
 __global__ void ln256(const half* input,const half* gamma,const half* beta,
-                      Output* output,unsigned rows,float inverse_scale) {
+                      Output* output,unsigned rows,float inverse_scale,
+                      const half* input_bias=nullptr,half* residual=nullptr) {
     unsigned row=blockIdx.x*4+threadIdx.x/32,lane=threadIdx.x%32;
     if(row>=rows)return; // Entire warp exits together.
     float x[8],sum=0;
     #pragma unroll
-    for(int i=0;i<8;++i){x[i]=__half2float(input[size_t(row)*256+lane+i*32]);sum+=x[i];}
+    for(int i=0;i<8;++i){auto idx=size_t(row)*256+lane+i*32;
+        x[i]=__half2float(input[idx]);
+        if(input_bias)x[i]+=__half2float(input_bias[lane+i*32]);
+        if(residual)residual[idx]=__float2half(x[i]);
+        sum+=x[i];}
     float mean=warp_sum(sum)/256.f,var=0;
     #pragma unroll
     for(int i=0;i<8;++i){x[i]-=mean;var+=x[i]*x[i];}
@@ -44,10 +49,11 @@ __global__ void ln256(const half* input,const half* gamma,const half* beta,
 }
 
 inline void hopper_ln256_fp8(const half* input,const half* gamma,const half* beta,
-    cutlass::float_e4m3_t* output,unsigned rows,float inverse_scale,cudaStream_t stream) {
+    cutlass::float_e4m3_t* output,unsigned rows,float inverse_scale,cudaStream_t stream,
+    const half* input_bias=nullptr,half* residual=nullptr) {
     if(!std::isfinite(inverse_scale)||inverse_scale<=0)throw std::invalid_argument("Invalid FP8 activation scale");
     if(!rows)return;
-    hopper_fp8_detail::ln256<<<(rows+3)/4,128,0,stream>>>(input,gamma,beta,output,rows,inverse_scale);
+    hopper_fp8_detail::ln256<<<(rows+3)/4,128,0,stream>>>(input,gamma,beta,output,rows,inverse_scale,input_bias,residual);
 }
 
 inline void hopper_fp8_linear(const cutlass::float_e4m3_t* input,

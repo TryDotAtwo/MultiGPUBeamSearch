@@ -32,8 +32,12 @@ class ExportTest(unittest.TestCase):
             for i in range(3):
                 np.ones((256,768),dtype='<f2').tofile(source/f'block{i}_attn_qkv_weight_hxk.fp16')
             np.ones(256,dtype='<f2').tofile(source/'block0_ln1_gamma.fp16')
+            for name in ('piece_positions.u16','piece_mask.u8','piece_types.u8'):
+                (source/name).write_bytes(b'\x01\x00')
             result=export(source,out)
-            self.assertEqual(len(result['files']),4)
+            self.assertEqual(len(result['files']),7)
+            for name in ('piece_positions.u16','piece_mask.u8','piece_types.u8'):
+                self.assertEqual((out/name).read_bytes(),(source/name).read_bytes())
             self.assertFalse((out/'block0_attn_qkv_weight_hxk.fp16').exists())
             self.assertEqual((out/'block0_attn_qkv_weight_hxk.e4m3').stat().st_size,256*768)
             self.assertEqual((out/'block0_ln1_gamma.fp16').read_bytes(),(source/'block0_ln1_gamma.fp16').read_bytes())

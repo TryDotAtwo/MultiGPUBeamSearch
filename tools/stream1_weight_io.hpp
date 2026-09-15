@@ -13,6 +13,7 @@
 #endif
 
 #include <cstddef>
+#include <cmath>
 #include <cstdlib>
 #include <cstdint>
 #include <filesystem>
@@ -36,6 +37,7 @@ inline constexpr std::uint32_t TRANSFORMER_LAYERS = 4;
 inline constexpr std::uint32_t TRANSFORMER_FF_DIM = 1024;
 
 struct HostTransformerBlockBytes {
+    float qkv_e4m3_scale = 0.f;
     std::vector<std::byte> ln1_gamma;
     std::vector<std::byte> ln1_beta;
     std::vector<std::byte> attn_qkv_weight;
@@ -91,6 +93,7 @@ struct HostWeightBytes {
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 struct DeviceTransformerBlockWeights {
+    float qkv_e4m3_scale = 0.f;
     half* ln1_gamma = nullptr;
     half* ln1_beta = nullptr;
     half* attn_qkv_weight = nullptr;
@@ -511,6 +514,16 @@ inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::p
     HostWeightBytes weights;
     weights.model = model;
     const std::string suffix = weight_suffix(model);
+    const std::string artifact = read_text_exact(dir / "manifest.json");
+    const bool native_fp8 = manifest_has_key(artifact, "schema");
+    if (native_fp8) {
+        const char* enabled = std::getenv("BEAM_HOPPER_NATIVE_FP8");
+        if (!enabled || std::string(enabled) != "1" ||
+            parse_manifest_string(artifact,"schema") != "hopper_native_e4m3_experimental_v1" ||
+            model.dtype != STREAM1_DTYPE_FP16 || model.state_len != 96 ||
+            model.d_model != 256 || model.ff_dim != 1024 || model.transformer_layers != 4 || model.seq_len != 57)
+            throw std::runtime_error("Experimental Hopper artifact requires explicit BEAM_HOPPER_NATIVE_FP8=1 and frozen Cube4 shape");
+    }
     HostTransformerBytes& t = weights.transformer;
     t.fast_slot_projected = read_binary_exact(
         dir / ("fast_slot_projected" + suffix),
@@ -529,9 +542,26 @@ inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::p
         HostTransformerBlockBytes& b = t.blocks[block];
         b.ln1_gamma = read_binary_exact(dir / (prefix + "_ln1_gamma" + suffix), fp16_bytes(model.d_model));
         b.ln1_beta = read_binary_exact(dir / (prefix + "_ln1_beta" + suffix), fp16_bytes(model.d_model));
-        b.attn_qkv_weight = read_binary_exact(
-            dir / (prefix + "_attn_qkv_weight_hxk" + suffix),
-            fp16_bytes(3ULL * model.d_model * model.d_model));
+        if (native_fp8 && block < 3) {
+            const std::string key = "\"" + prefix + "_attn_qkv_weight_hxk.fp16\"";
+            auto start = artifact.find(key);
+            auto end = artifact.find('}',start);
+            if (start == std::string::npos || end == std::string::npos) throw std::runtime_error("Missing FP8 weight record");
+            const std::string record = artifact.substr(start,end-start);
+            if (parse_manifest_string(record,"dtype") != "e4m3fn" ||
+                parse_manifest_string(record,"layout") != "column_major_kxn" ||
+                parse_manifest_u32(record,"stride_k") != 1 || parse_manifest_u32(record,"stride_n") != 256)
+                throw std::runtime_error("Invalid native FP8 layout");
+            auto pos = record.find("\"dequant_scale\"");
+            if(pos==std::string::npos)throw std::runtime_error("Missing FP8 scale");
+            b.qkv_e4m3_scale = std::stof(record.substr(record.find(':',pos)+1));
+            if(!std::isfinite(b.qkv_e4m3_scale)||b.qkv_e4m3_scale<=0)throw std::runtime_error("Invalid FP8 scale");
+            b.attn_qkv_weight=read_binary_exact(dir/(prefix+"_attn_qkv_weight_hxk.e4m3"),3ULL*256*256);
+        } else {
+            b.attn_qkv_weight = read_binary_exact(
+                dir / (prefix + "_attn_qkv_weight_hxk" + suffix),
+                fp16_bytes(3ULL * model.d_model * model.d_model));
+        }
         b.attn_qkv_bias = read_binary_exact(dir / (prefix + "_attn_qkv_bias" + suffix), fp16_bytes(3ULL * model.d_model));
         b.attn_out_weight = read_binary_exact(
             dir / (prefix + "_attn_out_weight_hxk" + suffix),
@@ -771,9 +801,19 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
         const std::string prefix = "block" + std::to_string(i);
         const HostTransformerBlockBytes& hb = h.blocks[i];
         DeviceTransformerBlockWeights& db = d.blocks[i];
+        db.qkv_e4m3_scale = hb.qkv_e4m3_scale;
+        if (hb.qkv_e4m3_scale > 0) {
+            int device=0; cudaDeviceProp props{};
+            BEAM_CUDA_CHECK(cudaGetDevice(&device)); BEAM_CUDA_CHECK(cudaGetDeviceProperties(&props,device));
+            if(props.major!=9 || host.model.activation!=STREAM1_ACTIVATION_RELU ||
+               !env_enabled("BEAM_STREAM1_TRANSFORMER_COMPACT57") ||
+               !env_enabled("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY") ||
+               env_enabled("BEAM_STREAM1_TRANSFORMER_DUAL_INPUT_LN"))
+                throw std::runtime_error("Native FP8 requires SM90, ReLU, compact57, final CLS, no dual input LN");
+        }
         alloc_and_copy(db.ln1_gamma, hb.ln1_gamma, (prefix + "_ln1_gamma").c_str());
         alloc_and_copy(db.ln1_beta, hb.ln1_beta, (prefix + "_ln1_beta").c_str());
-        const bool pack_qkv = stream1_transformer_hopper_uses_packed_full_token_weight(
+        const bool pack_qkv = hb.qkv_e4m3_scale == 0 && stream1_transformer_hopper_uses_packed_full_token_weight(
             qkv_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
         const bool pack_ff1 = stream1_transformer_hopper_uses_packed_full_token_weight(
             ff1_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
@@ -1057,7 +1097,8 @@ inline TransformerNetworkViewHolder transformer_network_view(
             b.ff1_weight,
             b.ff1_bias,
             b.ff2_weight,
-            b.ff2_bias};
+            b.ff2_bias,
+            b.qkv_e4m3_scale};
     }
     holder.view = Stream1TransformerNetworkView{
         weights.fast_slot_projected,

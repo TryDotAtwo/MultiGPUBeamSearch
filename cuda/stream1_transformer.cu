@@ -2,6 +2,9 @@
 #include "stream1_transformer_fmha.hpp"
 #include "stream1_transformer_gemm_policy.hpp"
 #include "stream1_transformer_hopper.cuh"
+#if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
+#include "stream1_hopper_native_fp8.cuh"
+#endif
 #include "stream1_transformer_layernorm_policy.hpp"
 #include "stream1_transformer_shape.hpp"
 #include "stream1_transformer_dual_ln.cuh"
@@ -3720,6 +3723,22 @@ void stream1_transformer_generic_run_layers_cuda(
     for (std::uint32_t layer = 0; layer < full_token_layer_count; ++layer) {
         const std::string layer_prefix = "layer" + std::to_string(layer) + "_";
         const Stream1TransformerBlockView block = network.blocks[layer];
+        if (block.qkv_e4m3_scale > 0.f) {
+#if BEAM_HAS_CUTLASS && defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
+            // Context storage is dead until attention; reuse its first half as
+            // one-byte LN output. No extra allocation or normalized FP16 copy.
+            constexpr float inverse_scale = 32.f;
+            auto* packed = reinterpret_cast<cutlass::float_e4m3_t*>(scratch.attention_context);
+            const half* input_bias = layer ? network.blocks[layer-1].ff2_bias : nullptr;
+            hopper_ln256_fp8(scratch.tokens,block.ln1_gamma,block.ln1_beta,
+                packed,token_rows,inverse_scale,stream,input_bias,layer?scratch.tokens:nullptr);
+            stage_profiler.mark(layer_prefix + "ln1");
+            hopper_fp8_linear(packed,reinterpret_cast<const cutlass::float_e4m3_t*>(block.attn_qkv_weight),
+                block.attn_qkv_bias,scratch.qkv,token_rows,256,768,block.qkv_e4m3_scale/inverse_scale,stream);
+#else
+            throw std::runtime_error("Native Hopper FP8 requires an SM90 CUTLASS build");
+#endif
+        } else {
         if (layer == 0U && !first_ln_ready) {
             stream1_transformer_layernorm_copy_launch(
                 scratch.tokens,
@@ -3754,6 +3773,7 @@ void stream1_transformer_generic_run_layers_cuda(
             3U * dims.d_model,
             dims.dtype,
             stream);
+        }
         stage_profiler.mark(layer_prefix + "qkv");
         stream1_transformer_attention_launch(
             scratch.qkv,

@@ -54,7 +54,9 @@ def export(source,destination):
             raise ValueError(f'Wrong weight size: {name}')
     destination.mkdir(parents=True,exist_ok=False)
     records={}
-    for path in sorted(source.glob('*.fp16')):
+    paths=list(source.glob('*.fp16'))+[source/name for name in
+        ('piece_positions.u16','piece_mask.u8','piece_types.u8')]
+    for path in sorted(paths):
         if path.name in selected:
             shape=selected[path.name]
             packed,scale=pack_weight(np.fromfile(path,dtype='<f2').reshape(shape))
@@ -66,7 +68,7 @@ def export(source,destination):
                 sha256=sha(target),bytes=target.stat().st_size)
         else:
             target=destination/path.name;shutil.copyfile(path,target)
-            records[path.name]=dict(file=path.name,dtype='fp16',source_sha256=sha(path),
+            records[path.name]=dict(file=path.name,dtype=path.suffix[1:],source_sha256=sha(path),
                                    sha256=sha(target),bytes=target.stat().st_size)
     result=dict(schema='hopper_native_e4m3_experimental_v1',target='sm90a',
                 source_manifest_sha256=sha(source/'manifest.json'),model=manifest,
