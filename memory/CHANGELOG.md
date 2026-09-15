@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-15 Hopper FP16 residual prototype
+- Seven alternating H200 FF2 component pairs at M21888/K1024/N256: SM80 median49.3981us, SM90 median29.6685us; deterministic outputs exact. 1.665x component speedup only; full Stream1/pipeline integration remains pending.
 - Physical H200 component gates passed at a6f07347: independent exact-dyadic oracle rows1/31/128/131, memcheck0errors, synccheck0errors. No performance or model-level acceptance yet.
 - Added an independent exact-dyadic FP32 CPU oracle for in-place FP16 FF2 residual, rows1/31/128/131. Target H200 nvcc first failed on the missing implementation header. Added isolated SM90 TMA/WGMMA FP16 residual prototype with deferred bias and no hot-path allocation. Not integrated or performance-qualified.
 

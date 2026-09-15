@@ -46,3 +46,15 @@ fp16_residual_memcheck.log and fp16_residual_synccheck.log are retained.
 These are component correctness gates only: no timing, model integration,
 arbitrary-model numerical qualification or integrated speedup is established.
 Restarted five-hour stop guard PID851 and verified it live after startup.
+
+## Paired FF2 component timing
+
+Source50a2911b, same H200: SM80 m128n128 residual GEMM versus SM90 prototype,
+M21888 K1024 N256, seven alternating pairs,300 graph replays per measurement.
+Median49.3981us versus29.6685us (1.665x). All pairs favor SM90.
+Full outputs match exactly on the benchmark's deterministic dyadic input.
+Each mode begins with the same residual; replays repeatedly update it in place.
+Separate row/column-major weight buffers are benchmark controls only, not a
+production two-copy layout. No transfer or offline packing included in timing.
+Raw results: fp16_residual_benchmark.log. Model-level and pipeline gates remain
+open; this result alone does not change defaults.

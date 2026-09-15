@@ -1,0 +1,15 @@
+paired outputs exact rows=21888
+rep=0 mode=sm80 us=49.4401
+rep=0 mode=sm90 us=29.686
+rep=1 mode=sm90 us=29.6889
+rep=1 mode=sm80 us=49.4161
+rep=2 mode=sm80 us=49.3981
+rep=2 mode=sm90 us=29.6637
+rep=3 mode=sm90 us=29.6685
+rep=3 mode=sm80 us=49.4272
+rep=4 mode=sm80 us=49.3716
+rep=4 mode=sm90 us=29.721
+rep=5 mode=sm90 us=29.5785
+rep=5 mode=sm80 us=49.179
+rep=6 mode=sm80 us=49.1599
+rep=6 mode=sm90 us=29.5809
