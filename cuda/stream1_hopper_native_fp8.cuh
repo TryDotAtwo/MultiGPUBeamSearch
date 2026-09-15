@@ -14,6 +14,7 @@
 #include <cutlass/util/packed_stride.hpp>
 #include <cmath>
 #include <stdexcept>
+#include <type_traits>
 
 namespace beam {
 namespace hopper_fp8_detail {
@@ -56,18 +57,21 @@ inline void hopper_ln256_fp8(const half* input,const half* gamma,const half* bet
     hopper_fp8_detail::ln256<<<(rows+3)/4,128,0,stream>>>(input,gamma,beta,output,rows,inverse_scale,input_bias,residual);
 }
 
+template<class Output=half,template<class>class Activation=cutlass::epilogue::thread::Identity>
 inline void hopper_fp8_linear(const cutlass::float_e4m3_t* input,
-    const cutlass::float_e4m3_t* weight,const half* bias,half* output,
+    const cutlass::float_e4m3_t* weight,const half* bias,Output* output,
     unsigned rows,unsigned k,unsigned n,float scale_product,cudaStream_t stream) {
     using namespace cute;
     using F8=cutlass::float_e4m3_t;using H=cutlass::half_t;
+    using D=std::conditional_t<std::is_same_v<Output,half>,H,Output>;
+    constexpr int AlignmentD=128/cutlass::sizeof_bits<D>::value;
     using Tile=Shape<_128,_128,_128>;using Cluster=Shape<_1,_2,_1>;
     using LA=cutlass::layout::RowMajor;using LB=cutlass::layout::ColumnMajor;
     using Fusion=cutlass::epilogue::fusion::LinCombPerColBiasEltAct<
-        cutlass::epilogue::thread::Identity,H,float,H,void,float>;
+        Activation,D,float,H,void,float>;
     using Epi=typename cutlass::epilogue::collective::CollectiveBuilder<
         cutlass::arch::Sm90,cutlass::arch::OpClassTensorOp,Tile,Cluster,
-        Shape<_128,_64>,float,float,void,LA,1,H,LA,8,
+        Shape<_128,_64>,float,float,void,LA,1,D,LA,AlignmentD,
         cutlass::epilogue::TmaWarpSpecializedCooperative,Fusion>::CollectiveOp;
     using Main=typename cutlass::gemm::collective::CollectiveBuilder<
         cutlass::arch::Sm90,cutlass::arch::OpClassTensorOp,F8,LA,16,F8,LB,16,
@@ -84,7 +88,7 @@ inline void hopper_fp8_linear(const cutlass::float_e4m3_t* input,
     auto sd=cutlass::make_cute_packed_stride(typename Kernel::StrideD{},make_shape(int(rows),int(n),1));
     typename Gemm::Arguments args{cutlass::gemm::GemmUniversalMode::kGemm,
         make_shape(int(rows),int(n),int(k),1),{input,sa,weight,sb},
-        {{},nullptr,sd,reinterpret_cast<H*>(output),sd}};
+        {{},nullptr,sd,reinterpret_cast<D*>(output),sd}};
     args.epilogue.thread.alpha=scale_product;args.epilogue.thread.beta=0;
     args.epilogue.thread.bias_ptr=reinterpret_cast<const H*>(bias);
     if(Gemm::get_workspace_size(args))throw std::runtime_error("Unexpected FP8 GEMM workspace");

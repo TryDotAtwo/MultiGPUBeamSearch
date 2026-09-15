@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-15 Native FP8 FFN next boundary
+- Added independent FF1 ReLU/direct E4M3 and FF2/FP16-residual oracles; target nvcc RED confirmed missing FFN header. Prepared generic FP8 output/activation epilogue and separate FP8 FF2+residual implementation. Not yet compiled, timed, integrated or promoted; existing QKV-only pipeline binary remains unchanged during its paired run.
+
 ## 2026-09-15 Native FP8 full-model integration candidate
 - Full native binary compiled on replacement H200. Loader gate passes with5781600 weight bytes. Seven-pair full Stream1 and CSV-seeded quality runs executed; analysis pending. Added bounded100M depth9 FP16/FP8 pipeline comparison with separate history directories and preserved process exit codes.
 - Added runtime lineage verifier and seven-pair full-Stream1 runner; source/checkpoint SHA and all60 artifact files verify on replacement H200. Added CPU loader gate for mandatory explicit opt-in, three one-byte QKV matrices and final FP16 QKV, plus complete piece metadata.
