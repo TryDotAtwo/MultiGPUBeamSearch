@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Two ranks, unique rendezvous and histories; no inherited single-rank settings.
+# Single-node H200 launcher; defaults preserve the measured two-rank profile.
 set -euo pipefail
-cd /workspace/MGBFS
-run_dir=$(mktemp -d /workspace/h200_dual_run.XXXXXX)
+cd "${H200_REPO_DIR:-/workspace/MGBFS}"
+world=${H200_WORLD_SIZE:-2}
+[[ "$world" =~ ^[1-8]$ ]] || { echo 'H200_WORLD_SIZE must be 1..8' >&2; exit 2; }
+run_dir=$(mktemp -d "${H200_RUN_ROOT:-/workspace}/h200_run.XXXXXX")
 echo "run_dir=$run_dir"
 export BEAM_NCCL_ID_FILE="$run_dir/nccl.bin"
 export BEAM_HISTORY_DIR="$run_dir/history"
@@ -26,27 +28,33 @@ export BEAM_STREAM4_TRIGGER_CANDIDATES=${BEAM_STREAM4_TRIGGER_CANDIDATES:-524288
 export BEAM_STREAM4_ACTIVE_SORT_SLOTS=${BEAM_STREAM4_ACTIVE_SORT_SLOTS:-4}
 export BEAM_SHARD_CAPACITY_SCALE_PPM=1000000
 beam=${BEAM_WIDTH:?set requested global beam}
-export BEAM_SHARD_CAPACITY_CANDIDATES=$(( ((beam+2*BEAM_SHARD_COUNT*1024-1)/(2*BEAM_SHARD_COUNT*1024))*1024 ))
-export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES=65536 BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=2000000
+[[ "$beam" =~ ^[1-9][0-9]*$ && ${#beam} -le 10 ]] || { echo 'invalid BEAM_WIDTH' >&2; exit 2; }
+[[ "$BEAM_SHARD_COUNT" =~ ^[1-9][0-9]*$ && ${#BEAM_SHARD_COUNT} -le 4 ]] || exit 2
+export BEAM_SHARD_CAPACITY_CANDIDATES=$(( ((beam+world*BEAM_SHARD_COUNT*1024-1)/(world*BEAM_SHARD_COUNT*1024))*1024 ))
+export BEAM_FINAL_MATERIALIZE_CHUNK_CANDIDATES=65536 BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=$((world*1000000))
+echo "world_size=$world requested_beam=$beam effective_beam=$((BEAM_SHARD_CAPACITY_CANDIDATES*world*BEAM_SHARD_COUNT)) shard_capacity=$BEAM_SHARD_CAPACITY_CANDIDATES"
 export BEAM_GPU_HEADROOM_BYTES=4294967296
 export BEAM_HISTORY_MODE=static_hybrid
 export BEAM_HISTORY_CHUNKED_PIN=${BEAM_HISTORY_CHUNKED_PIN:-1}
 # Global budgets, divided by WORLD_SIZE by the runner.
-export BEAM_HISTORY_RAM_BYTES=137438953472 BEAM_HISTORY_DISK_BYTES=644245094400
+export BEAM_HISTORY_RAM_BYTES=${BEAM_HISTORY_RAM_BYTES:-137438953472}
+export BEAM_HISTORY_DISK_BYTES=${BEAM_HISTORY_DISK_BYTES:-644245094400}
 export BEAM_SOLVED_NEIGHBORHOOD_RADIUS=4 BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES=3000000
-export BEAM_ENABLE_DEBUG=1 BEAM_DEPTH_LOG_EVERY=1 WORLD_SIZE=2 NCCL_DEBUG=WARN
+export BEAM_ENABLE_DEBUG=1 BEAM_DEPTH_LOG_EVERY=1 WORLD_SIZE=$world NCCL_DEBUG=WARN
 unset BEAM_HOPPER_NATIVE_FP8
 export LD_LIBRARY_PATH=/venv/main/lib/python3.12/site-packages/nvidia/nccl/lib:/usr/local/cuda/lib64
 pids=()
 cleanup(){ for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done; }
 trap cleanup EXIT INT TERM
-for rank in 0 1; do
+for ((rank=0; rank<world; rank++)); do
   RANK=$rank LOCAL_RANK=$rank "${H200_BUILD_DIR:-/workspace/build}/production_runner" \
     "${PUZZLE_ID:-1000}" "${DEPTH_LIMIT:-9}" "$beam" > "$run_dir/rank${rank}.log" 2>&1 &
   pids+=("$!")
 done
 rc=0
-for p in "${pids[@]}"; do if wait "$p"; then :; else rc=$?; cleanup; break; fi; done
+for ((remaining=world; remaining>0; remaining--)); do
+  if wait -n; then :; else rc=$?; cleanup; break; fi
+done
 trap - EXIT INT TERM
 echo "exit_code=$rc"
 exit "$rc"

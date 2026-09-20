@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-20 Bounded multi-rank launcher
+- Generalized H200 launcher to1..8 ranks with aligned global beam and exchange sizing; added256M eight-rank wrapper. History budgets are overridable for short tests. Wait for any failed rank and terminate peers instead of waiting sequentially. GPU validation pending; local shell/mock validation only.
+
 ## 2026-09-15 Two-H200 large-beam campaign
 - The two-depth allocation/D2H smoke passed, but depth5 exposed a CUDA copy crossing independently registered1GiB ranges. Extended smoke to depth5 and split final history D2H at the same boundaries on the existing stream, retaining one completion event after all copies. Full large-beam verification pending.
 - Dual100M completed, depth8=92.2702s.750M rejected by the exact4GiB-reserve budget gate.740M GPU allocation succeeded but monolithic11.84GB pinned history allocation failed with cudaErrorInvalidValue. Standalone1.60GB succeeds,4/8/10GiB fail;11.84GB contiguous memory registered in1GiB chunks succeeds. Added Linux opt-in startup-only chunked registration and teardown, preserving contiguous history/D2H contract. h200_large_history_smoke.sh reproduced the failure before the patch; rebuilt GPU validation pending.
@@ -1065,3 +1068,5 @@
 - 2026-09-05: Archived the Vast 8xH200 frontier sweep and solve evidence under `test_results/vast_h200_frontier_2026-09-04/`. The maximum demonstrated working requested beam was 2.90B with 64 shards and four active Stream4 sort slots; 2.94B failed at NCCL and 3.00B failed the static budget gate. Puzzles 1-10 plus their reflected variants were replay-valid. Puzzle 1000 saturated the 2.900361216B effective beam, completed depth 8 in 931.266 seconds, and was stopped during depth 9 on user request.
 - 2026-09-15: Started single-H200 tuning with reproducible sweep/production scripts and nine-hour GPU stop guard. Corrected earlier metric comparison: 11.194M candidates/s equals 466428 parents/s per GPU; old full pipeline achieved 389304 parents/s per GPU (~83.46%). Ring-job ratio alone does not establish serialization. See test_results/h200_single_2026-09-15.md.
 2026-09-15: H200 Stream1 diagnosis: archived physical Nsight trace (42 kernels/forward, 99.975% kernel-busy union); repeated baseline 459.8k parents/s, existing TMA FF1 491.0k with exact synthetic score keys. Found inaccurate seq57 TFLOPS accounting; not fixed yet. Score-dump summarizer now validates/skips the 24-byte header. Full 100M depth8 completed in 231.321s, unsolved at requested depth limit.
+# 2026-09-20
+- Generalized H200 launcher rank count and capacity/exchange derivation; added 8-GPU 256M wrapper. Local eight-process mock passed, no physical GPU run. See test_results/h200_8gpu_256m_readiness.md.

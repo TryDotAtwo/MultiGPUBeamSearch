@@ -1,5 +1,8 @@
 # Prompt History
 
+## 2026-09-20 Bounded H200 profile campaign
+- User requests sequential 2xH200 then 8xH200 rentals, pipeline profile tuning through depth8, global256M beam on8GPU, preserving isolated Stream1 throughput. Total budget $50 including disk and transfers. No duplicate active rentals; no subagents. Reuse native FP16 and puzzle1000, no full solve beyond this benchmark scope.
+
 ## 2026-09-15 Diagnose dual-H200 pipeline loss
 - User asks to determine the cause of the throughput drop. Diagnosis only: obtain bounded timing evidence, distinguish GPU graph spans from exclusive kernel work and CPU waits, do not implement a production fix or claim a partial-window speedup as full-depth throughput.
 
@@ -609,3 +612,5 @@ User reported that an interactive game had been running during part of the recen
 2026-09-15: User requested diagnosis of low Stream1 throughput and whether work units are too small for H200; inspect GEMM dimensions and actual GPU kernel timeline, not GPU-util percentage alone.
 - 2026-09-15: User requested implementing fusion to reduce normalization and intermediate-tensor memory traffic in H200 Stream1. Preserve the fastest measured baseline, check real-model output parity, and distinguish isolated inference from full-pipeline speed.
 - 2026-09-15: Before selecting more H200 experiments, user explicitly requested reading the RTX6000 optimization conversation and project files to reuse proven directions and avoid already-rejected ones.
+# 2026-09-20
+- User requested adapting and checking the existing launcher for an 8xH200 256M beam test.
