@@ -30,6 +30,8 @@ echo "repo=$repo build=$build cutlass=$cutlass"
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CUDA_COMPILER="$nvcc" \
   -DBEAM_CUDA_ARCHITECTURES=103 \
+  -DBEAM_STATE_LOGICAL_BYTES=96 \
+  -DBEAM_MOVE_COUNT=24 \
   -DCUTLASS_DIR="$cutlass" \
   -DNCCL_INCLUDE_DIR="$nccl_include" \
   -DNCCL_LIBRARY="$nccl_library" \

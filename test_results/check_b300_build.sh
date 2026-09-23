@@ -24,6 +24,7 @@ fi
 printf 'Cuda compilation tools, release 13.0, V13.0.88\n' > "$tmp/version"
 bash hpc/b300_build.sh
 grep -q -- '-DBEAM_CUDA_ARCHITECTURES=103' "$tmp/cmake_calls"
+grep -q -- '-DBEAM_STATE_LOGICAL_BYTES=96' "$tmp/cmake_calls"
 grep -q -- '-DBEAM_PUZZLE_INFO_JSON=' "$tmp/cmake_calls"
 grep -q -- '--target production_runner stream_benchmark stream1_transformer_cuda_tests' "$tmp/cmake_calls"
 echo 'PASS: B300 build rejects old CUDA and configures SM103 targets; mock compiler only'

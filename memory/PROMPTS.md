@@ -616,3 +616,4 @@ User reported that an interactive game had been running during part of the recen
 # 2026-09-20
 - User requested adapting and checking the existing launcher for an 8xH200 256M beam test.
 - 2026-09-23: With 8xH200 unavailable, user requested B300 preparation and cost-controlled staged work: rent 1xB300 first, benchmark isolated Stream1 and improve native inference on one GPU, then test 2xB300. FlashAttention-4 may be considered on B300, subject to measured end-to-end benefit.
+- 2026-09-23: With B300 offers unavailable, user requested preparing Cube4 beam search to launch on whichever supported GPU offer becomes available, while retaining real hardware, memory and speed validation before a paid full run.

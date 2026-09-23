@@ -1074,3 +1074,4 @@
 # 2026-09-23
 
 - Added guarded native-FP16 B300 SM103 build and 1/2-rank launch scripts. Disabled Hopper-specific QKV/FF1/FF2 paths until B300 validation, preserved compact57/final-CLS CUDA-graph baseline, and fail-closed on absent weights, inputs or binaries. Mock-only launcher and compiler gates passed; no B300 compilation, score parity, or throughput claim yet. See test_results/b300_readiness_2026-09-23.md.
+- Added a detected-architecture Cube4 native-FP16 probe/build/Stream1/search entry point and a model/data ordering verifier. B300 CMake build now pins state96 and 24 moves. Mock and real archived-bundle checks are documented in test_results/cube4_portable_readiness_2026-09-23.md; no new GPU run was performed.
