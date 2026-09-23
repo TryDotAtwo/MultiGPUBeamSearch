@@ -1,6 +1,7 @@
 # Prompt History
 
 ## 2026-09-20 Bounded H200 profile campaign
+- User clarifies mandatory order: first find the fastest isolated Stream1 configuration, then tune beam-search parameters to retain that measured throughput. Do not treat a narrow initial comparison as a completed Stream1 sweep.
 - User requests sequential 2xH200 then 8xH200 rentals, pipeline profile tuning through depth8, global256M beam on8GPU, preserving isolated Stream1 throughput. Total budget $50 including disk and transfers. No duplicate active rentals; no subagents. Reuse native FP16 and puzzle1000, no full solve beyond this benchmark scope.
 
 ## 2026-09-15 Diagnose dual-H200 pipeline loss
@@ -614,3 +615,4 @@ User reported that an interactive game had been running during part of the recen
 - 2026-09-15: Before selecting more H200 experiments, user explicitly requested reading the RTX6000 optimization conversation and project files to reuse proven directions and avoid already-rejected ones.
 # 2026-09-20
 - User requested adapting and checking the existing launcher for an 8xH200 256M beam test.
+- 2026-09-23: With 8xH200 unavailable, user requested B300 preparation and cost-controlled staged work: rent 1xB300 first, benchmark isolated Stream1 and improve native inference on one GPU, then test 2xB300. FlashAttention-4 may be considered on B300, subject to measured end-to-end benefit.

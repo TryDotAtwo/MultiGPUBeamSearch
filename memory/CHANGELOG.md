@@ -1070,3 +1070,7 @@
 2026-09-15: H200 Stream1 diagnosis: archived physical Nsight trace (42 kernels/forward, 99.975% kernel-busy union); repeated baseline 459.8k parents/s, existing TMA FF1 491.0k with exact synthetic score keys. Found inaccurate seq57 TFLOPS accounting; not fixed yet. Score-dump summarizer now validates/skips the 24-byte header. Full 100M depth8 completed in 231.321s, unsolved at requested depth limit.
 # 2026-09-20
 - Generalized H200 launcher rank count and capacity/exchange derivation; added 8-GPU 256M wrapper. Local eight-process mock passed, no physical GPU run. See test_results/h200_8gpu_256m_readiness.md.
+
+# 2026-09-23
+
+- Added guarded native-FP16 B300 SM103 build and 1/2-rank launch scripts. Disabled Hopper-specific QKV/FF1/FF2 paths until B300 validation, preserved compact57/final-CLS CUDA-graph baseline, and fail-closed on absent weights, inputs or binaries. Mock-only launcher and compiler gates passed; no B300 compilation, score parity, or throughput claim yet. See test_results/b300_readiness_2026-09-23.md.
