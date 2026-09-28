@@ -608,3 +608,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User requests collect allocation proportional to max collection count times expected solution length instead of beam times move count.
 
 2026-09-28: User explicitly requires collection overflow to log an error/warning but keep search running; write all stored hits and discard excess.
+
+2026-09-28: User allocates exactly ONE of two Kaggle GPU session slots to this task. Stop redundant own run; never launch a second concurrent GPU job.

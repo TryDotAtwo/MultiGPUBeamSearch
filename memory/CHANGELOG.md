@@ -1084,3 +1084,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Bound collection hit staging to min(local_beam*move_count, MAX_COLLECTED_SOLUTIONS*effective_MAX_DEPTH),40 bytes per record per GPU.100K*140=560MB instead of40.265GB atp26. Native synchronized overflow remains fatal; bounded capacity is not a lossless all-hits guarantee. Shared config/memory guard passes the same limits and actual Cube555 storage160.
 
 2026-09-28: Collection overflow now logs a global warning and per-rank hits/stored/dropped counters, then continues existing capacity-clamped gather. Existing solution-count/depth stop conditions remain. Cube555 performance report records truncation and dropped counts. Previous fatal-overflow policy superseded.
+
+2026-09-28: Confirmed UI showed public Cube555 v6 and v8 both Running. Requested Stop Session only for v6; retain v8. Future GPU work must be serial in one slot; publication while running must use Quick Save, not CLI push that starts another GPU run.
