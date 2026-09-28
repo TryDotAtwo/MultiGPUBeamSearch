@@ -1104,3 +1104,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Measured full envelope validation25.59ms/result locally (~2559s/100000 per pass). Memoize only generator-schema subtree by immutable canonical content (bounded32 entries); retain per-result schema/replay/hash checks. GPU collect after console throttling completed100000 in40.31s atBFS5; CPU publication still pending.
 
 2026-09-28: Acceptance launches collect v3 and width v2 pinned c5f1b159. Static audit found gzip builder omitted server 64MiB decompressed / 2000-result limits; enforce both and retry HTTP429 at 60s up to three retries while preserving local archives. GPU acceptance remains pending.
+
+2026-09-28: User supersedes 100000 collection default: set MAX_COLLECTED_SOLUTIONS=2000 for Cube555 notebook and launcher; acceptance uses 2000.

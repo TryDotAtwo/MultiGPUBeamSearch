@@ -69,7 +69,7 @@ REFLECT_MODE = "off"  # off | after_original | only
 REFLECT_SOURCE_CSV = None  # path to solutions CSV; required for "only"
 SOLUTION_MODE = "collect"  # first | collect
 COLLECT_UNTIL_DEPTH = MAX_DEPTH  # used by "collect"; capped to history budget
-MAX_COLLECTED_SOLUTIONS = 100_000
+MAX_COLLECTED_SOLUTIONS = 2_000
 
 KAGGLE_OWNER = "trydotatwo"
 KAGGLE_SLUG = "cube555-native-2xt4-blend"

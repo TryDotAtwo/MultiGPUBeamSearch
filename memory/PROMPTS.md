@@ -624,3 +624,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User requires Cube555 beam profiles capped at4000000 with smaller tiers, maximum depth140, radius5, and collect stall investigation.
 
 2026-09-28: User requests two Kaggle acceptance notebooks to verify public usability of final Cube555 configuration.
+
+2026-09-28: User supersedes 100000 collection default: set MAX_COLLECTED_SOLUTIONS=2000 for Cube555 notebook and launcher; acceptance uses 2000.

@@ -66,7 +66,7 @@ def configuration(args, pid, puzzle_info):
         reflect_source_csv=getattr(args, 'reflect_source_csv', None),
         solution_mode=getattr(args, 'solution_mode', 'first'),
         collect_until_depth=args.depth if getattr(args, 'collect_until_depth', None) is None else min(args.collect_until_depth, args.depth),
-        max_collected_solutions=getattr(args, 'max_collected_solutions', 100_000), touch_bfs_radius=args.touch_radius,
+        max_collected_solutions=getattr(args, 'max_collected_solutions', 2_000), touch_bfs_radius=args.touch_radius,
         publish_results=getattr(args, 'publish', False),
         results_ingest_url=getattr(args, 'ingest_url', ''), enable_debug=True,
         **getattr(args, 'publication', {}),
@@ -92,7 +92,7 @@ def main():
     parser.add_argument('--reflect-source-csv', type=Path)
     parser.add_argument('--solution-mode', choices=['first', 'collect'], default='collect')
     parser.add_argument('--collect-until-depth', type=int)
-    parser.add_argument('--max-collected-solutions', type=int, default=100_000)
+    parser.add_argument('--max-collected-solutions', type=int, default=2_000)
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--ingest-url', default='https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results')
     parser.add_argument('--publication-json', type=Path)
