@@ -57,6 +57,15 @@ PUZZLE_ID_END = 1020  # inclusive
 BEAM_WIDTH = 2**25  # any requested width; pipeline profile is selected automatically
 MAX_DEPTH = 200
 TRANSFORMER_WEIGHT = 0.8  # 0 = ResMLP, 1 = Transformer
+
+REFLECT_MODE = "off"  # off | after_original | only
+REFLECT_SOURCE_CSV = None  # path to solutions CSV; required for "only"
+SOLUTION_MODE = "first"  # first | collect
+COLLECT_UNTIL_DEPTH = MAX_DEPTH  # used by "collect"; capped to history budget
+MAX_COLLECTED_SOLUTIONS = 100
+
+KAGGLE_OWNER = "trydotatwo"
+KAGGLE_SLUG = "cube555-native-2xt4-blend"
 ''')
     cell(f'''# Runtime settings: normally leave unchanged.
 SOLVER_COMMIT = {commit!r}
@@ -67,9 +76,7 @@ TOUCH_BFS_RADIUS = 4
 B_MICRO = 8192
 MODEL_MICRO = 512
 PUBLISH_RESULTS = True
-KAGGLE_OWNER = "trydotatwo"
-KAGGLE_SLUG = "cube555-native-2xt4-blend"
-KAGGLE_VERSION = 6
+KAGGLE_VERSION = 7
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:
     raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")
@@ -116,6 +123,12 @@ command = [sys.executable, "-u", "-m", "tools.cube555.run",
     "--beam", str(beam), "--depth", str(depth), "--touch-radius", str(radius),
     "--transformer-weight", str(TRANSFORMER_WEIGHT)]
 command += ["--b-micro", str(B_MICRO), "--model-micro", str(MODEL_MICRO)]
+if not SMOKE_TEST:
+    command += ["--reflect-mode", REFLECT_MODE, "--solution-mode", SOLUTION_MODE,
+        "--collect-until-depth", str(COLLECT_UNTIL_DEPTH),
+        "--max-collected-solutions", str(MAX_COLLECTED_SOLUTIONS)]
+    if REFLECT_SOURCE_CSV is not None:
+        command += ["--reflect-source-csv", str(REFLECT_SOURCE_CSV)]
 if PUBLISH_RESULTS and not SMOKE_TEST:
     import hashlib
     notebook_path = Path("/kaggle/working/__notebook__.ipynb")

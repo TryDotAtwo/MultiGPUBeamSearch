@@ -91,3 +91,19 @@ def test_notebook_first_cell_is_simple_user_config(tmp_path):
     source = '\n'.join(''.join(c['source']) for c in notebook['cells'])
     assert '"--checkpoint", str(CHECKPOINT_PATH)' in source
     assert '"--mlp-checkpoint", str(RESMLP_CHECKPOINT_PATH)' in source
+
+
+@pytest.mark.parametrize('mode', ['off', 'after_original', 'only'])
+def test_reflection_and_collection_config_reaches_runner(tmp_path, mode):
+    from types import SimpleNamespace
+    from tools.cube555.run import configuration
+    args = SimpleNamespace(assets=tmp_path, competition=tmp_path, beam=2**22,
+        depth=80, touch_radius=4, reflect_mode=mode,
+        reflect_source_csv=tmp_path / 'solutions.csv', solution_mode='collect',
+        collect_until_depth=100, max_collected_solutions=100)
+    cfg = configuration(args, 1020, tmp_path / 'puzzle_info.json')
+    assert cfg.reflect_mode == mode
+    assert cfg.reflect_source_csv == args.reflect_source_csv
+    assert cfg.solution_mode == 'collect'
+    assert cfg.collect_until_depth == 80
+    assert cfg.max_collected_solutions == 100

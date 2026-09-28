@@ -1072,3 +1072,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Exact full-state BFS counts: r4=446403, r5=10739017. Current 4-slot table lower bound:40MiB vs1280MiB per GPU. Default radius4 chosen to preserve wide-beam memory; no native timing optimum claim. Updated public notebook and audit defaults.
 
 2026-09-28: Public v6 GPU push accepted, scriptVersionId353576422 RUNNING on 2xT4, runtime8f205871. Remote source verified radius4. Separate full-profile audit still blocked by batch-session quota.18 Cube555 tests passed.
+
+2026-09-28: Moved owner/slug and exposed reflection/collection controls in first Cube555 cell. Added CLI forwarding to existing shared reflection/collection runner. Collection depth follows explicit history depth cap; invalid requested bounds rejected.

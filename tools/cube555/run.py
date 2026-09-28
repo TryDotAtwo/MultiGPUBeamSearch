@@ -49,8 +49,11 @@ def configuration(args, pid, puzzle_info):
         puzzle_info_json=str(puzzle_info), test_csv=str(args.competition / 'test.csv'),
         sample_submission_csv=str(args.competition / 'sample_submission.csv'),
         puzzle_id_start=pid, puzzle_id_end=pid, beam_width=args.beam, max_depth=args.depth,
-        reflect_mode='off', reflect_source_csv=None, solution_mode='first', collect_until_depth=args.depth,
-        max_collected_solutions=1, touch_bfs_radius=args.touch_radius,
+        reflect_mode=getattr(args, 'reflect_mode', 'off'),
+        reflect_source_csv=getattr(args, 'reflect_source_csv', None),
+        solution_mode=getattr(args, 'solution_mode', 'first'),
+        collect_until_depth=args.depth if getattr(args, 'collect_until_depth', None) is None else min(args.collect_until_depth, args.depth),
+        max_collected_solutions=getattr(args, 'max_collected_solutions', 100), touch_bfs_radius=args.touch_radius,
         publish_results=getattr(args, 'publish', False),
         results_ingest_url=getattr(args, 'ingest_url', ''), enable_debug=True,
         **getattr(args, 'publication', {}),
@@ -72,10 +75,17 @@ def main():
     parser.add_argument('--transformer-weight', type=float, default=0.8)
     parser.add_argument('--b-micro', type=int, default=8192)
     parser.add_argument('--model-micro', type=int, default=512)
+    parser.add_argument('--reflect-mode', choices=['off', 'after_original', 'only'], default='off')
+    parser.add_argument('--reflect-source-csv', type=Path)
+    parser.add_argument('--solution-mode', choices=['first', 'collect'], default='first')
+    parser.add_argument('--collect-until-depth', type=int)
+    parser.add_argument('--max-collected-solutions', type=int, default=100)
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--ingest-url', default='https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results')
     parser.add_argument('--publication-json', type=Path)
     args = parser.parse_args()
+    if args.collect_until_depth is not None and not 0 <= args.collect_until_depth <= args.depth:
+        parser.error('--collect-until-depth must be within --depth')
     args.publication = json.loads(args.publication_json.read_text()) if args.publication_json else {}
     args.assets, args.competition, args.output = args.assets.resolve(), args.competition.resolve(), args.output.resolve()
     if args.output.exists():

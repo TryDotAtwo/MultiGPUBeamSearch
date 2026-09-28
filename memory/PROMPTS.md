@@ -600,3 +600,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User requests full profile memory/speed validation and a simple first cell: numeric BEAM_WIDTH, MAX_DEPTH, blend weight, explicit model paths and puzzle range; hide BFS radius and technical modes.
 
 2026-09-28: User asks to calculate suitable Cube555 BFS radius4 vs5 rather than keep radius2.
+
+2026-09-28: User explicitly requests KAGGLE_OWNER/KAGGLE_SLUG, REFLECT_MODE/REFLECT_SOURCE_CSV and SOLUTION_MODE/COLLECT_UNTIL_DEPTH/MAX_COLLECTED_SOLUTIONS in first cell.
