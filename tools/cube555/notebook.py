@@ -16,7 +16,7 @@ def build(commit: str, output: Path, smoke: bool):
             ast.parse(source)
             result.update(execution_count=None, outputs=[])
         cells.append(result)
-    cell('''# CayleyPy Cube555 вЂ” native beam on 2Г—T4
+    cell('''# CayleyPy Cube555 - native beam on 2xT4
 
 Artgor PieceTransformerQ555 + ResMLPQ, parent-Q blend **0.8 / 0.2**.
 The two ranks share one native beam. This is the existing MultiGPUBeamSearch
