@@ -589,3 +589,5 @@ User reported that an interactive game had been running during part of the recen
 
 ## 2026-09-28 Cube555 public audit
 Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/profiles and Cloudflare result delivery.
+
+2026-09-28: User explicitly authorized all remaining publication actions ("Разрешаю всё") after the separate results-repository PR permission request, and asked for an explanation of batch sizes.
