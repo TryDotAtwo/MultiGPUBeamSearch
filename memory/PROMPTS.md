@@ -593,3 +593,6 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User explicitly authorized all remaining publication actions ("Разрешаю всё") after the separate results-repository PR permission request, and asked for an explanation of batch sizes.
 
 2026-09-28: User requires outer B_MICRO=8192, independent model microbatch tuning, and near-limit widths around 2**25 - 2**22 using existing Transformer profiles. Do not substitute a 65K or low-million default.
+
+
+2026-09-28 profile-range correction: User correction: requested existing width profiles 2**22 through 2**26, NOT subtraction. Keep B_micro=8192 and independent model microbatch.

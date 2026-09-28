@@ -1059,3 +1059,6 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Correct Cube555 batching: LibTorch now chunks an outer transaction into independent model forwards, preserving original score-ring offsets and one completion event. Reuse the original Transformer pipeline profiles and history budgeting; default requested beam29,360,128, outer8192. Separate microbenchmark added; new native GPU validation pending.
 
 2026-09-28: Kaggle capacity audit v2 COMPLETE on81a05ab. Micro512 selected atouter8192; C++ build and4-move replay passed.29.36M depth5 loop passed, sampled peak8475MiB;33.55M allocation passed;58.72M/67.11M rejected by GPU planner. History permits177 at29.36M.70 Python unit tests passed with mocked host free-disk metadata. Public large-beam notebook preparation retains no saturated depth8/full-solve claim.
+
+
+2026-09-28 profile-range correction: Cube555: expose BEAM_PROFILE p22..p26 using original Transformer registry. Default p25 (33,554,432) passed allocation; p26 selectable but currently fails native Cube555 memory preflight. Removed mistaken subtraction default; historical audit preserved.

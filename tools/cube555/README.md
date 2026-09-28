@@ -93,7 +93,7 @@ reported solution lengths are not an equal-budget comparison.
 
 The old 65K table above varied both batch levels at once and is historical only.
 It does not select an inference microbatch for an 8192-parent outer transaction.
-The default requested beam is now `2**25 - 2**22` (29,360,128). Existing
+Select `BEAM_PROFILE` from `p22` through `p26` (widths `2**22` through `2**26`). Default `p25` requests 33,554,432. Existing
 Transformer p25/p26 pipeline profiles seed shard counts, Stream4 buffers and
 final exchange; exact Cube555 native memory checks remain authoritative.
 `B_MICRO=8192` and `MODEL_MICRO` are independent, including the C++ LibTorch

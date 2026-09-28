@@ -16,7 +16,7 @@ def build(commit: str, output: Path, smoke: bool):
             ast.parse(source)
             result.update(execution_count=None, outputs=[])
         cells.append(result)
-    cell('''# CayleyPy Cube555 — native beam on 2×T4
+    cell('''# CayleyPy Cube555 вЂ” native beam on 2Г—T4
 
 Artgor PieceTransformerQ555 + ResMLPQ, parent-Q blend **0.8 / 0.2**.
 The two ranks share one native beam. This is the existing MultiGPUBeamSearch
@@ -25,8 +25,11 @@ FP16 on T4 can choose different paths from BF16 on TPU. The reported 102/100
 results have not been reproduced by this notebook.
 
 Attach `artgor/cube555-tpu-artifacts` and `cayley-py-555-cube`.
-The default beam is `2**25 - 2**22` (29,360,128), using the existing
-Transformer pipeline profiles as seeds. Cube555 capacity is checked by the native
+Choose `BEAM_PROFILE` from `p22`, `p23`, `p24`, `p25`, `p26` for widths
+`2**22` through `2**26`, using the existing Transformer registry.
+The default is `p25` (33,554,432); its allocation probe passed on Cube555.
+The `p26` seed is available, but its current Cube555 native memory preflight fails
+on 2xT4. No profile silently reduces the requested beam. Cube555 capacity is checked by the native
 150/160-byte memory planner; Cube4's measured ceiling is not a Cube555 claim.
 `B_MICRO=8192` is the outer parent transaction. `MODEL_MICRO` independently limits
 one LibTorch forward. The original Transformer registry selects shards, Stream4
@@ -46,7 +49,9 @@ The notebook-source hash is derived from actual running cells, not a placeholder
 SOLVER_COMMIT = {commit!r}
 SMOKE_TEST = {smoke!r}
 PUZZLE_IDS = [35, 1020, 1034]  # 35: short real puzzle to check end-to-end delivery
-BEAM_WIDTH = 2**25 - 2**22
+BEAM_PROFILE = "p25"  # p22, p23, p24, p25, p26
+BEAM_PROFILES = {{f"p{{power}}": 2**power for power in range(22, 27)}}
+BEAM_WIDTH = BEAM_PROFILES[BEAM_PROFILE]
 MAX_DEPTH = 200
 TOUCH_BFS_RADIUS = 2
 TRANSFORMER_WEIGHT = 0.8
@@ -55,7 +60,7 @@ MODEL_MICRO = 512  # model forwards are independently microbatched
 PUBLISH_RESULTS = True  # replay-validated real competition solutions only
 KAGGLE_OWNER = "trydotatwo"
 KAGGLE_SLUG = "cube555-native-2xt4-blend"
-KAGGLE_VERSION = 3  # update when saving a new Kaggle version
+KAGGLE_VERSION = 4  # update when saving a new Kaggle version
 
 ''')
     cell('''import json, subprocess, sys, time

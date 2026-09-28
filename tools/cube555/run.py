@@ -20,7 +20,7 @@ from tools.run_cayleypy_public import (
 from tools.cube555.export import export_blend
 
 
-DEFAULT_BEAM = 2**25 - 2**22
+DEFAULT_BEAM = 2**25
 
 
 def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
