@@ -85,7 +85,7 @@ def main():
     parser.add_argument('--model-micro', type=int, default=512)
     parser.add_argument('--reflect-mode', choices=['off', 'after_original', 'only'], default='off')
     parser.add_argument('--reflect-source-csv', type=Path)
-    parser.add_argument('--solution-mode', choices=['first', 'collect'], default='first')
+    parser.add_argument('--solution-mode', choices=['first', 'collect'], default='collect')
     parser.add_argument('--collect-until-depth', type=int)
     parser.add_argument('--max-collected-solutions', type=int, default=100_000)
     parser.add_argument('--publish', action='store_true')

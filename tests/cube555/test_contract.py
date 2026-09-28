@@ -85,6 +85,7 @@ def test_notebook_first_cell_is_simple_user_config(tmp_path):
     config = {}
     exec(''.join(first['source']), config)
     assert config['BEAM_WIDTH'] == 2**25
+    assert config['SOLUTION_MODE'] == 'collect'
     assert 'BEAM_PROFILE' not in config
     assert 'TOUCH_BFS_RADIUS' not in config
     assert config['CHECKPOINT_PATH'].parent == config['MODEL_ROOT']
