@@ -1,0 +1,37 @@
+{
+  "profiles": [
+    {
+      "profile": "p22",
+      "beam": 4194304,
+      "outer": 8192,
+      "model": 512
+    },
+    {
+      "profile": "p23",
+      "beam": 8388608,
+      "outer": 8192,
+      "model": 512
+    },
+    {
+      "profile": "p24",
+      "beam": 16777216,
+      "outer": 8192,
+      "model": 512
+    },
+    {
+      "profile": "p25",
+      "beam": 33554432,
+      "outer": 8192,
+      "model": 512
+    },
+    {
+      "profile": "p26",
+      "beam": 67108864,
+      "outer": 8192,
+      "model": 512
+    }
+  ],
+  "unit_tests": "16 passed",
+  "public_version": 4,
+  "status": "source prepared"
+}
