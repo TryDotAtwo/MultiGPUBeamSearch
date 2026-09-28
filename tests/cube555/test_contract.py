@@ -73,7 +73,7 @@ def test_custom_checkpoint_is_used_in_public_config(tmp_path):
     checkpoint = tmp_path / 'replacement.pt'
     args = SimpleNamespace(assets=tmp_path, competition=tmp_path, checkpoint=checkpoint,
                            beam=2**24, depth=100, touch_radius=2)
-    assert configuration(args, 1020, tmp_path / 'puzzle_info.json').checkpoint_path == str(checkpoint)
+    assert configuration(args, 1020, tmp_path / 'puzzle_info.json').checkpoint_path == checkpoint
 
 
 def test_notebook_first_cell_is_simple_user_config(tmp_path):
