@@ -67,9 +67,8 @@ def main():
     parser.add_argument('--depth', type=int, default=200)
     parser.add_argument('--touch-radius', type=int, default=2)
     parser.add_argument('--transformer-weight', type=float, default=0.8)
-    parser.add_argument('--profile', choices=['safe', 'balanced', 'throughput'], default='safe')
     parser.add_argument('--b-micro', type=int, default=8192)
-    parser.add_argument('--model-micro', type=int)
+    parser.add_argument('--model-micro', type=int, default=512)
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--ingest-url', default='https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results')
     parser.add_argument('--publication-json', type=Path)
@@ -102,7 +101,7 @@ def main():
         manifest = export_blend(args.assets / 'q555_f1_bell2k.pt', args.assets / 'q555_2k_BEST.pt',
             args.assets / 'piece_layout_555.json', info, export_dir, args.transformer_weight)
         model = ExportedModel('cube555-q-blend', 'fp16', manifest['script_sha256'], manifest, 'piece_transformer')
-        plan = runtime_plan(args.beam, args.profile, b_micro=args.b_micro, model_micro=args.model_micro)
+        plan = runtime_plan(args.beam, b_micro=args.b_micro, model_micro=args.model_micro)
         # Reuse the existing public profiles' RAM/disk contract and explicit
         # depth cap. Beam is never reduced to fit history.
         ram, disk = _derive_history_budgets(_available_ram_bytes(), shutil.disk_usage('/tmp').free)
@@ -138,7 +137,7 @@ def main():
                 raise
             result = _materialize_run_artifacts(artifacts, out)
             publication = _publish_best_effort(configuration(args, pid, info), contracts[pid], model,
-                {'profile_registry_schema_version': 1, 'evidence': profile_evidence + '-' + args.profile},
+                {'profile_registry_schema_version': 1, 'evidence': profile_evidence},
                 plan, summary['gpus'], artifacts, out, time.monotonic() - start)
             print('Publication:', json.dumps(publication), flush=True)
             summary['results'].append(dict(pid=pid, publication=publication, **result))

@@ -27,7 +27,7 @@ python -m tools.cube555.run \
   --assets /kaggle/input/datasets/artgor/cube555-tpu-artifacts \
   --competition /kaggle/input/competitions/cayley-py-555-cube \
   --output /kaggle/working/cube555_run \
-  --pids 1020 1034 --beam 29360128 --b-micro 8192 --model-micro 128 --depth 200 --touch-radius 2
+  --pids 1020 1034 --beam 29360128 --b-micro 8192 --model-micro 512 --depth 200 --touch-radius 2
 ```
 
 The output directory must be new. Both GPUs must be T4. A dedicated conservative
@@ -84,7 +84,7 @@ Measured on 2026-09-28, one full depth-8 comparison at beam 65536:
 | balanced | 256 | 6.604 | 659 |
 | throughput | 512 | 7.397 | 1207 |
 
-`safe` remains the default: the larger presets were slower. These are single-run
+In the historical coupled-batch run, `safe` was fastest. These are single-run
 measurements, not exhaustive optima or a guarantee at a different beam width.
 The Artgor source currently uses beam 16777216, 256 times this validation width;
 reported solution lengths are not an equal-budget comparison.
@@ -105,3 +105,9 @@ public notebooks. Requested/effective depth and unchanged beam are reported.
 then builds the native runner once and checks near-limit allocation plus an
 outer-batch depth loop. A depth2 allocation pass is not a saturated depth8
 performance/capacity validation. New measurements are pending.
+
+Kaggle audit v2 completed: selected model micro512; native legal replay smoke
+and29,360,128 depth5 loop passed, sampled device high-water8475MiB. Allocation
+probes29,360,128 and33,554,432 passed;58,720,256 and67,108,864 failed the
+GPU budget gate. History at29,360,128 admitted depth177. These are bounded
+allocation/transaction checks, not a fully saturated depth8 ceiling.

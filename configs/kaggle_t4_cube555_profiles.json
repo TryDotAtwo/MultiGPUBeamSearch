@@ -44,5 +44,176 @@
       },
       "status": "complete"
     }
-  ]
+  ],
+  "historical_coupled_batch_only": true,
+  "macro_micro_audit": {
+    "solver_commit": "81a05ab05db18971b25dac4f732a20a00a0c0613",
+    "kaggle_version": 2,
+    "outer_parent_batch": 8192,
+    "selected_model_microbatch": 512,
+    "requested_default_beam": 29360128,
+    "validation_scope": "native replay smoke, full allocation depth2, outer transaction loop depth5; not saturated depth8",
+    "rows": [
+      {
+        "name": "smoke",
+        "beam": 8192,
+        "depth": 6,
+        "status": "complete",
+        "budget_max_depth": 630555,
+        "performance": {
+          "sample_interval_seconds": 1,
+          "sampled_peak_gpu_mib": {
+            "0": 1635.0,
+            "1": 1655.0
+          },
+          "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+          "depths": [
+            {
+              "log": "logs/puzzle-3/original/1fa45e78e7924080bc0f05f728fd494d/rank-0.log",
+              "depth": 0,
+              "seconds": 0.714335
+            },
+            {
+              "log": "logs/puzzle-3/original/1fa45e78e7924080bc0f05f728fd494d/rank-0.log",
+              "depth": 1,
+              "seconds": 0.37612
+            },
+            {
+              "log": "logs/puzzle-3/original/1fa45e78e7924080bc0f05f728fd494d/rank-0.log",
+              "depth": 2,
+              "seconds": 0.11111
+            }
+          ]
+        }
+      },
+      {
+        "name": "capacity-29360128",
+        "beam": 29360128,
+        "depth": 2,
+        "status": "complete",
+        "budget_max_depth": 177,
+        "performance": {
+          "sample_interval_seconds": 1,
+          "sampled_peak_gpu_mib": {
+            "0": 7685.0,
+            "1": 7705.0
+          },
+          "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+          "depths": [
+            {
+              "log": "logs/puzzle-1020/original/8e80a6257b594e8495435acb03962e94/rank-0.log",
+              "depth": 0,
+              "seconds": 0.895387
+            },
+            {
+              "log": "logs/puzzle-1020/original/8e80a6257b594e8495435acb03962e94/rank-0.log",
+              "depth": 1,
+              "seconds": 0.528914
+            }
+          ]
+        }
+      },
+      {
+        "name": "capacity-33554432",
+        "beam": 33554432,
+        "depth": 2,
+        "status": "complete",
+        "budget_max_depth": 155,
+        "performance": {
+          "sample_interval_seconds": 1,
+          "sampled_peak_gpu_mib": {
+            "0": 8677.0,
+            "1": 8697.0
+          },
+          "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+          "depths": [
+            {
+              "log": "logs/puzzle-1020/original/9fef64bb039a4ebea24c40e26fd0c554/rank-0.log",
+              "depth": 0,
+              "seconds": 0.875363
+            },
+            {
+              "log": "logs/puzzle-1020/original/9fef64bb039a4ebea24c40e26fd0c554/rank-0.log",
+              "depth": 1,
+              "seconds": 0.586751
+            }
+          ]
+        }
+      },
+      {
+        "name": "capacity-58720256",
+        "beam": 58720256,
+        "depth": 2,
+        "status": "failed",
+        "budget_max_depth": 90,
+        "performance": {
+          "sample_interval_seconds": 1,
+          "sampled_peak_gpu_mib": {
+            "0": 259.0,
+            "1": 257.0
+          },
+          "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+          "depths": []
+        }
+      },
+      {
+        "name": "capacity-67108864",
+        "beam": 67108864,
+        "depth": 2,
+        "status": "failed",
+        "budget_max_depth": 79,
+        "performance": {
+          "sample_interval_seconds": 1,
+          "sampled_peak_gpu_mib": {
+            "0": 165.0,
+            "1": 175.0
+          },
+          "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+          "depths": []
+        }
+      },
+      {
+        "name": "requested-beam-loop",
+        "beam": 29360128,
+        "depth": 5,
+        "status": "complete",
+        "budget_max_depth": 177,
+        "performance": {
+          "sample_interval_seconds": 1,
+          "sampled_peak_gpu_mib": {
+            "0": 8455.0,
+            "1": 8475.0
+          },
+          "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+          "depths": [
+            {
+              "log": "logs/puzzle-1020/original/02251eebb08b45e9a7c3ca28bfd26173/rank-0.log",
+              "depth": 0,
+              "seconds": 0.906943
+            },
+            {
+              "log": "logs/puzzle-1020/original/02251eebb08b45e9a7c3ca28bfd26173/rank-0.log",
+              "depth": 1,
+              "seconds": 0.54739
+            },
+            {
+              "log": "logs/puzzle-1020/original/02251eebb08b45e9a7c3ca28bfd26173/rank-0.log",
+              "depth": 2,
+              "seconds": 0.331021
+            },
+            {
+              "log": "logs/puzzle-1020/original/02251eebb08b45e9a7c3ca28bfd26173/rank-0.log",
+              "depth": 3,
+              "seconds": 1.83164
+            },
+            {
+              "log": "logs/puzzle-1020/original/02251eebb08b45e9a7c3ca28bfd26173/rank-0.log",
+              "depth": 4,
+              "seconds": 41.6742
+            }
+          ]
+        }
+      }
+    ]
+  }
 }

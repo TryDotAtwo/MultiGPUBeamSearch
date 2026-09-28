@@ -43,7 +43,7 @@ def benchmark(assets, output, outer=8192, micros=(64, 128, 256, 512, 1024)):
                             y=model(x[begin:begin+micro])
                         torch.cuda.synchronize()
                         times.append(time.perf_counter()-start)
-                    actual=model(x[:max(128,micro)])[:128].float().cpu()
+                    actual=(torch.cat([model(x[i:i+micro]) for i in range(0,128,micro)]) if micro < 128 else model(x[:micro])[:128]).float().cpu()
                     if not torch.isfinite(actual).all():
                         raise ValueError('nonfinite model output')
                     error=float((actual-reference).abs().max())

@@ -1,0 +1,167 @@
+{
+  "outer_parent_batch": 8192,
+  "selected_model_micro": 512,
+  "rows": [
+    {
+      "gpu": 0,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 64,
+      "status": "complete",
+      "seconds": [
+        1.4223765360000016,
+        1.3927144109999858,
+        1.3923306539999771
+      ],
+      "median_seconds": 1.3927144109999858,
+      "peak_allocated_bytes": 172915712,
+      "peak_reserved_bytes": 266338304,
+      "max_abs_vs_micro128": 0.0,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 0,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 128,
+      "status": "complete",
+      "seconds": [
+        1.3418372190000127,
+        1.3422182250000105,
+        1.3445467970000209
+      ],
+      "median_seconds": 1.3422182250000105,
+      "peak_allocated_bytes": 172923392,
+      "peak_reserved_bytes": 245366784,
+      "max_abs_vs_micro128": 0.0,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 0,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 256,
+      "status": "complete",
+      "seconds": [
+        1.3313952929999573,
+        1.3414753850000238,
+        1.3481784630000107
+      ],
+      "median_seconds": 1.3414753850000238,
+      "peak_allocated_bytes": 258692608,
+      "peak_reserved_bytes": 356515840,
+      "max_abs_vs_micro128": 0.05625152587890625,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 0,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 512,
+      "status": "complete",
+      "seconds": [
+        1.3151932769999917,
+        1.3303083469999706,
+        1.3310921890000031
+      ],
+      "median_seconds": 1.3303083469999706,
+      "peak_allocated_bytes": 434818560,
+      "peak_reserved_bytes": 610271232,
+      "max_abs_vs_micro128": 0.0500030517578125,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 0,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 1024,
+      "status": "complete",
+      "seconds": [
+        1.3290932030000135,
+        1.3391870899999958,
+        1.3420151619999956
+      ],
+      "median_seconds": 1.3391870899999958,
+      "peak_allocated_bytes": 786415104,
+      "peak_reserved_bytes": 1270874112,
+      "max_abs_vs_micro128": 0.056247711181640625,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 1,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 64,
+      "status": "complete",
+      "seconds": [
+        1.3985951330000148,
+        1.3725796749999972,
+        1.3758837359999916
+      ],
+      "median_seconds": 1.3758837359999916,
+      "peak_allocated_bytes": 172915712,
+      "peak_reserved_bytes": 266338304,
+      "max_abs_vs_micro128": 0.0,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 1,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 128,
+      "status": "complete",
+      "seconds": [
+        1.3297736989999862,
+        1.3267896580000524,
+        1.3466704900000082
+      ],
+      "median_seconds": 1.3297736989999862,
+      "peak_allocated_bytes": 172923392,
+      "peak_reserved_bytes": 245366784,
+      "max_abs_vs_micro128": 0.0,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 1,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 256,
+      "status": "complete",
+      "seconds": [
+        1.3401343119999751,
+        1.3557860979999532,
+        1.3614629840000134
+      ],
+      "median_seconds": 1.3557860979999532,
+      "peak_allocated_bytes": 258692608,
+      "peak_reserved_bytes": 356515840,
+      "max_abs_vs_micro128": 0.05625152587890625,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 1,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 512,
+      "status": "complete",
+      "seconds": [
+        1.3078920269999799,
+        1.321699338999963,
+        1.3265188219999686
+      ],
+      "median_seconds": 1.321699338999963,
+      "peak_allocated_bytes": 434818560,
+      "peak_reserved_bytes": 610271232,
+      "max_abs_vs_micro128": 0.0500030517578125,
+      "top1_agreement_vs_micro128": 1.0
+    },
+    {
+      "gpu": 1,
+      "outer_parent_batch": 8192,
+      "model_microbatch": 1024,
+      "status": "complete",
+      "seconds": [
+        1.3167448430000377,
+        1.329557207999983,
+        1.3319323749999512
+      ],
+      "median_seconds": 1.329557207999983,
+      "peak_allocated_bytes": 786415104,
+      "peak_reserved_bytes": 1270874112,
+      "max_abs_vs_micro128": 0.056247711181640625,
+      "top1_agreement_vs_micro128": 1.0
+    }
+  ],
+  "note": "Isolated model measurement; native depth loop and total device memory must be verified separately."
+}
