@@ -622,6 +622,7 @@ def _publish_best_effort(
         statuses = []
         with _working_directory(output_dir):
             for archive_index, archive in enumerate(archives):
+                Path(f'results-{archive_index:03d}.json.gz').write_bytes(archive)
                 statuses.append(publish_result_archive(
                     config.results_ingest_url,
                     archive,
