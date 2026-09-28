@@ -68,7 +68,7 @@ def main():
     parser.add_argument('--pids', type=int, nargs='+', default=[1020, 1034])
     parser.add_argument('--beam', type=int, default=DEFAULT_BEAM)
     parser.add_argument('--depth', type=int, default=200)
-    parser.add_argument('--touch-radius', type=int, default=2)
+    parser.add_argument('--touch-radius', type=int, default=4)
     parser.add_argument('--transformer-weight', type=float, default=0.8)
     parser.add_argument('--b-micro', type=int, default=8192)
     parser.add_argument('--model-micro', type=int, default=512)

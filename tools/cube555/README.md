@@ -27,7 +27,7 @@ python -m tools.cube555.run \
   --assets /kaggle/input/datasets/artgor/cube555-tpu-artifacts \
   --competition /kaggle/input/competitions/cayley-py-555-cube \
   --output /kaggle/working/cube555_run \
-  --pids 1020 1034 --beam 29360128 --b-micro 8192 --model-micro 512 --depth 200 --touch-radius 2
+  --pids 1020 1034 --beam 29360128 --b-micro 8192 --model-micro 512 --depth 200 --touch-radius 4
 ```
 
 The output directory must be new. Both GPUs must be T4. A dedicated conservative
@@ -112,4 +112,4 @@ probes29,360,128 and33,554,432 passed;58,720,256 and67,108,864 failed the
 GPU budget gate. History at29,360,128 admitted depth177. These are bounded
 allocation/transaction checks, not a fully saturated depth8 ceiling.
 
-The first notebook cell exposes explicit MODEL_ROOT, CHECKPOINT_PATH (Transformer), RESMLP_CHECKPOINT_PATH, inclusive puzzle range, BEAM_WIDTH, MAX_DEPTH, and TRANSFORMER_WEIGHT. Compatible replacement checkpoints are forwarded to export and hashed in provenance. BFS radius2 and other runtime defaults are below the explanation.
+The first notebook cell exposes explicit MODEL_ROOT, CHECKPOINT_PATH (Transformer), RESMLP_CHECKPOINT_PATH, inclusive puzzle range, BEAM_WIDTH, MAX_DEPTH, and TRANSFORMER_WEIGHT. Compatible replacement checkpoints are forwarded to export and hashed in provenance. BFS radius4 and other runtime defaults are below the explanation.

@@ -1,0 +1,45 @@
+{
+  "method": "Exact dedup of full 150-byte states, actual 30 Cube555 generators; no hash-only equality. Partition hash only routes records before full-state unique.",
+  "rows": [
+    {
+      "radius": 1,
+      "new_states": 30,
+      "total_states": 31,
+      "cpu_seconds": 0.00040979999903356656,
+      "minimum_gpu_table_bytes": 2560
+    },
+    {
+      "radius": 2,
+      "new_states": 735,
+      "total_states": 766,
+      "cpu_seconds": 0.0009004000003187684,
+      "minimum_gpu_table_bytes": 81920
+    },
+    {
+      "radius": 3,
+      "new_states": 17760,
+      "total_states": 18526,
+      "cpu_seconds": 0.0165590999986307,
+      "minimum_gpu_table_bytes": 2621440
+    },
+    {
+      "radius": 4,
+      "new_states": 427877,
+      "total_states": 446403,
+      "cpu_seconds": 0.5925356000007014,
+      "minimum_gpu_table_bytes": 41943040
+    },
+    {
+      "radius": 5,
+      "new_states": 10292614,
+      "total_states": 10739017,
+      "cpu_seconds": 44.67955869999969,
+      "method": "exact full-state partition sort",
+      "minimum_gpu_table_bytes": 1342177280
+    }
+  ],
+  "chosen_default_radius": 4,
+  "reason": "r5 adds 1240 MiB GPU table per rank and 24x entries vs r4; preserve wide-beam memory.",
+  "timing_scope": "Local CPU NumPy enumeration, NOT native T4 setup or whole-solve speed",
+  "gpu_table_scope": "Initial power-of-two bucket allocation, can grow if insertion fails."
+}

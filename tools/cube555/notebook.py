@@ -63,13 +63,13 @@ SOLVER_COMMIT = {commit!r}
 SMOKE_TEST = {smoke!r}
 COMPETITION_ROOT = Path("/kaggle/input/competitions/cayley-py-555-cube")
 LAYOUT_PATH = MODEL_ROOT / "piece_layout_555.json"
-TOUCH_BFS_RADIUS = 2
+TOUCH_BFS_RADIUS = 4
 B_MICRO = 8192
 MODEL_MICRO = 512
 PUBLISH_RESULTS = True
 KAGGLE_OWNER = "trydotatwo"
 KAGGLE_SLUG = "cube555-native-2xt4-blend"
-KAGGLE_VERSION = 5
+KAGGLE_VERSION = 6
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:
     raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")

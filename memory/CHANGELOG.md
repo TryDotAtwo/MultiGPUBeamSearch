@@ -1068,3 +1068,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Simplified Cube555 first cell; numeric beam selects profiles automatically. Explicit Transformer/ResMLP/layout CLI paths now reach export and provenance. BFS radius2 and outer8192/model512 remain runtime defaults. Expanded capacity audit to p22-p26 allocations and p22-p25 depth9 saturation checks.
 
 2026-09-28: Public v5 Quick Save published and downloaded for verification. Simple first config cell and explicit model arguments validated; 18 tests passed. Full p22-p26 GPU audit package prepared at8aa74f92 but repeated pushes blocked by max2 batch GPU sessions. Saturated speed validation remains incomplete.
+
+2026-09-28: Exact full-state BFS counts: r4=446403, r5=10739017. Current 4-slot table lower bound:40MiB vs1280MiB per GPU. Default radius4 chosen to preserve wide-beam memory; no native timing optimum claim. Updated public notebook and audit defaults.
