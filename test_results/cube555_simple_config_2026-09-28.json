@@ -1,0 +1,8 @@
+{
+  "version": 5,
+  "solver_commit": "8aa74f92332ec97f32c3a8052763499e0207c6a6",
+  "local_tests": "18 passed",
+  "remote_source": "AST valid, first cell numeric beam and explicit model paths",
+  "gpu_audit": "not started: maximum batch GPU session count of 2 reached",
+  "saturated_profiles_verified": false
+}
