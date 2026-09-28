@@ -30,7 +30,6 @@ def make_fixture(assets: Path, output: Path):
 
 
 def validate_cuda(assets: Path, output: Path):
-    model, _, _ = load_blend(assets / 'q555_f1_bell2k.pt', assets / 'q555_2k_BEST.pt', assets / 'piece_layout_555.json')
     info = json.loads((assets / 'puzzle_info.json').read_text())
     moves = np.asarray(list(info['generators'].values()))
     rng = np.random.default_rng(555)
@@ -43,6 +42,7 @@ def validate_cuda(assets: Path, output: Path):
     report = {}
     # Each physical GPU runs its own comparison; no fake ranks or shared cuda:0.
     for index in range(2):
+        model, _, _ = load_blend(assets / 'q555_f1_bell2k.pt', assets / 'q555_2k_BEST.pt', assets / 'piece_layout_555.json')
         device = torch.device('cuda', index)
         candidate = model.to(device).eval()
         x = cpu_states.to(device)
@@ -58,8 +58,10 @@ def validate_cuda(assets: Path, output: Path):
             max_script_error = 0.0
             for count in (1, 7, 128):
                 padded = torch.nn.functional.pad(x[:count], (0, 10), value=255)
-                out = script(padded)
+                with torch.jit.optimized_execution(False):
+                    out = script(padded)
                 eager = candidate(x[:count])
+                print(f"GPU {index} batch {count} script/eager max_abs={float((out-eager).abs().max())}", flush=True)
                 torch.testing.assert_close(out, eager, atol=1e-4, rtol=1e-5)
                 max_script_error = max(max_script_error, float((out - eager).abs().max()))
             report[str(index)] = dict(gpu=torch.cuda.get_device_name(index),
