@@ -75,3 +75,16 @@ requests survive network failures in each puzzle directory. A 200/202 transport
 acknowledgment does not establish final promotion in cayleypy-beam-results.
 Synthetic smoke puzzles never enable publishing. Real puzzle 35 is a short
 end-to-end delivery check before the two original target puzzles.
+
+Measured on 2026-09-28, one full depth-8 comparison at beam 65536:
+
+| Preset | Parent/model batch | Depth 8 seconds | Max sampled MiB/GPU |
+| --- | ---: | ---: | ---: |
+| safe | 128 | 5.864 | 551 |
+| balanced | 256 | 6.604 | 659 |
+| throughput | 512 | 7.397 | 1207 |
+
+`safe` remains the default: the larger presets were slower. These are single-run
+measurements, not exhaustive optima or a guarantee at a different beam width.
+The Artgor source currently uses beam 16777216, 256 times this validation width;
+reported solution lengths are not an equal-budget comparison.

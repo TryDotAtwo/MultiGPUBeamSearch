@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "hardware": "2x Tesla T4",
+  "model_family": "cube555_q_blend",
+  "dtype": "fp16",
+  "beam": 65536,
+  "pid": 1020,
+  "solver_commit": "4e2e3138c12330e1713b6ab2cda0f1bdee60d7a7",
+  "kaggle_run": "https://www.kaggle.com/code/trydotatwo/cube555-2xt4-profile-audit",
+  "version": 1,
+  "repetitions": 1,
+  "selected": "safe",
+  "rows": [
+    {
+      "profile": "safe",
+      "outer_parent_batch": 128,
+      "model_microbatch": 128,
+      "depth8_seconds": 5.864,
+      "sampled_peak_gpu_mib": {
+        "0": 531.0,
+        "1": 551.0
+      },
+      "status": "complete"
+    },
+    {
+      "profile": "balanced",
+      "outer_parent_batch": 256,
+      "model_microbatch": 256,
+      "depth8_seconds": 6.60447,
+      "sampled_peak_gpu_mib": {
+        "0": 659.0,
+        "1": 659.0
+      },
+      "status": "complete"
+    },
+    {
+      "profile": "throughput",
+      "outer_parent_batch": 512,
+      "model_microbatch": 512,
+      "depth8_seconds": 7.39705,
+      "sampled_peak_gpu_mib": {
+        "0": 1187.0,
+        "1": 1207.0
+      },
+      "status": "complete"
+    }
+  ]
+}

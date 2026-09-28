@@ -104,9 +104,11 @@ def main():
         disk = min(16 * 1024**3, shutil.disk_usage('/tmp').free - 4 * 1024**3)
         if min(ram, disk) < 512 * 1024**2:
             raise ValueError('insufficient host RAM or scratch disk for the two-rank run')
-        preflight = dict(plan=asdict(plan), state_len=150, state_storage_len=160,
+        measured = (args.beam == 65536 and args.transformer_weight == 0.8 and manifest['checkpoint_sha256'] == ['0241457776212801bc0705b61ffd31a3f97bd8dd44eb9c12ebeee47f51005db2', '2b540c3e396f7fb5710ccc44201a698740df1761495ee4059be706374e8e5ac2'])
+        profile_evidence = 'single-run-kaggle-2xt4-depth8' if measured else 'experimental-cube555'
+        preflight = dict(profile_name=args.profile, model_microbatch=plan.parent_batch, plan=asdict(plan), state_len=150, state_storage_len=160,
             state_value_pad=256, history_ram_bytes=ram, history_disk_bytes=disk,
-            profile_status='experimental', checkpoint_sha256=manifest['checkpoint_sha256'])
+            profile_status=profile_evidence, checkpoint_sha256=manifest['checkpoint_sha256'])
         (args.output / 'preflight.json').write_text(json.dumps(preflight, indent=2), encoding='utf-8')
         print(json.dumps(preflight, indent=2), flush=True)
         summary['status'] = 'building'
@@ -126,7 +128,7 @@ def main():
                 raise
             result = _materialize_run_artifacts(artifacts, out)
             publication = _publish_best_effort(configuration(args, pid, info), contracts[pid], model,
-                {'profile_registry_schema_version': 1, 'evidence': 'experimental-cube555-' + args.profile},
+                {'profile_registry_schema_version': 1, 'evidence': profile_evidence + '-' + args.profile},
                 plan, summary['gpus'], artifacts, out, time.monotonic() - start)
             print('Publication:', json.dumps(publication), flush=True)
             summary['results'].append(dict(pid=pid, publication=publication, **result))
