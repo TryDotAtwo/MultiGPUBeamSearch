@@ -1078,3 +1078,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Public v7 Quick Save verified by remote source download: all seven requested controls are in first cell. Runtime1cf5c5a1.21 tests passed; existing v6 production run left intact.
 
 2026-09-28: Cube555 defaults: max_collected_solutions100000, MAX_DEPTH140. History cap24GB RAM with6GB MemAvailable reserve and50GiB disk gives depth148 atp25/radius4. Lower RAM still reduces effective depth. Current collect p25 fails GPU lower-bound guard:22,817,013,760 bytes snapshot+frontier; do not claim100K output limit fixes it.
+
+2026-09-28: Public v8 GPU push accepted; remote first cell verified100000/140.22 tests passed. Runtime732b000c. Full GPU run pending.

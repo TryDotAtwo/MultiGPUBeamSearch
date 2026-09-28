@@ -1,0 +1,12 @@
+{
+  "version": 8,
+  "tests": "22 passed",
+  "max_collected_solutions": 100000,
+  "max_depth": 140,
+  "history_ram_cap": 24000000000,
+  "history_available_reserve": 6000000000,
+  "history_disk": 53687091200,
+  "p25_radius4_budget_depth": 148,
+  "collect_p25_gpu_lower_bound": 22817013760,
+  "publication": "push accepted; GPU run started, not completed"
+}
