@@ -1062,3 +1062,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 
 
 2026-09-28 profile-range correction: Cube555: expose BEAM_PROFILE p22..p26 using original Transformer registry. Default p25 (33,554,432) passed allocation; p26 selectable but currently fails native Cube555 memory preflight. Removed mistaken subtraction default; historical audit preserved.
+
+2026-09-28: Public Cube555 v4 Quick Save published with p22..p26 selector, default p25, runtime c1928e98; remote source and public metadata verified. 16 tests passed and all five runtime profile mappings checked. GPU execution blocked by two unrelated active batch sessions; CayleyPy Editor retained.

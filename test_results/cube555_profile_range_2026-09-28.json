@@ -33,5 +33,8 @@
   ],
   "unit_tests": "16 passed",
   "public_version": 4,
-  "status": "source prepared"
+  "status": "public v4 Quick Save; GPU run blocked by two active batch sessions",
+  "solver_commit": "c1928e987ec6022b7739b37dd3d32389a7db8dcb",
+  "remote_source_verified": true,
+  "public": true
 }
