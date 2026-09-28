@@ -1098,3 +1098,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Launched separate T4 inference profiler using completed profile-audit exported model after Artgor dataset API returned403. Collect publication test timed out3600s after13033 solution log lines; no publication proven. InferenceMode is enabled in C++ launcher. Per-record distributed reconstruction/flush remains a separate suspected collect bottleneck.
 
 2026-09-28: Restored four model/layout/generator artifacts from local copy; all SHA256 match validated export. Notebook builder now uses trydotatwo/cube555-transformer-resmlp-artifacts; original author attribution preserved.
+
+2026-09-28: Cube555 beam cap/default4000000; tiers2**16..2**21 then4000000, depth capped140, BFS5. Full rank0 log proves100000 solutions completed116.677s while notebook timed out3600s and displayed13033 solution lines. Throttle solution console records to first3/every1000; retain all TSV records, flush every1000. End-to-end GPU verification pending.

@@ -5197,8 +5197,13 @@ int main(int argc, char** argv) {
                                         << delta << '\t'
                                         << record.owner_rank << '\t'
                                         << record.path << '\n';
-                                    solve_bucket_result.flush();
+                                    if ((solve_bucket_record_count + 1ULL) % 1000ULL == 0ULL) {
+                                        solve_bucket_result.flush();
+                                    }
                                 }
+                                // Full paths are retained in TSV; avoid flooding torchrun/Jupyter.
+                                if (solve_bucket_record_count < 3ULL ||
+                                    (solve_bucket_record_count + 1ULL) % 1000ULL == 0ULL) {
                                 std::cout << "solve_bucket_solution=1"
                                           << " puzzle_id=" << repair_task.puzzle_id
                                           << " depth_index=" << depth
@@ -5206,6 +5211,7 @@ int main(int argc, char** argv) {
                                           << " solution_length=" << record.total_depth
                                           << " owner_rank=" << record.owner_rank
                                           << " solution=" << record.path << "\n";
+                                }
                                 if (task_solution_length < 0 ||
                                     static_cast<std::int64_t>(record.total_depth) <
                                         task_solution_length) {
@@ -5646,6 +5652,7 @@ int main(int argc, char** argv) {
     std::cout << "history_flush_sec=" << history_flush_sec << "\n";
 #endif
     if (solve_bucket_mode && rank == 0U) {
+        solve_bucket_result.flush();
         std::cout << "solve_bucket_summary=1"
                   << " puzzle_id=" << repair_task.puzzle_id
                   << " records=" << solve_bucket_record_count

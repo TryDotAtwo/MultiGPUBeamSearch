@@ -25,8 +25,9 @@ FP16 on T4 can choose different paths from BF16 on TPU. The reported 102/100
 results have not been reproduced by this notebook.
 
 Attach `trydotatwo/cube555-transformer-resmlp-artifacts` and `cayley-py-555-cube`.
-Enter `BEAM_WIDTH` directly. Existing p22-p26 pipeline settings are selected
-automatically; the width is never silently reduced. Default: `2**25`.
+Enter `BEAM_WIDTH` directly. Profiles: 65536, 131072, 262144, 524288, 1048576, 2097152, 4000000.
+Requested widths up to 4000000 are accepted; batch alignment may round up
+(the maximum request becomes 4005888 internally). Larger requests are rejected.
 Only compatible Cube555 PieceTransformerQ555 / ResMLPQ weights are supported.
 Keep layout and puzzle_info.json beside the model bundle.
 Cube555 capacity is checked by the native
@@ -60,7 +61,7 @@ RESMLP_CHECKPOINT_PATH = MODEL_ROOT / "q555_2k_BEST.pt"  # ResMLP
 
 PUZZLE_ID_START = 1020  # inclusive
 PUZZLE_ID_END = 1020  # inclusive
-BEAM_WIDTH = 2**25  # any requested width; pipeline profile is selected automatically
+BEAM_WIDTH = 4_000_000  # maximum; smaller numeric widths are supported
 MAX_DEPTH = 140
 TRANSFORMER_WEIGHT = 0.8  # 0 = ResMLP, 1 = Transformer
 
@@ -78,11 +79,11 @@ SOLVER_COMMIT = {commit!r}
 SMOKE_TEST = {smoke!r}
 COMPETITION_ROOT = Path("/kaggle/input/competitions/cayley-py-555-cube")
 LAYOUT_PATH = MODEL_ROOT / "piece_layout_555.json"
-TOUCH_BFS_RADIUS = 4
+TOUCH_BFS_RADIUS = 5
 B_MICRO = 8192
 MODEL_MICRO = 512
 PUBLISH_RESULTS = True
-KAGGLE_VERSION = 10
+KAGGLE_VERSION = 11
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:
     raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")

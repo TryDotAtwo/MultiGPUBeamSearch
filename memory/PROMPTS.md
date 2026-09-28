@@ -620,3 +620,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User requires root-cause diagnosis of Cube555 slow inference/search, compared with prior puzzles; explanations from beam size alone are insufficient.
 
 2026-09-28: User says original model owner was banned and requests reuploading preserved models to Kaggle and replacing notebook data attachment.
+
+2026-09-28: User requires Cube555 beam profiles capped at4000000 with smaller tiers, maximum depth140, radius5, and collect stall investigation.

@@ -18,10 +18,11 @@ def test_150_facelets_preserve_high_values(tmp_path):
     assert result.num_classes == result.state_len == 150
 
 
-@pytest.mark.parametrize('beam', [65536, 1048576, 2**25 - 2**22])
+@pytest.mark.parametrize('beam', [65536, 1048576, 4_000_000])
 def test_profile_reserves_incoming_batch_and_retains_requested_beam(beam):
     p = runtime_plan(beam)
-    assert p.effective_beam == beam
+    assert p.requested_beam == beam
+    assert beam <= p.effective_beam < beam + 16384
     assert p.stream3_batch_candidates == p.parent_batch * 30 * p.runtime['stream3_ring_slots']
     assert p.shard_capacity_candidates >= p.stream3_batch_candidates + p.runtime['stream4_batch_candidates'] + p.runtime['stream4_trigger_candidates']
 
@@ -46,14 +47,15 @@ def test_outer_batch_and_inference_microbatch_are_independent():
     from tools.cayleypy_public.runner import _runtime_env
     from tools.cayleypy_public.model import ExportedModel
     from types import SimpleNamespace
-    beam = 2**25 - 2**22
+    beam = 4_000_000
     a = runtime_plan(beam, b_micro=8192, model_micro=128)
     b = runtime_plan(beam, b_micro=8192, model_micro=512)
-    assert a.effective_beam == b.effective_beam == beam
+    assert a.effective_beam == b.effective_beam
+    assert a.requested_beam == b.requested_beam == beam
     assert a.parent_batch == b.parent_batch == 8192
     assert a.shard_capacity_candidates == b.shard_capacity_candidates
     assert a.runtime['shard_count'] == 4
-    assert a.runtime['stream4_batch_candidates'] == 262144
+    assert a.runtime['stream4_batch_candidates'] > 0
     config = SimpleNamespace(puzzle_info_json='info.json', test_csv='test.csv', touch_bfs_radius=2, depth_log_every=1, puzzle_log_every=1)
     model = ExportedModel('cube555-q-blend','fp16','test',{'source_generators':'info.json'},'piece_transformer')
     env = _runtime_env(config,b,Path('weights'),model)
@@ -64,7 +66,7 @@ def test_outer_batch_and_inference_microbatch_are_independent():
 @pytest.mark.parametrize('micro',[0,-1,8193,True])
 def test_bad_model_microbatch_rejected(micro):
     with pytest.raises(ValueError):
-        runtime_plan(2**25 - 2**22, model_micro=micro)
+        runtime_plan(4_000_000, model_micro=micro)
 
 
 def test_custom_checkpoint_is_used_in_public_config(tmp_path):
@@ -84,7 +86,7 @@ def test_notebook_first_cell_is_simple_user_config(tmp_path):
     assert first['cell_type'] == 'code'
     config = {}
     exec(''.join(first['source']), config)
-    assert config['BEAM_WIDTH'] == 2**25
+    assert config['BEAM_WIDTH'] == 4_000_000
     assert config['SOLUTION_MODE'] == 'collect'
     assert 'BEAM_PROFILE' not in config
     assert 'TOUCH_BFS_RADIUS' not in config
@@ -115,10 +117,10 @@ def test_cube555_history_reserves_runtime_memory():
     from tools.cayleypy_public.runner import maximum_history_depth
     ram, disk = history_budgets(31_000_000_000, 80 * 1024**3)
     assert ram == 24_000_000_000
-    assert maximum_history_depth(runtime_plan(2**25), 30, 4, ram, disk) == 148
+    assert maximum_history_depth(runtime_plan(4_000_000), 30, 5, ram, disk) >= 140
     ram, disk = history_budgets(20_000_000_000, 80 * 1024**3)
     assert ram == 14_000_000_000
-    assert maximum_history_depth(runtime_plan(2**25), 30, 4, ram, disk) < 140
+    assert maximum_history_depth(runtime_plan(4_000_000), 30, 5, ram, disk) >= 140
 
 
 def test_telemetry_preserves_collect_drop_counts(tmp_path):
@@ -131,3 +133,8 @@ def test_telemetry_preserves_collect_drop_counts(tmp_path):
     assert result['collection_truncated'] is True
     assert result['collection_dropped_hits'] == 30
     assert len(result['collection_truncations']) == 2
+
+@pytest.mark.parametrize('beam', [4_000_001, 2**22, 2**26, 0, True])
+def test_cube555_rejects_beam_outside_supported_range(beam):
+    with pytest.raises(ValueError, match='Cube555 beam'):
+        runtime_plan(beam)

@@ -20,7 +20,10 @@ from tools.run_cayleypy_public import (
 from tools.cube555.export import export_blend
 
 
-DEFAULT_BEAM = 2**25
+MAX_BEAM = 4_000_000
+MAX_DEPTH = 140
+DEFAULT_BEAM = MAX_BEAM
+BEAM_PROFILES = (65_536, 131_072, 262_144, 524_288, 1_048_576, 2_097_152, MAX_BEAM)
 
 
 def history_budgets(available_ram_bytes, tmp_free_bytes):
@@ -33,6 +36,8 @@ def history_budgets(available_ram_bytes, tmp_free_bytes):
 
 def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
                  model_micro: int | None = None) -> RuntimePlan:
+    if type(beam) is not int or not 1 <= beam <= MAX_BEAM:
+        raise ValueError(f'Cube555 beam must be in [1, {MAX_BEAM}]')
     micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile] if model_micro is None else model_micro
     if type(b_micro) is not int or not 1 <= b_micro <= 65536:
         raise ValueError('outer b_micro must be in [1, 65536]')
@@ -79,7 +84,7 @@ def main():
     parser.add_argument('--pids', type=int, nargs='+', default=[1020, 1034])
     parser.add_argument('--beam', type=int, default=DEFAULT_BEAM)
     parser.add_argument('--depth', type=int, default=140)
-    parser.add_argument('--touch-radius', type=int, default=4)
+    parser.add_argument('--touch-radius', type=int, default=5)
     parser.add_argument('--transformer-weight', type=float, default=0.8)
     parser.add_argument('--b-micro', type=int, default=8192)
     parser.add_argument('--model-micro', type=int, default=512)
@@ -92,6 +97,8 @@ def main():
     parser.add_argument('--ingest-url', default='https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results')
     parser.add_argument('--publication-json', type=Path)
     args = parser.parse_args()
+    if not 1 <= args.depth <= MAX_DEPTH:
+        parser.error(f'--depth must be in [1, {MAX_DEPTH}]')
     if args.collect_until_depth is not None and not 0 <= args.collect_until_depth <= args.depth:
         parser.error('--collect-until-depth must be within --depth')
     args.publication = json.loads(args.publication_json.read_text()) if args.publication_json else {}
