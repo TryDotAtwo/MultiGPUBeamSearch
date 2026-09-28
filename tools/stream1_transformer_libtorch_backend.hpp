@@ -5,6 +5,7 @@
 #include <ATen/ops/silu.h>
 #include <torch/cuda.h>
 #include <torch/torch.h>
+#include <torch/script.h>
 
 #include <chrono>
 #include <cstdint>
@@ -157,6 +158,7 @@ struct TransformerBlock {
 };
 
 struct PieceTransformerLibTorch {
+    mutable std::optional<torch::jit::Module> cube555_script;
     fs::path weight_dir;
     torch::Device device;
     torch::ScalarType dtype = torch::kFloat16;
@@ -225,6 +227,18 @@ struct PieceTransformerLibTorch {
         activation = manifest_string(manifest, "activation");
         const std::string piece_layout = manifest_string(manifest, "piece_layout");
         const std::string piece_embed_mode = manifest_string(manifest, "piece_embed_mode");
+        if (piece_layout == "cube555") {
+            if (state_len != 150 || num_classes != 150 || output_dim != 30 ||
+                num_pieces != 98 || d_model != 384 || nhead != 6 || num_layers != 6 ||
+                ff_dim != 1536 || max_piece_size != 1 || activation != "silu" ||
+                piece_embed_mode != "orbit_head" ||
+                manifest_string(manifest, "model_family") != "cube555_q_blend") {
+                throw std::runtime_error("invalid Cube555 scripted blend contract");
+            }
+            cube555_script = torch::jit::load((weight_dir / "cube555_blend.ts").string(), device);
+            cube555_script->eval();
+            return;
+        }
         const bool p900 = piece_layout == "p900" && piece_embed_mode == "full_s120" && activation == "silu";
         const bool cube4 = piece_layout == "cube4" && piece_embed_mode == "piece_local" && activation == "relu";
         if (manifest_string(manifest, "pooling") != "cls" || (!p900 && !cube4)) {
@@ -327,6 +341,9 @@ struct PieceTransformerLibTorch {
     }
 
     torch::Tensor forward(const torch::Tensor& state_u8) const {
+        if (cube555_script.has_value()) {
+            return cube555_script->forward({state_u8}).toTensor();
+        }
         const std::int64_t batch = state_u8.size(0);
         torch::Tensor x = layer_norm(build_tokens(state_u8), input_ln_gamma, input_ln_beta);
         for (const TransformerBlock& block : blocks) {

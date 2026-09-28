@@ -344,6 +344,23 @@ inline void validate_transformer_model_config(
     }
     require_manifest_u32(model.state_len, static_cast<std::uint32_t>(STATE_LEN), "state_len", context);
     require_manifest_u32(model.output_dim, static_cast<std::uint32_t>(MOVE_COUNT), "output_dim", context);
+    if (piece_layout == "cube555") {
+        require_manifest_u32(model.state_len, 150U, "state_len", context);
+        require_manifest_u32(model.num_classes, 150U, "num_classes", context);
+        require_manifest_u32(model.output_dim, 30U, "output_dim", context);
+        require_manifest_u32(model.num_pieces, 98U, "num_pieces", context);
+        require_manifest_u32(model.seq_len, 99U, "seq_len", context);
+        require_manifest_u32(model.max_piece_size, 1U, "max_piece_size", context);
+        require_manifest_u32(model.d_model, 384U, "d_model", context);
+        require_manifest_u32(model.nhead, 6U, "nhead", context);
+        require_manifest_u32(model.head_dim, 64U, "head_dim", context);
+        require_manifest_u32(model.transformer_layers, 6U, "transformer_layers", context);
+        require_manifest_u32(model.ff_dim, 1536U, "ff_dim", context);
+        require_manifest_string(activation, "silu", "activation", context);
+        require_manifest_string(pooling, "cls", "pooling", context);
+        require_manifest_string(piece_embed_mode, "orbit_head", "piece_embed_mode", context);
+        return;
+    }
     require_manifest_u32(model.max_piece_size, 3U, "max_piece_size", context);
     require_manifest_u32(model.d_model, TRANSFORMER_D_MODEL, "d_model", context);
     require_manifest_u32(model.nhead, TRANSFORMER_NHEAD, "nhead", context);
@@ -493,6 +510,9 @@ inline HostWeightBytes load_stream1_mlp_weights(const std::filesystem::path& dir
 }
 
 inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::path& dir, const Stream1ModelConfig& model) {
+    if (model.state_len == 150U) {
+        throw std::runtime_error("Cube555 requires BEAM_STREAM1_EXECUTOR=libtorch_eager");
+    }
     HostWeightBytes weights;
     weights.model = model;
     const std::string suffix = weight_suffix(model);

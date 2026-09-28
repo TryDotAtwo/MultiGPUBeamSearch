@@ -57,9 +57,9 @@ def load_puzzle_contract(
     info = json.loads(puzzle_info_path.read_text(encoding="utf-8"))
     central_state = _strict_json_integer_state(info["central_state"], "central_state")
     state_len = len(central_state)
-    if not 1 <= state_len <= 120:
+    if not (1 <= state_len <= 120 or state_len == 150):
         raise ValueError(
-            "public runner requires 1 <= state_len <= 120 for the State128 logical payload"
+            "public runner requires 1 <= state_len <= 120 for State128, or Cube555 state_len == 150"
         )
     if any(value < 0 or value > 255 for value in central_state):
         raise ValueError("central_state values must fit the State128 uint8 payload")

@@ -20,3 +20,7 @@
 - `CandidateMeta` must remain 32 bytes and 32-byte aligned.
 - Stream 3 payload id must be original candidate id, not compact index.
 - Stream 4 must not apply shard top-k or semantic shard cap.
+
+## Cube555 shape specialization
+- The Cube555 build uses 150 logical uint8 facelets, 160 storage bytes, and a 256-entry Zobrist value alphabet. Its target index occupies bytes 150..153 only in transient FinalResponse records. Default 120/128 behavior is preserved.
+- Cube555 Transformer + ResMLPQ scoring requires the LibTorch executor; blend parent Q logits in fp32 before the shared score quantizer.

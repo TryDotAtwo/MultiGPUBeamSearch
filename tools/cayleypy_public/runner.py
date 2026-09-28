@@ -173,7 +173,7 @@ def _path_depth(path: str) -> int:
     return 0 if path == "" else len(path.split("."))
 
 
-def derive_solved_result_capacity(plan: RuntimePlan, move_count: int) -> int:
+def derive_solved_result_capacity(plan: RuntimePlan, move_count: int, state_storage_len: int = 128) -> int:
     """Bound one rank's worst-case Stream2 hits for a completed depth."""
     if isinstance(move_count, bool) or not isinstance(move_count, int) or move_count <= 0:
         raise ValueError("move_count must be a positive integer")
@@ -183,7 +183,7 @@ def derive_solved_result_capacity(plan: RuntimePlan, move_count: int) -> int:
     if capacity > _UINT32_MAX:
         raise ValueError("BEAM_SOLVED_RESULT_CAPACITY exceeds uint32")
     snapshot_bytes = capacity * _SOLVED_RECORD_BYTES
-    frontier_bytes = plan.local_beam * 128
+    frontier_bytes = plan.local_beam * state_storage_len
     required_bytes = snapshot_bytes + frontier_bytes
     available_bytes = _T4_DEVICE_BYTES - _T4_HEADROOM_BYTES
     if required_bytes > available_bytes:
@@ -477,7 +477,7 @@ def build_runner_invocation(
     })
     env["BEAM_NCCL_ID_FILE"] = str(run_root / "nccl-id.bin")
     if result_tsv is not None:
-        snapshot_capacity = derive_solved_result_capacity(plan, move_count)
+        snapshot_capacity = derive_solved_result_capacity(plan, move_count, 160 if model is not None and model.manifest.get("state_len") == 150 else 128)
         derive_gather_chunk_plan(plan.local_beam, snapshot_capacity)
         env.update({
             "BEAM_SOLVE_BUCKET_MODE": "1",

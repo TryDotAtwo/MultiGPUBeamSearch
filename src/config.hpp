@@ -9,7 +9,8 @@ namespace beam {
 inline constexpr std::size_t STATE_LEN = BEAM_STATE_LOGICAL_BYTES;
 inline constexpr std::size_t STATE_STORAGE_LEN = BEAM_STATE_PHYSICAL_BYTES;
 inline constexpr std::size_t STATE_ALIGNMENT = BEAM_STATE_ALIGNMENT;
-inline constexpr std::size_t STATE_VALUE_PAD = 128;
+inline constexpr std::size_t STATE_VALUE_PAD = STATE_LEN > 128 ? 256 : 128;
+static_assert(STATE_LEN <= 256, "state indices must fit uint8");
 inline constexpr std::size_t MOVE_COUNT = BEAM_MOVE_COUNT;
 inline constexpr std::size_t FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET = STATE_LEN;
 static_assert(STATE_LEN > 0);

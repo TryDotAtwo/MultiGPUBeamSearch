@@ -581,3 +581,7 @@ User reported that an interactive game had been running during part of the recen
 - User: Нужно это всё как для МЛП, так и для трансформера. Для всех ноутов
 
 - User required every public notebook to keep MAX_DEPTH within the history budget computed separately for its actual beam; explicitly selected MAX_DEPTH=60 for Tetraminx beam 2**26.
+
+## 2026-09-28 - Cube555 Transformer/ResMLP on two T4 GPUs
+- User explicitly requested a new MultiGPUBeamSearch Git branch, implementation of Cube555 support, and a notebook pinned to the appropriate commit. Work is isolated in codex/cube555-blend-2xt4, based on the existing public 444 notebook commit f679504baddbab3765c91af526e57ec9360cf309.
+- Preserve the native beam pipeline. Add 150/160 state specialization and a LibTorch parent-Q blend of Artgor PieceTransformerQ555 and ResMLPQ at weights 0.8/0.2. Validate CPU reference parity and real two-T4 operation; do not claim the reported TPU 102/100 scores are reproduced.
