@@ -27,7 +27,7 @@ python -m tools.cube555.run \
   --assets /kaggle/input/datasets/artgor/cube555-tpu-artifacts \
   --competition /kaggle/input/competitions/cayley-py-555-cube \
   --output /kaggle/working/cube555_run \
-  --pids 1020 1034 --beam 65536 --depth 200 --touch-radius 2
+  --pids 1020 1034 --beam 29360128 --b-micro 8192 --model-micro 128 --depth 200 --touch-radius 2
 ```
 
 The output directory must be new. Both GPUs must be T4. A dedicated conservative
@@ -88,3 +88,20 @@ Measured on 2026-09-28, one full depth-8 comparison at beam 65536:
 measurements, not exhaustive optima or a guarantee at a different beam width.
 The Artgor source currently uses beam 16777216, 256 times this validation width;
 reported solution lengths are not an equal-budget comparison.
+
+## Corrected outer/model batching (2026-09-28)
+
+The old 65K table above varied both batch levels at once and is historical only.
+It does not select an inference microbatch for an 8192-parent outer transaction.
+The default requested beam is now `2**25 - 2**22` (29,360,128). Existing
+Transformer p25/p26 pipeline profiles seed shard counts, Stream4 buffers and
+final exchange; exact Cube555 native memory checks remain authoritative.
+`B_MICRO=8192` and `MODEL_MICRO` are independent, including the C++ LibTorch
+launcher which now writes each model chunk into its original score-ring slice.
+History uses the same RAM/disk budget and explicit MAX_DEPTH cap as the existing
+public notebooks. Requested/effective depth and unchanged beam are reported.
+
+`python -m tools.cube555.capacity_audit` tunes only model microbatches first,
+then builds the native runner once and checks near-limit allocation plus an
+outer-batch depth loop. A depth2 allocation pass is not a saturated depth8
+performance/capacity validation. New measurements are pending.

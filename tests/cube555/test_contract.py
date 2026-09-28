@@ -18,7 +18,7 @@ def test_150_facelets_preserve_high_values(tmp_path):
     assert result.num_classes == result.state_len == 150
 
 
-@pytest.mark.parametrize('beam', [8, 65536, 1048576])
+@pytest.mark.parametrize('beam', [65536, 1048576, 2**25 - 2**22])
 def test_profile_reserves_incoming_batch_and_retains_requested_beam(beam):
     p = runtime_plan(beam)
     assert p.effective_beam == beam
@@ -40,3 +40,28 @@ def test_launcher_passes_complete_public_config(tmp_path):
     assert config.puzzle_ids == (1020,)
     assert config.reflect_source_csv is None
     assert not config.publish_results
+
+
+def test_outer_batch_and_inference_microbatch_are_independent():
+    from tools.cayleypy_public.runner import _runtime_env
+    from tools.cayleypy_public.model import ExportedModel
+    from types import SimpleNamespace
+    beam = 2**25 - 2**22
+    a = runtime_plan(beam, b_micro=8192, model_micro=128)
+    b = runtime_plan(beam, b_micro=8192, model_micro=512)
+    assert a.effective_beam == b.effective_beam == beam
+    assert a.parent_batch == b.parent_batch == 8192
+    assert a.shard_capacity_candidates == b.shard_capacity_candidates
+    assert a.runtime['shard_count'] == 4
+    assert a.runtime['stream4_batch_candidates'] == 262144
+    config = SimpleNamespace(puzzle_info_json='info.json', test_csv='test.csv', touch_bfs_radius=2, depth_log_every=1, puzzle_log_every=1)
+    model = ExportedModel('cube555-q-blend','fp16','test',{'source_generators':'info.json'},'piece_transformer')
+    env = _runtime_env(config,b,Path('weights'),model)
+    assert env['BEAM_B_MICRO']=='8192'
+    assert env['BEAM_STREAM1_TRANSFORMER_MICRO']=='512'
+
+
+@pytest.mark.parametrize('micro',[0,-1,8193,True])
+def test_bad_model_microbatch_rejected(micro):
+    with pytest.raises(ValueError):
+        runtime_plan(2**25 - 2**22, model_micro=micro)

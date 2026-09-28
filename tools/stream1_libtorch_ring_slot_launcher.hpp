@@ -16,6 +16,8 @@ struct RingSlotLauncherConfig {
     std::uint32_t inference_parallelism = 0;
     std::uint32_t local_rank = 0;
     std::uint32_t b_micro = 0;
+    // Zero preserves legacy callers: one forward per outer batch.
+    std::uint32_t model_micro = 0;
     std::uint32_t move_count = 0;
     const State128* current_frontier_states = nullptr;
     const std::uint64_t* parent_base = nullptr;

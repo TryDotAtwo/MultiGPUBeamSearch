@@ -4739,6 +4739,7 @@ int main(int argc, char** argv) {
         launcher_config.inference_parallelism = config.inference_parallelism;
         launcher_config.local_rank = config.local_rank;
         launcher_config.b_micro = config.b_micro;
+        launcher_config.model_micro = stream1_transformer_micro;
         launcher_config.move_count = static_cast<std::uint32_t>(MOVE_COUNT);
         launcher_config.current_frontier_states = memory.current_frontier_states;
         launcher_config.parent_base = memory.streams.parent_base;

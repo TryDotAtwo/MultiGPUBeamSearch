@@ -25,13 +25,15 @@ FP16 on T4 can choose different paths from BF16 on TPU. The reported 102/100
 results have not been reproduced by this notebook.
 
 Attach `artgor/cube555-tpu-artifacts` and `cayley-py-555-cube`.
-The initial beam is conservative; larger widths require memory and quality
-validation. All returned solutions are replayed against the original state.
-Outputs, both rank logs, checkpoint hashes and submission.csv are retained.
-
-Edit the configuration cell below. `PROFILE` changes batching, not beam width:
-safe = 128, balanced = 256, throughput = 512. Each is specific to this blend;
-larger presets are experimental until the profile audit confirms their memory.
+The default beam is `2**25 - 2**22` (29,360,128), using the existing
+Transformer pipeline profiles as seeds. Cube555 capacity is checked by the native
+150/160-byte memory planner; Cube4's measured ceiling is not a Cube555 claim.
+`B_MICRO=8192` is the outer parent transaction. `MODEL_MICRO` independently limits
+one LibTorch forward. The original Transformer registry selects shards, Stream4
+buffers and final exchange chunks from the requested width.
+History uses the existing public RAM/disk budget. Preflight explicitly reports
+requested/effective MAX_DEPTH; beam is never silently reduced to fit history.
+All returned solutions are replayed. Both rank logs and provenance are retained.
 `gpu_samples.csv` samples both GPUs every second, and `performance.json` records
 memory high-water samples and native per-depth timings. Sampling can miss brief peaks.
 Result publication is on by default and applies only to locally replayed solutions.
@@ -44,15 +46,16 @@ The notebook-source hash is derived from actual running cells, not a placeholder
 SOLVER_COMMIT = {commit!r}
 SMOKE_TEST = {smoke!r}
 PUZZLE_IDS = [35, 1020, 1034]  # 35: short real puzzle to check end-to-end delivery
-BEAM_WIDTH = 65536
+BEAM_WIDTH = 2**25 - 2**22
 MAX_DEPTH = 200
 TOUCH_BFS_RADIUS = 2
 TRANSFORMER_WEIGHT = 0.8
-PROFILE = "safe"  # safe=128, balanced=256, throughput=512 parent/model batch
+B_MICRO = 8192  # outer parents per pipeline transaction, per GPU
+MODEL_MICRO = 128  # model forwards are independently microbatched
 PUBLISH_RESULTS = True  # replay-validated real competition solutions only
 KAGGLE_OWNER = "trydotatwo"
 KAGGLE_SLUG = "cube555-native-2xt4-blend"
-KAGGLE_VERSION = 2  # update when saving a new Kaggle version
+KAGGLE_VERSION = 3  # update when saving a new Kaggle version
 
 ''')
     cell('''import json, subprocess, sys, time
@@ -98,7 +101,7 @@ command = [sys.executable, "-u", "-m", "tools.cube555.run",
     "--output", str(output / "run"), "--pids", *map(str, pids),
     "--beam", str(beam), "--depth", str(depth), "--touch-radius", str(radius),
     "--transformer-weight", str(TRANSFORMER_WEIGHT)]
-command += ["--profile", PROFILE]
+command += ["--b-micro", str(B_MICRO), "--model-micro", str(MODEL_MICRO)]
 if PUBLISH_RESULTS and not SMOKE_TEST:
     import hashlib
     notebook_path = Path("/kaggle/working/__notebook__.ipynb")

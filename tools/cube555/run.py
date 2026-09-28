@@ -1,6 +1,6 @@
 """Two-T4 Cube555 launcher using the existing native distributed beam solver."""
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 from pathlib import Path
 import shutil
@@ -9,35 +9,38 @@ import time
 from tools.cayleypy_public.config import PublicRunConfig
 from tools.cayleypy_public.data import load_puzzle_contract
 from tools.cayleypy_public.model import ExportedModel
-from tools.cayleypy_public.profile import RuntimePlan
+from tools.cayleypy_public.profile import RuntimePlan, derive_runtime
+from tools.kaggle_t4_mlp_profiles import select_profile
+from tools.cayleypy_public.runner import maximum_history_depth
 from tools.cayleypy_public.runner import PublicSearchRunError
 from tools.run_cayleypy_public import (
     validate_t4_hardware, locate_or_build_runner, _available_ram_bytes,
-    _run_with_history_budgets, _materialize_run_artifacts, _publish_best_effort,
+    _run_with_history_budgets, _materialize_run_artifacts, _publish_best_effort, _derive_history_budgets,
 )
 from tools.cube555.export import export_blend
 
 
-def runtime_plan(beam: int, profile: str = 'safe') -> RuntimePlan:
-    if type(beam) is not int or not 2 <= beam <= 2**24:
-        raise ValueError('beam must be in [2, 2**24]; memory preflight may reject it')
-    effective = ((beam + 7) // 8) * 8
-    local = effective // 2
-    micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile]
-    slots, batch = 4, 16384
-    capacity = max((local * 105 + 399) // 400, micro * 30 * slots + 2 * batch)
-    capacity = ((capacity + 1023) // 1024) * 1024
-    return RuntimePlan(
-        requested_beam=beam, effective_beam=effective, alignment_delta=effective - beam,
-        profile_power=beam.bit_length() - 1, model_class='output_move_count',
-        local_beam=local, parent_batch=micro, stream3_batch_candidates=micro * 30 * slots,
-        shard_capacity_candidates=capacity,
-        runtime=dict(b_micro=micro, stream1_concurrency=1, stream3_ring_slots=slots,
-                     shard_count=4, shard_capacity_scale_ppm=1050000,
-                     stream4_batch_candidates=batch, stream4_trigger_candidates=batch,
-                     stream4_active_sort_slots=1, final_materialize_chunk_candidates=16384),
-        cross_puzzle_profile_note='Cube555 experimental profile; no Cube4 capacity claim',
-    )
+DEFAULT_BEAM = 2**25 - 2**22
+
+
+def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
+                 model_micro: int | None = None) -> RuntimePlan:
+    micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile] if model_micro is None else model_micro
+    if type(b_micro) is not int or not 1 <= b_micro <= 65536:
+        raise ValueError('outer b_micro must be in [1, 65536]')
+    if type(micro) is not int or not 1 <= micro <= b_micro:
+        raise ValueError('model_micro must be in [1, outer b_micro]')
+    registry = json.loads((Path(__file__).resolve().parents[2] / 'configs/kaggle_t4_transformer_profiles.json').read_text())
+    seed = select_profile(registry, beam, 30, 30)
+    old_batch = seed['runtime']['b_micro']
+    seed['runtime']['b_micro'] = b_micro
+    # Large Cube4 profiles encode many tiny outer slots. Preserve the candidate
+    # transaction budget while changing its unit from 384 to 8192 parents.
+    old_slots = seed['runtime']['stream3_ring_slots']
+    seed['runtime']['stream3_ring_slots'] = max(2, (old_batch * old_slots + b_micro - 1) // b_micro)
+    plan = derive_runtime(seed, beam, 30, 30, 2)
+    return replace(plan, runtime={**plan.runtime, 'model_micro': micro},
+        cross_puzzle_profile_note='Cube4 Transformer pipeline seed; Cube555 capacity requires native preflight and measurement')
 
 
 def configuration(args, pid, puzzle_info):
@@ -60,11 +63,13 @@ def main():
     parser.add_argument('--competition', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--pids', type=int, nargs='+', default=[1020, 1034])
-    parser.add_argument('--beam', type=int, default=65536)
+    parser.add_argument('--beam', type=int, default=DEFAULT_BEAM)
     parser.add_argument('--depth', type=int, default=200)
     parser.add_argument('--touch-radius', type=int, default=2)
     parser.add_argument('--transformer-weight', type=float, default=0.8)
     parser.add_argument('--profile', choices=['safe', 'balanced', 'throughput'], default='safe')
+    parser.add_argument('--b-micro', type=int, default=8192)
+    parser.add_argument('--model-micro', type=int)
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--ingest-url', default='https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results')
     parser.add_argument('--publication-json', type=Path)
@@ -97,18 +102,23 @@ def main():
         manifest = export_blend(args.assets / 'q555_f1_bell2k.pt', args.assets / 'q555_2k_BEST.pt',
             args.assets / 'piece_layout_555.json', info, export_dir, args.transformer_weight)
         model = ExportedModel('cube555-q-blend', 'fp16', manifest['script_sha256'], manifest, 'piece_transformer')
-        plan = runtime_plan(args.beam, args.profile)
-        # Bounded total host budgets (both ranks); exact history check stays in runner.
-        available = _available_ram_bytes()
-        ram = min(8 * 1024**3, available - 4 * 1024**3)
-        disk = min(16 * 1024**3, shutil.disk_usage('/tmp').free - 4 * 1024**3)
-        if min(ram, disk) < 512 * 1024**2:
-            raise ValueError('insufficient host RAM or scratch disk for the two-rank run')
-        measured = (args.beam == 65536 and args.transformer_weight == 0.8 and manifest['checkpoint_sha256'] == ['0241457776212801bc0705b61ffd31a3f97bd8dd44eb9c12ebeee47f51005db2', '2b540c3e396f7fb5710ccc44201a698740df1761495ee4059be706374e8e5ac2'])
-        profile_evidence = 'single-run-kaggle-2xt4-depth8' if measured else 'experimental-cube555'
-        preflight = dict(profile_name=args.profile, model_microbatch=plan.parent_batch, plan=asdict(plan), state_len=150, state_storage_len=160,
-            state_value_pad=256, history_ram_bytes=ram, history_disk_bytes=disk,
+        plan = runtime_plan(args.beam, args.profile, b_micro=args.b_micro, model_micro=args.model_micro)
+        # Reuse the existing public profiles' RAM/disk contract and explicit
+        # depth cap. Beam is never reduced to fit history.
+        ram, disk = _derive_history_budgets(_available_ram_bytes(), shutil.disk_usage('/tmp').free)
+        requested_depth = args.depth
+        budget_depth = maximum_history_depth(plan, 30, args.touch_radius, ram, disk)
+        args.depth = min(requested_depth, budget_depth)
+        config = configuration(args, args.pids[0], info)
+        profile_evidence = f'cube4-seed-p{plan.profile_power}-outer{args.b_micro}-model{plan.runtime["model_micro"]}-cube555-unmeasured'
+        preflight = dict(profile_name=f'p{plan.profile_power}', outer_parent_batch=plan.parent_batch,
+            model_microbatch=plan.runtime['model_micro'], plan=asdict(plan), state_len=150,
+            state_storage_len=160, state_value_pad=256, history_ram_bytes=ram, history_disk_bytes=disk,
+            requested_max_depth=requested_depth, budget_max_depth=budget_depth, effective_max_depth=args.depth,
             profile_status=profile_evidence, checkpoint_sha256=manifest['checkpoint_sha256'])
+        summary.update(requested_max_depth=requested_depth, effective_max_depth=args.depth)
+        if args.depth < requested_depth:
+            print(f'History budget: MAX_DEPTH {requested_depth} -> {args.depth}; BEAM_WIDTH stays {args.beam}', flush=True)
         (args.output / 'preflight.json').write_text(json.dumps(preflight, indent=2), encoding='utf-8')
         print(json.dumps(preflight, indent=2), flush=True)
         summary['status'] = 'building'

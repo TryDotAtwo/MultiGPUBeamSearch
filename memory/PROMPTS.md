@@ -591,3 +591,5 @@ User reported that an interactive game had been running during part of the recen
 Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/profiles and Cloudflare result delivery.
 
 2026-09-28: User explicitly authorized all remaining publication actions ("Разрешаю всё") after the separate results-repository PR permission request, and asked for an explanation of batch sizes.
+
+2026-09-28: User requires outer B_MICRO=8192, independent model microbatch tuning, and near-limit widths around 2**25 - 2**22 using existing Transformer profiles. Do not substitute a 65K or low-million default.

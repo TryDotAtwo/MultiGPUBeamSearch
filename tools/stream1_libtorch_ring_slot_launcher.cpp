@@ -128,17 +128,23 @@ struct RingSlotLauncher::Impl {
             const_cast<State128*>(config.current_frontier_states) + context.parent_base,
             {static_cast<std::int64_t>(context.count), static_cast<std::int64_t>(STATE_STORAGE_LEN)},
             state_options);
-        torch::Tensor logits = model.forward(states);
-        if (logits.dim() != 2 || logits.size(0) != static_cast<std::int64_t>(context.count) ||
-            logits.size(1) != static_cast<std::int64_t>(MOVE_COUNT)) {
-            throw std::runtime_error("LibTorch Stream1 logits shape does not match [count, MOVE_COUNT]");
+        const std::uint32_t micro = config.model_micro == 0U ? config.b_micro : config.model_micro;
+        // Keep score-ring offsets in original parent order; only model workspace
+        // is microbatched. Stream2 sees the full outer transaction after all copies.
+        for (std::uint32_t begin = 0; begin < context.count; begin += micro) {
+            const std::uint32_t count = std::min(micro, context.count - begin);
+            torch::Tensor logits = model.forward(states.narrow(0, begin, count));
+            if (logits.dim() != 2 || logits.size(0) != static_cast<std::int64_t>(count) ||
+                logits.size(1) != static_cast<std::int64_t>(MOVE_COUNT)) {
+                throw std::runtime_error("LibTorch Stream1 logits shape does not match [micro, MOVE_COUNT]");
+            }
+            torch::Tensor keys = score_keys_i32(logits);
+            torch::Tensor score_out = torch::from_blob(
+                config.score_ring + context.candidate_offset + static_cast<std::uint64_t>(begin) * MOVE_COUNT,
+                {static_cast<std::int64_t>(count), static_cast<std::int64_t>(MOVE_COUNT)},
+                score_options);
+            score_out.copy_(keys, true);
         }
-        torch::Tensor keys = score_keys_i32(logits);
-        torch::Tensor score_out = torch::from_blob(
-            config.score_ring + context.candidate_offset,
-            {static_cast<std::int64_t>(context.count), static_cast<std::int64_t>(MOVE_COUNT)},
-            score_options);
-        score_out.copy_(keys, true);
 
         BEAM_CUDA_CHECK(cudaEventRecord(score_ready[context.lane], context.stream1_lane));
         BEAM_CUDA_CHECK(cudaStreamWaitEvent(context.stream2_lane, score_ready[context.lane], 0));

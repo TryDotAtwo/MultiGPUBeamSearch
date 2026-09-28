@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import shutil
 import time
 
-from tools.cube555.run import configuration, runtime_plan
+from tools.cube555.run import configuration, runtime_plan, DEFAULT_BEAM
 from tools.cube555.export import export_blend
 from tools.cube555.telemetry import Telemetry
 from tools.cayleypy_public.data import load_puzzle_contract
@@ -19,7 +19,7 @@ def main():
     p.add_argument('--assets',type=Path,required=True)
     p.add_argument('--competition',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
-    p.add_argument('--beam',type=int,default=65536)
+    p.add_argument('--beam',type=int,default=DEFAULT_BEAM)
     p.add_argument('--pid',type=int,default=1020)
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=False)
     names=validate_t4_hardware()
