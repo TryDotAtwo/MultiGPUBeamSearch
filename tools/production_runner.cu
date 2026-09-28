@@ -5054,8 +5054,21 @@ int main(int argc, char** argv) {
                 nccl_runtime.comm,
                 world_size);
             if (global_solved_overflow != 0U) {
-                throw std::runtime_error(
-                    "solve bucket overflow: increase BEAM_SOLVED_RESULT_CAPACITY for this run");
+                // Collection is deliberately bounded. Gather only stored records;
+                // overflow never sets a search stop condition in bucket mode.
+                if (rank == 0U) {
+                    std::cout << "WARNING: collect buffer overflow; keeping stored hits, "
+                                 "dropping excess hits, continuing search\n";
+                }
+                if (solved_header.overflow != 0U) {
+                    const std::uint32_t stored =
+                        std::min(solved_header.count, config.solved_result_capacity);
+                    std::cout << "collection_truncated=1 depth=" << depth
+                              << " rank=" << rank
+                              << " hits=" << solved_header.count
+                              << " stored=" << stored
+                              << " dropped=" << (solved_header.count - stored) << "\n";
+                }
             }
 
             if (global_solved_value != 0U) {

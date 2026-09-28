@@ -13,7 +13,7 @@
       "depth_bound": 140
     }
   ],
-  "tests": "81 passed; host free-disk metadata mocked for existing history tests",
-  "gpu_validation": "not yet run",
-  "overflow": "existing synchronized fatal guard preserved"
+  "tests": "82 Python tests passed; mocked host disk metadata",
+  "gpu_validation": "C++ warning branch not yet run on GPU",
+  "overflow": "warning, stored-hit gather continues; excess hits dropped"
 }

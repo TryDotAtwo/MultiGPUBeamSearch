@@ -38,7 +38,8 @@ History uses at most 24 GB RAM, preserves at least 6 GB of available RAM
 for runtime overhead, and uses 50 GiB scratch disk. Default depth is 140.
 Collect staging is bounded by MAX_COLLECTED_SOLUTIONS * effective MAX_DEPTH
 records (40 bytes each per GPU), capped by the layer candidate count.
-A layer exceeding this budget fails explicitly; it never silently drops hits.
+A layer exceeding this budget logs a warning and dropped-hit counts, saves
+the stored hits, and continues search. performance.json records truncation.
 The native total-memory preflight still applies to the beam and all other buffers. Preflight explicitly reports
 requested/effective MAX_DEPTH; beam is never silently reduced to fit history.
 All returned solutions are replayed. Both rank logs and provenance are retained.

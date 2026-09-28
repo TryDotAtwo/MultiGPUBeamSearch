@@ -179,8 +179,8 @@ def derive_solved_result_capacity(plan: RuntimePlan, move_count: int, state_stor
     """Budget per-rank hit records by requested collection count and path bound.
 
     This is a bounded staging budget, not a worst-case guarantee for all hits
-    in a layer. Native overflow is fatal and synchronized across ranks; hits
-    are never silently truncated into a successful collection result.
+    in a layer. Native overflow is reported across ranks; stored hits are collected and
+    excess hits are dropped without terminating search.
     """
     if isinstance(move_count, bool) or not isinstance(move_count, int) or move_count <= 0:
         raise ValueError("move_count must be a positive integer")

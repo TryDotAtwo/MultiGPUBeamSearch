@@ -118,3 +118,15 @@ def test_cube555_history_reserves_runtime_memory():
     ram, disk = history_budgets(20_000_000_000, 80 * 1024**3)
     assert ram == 14_000_000_000
     assert maximum_history_depth(runtime_plan(2**25), 30, 4, ram, disk) < 140
+
+
+def test_telemetry_preserves_collect_drop_counts(tmp_path):
+    from tools.cube555.telemetry import Telemetry
+    (tmp_path / 'rank-0.log').write_text('collection_truncated=1 depth=8 rank=0 hits=120 stored=100 dropped=20\n')
+    (tmp_path / 'rank-1.log').write_text('collection_truncated=1 depth=8 rank=1 hits=110 stored=100 dropped=10\n')
+    monitor = Telemetry(tmp_path)
+    monitor.thread = type('Stopped', (), {'join': lambda self, timeout: None})()
+    result = monitor.finish()
+    assert result['collection_truncated'] is True
+    assert result['collection_dropped_hits'] == 30
+    assert len(result['collection_truncations']) == 2

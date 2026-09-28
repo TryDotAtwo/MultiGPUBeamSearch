@@ -45,7 +45,16 @@ class Telemetry:
         for p in self.output.rglob('rank-0.log'):
             for d, sec in re.findall(r'depth_done=(\d+) depth_sec=([\d.e+-]+)', p.read_text(errors='replace')):
                 depths.append(dict(log=str(p.relative_to(self.output)), depth=int(d), seconds=float(sec)))
-        report = dict(sample_interval_seconds=1, sampled_peak_gpu_mib=peaks,
+        truncations = []
+        for p in self.output.rglob('rank-*.log'):
+            for depth, rank, hits, stored, dropped in re.findall(
+                    r'collection_truncated=1 depth=(\d+) rank=(\d+) hits=(\d+) stored=(\d+) dropped=(\d+)',
+                    p.read_text(errors='replace')):
+                truncations.append(dict(log=str(p.relative_to(self.output)), depth=int(depth),
+                    rank=int(rank), hits=int(hits), stored=int(stored), dropped=int(dropped)))
+        report = dict(collection_truncated=bool(truncations), collection_truncations=truncations,
+                      collection_dropped_hits=sum(row['dropped'] for row in truncations),
+                      sample_interval_seconds=1, sampled_peak_gpu_mib=peaks,
                       note='Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.', depths=depths)
         (self.output / 'performance.json').write_text(json.dumps(report, indent=2))
         return report
