@@ -1074,3 +1074,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Public v6 GPU push accepted, scriptVersionId353576422 RUNNING on 2xT4, runtime8f205871. Remote source verified radius4. Separate full-profile audit still blocked by batch-session quota.18 Cube555 tests passed.
 
 2026-09-28: Moved owner/slug and exposed reflection/collection controls in first Cube555 cell. Added CLI forwarding to existing shared reflection/collection runner. Collection depth follows explicit history depth cap; invalid requested bounds rejected.
+
+2026-09-28: Public v7 Quick Save verified by remote source download: all seven requested controls are in first cell. Runtime1cf5c5a1.21 tests passed; existing v6 production run left intact.

@@ -1,0 +1,13 @@
+{
+  "remote_first_cell": {
+    "KAGGLE_OWNER": "trydotatwo",
+    "KAGGLE_SLUG": "cube555-native-2xt4-blend",
+    "REFLECT_MODE": "off",
+    "REFLECT_SOURCE_CSV": null,
+    "SOLUTION_MODE": "first",
+    "COLLECT_UNTIL_DEPTH": 200,
+    "MAX_COLLECTED_SOLUTIONS": 100
+  },
+  "tests": "21 passed",
+  "publication": "public v7 Quick Save"
+}
