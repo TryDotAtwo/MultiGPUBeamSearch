@@ -1236,7 +1236,9 @@ def test_collection_stop_contract_syncs_host_reason_and_explicit_depth_beats_leg
     assert "solve_bucket_gather_records_per_chunk" in source
     assert "local_selected_records" in source
     assert "collection_status=depth_reached" in source
-    assert "solve bucket overflow: increase BEAM_SOLVED_RESULT_CAPACITY" in source
+    assert "WARNING: collect buffer overflow" in source
+    assert "collection_truncated=1 depth=" in source
+    assert "solve bucket overflow: increase BEAM_SOLVED_RESULT_CAPACITY" not in source
 
 
 def test_runtime_log_sanitizer_covers_live_combined_rank_and_redirect_logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
