@@ -1,0 +1,7 @@
+{
+  "version": 9,
+  "mode": "collect",
+  "tests": "23 Cube555 tests passed; prior shared suite82 passed",
+  "gpu_validation": "pending; v8 predates changes",
+  "publication": "SDK QUICK_SAVE, no additional GPU session"
+}
