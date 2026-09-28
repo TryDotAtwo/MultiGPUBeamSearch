@@ -1045,3 +1045,7 @@
 - Kaggle smoke v3 COMPLETE on actual 2xT4 at c2c04abac3fab189831f456d2f18b0fbacdfad9a: four legal Cube555 scrambles solved in 1/2/3/4 moves with exact replay and nonempty logs from both ranks. PyTorch 2.10.0+cu128. Saved final real-competition notebook under kaggle/cube555_2xt4_blend, pinned to that verified runtime SHA. Evidence: test_results/cube555_2xt4_verification_2026-09-28.md. Full competition scores and larger beam capacity remain unverified.
 - Created private Kaggle notebook trydotatwo/cube555-native-2xt4-blend v1 with real Cube555 competition inputs; initial status RUNNING. Pulled it back and verified code-cell-source equality, exact runtime pin, private visibility, NvidiaTeslaT4 machine shape and input attachments. Synced metadata to Kaggle's title-derived canonical slug. This launch is not a full-puzzle result.
 - Windows Kaggle CLI recoded the Unicode Markdown heading in the running v1; executable cells match exactly. Saved notebook JSON now escapes Unicode to avoid that display-only issue on future pushes. The current full run was not duplicated for a heading correction.
+
+
+## 2026-09-28 Cube555 public audit
+Cube555 publication and profiling audit: explicit runtime presets, canonical blend provenance, 150-facelet proof replay support, and per-puzzle persisted publication status. Worker source imported from 638fcc90 for isolated compatibility update.

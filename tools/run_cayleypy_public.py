@@ -427,7 +427,7 @@ def _publication_context(
         "effective_beam": plan.effective_beam,
         "alignment_delta": plan.alignment_delta,
         "selected_profile": f"p{plan.profile_power}-{plan.model_class}",
-        "evidence": "measured-kaggle-2xt4",
+        "evidence": profile.get("evidence", "measured-kaggle-2xt4"),
         "profile_evidence_version": profile.get("profile_registry_schema_version"),
         "profile_power": plan.profile_power,
         "model_class": plan.model_class,

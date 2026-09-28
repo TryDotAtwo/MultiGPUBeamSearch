@@ -11,7 +11,7 @@ def build(commit: str, output: Path, smoke: bool):
         raise ValueError('solver commit must be a full Git SHA')
     cells = []
     def cell(source, kind='code'):
-        result = dict(cell_type=kind, metadata={}, source=source.splitlines(keepends=True))
+        result = dict(id=f'cube555-{len(cells)}', cell_type=kind, metadata={}, source=source.splitlines(keepends=True))
         if kind == 'code':
             ast.parse(source)
             result.update(execution_count=None, outputs=[])
@@ -37,6 +37,12 @@ BEAM_WIDTH = 65536
 MAX_DEPTH = 200
 TOUCH_BFS_RADIUS = 2
 TRANSFORMER_WEIGHT = 0.8
+PROFILE = "safe"  # safe=128, balanced=256, throughput=512 parent/model batch
+PUBLISH_RESULTS = True  # replay-validated real competition solutions only
+KAGGLE_OWNER = "trydotatwo"
+KAGGLE_SLUG = "cube555-native-2xt4-blend"
+KAGGLE_VERSION = 2  # update when saving a new Kaggle version
+
 ''')
     cell('''import json, subprocess, sys, time
 import torch
@@ -81,6 +87,24 @@ command = [sys.executable, "-u", "-m", "tools.cube555.run",
     "--output", str(output / "run"), "--pids", *map(str, pids),
     "--beam", str(beam), "--depth", str(depth), "--touch-radius", str(radius),
     "--transformer-weight", str(TRANSFORMER_WEIGHT)]
+command += ["--profile", PROFILE]
+if PUBLISH_RESULTS and not SMOKE_TEST:
+    import hashlib
+    notebook_path = Path("/kaggle/working/__notebook__.ipynb")
+    if not notebook_path.exists():
+        notebook_path = Path("__notebook__.ipynb")
+    if not notebook_path.exists():
+        raise FileNotFoundError("Cannot publish without the running notebook source")
+    source = json.loads(notebook_path.read_text())
+    source_cells = [{"cell_type": c["cell_type"], "source": c["source"]} for c in source["cells"]]
+    source_hash = hashlib.sha256(json.dumps(source_cells, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    publication = dict(competition="cayley-py-555-cube", kaggle_owner=KAGGLE_OWNER,
+        kaggle_slug=KAGGLE_SLUG, kaggle_version=KAGGLE_VERSION,
+        kaggle_username=KAGGLE_OWNER, solver_commit=SOLVER_COMMIT,
+        kaggle_notebook_sha256=source_hash)
+    # Hash identifies actual running cell sources, including the edited configuration.
+    (output / "publication.json").write_text(json.dumps(publication, indent=2))
+    command += ["--publish", "--publication-json", str(output / "publication.json")]
 print("Run:", command, flush=True)
 with (output / "launcher.log").open("w") as log:
     process = subprocess.Popen(command, cwd=repo, stdout=subprocess.PIPE,
@@ -110,7 +134,7 @@ if SMOKE_TEST:
     (output / name).write_text(json.dumps(notebook, indent=1, ensure_ascii=True) + '\n', encoding='utf-8')
     slug = 'cube555-native-2xt4-blend-smoke' if smoke else 'cube555-native-2xt4-blend'
     metadata = dict(id='trydotatwo/' + slug, title='Cube555 native 2xT4 blend' + (' smoke' if smoke else ''),
-        code_file=name, language='python', kernel_type='notebook', is_private=True,
+        code_file=name, language='python', kernel_type='notebook', is_private=smoke,
         enable_gpu=True, enable_internet=True, dataset_sources=['artgor/cube555-tpu-artifacts'],
         competition_sources=[] if smoke else ['cayley-py-555-cube'], kernel_sources=[], model_sources=[])
     (output / 'kernel-metadata.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')

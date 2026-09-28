@@ -430,7 +430,7 @@ def _runtime_env(
     if model is not None and model.backend == "piece_transformer":
         env.update({
             "BEAM_STREAM1_EXECUTOR": "libtorch_eager",
-            "BEAM_STREAM1_TRANSFORMER_MICRO": str(plan.runtime["b_micro"]),
+            "BEAM_STREAM1_TRANSFORMER_MICRO": str(plan.runtime.get("model_micro", plan.runtime["b_micro"])),
         })
     return env
 

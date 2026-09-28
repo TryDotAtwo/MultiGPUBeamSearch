@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://trydotatwo.github.io/cayleypy-results/result-batch-v1.schema.json",
-  "title": "Canonical CayleyPy Result Batch v1",
+  "$id": "https://trydotatwo.github.io/cayleypy-results/result-batch-v2.schema.json",
+  "title": "Canonical CayleyPy SLURM Result Batch v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,7 +11,7 @@
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 1
+      "const": 2
     },
     "results": {
       "type": "array",
@@ -50,7 +50,7 @@
     "state": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 150,
+      "maxItems": 120,
       "items": {
         "type": "integer",
         "minimum": 0,
@@ -82,7 +82,7 @@
       "properties": {
         "state_len": {
           "$ref": "#/$defs/positive_integer",
-          "maximum": 150
+          "maximum": 120
         },
         "num_classes": {
           "$ref": "#/$defs/positive_integer"
@@ -193,33 +193,6 @@
           "items": {
             "$ref": "#/$defs/move_token"
           }
-        },
-        "model_family": {
-          "const": "cube555_q_blend"
-        },
-        "blend_weights": {
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
-          "items": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          }
-        },
-        "checkpoint_sha256": {
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
-          "items": {
-            "$ref": "#/$defs/sha256"
-          }
-        },
-        "script_sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "score_contract": {
-          "const": "parent_q_fp32_blend_then_clamp_round"
         }
       }
     },
@@ -233,7 +206,6 @@
         "idempotency_key",
         "submitted_at",
         "author",
-        "kaggle",
         "competition",
         "puzzle_type",
         "puzzle_id",
@@ -245,12 +217,12 @@
         "model",
         "hardware",
         "timings",
-        "solver_commit"
+        "provenance"
       ],
       "properties": {
         "schema_version": {
           "type": "integer",
-          "const": 1
+          "const": 2
         },
         "client_submission_id": {
           "type": "string",
@@ -280,49 +252,8 @@
               "minLength": 1,
               "maxLength": 128
             },
-            "kaggle_username": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128,
-              "pattern": "^[A-Za-z0-9._-]+$"
-            },
             "verification": {
               "const": "claimed"
-            }
-          }
-        },
-        "kaggle": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "owner",
-            "slug",
-            "version",
-            "notebook_sha256"
-          ],
-          "properties": {
-            "owner": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128,
-              "pattern": "^[A-Za-z0-9._-]+$"
-            },
-            "slug": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128,
-              "pattern": "^[A-Za-z0-9._-]+$"
-            },
-            "version": {
-              "$ref": "#/$defs/positive_integer"
-            },
-            "run_url": {
-              "type": "string",
-              "maxLength": 2048,
-              "format": "uri"
-            },
-            "notebook_sha256": {
-              "$ref": "#/$defs/sha256"
             }
           }
         },
@@ -390,7 +321,7 @@
             "search_mode": {
               "enum": [
                 "off",
-                "after_original",
+                "after",
                 "only"
               ]
             },
@@ -507,48 +438,88 @@
             "requested_beam",
             "effective_beam",
             "alignment_delta",
-            "selected_profile",
-            "evidence",
-            "profile_evidence_version",
             "profile_power",
-            "model_class",
-            "world_size"
+            "profile_anchor_beam",
+            "profile_status",
+            "profile_evidence_id",
+            "gpu_family",
+            "vram_mib",
+            "native_sm",
+            "world_size",
+            "backend",
+            "model_class"
           ],
           "properties": {
             "requested_beam": {
-              "$ref": "#/$defs/positive_integer"
+              "type": "integer",
+              "minimum": 1
             },
             "effective_beam": {
-              "$ref": "#/$defs/positive_integer"
+              "type": "integer",
+              "minimum": 1
             },
             "alignment_delta": {
-              "$ref": "#/$defs/nonnegative_integer"
-            },
-            "selected_profile": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "evidence": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "profile_evidence_version": {
-              "$ref": "#/$defs/positive_integer"
+              "type": "integer",
+              "minimum": 0
             },
             "profile_power": {
-              "$ref": "#/$defs/positive_integer"
+              "maximum": 52,
+              "type": "integer",
+              "minimum": 0
+            },
+            "profile_anchor_beam": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "profile_status": {
+              "enum": [
+                "measured",
+                "bounded_from_measured"
+              ]
+            },
+            "profile_evidence_id": {
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:+-]+$",
+              "minLength": 1,
+              "type": "string"
+            },
+            "gpu_family": {
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._+-]+$",
+              "minLength": 1,
+              "type": "string"
+            },
+            "vram_mib": {
+              "maximum": 1048576,
+              "type": "integer",
+              "minimum": 1
+            },
+            "native_sm": {
+              "enum": [
+                75,
+                80,
+                86,
+                89,
+                90,
+                120
+              ]
+            },
+            "world_size": {
+              "maximum": 16,
+              "type": "integer",
+              "minimum": 1
+            },
+            "backend": {
+              "enum": [
+                "mlp",
+                "piece_transformer"
+              ]
             },
             "model_class": {
               "enum": [
                 "output1",
                 "output_move_count"
               ]
-            },
-            "world_size": {
-              "type": "integer",
-              "const": 2
             }
           }
         },
@@ -640,8 +611,7 @@
               "enum": [
                 "batchnorm-folded",
                 "resmlp-layernorm",
-                "piece-transformer",
-                "cube555-q-blend"
+                "piece-transformer"
               ]
             },
             "manifest": {
@@ -656,30 +626,55 @@
             "platform",
             "gpu_names",
             "accelerator_count",
-            "world_size"
+            "world_size",
+            "native_sm",
+            "vram_mib_per_gpu",
+            "driver_version"
           ],
           "properties": {
             "platform": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
+              "const": "slurm"
             },
             "gpu_names": {
-              "type": "array",
               "minItems": 1,
-              "maxItems": 16,
               "items": {
-                "type": "string",
+                "maxLength": 128,
                 "minLength": 1,
-                "maxLength": 128
-              }
+                "type": "string"
+              },
+              "type": "array",
+              "maxItems": 16
             },
             "accelerator_count": {
-              "$ref": "#/$defs/positive_integer"
+              "maximum": 16,
+              "type": "integer",
+              "minimum": 1
             },
             "world_size": {
+              "maximum": 16,
               "type": "integer",
-              "const": 2
+              "minimum": 1
+            },
+            "native_sm": {
+              "enum": [
+                75,
+                80,
+                86,
+                89,
+                90,
+                120
+              ]
+            },
+            "vram_mib_per_gpu": {
+              "maximum": 1048576,
+              "type": "integer",
+              "minimum": 1
+            },
+            "driver_version": {
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._+-]+$",
+              "minLength": 1,
+              "type": "string"
             }
           }
         },
@@ -699,9 +694,67 @@
             }
           }
         },
-        "solver_commit": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{40}$"
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "platform",
+            "cluster_name",
+            "slurm_job_id",
+            "slurm_array_task_id",
+            "run_id",
+            "release_tag",
+            "release_asset",
+            "release_manifest_sha256",
+            "solver_commit"
+          ],
+          "properties": {
+            "platform": {
+              "const": "slurm"
+            },
+            "cluster_name": {
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$",
+              "minLength": 1,
+              "type": "string"
+            },
+            "slurm_job_id": {
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:-]+$",
+              "minLength": 1,
+              "type": "string"
+            },
+            "slurm_array_task_id": {
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:-]+$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "run_id": {
+              "$ref": "#/$defs/identifier"
+            },
+            "release_tag": {
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:+-]+$",
+              "minLength": 1,
+              "type": "string"
+            },
+            "release_asset": {
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$",
+              "minLength": 1,
+              "type": "string"
+            },
+            "release_manifest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "solver_commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          }
         }
       }
     }

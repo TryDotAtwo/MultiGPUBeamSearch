@@ -13,17 +13,18 @@ from tools.cayleypy_public.profile import RuntimePlan
 from tools.cayleypy_public.runner import PublicSearchRunError
 from tools.run_cayleypy_public import (
     validate_t4_hardware, locate_or_build_runner, _available_ram_bytes,
-    _run_with_history_budgets, _materialize_run_artifacts,
+    _run_with_history_budgets, _materialize_run_artifacts, _publish_best_effort,
 )
 from tools.cube555.export import export_blend
 
 
-def runtime_plan(beam: int) -> RuntimePlan:
+def runtime_plan(beam: int, profile: str = 'safe') -> RuntimePlan:
     if type(beam) is not int or not 2 <= beam <= 2**24:
         raise ValueError('beam must be in [2, 2**24]; memory preflight may reject it')
     effective = ((beam + 7) // 8) * 8
     local = effective // 2
-    micro, slots, batch = 128, 4, 16384
+    micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile]
+    slots, batch = 4, 16384
     capacity = max((local * 105 + 399) // 400, micro * 30 * slots + 2 * batch)
     capacity = ((capacity + 1023) // 1024) * 1024
     return RuntimePlan(
@@ -47,7 +48,9 @@ def configuration(args, pid, puzzle_info):
         puzzle_id_start=pid, puzzle_id_end=pid, beam_width=args.beam, max_depth=args.depth,
         reflect_mode='off', reflect_source_csv=None, solution_mode='first', collect_until_depth=args.depth,
         max_collected_solutions=1, touch_bfs_radius=args.touch_radius,
-        publish_results=False, results_ingest_url='', enable_debug=True,
+        publish_results=getattr(args, 'publish', False),
+        results_ingest_url=getattr(args, 'ingest_url', ''), enable_debug=True,
+        **getattr(args, 'publication', {}),
     ))
 
 
@@ -61,7 +64,12 @@ def main():
     parser.add_argument('--depth', type=int, default=200)
     parser.add_argument('--touch-radius', type=int, default=2)
     parser.add_argument('--transformer-weight', type=float, default=0.8)
+    parser.add_argument('--profile', choices=['safe', 'balanced', 'throughput'], default='safe')
+    parser.add_argument('--publish', action='store_true')
+    parser.add_argument('--ingest-url', default='https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results')
+    parser.add_argument('--publication-json', type=Path)
     args = parser.parse_args()
+    args.publication = json.loads(args.publication_json.read_text()) if args.publication_json else {}
     args.assets, args.competition, args.output = args.assets.resolve(), args.competition.resolve(), args.output.resolve()
     if args.output.exists():
         raise ValueError('choose a new output directory; previous results are never overwritten')
@@ -72,6 +80,9 @@ def main():
     def save():
         summary['wall_seconds'] = time.monotonic() - start
         summary_path.write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
+    from tools.cube555.telemetry import Telemetry
+    telemetry = Telemetry(args.output)
+    telemetry.start()
     try:
         summary['gpus'] = validate_t4_hardware()
         info = args.assets / 'puzzle_info.json'
@@ -85,8 +96,8 @@ def main():
         export_dir = args.output / 'export'
         manifest = export_blend(args.assets / 'q555_f1_bell2k.pt', args.assets / 'q555_2k_BEST.pt',
             args.assets / 'piece_layout_555.json', info, export_dir, args.transformer_weight)
-        model = ExportedModel('cube555-q-blend', 'fp16', manifest['checkpoint_sha256'][0], manifest, 'piece_transformer')
-        plan = runtime_plan(args.beam)
+        model = ExportedModel('cube555-q-blend', 'fp16', manifest['script_sha256'], manifest, 'piece_transformer')
+        plan = runtime_plan(args.beam, args.profile)
         # Bounded total host budgets (both ranks); exact history check stays in runner.
         available = _available_ram_bytes()
         ram = min(8 * 1024**3, available - 4 * 1024**3)
@@ -114,7 +125,11 @@ def main():
                 _materialize_run_artifacts(error.partial_artifacts, out)
                 raise
             result = _materialize_run_artifacts(artifacts, out)
-            summary['results'].append(dict(pid=pid, **result))
+            publication = _publish_best_effort(configuration(args, pid, info), contracts[pid], model,
+                {'profile_registry_schema_version': 1, 'evidence': 'experimental-cube555-' + args.profile},
+                plan, summary['gpus'], artifacts, out, time.monotonic() - start)
+            print('Publication:', json.dumps(publication), flush=True)
+            summary['results'].append(dict(pid=pid, publication=publication, **result))
             selected = artifacts.submission.loc[artifacts.submission.initial_state_id == pid]
             for column in merged.columns:
                 if column != 'initial_state_id':
@@ -126,6 +141,7 @@ def main():
         summary['status'], summary['error'] = 'failed', str(error)
         raise
     finally:
+        summary['performance'] = telemetry.finish()
         save()
 
 

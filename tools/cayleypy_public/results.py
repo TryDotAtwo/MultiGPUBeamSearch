@@ -97,7 +97,8 @@ _MANIFEST_FIELDS = (
     "backend", "model_arch", "move_count", "num_pieces", "max_piece_size",
     "num_piece_types", "seq_len", "d_model", "nhead", "head_dim",
     "num_layers", "ff_dim", "activation", "pooling", "piece_layout",
-    "piece_embed_mode", "input_embedding",
+    "piece_embed_mode", "input_embedding", "model_family", "blend_weights",
+    "checkpoint_sha256", "script_sha256", "score_contract",
 )
 _MODEL_FIELDS = ("filename", "sha256", "format")
 _HARDWARE_FIELDS = ("platform", "gpu_names", "accelerator_count", "world_size")
@@ -181,8 +182,8 @@ def _validate_replay_contract(envelope: Mapping[str, object]) -> None:
     initial_state = tuple(_state_list(proof.get("initial_state"), "envelope.proof.initial_state"))
     central_state = tuple(_state_list(proof.get("central_state"), "envelope.proof.central_state"))
     state_len = len(initial_state)
-    if not 1 <= state_len <= 120 or len(central_state) != state_len:
-        raise ValueError("proof states must share a State128 logical length in 1..120")
+    if not (1 <= state_len <= 120 or state_len == 150) or len(central_state) != state_len:
+        raise ValueError("proof states must share a supported logical length in 1..120 or 150")
 
     generator_source = _mapping(proof.get("generators"), "envelope.proof.generators")
     generators = {

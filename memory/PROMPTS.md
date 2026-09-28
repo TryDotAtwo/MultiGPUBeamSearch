@@ -585,3 +585,7 @@ User reported that an interactive game had been running during part of the recen
 ## 2026-09-28 - Cube555 Transformer/ResMLP on two T4 GPUs
 - User explicitly requested a new MultiGPUBeamSearch Git branch, implementation of Cube555 support, and a notebook pinned to the appropriate commit. Work is isolated in codex/cube555-blend-2xt4, based on the existing public 444 notebook commit f679504baddbab3765c91af526e57ec9360cf309.
 - Preserve the native beam pipeline. Add 150/160 state specialization and a LibTorch parent-Q blend of Artgor PieceTransformerQ555 and ResMLPQ at weights 0.8/0.2. Validate CPU reference parity and real two-T4 operation; do not claim the reported TPU 102/100 scores are reproduced.
+
+
+## 2026-09-28 Cube555 public audit
+Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/profiles and Cloudflare result delivery.

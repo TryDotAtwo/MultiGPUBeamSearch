@@ -89,8 +89,8 @@ def test_canonical_v1_batch_schema_and_shared_goldens_are_present() -> None:
 
     Draft202012Validator.check_schema(schema)
     assert schema["required"] == ["schema_version", "results"]
-    assert schema["$defs"]["state"]["maxItems"] == 120
-    assert schema["$defs"]["manifest"]["properties"]["state_len"]["maximum"] == 120
+    assert schema["$defs"]["state"]["maxItems"] == 150
+    assert schema["$defs"]["manifest"]["properties"]["state_len"]["maximum"] == 150
     result_schema = schema["$defs"]["result"]
     assert "client_submission_id" in result_schema["required"]
     assert "submission_id" not in result_schema["properties"]

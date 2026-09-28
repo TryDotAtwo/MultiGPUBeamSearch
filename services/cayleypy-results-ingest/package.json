@@ -1,0 +1,29 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit",
+    "ci:cloudflare": "npm test && npm run typecheck",
+    "deploy:staging:github": "wrangler deploy --config wrangler.github-staging.jsonc",
+    "dev": "wrangler dev --env staging",
+    "bootstrap:github-app": "node ./scripts/github-app-bootstrap.mjs",
+    "bootstrap:github-app:dry-run": "node ./scripts/github-app-bootstrap.mjs --dry-run",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.19.0",
+    "@cloudflare/workers-types": "5.20260729.1",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "jose": "6.0.11",
+    "typescript": "5.8.3",
+    "undici": "7.28.0",
+    "vitest": "4.1.10",
+    "wrangler": "4.115.0"
+  },
+  "overrides": {
+    "workerd": "1.20260729.1"
+  }
+}
