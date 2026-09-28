@@ -1,0 +1,18 @@
+{
+  "id": "trydotatwo/cayleypy-2xt4-555-blend",
+  "title": "Cube555 native 2xT4 blend",
+  "code_file": "cube555-2xt4-blend.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "artgor/cube555-tpu-artifacts"
+  ],
+  "competition_sources": [
+    "cayley-py-555-cube"
+  ],
+  "kernel_sources": [],
+  "model_sources": []
+}
