@@ -65,3 +65,29 @@ def test_outer_batch_and_inference_microbatch_are_independent():
 def test_bad_model_microbatch_rejected(micro):
     with pytest.raises(ValueError):
         runtime_plan(2**25 - 2**22, model_micro=micro)
+
+
+def test_custom_checkpoint_is_used_in_public_config(tmp_path):
+    from types import SimpleNamespace
+    from tools.cube555.run import configuration
+    checkpoint = tmp_path / 'replacement.pt'
+    args = SimpleNamespace(assets=tmp_path, competition=tmp_path, checkpoint=checkpoint,
+                           beam=2**24, depth=100, touch_radius=2)
+    assert configuration(args, 1020, tmp_path / 'puzzle_info.json').checkpoint_path == str(checkpoint)
+
+
+def test_notebook_first_cell_is_simple_user_config(tmp_path):
+    from tools.cube555.notebook import build
+    build('a' * 40, tmp_path, False)
+    notebook = json.loads((tmp_path / 'cube555-2xt4-blend.ipynb').read_text())
+    first = notebook['cells'][0]
+    assert first['cell_type'] == 'code'
+    config = {}
+    exec(''.join(first['source']), config)
+    assert config['BEAM_WIDTH'] == 2**25
+    assert 'BEAM_PROFILE' not in config
+    assert 'TOUCH_BFS_RADIUS' not in config
+    assert config['CHECKPOINT_PATH'].parent == config['MODEL_ROOT']
+    source = '\n'.join(''.join(c['source']) for c in notebook['cells'])
+    assert '"--checkpoint", str(CHECKPOINT_PATH)' in source
+    assert '"--mlp-checkpoint", str(RESMLP_CHECKPOINT_PATH)' in source

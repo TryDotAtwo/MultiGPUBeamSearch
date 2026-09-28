@@ -596,3 +596,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 
 
 2026-09-28 profile-range correction: User correction: requested existing width profiles 2**22 through 2**26, NOT subtraction. Keep B_micro=8192 and independent model microbatch.
+
+2026-09-28: User requests full profile memory/speed validation and a simple first cell: numeric BEAM_WIDTH, MAX_DEPTH, blend weight, explicit model paths and puzzle range; hide BFS radius and technical modes.

@@ -25,11 +25,11 @@ FP16 on T4 can choose different paths from BF16 on TPU. The reported 102/100
 results have not been reproduced by this notebook.
 
 Attach `artgor/cube555-tpu-artifacts` and `cayley-py-555-cube`.
-Choose `BEAM_PROFILE` from `p22`, `p23`, `p24`, `p25`, `p26` for widths
-`2**22` through `2**26`, using the existing Transformer registry.
-The default is `p25` (33,554,432); its allocation probe passed on Cube555.
-The `p26` seed is available, but its current Cube555 native memory preflight fails
-on 2xT4. No profile silently reduces the requested beam. Cube555 capacity is checked by the native
+Enter `BEAM_WIDTH` directly. Existing p22-p26 pipeline settings are selected
+automatically; the width is never silently reduced. Default: `2**25`.
+Only compatible Cube555 PieceTransformerQ555 / ResMLPQ weights are supported.
+Keep layout and puzzle_info.json beside the model bundle.
+Cube555 capacity is checked by the native
 150/160-byte memory planner; Cube4's measured ceiling is not a Cube555 claim.
 `B_MICRO=8192` is the outer parent transaction. `MODEL_MICRO` independently limits
 one LibTorch forward. The original Transformer registry selects shards, Stream4
@@ -46,22 +46,38 @@ When forking, update the Kaggle owner, slug and saved version in the config.
 The notebook-source hash is derived from actual running cells, not a placeholder.
 ''', 'markdown')
     cell(f'''from pathlib import Path
+
+# USER CONFIG: change these values.
+MODEL_ROOT = Path("/kaggle/input/datasets/artgor/cube555-tpu-artifacts")
+CHECKPOINT_PATH = MODEL_ROOT / "q555_f1_bell2k.pt"  # Transformer
+RESMLP_CHECKPOINT_PATH = MODEL_ROOT / "q555_2k_BEST.pt"  # ResMLP
+
+PUZZLE_ID_START = 1020  # inclusive
+PUZZLE_ID_END = 1020  # inclusive
+BEAM_WIDTH = 2**25  # any requested width; pipeline profile is selected automatically
+MAX_DEPTH = 200
+TRANSFORMER_WEIGHT = 0.8  # 0 = ResMLP, 1 = Transformer
+''')
+    cell(f'''# Runtime settings: normally leave unchanged.
 SOLVER_COMMIT = {commit!r}
 SMOKE_TEST = {smoke!r}
-PUZZLE_IDS = [35, 1020, 1034]  # 35: short real puzzle to check end-to-end delivery
-BEAM_PROFILE = "p25"  # p22, p23, p24, p25, p26
-BEAM_PROFILES = {{f"p{{power}}": 2**power for power in range(22, 27)}}
-BEAM_WIDTH = BEAM_PROFILES[BEAM_PROFILE]
-MAX_DEPTH = 200
+COMPETITION_ROOT = Path("/kaggle/input/competitions/cayley-py-555-cube")
+LAYOUT_PATH = MODEL_ROOT / "piece_layout_555.json"
 TOUCH_BFS_RADIUS = 2
-TRANSFORMER_WEIGHT = 0.8
-B_MICRO = 8192  # outer parents per pipeline transaction, per GPU
-MODEL_MICRO = 512  # model forwards are independently microbatched
-PUBLISH_RESULTS = True  # replay-validated real competition solutions only
+B_MICRO = 8192
+MODEL_MICRO = 512
+PUBLISH_RESULTS = True
 KAGGLE_OWNER = "trydotatwo"
 KAGGLE_SLUG = "cube555-native-2xt4-blend"
-KAGGLE_VERSION = 4  # update when saving a new Kaggle version
-
+KAGGLE_VERSION = 5
+PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
+if not PUZZLE_IDS:
+    raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")
+for path in (CHECKPOINT_PATH, RESMLP_CHECKPOINT_PATH, LAYOUT_PATH,
+             MODEL_ROOT / "puzzle_info.json", COMPETITION_ROOT / "test.csv",
+             COMPETITION_ROOT / "sample_submission.csv"):
+    if not path.is_file():
+        raise FileNotFoundError(f"Missing input: {{path}}. Attach the dataset or edit its path.")
 ''')
     cell('''import json, subprocess, sys, time
 import torch
@@ -77,17 +93,8 @@ subprocess.run(["git", "checkout", "--detach", SOLVER_COMMIT], cwd=repo, check=T
 actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
 assert actual == SOLVER_COMMIT, (actual, SOLVER_COMMIT)
 sys.path.insert(0, str(repo))
-def mount(name, owner=None):
-    candidates = [Path("/kaggle/input") / name,
-        Path("/kaggle/input/competitions") / name]
-    if owner:
-        candidates.append(Path("/kaggle/input/datasets") / owner / name)
-    found = [p for p in candidates if p.is_dir()]
-    if not found:
-        raise FileNotFoundError(f"Attach Kaggle input {owner or ''}/{name}")
-    return found[0]
-assets = mount("cube555-tpu-artifacts", "artgor")
-competition = None if SMOKE_TEST else mount("cayley-py-555-cube")
+assets = MODEL_ROOT
+competition = COMPETITION_ROOT
 output = Path("/kaggle/working") / ("cube555_" + time.strftime("%Y%m%d_%H%M%S"))
 output.mkdir()
 (output / "provenance.json").write_text(json.dumps(dict(solver_commit=actual,
@@ -103,6 +110,8 @@ else:
     pids, beam, depth, radius = PUZZLE_IDS, BEAM_WIDTH, MAX_DEPTH, TOUCH_BFS_RADIUS
 command = [sys.executable, "-u", "-m", "tools.cube555.run",
     "--assets", str(assets), "--competition", str(competition),
+    "--checkpoint", str(CHECKPOINT_PATH), "--mlp-checkpoint", str(RESMLP_CHECKPOINT_PATH),
+    "--layout", str(LAYOUT_PATH),
     "--output", str(output / "run"), "--pids", *map(str, pids),
     "--beam", str(beam), "--depth", str(depth), "--touch-radius", str(radius),
     "--transformer-weight", str(TRANSFORMER_WEIGHT)]
@@ -147,6 +156,7 @@ if SMOKE_TEST:
         assert solutions["valid"].all(), f"smoke puzzle {pid} failed replay"
     print("PASS: four legal Cube555 scrambles solved and replayed by two native ranks")
 ''')
+    cells[0], cells[1] = cells[1], cells[0]
     output.mkdir(parents=True, exist_ok=True)
     name = 'cube555-2xt4-blend.ipynb'
     notebook = dict(cells=cells, metadata=dict(kernelspec=dict(display_name='Python 3', language='python', name='python3')), nbformat=4, nbformat_minor=5)

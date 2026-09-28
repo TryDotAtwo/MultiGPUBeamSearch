@@ -93,7 +93,7 @@ reported solution lengths are not an equal-budget comparison.
 
 The old 65K table above varied both batch levels at once and is historical only.
 It does not select an inference microbatch for an 8192-parent outer transaction.
-Select `BEAM_PROFILE` from `p22` through `p26` (widths `2**22` through `2**26`). Default `p25` requests 33,554,432. Existing
+Enter numeric `BEAM_WIDTH` directly; the existing p22-p26 settings are selected automatically. The default requests 33,554,432. Existing
 Transformer p25/p26 pipeline profiles seed shard counts, Stream4 buffers and
 final exchange; exact Cube555 native memory checks remain authoritative.
 `B_MICRO=8192` and `MODEL_MICRO` are independent, including the C++ LibTorch
@@ -111,3 +111,5 @@ and29,360,128 depth5 loop passed, sampled device high-water8475MiB. Allocation
 probes29,360,128 and33,554,432 passed;58,720,256 and67,108,864 failed the
 GPU budget gate. History at29,360,128 admitted depth177. These are bounded
 allocation/transaction checks, not a fully saturated depth8 ceiling.
+
+The first notebook cell exposes explicit MODEL_ROOT, CHECKPOINT_PATH (Transformer), RESMLP_CHECKPOINT_PATH, inclusive puzzle range, BEAM_WIDTH, MAX_DEPTH, and TRANSFORMER_WEIGHT. Compatible replacement checkpoints are forwarded to export and hashed in provenance. BFS radius2 and other runtime defaults are below the explanation.

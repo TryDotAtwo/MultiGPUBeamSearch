@@ -23,7 +23,7 @@ def main():
     p.add_argument('--assets',type=Path,required=True)
     p.add_argument('--competition',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
-    p.add_argument('--full-depth',type=int,default=5)
+    p.add_argument('--full-depth',type=int,default=9)
     a=p.parse_args(); a.output.mkdir(parents=True,exist_ok=False)
     gpus=validate_t4_hardware()
     micro=benchmark(a.assets,a.output/'inference_comparison.json')
@@ -34,9 +34,9 @@ def main():
     runner=locate_or_build_runner(a.output,info,backend='piece_transformer',config=configuration(cfg,1020,info))
     fixture=Path('/tmp/cube555_macro_micro_fixture');make_fixture(a.assets,fixture)
     jobs=[dict(name='smoke',beam=8192,depth=6,pid=3,competition=fixture,radius=0)]
-    jobs += [dict(name=f'capacity-{beam}',beam=beam,depth=2,pid=1020,competition=a.competition,radius=2) for beam in [DEFAULT_BEAM,2**25,2**26-2**23,2**26]]
-    jobs += [dict(name='requested-beam-loop',beam=DEFAULT_BEAM,depth=a.full_depth,pid=1020,competition=a.competition,radius=2)]
-    report=dict(gpus=gpus,outer_parent_batch=8192,model_microbatch=micro,rows=[],note='Depth2 probes validate allocation only; depth5 exercises full outer transactions, not a saturated depth8 beam. No Cube555 ceiling claim.')
+    jobs += [dict(name=f'capacity-{beam}',beam=beam,depth=2,pid=1020,competition=a.competition,radius=2) for beam in [2**p for p in range(22,27)]]
+    jobs += [dict(name=f'saturated-p{power}',beam=2**power,depth=a.full_depth,pid=1020,competition=a.competition,radius=2) for power in range(22,26)]
+    report=dict(gpus=gpus,outer_parent_batch=8192,model_microbatch=micro,rows=[],note='Depth2 probes validate allocation only. Depth9 loops require rank-log proof of a full local frontier to establish saturated throughput. p26 allocation failure remains a failed profile, not a successful sweep.')
     for job in jobs:
         out=a.output/job['name'];out.mkdir();row={k:v for k,v in job.items() if k!='competition'}
         cfg.competition=job['competition'];cfg.beam=job['beam'];cfg.depth=job['depth'];cfg.touch_radius=job['radius']
@@ -61,7 +61,7 @@ def main():
             print(json.dumps(row),flush=True)
         if job['name']=='smoke' and row['status']!='complete':
             raise RuntimeError('smoke failed; capacity tests aborted')
-    if any(r['status']!='complete' for r in report['rows'] if r['name'] in ['smoke','requested-beam-loop',f'capacity-{DEFAULT_BEAM}']):
+    if any(r['status']!='complete' for r in report['rows'] if r['name']=='smoke' or r['name'].startswith('saturated-')):
         raise RuntimeError('requested Cube555 configuration failed')
 
 

@@ -45,7 +45,7 @@ def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
 
 def configuration(args, pid, puzzle_info):
     return PublicRunConfig.from_mapping(dict(
-        author_name='Ivan Litvak', checkpoint_path=str(args.assets / 'q555_f1_bell2k.pt'),
+        author_name='Ivan Litvak', checkpoint_path=str(getattr(args, 'checkpoint', None) or args.assets / 'q555_f1_bell2k.pt'),
         puzzle_info_json=str(puzzle_info), test_csv=str(args.competition / 'test.csv'),
         sample_submission_csv=str(args.competition / 'sample_submission.csv'),
         puzzle_id_start=pid, puzzle_id_end=pid, beam_width=args.beam, max_depth=args.depth,
@@ -61,6 +61,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--assets', type=Path, required=True)
     parser.add_argument('--competition', type=Path, required=True)
+    parser.add_argument('--checkpoint', type=Path)
+    parser.add_argument('--mlp-checkpoint', type=Path)
+    parser.add_argument('--layout', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--pids', type=int, nargs='+', default=[1020, 1034])
     parser.add_argument('--beam', type=int, default=DEFAULT_BEAM)
@@ -98,8 +101,9 @@ def main():
                 raise ValueError('Cube555 initial states must be permutations of 0..149')
         config = configuration(args, args.pids[0], info)
         export_dir = args.output / 'export'
-        manifest = export_blend(args.assets / 'q555_f1_bell2k.pt', args.assets / 'q555_2k_BEST.pt',
-            args.assets / 'piece_layout_555.json', info, export_dir, args.transformer_weight)
+        manifest = export_blend(args.checkpoint or args.assets / 'q555_f1_bell2k.pt',
+            args.mlp_checkpoint or args.assets / 'q555_2k_BEST.pt',
+            args.layout or args.assets / 'piece_layout_555.json', info, export_dir, args.transformer_weight)
         model = ExportedModel('cube555-q-blend', 'fp16', manifest['script_sha256'], manifest, 'piece_transformer')
         plan = runtime_plan(args.beam, b_micro=args.b_micro, model_micro=args.model_micro)
         # Reuse the existing public profiles' RAM/disk contract and explicit
