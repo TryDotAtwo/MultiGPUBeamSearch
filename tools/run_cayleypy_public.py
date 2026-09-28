@@ -625,13 +625,18 @@ def _publish_best_effort(
         with _working_directory(output_dir):
             for archive_index, archive in enumerate(archives):
                 Path(f'results-{archive_index:03d}.json.gz').write_bytes(archive)
-                statuses.append(publish_result_archive(
-                    config.results_ingest_url,
-                    archive,
-                    result_count=len(envelopes),
-                    archive_index=archive_index,
-                    archive_count=len(archives),
-                ))
+                for attempt in range(4):
+                    published = publish_result_archive(
+                        config.results_ingest_url, archive,
+                        result_count=len(envelopes), archive_index=archive_index,
+                        archive_count=len(archives),
+                    )
+                    if published.status_code != 429 or attempt == 3:
+                        break
+                    print(f"[publication] archive={archive_index + 1}/{len(archives)} rate_limited; retry in 60s", flush=True)
+                    time.sleep(60)
+                statuses.append(published)
+                print(f"[publication] archive={archive_index + 1}/{len(archives)} HTTP={published.status_code} ok={published.ok}", flush=True)
         ok = all(status.ok for status in statuses)
         status_payload = {
             "state": "published" if ok else "failed",

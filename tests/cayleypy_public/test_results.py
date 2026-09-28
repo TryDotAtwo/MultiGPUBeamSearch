@@ -922,3 +922,15 @@ def test_publish_result_archive_posts_one_gzip_request_with_part_metadata(
     assert status.result_count == 3
     assert request.data == archive
     assert request.get_header("Content-type") == "application/gzip"
+
+
+def test_archives_obey_decompressed_and_record_limits(monkeypatch):
+    envelopes = [build_result_envelope(_context(), {**_solution(), "collection_index": i}) for i in range(7)]
+    monkeypatch.setattr(results_module, "MAX_ARCHIVE_RESULTS", 2)
+    archives = results_module.build_result_archives(envelopes)
+    assert [len(json.loads(gzip.decompress(a))["results"]) for a in archives] == [2, 2, 2, 1]
+    one = len(gzip.decompress(results_module.build_result_archives(envelopes[:1])[0]))
+    monkeypatch.setattr(results_module, "MAX_DECOMPRESSED_ARCHIVE_BYTES", one + 10)
+    archives = results_module.build_result_archives(envelopes)
+    assert len(archives) == 7
+    assert all(len(gzip.decompress(a)) <= one + 10 for a in archives)

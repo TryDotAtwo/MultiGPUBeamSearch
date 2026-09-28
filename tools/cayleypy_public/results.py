@@ -29,6 +29,8 @@ from tools.cayleypy_public.paths import invert_path, tokenize_path
 SCHEMA_VERSION = 1
 MAX_ENVELOPE_BYTES = 256 * 1024
 MAX_PUBLISH_ARCHIVE_BYTES = 32 * 1024 * 1024
+MAX_DECOMPRESSED_ARCHIVE_BYTES = 64 * 1024 * 1024
+MAX_ARCHIVE_RESULTS = 2_000
 MAX_PUBLISH_REQUEST_BYTES = 4 * 1024 * 1024
 MAX_RESULTS_PER_REQUEST = 100
 
@@ -469,7 +471,25 @@ def build_result_archives(
         middle = len(items) // 2
         return [*pack(items[:middle]), *pack(items[middle:])]
 
-    return pack(normalized)
+    archives = []
+    current = []
+    raw_bytes = len(_canonical_bytes({"schema_version": SCHEMA_VERSION, "results": []}))
+    empty_bytes = raw_bytes
+    for envelope in normalized:
+        item_bytes = len(_canonical_bytes(envelope))
+        extra = item_bytes + bool(current)
+        if current and (len(current) >= MAX_ARCHIVE_RESULTS or raw_bytes + extra > MAX_DECOMPRESSED_ARCHIVE_BYTES):
+            archives.extend(pack(current))
+            current = []
+            raw_bytes = empty_bytes
+            extra = item_bytes
+        if raw_bytes + extra > MAX_DECOMPRESSED_ARCHIVE_BYTES:
+            raise ValueError("one result exceeds decompressed archive limit")
+        current.append(envelope)
+        raw_bytes += extra
+    if current:
+        archives.extend(pack(current))
+    return archives
 
 @dataclass(frozen=True)
 class PublishStatus:

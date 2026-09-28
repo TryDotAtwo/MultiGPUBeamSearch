@@ -622,3 +622,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User says original model owner was banned and requests reuploading preserved models to Kaggle and replacing notebook data attachment.
 
 2026-09-28: User requires Cube555 beam profiles capped at4000000 with smaller tiers, maximum depth140, radius5, and collect stall investigation.
+
+2026-09-28: User requests two Kaggle acceptance notebooks to verify public usability of final Cube555 configuration.
