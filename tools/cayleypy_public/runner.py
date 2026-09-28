@@ -173,13 +173,23 @@ def _path_depth(path: str) -> int:
     return 0 if path == "" else len(path.split("."))
 
 
-def derive_solved_result_capacity(plan: RuntimePlan, move_count: int, state_storage_len: int = 128) -> int:
-    """Bound one rank's worst-case Stream2 hits for a completed depth."""
+def derive_solved_result_capacity(plan: RuntimePlan, move_count: int, state_storage_len: int = 128,
+                                 *, max_collected_solutions: int = 100_000,
+                                 max_depth: int = 140) -> int:
+    """Budget per-rank hit records by requested collection count and path bound.
+
+    This is a bounded staging budget, not a worst-case guarantee for all hits
+    in a layer. Native overflow is fatal and synchronized across ranks; hits
+    are never silently truncated into a successful collection result.
+    """
     if isinstance(move_count, bool) or not isinstance(move_count, int) or move_count <= 0:
         raise ValueError("move_count must be a positive integer")
     if plan.local_beam <= 0:
         raise ValueError("local_beam must be positive")
-    capacity = plan.local_beam * move_count
+    for name, value in (("max_collected_solutions", max_collected_solutions), ("max_depth", max_depth)):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+    capacity = min(plan.local_beam * move_count, max_collected_solutions * max_depth)
     if capacity > _UINT32_MAX:
         raise ValueError("BEAM_SOLVED_RESULT_CAPACITY exceeds uint32")
     snapshot_bytes = capacity * _SOLVED_RECORD_BYTES
@@ -477,7 +487,9 @@ def build_runner_invocation(
     })
     env["BEAM_NCCL_ID_FILE"] = str(run_root / "nccl-id.bin")
     if result_tsv is not None:
-        snapshot_capacity = derive_solved_result_capacity(plan, move_count, 160 if model is not None and model.manifest.get("state_len") == 150 else 128)
+        snapshot_capacity = derive_solved_result_capacity(
+            plan, move_count, 160 if model is not None and model.manifest.get("state_len") == 150 else 128,
+            max_collected_solutions=config.max_collected_solutions, max_depth=config.max_depth)
         derive_gather_chunk_plan(plan.local_beam, snapshot_capacity)
         env.update({
             "BEAM_SOLVE_BUCKET_MODE": "1",
@@ -1012,7 +1024,9 @@ def run_public_search(
         invert_path("", contract.generators)  # Validate inverse closure before any GPU launch.
     external_sources = _reflection_sources(config, contract)  # Must finish before any GPU launch.
     if config.solution_mode == "collect":
-        derive_solved_result_capacity(plan, contract.move_count)
+        derive_solved_result_capacity(plan, contract.move_count,
+            160 if model.manifest.get("state_len") == 150 else 128,
+            max_collected_solutions=config.max_collected_solutions, max_depth=config.max_depth)
     submission = contract.sample_submission.copy(deep=True)
     submission_column = _submission_column(submission)
     records: list[SolutionRecord] = []

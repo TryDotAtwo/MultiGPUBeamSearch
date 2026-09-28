@@ -284,7 +284,7 @@ def test_child_environment_drops_inherited_beam_and_torchrun_controls(
     assert not ({name for name in poison if not name.startswith("BEAM_")}).intersection(captured)
 
 
-def test_collect_capacity_is_full_local_depth_not_host_solution_limit(tmp_path: Path) -> None:
+def test_collect_capacity_is_bounded_by_requested_collection_and_depth(tmp_path: Path) -> None:
     invocation = runner.build_runner_invocation(
         _config(tmp_path, solution_mode="collect"), _plan(local_beam=128), 24, 7, "original",
         tmp_path / "weights", tmp_path,
@@ -294,16 +294,16 @@ def test_collect_capacity_is_full_local_depth_not_host_solution_limit(tmp_path: 
         "BEAM_SOLVE_BUCKET_MODE", "BEAM_SOLVE_BUCKET_STOP_DEPTH",
         "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS", "BEAM_SOLVED_RESULT_CAPACITY",
     )} == {"BEAM_SOLVE_BUCKET_MODE": "1", "BEAM_SOLVE_BUCKET_STOP_DEPTH": "12",
-          "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS": "3", "BEAM_SOLVED_RESULT_CAPACITY": "3072"}
+          "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS": "3", "BEAM_SOLVED_RESULT_CAPACITY": "300"}
 
 
 def test_solved_snapshot_capacity_fails_closed_on_uint32_or_t4_memory_overflow() -> None:
     with pytest.raises(ValueError, match="uint32"):
-        runner.derive_solved_result_capacity(_plan(local_beam=2**31), 24)
+        runner.derive_solved_result_capacity(_plan(local_beam=2**31), 24, max_collected_solutions=2**32, max_depth=2)
     with pytest.raises(ValueError, match="device memory"):
         runner.derive_solved_result_capacity(_plan(local_beam=400_000_000), 2)
     with pytest.raises(ValueError, match="snapshot plus current frontier"):
-        runner.derive_solved_result_capacity(_plan(local_beam=2**24), 24)
+        runner.derive_solved_result_capacity(_plan(local_beam=2**24), 24, max_collected_solutions=2**30, max_depth=140)
 
 
 def test_full_depth_capacity_uses_bounded_multi_chunk_gather_plan() -> None:
@@ -1278,3 +1278,18 @@ def test_runtime_log_sanitizer_covers_live_combined_rank_and_redirect_logs(tmp_p
         text = path.read_text(encoding="utf-8")
         assert private_path not in text and token not in text
         assert "<redacted-" in text or "puzzle_solved=1" in text
+
+
+def test_collection_budget_does_not_grow_with_wide_beam():
+    for local_beam in (2**24, 2**25):
+        capacity = runner.derive_solved_result_capacity(_plan(local_beam=local_beam), 30, 160,
+            max_collected_solutions=100_000, max_depth=140)
+        assert capacity == 14_000_000
+        assert capacity * 40 == 560_000_000
+
+
+@pytest.mark.parametrize('count,depth', [(0,140), (-1,140), (True,140), (100,0)])
+def test_collection_budget_rejects_invalid_limits(count, depth):
+    with pytest.raises(ValueError, match='positive integer'):
+        runner.derive_solved_result_capacity(_plan(local_beam=128), 30,
+            max_collected_solutions=count, max_depth=depth)

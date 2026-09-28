@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "beam": 33554432,
+      "old_snapshot_bytes": 20132659200,
+      "new_snapshot_bytes": 560000000,
+      "depth_bound": 140
+    },
+    {
+      "beam": 67108864,
+      "old_snapshot_bytes": 40265318400,
+      "new_snapshot_bytes": 560000000,
+      "depth_bound": 140
+    }
+  ],
+  "tests": "81 passed; host free-disk metadata mocked for existing history tests",
+  "gpu_validation": "not yet run",
+  "overflow": "existing synchronized fatal guard preserved"
+}

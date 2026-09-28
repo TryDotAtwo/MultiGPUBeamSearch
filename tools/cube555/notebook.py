@@ -36,8 +36,10 @@ one LibTorch forward. The original Transformer registry selects shards, Stream4
 buffers and final exchange chunks from the requested width.
 History uses at most 24 GB RAM, preserves at least 6 GB of available RAM
 for runtime overhead, and uses 50 GiB scratch disk. Default depth is 140.
-Collect mode needs extra GPU buffers: at beam 2**25 it is rejected by the
-current T4 memory guard regardless of the 100,000 output limit. Preflight explicitly reports
+Collect staging is bounded by MAX_COLLECTED_SOLUTIONS * effective MAX_DEPTH
+records (40 bytes each per GPU), capped by the layer candidate count.
+A layer exceeding this budget fails explicitly; it never silently drops hits.
+The native total-memory preflight still applies to the beam and all other buffers. Preflight explicitly reports
 requested/effective MAX_DEPTH; beam is never silently reduced to fit history.
 All returned solutions are replayed. Both rank logs and provenance are retained.
 `gpu_samples.csv` samples both GPUs every second, and `performance.json` records
@@ -79,7 +81,7 @@ TOUCH_BFS_RADIUS = 4
 B_MICRO = 8192
 MODEL_MICRO = 512
 PUBLISH_RESULTS = True
-KAGGLE_VERSION = 8
+KAGGLE_VERSION = 9
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:
     raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")
