@@ -59,3 +59,19 @@ python -m tools.cube555.validate --assets ASSET_DIRECTORY --output parity.json
 This checks original FP32 checkpoints against the dataset's independent JAX
 implementation on legal states, plus variable script batch sizes and ignored
 padding. It does not require or execute a GPU search.
+
+
+## Public notebook audit
+
+Presets `safe`, `balanced`, `throughput` use parent/model batches 128/256/512;
+beam remains user-controlled. They are experimental unless measured on the exact
+two-T4 blend. `python -m tools.cube555.benchmark` compares the full depth-8 loop
+on the same input and beam. Telemetry samples native+LibTorch device memory each
+second; its high-water value is a lower bound on instantaneous peak allocation.
+
+Publication uses replay-validated archives, preserves both checkpoint hashes,
+blend weights, script hash, original state and generator proof. Exact gzip
+requests survive network failures in each puzzle directory. A 200/202 transport
+acknowledgment does not establish final promotion in cayleypy-beam-results.
+Synthetic smoke puzzles never enable publishing. Real puzzle 35 is a short
+end-to-end delivery check before the two original target puzzles.

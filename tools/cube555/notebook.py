@@ -28,11 +28,22 @@ Attach `artgor/cube555-tpu-artifacts` and `cayley-py-555-cube`.
 The initial beam is conservative; larger widths require memory and quality
 validation. All returned solutions are replayed against the original state.
 Outputs, both rank logs, checkpoint hashes and submission.csv are retained.
+
+Edit the configuration cell below. `PROFILE` changes batching, not beam width:
+safe = 128, balanced = 256, throughput = 512. Each is specific to this blend;
+larger presets are experimental until the profile audit confirms their memory.
+`gpu_samples.csv` samples both GPUs every second, and `performance.json` records
+memory high-water samples and native per-depth timings. Sampling can miss brief peaks.
+Result publication is on by default and applies only to locally replayed solutions.
+Each puzzle retains `publish_status.json` and the exact `results-*.json.gz` request.
+HTTP acceptance is not a claim that the GitHub promotion has completed.
+When forking, update the Kaggle owner, slug and saved version in the config.
+The notebook-source hash is derived from actual running cells, not a placeholder.
 ''', 'markdown')
     cell(f'''from pathlib import Path
 SOLVER_COMMIT = {commit!r}
 SMOKE_TEST = {smoke!r}
-PUZZLE_IDS = [1020, 1034]
+PUZZLE_IDS = [35, 1020, 1034]  # 35: short real puzzle to check end-to-end delivery
 BEAM_WIDTH = 65536
 MAX_DEPTH = 200
 TOUCH_BFS_RADIUS = 2

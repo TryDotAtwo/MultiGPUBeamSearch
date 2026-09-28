@@ -1049,3 +1049,5 @@
 
 ## 2026-09-28 Cube555 public audit
 Cube555 publication and profiling audit: explicit runtime presets, canonical blend provenance, 150-facelet proof replay support, and per-puzzle persisted publication status. Worker source imported from 638fcc90 for isolated compatibility update.
+
+Cube555 audit: 68 Python tests, 34 schema/replay tests and 139 Worker tests passed. Cloudflare staging updated to f90367b7-fdb9-4b22-ad27-9a52e87f80e5; healthz normal/ok. Public notebook sharing saved with CayleyPy group Can edit. Profile audit queued on two T4 GPUs.

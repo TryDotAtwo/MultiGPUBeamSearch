@@ -453,7 +453,7 @@ def _publication_context(
         "profile": profile_payload,
         "runtime": runtime,
         "model": {
-            "filename": config.checkpoint_path.name,
+            "filename": "cube555_blend.ts" if model.format == "cube555-q-blend" else config.checkpoint_path.name,
             "sha256": model.checkpoint_sha256,
             "format": model.format,
             "manifest": dict(model.manifest),
