@@ -24,7 +24,7 @@ pipeline with a Cube555 LibTorch scoring module, not the TPU/JAX search engine.
 FP16 on T4 can choose different paths from BF16 on TPU. The reported 102/100
 results have not been reproduced by this notebook.
 
-Attach `artgor/cube555-tpu-artifacts` and `cayley-py-555-cube`.
+Attach `trydotatwo/cube555-transformer-resmlp-artifacts` and `cayley-py-555-cube`.
 Enter `BEAM_WIDTH` directly. Existing p22-p26 pipeline settings are selected
 automatically; the width is never silently reduced. Default: `2**25`.
 Only compatible Cube555 PieceTransformerQ555 / ResMLPQ weights are supported.
@@ -54,7 +54,7 @@ The notebook-source hash is derived from actual running cells, not a placeholder
     cell(f'''from pathlib import Path
 
 # USER CONFIG: change these values.
-MODEL_ROOT = Path("/kaggle/input/datasets/artgor/cube555-tpu-artifacts")
+MODEL_ROOT = Path("/kaggle/input/datasets/trydotatwo/cube555-transformer-resmlp-artifacts")
 CHECKPOINT_PATH = MODEL_ROOT / "q555_f1_bell2k.pt"  # Transformer
 RESMLP_CHECKPOINT_PATH = MODEL_ROOT / "q555_2k_BEST.pt"  # ResMLP
 
@@ -82,7 +82,7 @@ TOUCH_BFS_RADIUS = 4
 B_MICRO = 8192
 MODEL_MICRO = 512
 PUBLISH_RESULTS = True
-KAGGLE_VERSION = 9
+KAGGLE_VERSION = 10
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:
     raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")
@@ -183,7 +183,7 @@ if SMOKE_TEST:
     slug = 'cube555-native-2xt4-blend-smoke' if smoke else 'cube555-native-2xt4-blend'
     metadata = dict(id='trydotatwo/' + slug, title='Cube555 native 2xT4 blend' + (' smoke' if smoke else ''),
         code_file=name, language='python', kernel_type='notebook', is_private=smoke,
-        enable_gpu=True, enable_internet=True, dataset_sources=['artgor/cube555-tpu-artifacts'],
+        enable_gpu=True, enable_internet=True, dataset_sources=['trydotatwo/cube555-transformer-resmlp-artifacts'],
         competition_sources=[] if smoke else ['cayley-py-555-cube'], kernel_sources=[], model_sources=[])
     (output / 'kernel-metadata.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
 

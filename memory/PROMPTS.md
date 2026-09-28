@@ -614,3 +614,9 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User requires collect as the default solution mode and asks whether notebook completion establishes readiness for others.
 
 2026-09-28: User stopped v8 because it appeared hung. Diagnose without treating missing output as proof of deadlock.
+
+2026-09-28: User now explicitly permits TWO simultaneous Kaggle GPU slots; supersedes prior one-slot limit.
+
+2026-09-28: User requires root-cause diagnosis of Cube555 slow inference/search, compared with prior puzzles; explanations from beam size alone are insufficient.
+
+2026-09-28: User says original model owner was banned and requests reuploading preserved models to Kaggle and replacing notebook data attachment.
