@@ -107,8 +107,8 @@ if SMOKE_TEST:
     output.mkdir(parents=True, exist_ok=True)
     name = 'cube555-2xt4-blend.ipynb'
     notebook = dict(cells=cells, metadata=dict(kernelspec=dict(display_name='Python 3', language='python', name='python3')), nbformat=4, nbformat_minor=5)
-    (output / name).write_text(json.dumps(notebook, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
-    slug = 'cube555-native-2xt4-blend-smoke' if smoke else 'cayleypy-2xt4-555-blend'
+    (output / name).write_text(json.dumps(notebook, indent=1, ensure_ascii=True) + '\n', encoding='utf-8')
+    slug = 'cube555-native-2xt4-blend-smoke' if smoke else 'cube555-native-2xt4-blend'
     metadata = dict(id='trydotatwo/' + slug, title='Cube555 native 2xT4 blend' + (' smoke' if smoke else ''),
         code_file=name, language='python', kernel_type='notebook', is_private=True,
         enable_gpu=True, enable_internet=True, dataset_sources=['artgor/cube555-tpu-artifacts'],
