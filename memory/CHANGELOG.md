@@ -1051,3 +1051,5 @@
 Cube555 publication and profiling audit: explicit runtime presets, canonical blend provenance, 150-facelet proof replay support, and per-puzzle persisted publication status. Worker source imported from 638fcc90 for isolated compatibility update.
 
 Cube555 audit: 68 Python tests, 34 schema/replay tests and 139 Worker tests passed. Cloudflare staging updated to f90367b7-fdb9-4b22-ad27-9a52e87f80e5; healthz normal/ok. Public notebook sharing saved with CayleyPy group Can edit. Profile audit queued on two T4 GPUs.
+
+Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare and GitHub staging (4cea7132). Full v1: 1020 solved132, 1034 unsolved200; 2516.856 seconds. Results-repo promotion patch awaits explicit publication authorization after automatic review rejection.

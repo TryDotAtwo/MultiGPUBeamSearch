@@ -1,0 +1,32 @@
+{
+  "status": "complete",
+  "pids": [
+    1020,
+    1034
+  ],
+  "beam": 65536,
+  "results": [
+    {
+      "pid": 1020,
+      "solution_count": 1,
+      "solved_puzzle_count": 1,
+      "invocation_count": 1,
+      "collection_status": "first_solution",
+      "solve_seconds": 907.259331386
+    },
+    {
+      "pid": 1034,
+      "solution_count": 0,
+      "solved_puzzle_count": 0,
+      "invocation_count": 1,
+      "collection_status": "not_collected",
+      "solve_seconds": 1435.771461379
+    }
+  ],
+  "gpus": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "wall_seconds": 2516.855896993,
+  "current_pid": 1034
+}
