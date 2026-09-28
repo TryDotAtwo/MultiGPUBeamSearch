@@ -30,3 +30,13 @@ def test_profile_reserves_incoming_batch_and_retains_requested_beam(beam):
 def test_bad_blend_weight_rejected(weight):
     with pytest.raises(ValueError):
         Blend(None, None, weight)
+
+
+def test_launcher_passes_complete_public_config(tmp_path):
+    from types import SimpleNamespace
+    from tools.cube555.run import configuration
+    args = SimpleNamespace(assets=tmp_path, competition=tmp_path, beam=65536, depth=200, touch_radius=2)
+    config = configuration(args, 1020, tmp_path / 'puzzle_info.json')
+    assert config.puzzle_ids == (1020,)
+    assert config.reflect_source_csv is None
+    assert not config.publish_results

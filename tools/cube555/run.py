@@ -45,7 +45,7 @@ def configuration(args, pid, puzzle_info):
         puzzle_info_json=str(puzzle_info), test_csv=str(args.competition / 'test.csv'),
         sample_submission_csv=str(args.competition / 'sample_submission.csv'),
         puzzle_id_start=pid, puzzle_id_end=pid, beam_width=args.beam, max_depth=args.depth,
-        reflect_mode='off', solution_mode='first', collect_until_depth=args.depth,
+        reflect_mode='off', reflect_source_csv=None, solution_mode='first', collect_until_depth=args.depth,
         max_collected_solutions=1, touch_bfs_radius=args.touch_radius,
         publish_results=False, results_ingest_url='', enable_debug=True,
     ))
