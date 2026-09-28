@@ -23,6 +23,14 @@ from tools.cube555.export import export_blend
 DEFAULT_BEAM = 2**25
 
 
+def history_budgets(available_ram_bytes, tmp_free_bytes):
+    # Shared helper already retains 1.5 GB; retain another 4.5 GB for two
+    # LibTorch ranks, BFS neighborhoods, Python results and runtime overhead.
+    ram, disk = _derive_history_budgets(available_ram_bytes - 4_500_000_000, tmp_free_bytes)
+    return min(ram, 24_000_000_000), disk
+
+
+
 def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
                  model_micro: int | None = None) -> RuntimePlan:
     micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile] if model_micro is None else model_micro
@@ -53,7 +61,7 @@ def configuration(args, pid, puzzle_info):
         reflect_source_csv=getattr(args, 'reflect_source_csv', None),
         solution_mode=getattr(args, 'solution_mode', 'first'),
         collect_until_depth=args.depth if getattr(args, 'collect_until_depth', None) is None else min(args.collect_until_depth, args.depth),
-        max_collected_solutions=getattr(args, 'max_collected_solutions', 100), touch_bfs_radius=args.touch_radius,
+        max_collected_solutions=getattr(args, 'max_collected_solutions', 100_000), touch_bfs_radius=args.touch_radius,
         publish_results=getattr(args, 'publish', False),
         results_ingest_url=getattr(args, 'ingest_url', ''), enable_debug=True,
         **getattr(args, 'publication', {}),
@@ -70,7 +78,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--pids', type=int, nargs='+', default=[1020, 1034])
     parser.add_argument('--beam', type=int, default=DEFAULT_BEAM)
-    parser.add_argument('--depth', type=int, default=200)
+    parser.add_argument('--depth', type=int, default=140)
     parser.add_argument('--touch-radius', type=int, default=4)
     parser.add_argument('--transformer-weight', type=float, default=0.8)
     parser.add_argument('--b-micro', type=int, default=8192)
@@ -79,7 +87,7 @@ def main():
     parser.add_argument('--reflect-source-csv', type=Path)
     parser.add_argument('--solution-mode', choices=['first', 'collect'], default='first')
     parser.add_argument('--collect-until-depth', type=int)
-    parser.add_argument('--max-collected-solutions', type=int, default=100)
+    parser.add_argument('--max-collected-solutions', type=int, default=100_000)
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--ingest-url', default='https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results')
     parser.add_argument('--publication-json', type=Path)
@@ -118,7 +126,7 @@ def main():
         plan = runtime_plan(args.beam, b_micro=args.b_micro, model_micro=args.model_micro)
         # Reuse the existing public profiles' RAM/disk contract and explicit
         # depth cap. Beam is never reduced to fit history.
-        ram, disk = _derive_history_budgets(_available_ram_bytes(), shutil.disk_usage('/tmp').free)
+        ram, disk = history_budgets(_available_ram_bytes(), shutil.disk_usage('/tmp').free)
         requested_depth = args.depth
         budget_depth = maximum_history_depth(plan, 30, args.touch_radius, ram, disk)
         args.depth = min(requested_depth, budget_depth)

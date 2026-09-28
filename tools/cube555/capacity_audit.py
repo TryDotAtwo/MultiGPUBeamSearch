@@ -8,7 +8,7 @@ import time
 from types import SimpleNamespace
 
 from tools.cube555.inference_benchmark import benchmark
-from tools.cube555.run import configuration, runtime_plan, DEFAULT_BEAM
+from tools.cube555.run import configuration, runtime_plan, DEFAULT_BEAM, history_budgets
 from tools.cube555.export import export_blend
 from tools.cube555.smoke import make_fixture
 from tools.cube555.telemetry import Telemetry
@@ -41,7 +41,7 @@ def main():
         out=a.output/job['name'];out.mkdir();row={k:v for k,v in job.items() if k!='competition'}
         cfg.competition=job['competition'];cfg.beam=job['beam'];cfg.depth=job['depth'];cfg.touch_radius=job['radius']
         plan=runtime_plan(cfg.beam,model_micro=micro)
-        ram,disk=_derive_history_budgets(_available_ram_bytes(),shutil.disk_usage('/tmp').free)
+        ram,disk=history_budgets(_available_ram_bytes(),shutil.disk_usage('/tmp').free)
         row.update(plan=asdict(plan),history_ram_bytes=ram,history_disk_bytes=disk,budget_max_depth=maximum_history_depth(plan,30,cfg.touch_radius,ram,disk))
         contract=load_puzzle_contract(info,cfg.competition/'test.csv',cfg.competition/'sample_submission.csv',job['pid'],job['pid'])
         monitor=Telemetry(out);monitor.start();start=time.monotonic()

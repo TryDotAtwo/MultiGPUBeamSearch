@@ -34,7 +34,10 @@ Cube555 capacity is checked by the native
 `B_MICRO=8192` is the outer parent transaction. `MODEL_MICRO` independently limits
 one LibTorch forward. The original Transformer registry selects shards, Stream4
 buffers and final exchange chunks from the requested width.
-History uses the existing public RAM/disk budget. Preflight explicitly reports
+History uses at most 24 GB RAM, preserves at least 6 GB of available RAM
+for runtime overhead, and uses 50 GiB scratch disk. Default depth is 140.
+Collect mode needs extra GPU buffers: at beam 2**25 it is rejected by the
+current T4 memory guard regardless of the 100,000 output limit. Preflight explicitly reports
 requested/effective MAX_DEPTH; beam is never silently reduced to fit history.
 All returned solutions are replayed. Both rank logs and provenance are retained.
 `gpu_samples.csv` samples both GPUs every second, and `performance.json` records
@@ -55,14 +58,14 @@ RESMLP_CHECKPOINT_PATH = MODEL_ROOT / "q555_2k_BEST.pt"  # ResMLP
 PUZZLE_ID_START = 1020  # inclusive
 PUZZLE_ID_END = 1020  # inclusive
 BEAM_WIDTH = 2**25  # any requested width; pipeline profile is selected automatically
-MAX_DEPTH = 200
+MAX_DEPTH = 140
 TRANSFORMER_WEIGHT = 0.8  # 0 = ResMLP, 1 = Transformer
 
 REFLECT_MODE = "off"  # off | after_original | only
 REFLECT_SOURCE_CSV = None  # path to solutions CSV; required for "only"
 SOLUTION_MODE = "first"  # first | collect
 COLLECT_UNTIL_DEPTH = MAX_DEPTH  # used by "collect"; capped to history budget
-MAX_COLLECTED_SOLUTIONS = 100
+MAX_COLLECTED_SOLUTIONS = 100_000
 
 KAGGLE_OWNER = "trydotatwo"
 KAGGLE_SLUG = "cube555-native-2xt4-blend"
@@ -76,7 +79,7 @@ TOUCH_BFS_RADIUS = 4
 B_MICRO = 8192
 MODEL_MICRO = 512
 PUBLISH_RESULTS = True
-KAGGLE_VERSION = 7
+KAGGLE_VERSION = 8
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:
     raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")

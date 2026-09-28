@@ -107,3 +107,14 @@ def test_reflection_and_collection_config_reaches_runner(tmp_path, mode):
     assert cfg.solution_mode == 'collect'
     assert cfg.collect_until_depth == 80
     assert cfg.max_collected_solutions == 100
+
+
+def test_cube555_history_reserves_runtime_memory():
+    from tools.cube555.run import history_budgets
+    from tools.cayleypy_public.runner import maximum_history_depth
+    ram, disk = history_budgets(31_000_000_000, 80 * 1024**3)
+    assert ram == 24_000_000_000
+    assert maximum_history_depth(runtime_plan(2**25), 30, 4, ram, disk) == 148
+    ram, disk = history_budgets(20_000_000_000, 80 * 1024**3)
+    assert ram == 14_000_000_000
+    assert maximum_history_depth(runtime_plan(2**25), 30, 4, ram, disk) < 140

@@ -602,3 +602,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User asks to calculate suitable Cube555 BFS radius4 vs5 rather than keep radius2.
 
 2026-09-28: User explicitly requests KAGGLE_OWNER/KAGGLE_SLUG, REFLECT_MODE/REFLECT_SOURCE_CSV and SOLUTION_MODE/COLLECT_UNTIL_DEPTH/MAX_COLLECTED_SOLUTIONS in first cell.
+
+2026-09-28: User requests MAX_COLLECTED_SOLUTIONS100000 and memory-appropriate MAX_DEPTH on Kaggle.
