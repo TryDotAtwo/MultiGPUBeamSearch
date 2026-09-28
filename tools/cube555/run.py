@@ -165,6 +165,8 @@ def main():
                 _materialize_run_artifacts(error.partial_artifacts, out)
                 raise
             result = _materialize_run_artifacts(artifacts, out)
+            summary['status'] = 'publishing'
+            save()
             publication = _publish_best_effort(configuration(args, pid, info), contracts[pid], model,
                 {'profile_registry_schema_version': 1, 'evidence': profile_evidence},
                 plan, summary['gpus'], artifacts, out, time.monotonic() - start)

@@ -28,3 +28,14 @@ def test_high_index_150_facelet_replay_and_blend_provenance():
 def test_false_555_solution_rejected():
     c,s=inputs(); s['path']=''; s['original_oriented_path']=''
     with pytest.raises(ValueError):build_result_envelope(c,s)
+
+
+def test_generator_schema_cache_rejects_mutated_content():
+    from tools.cayleypy_public.results import _validate_publish_envelope
+    c,s=inputs()
+    envelope=build_result_envelope(c,s)
+    _validate_publish_envelope(envelope)
+    bad=copy.deepcopy(envelope)
+    bad['proof']['generators']['swap'][0]=True
+    with pytest.raises(ValueError):
+        _validate_publish_envelope(bad)

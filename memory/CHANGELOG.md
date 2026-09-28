@@ -1100,3 +1100,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Restored four model/layout/generator artifacts from local copy; all SHA256 match validated export. Notebook builder now uses trydotatwo/cube555-transformer-resmlp-artifacts; original author attribution preserved.
 
 2026-09-28: Cube555 beam cap/default4000000; tiers2**16..2**21 then4000000, depth capped140, BFS5. Full rank0 log proves100000 solutions completed116.677s while notebook timed out3600s and displayed13033 solution lines. Throttle solution console records to first3/every1000; retain all TSV records, flush every1000. End-to-end GPU verification pending.
+
+2026-09-28: Measured full envelope validation25.59ms/result locally (~2559s/100000 per pass). Memoize only generator-schema subtree by immutable canonical content (bounded32 entries); retain per-result schema/replay/hash checks. GPU collect after console throttling completed100000 in40.31s atBFS5; CPU publication still pending.

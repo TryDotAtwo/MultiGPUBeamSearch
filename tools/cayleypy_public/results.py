@@ -273,9 +273,31 @@ def _schema_validator() -> Draft202012Validator:
     return Draft202012Validator(schema)
 
 
+@lru_cache(maxsize=1)
+def _schema_without_generator_recheck() -> Draft202012Validator:
+    # Only this subtree is memoized; every other schema constraint still runs.
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    schema["$defs"]["result"]["properties"]["proof"]["properties"]["generators"] = {}
+    return Draft202012Validator(schema)
+
+
+@lru_cache(maxsize=32)
+def _validate_generator_schema_bytes(encoded: bytes) -> None:
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    subtree = schema["$defs"]["result"]["properties"]["proof"]["properties"]["generators"]
+    Draft202012Validator({"$defs": schema["$defs"], **subtree}).validate(json.loads(encoded))
+
+
 def _validate_schema(envelope: Mapping[str, object]) -> None:
     try:
-        _schema_validator().validate({"schema_version": SCHEMA_VERSION, "results": [envelope]})
+        proof = envelope.get("proof")
+        if isinstance(proof, Mapping) and "generators" in proof:
+            # Key by immutable canonical contents, never mutable identity or a supplied hash.
+            _validate_generator_schema_bytes(_canonical_bytes(proof["generators"]))
+            validator = _schema_without_generator_recheck()
+        else:
+            validator = _schema_validator()
+        validator.validate({"schema_version": SCHEMA_VERSION, "results": [envelope]})
     except ValidationError as error:
         raise ValueError("result envelope violates the exact v1 JSON schema") from error
 

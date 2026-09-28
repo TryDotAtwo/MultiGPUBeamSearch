@@ -544,6 +544,8 @@ def _publication_envelopes(
         if record.source_solution_sha256 is not None:
             solution["source_solution_sha256"] = record.source_solution_sha256
         envelopes.append(build_result_envelope(result_context, solution))
+        if len(envelopes) % 1000 == 0:
+            print(f"[publication] prepared={len(envelopes)}/{len(artifacts.solution_records)}", flush=True)
     return envelopes
 
 
