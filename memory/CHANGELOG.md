@@ -1090,3 +1090,5 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Set notebook and Cube555 CLI default solution_mode=collect. Running v8 predates bounded nonfatal collection and cannot validate it; subsequent one-slot GPU validation is required before claiming public readiness.
 
 2026-09-28: Public v9 saved via official SDK ApiSaveKernelRequest.kernel_execution_type=KernelExecutionType.QUICK_SAVE (no second GPU run). Remote first cell collect/100000/140 verified. Runtime3786a426.23 Cube555 tests passed. Public readiness still requires native bounded-collect/overflow/full-beam/publication validation after v8 frees the single allocated GPU slot.
+
+2026-09-28: Exact SDK DownloadKernelOutput(version_number=8) returned a22-byte empty ZIP after cancellation. UI No Active Events; logs0B/stale Running. Cause undetermined. Added30-second GPU memory/utilization/power and stage heartbeat plus bounded tails of known per-rank progress records. Do not relaunch unbounded v8.

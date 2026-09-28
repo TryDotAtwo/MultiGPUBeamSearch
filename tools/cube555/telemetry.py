@@ -15,6 +15,7 @@ class Telemetry:
 
     def sample(self):
         start = time.monotonic()
+        last_report = -30.0
         with (self.output / 'gpu_samples.csv').open('w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(['elapsed_s', 'gpu', 'used_mib', 'total_mib', 'gpu_util_pct', 'power_w'])
@@ -24,6 +25,32 @@ class Telemetry:
                     for row in csv.reader(p.stdout.splitlines()):
                         writer.writerow([round(time.monotonic()-start, 3), *[v.strip() for v in row]])
                     f.flush()
+                    elapsed = time.monotonic() - start
+                    if elapsed - last_report >= 30:
+                        last_report = elapsed
+                        stage = 'initializing'
+                        status_path = self.output / 'run_summary.json'
+                        if status_path.exists():
+                            try:
+                                status = json.loads(status_path.read_text())
+                                stage = status.get('status', stage)
+                            except (OSError, ValueError):
+                                pass
+                        print(f'[progress] elapsed={elapsed:.0f}s stage={stage} '
+                              f'GPU(index,MiB,totalMiB,util%,W)={p.stdout.strip().replace(chr(10), " | ")}', flush=True)
+                        # Native depth logs can be quiet during a long full beam layer.
+                        # Print only known progress records, never arbitrary log contents.
+                        for log in sorted(self.output.rglob('stdout.log')):
+                            try:
+                                with log.open('rb') as stream:
+                                    stream.seek(max(0, log.stat().st_size - 8192))
+                                    tail = stream.read().decode('utf-8', errors='replace')
+                                lines = [line for line in tail.splitlines() if
+                                         re.search(r'depth_done=|puzzle_solved=|collection_truncated=|solved_neighborhood_entries=', line)]
+                                if lines:
+                                    print(f'[rank-progress {log.parent.name}] {lines[-1]}', flush=True)
+                            except OSError:
+                                pass
                 except (OSError, subprocess.SubprocessError) as e:
                     (self.output / 'telemetry_error.txt').write_text(str(e))
                     return

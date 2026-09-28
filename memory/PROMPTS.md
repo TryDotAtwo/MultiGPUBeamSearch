@@ -612,3 +612,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User allocates exactly ONE of two Kaggle GPU session slots to this task. Stop redundant own run; never launch a second concurrent GPU job.
 
 2026-09-28: User requires collect as the default solution mode and asks whether notebook completion establishes readiness for others.
+
+2026-09-28: User stopped v8 because it appeared hung. Diagnose without treating missing output as proof of deadlock.
