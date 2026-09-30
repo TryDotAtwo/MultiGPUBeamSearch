@@ -1,0 +1,26 @@
+{
+  "source_cell_texts_types_order_exact_match": true,
+  "api_source_line_segmentation_differs": true,
+  "public": true,
+  "runtime_config": {
+    "SOLVER_COMMIT": "10824003c11693aad36ed467cb93183a14d44d93",
+    "BEAM_WIDTH": 4000000,
+    "MAX_DEPTH": 140,
+    "TRANSFORMER_WEIGHT": 0.8,
+    "SOLUTION_MODE": "collect",
+    "MAX_COLLECTED_SOLUTIONS": 2000,
+    "TOUCH_BFS_RADIUS": 5,
+    "MODEL_MICRO": 512,
+    "KAGGLE_OWNER": "trydotatwo",
+    "KAGGLE_SLUG": "cube555-native-2xt4-blend"
+  },
+  "normalized_cell_text_sha256": "a46564eea927b06745a0934cfe5a9a745daddd458979684a8a5f2f30eb40042a",
+  "outputs_present": false,
+  "remote_source_file": "D:\\100XH100\\test_results\\cube555_20260930_handoff\\public_current_refresh\\cube555-native-2xt4-blend.ipynb",
+  "dataset_files_available": [
+    "q555_f1_bell2k.pt",
+    "q555_2k_BEST.pt",
+    "piece_layout_555.json",
+    "puzzle_info.json"
+  ]
+}
