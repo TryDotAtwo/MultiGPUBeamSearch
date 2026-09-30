@@ -9,12 +9,15 @@
       "missing": 1350
     },
     "ingest/staging": {
-      "head": "eb7ddd6b4926ed6f10f1e3f694a9800eb5fb0f39",
-      "present": 770,
-      "exact_original_blob_matches": 770,
+      "head": "b6942db74287885726e23986d0bb1a2ea5430638",
+      "present": 890,
+      "exact_original_blob_matches": 890,
       "mismatched": 0,
-      "missing": 1230
+      "missing": 1110
     }
   },
-  "checked_at": "2026-09-30T17:18:00.264Z"
+  "checked_at": "2026-09-30T17:27:21.633Z",
+  "original_archive_sha256": "25d9c70a88e49d3c9c228bfb24a9f07a14f10e334fa340df9f8a59ea90a80889",
+  "d1_snapshot_sha256": "63aeea6507355f3529e91411da2a6814263ef7eefb8e4f482313e9a70d52d7d1",
+  "ledger_sha256": "6e81f6d456173e80aa5ea0abcf1a3e759147370e2d4a6f56758e74c7ddfca004"
 }

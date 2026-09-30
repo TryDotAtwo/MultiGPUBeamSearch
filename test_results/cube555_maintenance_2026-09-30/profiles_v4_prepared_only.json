@@ -1,0 +1,30 @@
+{
+  "state": "PREPARED_NOT_LAUNCHED",
+  "runtime_pin": "13533af0e33bbc1801528fb85d0fc25d021702cc",
+  "model_micro": 512,
+  "collect_limit": 2000,
+  "budget_depth": 140,
+  "touch_radius": 5,
+  "probe_depth": 9,
+  "gpu_slot_limit": 1,
+  "launch_after": "official CLI confirms retained long acceptance terminal",
+  "notebook_sha256": "9e49170f954fc8f08b3c4e1ff6408b0e2ad9c25448d1e685fe04b6dde9e811f9",
+  "requested_profiles": [
+    2097152
+  ],
+  "expected_rows": [
+    "smoke",
+    "capacity-2097152",
+    "saturated-2097152"
+  ],
+  "reused_evidence": "width_v3_recovered.json:all7allocation+5saturated512 rows;4m long run retained",
+  "overflow_probe": {
+    "pid": 35,
+    "beam": 65536,
+    "depth": 1,
+    "bfs_radius": 5,
+    "collect_limit": 1,
+    "expected": "truncated/dropped>0,1replayedsolution,exit0",
+    "state": "PREPARED_NOT_RUN"
+  }
+}

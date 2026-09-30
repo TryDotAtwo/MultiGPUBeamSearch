@@ -1,0 +1,32 @@
+{
+  "scope": "live partial run; no terminal or solution evidence",
+  "latest_rank_rows": [
+    {
+      "rank": 0,
+      "depth": 24,
+      "seconds": 381.811,
+      "frontier": 2002944,
+      "history_bytes": 676566544,
+      "disk_bytes": 644519440
+    },
+    {
+      "rank": 1,
+      "depth": 24,
+      "seconds": 381.811,
+      "frontier": 2002944,
+      "history_bytes": 676566528,
+      "disk_bytes": 644519424
+    }
+  ],
+  "recent_full_layer_seconds": {
+    "min": 378.962,
+    "median": 380.68050000000005,
+    "max": 381.938
+  },
+  "sampled_gpu_mib_peaks": [
+    4965,
+    4985
+  ],
+  "projection_is_not_guarantee": true,
+  "raw_log": "D:\\100XH100\\test_results\\cube555_20260930_handoff\\long_live_latest.log"
+}
