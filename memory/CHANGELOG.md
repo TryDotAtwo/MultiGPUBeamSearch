@@ -1106,3 +1106,15 @@ Public v2 code cells verified against remote. Real PID35 POST reached Cloudflare
 2026-09-28: Acceptance launches collect v3 and width v2 pinned c5f1b159. Static audit found gzip builder omitted server 64MiB decompressed / 2000-result limits; enforce both and retry HTTP429 at 60s up to three retries while preserving local archives. GPU acceptance remains pending.
 
 2026-09-28: User supersedes 100000 collection default: set MAX_COLLECTED_SOLUTIONS=2000 for Cube555 notebook and launcher; acceptance uses 2000.
+
+
+2026-09-30: Read-only Kaggle audit: publicv12 COMPLETE with empty outputs; smokev3 COMPLETE; collect acceptancev4 ERROR solely at publication assertion (HTTP503), native complete with2000 PID35 solutions; widthv2 COMPLETE at earlier pin/model128 with seven saturated depth9 tiers. Synced generated notebook/metadata and README to publicv12 runtime90b5d788/current defaults; changed only generator version label11->12, no native solver changes or external writes. Evidence and CPU checks under test_results/cube555_readiness_2026-09-30.
+
+Readiness closure evidence:87 CPU tests passed; all2000 saved envelopes passed schema/replay/hash; exact version outputs matched; both width ranks saturated all tiers. GitHub main29641749 contains none of current2000 IDs. Remotev12 and generated local cell texts match. Open gates remain delivery/promotion, saturated model512 collect validation and long-target current-default completion. Full report:test_results/cube555_readiness_2026-09-30.md.
+
+
+2026-09-30 Cube555 retry preparation: SELECT-only D1 audit finds0 current2000 semantic keys (one historical PID35 row); destination normal/ok, current deploymentf90367b7 unchanged. Historical503 body was not retained, so exact cause remains unproven. Fixed archive per-part counts, persist-all-before-send, bounded retries for retryable statuses including503/partial202, bounded allowlisted503 detail and atomic verified key/server-receipt ledger. Added offline-only prepare_retry preserving original IDs/semantics and filtering D1/verified receipt keys; prepared20x100 real2000 files, no external POST. Native scorer/GPU code and runtime pin unchanged; previous notebook/docs dirty edits retained. Tests/evidence under test_results/cube555_retry_2026-09-30.
+
+Retry-stage validation:122 Python tests and78 Worker tests passed; real2000 archives lossless20x100,40 local fault-injected calls and2000 unique accepted keys;0 real publication POSTs. Previous dirty edits retained, HEAD90b5d788 unchanged. Report:test_results/cube555_retry_2026-09-30.md.
+
+2026-09-30: Local handoff reviewed; 93 receipt/retry/result/CLI tests passed. Refreshed D1 after transient7403: no collect-v4 keys accepted. Started sequential preserved-envelope delivery. Capacity audit now explicitly tests production model512/collect2000/MAX_DEPTH140, collecting through bounded test depth; all allocation failures are fatal acceptance failures.

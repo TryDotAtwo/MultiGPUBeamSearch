@@ -24,13 +24,15 @@ def main():
     p.add_argument('--competition',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--full-depth',type=int,default=9)
+    p.add_argument('--model-micro',type=int,default=512)
     a=p.parse_args(); a.output.mkdir(parents=True,exist_ok=False)
     gpus=validate_t4_hardware()
-    micro=benchmark(a.assets,a.output/'inference_comparison.json')
+    micro=a.model_micro
+    if not 1 <= micro <= 8192: p.error('--model-micro must be in [1,8192]')
     info=a.assets/'puzzle_info.json'
     manifest=export_blend(a.assets/'q555_f1_bell2k.pt',a.assets/'q555_2k_BEST.pt',a.assets/'piece_layout_555.json',info,a.output/'export')
     model=ExportedModel('cube555-q-blend','fp16',manifest['script_sha256'],manifest,'piece_transformer')
-    cfg=SimpleNamespace(assets=a.assets,competition=a.competition,beam=DEFAULT_BEAM,depth=a.full_depth,touch_radius=5)
+    cfg=SimpleNamespace(assets=a.assets,competition=a.competition,beam=DEFAULT_BEAM,depth=140,touch_radius=5,solution_mode="collect",collect_until_depth=a.full_depth,max_collected_solutions=2000)
     runner=locate_or_build_runner(a.output,info,backend='piece_transformer',config=configuration(cfg,1020,info))
     fixture=Path('/tmp/cube555_macro_micro_fixture');make_fixture(a.assets,fixture)
     jobs=[dict(name='smoke',beam=8192,depth=6,pid=3,competition=fixture,radius=0)]
@@ -39,7 +41,7 @@ def main():
     report=dict(gpus=gpus,outer_parent_batch=8192,model_microbatch=micro,rows=[],note='Depth2 probes validate allocation only. Depth9 loops require rank-log proof of a full local frontier to establish saturated throughput. All supported widths must pass allocation.')
     for job in jobs:
         out=a.output/job['name'];out.mkdir();row={k:v for k,v in job.items() if k!='competition'}
-        cfg.competition=job['competition'];cfg.beam=job['beam'];cfg.depth=job['depth'];cfg.touch_radius=job['radius']
+        cfg.competition=job['competition'];cfg.beam=job['beam'];cfg.depth=140;cfg.collect_until_depth=job['depth'];cfg.touch_radius=job['radius']
         plan=runtime_plan(cfg.beam,model_micro=micro)
         ram,disk=history_budgets(_available_ram_bytes(),shutil.disk_usage('/tmp').free)
         row.update(plan=asdict(plan),history_ram_bytes=ram,history_disk_bytes=disk,budget_max_depth=maximum_history_depth(plan,30,cfg.touch_radius,ram,disk))
@@ -61,7 +63,7 @@ def main():
             print(json.dumps(row),flush=True)
         if job['name']=='smoke' and row['status']!='complete':
             raise RuntimeError('smoke failed; capacity tests aborted')
-    if any(r['status']!='complete' for r in report['rows'] if r['name']=='smoke' or r['name'].startswith('saturated-')):
+    if any(r['status']!='complete' for r in report['rows']):
         raise RuntimeError('requested Cube555 configuration failed')
 
 

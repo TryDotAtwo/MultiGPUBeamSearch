@@ -8,7 +8,7 @@
   "enable_gpu": true,
   "enable_internet": true,
   "dataset_sources": [
-    "artgor/cube555-tpu-artifacts"
+    "trydotatwo/cube555-transformer-resmlp-artifacts"
   ],
   "competition_sources": [
     "cayley-py-555-cube"

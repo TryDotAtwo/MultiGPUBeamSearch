@@ -899,13 +899,15 @@ def test_build_result_archives_splits_only_when_compressed_archive_exceeds_limit
 def test_publish_result_archive_posts_one_gzip_request_with_part_metadata(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
-    envelopes = [build_result_envelope(_context(), _solution()) for _ in range(3)]
+    envelopes = [build_result_envelope(_context(), {**_solution(), "collection_index": i}) for i in range(3)]
     archive = results_module.build_result_archives(envelopes)[0]
     observed: dict[str, object] = {}
 
     def fake_urlopen(request, timeout):
         observed.update(request=request, timeout=timeout)
-        return _FakeResponse(202)
+        response = _FakeResponse(202)
+        response.read = lambda limit: json.dumps({"receipts": [{"submission_id": str(uuid.uuid4()), "idempotency_key": e["idempotency_key"]} for e in envelopes]}).encode()
+        return response
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(results_module, "urlopen", fake_urlopen)

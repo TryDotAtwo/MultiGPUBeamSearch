@@ -46,6 +46,8 @@ def test_public_cli_uses_only_config_and_output_and_materializes_fake_run(
     record = SolutionRecord(7, "original", "", "", 0, 0, None, True, (0, 1, 2))
     artifacts = RunArtifacts((record,), pd.DataFrame({"initial_state_id": [7], "path": [""]}), (), (), (0,), (0.1,), ("first_solution",))
 
+    from types import SimpleNamespace
+    monkeypatch.setattr(public_cli.shutil, "disk_usage", lambda path: SimpleNamespace(free=1024**4))
     monkeypatch.setattr(public_cli, "validate_t4_hardware", lambda: ["Tesla T4", "Tesla T4"])
     monkeypatch.setattr(public_cli, "load_puzzle_contract", lambda *args: contract)
     monkeypatch.setattr(public_cli, "export_checkpoint", lambda *args, **kwargs: model)
@@ -188,6 +190,8 @@ def test_main_failed_search_materializes_partial_and_always_writes_publish_statu
         "parent_batch": 1, "stream3_batch_candidates": 2, "shard_capacity_candidates": 1024,
         "cross_puzzle_profile_note": ""})()
     partial = _one_solution_artifacts()
+    from types import SimpleNamespace
+    monkeypatch.setattr(public_cli.shutil, "disk_usage", lambda path: SimpleNamespace(free=1024**4))
     monkeypatch.setattr(public_cli, "validate_t4_hardware", lambda: ["Tesla T4", "Tesla T4"])
     monkeypatch.setattr(public_cli, "load_puzzle_contract", lambda *args: contract)
     monkeypatch.setattr(public_cli, "export_checkpoint", lambda *args, **kwargs: model)
@@ -198,7 +202,7 @@ def test_main_failed_search_materializes_partial_and_always_writes_publish_statu
     monkeypatch.setattr(public_cli, "run_public_search", lambda *args, **kwargs: (_ for _ in ()).throw(PublicSearchRunError("rank failed", partial)))
     if publish_enabled:
         monkeypatch.setattr(public_cli, "_publication_envelopes", lambda *args, **kwargs: [{"client_submission_id": "partial"}])
-        monkeypatch.setattr(public_cli, "build_result_archives", lambda items: [b"archive"])
+        monkeypatch.setattr(public_cli, "build_result_archives", lambda items: [__import__("gzip").compress(json.dumps({"schema_version": 1, "results": items}).encode(), mtime=0)])
         monkeypatch.setattr(public_cli, "publish_result_archive", lambda *args, **kwargs: PublishStatus(True, False, None, 202, 1, False, "https://ingest.example.test"))
     calls: list[RunArtifacts] = []
     original_publish = public_cli._publish_best_effort
@@ -278,9 +282,13 @@ def test_best_effort_sends_archives_sequentially_with_one_request_each(tmp_path:
     calls: list[tuple[bytes, int, int, int]] = []
 
     monkeypatch.setattr(public_cli, "_publication_envelopes", lambda *args, **kwargs: envelopes)
-    monkeypatch.setattr(public_cli, "build_result_archives", lambda items: [b"archive-0", b"archive-1"], raising=False)
+    import gzip
+    archives = [gzip.compress(json.dumps({"schema_version": 1, "results": part}).encode(), mtime=0) for part in [envelopes[:2], envelopes[2:]]]
+    monkeypatch.setattr(public_cli, "build_result_archives", lambda items: archives, raising=False)
 
     def publish(url, archive, *, result_count, archive_index, archive_count):
+        assert (tmp_path / "results-000.json.gz").read_bytes() == archives[0]
+        assert (tmp_path / "results-001.json.gz").read_bytes() == archives[1]
         calls.append((archive, result_count, archive_index, archive_count))
         return PublishStatus(True, False, None, 202, result_count, False, "https://ingest.example.test")
 
@@ -292,8 +300,43 @@ def test_best_effort_sends_archives_sequentially_with_one_request_each(tmp_path:
     )
 
     assert calls == [
-        (b"archive-0", 3, 0, 2),
-        (b"archive-1", 3, 1, 2),
+        (archives[0], 2, 0, 2),
+        (archives[1], 1, 1, 2),
     ]
     assert status["ok"] is True
     assert status["archive_count"] == 2
+
+
+@pytest.mark.parametrize("first_code", [429, 503, None, 202])
+def test_best_effort_retries_identical_saved_archive_for_retryable_outcomes(tmp_path, monkeypatch, first_code):
+    import gzip
+    from types import SimpleNamespace
+    envelopes = [{"client_submission_id": "original-id"}]
+    archive = gzip.compress(json.dumps({"schema_version": 1, "results": envelopes}).encode(), mtime=0)
+    monkeypatch.setattr(public_cli, "_publication_envelopes", lambda *args: envelopes)
+    monkeypatch.setattr(public_cli, "build_result_archives", lambda items: [archive])
+    calls, sleeps = [], []
+    def publish(url, body, **kwargs):
+        calls.append(body)
+        return PublishStatus(len(calls) > 1, len(calls) == 1, "temporary" if len(calls) == 1 else None, first_code if len(calls) == 1 else 202, 1, False, "https://ingest.example")
+    monkeypatch.setattr(public_cli, "publish_result_archive", publish)
+    monkeypatch.setattr(public_cli.time, "sleep", sleeps.append)
+    result = public_cli._publish_best_effort(SimpleNamespace(publish_results=True, results_ingest_url="https://ingest.example"), None, None, {}, None, [], None, tmp_path, 0)
+    assert result["ok"] and calls == [archive, archive] and sleeps == [60]
+    assert (tmp_path / "results-000.json.gz").read_bytes() == archive
+
+
+def test_best_effort_retry_budget_is_bounded(tmp_path, monkeypatch):
+    import gzip
+    from types import SimpleNamespace
+    archive = gzip.compress(json.dumps({"schema_version": 1, "results": [{"client_submission_id": "original-id"}]}).encode(), mtime=0)
+    monkeypatch.setattr(public_cli, "_publication_envelopes", lambda *args: [{"client_submission_id": "original-id"}])
+    monkeypatch.setattr(public_cli, "build_result_archives", lambda items: [archive])
+    calls, sleeps = [], []
+    def publish(url, body, **kwargs):
+        calls.append(body)
+        return PublishStatus(False, True, "HTTP503", 503, 1, False, "https://ingest.example")
+    monkeypatch.setattr(public_cli, "publish_result_archive", publish)
+    monkeypatch.setattr(public_cli.time, "sleep", sleeps.append)
+    result = public_cli._publish_best_effort(SimpleNamespace(publish_results=True, results_ingest_url="https://ingest.example"), None, None, {}, None, [], None, tmp_path, 0)
+    assert not result["ok"] and len(calls) == 4 and sleeps == [60, 60, 60]

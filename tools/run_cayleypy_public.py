@@ -31,6 +31,7 @@ from tools.cayleypy_public.results import (
     build_result_envelope,
     publish_results,
     publish_result_archive,
+    read_result_archive,
 )
 from tools.cayleypy_public.runner import (
     PublicSearchRunError, RunArtifacts, maximum_history_depth, run_public_search,
@@ -623,17 +624,20 @@ def _publish_best_effort(
         archives = build_result_archives(envelopes)
         statuses = []
         with _working_directory(output_dir):
+            # Persist every part before the first external request.
             for archive_index, archive in enumerate(archives):
                 Path(f'results-{archive_index:03d}.json.gz').write_bytes(archive)
+            for archive_index, archive in enumerate(archives):
+                part_count = len(read_result_archive(archive))
                 for attempt in range(4):
                     published = publish_result_archive(
                         config.results_ingest_url, archive,
-                        result_count=len(envelopes), archive_index=archive_index,
+                        result_count=part_count, archive_index=archive_index,
                         archive_count=len(archives),
                     )
-                    if published.status_code != 429 or attempt == 3:
+                    if not published.retryable or attempt == 3:
                         break
-                    print(f"[publication] archive={archive_index + 1}/{len(archives)} rate_limited; retry in 60s", flush=True)
+                    print(f"[publication] archive={archive_index + 1}/{len(archives)} retryable HTTP={published.status_code}; retry in 60s", flush=True)
                     time.sleep(60)
                 statuses.append(published)
                 print(f"[publication] archive={archive_index + 1}/{len(archives)} HTTP={published.status_code} ok={published.ok}", flush=True)

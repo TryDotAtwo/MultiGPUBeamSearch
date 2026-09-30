@@ -10,6 +10,8 @@ from hashlib import sha256
 from ipaddress import ip_address
 import json
 import gzip
+from io import BytesIO
+import re
 import math
 import os
 from pathlib import Path
@@ -695,6 +697,83 @@ def publish_results(
         retryable=status_code == 429 or status_code >= 500,
         status_code=status_code,
     )
+
+MAX_RECEIPT_BYTES = 1024 * 1024
+_SAFE_SERVER_CODES = frozenset({"ingest_disabled", "rate_limit_unavailable", "status_unavailable", "ingest_failed"})
+
+
+def read_result_archive(archive: bytes) -> list[dict]:
+    """Decode a bounded archive without changing envelope identities."""
+    if not isinstance(archive, bytes) or not archive.startswith(b"\x1f\x8b"):
+        raise ValueError("publish archive is not gzip")
+    if len(archive) > MAX_PUBLISH_ARCHIVE_BYTES:
+        raise ValueError("publish archive exceeds 32 MiB")
+    with gzip.GzipFile(fileobj=BytesIO(archive)) as source:
+        body = source.read(MAX_DECOMPRESSED_ARCHIVE_BYTES + 1)
+    if len(body) > MAX_DECOMPRESSED_ARCHIVE_BYTES:
+        raise ValueError("publish archive exceeds decompressed limit")
+    batch = json.loads(body)
+    if not isinstance(batch, dict) or batch.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("invalid archive schema version")
+    items = batch.get("results")
+    if not isinstance(items, list) or not 1 <= len(items) <= MAX_ARCHIVE_RESULTS:
+        raise ValueError("invalid archive result count")
+    if any(not isinstance(item, dict) for item in items):
+        raise ValueError("invalid archive result")
+    return items
+
+
+def _archive_receipts(response, expected_keys: set[str], archive: bytes) -> bool:
+    """Persist only verified key/receipt IDs; incomplete acceptance is retryable."""
+    raw = response.read(MAX_RECEIPT_BYTES + 1)
+    if len(raw) > MAX_RECEIPT_BYTES:
+        raise ValueError("receipt response exceeds limit")
+    body = json.loads(raw)
+    if not isinstance(body, dict) or not isinstance(body.get("receipts"), list):
+        raise ValueError("missing archive receipts")
+    receipts = {}
+    for item in body["receipts"]:
+        if not isinstance(item, dict):
+            raise ValueError("invalid archive receipt")
+        key, submission = item.get("idempotency_key"), item.get("submission_id")
+        if key not in expected_keys or not isinstance(submission, str) or not re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", submission):
+            raise ValueError("unexpected archive receipt")
+        if key in receipts:
+            raise ValueError("duplicate archive receipt key")
+        receipts[key] = {"idempotency_key": key, "submission_id": submission}
+    target = Path.cwd() / "publish_receipts.json"
+    ledger = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {"schema_version": 1, "archives": {}}
+    digest = sha256(archive).hexdigest()
+    previous = ledger["archives"].get(digest, {}).get("receipts", [])
+    merged = {item["idempotency_key"]: item for item in previous}
+    if any(key in merged and merged[key]["submission_id"] != item["submission_id"] for key, item in receipts.items()):
+        raise ValueError("receipt ID changed for an accepted idempotency key")
+    merged.update(receipts)
+    ledger["archives"][digest] = {"receipts": list(merged.values())}
+    temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("wb") as handle:
+            handle.write(_canonical_bytes(ledger) + b"\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    return len(receipts) == len(expected_keys) and not body.get("errors")
+
+
+def _archive_server_code(error: HTTPError) -> str | None:
+    try:
+        raw = error.read(2049)
+        if len(raw) > 2048:
+            return None
+        code = json.loads(raw).get("error")
+        return code if code in _SAFE_SERVER_CODES else None
+    except Exception:
+        return None
+
+
 def publish_result_archive(
     url: str,
     archive: bytes,
@@ -721,6 +800,12 @@ def publish_result_archive(
     if not math.isfinite(timeout) or timeout <= 0:
         return _failure(endpoint, result_count, "publish timeout is invalid", retryable=False)
     try:
+        items = read_result_archive(archive)
+        if len(items) != result_count:
+            raise ValueError("archive result count mismatch")
+        expected_keys = {item["idempotency_key"] for item in items}
+        if len(expected_keys) != result_count or any(not isinstance(key, str) or not re.fullmatch(r"[0-9a-f]{64}", key) for key in expected_keys):
+            raise ValueError("archive idempotency keys must be unique")
         parsed = urlsplit(url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname:
             raise ValueError("unsupported results endpoint")
@@ -744,9 +829,18 @@ def publish_result_archive(
             if status_code is None:
                 status_code = response.getcode()
             status_code = int(status_code)
+            if status_code in {200, 202}:
+                try:
+                    complete = _archive_receipts(response, expected_keys, archive)
+                except Exception:
+                    return _failure(endpoint, result_count, "archive receipt verification or persistence failed", retryable=True, status_code=status_code)
+                if not complete:
+                    return _failure(endpoint, result_count, "archive acceptance is incomplete; verified receipts saved", retryable=True, status_code=status_code)
     except HTTPError as error:
         status_code = int(error.code)
-        return _failure(endpoint, result_count, f"results endpoint returned HTTP {status_code}", retryable=status_code == 429 or status_code >= 500, status_code=status_code)
+        code = _archive_server_code(error)
+        detail = f" ({code})" if code else ""
+        return _failure(endpoint, result_count, f"results endpoint returned HTTP {status_code}{detail}", retryable=status_code == 429 or status_code >= 500, status_code=status_code)
     except (TimeoutError, URLError, OSError):
         return _failure(endpoint, result_count, "results endpoint is temporarily unavailable", retryable=True)
     except (TypeError, ValueError):

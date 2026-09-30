@@ -626,3 +626,11 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-28: User requests two Kaggle acceptance notebooks to verify public usability of final Cube555 configuration.
 
 2026-09-28: User supersedes 100000 collection default: set MAX_COLLECTED_SOLUTIONS=2000 for Cube555 notebook and launcher; acceptance uses 2000.
+
+
+2026-09-30: Continue only the isolated Cube555 blend worktree. First read current Kaggle statuses/outputs through existing authorized access; verify versions, source/model pins, both ranks, wrapper/replay and promotion. No new GPU runs, pushes, privacy changes or archive delivery. Then minimally synchronize tracked notebook/README with canonical current defaults (collect2000, seven beam tiers through4000000, depth140, BFS5) and record readiness gates.
+
+
+2026-09-30: Diagnose collect-acceptancev4 HTTP503 and prepare a reproducible retry without duplicate accepted decisions. First only read destination/accepted identifiers and run local idempotency/batching/retry/lossless2000 checks. Fix confirmed local errors minimally while retaining dirty edits. No publication, paid GPU or new Kaggle run. Precisely distinguish current model512 evidence from unlaunched current long/saturated gates.
+
+2026-09-30: Ivan explicitly requests coordination with existing Cube555 agent and Astra and continued acceptance work; existing two-slot and publication authorizations retained.
