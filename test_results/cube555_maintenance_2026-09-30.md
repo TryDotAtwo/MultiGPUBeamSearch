@@ -7,3 +7,5 @@ Cron now delegates only scheduledTime to the existing publication DO internal ma
 Local gate:72schema +156runtime testsPASS; tscPASS; Wrangler dry-runPASS, all bindings unchanged. Expected aborted-pipe messages in existing canceled-ingress tests do not indicate gate failure. Live Cron/GitHub exact downstream verification remains pending at this commit.
 
 Long acceptance official CLI RUNNING; one own slot. Current publicv13 runtime pin10824003 remains unchanged (server maintenance independent of notebook/native runtime).
+
+Live follow-up: deployed sourcec37ce051 Cloudflareversionc2fd6e8d-fb23-46e5-a2ab-c53739d0a587. Two Cron events outcomeok CPU0ms/wall~23.6s; maintain RPC outcomesok CPU106/98/10ms; writer alarm outcomeok CPU176ms/wall131904ms. Onealarm canceled observed, no cause inferred. Exact immutableGit tree comparison now650/2000main,770/2000staging,0mismatch. Full drain/promotion stillpending; no all-ready claim.

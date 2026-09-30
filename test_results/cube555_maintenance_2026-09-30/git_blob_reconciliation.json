@@ -1,0 +1,20 @@
+{
+  "original_count": 2000,
+  "branches": {
+    "main": {
+      "head": "1fc91c8ab485bd99350850c6a6c3c7cacf0d65ef",
+      "present": 650,
+      "exact_original_blob_matches": 650,
+      "mismatched": 0,
+      "missing": 1350
+    },
+    "ingest/staging": {
+      "head": "eb7ddd6b4926ed6f10f1e3f694a9800eb5fb0f39",
+      "present": 770,
+      "exact_original_blob_matches": 770,
+      "mismatched": 0,
+      "missing": 1230
+    }
+  },
+  "checked_at": "2026-09-30T17:18:00.264Z"
+}
