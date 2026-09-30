@@ -2,22 +2,22 @@
   "original_count": 2000,
   "branches": {
     "main": {
-      "head": "1fc91c8ab485bd99350850c6a6c3c7cacf0d65ef",
-      "present": 650,
-      "exact_original_blob_matches": 650,
+      "head": "9455524b1f4b424299a94c25a6a382752170a822",
+      "present": 2000,
+      "exact_original_blob_matches": 2000,
       "mismatched": 0,
-      "missing": 1350
+      "missing": 0
     },
     "ingest/staging": {
-      "head": "b6942db74287885726e23986d0bb1a2ea5430638",
-      "present": 890,
-      "exact_original_blob_matches": 890,
+      "head": "9455524b1f4b424299a94c25a6a382752170a822",
+      "present": 2000,
+      "exact_original_blob_matches": 2000,
       "mismatched": 0,
-      "missing": 1110
+      "missing": 0
     }
   },
-  "checked_at": "2026-09-30T17:27:21.633Z",
+  "checked_at": "2026-09-30T18:43:55.420Z",
   "original_archive_sha256": "25d9c70a88e49d3c9c228bfb24a9f07a14f10e334fa340df9f8a59ea90a80889",
   "d1_snapshot_sha256": "63aeea6507355f3529e91411da2a6814263ef7eefb8e4f482313e9a70d52d7d1",
-  "ledger_sha256": "6e81f6d456173e80aa5ea0abcf1a3e759147370e2d4a6f56758e74c7ddfca004"
+  "ledger_sha256": "94f9ad0ad69edf957613d84fc6ea8f6a3c0c95a4cd0368048c441d3c04d033b7"
 }

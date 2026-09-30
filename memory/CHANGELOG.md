@@ -1133,3 +1133,5 @@ Final local gate 2026-09-30: 72 schema + 152 Workers runtime tests PASS; 94 Pyth
 2026-09-30 Cube555 public fork attribution: launcher now derives publication author from kaggle_username/owner (explicit author_name override supported without mutating input metadata); no-publication fallback preserved.106 contract/retry/results testsPASS. Notebook generator version14 prepared; public source stillv13 until verifiedQuickSave. Search/inference/native unchanged; original2000 envelopes unchanged.
 
 2026-09-30: Public Cube555 v14 Quick Saved and exact source/metadata/UI verified; all2000 original blobs now exact in staging,1050 in main; hardware gates pending.
+
+2026-09-30: PR414 merged; fresh per-key Gitblob ledger proves all2000 originals exact on main9455524b and staging. Hardware gates remain open.
