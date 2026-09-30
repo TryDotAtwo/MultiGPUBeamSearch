@@ -1,0 +1,17 @@
+
+ ⛅️ wrangler 4.115.0
+────────────────────
+Total Upload: 458.39 KiB / gzip: 87.12 KiB
+Your Worker has access to the following bindings:
+Binding                                                 Resource                  
+env.GITHUB_WRITER (GitHubWriter)                        Durable Object            
+env.VALIDATE_QUEUE (cayleypy-validate-staging)          Queue                     
+env.VALIDATE_DLQ (cayleypy-validate-dlq-staging)        Queue                     
+env.RESULTS_DB (cayleypy-results-staging)               D1 Database               
+env.RAW_RESULTS (cayleypy-results-raw-staging)          R2 Bucket                 
+env.INGEST_MODE ("normal")                              Environment Variable      
+env.REPO_OWNER ("TryDotAtwo")                           Environment Variable      
+env.REPO_NAME ("cayleypy-beam-results")                 Environment Variable      
+env.STAGING_BRANCH ("ingest/staging")                   Environment Variable      
+
+--dry-run: exiting now.

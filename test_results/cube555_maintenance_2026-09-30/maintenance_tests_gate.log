@@ -1,0 +1,26 @@
+
+> test
+> vitest run --config vitest.schema.config.ts && vitest run --config vitest.config.ts
+
+
+ RUN  v4.1.10 C:/Users/Иван Литвак/.codex/worktrees/cube555-blend-2xt4/100XH100/services/cayleypy-results-ingest
+
+
+ Test Files  7 passed (7)
+      Tests  72 passed (72)
+   Start at  20:13:31
+   Duration  996ms (transform 654ms, setup 0ms, import 1.53s, tests 499ms, environment 1ms)
+
+
+ RUN  v4.1.10 C:/Users/Иван Литвак/.codex/worktrees/cube555-blend-2xt4/100XH100/services/cayleypy-results-ingest
+
+exception = kj/async-io.c++:669: disconnected: read end of pipe was aborted
+stack: 7ff7140d7eae
+exception = kj/async-io.c++:669: disconnected: read end of pipe was aborted
+stack: 7ff7140d7eae
+
+ Test Files  9 passed (9)
+      Tests  156 passed (156)
+   Start at  20:13:33
+   Duration  36.12s (transform 4.43s, setup 11.84s, import 893ms, tests 44.75s, environment 1ms)
+
