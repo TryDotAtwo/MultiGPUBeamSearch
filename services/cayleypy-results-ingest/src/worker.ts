@@ -2,9 +2,8 @@ import { forwardIngest } from "./ingest-transport.js";
 import { consumeValidationMessage } from "./consumer.js";
 export { resolveIngestMode, type IngestMode } from "./mode.js";
 export { GitHubWriter } from "./github-writer.js";
-import { findBySubmissionId, findStagedSubmissions, findValidatedSubmissions } from "./db.js";
+import { findBySubmissionId } from "./db.js";
 import { resolveIngestMode } from "./mode.js";
-import { recoverStaleSubmissions } from "./storage.js";
 import type { SchemaVersion } from "./schema-dispatch.js";
 import { SafeHttpError, jsonResponse, errorResponse, methodNotAllowed, rateLimited, consumeD1Limit, allowIpRequest, declaredBodyLength, mediaType,
  MAX_REQUEST_BYTES, MAX_ARCHIVE_REQUEST_BYTES, MAX_DECOMPRESSED_ARCHIVE_BYTES, MAX_RESULTS_PER_REQUEST,
@@ -118,20 +117,9 @@ export async function scheduled(
   _ctx: ExecutionContext,
 ): Promise<void> {
   if (resolveIngestMode(env.INGEST_MODE) !== "normal") return;
-  for (const row of await findStagedSubmissions(env.RESULTS_DB, 100)) {
-    await env.RAW_RESULTS.delete(row.raw_r2_key);
-  }
-  const writer = env.GITHUB_WRITER;
-  if (writer !== undefined) {
-    const target = writer.getByName("cayleypy-results-v1");
-    for (const row of await findValidatedSubmissions(env.RESULTS_DB, 100)) {
-      await target.enqueueValidated(row.submission_id);
-    }
-  }
-  await recoverStaleSubmissions(env, {
-    staleBefore: new Date(controller.scheduledTime - RECOVERY_STALE_MS),
-    limit: RECOVERY_LIMIT,
-  });
+  const target = env.GITHUB_WRITER?.getByName("cayleypy-results-v1");
+  if (!target?.maintain) throw new Error("maintenance_unavailable");
+  await target.maintain(controller.scheduledTime);
 }
 
 export async function queue(

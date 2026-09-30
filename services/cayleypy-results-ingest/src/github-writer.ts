@@ -1,4 +1,5 @@
 import { handleIngestBody, errorResponse, type WorkerEnv } from "./ingest.js";
+import { maintainSubmissions } from "./maintenance.js";
 import { DurableObject } from "cloudflare:workers";
 import { findBySubmissionId, transition, type SubmissionRow } from "./db.js";
 import { githubRequest, getInstallationToken, type GitHubAppConfig } from "./github-app.js";
@@ -101,6 +102,7 @@ export class GitHubWriter extends DurableObject<GitHubWriterEnv> {
   private async scheduleAlarmAt(deadline: number, force = false): Promise<void> { const update = this.alarmUpdate.then(async () => { const alarm = await this.ctx.storage.getAlarm(); if (force || alarm === null || alarm > deadline) await this.ctx.storage.setAlarm(deadline); }); this.alarmUpdate = update.catch(() => undefined); await update; }
   private async rearm(delayMs = RETAIN_DELAY_MS, force = false) { await this.scheduleAlarmAt(Date.now() + Math.min(MAX_DELAY_MS, Math.max(1, delayMs)), force); }
   async enqueueValidated(submissionId: string): Promise<void> { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(submissionId)) throw new Error("writer_submission_invalid"); await this.ctx.storage.put(pendingKey(submissionId), { submissionId } satisfies Pending); await this.scheduleAlarmAt(Date.now() + RETAIN_DELAY_MS); }
+  async maintain(scheduledTime: number): Promise<void> { await maintainSubmissions(this.env, scheduledTime, id => this.enqueueValidated(id)); }
   async alarm(): Promise<void> { await this.flush(true); }
   private async pending(): Promise<Pending[]> { const entries = await this.ctx.storage.list<Pending>({ prefix: PENDING_PREFIX, limit: MAX_RECORDS + 1 }); return [...entries.values()].slice(0, MAX_RECORDS); }
   private async terminalize(error: TerminalIntegrityError): Promise<void> { const changed = await transition(this.env.RESULTS_DB, error.submissionId, ["validated"], "dead_letter", { safeError: error.safeError }); if (!changed) { const current = await findBySubmissionId(this.env.RESULTS_DB, error.submissionId); if (!current || current.state !== "dead_letter" || current.safe_error !== error.safeError) throw new Error("writer_state_conflict"); } await this.ctx.storage.delete(pendingKey(error.submissionId)); }

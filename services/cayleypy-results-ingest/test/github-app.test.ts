@@ -1,5 +1,5 @@
 import { decodeJwt, decodeProtectedHeader, exportPKCS8, generateKeyPair } from "jose";
-import { beforeAll, beforeEach, describe, expect, test } from "vitest";
+import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppJwt, getInstallationToken, githubRequest, resetInstallationTokenCacheForTest } from "../src/github-app.js";
 
 const NOW = Date.UTC(2026, 6, 29, 12, 0, 0);
@@ -60,4 +60,17 @@ describe("safe GitHub requests", () => {
     await expect(githubRequest(env(), "/x", { token: "TOKEN-SENTINEL" }, async () => { throw new Error("TOKEN-SENTINEL"); })).rejects.toThrow("github_temporary_unavailable");
     await expect(githubRequest(env(), "/x", { token: "x" }, async () => new Response("not-json", { status: 200 }))).resolves.toEqual({ status: 200, body: undefined });
   });
+});
+
+
+test("failure diagnostics exclude paths, tokens, response bodies and arbitrary header text", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const response = new Response("PRIVATE_BODY_SENTINEL", { status: 429, headers: {
+      "retry-after": "120", "x-ratelimit-remaining": "0", "x-ratelimit-reset": "PRIVATE_HEADER_SENTINEL" } });
+    const parse = vi.spyOn(response, "json");
+    expect(await githubRequest(env(), "/PRIVATE_PATH_SENTINEL", { token: "PRIVATE_TOKEN_SENTINEL" }, async () => response)).toEqual({ status: 429, body: undefined });
+    expect(parse).not.toHaveBeenCalled();
+    expect(warn.mock.calls).toEqual([[JSON.stringify({ event: "github_http_failure", operation: "request", method: "GET", status: 429, "retry-after": 120, "x-ratelimit-remaining": 0 })]]);
+  } finally { warn.mockRestore(); }
 });

@@ -13,6 +13,7 @@ import { canonicalJson, computeIdempotency, sha256Hex } from "../src/ids.js";
 import { replayPath } from "../src/replay.js";
 import { validateEnvelopeIntegrity, type ResultEnvelopeV1 } from "../src/schema.js";
 import { receiveEnvelope, type IngestEnv } from "../src/storage.js";
+import { maintainSubmissions } from "../src/maintenance.js";
 import { queue as queueBatch, scheduled, type WorkerEnv } from "../src/worker.js";
 
 function envelope(): ResultEnvelopeV1 {
@@ -497,17 +498,14 @@ describe("Task 4 Queue replay consumer", () => {
       .bind("2000-01-01T00:00:00.000Z", seeded.id)
       .run();
     const sent: unknown[] = [];
-    await scheduled(
-      { scheduledTime: Date.now() } as ScheduledController,
-      {
+    const maintenanceEnv: WorkerEnv = {
         ...bindings(),
         INGEST_MODE: "normal",
         VALIDATE_QUEUE: {
           send: async (body: unknown) => { sent.push(body); },
         } as unknown as Queue,
-      } as WorkerEnv,
-      {} as ExecutionContext,
-    );
+      } as WorkerEnv;
+    await maintainSubmissions(maintenanceEnv, Date.now(), id => maintenanceEnv.GITHUB_WRITER!.getByName("cayleypy-results-v1").enqueueValidated(id));
     expect(sent).toEqual([{ submission_id: seeded.id }]);
     expect((await state(seeded.id)).state).toBe("queued");
   });
@@ -536,14 +534,30 @@ describe("Task 4 Queue replay consumer", () => {
       } as unknown as Queue,
       INGEST_MODE: "normal",
     };
-    await scheduled(
-      { scheduledTime: Date.now() } as ScheduledController,
-      workerEnv,
-      {} as ExecutionContext,
-    );
+    await maintainSubmissions(workerEnv, Date.now(), id => workerEnv.GITHUB_WRITER!.getByName("cayleypy-results-v1").enqueueValidated(id));
     expect(sends).toBe(1);
     expect((await state(validating.id)).state).toBe("queued");
     expect((await state(validated.id)).state).toBe("validated");
     expect((await state(deadLetter.id)).state).toBe("dead_letter");
   });
+});
+
+
+test("Cron delegates only its timestamp and fails closed without a maintenance binding", async () => {
+  const times: number[] = [];
+  const forbidden = () => { throw new Error("edge_storage_forbidden"); };
+  const workerEnv = { INGEST_MODE: "normal", RESULTS_DB: { prepare: forbidden }, RAW_RESULTS: { delete: forbidden },
+    GITHUB_WRITER: { getByName: (name: string) => {
+      expect(name).toBe("cayleypy-results-v1");
+      return { enqueueValidated: forbidden, maintain: async (time: number) => { times.push(time); } };
+    } } } as unknown as WorkerEnv;
+  const controller = { scheduledTime: 1234 } as ScheduledController;
+  await scheduled(controller, workerEnv, {} as ExecutionContext);
+  expect(times).toEqual([1234]);
+  await scheduled(controller, { ...workerEnv, INGEST_MODE: "store_only", GITHUB_WRITER: undefined }, {} as ExecutionContext);
+  await expect(scheduled(controller, { ...workerEnv, GITHUB_WRITER: undefined }, {} as ExecutionContext)).rejects.toThrow("maintenance_unavailable");
+});
+
+test("maintenance rejects invalid timestamps before storage access", async () => {
+  await expect(maintainSubmissions({} as IngestEnv, NaN, async () => undefined)).rejects.toThrow("maintenance_time_invalid");
 });

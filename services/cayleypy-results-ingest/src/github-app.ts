@@ -13,6 +13,17 @@ const JWT_BACKDATE_SECONDS = 30;
 const TOKEN_REFRESH_SKEW_MS = 60_000;
 const INSTALLATION_TOKEN_PERMISSIONS = { contents: "write", metadata: "read" } as const;
 const tokenCache = new Map<string, CachedToken>();
+/** Only bounded status/method and numeric headers; never paths, bodies or credentials. */
+function logFailure(response: Response, method: string, operation: "auth" | "request"): void {
+  const headers: Record<string, number> = {};
+  for (const name of ["retry-after", "x-ratelimit-remaining", "x-ratelimit-reset"]) {
+    const raw = response.headers.get(name);
+    if (raw !== null && /^\d{1,12}$/.test(raw)) headers[name] = Number(raw);
+  }
+  console.warn(JSON.stringify({ event: "github_http_failure", operation,
+    method: ["GET", "POST", "PATCH"].includes(method) ? method : "OTHER",
+    status: response.status, ...headers }));
+}
 function unavailable(): Error { return new Error("github_app_auth_unavailable"); }
 function failed(): Error { return new Error("github_app_auth_failed"); }
 function required(value: string | undefined): string { if (!value || !value.trim()) throw unavailable(); return value.trim(); }
@@ -48,7 +59,7 @@ export async function getInstallationToken(env: GitHubAppConfig, now = Date.now(
   try {
     response = await fetcher(`${target.api}/app/installations/${encodeURIComponent(target.installationId)}/access_tokens`, { method: "POST", headers: { accept: "application/vnd.github+json", authorization: `Bearer ${jwt}`, "user-agent": "cayleypy-results-ingest", "x-github-api-version": "2026-03-10" }, body: JSON.stringify({ repositories: [target.repo], permissions: INSTALLATION_TOKEN_PERMISSIONS }) });
   } catch { throw failed(); }
-  if (!response.ok) throw failed();
+  if (!response.ok) { logFailure(response, "POST", "auth"); throw failed(); }
   let body: unknown; try { body = await response.json(); } catch { throw failed(); }
   if (body === null || typeof body !== "object") throw failed();
   const result = body as Record<string, unknown>;
@@ -64,6 +75,6 @@ export async function githubRequest(env: GitHubAppConfig, path: string, options:
   let response: Response;
   try { response = await fetcher(`${api}${path}`, { method: options.method ?? "GET", headers: { accept: "application/vnd.github+json", authorization: `Bearer ${options.token}`, "content-type": "application/json", "user-agent": "cayleypy-results-ingest", "x-github-api-version": "2026-03-10" }, body: options.body === undefined ? undefined : JSON.stringify(options.body) }); }
   catch { throw new Error("github_temporary_unavailable"); }
-  if (!response.ok) return { status: response.status, body: undefined };
+  if (!response.ok) { if (response.status !== 404) logFailure(response, options.method ?? "GET", "request"); return { status: response.status, body: undefined }; }
   try { return { status: response.status, body: await response.json() }; } catch { return { status: response.status, body: undefined }; }
 }

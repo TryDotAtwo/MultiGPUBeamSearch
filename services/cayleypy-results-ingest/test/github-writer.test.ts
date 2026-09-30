@@ -652,3 +652,12 @@ test("v2 GitHub path conflict is terminal and retains raw evidence", async () =>
   expect(row).toMatchObject({state:"dead_letter",safe_error:"publication_path_conflict"});
   expect(await env.RAW_RESULTS.get(seeded.rawKey)).not.toBeNull();
 });
+
+test("real DO maintenance RPC enqueues validated rows without changing durable identity", async () => {
+  const seeded = await seedValidated(190);
+  const name = "maintenance-rpc";
+  await stub(name).maintain(Date.now());
+  expect(await pending(name)).toContain(`pending/${seeded.submissionId}`);
+  const row = await env.RESULTS_DB.prepare("SELECT state, idempotency_key FROM submissions WHERE submission_id = ?").bind(seeded.submissionId).first();
+  expect(row).toMatchObject({ state: "validated", idempotency_key: seeded.envelope.idempotency_key });
+});

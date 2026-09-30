@@ -1,3 +1,4 @@
+import { maintainSubmissions } from "../src/maintenance.js";
 import { handleIngestBody } from "../src/ingest.js";
 import { createHash } from "node:crypto";
 import { env } from "cloudflare:workers";
@@ -129,7 +130,7 @@ function customBindings(
   if (options.rateLimit) value.INGEST_RATE_LIMIT = options.rateLimit;
   if (options.writer) value.GITHUB_WRITER = options.writer;
   const publicationWriter = value.GITHUB_WRITER;
-  value.GITHUB_WRITER = { getByName: (name) => name === "ingest-validation-v1" ? { enqueueValidated: async () => undefined, fetch: (request) => handleIngestBody(request, value, request.url.endsWith("/v1/results") ? 1 : 2) } : (publicationWriter?.getByName(name) ?? { enqueueValidated: async () => undefined }) };
+  value.GITHUB_WRITER = { getByName: (name) => name === "ingest-validation-v1" ? { enqueueValidated: async () => undefined, fetch: (request) => handleIngestBody(request, value, request.url.endsWith("/v1/results") ? 1 : 2) } : ({ enqueueValidated: (id: string) => publicationWriter?.getByName(name).enqueueValidated(id) ?? Promise.resolve(), maintain: (time: number) => maintainSubmissions(value, time, id => publicationWriter?.getByName(name).enqueueValidated(id) ?? Promise.resolve()) }) };
   return value;
 }
 
