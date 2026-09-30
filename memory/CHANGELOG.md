@@ -1125,3 +1125,5 @@ Final local gate 2026-09-30: 72 schema + 152 Workers runtime tests PASS; 94 Pyth
 2026-09-30: Prepare public source v13 pinned to10824003c11693aad36ed467cb93183a14d44d93, with transport parts100/4MiB. Cloudflare deployed28f89828-1a8c-4546-a53e-e2937c493839; real1/10/100 canaries verified202. Source publication and full delivery/downstream still pending.
 
 2026-09-30 live gate:all2000 original keys accepted and reconciled;v13 public source exact-match confirmed. Downstream staging/promotion and long/profile hardware gates remain pending. Report:test_results/cube555_live_gate_2026-09-30.md.
+
+2026-09-30: Recovered cancelled widthauditv3 artifacts: all7 allocations and5 saturated rows with model512 passed. Add explicit optional --beams selector for remaining profile audit; default still all7. Long4m remainsrunning. No native runtime changes.

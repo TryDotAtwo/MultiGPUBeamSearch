@@ -1,0 +1,562 @@
+{
+  "kernel": "trydotatwo/cube555-2xt4-width-audit",
+  "version": 3,
+  "terminal": "CANCEL_ACKNOWLEDGED",
+  "runtime_pin": "1b9c6766af7456eacfb965d488a7c3a8ff02855f",
+  "model_micro": 512,
+  "allocation_passed": [
+    65536,
+    131072,
+    262144,
+    524288,
+    1048576,
+    2097152,
+    4000000
+  ],
+  "saturated_passed": [
+    65536,
+    131072,
+    262144,
+    524288,
+    1048576
+  ],
+  "rows": [
+    {
+      "name": "smoke",
+      "status": "complete",
+      "requested_beam": 8192,
+      "sampled_peak_gpu_mib": {
+        "0": 1487.0,
+        "1": 1507.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 4,
+          "last_depth_seconds": 0.739061,
+          "last_frontier": 4096,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 4,
+          "last_depth_seconds": 0.739073,
+          "last_frontier": 4096,
+          "finished": false
+        }
+      ]
+    },
+    {
+      "name": "capacity-65536",
+      "status": "complete",
+      "requested_beam": 65536,
+      "sampled_peak_gpu_mib": {
+        "0": 3163.0,
+        "1": 3251.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.454933,
+          "last_frontier": 15,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.547907,
+          "last_frontier": 15,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "capacity-131072",
+      "status": "complete",
+      "requested_beam": 131072,
+      "sampled_peak_gpu_mib": {
+        "0": 3309.0,
+        "1": 3309.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.527916,
+          "last_frontier": 15,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.61147,
+          "last_frontier": 15,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "capacity-262144",
+      "status": "complete",
+      "requested_beam": 262144,
+      "sampled_peak_gpu_mib": {
+        "0": 3397.0,
+        "1": 3365.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.508326,
+          "last_frontier": 15,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.964269,
+          "last_frontier": 15,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "capacity-524288",
+      "status": "complete",
+      "requested_beam": 524288,
+      "sampled_peak_gpu_mib": {
+        "0": 3455.0,
+        "1": 3423.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.588062,
+          "last_frontier": 15,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.851483,
+          "last_frontier": 15,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "capacity-1048576",
+      "status": "complete",
+      "requested_beam": 1048576,
+      "sampled_peak_gpu_mib": {
+        "0": 3569.0,
+        "1": 3567.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.638569,
+          "last_frontier": 15,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.532436,
+          "last_frontier": 15,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "capacity-2097152",
+      "status": "complete",
+      "requested_beam": 2097152,
+      "sampled_peak_gpu_mib": {
+        "0": 3709.0,
+        "1": 3717.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.58747,
+          "last_frontier": 15,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.957673,
+          "last_frontier": 15,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "capacity-4000000",
+      "status": "complete",
+      "requested_beam": 4000000,
+      "sampled_peak_gpu_mib": {
+        "0": 4195.0,
+        "1": 4163.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.566937,
+          "last_frontier": 15,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 0,
+          "last_depth_seconds": 0.607541,
+          "last_frontier": 15,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "saturated-65536",
+      "status": "complete",
+      "requested_beam": 65536,
+      "sampled_peak_gpu_mib": {
+        "0": 4059.0,
+        "1": 4079.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 7,
+          "last_depth_seconds": 7.6209,
+          "last_frontier": 32768,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 7,
+          "last_depth_seconds": 7.62094,
+          "last_frontier": 32768,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "saturated-131072",
+      "status": "complete",
+      "requested_beam": 131072,
+      "sampled_peak_gpu_mib": {
+        "0": 4079.0,
+        "1": 4099.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 7,
+          "last_depth_seconds": 14.7097,
+          "last_frontier": 65536,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 7,
+          "last_depth_seconds": 14.7099,
+          "last_frontier": 65536,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "saturated-262144",
+      "status": "complete",
+      "requested_beam": 262144,
+      "sampled_peak_gpu_mib": {
+        "0": 4167.0,
+        "1": 4187.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 7,
+          "last_depth_seconds": 31.9787,
+          "last_frontier": 131072,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 7,
+          "last_depth_seconds": 31.9787,
+          "last_frontier": 131072,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "saturated-524288",
+      "status": "complete",
+      "requested_beam": 524288,
+      "sampled_peak_gpu_mib": {
+        "0": 4225.0,
+        "1": 4245.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 7,
+          "last_depth_seconds": 62.4005,
+          "last_frontier": 262144,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 7,
+          "last_depth_seconds": 62.4005,
+          "last_frontier": 262144,
+          "finished": true
+        }
+      ]
+    },
+    {
+      "name": "saturated-1048576",
+      "status": "complete",
+      "requested_beam": 1048576,
+      "sampled_peak_gpu_mib": {
+        "0": 4339.0,
+        "1": 4359.0
+      },
+      "ranks": [
+        {
+          "rank": 0,
+          "last_depth_done": 7,
+          "last_depth_seconds": 124.429,
+          "last_frontier": 524288,
+          "finished": true
+        },
+        {
+          "rank": 1,
+          "last_depth_done": 7,
+          "last_depth_seconds": 124.429,
+          "last_frontier": 524288,
+          "finished": true
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "cube555-2xt4-width-audit.log",
+      "bytes": 318563,
+      "sha256": "ea5618e34483f8916fb2f3667e3ccf4e1818b9e3127f45d0dad34110f8cc3c7d"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-1048576\\logs\\puzzle-1020\\original\\f7cd73a7b34e4a29bcb01817aa34500e\\rank-0.log",
+      "bytes": 1574,
+      "sha256": "166fbe7700db59f20c710e37e4370aeb1dae6153cd24858c0753a6623ab2036c"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-1048576\\logs\\puzzle-1020\\original\\f7cd73a7b34e4a29bcb01817aa34500e\\rank-1.log",
+      "bytes": 1191,
+      "sha256": "2de2e779b2b6f14b3f376ca6816ff40c2674c2f87f96151ae238cd4bab55a869"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-1048576\\performance.json",
+      "bytes": 455,
+      "sha256": "d944a3d27f7101c1f905282f82ebe2a9e3a5ddd24e0e56b348f19802712d289c"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-131072\\logs\\puzzle-1020\\original\\65fb40ce9a3c4323974cdff48cdb3f8e\\rank-0.log",
+      "bytes": 1573,
+      "sha256": "83205b4d2b92eccb933df1462998f92b150671763c6a025ccef311b2003baef0"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-131072\\logs\\puzzle-1020\\original\\65fb40ce9a3c4323974cdff48cdb3f8e\\rank-1.log",
+      "bytes": 1190,
+      "sha256": "173b465b48b03df27fb500d96b7b8ffa50fe8cdd3af0c333693996233baf0231"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-131072\\performance.json",
+      "bytes": 455,
+      "sha256": "d4485b32220761aece6c1848292dc565734357f1063652a92687c71cc0df5877"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-2097152\\logs\\puzzle-1020\\original\\5ced31d999d64719b45adb33c2b851a7\\rank-0.log",
+      "bytes": 1573,
+      "sha256": "19329924e4596c1e01e54803cb4975080552fcf493017b32edf05898b279a549"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-2097152\\logs\\puzzle-1020\\original\\5ced31d999d64719b45adb33c2b851a7\\rank-1.log",
+      "bytes": 1190,
+      "sha256": "0b381ccbd7e815622db9c0e947abeef78d1220547f5fcca0cfb0c2a564a06d71"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-2097152\\performance.json",
+      "bytes": 454,
+      "sha256": "550abc17e1ea404976cd82629df478f3acb5021e7deb52501e817ac93e2bfac8"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-262144\\logs\\puzzle-1020\\original\\2e511d7d69974d0a835593be80d6f51d\\rank-0.log",
+      "bytes": 1573,
+      "sha256": "5223e5e0e2e837e5528257fd1798cd81f838c5874780696bd6b555cfa4525a46"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-262144\\logs\\puzzle-1020\\original\\2e511d7d69974d0a835593be80d6f51d\\rank-1.log",
+      "bytes": 1190,
+      "sha256": "76219e3ddf09493b4b8e156f89a4ad3a9e8e61925666d716a784ccf9c2be0b61"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-262144\\performance.json",
+      "bytes": 455,
+      "sha256": "719cd9837dd1dc4138b4a338f3454688897facfeacff297c54bac5442e2a77fe"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-4000000\\logs\\puzzle-1020\\original\\b1fe8e71d31047cb87f5430f15cd5db8\\rank-0.log",
+      "bytes": 1574,
+      "sha256": "426163115a4142971d4e540269924896c0c107d0f215db216405427a2482faab"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-4000000\\logs\\puzzle-1020\\original\\b1fe8e71d31047cb87f5430f15cd5db8\\rank-1.log",
+      "bytes": 1190,
+      "sha256": "d02ad9e3b99fef7649dc62434f91905e04d259d7e5c7b490aca99b8178ea38d6"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-4000000\\performance.json",
+      "bytes": 455,
+      "sha256": "53cae28429b35e3cccc094296a39ef99595c4a36e3d5da9a7735838324850c84"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-524288\\logs\\puzzle-1020\\original\\e87251c100574177a6439a762da648c6\\rank-0.log",
+      "bytes": 1573,
+      "sha256": "49c5139b11872b6a2dab5209dbfcbe445c8695e088e5283c63661c14ebded06b"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-524288\\logs\\puzzle-1020\\original\\e87251c100574177a6439a762da648c6\\rank-1.log",
+      "bytes": 1190,
+      "sha256": "1e7df339a60b9bc98ad74e0b01aa15d6ae7c2f383e9828f7002f88446040eea4"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-524288\\performance.json",
+      "bytes": 455,
+      "sha256": "8e6e9c208460b40115777b972d146e02067fd921cca2f95657e75227745c13bb"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-65536\\logs\\puzzle-1020\\original\\8edbe77c054041bda4bd51a962973107\\rank-0.log",
+      "bytes": 1571,
+      "sha256": "f1e3720d00a57ea6a19a68e602c3a8ab116a32532b36d22bad851af6f684e093"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-65536\\logs\\puzzle-1020\\original\\8edbe77c054041bda4bd51a962973107\\rank-1.log",
+      "bytes": 1191,
+      "sha256": "318ed3b1bdab7c18851bd4e46a9953903ccd26d87e9519aa192fd0b420a6ef6e"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity-65536\\performance.json",
+      "bytes": 455,
+      "sha256": "4fdb67dd673b2acf680878b0fdbb5728624c5cfd32e68cfe6d4715585c926a5e"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\capacity_report.json",
+      "bytes": 32959,
+      "sha256": "1e1a205b0aa4e38032a32c6ff2b9f80acfb37ce7c253f440022833e1da7db748"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-1048576\\logs\\puzzle-1020\\original\\be2b4fdc25084ab6a6d158175416894c\\rank-0.log",
+      "bytes": 4545,
+      "sha256": "f236688cc7f48b578ec9e96cd0d8b62183b432a03f026a14dae44a700e2ba75b"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-1048576\\logs\\puzzle-1020\\original\\be2b4fdc25084ab6a6d158175416894c\\rank-1.log",
+      "bytes": 4163,
+      "sha256": "3a64c701536467922ad3f20af9807a329bc9a00dc2777930bbf8b56ccd08c075"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-1048576\\performance.json",
+      "bytes": 1450,
+      "sha256": "66ad748bd31f7de6de533461ccd81165366144ef742330112a4b5e26836f468f"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-131072\\logs\\puzzle-1020\\original\\3772153f162642b0bac7fbb23144d4d4\\rank-0.log",
+      "bytes": 4502,
+      "sha256": "ef9697ebe3c88fc033afe1509a65cb713f3fc0f7b50845fdad22bf557f67310f"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-131072\\logs\\puzzle-1020\\original\\3772153f162642b0bac7fbb23144d4d4\\rank-1.log",
+      "bytes": 4120,
+      "sha256": "2ba468d6f49dee7ca885add29f568c601165c2bf209a0835cc49b2405d9fd020"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-131072\\performance.json",
+      "bytes": 1451,
+      "sha256": "16bed2bac2e4429d5e9708c84f798b881c890f54ba26cadfe9a9834a72f876cc"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-262144\\logs\\puzzle-1020\\original\\e44cfe75495347c8931ee2ca1260ba36\\rank-0.log",
+      "bytes": 4528,
+      "sha256": "d1397cf797025c2ce884363b5051039490272babdfa12fe95f28cb13c1ca64df"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-262144\\logs\\puzzle-1020\\original\\e44cfe75495347c8931ee2ca1260ba36\\rank-1.log",
+      "bytes": 4144,
+      "sha256": "19fe73396b53f57f91b0fb723526f85f728f1b519ff87c209d285912deb3d5d2"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-262144\\performance.json",
+      "bytes": 1450,
+      "sha256": "9ca9cd24995b0b9a3630934ade8ab3a6f6ba955379ae80a916df665a1396e0d0"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-524288\\logs\\puzzle-1020\\original\\23211dc41684495ca72aa70c58f006ab\\rank-0.log",
+      "bytes": 4542,
+      "sha256": "c880e4f6c78d90b4240efd9946a1d6141cfa4d2b98644a8fb6ac34924a3d9bcb"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-524288\\logs\\puzzle-1020\\original\\23211dc41684495ca72aa70c58f006ab\\rank-1.log",
+      "bytes": 4160,
+      "sha256": "25dc309eac023142190018fe9bb576d2822de858549d7de9abbbda753058a597"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-524288\\performance.json",
+      "bytes": 1450,
+      "sha256": "694688752c298c720b191d99f28088c92ff25dcf429b67064c28237e75d8bb90"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-65536\\logs\\puzzle-1020\\original\\7cecc3017e934243ab642c37d5a39355\\rank-0.log",
+      "bytes": 4493,
+      "sha256": "0e62938f7e10a67fbb7ea41c8da96e781ea17af31d775334a5d57660cdad3999"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-65536\\logs\\puzzle-1020\\original\\7cecc3017e934243ab642c37d5a39355\\rank-1.log",
+      "bytes": 4111,
+      "sha256": "da7c58e24739e0bcfef1ce7249af23a3d788253ba7cb4436e13ae8f2281e715d"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\saturated-65536\\performance.json",
+      "bytes": 1450,
+      "sha256": "c78725a58f34b69ee231551b43559f8e83cb6340add65f8698df3a6a803f572c"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\smoke\\logs\\puzzle-3\\original\\5293bd5a88704a62af183733c1d70861\\rank-0.log",
+      "bytes": 3695,
+      "sha256": "3ac606713a07c8cbca27a75ee6c3fd5538081711f8194d61a958ecf099853738"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\smoke\\logs\\puzzle-3\\original\\5293bd5a88704a62af183733c1d70861\\rank-1.log",
+      "bytes": 2759,
+      "sha256": "410f2e31b04d3e4dc66704fb668b7ace879cf258201b6251aa5589010d99d91f"
+    },
+    {
+      "path": "cube555_20260930_150327\\profiles\\smoke\\performance.json",
+      "bytes": 1013,
+      "sha256": "e39e086c4a9b26462d19160606283b22b40b96fb0f018605e581baec42aaaea4"
+    }
+  ],
+  "remaining_saturated_profiles": [
+    2097152,
+    4000000
+  ],
+  "scope": "Bounded depth9 throughput; not long target solution acceptance. Native core and wrapper unchanged between1b9 and10824003. Largest profile long run retained; only2m needs separate bounded row."
+}
