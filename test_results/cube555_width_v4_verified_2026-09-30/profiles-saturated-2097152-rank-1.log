@@ -1,0 +1,37 @@
+[stdout]
+stream1_mode=model
+stream1_executor=libtorch_eager
+runtime_ring_count=2
+runtime_ring_slot_count=2
+runtime_ring_slot_physical_jobs=4
+runtime_ring_graph_execs_per_lane_requested=
+runtime_ring_graph_debug_sync=
+stream1_backend=piece_transformer
+stream1_transformer_micro=512
+stream1_transformer_dims seq_len=99 d_model=384 nhead=6 head_dim=64 layers=6 ff_dim=1536 output_dim=30
+stream1_transformer_block51=0 raw=
+stream1_transformer_final_cls_only=0 raw=
+stream1_transformer_final_cls_attention=0 raw=
+runtime_ring_slot_graph_windowed=0
+runtime_ring_slot_graph_window_rings=2
+runtime_ring_slot_graph_window_jobs=4
+runtime_ring_slot_graph_physical_jobs=4
+depth_start=0 frontier_size=0 depth_limit=140
+depth_done=0 depth_sec=0.622042 ring_slot_jobs=0 stream3_jobs=0 stream4_jobs=4 stream4_slots_used=2 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=15 final_request_count=0 next_frontier_size=15 history_bytes_received=480 history_bytes_stored=240 history_bytes_stored_ram=0 history_bytes_stored_disk=0 history_bytes_pruned=0
+depth_start=1 frontier_size=15 depth_limit=140
+depth_done=1 depth_sec=0.371514 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=4 stream4_slots_used=2 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=368 final_request_count=370 next_frontier_size=368 history_bytes_received=12256 history_bytes_stored=6128 history_bytes_stored_ram=0 history_bytes_stored_disk=240 history_bytes_pruned=0
+depth_start=2 frontier_size=368 depth_limit=140
+depth_done=2 depth_sec=0.132958 ring_slot_jobs=1 stream3_jobs=1 stream4_jobs=4 stream4_slots_used=2 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=8895 final_request_count=8900 next_frontier_size=8895 history_bytes_received=296896 history_bytes_stored=148448 history_bytes_stored_ram=0 history_bytes_stored_disk=6128 history_bytes_pruned=0
+depth_start=3 frontier_size=8895 depth_limit=140
+depth_done=3 depth_sec=1.56873 ring_slot_jobs=2 stream3_jobs=1 stream4_jobs=4 stream4_slots_used=2 threshold_updates_depth=0 final_threshold=4294967295 final_candidate_count=214306 final_request_count=214400 next_frontier_size=214306 history_bytes_received=7154688 history_bytes_stored=3577344 history_bytes_stored_ram=0 history_bytes_stored_disk=148448 history_bytes_pruned=0
+depth_start=4 frontier_size=214306 depth_limit=140
+depth_done=4 depth_sec=38.9968 ring_slot_jobs=27 stream3_jobs=14 stream4_jobs=28 stream4_slots_used=2 threshold_updates_depth=3 final_threshold=41626 final_candidate_count=1048576 final_request_count=1047401 next_frontier_size=1048576 history_bytes_received=40709120 history_bytes_stored=20354560 history_bytes_stored_ram=0 history_bytes_stored_disk=3577344 history_bytes_pruned=0
+depth_start=5 frontier_size=1048576 depth_limit=140
+depth_done=5 depth_sec=226.783 ring_slot_jobs=128 stream3_jobs=64 stream4_jobs=44 stream4_slots_used=2 threshold_updates_depth=5 final_threshold=36058 final_candidate_count=1048576 final_request_count=1042245 next_frontier_size=1048576 history_bytes_received=74263552 history_bytes_stored=37131776 history_bytes_stored_ram=0 history_bytes_stored_disk=20354560 history_bytes_pruned=0
+depth_start=6 frontier_size=1048576 depth_limit=140
+depth_done=6 depth_sec=226.811 ring_slot_jobs=128 stream3_jobs=64 stream4_jobs=44 stream4_slots_used=2 threshold_updates_depth=6 final_threshold=32992 final_candidate_count=1048576 final_request_count=1047553 next_frontier_size=1048576 history_bytes_received=107817984 history_bytes_stored=53908992 history_bytes_stored_ram=0 history_bytes_stored_disk=37131776 history_bytes_pruned=0
+depth_start=7 frontier_size=1048576 depth_limit=140
+depth_done=7 depth_sec=226.471 ring_slot_jobs=128 stream3_jobs=64 stream4_jobs=44 stream4_slots_used=2 threshold_updates_depth=5 final_threshold=30970 final_candidate_count=1048576 final_request_count=1044316 next_frontier_size=1048576 history_bytes_received=141372416 history_bytes_stored=70686208 history_bytes_stored_ram=0 history_bytes_stored_disk=53908992 history_bytes_pruned=0
+depth_start=8 frontier_size=1048576 depth_limit=140
+puzzle_solved=0 puzzle_id=1020 seconds=948.272 solution_length=-1 solution=
+[stderr]

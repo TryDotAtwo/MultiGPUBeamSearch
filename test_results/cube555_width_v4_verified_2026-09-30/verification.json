@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "runtime_pin": "04632570d5f378c6f1530fcb2fbdcf556bd04d9c",
+  "profile_2m": {
+    "effective_global_beam": 2097152,
+    "both_rank_last_iteration8_full_frontier": true,
+    "terminal_complete": true,
+    "sampled_peak_gpu_mib": {
+      "0": 4519.0,
+      "1": 4539.0
+    },
+    "wall_seconds": 979.1821440809999
+  },
+  "overflow": {
+    "status": "complete",
+    "dropped": 29,
+    "stored_valid_solutions": 1,
+    "independent_replay": true,
+    "path": "f0.f0.f0",
+    "both_rank_logs_retained": true
+  },
+  "limitations": [
+    "NoPID1020solve",
+    "NoTPU102/100reproduction",
+    "140depth4mnot12hguaranteed"
+  ]
+}

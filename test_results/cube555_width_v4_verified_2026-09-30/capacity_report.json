@@ -1,0 +1,252 @@
+{
+  "gpus": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "requested_profiles": [
+    2097152
+  ],
+  "outer_parent_batch": 8192,
+  "model_microbatch": 512,
+  "rows": [
+    {
+      "name": "smoke",
+      "beam": 8192,
+      "depth": 6,
+      "pid": 3,
+      "radius": 0,
+      "plan": {
+        "requested_beam": 8192,
+        "effective_beam": 8192,
+        "alignment_delta": 0,
+        "profile_power": 16,
+        "model_class": "output_move_count",
+        "local_beam": 4096,
+        "parent_batch": 8192,
+        "stream3_batch_candidates": 491520,
+        "shard_capacity_candidates": 524288,
+        "runtime": {
+          "stream4_active_sort_slots": 2,
+          "stream4_trigger_candidates": 16384,
+          "stream1_concurrency": 1,
+          "stream3_ring_slots": 2,
+          "shard_count": 2,
+          "stream4_batch_candidates": 16384,
+          "shard_capacity_scale_ppm": 2500000,
+          "b_micro": 8192,
+          "final_materialize_chunk_candidates": 88064,
+          "model_micro": 512
+        },
+        "cross_puzzle_profile_note": "Cube4 Transformer pipeline seed; Cube555 capacity requires native preflight and measurement"
+      },
+      "history_ram_bytes": 24000000000,
+      "history_disk_bytes": 53687091200,
+      "budget_max_depth": 592701,
+      "status": "complete",
+      "result": {
+        "solution_count": 38,
+        "solved_puzzle_count": 1,
+        "invocation_count": 1,
+        "collection_status": "depth_reached",
+        "solve_seconds": 18.636242600999935
+      },
+      "wall_seconds": 18.68582921799998,
+      "performance": {
+        "collection_truncated": false,
+        "collection_truncations": [],
+        "collection_dropped_hits": 0,
+        "sample_interval_seconds": 1,
+        "sampled_peak_gpu_mib": {
+          "0": 1487.0,
+          "1": 1507.0
+        },
+        "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+        "depths": [
+          {
+            "log": "logs/puzzle-3/original/2968f700c73448d6b76f5231269a3c64/rank-0.log",
+            "depth": 0,
+            "seconds": 1.32396
+          },
+          {
+            "log": "logs/puzzle-3/original/2968f700c73448d6b76f5231269a3c64/rank-0.log",
+            "depth": 1,
+            "seconds": 0.441743
+          },
+          {
+            "log": "logs/puzzle-3/original/2968f700c73448d6b76f5231269a3c64/rank-0.log",
+            "depth": 2,
+            "seconds": 0.106929
+          },
+          {
+            "log": "logs/puzzle-3/original/2968f700c73448d6b76f5231269a3c64/rank-0.log",
+            "depth": 3,
+            "seconds": 0.708009
+          },
+          {
+            "log": "logs/puzzle-3/original/2968f700c73448d6b76f5231269a3c64/rank-0.log",
+            "depth": 4,
+            "seconds": 0.710586
+          }
+        ]
+      }
+    },
+    {
+      "name": "capacity-2097152",
+      "beam": 2097152,
+      "depth": 2,
+      "pid": 1020,
+      "radius": 5,
+      "plan": {
+        "requested_beam": 2097152,
+        "effective_beam": 2097152,
+        "alignment_delta": 0,
+        "profile_power": 21,
+        "model_class": "output_move_count",
+        "local_beam": 1048576,
+        "parent_batch": 8192,
+        "stream3_batch_candidates": 491520,
+        "shard_capacity_candidates": 753664,
+        "runtime": {
+          "stream4_active_sort_slots": 2,
+          "stream4_trigger_candidates": 131072,
+          "stream1_concurrency": 1,
+          "stream3_ring_slots": 2,
+          "shard_count": 4,
+          "stream4_batch_candidates": 131072,
+          "shard_capacity_scale_ppm": 1250000,
+          "b_micro": 8192,
+          "final_materialize_chunk_candidates": 88064,
+          "model_micro": 512
+        },
+        "cross_puzzle_profile_note": "Cube4 Transformer pipeline seed; Cube555 capacity requires native preflight and measurement"
+      },
+      "history_ram_bytes": 24000000000,
+      "history_disk_bytes": 53687091200,
+      "budget_max_depth": 2317,
+      "status": "complete",
+      "result": {
+        "solution_count": 0,
+        "solved_puzzle_count": 0,
+        "invocation_count": 1,
+        "collection_status": "depth_reached",
+        "solve_seconds": 31.500527325000007
+      },
+      "wall_seconds": 31.566272006999952,
+      "performance": {
+        "collection_truncated": false,
+        "collection_truncations": [],
+        "collection_dropped_hits": 0,
+        "sample_interval_seconds": 1,
+        "sampled_peak_gpu_mib": {
+          "0": 3747.0,
+          "1": 3717.0
+        },
+        "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+        "depths": [
+          {
+            "log": "logs/puzzle-1020/original/485da68d3077470691269b67ce28fb4a/rank-0.log",
+            "depth": 0,
+            "seconds": 0.583582
+          }
+        ]
+      }
+    },
+    {
+      "name": "saturated-2097152",
+      "beam": 2097152,
+      "depth": 9,
+      "pid": 1020,
+      "radius": 5,
+      "plan": {
+        "requested_beam": 2097152,
+        "effective_beam": 2097152,
+        "alignment_delta": 0,
+        "profile_power": 21,
+        "model_class": "output_move_count",
+        "local_beam": 1048576,
+        "parent_batch": 8192,
+        "stream3_batch_candidates": 491520,
+        "shard_capacity_candidates": 753664,
+        "runtime": {
+          "stream4_active_sort_slots": 2,
+          "stream4_trigger_candidates": 131072,
+          "stream1_concurrency": 1,
+          "stream3_ring_slots": 2,
+          "shard_count": 4,
+          "stream4_batch_candidates": 131072,
+          "shard_capacity_scale_ppm": 1250000,
+          "b_micro": 8192,
+          "final_materialize_chunk_candidates": 88064,
+          "model_micro": 512
+        },
+        "cross_puzzle_profile_note": "Cube4 Transformer pipeline seed; Cube555 capacity requires native preflight and measurement"
+      },
+      "history_ram_bytes": 24000000000,
+      "history_disk_bytes": 53687091200,
+      "budget_max_depth": 2317,
+      "status": "complete",
+      "result": {
+        "solution_count": 0,
+        "solved_puzzle_count": 0,
+        "invocation_count": 1,
+        "collection_status": "depth_reached",
+        "solve_seconds": 979.078870192
+      },
+      "wall_seconds": 979.1821440809999,
+      "performance": {
+        "collection_truncated": false,
+        "collection_truncations": [],
+        "collection_dropped_hits": 0,
+        "sample_interval_seconds": 1,
+        "sampled_peak_gpu_mib": {
+          "0": 4519.0,
+          "1": 4539.0
+        },
+        "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+        "depths": [
+          {
+            "log": "logs/puzzle-1020/original/ea66ddd13b93432e86d1221725bf2822/rank-0.log",
+            "depth": 0,
+            "seconds": 0.74978
+          },
+          {
+            "log": "logs/puzzle-1020/original/ea66ddd13b93432e86d1221725bf2822/rank-0.log",
+            "depth": 1,
+            "seconds": 0.371535
+          },
+          {
+            "log": "logs/puzzle-1020/original/ea66ddd13b93432e86d1221725bf2822/rank-0.log",
+            "depth": 2,
+            "seconds": 0.132945
+          },
+          {
+            "log": "logs/puzzle-1020/original/ea66ddd13b93432e86d1221725bf2822/rank-0.log",
+            "depth": 3,
+            "seconds": 1.56872
+          },
+          {
+            "log": "logs/puzzle-1020/original/ea66ddd13b93432e86d1221725bf2822/rank-0.log",
+            "depth": 4,
+            "seconds": 38.9967
+          },
+          {
+            "log": "logs/puzzle-1020/original/ea66ddd13b93432e86d1221725bf2822/rank-0.log",
+            "depth": 5,
+            "seconds": 226.782
+          },
+          {
+            "log": "logs/puzzle-1020/original/ea66ddd13b93432e86d1221725bf2822/rank-0.log",
+            "depth": 6,
+            "seconds": 226.811
+          },
+          {
+            "log": "logs/puzzle-1020/original/ea66ddd13b93432e86d1221725bf2822/rank-0.log",
+            "depth": 7,
+            "seconds": 226.471
+          }
+        ]
+      }
+    }
+  ],
+  "note": "Depth2 probes validate allocation only. Depth9 loops require rank-log proof of a full local frontier to establish saturated throughput. All requested widths must pass allocation."
+}

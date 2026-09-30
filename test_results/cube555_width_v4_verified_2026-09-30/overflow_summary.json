@@ -1,0 +1,53 @@
+{
+  "status": "complete",
+  "pids": [
+    35
+  ],
+  "beam": 65536,
+  "results": [
+    {
+      "pid": 35,
+      "publication": {
+        "state": "skipped",
+        "ok": false,
+        "safe_error": null,
+        "reason": "disabled",
+        "result_count": 0
+      },
+      "solution_count": 1,
+      "solved_puzzle_count": 1,
+      "invocation_count": 1,
+      "collection_status": "capacity_reached",
+      "solve_seconds": 31.871340404999955
+    }
+  ],
+  "gpus": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "requested_max_depth": 1,
+  "effective_max_depth": 1,
+  "wall_seconds": 37.444227001999934,
+  "current_pid": 35,
+  "performance": {
+    "collection_truncated": true,
+    "collection_truncations": [
+      {
+        "log": "puzzle-35/logs/puzzle-35/original/f658cff27e694bbfbdcd319d8aea14b3/rank-0.log",
+        "depth": 0,
+        "rank": 0,
+        "hits": 30,
+        "stored": 1,
+        "dropped": 29
+      }
+    ],
+    "collection_dropped_hits": 29,
+    "sample_interval_seconds": 1,
+    "sampled_peak_gpu_mib": {
+      "0": 2743.0,
+      "1": 2743.0
+    },
+    "note": "Sampled device memory includes native CUDA and LibTorch; brief peaks may be missed.",
+    "depths": []
+  }
+}

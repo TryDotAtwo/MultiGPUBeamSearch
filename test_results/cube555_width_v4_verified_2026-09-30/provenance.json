@@ -1,0 +1,9 @@
+{
+  "solver_commit": "04632570d5f378c6f1530fcb2fbdcf556bd04d9c",
+  "torch": "2.10.0+cu128",
+  "gpus": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "smoke": false
+}

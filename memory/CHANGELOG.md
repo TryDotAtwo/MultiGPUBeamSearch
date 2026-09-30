@@ -1137,3 +1137,5 @@ Final local gate 2026-09-30: 72 schema + 152 Workers runtime tests PASS; 94 Pyth
 2026-09-30: PR414 merged; fresh per-key Gitblob ledger proves all2000 originals exact on main9455524b and staging. Hardware gates remain open.
 
 2026-09-30: Long v1 canceled per short-profile priority; terminal artifacts preserved, both ranks depth39, sampled peaks4965/4985MiB, median381.33s saturated layer; noPID1020solution. Focusedwidth v4 RUNNING on public0463pin, remaining2mdepth9+overflowdepth1,45minstopbudget.
+
+2026-09-30: Widthv4COMPLETE,2m saturated9iterations bothrankfullfrontier PASS,4519/4539MiB sampledpeak. Overflowcollect1PASS:29dropped,1saved,independent replay f0.f0.f0,normalcomplete. Public0463pin exact. All2000originals published; remaining limitations PID1020unsolved/full140not12h/TPU102100unreproduced.

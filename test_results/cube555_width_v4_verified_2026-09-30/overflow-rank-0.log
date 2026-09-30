@@ -1,0 +1,28 @@
+[stdout]
+stream1_mode=model
+stream1_executor=libtorch_eager
+runtime_ring_count=1
+runtime_ring_slot_count=2
+runtime_ring_slot_physical_jobs=2
+runtime_ring_graph_execs_per_lane_requested=
+runtime_ring_graph_debug_sync=
+stream1_backend=piece_transformer
+stream1_transformer_micro=512
+stream1_transformer_dims seq_len=99 d_model=384 nhead=6 head_dim=64 layers=6 ff_dim=1536 output_dim=30
+stream1_transformer_block51=0 raw=
+stream1_transformer_final_cls_only=0 raw=
+stream1_transformer_final_cls_attention=0 raw=
+runtime_ring_slot_graph_windowed=0
+runtime_ring_slot_graph_window_rings=1
+runtime_ring_slot_graph_window_jobs=2
+runtime_ring_slot_graph_physical_jobs=2
+depth_start=0 frontier_size=1 depth_limit=1
+WARNING: collect buffer overflow; keeping stored hits, dropping excess hits, continuing search
+collection_truncated=1 depth=0 rank=0 hits=30 stored=1 dropped=29
+solve_bucket_solution=1 puzzle_id=35 depth_index=0 found_depth=1 solution_length=3 owner_rank=0 solution=f0.f0.f0
+collection_status=capacity_reached
+solve_bucket_stop=1 puzzle_id=35 depth_index=0 first_found_depth_index=0 extra_depths=1 records=1 depth_sec=0.438282
+solve_bucket_summary=1 puzzle_id=35 records=1 best_length=3 known_length=0 result_tsv=/kaggle/working/cube555_20260930_185434/overflow/puzzle-35/logs/puzzle-35/original/f658cff27e694bbfbdcd319d8aea14b3/solve_bucket.tsv
+solve_bucket_length_count puzzle_id=35 length=3 count=1
+puzzle_solved=1 puzzle_id=35 seconds=0.440399 solution_length=3 solution=f0.f0.f0
+[stderr]
