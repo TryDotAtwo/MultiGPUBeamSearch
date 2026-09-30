@@ -50,6 +50,8 @@ Result publication is on by default and applies only to locally replayed solutio
 Each puzzle retains `publish_status.json` and the exact `results-*.json.gz` request.
 HTTP acceptance is not a claim that the GitHub promotion has completed.
 When forking, update the Kaggle owner, slug and saved version in the config.
+The result author is derived from your Kaggle username; an explicit author_name
+in publication metadata can override the display name.
 The notebook-source hash is derived from actual running cells, not a placeholder.
 ''', 'markdown')
     cell(f'''from pathlib import Path
@@ -83,7 +85,7 @@ TOUCH_BFS_RADIUS = 5
 B_MICRO = 8192
 MODEL_MICRO = 512
 PUBLISH_RESULTS = True
-KAGGLE_VERSION = 13
+KAGGLE_VERSION = 14
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:
     raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")

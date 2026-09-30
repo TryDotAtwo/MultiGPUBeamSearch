@@ -1129,3 +1129,5 @@ Final local gate 2026-09-30: 72 schema + 152 Workers runtime tests PASS; 94 Pyth
 2026-09-30: Recovered cancelled widthauditv3 artifacts: all7 allocations and5 saturated rows with model512 passed. Add explicit optional --beams selector for remaining profile audit; default still all7. Long4m remainsrunning. No native runtime changes.
 
 2026-09-30 Cube555 downstream: confirmed scheduled CPU10ms failure; moved bounded cleanup/enqueue/recovery into existing publication DO timestamp-only RPC. Added safe status/numeric-header GitHub diagnostics.72schema+156runtime tests, TypeScript, dry-run PASS. Live downstream still pending; no native/runtime/notebook pin change.
+
+2026-09-30 Cube555 public fork attribution: launcher now derives publication author from kaggle_username/owner (explicit author_name override supported without mutating input metadata); no-publication fallback preserved.106 contract/retry/results testsPASS. Notebook generator version14 prepared; public source stillv13 until verifiedQuickSave. Search/inference/native unchanged; original2000 envelopes unchanged.

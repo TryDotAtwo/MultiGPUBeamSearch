@@ -636,3 +636,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-30: Ivan explicitly requests coordination with existing Cube555 agent and Astra and continued acceptance work; existing two-slot and publication authorizations retained.
 
 2026-09-30 Ivan: «Поставь себе цель и продолжай». Active goal: Cube555 ingest CPU fix, original2000 receipts/downstream, acceptance/public immutable pin. Coordinator handoff supersedes two-slot permission: maximumONE Cube555 Kaggle slot. Local owner implements; supporting chat reviews. No subagents.
+
+2026-09-30 continuation requirement from Ivan: public Cube555 notebook must work for other users with simple KAGGLE_OWNER/KAGGLE_SLUG settings. Fork publication must not retain the original owner display name; existing archived results and identities must remain unchanged.

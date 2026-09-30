@@ -138,3 +138,28 @@ def test_telemetry_preserves_collect_drop_counts(tmp_path):
 def test_cube555_rejects_beam_outside_supported_range(beam):
     with pytest.raises(ValueError, match='Cube555 beam'):
         runtime_plan(beam)
+
+
+@pytest.mark.parametrize('identity, expected_name', [
+    ({'kaggle_owner': 'anotheruser', 'kaggle_username': 'anotheruser'}, 'anotheruser'),
+    ({'kaggle_owner': 'anotheruser'}, 'anotheruser'),
+    ({'kaggle_owner': 'anotheruser', 'author_name': 'Display Name'}, 'Display Name'),
+])
+def test_fork_publication_author_is_not_hardcoded_to_original_owner(tmp_path, identity, expected_name):
+    from types import SimpleNamespace
+    from tools.cube555.run import configuration
+    from tools.run_cayleypy_public import _publication_context
+    publication = dict(competition='cayley-py-555-cube', kaggle_slug='forked-cube555',
+        kaggle_version=1, solver_commit='b' * 40, kaggle_notebook_sha256='c' * 64, **identity)
+    original = publication.copy()
+    args = SimpleNamespace(assets=tmp_path, competition=tmp_path, beam=65536,
+        depth=140, touch_radius=5, publication=publication)
+    cfg = configuration(args, 35, tmp_path / 'puzzle_info.json')
+    contract = SimpleNamespace(central_state=tuple(range(150)), generators={'r': tuple(range(150))}, state_len=150, move_count=1)
+    model = SimpleNamespace(format='cube555-q-blend', checkpoint_sha256='a' * 64, manifest={})
+    payload = _publication_context(cfg, contract, model, {}, runtime_plan(65536),
+        ['Tesla T4', 'Tesla T4'], wall_seconds=1, solve_seconds=1)
+    assert payload['author']['name'] == expected_name
+    assert payload['kaggle']['owner'] == 'anotheruser'
+    assert payload['author'].get('kaggle_username') == identity.get('kaggle_username')
+    assert publication == original  # Repeated configuration must preserve the caller's metadata.

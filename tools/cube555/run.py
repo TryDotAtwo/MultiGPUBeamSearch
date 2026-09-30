@@ -57,8 +57,11 @@ def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
 
 
 def configuration(args, pid, puzzle_info):
+    publication = dict(getattr(args, 'publication', {}))
+    author_name = (publication.pop('author_name', None) or publication.get('kaggle_username')
+                   or publication.get('kaggle_owner') or 'Ivan Litvak')
     return PublicRunConfig.from_mapping(dict(
-        author_name='Ivan Litvak', checkpoint_path=str(getattr(args, 'checkpoint', None) or args.assets / 'q555_f1_bell2k.pt'),
+        author_name=author_name, checkpoint_path=str(getattr(args, 'checkpoint', None) or args.assets / 'q555_f1_bell2k.pt'),
         puzzle_info_json=str(puzzle_info), test_csv=str(args.competition / 'test.csv'),
         sample_submission_csv=str(args.competition / 'sample_submission.csv'),
         puzzle_id_start=pid, puzzle_id_end=pid, beam_width=args.beam, max_depth=args.depth,
@@ -69,7 +72,7 @@ def configuration(args, pid, puzzle_info):
         max_collected_solutions=getattr(args, 'max_collected_solutions', 2_000), touch_bfs_radius=args.touch_radius,
         publish_results=getattr(args, 'publish', False),
         results_ingest_url=getattr(args, 'ingest_url', ''), enable_debug=True,
-        **getattr(args, 'publication', {}),
+        **publication,
     ))
 
 
