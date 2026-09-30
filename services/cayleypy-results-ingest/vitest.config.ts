@@ -26,13 +26,14 @@ export default defineConfig({
           compatibilityDate: "2026-07-28",
           d1Databases: ["RESULTS_DB"],
           r2Buckets: ["RAW_RESULTS"],
+          queueProducers: { VALIDATE_QUEUE: "ingest-validation-test" },
           durableObjects: { GITHUB_WRITER: "GitHubWriter" },
         },
       };
     }),
   ],
   test: {
-    include: ["test/receipt.test.ts", "test/worker-v2.test.ts", "test/worker.test.ts", "test/consumer.test.ts", "test/replay.test.ts", "test/github-app.test.ts", "test/github-writer.test.ts"],
+    include: ["test/ingest-transport.test.ts", "test/ingress-do.test.ts", "test/receipt.test.ts", "test/worker-v2.test.ts", "test/worker.test.ts", "test/consumer.test.ts", "test/replay.test.ts", "test/github-app.test.ts", "test/github-writer.test.ts"],
     deps: {
       optimizer: {
         ssr: {

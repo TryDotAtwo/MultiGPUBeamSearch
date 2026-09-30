@@ -1,0 +1,31 @@
+{
+  "source_sha256": "25d9c70a88e49d3c9c228bfb24a9f07a14f10e334fa340df9f8a59ea90a80889",
+  "results": 2000,
+  "parts": 20,
+  "counts": [
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100
+  ],
+  "max_decoded_bytes": 1894165,
+  "max_compressed_bytes": 29710,
+  "all_original_fields_preserved": true,
+  "network_requests": 0
+}

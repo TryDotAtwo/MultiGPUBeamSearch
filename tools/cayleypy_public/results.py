@@ -33,6 +33,8 @@ MAX_ENVELOPE_BYTES = 256 * 1024
 MAX_PUBLISH_ARCHIVE_BYTES = 32 * 1024 * 1024
 MAX_DECOMPRESSED_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_ARCHIVE_RESULTS = 2_000
+MAX_INGRESS_ARCHIVE_RESULTS = 100
+MAX_INGRESS_DECOMPRESSED_BYTES = 4 * 1024 * 1024
 MAX_PUBLISH_REQUEST_BYTES = 4 * 1024 * 1024
 MAX_RESULTS_PER_REQUEST = 100
 
@@ -480,12 +482,12 @@ def build_result_archives(
     for envelope in normalized:
         item_bytes = len(_canonical_bytes(envelope))
         extra = item_bytes + bool(current)
-        if current and (len(current) >= MAX_ARCHIVE_RESULTS or raw_bytes + extra > MAX_DECOMPRESSED_ARCHIVE_BYTES):
+        if current and (len(current) >= min(MAX_ARCHIVE_RESULTS, MAX_INGRESS_ARCHIVE_RESULTS) or raw_bytes + extra > min(MAX_DECOMPRESSED_ARCHIVE_BYTES, MAX_INGRESS_DECOMPRESSED_BYTES)):
             archives.extend(pack(current))
             current = []
             raw_bytes = empty_bytes
             extra = item_bytes
-        if raw_bytes + extra > MAX_DECOMPRESSED_ARCHIVE_BYTES:
+        if raw_bytes + extra > min(MAX_DECOMPRESSED_ARCHIVE_BYTES, MAX_INGRESS_DECOMPRESSED_BYTES):
             raise ValueError("one result exceeds decompressed archive limit")
         current.append(envelope)
         raw_bytes += extra
@@ -660,7 +662,7 @@ def publish_results(
             endpoint,
             result_count,
             f"results endpoint returned HTTP {status_code}",
-            retryable=status_code == 429 or status_code >= 500,
+            retryable=status_code in (408, 429) or status_code >= 500,
             status_code=status_code,
         )
     except (TimeoutError, URLError, OSError):
@@ -694,7 +696,7 @@ def publish_results(
         endpoint,
         result_count,
         f"results endpoint returned HTTP {status_code}",
-        retryable=status_code == 429 or status_code >= 500,
+        retryable=status_code in (408, 429) or status_code >= 500,
         status_code=status_code,
     )
 
@@ -840,7 +842,7 @@ def publish_result_archive(
         status_code = int(error.code)
         code = _archive_server_code(error)
         detail = f" ({code})" if code else ""
-        return _failure(endpoint, result_count, f"results endpoint returned HTTP {status_code}{detail}", retryable=status_code == 429 or status_code >= 500, status_code=status_code)
+        return _failure(endpoint, result_count, f"results endpoint returned HTTP {status_code}{detail}", retryable=status_code in (408, 429) or status_code >= 500, status_code=status_code)
     except (TimeoutError, URLError, OSError):
         return _failure(endpoint, result_count, "results endpoint is temporarily unavailable", retryable=True)
     except (TypeError, ValueError):
@@ -853,4 +855,4 @@ def publish_result_archive(
             ok=True, retryable=False, safe_error=None, status_code=status_code,
             result_count=result_count, duplicate=status_code == 200, endpoint=endpoint,
         ))
-    return _failure(endpoint, result_count, f"results endpoint returned HTTP {status_code}", retryable=status_code == 429 or status_code >= 500, status_code=status_code)
+    return _failure(endpoint, result_count, f"results endpoint returned HTTP {status_code}", retryable=status_code in (408, 429) or status_code >= 500, status_code=status_code)

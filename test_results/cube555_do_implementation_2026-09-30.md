@@ -1,0 +1,13 @@
+# Cube555 DO ingest local implementation gate
+
+WIP after1b9c6766, not deployed. Source owner original Cube555 chat. Reviewer read-only via Astra.
+
+Heavy ingest (parse/decompress/schema/full-batch integrity/global rate/storage/canonicalization) extracted into src/ingest.ts, executed from existing SQLite GitHubWriter.fetch via fixed distinct ingest-validation-v1. Edge retains mode/method/media/declared-length/IP rate gates and forwards Request stream, returns Response without reading body. No migration, new privilege, tariff or cpu_ms change. DO per-object active guard returns503+Retry-After60 for interleaved ingress. Entire batch validates before any accepted-result persistence; storage/idempotency/queue semantics preserved. Sequential integrity; storage concurrency2.
+
+Deliberate advertised ingress tightening:100 results, decoded4MiB, actualcompressed32MiB. Larger transport requests reject; Python builder splits accordingly. Offline saved2000-record/64MiB reader remains compatible. Existing v12 and active long run use earlier client; any oversized archive must be repackaged from saved originals, never regenerated semantic identities.
+
+Validation:72 schema +145 Workers runtime tests PASS, including6 realDO fetch/duplicate/corrupt gzip/expansion cap/count cap/busy/gateway/missingbinding cases. tsc --noEmitPASS.76 client/results/retry Python testsPASS. Wrangler deploy dry-runPASS bindings unchanged. Test outputs copied alongside report. ActualDO/edge liveCPU and receipts/D1/downstream remain PENDING.
+
+Kaggle quota:widthauditv3 CANCEL_ACKNOWLEDGED via officialCLI after UI Stop Session. Longacceptancev1 is only retained OWN Cube555 run. No unrelated run stopped. At UI runtime2815s it completed depth10 on both ranks, full local frontier2002944; saturateddepths376.013,381.841,381.064,381.379,380.996,379.459s. GPU device memory4965/4985MiB. This confirms bounded progress, not solvedPID1020/full140/12h readiness. At this observed early saturated rate110 total depths is roughly11.2h; full140 roughly14.4h, neither is a guarantee of later depth cost.
+
+Final local gate 2026-09-30: 72 schema + 152 Workers runtime tests PASS; 94 Python client/CLI/retry tests PASS; typecheck and Wrangler dry-run PASS. Real DO tests cover 15-second absolute body deadline, upstream cancellation, recovery after timeout, dishonest/absent Content-Length and compressed overflow. Retained-reader transport has highWaterMark=0, preserves chunks, cancels on early response/fetch failure/downstream cancellation; no body decoding at edge. Expected aborted-pipe diagnostics occurred in cancellation tests. Original 2000 envelopes repacked into 20 parts of 100 without field/identity changes (network requests=0). Live CPU, delivery and downstream remain pending.

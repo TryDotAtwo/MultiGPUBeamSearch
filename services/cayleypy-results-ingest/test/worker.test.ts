@@ -1,3 +1,4 @@
+import { handleIngestBody } from "../src/ingest.js";
 import { createHash } from "node:crypto";
 import { env } from "cloudflare:workers";
 import canonicalGolden from "../../../configs/cayleypy_results_v1_golden.json";
@@ -52,6 +53,7 @@ function bindings(mode: string | undefined = "normal"): WorkerEnv {
     VALIDATE_QUEUE: { send: async () => undefined } as unknown as Queue,
   };
   if (mode !== undefined) result.INGEST_MODE = mode;
+  result.GITHUB_WRITER = { getByName: () => ({ enqueueValidated: async () => undefined, fetch: (request) => handleIngestBody(request, result, request.url.endsWith("/v1/results") ? 1 : 2) }) };
   return result;
 }
 
@@ -126,6 +128,8 @@ function customBindings(
   if (mode !== undefined) value.INGEST_MODE = mode;
   if (options.rateLimit) value.INGEST_RATE_LIMIT = options.rateLimit;
   if (options.writer) value.GITHUB_WRITER = options.writer;
+  const publicationWriter = value.GITHUB_WRITER;
+  value.GITHUB_WRITER = { getByName: (name) => name === "ingest-validation-v1" ? { enqueueValidated: async () => undefined, fetch: (request) => handleIngestBody(request, value, request.url.endsWith("/v1/results") ? 1 : 2) } : (publicationWriter?.getByName(name) ?? { enqueueValidated: async () => undefined }) };
   return value;
 }
 
@@ -360,10 +364,10 @@ describe("fail-closed modes and bounded request parsing", () => {
     expect(parsed.errors.every((error) => Object.keys(error).sort().join(",") === "keyword,path")).toBe(true);
   });
 
-  test("accepts 101 envelopes after the archive batch-cap increase", async () => {
+  test("rejects more than the advertised 100-envelope ingress cap", async () => {
     const response = await postJson(resultBatch(...Array.from({ length: 101 }, (_, index) => index)), bindings());
-    expect(response.status).toBe(202);
-    expect(await rowCount()).toBe(101);
+    expect(response.status).toBe(413);
+    expect(await rowCount()).toBe(0);
   });
 });
 
@@ -935,7 +939,7 @@ describe("concurrency and early-reject regression gates", () => {
   });
 });
 
-test("accepts 101 results in one bounded gzip archive request", async () => {
+test("rejects 101 results before any persistence", async () => {
   const payload = JSON.stringify(uniqueResultBatch(101));
   const compressed = await new Response(
     new Blob([payload]).stream().pipeThrough(new CompressionStream("gzip")),
@@ -951,7 +955,7 @@ test("accepts 101 results in one bounded gzip archive request", async () => {
     context(),
   );
 
-  expect(response.status).toBe(202);
+  expect(response.status).toBe(413);
   const body = await response.json() as { receipts: unknown[] };
-  expect(body.receipts).toHaveLength(101);
+  expect(body).toEqual({ error: "too_many_results" });
 });

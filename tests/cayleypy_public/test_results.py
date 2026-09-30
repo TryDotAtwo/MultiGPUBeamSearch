@@ -609,6 +609,7 @@ def test_publish_results_does_not_follow_redirects(
     ("error", "expected_status_code"),
     [
         (TimeoutError("endpoint-password query-secret timeout"), None),
+        (HTTPError("https://example.test/ingest", 408, "timeout", {}, BytesIO(b"private")), 408),
         (URLError(socket.gaierror("dns-secret")), None),
         (
             HTTPError(

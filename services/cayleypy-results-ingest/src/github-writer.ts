@@ -1,3 +1,4 @@
+import { handleIngestBody, errorResponse, type WorkerEnv } from "./ingest.js";
 import { DurableObject } from "cloudflare:workers";
 import { findBySubmissionId, transition, type SubmissionRow } from "./db.js";
 import { githubRequest, getInstallationToken, type GitHubAppConfig } from "./github-app.js";
@@ -9,7 +10,8 @@ import type { ResultEnvelopeV2 } from "./schema-v2.js";
 
 export type WriterMode = IngestMode;
 export const resolveWriterMode = resolveIngestMode;
-export interface GitHubWriterEnv extends GitHubAppConfig { RESULTS_DB: D1Database; RAW_RESULTS: R2Bucket; INGEST_MODE?: string; STAGING_BRANCH?: string; }
+export interface GitHubWriterEnv extends GitHubAppConfig {
+  VALIDATE_QUEUE: Queue; RESULTS_DB: D1Database; RAW_RESULTS: R2Bucket; INGEST_MODE?: string; STAGING_BRANCH?: string; }
 export interface FlushResult { staged: number; retained: number; }
 interface Pending { submissionId: string; }
 interface Verified { id: string; row: SubmissionRow; envelope: ResultEnvelope; body: string; path: string; }
@@ -83,6 +85,15 @@ function referenceSha(value: unknown): string | null {
   return sha(record.object) ?? sha(record);
 }
 export class GitHubWriter extends DurableObject<GitHubWriterEnv> {
+  private ingestActive = false;
+  async fetch(request: Request): Promise<Response> {
+    const path = new URL(request.url).pathname;
+    if (request.method !== "POST" || (path !== "/v1/results" && path !== "/v2/results")) return errorResponse(404, "not_found");
+    if (this.ingestActive) return errorResponse(503, "ingest_busy", { "Retry-After": "60" });
+    this.ingestActive = true;
+    try { return await handleIngestBody(request, this.env as WorkerEnv, path === "/v1/results" ? 1 : 2); }
+    finally { this.ingestActive = false; }
+  }
   private alarmUpdate: Promise<void> = Promise.resolve();
   constructor(ctx: DurableObjectState, env: GitHubWriterEnv) { super(ctx, env); ctx.blockConcurrencyWhile(async () => { const entries = await ctx.storage.list<Pending>({ prefix: PENDING_PREFIX, limit: 1 }); if (entries.size && await ctx.storage.getAlarm() === null) await this.rearm(); }); }
   private assertNormalMode(): void { if (resolveIngestMode(this.env.INGEST_MODE) !== "normal") throw new Error("writer_paused"); }

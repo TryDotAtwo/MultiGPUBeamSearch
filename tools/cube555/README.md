@@ -160,3 +160,5 @@ option exists. Refresh the scoped D1 snapshot before any separately authorized
 send. A verified receipt confirms ingest handling; confirm downstream state and
 promotion separately. Never use mock receipt ledgers as remote acceptance proof.
 See [HTTP503 diagnosis and retry evidence](../../test_results/cube555_retry_2026-09-30.md).
+
+Cloudflare transport uses at most100 results and4MiB decoded JSON per gzip part. The2000 solution collection limit remains independent of request batching. Saved legacy2000-result archives stay readable for idempotent repackaging/retry. New DO ingest fix is locally tested but live acceptance remains pending; do not infer public readiness from source-only saves.

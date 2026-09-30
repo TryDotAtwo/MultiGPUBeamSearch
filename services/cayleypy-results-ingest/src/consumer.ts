@@ -17,7 +17,7 @@ export interface QueueMessageLike {
 }
 
 export interface GitHubWriterNamespace {
-  getByName(name: string): { enqueueValidated(submissionId: string): Promise<void> };
+  getByName(name: string): { enqueueValidated(submissionId: string): Promise<void>; fetch?(request: Request): Promise<Response> };
 }
 
 export interface ConsumerEnv extends IngestEnv {
