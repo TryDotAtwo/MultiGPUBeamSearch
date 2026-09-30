@@ -1,0 +1,11 @@
+# Cube555 final readiness — 2026-09-30
+
+Public notebook: https://www.kaggle.com/code/trydotatwo/cube555-native-2xt4-blend version14, immutable runtime04632570d5f378c6f1530fcb2fbdcf556bd04d9c. Final official pull matches prepared cell text/type/order, AST PASS, public/restored dataset/competition correct. CayleyPy editor retained. Firstcell models/blend/beam/depth/reflection/collect/owner configuration; defaults beam4m,depth140,collect2000; BFS5,outer8192/model512 automatic runtime.
+
+Cloudflare existing-DO CPU-limit repairs deployed, preserving bounded schema/replay/hash/idempotency and retry originals. All2000 original envelopes exactly verified in Git main9455524b1f4b424299a94c25a6a382752170a822 after exact-candidate gate and PR414 merge. No permanent error-free service claim.
+
+Model512 hardware coverage: all7 allocation profiles plus five saturated profiles through1m from recovered widthv3, remaining2m saturated9iterations PASS in widthv4 and4m fullfrontier through39 in deliberately canceled longv1. Widthv4 COMPLETE on public0463pin: smoke,capacity2m,saturated2m allcomplete; bothrank finaliteration8/fullfrontier1048576; sampledpeaks4519/4539MiB; saturatedwall979.182s. Overflow normalcomplete: hits30/stored1/dropped29,warning, one valid length3 solution f0.f0.f0 independently replayed against originalPID35proof. Bothranklogs retained. Final layer emits collectstop instead of depth_done8; verifier uses bothrank depth_start8 plus terminal summary and rank0stop8.
+
+Long run stopped per newer user priority for bounded tests. Bothrank lastdepth39, median381.33s/layer, sampledpeaks4965/4985MiB. PID1020 remained unsolved; no full140 completion or TPU102/100 reproduction. MAX_DEPTH140 is an upper bound, not12hour guarantee; full4m140 projection exceeds12h. All sampled memory peaks may miss brief spikes. Private widthv4 COMPLETE and long CANCEL_ACKNOWLEDGED; no Cube555 GPU job remains running. Notebook is available for use within these measured limits; no new quality guarantee is inferred.
+
+Evidence: cube555_width_v4_verified_2026-09-30, cube555_long_terminal_2026-09-30, cube555_maintenance_2026-09-30 exact2000 ledger, public_v14 source audit and106Python contract/retry/results tests. Coordinator received ownership, stop, publication and finalhardware evidence. No subagents spawned by primary.
