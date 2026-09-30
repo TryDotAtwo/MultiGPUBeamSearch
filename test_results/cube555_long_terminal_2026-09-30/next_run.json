@@ -1,0 +1,11 @@
+{
+  "started_observed_at": "2026-09-30T18:54:29.970262+00:00",
+  "stop_deadline_utc": "2026-09-30T19:39:29.970262+00:00",
+  "slug": "trydotatwo/cube555-2xt4-width-audit",
+  "version": 4,
+  "runtime_pin": "04632570d5f378c6f1530fcb2fbdcf556bd04d9c",
+  "state": "PUSH_SUCCESS_PENDING_STATUS",
+  "long_terminal": "CANCEL_ACKNOWLEDGED+UICancelled",
+  "long_logs": "long_terminal",
+  "budget_minutes": 45
+}

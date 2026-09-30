@@ -1135,3 +1135,5 @@ Final local gate 2026-09-30: 72 schema + 152 Workers runtime tests PASS; 94 Pyth
 2026-09-30: Public Cube555 v14 Quick Saved and exact source/metadata/UI verified; all2000 original blobs now exact in staging,1050 in main; hardware gates pending.
 
 2026-09-30: PR414 merged; fresh per-key Gitblob ledger proves all2000 originals exact on main9455524b and staging. Hardware gates remain open.
+
+2026-09-30: Long v1 canceled per short-profile priority; terminal artifacts preserved, both ranks depth39, sampled peaks4965/4985MiB, median381.33s saturated layer; noPID1020solution. Focusedwidth v4 RUNNING on public0463pin, remaining2mdepth9+overflowdepth1,45minstopbudget.

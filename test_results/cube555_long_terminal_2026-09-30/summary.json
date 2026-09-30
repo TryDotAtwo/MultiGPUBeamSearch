@@ -1,0 +1,52 @@
+{
+  "termination": "user-requested cancellation; not native successful completion",
+  "pid1020_solution_confirmed": false,
+  "ranks": [
+    {
+      "path": "test_results\\cube555_20260930_handoff\\long_terminal\\cube555_20260930_150334\\run\\puzzle-1020\\logs\\puzzle-1020\\original\\e47484d649cc484c8a98f86e55a600e7\\torchrun\\e47484d649cc484c8a98f86e55a600e7_vi9xbiyf\\attempt_0\\0\\stdout.log",
+      "last_progress": [
+        "39",
+        "381.459"
+      ],
+      "bytes": 18232
+    },
+    {
+      "path": "test_results\\cube555_20260930_handoff\\long_terminal\\cube555_20260930_150334\\run\\puzzle-1020\\logs\\puzzle-1020\\original\\e47484d649cc484c8a98f86e55a600e7\\torchrun\\e47484d649cc484c8a98f86e55a600e7_vi9xbiyf\\attempt_0\\1\\stdout.log",
+      "last_progress": [
+        "39",
+        "381.459"
+      ],
+      "bytes": 18230
+    }
+  ],
+  "gpu_columns": [
+    "elapsed_s",
+    "gpu",
+    "used_mib",
+    "total_mib",
+    "gpu_util_pct",
+    "power_w"
+  ],
+  "sample_rows": 25688,
+  "solution_files": [],
+  "sampled_gpu_peak_mib": {
+    "0": 4965.0,
+    "1": 4985.0
+  },
+  "max_gpu_sample_elapsed_s": 13728.554,
+  "saturated_layer_seconds": {
+    "0": {
+      "count": 33,
+      "median": 381.329,
+      "min": 378.962,
+      "max": 382.772
+    },
+    "1": {
+      "count": 33,
+      "median": 381.33,
+      "min": 378.962,
+      "max": 382.772
+    }
+  },
+  "full140_budget_fit": "not verified; ~381seconds per saturated layer projects beyond12hours"
+}
