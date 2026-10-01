@@ -16,7 +16,21 @@
       "model_micro": 128,
       "stream1_concurrency": 1,
       "outer_parent_batch": 8192,
-      "evidence": null
+      "evidence": null,
+      "runtime": {
+        "stream4_trigger_candidates": 131072,
+        "shard_count": 4,
+        "b_micro": 8192,
+        "stream3_ring_slots": 2,
+        "shard_capacity_scale_ppm": 1250000,
+        "stream4_active_sort_slots": 2,
+        "stream1_concurrency": 1,
+        "stream4_batch_candidates": 131072,
+        "final_materialize_chunk_candidates": 88064,
+        "model_micro": 128
+      },
+      "effective_beam": 1048576,
+      "profile_power": 20
     },
     {
       "anchor_beam": 2097152,
@@ -24,7 +38,21 @@
       "model_micro": 128,
       "stream1_concurrency": 1,
       "outer_parent_batch": 8192,
-      "evidence": null
+      "evidence": null,
+      "runtime": {
+        "stream4_trigger_candidates": 131072,
+        "shard_count": 4,
+        "b_micro": 8192,
+        "stream3_ring_slots": 2,
+        "shard_capacity_scale_ppm": 1250000,
+        "stream4_active_sort_slots": 2,
+        "stream1_concurrency": 1,
+        "stream4_batch_candidates": 131072,
+        "final_materialize_chunk_candidates": 88064,
+        "model_micro": 128
+      },
+      "effective_beam": 2097152,
+      "profile_power": 21
     },
     {
       "anchor_beam": 4000000,
@@ -32,7 +60,21 @@
       "model_micro": 128,
       "stream1_concurrency": 1,
       "outer_parent_batch": 8192,
-      "evidence": null
+      "evidence": null,
+      "runtime": {
+        "stream4_trigger_candidates": 262144,
+        "shard_count": 4,
+        "b_micro": 8192,
+        "stream3_ring_slots": 2,
+        "shard_capacity_scale_ppm": 1250000,
+        "stream4_active_sort_slots": 2,
+        "stream1_concurrency": 1,
+        "stream4_batch_candidates": 262144,
+        "final_materialize_chunk_candidates": 88064,
+        "model_micro": 128
+      },
+      "effective_beam": 4001792,
+      "profile_power": 22
     },
     {
       "anchor_beam": 8000000,
@@ -40,7 +82,21 @@
       "model_micro": 128,
       "stream1_concurrency": 1,
       "outer_parent_batch": 8192,
-      "evidence": null
+      "evidence": null,
+      "runtime": {
+        "stream4_trigger_candidates": 262144,
+        "shard_count": 4,
+        "b_micro": 8192,
+        "stream3_ring_slots": 2,
+        "shard_capacity_scale_ppm": 1250000,
+        "stream4_active_sort_slots": 2,
+        "stream1_concurrency": 1,
+        "stream4_batch_candidates": 262144,
+        "final_materialize_chunk_candidates": 88064,
+        "model_micro": 128
+      },
+      "effective_beam": 8003584,
+      "profile_power": 23
     },
     {
       "anchor_beam": 12000000,
@@ -48,7 +104,21 @@
       "model_micro": 128,
       "stream1_concurrency": 1,
       "outer_parent_batch": 8192,
-      "evidence": null
+      "evidence": null,
+      "runtime": {
+        "stream4_trigger_candidates": 262144,
+        "shard_count": 4,
+        "b_micro": 8192,
+        "stream3_ring_slots": 2,
+        "shard_capacity_scale_ppm": 1250000,
+        "stream4_active_sort_slots": 2,
+        "stream1_concurrency": 1,
+        "stream4_batch_candidates": 262144,
+        "final_materialize_chunk_candidates": 88064,
+        "model_micro": 128
+      },
+      "effective_beam": 12001280,
+      "profile_power": 24
     },
     {
       "anchor_beam": 16000000,
@@ -56,7 +126,21 @@
       "model_micro": 128,
       "stream1_concurrency": 1,
       "outer_parent_batch": 8192,
-      "evidence": null
+      "evidence": null,
+      "runtime": {
+        "stream4_trigger_candidates": 262144,
+        "shard_count": 4,
+        "b_micro": 8192,
+        "stream3_ring_slots": 2,
+        "shard_capacity_scale_ppm": 1250000,
+        "stream4_active_sort_slots": 2,
+        "stream1_concurrency": 1,
+        "stream4_batch_candidates": 262144,
+        "final_materialize_chunk_candidates": 88064,
+        "model_micro": 128
+      },
+      "effective_beam": 16003072,
+      "profile_power": 24
     },
     {
       "anchor_beam": 17000000,
@@ -64,7 +148,21 @@
       "model_micro": 128,
       "stream1_concurrency": 1,
       "outer_parent_batch": 8192,
-      "evidence": null
+      "evidence": null,
+      "runtime": {
+        "stream4_trigger_candidates": 262144,
+        "shard_count": 4,
+        "b_micro": 8192,
+        "stream3_ring_slots": 2,
+        "shard_capacity_scale_ppm": 1250000,
+        "stream4_active_sort_slots": 2,
+        "stream1_concurrency": 1,
+        "stream4_batch_candidates": 262144,
+        "final_materialize_chunk_candidates": 88064,
+        "model_micro": 128
+      },
+      "effective_beam": 17002496,
+      "profile_power": 24
     }
   ]
 }

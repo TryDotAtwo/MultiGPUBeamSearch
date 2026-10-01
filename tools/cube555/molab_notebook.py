@@ -76,7 +76,7 @@ def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, INPUT_BUNDLE_URL, MODEL_ROOT,
     import zipfile as _zipfile
     import hashlib as _hashlib
 
-    _commit = "24b28667439719ec9db3d8797d42662973d571f8"
+    _commit = "1a03f17dd9961c057e459d2460dc8cf2206c7f0c"
     _repo = _Path("cube555_solver").resolve()
     if _repo.exists() and not (_repo / ".git").is_dir():
         # Molab persistence may restore source files without hidden Git metadata.
@@ -226,7 +226,7 @@ def _(AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITIO
         "--competition", str(_competition), "--output", str((_output / "run").resolve()),
         "--pids", *map(str, _pids), "--beam", str(_beam), "--depth", str(_depth),
         "--touch-radius", str(_radius), "--transformer-weight", str(TRANSFORMER_WEIGHT),
-        "--b-micro", "8192", "--model-micro", "128", "--inference-concurrency", "1",
+        "--b-micro", "8192",
         "--reflect-mode", REFLECT_MODE, "--solution-mode", SOLUTION_MODE,
         "--collect-extra-depths", str(COLLECT_EXTRA_DEPTHS),
         "--max-collected-solutions", str(MAX_COLLECTED_SOLUTIONS)]
@@ -239,13 +239,17 @@ def _(AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITIO
         molab_notebook_url="https://molab.marimo.io/notebooks/nb_TYNXg2wyehhgBDcTVRRKzQ",
         molab_notebook_sha256=_hashlib.sha256(_Path(__file__).read_bytes()).hexdigest()), indent=2))
     _command += ["--publish", "--publication-json", str(_publication.resolve())]
+    from tools.cube555.run import runtime_plan as _runtime_plan
+    _selected_plan = _runtime_plan(_beam, world_size=1)
     (_output / "provenance.json").write_text(_json.dumps(dict(
         platform="molab", world_size=1,
         solver_commit=_subprocess.check_output(["git", "rev-parse", "HEAD"],
             cwd=prepared_repo, text=True).strip(),
         beam=_beam, max_depth=_depth, touch_bfs_radius=_radius,
-        transformer_weight=TRANSFORMER_WEIGHT, model_micro=128,
-        inference_concurrency=1, solution_mode=SOLUTION_MODE,
+        transformer_weight=TRANSFORMER_WEIGHT,
+        model_micro=_selected_plan.runtime['model_micro'],
+        inference_concurrency=_selected_plan.runtime['stream1_concurrency'],
+        profile_note=_selected_plan.cross_puzzle_profile_note, solution_mode=SOLUTION_MODE,
         collect_extra_depths=COLLECT_EXTRA_DEPTHS,
         max_collected_solutions=MAX_COLLECTED_SOLUTIONS), indent=2))
     _shutil.copy2("cube555_input_manifest.json", _output / "input_manifest.json")

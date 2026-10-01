@@ -44,6 +44,14 @@ def test_large_molab_width_does_not_expand_kaggle_limit():
         runtime_plan(17_000_001, world_size=1)
 
 
+def test_molab_downstream_preserves_rank_and_beam():
+    from tools.cube555.downstream_audit import downstream_plan
+    base = runtime_plan(8_000_000, world_size=1)
+    changed = downstream_plan(base, {'stream4_active_sort_slots': 1})
+    assert changed.world_size == 1
+    assert changed.effective_beam == base.effective_beam
+
+
 def test_single_rank_history_uses_whole_budget():
     plan = runtime_plan(1_048_576, world_size=1)
     single = maximum_history_depth(plan, 30, 5, 8_000_000_000, 30_000_000_000)

@@ -26,16 +26,16 @@ def downstream_plan(base, overrides):
         raise ValueError('ring slots must cover inference lanes')
     plan = derive_runtime(dict(runtime=runtime, model_class=base.model_class,
         profile_power=base.profile_power, validation_status='bounded_from_measured'),
-        base.requested_beam, 30, 30, 2)
+        base.requested_beam, 30, 30, base.world_size, allow_single_rank=True)
     if plan.effective_beam != base.effective_beam:
         raise ValueError('diagnostic overrides must preserve effective beam')
     return replace(plan, runtime={**plan.runtime, 'model_micro': base.runtime['model_micro']},
                    cross_puzzle_profile_note='experimental_cube555_downstream')
 
 
-def saturated_layers(folder, local_beam, required_layers=4):
+def saturated_layers(folder, local_beam, required_layers=4, world_size=2):
     ranks = []
-    for rank in (0, 1):
+    for rank in range(world_size):
         paths = list(Path(folder).rglob(f'rank-{rank}.log'))
         if len(paths) != 1:
             raise ValueError(f'expected exactly one native rank-{rank} log')
@@ -49,9 +49,9 @@ def saturated_layers(folder, local_beam, required_layers=4):
         ranks.append((starts, ends))
     layers = [dict(depth=d, seconds=max(rank[1][d] for rank in ranks),
                    rank_seconds=[rank[1][d] for rank in ranks])
-        for d in sorted(set(ranks[0][1]) & set(ranks[1][1]))
+        for d in sorted(set.intersection(*(set(rank[1]) for rank in ranks)))
         if all(rank[0].get(d) == local_beam for rank in ranks)]
-    if len(layers) < required_layers or layers[-1]['depth'] != 4 + required_layers:
+    if len(layers) < required_layers:
         raise ValueError(f'insufficient both-rank steady-state evidence: {layers}')
     return layers
 
@@ -87,6 +87,9 @@ def main():
     parser.add_argument('--model-micro', type=int, required=True)
     parser.add_argument('--inference-concurrency', type=int, choices=(1, 2, 4), required=True)
     parser.add_argument('--neighbor-micro', type=int, required=True)
+    parser.add_argument('--runtime-target', choices=['kaggle-2xt4', 'molab-single-gpu'],
+                        default='kaggle-2xt4')
+    parser.add_argument('--beam', type=int, default=2**20)
     parser.add_argument('--saturated-depths', type=int, choices=(2, 4), default=2,
                         help='equal saturated work in every paired block; default two depths')
     parser.add_argument('--control-parent-groups', type=int, default=32)
@@ -108,14 +111,24 @@ def main():
         args.assets/'piece_layout_555.json', info, args.output/'export')
     model = ExportedModel('cube555-q-blend', 'fp16', manifest['script_sha256'], manifest,
                           'piece_transformer')
-    cfg = SimpleNamespace(assets=args.assets, competition=args.competition, beam=2**20,
+    world_size, cuda_arch = 2, 75
+    if args.runtime_target == 'molab-single-gpu':
+        if torch.cuda.device_count() != 1:
+            raise RuntimeError('Molab audit requires one real GPU')
+        world_size = 1
+        major, minor = torch.cuda.get_device_capability(0)
+        cuda_arch = 10 * major + minor
+        gpus = [torch.cuda.get_device_name(0)]
+    else:
+        gpus = validate_t4_hardware()
+    cfg = SimpleNamespace(assets=args.assets, competition=args.competition, beam=args.beam,
         depth=140, touch_radius=5, solution_mode='collect',
-        collect_until_depth=5 + args.saturated_depths,
+        collect_until_depth=(6 if args.beam > 4_000_000 else 5) + args.saturated_depths,
         max_collected_solutions=2000)
     base = runtime_plan(cfg.beam, model_micro=args.model_micro,
-                        inference_concurrency=args.inference_concurrency)
+                        inference_concurrency=args.inference_concurrency, world_size=world_size)
     runner = locate_or_build_runner(args.output, info, backend='piece_transformer',
-                                    config=configuration(cfg, 1020, info))
+                                    config=configuration(cfg, 1020, info), cuda_arch=cuda_arch)
     subprocess.run(['cmake', '--build', str(runner.parent), '--target',
                     'cube555_stream1_benchmark', '-j', '2'], check=True)
     binary = runner.parent/'cube555_stream1_benchmark'
@@ -138,7 +151,7 @@ def main():
                                           fixture/'sample_submission.csv', 3, 3)
     smoke_cfg = SimpleNamespace(**{**vars(cfg), 'competition': fixture, 'depth': 4,
         'touch_radius': 0, 'solution_mode': 'first', 'collect_until_depth': 0})
-    report = dict(gpus=validate_t4_hardware(), manifest=manifest, rows=[],
+    report = dict(gpus=gpus, manifest=manifest, rows=[],
         runner_sha256=hashlib.sha256(runner.read_bytes()).hexdigest(),
         benchmark_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
         corpus_sha256=hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
@@ -152,7 +165,7 @@ def main():
     def isolated(plan, out, label):
         processes = []
         try:
-            for gpu in (0, 1):
+            for gpu in range(world_size):
                 log = (out/f'isolated-{label}-gpu-{gpu}.log').open('w')
                 proc = subprocess.Popen([str(binary), str(args.output/'export'),
                     str(corpus_path), str(plan.runtime['model_micro']), str(gpu),
@@ -174,7 +187,7 @@ def main():
                                                /result['steady_median_seconds'])
                 rows.append(result)
             return dict(rows=rows, stable=all(row['steady_spread_fraction']<=0.10 for row in rows),
-                balanced_parents_per_second=2*min(
+                balanced_parents_per_second=world_size*min(
                 row['parents_per_second'] for row in rows))
         finally:
             for _, proc, log in processes:
@@ -205,7 +218,8 @@ def main():
             artifacts = _run_with_history_budgets(ram, disk, configuration(cfg, 1020, info),
                 contract, model, plan, args.output/'export', out/'logs', runner_path=str(runner))
             row['result'] = _materialize_run_artifacts(artifacts, out)
-            row['layers'] = saturated_layers(out/'logs', plan.local_beam, args.saturated_depths)
+            row['layers'] = saturated_layers(out/'logs', plan.local_beam, args.saturated_depths,
+                                             world_size=world_size)
             seconds = [layer['seconds'] for layer in row['layers']]
             row['median_seconds'] = statistics.median(seconds)
             row['relative_spread'] = (max(seconds)-min(seconds))/row['median_seconds']
@@ -282,7 +296,8 @@ def main():
         _, best_name, best_plan = max(confirmed, key=lambda item: item[0])
     report['best_fixed_stream1'] = best_name
     neighbor_base = runtime_plan(cfg.beam, model_micro=args.neighbor_micro,
-                                inference_concurrency=args.inference_concurrency)
+                                inference_concurrency=args.inference_concurrency,
+                                world_size=world_size)
     neighbor = downstream_plan(neighbor_base, {k: best_plan.runtime[k] for k in (
         'stream3_ring_slots', 'stream4_batch_candidates', 'stream4_trigger_candidates',
         'shard_count', 'stream4_active_sort_slots')})

@@ -35,14 +35,17 @@ def history_budgets(available_ram_bytes, tmp_free_bytes):
 
 
 def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
-                 model_micro: int | None = None, inference_concurrency: int = 1,
+                 model_micro: int | None = None, inference_concurrency: int | None = None,
                  world_size: int = 2) -> RuntimePlan:
     from tools.cube555 import molab_profiles
     limit = molab_profiles.MAX_BEAM if world_size == 1 else MAX_BEAM
     if type(beam) is not int or not 1 <= beam <= limit:
         raise ValueError(f'Cube555 beam must be in [1, {limit}]')
     molab_row = molab_profiles.candidate(beam) if world_size == 1 else None
-    micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile] if model_micro is None else model_micro
+    micro = (molab_row['model_micro'] if molab_row else
+             {'safe': 128, 'balanced': 256, 'throughput': 512}[profile]) if model_micro is None else model_micro
+    if inference_concurrency is None:
+        inference_concurrency = molab_row['stream1_concurrency'] if molab_row else 1
     if type(b_micro) is not int or not 1 <= b_micro <= 65536:
         raise ValueError('outer b_micro must be in [1, 65536]')
     if type(micro) is not int or not 1 <= micro <= b_micro:
@@ -51,6 +54,8 @@ def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
         raise ValueError('inference_concurrency must be 1, 2 or 4')
     registry = json.loads((Path(__file__).resolve().parents[2] / 'configs/kaggle_t4_transformer_profiles.json').read_text())
     seed = select_profile(registry, beam, 30, 30)
+    if molab_row:
+        seed['runtime'] = dict(molab_row['runtime'])
     old_batch = seed['runtime']['b_micro']
     seed['runtime']['b_micro'] = b_micro
     # Large Cube4 profiles encode many tiny outer slots. Preserve the candidate
@@ -103,8 +108,8 @@ def main():
     parser.add_argument('--touch-radius', type=int, default=5)
     parser.add_argument('--transformer-weight', type=float, default=0.8)
     parser.add_argument('--b-micro', type=int, default=8192)
-    parser.add_argument('--model-micro', type=int, default=128)
-    parser.add_argument('--inference-concurrency', type=int, choices=(1, 2, 4), default=1)
+    parser.add_argument('--model-micro', type=int)
+    parser.add_argument('--inference-concurrency', type=int, choices=(1, 2, 4))
     parser.add_argument('--reflect-mode', choices=['off', 'after_original', 'only'], default='off')
     parser.add_argument('--reflect-source-csv', type=Path)
     parser.add_argument('--solution-mode', choices=['first', 'collect'], default='collect')

@@ -1179,3 +1179,5 @@ Actual RTX PRO 6000 SM120 build solved first fixture; fixed single-rank invocati
 Molab SM120 collect cap1 regression passed on four fixtures; overflow30hits/stored6/dropped24 continued to configured window; saved paths replay valid. Public notebook pinned24b28667. Default beam/BFS5 seven-depth gate in progress.
 
 2026-10-01 Added experimental Molab1rank grid1m..17m isolated from unchanged Kaggle4m limit, native Stream1 audit target SM120/oneGPU.13 grid/history regression tests passed. GPU timing promotion pending; not claimed validated.
+
+Molab grid runtime selection now drives model micro/concurrency automatically; downstream audit supports one-rank work and configurable beam without parallel-stage summation.33 local tests pass. Native initial paired Stream1 screen complete (256/C2 approx66742parents/s); neighboring sweep interrupted byHTTP410. No measured profile promotion. Add preparation telemetry heartbeat for silent builds.

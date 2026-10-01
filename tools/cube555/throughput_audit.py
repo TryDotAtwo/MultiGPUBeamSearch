@@ -76,6 +76,9 @@ def main():
     else:
         gpus = validate_t4_hardware()
         cuda_arch = 75
+    preparation_monitor = Telemetry(a.output)
+    preparation_monitor.start()
+    print(f'audit_preparing target={a.runtime_target} cuda_arch={cuda_arch}', flush=True)
     manifest = export_blend(a.assets/'q555_f1_bell2k.pt', a.assets/'q555_2k_BEST.pt',
         a.assets/'piece_layout_555.json', a.assets/'puzzle_info.json', a.output/'export')
     info = json.loads((a.assets/'puzzle_info.json').read_text())
@@ -93,8 +96,11 @@ def main():
     runner = locate_or_build_runner(a.output, a.assets/'puzzle_info.json', backend='piece_transformer',
         config=configuration(cfg,1020,a.assets/'puzzle_info.json'), cuda_arch=cuda_arch)
     subprocess.run(['cmake','--build',str(runner.parent),'--target','cube555_stream1_benchmark','-j','2'],check=True,timeout=remaining())
+    preparation_performance = preparation_monitor.finish()
     binary = runner.parent/'cube555_stream1_benchmark'
     report = dict(gpus=gpus,torch=torch.__version__,manifest=manifest,
+        runtime_target=a.runtime_target, cuda_arch=cuda_arch,
+        preparation_performance=preparation_performance,
         binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
         runner_sha256=hashlib.sha256(runner.read_bytes()).hexdigest(),
         corpus_sha256=hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
