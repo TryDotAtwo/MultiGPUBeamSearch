@@ -41,6 +41,7 @@ class RuntimePlan:
     shard_capacity_candidates: int
     runtime: Mapping[str, int]
     cross_puzzle_profile_note: str
+    world_size: int = 2
 
 
 def _positive_int(value: object, name: str) -> int:
@@ -74,12 +75,13 @@ def derive_runtime(
     output_dim: int,
     move_count: int,
     world_size: int = 2,
+    *, allow_single_rank: bool = False,
 ) -> RuntimePlan:
     """Derive move-count-aware batches without replacing the requested beam."""
     requested_beam = _positive_int(beam_width, "beam_width")
     moves = _positive_int(move_count, "move_count")
     ranks = _positive_int(world_size, "world_size")
-    if ranks != 2:
+    if ranks != 2 and not (allow_single_rank and ranks == 1):
         raise ValueError("world_size must be exactly 2 for kaggle_2xt4")
     if profile.get("validation_status") not in {"measured", "bounded_from_measured"}:
         raise ValueError("profile validation_status must be measured or bounded_from_measured")
@@ -130,6 +132,7 @@ def derive_runtime(
         shard_capacity_candidates=capacity,
         runtime=MappingProxyType(dict(runtime)),
         cross_puzzle_profile_note="measured_24_move_seed" if moves != 24 else "",
+        world_size=ranks,
     )
 
 

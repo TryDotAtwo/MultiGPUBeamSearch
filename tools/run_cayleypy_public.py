@@ -192,11 +192,13 @@ def _git_stdout(arguments: Sequence[object], *, cwd: Path) -> str:
     return completed.stdout.strip()
 
 
-def locate_or_build_runner(output_dir: Path, puzzle_info_json: Path | None = None, *, backend: str = "mlp", config: PublicRunConfig | None = None) -> Path:
+def locate_or_build_runner(output_dir: Path, puzzle_info_json: Path | None = None, *, backend: str = "mlp", config: PublicRunConfig | None = None, cuda_arch: int = 75) -> Path:
     """Build the existing runner in Release mode for T4 (SM75), without source edits."""
     logs = output_dir / "logs"
     cutlass = Path(os.environ.get("CAYLEYPY_CUTLASS_DIR", "/tmp/cayleypy_public_cutlass"))
-    default_build = f"/tmp/cayleypy_public_build_sm75_{backend}"
+    if type(cuda_arch) is not int or not 70 <= cuda_arch <= 130:
+        raise ValueError('unsupported CUDA architecture')
+    default_build = f"/tmp/cayleypy_public_build_sm{cuda_arch}_{backend}"
     build = Path(os.environ.get("CAYLEYPY_BUILD_DIR", default_build))
     private_paths = tuple(path for path in (cutlass, build, puzzle_info_json) if path is not None)
     if not cutlass.exists():
@@ -227,7 +229,7 @@ def locate_or_build_runner(output_dir: Path, puzzle_info_json: Path | None = Non
     target = "production_runner" if backend == "mlp" else "production_runner_libtorch_stream1"
     configure: list[object] = [
         "cmake", "-S", _REPO_ROOT, "-B", build, "-GNinja",
-        "-DCMAKE_BUILD_TYPE=Release", "-DBEAM_CUDA_ARCHITECTURES=75",
+        "-DCMAKE_BUILD_TYPE=Release", f"-DBEAM_CUDA_ARCHITECTURES={cuda_arch}",
         f"-DCUTLASS_DIR={cutlass}",
         f"-DBEAM_ENABLE_DEBUG={'ON' if config is None or config.enable_debug else 'OFF'}",
         f"-DBEAM_ENABLE_DEPTH_LOGS={'ON' if config is None or config.enable_depth_logs else 'OFF'}",

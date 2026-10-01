@@ -35,7 +35,8 @@ def history_budgets(available_ram_bytes, tmp_free_bytes):
 
 
 def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
-                 model_micro: int | None = None, inference_concurrency: int = 1) -> RuntimePlan:
+                 model_micro: int | None = None, inference_concurrency: int = 1,
+                 world_size: int = 2) -> RuntimePlan:
     if type(beam) is not int or not 1 <= beam <= MAX_BEAM:
         raise ValueError(f'Cube555 beam must be in [1, {MAX_BEAM}]')
     micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile] if model_micro is None else model_micro
@@ -54,7 +55,9 @@ def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
     old_slots = seed['runtime']['stream3_ring_slots']
     seed['runtime']['stream3_ring_slots'] = max(2, inference_concurrency, (old_batch * old_slots + b_micro - 1) // b_micro)
     seed['runtime']['stream1_concurrency'] = inference_concurrency
-    plan = derive_runtime(seed, beam, 30, 30, 2)
+    if world_size == 1:
+        seed.pop('effective_beam', None)  # recompute alignment for one physical rank
+    plan = derive_runtime(seed, beam, 30, 30, world_size, allow_single_rank=True)
     return replace(plan, runtime={**plan.runtime, 'model_micro': micro},
         cross_puzzle_profile_note='Cube4 Transformer pipeline seed; Cube555 capacity requires native preflight and measurement')
 
@@ -105,7 +108,10 @@ def main():
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--ingest-url', default='https://cayleypy-results-ingest-staging.tupa-expert.workers.dev/v1/results')
     parser.add_argument('--publication-json', type=Path)
+    parser.add_argument('--runtime-target', choices=['kaggle-2xt4', 'molab-single-gpu'], default='kaggle-2xt4')
     args = parser.parse_args()
+    if args.runtime_target == 'molab-single-gpu' and args.publish:
+        parser.error('Molab publication needs Molab provenance support; local replayed results are saved')
     if not 1 <= args.depth <= MAX_DEPTH:
         parser.error(f'--depth must be in [1, {MAX_DEPTH}]')
     if args.collect_until_depth is not None and not 0 <= args.collect_until_depth <= args.depth:
@@ -127,7 +133,17 @@ def main():
     telemetry = Telemetry(args.output)
     telemetry.start()
     try:
-        summary['gpus'] = validate_t4_hardware()
+        world_size, cuda_arch = 2, 75
+        if args.runtime_target == 'molab-single-gpu':
+            import torch
+            if torch.cuda.device_count() != 1:
+                raise RuntimeError('Molab target requires exactly one real CUDA GPU')
+            summary['gpus'] = [torch.cuda.get_device_name(0)]
+            major, minor = torch.cuda.get_device_capability(0)
+            cuda_arch, world_size = 10 * major + minor, 1
+        else:
+            summary['gpus'] = validate_t4_hardware()
+        summary.update(runtime_target=args.runtime_target, world_size=world_size, cuda_arch=cuda_arch)
         info = args.assets / 'puzzle_info.json'
         contracts = {}
         for pid in args.pids:
@@ -142,7 +158,7 @@ def main():
             args.layout or args.assets / 'piece_layout_555.json', info, export_dir, args.transformer_weight)
         model = ExportedModel('cube555-q-blend', 'fp16', manifest['script_sha256'], manifest, 'piece_transformer')
         plan = runtime_plan(args.beam, b_micro=args.b_micro, model_micro=args.model_micro,
-                            inference_concurrency=args.inference_concurrency)
+                            inference_concurrency=args.inference_concurrency, world_size=world_size)
         # Reuse the existing public profiles' RAM/disk contract and explicit
         # depth cap. Beam is never reduced to fit history.
         ram, disk = history_budgets(_available_ram_bytes(), shutil.disk_usage('/tmp').free)
@@ -163,7 +179,7 @@ def main():
         print(json.dumps(preflight, indent=2), flush=True)
         summary['status'] = 'building'
         save()
-        runner = locate_or_build_runner(args.output, info, backend='piece_transformer', config=config)
+        runner = locate_or_build_runner(args.output, info, backend='piece_transformer', config=config, cuda_arch=cuda_arch)
         merged = contracts[args.pids[0]].sample_submission.copy()
         for pid in args.pids:
             summary['status'], summary['current_pid'] = 'running', pid
