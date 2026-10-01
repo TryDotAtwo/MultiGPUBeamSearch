@@ -22,7 +22,23 @@ def main():
     p.add_argument('--assets', type=Path, required=True)
     p.add_argument('--competition', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--microbatches', type=int, nargs='+',
+                   default=[64, 128, 256, 384, 512, 768, 1024, 1536, 2048])
+    p.add_argument('--concurrencies', type=int, choices=(1, 2, 4), nargs='+', default=[1, 2, 4])
+    p.add_argument('--repeats', type=int, default=5)
+    p.add_argument('--parent-groups', type=int, default=0,
+                   help='fixed timed work: total8192-parent groups per case, divided across lanes')
+    p.add_argument('--isolated-only', action='store_true')
     a = p.parse_args()
+    if not 3 <= a.repeats <= 100:
+        p.error('--repeats must be within [3,100]')
+    if any(not 1 <= micro <= 8192 for micro in a.microbatches):
+        p.error('--microbatches must be within [1,8192]')
+    if len(set(a.microbatches)) != len(a.microbatches) or len(set(a.concurrencies)) != len(a.concurrencies):
+        p.error('sweep cases must not contain duplicates')
+    if a.parent_groups < 0 or (a.parent_groups and any(
+            a.parent_groups % c or a.parent_groups//c < 3 for c in a.concurrencies)):
+        p.error('--parent-groups must divide across all lane counts with >=3 repeats each')
     torch.set_num_threads(1)
     a.output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
@@ -55,13 +71,16 @@ def main():
         binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
         runner_sha256=hashlib.sha256(runner.read_bytes()).hexdigest(),
         corpus_sha256=hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
-        outer=8192,concurrency_sweep=[1,2,4],rows=[],pipeline=[],
+        outer=8192,concurrency_sweep=a.concurrencies,microbatch_sweep=a.microbatches,
+        repeats=a.repeats,warmup_outer_groups=2,isolated_only=a.isolated_only,rows=[],pipeline=[],
+        fixed_total_parent_groups=a.parent_groups,
         metric='1 - pipeline_parents_per_second / isolated_Stream1_parents_per_second',
         excluded='isolated: model load/input H2D; included: production forward, fp32 blend, quantizer, score-ring copy. Pipeline includes all search stages; state populations differ but shapes/work counts match.')
     def save():
         report['audit_wall_seconds'] = time.monotonic()-started
         (a.output/'throughput_report.json').write_text(json.dumps(report,indent=2))
-    for micro, concurrency in itertools.product((64,128,256,384,512,768,1024,1536,2048),(1,2,4)):
+    for micro, concurrency in itertools.product(a.microbatches, a.concurrencies):
+        repeats = a.parent_groups//concurrency if a.parent_groups else a.repeats
         directory = a.output/f'isolated-{micro}-c{concurrency}'
         directory.mkdir()
         monitor = Telemetry(directory)
@@ -71,16 +90,26 @@ def main():
             for gpu in range(2):
                 out=(directory/f'gpu-{gpu}.log').open('w')
                 err=(directory/f'gpu-{gpu}.err').open('w')
-                proc=subprocess.Popen([str(binary),str(a.output/'export'),str(corpus_path),str(micro),str(gpu),'5',str(concurrency)],stdout=out,stderr=err,
+                proc=subprocess.Popen([str(binary),str(a.output/'export'),str(corpus_path),str(micro),str(gpu),str(repeats),str(concurrency)],stdout=out,stderr=err,
                     env={**os.environ,'OMP_NUM_THREADS':'1','MKL_NUM_THREADS':'1'})
                 processes.append((gpu,proc,out,err))
             for gpu,proc,out,err in processes:
-                code=proc.wait(timeout=min(180,remaining()))
+                code=proc.wait(timeout=min(300 if a.parent_groups else 180, remaining()))
                 out.close();err.close()
                 row=dict(gpu=gpu,micro=micro,concurrency=concurrency,return_code=code,status='failed')
                 if code==0:
                     row.update(json.loads((directory/f'gpu-{gpu}.log').read_text()))
                     row.update(status='complete',median_seconds=statistics.median(row['seconds']))
+                    row['repeat_groups'] = repeats
+                    row['timed_parents'] = 8192*concurrency*repeats
+                    if a.parent_groups:
+                        steady = row['seconds'][len(row['seconds'])//2:]
+                        row['early_median_seconds'] = statistics.median(row['seconds'][:len(row['seconds'])//2])
+                        row['all_repeat_median_seconds'] = row['median_seconds']
+                        row['median_seconds'] = statistics.median(steady)
+                        row['steady_spread_fraction'] = (max(steady)-min(steady))/row['median_seconds']
+                        if row['steady_spread_fraction'] > 0.10:
+                            row['status'] = 'unstable'
                     row['parents_per_second']=8192*concurrency/row['median_seconds']
                 report['rows'].append(row)
                 print(json.dumps(row),flush=True)
@@ -103,6 +132,10 @@ def main():
         if len(neighbors)>=4: break
         if case[1] not in {chosen[1] for chosen in neighbors}: neighbors.append(case)
     report['isolated_winner']=dict(micro=winner[0],concurrency=winner[1])
+    if a.isolated_only:
+        report.update(status='complete', pipeline_candidates=[])
+        save()
+        return
     report['pipeline_candidates']=neighbors
     save()
     for micro, concurrency in neighbors:
