@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["marimo>=0.18", "torch>=2.8", "numpy", "pandas", "cmake", "ninja"]
+# dependencies = ["marimo>=0.18", "torch==2.11.0", "numpy", "pandas", "cmake", "ninja", "cuda-toolkit[nvcc,crt,nvvm,cudart,cccl,culibos]==13.0.2"]
 # ///
 """Interactive Cube555 notebook for one physical Molab GPU."""
 import marimo
@@ -76,8 +76,13 @@ def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, INPUT_BUNDLE_URL, MODEL_ROOT,
     import zipfile as _zipfile
     import hashlib as _hashlib
 
-    _commit = "e64939a8091a4450907dfd52a800dfb7f2e6df89"
+    _commit = "db65495de0bdb0080f5c056cc44bf4e4ce428200"
     _repo = _Path("cube555_solver").resolve()
+    if _repo.exists() and not (_repo / ".git").is_dir():
+        # Molab persistence may restore source files without hidden Git metadata.
+        # Keep that snapshot and recreate the verifiable pinned checkout.
+        import time as _time
+        _repo.rename(_repo.with_name(_repo.name + f".snapshot-{_time.time_ns()}"))
     if not _repo.exists():
         _subprocess.run(["git", "clone", "--filter=blob:none", "--no-checkout",
                         "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git", str(_repo)], check=True)
@@ -140,6 +145,41 @@ def _(prepared_repo):
     # Molab installs PEP 723 dependencies into its kernel virtual environment.
     # Native tools and torchrun must use the same environment as this kernel.
     _os.environ["PATH"] = str(_Path(_sys.executable).parent) + _os.pathsep + _os.environ.get("PATH", "")
+    import importlib.metadata as _metadata
+    _compiler = _metadata.distribution("nvidia-cuda-nvcc")
+    if _compiler.version != "13.0.88":
+        raise RuntimeError("Expected the declared CUDA Toolkit 13.0.2 compiler")
+    _cuda_roots = list(dict.fromkeys([
+        _Path(_compiler.locate_file("nvidia/cu13")),
+        _Path(_torch.__file__).resolve().parents[1] / "nvidia/cu13",
+    ]))
+    # Compose the wheel SDK in an owned temporary directory: pinned compiler
+    # first, then PyTorch's CUDA libraries. Never modify package installations.
+    _sdk = _Path("/tmp/cube555_cuda13_sdk")
+    _sdk.mkdir(parents=True, exist_ok=True)
+    for _root in _cuda_roots:
+        for _file in _root.rglob("*"):
+            if not _file.is_file():
+                continue
+            _target = _sdk / _file.relative_to(_root)
+            if not _target.exists() and not _target.is_symlink():
+                _target.parent.mkdir(parents=True, exist_ok=True)
+                _target.symlink_to(_file.resolve())
+    if not (_sdk / "lib64").exists():
+        (_sdk / "lib64").symlink_to(_sdk / "lib", target_is_directory=True)
+    for _component in ["cub", "thrust", "cuda"]:
+        _nested = _sdk / "include/cccl" / _component
+        _flat = _sdk / "include" / _component
+        if _nested.exists() and not _flat.exists():
+            _flat.symlink_to(_nested, target_is_directory=True)
+    for _library in (_sdk / "lib").glob("lib*.so.*"):
+        _alias = _library.with_name(_library.name.split(".so.")[0] + ".so")
+        if not _alias.exists() and not _alias.is_symlink():
+            _alias.symlink_to(_library)
+    _os.environ["CUDA_HOME"] = _os.environ["CUDAToolkit_ROOT"] = str(_sdk)
+    _os.environ["CUDACXX"] = str(_sdk / "bin/nvcc")
+    _os.environ["PATH"] = str(_sdk / "bin") + _os.pathsep + _os.environ["PATH"]
+    _os.environ["LD_LIBRARY_PATH"] = str(_sdk / "lib") + _os.pathsep + _os.environ.get("LD_LIBRARY_PATH", "")
     if _torch.cuda.device_count() != 1:
         raise RuntimeError("Attach one GPU in Molab before running this notebook")
     for _tool in ["nvcc", "cmake", "ninja", "git", "nvidia-smi"]:
