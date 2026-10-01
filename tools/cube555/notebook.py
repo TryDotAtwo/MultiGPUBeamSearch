@@ -28,6 +28,10 @@ Attach `trydotatwo/cube555-transformer-resmlp-artifacts` and `cayley-py-555-cube
 Enter `BEAM_WIDTH` directly. Profiles: 65536, 131072, 262144, 524288, 1048576, 2097152, 4000000.
 Requested widths up to 4000000 are accepted; batch alignment may round up
 (the maximum request becomes 4005888 internally). Larger requests are rejected.
+The default beam is 2097152. A provisional short-run estimate for this width
+and depth 140 is about 11.6 h, assuming 1 h for preparation/BFS/save and 20% slowdown.
+This is not a 12-hour validation or guarantee. Width 4000000 at depth 140 is
+estimated above 12 h; choose a smaller beam or fewer depths for one Kaggle session.
 Only compatible Cube555 PieceTransformerQ555 / ResMLPQ weights are supported.
 Keep layout and puzzle_info.json beside the model bundle.
 Cube555 capacity is checked by the native
@@ -63,7 +67,7 @@ RESMLP_CHECKPOINT_PATH = MODEL_ROOT / "q555_2k_BEST.pt"  # ResMLP
 
 PUZZLE_ID_START = 1020  # inclusive
 PUZZLE_ID_END = 1020  # inclusive
-BEAM_WIDTH = 4_000_000  # maximum; smaller numeric widths are supported
+BEAM_WIDTH = 2_097_152  # recommended start; maximum supported request is 4_000_000
 MAX_DEPTH = 140
 TRANSFORMER_WEIGHT = 0.8  # 0 = ResMLP, 1 = Transformer
 
@@ -75,6 +79,7 @@ MAX_COLLECTED_SOLUTIONS = 2_000
 
 KAGGLE_OWNER = "trydotatwo"
 KAGGLE_SLUG = "cube555-native-2xt4-blend"
+KAGGLE_VERSION = 15  # saved notebook version; when forking, set your owner/slug/version
 ''')
     cell(f'''# Runtime settings: normally leave unchanged.
 SOLVER_COMMIT = {commit!r}
@@ -85,10 +90,12 @@ TOUCH_BFS_RADIUS = 5
 B_MICRO = 8192
 MODEL_MICRO = 512
 PUBLISH_RESULTS = True
-KAGGLE_VERSION = 14
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:
     raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")
+if BEAM_WIDTH > 2_097_152 and MAX_DEPTH >= 110:
+    print("Time warning: this beam/depth may exceed Kaggle's 12h session. "
+          "Use a smaller beam or depth; the requested beam will not be reduced automatically.")
 for path in (CHECKPOINT_PATH, RESMLP_CHECKPOINT_PATH, LAYOUT_PATH,
              MODEL_ROOT / "puzzle_info.json", COMPETITION_ROOT / "test.csv",
              COMPETITION_ROOT / "sample_submission.csv"):
@@ -143,18 +150,23 @@ if PUBLISH_RESULTS and not SMOKE_TEST:
     notebook_path = Path("/kaggle/working/__notebook__.ipynb")
     if not notebook_path.exists():
         notebook_path = Path("__notebook__.ipynb")
-    if not notebook_path.exists():
-        raise FileNotFoundError("Cannot publish without the running notebook source")
-    source = json.loads(notebook_path.read_text())
-    source_cells = [{"cell_type": c["cell_type"], "source": c["source"]} for c in source["cells"]]
-    source_hash = hashlib.sha256(json.dumps(source_cells, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    publication = dict(competition="cayley-py-555-cube", kaggle_owner=KAGGLE_OWNER,
-        kaggle_slug=KAGGLE_SLUG, kaggle_version=KAGGLE_VERSION,
-        kaggle_username=KAGGLE_OWNER, solver_commit=SOLVER_COMMIT,
-        kaggle_notebook_sha256=source_hash)
-    # Hash identifies actual running cell sources, including the edited configuration.
-    (output / "publication.json").write_text(json.dumps(publication, indent=2))
-    command += ["--publish", "--publication-json", str(output / "publication.json")]
+    try:
+        if not notebook_path.exists():
+            raise FileNotFoundError("Cannot publish without the running notebook source")
+        source = json.loads(notebook_path.read_text())
+        source_cells = [{"cell_type": c["cell_type"], "source": c["source"]} for c in source["cells"]]
+        source_hash = hashlib.sha256(json.dumps(source_cells, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        publication = dict(competition="cayley-py-555-cube", kaggle_owner=KAGGLE_OWNER,
+            kaggle_slug=KAGGLE_SLUG, kaggle_version=KAGGLE_VERSION,
+            kaggle_username=KAGGLE_OWNER, solver_commit=SOLVER_COMMIT,
+            kaggle_notebook_sha256=source_hash)
+        # Hash identifies actual running cell sources, including the edited configuration.
+        (output / "publication.json").write_text(json.dumps(publication, indent=2))
+        command += ["--publish", "--publication-json", str(output / "publication.json")]
+    except Exception as error:
+        message = f"Publication setup failed: {type(error).__name__}: {error}"
+        (output / "publication_setup_error.json").write_text(json.dumps(dict(error=message)))
+        print(message + "; continuing search with local result files.", flush=True)
 print("Run:", command, flush=True)
 with (output / "launcher.log").open("w") as log:
     process = subprocess.Popen(command, cwd=repo, stdout=subprocess.PIPE,

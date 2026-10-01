@@ -103,7 +103,7 @@ def test_notebook_first_cell_is_simple_user_config(tmp_path):
     assert first['cell_type'] == 'code'
     config = {}
     exec(''.join(first['source']), config)
-    assert config['BEAM_WIDTH'] == 4_000_000
+    assert config['BEAM_WIDTH'] == 2_097_152
     assert config['SOLUTION_MODE'] == 'collect'
     assert config['COLLECT_EXTRA_DEPTHS'] == 1
     assert 'COLLECT_UNTIL_DEPTH' not in config
