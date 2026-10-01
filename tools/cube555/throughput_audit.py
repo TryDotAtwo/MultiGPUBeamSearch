@@ -29,9 +29,12 @@ def main():
     p.add_argument('--parent-groups', type=int, default=0,
                    help='fixed timed work: total8192-parent groups per case, divided across lanes')
     p.add_argument('--isolated-only', action='store_true')
+    p.add_argument('--time-budget-seconds', type=int, default=3300)
     p.add_argument('--case-sequence', nargs='+',
                    help='explicit repeated micro:concurrency order for isolated paired controls')
     a = p.parse_args()
+    if not 300 <= a.time_budget_seconds <= 7200:
+        p.error('--time-budget-seconds must be within [300,7200]')
     if not 3 <= a.repeats <= 100:
         p.error('--repeats must be within [3,100]')
     if any(not 1 <= micro <= 8192 for micro in a.microbatches):
@@ -56,11 +59,11 @@ def main():
     torch.set_num_threads(1)
     a.output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
-    deadline = started + 3300
+    deadline = started + a.time_budget_seconds
     def remaining():
         seconds = deadline - time.monotonic()
         if seconds <= 0:
-            raise TimeoutError('55 minute audit budget exhausted')
+            raise TimeoutError('bounded audit time budget exhausted')
         return seconds
     gpus = validate_t4_hardware()
     manifest = export_blend(a.assets/'q555_f1_bell2k.pt', a.assets/'q555_2k_BEST.pt',
@@ -88,7 +91,8 @@ def main():
         outer=8192,concurrency_sweep=a.concurrencies,microbatch_sweep=a.microbatches,
         repeats=({str(c): a.parent_groups//c for c in a.concurrencies}
                  if a.parent_groups else a.repeats),
-        warmup_outer_groups=2,isolated_only=a.isolated_only,rows=[],pipeline=[],
+        warmup_parent_groups=8,warmup_parent_count=65536,
+        isolated_only=a.isolated_only,rows=[],pipeline=[],
         fixed_total_parent_groups=a.parent_groups,
         metric='1 - pipeline_parents_per_second / isolated_Stream1_parents_per_second',
         excluded='isolated: model load/input H2D; included: production forward, fp32 blend, quantizer, score-ring copy. Pipeline includes all search stages; state populations differ but shapes/work counts match.')

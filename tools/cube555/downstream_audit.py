@@ -89,9 +89,14 @@ def main():
     parser.add_argument('--neighbor-micro', type=int, required=True)
     parser.add_argument('--saturated-depths', type=int, choices=(2, 4), default=2,
                         help='equal saturated work in every paired block; default two depths')
+    parser.add_argument('--control-parent-groups', type=int, default=32)
     parser.add_argument('--variants', nargs='+', default=['batch-half', 'batch-double',
         'ring-four', 'shards-two', 'shards-eight', 'sort-one'])
     args = parser.parse_args()
+    if (args.control_parent_groups % args.inference_concurrency
+            or args.control_parent_groups//args.inference_concurrency < 6) or not (
+            8 <= args.control_parent_groups <= 128):
+        parser.error('--control-parent-groups must be within[8,128] and divide across lanes')
     torch.set_num_threads(1)
     args.output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
@@ -150,21 +155,26 @@ def main():
             for gpu in (0, 1):
                 log = (out/f'isolated-{label}-gpu-{gpu}.log').open('w')
                 proc = subprocess.Popen([str(binary), str(args.output/'export'),
-                    str(corpus_path), str(plan.runtime['model_micro']), str(gpu), '5',
+                    str(corpus_path), str(plan.runtime['model_micro']), str(gpu),
+                    str(args.control_parent_groups//plan.runtime['stream1_concurrency']),
                     str(plan.runtime['stream1_concurrency'])], stdout=log,
                     stderr=subprocess.STDOUT,
                     env={**os.environ, 'OMP_NUM_THREADS': '1', 'MKL_NUM_THREADS': '1'})
                 processes.append((gpu, proc, log))
             rows = []
             for gpu, proc, log in processes:
-                if proc.wait(timeout=180) != 0:
+                if proc.wait(timeout=300) != 0:
                     raise RuntimeError(f'bracketed isolated benchmark failed on GPU{gpu}')
                 log.close()
                 result = json.loads((out/f'isolated-{label}-gpu-{gpu}.log').read_text().splitlines()[-1])
+                steady = result['seconds'][len(result['seconds'])//2:]
+                result['steady_median_seconds'] = statistics.median(steady)
+                result['steady_spread_fraction'] = (max(steady)-min(steady))/result['steady_median_seconds']
                 result['parents_per_second'] = (8192*plan.runtime['stream1_concurrency']
-                                               /statistics.median(result['seconds']))
+                                               /result['steady_median_seconds'])
                 rows.append(result)
-            return dict(rows=rows, balanced_parents_per_second=2*min(
+            return dict(rows=rows, stable=all(row['steady_spread_fraction']<=0.10 for row in rows),
+                balanced_parents_per_second=2*min(
                 row['parents_per_second'] for row in rows))
         finally:
             for _, proc, log in processes:
@@ -204,7 +214,8 @@ def main():
             before = row['isolated_before']['balanced_parents_per_second']
             after = row['isolated_after']['balanced_parents_per_second']
             row['isolated_drift_fraction'] = abs(after-before)/((after+before)/2)
-            row['overhead_reliable'] = row['isolated_drift_fraction'] <= 0.05
+            row['overhead_reliable'] = (row['isolated_drift_fraction'] <= 0.05
+                and row['isolated_before']['stable'] and row['isolated_after']['stable'])
             row['bracketed_overhead_fraction'] = 1-row['parents_per_second']/((before+after)/2)
             row['status'] = ('complete' if row['relative_spread'] <= 0.10
                              and row['overhead_reliable'] else 'unstable')
@@ -227,6 +238,8 @@ def main():
         ('batch-double', dict(stream4_batch_candidates=262144, stream4_trigger_candidates=262144)),
         ('ring-four', dict(stream3_ring_slots=max(4, args.inference_concurrency))),
         ('shards-two', dict(shard_count=2)),
+        ('shards-two-batch-double', dict(shard_count=2,
+            stream4_batch_candidates=262144, stream4_trigger_candidates=262144)),
         ('shards-eight', dict(shard_count=8)),
         ('sort-one', dict(stream4_active_sort_slots=1)),
     ]

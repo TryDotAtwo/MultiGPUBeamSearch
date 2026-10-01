@@ -42,7 +42,8 @@ int main(int argc, char** argv) {
    }
    }
   };
-  for(int i=0;i<2;++i) run();
+  constexpr int warmup_parent_groups=8;
+  for(int i=0;i<warmup_parent_groups/concurrency;++i) run();
   torch::cuda::synchronize(gpu);
   std::vector<double> times;
   for(int i=0;i<repeats;++i) {
@@ -58,7 +59,7 @@ int main(int argc, char** argv) {
   if(!finite || error>0.3) throw std::runtime_error("microbatch parity failed");
   auto checksum=scores[0].to(torch::kInt64).sum().item<int64_t>();
   for(int lane=1;lane<concurrency;++lane) if(!torch::equal(scores[0],scores[lane])) throw std::runtime_error("concurrent score buffer mismatch");
-  std::cout<<"{\"gpu\":"<<gpu<<",\"micro\":"<<micro<<",\"concurrency\":"<<concurrency<<",\"outer\":8192,\"finite\":true,\"max_abs_vs_128\":"<<error<<",\"top1_agreement\":"<<agreement<<",\"score_checksum\":"<<checksum<<",\"seconds\":[";
+  std::cout<<"{\"gpu\":"<<gpu<<",\"micro\":"<<micro<<",\"concurrency\":"<<concurrency<<",\"outer\":8192,\"warmup_parent_groups\":8,\"warmup_waves\":"<<warmup_parent_groups/concurrency<<",\"finite\":true,\"max_abs_vs_128\":"<<error<<",\"top1_agreement\":"<<agreement<<",\"score_checksum\":"<<checksum<<",\"seconds\":[";
   for(size_t i=0;i<times.size();++i) std::cout<<(i?",":"")<<times[i];
   std::cout<<"]}"<<std::endl;
   return 0;
