@@ -1,41 +1,23 @@
 # Cube555 on Molab
 
-Open `molab_notebook.py` through Molab's GitHub importer. The first cell holds
-model paths, puzzle range, beam, depth, blend, reflection and collection settings.
-Defaults match Kaggle v16: beam 3,100,000, depth 140, Transformer weight 0.8,
-collect 2000 solutions with one extra depth, BFS radius 5.
+Select one GPU, edit the first cell if needed and choose **Run All**.
+There are no Prepare/Check/Run search widgets and no Kaggle credentials.
+Model and competition files download from the public GitHub Release;
+the ZIP and every member are SHA-256 verified.
 
-This notebook runs one native rank on one actual CUDA GPU. The Python launcher
-chooses the observed compute capability for CMake. It never simulates two ranks
-on one GPU. Model microbatch128/concurrency1 are inherited T4 settings, not a
-Molab tuning result. Native CUDA memory preflight still applies; history budgets
-can reduce depth and report that reduction, while beam stays unchanged.
+Defaults: beam 3,100,000; depth 140; Transformer weight 0.8; BFS radius 5;
+collect up to 2000 solutions, then one additional depth after the first hit.
+Set AUTHOR_NAME to your public name. Every saved path is replayed before sending.
 
-## Launch
+The notebook builds the pinned native solver for the observed architecture,
+runs one real GPU rank in a foreground cell and attempts Cloudflare publication
+with explicit Molab provenance. Publishing errors are saved, never fatal to
+local results. Download the results ZIP before ending the sandbox session.
 
-1. Attach one GPU in Molab. The environment needs CUDA-enabled PyTorch, NVCC
-   supporting that GPU, Git, CMake, Ninja and the PyTorch NCCL headers/library.
-2. Put the Kaggle credential in Molab Secrets as `KAGGLE_API_TOKEN`, and accept
-   the competition rules on Kaggle. Credentials never enter notebook source.
-   Prepare automatically downloads the model dataset and competition files;
-   local cache paths are internal. No manual model/data upload is required.
-   Change MODEL_DATASET and the two checkpoint filenames for another compatible bundle.
-3. Click Prepare, then Check GPU. Both stages are explicitly gated.
-4. Select Short replay smoke first. It solves/replays four legal scrambles.
-   Select Configured search afterwards and press Run search deliberately.
-5. Keep the foreground computation attached to the notebook. Download the ZIP
-   in the Molab file browser after each run; automatic persistence of generated
-   sandbox files is not assumed.
+CUDA PyTorch, NVCC supporting the GPU, Git, CMake, Ninja and PyTorch NCCL are
+checked automatically. Microbatch128/concurrency1 are T4 seed settings.
+Molab GPU build and speed are not verified yet. Kaggle timing forecasts do not
+apply to Molab. History preflight may cap depth with a warning, never beam.
 
-Automatic Cloudflare publication is disabled: the current public ingestion
-format requires Kaggle execution provenance. This notebook saves replayed
-solutions without falsely claiming Kaggle execution. The launcher rejects
-`--publish` on this target until Molab provenance has separate support.
-
-## Evidence
-
-127 local Python tests pass, covering default two-rank behavior and the new
-single-rank beam/history/torchrun/log contract. No Molab GPU search or native
-SM120 build has been verified yet. The Kaggle runtime forecasts do not apply
-to Molab. The runtime source is pinned in the notebook independently of its
-notebook-document commit.
+The explicit Molab server schema must be deployed before publication succeeds.
+This remains a separate validation gate from the source checks.

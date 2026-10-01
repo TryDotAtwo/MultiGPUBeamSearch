@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["marimo>=0.18", "torch>=2.8", "numpy", "pandas", "kaggle", "kagglehub", "cmake", "ninja"]
+# dependencies = ["marimo>=0.18", "torch>=2.8", "numpy", "pandas", "cmake", "ninja"]
 # ///
 """Interactive Cube555 notebook for one physical Molab GPU."""
 import marimo
@@ -12,7 +12,7 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     # USER CONFIG: edit these values.
-    MODEL_DATASET = "trydotatwo/cube555-transformer-resmlp-artifacts"  # downloaded automatically
+    INPUT_BUNDLE_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch/releases/download/cube555-inputs-20261001/cube555-inputs.zip"
     CHECKPOINT_FILENAME = "q555_f1_bell2k.pt"  # Transformer
     RESMLP_CHECKPOINT_FILENAME = "q555_2k_BEST.pt"  # ResMLP
     PUZZLE_ID_START = 1020
@@ -25,8 +25,9 @@ def _():
     SOLUTION_MODE = "collect"  # first | collect
     COLLECT_EXTRA_DEPTHS = 1
     MAX_COLLECTED_SOLUTIONS = 2_000
-    return (BEAM_WIDTH, CHECKPOINT_FILENAME, COLLECT_EXTRA_DEPTHS,
-            MAX_COLLECTED_SOLUTIONS, MAX_DEPTH, MODEL_DATASET, PUZZLE_ID_END,
+    AUTHOR_NAME = "Molab Cube555 participant"  # your public name
+    return (AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_FILENAME, COLLECT_EXTRA_DEPTHS,
+            MAX_COLLECTED_SOLUTIONS, MAX_DEPTH, INPUT_BUNDLE_URL, PUZZLE_ID_END,
             PUZZLE_ID_START, REFLECT_MODE, REFLECT_SOURCE_CSV,
             RESMLP_CHECKPOINT_FILENAME, SOLUTION_MODE, TRANSFORMER_WEIGHT)
 
@@ -38,10 +39,10 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(CHECKPOINT_FILENAME, MODEL_DATASET, RESMLP_CHECKPOINT_FILENAME):
+def _(CHECKPOINT_FILENAME, INPUT_BUNDLE_URL, RESMLP_CHECKPOINT_FILENAME):
     from pathlib import Path as _Path
-    # Cache paths are internal; Prepare downloads inputs automatically.
-    MODEL_ROOT = _Path("cube555_inputs/models") / MODEL_DATASET.replace("/", "__")
+    # Cache paths are internal; Run All downloads the public bundle automatically.
+    MODEL_ROOT = _Path("cube555_inputs/model")
     CHECKPOINT_PATH = MODEL_ROOT / CHECKPOINT_FILENAME
     RESMLP_CHECKPOINT_PATH = MODEL_ROOT / RESMLP_CHECKPOINT_FILENAME
     COMPETITION_ROOT = _Path("cube555_inputs/competition")
@@ -51,46 +52,23 @@ def _(CHECKPOINT_FILENAME, MODEL_DATASET, RESMLP_CHECKPOINT_FILENAME):
 @app.cell
 def _(mo):
     mo.md("""
-    # Cube555 — native beam search on Molab
+    # Cube555 — Run All on Molab
 
-    1. Attach a GPU in Molab. This notebook uses **one real GPU, one native rank**.
-    2. Put your Kaggle API credential in Molab Secrets (`KAGGLE_API_TOKEN`),
-       accept the Cube555 competition rules on Kaggle, then press **Prepare**.
-       Model and competition files are downloaded automatically and reused from cache.
-    3. Press **Check GPU**, choose a short replay smoke or your configured search,
-       then press **Run search**. Work stays in the foreground cell with live logs.
-
-    Same Transformer/ResMLP blend and native search algorithm as the Kaggle notebook.
-    BFS radius 5, outer batch 8192, model microbatch 128, one inference lane.
-    These settings were measured on two T4s; **Molab speed is not yet measured**.
-    The Kaggle 12-hour forecast does not transfer to this GPU.
-    Maximum beam request 4,000,000; memory preflight can cap depth, never beam.
-    Collect saves at most 2000 solutions, then continues the requested extra depths;
-    a staging overflow logs dropped hits and continues. Every saved solution is replayed.
-
-    Automatic Cloudflare publishing is disabled here: the current ingestion contract
-    requires Kaggle execution provenance. Molab results are saved locally without
-    labelling this run as a Kaggle run. Download the results ZIP after each run;
-    do not assume sandbox-generated files survive session termination.
+    Select one GPU in Molab, edit the first cell if needed, then **Run All**.
+    The following cells download public inputs from GitHub without credentials,
+    verify hashes, build the pinned native solver and run the search in the foreground.
+    Model weights are the Transformer/ResMLP blend restored from Artgor's notebook.
+    BFS radius 5; collect keeps at most 2000 solutions and searches the requested
+    number of additional depths after the first solution. Every saved path is replayed.
+    Download the results ZIP before ending the sandbox session.
+    Molab speed has not yet been measured; the Kaggle 12-hour estimate does not apply.
     """)
     return
 
 
 @app.cell
-def _(mo):
-    prepare_button = mo.ui.run_button(label="Prepare model, data and pinned solver")
-    check_button = mo.ui.run_button(label="Check GPU and build prerequisites")
-    run_button = mo.ui.run_button(label="Run search")
-    run_kind = mo.ui.dropdown(options=["Configured search", "Short replay smoke"],
-                              value="Configured search", label="Run mode")
-    mo.vstack([prepare_button, check_button, run_kind, run_button])
-    return check_button, prepare_button, run_button, run_kind
-
-
-@app.cell
-def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, MODEL_DATASET, MODEL_ROOT,
-      RESMLP_CHECKPOINT_FILENAME, mo, prepare_button):
-    mo.stop(not prepare_button.value)
+def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, INPUT_BUNDLE_URL, MODEL_ROOT,
+      RESMLP_CHECKPOINT_FILENAME, mo):
     from pathlib import Path as _Path
     import json as _json
     import shutil as _shutil
@@ -98,7 +76,7 @@ def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, MODEL_DATASET, MODEL_ROOT,
     import zipfile as _zipfile
     import hashlib as _hashlib
 
-    _commit = "0157b6f461eff797bfa481b5593fe42d2238a2d6"
+    _commit = "e64939a8091a4450907dfd52a800dfb7f2e6df89"
     _repo = _Path("cube555_solver").resolve()
     if not _repo.exists():
         _subprocess.run(["git", "clone", "--filter=blob:none", "--no-checkout",
@@ -106,31 +84,37 @@ def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, MODEL_DATASET, MODEL_ROOT,
     _subprocess.run(["git", "fetch", "--depth", "1", "origin", _commit], cwd=_repo, check=True)
     _subprocess.run(["git", "checkout", "--detach", _commit], cwd=_repo, check=True)
     assert _subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=_repo, text=True).strip() == _commit
-    MODEL_ROOT.mkdir(parents=True, exist_ok=True)
-    COMPETITION_ROOT.mkdir(parents=True, exist_ok=True)
+    import urllib.request as _urlrequest
+    _bundle = _Path("cube555_inputs.zip")
+    _expected = "49d61a127540cd197db9bf75aacad5712a7ab54d3fbcb39bf2da9ae9bb477286"
+    def _file_hash(_file_path):
+        _digest = _hashlib.sha256()
+        with _file_path.open("rb") as _file:
+            for _block in iter(lambda: _file.read(1024 * 1024), b""):
+                _digest.update(_block)
+        return _digest.hexdigest()
+    if not _bundle.is_file() or _file_hash(_bundle) != _expected:
+        print("Downloading public Cube555 inputs from GitHub", flush=True)
+        _partial = _bundle.with_suffix(".partial")
+        with _urlrequest.urlopen(INPUT_BUNDLE_URL, timeout=120) as _response, _partial.open("wb") as _file:
+            _shutil.copyfileobj(_response, _file)
+        if _file_hash(_partial) != _expected:
+            raise RuntimeError("Input bundle SHA-256 mismatch")
+        _partial.replace(_bundle)
+    _cache = _Path("cube555_inputs").resolve()
+    _cache.mkdir(exist_ok=True)
+    with _zipfile.ZipFile(_bundle) as _archive:
+        for _member in _archive.infolist():
+            if not (_cache / _member.filename).resolve().is_relative_to(_cache):
+                raise RuntimeError("Unsafe input ZIP member")
+        _archive.extractall(_cache)
+    _bundle_manifest = _json.loads((_cache / "manifest.json").read_text())
+    for _name, _entry in _bundle_manifest.items():
+        _file_path = _cache / _name
+        if _file_path.stat().st_size != _entry["bytes"] or _file_hash(_file_path) != _entry["sha256"]:
+            raise RuntimeError(f"Input verification failed: {_name}")
     _required_model = [CHECKPOINT_FILENAME, RESMLP_CHECKPOINT_FILENAME,
                        "piece_layout_555.json", "puzzle_info.json"]
-    if not all((MODEL_ROOT / _name).is_file() for _name in _required_model):
-        import kagglehub as _kh
-        print(f"Downloading model bundle from Kaggle: {MODEL_DATASET}", flush=True)
-        _download = _Path(_kh.dataset_download(MODEL_DATASET))
-        for _name in _required_model:
-            _matches = list(_download.rglob(_name))
-            if len(_matches) != 1:
-                raise RuntimeError(f"Expected one model bundle file: {_name}")
-            _shutil.copy2(_matches[0], MODEL_ROOT / _name)
-    if not all((COMPETITION_ROOT / _name).is_file() for _name in ["test.csv", "sample_submission.csv"]):
-        from kaggle.api.kaggle_api_extended import KaggleApi as _KaggleApi
-        _api = _KaggleApi()
-        _api.authenticate()
-        print("Downloading competition data from Kaggle: cayley-py-555-cube", flush=True)
-        _api.competition_download_files("cayley-py-555-cube", path=str(COMPETITION_ROOT), quiet=True)
-        with _zipfile.ZipFile(COMPETITION_ROOT / "cayley-py-555-cube.zip") as _archive:
-            for _member in _archive.infolist():
-                _target = (COMPETITION_ROOT / _member.filename).resolve()
-                if not _target.is_relative_to(COMPETITION_ROOT.resolve()):
-                    raise RuntimeError("Unsafe competition ZIP member")
-            _archive.extractall(COMPETITION_ROOT)
     _manifest = {}
     for _path in [*(MODEL_ROOT / _name for _name in _required_model),
                   COMPETITION_ROOT / "test.csv", COMPETITION_ROOT / "sample_submission.csv"]:
@@ -141,13 +125,12 @@ def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, MODEL_DATASET, MODEL_ROOT,
         _manifest[str(_path)] = _digest.hexdigest()
     _Path("cube555_input_manifest.json").write_text(_json.dumps(_manifest, indent=2))
     prepared_repo = _repo
-    mo.md("Prepared pinned solver and hashed model/data files. Now check the GPU.")
+    mo.md("Prepared pinned solver and hashed model/data files. Inputs ready; checking the GPU automatically.")
     return (prepared_repo,)
 
 
 @app.cell
-def _(check_button, mo):
-    mo.stop(not check_button.value)
+def _(prepared_repo):
     import torch as _torch
     import shutil as _shutil
     import subprocess as _subprocess
@@ -166,11 +149,10 @@ def _(check_button, mo):
 
 
 @app.cell
-def _(BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITION_ROOT,
+def _(AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITION_ROOT,
       MAX_COLLECTED_SOLUTIONS, MAX_DEPTH, MODEL_ROOT, PUZZLE_ID_END, PUZZLE_ID_START,
       REFLECT_MODE, REFLECT_SOURCE_CSV, RESMLP_CHECKPOINT_PATH, SOLUTION_MODE,
-      TRANSFORMER_WEIGHT, gpu_checked, mo, prepared_repo, run_button, run_kind):
-    mo.stop(not run_button.value or not gpu_checked)
+      TRANSFORMER_WEIGHT, gpu_checked, mo, prepared_repo):
     import subprocess as _subprocess
     import sys as _sys
     import time as _time
@@ -179,6 +161,10 @@ def _(BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITION_ROOT,
     from pathlib import Path as _Path
     import os as _os
     import signal as _signal
+    import hashlib as _hashlib
+    import torch as _torch
+    if not gpu_checked or _torch.cuda.device_count() != 1:
+        raise RuntimeError("Select one GPU in Molab, then Run All")
     _output = _Path("cube555_results") / _time.strftime("%Y%m%d_%H%M%S")
     _output.mkdir(parents=True, exist_ok=False)
     _sys.path.insert(0, str(prepared_repo))
@@ -187,11 +173,6 @@ def _(BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITION_ROOT,
         raise ValueError("PUZZLE_ID_END must be >= PUZZLE_ID_START")
     _competition = COMPETITION_ROOT.resolve()
     _beam, _depth, _radius = BEAM_WIDTH, MAX_DEPTH, 5
-    if run_kind.value == "Short replay smoke":
-        from tools.cube555.smoke import make_fixture as _make_fixture
-        _competition = (_output / "smoke_fixture").resolve()
-        _make_fixture(MODEL_ROOT.resolve(), _competition)
-        _pids, _beam, _depth, _radius = [0, 1, 2, 3], 4096, 6, 0
     _command = [_sys.executable, "-u", "-m", "tools.cube555.run",
         "--runtime-target", "molab-single-gpu", "--assets", str(MODEL_ROOT.resolve()),
         "--checkpoint", str(CHECKPOINT_PATH.resolve()),
@@ -203,6 +184,15 @@ def _(BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITION_ROOT,
         "--reflect-mode", REFLECT_MODE, "--solution-mode", SOLUTION_MODE,
         "--collect-extra-depths", str(COLLECT_EXTRA_DEPTHS),
         "--max-collected-solutions", str(MAX_COLLECTED_SOLUTIONS)]
+    _commit = _subprocess.check_output(["git", "rev-parse", "HEAD"],
+                                    cwd=prepared_repo, text=True).strip()
+    _publication = _output / "publication.json"
+    _publication.write_text(_json.dumps(dict(
+        author_name=AUTHOR_NAME, competition="cayley-py-555-cube",
+        solver_commit=_commit,
+        molab_notebook_url="https://molab.marimo.io/notebooks/nb_TYNXg2wyehhgBDcTVRRKzQ",
+        molab_notebook_sha256=_hashlib.sha256(_Path(__file__).read_bytes()).hexdigest()), indent=2))
+    _command += ["--publish", "--publication-json", str(_publication.resolve())]
     (_output / "provenance.json").write_text(_json.dumps(dict(
         platform="molab", world_size=1,
         solver_commit=_subprocess.check_output(["git", "rev-parse", "HEAD"],
@@ -241,12 +231,6 @@ def _(BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITION_ROOT,
         raise RuntimeError(f"Search exited {_code}; inspect {_output}/launcher.log")
     _summary = _json.loads((_output / "run/run_summary.json").read_text())
     print(_json.dumps(_summary, indent=2))
-    if run_kind.value == "Short replay smoke":
-        import pandas as _pd
-        for _pid in _pids:
-            _solutions = _pd.read_csv(_output / f"run/puzzle-{_pid}/solutions/solutions.csv")
-            assert len(_solutions) and _solutions["valid"].all()
-        print("PASS: four Cube555 scrambles solved and replayed on one native rank")
     mo.md(f"Completed. Download **{_archive}** using the Molab file browser.")
     return
 

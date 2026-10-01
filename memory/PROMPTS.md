@@ -655,3 +655,7 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-10-01 Ivan: Confirm both T4 GPUs use my native beam search, and make the same notebook for Molab. Preserve Cube555 blend, beam3100000/depth140/collect2000 and easy configuration; adapt to actual Molab hardware without claiming T4 performance transfers.
 
 2026-10-01 Ivan: Download model/competition from GitHub or Kaggle automatically; users must not manually install files into local paths.
+
+2026-10-01 Molab Run All: remove Prepare/Check/Run widgets and Kaggle authentication; download public GitHub release with bundle and member SHA-256 verification. User requires automatic result publishing; truthful Molab ingest support remains pending.
+
+2026-10-01 Molab publication: explicit molab notebook URL/hash replaces Kaggle provenance; one-rank hardware contract, public bundle HTTP200 unauthenticated verified; 167 Python tests pass. Worker schema/deployment and actual Molab GPU run remain separate pending gates. Run All foreground guard rechecks actual device count even after live cell replacement.
