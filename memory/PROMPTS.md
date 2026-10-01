@@ -646,3 +646,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-10-01 Ivan correction: «Там же есть микробатч + число одновременно инферянсещих нейронок». Joint tuning of model_micro and actual inference concurrency is required; one-axis optimum is insufficient.
 
 2026-10-01 Ivan: collect parameter must count additional depths after the first solution (1, 2, etc.), rather than an absolute depth.
+
+2026-10-01 direct Ivan relay: Cube555 may use two Kaggle slots while BFS runs on Vast. Optimize useful isolated Stream1 jointly by microbatch/concurrency first, then Stream3/4 for minimum full step time at fixed width/work/correctness. Overhead fraction is secondary; do not compare bare times across widths. Ivan subsequently requested continue.

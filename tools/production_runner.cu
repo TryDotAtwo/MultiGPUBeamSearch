@@ -5267,11 +5267,19 @@ int main(int argc, char** argv) {
                 const auto depth_end = std::chrono::steady_clock::now();
                 const double depth_sec =
                     std::chrono::duration<double>(depth_end - depth_start).count();
+#if BEAM_ENABLE_DEPTH_LOGS
+                if (emit_depth_log) {
+                    std::cout << "depth_done=" << depth << " depth_sec=" << depth_sec << "\n";
+                }
+#endif
                 if (rank == 0U) {
                     if (bucket_global_stop_reason == 2U) {
                         std::cout << "collection_status=capacity_reached\n";
-                    } else if (solve_bucket_stop_depth != 0U) {
+                    } else {
                         std::cout << "collection_status=depth_reached\n";
+                        std::cout << "collection_stop_reason="
+                                  << (bucket_depth_reached ? "absolute_depth" : "after_first_window")
+                                  << "\n";
                     }
                     std::cout << "solve_bucket_stop=1"
                               << " puzzle_id=" << repair_task.puzzle_id
@@ -5626,6 +5634,10 @@ int main(int argc, char** argv) {
             break;
         }
 #endif
+    }
+    if (solve_bucket_mode && completed_depths >= depth_limit && rank == 0U) {
+        std::cout << "collection_status=depth_reached\n";
+        std::cout << "collection_stop_reason=max_depth\n";
     }
     const auto end = std::chrono::steady_clock::now();
     const double elapsed_sec = std::chrono::duration<double>(end - start).count();

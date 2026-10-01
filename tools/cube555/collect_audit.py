@@ -50,6 +50,7 @@ def main():
             contract, model, plan, args.output/'export', out/'logs', runner_path=str(runner))
         result = _materialize_run_artifacts(artifacts, out)
         assert artifacts.solution_records, 'one-move fixture must solve'
+        assert result['collection_status'] == 'depth_reached', result
         ranks = []
         for rank in (0, 1):
             logs = list((out/'logs').rglob(f'rank-{rank}.log'))

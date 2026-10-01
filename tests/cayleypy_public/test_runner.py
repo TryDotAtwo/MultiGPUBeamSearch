@@ -297,6 +297,18 @@ def test_collect_capacity_is_bounded_by_requested_collection_and_depth(tmp_path:
           "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS": "3", "BEAM_SOLVED_RESULT_CAPACITY": "300"}
 
 
+@pytest.mark.parametrize("extra", [0, 1, 2, 10**30])
+def test_relative_collect_window_is_forwarded_without_uint32_overflow(tmp_path: Path, extra: int) -> None:
+    from dataclasses import replace
+    config = replace(_config(tmp_path, solution_mode="collect"),
+                     collect_until_depth=0, collect_extra_depths=extra)
+    invocation = runner.build_runner_invocation(
+        config, _plan(local_beam=128), 24, 7, "original", tmp_path / "weights", tmp_path,
+    )
+    assert invocation.env["BEAM_SOLVE_BUCKET_STOP_DEPTH"] == "0"
+    assert invocation.env["BEAM_SOLVE_BUCKET_EXTRA_DEPTHS"] == str(min(extra, config.max_depth))
+
+
 def test_solved_snapshot_capacity_fails_closed_on_uint32_or_t4_memory_overflow() -> None:
     with pytest.raises(ValueError, match="uint32"):
         runner.derive_solved_result_capacity(_plan(local_beam=2**31), 24, max_collected_solutions=2**32, max_depth=2)

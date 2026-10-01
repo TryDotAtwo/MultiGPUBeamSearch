@@ -18,10 +18,11 @@ class Telemetry:
         last_report = -30.0
         with (self.output / 'gpu_samples.csv').open('w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['elapsed_s', 'gpu', 'used_mib', 'total_mib', 'gpu_util_pct', 'power_w'])
+            writer.writerow(['elapsed_s', 'gpu', 'used_mib', 'total_mib', 'gpu_util_pct', 'power_w',
+                             'sm_clock_mhz', 'memory_clock_mhz', 'temperature_c', 'pstate'])
             while not self.stop.is_set():
                 try:
-                    p = subprocess.run(['nvidia-smi', '--query-gpu=index,memory.used,memory.total,utilization.gpu,power.draw', '--format=csv,noheader,nounits'], capture_output=True, text=True, timeout=5, check=True)
+                    p = subprocess.run(['nvidia-smi', '--query-gpu=index,memory.used,memory.total,utilization.gpu,power.draw,clocks.sm,clocks.mem,temperature.gpu,pstate', '--format=csv,noheader,nounits'], capture_output=True, text=True, timeout=5, check=True)
                     for row in csv.reader(p.stdout.splitlines()):
                         writer.writerow([round(time.monotonic()-start, 3), *[v.strip() for v in row]])
                     f.flush()
@@ -37,7 +38,7 @@ class Telemetry:
                             except (OSError, ValueError):
                                 pass
                         print(f'[progress] elapsed={elapsed:.0f}s stage={stage} '
-                              f'GPU(index,MiB,totalMiB,util%,W)={p.stdout.strip().replace(chr(10), " | ")}', flush=True)
+                              f'GPU(index,MiB,totalMiB,util%,W,SMMHz,memMHz,C,pstate)={p.stdout.strip().replace(chr(10), " | ")}', flush=True)
                         # Native depth logs can be quiet during a long full beam layer.
                         # Print only known progress records, never arbitrary log contents.
                         for log in sorted(self.output.rglob('stdout.log')):
