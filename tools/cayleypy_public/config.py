@@ -12,7 +12,7 @@ _ALLOWED_KEYS = frozenset({
     "checkpoint_source_root", "puzzle_info_json", "test_csv",
     "sample_submission_csv", "puzzle_id_start", "puzzle_id_end", "beam_width",
     "max_depth", "reflect_mode", "reflect_source_csv", "solution_mode",
-    "collect_until_depth", "max_collected_solutions", "touch_bfs_radius",
+    "collect_until_depth", "collect_extra_depths", "max_collected_solutions", "touch_bfs_radius",
     "publish_results", "results_ingest_url", "competition", "kaggle_owner",
     "kaggle_slug", "kaggle_version", "kaggle_username", "solver_commit",
     "kaggle_notebook_sha256",
@@ -89,6 +89,7 @@ class PublicRunConfig:
     touch_bfs_radius: int
     publish_results: bool
     results_ingest_url: str
+    collect_extra_depths: int = 1
     enable_debug: bool = True
     enable_depth_logs: bool = True
     enable_debug_logs: bool = False
@@ -185,6 +186,10 @@ class PublicRunConfig:
         collect_until_depth = integer("collect_until_depth")
         if collect_until_depth < 0 or collect_until_depth > positive_values["max_depth"]:
             raise ValueError("COLLECT_UNTIL_DEPTH must be within MAX_DEPTH")
+
+        collect_extra_depths = values.get("collect_extra_depths", 1)
+        if type(collect_extra_depths) is not int or collect_extra_depths < 0:
+            raise ValueError("COLLECT_EXTRA_DEPTHS must be a nonnegative integer")
 
         touch_bfs_radius = integer("touch_bfs_radius")
         if not 0 <= touch_bfs_radius <= 12:
@@ -284,6 +289,7 @@ class PublicRunConfig:
             reflect_source_csv=Path(reflect_source) if reflect_source is not None else None,
             solution_mode=solution_mode,
             collect_until_depth=collect_until_depth,
+            collect_extra_depths=collect_extra_depths,
             max_collected_solutions=positive_values["max_collected_solutions"],
             touch_bfs_radius=touch_bfs_radius,
             publish_results=publish_results,

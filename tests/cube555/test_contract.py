@@ -105,6 +105,8 @@ def test_notebook_first_cell_is_simple_user_config(tmp_path):
     exec(''.join(first['source']), config)
     assert config['BEAM_WIDTH'] == 4_000_000
     assert config['SOLUTION_MODE'] == 'collect'
+    assert config['COLLECT_EXTRA_DEPTHS'] == 1
+    assert 'COLLECT_UNTIL_DEPTH' not in config
     assert 'BEAM_PROFILE' not in config
     assert 'TOUCH_BFS_RADIUS' not in config
     assert config['CHECKPOINT_PATH'].parent == config['MODEL_ROOT']
@@ -180,3 +182,24 @@ def test_fork_publication_author_is_not_hardcoded_to_original_owner(tmp_path, id
     assert payload['kaggle']['owner'] == 'anotheruser'
     assert payload['author'].get('kaggle_username') == identity.get('kaggle_username')
     assert publication == original  # Repeated configuration must preserve the caller's metadata.
+
+
+@pytest.mark.parametrize("extra", [0, 1, 2, 140, 10**30])
+def test_collect_window_is_relative_to_first_solution(tmp_path, extra):
+    from types import SimpleNamespace
+    from tools.cube555.run import configuration
+    args = SimpleNamespace(assets=tmp_path, competition=tmp_path, beam=2**20,
+        depth=140, touch_radius=5, solution_mode="collect", collect_extra_depths=extra)
+    cfg = configuration(args, 1020, tmp_path / "puzzle_info.json")
+    assert cfg.collect_until_depth == 0  # enables native after-first window
+    assert cfg.collect_extra_depths == extra
+
+
+@pytest.mark.parametrize("extra", [-1, True, 1.5])
+def test_collect_extra_depths_rejects_invalid_values(tmp_path, extra):
+    from types import SimpleNamespace
+    from tools.cube555.run import configuration
+    args = SimpleNamespace(assets=tmp_path, competition=tmp_path, beam=2**20,
+        depth=140, touch_radius=5, collect_extra_depths=extra)
+    with pytest.raises(ValueError, match="COLLECT_EXTRA_DEPTHS"):
+        configuration(args, 1020, tmp_path / "puzzle_info.json")

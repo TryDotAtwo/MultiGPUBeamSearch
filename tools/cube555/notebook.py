@@ -70,7 +70,7 @@ TRANSFORMER_WEIGHT = 0.8  # 0 = ResMLP, 1 = Transformer
 REFLECT_MODE = "off"  # off | after_original | only
 REFLECT_SOURCE_CSV = None  # path to solutions CSV; required for "only"
 SOLUTION_MODE = "collect"  # first | collect
-COLLECT_UNTIL_DEPTH = MAX_DEPTH  # used by "collect"; capped to history budget
+COLLECT_EXTRA_DEPTHS = 1  # collect: additional depths after the first solution (0, 1, 2, ...)
 MAX_COLLECTED_SOLUTIONS = 2_000
 
 KAGGLE_OWNER = "trydotatwo"
@@ -134,7 +134,7 @@ command = [sys.executable, "-u", "-m", "tools.cube555.run",
 command += ["--b-micro", str(B_MICRO), "--model-micro", str(MODEL_MICRO)]
 if not SMOKE_TEST:
     command += ["--reflect-mode", REFLECT_MODE, "--solution-mode", SOLUTION_MODE,
-        "--collect-until-depth", str(COLLECT_UNTIL_DEPTH),
+        "--collect-extra-depths", str(COLLECT_EXTRA_DEPTHS),
         "--max-collected-solutions", str(MAX_COLLECTED_SOLUTIONS)]
     if REFLECT_SOURCE_CSV is not None:
         command += ["--reflect-source-csv", str(REFLECT_SOURCE_CSV)]

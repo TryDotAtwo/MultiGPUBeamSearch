@@ -494,6 +494,7 @@ def build_runner_invocation(
         env.update({
             "BEAM_SOLVE_BUCKET_MODE": "1",
             "BEAM_SOLVE_BUCKET_STOP_DEPTH": str(config.collect_until_depth),
+            "BEAM_SOLVE_BUCKET_EXTRA_DEPTHS": str(min(config.collect_extra_depths, config.max_depth)),
             "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS": str(config.max_collected_solutions),
             "BEAM_SOLVED_RESULT_CAPACITY": str(snapshot_capacity),
             "BEAM_SOLVE_BUCKET_RESULT_TSV": str(result_tsv),
