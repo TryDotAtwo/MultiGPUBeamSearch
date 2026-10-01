@@ -5245,8 +5245,6 @@ int main(int argc, char** argv) {
             }
 
             reset_solved_buffers(memory);
-            const bool bucket_capacity_reached = solve_bucket_max_solutions != 0ULL &&
-                synchronized_accepted_count >= solve_bucket_max_solutions;
             const bool bucket_depth_reached = solve_bucket_stop_depth != 0U &&
                 completed_depths >= solve_bucket_stop_depth;
             const bool bucket_legacy_window_reached =
@@ -5254,8 +5252,7 @@ int main(int argc, char** argv) {
                 solve_bucket_found_any &&
                 depth >= solve_bucket_first_found_depth_index + solve_bucket_extra_depths;
             const std::uint32_t bucket_local_stop_reason =
-                bucket_capacity_reached ? 2U :
-                ((bucket_depth_reached || bucket_legacy_window_reached) ? 1U : 0U);
+                (bucket_depth_reached || bucket_legacy_window_reached) ? 1U : 0U;
             const std::uint32_t bucket_global_stop_reason = propagate_host_stop_value(
                 bucket_local_stop_reason,
                 memory,
