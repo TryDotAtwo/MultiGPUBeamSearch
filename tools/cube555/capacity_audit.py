@@ -24,7 +24,7 @@ def main():
     p.add_argument('--competition',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--full-depth',type=int,default=9)
-    p.add_argument('--model-micro',type=int,default=512)
+    p.add_argument('--model-micro',type=int,default=128)
     p.add_argument('--inference-concurrency',type=int,choices=(1,2,4),default=1)
     p.add_argument('--beams',type=int,nargs='+',choices=BEAM_PROFILES,default=list(BEAM_PROFILES),
                    help='Supported profile widths to audit; default checks all profiles')

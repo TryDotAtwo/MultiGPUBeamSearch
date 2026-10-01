@@ -649,3 +649,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 
 2026-10-01 direct Ivan relay: Cube555 may use two Kaggle slots while BFS runs on Vast. Optimize useful isolated Stream1 jointly by microbatch/concurrency first, then Stream3/4 for minimum full step time at fixed width/work/correctness. Overhead fraction is secondary; do not compare bare times across widths. Ivan subsequently requested continue.
 2026-10-01 Ivan/Astra: compare same-instance short base -> variant -> base blocks with identical work/warmup, keep both rank times and slower-rank completion. Baseline disagreement greater than sought gain means no winner; reverse-order leader confirmations. Save clocks/temperature without asserting overheating cause.
+
+2026-10-01 Ivan: Easy public Cube555 notebook; jointly tune microbatch/concurrency then full-step Stream3/4 with fixed work, paired/reverse controls and drift exclusions; collect2000, extra depths after first solution, depth140, BFS5, beam<=4000000, exactGit pin, replay/memory/Cloudflare, public+CayleyPy Editor. Maximumtwo own Kaggle slots, no subagents. Retain baseline when no confirmed improvement.

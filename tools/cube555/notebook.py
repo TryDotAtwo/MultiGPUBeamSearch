@@ -39,6 +39,10 @@ Cube555 capacity is checked by the native
 `B_MICRO=8192` is the outer parent transaction. `MODEL_MICRO` independently limits
 one LibTorch forward. The original Transformer registry selects shards, Stream4
 buffers and final exchange chunks from the requested width.
+The default is MODEL_MICRO=128 with one inference lane. Fixed-work, equal-warmup
+paired controls found no confirmed faster challenger; several small differences
+remain unresolved. A paired full-step check retained the baseline pipeline;
+the combined shard/batch alternative had an unstable control block.
 History uses at most 24 GB RAM, preserves at least 6 GB of available RAM
 for runtime overhead, and uses 50 GiB scratch disk. Default depth is 140.
 Collect staging is bounded by MAX_COLLECTED_SOLUTIONS * effective MAX_DEPTH
@@ -88,7 +92,7 @@ COMPETITION_ROOT = Path("/kaggle/input/competitions/cayley-py-555-cube")
 LAYOUT_PATH = MODEL_ROOT / "piece_layout_555.json"
 TOUCH_BFS_RADIUS = 5
 B_MICRO = 8192
-MODEL_MICRO = 512
+MODEL_MICRO = 128
 PUBLISH_RESULTS = True
 PUZZLE_IDS = list(range(PUZZLE_ID_START, PUZZLE_ID_END + 1))
 if not PUZZLE_IDS:

@@ -94,7 +94,7 @@ def main():
     parser.add_argument('--touch-radius', type=int, default=5)
     parser.add_argument('--transformer-weight', type=float, default=0.8)
     parser.add_argument('--b-micro', type=int, default=8192)
-    parser.add_argument('--model-micro', type=int, default=512)
+    parser.add_argument('--model-micro', type=int, default=128)
     parser.add_argument('--inference-concurrency', type=int, choices=(1, 2, 4), default=1)
     parser.add_argument('--reflect-mode', choices=['off', 'after_original', 'only'], default='off')
     parser.add_argument('--reflect-source-csv', type=Path)
