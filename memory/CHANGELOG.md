@@ -1181,3 +1181,5 @@ Molab SM120 collect cap1 regression passed on four fixtures; overflow30hits/stor
 2026-10-01 Added experimental Molab1rank grid1m..17m isolated from unchanged Kaggle4m limit, native Stream1 audit target SM120/oneGPU.13 grid/history regression tests passed. GPU timing promotion pending; not claimed validated.
 
 Molab grid runtime selection now drives model micro/concurrency automatically; downstream audit supports one-rank work and configurable beam without parallel-stage summation.33 local tests pass. Native initial paired Stream1 screen complete (256/C2 approx66742parents/s); neighboring sweep interrupted byHTTP410. No measured profile promotion. Add preparation telemetry heartbeat for silent builds.
+
+Molab pairing audit: local adapter treated EOF without done as exit0 and allowed subsequent kernelexecute probes; corrected EOF failure and same-session ownership lock, mocked done/EOF/conflictingexecute regression passed. Silent build preparation now has telemetry. User confirms no compute changes/stops; HTTP410 cause unconfirmed. Main search disabled during profiling; no overlapping kernel POSTs.
