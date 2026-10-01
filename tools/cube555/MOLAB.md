@@ -17,8 +17,9 @@ can reduce depth and report that reduction, while beam stays unchanged.
    supporting that GPU, Git, CMake, Ninja and the PyTorch NCCL headers/library.
 2. Put the Kaggle credential in Molab Secrets as `KAGGLE_API_TOKEN`, and accept
    the competition rules on Kaggle. Credentials never enter notebook source.
-   Alternatively upload the four public model bundle files and competition
-   `test.csv`/`sample_submission.csv` to the first-cell paths.
+   Prepare automatically downloads the model dataset and competition files;
+   local cache paths are internal. No manual model/data upload is required.
+   Change MODEL_DATASET and the two checkpoint filenames for another compatible bundle.
 3. Click Prepare, then Check GPU. Both stages are explicitly gated.
 4. Select Short replay smoke first. It solves/replays four legal scrambles.
    Select Configured search afterwards and press Run search deliberately.

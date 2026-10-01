@@ -11,13 +11,10 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
-    from pathlib import Path
-
     # USER CONFIG: edit these values.
-    MODEL_ROOT = Path("cube555_inputs/model")
-    CHECKPOINT_PATH = MODEL_ROOT / "q555_f1_bell2k.pt"
-    RESMLP_CHECKPOINT_PATH = MODEL_ROOT / "q555_2k_BEST.pt"
-    COMPETITION_ROOT = Path("cube555_inputs/competition")
+    MODEL_DATASET = "trydotatwo/cube555-transformer-resmlp-artifacts"  # downloaded automatically
+    CHECKPOINT_FILENAME = "q555_f1_bell2k.pt"  # Transformer
+    RESMLP_CHECKPOINT_FILENAME = "q555_2k_BEST.pt"  # ResMLP
     PUZZLE_ID_START = 1020
     PUZZLE_ID_END = 1020
     BEAM_WIDTH = 3_100_000
@@ -28,16 +25,27 @@ def _():
     SOLUTION_MODE = "collect"  # first | collect
     COLLECT_EXTRA_DEPTHS = 1
     MAX_COLLECTED_SOLUTIONS = 2_000
-    return (BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITION_ROOT,
-            MAX_COLLECTED_SOLUTIONS, MAX_DEPTH, MODEL_ROOT, PUZZLE_ID_END,
+    return (BEAM_WIDTH, CHECKPOINT_FILENAME, COLLECT_EXTRA_DEPTHS,
+            MAX_COLLECTED_SOLUTIONS, MAX_DEPTH, MODEL_DATASET, PUZZLE_ID_END,
             PUZZLE_ID_START, REFLECT_MODE, REFLECT_SOURCE_CSV,
-            RESMLP_CHECKPOINT_PATH, SOLUTION_MODE, TRANSFORMER_WEIGHT)
+            RESMLP_CHECKPOINT_FILENAME, SOLUTION_MODE, TRANSFORMER_WEIGHT)
 
 
 @app.cell
 def _():
     import marimo as mo
     return (mo,)
+
+
+@app.cell(hide_code=True)
+def _(CHECKPOINT_FILENAME, MODEL_DATASET, RESMLP_CHECKPOINT_FILENAME):
+    from pathlib import Path as _Path
+    # Cache paths are internal; Prepare downloads inputs automatically.
+    MODEL_ROOT = _Path("cube555_inputs/models") / MODEL_DATASET.replace("/", "__")
+    CHECKPOINT_PATH = MODEL_ROOT / CHECKPOINT_FILENAME
+    RESMLP_CHECKPOINT_PATH = MODEL_ROOT / RESMLP_CHECKPOINT_FILENAME
+    COMPETITION_ROOT = _Path("cube555_inputs/competition")
+    return CHECKPOINT_PATH, COMPETITION_ROOT, MODEL_ROOT, RESMLP_CHECKPOINT_PATH
 
 
 @app.cell
@@ -48,7 +56,7 @@ def _(mo):
     1. Attach a GPU in Molab. This notebook uses **one real GPU, one native rank**.
     2. Put your Kaggle API credential in Molab Secrets (`KAGGLE_API_TOKEN`),
        accept the Cube555 competition rules on Kaggle, then press **Prepare**.
-       Alternatively upload model files and competition CSVs to the paths above.
+       Model and competition files are downloaded automatically and reused from cache.
     3. Press **Check GPU**, choose a short replay smoke or your configured search,
        then press **Run search**. Work stays in the foreground cell with live logs.
 
@@ -80,7 +88,8 @@ def _(mo):
 
 
 @app.cell
-def _(COMPETITION_ROOT, MODEL_ROOT, mo, prepare_button):
+def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, MODEL_DATASET, MODEL_ROOT,
+      RESMLP_CHECKPOINT_FILENAME, mo, prepare_button):
     mo.stop(not prepare_button.value)
     from pathlib import Path as _Path
     import json as _json
@@ -99,10 +108,12 @@ def _(COMPETITION_ROOT, MODEL_ROOT, mo, prepare_button):
     assert _subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=_repo, text=True).strip() == _commit
     MODEL_ROOT.mkdir(parents=True, exist_ok=True)
     COMPETITION_ROOT.mkdir(parents=True, exist_ok=True)
-    _required_model = ["q555_f1_bell2k.pt", "q555_2k_BEST.pt", "piece_layout_555.json", "puzzle_info.json"]
+    _required_model = [CHECKPOINT_FILENAME, RESMLP_CHECKPOINT_FILENAME,
+                       "piece_layout_555.json", "puzzle_info.json"]
     if not all((MODEL_ROOT / _name).is_file() for _name in _required_model):
         import kagglehub as _kh
-        _download = _Path(_kh.dataset_download("trydotatwo/cube555-transformer-resmlp-artifacts"))
+        print(f"Downloading model bundle from Kaggle: {MODEL_DATASET}", flush=True)
+        _download = _Path(_kh.dataset_download(MODEL_DATASET))
         for _name in _required_model:
             _matches = list(_download.rglob(_name))
             if len(_matches) != 1:
@@ -112,6 +123,7 @@ def _(COMPETITION_ROOT, MODEL_ROOT, mo, prepare_button):
         from kaggle.api.kaggle_api_extended import KaggleApi as _KaggleApi
         _api = _KaggleApi()
         _api.authenticate()
+        print("Downloading competition data from Kaggle: cayley-py-555-cube", flush=True)
         _api.competition_download_files("cayley-py-555-cube", path=str(COMPETITION_ROOT), quiet=True)
         with _zipfile.ZipFile(COMPETITION_ROOT / "cayley-py-555-cube.zip") as _archive:
             for _member in _archive.infolist():
