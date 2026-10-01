@@ -12,7 +12,7 @@ import subprocess
 import time
 from types import SimpleNamespace
 
-from tools.cube555.run import configuration, history_budgets, runtime_plan
+from tools.cube555.run import configuration, history_budgets, runtime_plan, _available_ram_bytes
 from tools.cayleypy_public.profile import derive_runtime
 
 
@@ -75,7 +75,7 @@ def main():
     from tools.cayleypy_public.data import load_puzzle_contract
     from tools.cayleypy_public.model import ExportedModel
     from tools.run_cayleypy_public import (
-        validate_t4_hardware, locate_or_build_runner, _available_ram_bytes,
+        validate_t4_hardware, locate_or_build_runner,
         _run_with_history_budgets, _materialize_run_artifacts,
     )
     import torch

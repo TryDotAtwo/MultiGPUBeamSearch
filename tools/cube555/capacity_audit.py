@@ -8,14 +8,14 @@ import time
 from types import SimpleNamespace
 
 from tools.cube555.inference_benchmark import benchmark
-from tools.cube555.run import configuration, runtime_plan, DEFAULT_BEAM, BEAM_PROFILES, history_budgets
+from tools.cube555.run import configuration, runtime_plan, DEFAULT_BEAM, BEAM_PROFILES, history_budgets, _available_ram_bytes
 from tools.cube555.export import export_blend
 from tools.cube555.smoke import make_fixture
 from tools.cube555.telemetry import Telemetry
 from tools.cayleypy_public.data import load_puzzle_contract
 from tools.cayleypy_public.model import ExportedModel
 from tools.cayleypy_public.runner import maximum_history_depth, PublicSearchRunError
-from tools.run_cayleypy_public import validate_t4_hardware, locate_or_build_runner, _run_with_history_budgets, _materialize_run_artifacts, _available_ram_bytes, _derive_history_budgets
+from tools.run_cayleypy_public import validate_t4_hardware, locate_or_build_runner, _run_with_history_budgets, _materialize_run_artifacts, _derive_history_budgets
 
 
 def main():

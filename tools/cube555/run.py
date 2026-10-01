@@ -14,7 +14,7 @@ from tools.kaggle_t4_mlp_profiles import select_profile
 from tools.cayleypy_public.runner import maximum_history_depth
 from tools.cayleypy_public.runner import PublicSearchRunError
 from tools.run_cayleypy_public import (
-    validate_t4_hardware, locate_or_build_runner, _available_ram_bytes,
+    validate_t4_hardware, locate_or_build_runner, _available_ram_bytes as _host_available_ram_bytes,
     _run_with_history_budgets, _materialize_run_artifacts, _publish_best_effort, _derive_history_budgets,
 )
 from tools.cube555.export import export_blend
@@ -24,6 +24,11 @@ MAX_BEAM = 4_000_000
 MAX_DEPTH = 140
 DEFAULT_BEAM = 2_097_152
 BEAM_PROFILES = (65_536, 131_072, 262_144, 524_288, 1_048_576, 2_097_152, MAX_BEAM)
+
+
+def _available_ram_bytes():
+    from tools.cube555.host_budget import available_ram_bytes
+    return available_ram_bytes(_host_available_ram_bytes())
 
 
 def history_budgets(available_ram_bytes, tmp_free_bytes):

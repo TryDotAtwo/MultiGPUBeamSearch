@@ -665,3 +665,7 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-10-01 Ivan: Около17лямов; сделать сетку профилей Molab как для Kaggle. Tune pureStream1 micro/concurrency first, then saturated Stream3/4 paired same-work measurements; no slowdown reserve in12h boundary.
 
 2026-10-01 Ivan: inspect Molab documentation and consult local Molab agent about possible background-job termination. No foreign jobs or GPU launches.
+
+
+## 2026-10-02 Molab lifecycle isolation requirement
+Ivan requested a simple single-cell Molab control to determine when session loss starts, then GPU allocation without CUDA, simple CUDA, and native search. CPU20minute control completed; GPU control transport lost locally without proof of sandbox destruction. Do not classify missing local tool handles as HTTP410 or overlap execute requests. Public Cube555 must safely size memory for high beam/depth.

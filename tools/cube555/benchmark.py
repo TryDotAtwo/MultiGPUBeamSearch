@@ -7,12 +7,12 @@ from types import SimpleNamespace
 import shutil
 import time
 
-from tools.cube555.run import configuration, runtime_plan, DEFAULT_BEAM
+from tools.cube555.run import configuration, runtime_plan, DEFAULT_BEAM, _available_ram_bytes
 from tools.cube555.export import export_blend
 from tools.cube555.telemetry import Telemetry
 from tools.cayleypy_public.data import load_puzzle_contract
 from tools.cayleypy_public.model import ExportedModel
-from tools.run_cayleypy_public import validate_t4_hardware, locate_or_build_runner, _run_with_history_budgets, _materialize_run_artifacts, _available_ram_bytes
+from tools.run_cayleypy_public import validate_t4_hardware, locate_or_build_runner, _run_with_history_budgets, _materialize_run_artifacts
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)

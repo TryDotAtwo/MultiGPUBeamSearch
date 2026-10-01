@@ -1193,3 +1193,9 @@ Molab expert ACK: parent foreground template has no explicit lifecycle mismatch;
 2026-10-02 diagnostic largebeam3100672 micro256/C2 CUDA_LAUNCH_BLOCKING reacheddepth5 before SSEEOF and read-onlyHTTP410; memory9.09GB/cgroup160GiB, VRAM5255MiB, parentheartbeat123sec. No terminalCUDAerror and no completion claim. Fixed two f-string alias references after token-based import normalization; live diagnostic still used separate unmodified wrapper.
 
 2026-10-02 expert correction:160GiB counter scope not proven to be notebook32GiB allocation. Resolve process membership againstmountinfo before scopeclaim; otherwise labelcontroller_root_unverified. Regression child32GB vsparent160GB passes;3memorytestsPASS. Sanitized provider inquiry preparedlocally, notsent.
+
+
+## 2026-10-02 Cube555 host history budget
+- Derive remaining RAM from host MemAvailable and process-resolved visible cgroup v1/v2 limits, including ancestor usage with siblings. Unknown membership fails explicitly rather than trusting host memory.
+- Apply same budget reader to launcher and capacity, collect, downstream and benchmark audits. Requested beam semantics unchanged.
+- 43 scoped pytest checks pass; git diff --check clean. Target Molab validation still pending; no claim this fixes historical HTTP410 or CUDA illegal access. Runtime notebook pin remains last published pin until target validation.
