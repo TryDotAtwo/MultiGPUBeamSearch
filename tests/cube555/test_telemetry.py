@@ -18,6 +18,20 @@ class HostMemoryTests(unittest.TestCase):
                 'memory.events': {'oom': 2, 'oom_kill': 1},
             })
 
+    def test_cgroup_v1_limit_is_not_host_meminfo(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            memory = root / 'memory'
+            memory.mkdir()
+            (memory / 'memory.usage_in_bytes').write_text('8192')
+            (memory / 'memory.limit_in_bytes').write_text('32768')
+            (memory / 'memory.failcnt').write_text('3')
+            (memory / 'memory.oom_control').write_text('under_oom 0\noom_kill 1\n')
+            self.assertEqual(host_memory_sample(root), {
+                'memory.current': 8192, 'memory.max': 32768, 'memory.failcnt': 3,
+                'memory.oom_control': {'under_oom': 0, 'oom_kill': 1},
+            })
+
 
 if __name__ == '__main__':
     unittest.main()

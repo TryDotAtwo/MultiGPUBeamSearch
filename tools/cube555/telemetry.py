@@ -24,6 +24,27 @@ def host_memory_sample(root=Path('/sys/fs/cgroup')):
         }
     except (OSError, ValueError):
         pass
+    if not sample:
+        # Molab currently exposes cgroup v1; /proc/meminfo may describe the
+        # larger host, so it cannot substitute for this container limit.
+        memory_root = root / 'memory'
+        for legacy, field in (
+            ('memory.usage_in_bytes', 'memory.current'),
+            ('memory.limit_in_bytes', 'memory.max'),
+            ('memory.max_usage_in_bytes', 'memory.peak'),
+            ('memory.failcnt', 'memory.failcnt'),
+        ):
+            try:
+                sample[field] = int((memory_root / legacy).read_text().strip())
+            except (OSError, ValueError):
+                pass
+        try:
+            sample['memory.oom_control'] = {
+                key: int(value) for key, value in
+                (line.split() for line in (memory_root / 'memory.oom_control').read_text().splitlines())
+            }
+        except (OSError, ValueError):
+            pass
     return sample
 
 
