@@ -2,7 +2,22 @@ from pathlib import Path
 
 import pytest
 
-from tools.cube555.downstream_audit import downstream_plan, saturated_layers
+from tools.cube555.downstream_audit import downstream_plan, saturated_layers, paired_comparison
+
+
+@pytest.mark.parametrize('before,candidate,after,resolved', [
+    (100, 99, 103, False), (100, 95, 101, True),
+    (100, 100, 100, False), (100, 105, 100, False),
+])
+def test_surrounding_baseline_drift_must_be_smaller_than_gain(before, candidate, after, resolved):
+    rows = [dict(status='complete', median_seconds=t) for t in (before, candidate, after)]
+    assert paired_comparison(*rows)['resolved'] is resolved
+
+
+def test_unstable_block_cannot_select_winner():
+    rows = [dict(status=s, median_seconds=t) for s, t in
+            [('complete', 100), ('unstable', 80), ('complete', 100)]]
+    assert not paired_comparison(*rows)['resolved']
 from tools.cube555.run import runtime_plan
 
 

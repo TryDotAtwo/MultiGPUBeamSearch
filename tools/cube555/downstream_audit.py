@@ -55,6 +55,18 @@ def saturated_layers(folder, local_beam):
     return layers
 
 
+def paired_comparison(before, candidate, after):
+    """Only resolve a gain larger than surrounding identical-base drift."""
+    if any(row['status'] != 'complete' for row in (before, candidate, after)):
+        return dict(resolved=False, reason='unstable_or_failed_block')
+    base_seconds = (before['median_seconds'] + after['median_seconds']) / 2
+    drift = abs(before['median_seconds'] - after['median_seconds']) / base_seconds
+    gain = 1 - candidate['median_seconds'] / base_seconds
+    return dict(resolved=gain > drift, gain_fraction=gain,
+                baseline_drift_fraction=drift, baseline_seconds=base_seconds,
+                reason='gain_exceeds_drift' if gain > drift else 'gain_not_larger_than_drift')
+
+
 def main():
     from tools.cube555.export import export_blend
     from tools.cube555.smoke import make_fixture
@@ -74,6 +86,8 @@ def main():
     parser.add_argument('--model-micro', type=int, required=True)
     parser.add_argument('--inference-concurrency', type=int, choices=(1, 2, 4), required=True)
     parser.add_argument('--neighbor-micro', type=int, required=True)
+    parser.add_argument('--variants', nargs='+', default=['batch-half', 'batch-double',
+        'ring-four', 'shards-two', 'shards-eight', 'sort-one'])
     args = parser.parse_args()
     torch.set_num_threads(1)
     args.output.mkdir(parents=True, exist_ok=False)
@@ -188,7 +202,13 @@ def main():
             row['isolated_drift_fraction'] = abs(after-before)/((after+before)/2)
             row['overhead_reliable'] = row['isolated_drift_fraction'] <= 0.05
             row['bracketed_overhead_fraction'] = 1-row['parents_per_second']/((before+after)/2)
-            row['status'] = 'complete' if row['relative_spread'] <= 0.10 else 'unstable'
+            row['status'] = ('complete' if row['relative_spread'] <= 0.10
+                             and row['overhead_reliable'] else 'unstable')
+            row['comparison_exclusions'] = []
+            if row['relative_spread'] > 0.10:
+                row['comparison_exclusions'].append('saturated_layer_spread_exceeds_10_percent')
+            if not row['overhead_reliable']:
+                row['comparison_exclusions'].append('isolated_hardware_drift_exceeds_5_percent')
         except Exception as error:
             row.update(status='failed', error=f'{type(error).__name__}: {error}')
         finally:
@@ -197,10 +217,7 @@ def main():
             save()
             print('downstream_result '+json.dumps(row), flush=True)
         return row
-    best = probe('baseline', base)
-    if best['status'] != 'complete':
-        raise RuntimeError('baseline failed; downstream sweep aborted')
-    # Coordinate descent: each trial starts from the current fastest stable plan.
+    # Paired fixed-base blocks; never select by unpaired chronological minima.
     variants = [
         ('batch-half', dict(stream4_batch_candidates=65536, stream4_trigger_candidates=65536)),
         ('batch-double', dict(stream4_batch_candidates=262144, stream4_trigger_candidates=262144)),
@@ -209,24 +226,53 @@ def main():
         ('shards-eight', dict(shard_count=8)),
         ('sort-one', dict(stream4_active_sort_slots=1)),
     ]
-    best_plan = base
+    report['paired_blocks'] = []
+    leaders = []
+    if set(args.variants) - {name for name, _ in variants}:
+        raise ValueError('unknown downstream variant')
     for name, overrides in variants:
+        if name not in args.variants:
+            continue
         if time.monotonic()-started > 4400:
             raise TimeoutError('bounded downstream audit budget exhausted')
-        candidate = downstream_plan(best_plan, overrides)
+        candidate = downstream_plan(base, overrides)
+        before = probe(name+'-base-before', base)
         row = probe(name, candidate)
-        if row['status'] == 'complete' and row['median_seconds'] < best['median_seconds']:
-            best, best_plan = row, candidate
-    report['best_fixed_stream1'] = best['name']
+        after = probe(name+'-base-after', base)
+        comparison = dict(name=name, **paired_comparison(before, row, after))
+        report['paired_blocks'].append(comparison)
+        if comparison['resolved']:
+            leaders.append((name, candidate, comparison))
+        save()
+    confirmed = []
+    for name, candidate, original in reversed(leaders):
+        if time.monotonic()-started > 4400:
+            raise TimeoutError('reverse-order confirmation budget exhausted')
+        before = probe(name+'-reverse-base-before', base)
+        row = probe(name+'-reverse', candidate)
+        after = probe(name+'-reverse-base-after', base)
+        comparison = dict(name=name+'-reverse', **paired_comparison(before, row, after))
+        report['paired_blocks'].append(comparison)
+        if comparison['resolved']:
+            confirmed.append((min(original['gain_fraction'], comparison['gain_fraction']), name, candidate))
+        save()
+    if not confirmed:
+        report.update(status='inconclusive', winner=None)
+        save()
+        return
+    _, best_name, best_plan = max(confirmed, key=lambda item: item[0])
+    report['best_fixed_stream1'] = best_name
     neighbor_base = runtime_plan(cfg.beam, model_micro=args.neighbor_micro,
                                 inference_concurrency=args.inference_concurrency)
     neighbor = downstream_plan(neighbor_base, {k: best_plan.runtime[k] for k in (
         'stream3_ring_slots', 'stream4_batch_candidates', 'stream4_trigger_candidates',
         'shard_count', 'stream4_active_sort_slots')})
+    before = probe('neighbor-base-before', best_plan)
     neighbor_row = probe('neighbor-stream1', neighbor)
-    if neighbor_row['status'] == 'complete' and neighbor_row['median_seconds'] < best['median_seconds']:
-        best = neighbor_row
-    report['winner'] = best['name']
+    after = probe('neighbor-base-after', best_plan)
+    comparison = dict(name='neighbor-stream1', **paired_comparison(before, neighbor_row, after))
+    report['paired_blocks'].append(comparison)
+    report['winner'] = 'neighbor-stream1' if comparison['resolved'] else best_name
     report['status'] = 'complete'
     save()
 
