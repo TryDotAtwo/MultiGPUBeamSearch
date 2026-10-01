@@ -1170,3 +1170,6 @@ Relative collect window accepts arbitrarily large nonnegative Python integers; n
 2026-10-01 Molab Run All source published with a dedicated notebook.py importer directory. Cloudflare owner reports deployment49d57e97 with cleanup preserved; local schema73/Worker161/Cube55535 checks and local HTTP202 pass; actual Molab GPU solve/public202 still pending because device_count0.
 
 2026-10-01 Molab kernel environment: bootstrap PATH from sys.executable parent so CMake/Ninja/torchrun use the same PEP723 environment. Installed CMake/Ninja through native CM packages API in own live notebook; paths verified. Marimo check PASS; live7 cells/no custom widgets/input hashes/runtime pin verified again, GPU0 and search cancelled, no native processes. Active source12014 bytes.
+
+## 2026-10-01 Molab GPU validation
+Actual RTX PRO 6000 SM120 build solved first fixture; fixed single-rank invocation artifact indexing. Added one/two-rank regression. CUDA 13.0.2 coherent wheel SDK and restored-directory recovery implemented; full default search remains unverified.

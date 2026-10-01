@@ -39,7 +39,7 @@ def test_public_cli_uses_only_config_and_output_and_materializes_fake_run(
     })()
     model = type("Model", (), {"format": "batchnorm-folded", "backend": "mlp", "dtype": "fp16", "checkpoint_sha256": "a" * 64,
         "manifest": {"state_len": 3, "num_classes": 3, "output_dim": 1, "normalization": "batchnorm_folded"}})()
-    plan = type("Plan", (), {"requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0,
+    plan = type("Plan", (), {"world_size": 2, "requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0,
         "profile_power": 16, "model_class": "output1", "runtime": {"b_micro": 2},
         "local_beam": 2**15, "parent_batch": 1, "stream3_batch_candidates": 2,
         "shard_capacity_candidates": 1024, "cross_puzzle_profile_note": ""})()
@@ -137,7 +137,7 @@ def test_best_effort_publication_failure_keeps_solve_artifacts(tmp_path: Path, m
     artifacts = _one_solution_artifacts()
     contract = type("Contract", (), {"state_len": 3, "move_count": 2, "central_state": (0, 1, 2), "generators": {"a": (0, 1, 2), "b": (0, 1, 2)}, "initial_states": {7: (0, 1, 2)}})()
     model = type("Model", (), {"format": "batchnorm-folded", "checkpoint_sha256": "c" * 64, "manifest": {"state_len": 3, "num_classes": 3, "output_dim": 1}})()
-    plan = type("Plan", (), {"requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0, "profile_power": 16, "model_class": "output1", "runtime": {}})()
+    plan = type("Plan", (), {"world_size": 2, "requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0, "profile_power": 16, "model_class": "output1", "runtime": {}})()
     failure = PublishStatus(False, True, "results endpoint is temporarily unavailable", None, 1, False, "https://ingest.example.test")
     monkeypatch.setattr(public_cli, "_publication_envelopes", lambda *args, **kwargs: [{"client_submission_id": "x"}])
     monkeypatch.setattr(public_cli, "publish_results", lambda *args, **kwargs: failure)
@@ -185,7 +185,7 @@ def test_main_failed_search_materializes_partial_and_always_writes_publish_statu
         "initial_states": {7: (0, 1, 2)}})()
     model = type("Model", (), {"format": "batchnorm-folded", "backend": "mlp", "dtype": "fp16", "checkpoint_sha256": "a" * 64,
         "manifest": {"state_len": 3, "num_classes": 3, "output_dim": 1}})()
-    plan = type("Plan", (), {"requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0,
+    plan = type("Plan", (), {"world_size": 2, "requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0,
         "profile_power": 16, "model_class": "output1", "runtime": {"b_micro": 2}, "local_beam": 2**15,
         "parent_batch": 1, "stream3_batch_candidates": 2, "shard_capacity_candidates": 1024,
         "cross_puzzle_profile_note": ""})()
@@ -277,7 +277,7 @@ def test_best_effort_sends_archives_sequentially_with_one_request_each(tmp_path:
     artifacts = _one_solution_artifacts()
     contract = type("Contract", (), {"state_len": 3, "move_count": 2, "central_state": (0, 1, 2), "generators": {"a": (0, 1, 2), "b": (0, 1, 2)}, "initial_states": {7: (0, 1, 2)}})()
     model = type("Model", (), {"format": "batchnorm-folded", "checkpoint_sha256": "c" * 64, "manifest": {"state_len": 3, "num_classes": 3, "output_dim": 1}})()
-    plan = type("Plan", (), {"requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0, "profile_power": 16, "model_class": "output1", "runtime": {}})()
+    plan = type("Plan", (), {"world_size": 2, "requested_beam": 2**16, "effective_beam": 2**16, "alignment_delta": 0, "profile_power": 16, "model_class": "output1", "runtime": {}})()
     envelopes = [{"client_submission_id": str(index)} for index in range(3)]
     calls: list[tuple[bytes, int, int, int]] = []
 

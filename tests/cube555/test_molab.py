@@ -1,9 +1,22 @@
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
+import pytest
 
 from tools.cube555.run import runtime_plan
 from tools.cayleypy_public.config import PublicRunConfig
 from tools.cayleypy_public.runner import build_runner_invocation, maximum_history_depth
+
+
+@pytest.mark.parametrize('ranks', [1, 2])
+def test_saved_invocation_logs_match_actual_rank_count(tmp_path, ranks):
+    from tools.run_cayleypy_public import _invocation_rows
+    paths = tuple(tmp_path / f'rank-{rank}.log' for rank in range(ranks))
+    artifacts = SimpleNamespace(rank_logs=(paths,), combined_logs=(), return_codes=(0,),
+                                timing_summaries=(0.1,), collection_statuses=('depth_reached',))
+    row = _invocation_rows(artifacts, tmp_path)[0]
+    assert row['rank0_log'] == 'rank-0.log'
+    assert row['rank1_log'] == ('rank-1.log' if ranks == 2 else None)
 
 
 def test_one_real_rank_owns_entire_aligned_beam():
