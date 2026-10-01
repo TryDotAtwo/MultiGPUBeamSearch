@@ -640,3 +640,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-09-30 continuation requirement from Ivan: public Cube555 notebook must work for other users with simple KAGGLE_OWNER/KAGGLE_SLUG settings. Fork publication must not retain the original owner display name; existing archived results and identities must remain unchanged.
 
 2026-09-30 relay acknowledged: Ivan requests short sensible profile checks instead of waiting12hours; preserve/stop sole long run then remaining2m and overflow sequentially.
+
+2026-10-01 Ivan: authorize native isolated Stream1 microbatch sweep and matched saturated pipeline; metric 1 - pipeline_rate / Stream1_rate, never sum parallel stage times. Winner plus neighbors in pipeline; 12h forecast includes setup/BFS/save, lower profiles powers of two. No subagents.

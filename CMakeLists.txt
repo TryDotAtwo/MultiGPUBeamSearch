@@ -254,6 +254,11 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF)
 
+    add_executable(cube555_stream1_benchmark tools/cube555_stream1_benchmark.cpp)
+    target_link_libraries(cube555_stream1_benchmark PRIVATE "${TORCH_LIBRARIES}")
+    target_include_directories(cube555_stream1_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
+    set_target_properties(cube555_stream1_benchmark PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+
     add_executable(production_runner_libtorch_stream1
         tools/production_runner.cu
         tools/stream1_libtorch_ring_slot_launcher.cpp
