@@ -19,5 +19,7 @@ checked automatically. Microbatch128/concurrency1 are T4 seed settings.
 Molab GPU build and speed are not verified yet. Kaggle timing forecasts do not
 apply to Molab. History preflight may cap depth with a warning, never beam.
 
-The explicit Molab server schema must be deployed before publication succeeds.
-This remains a separate validation gate from the source checks.
+The explicit Molab server schema is deployed as Worker version
+49d57e97-a1b8-4eae-997d-ae03af313a6e. Schema/replay, local HTTP202 and deployment
+health passed. An actual Molab GPU solve followed by public HTTP202 and GitHub
+publication is still pending; local fixture tests do not prove that sequence.
