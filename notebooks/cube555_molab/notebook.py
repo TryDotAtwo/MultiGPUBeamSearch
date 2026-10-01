@@ -134,6 +134,12 @@ def _(prepared_repo):
     import torch as _torch
     import shutil as _shutil
     import subprocess as _subprocess
+    import os as _os
+    import sys as _sys
+    from pathlib import Path as _Path
+    # Molab installs PEP 723 dependencies into its kernel virtual environment.
+    # Native tools and torchrun must use the same environment as this kernel.
+    _os.environ["PATH"] = str(_Path(_sys.executable).parent) + _os.pathsep + _os.environ.get("PATH", "")
     if _torch.cuda.device_count() != 1:
         raise RuntimeError("Attach one GPU in Molab before running this notebook")
     for _tool in ["nvcc", "cmake", "ninja", "git", "nvidia-smi"]:
