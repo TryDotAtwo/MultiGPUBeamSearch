@@ -8,26 +8,60 @@ import time
 from pathlib import Path
 
 
-def host_memory_sample(root=Path('/sys/fs/cgroup')):
-    """Container memory, not host-wide free RAM; missing counters remain unknown."""
+def host_memory_sample(root=Path('/sys/fs/cgroup'), proc_root=Path('/proc/self')):
+    """Memory controller samples; scope is unknown until membership is resolved."""
     sample = {}
+    v2_root, v1_root = root, root / 'memory'
+    scope = 'controller_root_unverified'
+    try:
+        memberships = {}
+        for line in (proc_root / 'cgroup').read_text().splitlines():
+            _, controllers, member = line.split(':', 2)
+            if not controllers:
+                memberships['cgroup2'] = member
+            elif 'memory' in controllers.split(','):
+                memberships['cgroup'] = member
+        for line in (proc_root / 'mountinfo').read_text().splitlines():
+            before, after = line.split(' - ', 1)
+            fields, filesystem = before.split(), after.split()
+            kind = filesystem[0]
+            if kind not in memberships or (kind == 'cgroup' and
+                    'memory' not in filesystem[-1].split(',')):
+                continue
+            mount_root = Path(fields[3])
+            member = Path(memberships[kind])
+            try:
+                relative = member.relative_to(mount_root)
+            except ValueError:
+                continue
+            candidate = Path(fields[4]) / relative
+            marker = 'memory.current' if kind == 'cgroup2' else 'memory.usage_in_bytes'
+            if (candidate / marker).is_file():
+                if kind == 'cgroup2':
+                    v2_root = candidate
+                else:
+                    v1_root = candidate
+                scope = 'process_cgroup'
+                break
+    except (OSError, ValueError, IndexError):
+        pass
     for name in ('memory.current', 'memory.max', 'memory.peak'):
         try:
-            value = (root / name).read_text().strip()
+            value = (v2_root / name).read_text().strip()
             sample[name] = int(value) if value != 'max' else 'unlimited'
         except (OSError, ValueError):
             pass
     try:
         sample['memory.events'] = {
             key: int(value) for key, value in
-            (line.split() for line in (root / 'memory.events').read_text().splitlines())
+            (line.split() for line in (v2_root / 'memory.events').read_text().splitlines())
         }
     except (OSError, ValueError):
         pass
     if not sample:
         # Molab currently exposes cgroup v1; /proc/meminfo may describe the
         # larger host, so it cannot substitute for this container limit.
-        memory_root = root / 'memory'
+        memory_root = v1_root
         for legacy, field in (
             ('memory.usage_in_bytes', 'memory.current'),
             ('memory.limit_in_bytes', 'memory.max'),
@@ -45,6 +79,9 @@ def host_memory_sample(root=Path('/sys/fs/cgroup')):
             }
         except (OSError, ValueError):
             pass
+    if sample:
+        sample['memory.scope'] = scope
+        sample['memory.note'] = 'Own controller limit may also be constrained by ancestor cgroups.'
     return sample
 
 

@@ -1191,3 +1191,5 @@ Molab expert ACK: parent foreground template has no explicit lifecycle mismatch;
 2026-10-01 target evidence: diagnostic C2/C4/C2 completed143s with launcher receipt and SSEdone; full JSON captured locally. Molab uses cgroupv1 so v2 samples were unknown; add v1usage/limit/peak/failcnt/oom_control. Repeated import aliases normalized per cell; official marimo check clean;34regressions and2memorytests passed. CUDA large-beam gate still pending.
 
 2026-10-02 diagnostic largebeam3100672 micro256/C2 CUDA_LAUNCH_BLOCKING reacheddepth5 before SSEEOF and read-onlyHTTP410; memory9.09GB/cgroup160GiB, VRAM5255MiB, parentheartbeat123sec. No terminalCUDAerror and no completion claim. Fixed two f-string alias references after token-based import normalization; live diagnostic still used separate unmodified wrapper.
+
+2026-10-02 expert correction:160GiB counter scope not proven to be notebook32GiB allocation. Resolve process membership againstmountinfo before scopeclaim; otherwise labelcontroller_root_unverified. Regression child32GB vsparent160GB passes;3memorytestsPASS. Sanitized provider inquiry preparedlocally, notsent.
