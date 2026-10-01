@@ -76,7 +76,7 @@ def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, INPUT_BUNDLE_URL, MODEL_ROOT,
     import zipfile as _zipfile
     import hashlib as _hashlib
 
-    _commit = "3bfee5e2b2afd953e50725304f893f9f9f591804"
+    _commit = "856ab0aa0222900547c81fd2f42b072747af77a1"
     _repo = _Path("cube555_solver").resolve()
     if _repo.exists() and not (_repo / ".git").is_dir():
         # Molab persistence may restore source files without hidden Git metadata.
@@ -273,6 +273,7 @@ def _(AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITIO
         _reader = _threading.Thread(target=_read_child_output, daemon=True)
         _reader.start()
         _started = _time.monotonic()
+        _pipe_closed = False
         try:
             while True:
                 try:
@@ -282,24 +283,57 @@ def _(AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITIO
                     print(_heartbeat, end="", flush=True)
                     _log.write(_heartbeat)
                     _log.flush()
+                    if _process.poll() is not None:
+                        # A surviving descendant can retain stdout after launcher
+                        # exit. Never wait indefinitely for its inherited pipe.
+                        try:
+                            _os.killpg(_process.pid, _signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                        _reader.join(timeout=15)
+                        if _reader.is_alive():
+                            try:
+                                _os.killpg(_process.pid, _signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                        break
                     continue
                 if _line is None:
+                    _pipe_closed = True
                     break
                 print(_line, end="", flush=True)
                 _log.write(_line)
                 _log.flush()
             _code = _process.wait()
             _reader.join(timeout=1)
-            _terminal = dict(returncode=_code, elapsed_seconds=_time.monotonic()-_started)
+            while not _lines.empty():
+                _line = _lines.get_nowait()
+                if _line is None:
+                    _pipe_closed = True
+                else:
+                    print(_line, end="", flush=True)
+                    _log.write(_line)
+            _log.flush()
+            _terminal = dict(returncode=_code, elapsed_seconds=_time.monotonic()-_started,
+                             stdout_pipe_closed=_pipe_closed)
             (_output / "launcher_terminal.json").write_text(_json.dumps(_terminal, indent=2))
             print("[cell-terminal] "+_json.dumps(_terminal), flush=True)
-        except BaseException:
-            _os.killpg(_process.pid, _signal.SIGTERM)
+            if not _pipe_closed:
+                raise RuntimeError("Launcher exited but descendant stdout did not close; own process group cleanup requested")
+        except BaseException as _error:
+            try:
+                _os.killpg(_process.pid, _signal.SIGTERM)
+            except ProcessLookupError:
+                pass
             try:
                 _process.wait(timeout=15)
             except _subprocess.TimeoutExpired:
                 _os.killpg(_process.pid, _signal.SIGKILL)
                 _process.wait()
+            (_output / "launcher_terminal.json").write_text(_json.dumps(dict(
+                returncode=_process.returncode, exception_type=type(_error).__name__,
+                elapsed_seconds=_time.monotonic()-_started,
+                stdout_pipe_closed=_pipe_closed), indent=2))
             raise
         finally:
             # Preserve partial logs/solutions on ordinary search failure too.
