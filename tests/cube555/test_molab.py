@@ -26,6 +26,24 @@ def test_one_real_rank_owns_entire_aligned_beam():
     assert two.world_size == 2 and two.local_beam * 2 == two.effective_beam
 
 
+@pytest.mark.parametrize('beam', [1_048_576, 2_097_152, 4_000_000, 8_000_000,
+                                  12_000_000, 16_000_000, 17_000_000])
+def test_molab_grid_preserves_requested_width(beam):
+    plan = runtime_plan(beam, world_size=1)
+    assert plan.requested_beam == beam
+    assert plan.local_beam == plan.effective_beam >= beam
+    assert 'unmeasured' in plan.cross_puzzle_profile_note
+    assert maximum_history_depth(plan, 30, 5, 24_000_000_000,
+                                 50_000_000_000) >= 140
+
+
+def test_large_molab_width_does_not_expand_kaggle_limit():
+    with pytest.raises(ValueError):
+        runtime_plan(4_000_001, world_size=2)
+    with pytest.raises(ValueError):
+        runtime_plan(17_000_001, world_size=1)
+
+
 def test_single_rank_history_uses_whole_budget():
     plan = runtime_plan(1_048_576, world_size=1)
     single = maximum_history_depth(plan, 30, 5, 8_000_000_000, 30_000_000_000)

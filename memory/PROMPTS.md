@@ -661,3 +661,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-10-01 Molab publication: explicit molab notebook URL/hash replaces Kaggle provenance; one-rank hardware contract, public bundle HTTP200 unauthenticated verified; 167 Python tests pass. Worker schema/deployment and actual Molab GPU run remain separate pending gates. Run All foreground guard rechecks actual device count even after live cell replacement.
 
 2026-10-01 Ivan: Выбрал гпу. Validate Molab Run All on actual GPU, automatic public inputs, replay and publication.
+
+2026-10-01 Ivan: Около17лямов; сделать сетку профилей Molab как для Kaggle. Tune pureStream1 micro/concurrency first, then saturated Stream3/4 paired same-work measurements; no slowdown reserve in12h boundary.

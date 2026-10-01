@@ -37,8 +37,11 @@ def history_budgets(available_ram_bytes, tmp_free_bytes):
 def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
                  model_micro: int | None = None, inference_concurrency: int = 1,
                  world_size: int = 2) -> RuntimePlan:
-    if type(beam) is not int or not 1 <= beam <= MAX_BEAM:
-        raise ValueError(f'Cube555 beam must be in [1, {MAX_BEAM}]')
+    from tools.cube555 import molab_profiles
+    limit = molab_profiles.MAX_BEAM if world_size == 1 else MAX_BEAM
+    if type(beam) is not int or not 1 <= beam <= limit:
+        raise ValueError(f'Cube555 beam must be in [1, {limit}]')
+    molab_row = molab_profiles.candidate(beam) if world_size == 1 else None
     micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile] if model_micro is None else model_micro
     if type(b_micro) is not int or not 1 <= b_micro <= 65536:
         raise ValueError('outer b_micro must be in [1, 65536]')
@@ -59,7 +62,10 @@ def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
         seed.pop('effective_beam', None)  # recompute alignment for one physical rank
     plan = derive_runtime(seed, beam, 30, 30, world_size, allow_single_rank=True)
     return replace(plan, runtime={**plan.runtime, 'model_micro': micro},
-        cross_puzzle_profile_note='Cube4 Transformer pipeline seed; Cube555 capacity requires native preflight and measurement')
+        cross_puzzle_profile_note=(
+            f'Molab experimental anchor={molab_row["anchor_beam"]}; SM120 capacity and timing unmeasured'
+            if molab_row else
+            'Cube4 Transformer pipeline seed; Cube555 capacity requires native preflight and measurement'))
 
 
 def configuration(args, pid, puzzle_info):

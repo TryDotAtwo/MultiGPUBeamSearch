@@ -29,6 +29,8 @@ def main():
     p.add_argument('--parent-groups', type=int, default=0,
                    help='fixed timed work: total8192-parent groups per case, divided across lanes')
     p.add_argument('--isolated-only', action='store_true')
+    p.add_argument('--runtime-target', choices=['kaggle-2xt4', 'molab-single-gpu'],
+                   default='kaggle-2xt4')
     p.add_argument('--time-budget-seconds', type=int, default=3300)
     p.add_argument('--case-sequence', nargs='+',
                    help='explicit repeated micro:concurrency order for isolated paired controls')
@@ -65,7 +67,15 @@ def main():
         if seconds <= 0:
             raise TimeoutError('bounded audit time budget exhausted')
         return seconds
-    gpus = validate_t4_hardware()
+    if a.runtime_target == 'molab-single-gpu':
+        if torch.cuda.device_count() != 1:
+            raise RuntimeError('Molab benchmark requires one real GPU')
+        gpus = [torch.cuda.get_device_name(0)]
+        major, minor = torch.cuda.get_device_capability(0)
+        cuda_arch = 10 * major + minor
+    else:
+        gpus = validate_t4_hardware()
+        cuda_arch = 75
     manifest = export_blend(a.assets/'q555_f1_bell2k.pt', a.assets/'q555_2k_BEST.pt',
         a.assets/'piece_layout_555.json', a.assets/'puzzle_info.json', a.output/'export')
     info = json.loads((a.assets/'puzzle_info.json').read_text())
@@ -81,7 +91,7 @@ def main():
     cfg = SimpleNamespace(assets=a.assets,competition=a.competition,beam=1048576,depth=140,
         touch_radius=5,solution_mode='collect',collect_until_depth=8,max_collected_solutions=2000)
     runner = locate_or_build_runner(a.output, a.assets/'puzzle_info.json', backend='piece_transformer',
-        config=configuration(cfg,1020,a.assets/'puzzle_info.json'))
+        config=configuration(cfg,1020,a.assets/'puzzle_info.json'), cuda_arch=cuda_arch)
     subprocess.run(['cmake','--build',str(runner.parent),'--target','cube555_stream1_benchmark','-j','2'],check=True,timeout=remaining())
     binary = runner.parent/'cube555_stream1_benchmark'
     report = dict(gpus=gpus,torch=torch.__version__,manifest=manifest,
@@ -111,7 +121,7 @@ def main():
         monitor.start()
         processes=[]
         try:
-            for gpu in range(2):
+            for gpu in range(len(gpus)):
                 out=(directory/f'gpu-{gpu}.log').open('w')
                 err=(directory/f'gpu-{gpu}.err').open('w')
                 proc=subprocess.Popen([str(binary),str(a.output/'export'),str(corpus_path),str(micro),str(gpu),str(repeats),str(concurrency)],stdout=out,stderr=err,
@@ -152,7 +162,7 @@ def main():
     successful={}
     for row in report['rows']:
         if row['status']=='complete': successful.setdefault((row['micro'],row['concurrency']),[]).append(row)
-    ranked=sorted((1/min(r['parents_per_second'] for r in rows),case) for case,rows in successful.items() if len(rows)==2)
+    ranked=sorted((1/min(r['parents_per_second'] for r in rows),case) for case,rows in successful.items() if len(rows)==len(gpus))
     if not ranked: raise RuntimeError('no both-GPU passing microbatch')
     winner=ranked[0][1]
     safe=sorted(case[0] for _,case in ranked if case[1]==winner[1])
@@ -174,6 +184,7 @@ def main():
         print(f'pipeline_start micro={micro} concurrency={concurrency}',flush=True)
         with log.open('w') as stream:
             command=[os.sys.executable,'-u','-m','tools.cube555.run',
+                '--runtime-target',a.runtime_target,
                 '--assets',str(a.assets),'--competition',str(a.competition),'--output',str(directory),
                 '--pids','1020','--beam','1048576','--depth','140','--collect-until-depth','8',
                 '--touch-radius','5','--model-micro',str(micro),'--inference-concurrency',str(concurrency)]

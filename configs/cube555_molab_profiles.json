@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "hardware": "molab_rtx_pro6000_sm120",
+  "world_size": 1,
+  "model_family": "cube555_transformer_resmlpq_fp16",
+  "max_depth": 140,
+  "max_collected_solutions": 2000,
+  "touch_bfs_radius": 5,
+  "timing_limit_seconds": 43200,
+  "maximum_measured_beam": null,
+  "promotion": "native correctness, memory, saturated paired timing and reverse-order confirmation",
+  "profiles": [
+    {
+      "anchor_beam": 1048576,
+      "status": "experimental_unmeasured",
+      "model_micro": 128,
+      "stream1_concurrency": 1,
+      "outer_parent_batch": 8192,
+      "evidence": null
+    },
+    {
+      "anchor_beam": 2097152,
+      "status": "experimental_unmeasured",
+      "model_micro": 128,
+      "stream1_concurrency": 1,
+      "outer_parent_batch": 8192,
+      "evidence": null
+    },
+    {
+      "anchor_beam": 4000000,
+      "status": "experimental_unmeasured",
+      "model_micro": 128,
+      "stream1_concurrency": 1,
+      "outer_parent_batch": 8192,
+      "evidence": null
+    },
+    {
+      "anchor_beam": 8000000,
+      "status": "experimental_unmeasured",
+      "model_micro": 128,
+      "stream1_concurrency": 1,
+      "outer_parent_batch": 8192,
+      "evidence": null
+    },
+    {
+      "anchor_beam": 12000000,
+      "status": "experimental_unmeasured",
+      "model_micro": 128,
+      "stream1_concurrency": 1,
+      "outer_parent_batch": 8192,
+      "evidence": null
+    },
+    {
+      "anchor_beam": 16000000,
+      "status": "experimental_unmeasured",
+      "model_micro": 128,
+      "stream1_concurrency": 1,
+      "outer_parent_batch": 8192,
+      "evidence": null
+    },
+    {
+      "anchor_beam": 17000000,
+      "status": "experimental_unmeasured",
+      "model_micro": 128,
+      "stream1_concurrency": 1,
+      "outer_parent_batch": 8192,
+      "evidence": null
+    }
+  ]
+}

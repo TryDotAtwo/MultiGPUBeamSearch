@@ -1177,3 +1177,5 @@ Actual RTX PRO 6000 SM120 build solved first fixture; fixed single-rank invocati
 2026-10-01 Actual Molab cap1 test exposed premature capacity stop. Collection count remains capped but stop condition now follows requested depth window. GPU regression pending.
 
 Molab SM120 collect cap1 regression passed on four fixtures; overflow30hits/stored6/dropped24 continued to configured window; saved paths replay valid. Public notebook pinned24b28667. Default beam/BFS5 seven-depth gate in progress.
+
+2026-10-01 Added experimental Molab1rank grid1m..17m isolated from unchanged Kaggle4m limit, native Stream1 audit target SM120/oneGPU.13 grid/history regression tests passed. GPU timing promotion pending; not claimed validated.
