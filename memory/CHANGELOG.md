@@ -1175,3 +1175,5 @@ Relative collect window accepts arbitrarily large nonnegative Python integers; n
 Actual RTX PRO 6000 SM120 build solved first fixture; fixed single-rank invocation artifact indexing. Added one/two-rank regression. CUDA 13.0.2 coherent wheel SDK and restored-directory recovery implemented; full default search remains unverified.
 
 2026-10-01 Actual Molab cap1 test exposed premature capacity stop. Collection count remains capped but stop condition now follows requested depth window. GPU regression pending.
+
+Molab SM120 collect cap1 regression passed on four fixtures; overflow30hits/stored6/dropped24 continued to configured window; saved paths replay valid. Public notebook pinned24b28667. Default beam/BFS5 seven-depth gate in progress.

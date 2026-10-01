@@ -76,7 +76,7 @@ def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, INPUT_BUNDLE_URL, MODEL_ROOT,
     import zipfile as _zipfile
     import hashlib as _hashlib
 
-    _commit = "db65495de0bdb0080f5c056cc44bf4e4ce428200"
+    _commit = "24b28667439719ec9db3d8797d42662973d571f8"
     _repo = _Path("cube555_solver").resolve()
     if _repo.exists() and not (_repo / ".git").is_dir():
         # Molab persistence may restore source files without hidden Git metadata.
