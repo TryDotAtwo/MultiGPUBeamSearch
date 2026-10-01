@@ -72,7 +72,9 @@ def main():
         runner_sha256=hashlib.sha256(runner.read_bytes()).hexdigest(),
         corpus_sha256=hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
         outer=8192,concurrency_sweep=a.concurrencies,microbatch_sweep=a.microbatches,
-        repeats=a.repeats,warmup_outer_groups=2,isolated_only=a.isolated_only,rows=[],pipeline=[],
+        repeats=({str(c): a.parent_groups//c for c in a.concurrencies}
+                 if a.parent_groups else a.repeats),
+        warmup_outer_groups=2,isolated_only=a.isolated_only,rows=[],pipeline=[],
         fixed_total_parent_groups=a.parent_groups,
         metric='1 - pipeline_parents_per_second / isolated_Stream1_parents_per_second',
         excluded='isolated: model load/input H2D; included: production forward, fp32 blend, quantizer, score-ring copy. Pipeline includes all search stages; state populations differ but shapes/work counts match.')
