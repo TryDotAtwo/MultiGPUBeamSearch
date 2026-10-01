@@ -29,6 +29,8 @@ def main():
     p.add_argument('--parent-groups', type=int, default=0,
                    help='fixed timed work: total8192-parent groups per case, divided across lanes')
     p.add_argument('--isolated-only', action='store_true')
+    p.add_argument('--case-sequence', nargs='+',
+                   help='explicit repeated micro:concurrency order for isolated paired controls')
     a = p.parse_args()
     if not 3 <= a.repeats <= 100:
         p.error('--repeats must be within [3,100]')
@@ -39,6 +41,18 @@ def main():
     if a.parent_groups < 0 or (a.parent_groups and any(
             a.parent_groups % c or a.parent_groups//c < 3 for c in a.concurrencies)):
         p.error('--parent-groups must divide across all lane counts with >=3 repeats each')
+    cases = list(itertools.product(a.microbatches, a.concurrencies))
+    if a.case_sequence:
+        if not a.isolated_only or not a.parent_groups:
+            p.error('--case-sequence requires --isolated-only and fixed --parent-groups')
+        try:
+            cases = [tuple(map(int, value.split(':'))) for value in a.case_sequence]
+            if any(len(case) != 2 or not 1 <= case[0] <= 8192 or case[1] not in (1, 2, 4)
+                   or a.parent_groups % case[1] or a.parent_groups//case[1] < 3
+                   for case in cases):
+                raise ValueError('invalid case')
+        except ValueError:
+            p.error('each case must be supported micro:concurrency with equal timed parent work')
     torch.set_num_threads(1)
     a.output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
@@ -81,9 +95,13 @@ def main():
     def save():
         report['audit_wall_seconds'] = time.monotonic()-started
         (a.output/'throughput_report.json').write_text(json.dumps(report,indent=2))
-    for micro, concurrency in itertools.product(a.microbatches, a.concurrencies):
+    report['case_sequence'] = cases
+    for case_index, (micro, concurrency) in enumerate(cases):
         repeats = a.parent_groups//concurrency if a.parent_groups else a.repeats
-        directory = a.output/f'isolated-{micro}-c{concurrency}'
+        label = f'{micro}-c{concurrency}'
+        if a.case_sequence:
+            label = f'block-{case_index:02d}-'+label
+        directory = a.output/f'isolated-{label}'
         directory.mkdir()
         monitor = Telemetry(directory)
         monitor.start()
@@ -98,7 +116,8 @@ def main():
             for gpu,proc,out,err in processes:
                 code=proc.wait(timeout=min(300 if a.parent_groups else 180, remaining()))
                 out.close();err.close()
-                row=dict(gpu=gpu,micro=micro,concurrency=concurrency,return_code=code,status='failed')
+                row=dict(gpu=gpu,micro=micro,concurrency=concurrency,case_index=case_index,
+                         return_code=code,status='failed')
                 if code==0:
                     row.update(json.loads((directory/f'gpu-{gpu}.log').read_text()))
                     row.update(status='complete',median_seconds=statistics.median(row['seconds']))
@@ -119,8 +138,13 @@ def main():
             for _,proc,out,err in processes:
                 if proc.poll() is None: proc.kill();proc.wait()
                 out.close();err.close()
-            report.setdefault('isolated_telemetry',{})[f'{micro}-c{concurrency}']=monitor.finish()
+            report.setdefault('isolated_telemetry',{})[label]=monitor.finish()
             save()
+    if a.case_sequence:
+        report.update(status='complete', isolated_winner=None, pipeline_candidates=[],
+                      comparison_note='Repeated same-work controls retained; no chronological winner selected.')
+        save()
+        return
     successful={}
     for row in report['rows']:
         if row['status']=='complete': successful.setdefault((row['micro'],row['concurrency']),[]).append(row)

@@ -57,6 +57,18 @@ def test_saturated_layers_uses_parallel_max_and_ignores_initial_growth(tmp_path:
         (tmp_path/f'rank-{rank}.log').write_text(''.join(rows))
     layers = saturated_layers(tmp_path, 524288)
     assert [row['seconds'] for row in layers] == [11, 12, 13, 14]
+    assert layers[0]['rank_seconds'] == [10, 11]
+
+
+def test_short_paired_blocks_preserve_both_rank_times(tmp_path):
+    for rank in (0, 1):
+        (tmp_path/f'rank-{rank}.log').write_text(''.join(
+            f'depth_start={d} frontier_size=524288\ndepth_done={d} depth_sec={10+rank}\n'
+            for d in (5, 6)))
+    layers = saturated_layers(tmp_path, 524288, required_layers=2)
+    assert [row['rank_seconds'] for row in layers] == [[10, 11], [10, 11]]
+    with pytest.raises(ValueError, match='steady-state'):
+        saturated_layers(tmp_path, 524288)
 
 
 def test_saturated_layers_rejects_missing_second_rank_completion(tmp_path: Path):

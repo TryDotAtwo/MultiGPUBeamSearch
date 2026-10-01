@@ -33,7 +33,7 @@ def downstream_plan(base, overrides):
                    cross_puzzle_profile_note='experimental_cube555_downstream')
 
 
-def saturated_layers(folder, local_beam):
+def saturated_layers(folder, local_beam, required_layers=4):
     ranks = []
     for rank in (0, 1):
         paths = list(Path(folder).rglob(f'rank-{rank}.log'))
@@ -47,10 +47,11 @@ def saturated_layers(folder, local_beam):
         ends = {int(d): float(t) for d, t in re.findall(
             r'depth_done=(\d+) depth_sec=([\d.e+-]+)', text)}
         ranks.append((starts, ends))
-    layers = [dict(depth=d, seconds=max(rank[1][d] for rank in ranks))
+    layers = [dict(depth=d, seconds=max(rank[1][d] for rank in ranks),
+                   rank_seconds=[rank[1][d] for rank in ranks])
         for d in sorted(set(ranks[0][1]) & set(ranks[1][1]))
         if all(rank[0].get(d) == local_beam for rank in ranks)]
-    if len(layers) < 4 or layers[-1]['depth'] != 8:
+    if len(layers) < required_layers or layers[-1]['depth'] != 4 + required_layers:
         raise ValueError(f'insufficient both-rank steady-state evidence: {layers}')
     return layers
 
@@ -86,6 +87,8 @@ def main():
     parser.add_argument('--model-micro', type=int, required=True)
     parser.add_argument('--inference-concurrency', type=int, choices=(1, 2, 4), required=True)
     parser.add_argument('--neighbor-micro', type=int, required=True)
+    parser.add_argument('--saturated-depths', type=int, choices=(2, 4), default=2,
+                        help='equal saturated work in every paired block; default two depths')
     parser.add_argument('--variants', nargs='+', default=['batch-half', 'batch-double',
         'ring-four', 'shards-two', 'shards-eight', 'sort-one'])
     args = parser.parse_args()
@@ -101,7 +104,8 @@ def main():
     model = ExportedModel('cube555-q-blend', 'fp16', manifest['script_sha256'], manifest,
                           'piece_transformer')
     cfg = SimpleNamespace(assets=args.assets, competition=args.competition, beam=2**20,
-        depth=140, touch_radius=5, solution_mode='collect', collect_until_depth=9,
+        depth=140, touch_radius=5, solution_mode='collect',
+        collect_until_depth=5 + args.saturated_depths,
         max_collected_solutions=2000)
     base = runtime_plan(cfg.beam, model_micro=args.model_micro,
                         inference_concurrency=args.inference_concurrency)
@@ -191,7 +195,7 @@ def main():
             artifacts = _run_with_history_budgets(ram, disk, configuration(cfg, 1020, info),
                 contract, model, plan, args.output/'export', out/'logs', runner_path=str(runner))
             row['result'] = _materialize_run_artifacts(artifacts, out)
-            row['layers'] = saturated_layers(out/'logs', plan.local_beam)
+            row['layers'] = saturated_layers(out/'logs', plan.local_beam, args.saturated_depths)
             seconds = [layer['seconds'] for layer in row['layers']]
             row['median_seconds'] = statistics.median(seconds)
             row['relative_spread'] = (max(seconds)-min(seconds))/row['median_seconds']
@@ -272,7 +276,16 @@ def main():
     after = probe('neighbor-base-after', best_plan)
     comparison = dict(name='neighbor-stream1', **paired_comparison(before, neighbor_row, after))
     report['paired_blocks'].append(comparison)
-    report['winner'] = 'neighbor-stream1' if comparison['resolved'] else best_name
+    if comparison['resolved']:
+        reverse_before = probe('neighbor-reverse-base-before', best_plan)
+        reverse_row = probe('neighbor-reverse', neighbor)
+        reverse_after = probe('neighbor-reverse-base-after', best_plan)
+        reverse = dict(name='neighbor-reverse',
+                       **paired_comparison(reverse_before, reverse_row, reverse_after))
+        report['paired_blocks'].append(reverse)
+        report['winner'] = 'neighbor-stream1' if reverse['resolved'] else best_name
+    else:
+        report['winner'] = best_name
     report['status'] = 'complete'
     save()
 
