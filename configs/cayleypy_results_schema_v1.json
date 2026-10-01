@@ -233,7 +233,6 @@
         "idempotency_key",
         "submitted_at",
         "author",
-        "kaggle",
         "competition",
         "puzzle_type",
         "puzzle_id",
@@ -548,7 +547,10 @@
             },
             "world_size": {
               "type": "integer",
-              "const": 2
+              "enum": [
+                1,
+                2
+              ]
             }
           }
         },
@@ -679,7 +681,10 @@
             },
             "world_size": {
               "type": "integer",
-              "const": 2
+              "enum": [
+                1,
+                2
+              ]
             }
           }
         },
@@ -702,8 +707,102 @@
         "solver_commit": {
           "type": "string",
           "pattern": "^[a-f0-9]{40}$"
+        },
+        "molab": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "notebook_url",
+            "notebook_sha256"
+          ],
+          "properties": {
+            "notebook_url": {
+              "type": "string",
+              "maxLength": 2048,
+              "pattern": "^https://molab\\.marimo\\.io/notebooks/[A-Za-z0-9_-]+$"
+            },
+            "notebook_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "kaggle"
+          ],
+          "not": {
+            "required": [
+              "molab"
+            ]
+          }
+        },
+        {
+          "required": [
+            "molab"
+          ],
+          "not": {
+            "required": [
+              "kaggle"
+            ]
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "molab"
+            ]
+          },
+          "then": {
+            "properties": {
+              "hardware": {
+                "properties": {
+                  "platform": {
+                    "const": "molab"
+                  },
+                  "world_size": {
+                    "const": 1
+                  },
+                  "accelerator_count": {
+                    "const": 1
+                  },
+                  "gpu_names": {
+                    "maxItems": 1
+                  }
+                }
+              },
+              "profile": {
+                "properties": {
+                  "world_size": {
+                    "const": 1
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "hardware": {
+                "properties": {
+                  "world_size": {
+                    "const": 2
+                  }
+                }
+              },
+              "profile": {
+                "properties": {
+                  "world_size": {
+                    "const": 2
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

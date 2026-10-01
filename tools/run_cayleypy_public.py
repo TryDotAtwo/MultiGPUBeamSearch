@@ -412,6 +412,9 @@ def _publication_context(
         "solver_commit": config.solver_commit,
         "kaggle_notebook_sha256": notebook_sha256,
     }
+    if config.molab_notebook_url is not None:
+        required = {"competition": config.competition, "solver_commit": config.solver_commit,
+                    "molab_notebook_sha256": config.molab_notebook_sha256}
     missing = sorted(name for name, value in required.items() if value in {None, ""})
     if missing:
         raise ValueError(f"publication provenance is incomplete: {', '.join(missing)}")
@@ -430,22 +433,21 @@ def _publication_context(
         "effective_beam": plan.effective_beam,
         "alignment_delta": plan.alignment_delta,
         "selected_profile": f"p{plan.profile_power}-{plan.model_class}",
-        "evidence": profile.get("evidence", "measured-kaggle-2xt4"),
+        "evidence": "unmeasured-molab-seed-from-t4" if config.molab_notebook_url else profile.get("evidence", "measured-kaggle-2xt4"),
         "profile_evidence_version": profile.get("profile_registry_schema_version"),
         "profile_power": plan.profile_power,
         "model_class": plan.model_class,
-        "world_size": 2,
+        "world_size": plan.world_size,
     }
+    provenance = {"molab": {"notebook_url": config.molab_notebook_url,
+                    "notebook_sha256": config.molab_notebook_sha256}} if config.molab_notebook_url else {"kaggle": {
+            "owner": config.kaggle_owner, "slug": config.kaggle_slug, "version": config.kaggle_version,
+            "run_url": f"https://www.kaggle.com/code/{config.kaggle_owner}/{config.kaggle_slug}",
+            "notebook_sha256": notebook_sha256}}
     return {
         "run_id": f"run-{uuid.uuid4().hex}",
         "author": author,
-        "kaggle": {
-            "owner": config.kaggle_owner,
-            "slug": config.kaggle_slug,
-            "version": config.kaggle_version,
-            "run_url": f"https://www.kaggle.com/code/{config.kaggle_owner}/{config.kaggle_slug}",
-            "notebook_sha256": notebook_sha256,
-        },
+        **provenance,
         "competition": config.competition,
         "puzzle_type": _puzzle_type(contract),
         "proof": {
@@ -462,8 +464,8 @@ def _publication_context(
             "manifest": dict(model.manifest),
         },
         "hardware": {
-            "platform": "kaggle", "gpu_names": list(hardware_names),
-            "accelerator_count": 2, "world_size": 2,
+            "platform": "molab" if config.molab_notebook_url else "kaggle", "gpu_names": list(hardware_names),
+            "accelerator_count": plan.world_size, "world_size": plan.world_size,
         },
         "timings": {
             "solve_us": max(0, round(solve_seconds * 1_000_000)),

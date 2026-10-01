@@ -65,6 +65,24 @@ def _solution() -> dict[str, object]:
     return solution
 
 
+def test_molab_provenance_without_fake_kaggle():
+    context = _context()
+    context.pop("kaggle")
+    context["molab"] = {"notebook_url": "https://molab.marimo.io/notebooks/nb_test",
+                        "notebook_sha256": SHA_A}
+    context["profile"]["world_size"] = 1
+    context["hardware"].update(platform="molab", world_size=1, accelerator_count=1,
+                               gpu_names=["NVIDIA GPU"])
+    envelope = build_result_envelope(context, _solution())
+    assert "kaggle" not in envelope
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema)
+    validator.validate({"schema_version": 1, "results": [envelope]})
+    wrong = deepcopy(envelope)
+    wrong["hardware"]["world_size"] = 2
+    assert list(validator.iter_errors({"schema_version": 1, "results": [wrong]}))
+
+
 def _canonical_bytes(value: object) -> bytes:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False,

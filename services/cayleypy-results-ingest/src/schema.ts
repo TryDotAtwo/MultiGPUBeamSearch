@@ -28,7 +28,8 @@ export interface ResultEnvelopeV1 {
   idempotency_key: Sha256;
   submitted_at: string;
   author: { name: string; kaggle_username?: string; verification: "claimed" };
-  kaggle: { owner: string; slug: string; version: number; notebook_sha256: Sha256; run_url?: string };
+  molab?: { notebook_url: string; notebook_sha256: Sha256 };
+  kaggle?: { owner: string; slug: string; version: number; notebook_sha256: Sha256; run_url?: string };
   competition: string;
   puzzle_type: string;
   puzzle_id: number;
@@ -47,7 +48,7 @@ export interface ResultEnvelopeV1 {
   };
   profile: {
     requested_beam: number; effective_beam: number; alignment_delta: number; selected_profile: string; evidence: string;
-    profile_evidence_version: number; profile_power: number; model_class: ModelClass; world_size: 2;
+    profile_evidence_version: number; profile_power: number; model_class: ModelClass; world_size: 1 | 2;
   };
   runtime: {
     touch_bfs_radius: number; solution_mode: "first" | "collect"; max_depth: number; max_collected_solutions: number;
@@ -55,7 +56,7 @@ export interface ResultEnvelopeV1 {
     shard_capacity_scale_ppm: number; stream4_batch_candidates: number; stream4_trigger_candidates: number; stream4_active_sort_slots: number;
   };
   model: { filename: string; sha256: Sha256; format: "batchnorm-folded" | "resmlp-layernorm" | "piece-transformer" | "cube555-q-blend"; manifest: ModelManifestV1 };
-  hardware: { platform: string; gpu_names: string[]; accelerator_count: number; world_size: 2 };
+  hardware: { platform: string; gpu_names: string[]; accelerator_count: number; world_size: 1 | 2 };
   timings: { solve_us: number; wall_us: number };
   solver_commit: string;
 }

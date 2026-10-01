@@ -15,7 +15,7 @@ _ALLOWED_KEYS = frozenset({
     "collect_until_depth", "collect_extra_depths", "max_collected_solutions", "touch_bfs_radius",
     "publish_results", "results_ingest_url", "competition", "kaggle_owner",
     "kaggle_slug", "kaggle_version", "kaggle_username", "solver_commit",
-    "kaggle_notebook_sha256",
+    "kaggle_notebook_sha256", "molab_notebook_url", "molab_notebook_sha256",
     "enable_debug", "enable_depth_logs", "enable_debug_logs",
     "debug_stream_timing", "debug_inference_trace", "debug_path_trace",
     "debug_final_validate", "debug_final_exchange_trace", "debug_final_histogram_trace",
@@ -112,6 +112,9 @@ class PublicRunConfig:
     kaggle_username: str | None = None
     solver_commit: str | None = None
     kaggle_notebook_sha256: str | None = None
+
+    molab_notebook_url: str | None = None
+    molab_notebook_sha256: str | None = None
 
     @property
     def puzzle_ids(self) -> tuple[int, ...]:
@@ -244,7 +247,20 @@ class PublicRunConfig:
             )
         author_name = nonempty_string("author_name")
         assert author_name is not None
-        if publish_results:
+        molab_url = nonempty_string("molab_notebook_url", optional=True)
+        molab_sha = nonempty_string("molab_notebook_sha256", optional=True)
+        if molab_url is not None:
+            parsed_molab = urlsplit(molab_url)
+            if (parsed_molab.scheme != "https" or parsed_molab.netloc != "molab.marimo.io"
+                    or not parsed_molab.path.startswith("/notebooks/") or parsed_molab.query or parsed_molab.fragment):
+                raise ValueError("MOLAB_NOTEBOOK_URL must be a public Molab notebook URL")
+            if molab_sha is None or _HEX_64.fullmatch(molab_sha) is None:
+                raise ValueError("MOLAB_NOTEBOOK_SHA256 is required")
+        if publish_results and molab_url is not None and not competition:
+            raise ValueError("COMPETITION is required")
+        if publish_results and molab_url is not None and not solver_commit:
+            raise ValueError("SOLVER_COMMIT is required")
+        if publish_results and molab_url is None:
             provenance = {
                 "COMPETITION": competition,
                 "KAGGLE_OWNER": kaggle_owner,
@@ -309,6 +325,8 @@ class PublicRunConfig:
             depth_log_every=positive_optional_integer("depth_log_every", 1),
             puzzle_log_every=positive_optional_integer("puzzle_log_every", 1),
             competition=competition,
+            molab_notebook_url=molab_url,
+            molab_notebook_sha256=molab_sha,
             kaggle_owner=kaggle_owner,
             kaggle_slug=kaggle_slug,
             kaggle_version=kaggle_version,

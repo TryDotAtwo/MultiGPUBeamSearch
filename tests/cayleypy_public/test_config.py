@@ -26,6 +26,18 @@ def test_config_accepts_exact_public_contract():
     assert cfg.model_dtype == "fp16"
 
 
+def test_molab_publication_requires_real_molab_provenance():
+    values = {key: value for key, value in BASE.items() if not key.startswith("kaggle_")}
+    values.update(molab_notebook_url="https://molab.marimo.io/notebooks/nb_test",
+                  molab_notebook_sha256="b" * 64)
+    cfg = PublicRunConfig.from_mapping(values)
+    assert cfg.kaggle_owner is None
+    assert cfg.molab_notebook_url.endswith("nb_test")
+    values["molab_notebook_url"] += "?token=private"
+    with pytest.raises(ValueError, match="public Molab"):
+        PublicRunConfig.from_mapping(values)
+
+
 def test_collect_depth_cannot_exceed_max_depth():
     values = {**BASE, "solution_mode": "collect", "collect_until_depth": 101}
     with pytest.raises(ValueError, match="COLLECT_UNTIL_DEPTH"):

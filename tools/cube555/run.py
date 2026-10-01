@@ -110,8 +110,6 @@ def main():
     parser.add_argument('--publication-json', type=Path)
     parser.add_argument('--runtime-target', choices=['kaggle-2xt4', 'molab-single-gpu'], default='kaggle-2xt4')
     args = parser.parse_args()
-    if args.runtime_target == 'molab-single-gpu' and args.publish:
-        parser.error('Molab publication needs Molab provenance support; local replayed results are saved')
     if not 1 <= args.depth <= MAX_DEPTH:
         parser.error(f'--depth must be in [1, {MAX_DEPTH}]')
     if args.collect_until_depth is not None and not 0 <= args.collect_until_depth <= args.depth:

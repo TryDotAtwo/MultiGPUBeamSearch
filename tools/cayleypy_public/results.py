@@ -345,7 +345,9 @@ def _sanitized_payload(
 
     author = _project(_mapping(context.get("author"), "context.author"), _AUTHOR_FIELDS)
     author["verification"] = "claimed"
-    kaggle = _project(_mapping(context.get("kaggle"), "context.kaggle"), _KAGGLE_FIELDS)
+    provenance = {"molab": _project(_mapping(context["molab"], "context.molab"),
+                                    ("notebook_url", "notebook_sha256"))} if "molab" in context else {
+        "kaggle": _project(_mapping(context.get("kaggle"), "context.kaggle"), _KAGGLE_FIELDS)}
 
     proof_source = _mapping(context.get("proof"), "context.proof")
     initial_state = _state_list(proof_source.get("initial_state"), "context.proof.initial_state")
@@ -415,7 +417,7 @@ def _sanitized_payload(
     return {
         "schema_version": SCHEMA_VERSION,
         "author": author,
-        "kaggle": kaggle,
+        **provenance,
         "competition": context.get("competition"),
         "puzzle_type": context.get("puzzle_type"),
         "puzzle_id": solution.get("puzzle_id"),
