@@ -82,7 +82,7 @@ def _(CHECKPOINT_FILENAME, COMPETITION_ROOT, INPUT_BUNDLE_URL, MODEL_ROOT,
         # Molab persistence may restore source files without hidden Git metadata.
         # Keep that snapshot and recreate the verifiable pinned checkout.
         import time as _cell4_time
-        _repo.rename(_repo.with_name(_repo.name + f".snapshot-{_time.time_ns()}"))
+        _repo.rename(_repo.with_name(_repo.name + f".snapshot-{_cell4_time.time_ns()}"))
     if not _repo.exists():
         _cell4_subprocess.run(["git", "clone", "--filter=blob:none", "--no-checkout",
                         "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git", str(_repo)], check=True)
@@ -279,7 +279,7 @@ def _(AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITIO
                 try:
                     _line = _lines.get(timeout=15)
                 except _cell6_queue.Empty:
-                    _heartbeat = f"[cell-progress] pid={_process.pid} elapsed={_time.monotonic()-_started:.0f}s returncode={_process.poll()}\n"
+                    _heartbeat = f"[cell-progress] pid={_process.pid} elapsed={_cell6_time.monotonic()-_started:.0f}s returncode={_process.poll()}\n"
                     print(_heartbeat, end="", flush=True)
                     _log.write(_heartbeat)
                     _log.flush()
