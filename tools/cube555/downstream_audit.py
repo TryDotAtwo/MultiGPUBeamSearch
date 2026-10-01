@@ -261,10 +261,12 @@ def main():
             confirmed.append((min(original['gain_fraction'], comparison['gain_fraction']), name, candidate))
         save()
     if not confirmed:
-        report.update(status='inconclusive', winner=None)
+        report['downstream_selection'] = 'baseline_retained_no_confirmed_gain'
+        best_name, best_plan = 'baseline', base
         save()
-        return
-    _, best_name, best_plan = max(confirmed, key=lambda item: item[0])
+    else:
+        report['downstream_selection'] = 'confirmed_gain'
+        _, best_name, best_plan = max(confirmed, key=lambda item: item[0])
     report['best_fixed_stream1'] = best_name
     neighbor_base = runtime_plan(cfg.beam, model_micro=args.neighbor_micro,
                                 inference_concurrency=args.inference_concurrency)
