@@ -33,6 +33,23 @@ def test_bad_blend_weight_rejected(weight):
         Blend(None, None, weight)
 
 
+@pytest.mark.parametrize('concurrency', [1, 2, 4])
+def test_inference_lanes_have_slots_and_full_candidate_reserve(concurrency):
+    plan = runtime_plan(2**20, model_micro=128, inference_concurrency=concurrency)
+    assert plan.requested_beam == plan.effective_beam == 2**20
+    assert plan.runtime['stream1_concurrency'] == concurrency
+    assert plan.runtime['stream3_ring_slots'] >= concurrency
+    assert plan.shard_capacity_candidates >= (
+        plan.stream3_batch_candidates + plan.runtime['stream4_batch_candidates']
+        + plan.runtime['stream4_trigger_candidates'])
+
+
+@pytest.mark.parametrize('concurrency', [0, 3, 5, True])
+def test_invalid_inference_parallelism_rejected(concurrency):
+    with pytest.raises(ValueError, match='inference_concurrency'):
+        runtime_plan(2**20, inference_concurrency=concurrency)
+
+
 def test_launcher_passes_complete_public_config(tmp_path):
     from types import SimpleNamespace
     from tools.cube555.run import configuration

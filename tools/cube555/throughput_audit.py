@@ -1,6 +1,7 @@
 """Bounded native Stream1 sweep followed by matched saturated pipeline probes."""
 import argparse
 import hashlib
+import itertools
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ def main():
     p.add_argument('--competition', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
+    torch.set_num_threads(1)
     a.output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
     deadline = started + 3300
@@ -53,14 +55,14 @@ def main():
         binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
         runner_sha256=hashlib.sha256(runner.read_bytes()).hexdigest(),
         corpus_sha256=hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
-        outer=8192,stream1_concurrency=1,rows=[],pipeline=[],
+        outer=8192,concurrency_sweep=[1,2,4],rows=[],pipeline=[],
         metric='1 - pipeline_parents_per_second / isolated_Stream1_parents_per_second',
         excluded='isolated: model load/input H2D; included: production forward, fp32 blend, quantizer, score-ring copy. Pipeline includes all search stages; state populations differ but shapes/work counts match.')
     def save():
         report['audit_wall_seconds'] = time.monotonic()-started
         (a.output/'throughput_report.json').write_text(json.dumps(report,indent=2))
-    for micro in (64,128,256,384,512,768,1024,1536,2048):
-        directory = a.output/f'isolated-{micro}'
+    for micro, concurrency in itertools.product((64,128,256,384,512,768,1024,1536,2048),(1,2,4)):
+        directory = a.output/f'isolated-{micro}-c{concurrency}'
         directory.mkdir()
         monitor = Telemetry(directory)
         monitor.start()
@@ -69,48 +71,55 @@ def main():
             for gpu in range(2):
                 out=(directory/f'gpu-{gpu}.log').open('w')
                 err=(directory/f'gpu-{gpu}.err').open('w')
-                proc=subprocess.Popen([str(binary),str(a.output/'export'),str(corpus_path),str(micro),str(gpu),'5'],stdout=out,stderr=err)
+                proc=subprocess.Popen([str(binary),str(a.output/'export'),str(corpus_path),str(micro),str(gpu),'5',str(concurrency)],stdout=out,stderr=err,
+                    env={**os.environ,'OMP_NUM_THREADS':'1','MKL_NUM_THREADS':'1'})
                 processes.append((gpu,proc,out,err))
             for gpu,proc,out,err in processes:
                 code=proc.wait(timeout=min(180,remaining()))
                 out.close();err.close()
-                row=dict(gpu=gpu,micro=micro,return_code=code,status='failed')
+                row=dict(gpu=gpu,micro=micro,concurrency=concurrency,return_code=code,status='failed')
                 if code==0:
                     row.update(json.loads((directory/f'gpu-{gpu}.log').read_text()))
                     row.update(status='complete',median_seconds=statistics.median(row['seconds']))
-                    row['parents_per_second']=8192/row['median_seconds']
+                    row['parents_per_second']=8192*concurrency/row['median_seconds']
                 report['rows'].append(row)
                 print(json.dumps(row),flush=True)
         finally:
             for _,proc,out,err in processes:
                 if proc.poll() is None: proc.kill();proc.wait()
                 out.close();err.close()
-            report.setdefault('isolated_telemetry',{})[str(micro)]=monitor.finish()
+            report.setdefault('isolated_telemetry',{})[f'{micro}-c{concurrency}']=monitor.finish()
             save()
     successful={}
     for row in report['rows']:
-        if row['status']=='complete': successful.setdefault(row['micro'],[]).append(row)
-    ranked=sorted((max(r['median_seconds'] for r in rows),micro) for micro,rows in successful.items() if len(rows)==2)
+        if row['status']=='complete': successful.setdefault((row['micro'],row['concurrency']),[]).append(row)
+    ranked=sorted((1/min(r['parents_per_second'] for r in rows),case) for case,rows in successful.items() if len(rows)==2)
     if not ranked: raise RuntimeError('no both-GPU passing microbatch')
     winner=ranked[0][1]
-    safe=sorted(m for _,m in ranked)
-    index=safe.index(winner)
-    neighbors=safe[max(0,index-1):min(len(safe),index+2)]
-    if len(neighbors)<3:
-        neighbors=sorted(set(neighbors+[m for _,m in ranked[:3]]))
-    report['isolated_winner']=winner
+    safe=sorted(case[0] for _,case in ranked if case[1]==winner[1])
+    index=safe.index(winner[0])
+    neighbors=[(m,winner[1]) for m in safe[max(0,index-1):min(len(safe),index+2)]]
+    for _,case in ranked:
+        if len(neighbors)>=4: break
+        if case[1] not in {chosen[1] for chosen in neighbors}: neighbors.append(case)
+    report['isolated_winner']=dict(micro=winner[0],concurrency=winner[1])
     report['pipeline_candidates']=neighbors
     save()
-    for micro in neighbors:
-        directory=a.output/f'pipeline-{micro}'
-        log=a.output/f'pipeline-{micro}.launcher.log'
+    for micro, concurrency in neighbors:
+        directory=a.output/f'pipeline-{micro}-c{concurrency}'
+        log=a.output/f'pipeline-{micro}-c{concurrency}.launcher.log'
+        print(f'pipeline_start micro={micro} concurrency={concurrency}',flush=True)
         with log.open('w') as stream:
-            subprocess.run([os.sys.executable,'-u','-m','tools.cube555.run',
+            command=[os.sys.executable,'-u','-m','tools.cube555.run',
                 '--assets',str(a.assets),'--competition',str(a.competition),'--output',str(directory),
                 '--pids','1020','--beam','1048576','--depth','140','--collect-until-depth','8',
-                '--touch-radius','5','--model-micro',str(micro)],stdout=stream,stderr=subprocess.STDOUT,
-                check=True,timeout=remaining())
-        report['pipeline'].append(dict(micro=micro,summary=json.loads((directory/'run_summary.json').read_text())))
+                '--touch-radius','5','--model-micro',str(micro),'--inference-concurrency',str(concurrency)]
+            proc=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+            for line in proc.stdout:
+                print(line,end='',flush=True);stream.write(line);stream.flush()
+                remaining()
+            if proc.wait(timeout=remaining())!=0: raise RuntimeError(f'pipeline failed {micro}/{concurrency}')
+        report['pipeline'].append(dict(micro=micro,concurrency=concurrency,summary=json.loads((directory/'run_summary.json').read_text())))
         save()
     report['status']='complete'
     save()

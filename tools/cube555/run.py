@@ -35,7 +35,7 @@ def history_budgets(available_ram_bytes, tmp_free_bytes):
 
 
 def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
-                 model_micro: int | None = None) -> RuntimePlan:
+                 model_micro: int | None = None, inference_concurrency: int = 1) -> RuntimePlan:
     if type(beam) is not int or not 1 <= beam <= MAX_BEAM:
         raise ValueError(f'Cube555 beam must be in [1, {MAX_BEAM}]')
     micro = {'safe': 128, 'balanced': 256, 'throughput': 512}[profile] if model_micro is None else model_micro
@@ -43,6 +43,8 @@ def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
         raise ValueError('outer b_micro must be in [1, 65536]')
     if type(micro) is not int or not 1 <= micro <= b_micro:
         raise ValueError('model_micro must be in [1, outer b_micro]')
+    if type(inference_concurrency) is not int or inference_concurrency not in (1, 2, 4):
+        raise ValueError('inference_concurrency must be 1, 2 or 4')
     registry = json.loads((Path(__file__).resolve().parents[2] / 'configs/kaggle_t4_transformer_profiles.json').read_text())
     seed = select_profile(registry, beam, 30, 30)
     old_batch = seed['runtime']['b_micro']
@@ -50,7 +52,8 @@ def runtime_plan(beam: int, profile: str = 'safe', *, b_micro: int = 8192,
     # Large Cube4 profiles encode many tiny outer slots. Preserve the candidate
     # transaction budget while changing its unit from 384 to 8192 parents.
     old_slots = seed['runtime']['stream3_ring_slots']
-    seed['runtime']['stream3_ring_slots'] = max(2, (old_batch * old_slots + b_micro - 1) // b_micro)
+    seed['runtime']['stream3_ring_slots'] = max(2, inference_concurrency, (old_batch * old_slots + b_micro - 1) // b_micro)
+    seed['runtime']['stream1_concurrency'] = inference_concurrency
     plan = derive_runtime(seed, beam, 30, 30, 2)
     return replace(plan, runtime={**plan.runtime, 'model_micro': micro},
         cross_puzzle_profile_note='Cube4 Transformer pipeline seed; Cube555 capacity requires native preflight and measurement')
@@ -91,6 +94,7 @@ def main():
     parser.add_argument('--transformer-weight', type=float, default=0.8)
     parser.add_argument('--b-micro', type=int, default=8192)
     parser.add_argument('--model-micro', type=int, default=512)
+    parser.add_argument('--inference-concurrency', type=int, choices=(1, 2, 4), default=1)
     parser.add_argument('--reflect-mode', choices=['off', 'after_original', 'only'], default='off')
     parser.add_argument('--reflect-source-csv', type=Path)
     parser.add_argument('--solution-mode', choices=['first', 'collect'], default='collect')
@@ -133,7 +137,8 @@ def main():
             args.mlp_checkpoint or args.assets / 'q555_2k_BEST.pt',
             args.layout or args.assets / 'piece_layout_555.json', info, export_dir, args.transformer_weight)
         model = ExportedModel('cube555-q-blend', 'fp16', manifest['script_sha256'], manifest, 'piece_transformer')
-        plan = runtime_plan(args.beam, b_micro=args.b_micro, model_micro=args.model_micro)
+        plan = runtime_plan(args.beam, b_micro=args.b_micro, model_micro=args.model_micro,
+                            inference_concurrency=args.inference_concurrency)
         # Reuse the existing public profiles' RAM/disk contract and explicit
         # depth cap. Beam is never reduced to fit history.
         ram, disk = history_budgets(_available_ram_bytes(), shutil.disk_usage('/tmp').free)
