@@ -117,6 +117,8 @@ def main():
         (a.output/'throughput_report.json').write_text(json.dumps(report,indent=2))
     report['case_sequence'] = cases
     for case_index, (micro, concurrency) in enumerate(cases):
+        print(f'isolated_case_start index={case_index} micro={micro} concurrency={concurrency}',
+              flush=True)
         repeats = a.parent_groups//concurrency if a.parent_groups else a.repeats
         label = f'{micro}-c{concurrency}'
         if a.case_sequence:

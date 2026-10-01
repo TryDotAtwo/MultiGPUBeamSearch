@@ -207,6 +207,8 @@ def _(AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITIO
     from pathlib import Path as _Path
     import os as _os
     import signal as _signal
+    import queue as _queue
+    import threading as _threading
     import hashlib as _hashlib
     import torch as _torch
     if not gpu_checked or _torch.cuda.device_count() != 1:
@@ -259,12 +261,38 @@ def _(AUTHOR_NAME, BEAM_WIDTH, CHECKPOINT_PATH, COLLECT_EXTRA_DEPTHS, COMPETITIO
         _process = _subprocess.Popen(_command, cwd=prepared_repo, stdout=_subprocess.PIPE,
                                     stderr=_subprocess.STDOUT, text=True, bufsize=1,
                                     start_new_session=True)
+        # A process group lets interruption stop torchrun children too. The parent
+        # still reads and waits here; this is not a detached/background launch.
+        _lines = _queue.Queue()
+        def _read_child_output():
+            try:
+                for _child_line in _process.stdout:
+                    _lines.put(_child_line)
+            finally:
+                _lines.put(None)
+        _reader = _threading.Thread(target=_read_child_output, daemon=True)
+        _reader.start()
+        _started = _time.monotonic()
         try:
-            for _line in _process.stdout:
+            while True:
+                try:
+                    _line = _lines.get(timeout=15)
+                except _queue.Empty:
+                    _heartbeat = f"[cell-progress] pid={_process.pid} elapsed={_time.monotonic()-_started:.0f}s returncode={_process.poll()}\n"
+                    print(_heartbeat, end="", flush=True)
+                    _log.write(_heartbeat)
+                    _log.flush()
+                    continue
+                if _line is None:
+                    break
                 print(_line, end="", flush=True)
                 _log.write(_line)
                 _log.flush()
             _code = _process.wait()
+            _reader.join(timeout=1)
+            _terminal = dict(returncode=_code, elapsed_seconds=_time.monotonic()-_started)
+            (_output / "launcher_terminal.json").write_text(_json.dumps(_terminal, indent=2))
+            print("[cell-terminal] "+_json.dumps(_terminal), flush=True)
         except BaseException:
             _os.killpg(_process.pid, _signal.SIGTERM)
             try:

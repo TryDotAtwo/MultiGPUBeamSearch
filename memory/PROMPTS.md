@@ -663,3 +663,5 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-10-01 Ivan: Выбрал гпу. Validate Molab Run All on actual GPU, automatic public inputs, replay and publication.
 
 2026-10-01 Ivan: Около17лямов; сделать сетку профилей Molab как для Kaggle. Tune pureStream1 micro/concurrency first, then saturated Stream3/4 paired same-work measurements; no slowdown reserve in12h boundary.
+
+2026-10-01 Ivan: inspect Molab documentation and consult local Molab agent about possible background-job termination. No foreign jobs or GPU launches.

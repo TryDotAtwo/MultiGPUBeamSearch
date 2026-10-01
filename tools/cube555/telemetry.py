@@ -5,6 +5,26 @@ import re
 import subprocess
 import threading
 import time
+from pathlib import Path
+
+
+def host_memory_sample(root=Path('/sys/fs/cgroup')):
+    """Container memory, not host-wide free RAM; missing counters remain unknown."""
+    sample = {}
+    for name in ('memory.current', 'memory.max', 'memory.peak'):
+        try:
+            value = (root / name).read_text().strip()
+            sample[name] = int(value) if value != 'max' else 'unlimited'
+        except (OSError, ValueError):
+            pass
+    try:
+        sample['memory.events'] = {
+            key: int(value) for key, value in
+            (line.split() for line in (root / 'memory.events').read_text().splitlines())
+        }
+    except (OSError, ValueError):
+        pass
+    return sample
 
 
 class Telemetry:
@@ -27,6 +47,10 @@ class Telemetry:
                         writer.writerow([round(time.monotonic()-start, 3), *[v.strip() for v in row]])
                     f.flush()
                     elapsed = time.monotonic() - start
+                    host_memory = host_memory_sample()
+                    with (self.output / 'host_memory_samples.jsonl').open('a') as host_log:
+                        host_log.write(json.dumps(dict(elapsed_s=round(elapsed, 3),
+                                                       **host_memory)) + '\n')
                     if elapsed - last_report >= 30:
                         last_report = elapsed
                         stage = 'initializing'
@@ -39,6 +63,7 @@ class Telemetry:
                                 pass
                         print(f'[progress] elapsed={elapsed:.0f}s stage={stage} '
                               f'GPU(index,MiB,totalMiB,util%,W,SMMHz,memMHz,C,pstate)={p.stdout.strip().replace(chr(10), " | ")}', flush=True)
+                        print('[host-memory] '+json.dumps(host_memory), flush=True)
                         # Native depth logs can be quiet during a long full beam layer.
                         # Print only known progress records, never arbitrary log contents.
                         for log in sorted(self.output.rglob('stdout.log')):
