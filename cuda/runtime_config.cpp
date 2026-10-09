@@ -256,9 +256,14 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stre
 
 void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
     const std::uint64_t logical_shard_size = logical_shard_size_for(config);
+    const std::uint64_t owner_batch_reserve = std::max<std::uint64_t>(
+        config.stream3_batch_candidates,
+        scaled_round_up(config.stream3_batch_candidates, config.stream5_recv_capacity_scale_ppm));
+    if (logical_shard_size > UINT64_MAX - owner_batch_reserve)
+        throw std::overflow_error("shard writable reserve exceeds uint64");
     const std::uint64_t scaled_capacity =
         std::max<std::uint64_t>(
-            logical_shard_size,
+            logical_shard_size + owner_batch_reserve,
             scaled_round_up(logical_shard_size, config.shard_capacity_scale_ppm));
     if (env_present("BEAM_SHARD_CAPACITY_CANDIDATES")) {
         config.shard_capacity_candidates = env_u32("BEAM_SHARD_CAPACITY_CANDIDATES", 1);
