@@ -528,6 +528,20 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
     runner = snapshot_runtime_runner(runtime, run_dir)
+    if model.backend == "ensemble" and options.autotune:
+        from .pipeline_autotune import tune_downstream
+        downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
+            run_dir,env,runner,calibration)
+        measured=downstream.get('phase')=='pipeline_measured'
+        if measured:
+            env.update(downstream['environment'])
+            microbatch_metadata['derived_parent_batch']=int(env['BEAM_B_MICRO'])
+            microbatch_metadata['inference_parent_batch']=calibration['parent_batch']
+        runtime.profile.update(autotuned=measured,pipeline_autotuned=measured,
+            pipeline_calibration=downstream)
+        (run_dir/'runtime-config.json').write_text(json.dumps(
+            {'mode':'auto','profile':runtime.profile,'microbatch':microbatch_metadata,
+             'search_budget':search_budget},indent=2)+'\n',encoding='utf-8')
     args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
     log = run_dir / "native.log"
     process_log = log
@@ -572,3 +586,4 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     (run_dir / "native-outcome.json").write_text(json.dumps({"path": path, "elapsed_seconds": elapsed,
         "effective_beam_width": effective, "metadata": metadata}, indent=2) + "\n", encoding="utf-8")
     return NativeOutcome(path, elapsed, effective, run_dir, metadata)
+
