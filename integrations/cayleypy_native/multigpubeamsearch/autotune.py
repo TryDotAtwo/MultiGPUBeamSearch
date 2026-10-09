@@ -16,6 +16,32 @@ from .build import file_sha256
 from .calibration_telemetry import CalibrationTelemetry
 
 
+def coarse_batches(cap):
+    """Include the real beam/user cap, even when it is not a power of two."""
+    if type(cap) is not int or not 1 <= cap <= 65536:
+        raise ValueError('inference cap must be in [1,65536]')
+    baseline=min(256,cap)
+    values=[x for x in (32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536)
+            if x<=cap and x!=baseline]
+    if cap!=baseline and cap not in values:values.append(cap)
+    random.Random(20261009).shuffle(values)
+    return [baseline]+values
+
+
+def refinement_batches(winner,cap,visited):
+    """Bounded local search; performance is measured rather than inferred."""
+    if type(winner) is not int or not 1 <= winner <= cap:
+        raise ValueError('inference winner must fit its cap')
+    grain=max(1,min(32,winner//8))
+    values=set()
+    for numerator,denominator in ((5,8),(3,4),(7,8),(9,8),(5,4),(3,2)):
+        batch=((winner*numerator+denominator*grain//2)//(denominator*grain))*grain
+        if 1<=batch<=cap and batch not in visited:values.add(batch)
+    result=sorted(values)
+    random.Random(20261010).shuffle(result)
+    return result
+
+
 def graph_samples(contract, count=128):
     rng=random.Random(20261009)
     state=contract.start
@@ -38,7 +64,7 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             '--format=csv,noheader'],capture_output=True,text=True,timeout=10,check=True).stdout
     except (OSError,subprocess.SubprocessError):hardware='unavailable'
     import platform
-    return {'schema':3,'graph':contract.graph_hash,'models':model.artifact_hash,
+    return {'schema':4,'search_policy':'coarse-local-v1','graph':contract.graph_hash,'models':model.artifact_hash,
             'runner':runtime.build_metadata['binary_sha256'],
             'probe':runtime.build_metadata.get('calibration_binary_sha256'),
             'gpu_properties':[str(torch.cuda.get_device_properties(d)) for d in devices],
@@ -83,16 +109,26 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     manifest['generators']=[list(x) for x in contract.generators]
     (probe_dir/('ensemble.json' if model.backend=='ensemble' else 'calibration.json')).write_text(json.dumps(manifest))
     cap=min(options.calibration_max_batch,max(1,(beam_width+len(devices)-1)//len(devices)))
-    baseline=min(256,cap)
-    candidates=[baseline]+[x for x in (32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536) if x<=cap and x!=baseline]
-    # Randomized order reduces systematic clock/temperature drift. Baseline is
-    # first so a bounded sweep always has a viable measured reference.
-    tail=candidates[1:];random.Random(20261009).shuffle(tail);candidates=[baseline]+tail
+    candidates=coarse_batches(cap)
+    baseline=candidates[0]
+    coarse_candidates=list(candidates)
+    refined=[]
     parents=max(8192,cap)
-    deadline=time.monotonic()+options.calibration_seconds
+    started=time.monotonic()
+    deadline=started+options.calibration_seconds
+    coarse_deadline=started+.7*options.calibration_seconds
+    refinement_queued=False
     samples=[];records=[];rejected={};reserves={};telemetry_records={}
-    for batch in candidates:
+    for index,batch in enumerate(candidates):
         if time.monotonic()>=deadline:break
+        if index<len(coarse_candidates) and index>0 and time.monotonic()>=coarse_deadline:
+            if not refinement_queued:
+                coarse_winner,_=select(samples,baseline=str(baseline))
+                refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
+                candidates.extend(refined)
+                refinement_queued=True
+            continue
+        candidate_deadline=deadline if index==0 or index>=len(coarse_candidates) else coarse_deadline
         processes=[];rows=[]
         telemetry=CalibrationTelemetry()
         telemetry.__enter__()
@@ -109,7 +145,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                     raise
                 processes.append((rank,process,log,path))
             for rank,process,log,path in processes:
-                try:code=process.wait(timeout=max(.1,deadline-time.monotonic()))
+                try:code=process.wait(timeout=max(.1,candidate_deadline-time.monotonic()))
                 except subprocess.TimeoutExpired:_stop_process_tree(process);code=-1
                 log.close()
                 parsed=[]
@@ -137,12 +173,18 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
             reserves[str(batch)]=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
         elif batch==baseline:
             raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
+        if index+1==len(coarse_candidates) and not refinement_queued and time.monotonic()<deadline:
+            coarse_winner,_=select(samples,baseline=str(baseline))
+            refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
+            candidates.extend(refined)
+            refinement_queued=True
     winner,stat_rejected=select(samples,baseline=str(baseline))
     verify_prepared_model(model,contract)
     data={'signature':signature,'phase':'inference_verified','parent_batch':int(winner.profile),
           'reserve_bytes':reserves[winner.profile],'estimate':winner.__dict__,
           'records':records,'rejected':rejected,'stat_rejected':stat_rejected,
           'gpu_telemetry':telemetry_records,
+          'coarse_candidates':coarse_candidates,'refinement_candidates':refined,
           'pipeline_verified':False,'cache_hit':False,'measured_candidates':sorted({int(s.profile) for s in samples})}
     (directory/'inference-selection.json').write_text(json.dumps(data,indent=2))
     cache.parent.mkdir(parents=True,exist_ok=True)
