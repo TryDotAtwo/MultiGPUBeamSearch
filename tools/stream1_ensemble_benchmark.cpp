@@ -72,6 +72,10 @@ int main(int argc,char** argv) {
         if(full_frontier && parents!=states.size(0)) throw std::runtime_error("session must preserve its exact verified frontier");
         model.inference_micro=batch;
         flag.zero_();
+        // A previous large candidate must not inflate this batch's reserve.
+        // Flush only unused blocks before warmup, outside the timed region.
+        cudaDeviceSynchronize();
+        c10::cuda::CUDACachingAllocator::emptyCache();
         c10::cuda::CUDACachingAllocator::resetPeakStats(device);
     }
     run(batch);cudaDeviceSynchronize();
