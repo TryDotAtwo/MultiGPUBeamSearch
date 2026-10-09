@@ -13,6 +13,7 @@ from .calibration_stats import Measurement, select
 from .errors import NativeBackendError
 from .models import verify_prepared_model
 from .build import file_sha256
+from .calibration_telemetry import CalibrationTelemetry
 
 
 def graph_samples(contract, count=128):
@@ -86,18 +87,24 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     tail=candidates[1:];random.Random(20261009).shuffle(tail);candidates=[baseline]+tail
     parents=max(8192,cap)
     deadline=time.monotonic()+options.calibration_seconds
-    samples=[];records=[];rejected={};reserves={}
+    samples=[];records=[];rejected={};reserves={};telemetry_records={}
     for batch in candidates:
         if time.monotonic()>=deadline:break
         processes=[];rows=[]
-        for rank in range(len(devices)):
-            path=directory/f'batch-{batch}-rank-{rank}.log'
-            log=path.open('wb')
-            command=[str(helper),str(probe_dir),str(batch),str(parents),str(rank)]
-            process=subprocess.Popen(command,env=environment,stdout=log,stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL,start_new_session=True)
-            processes.append((rank,process,log,path))
+        telemetry=CalibrationTelemetry()
+        telemetry.__enter__()
         try:
+            for rank in range(len(devices)):
+                path=directory/f'batch-{batch}-rank-{rank}.log'
+                log=path.open('wb')
+                command=[str(helper),str(probe_dir),str(batch),str(parents),str(rank)]
+                try:
+                    process=subprocess.Popen(command,env=environment,stdout=log,stderr=subprocess.STDOUT,
+                        stdin=subprocess.DEVNULL,start_new_session=True)
+                except Exception:
+                    log.close()
+                    raise
+                processes.append((rank,process,log,path))
             for rank,process,log,path in processes:
                 try:code=process.wait(timeout=max(.1,deadline-time.monotonic()))
                 except subprocess.TimeoutExpired:_stop_process_tree(process);code=-1
@@ -116,11 +123,14 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
             for _,process,log,_ in processes:
                 if process.poll() is None:_stop_process_tree(process)
                 log.close()
+            telemetry.__exit__()
+            telemetry_records[str(batch)]=telemetry.receipt()
         records.extend(rows)
         if len(rows)==len(devices):
             for repeat in range(min(len(row['seconds']) for row in rows)):
                 samples.append(Measurement(str(batch),parents*len(devices),
-                    tuple(row['seconds'][repeat] for row in rows),True,True))
+                    tuple(row['seconds'][repeat] for row in rows),True,True,
+                    throttled=telemetry.throttled))
             reserves[str(batch)]=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
         elif batch==baseline:
             raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
@@ -129,6 +139,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     data={'signature':signature,'phase':'inference_verified','parent_batch':int(winner.profile),
           'reserve_bytes':reserves[winner.profile],'estimate':winner.__dict__,
           'records':records,'rejected':rejected,'stat_rejected':stat_rejected,
+          'gpu_telemetry':telemetry_records,
           'pipeline_verified':False,'cache_hit':False,'measured_candidates':sorted({int(s.profile) for s in samples})}
     (directory/'inference-selection.json').write_text(json.dumps(data,indent=2))
     cache.parent.mkdir(parents=True,exist_ok=True)
