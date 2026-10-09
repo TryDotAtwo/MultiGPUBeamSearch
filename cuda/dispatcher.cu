@@ -5346,4 +5346,3 @@ FinalizeDepthState finalize_depth_single_gpu(
 }
 
 } // namespace beam
-
