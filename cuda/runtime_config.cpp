@@ -190,6 +190,13 @@ std::uint64_t estimate_stream1_scratch_b_micro(
 std::uint64_t estimate_non_static_device_bytes(
     const RuntimeConfig& config,
     const Stream1ModelConfig& stream1_model) {
+    // The production runner already subtracts the measured LibTorch reserve.
+    // That executor never uploads native weights or allocates native scratch.
+    // Keep the legacy estimate when no explicit Torch reserve is charged.
+    if (env_equals("BEAM_STREAM1_EXECUTOR", "libtorch_eager") &&
+        (env_present("BEAM_BLEND_DIR") || env_present("BEAM_ENSEMBLE_RESERVE_BYTES"))) {
+        return estimate_read_only_table_bytes();
+    }
     const std::uint32_t scratch_b_micro = estimate_stream1_scratch_b_micro(config, stream1_model);
     return estimate_read_only_table_bytes() +
            estimate_stream1_weight_bytes(stream1_model) +
@@ -826,3 +833,4 @@ RuntimeConfigBuild build_runtime_config_from_budget(
 }
 
 } // namespace beam
+
