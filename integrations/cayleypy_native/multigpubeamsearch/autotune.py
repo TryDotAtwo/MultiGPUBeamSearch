@@ -24,8 +24,18 @@ def coarse_batches(cap):
     values=[x for x in (32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536)
             if x<=cap and x!=baseline]
     if cap!=baseline and cap not in values:values.append(cap)
-    random.Random(20261009).shuffle(values)
-    return [baseline]+values
+    # Throughput candidates precede expensive tiny capacity-floor probes.
+    larger=[x for x in values if x>=baseline and x!=cap]
+    smaller=[x for x in values if x<baseline]
+    random.Random(20261009).shuffle(larger)
+    random.Random(20261009).shuffle(smaller)
+    return [baseline]+([cap] if cap!=baseline else [])+larger+smaller
+
+
+def probe_time_allowance(records, default=12.0):
+    """Measured repeats plus warmup/oracle and control overhead."""
+    estimates=[10*max(row['seconds'])+3 for row in records if row.get('seconds')]
+    return max(default,max(estimates,default=default))
 
 
 def refinement_batches(winner,cap,visited):
@@ -64,7 +74,7 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             '--format=csv,noheader'],capture_output=True,text=True,timeout=10,check=True).stdout
     except (OSError,subprocess.SubprocessError):hardware='unavailable'
     import platform
-    return {'schema':6,'search_policy':'coarse-local-v1','graph':contract.graph_hash,'models':model.artifact_hash,
+    return {'schema':7,'search_policy':'upper-first-soft-phase-v2','graph':contract.graph_hash,'models':model.artifact_hash,
             'runner':runtime.build_metadata['binary_sha256'],
             'probe':runtime.build_metadata.get('calibration_binary_sha256'),
             'gpu_properties':[str(torch.cuda.get_device_properties(d)) for d in devices],
@@ -125,6 +135,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     try:
         for index,batch in enumerate(candidates):
             if time.monotonic()>=deadline:break
+            if index>0 and deadline-time.monotonic()<probe_time_allowance(records):break
             if index<len(coarse_candidates) and index>0 and time.monotonic()>=coarse_deadline:
                 if not refinement_queued:
                     coarse_winner,_=select(samples,baseline=str(baseline))
@@ -132,7 +143,8 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                     candidates.extend(refined)
                     refinement_queued=True
                 continue
-            candidate_deadline=deadline if index==0 or index>=len(coarse_candidates) else coarse_deadline
+            # A phase boundary limits starts, never an in-flight healthy rank.
+            candidate_deadline=deadline
             processes=[];rows=[]
             telemetry=CalibrationTelemetry()
             telemetry.__enter__()

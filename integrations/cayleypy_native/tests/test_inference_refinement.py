@@ -31,12 +31,15 @@ def test_real_tuning_control_selects_refined_batch_with_all_rank_evidence(tmp_pa
         'ensemble':{'models':[{'weights_dir':'member-0','coefficient':1}]}})
     options=SimpleNamespace(cache_dir=tmp_path/'cache',calibration_max_batch=1024,calibration_seconds=120)
     monkeypatch.setattr(module,'verify_prepared_model',lambda *args:None)
-    monkeypatch.setattr(module,'calibration_signature',lambda *args:{'world_size':2,'schema':4})
+    monkeypatch.setattr(module,'calibration_signature',lambda *args:{'world_size':2,'schema':7,
+        'device_indices':[0,1],'gpu_uuids':['GPU-a','GPU-b']})
     class Telemetry:
         throttled=False
         def __enter__(self):return self
         def __exit__(self,*args):pass
-        def receipt(self):return {'throttled':False,'samples':[[{'throttled':False}]]}
+        def receipt(self):
+            sample=[{'index':0,'uuid':'GPU-a','throttled':False},{'index':1,'uuid':'GPU-b','throttled':False}]
+            return {'throttled':False,'errors':[],'samples':[sample,sample]}
     monkeypatch.setattr(module,'CalibrationTelemetry',Telemetry)
     measured=[]
     class Process:
@@ -55,3 +58,14 @@ def test_real_tuning_control_selects_refined_batch_with_all_rank_evidence(tmp_pa
     assert 384 not in result['coarse_candidates'] and 384 in result['refinement_candidates']
     assert {rank for batch,rank in measured if batch==384}=={0,1}
     assert module.valid_cached_profile(result,result['signature'],1024)
+
+
+def test_upper_throughput_range_precedes_tiny_capacity_probes():
+    values=module.coarse_batches(8192)
+    assert values[:2]==[256,8192]
+    assert max(values.index(x) for x in (512,1024,2048,4096))<min(values.index(x) for x in (32,64,128))
+
+
+def test_no_new_probe_when_remaining_budget_cannot_cover_observed_work():
+    assert module.probe_time_allowance([])==12.
+    assert module.probe_time_allowance([{'seconds':[2.]*7}])==23.
