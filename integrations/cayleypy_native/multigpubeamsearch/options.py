@@ -25,7 +25,7 @@ class NativeOptions:
     calibration_seconds: float = 180.0
     calibration_max_batch: int = 8192
     calibration_pipeline_seconds: float = 600.0
-    calibration_frontier_max_states: int = 65536
+    calibration_frontier_max_states: int | None = None
 
     def __post_init__(self):
         if self.inference_backend not in ("auto", "libtorch", "cutlass"):
@@ -52,7 +52,7 @@ class NativeOptions:
             raise ValueError("autotune must be boolean")
         if type(self.calibration_max_batch) is not int or not 1 <= self.calibration_max_batch <= 65536:
             raise ValueError("calibration_max_batch must be in [1, 65536]")
-        if type(self.calibration_frontier_max_states) is not int or self.calibration_frontier_max_states<=0:
+        if self.calibration_frontier_max_states is not None and (type(self.calibration_frontier_max_states) is not int or self.calibration_frontier_max_states<=0):
             raise ValueError('calibration_frontier_max_states must be positive')
         if type(self.touch_bfs_radius) is not int or not 0 <= self.touch_bfs_radius <= 12:
             raise ValueError("touch_bfs_radius must be an integer in [0, 12]")

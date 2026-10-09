@@ -55,7 +55,7 @@ class NativePipelineProbe:
     One process group per rank is always cleaned up on timeout or failure.
     """
     def __init__(self, runner, environment, beam_width, world_size, directory,
-                 fixtures, physical_bytes, *, deadline, verify, repeats=6, puzzle_id=0):
+                 fixtures, physical_bytes, *, deadline, verify, repeats=6, puzzle_id=0, planning_session=None):
         if not 6 <= repeats <= 16:
             raise ValueError('need a warmup depth and at least five measurements')
         self.runner = Path(runner)
@@ -78,6 +78,7 @@ class NativePipelineProbe:
         if type(puzzle_id) is not int or puzzle_id < 0:
             raise ValueError('calibration puzzle ID must be nonnegative')
         self.puzzle_id = puzzle_id
+        self.planning_session = planning_session
 
     def _run(self, environment, *, planning):
         from .backend import _stop_process_tree
@@ -137,7 +138,8 @@ class NativePipelineProbe:
                 log.close()
 
     def admit(self, environment):
-        plans = [parse_plan(text) for text in self._run(environment, planning=True)]
+        plans = (self.planning_session.admit(self.beam, environment) if self.planning_session is not None else
+                 [parse_plan(text) for text in self._run(environment, planning=True)])
         validate_rank_plans(plans)
         if plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'] < self.beam:
             raise ValueError('native admission shrinks requested beam')

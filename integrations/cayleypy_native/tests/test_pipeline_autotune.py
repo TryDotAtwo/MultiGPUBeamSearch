@@ -32,7 +32,7 @@ def setup_probe(monkeypatch, fail_actual=False, fail_fixture=False):
     def select(micro, baseline, admit, measure, **kwargs):
         env = dict(baseline, BEAM_B_MICRO=str(micro * 2))
         admit(env)
-        return dict(environment=env, workload_parents=8192)
+        return dict(environment=env, workload_parents=1000000)
 
     monkeypatch.setattr(module, 'NativePipelineProbe', Probe)
     monkeypatch.setattr(module, 'write_frontiers', fixture)
@@ -43,7 +43,7 @@ def setup_probe(monkeypatch, fail_actual=False, fail_fixture=False):
 
 def invoke(tmp_path):
     options = SimpleNamespace(calibration_pipeline_seconds=600,
-                              calibration_frontier_max_states=8192,
+                              calibration_frontier_max_states=None,
                               calibration_max_batch=1024)
     runtime = SimpleNamespace(build_metadata={'shape': {'storage_len': 112}})
     return module.tune_downstream(None, None, runtime, options, [0, 1],
@@ -51,14 +51,14 @@ def invoke(tmp_path):
         {'parent_batch': 1024, 'phase': 'inference_verified'})
 
 
-def test_bounded_measurement_preserves_requested_beam_and_inference(tmp_path, monkeypatch):
+def test_exact_measurement_preserves_requested_beam_and_inference(tmp_path, monkeypatch):
     calls = setup_probe(monkeypatch)
     result = invoke(tmp_path)
     assert result['requested_beam_effective'] == 1000000
-    assert result['measurement_scope'] == 'bounded_legal_frontier'
+    assert result['measurement_scope'] == 'full_requested_frontier'
     assert result['environment']['BEAM_B_MICRO'] == '2048'
     assert all(env['BEAM_ENSEMBLE_INFERENCE_MICRO'] == '1024' for _, env in calls)
-    assert [beam for beam, _ in calls] == [1000000, 8192, 1000000, 8192, 1000000]
+    assert [beam for beam, _ in calls] == [1000000]*4
 
 
 def test_real_beam_admission_failure_cannot_be_hidden_by_small_fixture(tmp_path, monkeypatch):
@@ -81,10 +81,10 @@ def test_native_scalar_inference_parent_batch_maps_to_child_row_budget(tmp_path,
     def select(micro, baseline, **kwargs):
         assert micro==256 and kwargs['tune_outer'] is False
         assert baseline['BEAM_B_MICRO']=='768'
-        return dict(environment=baseline,workload_parents=8192)
+        return dict(environment=baseline,workload_parents=1000000)
     monkeypatch.setattr(module,'tune_pipeline',select)
     options=SimpleNamespace(calibration_pipeline_seconds=600,
-        calibration_frontier_max_states=8192,calibration_max_batch=1024)
+        calibration_frontier_max_states=None,calibration_max_batch=1024)
     runtime=SimpleNamespace(build_metadata={'shape':{'storage_len':16}})
     result=module.tune_downstream(SimpleNamespace(move_count=3),
         SimpleNamespace(backend='mlp',manifest={'output_dim':1}),runtime,options,

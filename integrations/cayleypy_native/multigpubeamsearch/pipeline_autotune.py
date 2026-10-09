@@ -13,6 +13,18 @@ from .errors import NativeBackendError
 
 def tune_downstream(contract, model, runtime, options, devices, beam_width,
                     run_dir, environment, runner, inference):
+    if runtime.build_metadata.get('plan_calibration_protocol')=='json-session-v1':
+        from .plan_session import NativePlanSession
+        with NativePlanSession(runner,environment,len(devices),Path(run_dir)/'plan-session',
+                deadline=time.monotonic()+options.calibration_pipeline_seconds) as session:
+            return _tune_downstream(contract,model,runtime,options,devices,beam_width,
+                run_dir,environment,runner,inference,session)
+    return _tune_downstream(contract,model,runtime,options,devices,beam_width,
+                run_dir,environment,runner,inference,None)
+
+
+def _tune_downstream(contract, model, runtime, options, devices, beam_width,
+                    run_dir, environment, runner, inference, session):
     directory=Path(run_dir)/'pipeline-calibration';directory.mkdir()
     deadline=time.monotonic()+options.calibration_pipeline_seconds
     search_deadline=deadline-min(30.0,options.calibration_pipeline_seconds*.1)
@@ -40,36 +52,63 @@ def tune_downstream(contract, model, runtime, options, devices, beam_width,
         return inference.get('phase')=='inference_verified'
     actual=NativePipelineProbe(runner,probe_env,beam_width,world,directory/'actual-plans',
         fixtures,storage,deadline=search_deadline,verify=verify)
+    actual.planning_session=session
     # Failure to admit the real requested beam is an execution error, never a
     # reason to benchmark a smaller beam and silently run that instead.
-    try:actual.admit(baseline)
+    try:initial_plans=actual.admit(baseline)
     except ValueError as error:
         raise NativeBackendError('requested beam failed all-rank native admission') from error
-    workload=min(beam_width,options.calibration_frontier_max_states)
+    # A measured small-frontier profile cannot certify or optimize a larger
+    # frontier. If an explicit fixture budget is exceeded, decline calibration.
+    workload=beam_width
     probe=NativePipelineProbe(runner,probe_env,workload,world,directory/'measurements',
         fixtures,storage,deadline=search_deadline,verify=verify)
+    probe.planning_session=session
     try:
         plans=probe.admit(baseline)
         receipt=write_frontiers(contract,[row['frontier_state_capacity'] for row in plans],
             storage,directory/'frontiers',deadline=deadline,
-            max_states=options.calibration_frontier_max_states)
+            max_states=options.calibration_frontier_max_states or plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
     except ValueError as error:
         data={'phase':'not_measured','reason':str(error),'requested_beam_width':beam_width,
               'pipeline_verified':False,'cache_hit':False}
         (directory/'selection.json').write_text(json.dumps(data,indent=2))
         return data
     def admit(env):
-        actual.admit(env)
-        return probe.admit(env)
+        return actual.admit(env)
+    fast={}
+    if session is not None:
+        from .beam_geometry import Shape,memory_shortlist
+        initial=initial_plans[0]
+        shape=Shape(beam_width,world,int(baseline['BEAM_B_MICRO']),contract.move_count,storage,
+            alignment=initial['STREAM4_BATCH_ALIGNMENT'],
+            capacity_ppm=int(environment.get('BEAM_SHARD_CAPACITY_SCALE_PPM','1250000')),
+            receive_ppm=int(environment.get('BEAM_GLOBAL_SPILL_SCALE_PPM','2000000')))
+        baseline['BEAM_SHARD_COUNT']=str(initial['SHARD_COUNT'])
+        baseline['BEAM_STREAM3_RING_SLOTS']=str(initial['STREAM3_RING_SLOTS'])
+        baseline['BEAM_STREAM4_ACTIVE_SORT_SLOTS']=str(initial['STREAM4_ACTIVE_SORT_SLOTS'])
+        rows=memory_shortlist(shape,effective_beam=initial['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
+            staging_slots=initial['STREAM3_RING_SLOTS'],sort_slots=initial['STREAM4_ACTIVE_SORT_SLOTS'],
+            budget_bytes=min(p['gpu_budget_bytes'] for p in initial_plans))
+        candidates=[('shards-'+str(r['shards']),dict(baseline,BEAM_SHARD_COUNT=str(r['shards'])))
+            for r in rows if r['shards']!=initial['SHARD_COUNT']][:2]
+        if len(candidates)<2:
+            ring=4 if initial['STREAM3_RING_SLOTS']!=4 else 2
+            candidates.append(('staging-'+str(ring),dict(baseline,BEAM_STREAM3_RING_SLOTS=str(ring))))
+        def finish_planning():
+            session.close();actual.planning_session=None;probe.planning_session=None
+        fast=dict(candidate_profiles=candidates,finish_planning=finish_planning)
     try:
         selection=tune_pipeline(micro,baseline,admit=admit,measure=probe.measure,
             deadline=search_deadline,max_outer=max(micro,min(65536,options.calibration_max_batch*8)),
-            tune_outer=not native_single)
+            tune_outer=not native_single,**fast)
     except ValueError as error:
         raise NativeBackendError('full-pipeline baseline calibration failed: '+str(directory)) from error
     actual.deadline=deadline
     final_plans=actual.admit(selection['environment'])
     verify_prepared_model(model,contract)
+    if selection['workload_parents']!=final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']:
+        raise NativeBackendError('pipeline calibration attempted to transfer a smaller-frontier profile')
     data=dict(selection,phase='pipeline_measured',requested_beam_width=beam_width,
         requested_beam_effective=final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
         fixture=receipt,pipeline_verified=True,cache_hit=False,

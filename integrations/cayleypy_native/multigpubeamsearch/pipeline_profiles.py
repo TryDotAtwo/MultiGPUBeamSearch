@@ -54,7 +54,8 @@ def validate_rank_plans(plans):
 
 
 def tune_pipeline(inference_micro, baseline, *, admit, measure, deadline,
-                  max_outer=65536, rounds=2, tune_outer=True):
+                  max_outer=65536, rounds=2, tune_outer=True, candidate_profiles=None,
+                  finish_planning=None):
     """Coordinate search with native rank admission and full-step measurements.
 
     Callbacks must observe the actual requested beam. Admission returns native
@@ -68,6 +69,9 @@ def tune_pipeline(inference_micro, baseline, *, admit, measure, deadline,
         raise ValueError('pipeline search rounds must be in [1,4]')
     if not callable(admit) or not callable(measure):
         raise TypeError('native admission and full-step measurement are required')
+    if candidate_profiles is not None:
+        return _tune_shortlist(inference_micro,baseline,candidate_profiles,admit,measure,
+                               deadline,finish_planning)
     fixed = pipeline_candidates(inference_micro, baseline, max_outer=max_outer, tune_outer=tune_outer)[0][1]
     plans = admit(dict(fixed))
     validate_rank_plans(plans)
@@ -115,3 +119,48 @@ def tune_pipeline(inference_micro, baseline, *, admit, measure, deadline,
             'rejected': rejected, 'effective_beam': effective,
             'workload_parents': workload, 'world_size': world,
             'measurements': [row.__dict__ for row in samples]}
+
+
+def _tune_shortlist(micro,baseline,candidates,admit,measure,deadline,finish_planning):
+    """Admit at most three exact-frontier profiles, then release planning owners."""
+    import time
+    from dataclasses import replace
+    from .calibration_stats import select
+    candidates=list(candidates)
+    if len(candidates)>2:raise ValueError('fast downstream search permits baseline plus two candidates')
+    profiles={};plans_by_profile={};rejected={};effective=None
+    try:
+        for name,env in [('baseline',dict(baseline))]+candidates:
+            if name in profiles:raise ValueError('duplicate profile name')
+            if env.get('BEAM_ENSEMBLE_INFERENCE_MICRO')!=str(micro):
+                raise ValueError('downstream cannot change measured inference microbatch')
+            if time.monotonic()>=deadline:break
+            try:
+                plans=admit(dict(env));validate_rank_plans(plans)
+                value=plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']
+                if effective is not None and value!=effective:
+                    raise ValueError('candidate changes exact frontier')
+                effective=value
+            except (ValueError,MemoryError) as error:
+                if name=='baseline':raise
+                rejected[name]=str(error);continue
+            profiles[name]=dict(env);plans_by_profile[name]=plans
+    finally:
+        if finish_planning is not None:finish_planning()
+    if 'baseline' not in profiles:raise ValueError('no admitted baseline within calibration deadline')
+    samples=[];world=len(plans_by_profile['baseline'])
+    for name,env in profiles.items():
+        if name!='baseline' and time.monotonic()>=deadline:break
+        try:
+            rows=list(measure(dict(env),plans_by_profile[name]))
+            if not rows or any(row.parents!=effective or len(row.seconds_by_rank)!=world for row in rows):
+                raise ValueError('full-step measurement does not match admitted frontier/cohort')
+            samples.extend(replace(row,profile=name) for row in rows)
+        except (ValueError,MemoryError) as error:
+            if name=='baseline':raise
+            rejected[name]=str(error)
+    winner,stat_rejected=select(samples,baseline='baseline');rejected.update(stat_rejected)
+    return dict(environment=profiles[winner.profile],estimate=winner.__dict__,rejected=rejected,
+        effective_beam=effective,workload_parents=effective,world_size=world,
+        planning_scope='exact_requested_frontier',search_policy='bounded-shortlist-v1',
+        measurements=[row.__dict__ for row in samples])
