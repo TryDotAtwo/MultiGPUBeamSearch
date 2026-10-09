@@ -15,6 +15,13 @@ def test_inference_is_frozen_and_semantics_preserved():
     assert any(env['BEAM_B_MICRO']=='8192' for _,env in candidates)
 
 
+def test_native_scalar_row_budget_remains_frozen_during_downstream_tuning():
+    candidates=pipeline_candidates(256,{'BEAM_B_MICRO':'768'},tune_outer=False)
+    assert len(candidates)>10
+    assert all(env['BEAM_B_MICRO']=='768' for _,env in candidates)
+    assert not any(name.startswith('outer-') for name,_ in candidates)
+
+
 def test_128_rank_memory_intersection():
     row={'GLOBAL_BEAM_WIDTH_EFFECTIVE':268435456,'BEAM_WIDTH_ALIGNMENT':524288,
          'SHARD_COUNT':16,'B_MICRO':1024,'WORLD_SIZE':128,'STREAM4_BATCH_ALIGNMENT':256,
