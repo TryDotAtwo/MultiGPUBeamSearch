@@ -67,6 +67,10 @@ int main(int argc, char** argv) {
     auto oracle_states=model.output_dim==1?beam::stream1_libtorch::scalar_children(states,
         indices.data_ptr<std::uint8_t>(),beam::MOVE_COUNT,beam::STATE_LEN,beam::STATE_STORAGE_LEN):states;
     auto reference=oracle.forward(oracle_states).to(torch::kFloat32).reshape({batch,beam::MOVE_COUNT});
+    // Preserve the existing native scalar-child scoring convention. This is
+    // not part of the model forward pass and must be explicit in the receipt.
+    const float score_offset=model.output_dim==1?beam::STREAM1_SINGLE_OUTPUT_SCORE_OFFSET:0.f;
+    reference.add_(score_offset);
     if(!torch::isfinite(reference).all().item<bool>())throw std::runtime_error("nonfinite independent backbone oracle");
     auto expected=torch::round(torch::clamp(reference,0.,beam::SCORE_MAX_Q)*beam::SCORE_SCALE).to(torch::kInt32);
     auto error=(keys.to(torch::kInt64)-expected.to(torch::kInt64)).abs().max().item<std::int64_t>();
@@ -88,6 +92,7 @@ int main(int argc, char** argv) {
     std::cout<<nlohmann::json({{"batch",batch},{"parents",parents},{"device",device},
         {"seconds",seconds},{"correctness_passed",true},{"numeric_error",0},
         {"backbone_oracle_max_key_error",error},{"torch_reserved_peak_bytes",0},
+        {"native_scalar_score_offset",score_offset},
         {"model_count",1},{"executor","native_cutlass"},{"score_input","graph_states"}}).dump()<<std::endl;
     beam::stream1_weights::free_stream1_scratch(allocation);
     beam::stream1_weights::free_weights(weights);
