@@ -4394,13 +4394,14 @@ int run_production_runner(int argc, char** argv) {
     std::size_t free_before = 0;
     std::size_t total_before = 0;
     BEAM_CUDA_CHECK(cudaMemGetInfo(&free_before, &total_before));
-    if(!blend_dir.empty()) {
-        // Separate reserve for FP32 heads, ATen workspace, and the second stream.
-        const std::size_t blend_reserve=is_ensemble
+    if(!blend_dir.empty() || (use_libtorch_stream1_executor && env_present("BEAM_ENSEMBLE_RESERVE_BYTES"))) {
+        // Calibrated ATen/model reserve applies to ordinary LibTorch MLPs too.
+        const bool calibrated_torch=is_ensemble || blend_dir.empty();
+        const std::size_t blend_reserve=calibrated_torch
             ? env_u64("BEAM_ENSEMBLE_RESERVE_BYTES",4ULL*1024*1024*1024)
             : env_u64("BEAM_BENCHMARK_BLEND_RESERVE_BYTES",4ULL*1024*1024*1024);
         if(blend_reserve<(512ULL<<20) ||
-           (!is_ensemble && blend_reserve!=(4ULL<<30) && !env_present("BEAM_BENCHMARK_PLAN_ONLY") && !env_present("BEAM_BENCHMARK_FRONTIER_FILE")))
+           (!calibrated_torch && blend_reserve!=(4ULL<<30) && !env_present("BEAM_BENCHMARK_PLAN_ONLY") && !env_present("BEAM_BENCHMARK_FRONTIER_FILE")))
             throw std::runtime_error("calibrated blend reserve is benchmark-only and must be at least512MiB");
         if(free_before<=blend_reserve) throw std::runtime_error("insufficient blend GPU reserve");
         free_before-=blend_reserve;
