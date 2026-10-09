@@ -4494,7 +4494,8 @@ int run_production_runner(int argc, char** argv) {
         std::cout << "benchmark_plan_only=1 admitted_global_beam=" << plan.derived.global_beam_width_effective << "\n";
         return 0;
     }
-    if(!benchmark_frontier.empty() && (cli_depth_limit!=1 || repair_resident_mode || solve_bucket_mode || blend_dir.empty()))
+    const auto benchmark_repeats=env_u32("BEAM_BENCHMARK_FRONTIER_REPEATS",1);
+    if(!benchmark_frontier.empty() && (benchmark_repeats==0 || benchmark_repeats>16 || cli_depth_limit!=benchmark_repeats || repair_resident_mode || solve_bucket_mode || blend_dir.empty()))
         throw std::runtime_error("benchmark frontier requires one-depth blend profile without repair/solution collection");
     const ZobristTable host_zobrist = make_deterministic_zobrist(0xC0DEC0DEULL);
     std::vector<RepairTask> repair_tasks;
@@ -5082,6 +5083,19 @@ int run_production_runner(int argc, char** argv) {
     bool solve_bucket_found_any = false;
     std::uint32_t solve_bucket_first_found_depth_index = 0;
     for (std::uint32_t depth = 0; depth < depth_limit; ++depth) {
+        if(!benchmark_frontier.empty() && depth>0) {
+            // Repeat the exact admitted fixture outside the timed depth. Normal
+            // searches never enter this branch; native per-depth resets remain
+            // responsible for thresholds, buffers and service counters.
+            frontier_size=benchmark::load_frontier(benchmark_frontier,memory.current_frontier_states,
+                plan.frontier_states,stream1_model.num_classes);
+            if(world_size>1U) {
+                require_nccl(ncclAllReduce(stream1_scratch.transformer_numeric_error,
+                    stream1_scratch.transformer_numeric_error,1,ncclUint32,ncclMax,
+                    nccl_runtime.comm,streams.stream5),"calibration fixture ready barrier");
+                BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
+            }
+        }
         const std::uint32_t current_solution_depth = depth + 1U;
         BEAM_CUDA_CHECK(cudaMemcpy(
             memory.current_depth,

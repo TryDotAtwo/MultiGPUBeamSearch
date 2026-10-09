@@ -257,7 +257,7 @@ def microbatch_environment(contract, model, beam_width: int, world_size: int, *,
     logical_shard = ((beam_width + divisor - 1) // divisor) * alignment
     scaled_capacity = (logical_shard * 5 + 3) // 4
     shard_storage = ((scaled_capacity + alignment - 1) // alignment) * alignment
-    rows_per_parent = contract.move_count if model.manifest["output_dim"] == 1 and model.backend != "ensemble" else 1
+    rows_per_parent = contract.move_count if model.manifest["output_dim"] == 1 and getattr(model,"backend","mlp") != "ensemble" else 1
     default_parents = default_rows // rows_per_parent
     parents = min(default_parents, shard_storage // contract.move_count)
     row_budget = default_rows if parents == default_parents else parents * rows_per_parent
