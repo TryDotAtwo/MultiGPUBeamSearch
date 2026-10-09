@@ -1,0 +1,3 @@
+index, uuid, power.limit [W], power.default_limit [W], clocks_event_reasons.sw_power_cap
+0, GPU-057b5cc0-abef-fb4e-0981-96f183c1c91b, 100.00 W, 170.00 W, Active
+1, GPU-4699ae1e-c8f8-0f27-9fb1-95951cadabd8, 100.00 W, 170.00 W, Active

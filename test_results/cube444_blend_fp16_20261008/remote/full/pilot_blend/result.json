@@ -1,0 +1,13 @@
+{
+  "beam": 262144,
+  "only": false,
+  "exit_codes": [
+    0,
+    0
+  ],
+  "wall_seconds": 14.61334496398922,
+  "depth_seconds": [
+    8.92921,
+    8.9294
+  ]
+}

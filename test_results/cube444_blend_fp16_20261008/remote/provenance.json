@@ -1,0 +1,17 @@
+{
+  "binary_sha256": "bfb9c2364ad396082f293191505033c7d2668be02ef539198038aa97100a61e5",
+  "source_manifest_sha256": "a64249da5525d4129a5eeb0b66c9c25a1501b19f9cde41350e539b852bd0d944",
+  "source_files": 434,
+  "precision": "FP16 weights/activations; FP32 reductions/readout accumulator/blend",
+  "build_info": {
+    "schema_version": 1,
+    "state_len": 96,
+    "state_storage_len": 112,
+    "move_count": 24,
+    "candidate_meta_bytes": 32,
+    "debug_stream_timing": false,
+    "depth_logs_enabled": true,
+    "debug_enabled": true,
+    "cuda_architectures": "86"
+  }
+}

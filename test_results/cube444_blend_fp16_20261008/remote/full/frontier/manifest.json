@@ -1,0 +1,29 @@
+{
+  "format": "96 colors,3 bits little-endian per color,zero padding reconstructed to112 bytes",
+  "entries": [
+    {
+      "rank": 0,
+      "parents": 17465344,
+      "sha256": "73c3da226f1883ec38752dc17b2ce473b91fdbc0910793bc3d92a1b43623cdf4",
+      "bytes": 1956118528,
+      "seed": 2026100800,
+      "walk_length": 80,
+      "source": "prefix of original deterministic frontier",
+      "packed_file": "rank0.colors3.bin",
+      "packed_sha256": "83d57ef4e2af6da267abee98be40072af32d1531aa188450d8e4e7f4d18a0c3e",
+      "packed_bytes": 628752384
+    },
+    {
+      "rank": 1,
+      "parents": 17465344,
+      "sha256": "d5ab2749946856b97d87f7590d8735d92c4b2ba58fe041cf69cc58fecfd36e95",
+      "bytes": 1956118528,
+      "seed": 2026100801,
+      "walk_length": 80,
+      "source": "prefix of original deterministic frontier",
+      "packed_file": "rank1.colors3.bin",
+      "packed_sha256": "6d2e28b3d2800d14a3e0262278c615e7b6b5625b8f151fe5df539f63ac90d00f",
+      "packed_bytes": 628752384
+    }
+  ]
+}
