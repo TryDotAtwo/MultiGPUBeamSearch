@@ -826,4 +826,3 @@ RuntimeConfigBuild build_runtime_config_from_budget(
 }
 
 } // namespace beam
-
