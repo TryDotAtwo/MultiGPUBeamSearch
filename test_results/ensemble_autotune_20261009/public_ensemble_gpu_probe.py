@@ -10,7 +10,7 @@ from multigpubeamsearch import NativeEnsemble, NativeOptions, prepare_native, be
 
 root = Path('/workspace/results/public-ensemble-api')
 root.mkdir(exist_ok=False)
-graph = CayleyGraph(PermutationGroups.lrx(8), device='cuda:0', random_seed=20261009)
+graph = CayleyGraph(PermutationGroups.lrx(8), device='cuda', random_seed=20261009)
 options = NativeOptions(source_dir='/workspace/source', cutlass_dir='/workspace/cutlass',
     cache_dir=root/'cache', num_gpus=2, build_jobs=2, build_timeout_seconds=1800,
     timeout_seconds=900, calibration_seconds=120, calibration_max_batch=256,
