@@ -571,6 +571,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             if report.get('measurement_scope')=='matched_full_frontier':
                 print(f"[MultiGPUBeamSearch] {len(devices)} GPUs, frontier {report['parents']:,}, "
                     f"inference batch {calibration['parent_batch']}: best found Stream1 "
+                    f"{1/calibration['estimate']['median']:,.0f} parents/s; matched frontier Stream1 "
                     f"{report['stream1_parents_per_second']:,.0f} parents/s; full step "
                     f"{report['full_step_seconds']:.6f}s, throughput loss "
                     f"{100*report['throughput_loss_fraction']:.2f}%; calibration "

@@ -450,6 +450,10 @@ prepares legal unique states and runs five measured complete depths after a
 warmup, followed by matched Stream1 inference on those same files. The report
 distinguishes throughput loss from relative time overhead. Small finite graphs
 or an explicit preparation budget can prevent a full-frontier fixture.
+For effective frontiers up to 1,048,576, this full check also compares a proxy
+winner against the exact-frontier baseline and retains the baseline unless a
+stable material speedup is measured. Larger frontiers keep the bounded service
+selection; a full timing receipt certifies execution, not global optimality.
 
 `beam_width="max"` searches native memory admission across shard counts 1–128
 with two staging slots and one active sort slot. This is the largest admitted
