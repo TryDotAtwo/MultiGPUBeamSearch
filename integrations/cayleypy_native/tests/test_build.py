@@ -45,6 +45,14 @@ def test_cmake_dimensions_are_explicit_not_cached_inference(tmp_path):
     assert command[:2] == ["cmake", "-S"]
 
 
+def test_cutlass_ensemble_enables_libtorch_backbones(tmp_path):
+    command = configure_command(tmp_path, tmp_path / 'build', tmp_path / 'cutlass',
+        contract(8, 3), 'ensemble', (86,),
+        {'cmake': 'cmake', 'cxx': 'c++', 'nvcc': 'nvcc'}, inference_backend='cutlass')
+    assert '-DBEAM_ENABLE_LIBTORCH_STREAM1=ON' in command
+    assert any(value.startswith('-DCMAKE_PREFIX_PATH=') for value in command)
+
+
 def test_pip_nccl_versioned_library_is_selected_and_passed_to_cmake(monkeypatch, tmp_path):
     import cayleypy_native.build as build
     package = tmp_path / "site-packages" / "nvidia" / "nccl"
@@ -117,3 +125,4 @@ def test_build_prerequisites_do_not_download_missing_source(tmp_path):
     with pytest.raises(NativeUnavailable, match="source_dir"):
         prerequisites(NativeOptions(source_dir=tmp_path, cache_dir=tmp_path / "cache"))
     assert list(tmp_path.iterdir()) == []
+
