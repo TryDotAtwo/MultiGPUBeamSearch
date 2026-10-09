@@ -152,6 +152,8 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
     if type(radius) is not int or radius < 0:
         raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
     validate_touch_bfs_contract(contract, radius, options.touch_bfs_max_entries)
+    if model.backend in ("cube444_transformer", "cube444_mlp"):
+        raise NativeUnavailable("Cube444 heads require NativeEnsemble, including a single-head ensemble")
     # Stream1's scalar head has a separate kernel. The Q head uses unpadded
     # row-major CUTLASS GEMM with eight-element B/C/D access alignment.
     if options.inference_backend == "cutlass" and model.backend == "mlp" and model.manifest["output_dim"] != 1 and model.manifest["output_dim"] % 8:

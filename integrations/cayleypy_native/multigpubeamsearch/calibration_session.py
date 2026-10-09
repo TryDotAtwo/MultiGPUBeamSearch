@@ -74,6 +74,7 @@ class EnsembleProbePool:
         self.deadline=deadline;self.sessions={};self.starts=0
 
     def measure(self, batch, parents, deadline):
+        starting=[]
         for rank in range(self.world):
             if rank not in self.sessions:
                 self.starts+=1
@@ -81,9 +82,16 @@ class EnsembleProbePool:
                     str(self.parents),str(rank),'--session'],self.environment,
                     self.directory/f'session-{self.starts}-rank-{rank}.log',deadline=self.deadline)
                 self.sessions[rank]=session
+                starting.append((rank,session))
+        try:
+            for rank,session in starting:
                 ready=session.receive(deadline)
                 if ready.get('ready') is not True or ready.get('device')!=rank:
                     raise RuntimeError('inference rank did not acknowledge readiness')
+        except BaseException:
+            # No request is sent until every newly started rank is ready.
+            self.close()
+            raise
         for session in self.sessions.values():session.send(batch,parents)
         rows=[];failures=[]
         for rank in range(self.world):
@@ -108,3 +116,4 @@ class EnsembleProbePool:
             except Exception as error:
                 if failure is None:failure=error
         if failure is not None:raise failure
+

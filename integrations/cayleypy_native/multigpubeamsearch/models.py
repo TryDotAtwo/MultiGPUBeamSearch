@@ -220,6 +220,9 @@ def _load_unambiguous_manifest(manifest_path: Path) -> tuple[dict, bytes]:
 
 
 def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> PreparedModel:
+    if backend in ("cube444_transformer", "cube444_mlp"):
+        from .cube444_artifacts import validate_bundle
+        return validate_bundle(path, contract, backend)
     if backend != "mlp":
         raise NativeUnavailable(f"native model backend {backend!r} is not supported by this adapter")
     path = path.resolve()
@@ -696,11 +699,16 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
         directory = Path(run_dir).resolve() / "weights"
         directory.mkdir(parents=True, exist_ok=False)
         members = []
+        shared_artifacts = {}
         for i, (source, coefficient) in enumerate(zip(predictor.models, predictor.coefficients)):
             if isinstance(source, NativeEnsemble):
                 raise NativeUnavailable("flatten nested ensembles explicitly to preserve coefficient order")
             member = prepare_model(source, contract, options, directory / f"member-{i}")
             relative = member.weights_dir.relative_to(directory)
+            # Cube444 heads share one immutable bundle and one native model
+            # cache. Preserve the member family/coefficient, reuse its path.
+            if member.backend in ("cube444_transformer", "cube444_mlp"):
+                relative = shared_artifacts.setdefault(member.artifact_hash, relative)
             members.append({"family": member.backend, "weights_dir": relative.as_posix(),
                             "coefficient": coefficient, "artifact_hash": member.artifact_hash})
         manifest = {"schema_version": 1, "state_len": contract.state_len,
@@ -766,3 +774,4 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
         raise
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         raise NativeBackendError(f"native model export failed: {error}") from error
+
