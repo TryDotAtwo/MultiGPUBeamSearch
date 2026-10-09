@@ -547,7 +547,11 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             derived_candidates_per_slot=calibration['parent_batch']*contract.move_count)
     if maximum_requested:
         if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
-        from .maximum_beam import discover_capacity,refine_maximum
+        from .maximum_beam import capacity_seed,discover_capacity,refine_maximum
+        calibration=capacity_seed(calibration)
+        env.update(BEAM_B_MICRO=str(calibration['parent_batch']*rows_per_parent),
+            BEAM_ENSEMBLE_INFERENCE_MICRO=str(calibration['parent_batch']),
+            BEAM_ENSEMBLE_RESERVE_BYTES=str(calibration['reserve_bytes']))
         capacity=discover_capacity(contract,runtime,devices,env,runner,run_dir,
             seconds=min(60.0,options.calibration_pipeline_seconds*.25))
         def exact_inference(width,index):
@@ -668,3 +672,4 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     (run_dir / "native-outcome.json").write_text(json.dumps({"path": path, "elapsed_seconds": elapsed,
         "effective_beam_width": effective, "metadata": metadata}, indent=2) + "\n", encoding="utf-8")
     return NativeOutcome(path, elapsed, effective, run_dir, metadata)
+

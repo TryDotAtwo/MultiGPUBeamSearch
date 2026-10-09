@@ -9,6 +9,21 @@ from .beam_capacity import CapacityRejected,find_capacity
 from .plan_session import NativePlanSession
 
 
+def capacity_seed(calibration):
+    """Start width discovery with the smallest measured inference footprint.
+
+    This is a bootstrap, not the final performance profile. Exact-width
+    calibration and admission select the fastest feasible batch afterwards.
+    """
+    from .inference_admission import measured_candidates
+    candidates=measured_candidates(calibration)
+    if not candidates:raise CapacityRejected('no verified inference batch for maximum frontier')
+    seed=min(candidates,key=lambda row:(row['reserve_bytes'],row['parent_batch']))
+    return dict(calibration,**seed,capacity_bootstrap=dict(
+        objective='minimum measured reserve then parent batch',
+        unconstrained_batch=calibration['parent_batch']))
+
+
 def refine_maximum(initial_capacity,initial_inference,*,tune,discover,max_rounds=3):
     """Bootstrap an unknown width, then bind inference to its exact width.
 
@@ -76,3 +91,4 @@ def discover_capacity(contract,runtime,devices,environment,runner,run_dir,*,seco
         capacity_scope='native memory admission; full-step verification pending',rejected=rejections)
     (Path(run_dir)/'maximum-beam.json').write_text(json.dumps(data,indent=2))
     return data
+
