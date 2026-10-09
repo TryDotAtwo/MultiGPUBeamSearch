@@ -99,3 +99,15 @@ No newly recovered result files were downloaded onto Windows.
 GitHub connected-app access supports write; HF connected app currently
 has read-only scopes. Binary archive remains unverified/unpublished; disks
 must not be destroyed until its backup is verified.
+
+
+## Archive verification limitation
+
+Recovered finalize log confirms archive_remote.py failed at the binary SHA256
+comparison against provenance.json. The final tar.gz was not created.
+The cause of the changed executable is not yet established. Thus the logs
+record successful runs and a frozen source snapshot, but the measured executable
+is not yet backed up with verified identity. Both task-owned machines are
+stopped and retained; archives_verified remains false. No deletion or HF upload
+is claimed. GitHub archive commit c82649f2d11bdfb2937bc3a0c0435999c302eb2a
+contains 434 frozen source files, 37 remote result/log files and validation tools.
