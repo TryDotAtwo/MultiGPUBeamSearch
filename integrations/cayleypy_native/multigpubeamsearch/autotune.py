@@ -57,6 +57,10 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     memory; a calibration record never bypasses that admission.
     """
     from .backend import _stop_process_tree
+    helper=runtime.runner.parent/'stream1_ensemble_benchmark'
+    if not helper.is_file() or file_sha256(helper)!=runtime.build_metadata.get('calibration_binary_sha256'):
+        raise NativeBackendError('verified Stream1 calibration executable is required for ensemble autotuning')
+    verify_prepared_model(model,contract)
     signature=calibration_signature(contract,model,runtime,devices,beam_width)
     signature['max_batch']=options.calibration_max_batch
     key=hashlib.sha256(json.dumps(signature,sort_keys=True).encode()).hexdigest()
@@ -64,15 +68,9 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     if cache.is_file():
         try:
             data=json.loads(cache.read_text())
-            if (data.get('signature')==signature and data.get('phase')=='inference_verified'
-                    and type(data.get('parent_batch')) is int and 0<data['parent_batch']<=options.calibration_max_batch
-                    and type(data.get('reserve_bytes')) is int and data['reserve_bytes']>0):
+            if valid_cached_profile(data,signature,options.calibration_max_batch):
                 return dict(data,cache_hit=True)
         except (OSError,ValueError):pass
-    helper=runtime.runner.parent/'stream1_ensemble_benchmark'
-    if not helper.is_file() or file_sha256(helper)!=runtime.build_metadata.get('calibration_binary_sha256'):
-        raise NativeBackendError('verified Stream1 calibration executable is required for ensemble autotuning')
-    verify_prepared_model(model,contract)
     directory=Path(run_dir)/'calibration';directory.mkdir(exist_ok=False)
     probe_dir=directory/'inputs';probe_dir.mkdir()
     manifest=dict(model.manifest['ensemble'])
@@ -137,4 +135,29 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     temporary=cache.with_name(cache.name+'.'+str(os.getpid())+'.tmp')
     temporary.write_text(json.dumps(data,indent=2));temporary.replace(cache)
     return data
+
+
+def valid_cached_profile(data, signature, max_batch):
+    """A batch value without all-rank measurement evidence is not a profile."""
+    try:
+        batch=data['parent_batch']
+        if (data.get('signature')!=signature or data.get('phase')!='inference_verified'
+                or type(batch) is not int or not 0<batch<=max_batch
+                or type(data.get('reserve_bytes')) is not int or data['reserve_bytes']<=0):
+            return False
+        rows=[row for row in data['records'] if row['batch']==batch]
+        world=signature['world_size']
+        if len(rows)!=world or {row['device'] for row in rows}!=set(range(world)):
+            return False
+        parents={row['parents'] for row in rows}
+        if len(parents)!=1 or any(type(n) is not int or n<=0 for n in parents):return False
+        for row in rows:
+            if row.get('correctness_passed') is not True or row.get('numeric_error')!=0:
+                return False
+            if len(row['seconds'])<5 or any(not math.isfinite(x) or x<=0 for x in row['seconds']):
+                return False
+        expected_reserve=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
+        return data['reserve_bytes']==expected_reserve
+    except (KeyError,TypeError,ValueError):
+        return False
 
