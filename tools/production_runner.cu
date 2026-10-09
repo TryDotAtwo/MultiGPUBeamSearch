@@ -4406,6 +4406,56 @@ int run_production_runner(int argc, char** argv) {
         if(free_before<=blend_reserve) throw std::runtime_error("insufficient blend GPU reserve");
         free_before-=blend_reserve;
     }
+    if(env_bool("BEAM_CALIBRATION_PLAN_SESSION",false)) {
+        // One context/NCCL owner and one model manifest for all capacity queries.
+        // This service only queries exact native/CUB layouts; no frontier is run.
+        const std::vector<std::string> allowed={"BEAM_B_MICRO","BEAM_STREAM3_RING_SLOTS",
+            "BEAM_SHARD_COUNT","BEAM_STREAM4_BATCH_CANDIDATES","BEAM_STREAM4_ACTIVE_SORT_SLOTS"};
+        std::map<std::string,std::string> original;
+        for(const auto& key:allowed) if(const char* value=std::getenv(key.c_str())) original[key]=value;
+        std::cout<<nlohmann::json({{"ready",true},{"rank",rank},{"free_bytes_snapshot",free_before}}).dump()<<std::endl;
+        std::string line;
+        while(std::getline(std::cin,line)) {
+            const auto request=nlohmann::json::parse(line);
+            if(request.value("stop",false)) break;
+            for(const auto& key:allowed) {
+                const auto found=original.find(key);
+                if(found==original.end()) unsetenv(key.c_str());
+                else setenv(key.c_str(),found->second.c_str(),1);
+            }
+            const auto overrides=request.value("environment",nlohmann::json::object());
+            for(auto item=overrides.begin();item!=overrides.end();++item) {
+                if(std::find(allowed.begin(),allowed.end(),item.key())==allowed.end())
+                    throw std::runtime_error("plan session cannot change semantic/capacity policy");
+                const auto value=item.value().get<std::string>();
+                parse_u64(value.c_str(),item.key().c_str());
+                setenv(item.key().c_str(),value.c_str(),1);
+            }
+            const auto requested=request.at("beam").get<std::uint64_t>();
+            try {
+                const auto build=build_runtime_config_from_budget(requested,world_size,rank,stream1_model,free_before);
+                const auto& c=build.config;const auto& p=build.plan;
+                std::cout<<nlohmann::json({{"admitted",true},{"plan",{
+                    {"GLOBAL_BEAM_WIDTH_EFFECTIVE",p.derived.global_beam_width_effective},
+                    {"BEAM_WIDTH_ALIGNMENT",p.derived.beam_width_alignment},
+                    {"WORLD_SIZE",c.world_size},{"LOCAL_RANK",c.local_rank},
+                    {"B_MICRO",c.b_micro},{"SHARD_COUNT",c.shard_count},
+                    {"STREAM4_BATCH_ALIGNMENT",c.stream4_batch_alignment},
+                    {"STREAM3_RING_SLOTS",build.stream3_ring_slots},{"RING_COUNT",c.ring_count},
+                    {"STREAM4_ACTIVE_SORT_SLOTS",c.stream4_active_sort_slots},
+                    {"STREAM4_BATCH_CANDIDATES",c.stream4_batch_candidates},
+                    {"SHARD_CAPACITY_CANDIDATES",c.shard_capacity_candidates},
+                    {"frontier_state_capacity",p.frontier_states},
+                    {"estimated_required_device_bytes",build.estimated_required_device_bytes},
+                    {"gpu_budget_bytes",build.gpu_budget_bytes}}}}).dump()<<std::endl;
+            } catch(const std::runtime_error& error) {
+                const std::string message=error.what();
+                if(message.rfind("no runtime config fits GPU/final-layout budget:",0)!=0) throw;
+                std::cout<<nlohmann::json({{"admitted",false},{"capacity_rejected",true},{"reason",message}}).dump()<<std::endl;
+            }
+        }
+        return 0;
+    }
     const RuntimeConfigBuild config_build =
         build_runtime_config_from_budget(beam, world_size, rank, stream1_model, free_before);
     const RuntimeConfig config = config_build.config;

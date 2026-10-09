@@ -47,9 +47,12 @@ class InferenceSession:
         return row
 
     def send(self, batch, parents):
+        self.send_request({'batch':batch,'parents':parents})
+
+    def send_request(self, request):
         if self.process.poll() is not None:
             raise RuntimeError('inference session is no longer running')
-        self.process.stdin.write(json.dumps({'batch':batch,'parents':parents})+'\n')
+        self.process.stdin.write(json.dumps(request)+'\n')
         self.process.stdin.flush()
 
     def close(self):
