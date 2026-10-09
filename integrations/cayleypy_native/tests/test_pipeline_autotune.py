@@ -61,6 +61,39 @@ def test_exact_measurement_preserves_requested_beam_and_inference(tmp_path, monk
     assert [beam for beam, _ in calls] == [1000000]*4
 
 
+def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch):
+    from multigpubeamsearch.calibration_stats import Measurement
+    from multigpubeamsearch import component_autotune,beam_geometry
+    plan=dict(frontier_state_capacity=512,GLOBAL_BEAM_WIDTH_EFFECTIVE=1024,
+        SHARD_COUNT=4,STREAM3_RING_SLOTS=2,STREAM4_ACTIVE_SORT_SLOTS=1,
+        STREAM4_BATCH_CANDIDATES=1024,STREAM4_BATCH_ALIGNMENT=1024,gpu_budget_bytes=10**9)
+    class Probe:
+        def __init__(self,*args,**kwargs):pass
+        def admit(self,env):return [plan]*2
+        def measure(self,env,plans):
+            seconds=.01 if env.get('marker')=='base' else .03
+            return [Measurement('unused',1024,(seconds,seconds),True,True)]*5
+    def components(probe,session,plans,baseline,candidates,**kwargs):
+        base=dict(baseline,marker='base');candidate=dict(baseline,marker='candidate')
+        return dict(selection='candidate',environment=candidate,
+            tested=[dict(name='baseline',plans=plans,environment=base),
+                    dict(name='candidate',plans=plans,environment=candidate)])
+    monkeypatch.setattr(module,'NativePipelineProbe',Probe)
+    monkeypatch.setattr(module,'verify_prepared_model',lambda *a:None)
+    monkeypatch.setattr(module,'write_frontiers',lambda *a,**kw:{'legal':True})
+    monkeypatch.setattr(component_autotune,'tune_components',components)
+    monkeypatch.setattr(beam_geometry,'memory_shortlist',lambda *a,**kw:[])
+    result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
+        SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
+        SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=True,
+            calibration_frontier_max_states=None,calibration_max_batch=256),[0,1],1024,tmp_path,{},'runner',
+        {'parent_batch':256,'phase':'inference_verified'})
+    assert result['selection']=='baseline-full-verified'
+    assert result['environment']['marker']=='base'
+    assert result['estimate']['profile']=='baseline'
+    assert len(result['full_comparison_measurements'])==10
+
+
 def test_real_beam_admission_failure_cannot_be_hidden_by_small_fixture(tmp_path, monkeypatch):
     calls = setup_probe(monkeypatch, fail_actual=True)
     with pytest.raises(NativeBackendError, match='requested beam'):

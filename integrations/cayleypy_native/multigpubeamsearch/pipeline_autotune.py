@@ -94,10 +94,27 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 storage,directory/'frontiers',deadline=deadline,
                 max_states=options.calibration_frontier_max_states or final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
             samples=[replace(r,profile='selected') for r in actual.measure(data['environment'],final_plans)]
+            # Component envelopes omit graph-dependent rejection and pressure.
+            # On inexpensive exact frontiers, verify the proxy winner against
+            # the baseline rather than certifying a known avoidable slowdown.
+            full_comparison=[]
+            if data['selection']!='baseline' and final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']<=1048576:
+                from .calibration_stats import select
+                base=next(r for r in data['tested'] if r['name']=='baseline')
+                if base['plans'][0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']!=final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']:
+                    raise NativeBackendError('full comparison changed exact frontier')
+                baseline_samples=[replace(r,profile='baseline') for r in actual.measure(base['environment'],base['plans'])]
+                winner,rejections=select(baseline_samples+samples,baseline='baseline',min_improvement=.02)
+                full_comparison=[r.__dict__ for r in baseline_samples+samples]
+                data['full_comparison_rejections']=rejections
+                if winner.profile=='baseline':
+                    data.update(environment=base['environment'],selection='baseline-full-verified')
+                    final_plans=base['plans'];samples=baseline_samples
             data.update(phase='pipeline_measured',pipeline_verified=True,fixture=receipt,
                 measurement_scope='full_requested_frontier',
-                estimate=estimate('selected',samples).__dict__,
+                estimate=estimate(samples[0].profile,samples).__dict__,
                 measurements=[r.__dict__ for r in samples])
+            if full_comparison:data['full_comparison_measurements']=full_comparison
             if runtime.build_metadata.get('calibration_protocol')=='json-session-v1':
                 from .matched_probe import measure_matched
                 data['matched_stream1']=measure_matched(contract,model,runtime,probe_env,
