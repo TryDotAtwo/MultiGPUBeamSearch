@@ -69,3 +69,20 @@ def test_missing_rank_measurement_is_rejected():
             measure=lambda env,plans:[Measurement('',8192,(1.0,),True,True)]*5,
             deadline=time.monotonic()+60)
 
+
+def test_128_rank_cohort_distinguishes_communicator_and_device_ordinals():
+    row={'GLOBAL_BEAM_WIDTH_EFFECTIVE':268435456,'BEAM_WIDTH_ALIGNMENT':524288,
+         'SHARD_COUNT':16,'B_MICRO':1024,'WORLD_SIZE':128,'STREAM4_BATCH_ALIGNMENT':256,
+         'estimated_required_device_bytes':10,'gpu_budget_bytes':11}
+    plans=[dict(row,LOCAL_RANK=rank,CUDA_DEVICE_LOCAL_RANK=rank%8) for rank in range(128)]
+    assert validate_rank_plans(plans)
+    plans[-1]['LOCAL_RANK']=0
+    with pytest.raises(ValueError,match='communicator rank'):validate_rank_plans(plans)
+
+
+def test_negative_memory_estimate_is_not_admission():
+    row={'GLOBAL_BEAM_WIDTH_EFFECTIVE':8192,'BEAM_WIDTH_ALIGNMENT':1024,
+         'SHARD_COUNT':4,'B_MICRO':32,'WORLD_SIZE':1,'STREAM4_BATCH_ALIGNMENT':1024,
+         'estimated_required_device_bytes':-1,'gpu_budget_bytes':11}
+    with pytest.raises(ValueError,match='values'):validate_rank_plans([row])
+
