@@ -104,4 +104,3 @@ void stream1_ensemble_head_fp16_cuda(const __half*,const __half*,const float*,fl
 }
 }
 #endif
-
