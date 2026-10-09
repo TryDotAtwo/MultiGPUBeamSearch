@@ -469,6 +469,11 @@ its preparation and repeated full steps are included in the reported total
 calibration duration. The default component calibration does not generate those
 large frontier files. Small beams need not benefit from more GPUs: dispatch,
 collectives and final selection can dominate a very fast inference pass.
+The globally selected next frontier must be known before its states can be
+materialized. This end-of-depth tail cannot all overlap inference of the same
+depth. A communication stage slower than Stream1 also cannot be hidden merely
+by allocating more rings. Diagnose the actual topology and full-depth trace
+before attributing a large matched gap to the inference batch.
 For effective frontiers up to 1,048,576, this full check also compares a proxy
 winner against the exact-frontier baseline and retains the baseline unless a
 stable material speedup is measured. Larger frontiers keep the bounded service
