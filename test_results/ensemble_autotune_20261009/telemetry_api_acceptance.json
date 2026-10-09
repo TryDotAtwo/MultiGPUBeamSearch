@@ -1,0 +1,32 @@
+{
+  "source_commit": "0287571d087285ae8616ab7b7ded31731834a6da",
+  "result": "264 passed, 5 skipped in 15.19s",
+  "scope": "Python regressions including sampled throttling gates; no GPU public-hook acceptance claimed",
+  "gpu_observation": {
+    "temperatures": [
+      72,
+      67
+    ],
+    "thermal_events": [
+      "Not Active",
+      "Not Active"
+    ],
+    "external_power_brake": [
+      "Not Active",
+      "Not Active"
+    ],
+    "scope": "one observation, not whole-sweep telemetry"
+  },
+  "random_readout": {
+    "source_commit": "2f69e4b0e4e5c532211b460dd42d73be2ffa8fe8",
+    "compiled": true,
+    "acceptance_pending": true,
+    "wait_session": 70967
+  },
+  "pipeline_sweep": {
+    "pid": 4287,
+    "observed_live": true,
+    "elapsed": "23:10",
+    "latest_run": 14
+  }
+}
