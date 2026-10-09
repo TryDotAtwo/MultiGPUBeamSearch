@@ -619,6 +619,16 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
                 if hasattr(failure, "add_note"):
                     failure.add_note(f"native worker log collection also failed: {log_error}")
     path, effective, terminal_metadata = parse_terminal(log, contract, max_steps=max_steps)
+    if calibrate and effective is not None:
+        from .runtime_report import observed_depths
+        reports=observed_depths(log.read_text(errors='replace'),len(devices),effective,
+            calibration['estimate']['median'])
+        runtime.profile['observed_saturated_depths']=reports
+        if reports and options.report_calibration:
+            row=reports[0]
+            print(f"[MultiGPUBeamSearch] observed full step {row['full_step_seconds']:.6f}s; "
+                  f"throughput loss versus Stream1 curve {100*row['throughput_loss_fraction']:.2f}% "
+                  f"(normalized reference)",flush=True)
     if effective is not None and effective < beam_width:
         raise NativeBackendError("observed effective global beam is smaller than requested")
     metadata = {"build": build_metadata, "profile": runtime.profile, "model_artifact_hash": model.artifact_hash,
