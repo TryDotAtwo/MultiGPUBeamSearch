@@ -280,7 +280,8 @@ def test_timeout_kills_descendant_process(tmp_path):
     assert not marker.exists()
 
 
-def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(monkeypatch, tmp_path):
+@pytest.mark.parametrize('model_backend', ['mlp', 'ensemble'])
+def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(monkeypatch, tmp_path, model_backend):
     import torch
     import cayleypy_native.backend as backend
     import cayleypy_native.build as build
@@ -288,6 +289,9 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         replay=lambda path: tuple(path) == (1,),
         to_puzzle_info=lambda: {"central_state": [0, 1], "generators": {"m0": [0, 1], "m1": [1, 0]}})
     model = SimpleNamespace(weights_dir=tmp_path / "weights", backend="mlp", artifact_hash="model", manifest={"dtype": "fp16", "output_dim": 1})
+    model.backend = model_backend
+    if model_backend == 'ensemble':
+        model.manifest['ensemble'] = {'models': [{'weights_dir': 'member'}]}
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (7, 5))
     nccl_dir = tmp_path / "test-only-nccl"
     nccl_dir.mkdir()
@@ -320,13 +324,16 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     # its own artifact-backed regression test below.
     monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12, touch_bfs_max_entries=12345)
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12, touch_bfs_max_entries=12345, autotune=False)
     outcome = backend.run_native(contract, model, options, 1000, 4, tmp_path / "run", (0,))
     assert outcome.path == (1,)
     assert (tmp_path / "run/test.csv").read_text() == 'initial_state_id,initial_state\n0,"1,0"\n'
     assert list(json.loads((tmp_path / "run/puzzle_info.json").read_text())["generators"]) == ["m0", "m1"]
     assert observed["command"][-5:] == ["0", "1", "1000", "1", "0"]
     assert observed["env"]["BEAM_RUNTIME_CONFIG_MODE"] == "auto"
+    if model_backend == 'ensemble':
+        assert observed['env']['BEAM_STREAM1_EXECUTOR'] == 'libtorch_eager'
+        assert observed['env']['BEAM_BLEND_DIR'] == str(model.weights_dir)
     assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_RADIUS"] == "3"
     assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES"] == "12345"
     assert outcome.metadata["requested_max_steps"] == 4
@@ -540,3 +547,4 @@ def test_rank_log_collection_does_not_follow_stream_symlink(tmp_path):
     with pytest.raises(NativeBackendError, match="unsafe rank stream"):
         collect_worker_logs(root, launcher, combined, 2, strict=True)
     assert "UNRELATED_LOG_MUST_NOT_BE_READ" not in combined.read_text()
+
