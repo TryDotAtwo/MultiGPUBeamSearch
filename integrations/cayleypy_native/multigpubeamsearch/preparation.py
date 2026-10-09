@@ -73,6 +73,8 @@ def prepare_native(graph, predictor=None, *, native_options=None, fallback=None)
         binary_dir.mkdir()
         runner = binary_dir / runtime.runner.name
         shutil.copy2(runtime.runner, runner)
+        if "calibration_binary_sha256" in runtime.build_metadata:
+            shutil.copy2(runtime.runner.parent / "stream1_ensemble_benchmark",binary_dir / "stream1_ensemble_benchmark")
         _write_json(binary_dir / "native-build.json", runtime.build_metadata)
         verified = validate_runner(runner, contract, model.backend, runtime.architectures)
         prepared_options = replace(options, runner_path=runner, source_dir=None, cutlass_dir=None,

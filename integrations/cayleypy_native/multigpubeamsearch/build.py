@@ -159,6 +159,10 @@ def validate_runner(runner: Path, contract, backend: str, architectures: tuple[i
         raise NativeUnavailable(f"native runner is not executable: {runner}")
     if metadata.get("binary_sha256") != file_sha256(runner):
         raise NativeBackendError("native runner SHA256 differs from native-build.json")
+    if "calibration_binary_sha256" in metadata:
+        helper=runner.parent / "stream1_ensemble_benchmark"
+        if not helper.is_file() or metadata["calibration_binary_sha256"] != file_sha256(helper):
+            raise NativeBackendError("native calibration executable changed or is missing")
     return metadata
 
 
@@ -233,7 +237,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         run_process(configure_command(source, build_dir, cutlass, contract, model.backend, architectures, programs, nccl=nccl,
                                      inference_backend=options.inference_backend),
                     cwd=run_dir, env=env, timeout=options.build_timeout_seconds, log_path=run_dir / "cmake-configure.log")
-        run_process([programs["cmake"], "--build", str(build_dir), "--target", target,
+        targets=[target]+(["stream1_ensemble_benchmark"] if model.backend == "ensemble" else [])
+        run_process([programs["cmake"], "--build", str(build_dir), "--target", *targets,
                      "--parallel", str(options.build_jobs)], cwd=run_dir, env=env,
                     timeout=options.build_timeout_seconds, log_path=run_dir / "cmake-build.log")
         if specification["source_digest"] != source_digest(source) or specification["cutlass_digest"] != source_digest(cutlass, cutlass=True):
@@ -247,6 +252,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         if not runner.is_file():
             raise NativeBackendError("native build completed without producing the requested executable")
         metadata = dict(specification, build_key=key, binary_sha256=file_sha256(runner))
+        if model.backend == "ensemble":
+            metadata["calibration_binary_sha256"]=file_sha256(build_dir / "stream1_ensemble_benchmark")
         temporary = build_dir / "native-build.json.tmp"
         temporary.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         temporary.replace(build_dir / "native-build.json")

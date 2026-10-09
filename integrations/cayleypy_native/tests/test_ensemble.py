@@ -28,7 +28,7 @@ def test_arbitrary_members_and_private_snapshot(tmp_path):
     copied=prepare_model(pinned,graph,NativeOptions(),tmp_path/'copied')
     assert copied.artifact_hash==prepared.artifact_hash
     member=copied.weights_dir/'member-0'/'weights'/'output_bias.fp16'
-    member.write_bytes(b'\x00\x00')
+    member.write_bytes(b'\x00\x3c')
     with pytest.raises(NativeBackendError):verify_prepared_model(copied,graph)
     verify_prepared_model(prepared,graph)
 

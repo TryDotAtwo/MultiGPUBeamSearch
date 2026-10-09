@@ -21,6 +21,9 @@ class NativeOptions:
     touch_bfs_max_entries: int = 1_048_576
     build_jobs: int = 2
     warn_on_fallback: bool = True
+    autotune: bool = True
+    calibration_seconds: float = 180.0
+    calibration_max_batch: int = 8192
 
     def __post_init__(self):
         if self.inference_backend not in ("auto", "libtorch", "cutlass"):
@@ -39,10 +42,14 @@ class NativeOptions:
                 raise ValueError("devices must be a nonempty sequence of distinct nonnegative CUDA indices")
             object.__setattr__(self, "devices", values)
         import math
-        for name in ("timeout_seconds", "build_timeout_seconds"):
+        for name in ("timeout_seconds", "build_timeout_seconds", "calibration_seconds"):
             value = getattr(self, name)
             if isinstance(value, bool) or not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
+        if type(self.autotune) is not bool:
+            raise ValueError("autotune must be boolean")
+        if type(self.calibration_max_batch) is not int or not 1 <= self.calibration_max_batch <= 65536:
+            raise ValueError("calibration_max_batch must be in [1, 65536]")
         if type(self.touch_bfs_radius) is not int or not 0 <= self.touch_bfs_radius <= 12:
             raise ValueError("touch_bfs_radius must be an integer in [0, 12]")
         if (type(self.touch_bfs_max_entries) is not int

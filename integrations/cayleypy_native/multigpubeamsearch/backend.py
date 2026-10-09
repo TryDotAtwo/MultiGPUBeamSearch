@@ -494,6 +494,17 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),
         row_limit=runtime.profile.get("inference_row_limit", 8192))
     env.update(microbatch_env)
+    if model.backend == "ensemble" and options.autotune:
+        from .autotune import tune_inference
+        calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env)
+        # Native admission may reject this microbatch under the current beam
+        # footprint. Never silently shrink the winner or the requested beam.
+        env["BEAM_B_MICRO"]=str(calibration["parent_batch"])
+        env["BEAM_ENSEMBLE_RESERVE_BYTES"]=str(calibration["reserve_bytes"])
+        runtime.profile.update({"autotuned":True,"inference_calibration":calibration,
+                                "pipeline_autotuned":False})
+        microbatch_metadata.update({"configured_row_budget":calibration["parent_batch"],
+                                    "derived_parent_batch":calibration["parent_batch"]})
     search_budget = {"requested_max_steps": max_steps, "native_forward_depth_limit": forward_depth_limit,
                      "configured_touch_bfs_radius": options.touch_bfs_radius,
                      "effective_touch_bfs_radius": effective_touch_bfs_radius,
