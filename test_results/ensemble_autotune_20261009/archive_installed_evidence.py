@@ -30,15 +30,19 @@ records={p.relative_to(root).as_posix():dict(bytes=p.stat().st_size,
 manifest=root/'installed-wheel-evidence-manifest.json'
 manifest.write_text(json.dumps(records,indent=2))
 archive=root/'installed-wheel-evidence.tar.gz'
+unique={}
+for p in sorted(files):unique.setdefault(records[p.relative_to(root).as_posix()]['sha256'],p)
 with tarfile.open(archive,'w:gz') as tar:
-    for p in sorted(files):tar.add(p,arcname=p.relative_to(root).as_posix(),recursive=False)
+    # Every logical file is retained in the manifest. Store identical bytes once.
+    for digest,p in sorted(unique.items()):tar.add(p,arcname='blobs/'+digest,recursive=False)
     tar.add(manifest,arcname=manifest.name,recursive=False)
 with tarfile.open(archive,'r:gz') as tar:
-    assert len(tar.getmembers())==len(records)+1
+    assert len(tar.getmembers())==len(unique)+1
     for name,row in records.items():
-        content=tar.extractfile(name).read()
+        content=tar.extractfile('blobs/'+row['sha256']).read()
         assert len(content)==row['bytes'] and hashlib.sha256(content).hexdigest()==row['sha256']
 summary=dict(archive=str(archive),bytes=archive.stat().st_size,
-    sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),files=len(records),members_verified=True)
+    sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),files=len(records),
+    unique_blobs=len(unique),format='manifest-content-addressed-tar-v1',members_verified=True)
 (root/'installed-wheel-archive-receipt.json').write_text(json.dumps(summary,indent=2))
 print(json.dumps(summary))
