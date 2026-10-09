@@ -500,8 +500,9 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         # Native admission may reject this microbatch under the current beam
         # footprint. Never silently shrink the winner or the requested beam.
         env["BEAM_B_MICRO"]=str(calibration["parent_batch"])
+        env["BEAM_ENSEMBLE_INFERENCE_MICRO"]=str(calibration["parent_batch"])
         env["BEAM_ENSEMBLE_RESERVE_BYTES"]=str(calibration["reserve_bytes"])
-        runtime.profile.update({"autotuned":True,"inference_calibration":calibration,
+        runtime.profile.update({"autotuned":False,"inference_autotuned":True,"inference_calibration":calibration,
                                 "pipeline_autotuned":False})
         microbatch_metadata.update({"configured_row_budget":calibration["parent_batch"],
                                     "derived_parent_batch":calibration["parent_batch"]})

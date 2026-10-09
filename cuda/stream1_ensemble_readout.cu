@@ -70,10 +70,10 @@ void stream1_ensemble_head_fp16_cuda(const __half* a,const __half* w,const float
         cutlass::arch::OpMultiplyAdd>;
     using GemmScalar=cutlass::gemm::device::GemmUniversalWithBroadcast<
         cutlass::half_t,cutlass::layout::RowMajor,cutlass::half_t,cutlass::layout::RowMajor,
-        float,cutlass::layout::RowMajor,float,cutlass::arch::OpClassTensorOp,
-        cutlass::arch::Sm80,cutlass::gemm::GemmShape<128,32,32>,
-        cutlass::gemm::GemmShape<64,32,32>,cutlass::gemm::GemmShape<16,8,16>,EnsembleReadout,
-        cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>,3,8,1,
+        float,cutlass::layout::RowMajor,float,cutlass::arch::OpClassSimt,
+        cutlass::arch::Sm50,cutlass::gemm::GemmShape<128,32,8>,
+        cutlass::gemm::GemmShape<32,32,8>,cutlass::gemm::GemmShape<1,1,1>,EnsembleReadout,
+        cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>,2,1,1,
         cutlass::arch::OpMultiplyAdd>;
     auto destination=finalize?static_cast<void*>(keys):static_cast<void*>(accumulator);
     auto launch=[&](auto gemm) {

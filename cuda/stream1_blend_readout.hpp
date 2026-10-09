@@ -6,8 +6,9 @@
 namespace beam {
 // Arbitrary-length ensemble: call once per head in stable manifest order on
 // the same stream. First call uses initialize=true; only last call emits keys.
-// A[rows,hidden], W[hidden,outputs] must be contiguous FP16 and aligned for
-// Tensor Core loads. FP32 accumulator is shared by all heads, never quantized
+// A[rows,hidden], W[hidden,outputs] are contiguous FP16. Aligned Q heads use
+// Tensor Cores; scalar/unaligned heads use a CUTLASS SIMT readout. FP32 accumulator
+// is shared by all heads, never quantized
 // between heads. The caller owns lifetime and cross-stream producer events.
 void stream1_ensemble_head_fp16_cuda(const __half* activations, const __half* weight,
     const float* bias, float* accumulator, std::uint32_t* keys,

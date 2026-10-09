@@ -27,6 +27,7 @@ struct NativeEnsemble {
     struct Workspace {torch::Tensor sum,keys;};
     std::vector<Workspace> workspaces;
     bool use_cutlass=true;
+    std::uint32_t inference_micro=0,max_parents=0;
     torch::Device device;
     std::uint32_t state_len,output_dim,padded_output;
     NativeEnsemble(const fs::path& directory,const torch::Device& target,
@@ -80,14 +81,29 @@ struct NativeEnsemble {
             heads.push_back(std::move(head));
         }
         if(!max_batch||!lanes) throw std::runtime_error("ensemble batch and lanes must be positive");
+        max_parents=max_batch;
+        inference_micro=max_batch;
+        if(const char* value=std::getenv("BEAM_ENSEMBLE_INFERENCE_MICRO")) {
+            auto parsed=std::stoul(value);
+            if(!parsed||parsed>UINT32_MAX) throw std::runtime_error("invalid ensemble inference microbatch");
+            inference_micro=std::min<std::uint32_t>(parsed,max_batch);
+        }
         auto options=torch::TensorOptions().device(device).dtype(torch::kFloat32);
         for(std::uint32_t i=0;i<lanes;++i) workspaces.push_back({
-            torch::empty({max_batch,padded_output},options),
-            torch::empty({max_batch,padded_output},options.dtype(torch::kInt32))});
+            torch::empty({inference_micro,padded_output},options),
+            torch::empty({inference_micro,padded_output},options.dtype(torch::kInt32))});
         if(cudaDeviceSynchronize()!=cudaSuccess) throw std::runtime_error("ensemble startup synchronization failed");
     }
     void score(const torch::Tensor& states,std::uint32_t* destination,std::uint32_t* error,
                cudaStream_t stream,std::uint32_t lane=0,const std::uint8_t* generators=nullptr) const {
+        if(states.size(0)>max_parents) throw std::runtime_error("ensemble outer slot exceeds admitted parent capacity");
+        for(std::int64_t offset=0;offset<states.size(0);offset+=inference_micro) {
+            auto count=std::min<std::int64_t>(inference_micro,states.size(0)-offset);
+            score_chunk(states.narrow(0,offset,count),destination+offset*output_dim,error,stream,lane,generators);
+        }
+    }
+    void score_chunk(const torch::Tensor& states,std::uint32_t* destination,std::uint32_t* error,
+               cudaStream_t stream,std::uint32_t lane,const std::uint8_t* generators) const {
         auto rows=states.size(0);
         if(lane>=workspaces.size()||rows>workspaces[lane].sum.size(0))
             throw std::runtime_error("ensemble score exceeds preallocated lane workspace");
