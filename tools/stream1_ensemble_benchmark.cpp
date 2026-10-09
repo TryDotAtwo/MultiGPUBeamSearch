@@ -45,8 +45,19 @@ int main(int argc,char** argv) {
         generators=torch::from_blob(host.data(),{beam::MOVE_COUNT,beam::STATE_STORAGE_LEN},states.options().device(torch::kCPU)).to(states.device());
     }
     const auto* generator_ptr=generators.defined()?generators.data_ptr<std::uint8_t>():nullptr;
-    auto run=[&](unsigned count) {
-        model.score(states.narrow(0,0,count),reinterpret_cast<std::uint32_t*>(keys.data_ptr<int>()),
+    const bool full_frontier=identity.contains("calibration_frontier_file");
+    if(full_frontier) {
+        std::ifstream file(identity.at("calibration_frontier_file").get<std::string>(),std::ios::binary|std::ios::ate);
+        const auto bytes=static_cast<std::uint64_t>(parents)*beam::STATE_STORAGE_LEN;
+        if(!file || file.tellg()!=static_cast<std::streamoff>(bytes)) throw std::runtime_error("calibration frontier size mismatch");
+        std::vector<std::uint8_t> host(bytes);file.seekg(0);file.read(reinterpret_cast<char*>(host.data()),bytes);
+        if(!file) throw std::runtime_error("calibration frontier read failed");
+        for(std::uint64_t row=0;row<parents;++row) for(unsigned j=beam::STATE_LEN;j<beam::STATE_STORAGE_LEN;++j)
+            if(host[row*beam::STATE_STORAGE_LEN+j]) throw std::runtime_error("calibration frontier padding is not zero");
+        states=torch::from_blob(host.data(),{parents,beam::STATE_STORAGE_LEN},states.options().device(torch::kCPU)).to(states.device()).narrow(1,0,beam::STATE_LEN);
+    }
+    auto run=[&](unsigned count,unsigned offset=0) {
+        model.score(states.narrow(0,offset,count),reinterpret_cast<std::uint32_t*>(keys.data_ptr<int>()),
                     reinterpret_cast<std::uint32_t*>(flag.data_ptr<int>()),stream,0,generator_ptr);
     };
     if(session) std::cout<<nlohmann::json({{"ready",true},{"device",device},{"capacity",capacity}}).dump()<<std::endl;
@@ -58,6 +69,7 @@ int main(int argc,char** argv) {
         if(request.value("stop",false)) break;
         batch=request.at("batch").get<unsigned>();parents=request.at("parents").get<unsigned>();
         if(!batch || batch>capacity || batch>parents) throw std::runtime_error("invalid session workload");
+        if(full_frontier && parents!=states.size(0)) throw std::runtime_error("session must preserve its exact verified frontier");
         model.inference_micro=batch;
         flag.zero_();
         c10::cuda::CUDACachingAllocator::resetPeakStats(device);
@@ -82,7 +94,7 @@ int main(int argc,char** argv) {
     nlohmann::json samples=nlohmann::json::array();
     for(int repeat=0;repeat<7;++repeat) {
         cudaEventRecord(start,stream);
-        for(unsigned offset=0;offset<parents;offset+=batch) run(std::min(batch,parents-offset));
+        for(unsigned offset=0;offset<parents;offset+=batch) run(std::min(batch,parents-offset),full_frontier?offset:0);
         cudaEventRecord(end,stream);cudaEventSynchronize(end);
         float ms=0;cudaEventElapsedTime(&ms,start,end);samples.push_back(ms/1000.0);
     }
@@ -93,7 +105,7 @@ int main(int argc,char** argv) {
         {"seconds",samples},{"numeric_error",error},{"model_count",model.heads.size()},
         {"readout_oracle_max_key_error",max_key_error},{"correctness_passed",true},
         {"torch_reserved_peak_bytes",stats.reserved_bytes[0].peak},
-        {"free_bytes_after",free},{"score_input",identity.contains("calibration_states")?"graph_states":"synthetic_zero_labels"}};
+        {"free_bytes_after",free},{"score_input",full_frontier?"full_frontier_file":identity.contains("calibration_states")?"graph_states":"synthetic_zero_labels"}};
     std::cout<<output.dump()<<std::endl;
     cudaEventDestroy(start);cudaEventDestroy(end);
     if(error) return 2;

@@ -119,65 +119,75 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     coarse_deadline=started+.7*options.calibration_seconds
     refinement_queued=False
     samples=[];records=[];rejected={};reserves={};telemetry_records={}
-    for index,batch in enumerate(candidates):
-        if time.monotonic()>=deadline:break
-        if index<len(coarse_candidates) and index>0 and time.monotonic()>=coarse_deadline:
-            if not refinement_queued:
+    from .calibration_session import EnsembleProbePool
+    pool=EnsembleProbePool(helper,probe_dir,cap,parents,len(devices),environment,directory,deadline) if (
+        runtime.build_metadata.get('calibration_protocol')=='json-session-v1') else None
+    try:
+        for index,batch in enumerate(candidates):
+            if time.monotonic()>=deadline:break
+            if index<len(coarse_candidates) and index>0 and time.monotonic()>=coarse_deadline:
+                if not refinement_queued:
+                    coarse_winner,_=select(samples,baseline=str(baseline))
+                    refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
+                    candidates.extend(refined)
+                    refinement_queued=True
+                continue
+            candidate_deadline=deadline if index==0 or index>=len(coarse_candidates) else coarse_deadline
+            processes=[];rows=[]
+            telemetry=CalibrationTelemetry()
+            telemetry.__enter__()
+            try:
+                if pool is not None:
+                    rows,failures=pool.measure(batch,parents,candidate_deadline)
+                    if failures:rejected[str(batch)]='; '.join(failures)
+                else:
+                    for rank in range(len(devices)):
+                        path=directory/f'batch-{batch}-rank-{rank}.log'
+                        log=path.open('wb')
+                        command=[str(helper),str(probe_dir),str(batch),str(parents),str(rank)]
+                        try:
+                            process=subprocess.Popen(command,env=environment,stdout=log,stderr=subprocess.STDOUT,
+                                stdin=subprocess.DEVNULL,start_new_session=True)
+                        except Exception:
+                            log.close()
+                            raise
+                        processes.append((rank,process,log,path))
+                    for rank,process,log,path in processes:
+                        try:code=process.wait(timeout=max(.1,candidate_deadline-time.monotonic()))
+                        except subprocess.TimeoutExpired:_stop_process_tree(process);code=-1
+                        log.close()
+                        parsed=[]
+                        for line in path.read_text(errors='replace').splitlines():
+                            try:
+                                row=json.loads(line)
+                                if 'seconds' in row:parsed.append(row)
+                            except ValueError:pass
+                        if (code or len(parsed)!=1 or not parsed[0].get('correctness_passed')
+                                or parsed[0].get('numeric_error') or len(parsed[0]['seconds'])<5):
+                            rejected[str(batch)]=f'rank {rank} failed admission or timed out';continue
+                        rows.append(parsed[0])
+            finally:
+                for _,process,log,_ in processes:
+                    if process.poll() is None:_stop_process_tree(process)
+                    log.close()
+                telemetry.__exit__()
+                telemetry_records[str(batch)]=telemetry.receipt()
+            records.extend(rows)
+            if len(rows)==len(devices):
+                for repeat in range(min(len(row['seconds']) for row in rows)):
+                    samples.append(Measurement(str(batch),parents*len(devices),
+                        tuple(row['seconds'][repeat] for row in rows),True,True,
+                        throttled=telemetry.throttled))
+                reserves[str(batch)]=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
+            elif batch==baseline:
+                raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
+            if index+1==len(coarse_candidates) and not refinement_queued and time.monotonic()<deadline:
                 coarse_winner,_=select(samples,baseline=str(baseline))
                 refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
                 candidates.extend(refined)
                 refinement_queued=True
-            continue
-        candidate_deadline=deadline if index==0 or index>=len(coarse_candidates) else coarse_deadline
-        processes=[];rows=[]
-        telemetry=CalibrationTelemetry()
-        telemetry.__enter__()
-        try:
-            for rank in range(len(devices)):
-                path=directory/f'batch-{batch}-rank-{rank}.log'
-                log=path.open('wb')
-                command=[str(helper),str(probe_dir),str(batch),str(parents),str(rank)]
-                try:
-                    process=subprocess.Popen(command,env=environment,stdout=log,stderr=subprocess.STDOUT,
-                        stdin=subprocess.DEVNULL,start_new_session=True)
-                except Exception:
-                    log.close()
-                    raise
-                processes.append((rank,process,log,path))
-            for rank,process,log,path in processes:
-                try:code=process.wait(timeout=max(.1,candidate_deadline-time.monotonic()))
-                except subprocess.TimeoutExpired:_stop_process_tree(process);code=-1
-                log.close()
-                parsed=[]
-                for line in path.read_text(errors='replace').splitlines():
-                    try:
-                        row=json.loads(line)
-                        if 'seconds' in row:parsed.append(row)
-                    except ValueError:pass
-                if (code or len(parsed)!=1 or not parsed[0].get('correctness_passed')
-                        or parsed[0].get('numeric_error') or len(parsed[0]['seconds'])<5):
-                    rejected[str(batch)]=f'rank {rank} failed admission or timed out';continue
-                rows.append(parsed[0])
-        finally:
-            for _,process,log,_ in processes:
-                if process.poll() is None:_stop_process_tree(process)
-                log.close()
-            telemetry.__exit__()
-            telemetry_records[str(batch)]=telemetry.receipt()
-        records.extend(rows)
-        if len(rows)==len(devices):
-            for repeat in range(min(len(row['seconds']) for row in rows)):
-                samples.append(Measurement(str(batch),parents*len(devices),
-                    tuple(row['seconds'][repeat] for row in rows),True,True,
-                    throttled=telemetry.throttled))
-            reserves[str(batch)]=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
-        elif batch==baseline:
-            raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
-        if index+1==len(coarse_candidates) and not refinement_queued and time.monotonic()<deadline:
-            coarse_winner,_=select(samples,baseline=str(baseline))
-            refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
-            candidates.extend(refined)
-            refinement_queued=True
+    finally:
+        if pool is not None:pool.close()
     winner,stat_rejected=select(samples,baseline=str(baseline))
     verify_prepared_model(model,contract)
     data={'signature':signature,'phase':'inference_verified','parent_batch':int(winner.profile),
@@ -186,6 +196,8 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
           'gpu_telemetry':telemetry_records,
           'coarse_candidates':coarse_candidates,'refinement_candidates':refined,
           'calibration_wall_seconds':time.monotonic()-started,
+          'probe_process_starts':pool.starts if pool is not None else len(records),
+          'probe_protocol':runtime.build_metadata.get('calibration_protocol','oneshot'),
           'pipeline_verified':False,'cache_hit':False,'measured_candidates':sorted({int(s.profile) for s in samples})}
     (directory/'inference-selection.json').write_text(json.dumps(data,indent=2))
     cache.parent.mkdir(parents=True,exist_ok=True)
