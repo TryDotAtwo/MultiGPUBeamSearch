@@ -1,0 +1,11 @@
+{
+  "checked_at": 1791550471.6749475,
+  "owned_test_absent": true,
+  "inventory": [
+    {
+      "id": 55013509,
+      "label": "mgbfs-lrx13-universal-packed-two3060-20261009",
+      "actual_status": "running"
+    }
+  ]
+}
