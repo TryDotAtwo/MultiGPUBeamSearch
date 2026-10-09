@@ -1,0 +1,8 @@
+{
+  "instance": 55039547,
+  "archive_sha256": "ee41b3622c7eaaee40b0febbee8bc538958600de2d726d8b7a876a9116edaf14",
+  "files_verified": 1938,
+  "archives_verified": true,
+  "github_commit": "b3314be34d2857c05784db68f511f6781cd9bd7d",
+  "method": "remote download from immutable GitHub commit; full tar and every included file SHA256 roundtrip"
+}
