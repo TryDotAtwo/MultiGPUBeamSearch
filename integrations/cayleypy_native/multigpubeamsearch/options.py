@@ -26,6 +26,7 @@ class NativeOptions:
     calibration_max_batch: int = 8192
     calibration_pipeline_seconds: float = 600.0
     calibration_frontier_max_states: int | None = None
+    report_calibration: bool = True
 
     def __post_init__(self):
         if self.inference_backend not in ("auto", "libtorch", "cutlass"):
@@ -50,6 +51,8 @@ class NativeOptions:
                 raise ValueError(f"{name} must be finite and positive")
         if type(self.autotune) is not bool:
             raise ValueError("autotune must be boolean")
+        if type(self.report_calibration) is not bool:
+            raise ValueError('report_calibration must be boolean')
         if type(self.calibration_max_batch) is not int or not 1 <= self.calibration_max_batch <= 65536:
             raise ValueError("calibration_max_batch must be in [1, 65536]")
         if self.calibration_frontier_max_states is not None and (type(self.calibration_frontier_max_states) is not int or self.calibration_frontier_max_states<=0):

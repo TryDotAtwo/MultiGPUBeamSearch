@@ -454,8 +454,12 @@ def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int
 
 
 def run_native(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
-    if type(beam_width) is not int or beam_width <= 0 or type(max_steps) is not int or max_steps < 0:
+    maximum_requested=type(beam_width) is str and beam_width=='max'
+    if (not maximum_requested and (type(beam_width) is not int or beam_width <= 0)) or type(max_steps) is not int or max_steps < 0:
         raise NativeUnavailable("native beam_width must be positive and max_steps nonnegative integers")
+    if maximum_requested:
+        if not options.autotune:raise NativeUnavailable('maximum beam requires autotuning')
+        beam_width=1_048_576  # Bounded inference curve; capacity uses actual native plans below.
     if contract.replay(()):
         return NativeOutcome((), 0.0, None, None, {"already_solved": True, "replay_valid": True})
     if max_steps == 0:
@@ -499,6 +503,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             ('stream1_native_mlp_benchmark','stream1_libtorch_mlp_benchmark')))
     if calibrate:
         from .autotune import tune_inference
+        calibration_started=time.monotonic()
         calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env)
         # Native admission may reject this microbatch under the current beam
         # footprint. Never silently shrink the winner or the requested beam.
@@ -533,6 +538,16 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
     runner = snapshot_runtime_runner(runtime, run_dir)
+    if maximum_requested:
+        if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
+        from .maximum_beam import discover_capacity
+        capacity=discover_capacity(contract,runtime,devices,env,runner,run_dir,
+            seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+        beam_width=capacity['effective_beam'];env.update(capacity['profile'])
+        runtime.profile['maximum_beam']=capacity
+        if options.report_calibration:
+            print(f"[MultiGPUBeamSearch] largest admitted frontier {beam_width:,}; "
+                f"capacity search {capacity['wall_seconds']:.2f}s; full-step verification pending",flush=True)
     if calibrate:
         from .pipeline_autotune import tune_downstream
         downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
@@ -544,7 +559,24 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             microbatch_metadata['derived_candidates_per_slot']=microbatch_metadata['derived_parent_batch']*contract.move_count
             microbatch_metadata['inference_parent_batch']=calibration['parent_batch']
         runtime.profile.update(autotuned=measured,pipeline_autotuned=measured,
-            pipeline_calibration=downstream)
+            pipeline_calibration=downstream,calibration_total_wall_seconds=time.monotonic()-calibration_started)
+        if maximum_requested:
+            capacity['full_step_verified']=measured and downstream.get('measurement_scope')=='full_requested_frontier'
+            capacity['capacity_scope']='full-step verified' if capacity['full_step_verified'] else 'native memory admission only'
+            (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
+        if options.report_calibration:
+            report=downstream.get('matched_stream1',{})
+            if report.get('measurement_scope')=='matched_full_frontier':
+                print(f"[MultiGPUBeamSearch] {len(devices)} GPUs, frontier {report['parents']:,}, "
+                    f"inference batch {calibration['parent_batch']}: best found Stream1 "
+                    f"{report['stream1_parents_per_second']:,.0f} parents/s; full step "
+                    f"{report['full_step_seconds']:.6f}s, throughput loss "
+                    f"{100*report['throughput_loss_fraction']:.2f}%; calibration "
+                    f"{runtime.profile['calibration_total_wall_seconds']:.2f}s",flush=True)
+            else:
+                print(f"[MultiGPUBeamSearch] inference batch {calibration['parent_batch']}; "
+                    f"pipeline scope {downstream.get('measurement_scope',downstream.get('phase'))}; "
+                    f"matched throughput loss unavailable",flush=True)
         (run_dir/'runtime-config.json').write_text(json.dumps(
             {'mode':'auto','profile':runtime.profile,'microbatch':microbatch_metadata,
              'search_budget':search_budget},indent=2)+'\n',encoding='utf-8')

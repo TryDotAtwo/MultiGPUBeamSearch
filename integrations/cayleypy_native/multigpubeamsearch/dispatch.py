@@ -123,6 +123,8 @@ def _parameters(kwargs):
         raise NativeUnavailable("native does not implement upstream options: " + ", ".join(sorted(unknown)))
     for name in ("beam_width", "max_steps"):
         value = params[name]
+        if name=='beam_width' and type(value) is str and value=='max':
+            continue
         if type(value) is not int or value < (1 if name == "beam_width" else 0):
             raise ValueError(f"{name} must be an integer {'> 0' if name == 'beam_width' else '>= 0'}")
         maximum = (1 << (64 if name == "beam_width" else 32)) - 1
