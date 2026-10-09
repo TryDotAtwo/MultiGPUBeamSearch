@@ -74,6 +74,7 @@ class NativePipelineProbe:
             raise TypeError('independent pipeline correctness verifier is required')
         self.verify = verify
         self.counter = 0
+        self.fastest_measure_wall_seconds = None
         if type(puzzle_id) is not int or puzzle_id < 0:
             raise ValueError('calibration puzzle ID must be nonnegative')
         self.puzzle_id = puzzle_id
@@ -82,6 +83,14 @@ class NativePipelineProbe:
         from .backend import _stop_process_tree
         if time.monotonic() >= self.deadline:
             raise ValueError('pipeline calibration budget expired')
+        # A failed candidate must not consume the whole search. After a valid
+        # baseline, use four times its wall time as the candidate budget.
+        # Keep startup allowance and the overall deadline as hard bounds.
+        allowance = max(30.0, 2.0*self.world) if planning else (
+            max(30.0, 4.0*self.fastest_measure_wall_seconds)
+            if self.fastest_measure_wall_seconds is not None else None)
+        run_deadline = self.deadline if allowance is None else min(
+            self.deadline, time.monotonic()+allowance)
         self.counter += 1
         directory = self.directory / str(self.counter)
         directory.mkdir()
@@ -112,7 +121,7 @@ class NativePipelineProbe:
             texts = []
             for process, log, path in processes:
                 try:
-                    code = process.wait(timeout=max(.1, self.deadline-time.monotonic()))
+                    code = process.wait(timeout=max(.1, run_deadline-time.monotonic()))
                 except subprocess.TimeoutExpired as error:
                     raise ValueError('native calibration timed out: '+str(directory)) from error
                 log.close()
@@ -138,6 +147,7 @@ class NativePipelineProbe:
         for rank, path in enumerate(self.fixtures):
             if path.stat().st_size != plans[rank]['frontier_state_capacity'] * self.physical_bytes:
                 raise ValueError('fixture must fill the exact admitted rank frontier')
+        started = time.monotonic()
         with CalibrationTelemetry() as telemetry:
             texts = self._run(environment, planning=False)
         (self.directory/str(self.counter)/'gpu-telemetry.json').write_text(
@@ -146,6 +156,9 @@ class NativePipelineProbe:
             raise ValueError('full-pipeline correctness verification failed')
         seconds = [parse_depths(text, plans[rank]['frontier_state_capacity'], self.repeats)
                    for rank, text in enumerate(texts)]
+        wall_seconds = time.monotonic()-started
+        self.fastest_measure_wall_seconds = min(wall_seconds,
+            self.fastest_measure_wall_seconds if self.fastest_measure_wall_seconds is not None else wall_seconds)
         parents = sum(plan['frontier_state_capacity'] for plan in plans)
         # First complete depth is warmup. No mean-of-means or summed GPU rates.
         return [Measurement('', parents, tuple(row[index] for row in seconds), True, True,
