@@ -1,0 +1,38 @@
+{
+  "source_commit": "b9559d9240b44e6860b1401dc3de9e8662eaa309",
+  "bytes": 432715,
+  "sha256": "635ffed25aca4fc01045b81652e39ca350d19200d9b8edc4e1f752e9730d5435",
+  "parts": [
+    {
+      "name": "part-000",
+      "bytes": 75000,
+      "sha256": "6e27feadfcff3552c7184131ed10b96eb333389a6656923ccbfa0262bd346d91"
+    },
+    {
+      "name": "part-001",
+      "bytes": 75000,
+      "sha256": "c08c1eb28522e0f5ac5f261bf3cb12161fac00b4c4d821da4a0b3f1d3bf85b9d"
+    },
+    {
+      "name": "part-002",
+      "bytes": 75000,
+      "sha256": "12d416eae9dbaf7595af59aae050adb835450904d7cba4afa036c0d16ab5f580"
+    },
+    {
+      "name": "part-003",
+      "bytes": 75000,
+      "sha256": "0f134e3cfd5072a4d11fb399c2efe96cf219e1def7de62de5205c82edb87030e"
+    },
+    {
+      "name": "part-004",
+      "bytes": 75000,
+      "sha256": "5e11c8889a323bfa8152d6b1915db7fac6381577bf2087b4e91e5b2c56510a9c"
+    },
+    {
+      "name": "part-005",
+      "bytes": 57715,
+      "sha256": "664c8c5f0d3f4f16e590fce1962499847731f4a4d0c615dfd159414a89e7e4d6"
+    }
+  ],
+  "helper_sha256": "fc15f6736456c8a3b01776d43eacdedf7f2c91c77fffb720e0535064dcffd53f"
+}
