@@ -1,6 +1,7 @@
 """Native rank-plan and full-frontier adapters for downstream calibration."""
 from __future__ import annotations
 import math
+import json
 import os
 from pathlib import Path
 import re
@@ -10,6 +11,7 @@ import uuid
 
 from .calibration_stats import Measurement
 from .pipeline_profiles import validate_rank_plans
+from .calibration_telemetry import CalibrationTelemetry
 
 
 def parse_plan(text):
@@ -136,13 +138,17 @@ class NativePipelineProbe:
         for rank, path in enumerate(self.fixtures):
             if path.stat().st_size != plans[rank]['frontier_state_capacity'] * self.physical_bytes:
                 raise ValueError('fixture must fill the exact admitted rank frontier')
-        texts = self._run(environment, planning=False)
+        with CalibrationTelemetry() as telemetry:
+            texts = self._run(environment, planning=False)
+        (self.directory/str(self.counter)/'gpu-telemetry.json').write_text(
+            json.dumps(telemetry.receipt(), indent=2))
         if self.verify(texts, plans) is not True:
             raise ValueError('full-pipeline correctness verification failed')
         seconds = [parse_depths(text, plans[rank]['frontier_state_capacity'], self.repeats)
                    for rank, text in enumerate(texts)]
         parents = sum(plan['frontier_state_capacity'] for plan in plans)
         # First complete depth is warmup. No mean-of-means or summed GPU rates.
-        return [Measurement('', parents, tuple(row[index] for row in seconds), True, True)
+        return [Measurement('', parents, tuple(row[index] for row in seconds), True, True,
+                            throttled=telemetry.throttled)
                 for index in range(1, self.repeats)]
 
