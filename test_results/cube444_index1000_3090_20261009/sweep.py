@@ -114,11 +114,14 @@ def main():
  sys.path.insert(0,str(SOURCE/'tools'));from export_cube444_blend import export
  export(assets,ROOT/'inputs/bundle')
  subprocess.run(['nvidia-smi','--query-gpu=index,name,uuid,memory.total,power.limit,driver_version','--format=csv'],stdout=(OUT/'hardware.csv').open('w'),check=True)
- passed,logs,_=run(4096,'near_goal',near=True,timeout=180)
+ if (OUT/'near_goal/result.json').exists():
+  prior=json.loads((OUT/'near_goal/result.json').read_text());assert prior['binary_sha256']==sha(EXE)
+  passed=prior['exit_codes']==[0]*WORLD;logs=[(OUT/'near_goal'/f'rank{r}.log').read_text() for r in range(WORLD)]
+ else:passed,logs,_=run(4096,'near_goal',near=True,timeout=180)
  assert passed,'eight-GPU near-goal run failed'
  graph=json.loads((assets/'smoke_graph.json').read_text());start=json.loads((OUT/'near_goal/start.json').read_text());paths=[]
  for log in logs:
-  match=re.search(r'task_solution_path=(.*)',log)
+  match=re.search(r'^solution_path=(.*)$',log,re.MULTILINE)
   if match:paths.append(match.group(1).strip())
  assert paths,'no returned solution path'
  for path in paths:
