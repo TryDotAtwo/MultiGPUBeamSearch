@@ -118,4 +118,3 @@ int main(int argc, char** argv) {
     BEAM_CUDA_CHECK(cudaEventDestroy(begin));BEAM_CUDA_CHECK(cudaEventDestroy(end));
     BEAM_CUDA_CHECK(cudaStreamDestroy(stream));
 }
-
