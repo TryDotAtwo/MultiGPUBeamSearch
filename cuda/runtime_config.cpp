@@ -271,8 +271,10 @@ void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
 }
 
 void set_global_spill_capacity(RuntimeConfig& config) {
-    // Both rotating shard buffers can be occupied when an owner batch arrives.
-    // Buffer count does not eliminate the Stream3 -> Stream4 backlog bound.
+    if (config.shard_buffer_count > 1U) {
+        config.global_spill_capacity = env_u32("BEAM_GLOBAL_SPILL_CAPACITY", 0);
+        return;
+    }
     const std::uint64_t stream3_batch = static_cast<std::uint64_t>(config.stream3_batch_candidates);
     const std::uint64_t stream4_worker_count =
         static_cast<std::uint64_t>(config.stream4_active_sort_slots);
