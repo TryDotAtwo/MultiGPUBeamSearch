@@ -16,6 +16,8 @@
 #endif
 
 namespace beam {
+class Stream1PolicySnapshot;
+class Stream1ExecutionContract;
 
 struct DispatcherStreams {
     cudaStream_t stream1 = nullptr;
@@ -45,6 +47,13 @@ struct DispatcherEvents {
 struct CudaGraphJobTemplates {
     std::vector<cudaGraph_t> ring_slot_graphs;
     std::vector<cudaGraphExec_t> ring_slot_execs;
+    std::vector<cudaEvent_t> ring_slot_done;
+    std::vector<std::uint8_t> ring_slot_in_use;
+    std::uint32_t* ring_slot_job_index = nullptr;
+    std::uint32_t ring_slot_physical_jobs = 0;
+    std::uint32_t ring_slot_window_rings = 0;
+    std::uint32_t ring_slot_window_jobs = 0;
+    bool ring_slot_windowed = false;
     std::vector<cudaGraph_t> stream3_ring_graphs;
     std::vector<cudaGraphExec_t> stream3_ring_execs;
     std::vector<cudaGraph_t> stream4_shard_graphs;
@@ -57,14 +66,54 @@ struct DispatcherDeviceTables {
     const Hash128* zobrist = nullptr;
 };
 
+enum class DispatcherStream1Backend : std::uint8_t {
+    Mlp = 0,
+    PieceTransformer = 1,
+};
+
 struct DispatcherNetwork {
-    Stream1NetworkView view;
-    std::vector<Stream1CutlassScratch> scratch_lanes;
+    DispatcherStream1Backend backend = DispatcherStream1Backend::Mlp;
+    Stream1NetworkView mlp_view{};
+    std::vector<Stream1CutlassScratch> mlp_scratch_lanes;
+    Stream1TransformerNetworkView transformer_view{};
+    std::vector<Stream1TransformerScratchView> transformer_scratch_lanes;
+    std::uint32_t transformer_micro = 0;
+    // Host-only, immutable owner must outlive capture and eager launch callbacks.
+    // Never add this host pointer to the device-facing network view.
+    const Stream1PolicySnapshot* transformer_policy_snapshot = nullptr;
+    const Stream1ExecutionContract* transformer_execution_contract = nullptr;
     bool uniform_score = false;
 };
 
 struct DispatcherCollective {
     ncclComm_t comm = nullptr;
+};
+
+enum class DepthDispatchStopStage : std::uint8_t {
+    Full = 0,
+    AfterStream12 = 1,
+    AfterStream3 = 2,
+};
+
+struct DispatcherRingSlotLaunchContext {
+    std::uint32_t job = UINT32_MAX;
+    std::uint32_t ring = UINT32_MAX;
+    std::uint32_t ring_slot = UINT32_MAX;
+    std::uint32_t lane = UINT32_MAX;
+    std::uint32_t b_micro = 0;
+    std::uint64_t candidate_offset = 0;
+    std::uint64_t parent_base = 0;
+    std::uint32_t count = 0;
+    cudaStream_t stream1_lane = nullptr;
+    cudaStream_t stream2_lane = nullptr;
+};
+
+using DispatcherRingSlotLaunchFn = void (*)(const DispatcherRingSlotLaunchContext& context, void* user);
+
+struct DispatcherRingSlotLauncher {
+    DispatcherRingSlotLaunchFn launch = nullptr;
+    void* user = nullptr;
+    const char* name = nullptr;
 };
 
 struct GeneratedTrackRequest {
@@ -182,6 +231,8 @@ struct Stream3TrackResult {
 };
 
 struct DepthDispatchState {
+    // Owned final post-drain snapshot; empty on diagnostic/stop early returns.
+    std::vector<std::uint32_t> final_clean_counts;
     std::uint64_t frontier_cursor = 0;
     std::uint64_t frontier_size = 0;
     std::uint32_t ring_slot_jobs_launched = 0;
@@ -267,7 +318,8 @@ void instantiate_cuda_graph_job_templates(
     Stream2SolvedBuffers solved,
     DispatcherStreams& streams,
     DispatcherEvents& events,
-    CudaGraphJobTemplates& graphs);
+    CudaGraphJobTemplates& graphs,
+    bool skip_ring_slot_templates = false);
 
 void destroy_cuda_graph_job_templates(CudaGraphJobTemplates& graphs);
 
@@ -278,8 +330,13 @@ DepthDispatchState run_depth_cuda_graphs(
     DispatcherStreams& streams,
     std::uint64_t frontier_size,
     GeneratedTrackRequest track_request = {},
-    const DispatcherCollective* collective = nullptr);
+    const DispatcherCollective* collective = nullptr,
+    const DispatcherRingSlotLauncher* ring_slot_launcher = nullptr,
+    DepthDispatchStopStage stop_stage = DepthDispatchStopStage::Full);
 
+// Phase boundary: all producer/collector/Stream4 writers must be drained, as
+// guaranteed by a successful full run_depth_cuda_graphs(). Final union reuses
+// their temporary arena before exact global selection and materialization.
 FinalizeDepthState finalize_depth_single_gpu(
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
@@ -291,6 +348,7 @@ FinalizeDepthState finalize_depth_single_gpu(
     cudaStream_t history_stream = nullptr,
     cudaEvent_t history_copy_done = nullptr,
     const Hash128* tracked_prefinal_hash = nullptr,
-    const DispatcherCollective* collective = nullptr);
+    const DispatcherCollective* collective = nullptr,
+    const std::vector<std::uint32_t>* final_clean_counts = nullptr);
 
 } // namespace beam
