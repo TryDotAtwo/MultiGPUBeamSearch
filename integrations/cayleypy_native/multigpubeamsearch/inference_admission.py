@@ -6,6 +6,7 @@ from pathlib import Path
 from .calibration_stats import Measurement, estimate
 from .beam_capacity import CapacityRejected
 from .errors import NativeBackendError
+from .calibration_telemetry import verified_telemetry
 
 
 def measured_candidates(calibration):
@@ -25,6 +26,8 @@ def measured_candidates(calibration):
         telemetry=calibration.get("gpu_telemetry",{}).get(str(batch))
         if calibration["signature"].get("schema",0)>=3 and (
             not telemetry or telemetry.get("throttled") is not False):
+            continue
+        if calibration['signature'].get('schema',0)>=6 and not verified_telemetry(telemetry,calibration['signature']):
             continue
         if len({r["parents"] for r in rows})!=1:
             continue

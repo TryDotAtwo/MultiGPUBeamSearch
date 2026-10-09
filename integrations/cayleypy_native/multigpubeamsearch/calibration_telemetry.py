@@ -21,6 +21,26 @@ def parse_telemetry(text):
     return rows
 
 
+def verified_telemetry(receipt, signature):
+    """Require observed, complete selected-GPU cohorts, never missing-data success."""
+    try:
+        samples = receipt['samples']
+        if receipt.get('errors') or receipt.get('throttled') is not False or len(samples) < 2:
+            return False
+        uuids = signature.get('gpu_uuids', [])
+        use_uuid = len(uuids) == signature['world_size'] and all(x != 'unavailable' for x in uuids)
+        key = 'uuid' if use_uuid else 'index'
+        expected = set(uuids if use_uuid else signature['device_indices'])
+        if len(expected) != signature['world_size']: return False
+        for sample in samples:
+            observed = {row[key]: row for row in sample}
+            if len(observed) != len(sample) or not expected.issubset(observed): return False
+            if any(observed[value].get('throttled') is not False for value in expected): return False
+        return True
+    except (KeyError, TypeError):
+        return False
+
+
 class CalibrationTelemetry:
     """Sampling evidence, not a claim to detect every transient event."""
     def __init__(self, interval=5.0):

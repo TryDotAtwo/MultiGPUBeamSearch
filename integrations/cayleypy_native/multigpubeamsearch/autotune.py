@@ -13,7 +13,7 @@ from .calibration_stats import Measurement, select
 from .errors import NativeBackendError
 from .models import verify_prepared_model
 from .build import file_sha256
-from .calibration_telemetry import CalibrationTelemetry
+from .calibration_telemetry import CalibrationTelemetry, verified_telemetry
 
 
 def coarse_batches(cap):
@@ -64,7 +64,7 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             '--format=csv,noheader'],capture_output=True,text=True,timeout=10,check=True).stdout
     except (OSError,subprocess.SubprocessError):hardware='unavailable'
     import platform
-    return {'schema':5,'search_policy':'coarse-local-v1','graph':contract.graph_hash,'models':model.artifact_hash,
+    return {'schema':6,'search_policy':'coarse-local-v1','graph':contract.graph_hash,'models':model.artifact_hash,
             'runner':runtime.build_metadata['binary_sha256'],
             'probe':runtime.build_metadata.get('calibration_binary_sha256'),
             'gpu_properties':[str(torch.cuda.get_device_properties(d)) for d in devices],
@@ -174,10 +174,13 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                 telemetry_records[str(batch)]=telemetry.receipt()
             records.extend(rows)
             if len(rows)==len(devices):
+                telemetry_verified=verified_telemetry(telemetry_records[str(batch)],signature)
+                if not telemetry_verified:
+                    rejected[str(batch)]='GPU telemetry missing, incomplete or throttled'
                 for repeat in range(min(len(row['seconds']) for row in rows)):
                     samples.append(Measurement(str(batch),parents*len(devices),
                         tuple(row['seconds'][repeat] for row in rows),True,True,
-                        throttled=telemetry.throttled))
+                        throttled=not telemetry_verified))
                 reserves[str(batch)]=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
             elif batch==baseline:
                 raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
@@ -217,6 +220,8 @@ def valid_cached_profile(data, signature, max_batch):
         rows=[row for row in data['records'] if row['batch']==batch]
         if signature.get('schema', 0)>=3:
             telemetry=data['gpu_telemetry'][str(batch)]
+            if signature.get('schema',0)>=6 and not verified_telemetry(telemetry,signature):
+                return False
             if telemetry.get('throttled') is not False:
                 return False
             if any(row.get('throttled') is not False
