@@ -494,18 +494,22 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),
         row_limit=runtime.profile.get("inference_row_limit", 8192))
     env.update(microbatch_env)
-    if model.backend == "ensemble" and options.autotune:
+    calibrate=options.autotune and (model.backend=='ensemble' or
+        (model.backend=='mlp' and runtime.build_metadata.get('calibration_binary_name')=='stream1_native_mlp_benchmark'))
+    if calibrate:
         from .autotune import tune_inference
         calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env)
         # Native admission may reject this microbatch under the current beam
         # footprint. Never silently shrink the winner or the requested beam.
-        env["BEAM_B_MICRO"]=str(calibration["parent_batch"])
+        rows_per_parent=contract.move_count if model.backend=='mlp' and model.manifest['output_dim']==1 else 1
+        env["BEAM_B_MICRO"]=str(calibration["parent_batch"]*rows_per_parent)
         env["BEAM_ENSEMBLE_INFERENCE_MICRO"]=str(calibration["parent_batch"])
         env["BEAM_ENSEMBLE_RESERVE_BYTES"]=str(calibration["reserve_bytes"])
         runtime.profile.update({"autotuned":False,"inference_autotuned":True,"inference_calibration":calibration,
                                 "pipeline_autotuned":False})
-        microbatch_metadata.update({"configured_row_budget":calibration["parent_batch"],
-                                    "derived_parent_batch":calibration["parent_batch"]})
+        microbatch_metadata.update({"configured_row_budget":int(env['BEAM_B_MICRO']),
+                                    "derived_parent_batch":calibration["parent_batch"],
+                                    'derived_candidates_per_slot':calibration['parent_batch']*contract.move_count})
     search_budget = {"requested_max_steps": max_steps, "native_forward_depth_limit": forward_depth_limit,
                      "configured_touch_bfs_radius": options.touch_bfs_radius,
                      "effective_touch_bfs_radius": effective_touch_bfs_radius,
@@ -528,14 +532,15 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
     runner = snapshot_runtime_runner(runtime, run_dir)
-    if model.backend == "ensemble" and options.autotune:
+    if calibrate:
         from .pipeline_autotune import tune_downstream
         downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
             run_dir,env,runner,calibration)
         measured=downstream.get('phase')=='pipeline_measured'
         if measured:
             env.update(downstream['environment'])
-            microbatch_metadata['derived_parent_batch']=int(env['BEAM_B_MICRO'])
+            microbatch_metadata['derived_parent_batch']=int(env['BEAM_B_MICRO'])//rows_per_parent
+            microbatch_metadata['derived_candidates_per_slot']=microbatch_metadata['derived_parent_batch']*contract.move_count
             microbatch_metadata['inference_parent_batch']=calibration['parent_batch']
         runtime.profile.update(autotuned=measured,pipeline_autotuned=measured,
             pipeline_calibration=downstream)
