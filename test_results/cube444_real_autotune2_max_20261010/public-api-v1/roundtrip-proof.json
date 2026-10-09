@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "commit": "4b79fc4417ce0275d56f1a1d9870dd809b33d044",
+  "archive_sha256": "4a5ad8d3ea6ba093c96b6a29ac434cf23efdd5a677ca582ed44725a894846093",
+  "files_verified": 205,
+  "parts_verified": 5,
+  "scope": "pair public trained cold/warm API and full1M/8M, maximum pending"
+}
