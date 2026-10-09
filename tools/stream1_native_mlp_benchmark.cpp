@@ -70,7 +70,11 @@ int main(int argc, char** argv) {
     if(!torch::isfinite(reference).all().item<bool>())throw std::runtime_error("nonfinite independent backbone oracle");
     auto expected=torch::round(torch::clamp(reference,0.,beam::SCORE_MAX_Q)*beam::SCORE_SCALE).to(torch::kInt32);
     auto error=(keys.to(torch::kInt64)-expected.to(torch::kInt64)).abs().max().item<std::int64_t>();
-    if(error>2)throw std::runtime_error("native backbone disagrees with independent oracle");
+    if(error>2){
+        std::cerr<<"native_oracle_max_key_error="<<error
+                 <<" native_first="<<keys[0]<<" oracle_first="<<expected[0]<<std::endl;
+        throw std::runtime_error("native backbone disagrees with independent oracle");
+    }
     for(int i=0;i<3;++i)run(batch);
     BEAM_CUDA_CHECK(cudaStreamSynchronize(stream));
     cudaEvent_t begin,end;BEAM_CUDA_CHECK(cudaEventCreate(&begin));BEAM_CUDA_CHECK(cudaEventCreate(&end));
