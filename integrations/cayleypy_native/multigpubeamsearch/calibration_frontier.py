@@ -45,7 +45,7 @@ def _enumerated_frontiers(contract, counts, storage_len, directory, deadline, ce
         with path.open('xb') as file:
             while written<count:
                 if time.monotonic()>=deadline or cursor>=ceiling:
-                    raise ValueError('enumerated legal frontier preparation exceeded budget')
+                    raise ValueError('graph did not yield a full unique calibration frontier within enumeration budget')
                 batch=min(65536,count-written+len(forbidden),ceiling-cursor)
                 indices=np.arange(cursor,cursor+batch,dtype=np.uint64);cursor+=batch
                 indices=(indices*stride+offset)%ceiling
