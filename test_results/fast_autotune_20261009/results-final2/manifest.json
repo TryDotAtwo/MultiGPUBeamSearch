@@ -1,0 +1,11 @@
+{
+  "instance": 55053060,
+  "archive": "/workspace/results-final2.tar.gz",
+  "bytes": 519329,
+  "sha256": "5cd7415e70d1d7f9a6bb09b38fc92448948aa1794d11e2b9aebb881520947be2",
+  "manifest_sha256": "56b4ff0db31ba2f4863af3923490a89e115e68cb3294736923f87b6d21857d5d",
+  "files": 337,
+  "part_bytes": 300000,
+  "parts": 2,
+  "excluded_bytes": 25776546067
+}
