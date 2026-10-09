@@ -142,11 +142,20 @@ class NativePipelineProbe:
 
     def measure_components(self, environment, plans, *, move_count):
         with CalibrationTelemetry() as telemetry:
-            texts = self._run(environment, planning=False, components=True)
+            if self.planning_session is not None and self.planning_session.supports_components:
+                values_by_rank=self.planning_session.measure_components(self.beam,environment)
+                self.counter+=1;(self.directory/str(self.counter)).mkdir()
+                (self.directory/str(self.counter)/'components.json').write_text(json.dumps(values_by_rank,indent=2))
+                texts=None
+            else:
+                texts = self._run(environment, planning=False, components=True)
+                values_by_rank=None
         rows=[]
-        for rank,text in enumerate(texts):
+        for rank in range(self.world):
+            text=texts[rank] if texts is not None else ''
             values=[json.loads(line) for line in text.splitlines()
                     if line.startswith('{') and 'component_calibration' in line]
+            if values_by_rank is not None:values=[values_by_rank[rank]]
             if len(values)!=1:raise ValueError('missing component calibration receipt')
             row=values[0]
             if (row.get('rank')!=rank or row.get('correctness_passed') is not True

@@ -51,8 +51,10 @@ def service_geometry(rows,plan,*,moves,inference):
 
 def tune_components(probe, session, plans, baseline, candidates, *, moves, inference):
     admitted=[('baseline',dict(baseline),plans)]
-    if session is not None:session.close()
-    probe.planning_session=None
+    persistent=session is not None and session.supports_components
+    if not persistent:
+        if session is not None:session.close()
+        probe.planning_session=None
     tested=[]
     samples=[]
     from .calibration_stats import Measurement,select
@@ -75,8 +77,10 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                     proposed.append(('service-staging',dict(baseline,**proposal)))
                 # Close all native memory owners before measuring another profile.
                 from .plan_session import NativePlanSession
-                with NativePlanSession(probe.runner,probe.environment,probe.world,
-                        probe.directory/'service-plans',deadline=probe.deadline) as planner:
+                from contextlib import nullcontext
+                owner=(nullcontext(session) if persistent else NativePlanSession(probe.runner,probe.environment,
+                    probe.world,probe.directory/'service-plans',deadline=probe.deadline))
+                with owner as planner:
                     for next_name,next_env in proposed:
                         try:
                             next_plans=planner.admit(probe.beam,next_env)

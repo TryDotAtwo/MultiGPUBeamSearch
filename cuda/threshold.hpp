@@ -7,6 +7,12 @@
 #include <cstddef>
 
 namespace beam {
+// Read-only exact union histogram of independently sorted/unique A/B banks.
+// Caller must drain every Stream4 writer before this pressure checkpoint.
+void threshold_build_exact_bank_union_histogram_cuda(
+    const CandidateMeta* candidates,const std::uint32_t* clean_count,
+    std::uint64_t* histogram,std::uint32_t logical_shards,
+    std::uint32_t capacity,cudaStream_t stream);
 
 // Online lower-bound histogram: max of the physical-buffer CDFs per
 // logical shard, then sum across disjoint logical owner domains.

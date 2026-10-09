@@ -12,6 +12,40 @@
 
 namespace beam {
 
+namespace exact_bank_histogram {
+__device__ bool less(Hash128 a,Hash128 b) {return a.hi<b.hi || (a.hi==b.hi && a.lo<b.lo);}
+__device__ std::uint32_t find(const CandidateMeta* rows,std::uint32_t count,Hash128 key) {
+    std::uint32_t first=0,last=count;
+    while(first<last) {const auto mid=first+(last-first)/2;
+        if(less(rows[mid].hash,key)) first=mid+1;else last=mid;}
+    return first<count && rows[first].hash.lo==key.lo && rows[first].hash.hi==key.hi ? first : count;
+}
+__device__ void add(std::uint64_t* hist,std::uint32_t key) {
+    const auto active=__activemask();const auto peers=__match_any_sync(active,key);
+    if((threadIdx.x&31)==__ffs(peers)-1)
+        atomicAdd(reinterpret_cast<unsigned long long*>(hist+key),static_cast<unsigned long long>(__popc(peers)));
+}
+__global__ void build(const CandidateMeta* rows,const std::uint32_t* counts,
+                      std::uint64_t* hist,std::uint32_t capacity) {
+    const auto logical=blockIdx.y,i=blockIdx.x*blockDim.x+threadIdx.x;
+    const auto* a=rows+static_cast<std::uint64_t>(logical)*2*capacity;const auto* b=a+capacity;
+    const auto na=counts[logical*2],nb=counts[logical*2+1];
+    if(i<na) {const auto found=find(b,nb,a[i].hash);
+        const auto key=found<nb ? min(a[i].score_key,b[found].score_key) : a[i].score_key;
+        if(key<SCORE_BIN_COUNT) add(hist,key);}
+    if(i<nb && find(a,na,b[i].hash)==na && b[i].score_key<SCORE_BIN_COUNT) add(hist,b[i].score_key);
+}
+} // namespace exact_bank_histogram
+
+void threshold_build_exact_bank_union_histogram_cuda(const CandidateMeta* rows,
+    const std::uint32_t* counts,std::uint64_t* hist,std::uint32_t shards,
+    std::uint32_t capacity,cudaStream_t stream) {
+    if(cudaMemsetAsync(hist,0,SCORE_BIN_COUNT*sizeof(std::uint64_t),stream)!=cudaSuccess)
+        throw std::runtime_error("exact bank histogram memset failed");
+    exact_bank_histogram::build<<<dim3((capacity+255)/256,shards),256,0,stream>>>(rows,counts,hist,capacity);
+    if(cudaGetLastError()!=cudaSuccess) throw std::runtime_error("exact bank histogram launch failed");
+}
+
 namespace {
 
 void check_nccl_threshold(ncclResult_t status, const char* op) {

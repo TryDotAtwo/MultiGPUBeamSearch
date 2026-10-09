@@ -80,6 +80,8 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             candidates.append(('staging-'+str(ring),dict(baseline,BEAM_STREAM3_RING_SLOTS=str(ring))))
         data=tune_components(actual,session,initial_plans,baseline,candidates,
             moves=contract.move_count,inference=inference)
+        if session is not None:session.close()
+        actual.planning_session=None
         verify_prepared_model(model,contract)
         data['requested_beam_width']=beam_width
         if options.calibration_full_frontier:

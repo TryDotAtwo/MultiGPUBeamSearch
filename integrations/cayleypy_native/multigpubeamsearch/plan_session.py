@@ -9,6 +9,7 @@ from .pipeline_profiles import validate_rank_plans
 class NativePlanSession:
     def __init__(self, runner, environment, world, directory, *, deadline, puzzle_id=0):
         self.sessions=[]
+        self.supports_components=False
         self.inference_micro=environment.get('BEAM_ENSEMBLE_INFERENCE_MICRO')
         directory=Path(directory);directory.mkdir(parents=True,exist_ok=False)
         try:
@@ -20,19 +21,20 @@ class NativePlanSession:
                 self.sessions.append(InferenceSession(
                     [str(runner),str(puzzle_id),'1','1024',str(world),str(rank)],rank_env,
                     directory/f'rank-{rank}.log',deadline=deadline))
+            capabilities=[]
             for rank,session in enumerate(self.sessions):
                 ready=session.receive()
                 if ready.get('ready') is not True or ready.get('rank')!=rank:
                     raise RuntimeError('native planning service did not acknowledge its rank')
+                capabilities.append(ready.get('component_protocol')=='persistent-exact-capacity-v1')
+            if any(capabilities) and not all(capabilities):raise RuntimeError('mixed native component service cohort')
+            self.supports_components=all(capabilities)
         except BaseException:
             self.close()
             raise
 
     def admit(self, beam, environment):
-        environment=dict(environment)
-        if 'BEAM_ENSEMBLE_INFERENCE_MICRO' in environment:
-            if environment.pop('BEAM_ENSEMBLE_INFERENCE_MICRO')!=self.inference_micro:
-                raise ValueError('planner cannot change the frozen model inference microbatch')
+        environment=self._environment(environment)
         for session in self.sessions:
             session.send_request({'beam':beam,'environment':environment})
         rows=[session.receive() for session in self.sessions]
@@ -46,6 +48,27 @@ class NativePlanSession:
         if plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']<beam:
             raise ValueError('native planner shrank requested frontier')
         return plans
+
+    def _environment(self,environment):
+        environment=dict(environment)
+        if 'BEAM_ENSEMBLE_INFERENCE_MICRO' in environment:
+            if environment.pop('BEAM_ENSEMBLE_INFERENCE_MICRO')!=self.inference_micro:
+                raise ValueError('planner cannot change the frozen model inference microbatch')
+        return environment
+
+    def measure_components(self,beam,environment):
+        if not self.supports_components:raise RuntimeError('native component session unsupported')
+        environment=self._environment(environment)
+        for session in self.sessions:
+            session.send_request({'beam':beam,'environment':environment,'prepare_component':True})
+        ready=[session.receive() for session in self.sessions]
+        if any(row.get('prepared') is not True or row.get('rank')!=rank for rank,row in enumerate(ready)):
+            for session in self.sessions:session.send_request({'cancel_component':True})
+            for session in self.sessions:session.receive()
+            raise ValueError('component allocation was not prepared on every rank')
+        # Two-phase protocol: no rank enters NCCL until every allocation succeeded.
+        for session in self.sessions:session.send_request({'run_component':True})
+        return [session.receive() for session in self.sessions]
 
     def close(self):
         sessions,self.sessions=self.sessions,[]

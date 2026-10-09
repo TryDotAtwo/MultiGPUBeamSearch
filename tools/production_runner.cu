@@ -4416,11 +4416,27 @@ int run_production_runner(int argc, char** argv) {
             "BEAM_SHARD_COUNT","BEAM_STREAM4_BATCH_CANDIDATES","BEAM_STREAM4_ACTIVE_SORT_SLOTS"};
         std::map<std::string,std::string> original;
         for(const auto& key:allowed) if(const char* value=std::getenv(key.c_str())) original[key]=value;
-        std::cout<<nlohmann::json({{"ready",true},{"rank",rank},{"free_bytes_snapshot",free_before}}).dump()<<std::endl;
+        std::optional<StaticDeviceMemory> component_memory;
+        std::optional<StaticMemoryPlan> component_plan;
+        std::cout<<nlohmann::json({{"ready",true},{"rank",rank},{"free_bytes_snapshot",free_before},
+            {"component_protocol","persistent-exact-capacity-v1"}}).dump()<<std::endl;
         std::string line;
         while(std::getline(std::cin,line)) {
             const auto request=nlohmann::json::parse(line);
             if(request.value("stop",false)) break;
+            if(request.value("cancel_component",false)) {
+                if(component_memory) free_static_device_memory(*component_memory);
+                component_memory.reset();component_plan.reset();
+                std::cout<<nlohmann::json({{"cancelled",true},{"rank",rank}}).dump()<<std::endl;continue;
+            }
+            if(request.value("run_component",false)) {
+                if(!component_memory || !component_plan) throw std::runtime_error("component session has no prepared allocation");
+                nlohmann::json result;
+                try {result=beam::component_probe::run(*component_plan,*component_memory,nccl_runtime.comm);}
+                catch(...) {free_static_device_memory(*component_memory);component_memory.reset();component_plan.reset();throw;}
+                free_static_device_memory(*component_memory);component_memory.reset();component_plan.reset();
+                std::cout<<result.dump()<<std::endl;continue;
+            }
             for(const auto& key:allowed) {
                 const auto found=original.find(key);
                 if(found==original.end()) unsetenv(key.c_str());
@@ -4438,6 +4454,12 @@ int run_production_runner(int argc, char** argv) {
             try {
                 const auto build=build_runtime_config_from_budget(requested,world_size,rank,stream1_model,free_before);
                 const auto& c=build.config;const auto& p=build.plan;
+                if(request.value("prepare_component",false)) {
+                    if(component_memory) throw std::runtime_error("component session allocation is already owned");
+                    component_plan=p;component_memory.emplace();
+                    allocate_static_device_memory(p,*component_memory);
+                    std::cout<<nlohmann::json({{"prepared",true},{"rank",rank}}).dump()<<std::endl;continue;
+                }
                 std::cout<<nlohmann::json({{"admitted",true},{"plan",{
                     {"GLOBAL_BEAM_WIDTH_EFFECTIVE",p.derived.global_beam_width_effective},
                     {"BEAM_WIDTH_ALIGNMENT",p.derived.beam_width_alignment},
@@ -4457,6 +4479,7 @@ int run_production_runner(int argc, char** argv) {
                 std::cout<<nlohmann::json({{"admitted",false},{"capacity_rejected",true},{"reason",message}}).dump()<<std::endl;
             }
         }
+        if(component_memory) free_static_device_memory(*component_memory);
         return 0;
     }
     const RuntimeConfigBuild config_build =

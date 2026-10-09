@@ -185,6 +185,9 @@ set_target_properties(beam_cuda PROPERTIES
 )
 
 add_executable(stream2_cuda_tests tests/stream2_cuda_tests.cu)
+add_executable(threshold_bank_union_cuda_tests EXCLUDE_FROM_ALL tests/threshold_bank_union_cuda_tests.cu)
+target_link_libraries(threshold_bank_union_cuda_tests PRIVATE beam_cuda)
+set_target_properties(threshold_bank_union_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 target_link_libraries(stream2_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream2_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 

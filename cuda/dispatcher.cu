@@ -1062,13 +1062,19 @@ void update_threshold_global(
     bool periodic,
     const DispatcherCollective* collective,
     bool local_histogram_only = false,
-    const char* debug_label = "threshold_update") {
+    const char* debug_label = "threshold_update",
+    bool exact_banks = false) {
     const std::uint64_t threshold_width = plan.derived.global_beam_width_effective;
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
     log_threshold_trace(plan, debug_label, "entry", periodic, local_histogram_only, threshold_width);
     log_threshold_trace(plan, debug_label, "local_histogram_begin", periodic, local_histogram_only, threshold_width);
 #endif
-    if (periodic) {
+    if (exact_banks) {
+        if(plan.config.shard_buffer_count!=2U) throw std::runtime_error("exact pressure histogram requires two banks");
+        threshold_build_exact_bank_union_histogram_cuda(memory.streams.survivor_shard,
+            memory.streams.clean_count,memory.streams.local_score_hist,plan.config.shard_count,
+            plan.config.shard_capacity_candidates,stream);
+    } else if (periodic) {
         // Physical A/B survivors can share hashes. Summing their counts could
         // irreversibly prune unique candidates. max(CDF_A,CDF_B) is a lower
         // bound on the logical union; owner/shard domains remain disjoint.
@@ -3266,12 +3272,13 @@ DepthDispatchState run_depth_cuda_graphs(
         return local_period != 0U && stream4_jobs_since_threshold_update >= local_period;
     };
 
-    const auto maybe_run_stream5_threshold_update = [&](bool force_local_request) -> bool {
+    std::function<void()> pressure_flush_stream4;
+    const auto maybe_run_stream5_threshold_update = [&](bool force_local_request,bool capacity_pressure=true) -> bool {
         if (!multi_rank) {
             return false;
         }
         const std::uint32_t local_request =
-            (force_local_request || periodic_threshold_due()) ? 1U : 0U;
+            force_local_request ? (capacity_pressure ? 2U : 1U) : (periodic_threshold_due() ? 1U : 0U);
         std::uint32_t global_request = 0;
         progress_trace("threshold-request-begin");
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
@@ -3321,16 +3328,20 @@ DepthDispatchState run_depth_cuda_graphs(
         if (global_request == 0U) {
             return false;
         }
+        const bool exact_pressure=global_request==2U && plan.config.shard_buffer_count==2U;
+        if(exact_pressure) pressure_flush_stream4();
         progress_trace("threshold-update-begin");
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 threshold timing start");
 #endif
-        update_threshold_global(plan, memory, streams.stream5, true, collective, false, "stream5_collective_periodic");
+        update_threshold_global(plan, memory, streams.stream5, true, collective, false,
+            "stream5_collective_periodic",exact_pressure);
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 threshold timing stop");
 #endif
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 threshold update");
         progress_trace("threshold-update-ready");
+        if(exact_pressure) pressure_flush_stream4();
 #if BEAM_DEBUG_STREAM_TIMING
         accumulate_elapsed_ms(
             stream5_timing_start[0],
@@ -3701,6 +3712,21 @@ DepthDispatchState run_depth_cuda_graphs(
         }
         wait_all_stream4_slots();
         return launched;
+    };
+
+    pressure_flush_stream4=[&]() {
+        // Global request already agreed on Stream5. Pause only local writers;
+        // sorting here introduces no additional NCCL sequence or shard top-k.
+        drain_pending_stream4_shards();wait_all_stream4_slots();
+        const std::uint32_t one=1;
+        for(std::uint32_t shard=0;shard<plan.storage_shard_count;++shard) {
+            const auto slot=acquire_stream4_slot_blocking();
+            check_cuda(cudaMemcpyAsync(memory.streams.processing_flag+shard,&one,sizeof(one),cudaMemcpyHostToDevice,
+                streams.stream4_slot_streams[slot]),"pressure Stream4 ownership");
+            launch_stream4_shard_on_slot(shard,slot,"pressure_compact_sort");
+            wait_all_stream4_slots();
+        }
+        throw_if_stream_fatal_error("pressure_compact_sort");
     };
 
     const auto any_active_ring = [&]() -> bool {
@@ -4093,7 +4119,7 @@ DepthDispatchState run_depth_cuda_graphs(
         // Every rank must enter the boundary request collective. A rank with no
         // local Stream4 work can still receive a global threshold request from
         // another rank before final spill drain starts.
-        maybe_run_stream5_threshold_update(stream4_jobs_since_threshold_update != 0U);
+        maybe_run_stream5_threshold_update(stream4_jobs_since_threshold_update != 0U,false);
     }
 
     drain_pending_stream4_shards();
