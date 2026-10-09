@@ -6,7 +6,7 @@ TUNABLE_KEYS=frozenset({'BEAM_B_MICRO','BEAM_STREAM3_RING_SLOTS','BEAM_SHARD_COU
     'BEAM_STREAM4_BATCH_CANDIDATES','BEAM_STREAM4_ACTIVE_SORT_SLOTS'})
 
 
-def pipeline_candidates(inference_micro, baseline, *, max_outer=65536):
+def pipeline_candidates(inference_micro, baseline, *, max_outer=65536, tune_outer=True):
     if type(inference_micro) is not int or inference_micro<=0:
         raise ValueError('inference microbatch must be positive')
     if max_outer<inference_micro:raise ValueError('outer capacity cannot truncate model microbatch')
@@ -16,7 +16,7 @@ def pipeline_candidates(inference_micro, baseline, *, max_outer=65536):
     def add(name,key,value):
         if key not in TUNABLE_KEYS:raise ValueError('attempt to tune a semantic or capacity policy')
         candidates.append((name,dict(fixed,**{key:str(value)})))
-    for multiple in (2,4,8):
+    for multiple in ((2,4,8) if tune_outer else ()):
         if inference_micro*multiple<=max_outer:add(f'outer-{multiple}x','BEAM_B_MICRO',inference_micro*multiple)
     for ring in (1,2,4,8):add(f'ring-{ring}','BEAM_STREAM3_RING_SLOTS',ring)
     for shards in (4,8,16,32,64,128):add(f'shards-{shards}','BEAM_SHARD_COUNT',shards)
@@ -54,7 +54,7 @@ def validate_rank_plans(plans):
 
 
 def tune_pipeline(inference_micro, baseline, *, admit, measure, deadline,
-                  max_outer=65536, rounds=2):
+                  max_outer=65536, rounds=2, tune_outer=True):
     """Coordinate search with native rank admission and full-step measurements.
 
     Callbacks must observe the actual requested beam. Admission returns native
@@ -68,7 +68,7 @@ def tune_pipeline(inference_micro, baseline, *, admit, measure, deadline,
         raise ValueError('pipeline search rounds must be in [1,4]')
     if not callable(admit) or not callable(measure):
         raise TypeError('native admission and full-step measurement are required')
-    fixed = pipeline_candidates(inference_micro, baseline, max_outer=max_outer)[0][1]
+    fixed = pipeline_candidates(inference_micro, baseline, max_outer=max_outer, tune_outer=tune_outer)[0][1]
     plans = admit(dict(fixed))
     validate_rank_plans(plans)
     effective = plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']
@@ -85,7 +85,7 @@ def tune_pipeline(inference_micro, baseline, *, admit, measure, deadline,
     seen = {tuple(sorted(fixed.items()))}
     for round_index in range(rounds):
         previous = winner.profile
-        for name, environment in pipeline_candidates(inference_micro, current, max_outer=max_outer):
+        for name, environment in pipeline_candidates(inference_micro, current, max_outer=max_outer, tune_outer=tune_outer):
             identity = tuple(sorted(environment.items()))
             if identity in seen:
                 continue
