@@ -34,6 +34,36 @@ def test_runtime_error_cannot_be_interpreted_as_capacity():
                       deadline=time.monotonic()+10)
 
 
+def test_maximum_recalibrates_actual_width_and_readmits_changed_reserve():
+    from multigpubeamsearch.maximum_beam import refine_maximum
+    seen=[]
+    def tune(beam,index):
+        seen.append(beam);return dict(parent_batch=512,reserve_bytes=2048,signature=dict(requested_beam_width=beam))
+    capacity,calibration=refine_maximum({'effective_beam':8192},
+        dict(parent_batch=256,reserve_bytes=1024),tune=tune,
+        discover=lambda chosen,index:{'effective_beam':7168})
+    assert seen==[8192,7168]
+    assert capacity['effective_beam']==7168 and calibration['parent_batch']==512
+    assert capacity['inference_refinement'][0]['readmitted'] is True
+    assert capacity['inference_refinement'][1]['readmitted'] is False
+
+
+def test_maximum_does_not_accept_nonconvergent_capacity():
+    from multigpubeamsearch.maximum_beam import refine_maximum
+    with pytest.raises(RuntimeError,match='converge'):
+        refine_maximum({'effective_beam':8192},dict(parent_batch=1,reserve_bytes=1),
+            tune=lambda beam,index:dict(parent_batch=index+2,reserve_bytes=index+2,signature=dict(requested_beam_width=beam)),
+            discover=lambda chosen,index:{'effective_beam':8192-index-1})
+
+
+def test_maximum_rejects_small_beam_cache_receipt():
+    from multigpubeamsearch.maximum_beam import refine_maximum
+    with pytest.raises(ValueError,match='exact frontier'):
+        refine_maximum({'effective_beam':8192},dict(parent_batch=256,reserve_bytes=1024),
+            tune=lambda beam,index:dict(parent_batch=256,reserve_bytes=1024,
+                signature=dict(requested_beam_width=1024)),discover=lambda *args:None)
+
+
 def receipt(seconds):
     return dict(parents=8192, gpu_uuids=['a','b'], frontier_sha256=['x','y'],
         model_sha256='m', build_sha256='b', precision='fp16/fp32', executor='native',

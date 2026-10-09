@@ -540,9 +540,27 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     runner = snapshot_runtime_runner(runtime, run_dir)
     if maximum_requested:
         if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
-        from .maximum_beam import discover_capacity
+        from .maximum_beam import discover_capacity,refine_maximum
         capacity=discover_capacity(contract,runtime,devices,env,runner,run_dir,
             seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+        def exact_inference(width,index):
+            directory=run_dir/f'maximum-inference-{index}';directory.mkdir()
+            return tune_inference(contract,model,runtime,options,devices,width,directory,env)
+        def readmit_inference(chosen,index):
+            env.update(BEAM_B_MICRO=str(chosen['parent_batch']*rows_per_parent),
+                BEAM_ENSEMBLE_INFERENCE_MICRO=str(chosen['parent_batch']),
+                BEAM_ENSEMBLE_RESERVE_BYTES=str(chosen['reserve_bytes']))
+            directory=run_dir/f'maximum-capacity-{index}';directory.mkdir()
+            return discover_capacity(contract,runtime,devices,env,runner,directory,
+                seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+        capacity,calibration=refine_maximum(capacity,calibration,
+            tune=exact_inference,discover=readmit_inference)
+        runtime.profile['inference_calibration']=calibration
+        env.update(BEAM_ENSEMBLE_INFERENCE_MICRO=str(calibration['parent_batch']),
+                   BEAM_ENSEMBLE_RESERVE_BYTES=str(calibration['reserve_bytes']))
+        microbatch_metadata.update(configured_row_budget=calibration['parent_batch']*rows_per_parent,
+            derived_parent_batch=calibration['parent_batch'],
+            derived_candidates_per_slot=calibration['parent_batch']*contract.move_count)
         beam_width=capacity['effective_beam'];env.update(capacity['profile'])
         runtime.profile['maximum_beam']=capacity
         if options.report_calibration:

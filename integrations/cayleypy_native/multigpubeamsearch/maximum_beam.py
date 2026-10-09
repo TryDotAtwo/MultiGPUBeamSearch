@@ -9,6 +9,28 @@ from .beam_capacity import CapacityRejected,find_capacity
 from .plan_session import NativePlanSession
 
 
+def refine_maximum(initial_capacity,initial_inference,*,tune,discover,max_rounds=3):
+    """Bootstrap an unknown width, then bind inference to its exact width.
+
+    A changed inference batch/reserve invalidates admission and requires a new
+    capacity search. Never label the bootstrap's small-beam cache as exact.
+    """
+    capacity=initial_capacity;previous=initial_inference;history=[]
+    for round_index in range(max_rounds):
+        beam=capacity['effective_beam'];calibration=tune(beam,round_index)
+        if calibration.get('signature',{}).get('requested_beam_width')!=beam:
+            raise ValueError('maximum inference receipt is not bound to the exact frontier')
+        changed=any(calibration[key]!=previous[key] for key in ('parent_batch','reserve_bytes'))
+        if changed:capacity=discover(calibration,round_index)
+        history.append(dict(beam=beam,parent_batch=calibration['parent_batch'],
+                            reserve_bytes=calibration['reserve_bytes'],readmitted=changed))
+        if capacity['effective_beam']==beam:
+            capacity['inference_refinement']=history
+            return capacity,calibration
+        previous=calibration
+    raise RuntimeError('maximum frontier/inference calibration did not converge')
+
+
 def discover_capacity(contract,runtime,devices,environment,runner,run_dir,*,seconds):
     import torch
     if runtime.build_metadata.get('plan_calibration_protocol')!='json-session-v1':
