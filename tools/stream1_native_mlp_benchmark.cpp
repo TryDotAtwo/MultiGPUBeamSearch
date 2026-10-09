@@ -13,7 +13,8 @@ int main(int argc, char** argv) {
     const int device=std::stoi(argv[4]);
     if(!batch||batch>parents)throw std::runtime_error("invalid native benchmark workload");
     c10::cuda::CUDAGuard guard(device);c10::InferenceMode inference;
-    auto stream=c10::cuda::getCurrentCUDAStream(device).stream();
+    cudaStream_t stream;BEAM_CUDA_CHECK(cudaStreamCreateWithFlags(&stream,cudaStreamNonBlocking));
+    c10::cuda::CUDAStreamGuard stream_guard(c10::cuda::getStreamFromExternal(stream,device));
     auto spec=nlohmann::json::parse(beam::stream1_libtorch::read_text_exact(
         std::filesystem::path(argv[1])/"calibration.json"));
     auto directory=std::filesystem::path(spec.at("weights_dir").get<std::string>());
@@ -64,28 +65,39 @@ int main(int argc, char** argv) {
     };
     run(batch);BEAM_CUDA_CHECK(cudaStreamSynchronize(stream));
     beam::stream1_libtorch::MlpLibTorch oracle(directory,torch::Device(torch::kCUDA,device));
-    auto oracle_states=model.output_dim==1?beam::stream1_libtorch::scalar_children(states,
-        indices.data_ptr<std::uint8_t>(),beam::MOVE_COUNT,beam::STATE_LEN,beam::STATE_STORAGE_LEN):states;
-    auto reference=oracle.forward(oracle_states).to(torch::kFloat32).reshape({batch,beam::MOVE_COUNT});
     // Preserve the existing native scalar-child scoring convention. This is
     // not part of the model forward pass and must be explicit in the receipt.
     const float score_offset=model.output_dim==1?beam::STREAM1_SINGLE_OUTPUT_SCORE_OFFSET:0.f;
-    reference.add_(score_offset);
-    if(!torch::isfinite(reference).all().item<bool>())throw std::runtime_error("nonfinite independent backbone oracle");
-    auto expected=torch::round(torch::clamp(reference,0.,beam::SCORE_MAX_Q)*beam::SCORE_SCALE).to(torch::kInt32);
-    auto error=(keys.to(torch::kInt64)-expected.to(torch::kInt64)).abs().max().item<std::int64_t>();
-    if(error>2){
-        std::cerr<<"native_oracle_max_key_error="<<error
-                 <<" native_first="<<keys[0]<<" oracle_first="<<expected[0]<<std::endl;
-        throw std::runtime_error("native backbone disagrees with independent oracle");
+    std::int64_t error=0;
+    for(unsigned offset=0;offset<batch;offset+=128){
+        const unsigned n=std::min(128U,batch-offset);
+        auto rows=states.narrow(0,offset,n);
+        auto oracle_states=model.output_dim==1?beam::stream1_libtorch::scalar_children(rows,
+            indices.data_ptr<std::uint8_t>(),beam::MOVE_COUNT,beam::STATE_LEN,beam::STATE_STORAGE_LEN):rows;
+        auto reference=oracle.forward(oracle_states).to(torch::kFloat32).reshape({n,beam::MOVE_COUNT});
+        reference.add_(score_offset);
+        if(!torch::isfinite(reference).all().item<bool>())throw std::runtime_error("nonfinite independent backbone oracle");
+        auto expected=torch::round(torch::clamp(reference,0.,beam::SCORE_MAX_Q)*beam::SCORE_SCALE).to(torch::kInt32);
+        error=std::max(error,(keys.narrow(0,offset,n).to(torch::kInt64)-expected.to(torch::kInt64)).abs().max().item<std::int64_t>());
+        if(error>2)throw std::runtime_error("native backbone disagrees with independent oracle");
     }
-    for(int i=0;i<3;++i)run(batch);
+    cudaGraph_t graph;cudaGraphExec_t executable;
+    BEAM_CUDA_CHECK(cudaStreamSynchronize(stream));
+    BEAM_CUDA_CHECK(cudaStreamBeginCapture(stream,cudaStreamCaptureModeGlobal));
+    run(batch);
+    BEAM_CUDA_CHECK(cudaStreamEndCapture(stream,&graph));
+    BEAM_CUDA_CHECK(cudaGraphInstantiate(&executable,graph,nullptr,nullptr,0));
+    auto replay=[&](unsigned n){
+        if(n!=current_count){count.fill_(n);current_count=n;}
+        BEAM_CUDA_CHECK(cudaGraphLaunch(executable,stream));
+    };
+    for(int i=0;i<3;++i)replay(batch);
     BEAM_CUDA_CHECK(cudaStreamSynchronize(stream));
     cudaEvent_t begin,end;BEAM_CUDA_CHECK(cudaEventCreate(&begin));BEAM_CUDA_CHECK(cudaEventCreate(&end));
     nlohmann::json seconds=nlohmann::json::array();
     for(int repeat=0;repeat<7;++repeat){
         BEAM_CUDA_CHECK(cudaEventRecord(begin,stream));
-        for(unsigned offset=0;offset<parents;offset+=batch)run(std::min(batch,parents-offset));
+        for(unsigned offset=0;offset<parents;offset+=batch)replay(std::min(batch,parents-offset));
         BEAM_CUDA_CHECK(cudaEventRecord(end,stream));BEAM_CUDA_CHECK(cudaEventSynchronize(end));
         float ms;BEAM_CUDA_CHECK(cudaEventElapsedTime(&ms,begin,end));seconds.push_back(ms/1000.);
     }
@@ -93,9 +105,12 @@ int main(int argc, char** argv) {
         {"seconds",seconds},{"correctness_passed",true},{"numeric_error",0},
         {"backbone_oracle_max_key_error",error},{"torch_reserved_peak_bytes",0},
         {"native_scalar_score_offset",score_offset},
-        {"model_count",1},{"executor","native_cutlass"},{"score_input","graph_states"}}).dump()<<std::endl;
+        {"model_count",1},{"executor","native_cuda_graph"},{"oracle_parent_chunk",128},
+        {"score_input","graph_states"}}).dump()<<std::endl;
+    BEAM_CUDA_CHECK(cudaGraphExecDestroy(executable));BEAM_CUDA_CHECK(cudaGraphDestroy(graph));
     beam::stream1_weights::free_stream1_scratch(allocation);
     beam::stream1_weights::free_weights(weights);
     BEAM_CUDA_CHECK(cudaEventDestroy(begin));BEAM_CUDA_CHECK(cudaEventDestroy(end));
+    BEAM_CUDA_CHECK(cudaStreamDestroy(stream));
 }
 
