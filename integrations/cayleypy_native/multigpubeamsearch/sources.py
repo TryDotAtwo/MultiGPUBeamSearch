@@ -31,8 +31,8 @@ class SourceArchive:
 # Immutable source snapshots. Native ensemble/autotune development is validated
 # on RTX3060; this pin is not an additional T4 hardware acceptance claim.
 NATIVE_SOURCE = SourceArchive(
-    "native", "TryDotAtwo/MultiGPUBeamSearch", "567aa62634c6ba43804d61916898640e069610f8",
-    "df33cccb71a189c74893bb13fda630479f61553e9ce59a5db260c23c74657993", "MultiGPUBeamSearch-567aa62634c6ba43804d61916898640e069610f8",
+    "native", "TryDotAtwo/MultiGPUBeamSearch", "c1917b6c99c0048bd1f309915f7e3cac677be3dd",
+    "805b6df956ce53421d08ae044b83d9b653e1ea16cf7a4f1c3dc1b4188d635e78", "MultiGPUBeamSearch-c1917b6c99c0048bd1f309915f7e3cac677be3dd",
 )
 CUTLASS_SOURCE = SourceArchive(
     "cutlass", "NVIDIA/cutlass", "afa1772203677c5118fcd82537a9c8fefbcc7008",
@@ -195,3 +195,4 @@ def setup_sources(*, options=None, cache_dir=None, source_dir=None, cutlass_dir=
     native = selected.source_dir or _setup_one(selected.cache_dir, NATIVE_SOURCE, offline=offline)
     cutlass = selected.cutlass_dir or _setup_one(selected.cache_dir, CUTLASS_SOURCE, offline=offline)
     return replace(selected, source_dir=native, cutlass_dir=cutlass)
+
