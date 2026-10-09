@@ -75,6 +75,17 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                     proposed.append((candidate_name,dict(candidate_env,**proposal)))
                 else:
                     proposed.append(('service-staging',dict(baseline,**proposal)))
+                # Keep the inference winner frozen while testing amortization
+                # of dispatch/transport over two inference batches. Admission
+                # must preserve the exact frontier; no rounded smaller proxy.
+                outer=int(baseline['BEAM_B_MICRO'])
+                if outer*2<=target[0]['frontier_state_capacity']:
+                    proposed.append(('outer-double',dict(baseline,**proposal,BEAM_B_MICRO=str(outer*2))))
+                lanes=int(baseline['BEAM_STREAM4_ACTIVE_SORT_SLOTS'])
+                alternative=min(target[0]['SHARD_COUNT'],lanes*2) if lanes==1 else max(1,lanes//2)
+                if alternative!=lanes:
+                    proposed.append(('sort-lanes-'+str(alternative),dict(baseline,**proposal,
+                        BEAM_STREAM4_ACTIVE_SORT_SLOTS=str(alternative))))
                 # Close all native memory owners before measuring another profile.
                 from .plan_session import NativePlanSession
                 from contextlib import nullcontext
@@ -114,4 +125,4 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
             'pipeline_verified':False,'cache_hit':False,'tested':tested,
             'selection':best['name'],'estimate':best['estimate'],
             'selection_rejections':rejected,
-            'search_policy':'baseline plus at most two exact-capacity candidates'}
+            'search_policy':'baseline plus at most four exact-capacity candidates; frozen inference microbatch'}
