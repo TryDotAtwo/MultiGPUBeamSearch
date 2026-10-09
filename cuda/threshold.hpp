@@ -8,6 +8,19 @@
 
 namespace beam {
 
+// Online lower-bound histogram: max of the physical-buffer CDFs per
+// logical shard, then sum across disjoint logical owner domains.
+// Histogram publications must remain readable until stream completion.
+void threshold_build_conservative_histogram_cuda(
+    const std::uint32_t* shard_score_hist_a,
+    const std::uint32_t* shard_score_hist_b,
+    const std::uint32_t* shard_score_hist_active_index,
+    std::uint32_t* threshold_hist_active_snapshot,
+    std::uint64_t* local_score_hist,
+    std::uint32_t logical_shard_count,
+    std::uint32_t physical_buffers_per_shard,
+    cudaStream_t stream);
+
 void threshold_build_local_histogram_cuda(
     const std::uint32_t* shard_score_hist_a,
     const std::uint32_t* shard_score_hist_b,
