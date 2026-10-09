@@ -8,6 +8,9 @@
 #include <cuda_runtime.h>
 
 #include <stdexcept>
+#include <climits>
+#include <cstdlib>
+#include <cstring>
 #include <string>
 
 namespace beam {
@@ -113,6 +116,22 @@ void check_cub(cudaError_t status, const char* op) {
     }
 }
 
+#if CUDART_VERSION >= 12040
+// Set every handle before any body can overwrite scratch_count. Exactly one
+// body executes, including count=0; no host readback or candidate truncation.
+__global__ void stream4_choose_sort_body_kernel(
+    const std::uint32_t* count, std::uint32_t quarter, std::uint32_t half,
+    std::uint32_t capacity, cudaGraphConditionalHandle small,
+    cudaGraphConditionalHandle medium, cudaGraphConditionalHandle full) {
+    if (blockIdx.x || threadIdx.x) return;
+    const auto n = *count;
+    if (n > capacity) asm("trap;");
+    cudaGraphSetConditional(small, n <= quarter);
+    cudaGraphSetConditional(medium, n > quarter && n <= half);
+    cudaGraphSetConditional(full, n > half);
+}
+#endif
+
 __global__ void stream4_mark_threshold_counts_kernel(
     const CandidateMeta* input,
     const std::uint32_t* clean_count,
@@ -146,6 +165,44 @@ __global__ void stream4_mark_threshold_counts_kernel(
     }
     if (tid == 0) {
         block_counts[blockIdx.x] = flags[0];
+    }
+}
+
+__global__ void stream4_mark_union_counts_kernel(
+    const CandidateMeta* input, const std::uint32_t* clean_count,
+    std::uint32_t* keep_flags, std::uint32_t* block_counts,
+    std::uint32_t threshold, std::uint32_t physical_capacity) {
+    __shared__ std::uint32_t flags[256];
+    const auto tid = threadIdx.x;
+    const auto i = blockIdx.x * blockDim.x + tid;
+    if (clean_count[0] > physical_capacity || clean_count[1] > physical_capacity) {
+        asm("trap;");
+        return;
+    }
+    std::uint32_t keep = 0;
+    if (i < 2U * physical_capacity) {
+        const auto physical = i / physical_capacity;
+        keep = i % physical_capacity < clean_count[physical] && input[i].score_key <= threshold;
+        keep_flags[i] = keep;
+    }
+    flags[tid] = keep;
+    __syncthreads();
+    for (unsigned stride = 128; stride; stride >>= 1) {
+        if (tid < stride) flags[tid] += flags[tid + stride];
+        __syncthreads();
+    }
+    if (tid == 0) block_counts[blockIdx.x] = flags[0];
+}
+
+__global__ void stream4_split_union_counts_kernel(
+    std::uint32_t* clean, std::uint32_t* dirty, std::uint32_t* processing,
+    const std::uint32_t* total, std::uint32_t capacity) {
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        const auto n = *total;
+        clean[0] = n < capacity ? n : capacity;
+        clean[1] = n - clean[0];
+        dirty[0] = dirty[1] = 0;
+        processing[0] = processing[1] = 0;
     }
 }
 
@@ -190,6 +247,12 @@ __global__ void stream4_compact_threshold_kernel(
         compact_key[out] = candidate.hash;
         compact_value[out] = candidate;
     }
+}
+
+__global__ void stream4_check_sort_bound_kernel(const std::uint32_t* compact_count,
+                                               std::uint32_t bound) {
+    // Unconditional device failure, independent of NDEBUG: never truncate.
+    if (*compact_count > bound) asm("trap;");
 }
 
 __global__ void stream4_fill_sort_tail_kernel(
@@ -282,7 +345,7 @@ void stream4_write_shard_histogram(
     std::size_t cub_temp_storage_bytes,
     cudaStream_t stream) {
     const std::uint32_t block_size = 256;
-    const std::uint32_t block_count = (capacity + block_size - 1U) / block_size;
+    const std::uint32_t block_count = capacity / block_size + (capacity % block_size != 0U);
     const dim3 block(block_size);
     const dim3 grid(block_count);
     const dim3 hist_grid((SCORE_BIN_COUNT + block_size - 1U) / block_size);
@@ -343,6 +406,54 @@ void stream4_write_shard_histogram(
 
 } // namespace
 
+void stream4_finalize_logical_shard_union_cuda(
+    CandidateMeta* survivors, std::uint32_t* clean, std::uint32_t* dirty,
+    std::uint32_t* processing, std::uint32_t threshold, std::uint32_t physical_capacity,
+    Hash128* sort_key, Hash128* reduce_key,
+    CandidateMeta* sort_value, CandidateMeta* reduce_value,
+    std::uint32_t* score_key_a, std::uint32_t* score_key_b,
+    std::uint64_t* score_count_a, std::uint64_t* score_count_b,
+    std::uint32_t* keep, std::uint32_t* counts, std::uint32_t* offsets,
+    std::uint32_t* scratch_count, std::uint32_t* hist_a, std::uint32_t* hist_b,
+    std::uint32_t* active, void* temp, std::size_t temp_bytes, cudaStream_t stream,
+    std::uint32_t sort_item_bound) {
+    if (!physical_capacity || physical_capacity > static_cast<unsigned>(INT_MAX / 2) || !temp || !temp_bytes)
+        throw std::invalid_argument("logical union requires fixed 2*capacity CUB scratch in int range");
+    const auto capacity = 2U * physical_capacity;
+    const auto sort_items = sort_item_bound == 0 ? capacity : sort_item_bound;
+    if (sort_items > capacity)
+        throw std::invalid_argument("logical union sort bound exceeds physical arena");
+    const auto blocks = (capacity + 255U) / 256U;
+    stream4_mark_union_counts_kernel<<<blocks, 256, 0, stream>>>(
+        survivors, clean, keep, counts, threshold, physical_capacity);
+    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(counts, offsets, scratch_count, blocks);
+    stream4_compact_threshold_kernel<<<blocks, 256, 0, stream>>>(
+        survivors, keep, offsets, sort_key, sort_value, capacity);
+    if (sort_item_bound != 0)
+        stream4_check_sort_bound_kernel<<<1, 1, 0, stream>>>(scratch_count, sort_items);
+    stream4_fill_sort_tail_kernel<<<blocks, 256, 0, stream>>>(sort_key, sort_value, scratch_count, capacity);
+    auto bytes = temp_bytes;
+    check_cub(cub::DeviceMergeSort::SortPairs(temp, bytes, sort_key, sort_value, sort_items,
+                                            Stream4HashLess{}, stream), "CUB final logical union sort");
+    bytes = temp_bytes;
+    check_cub(cub::DeviceReduce::ReduceByKey(temp, bytes, sort_key, reduce_key, sort_value,
+        reduce_value, scratch_count, Stream4BestCandidate{}, sort_items, stream), "CUB final logical union reduce");
+    stream4_mark_valid_unique_counts_kernel<<<blocks, 256, 0, stream>>>(
+        reduce_value, keep, counts, scratch_count, capacity);
+    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(counts, offsets, scratch_count, blocks);
+    stream4_compact_valid_unique_kernel<<<blocks, 256, 0, stream>>>(
+        reduce_value, keep, offsets, survivors, clean, dirty, scratch_count, capacity);
+    stream4_split_union_counts_kernel<<<1, 1, 0, stream>>>(clean, dirty, processing, scratch_count, physical_capacity);
+    // No reader may consume histograms until both publications complete.
+    for (unsigned physical = 0; physical < 2; ++physical) {
+        stream4_write_shard_histogram(survivors + physical * physical_capacity, clean + physical,
+            physical_capacity, score_key_a, score_key_b, score_count_a, score_count_b, scratch_count,
+            hist_a + static_cast<std::uint64_t>(physical) * SCORE_BIN_COUNT,
+            hist_b + static_cast<std::uint64_t>(physical) * SCORE_BIN_COUNT,
+            active + physical, processing + physical, temp, temp_bytes, stream);
+    }
+}
+
 void stream4_shard_job_cuda(
     CandidateMeta* survivor_shard,
     std::uint32_t* clean_count,
@@ -376,7 +487,7 @@ void stream4_shard_job_cuda(
         throw std::invalid_argument("stream4 CUB fixed temp storage is required");
     }
     const std::uint32_t block_size = 256;
-    const std::uint32_t block_count = (capacity + block_size - 1U) / block_size;
+    const std::uint32_t block_count = capacity / block_size + (capacity % block_size != 0U);
     const dim3 block(block_size);
     const dim3 grid(block_count);
 
@@ -503,7 +614,7 @@ void stream4_shard_job_device_threshold_cuda(
         throw std::invalid_argument("stream4 CUB fixed temp storage is required");
     }
     const std::uint32_t block_size = 256;
-    const std::uint32_t block_count = (capacity + block_size - 1U) / block_size;
+    const std::uint32_t block_count = capacity / block_size + (capacity % block_size != 0U);
     const dim3 block(block_size);
     const dim3 grid(block_count);
 
@@ -529,7 +640,10 @@ void stream4_shard_job_device_threshold_cuda(
         sort_key,
         sort_value,
         capacity);
-    stream4_fill_sort_tail_kernel<<<grid, block, 0, stream>>>(sort_key, sort_value, scratch_count, capacity);
+    const auto finish = [&](std::uint32_t sort_items, cudaStream_t stream) {
+        const auto sort_blocks = sort_items / block_size + (sort_items % block_size != 0U);
+        const dim3 sort_grid(sort_blocks);
+    stream4_fill_sort_tail_kernel<<<sort_grid, block, 0, stream>>>(sort_key, sort_value, scratch_count, sort_items);
 
     std::size_t sort_temp_bytes = cub_temp_storage_bytes;
     check_cub(
@@ -538,7 +652,7 @@ void stream4_shard_job_device_threshold_cuda(
             sort_temp_bytes,
             sort_key,
             sort_value,
-            capacity,
+            sort_items,
             Stream4HashLess{},
             stream),
         "cub::DeviceMergeSort::SortPairs stream4");
@@ -554,22 +668,22 @@ void stream4_shard_job_device_threshold_cuda(
             reduce_value,
             scratch_count,
             Stream4BestCandidate{},
-            capacity,
+            sort_items,
             stream),
         "cub::DeviceReduce::ReduceByKey stream4");
 
-    stream4_mark_valid_unique_counts_kernel<<<grid, block, 0, stream>>>(
+    stream4_mark_valid_unique_counts_kernel<<<sort_grid, block, 0, stream>>>(
         reduce_value,
         keep_flags,
         block_counts,
         scratch_count,
-        capacity);
+        sort_items);
     stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
         block_counts,
         block_offsets,
         scratch_count,
-        block_count);
-    stream4_compact_valid_unique_kernel<<<grid, block, 0, stream>>>(
+        sort_blocks);
+    stream4_compact_valid_unique_kernel<<<sort_grid, block, 0, stream>>>(
         reduce_value,
         keep_flags,
         block_offsets,
@@ -577,11 +691,11 @@ void stream4_shard_job_device_threshold_cuda(
         clean_count,
         dirty_count,
         scratch_count,
-        capacity);
+        sort_items);
     stream4_write_shard_histogram(
         survivor_shard,
         clean_count,
-        capacity,
+        sort_items,
         score_key_a,
         score_key_b,
         score_count_a,
@@ -594,6 +708,69 @@ void stream4_shard_job_device_threshold_cuda(
         cub_temp_storage,
         cub_temp_storage_bytes,
         stream);
+    };
+    const char* selector = std::getenv("BEAM_STREAM4_BOUNDED_SORT");
+    if (selector && std::strcmp(selector, "0") && std::strcmp(selector, "1"))
+        throw std::invalid_argument("BEAM_STREAM4_BOUNDED_SORT must be 0 or 1");
+    if (!selector || std::strcmp(selector, "1")) {
+        finish(capacity, stream);
+        return;
+    }
+#if CUDART_VERSION >= 12040
+    cudaStreamCaptureStatus capture_status;
+    cudaGraph_t parent = nullptr;
+    check_cub(cudaStreamGetCaptureInfo_v2(stream, &capture_status, nullptr,
+        &parent, nullptr, nullptr), "stream4 conditional parent");
+    if (capture_status != cudaStreamCaptureStatusActive)
+        throw std::invalid_argument("bounded Stream4 requires graph capture");
+    cudaGraphConditionalHandle handles[3];
+    for (auto& handle : handles)
+        check_cub(cudaGraphConditionalHandleCreate(&handle, parent, 0,
+            cudaGraphCondAssignDefault), "stream4 conditional handle");
+    const std::uint32_t bounds[3] = {
+        capacity / 4U + (capacity % 4U != 0U),
+        capacity / 2U + (capacity % 2U != 0U), capacity};
+    stream4_choose_sort_body_kernel<<<1, 1, 0, stream>>>(scratch_count,
+        bounds[0], bounds[1], capacity, handles[0], handles[1], handles[2]);
+    // Capture each alternative at startup only. The bodies share one fixed
+    // scratch slot and are chained; mutual exclusion is decided on the GPU.
+    for (unsigned alternative = 0; alternative < 3; ++alternative) {
+        const cudaGraphNode_t* dependencies = nullptr;
+        std::size_t dependency_count = 0;
+        check_cub(cudaStreamGetCaptureInfo_v2(stream, &capture_status, nullptr,
+            &parent, &dependencies, &dependency_count), "stream4 conditional dependencies");
+        cudaGraphNodeParams parameters{};
+        parameters.type = cudaGraphNodeTypeConditional;
+        parameters.conditional.handle = handles[alternative];
+        parameters.conditional.type = cudaGraphCondTypeIf;
+        parameters.conditional.size = 1;
+        cudaGraphNode_t conditional;
+        check_cub(cudaGraphAddNode(&conditional, parent, dependencies,
+            dependency_count, &parameters), "stream4 conditional node");
+        cudaStream_t body_stream = nullptr;
+        check_cub(cudaStreamCreateWithFlags(&body_stream, cudaStreamNonBlocking), "stream4 body stream");
+        try {
+            check_cub(cudaStreamBeginCaptureToGraph(body_stream,
+                parameters.conditional.phGraph_out[0], nullptr, nullptr, 0,
+                cudaStreamCaptureModeThreadLocal), "stream4 body capture");
+            finish(bounds[alternative], body_stream);
+            cudaGraph_t body = nullptr;
+            check_cub(cudaStreamEndCapture(body_stream, &body), "stream4 body end capture");
+            // Parent graph owns body; never destroy it separately.
+            check_cub(cudaStreamDestroy(body_stream), "stream4 body stream destroy");
+        } catch (...) {
+            cudaGraph_t ignored = nullptr;
+            cudaStreamEndCapture(body_stream, &ignored);
+            cudaStreamDestroy(body_stream);
+            throw;
+        }
+        check_cub(cudaStreamUpdateCaptureDependencies(stream, &conditional, 1,
+            cudaStreamSetCaptureDependencies), "stream4 conditional continuation");
+    }
+#else
+    throw std::invalid_argument("bounded Stream4 requires CUDA 12.4 or newer");
+#endif
+
 }
 
 } // namespace beam
