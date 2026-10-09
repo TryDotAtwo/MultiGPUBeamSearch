@@ -44,9 +44,11 @@ our adapter supports simple search. Importing the adapter alone changes nothing.
 Inference implementation is selected automatically: T4 uses LibTorch; newer
 supported GPUs use CUTLASS. A mixed set containing T4 uses LibTorch for the whole
 job. `inference_backend` is an optional diagnostic override, separate from search
-`backend`. LibTorch has a conservative row profile; CUTLASS uses the native row
-profile, with native VRAM planning and smaller batches for small beams. This
-policy is not a claim of measured optimal tuning. Requested GPU count is never
+`backend`. MLPs and ensembles calibrate the selected executor when `autotune=True`:
+native MLPs measure CUDA Graph replay, LibTorch MLPs measure the eager path,
+and ensembles measure their actual ordered readout. Other registered families
+retain conservative profiles until they have an executor-specific probe.
+Native VRAM planning still admits the requested beam. Requested GPU count is never
 silently reduced. Native allocation alignment may increase effective beam width;
 inspect `result.native_metadata` for requested/effective widths, executor,
 profile, build/model identities and replay validation.
@@ -71,9 +73,11 @@ Backbones currently use LibTorch; importing this API does not compile arbitrary
 Python neural architectures. The public artifact adapter currently accepts MLPs;
 additional native C++ families still require public adapter registration.
 
-With ensemble autotuning enabled, Stream1 first measures inference batches on
+With autotuning enabled for an MLP or ensemble, Stream1 first measures inference batches on
 all selected GPUs. The downstream stage freezes that inference batch and measures
 complete depths while varying outer batch, rings, shards and sort buffers.
+For an ordinary MLP, the native row budget remains fixed too; increasing it
+would change the inference batch that was just calibrated.
 Every candidate must pass native memory admission for the actual requested beam.
 Default calibration budgets are 180 seconds for inference and 600 seconds for
 the pipeline, with a bounded legal measurement frontier of at most 65,536 states.
