@@ -38,8 +38,12 @@ result = beam_search(graph, start_state=start, predictor=prepared.model,
     max_steps=8, return_path=True)
 assert result.path_found, 'public ensemble search did not find path'
 assert graph.apply_path(start, result.path).reshape(-1).tolist()==graph.central_state.tolist()
+metadata = result.native_metadata
+assert metadata['profile']['inference_autotuned'] is True
+assert metadata['profile']['pipeline_autotuned'] is True
+assert metadata['profile']['pipeline_calibration']['phase']=='pipeline_measured'
 receipt = dict(path_found=True, replay_valid=True, path_length=result.path_length,
-    backend=getattr(result, 'backend', None), metadata=getattr(result, 'metadata', {}))
+    backend=result.backend, metadata=metadata)
 (root/'acceptance.json').write_text(json.dumps(receipt, indent=2, default=str))
 print(json.dumps(receipt, default=str), flush=True)
 
