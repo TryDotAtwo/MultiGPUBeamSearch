@@ -4,6 +4,7 @@
 #include "nvtx_ranges.hpp"
 
 #include <cuda_runtime.h>
+#include <cub/block/block_scan.cuh>
 
 #include <climits>
 #include <stdexcept>
@@ -59,6 +60,46 @@ __global__ void threshold_sum_shard_histograms_kernel(
         sum += static_cast<std::uint64_t>(hist[offset]);
     }
     local_score_hist[score] = sum;
+}
+
+__global__ void threshold_conservative_union_kernel(
+    const std::uint32_t* hist_a, const std::uint32_t* hist_b,
+    const std::uint32_t* active_snapshot, std::uint64_t* output) {
+    using Scan = cub::BlockScan<unsigned long long, 256>;
+    __shared__ Scan::TempStorage temp;
+    __shared__ unsigned long long lower[256];
+    __shared__ unsigned long long carry_a, carry_b, previous_lower;
+    const unsigned tid = threadIdx.x;
+    const unsigned physical_a = blockIdx.x * 2U;
+    const unsigned physical_b = physical_a + 1U;
+    const auto* a = (active_snapshot[physical_a] == 0 ? hist_a : hist_b)
+        + static_cast<std::uint64_t>(physical_a) * SCORE_BIN_COUNT;
+    const auto* b = (active_snapshot[physical_b] == 0 ? hist_a : hist_b)
+        + static_cast<std::uint64_t>(physical_b) * SCORE_BIN_COUNT;
+    if (tid == 0) { carry_a = 0; carry_b = 0; previous_lower = 0; }
+    __syncthreads();
+    for (unsigned base = 0; base < SCORE_BIN_COUNT; base += 256U) {
+        const unsigned score = base + tid;
+        unsigned long long prefix_a = 0, prefix_b = 0;
+        Scan(temp).InclusiveSum(score < SCORE_BIN_COUNT ? a[score] : 0ULL, prefix_a);
+        __syncthreads();
+        Scan(temp).InclusiveSum(score < SCORE_BIN_COUNT ? b[score] : 0ULL, prefix_b);
+        __syncthreads();
+        prefix_a += carry_a;
+        prefix_b += carry_b;
+        lower[tid] = prefix_a > prefix_b ? prefix_a : prefix_b;
+        __syncthreads();
+        const auto before = tid == 0 ? previous_lower : lower[tid - 1];
+        if (score < SCORE_BIN_COUNT) {
+            atomicAdd(reinterpret_cast<unsigned long long*>(output + score), lower[tid] - before);
+        }
+        // Every lane must consume the prior carry before the last lane updates it.
+        __syncthreads();
+        if (tid == 255) {
+            carry_a = prefix_a; carry_b = prefix_b; previous_lower = lower[tid];
+        }
+        __syncthreads();
+    }
 }
 
 __global__ void threshold_select_kernel(
@@ -407,6 +448,29 @@ void threshold_build_local_histogram_cuda(
         threshold_hist_active_snapshot,
         local_score_hist,
         shard_count);
+}
+
+void threshold_build_conservative_histogram_cuda(
+    const std::uint32_t* hist_a, const std::uint32_t* hist_b,
+    const std::uint32_t* active_index, std::uint32_t* snapshot,
+    std::uint64_t* local_hist, std::uint32_t logical_shards,
+    std::uint32_t physical_buffers, cudaStream_t stream) {
+    if (logical_shards == 0 || logical_shards > UINT32_MAX / 2U ||
+        (physical_buffers != 1U && physical_buffers != 2U)) {
+        throw std::invalid_argument("conservative histogram requires nonzero shards and 1/2 buffers");
+    }
+    if (physical_buffers == 1U) {
+        threshold_build_local_histogram_cuda(hist_a, hist_b, active_index, snapshot,
+                                             local_hist, logical_shards, stream);
+        return;
+    }
+    const auto count = logical_shards * 2U;
+    threshold_snapshot_active_histogram_kernel<<<(count + 255ULL) / 256ULL, 256, 0, stream>>>(
+        active_index, snapshot, count);
+    const auto status = cudaMemsetAsync(local_hist, 0, SCORE_BIN_COUNT * sizeof(std::uint64_t), stream);
+    if (status != cudaSuccess) throw std::runtime_error(cudaGetErrorString(status));
+    threshold_conservative_union_kernel<<<logical_shards, 256, 0, stream>>>(
+        hist_a, hist_b, snapshot, local_hist);
 }
 
 void threshold_select_cuda(
