@@ -160,7 +160,7 @@ def validate_runner(runner: Path, contract, backend: str, architectures: tuple[i
     if metadata.get("binary_sha256") != file_sha256(runner):
         raise NativeBackendError("native runner SHA256 differs from native-build.json")
     if "calibration_binary_sha256" in metadata:
-        helper=runner.parent / "stream1_ensemble_benchmark"
+        helper=runner.parent / metadata.get('calibration_binary_name', 'stream1_ensemble_benchmark')
         if not helper.is_file() or metadata["calibration_binary_sha256"] != file_sha256(helper):
             raise NativeBackendError("native calibration executable changed or is missing")
     return metadata
@@ -168,7 +168,7 @@ def validate_runner(runner: Path, contract, backend: str, architectures: tuple[i
 
 def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                       backend: str, architectures: tuple[int, ...], programs: dict[str, str],
-                      *, nccl: dict[str, str] | None = None, inference_backend="cutlass") -> list[str]:
+                      *, nccl: dict[str, str] | None = None, inference_backend="cutlass", calibration=False) -> list[str]:
     shape = shape_contract(contract)
     command = [programs["cmake"], "-S", str(source), "-B", str(build_dir),
                "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_CXX_COMPILER={programs['cxx']}",
@@ -183,7 +183,7 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
     if nccl is not None:
         command += [f"-DNCCL_INCLUDE_DIR={nccl['include_dir']}", f"-DNCCL_LIBRARY={nccl['library']}",
                     f"-DCMAKE_BUILD_RPATH={Path(nccl['library']).parent}"]
-    if inference_backend == "libtorch" or backend in ("piece_transformer", "ensemble"):
+    if calibration or inference_backend == "libtorch" or backend in ("piece_transformer", "ensemble"):
         import torch
         command += ["-DBEAM_ENABLE_LIBTORCH_STREAM1=ON", f"-DCMAKE_PREFIX_PATH={torch.utils.cmake_prefix_path}"]
     elif backend != "mlp":
@@ -202,6 +202,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
     source, cutlass = options.source_dir, options.cutlass_dir
     cmake_text = (source / "CMakeLists.txt").read_text(encoding="utf-8")
     target = "production_runner_libtorch_stream1" if options.inference_backend == "libtorch" or model.backend != "mlp" else "production_runner"
+    calibration_target = ('stream1_ensemble_benchmark' if model.backend == 'ensemble' else
+        'stream1_native_mlp_benchmark' if model.backend == 'mlp' and options.autotune and options.inference_backend == 'cutlass' else None)
     if target not in cmake_text or (model.backend == "piece_transformer" and "BEAM_ENABLE_LIBTORCH_STREAM1" not in cmake_text):
         raise NativeUnavailable(f"configured native source does not expose compatible target {target}")
     nccl = discover_nccl()
@@ -209,8 +211,9 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
                      "cuda_architectures": list(architectures), "source_digest": source_digest(source),
                      "cutlass_digest": source_digest(cutlass, cutlass=True),
                      "toolchain": toolchain_identity(programs), "target": target, "nccl": nccl,
-                     "build_mode": "release-debug-logs-v1", "inference_backend": options.inference_backend}
-    if options.inference_backend == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
+                     "build_mode": "release-debug-logs-v1", "inference_backend": options.inference_backend,
+                     'calibration_binary_name': calibration_target}
+    if calibration_target or options.inference_backend == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
         import torch
         specification["torch"] = {"version": torch.__version__, "cuda": torch.version.cuda,
                                   "cxx11_abi": bool(torch._C._GLIBCXX_USE_CXX11_ABI),
@@ -235,9 +238,9 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         # wheel, overriding our device-specific CMake CUDA architecture list.
         env["TORCH_CUDA_ARCH_LIST"] = ";".join(f"{sm // 10}.{sm % 10}" for sm in architectures)
         run_process(configure_command(source, build_dir, cutlass, contract, model.backend, architectures, programs, nccl=nccl,
-                                     inference_backend=options.inference_backend),
+                                     inference_backend=options.inference_backend, calibration=bool(calibration_target)),
                     cwd=run_dir, env=env, timeout=options.build_timeout_seconds, log_path=run_dir / "cmake-configure.log")
-        targets=[target]+(["stream1_ensemble_benchmark"] if model.backend == "ensemble" else [])
+        targets=[target]+([calibration_target] if calibration_target else [])
         run_process([programs["cmake"], "--build", str(build_dir), "--target", *targets,
                      "--parallel", str(options.build_jobs)], cwd=run_dir, env=env,
                     timeout=options.build_timeout_seconds, log_path=run_dir / "cmake-build.log")
@@ -252,8 +255,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         if not runner.is_file():
             raise NativeBackendError("native build completed without producing the requested executable")
         metadata = dict(specification, build_key=key, binary_sha256=file_sha256(runner))
-        if model.backend == "ensemble":
-            metadata["calibration_binary_sha256"]=file_sha256(build_dir / "stream1_ensemble_benchmark")
+        if calibration_target:
+            metadata["calibration_binary_sha256"]=file_sha256(build_dir / calibration_target)
         temporary = build_dir / "native-build.json.tmp"
         temporary.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         temporary.replace(build_dir / "native-build.json")
