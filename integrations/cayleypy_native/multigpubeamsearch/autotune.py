@@ -172,6 +172,10 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                     log.close()
                 telemetry.__exit__()
                 telemetry_records[str(batch)]=telemetry.receipt()
+            (directory/f'batch-{batch}-receipt.json').write_text(json.dumps({
+                'signature':signature,'batch':batch,'rank_measurements':rows,
+                'gpu_telemetry':telemetry_records[str(batch)],
+                'failure':rejected.get(str(batch))},indent=2))
             records.extend(rows)
             if len(rows)==len(devices):
                 telemetry_verified=verified_telemetry(telemetry_records[str(batch)],signature)

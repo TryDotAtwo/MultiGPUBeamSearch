@@ -31,3 +31,13 @@ def test_verification_requires_two_complete_selected_gpu_observations():
         assert not verified_telemetry(dict(receipt,samples=samples),signature)
     assert not verified_telemetry(dict(receipt,errors=['TimeoutExpired']),signature)
     assert not verified_telemetry(dict(receipt,throttled=True),signature)
+
+
+def test_torch_bare_uuid_matches_nvml_gpu_prefix_without_index_guessing():
+    signature={'world_size':1,'device_indices':[0],
+        'gpu_uuids':['f3cc4337-82f1-115b-9058-58cde88a4124']}
+    sample=[{'index':4,'uuid':'GPU-f3cc4337-82f1-115b-9058-58cde88a4124','throttled':False}]
+    receipt={'samples':[sample,sample],'errors':[],'throttled':False}
+    assert verified_telemetry(receipt,signature)
+    sample[0]['uuid']='GPU-e538a8fd-9699-e5f5-9eda-3323027e9a42'
+    assert not verified_telemetry(receipt,signature)

@@ -30,10 +30,16 @@ def verified_telemetry(receipt, signature):
         uuids = signature.get('gpu_uuids', [])
         use_uuid = len(uuids) == signature['world_size'] and all(x != 'unavailable' for x in uuids)
         key = 'uuid' if use_uuid else 'index'
-        expected = set(uuids if use_uuid else signature['device_indices'])
+        def identity(value):
+            if use_uuid:
+                if not isinstance(value,str) or not value: raise TypeError('invalid GPU UUID')
+                # PyTorch exposes bare UUIDs; NVML adds the GPU- prefix.
+                return value.lower().removeprefix('gpu-')
+            return value
+        expected = {identity(value) for value in (uuids if use_uuid else signature['device_indices'])}
         if len(expected) != signature['world_size']: return False
         for sample in samples:
-            observed = {row[key]: row for row in sample}
+            observed = {identity(row[key]): row for row in sample}
             if len(observed) != len(sample) or not expected.issubset(observed): return False
             if any(observed[value].get('throttled') is not False for value in expected): return False
         return True
