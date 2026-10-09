@@ -22,7 +22,7 @@ class NativeOptions:
     build_jobs: int = 2
     warn_on_fallback: bool = True
     autotune: bool = True
-    calibration_seconds: float = 180.0
+    calibration_seconds: float = 90.0
     calibration_max_batch: int = 8192
     calibration_pipeline_seconds: float = 600.0
     calibration_frontier_max_states: int | None = None

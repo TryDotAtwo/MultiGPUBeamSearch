@@ -90,7 +90,7 @@ shards and sort buffers. Complete-depth verification is optional.
 For an ordinary MLP, the native row budget remains fixed too; increasing it
 would change the inference batch that was just calibrated.
 Every candidate must pass native memory admission for the actual requested beam.
-Default calibration budgets are 180 seconds for inference and 600 seconds for
+Default calibration budgets are 90 seconds for inference and 600 seconds for
 the pipeline. No profile measured at 65,536 or 10M states is transferred as
 certification of a larger requested frontier. A large optional full-frontier
 check may require increasing `calibration_pipeline_seconds`.
@@ -549,4 +549,3 @@ object, while native weights remain the frozen snapshot. Preparation itself
 never falls back. A `NativeModel` constructed manually remains an unpinned
 source declaration unless its optional `expected_artifact_hash` is supplied;
 the per-search execution copy is always content-checked and isolated.
-
