@@ -160,7 +160,10 @@ def validate_runner(runner: Path, contract, backend: str, architectures: tuple[i
     if metadata.get("binary_sha256") != file_sha256(runner):
         raise NativeBackendError("native runner SHA256 differs from native-build.json")
     if "calibration_binary_sha256" in metadata:
-        helper=runner.parent / metadata.get('calibration_binary_name', 'stream1_ensemble_benchmark')
+        name=metadata.get('calibration_binary_name', 'stream1_ensemble_benchmark')
+        if name not in ('stream1_ensemble_benchmark','stream1_native_mlp_benchmark','stream1_libtorch_mlp_benchmark'):
+            raise NativeBackendError("native calibration executable name is invalid")
+        helper=runner.parent / name
         if not helper.is_file() or metadata["calibration_binary_sha256"] != file_sha256(helper):
             raise NativeBackendError("native calibration executable changed or is missing")
     return metadata
@@ -203,7 +206,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
     cmake_text = (source / "CMakeLists.txt").read_text(encoding="utf-8")
     target = "production_runner_libtorch_stream1" if options.inference_backend == "libtorch" or model.backend != "mlp" else "production_runner"
     calibration_target = ('stream1_ensemble_benchmark' if model.backend == 'ensemble' else
-        'stream1_native_mlp_benchmark' if model.backend == 'mlp' and options.autotune and options.inference_backend == 'cutlass' else None)
+        ('stream1_native_mlp_benchmark' if options.inference_backend == 'cutlass' else
+         'stream1_libtorch_mlp_benchmark') if model.backend == 'mlp' and options.autotune else None)
     if target not in cmake_text or (model.backend == "piece_transformer" and "BEAM_ENABLE_LIBTORCH_STREAM1" not in cmake_text):
         raise NativeUnavailable(f"configured native source does not expose compatible target {target}")
     nccl = discover_nccl()
