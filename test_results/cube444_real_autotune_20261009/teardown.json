@@ -1,0 +1,10 @@
+{
+  "instance": 55065930,
+  "label": "cube444-real-autotune-2x3060-20261009",
+  "archive_commit": "972d523bb2870df5053fb8306ac9d5c14195f5a1",
+  "proof_commit": "00a9f82dd95c6aaf8ebcb1ffea66fe3537fb66a0",
+  "stopped": true,
+  "destroyed": true,
+  "absence_verified": true,
+  "scope": "only owned task lease"
+}
