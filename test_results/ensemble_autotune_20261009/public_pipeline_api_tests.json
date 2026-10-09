@@ -1,0 +1,20 @@
+{
+  "source_commit": "b8d48e745ca9b142b32842f0e5105fcce3f3139c",
+  "instance": 54987544,
+  "command": "PYTHONPATH=/workspace/source/integrations/cayleypy_native /venv/main/bin/python -m pytest /workspace/source/integrations/cayleypy_native/tests -q",
+  "result": "260 passed, 5 skipped in 14.94s",
+  "scope": "Python API and orchestration contracts; not GPU acceptance of public downstream hook",
+  "pipeline_sweep": {
+    "pid": 4287,
+    "observed_live": true,
+    "run": 10,
+    "rank0_depth_seconds": [
+      36.9475,
+      36.8424,
+      36.8626
+    ],
+    "global_parents": 1048576,
+    "inference_micro": 1024,
+    "selection_complete": false
+  }
+}
