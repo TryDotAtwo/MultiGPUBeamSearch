@@ -1,0 +1,458 @@
+{
+  "environment": {
+    "BEAM_ENSEMBLE_INFERENCE_MICRO": "1024",
+    "BEAM_B_MICRO": "1024"
+  },
+  "estimate": {
+    "profile": "baseline",
+    "median": 0.00003505659103393555,
+    "low": 0.00003503513336181641,
+    "high": 0.00003513851165771484,
+    "relative_mad": 0.0006120866714727037,
+    "repeats": 5
+  },
+  "rejected": {
+    "round-0-ring-8": "native calibration timed out: /workspace/results/pipeline-profile-sweep/runs/16",
+    "round-0-ring-4": "no statistically separated material gain",
+    "round-0-ring-2": "no statistically separated material gain",
+    "round-0-ring-1": "no statistically separated material gain",
+    "round-0-outer-2x": "no statistically separated material gain",
+    "round-0-outer-4x": "no statistically separated material gain",
+    "round-0-outer-8x": "no statistically separated material gain"
+  },
+  "effective_beam": 1048576,
+  "workload_parents": 1048576,
+  "world_size": 2,
+  "measurements": [
+    {
+      "profile": "baseline",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.737,
+        36.737
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "baseline",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.7584,
+        36.7584
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "baseline",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.7595,
+        36.7594
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "baseline",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.7982,
+        36.7982
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "baseline",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8454,
+        36.8454
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-2x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2172,
+        37.2171
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-2x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.218,
+        37.218
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-2x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2184,
+        37.2184
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-2x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.219,
+        37.2191
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-2x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2176,
+        37.2176
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-4x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2243,
+        37.2243
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-4x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2258,
+        37.2258
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-4x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2247,
+        37.2247
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-4x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2244,
+        37.2244
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-4x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2246,
+        37.2245
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-8x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2387,
+        37.2387
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-8x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2384,
+        37.2384
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-8x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2388,
+        37.2388
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-8x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2384,
+        37.2384
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-outer-8x",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        37.2373,
+        37.2373
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-1",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8424,
+        36.8425
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-1",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8626,
+        36.8626
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-1",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.855,
+        36.855
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-1",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8432,
+        36.8432
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-1",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.843,
+        36.8429
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-2",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8023,
+        36.8023
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-2",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8029,
+        36.8029
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-2",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8,
+        36.7999
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-2",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8003,
+        36.8002
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-2",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.8246,
+        36.8246
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-4",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.7863,
+        36.7863
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-4",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.7873,
+        36.7873
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-4",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.7877,
+        36.7877
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-4",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.7883,
+        36.7883
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    },
+    {
+      "profile": "round-0-ring-4",
+      "parents": 1048576,
+      "seconds_by_rank": [
+        36.7868,
+        36.7868
+      ],
+      "correctness_passed": true,
+      "memory_admitted": true,
+      "throttled": false
+    }
+  ],
+  "verification_scope": "legal fixture + independently accepted backbone/readout + native structural completion; full arbitrary-graph replay remains pending",
+  "inference_readout_gates": [
+    {
+      "batch": 1024,
+      "correctness_passed": true,
+      "device": 0,
+      "free_bytes_after": 11046617088,
+      "model_count": 3,
+      "numeric_error": 0,
+      "parents": 8192,
+      "readout_oracle_max_key_error": 1,
+      "score_input": "graph_states",
+      "seconds": [
+        0.5705942993164063,
+        0.5702625122070313,
+        0.5685626831054688,
+        0.5681796875,
+        0.5683455810546875,
+        0.568142822265625,
+        0.5682462768554688
+      ],
+      "torch_reserved_peak_bytes": 1293942784
+    },
+    {
+      "batch": 1024,
+      "correctness_passed": true,
+      "device": 1,
+      "free_bytes_after": 11046617088,
+      "model_count": 3,
+      "numeric_error": 0,
+      "parents": 8192,
+      "readout_oracle_max_key_error": 1,
+      "score_input": "graph_states",
+      "seconds": [
+        0.5679429931640625,
+        0.568872802734375,
+        0.5688934326171875,
+        0.5686773681640624,
+        0.5688431396484375,
+        0.5687470092773438,
+        0.5690316772460937
+      ],
+      "torch_reserved_peak_bytes": 1293942784
+    }
+  ]
+}
