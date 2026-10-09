@@ -4,11 +4,24 @@
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/core/InferenceMode.h>
 #include <iostream>
+#include <algorithm>
 
 int main(int argc,char** argv) {
-    if(argc!=5 && argc!=6) throw std::runtime_error("usage: ensemble-benchmark ensemble-dir batch parents device [--session]");
-    const bool session=argc==6 && std::string(argv[5])=="--session";
-    if(argc==6 && !session) throw std::runtime_error("unknown benchmark option");
+    if(argc<5 || argc>7) throw std::runtime_error("usage: ensemble-benchmark ensemble-dir batch parents device [--session] [--repeats=1..31]");
+    bool session=false,seen_repeats=false;
+    unsigned repeats=7;
+    for(int i=5;i<argc;++i) {
+        const std::string option(argv[i]);
+        if(option=="--session" && !session) session=true;
+        else if(option.rfind("--repeats=",0)==0 && !seen_repeats) {
+            const auto value=option.substr(10);
+            if(value.empty() || !std::all_of(value.begin(),value.end(),[](char c){return c>='0'&&c<='9';}))
+                throw std::runtime_error("benchmark repeats must be decimal 1..31");
+            const auto parsed=std::stoul(value);
+            if(parsed<1 || parsed>31) throw std::runtime_error("benchmark repeats must be in 1..31");
+            repeats=static_cast<unsigned>(parsed);seen_repeats=true;
+        } else throw std::runtime_error("unknown or duplicate benchmark option");
+    }
     unsigned batch=std::stoul(argv[2]),parents=std::stoul(argv[3]);
     const unsigned capacity=batch;
     const int device=std::stoi(argv[4]);
@@ -96,7 +109,7 @@ int main(int argc,char** argv) {
     cudaDeviceSynchronize();
     cudaEvent_t start,end;cudaEventCreate(&start);cudaEventCreate(&end);
     nlohmann::json samples=nlohmann::json::array();
-    for(int repeat=0;repeat<7;++repeat) {
+    for(unsigned repeat=0;repeat<repeats;++repeat) {
         cudaEventRecord(start,stream);
         for(unsigned offset=0;offset<parents;offset+=batch) run(std::min(batch,parents-offset),full_frontier?offset:0);
         cudaEventRecord(end,stream);cudaEventSynchronize(end);
@@ -106,7 +119,7 @@ int main(int argc,char** argv) {
     auto stats=c10::cuda::CUDACachingAllocator::getDeviceStats(device);
     std::size_t free,total;cudaMemGetInfo(&free,&total);
     nlohmann::json output={{"batch",batch},{"parents",parents},{"device",device},
-        {"seconds",samples},{"numeric_error",error},{"model_count",model.heads.size()},
+        {"seconds",samples},{"repeat_count",repeats},{"numeric_error",error},{"model_count",model.heads.size()},
         {"readout_oracle_max_key_error",max_key_error},{"correctness_passed",true},
         {"torch_allocated_peak_bytes",stats.allocated_bytes[0].peak},
         {"torch_reserved_peak_bytes",stats.reserved_bytes[0].peak},
@@ -117,3 +130,4 @@ int main(int argc,char** argv) {
     } while(session);
     return 0;
 }
+
