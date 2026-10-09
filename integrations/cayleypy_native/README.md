@@ -56,7 +56,7 @@ profile, build/model identities and replay validation.
 ## Ensembles and inference-first calibration (development)
 
 The current development source is on branch
-[`codex/ensemble-autotune-source-20261009`](https://github.com/TryDotAtwo/MultiGPUBeamSearch/tree/codex/ensemble-autotune-source-20261009).
+[`codex/fast-autotune-20261009`](https://github.com/TryDotAtwo/MultiGPUBeamSearch/tree/codex/fast-autotune-20261009).
 Install that matching compact checkout with
 `pip install ./integrations/cayleypy_native`; the default branch is not a release
 of this ensemble/autotune update.
@@ -84,22 +84,29 @@ all selected GPUs. The bounded sweep includes power-of-two batches, the actual
 user/beam cap and a local refinement around the coarse winner. Selection uses
 the slowest rank, repeated timings and confidence intervals; it finds the best
 verified candidate within its time budget, not a guaranteed global optimum.
-The downstream stage freezes that inference batch and measures
-complete depths while varying outer batch, rings, shards and sort buffers.
+The downstream stage freezes that inference batch and measures isolated native
+services at the exact admitted capacities while varying outer batch, rings,
+shards and sort buffers. Complete-depth verification is optional.
 For an ordinary MLP, the native row budget remains fixed too; increasing it
 would change the inference batch that was just calibrated.
 Every candidate must pass native memory admission for the actual requested beam.
 Default calibration budgets are 180 seconds for inference and 600 seconds for
-the pipeline, with a bounded legal measurement frontier of at most 65,536 states.
+the pipeline. No profile measured at 65,536 or 10M states is transferred as
+certification of a larger requested frontier. A large optional full-frontier
+check may require increasing `calibration_pipeline_seconds`.
 Inspect `result.native_metadata['profile']` for the selected parameters and the
-measured frontier scope. A bounded-frontier measurement is not a measured optimum
-for a larger requested beam. Small finite graphs may report pipeline calibration
-as not measured if they cannot fill a unique legal frontier.
+measured frontier scope. Isolated component probes are a scheduling proxy,
+not a measured complete step or a global optimum. Small finite graphs can
+prevent a unique legal fixture for the optional complete-step measurement.
 
 `plan_cluster([8] * 16, beam_width)` computes a 128-rank layout and alignment.
 It does not launch multiple nodes or prove hardware performance; every actual
 rank must independently pass native memory admission. Current hardware evidence
-for this development is from two RTX 3060 GPUs.
+for this development is from two and eight RTX 3060 GPUs; the exact workload
+and measured scopes are recorded in the linked evidence branch below.
+
+Raw receipts and SHA256-verified archives are on
+[`codex/fast-autotune-evidence-20261009`](https://github.com/TryDotAtwo/MultiGPUBeamSearch/tree/codex/fast-autotune-evidence-20261009/test_results/fast_autotune_20261009).
 
 The remainder records the older explicit setup API and historical validation.
 Its default-auto and pinned-native setup descriptions do not describe the new
@@ -437,12 +444,19 @@ Stream4 jobs, final union and NCCL transport at those exact buffer capacities,
 and derives a bounded shortlist from arrival/service and memory constraints.
 The shortlist also tests a doubled outer dispatch batch and an alternative
 number of concurrent sort lanes, while the inference microbatch stays frozen.
+It compares a latency-oriented flush batch with a larger throughput-oriented
+batch at the same admitted shard capacity. Selection minimizes summed measured
+service work; the maximum of stage estimates is retained only as a diagnostic.
+This avoids hiding extra sorting work behind a transport-dominated envelope.
 Every proposal must admit the same effective frontier on all ranks. Native
 component probes share persistent per-GPU processes and use an allocation
 acknowledgement barrier before entering transport collectives.
 The five-stream architecture and global selection semantics remain unchanged.
 
 The default reports best found Stream1 throughput and calibration duration.
+Inference search is bounded by `calibration_max_batch` (8192 by default); its
+winner is the best verified candidate in that search, not an unbounded optimum.
+The cache includes this bound as well as the exact requested frontier.
 Isolated component timings are a scheduling proxy; they are not a measured
 complete depth or a proof of globally optimal performance. To measure the exact
 full-frontier gap, use `NativeOptions(calibration_full_frontier=True)`; this
@@ -450,6 +464,11 @@ prepares legal unique states and runs five measured complete depths after a
 warmup, followed by matched Stream1 inference on those same files. The report
 distinguishes throughput loss from relative time overhead. Small finite graphs
 or an explicit preparation budget can prevent a full-frontier fixture.
+Full-frontier verification is optional and can take minutes on a maximum beam:
+its preparation and repeated full steps are included in the reported total
+calibration duration. The default component calibration does not generate those
+large frontier files. Small beams need not benefit from more GPUs: dispatch,
+collectives and final selection can dominate a very fast inference pass.
 For effective frontiers up to 1,048,576, this full check also compares a proxy
 winner against the exact-frontier baseline and retains the baseline unless a
 stable material speedup is measured. Larger frontiers keep the bounded service
