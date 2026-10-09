@@ -3273,6 +3273,7 @@ DepthDispatchState run_depth_cuda_graphs(
         const std::uint32_t local_request =
             (force_local_request || periodic_threshold_due()) ? 1U : 0U;
         std::uint32_t global_request = 0;
+        progress_trace("threshold-request-begin");
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         std::cout << "threshold_trace"
                   << " rank=" << plan.config.local_rank
@@ -3307,6 +3308,7 @@ DepthDispatchState run_depth_cuda_graphs(
             cudaMemcpyDeviceToHost,
             streams.stream5), "cudaMemcpyAsync stream5 threshold global request");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 threshold request");
+        progress_trace("threshold-request-ready");
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         std::cout << "threshold_trace"
                   << " rank=" << plan.config.local_rank
@@ -3319,6 +3321,7 @@ DepthDispatchState run_depth_cuda_graphs(
         if (global_request == 0U) {
             return false;
         }
+        progress_trace("threshold-update-begin");
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 threshold timing start");
 #endif
@@ -3327,6 +3330,7 @@ DepthDispatchState run_depth_cuda_graphs(
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 threshold timing stop");
 #endif
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 threshold update");
+        progress_trace("threshold-update-ready");
 #if BEAM_DEBUG_STREAM_TIMING
         accumulate_elapsed_ms(
             stream5_timing_start[0],
@@ -3475,6 +3479,7 @@ DepthDispatchState run_depth_cuda_graphs(
 #endif
         release_completed_stream4_slots_nonblocking();
         if (recv_total_64 != 0ULL) {
+            progress_trace("remote-collect-begin");
             stream3_collect_remote_recv_cuda(
                 recv_buffer,
                 memory.streams.recv_count,
@@ -3512,17 +3517,24 @@ DepthDispatchState run_depth_cuda_graphs(
                 memory.streams.fatal_error_flag,
                 memory.streams.fatal_error_trace);
             check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize stream3 remote recv collect");
+            progress_trace("remote-collect-ready");
             throw_if_stream_fatal_error("stream3_remote_recv_collect");
+            progress_trace("remote-fatal-gate-ready");
             update_global_spill_peak();
+            progress_trace("remote-spill-peak-ready");
 #if BEAM_DEBUG_DEPTH_FLOW_TRACE
             accumulate_stream3_remote_flow(recv_total_64);
 #endif
             append_stream3_ready_queue();
+            progress_trace("remote-ready-queue-ready");
         }
         // Every rank reaches this boundary once per exchange round, including
         // zero-send ranks. Request global filtering before local backpressure
         // can block the next round on clean buffers that sorting cannot shrink.
-        maybe_run_stream5_threshold_update(!stream3_has_writable_buffer());
+        progress_trace("writable-buffer-check-begin");
+        const bool writable=stream3_has_writable_buffer();
+        progress_trace("writable-buffer-check-ready");
+        maybe_run_stream5_threshold_update(!writable);
         ++completed_exchange_rounds;
     };
 

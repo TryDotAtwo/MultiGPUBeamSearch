@@ -48,9 +48,13 @@ class NativePlanSession:
         return plans
 
     def close(self):
-        for session in self.sessions:
-            session.close()
-        self.sessions=[]
+        sessions,self.sessions=self.sessions,[]
+        failure=None
+        for session in sessions:
+            try:session.close()
+            except Exception as error:
+                if failure is None:failure=error
+        if failure is not None:raise failure
 
     def __enter__(self):return self
     def __exit__(self,*args):self.close()
