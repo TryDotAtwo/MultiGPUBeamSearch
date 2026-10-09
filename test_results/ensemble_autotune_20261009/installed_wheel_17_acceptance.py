@@ -35,7 +35,7 @@ assert result.path_found and graph.apply_path(start,result.path).reshape(-1).tol
 metadata=result.native_metadata
 assert metadata['profile']['inference_autotuned'] and metadata['profile']['pipeline_autotuned']
 assert metadata['build']['backend']=='ensemble'
-assert metadata['build']['inference_backend']=='cutlass'
+assert metadata['build']['inference_backend']=='libtorch'  # ensemble backbone executor
 wheel=next(Path('/workspace/compact-dist-v2').glob('*.whl'))
 receipt=dict(head_count=17,path_found=True,replay_valid=True,path_length=result.path_length,
     package_path=str(multigpubeamsearch.__file__),
