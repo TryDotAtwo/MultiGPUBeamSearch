@@ -112,7 +112,11 @@ def main():
  graph=json.loads((assets/'p002.json').read_text());graph['central_state']=np.load(assets/'solved_state.npy',allow_pickle=False).tolist()
  (assets/'smoke_graph.json').write_text(json.dumps(graph))
  sys.path.insert(0,str(SOURCE/'tools'));from export_cube444_blend import export
- export(assets,ROOT/'inputs/bundle')
+ bundle=ROOT/'inputs/bundle'
+ if not bundle.exists():export(assets,bundle)
+ else:
+  manifest=json.loads((bundle/'blend.json').read_text())
+  for name,digest in manifest['files'].items():assert sha(bundle/name)==digest,name
  subprocess.run(['nvidia-smi','--query-gpu=index,name,uuid,memory.total,power.limit,driver_version','--format=csv'],stdout=(OUT/'hardware.csv').open('w'),check=True)
  if (OUT/'near_goal/result.json').exists():
   prior=json.loads((OUT/'near_goal/result.json').read_text());assert prior['binary_sha256']==sha(EXE)
