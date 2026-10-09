@@ -26,3 +26,14 @@ def test_cache_rejects_failed_or_nonfinite_measurements():
         data=deepcopy(original);data['records'][1][field]=value
         assert not valid_cached_profile(data,signature,8192)
 
+
+def test_new_cache_cannot_drop_or_override_observed_throttling():
+    data, signature = profile()
+    signature['schema'] = 3
+    assert not valid_cached_profile(data, signature, 8192)
+    data['gpu_telemetry'] = {'1024': {'throttled': False,
+        'samples': [[{'throttled': False}]]}}
+    assert valid_cached_profile(data, signature, 8192)
+    data['gpu_telemetry']['1024']['samples'][0][0]['throttled'] = True
+    assert not valid_cached_profile(data, signature, 8192)
+
