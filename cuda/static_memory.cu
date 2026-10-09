@@ -358,6 +358,30 @@ struct LayoutSizeCursor {
 std::size_t bytes_final_select(const RuntimeConfig& config, const DerivedConfig& derived);
 std::size_t bytes_final_materialize(const RuntimeConfig& config, const DerivedConfig& derived);
 
+std::uint32_t union_capacity(const RuntimeConfig& config) {
+    if (config.shard_buffer_count == 1U) return 0;
+    if (config.shard_buffer_count != 2U || config.shard_capacity_candidates == 0U ||
+        config.shard_capacity_candidates > static_cast<std::uint32_t>(std::numeric_limits<int>::max() / 2))
+        throw std::invalid_argument("logical union requires two buffers and 2*capacity in CUB int range");
+    return 2U * config.shard_capacity_candidates;
+}
+
+std::size_t bytes_union(const RuntimeConfig& config) {
+    const auto capacity = union_capacity(config);
+    if (!capacity) return 0;
+    LayoutSizeCursor c;
+    c.take<Hash128>(capacity); c.take<Hash128>(capacity);
+    c.take<CandidateMeta>(capacity); c.take<CandidateMeta>(capacity);
+    c.take<std::uint32_t>(capacity); c.take<std::uint32_t>(capacity);
+    c.take<std::uint64_t>(capacity); c.take<std::uint64_t>(capacity);
+    c.take<std::uint32_t>(capacity);
+    c.take<std::uint32_t>((capacity + 255ULL) / 256ULL);
+    c.take<std::uint32_t>((capacity + 255ULL) / 256ULL);
+    c.take<std::uint32_t>(1); c.take<std::uint32_t>(2); c.take<std::uint32_t>(2);
+    c.take_bytes(stream4_cub_temp_bytes(capacity), 256);
+    return align_up_size(c.offset, 256);
+}
+
 std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& derived) {
     const std::uint32_t storage_shard_count = storage_shard_count_for(config);
     const std::uint64_t ring_slots = static_cast<std::uint64_t>(config.ring_count) * derived.ring_slot_count;
@@ -417,6 +441,10 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take<Hash128>(stream3);
     cursor.take<std::uint64_t>(stream3);
     cursor.take<std::uint32_t>(1);
+#if BEAM_DEBUG_DEPTH_FLOW_TRACE
+    cursor.take<std::uint32_t>(config.ring_count);
+    cursor.take<std::uint32_t>(config.ring_count);
+#endif
     cursor.take<CandidateMeta>(stream3);
     cursor.take<std::uint32_t>(1);
     cursor.take<CandidateMeta>(stream5_send);
@@ -451,7 +479,7 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
     const std::size_t final_layout_budget =
-        std::max(bytes_final_select(config, derived), bytes_final_materialize(config, derived));
+        std::max({bytes_final_select(config, derived), bytes_final_materialize(config, derived), bytes_union(config)});
     cursor.offset = std::max(cursor.offset, final_layout_budget);
     cursor.take<CandidateMeta>(survivors);
     cursor.take<std::uint32_t>(storage_shard_count);
@@ -463,6 +491,9 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take<std::uint32_t>(storage_shard_count);
     cursor.take<std::uint64_t>(SCORE_BIN_COUNT);
     cursor.take<std::uint64_t>(SCORE_BIN_COUNT);
+    cursor.take<std::uint32_t>(2);
+    cursor.take<std::uint32_t>(2);
+    cursor.take<std::uint32_t>(1);
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint32_t>(1);
     return align_up_size(cursor.offset, 256);
@@ -625,6 +656,8 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
         stream3_cub_temp_bytes(config.stream3_batch_candidates),
         stream3_partition_cub_temp_bytes(stream3_partition_count, config.shard_count));
     plan.stream4_cub_temp_bytes = stream4_cub_temp_bytes(config.shard_capacity_candidates);
+    plan.layout_union_bytes = bytes_union(config);
+    plan.union_cub_temp_bytes = union_capacity(config) ? stream4_cub_temp_bytes(union_capacity(config)) : 0;
     plan.final_materialize_cub_temp_bytes = final_materialize_cub_temp_bytes(
         static_cast<std::uint32_t>(plan.final_materialize_exchange_capacity));
     plan.current_frontier_bytes = static_cast<std::size_t>(plan.frontier_states) * sizeof(State128);
@@ -633,12 +666,14 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     plan.layout_phase2_select_bytes = bytes_final_select(config, derived);
     plan.layout_phase3_materialize_bytes = bytes_final_materialize(config, derived);
     plan.layout_streams_bytes = plan.layout_phase1_streams_bytes;
-    plan.layout_final_budget_bytes = std::max(plan.layout_phase2_select_bytes, plan.layout_phase3_materialize_bytes);
+    plan.layout_final_budget_bytes = std::max({plan.layout_phase2_select_bytes,
+                                             plan.layout_phase3_materialize_bytes, plan.layout_union_bytes});
     plan.layout_final_bytes = plan.layout_final_budget_bytes;
     plan.scratch_pool_bytes = std::max({
         plan.layout_phase1_streams_bytes,
         plan.layout_phase2_select_bytes,
         plan.layout_phase3_materialize_bytes,
+        static_cast<std::size_t>(config.solve_bucket_gather_scratch_bytes),
     });
     plan.total_device_bytes =
         align_up_size(plan.current_frontier_bytes, 256) +
@@ -671,6 +706,23 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     root.offset = align_up_size(root.offset, 256);
     memory.scratch_pool = root.base + root.offset;
     memory.scratch_pool_bytes = plan.scratch_pool_bytes;
+
+    if (plan.layout_union_bytes) {
+        Cursor u{reinterpret_cast<std::byte*>(memory.scratch_pool), 0};
+        const auto capacity = union_capacity(plan.config);
+        auto& v = memory.final_union;
+        v.key_a = u.take<Hash128>(capacity); v.key_b = u.take<Hash128>(capacity);
+        v.value_a = u.take<CandidateMeta>(capacity); v.value_b = u.take<CandidateMeta>(capacity);
+        v.score_a = u.take<std::uint32_t>(capacity); v.score_b = u.take<std::uint32_t>(capacity);
+        v.score_count_a = u.take<std::uint64_t>(capacity); v.score_count_b = u.take<std::uint64_t>(capacity);
+        v.keep = u.take<std::uint32_t>(capacity);
+        v.blocks = u.take<std::uint32_t>((capacity + 255ULL) / 256ULL);
+        v.offsets = u.take<std::uint32_t>((capacity + 255ULL) / 256ULL);
+        v.count = u.take<std::uint32_t>(1); v.dirty = u.take<std::uint32_t>(2);
+        v.processing = u.take<std::uint32_t>(2);
+        v.cub_temp = u.take<std::byte>(plan.union_cub_temp_bytes, 256);
+        if (u.offset > plan.layout_union_bytes) throw std::logic_error("union layout exceeds planned extent");
+    }
 
     Cursor streams{reinterpret_cast<std::byte*>(memory.scratch_pool), 0};
     memory.streams.score_ring = streams.take<std::uint32_t>(plan.score_ring_count);
@@ -777,6 +829,11 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     memory.streams.current_threshold_active_index = streams.take<std::uint32_t>(1);
     memory.streams.threshold_request_local = streams.take<std::uint32_t>(1);
     memory.streams.threshold_request_global = streams.take<std::uint32_t>(1);
+
+    if (streams.offset > plan.layout_phase1_streams_bytes ||
+        streams.offset > memory.scratch_pool_bytes) {
+        throw std::runtime_error("streams layout exceeds its planned scratch extent");
+    }
 
     Cursor final_common{reinterpret_cast<std::byte*>(memory.scratch_pool), 0};
     if (plan.config.world_size > 1U) {
