@@ -1,0 +1,2760 @@
+{
+  "acceptance": {
+    "native-one": {
+      "path_found": true,
+      "replay_valid": true,
+      "path_length": 4,
+      "backend": "native",
+      "metadata": {
+        "build": {
+          "schema_version": 1,
+          "shape": {
+            "state_len": 8,
+            "storage_len": 16,
+            "move_count": 3,
+            "alignment": 16
+          },
+          "backend": "mlp",
+          "cuda_architectures": [
+            86
+          ],
+          "source_digest": "10add5796c4007cad9639b8f68c1c52fa03ee26234c3e0b2d4a0a03b6429107e",
+          "cutlass_digest": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+          "toolchain": {
+            "cmake": "/usr/bin/cmake\ncmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+            "nvcc": "/usr/local/cuda-12.8/bin/nvcc\nnvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+            "cxx": "/usr/bin/x86_64-linux-gnu-g++-13\nx86_64-linux-gnu-g++-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+          },
+          "target": "production_runner",
+          "nccl": {
+            "include_dir": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/include",
+            "library": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2",
+            "header_sha256": "06b934792a70f08cafabd96b8f94015b143a182fbb3bc56ac71c4c6de7deb971",
+            "library_sha256": "1792291e26d2b27fe51e59cf4dbd361dbfa84cbfe8ee8196c087c7ebf5146d48"
+          },
+          "build_mode": "release-debug-logs-v1",
+          "inference_backend": "cutlass",
+          "calibration_binary_name": "stream1_native_mlp_benchmark",
+          "torch": {
+            "version": "2.11.0+cu128",
+            "cuda": "12.8",
+            "cxx11_abi": true,
+            "cmake_prefix": "/venv/main/lib/python3.12/site-packages/torch/share/cmake"
+          },
+          "build_key": "5027dfd7931f0a5467d322ccf1dd95c223a600d34429dea4d752e7e737be78d1",
+          "binary_sha256": "d32bd31f7d358c5fe67f480d84b05bf6b3f9e965ffc22d04514d21beb5d8bdc2",
+          "calibration_binary_sha256": "504bbe91bf7699eba02f7384befbb9a9dc65f1de54d8effa611f14880dcfd574"
+        },
+        "profile": {
+          "policy": "cutlass-default-v1",
+          "inference_backend": "cutlass",
+          "inference_row_limit": 8192,
+          "cuda_architectures": [
+            86
+          ],
+          "gpu_names": [
+            "NVIDIA GeForce RTX 3060"
+          ],
+          "memory_planning": "native_auto",
+          "autotuned": true,
+          "inference_autotuned": true,
+          "inference_calibration": {
+            "signature": {
+              "schema": 3,
+              "graph": "695e6baa6867ac666737abb2ca54dd9b67a5de168ce0467afeb63653d9169871",
+              "models": "920bd6e2c14f69c738ce3a028ddda556213cbbd4d9132d9c17345c26ef9ea29d",
+              "runner": "d32bd31f7d358c5fe67f480d84b05bf6b3f9e965ffc22d04514d21beb5d8bdc2",
+              "probe": "504bbe91bf7699eba02f7384befbb9a9dc65f1de54d8effa611f14880dcfd574",
+              "gpu_properties": [
+                "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11911MB, multi_processor_count=28, uuid=0c5a8fa7-4abf-40ae-55be-9a70889c72c1, pci_bus_id=10, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)"
+              ],
+              "device_indices": [
+                1
+              ],
+              "world_size": 1,
+              "torch": "2.11.0+cu128",
+              "cuda": "12.8",
+              "topology_sha256": "975aced5db3f5febc889df1b0d24fa148480e292ca5742fdf7f573398a0518ff",
+              "hardware_sha256": "e2d6d769ca1791139063819a562dac533b0db0992b91f595a4faab25d84cdfc5",
+              "gpu_uuids": [
+                "0c5a8fa7-4abf-40ae-55be-9a70889c72c1"
+              ],
+              "host": {
+                "machine": "x86_64",
+                "processor": "x86_64"
+              },
+              "beam_anchor_power": 13,
+              "precision": "fp16/fp32",
+              "max_batch": 256
+            },
+            "phase": "inference_verified",
+            "parent_batch": 256,
+            "reserve_bytes": 536870912,
+            "estimate": {
+              "profile": "256",
+              "median": 7.812499825377017e-8,
+              "low": 7.812499825377017e-8,
+              "high": 7.812499825377017e-8,
+              "relative_mad": 0,
+              "repeats": 7
+            },
+            "records": [
+              {
+                "backbone_oracle_max_key_error": 0,
+                "batch": 256,
+                "correctness_passed": true,
+                "device": 0,
+                "executor": "native_cuda_graph",
+                "model_count": 1,
+                "native_scalar_score_offset": 3,
+                "numeric_error": 0,
+                "oracle_parent_chunk": 128,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.000644320011138916,
+                  0.0006399999856948852,
+                  0.0006399999856948852,
+                  0.0006399999856948852,
+                  0.0006399999856948852,
+                  0.0006399999856948852,
+                  0.0006399999856948852
+                ],
+                "torch_reserved_peak_bytes": 0
+              },
+              {
+                "backbone_oracle_max_key_error": 0,
+                "batch": 64,
+                "correctness_passed": true,
+                "device": 0,
+                "executor": "native_cuda_graph",
+                "model_count": 1,
+                "native_scalar_score_offset": 3,
+                "numeric_error": 0,
+                "oracle_parent_chunk": 128,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.0020858559608459473,
+                  0.0020756480693817137,
+                  0.0020797441005706786,
+                  0.0020766079425811766,
+                  0.0020796480178833007,
+                  0.002077696084976196,
+                  0.0020796480178833007
+                ],
+                "torch_reserved_peak_bytes": 0
+              },
+              {
+                "backbone_oracle_max_key_error": 0,
+                "batch": 32,
+                "correctness_passed": true,
+                "device": 0,
+                "executor": "native_cuda_graph",
+                "model_count": 1,
+                "native_scalar_score_offset": 3,
+                "numeric_error": 0,
+                "oracle_parent_chunk": 128,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.004115839958190918,
+                  0.0041113600730896,
+                  0.0041113600730896,
+                  0.0041113600730896,
+                  0.004110335826873779,
+                  0.004110335826873779,
+                  0.004110239982604981
+                ],
+                "torch_reserved_peak_bytes": 0
+              },
+              {
+                "backbone_oracle_max_key_error": 0,
+                "batch": 128,
+                "correctness_passed": true,
+                "device": 0,
+                "executor": "native_cuda_graph",
+                "model_count": 1,
+                "native_scalar_score_offset": 3,
+                "numeric_error": 0,
+                "oracle_parent_chunk": 128,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.0011623680591583252,
+                  0.0011571199893951416,
+                  0.0011560959815979004,
+                  0.0011581439971923829,
+                  0.0011570240259170532,
+                  0.0011571199893951416,
+                  0.0011571199893951416
+                ],
+                "torch_reserved_peak_bytes": 0
+              }
+            ],
+            "rejected": {},
+            "stat_rejected": {
+              "32": "no statistically separated material gain",
+              "64": "no statistically separated material gain",
+              "128": "no statistically separated material gain"
+            },
+            "gpu_telemetry": {
+              "32": {
+                "samples": [
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 41,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 42,
+                      "throttled": false
+                    }
+                  ],
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 42,
+                      "throttled": false
+                    }
+                  ]
+                ],
+                "errors": [],
+                "interval_seconds": 5,
+                "throttled": false,
+                "scope": "sampled visible GPUs; transient events may be missed"
+              },
+              "64": {
+                "samples": [
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 41,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 41,
+                      "throttled": false
+                    }
+                  ],
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 41,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 42,
+                      "throttled": false
+                    }
+                  ]
+                ],
+                "errors": [],
+                "interval_seconds": 5,
+                "throttled": false,
+                "scope": "sampled visible GPUs; transient events may be missed"
+              },
+              "128": {
+                "samples": [
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 42,
+                      "throttled": false
+                    }
+                  ],
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 42,
+                      "throttled": false
+                    }
+                  ]
+                ],
+                "errors": [],
+                "interval_seconds": 5,
+                "throttled": false,
+                "scope": "sampled visible GPUs; transient events may be missed"
+              },
+              "256": {
+                "samples": [
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 40,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 40,
+                      "throttled": false
+                    }
+                  ],
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 41,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 41,
+                      "throttled": false
+                    }
+                  ]
+                ],
+                "errors": [],
+                "interval_seconds": 5,
+                "throttled": false,
+                "scope": "sampled visible GPUs; transient events may be missed"
+              }
+            },
+            "pipeline_verified": false,
+            "cache_hit": false,
+            "measured_candidates": [
+              32,
+              64,
+              128,
+              256
+            ]
+          },
+          "pipeline_autotuned": true,
+          "pipeline_calibration": {
+            "environment": {
+              "BEAM_B_MICRO": "768",
+              "BEAM_ENSEMBLE_INFERENCE_MICRO": "256",
+              "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+              "BEAM_STREAM4_BATCH_CANDIDATES": "16384"
+            },
+            "estimate": {
+              "profile": "round-1-sort-batch-16384",
+              "median": 0.00000339544677734375,
+              "low": 0.0000033491455078125,
+              "high": 0.0000034302490234375,
+              "relative_mad": 0.006647372867645799,
+              "repeats": 5
+            },
+            "rejected": {
+              "round-0-shards-16": "candidate changes effective beam; timing is not comparable",
+              "round-0-shards-32": "candidate changes effective beam; timing is not comparable",
+              "round-0-shards-64": "candidate changes effective beam; timing is not comparable",
+              "round-0-shards-128": "candidate changes effective beam; timing is not comparable",
+              "round-0-sort-batch-32768": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/pipeline-calibration/actual-plans/15/rank-0.log",
+              "round-0-sort-batch-65536": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/pipeline-calibration/actual-plans/16/rank-0.log",
+              "round-0-sort-batch-131072": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/pipeline-calibration/actual-plans/17/rank-0.log",
+              "round-1-ring-1": "native calibration timed out: /workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/pipeline-calibration/measurements/33",
+              "round-1-shards-16": "candidate changes effective beam; timing is not comparable",
+              "round-1-shards-32": "candidate changes effective beam; timing is not comparable",
+              "round-1-shards-64": "candidate changes effective beam; timing is not comparable",
+              "round-1-shards-128": "candidate changes effective beam; timing is not comparable",
+              "round-1-sort-batch-32768": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/pipeline-calibration/actual-plans/34/rank-0.log",
+              "round-1-sort-batch-65536": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/pipeline-calibration/actual-plans/35/rank-0.log",
+              "round-1-sort-batch-131072": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/pipeline-calibration/actual-plans/36/rank-0.log"
+            },
+            "effective_beam": 8192,
+            "workload_parents": 8192,
+            "world_size": 1,
+            "measurements": [
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0313963
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0310197
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0311681
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0321284
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0311601
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0310383
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0311307
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0310172
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0309453
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.031084
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0301755
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0299118
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0299105
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0301057
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0297327
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0293579
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0290457
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0294689
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.029281
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0295363
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0305766
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0307174
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0304803
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0305763
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0304205
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0293603
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0292806
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0294527
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0291348
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0297006
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0305775
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0304326
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0304505
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0307378
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0302186
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0295212
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0293813
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0293509
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.029442
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0286994
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0282192
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0280224
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0282268
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0282195
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0286085
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0279872
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0280562
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0279783
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0281907
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0280601
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0284542
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0290673
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0284386
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.029572
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0285776
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0312519
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0302101
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0303137
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0305839
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.03007
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0302999
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0301401
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0306061
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0298984
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0303746
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0286851
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0291294
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0286148
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0289892
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0287502
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0283838
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0284862
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0285497
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0283257
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0286219
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0282176
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0281417
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0279108
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0280954
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0281904
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0297603
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0299801
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0296231
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0299521
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0297867
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0315571
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0317441
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0316512
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0316801
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-shards-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.031769
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0293685
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0296238
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0293909
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0292119
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.029458
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0280004
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0278047
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0281006
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0278155
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0274362
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              }
+            ],
+            "phase": "pipeline_measured",
+            "requested_beam_width": 8192,
+            "requested_beam_effective": 8192,
+            "fixture": {
+              "schema": 1,
+              "graph_hash": "695e6baa6867ac666737abb2ca54dd9b67a5de168ce0467afeb63653d9169871",
+              "global_parents": 8192,
+              "unique_states": 8192,
+              "seed": 20261009,
+              "walk_length": 64,
+              "walk_length_min": 32,
+              "state_len": 8,
+              "storage_len": 16,
+              "excluded_center_and_predecessors": true,
+              "files": [
+                {
+                  "rank": 0,
+                  "parents": 8192,
+                  "path": "/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/pipeline-calibration/frontiers/frontier-rank-0.bin",
+                  "sha256": "6293b97178561c6975e3edcf567b917d15fd12c902f0da6583bc6770b6dbdec3",
+                  "bytes": 131072
+                }
+              ]
+            },
+            "pipeline_verified": true,
+            "cache_hit": false,
+            "measurement_scope": "full_requested_frontier",
+            "correctness_scope": "fixture legality, accepted model readout, native completion; normal solution replay checked by run_native"
+          }
+        },
+        "model_artifact_hash": "920bd6e2c14f69c738ce3a028ddda556213cbbd4d9132d9c17345c26ef9ea29d",
+        "graph_hash": "695e6baa6867ac666737abb2ca54dd9b67a5de168ce0467afeb63653d9169871",
+        "devices": [
+          1
+        ],
+        "requested_beam_width": 8192,
+        "microbatch": {
+          "native_default_row_budget": 8192,
+          "configured_row_budget": 768,
+          "derived_parent_batch": 256,
+          "derived_candidates_per_slot": 768,
+          "reference_logical_shard": 2048,
+          "reference_shard_storage": 3072,
+          "adjusted_for_small_beam": true,
+          "inference_parent_batch": 256
+        },
+        "requested_max_steps": 8,
+        "native_forward_depth_limit": 6,
+        "configured_touch_bfs_radius": 2,
+        "effective_touch_bfs_radius": 2,
+        "touch_bfs_max_entries": 1048576,
+        "touch_bfs_worst_case_entries": 13,
+        "replay_valid": true,
+        "log_path": "/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/native.log",
+        "native_seconds": 0.0568286,
+        "terminal_records": 1,
+        "observed_parent_batch": 256,
+        "observed_inference_rows": 768,
+        "observed_stream3_batch_candidates": 6144,
+        "backend": "native",
+        "inference_backend": "cutlass",
+        "heuristic": "hamming",
+        "model_hash": "920bd6e2c14f69c738ce3a028ddda556213cbbd4d9132d9c17345c26ef9ea29d",
+        "effective_beam_width": 8192,
+        "elapsed_seconds": 0.315268621998257,
+        "run_dir": "/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa",
+        "scoring": "scalar_children",
+        "status": "found"
+      }
+    },
+    "libtorch-two": {
+      "path_found": true,
+      "replay_valid": true,
+      "path_length": 4,
+      "backend": "native",
+      "metadata": {
+        "build": {
+          "schema_version": 1,
+          "shape": {
+            "state_len": 8,
+            "storage_len": 16,
+            "move_count": 3,
+            "alignment": 16
+          },
+          "backend": "mlp",
+          "cuda_architectures": [
+            86
+          ],
+          "source_digest": "110909bc89c37cce25b867f6a6076ba7d399884944d2551ad088007d37777fab",
+          "cutlass_digest": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+          "toolchain": {
+            "cmake": "/usr/bin/cmake\ncmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+            "nvcc": "/usr/local/cuda-12.8/bin/nvcc\nnvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+            "cxx": "/usr/bin/x86_64-linux-gnu-g++-13\nx86_64-linux-gnu-g++-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+          },
+          "target": "production_runner_libtorch_stream1",
+          "nccl": {
+            "include_dir": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/include",
+            "library": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2",
+            "header_sha256": "06b934792a70f08cafabd96b8f94015b143a182fbb3bc56ac71c4c6de7deb971",
+            "library_sha256": "1792291e26d2b27fe51e59cf4dbd361dbfa84cbfe8ee8196c087c7ebf5146d48"
+          },
+          "build_mode": "release-debug-logs-v1",
+          "inference_backend": "libtorch",
+          "calibration_binary_name": "stream1_libtorch_mlp_benchmark",
+          "torch": {
+            "version": "2.11.0+cu128",
+            "cuda": "12.8",
+            "cxx11_abi": true,
+            "cmake_prefix": "/venv/main/lib/python3.12/site-packages/torch/share/cmake"
+          },
+          "build_key": "a6c0c3fe5a53d2f9ac67e2ce280136a72e83e53f7a48870017b44853876f60db",
+          "binary_sha256": "a08412ee272ef4be25489074f5a0660310ca5a11d96d7be16ad7c7f96d621b26",
+          "calibration_binary_sha256": "7b8034c21faacd7d1d8f66d36ee715bdf062f7966a076d46fcbdf92318794781"
+        },
+        "profile": {
+          "policy": "libtorch-conservative-v1",
+          "inference_backend": "libtorch",
+          "inference_row_limit": 2048,
+          "cuda_architectures": [
+            86
+          ],
+          "gpu_names": [
+            "NVIDIA GeForce RTX 3060",
+            "NVIDIA GeForce RTX 3060"
+          ],
+          "memory_planning": "native_auto",
+          "autotuned": true,
+          "inference_autotuned": true,
+          "inference_calibration": {
+            "signature": {
+              "schema": 3,
+              "graph": "695e6baa6867ac666737abb2ca54dd9b67a5de168ce0467afeb63653d9169871",
+              "models": "920bd6e2c14f69c738ce3a028ddda556213cbbd4d9132d9c17345c26ef9ea29d",
+              "runner": "a08412ee272ef4be25489074f5a0660310ca5a11d96d7be16ad7c7f96d621b26",
+              "probe": "7b8034c21faacd7d1d8f66d36ee715bdf062f7966a076d46fcbdf92318794781",
+              "gpu_properties": [
+                "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11911MB, multi_processor_count=28, uuid=2738b41f-9563-2b72-eb23-4499e22393b1, pci_bus_id=9, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)",
+                "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11911MB, multi_processor_count=28, uuid=0c5a8fa7-4abf-40ae-55be-9a70889c72c1, pci_bus_id=10, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)"
+              ],
+              "device_indices": [
+                0,
+                1
+              ],
+              "world_size": 2,
+              "torch": "2.11.0+cu128",
+              "cuda": "12.8",
+              "topology_sha256": "975aced5db3f5febc889df1b0d24fa148480e292ca5742fdf7f573398a0518ff",
+              "hardware_sha256": "e2d6d769ca1791139063819a562dac533b0db0992b91f595a4faab25d84cdfc5",
+              "gpu_uuids": [
+                "2738b41f-9563-2b72-eb23-4499e22393b1",
+                "0c5a8fa7-4abf-40ae-55be-9a70889c72c1"
+              ],
+              "host": {
+                "machine": "x86_64",
+                "processor": "x86_64"
+              },
+              "beam_anchor_power": 13,
+              "precision": "fp16/fp32",
+              "max_batch": 256
+            },
+            "phase": "inference_verified",
+            "parent_batch": 256,
+            "reserve_bytes": 559939584,
+            "estimate": {
+              "profile": "256",
+              "median": 7.609316380694509e-7,
+              "low": 7.504277164116502e-7,
+              "high": 7.65187491197139e-7,
+              "relative_mad": 0.0055929506867208505,
+              "repeats": 7
+            },
+            "records": [
+              {
+                "batch": 256,
+                "batch_invariance_max_key_error": 0,
+                "correctness_passed": true,
+                "device": 0,
+                "executor": "libtorch_eager",
+                "model_count": 1,
+                "numeric_error": 0,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.011107328414916993,
+                  0.011055007934570312,
+                  0.010879072189331054,
+                  0.011020416259765626,
+                  0.010938367843627929,
+                  0.010901503562927246,
+                  0.010877951622009278
+                ],
+                "torch_reserved_peak_bytes": 23068672
+              },
+              {
+                "batch": 256,
+                "batch_invariance_max_key_error": 0,
+                "correctness_passed": true,
+                "device": 1,
+                "executor": "libtorch_eager",
+                "model_count": 1,
+                "numeric_error": 0,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.012579839706420898,
+                  0.012209152221679688,
+                  0.012526592254638673,
+                  0.012295007705688477,
+                  0.012405887603759765,
+                  0.012536831855773926,
+                  0.012467103958129883
+                ],
+                "torch_reserved_peak_bytes": 23068672
+              },
+              {
+                "batch": 64,
+                "batch_invariance_max_key_error": 0,
+                "correctness_passed": true,
+                "device": 0,
+                "executor": "libtorch_eager",
+                "model_count": 1,
+                "numeric_error": 0,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.04464025497436523,
+                  0.044493824005126956,
+                  0.044370079040527345,
+                  0.044480510711669925,
+                  0.0442347526550293,
+                  0.044230655670166014,
+                  0.04426559829711914
+                ],
+                "torch_reserved_peak_bytes": 23068672
+              },
+              {
+                "batch": 64,
+                "batch_invariance_max_key_error": 0,
+                "correctness_passed": true,
+                "device": 1,
+                "executor": "libtorch_eager",
+                "model_count": 1,
+                "numeric_error": 0,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.04430233764648438,
+                  0.04415999984741211,
+                  0.04415180969238281,
+                  0.044423038482666016,
+                  0.04420403289794922,
+                  0.04423680114746094,
+                  0.044230655670166014
+                ],
+                "torch_reserved_peak_bytes": 23068672
+              },
+              {
+                "batch": 32,
+                "batch_invariance_max_key_error": 0,
+                "correctness_passed": true,
+                "device": 0,
+                "executor": "libtorch_eager",
+                "model_count": 1,
+                "numeric_error": 0,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.0963051528930664,
+                  0.09579110717773437,
+                  0.09607782745361328,
+                  0.09605017852783203,
+                  0.09603379058837891,
+                  0.095963134765625,
+                  0.0961638412475586
+                ],
+                "torch_reserved_peak_bytes": 23068672
+              },
+              {
+                "batch": 32,
+                "batch_invariance_max_key_error": 0,
+                "correctness_passed": true,
+                "device": 1,
+                "executor": "libtorch_eager",
+                "model_count": 1,
+                "numeric_error": 0,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.10406291198730469,
+                  0.10434371185302735,
+                  0.10361548614501953,
+                  0.10328678131103515,
+                  0.10361241912841797,
+                  0.10343936157226563,
+                  0.10370854187011719
+                ],
+                "torch_reserved_peak_bytes": 23068672
+              },
+              {
+                "batch": 128,
+                "batch_invariance_max_key_error": 0,
+                "correctness_passed": true,
+                "device": 0,
+                "executor": "libtorch_eager",
+                "model_count": 1,
+                "numeric_error": 0,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.023111679077148437,
+                  0.023036928176879884,
+                  0.02310860824584961,
+                  0.022972415924072266,
+                  0.02307583999633789,
+                  0.023145471572875977,
+                  0.02311065673828125
+                ],
+                "torch_reserved_peak_bytes": 23068672
+              },
+              {
+                "batch": 128,
+                "batch_invariance_max_key_error": 0,
+                "correctness_passed": true,
+                "device": 1,
+                "executor": "libtorch_eager",
+                "model_count": 1,
+                "numeric_error": 0,
+                "parents": 8192,
+                "score_input": "graph_states",
+                "seconds": [
+                  0.022382591247558595,
+                  0.022230079650878906,
+                  0.022182912826538087,
+                  0.02215116882324219,
+                  0.022162431716918944,
+                  0.022199296951293947,
+                  0.022148992538452147
+                ],
+                "torch_reserved_peak_bytes": 23068672
+              }
+            ],
+            "rejected": {},
+            "stat_rejected": {
+              "32": "no statistically separated material gain",
+              "64": "no statistically separated material gain",
+              "128": "no statistically separated material gain"
+            },
+            "gpu_telemetry": {
+              "32": {
+                "samples": [
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 47,
+                      "throttled": false
+                    }
+                  ],
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 47,
+                      "throttled": false
+                    }
+                  ]
+                ],
+                "errors": [],
+                "interval_seconds": 5,
+                "throttled": false,
+                "scope": "sampled visible GPUs; transient events may be missed"
+              },
+              "64": {
+                "samples": [
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 47,
+                      "throttled": false
+                    }
+                  ],
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 47,
+                      "throttled": false
+                    }
+                  ]
+                ],
+                "errors": [],
+                "interval_seconds": 5,
+                "throttled": false,
+                "scope": "sampled visible GPUs; transient events may be missed"
+              },
+              "128": {
+                "samples": [
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 47,
+                      "throttled": false
+                    }
+                  ],
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 43,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 47,
+                      "throttled": false
+                    }
+                  ]
+                ],
+                "errors": [],
+                "interval_seconds": 5,
+                "throttled": false,
+                "scope": "sampled visible GPUs; transient events may be missed"
+              },
+              "256": {
+                "samples": [
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 41,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 45,
+                      "throttled": false
+                    }
+                  ],
+                  [
+                    {
+                      "index": 0,
+                      "uuid": "GPU-2738b41f-9563-2b72-eb23-4499e22393b1",
+                      "temperature": 42,
+                      "throttled": false
+                    },
+                    {
+                      "index": 1,
+                      "uuid": "GPU-0c5a8fa7-4abf-40ae-55be-9a70889c72c1",
+                      "temperature": 46,
+                      "throttled": false
+                    }
+                  ]
+                ],
+                "errors": [],
+                "interval_seconds": 5,
+                "throttled": false,
+                "scope": "sampled visible GPUs; transient events may be missed"
+              }
+            },
+            "pipeline_verified": false,
+            "cache_hit": false,
+            "measured_candidates": [
+              32,
+              64,
+              128,
+              256
+            ]
+          },
+          "pipeline_autotuned": true,
+          "pipeline_calibration": {
+            "environment": {
+              "BEAM_B_MICRO": "768",
+              "BEAM_ENSEMBLE_INFERENCE_MICRO": "256",
+              "BEAM_STREAM4_BATCH_CANDIDATES": "16384",
+              "BEAM_STREAM3_RING_SLOTS": "8"
+            },
+            "estimate": {
+              "profile": "round-1-ring-8",
+              "median": 0.0000011958154296875,
+              "low": 0.00000119000732421875,
+              "high": 0.00000122137451171875,
+              "relative_mad": 0.004857025026234896,
+              "repeats": 5
+            },
+            "rejected": {
+              "round-0-shards-8": "candidate changes effective beam; timing is not comparable",
+              "round-0-shards-16": "candidate changes effective beam; timing is not comparable",
+              "round-0-shards-32": "candidate changes effective beam; timing is not comparable",
+              "round-0-shards-64": "candidate changes effective beam; timing is not comparable",
+              "round-0-shards-128": "candidate changes effective beam; timing is not comparable",
+              "round-0-sort-batch-32768": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/15/rank-0.log",
+              "round-0-sort-batch-65536": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/16/rank-0.log",
+              "round-0-sort-batch-131072": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/17/rank-0.log",
+              "round-0-sort-slots-8": "candidate changes effective beam; timing is not comparable",
+              "round-1-ring-1": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/22/rank-0.log",
+              "round-1-ring-2": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/23/rank-0.log",
+              "round-1-ring-4": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/24/rank-0.log",
+              "round-1-shards-4": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/26/rank-0.log",
+              "round-1-shards-8": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/27/rank-0.log",
+              "round-1-shards-16": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/28/rank-0.log",
+              "round-1-shards-32": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/29/rank-0.log",
+              "round-1-shards-64": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/30/rank-0.log",
+              "round-1-shards-128": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/31/rank-0.log",
+              "round-1-sort-slots-2": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/33/rank-0.log",
+              "round-1-sort-slots-4": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/34/rank-0.log",
+              "round-1-sort-slots-8": "native calibration failed: /workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/actual-plans/35/rank-0.log"
+            },
+            "effective_beam": 8192,
+            "workload_parents": 8192,
+            "world_size": 2,
+            "measurements": [
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.011337,
+                  0.0113409
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0121661,
+                  0.0121757
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0111777,
+                  0.0111833
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112501,
+                  0.0112574
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "baseline",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0111727,
+                  0.0111745
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0622462,
+                  0.0622521
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0622475,
+                  0.0622538
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0618623,
+                  0.0618691
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0611472,
+                  0.0611571
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0609922,
+                  0.0610004
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0365571,
+                  0.0365611
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0364703,
+                  0.0364794
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0364972,
+                  0.0365061
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0366455,
+                  0.0366504
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0364693,
+                  0.0364771
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0354198,
+                  0.0354214
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0355673,
+                  0.0355636
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0353621,
+                  0.0353635
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0351381,
+                  0.0351442
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0349742,
+                  0.0349812
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112092,
+                  0.011211
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0113553,
+                  0.0113633
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0115516,
+                  0.0115584
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0110117,
+                  0.0110172
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0110189,
+                  0.0110273
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0113274,
+                  0.0113286
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0119411,
+                  0.0119497
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112642,
+                  0.0112719
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112247,
+                  0.0112316
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-shards-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0111552,
+                  0.011163
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0107973,
+                  0.0108047
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0107211,
+                  0.0107311
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0107405,
+                  0.0107418
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.010682,
+                  0.0106916
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-8192",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0107315,
+                  0.010742
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.010141,
+                  0.0101432
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00989925,
+                  0.00990182
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0098636,
+                  0.00987095
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0098868,
+                  0.00989519
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-batch-16384",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00987281,
+                  0.00988037
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.01034,
+                  0.0103538
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0102664,
+                  0.0102723
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0102362,
+                  0.010239
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0103512,
+                  0.0103085
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0103054,
+                  0.0103111
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0114012,
+                  0.0114121
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112311,
+                  0.0112391
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112952,
+                  0.0112997
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112079,
+                  0.0112143
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-2",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112118,
+                  0.0112168
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.011343,
+                  0.011345
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0111332,
+                  0.0111377
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.011707,
+                  0.011711
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0111166,
+                  0.0111249
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-0-sort-slots-4",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0112471,
+                  0.0112507
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00989258,
+                  0.00989682
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00976544,
+                  0.00977148
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0099998,
+                  0.0100055
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00974061,
+                  0.00974854
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-ring-8",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00978706,
+                  0.00979612
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0100154,
+                  0.0100216
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.0101844,
+                  0.0101889
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00996005,
+                  0.009961
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00995526,
+                  0.0099602
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              },
+              {
+                "profile": "round-1-sort-slots-1",
+                "parents": 8192,
+                "seconds_by_rank": [
+                  0.00992077,
+                  0.009928
+                ],
+                "correctness_passed": true,
+                "memory_admitted": true,
+                "throttled": false
+              }
+            ],
+            "phase": "pipeline_measured",
+            "requested_beam_width": 8192,
+            "requested_beam_effective": 8192,
+            "fixture": {
+              "schema": 1,
+              "graph_hash": "695e6baa6867ac666737abb2ca54dd9b67a5de168ce0467afeb63653d9169871",
+              "global_parents": 8192,
+              "unique_states": 8192,
+              "seed": 20261009,
+              "walk_length": 64,
+              "walk_length_min": 32,
+              "state_len": 8,
+              "storage_len": 16,
+              "excluded_center_and_predecessors": true,
+              "files": [
+                {
+                  "rank": 0,
+                  "parents": 4096,
+                  "path": "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/frontiers/frontier-rank-0.bin",
+                  "sha256": "612d709d9020fb2deff3d3b3f84a90c4d07b24f74dcbf5060000447c6c524abc",
+                  "bytes": 65536
+                },
+                {
+                  "rank": 1,
+                  "parents": 4096,
+                  "path": "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/pipeline-calibration/frontiers/frontier-rank-1.bin",
+                  "sha256": "e6ef5808e530ca4f4b4397d91671fc72a8edbf1ed35b107cfc56f78ab0e2582f",
+                  "bytes": 65536
+                }
+              ]
+            },
+            "pipeline_verified": true,
+            "cache_hit": false,
+            "measurement_scope": "full_requested_frontier",
+            "correctness_scope": "fixture legality, accepted model readout, native completion; normal solution replay checked by run_native"
+          }
+        },
+        "model_artifact_hash": "920bd6e2c14f69c738ce3a028ddda556213cbbd4d9132d9c17345c26ef9ea29d",
+        "graph_hash": "695e6baa6867ac666737abb2ca54dd9b67a5de168ce0467afeb63653d9169871",
+        "devices": [
+          0,
+          1
+        ],
+        "requested_beam_width": 8192,
+        "microbatch": {
+          "native_default_row_budget": 2048,
+          "configured_row_budget": 768,
+          "derived_parent_batch": 256,
+          "derived_candidates_per_slot": 768,
+          "reference_logical_shard": 1024,
+          "reference_shard_storage": 2048,
+          "adjusted_for_small_beam": true,
+          "inference_parent_batch": 256
+        },
+        "requested_max_steps": 8,
+        "native_forward_depth_limit": 6,
+        "configured_touch_bfs_radius": 2,
+        "effective_touch_bfs_radius": 2,
+        "touch_bfs_max_entries": 1048576,
+        "touch_bfs_worst_case_entries": 13,
+        "replay_valid": true,
+        "log_path": "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/native.log",
+        "launcher_log": "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/launcher.log",
+        "worker_log_dir": "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs",
+        "worker_streams": [
+          "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs/84077445-0a5d-45b4-9610-86df8d60d726_ed_v6zzc/attempt_0/0/stdout.log",
+          "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs/84077445-0a5d-45b4-9610-86df8d60d726_ed_v6zzc/attempt_0/0/stderr.log",
+          "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs/84077445-0a5d-45b4-9610-86df8d60d726_ed_v6zzc/attempt_0/1/stdout.log",
+          "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs/84077445-0a5d-45b4-9610-86df8d60d726_ed_v6zzc/attempt_0/1/stderr.log"
+        ],
+        "worker_logs_complete": true,
+        "worker_log_diagnostics": [],
+        "native_seconds": 0.556101,
+        "terminal_records": 1,
+        "observed_parent_batch": 256,
+        "observed_inference_rows": 768,
+        "observed_stream3_batch_candidates": 6144,
+        "backend": "native",
+        "inference_backend": "libtorch",
+        "heuristic": "hamming",
+        "model_hash": "920bd6e2c14f69c738ce3a028ddda556213cbbd4d9132d9c17345c26ef9ea29d",
+        "effective_beam_width": 8192,
+        "elapsed_seconds": 4.125346699001966,
+        "run_dir": "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9",
+        "scoring": "scalar_children",
+        "status": "found"
+      },
+      "hardware_scope": "2xRTX3060 forced LibTorch; not T4"
+    }
+  },
+  "worker_logs": {
+    "native-one": {
+      "/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/native.log": "native_host_memory_available_bytes=84559519744 native_host_memory_history_budget=0 native_host_memory_headroom=3221225472\npuzzle_id=0\ndepth_limit=6\nRUNTIME_CONFIG_MODE=auto\nUSER_GLOBAL_BEAM_WIDTH=8192\nWORLD_SIZE=1\nLOCAL_RANK=0\nCUDA_DEVICE_LOCAL_RANK=0\nB_MICRO=256\nSTREAM1_ROWS_PER_JOB=768\nSTREAM1_CONCURRENCY=1\nSTREAM3_RING_SLOTS=8\nRING_COUNT=11\nRING_SLOT_COUNT=8\nSTREAM3_BATCH_CANDIDATES=6144\nSTREAM5_BATCH_CANDIDATES=6144\nSHARD_COUNT=1\nSHARD_BUFFER_COUNT=2\nSTORAGE_SHARD_COUNT=2\nSTREAM4_BATCH_CANDIDATES=16384\nSTREAM4_TRIGGER_CANDIDATES=16384\nSTREAM4_BATCH_ALIGNMENT=1024\nSTREAM4_ACTIVE_SORT_SLOTS=1\nSHARD_CAPACITY_CANDIDATES=20480\nSHARD_CAPACITY_SCALE_PPM=1250000\nGLOBAL_SPILL_CAPACITY=0\nGLOBAL_SPILL_SCALE_PPM=2000000\nSTREAM5_RECV_CAPACITY_SCALE_PPM=2000000\nFINAL_MATERIALIZE_CHUNK_CANDIDATES=0\nFINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=1000000\nSTREAM5_SLOT_COUNT=1\nSTREAM5_SEND_SLOT_CANDIDATES=6144\nSTREAM5_RECV_SLOT_CANDIDATES=12288\nFINAL_MATERIALIZE_EXCHANGE_CANDIDATES=6144\nN_LOCAL=8192\nLOGICAL_SHARD_SIZE=8192\nGROSS_CANDIDATES_PER_DEPTH_EST=24576\nSTREAM3_JOBS_PER_DEPTH_EST=4\nSTREAM3_SORT_WORK_UNITS_EST=319488\nSTREAM4_FLOW_SCALE_PPM=2500000\nSTREAM4_INPUT_CANDIDATES_PER_DEPTH_EST=61440\nSTREAM4_JOBS_PER_SHARD_EST=4\nSTREAM4_JOBS_PER_DEPTH_EST=4\nSTREAM4_WAVES_PER_DEPTH_EST=4\nSTREAM4_SORT_WORK_UNITS_EST=860160\nGLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS=64\nGLOBAL_BEAM_WIDTH_EFFECTIVE=8192\nBEAM_WIDTH_ALIGNMENT=1024\nSCORE_SCALE=1024\nSCORE_MAX_KEY=307200\nSCORE_BIN_COUNT=307201\nSOLVED_RESULT_CAPACITY=1024\ngpu_total_bytes=12490440704\ngpu_free_before_bytes=12374114304\ngpu_headroom_bytes=805306368\ngpu_budget_bytes=11568807936\nstatic_allocation_bytes=20664576\nestimated_non_static_device_bytes=72722\nestimated_required_device_bytes=20737298\ncurrent_frontier_bytes=131072\nsolved_bytes=40996\nscratch_pool_bytes=20492288\nlayout_phase1_streams_bytes=20492288\nlayout_phase2_select_bytes=559616\nlayout_phase3_materialize_bytes=525568\nlayout_streams_bytes=20492288\nlayout_final_budget_bytes=7047168\nlayout_final_bytes=7047168\nfrontier_state_capacity=8192\nreal_assets=enabled\ngenerator_path=/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/puzzle_info.json\npuzzle_info_path=/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/puzzle_info.json\ntest_csv_path=/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/test.csv\nstart_state_override=0\ntarget_state_override=0\nsolve_bucket_mode=0\nweight_dir=/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/weights\nstream1_model_state_len=8\nstream1_model_num_classes=8\nstream1_model_hidden1=8\nstream1_model_hidden2=8\nstream1_model_residual_count=1\nstream1_model_output_dim=1\nstream1_model_dtype=fp16\nstream1_model_normalization=none\nstream1_model_weight_bytes=1490\nsolved_neighborhood_radius=2\nsolved_neighborhood_entries=10\nsolved_neighborhood_bucket_count=16\nsolved_neighborhood_device_bytes=1280\nstream2_suffix_radius=0\nstream2_suffix_backend=base_generators\nstream2_suffix_entries=0\nstream2_suffix_device_bytes=0\ngpu_free_after_static_alloc_bytes=12348948480\nrunner_phase=allocations_done\ngpu_free_after_all_allocations_bytes=12348948480\nstream1_mode=model\nstream1_executor=native_cuda_graph\nruntime_ring_count=11\nruntime_ring_slot_count=8\nruntime_ring_slot_physical_jobs=88\nruntime_ring_graph_execs_per_lane_requested=\nruntime_ring_graph_debug_sync=\nstream1_backend=mlp\nruntime_ring_slot_graph_windowed=0\nruntime_ring_slot_graph_window_rings=11\nruntime_ring_slot_graph_window_jobs=88\nruntime_ring_slot_graph_physical_jobs=88\nrunner_phase=graphs_instantiated\ncandidate_history_dir=/workspace/results/serial-public-mlp-cache/runs/cbc50391c1c94c27b36bf2f89a8b21fa/history\ncandidate_history_mode=disk\ncandidate_history_prune_enabled=1\ncandidate_history_slots=3\ncandidate_history_workers=1\ncandidate_history_ram_budget_total=0\ncandidate_history_disk_budget_total=0\ncandidate_history_ram_budget_per_rank=0\ncandidate_history_disk_budget_per_rank=0\ncandidate_history_pinned_slot_bytes=786432\ncandidate_history_slot_staging_bytes=393216\ncandidate_history_static_ram_arena_bytes=0\ncandidate_history_static_disk_arena_bytes=0\ncandidate_history_budget_formula=all_expansion_depths_fixed_reservations\ncandidate_history_ram_reserved_entries=0\ncandidate_history_disk_reserved_entries=0\ncandidate_history_prefull_estimator=move_count_upper_bound\ncandidate_history_effective_depth=0\ncandidate_history_target_beam_depth=0\ncandidate_history_states_before_target_beam=0\ncandidate_history_required_entries=0\ncandidate_history_required_bytes=0\nhistory_read_ok rank=0 tier=disk depth_index=0 entry_index=2\nsolution_log=test_results/solution_p0_d6_b8192_1791545727.log\nsubmit_csv=submit.csv\nsubmit_path_copy=test_results/submit_p0_d6_b8192.csv\nsolution_path_copy=test_results/solution_path_p0_d6_b8192.csv\nsolution_found=1\nsolution_valid=1\nsolution_depth=4\nsolution_path=m2.m1.m2.m1\nsolution_state=\"0,1,2,3,4,5,6,7\"\npuzzle_solved=1 puzzle_id=0 seconds=0.0568286 solution_length=4 found_depth=2 touch_depth=2 solution=m2.m1.m2.m1\nelapsed_sec=0.0570991\navg_depth_sec=0.0285495\ncompleted_depths=2\nlast_final_frontier_size=3\nlast_final_threshold=4294967295\nthreshold_updates=1\nsolution_found=1\nhistory_mode=disk\nhistory_depth_count=1\nhistory_bytes_received=96\nhistory_bytes_stored=48\nhistory_bytes_stored_ram=0\nhistory_bytes_stored_disk=48\nhistory_bytes_pruned=0\nhistory_flush_sec=2.86e-07\n"
+    },
+    "libtorch-two": {
+      "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs/84077445-0a5d-45b4-9610-86df8d60d726_ed_v6zzc/attempt_0/0/stdout.log": "native_host_memory_available_bytes=83011510272 native_host_memory_history_budget=0 native_host_memory_headroom=4294967296\npuzzle_id=0\ndepth_limit=6\nRUNTIME_CONFIG_MODE=auto\nUSER_GLOBAL_BEAM_WIDTH=8192\nWORLD_SIZE=2\nLOCAL_RANK=0\nCUDA_DEVICE_LOCAL_RANK=0\nB_MICRO=256\nSTREAM1_ROWS_PER_JOB=768\nSTREAM1_CONCURRENCY=1\nSTREAM3_RING_SLOTS=8\nRING_COUNT=6\nRING_SLOT_COUNT=8\nSTREAM3_BATCH_CANDIDATES=6144\nSTREAM5_BATCH_CANDIDATES=6144\nSHARD_COUNT=1\nSHARD_BUFFER_COUNT=2\nSTORAGE_SHARD_COUNT=2\nSTREAM4_BATCH_CANDIDATES=16384\nSTREAM4_TRIGGER_CANDIDATES=16384\nSTREAM4_BATCH_ALIGNMENT=1024\nSTREAM4_ACTIVE_SORT_SLOTS=1\nSHARD_CAPACITY_CANDIDATES=16384\nSHARD_CAPACITY_SCALE_PPM=1250000\nGLOBAL_SPILL_CAPACITY=0\nGLOBAL_SPILL_SCALE_PPM=2000000\nSTREAM5_RECV_CAPACITY_SCALE_PPM=2000000\nFINAL_MATERIALIZE_CHUNK_CANDIDATES=0\nFINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=2000000\nSTREAM5_SLOT_COUNT=6\nSTREAM5_SEND_SLOT_CANDIDATES=6144\nSTREAM5_RECV_SLOT_CANDIDATES=12288\nFINAL_MATERIALIZE_EXCHANGE_CANDIDATES=8192\nN_LOCAL=4096\nLOGICAL_SHARD_SIZE=4096\nGROSS_CANDIDATES_PER_DEPTH_EST=12288\nSTREAM3_JOBS_PER_DEPTH_EST=2\nSTREAM3_SORT_WORK_UNITS_EST=159744\nSTREAM4_FLOW_SCALE_PPM=2500000\nSTREAM4_INPUT_CANDIDATES_PER_DEPTH_EST=30720\nSTREAM4_JOBS_PER_SHARD_EST=2\nSTREAM4_JOBS_PER_DEPTH_EST=2\nSTREAM4_WAVES_PER_DEPTH_EST=2\nSTREAM4_SORT_WORK_UNITS_EST=430080\nGLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS=64\nGLOBAL_BEAM_WIDTH_EFFECTIVE=8192\nBEAM_WIDTH_ALIGNMENT=2048\nSCORE_SCALE=1024\nSCORE_MAX_KEY=307200\nSCORE_BIN_COUNT=307201\nSOLVED_RESULT_CAPACITY=1024\ngpu_total_bytes=12490440704\ngpu_free_before_bytes=11601117184\ngpu_headroom_bytes=805306368\ngpu_budget_bytes=10795810816\nstatic_allocation_bytes=21966336\nestimated_non_static_device_bytes=72722\nestimated_required_device_bytes=22039058\ncurrent_frontier_bytes=65536\nsolved_bytes=40996\nscratch_pool_bytes=21859584\nlayout_phase1_streams_bytes=21859584\nlayout_phase2_select_bytes=395520\nlayout_phase3_materialize_bytes=5155584\nlayout_streams_bytes=21859584\nlayout_final_budget_bytes=5637888\nlayout_final_bytes=5637888\nfrontier_state_capacity=4096\nreal_assets=enabled\ngenerator_path=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/puzzle_info.json\npuzzle_info_path=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/puzzle_info.json\ntest_csv_path=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/test.csv\nstart_state_override=0\ntarget_state_override=0\nsolve_bucket_mode=0\nweight_dir=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/weights\nstream1_model_state_len=8\nstream1_model_num_classes=8\nstream1_model_hidden1=8\nstream1_model_hidden2=8\nstream1_model_residual_count=1\nstream1_model_output_dim=1\nstream1_model_dtype=fp16\nstream1_model_normalization=none\nstream1_model_weight_bytes=0\nsolved_neighborhood_radius=2\nsolved_neighborhood_entries=10\nsolved_neighborhood_bucket_count=16\nsolved_neighborhood_device_bytes=1280\nstream2_suffix_radius=0\nstream2_suffix_backend=base_generators\nstream2_suffix_entries=0\nstream2_suffix_device_bytes=0\ngpu_free_after_static_alloc_bytes=12135890944\nrunner_phase=allocations_done\ngpu_free_after_all_allocations_bytes=12135890944\nstream1_mode=model\nstream1_executor=libtorch_eager\nruntime_ring_count=6\nruntime_ring_slot_count=8\nruntime_ring_slot_physical_jobs=48\nruntime_ring_graph_execs_per_lane_requested=\nruntime_ring_graph_debug_sync=\nstream1_backend=mlp\nruntime_ring_slot_graph_windowed=0\nruntime_ring_slot_graph_window_rings=6\nruntime_ring_slot_graph_window_jobs=48\nruntime_ring_slot_graph_physical_jobs=48\nrunner_phase=graphs_instantiated\ncandidate_history_dir=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/history/rank-0\ncandidate_history_mode=disk\ncandidate_history_prune_enabled=0\ncandidate_history_slots=3\ncandidate_history_workers=1\ncandidate_history_ram_budget_total=0\ncandidate_history_disk_budget_total=0\ncandidate_history_ram_budget_per_rank=0\ncandidate_history_disk_budget_per_rank=0\ncandidate_history_pinned_slot_bytes=393216\ncandidate_history_slot_staging_bytes=196608\ncandidate_history_static_ram_arena_bytes=0\ncandidate_history_static_disk_arena_bytes=0\ncandidate_history_budget_formula=all_expansion_depths_fixed_reservations\ncandidate_history_ram_reserved_entries=0\ncandidate_history_disk_reserved_entries=0\ncandidate_history_prefull_estimator=move_count_upper_bound\ncandidate_history_effective_depth=0\ncandidate_history_target_beam_depth=0\ncandidate_history_states_before_target_beam=0\ncandidate_history_required_entries=0\ncandidate_history_required_bytes=0\nsolution_log=test_results/solution_p0_d6_b8192_1791545855.log\nsubmit_csv=submit.csv\nsubmit_path_copy=test_results/submit_p0_d6_b8192.csv\nsolution_path_copy=test_results/solution_path_p0_d6_b8192.csv\nsolution_found=1\nsolution_valid=1\nsolution_depth=4\nsolution_path=m2.m1.m2.m1\nsolution_state=\"0,1,2,3,4,5,6,7\"\npuzzle_solved=1 puzzle_id=0 seconds=0.556101 solution_length=4 found_depth=2 touch_depth=2 solution=m2.m1.m2.m1\nelapsed_sec=0.556413\navg_depth_sec=0.278206\ncompleted_depths=2\nlast_final_frontier_size=2\nlast_final_threshold=4294967295\nthreshold_updates=0\nsolution_found=1\nhistory_mode=disk\nhistory_depth_count=1\nhistory_bytes_received=64\nhistory_bytes_stored=32\nhistory_bytes_stored_ram=0\nhistory_bytes_stored_disk=32\nhistory_bytes_pruned=0\nhistory_flush_sec=3.99e-07\n",
+      "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs/84077445-0a5d-45b4-9610-86df8d60d726_ed_v6zzc/attempt_0/0/stderr.log": "",
+      "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs/84077445-0a5d-45b4-9610-86df8d60d726_ed_v6zzc/attempt_0/1/stdout.log": "native_host_memory_available_bytes=83010854912 native_host_memory_history_budget=0 native_host_memory_headroom=4294967296\npuzzle_id=0\ndepth_limit=6\nRUNTIME_CONFIG_MODE=auto\nUSER_GLOBAL_BEAM_WIDTH=8192\nWORLD_SIZE=2\nLOCAL_RANK=1\nCUDA_DEVICE_LOCAL_RANK=1\nB_MICRO=256\nSTREAM1_ROWS_PER_JOB=768\nSTREAM1_CONCURRENCY=1\nSTREAM3_RING_SLOTS=8\nRING_COUNT=6\nRING_SLOT_COUNT=8\nSTREAM3_BATCH_CANDIDATES=6144\nSTREAM5_BATCH_CANDIDATES=6144\nSHARD_COUNT=1\nSHARD_BUFFER_COUNT=2\nSTORAGE_SHARD_COUNT=2\nSTREAM4_BATCH_CANDIDATES=16384\nSTREAM4_TRIGGER_CANDIDATES=16384\nSTREAM4_BATCH_ALIGNMENT=1024\nSTREAM4_ACTIVE_SORT_SLOTS=1\nSHARD_CAPACITY_CANDIDATES=16384\nSHARD_CAPACITY_SCALE_PPM=1250000\nGLOBAL_SPILL_CAPACITY=0\nGLOBAL_SPILL_SCALE_PPM=2000000\nSTREAM5_RECV_CAPACITY_SCALE_PPM=2000000\nFINAL_MATERIALIZE_CHUNK_CANDIDATES=0\nFINAL_MATERIALIZE_EXCHANGE_SCALE_PPM=2000000\nSTREAM5_SLOT_COUNT=6\nSTREAM5_SEND_SLOT_CANDIDATES=6144\nSTREAM5_RECV_SLOT_CANDIDATES=12288\nFINAL_MATERIALIZE_EXCHANGE_CANDIDATES=8192\nN_LOCAL=4096\nLOGICAL_SHARD_SIZE=4096\nGROSS_CANDIDATES_PER_DEPTH_EST=12288\nSTREAM3_JOBS_PER_DEPTH_EST=2\nSTREAM3_SORT_WORK_UNITS_EST=159744\nSTREAM4_FLOW_SCALE_PPM=2500000\nSTREAM4_INPUT_CANDIDATES_PER_DEPTH_EST=30720\nSTREAM4_JOBS_PER_SHARD_EST=2\nSTREAM4_JOBS_PER_DEPTH_EST=2\nSTREAM4_WAVES_PER_DEPTH_EST=2\nSTREAM4_SORT_WORK_UNITS_EST=430080\nGLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS=64\nGLOBAL_BEAM_WIDTH_EFFECTIVE=8192\nBEAM_WIDTH_ALIGNMENT=2048\nSCORE_SCALE=1024\nSCORE_MAX_KEY=307200\nSCORE_BIN_COUNT=307201\nSOLVED_RESULT_CAPACITY=1024\ngpu_total_bytes=12490440704\ngpu_free_before_bytes=11732320256\ngpu_headroom_bytes=805306368\ngpu_budget_bytes=10927013888\nstatic_allocation_bytes=21966336\nestimated_non_static_device_bytes=72722\nestimated_required_device_bytes=22039058\ncurrent_frontier_bytes=65536\nsolved_bytes=40996\nscratch_pool_bytes=21859584\nlayout_phase1_streams_bytes=21859584\nlayout_phase2_select_bytes=395520\nlayout_phase3_materialize_bytes=5155584\nlayout_streams_bytes=21859584\nlayout_final_budget_bytes=5637888\nlayout_final_bytes=5637888\nfrontier_state_capacity=4096\nreal_assets=enabled\ngenerator_path=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/puzzle_info.json\npuzzle_info_path=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/puzzle_info.json\ntest_csv_path=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/test.csv\nstart_state_override=0\ntarget_state_override=0\nsolve_bucket_mode=0\nweight_dir=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/weights\nstream1_model_state_len=8\nstream1_model_num_classes=8\nstream1_model_hidden1=8\nstream1_model_hidden2=8\nstream1_model_residual_count=1\nstream1_model_output_dim=1\nstream1_model_dtype=fp16\nstream1_model_normalization=none\nstream1_model_weight_bytes=0\nsolved_neighborhood_radius=2\nsolved_neighborhood_entries=10\nsolved_neighborhood_bucket_count=16\nsolved_neighborhood_device_bytes=1280\nstream2_suffix_radius=0\nstream2_suffix_backend=base_generators\nstream2_suffix_entries=0\nstream2_suffix_device_bytes=0\ngpu_free_after_static_alloc_bytes=12267094016\nrunner_phase=allocations_done\ngpu_free_after_all_allocations_bytes=12267094016\nstream1_mode=model\nstream1_executor=libtorch_eager\nruntime_ring_count=6\nruntime_ring_slot_count=8\nruntime_ring_slot_physical_jobs=48\nruntime_ring_graph_execs_per_lane_requested=\nruntime_ring_graph_debug_sync=\nstream1_backend=mlp\nruntime_ring_slot_graph_windowed=0\nruntime_ring_slot_graph_window_rings=6\nruntime_ring_slot_graph_window_jobs=48\nruntime_ring_slot_graph_physical_jobs=48\nrunner_phase=graphs_instantiated\ncandidate_history_dir=/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/history/rank-1\ncandidate_history_mode=disk\ncandidate_history_prune_enabled=0\ncandidate_history_slots=3\ncandidate_history_workers=1\ncandidate_history_ram_budget_total=0\ncandidate_history_disk_budget_total=0\ncandidate_history_ram_budget_per_rank=0\ncandidate_history_disk_budget_per_rank=0\ncandidate_history_pinned_slot_bytes=393216\ncandidate_history_slot_staging_bytes=196608\ncandidate_history_static_ram_arena_bytes=0\ncandidate_history_static_disk_arena_bytes=0\ncandidate_history_budget_formula=all_expansion_depths_fixed_reservations\ncandidate_history_ram_reserved_entries=0\ncandidate_history_disk_reserved_entries=0\ncandidate_history_prefull_estimator=move_count_upper_bound\ncandidate_history_effective_depth=0\ncandidate_history_target_beam_depth=0\ncandidate_history_states_before_target_beam=0\ncandidate_history_required_entries=0\ncandidate_history_required_bytes=0\nhistory_read_ok rank=1 tier=disk depth_index=0 entry_index=0\nelapsed_sec=0.541695\navg_depth_sec=0.270848\ncompleted_depths=2\nlast_final_frontier_size=1\nlast_final_threshold=4294967295\nthreshold_updates=0\nsolution_found=1\nhistory_mode=disk\nhistory_depth_count=1\nhistory_bytes_received=32\nhistory_bytes_stored=16\nhistory_bytes_stored_ram=0\nhistory_bytes_stored_disk=16\nhistory_bytes_pruned=0\nhistory_flush_sec=2.36e-07\n",
+      "/workspace/results/serial-public-mlp-cache/runs/c4837cdba7d84acf908a812ebfcd33a9/worker-logs/84077445-0a5d-45b4-9610-86df8d60d726_ed_v6zzc/attempt_0/1/stderr.log": ""
+    }
+  },
+  "timeout_cpu_gate": "....                                                                     [100%]\n4 passed in 3.17s\n",
+  "execution": "serial, fresh inference profile caches, no concurrent GPU benchmark",
+  "adapter_source_commit": "f37780aa168f8d09b7e76a360553989ae3484dc7"
+}
