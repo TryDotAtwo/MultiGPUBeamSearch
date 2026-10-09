@@ -16,6 +16,18 @@ def test_inference_uses_global_parent_normalization():
     assert result['service_envelope_seconds']>=result['inference_seconds']
 
 
+def test_transport_plateau_does_not_hide_extra_sort_work():
+    row=dict(outer_candidates=1000,shard_capacity=4000,sort_jobs_concurrent=1,
+        stream3_seconds=[.001]*5,stream4_group_seconds=[.1]*5,union_seconds=[.01]*5,
+        transport=[dict(items=3000,seconds=[1.0]*5)])
+    plan=dict(frontier_state_capacity=1000,WORLD_SIZE=2,SHARD_COUNT=1,STREAM4_BATCH_CANDIDATES=500)
+    frequent=service_envelope([row]*2,plan,moves=3,inference_seconds=.0001,parent_batch=100)
+    bulk=service_envelope([row]*2,dict(plan,STREAM4_BATCH_CANDIDATES=3000),moves=3,
+        inference_seconds=.0001,parent_batch=100)
+    assert frequent['service_envelope_seconds']==bulk['service_envelope_seconds']
+    assert bulk['service_work_seconds']<frequent['service_work_seconds']
+
+
 def test_connected_conjugates_certificate_rejects_disconnected_edges():
     assert symmetric_orbit_certificate([[1,2,3,0],[1,0,2,3]],4)
     assert symmetric_orbit_certificate([[1,2,3,0],[2,1,0,3]],4) is None

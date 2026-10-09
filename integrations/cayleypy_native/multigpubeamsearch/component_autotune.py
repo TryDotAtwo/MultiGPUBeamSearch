@@ -28,6 +28,10 @@ def service_envelope(rows, plan, *, moves, inference_seconds, parent_batch):
             statistics.median(r['transport'][-1]['seconds']) for r in rows)
     union=plan['SHARD_COUNT']*slow('union_seconds')
     return {'service_envelope_seconds':max(t1,t3,t4,transport)+union,
+            # A max-only envelope ties profiles once transport dominates and
+            # ignores sort pressure on the inference producer. Minimize total
+            # service work; do not claim its sum is an actual depth duration.
+            'service_work_seconds':t1+t3+t4+transport+union,
             'inference_seconds':t1,'stream3_seconds':t3,'stream4_seconds':t4,
             'transport_seconds':transport,'union_seconds':union,
             'scope':'isolated exact-capacity service envelope; not full-step timing'}
@@ -120,7 +124,7 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                 value=service_envelope(cohort,target[0],moves=moves,
                     inference_seconds=inference['estimate']['median'],parent_batch=inference['parent_batch'])
                 samples.append(Measurement(name,plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
-                    (value['service_envelope_seconds'],),True,True))
+                    (value['service_work_seconds'],),True,True))
         except ValueError as error:
             if name=='baseline':raise
             tested.append({'name':name,'rejected':str(error)})
@@ -135,4 +139,5 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
             'pipeline_verified':False,'cache_hit':False,'tested':tested,
             'selection':best['name'],'estimate':best['estimate'],
             'selection_rejections':rejected,
+            'selection_objective':'minimize summed service work; proxy only, not full-step wall time',
             'search_policy':'baseline plus at most five exact-capacity candidates; frozen inference microbatch'}
