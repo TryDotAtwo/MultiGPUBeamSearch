@@ -35,6 +35,8 @@ struct StaticMemoryPlan {
     std::uint64_t final_state_count = 0;
     std::size_t stream3_cub_temp_bytes = 0;
     std::size_t stream4_cub_temp_bytes = 0;
+    std::size_t union_cub_temp_bytes = 0;
+    std::size_t layout_union_bytes = 0;
     std::size_t final_materialize_cub_temp_bytes = 0;
     std::size_t current_frontier_bytes = 0;
     std::size_t solved_bytes = 0;
@@ -167,6 +169,18 @@ struct LayoutFinalView {
     std::uint32_t* final_recv_offset = nullptr;
 };
 
+// Sequential final-union phase overlays dead Stream1/3/4 temporary storage.
+// Persistent survivors/counts/histograms remain beyond this entire extent.
+struct LayoutUnionView {
+    Hash128 *key_a = nullptr, *key_b = nullptr;
+    CandidateMeta *value_a = nullptr, *value_b = nullptr;
+    std::uint32_t *score_a = nullptr, *score_b = nullptr;
+    std::uint64_t *score_count_a = nullptr, *score_count_b = nullptr;
+    std::uint32_t *keep = nullptr, *blocks = nullptr, *offsets = nullptr;
+    std::uint32_t *count = nullptr, *dirty = nullptr, *processing = nullptr;
+    void* cub_temp = nullptr;
+};
+
 struct StaticDeviceMemory {
     void* allocation = nullptr;
     std::size_t allocation_bytes = 0;
@@ -184,6 +198,7 @@ struct StaticDeviceMemory {
     std::size_t scratch_pool_bytes = 0;
     LayoutStreamsView streams;
     LayoutFinalView final;
+    LayoutUnionView final_union;
 };
 
 StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config);
