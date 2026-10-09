@@ -1,0 +1,9 @@
+{
+  "archive": "/workspace/results/installed-wheel-evidence.tar.gz",
+  "bytes": 349879,
+  "sha256": "310bba33bdf926c1a49ca2938428e517ac402d5fb613cb7bbbea360b6448406d",
+  "files": 1256,
+  "unique_blobs": 624,
+  "format": "manifest-content-addressed-tar-v1",
+  "members_verified": true
+}
