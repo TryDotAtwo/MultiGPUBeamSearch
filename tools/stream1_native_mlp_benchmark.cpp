@@ -68,6 +68,7 @@ int main(int argc, char** argv) {
     // Preserve the existing native scalar-child scoring convention. This is
     // not part of the model forward pass and must be explicit in the receipt.
     const float score_offset=model.output_dim==1?beam::STREAM1_SINGLE_OUTPUT_SCORE_OFFSET:0.f;
+    auto check_oracle=[&](){
     std::int64_t error=0;
     for(unsigned offset=0;offset<batch;offset+=128){
         const unsigned n=std::min(128U,batch-offset);
@@ -81,6 +82,9 @@ int main(int argc, char** argv) {
         error=std::max(error,(keys.narrow(0,offset,n).to(torch::kInt64)-expected.to(torch::kInt64)).abs().max().item<std::int64_t>());
         if(error>2)throw std::runtime_error("native backbone disagrees with independent oracle");
     }
+    return error;
+    };
+    auto error=check_oracle();
     cudaGraph_t graph;cudaGraphExec_t executable;
     BEAM_CUDA_CHECK(cudaStreamSynchronize(stream));
     BEAM_CUDA_CHECK(cudaStreamBeginCapture(stream,cudaStreamCaptureModeGlobal));
@@ -93,6 +97,7 @@ int main(int argc, char** argv) {
     };
     for(int i=0;i<3;++i)replay(batch);
     BEAM_CUDA_CHECK(cudaStreamSynchronize(stream));
+    error=std::max(error,check_oracle());
     cudaEvent_t begin,end;BEAM_CUDA_CHECK(cudaEventCreate(&begin));BEAM_CUDA_CHECK(cudaEventCreate(&end));
     nlohmann::json seconds=nlohmann::json::array();
     for(int repeat=0;repeat<7;++repeat){
