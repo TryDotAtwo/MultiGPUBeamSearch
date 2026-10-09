@@ -15,7 +15,8 @@ def service_envelope(rows, plan, *, moves, inference_seconds, parent_batch):
     n=plan['frontier_state_capacity'];gross=n*moves
     q=rows[0]['outer_candidates'];c=rows[0]['shard_capacity']
     def slow(name):return max(statistics.median(r[name]) for r in rows)
-    t1=math.ceil(n/parent_batch)*inference_seconds
+    # Inference estimate is slowest-rank seconds / GLOBAL parent count.
+    t1=n*plan['WORLD_SIZE']*inference_seconds
     t3=math.ceil(gross/q)*slow('stream3_seconds')
     jobs=rows[0]['sort_jobs_concurrent']
     trigger=min(plan['STREAM4_BATCH_CANDIDATES'],c)
@@ -44,30 +45,41 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
             continue
     if session is not None:session.close()
     probe.planning_session=None
-    probe.environment_move_count=moves
     tested=[]
+    samples=[]
+    from .calibration_stats import Measurement,select
     for name,env,target in admitted:
         if time.monotonic()>=probe.deadline:break
         try:
-            rows=probe.measure_components(env,target)
+            rows=probe.measure_components(env,target,move_count=moves)
             estimate=service_envelope(rows,target[0],moves=moves,
                 inference_seconds=inference['estimate']['median'],parent_batch=inference['parent_batch'])
             tested.append({'name':name,'environment':env,'plans':target,
                            'rank_measurements':rows,'estimate':estimate})
+            for repeat in range(5):
+                cohort=[]
+                for row in rows:
+                    item=dict(row)
+                    for key in ('stream3_seconds','stream4_group_seconds','union_seconds'):
+                        item[key]=[row[key][repeat]]
+                    item['transport']=[dict(t,seconds=[t['seconds'][repeat]]) for t in row['transport']]
+                    cohort.append(item)
+                value=service_envelope(cohort,target[0],moves=moves,
+                    inference_seconds=inference['estimate']['median'],parent_batch=inference['parent_batch'])
+                samples.append(Measurement(name,plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
+                    (value['service_envelope_seconds'],),True,True))
         except ValueError as error:
             if name=='baseline':raise
             tested.append({'name':name,'rejected':str(error)})
     valid=[r for r in tested if 'estimate' in r]
     if not valid:raise ValueError('no verified component profile')
-    best=min(valid,key=lambda r:r['estimate']['service_envelope_seconds'])
-    # Avoid changing profiles on an insignificant proxy difference.
-    first=valid[0]
-    if best['estimate']['service_envelope_seconds']>.95*first['estimate']['service_envelope_seconds']:
-        best=first
+    winner,rejected=select(samples,baseline='baseline',min_improvement=.05)
+    best=next(r for r in valid if r['name']==winner.profile)
     return {'phase':'component_calibrated','environment':best['environment'],
             'requested_beam_effective':plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
             'workload_parents':plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
             'measurement_scope':'exact_admitted_component_capacities',
             'pipeline_verified':False,'cache_hit':False,'tested':tested,
             'selection':best['name'],'estimate':best['estimate'],
+            'selection_rejections':rejected,
             'search_policy':'baseline plus at most two exact-capacity candidates'}

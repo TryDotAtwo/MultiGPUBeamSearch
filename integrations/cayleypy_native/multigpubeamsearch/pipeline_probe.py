@@ -140,7 +140,7 @@ class NativePipelineProbe:
                     _stop_process_tree(process)
                 log.close()
 
-    def measure_components(self, environment, plans):
+    def measure_components(self, environment, plans, *, move_count):
         with CalibrationTelemetry() as telemetry:
             texts = self._run(environment, planning=False, components=True)
         rows=[]
@@ -153,7 +153,7 @@ class NativePipelineProbe:
                 or row.get('full_step_verified') is not False
                 or row.get('shard_capacity')!=plans[rank]['SHARD_CAPACITY_CANDIDATES']
                 or row.get('outer_candidates')!=int(environment['BEAM_B_MICRO'])*
-                    int(environment['BEAM_STREAM3_RING_SLOTS'])*self.environment_move_count):
+                    int(environment['BEAM_STREAM3_RING_SLOTS'])*move_count):
                 raise ValueError('component calibration contract mismatch')
             for name in ('stream3_seconds','stream4_group_seconds','union_seconds'):
                 samples=row[name]
