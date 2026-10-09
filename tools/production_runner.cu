@@ -4490,13 +4490,12 @@ int run_production_runner(int argc, char** argv) {
 
     const auto benchmark_frontier=env_path("BEAM_BENCHMARK_FRONTIER_FILE", "");
     if(env_bool("BEAM_BENCHMARK_PLAN_ONLY",false)) {
-        if(blend_dir.empty()) throw std::runtime_error("benchmark memory plan requires blend profile");
         std::cout << "benchmark_plan_only=1 admitted_global_beam=" << plan.derived.global_beam_width_effective << "\n";
         return 0;
     }
     const auto benchmark_repeats=env_u32("BEAM_BENCHMARK_FRONTIER_REPEATS",1);
-    if(!benchmark_frontier.empty() && (benchmark_repeats==0 || benchmark_repeats>16 || cli_depth_limit!=benchmark_repeats || repair_resident_mode || solve_bucket_mode || blend_dir.empty()))
-        throw std::runtime_error("benchmark frontier requires one-depth blend profile without repair/solution collection");
+    if(!benchmark_frontier.empty() && (benchmark_repeats==0 || benchmark_repeats>16 || cli_depth_limit!=benchmark_repeats || repair_resident_mode || solve_bucket_mode))
+        throw std::runtime_error("benchmark frontier requires bounded repeats without repair/solution collection");
     const ZobristTable host_zobrist = make_deterministic_zobrist(0xC0DEC0DEULL);
     std::vector<RepairTask> repair_tasks;
     if (repair_resident_mode) {
@@ -4658,6 +4657,12 @@ int run_production_runner(int argc, char** argv) {
             stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER ? stream1_transformer_micro : config.b_micro;
         stream1_scratch =
             stream1_weights::alloc_stream1_scratch(stream1_model, scratch_b_micro, config.inference_parallelism);
+    }
+    // A native MLP has no transformer error buffer. Full-frontier calibration
+    // still needs a valid all-rank ready/barrier payload on Stream5.
+    if(!benchmark_frontier.empty() && stream1_scratch.transformer_numeric_error==nullptr) {
+        BEAM_CUDA_CHECK(cudaMalloc(&stream1_scratch.transformer_numeric_error,sizeof(std::uint32_t)));
+        BEAM_CUDA_CHECK(cudaMemset(stream1_scratch.transformer_numeric_error,0,sizeof(std::uint32_t)));
     }
     TrackedSolutionPrefix tracked_solution;
 #if BEAM_DEBUG_PATH_TRACE
