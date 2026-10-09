@@ -75,3 +75,21 @@ def test_finite_graph_declines_calibration_without_claiming_verification(tmp_pat
     assert result['pipeline_verified'] is False
     assert 'environment' not in result
 
+
+def test_native_scalar_inference_parent_batch_maps_to_child_row_budget(tmp_path, monkeypatch):
+    calls=setup_probe(monkeypatch)
+    def select(micro, baseline, **kwargs):
+        assert micro==256 and kwargs['tune_outer'] is False
+        assert baseline['BEAM_B_MICRO']=='768'
+        return dict(environment=baseline,workload_parents=8192)
+    monkeypatch.setattr(module,'tune_pipeline',select)
+    options=SimpleNamespace(calibration_pipeline_seconds=600,
+        calibration_frontier_max_states=8192,calibration_max_batch=1024)
+    runtime=SimpleNamespace(build_metadata={'shape':{'storage_len':16}})
+    result=module.tune_downstream(SimpleNamespace(move_count=3),
+        SimpleNamespace(backend='mlp',manifest={'output_dim':1}),runtime,options,
+        [0,1],1000000,tmp_path,{},'runner',
+        {'parent_batch':256,'phase':'inference_verified'})
+    assert result['environment']['BEAM_B_MICRO']=='768'
+    assert all(env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256' for _,env in calls)
+
