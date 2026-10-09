@@ -9,7 +9,7 @@ import random
 import subprocess
 import time
 
-from .calibration_stats import Measurement, select
+from .calibration_stats import Measurement, estimate, select
 from .errors import NativeBackendError
 from .models import verify_prepared_model
 from .build import file_sha256
@@ -36,6 +36,23 @@ def probe_time_allowance(records, default=12.0):
     """Measured repeats plus warmup/oracle and control overhead."""
     estimates=[10*max(row['seconds'])+3 for row in records if row.get('seconds')]
     return max(default,max(estimates,default=default))
+
+
+def select_inference(samples, *, baseline):
+    """A noisy reference cannot disqualify another complete, stable cohort."""
+    rejected={}
+    try:
+        estimate(baseline,samples)
+    except ValueError as error:
+        rejected[baseline]=str(error)
+        valid=[]
+        for profile in sorted({row.profile for row in samples}-{baseline}):
+            try:valid.append(estimate(profile,samples))
+            except ValueError as candidate_error:rejected[profile]=str(candidate_error)
+        if not valid:raise NativeBackendError('no stable complete inference candidate') from error
+        baseline=min(valid,key=lambda row:(row.median,row.profile)).profile
+    winner,other_rejected=select(samples,baseline=baseline)
+    return winner,dict(rejected,**other_rejected)
 
 
 def refinement_batches(winner,cap,visited):
@@ -74,7 +91,7 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             '--format=csv,noheader'],capture_output=True,text=True,timeout=10,check=True).stdout
     except (OSError,subprocess.SubprocessError):hardware='unavailable'
     import platform
-    return {'schema':7,'search_policy':'upper-first-soft-phase-v2','graph':contract.graph_hash,'models':model.artifact_hash,
+    return {'schema':8,'search_policy':'upper-first-stable-reference-v3','graph':contract.graph_hash,'models':model.artifact_hash,
             'runner':runtime.build_metadata['binary_sha256'],
             'probe':runtime.build_metadata.get('calibration_binary_sha256'),
             'gpu_properties':[str(torch.cuda.get_device_properties(d)) for d in devices],
@@ -138,7 +155,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
             if index>0 and deadline-time.monotonic()<probe_time_allowance(records):break
             if index<len(coarse_candidates) and index>0 and time.monotonic()>=coarse_deadline:
                 if not refinement_queued:
-                    coarse_winner,_=select(samples,baseline=str(baseline))
+                    coarse_winner,_=select_inference(samples,baseline=str(baseline))
                     refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
                     candidates.extend(refined)
                     refinement_queued=True
@@ -201,13 +218,13 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
             elif batch==baseline:
                 raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
             if index+1==len(coarse_candidates) and not refinement_queued and time.monotonic()<deadline:
-                coarse_winner,_=select(samples,baseline=str(baseline))
+                coarse_winner,_=select_inference(samples,baseline=str(baseline))
                 refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
                 candidates.extend(refined)
                 refinement_queued=True
     finally:
         if pool is not None:pool.close()
-    winner,stat_rejected=select(samples,baseline=str(baseline))
+    winner,stat_rejected=select_inference(samples,baseline=str(baseline))
     verify_prepared_model(model,contract)
     data={'signature':signature,'phase':'inference_verified','parent_batch':int(winner.profile),
           'reserve_bytes':reserves[winner.profile],'estimate':winner.__dict__,

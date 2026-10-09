@@ -6,6 +6,32 @@ import pytest
 from multigpubeamsearch import autotune as module
 
 
+def test_noisy_baseline_uses_stable_complete_candidate():
+    from multigpubeamsearch.calibration_stats import Measurement
+    samples=[Measurement('256',100,(value,value),True,True)
+             for value in (1.,2.,3.,4.,5.,6.,7.)]
+    samples.extend(Measurement('8192',100,(.5,.5),True,True) for _ in range(7))
+    chosen,rejected=module.select_inference(samples,baseline='256')
+    assert chosen.profile=='8192' and rejected['256']=='unstable timing samples'
+
+
+def test_noisy_baseline_cannot_accept_throttled_fallback():
+    from multigpubeamsearch.calibration_stats import Measurement
+    samples=[Measurement('256',100,(value,),True,True)
+             for value in (1.,2.,3.,4.,5.,6.,7.)]
+    samples.extend(Measurement('8192',100,(.5,),True,True,throttled=True) for _ in range(7))
+    with pytest.raises(module.NativeBackendError,match='no stable complete'):
+        module.select_inference(samples,baseline='256')
+
+
+def test_stable_reference_still_requires_material_gain():
+    from multigpubeamsearch.calibration_stats import Measurement
+    samples=[Measurement(name,100,(value,),True,True)
+             for name,value in (('256',1.),('8192',.99)) for _ in range(7)]
+    chosen,_=module.select_inference(samples,baseline='256')
+    assert chosen.profile=='256'
+
+
 @pytest.mark.parametrize('cap',[1,17,256,1000,1536,8192,65536])
 def test_real_cap_is_measured_without_exceeding_it(cap):
     values=module.coarse_batches(cap)
