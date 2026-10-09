@@ -58,9 +58,9 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     memory; a calibration record never bypasses that admission.
     """
     from .backend import _stop_process_tree
-    helper=runtime.runner.parent/'stream1_ensemble_benchmark'
+    helper=runtime.runner.parent/runtime.build_metadata.get('calibration_binary_name','stream1_ensemble_benchmark')
     if not helper.is_file() or file_sha256(helper)!=runtime.build_metadata.get('calibration_binary_sha256'):
-        raise NativeBackendError('verified Stream1 calibration executable is required for ensemble autotuning')
+        raise NativeBackendError('verified Stream1 calibration executable is required for autotuning')
     verify_prepared_model(model,contract)
     signature=calibration_signature(contract,model,runtime,devices,beam_width)
     signature['max_batch']=options.calibration_max_batch
@@ -74,11 +74,14 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
         except (OSError,ValueError):pass
     directory=Path(run_dir)/'calibration';directory.mkdir(exist_ok=False)
     probe_dir=directory/'inputs';probe_dir.mkdir()
-    manifest=dict(model.manifest['ensemble'])
-    manifest['models']=[dict(entry,weights_dir=str(model.weights_dir/entry['weights_dir'])) for entry in manifest['models']]
+    if model.backend=='ensemble':
+        manifest=dict(model.manifest['ensemble'])
+        manifest['models']=[dict(entry,weights_dir=str(model.weights_dir/entry['weights_dir'])) for entry in manifest['models']]
+    else:
+        manifest={'weights_dir':str(model.weights_dir)}
     manifest['calibration_states']=graph_samples(contract)
     manifest['generators']=[list(x) for x in contract.generators]
-    (probe_dir/'ensemble.json').write_text(json.dumps(manifest))
+    (probe_dir/('ensemble.json' if model.backend=='ensemble' else 'calibration.json')).write_text(json.dumps(manifest))
     cap=min(options.calibration_max_batch,max(1,(beam_width+len(devices)-1)//len(devices)))
     baseline=min(256,cap)
     candidates=[baseline]+[x for x in (32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536) if x<=cap and x!=baseline]
