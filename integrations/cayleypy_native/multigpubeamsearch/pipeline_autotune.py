@@ -58,8 +58,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     try:initial_plans=actual.admit(baseline)
     except ValueError as error:
         raise NativeBackendError('requested beam failed all-rank native admission') from error
-    if (not options.calibration_full_frontier and
-            runtime.build_metadata.get('component_calibration_protocol')=='exact-capacity-v1'):
+    if runtime.build_metadata.get('component_calibration_protocol')=='exact-capacity-v1':
         from .beam_geometry import Shape,memory_shortlist
         from .component_autotune import tune_components
         initial=initial_plans[0]
@@ -83,6 +82,24 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             moves=contract.move_count,inference=inference)
         verify_prepared_model(model,contract)
         data['requested_beam_width']=beam_width
+        if options.calibration_full_frontier:
+            from dataclasses import replace
+            from .calibration_stats import estimate
+            chosen=next(r for r in data['tested'] if r['name']==data['selection'])
+            final_plans=chosen['plans']
+            actual.deadline=deadline
+            receipt=write_frontiers(contract,[p['frontier_state_capacity'] for p in final_plans],
+                storage,directory/'frontiers',deadline=deadline,
+                max_states=options.calibration_frontier_max_states or final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
+            samples=[replace(r,profile='selected') for r in actual.measure(data['environment'],final_plans)]
+            data.update(phase='pipeline_measured',pipeline_verified=True,fixture=receipt,
+                measurement_scope='full_requested_frontier',
+                estimate=estimate('selected',samples).__dict__,
+                measurements=[r.__dict__ for r in samples])
+            if runtime.build_metadata.get('calibration_protocol')=='json-session-v1':
+                from .matched_probe import measure_matched
+                data['matched_stream1']=measure_matched(contract,model,runtime,probe_env,
+                    directory/'matched-stream1',receipt,data,micro,deadline=deadline,devices=devices)
         (directory/'selection.json').write_text(json.dumps(data,indent=2))
         return data
     # A measured small-frontier profile cannot certify or optimize a larger

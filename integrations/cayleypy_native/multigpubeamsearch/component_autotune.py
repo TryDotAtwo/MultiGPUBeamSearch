@@ -33,16 +33,24 @@ def service_envelope(rows, plan, *, moves, inference_seconds, parent_batch):
             'scope':'isolated exact-capacity service envelope; not full-step timing'}
 
 
+def service_geometry(rows,plan,*,moves,inference):
+    """Arrival/service bounds; only native admission can accept the proposal."""
+    from .beam_geometry import round_up,staging_from_release_latency
+    median=inference['estimate']['median'];world=plan['WORLD_SIZE']
+    arrival=moves/(median*world)
+    sort=max(statistics.median(r['stream4_group_seconds'])/r['sort_jobs_concurrent'] for r in rows)
+    native_floor=math.ceil(plan['frontier_state_capacity']*moves/plan['SHARD_COUNT']/4)
+    desired=min(plan['SHARD_CAPACITY_CANDIDATES'],native_floor,max(1,math.ceil(arrival*sort/.8)))
+    trigger=round_up(desired,plan['STREAM4_BATCH_ALIGNMENT'])
+    release=max(sorted(r['stream3_seconds'])[4]+(
+        sorted(r['transport'][-1]['seconds'])[4] if r['transport'] else 0) for r in rows)
+    producer=inference['parent_batch']*world*median
+    ring=min(8,staging_from_release_latency(release,producer))
+    return {'BEAM_STREAM4_BATCH_CANDIDATES':str(trigger),'BEAM_STREAM3_RING_SLOTS':str(ring)}
+
+
 def tune_components(probe, session, plans, baseline, candidates, *, moves, inference):
     admitted=[('baseline',dict(baseline),plans)]
-    for name,env in candidates[:2]:
-        try:
-            target=probe.admit(env)
-            if target[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']!=plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']:
-                continue
-            admitted.append((name,env,target))
-        except ValueError:
-            continue
     if session is not None:session.close()
     probe.planning_session=None
     tested=[]
@@ -56,6 +64,26 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                 inference_seconds=inference['estimate']['median'],parent_batch=inference['parent_batch'])
             tested.append({'name':name,'environment':env,'plans':target,
                            'rank_measurements':rows,'estimate':estimate})
+            if name=='baseline':
+                proposal=service_geometry(rows,target[0],moves=moves,inference=inference)
+                proposed=[('service-batch',dict(baseline,
+                    BEAM_STREAM4_BATCH_CANDIDATES=proposal['BEAM_STREAM4_BATCH_CANDIDATES']))]
+                if candidates:
+                    candidate_name,candidate_env=candidates[0]
+                    proposed.append((candidate_name,dict(candidate_env,**proposal)))
+                else:
+                    proposed.append(('service-staging',dict(baseline,**proposal)))
+                # Close all native memory owners before measuring another profile.
+                from .plan_session import NativePlanSession
+                with NativePlanSession(probe.runner,probe.environment,probe.world,
+                        probe.directory/'service-plans',deadline=probe.deadline) as planner:
+                    for next_name,next_env in proposed:
+                        try:
+                            next_plans=planner.admit(probe.beam,next_env)
+                            if next_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']==plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']:
+                                admitted.append((next_name,next_env,next_plans))
+                        except ValueError:
+                            continue
             for repeat in range(5):
                 cohort=[]
                 for row in rows:

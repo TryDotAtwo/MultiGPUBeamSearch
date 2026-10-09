@@ -575,7 +575,9 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
                     f"{100*report['throughput_loss_fraction']:.2f}%; calibration "
                     f"{runtime.profile['calibration_total_wall_seconds']:.2f}s",flush=True)
             else:
-                print(f"[MultiGPUBeamSearch] inference batch {calibration['parent_batch']}; "
+                print(f"[MultiGPUBeamSearch] best found Stream1 {1/calibration['estimate']['median']:,.0f} parents/s, "
+                    f"inference batch {calibration['parent_batch']}; calibration "
+                    f"{runtime.profile['calibration_total_wall_seconds']:.2f}s; "
                     f"pipeline scope {downstream.get('measurement_scope',downstream.get('phase'))}; "
                     f"matched throughput loss unavailable",flush=True)
         (run_dir/'runtime-config.json').write_text(json.dumps(
