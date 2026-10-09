@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "commit": "496ca2254dc4f759124fdcbd2a9b7aa4664d6689",
+  "archive_sha256": "09b2313adc3cba4c1edfa9ddf4ecbf453c3e5c07a463b01b4957cfee59472298",
+  "files_verified": 406,
+  "parts_verified": 5,
+  "scope": "native32M completed six depths on all eight ranks, matched Stream1 pending"
+}
