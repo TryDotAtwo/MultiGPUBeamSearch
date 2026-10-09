@@ -5690,6 +5690,13 @@ int run_production_runner(int argc, char** argv) {
 #endif
         const auto depth_end = std::chrono::steady_clock::now();
         const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
+        if (!benchmark_frontier.empty()) {
+            std::cout << "calibration_depth=" << depth
+                      << " rank=" << rank
+                      << " parents=" << plan.frontier_states
+                      << " depth_sec=" << depth_sec
+                      << " next_frontier_size=" << frontier_size << std::endl;
+        }
 #if BEAM_ENABLE_DEPTH_LOGS
         if (emit_depth_log) {
 #if BEAM_DEBUG_STREAM_TIMING
@@ -5932,3 +5939,4 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
+
