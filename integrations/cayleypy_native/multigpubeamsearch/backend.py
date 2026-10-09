@@ -538,6 +538,13 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
     runner = snapshot_runtime_runner(runtime, run_dir)
+    if calibrate:
+        from .inference_admission import admit_inference
+        admit_inference(contract,model,runtime,options,devices,beam_width,
+            run_dir,env,runner,calibration)
+        microbatch_metadata.update(configured_row_budget=int(env['BEAM_B_MICRO']),
+            derived_parent_batch=calibration['parent_batch'],
+            derived_candidates_per_slot=calibration['parent_batch']*contract.move_count)
     if maximum_requested:
         if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
         from .maximum_beam import discover_capacity,refine_maximum
@@ -545,7 +552,9 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             seconds=min(60.0,options.calibration_pipeline_seconds*.25))
         def exact_inference(width,index):
             directory=run_dir/f'maximum-inference-{index}';directory.mkdir()
-            return tune_inference(contract,model,runtime,options,devices,width,directory,env)
+            chosen=tune_inference(contract,model,runtime,options,devices,width,directory,env)
+            return admit_inference(contract,model,runtime,options,devices,width,
+                directory,env,runner,chosen)
         def readmit_inference(chosen,index):
             env.update(BEAM_B_MICRO=str(chosen['parent_batch']*rows_per_parent),
                 BEAM_ENSEMBLE_INFERENCE_MICRO=str(chosen['parent_batch']),
@@ -574,6 +583,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         selected=measured or downstream.get('phase')=='component_calibrated'
         if selected:
             env.update(downstream['environment'])
+            microbatch_metadata['configured_row_budget']=int(env['BEAM_B_MICRO'])
             microbatch_metadata['derived_parent_batch']=int(env['BEAM_B_MICRO'])//rows_per_parent
             microbatch_metadata['derived_candidates_per_slot']=microbatch_metadata['derived_parent_batch']*contract.move_count
             microbatch_metadata['inference_parent_batch']=calibration['parent_batch']
@@ -588,14 +598,14 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             report=downstream.get('matched_stream1',{})
             if report.get('measurement_scope')=='matched_full_frontier':
                 print(f"[MultiGPUBeamSearch] {len(devices)} GPUs, frontier {report['parents']:,}, "
-                    f"inference batch {calibration['parent_batch']}: best found Stream1 "
+                    f"inference batch {calibration['parent_batch']}: best admitted Stream1 "
                     f"{1/calibration['estimate']['median']:,.0f} parents/s; matched frontier Stream1 "
                     f"{report['stream1_parents_per_second']:,.0f} parents/s; full step "
                     f"{report['full_step_seconds']:.6f}s, throughput loss "
                     f"{100*report['throughput_loss_fraction']:.2f}%; calibration "
                     f"{runtime.profile['calibration_total_wall_seconds']:.2f}s",flush=True)
             else:
-                print(f"[MultiGPUBeamSearch] best found Stream1 {1/calibration['estimate']['median']:,.0f} parents/s, "
+                print(f"[MultiGPUBeamSearch] best admitted Stream1 {1/calibration['estimate']['median']:,.0f} parents/s, "
                     f"inference batch {calibration['parent_batch']}; calibration "
                     f"{runtime.profile['calibration_total_wall_seconds']:.2f}s; "
                     f"pipeline scope {downstream.get('measurement_scope',downstream.get('phase'))}; "
