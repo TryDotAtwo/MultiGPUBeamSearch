@@ -1,0 +1,29 @@
+{
+  "instance": 54987544,
+  "devices": [
+    0,
+    1
+  ],
+  "gpu": "RTX 3060",
+  "implementation_commit": "61c6de665f5c1ba2009d7e7b07b2ffbc7a97db86",
+  "probe_commit": "ecd1eac23c625929632c092becabc75584b902fe",
+  "rows": 257,
+  "hidden": 32,
+  "outputs": [
+    1,
+    3,
+    24
+  ],
+  "head_counts": [
+    1,
+    2,
+    3,
+    8,
+    17
+  ],
+  "constant_reference_key": 3072,
+  "signed_accumulation": "PASS",
+  "nonfinite_guard": "PASS",
+  "exit_code": 0,
+  "scope": "CUDA readout epilogue only; full inference and beam search not yet accepted"
+}
