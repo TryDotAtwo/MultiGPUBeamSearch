@@ -74,4 +74,3 @@ int main() {
     std::cout << "runtime_arithmetic failures=" << failures << '\n';
     return failures ? 1 : 0;
 }
-
