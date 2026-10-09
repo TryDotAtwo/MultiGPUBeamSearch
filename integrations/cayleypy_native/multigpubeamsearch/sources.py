@@ -28,11 +28,11 @@ class SourceArchive:
         return f"https://codeload.github.com/{self.repository}/tar.gz/{self.revision}"
 
 
-# Immutable native/CUTLASS snapshots used in real two-T4 acceptance. Updating a
-# pin requires a new archive checksum and native integration validation.
+# Immutable source snapshots. Native ensemble/autotune development is validated
+# on RTX3060; this pin is not an additional T4 hardware acceptance claim.
 NATIVE_SOURCE = SourceArchive(
-    "native", "TryDotAtwo/MultiGPUBeamSearch", "a1db0e6d9bb5458c8a842b37dfa99572d3025667",
-    "53a68e2261e799aa5421f925c2a70bd23b40dae262092a3a34fea6026bafd6ad", "MultiGPUBeamSearch-a1db0e6d9bb5458c8a842b37dfa99572d3025667",
+    "native", "TryDotAtwo/MultiGPUBeamSearch", "b24037316dc62f9c71a171ead4fba5af24d981ed",
+    "d27f76bf18c3dfc13661e4cb10f8240a9b5c76a211343c31e97360bb2625a509", "MultiGPUBeamSearch-b24037316dc62f9c71a171ead4fba5af24d981ed",
 )
 CUTLASS_SOURCE = SourceArchive(
     "cutlass", "NVIDIA/cutlass", "afa1772203677c5118fcd82537a9c8fefbcc7008",
