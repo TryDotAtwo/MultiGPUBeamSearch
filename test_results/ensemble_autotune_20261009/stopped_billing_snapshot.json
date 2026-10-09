@@ -1,0 +1,20 @@
+{
+  "actual_status": "exited",
+  "cur_state": "stopped",
+  "dlperf_per_dphtotal": 185.9308767759125,
+  "dph_base": 0.112,
+  "dph_total": 0.13422222222222221,
+  "end_date": 1792249200.0,
+  "flops_per_dphtotal": 183.28243708609276,
+  "inet_down_cost": 0.00390625,
+  "inet_up_cost": 0.00390625,
+  "intended_status": "stopped",
+  "internet_down_cost_per_tb": 4.0,
+  "internet_up_cost_per_tb": 4.0,
+  "next_state": "stopped",
+  "start_date": 1791533145.461508,
+  "status_msg": "success, running ghcr.io/trydotatwo/multigpubeamsearch-h200_sha256_11d1189d9eb160d2260a4e862551eaf45275c6fd4c428ebd574ff52df9f66366/ssh",
+  "storage_cost": 0.39999999999999997,
+  "storage_total_cost": 0.02222222222222222,
+  "vram_costperhour": 5.461516203703704e-06
+}
