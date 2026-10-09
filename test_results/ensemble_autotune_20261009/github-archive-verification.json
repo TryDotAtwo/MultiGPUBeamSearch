@@ -1,0 +1,8 @@
+{
+  "commit": "11236901774c07827c41997380eea0a8e69d3777",
+  "sha256": "310bba33bdf926c1a49ca2938428e517ac402d5fb613cb7bbbea360b6448406d",
+  "bytes": 349879,
+  "files_verified": 1256,
+  "verified": true,
+  "verification": "Downloaded immutable GitHub archive back to Vast; SHA256, byte count and every content-addressed manifest member matched. No result archive copied to Windows."
+}
