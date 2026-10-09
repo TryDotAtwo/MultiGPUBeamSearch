@@ -457,6 +457,10 @@ The default reports best found Stream1 throughput and calibration duration.
 Inference search is bounded by `calibration_max_batch` (8192 by default); its
 winner is the best verified candidate in that search, not an unbounded optimum.
 The cache includes this bound as well as the exact requested frontier.
+Component profiles are cached for the same trained model, GPU cohort, precision,
+frontier and inference reserve. Every reuse requires fresh all-rank native memory
+admission with unchanged buffer geometry. Cached component timings remain a
+scheduling proxy; they do not certify a measured complete search step.
 Isolated component timings are a scheduling proxy; they are not a measured
 complete depth or a proof of globally optimal performance. To measure the exact
 full-frontier gap, use `NativeOptions(calibration_full_frontier=True)`; this

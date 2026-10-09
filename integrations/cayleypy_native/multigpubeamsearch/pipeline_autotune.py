@@ -59,6 +59,18 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     except ValueError as error:
         raise NativeBackendError('requested beam failed all-rank native admission') from error
     if runtime.build_metadata.get('component_calibration_protocol')=='exact-capacity-v1':
+        from .pipeline_cache import cache_identity,cache_path,read_profile,write_profile
+        identity=cache_identity(inference,environment,beam=beam_width,world=world,
+            full_frontier=getattr(options,'calibration_full_frontier',False))
+        if identity is not None:
+            identity['runtime_metadata']=runtime.build_metadata
+        path=cache_path(options.cache_dir,identity) if identity is not None else None
+        if path is not None and not options.calibration_full_frontier:
+            cached=read_profile(path,identity,actual.admit)
+            if cached is not None:
+                verify_prepared_model(model,contract)
+                (directory/'selection.json').write_text(json.dumps(cached,indent=2))
+                return cached
         from .beam_geometry import Shape,memory_shortlist
         from .component_autotune import tune_components
         initial=initial_plans[0]
@@ -84,6 +96,8 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         actual.planning_session=None
         verify_prepared_model(model,contract)
         data['requested_beam_width']=beam_width
+        if path is not None and not options.calibration_full_frontier:
+            write_profile(path,identity,data)
         (directory/'selection.json').write_text(json.dumps(data,indent=2))
         if options.calibration_full_frontier:
             from dataclasses import replace
