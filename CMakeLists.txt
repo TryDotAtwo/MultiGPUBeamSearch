@@ -529,4 +529,3 @@ set_tests_properties(threshold_union_cuda_tests PROPERTIES LABELS "gpu;multi_gpu
 add_test(NAME stitched_cuda_tests COMMAND stitched_cuda_tests)
 add_test(NAME dispatcher_cuda_tests COMMAND dispatcher_cuda_tests)
 add_test(NAME static_memory_cuda_tests COMMAND static_memory_cuda_tests)
-
