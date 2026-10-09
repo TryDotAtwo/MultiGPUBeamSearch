@@ -9,6 +9,7 @@ from .pipeline_profiles import validate_rank_plans
 class NativePlanSession:
     def __init__(self, runner, environment, world, directory, *, deadline, puzzle_id=0):
         self.sessions=[]
+        self.inference_micro=environment.get('BEAM_ENSEMBLE_INFERENCE_MICRO')
         directory=Path(directory);directory.mkdir(parents=True,exist_ok=False)
         try:
             env=dict(environment, BEAM_CALIBRATION_PLAN_SESSION='1', BEAM_BENCHMARK_PLAN_ONLY='1',
@@ -28,6 +29,10 @@ class NativePlanSession:
             raise
 
     def admit(self, beam, environment):
+        environment=dict(environment)
+        if 'BEAM_ENSEMBLE_INFERENCE_MICRO' in environment:
+            if environment.pop('BEAM_ENSEMBLE_INFERENCE_MICRO')!=self.inference_micro:
+                raise ValueError('planner cannot change the frozen model inference microbatch')
         for session in self.sessions:
             session.send_request({'beam':beam,'environment':environment})
         rows=[session.receive() for session in self.sessions]
