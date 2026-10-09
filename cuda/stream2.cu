@@ -246,4 +246,130 @@ void stream2_hash_goal_cuda(
         solved);
 }
 
+__global__ void stream2_hash_goal_graph_job_kernel(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const std::uint32_t* graph_job_index,
+    const std::uint8_t* generators,
+    const State128* central_state,
+    const Hash128* zobrist,
+    Hash128* hash_ring,
+    std::uint32_t b_micro,
+    std::uint32_t depth,
+    std::uint32_t local_rank,
+    Stream2SolvedBuffers solved) {
+    const std::uint32_t candidate = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t total = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+    if (candidate >= total) {
+        return;
+    }
+    const std::uint32_t job = *graph_job_index;
+    const std::uint32_t parent_local = candidate / static_cast<std::uint32_t>(MOVE_COUNT);
+    const std::uint32_t move = candidate % static_cast<std::uint32_t>(MOVE_COUNT);
+    if (parent_local >= count[job]) {
+        return;
+    }
+
+    const std::uint64_t parent_idx = parent_base[job] + parent_local;
+    const State128 parent = current_frontier_states[parent_idx];
+    Hash128 hash{0, 0};
+    const bool use_neighborhood = solved.solved_neighborhood.enabled != 0U;
+    bool found = !use_neighborhood;
+
+    for (std::uint32_t p = 0; p < STATE_STORAGE_LEN; ++p) {
+        const std::uint8_t source = generators[move * STATE_STORAGE_LEN + p];
+        const std::uint8_t value = parent.v[source];
+        if (!use_neighborhood && value != central_state->v[p]) {
+            found = false;
+        }
+        const Hash128 h = zobrist[p * STATE_VALUE_PAD + value];
+        hash = hash_xor(hash, h);
+    }
+
+    const std::uint64_t hash_offset =
+        (static_cast<std::uint64_t>(job) * b_micro + parent_local) * MOVE_COUNT + move;
+    hash_ring[hash_offset] = hash;
+    if (use_neighborhood) {
+        found = solved_neighborhood_contains(solved.solved_neighborhood, hash);
+    }
+    Hash128 found_hash = hash;
+    std::uint32_t found_suffix_id = 0;
+    if (!found && solved.stream2_suffix.enabled != 0U) {
+        found = stream2_suffix_find_hit(
+            solved.stream2_suffix,
+            generators,
+            parent,
+            move,
+            central_state,
+            zobrist,
+            solved.solved_neighborhood,
+            use_neighborhood,
+            &found_hash,
+            &found_suffix_id);
+    }
+
+    if (found && solved.solved_count != nullptr) {
+        const std::uint32_t idx = atomicAdd(solved.solved_count, 1U);
+        if (idx < solved.solved_result_capacity) {
+            const std::uint32_t solved_depth =
+                solved.current_depth == nullptr ? depth : *solved.current_depth;
+            CandidateMeta meta{};
+            meta.hash = found_hash;
+            meta.parent_idx = parent_idx;
+            meta.score_key = GOAL_SCORE_KEY;
+            meta.route_packed =
+                (static_cast<std::uint32_t>(local_rank) << 16) |
+                (static_cast<std::uint32_t>(local_rank) << 8) |
+                move;
+            solved.solved_meta_list[idx] = meta;
+            solved.solved_depth_list[idx] = solved_depth;
+            if (solved.solved_suffix_list != nullptr) {
+                solved.solved_suffix_list[idx] = found_suffix_id;
+            }
+        } else {
+            atomicExch(solved.solved_overflow, 1U);
+        }
+        __threadfence_system();
+        if (atomicCAS(solved.solved_flag, 0U, 1U) == 0U) {
+            if (solved.stop_on_found != 0U) {
+                atomicExch(solved.stop_flag, 1U);
+            }
+        }
+    }
+}
+
+void stream2_hash_goal_graph_job_cuda(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const std::uint32_t* graph_job_index,
+    const std::uint8_t* generators,
+    const State128* central_state,
+    const Hash128* zobrist,
+    Hash128* hash_ring,
+    std::uint32_t b_micro,
+    std::uint32_t depth,
+    std::uint32_t local_rank,
+    Stream2SolvedBuffers solved,
+    cudaStream_t stream) {
+    NvtxRange range("Stream2_hash_goal_graph_job_launch");
+    const std::uint32_t total = b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+    const dim3 block(128);
+    const dim3 grid((total + block.x - 1) / block.x);
+    stream2_hash_goal_graph_job_kernel<<<grid, block, 0, stream>>>(
+        current_frontier_states,
+        parent_base,
+        count,
+        graph_job_index,
+        generators,
+        central_state,
+        zobrist,
+        hash_ring,
+        b_micro,
+        depth,
+        local_rank,
+        solved);
+}
+
 } // namespace beam
