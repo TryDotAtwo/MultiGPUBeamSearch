@@ -585,6 +585,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             {'mode':'auto','profile':runtime.profile,'microbatch':microbatch_metadata,
              'search_budget':search_budget},indent=2)+'\n',encoding='utf-8')
     args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
+    if calibrate:env['BEAM_RUNTIME_DEPTH_TIMING']='1'
     log = run_dir / "native.log"
     process_log = log
     log_metadata = {}

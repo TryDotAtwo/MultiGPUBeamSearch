@@ -1827,6 +1827,11 @@ DepthDispatchState run_depth_cuda_graphs(
         frontier_size == 0U
             ? 0U
             : (frontier_size + parents_per_stream3_round - 1ULL) / parents_per_stream3_round;
+    const bool calibration_progress=std::getenv("BEAM_CALIBRATION_PROGRESS")!=nullptr;
+    const auto progress_trace=[&](const char* phase){
+        if(calibration_progress) std::cerr << "calibration_progress rank=" << plan.config.local_rank
+            << " phase=" << phase << std::endl;
+    };
     std::uint64_t global_exchange_rounds = local_exchange_rounds;
     if (multi_rank) {
         check_cuda(cudaMemcpyAsync(
@@ -1851,7 +1856,9 @@ DepthDispatchState run_depth_cuda_graphs(
             sizeof(global_exchange_rounds),
             cudaMemcpyDeviceToHost,
             streams.stream5), "cudaMemcpyAsync global stream5 round count");
+        progress_trace("round-count-wait");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 round count");
+        progress_trace("round-count-ready");
     }
 
     DepthDispatchState state;
@@ -2535,6 +2542,7 @@ DepthDispatchState run_depth_cuda_graphs(
     const auto wait_all_stream4_slots = [&]() {
         while (!stream4_busy_slots.empty()) {
             const std::uint32_t slot = stream4_busy_slots.front();
+            progress_trace("stream4-slot-wait");
             check_cuda(cudaEventSynchronize(streams.stream4_slot_done[slot]), "cudaEventSynchronize stream4 drain slot");
             stream4_busy_slots.pop_front();
             mark_stream4_slot_complete(slot);
@@ -3352,6 +3360,9 @@ DepthDispatchState run_depth_cuda_graphs(
         if (!multi_rank) {
             return;
         }
+        if(calibration_progress) std::cerr << "calibration_progress rank=" << plan.config.local_rank
+            << " phase=exchange-start round=" << completed_exchange_rounds
+            << " cursor=" << state.frontier_cursor << std::endl;
         if (ring >= plan.stream5_slot_count) {
             throw std::runtime_error("stream5 exchange ring exceeds slot count");
         }
@@ -3404,7 +3415,9 @@ DepthDispatchState run_depth_cuda_graphs(
         // before the host waits for the collective's dynamic receive metadata.
         // This does not launch Stream3 or change the collective sequence.
         if (prefill_before_wait) launch_free_rings();
+        progress_trace("exchange-count-wait");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 count exchange");
+        progress_trace("exchange-count-ready");
         check_cuda(cudaMemcpy(
             host_recv_count.data(),
             memory.streams.recv_count,
@@ -3449,7 +3462,9 @@ DepthDispatchState run_depth_cuda_graphs(
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 exchange timing stop");
 #endif
         if (prefill_before_wait) launch_free_rings();
+        progress_trace("exchange-payload-wait");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 payload exchange");
+        progress_trace("exchange-payload-ready");
 #if BEAM_DEBUG_STREAM_TIMING
         accumulate_elapsed_ms(
             stream5_timing_start[0],
@@ -3873,6 +3888,7 @@ DepthDispatchState run_depth_cuda_graphs(
             return false;
         }
         const std::uint32_t ring = stream1_running_rings.front();
+        progress_trace("stream1-ring-wait");
         check_cuda(cudaEventSynchronize(ring_done[ring]), "cudaEventSynchronize ring done");
         stream1_running_rings.pop_front();
 #if BEAM_DEBUG_STREAM_TIMING
@@ -3939,6 +3955,7 @@ DepthDispatchState run_depth_cuda_graphs(
         if (!stream3_active) {
             return false;
         }
+        progress_trace("stream3-wait");
         check_cuda(cudaEventSynchronize(stream3_done[stream3_active_ring]), "cudaEventSynchronize stream3 done");
         complete_stream3_ring();
         return true;

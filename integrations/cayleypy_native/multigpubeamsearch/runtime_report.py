@@ -10,14 +10,14 @@ def observed_depths(text,world,effective_beam,seconds_per_global_parent):
         if marker:rank=int(marker[1]);continue
         if line.startswith('[rank ') or line=='[launcher]':rank=-1;continue
         if not 0<=rank<world:continue
-        if line.startswith('depth_start='):
+        if line.startswith('runtime_depth_start='):
             fields=dict(p.split('=',1) for p in line.split() if '=' in p)
-            key=(int(fields['depth_start']),rank)
+            key=(int(fields['runtime_depth_start']),rank)
             if key in starts:raise ValueError('duplicate runtime depth start')
             starts[key]=int(fields['frontier_size'])
-        if line.startswith('depth_done='):
+        if line.startswith('runtime_depth_done='):
             fields=dict(p.split('=',1) for p in line.split() if '=' in p)
-            key=(int(fields['depth_done']),rank)
+            key=(int(fields['runtime_depth_done']),rank)
             if key in done:raise ValueError('duplicate runtime depth completion')
             value=float(fields['depth_sec'])
             if not math.isfinite(value) or value<=0:raise ValueError('invalid complete depth duration')

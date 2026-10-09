@@ -5168,6 +5168,9 @@ int run_production_runner(int argc, char** argv) {
             &current_solution_depth,
             sizeof(current_solution_depth),
             cudaMemcpyHostToDevice));
+        const bool runtime_depth_timing=env_bool("BEAM_RUNTIME_DEPTH_TIMING",false);
+        if(runtime_depth_timing) std::cout << "runtime_depth_start=" << depth
+            << " frontier_size=" << frontier_size << std::endl;
         const auto depth_start = std::chrono::steady_clock::now();
         history.pump_completed(false);
         [[maybe_unused]] const bool emit_depth_log = (depth_log_every != 0U) && ((depth % depth_log_every) == 0U);
@@ -5763,6 +5766,8 @@ int run_production_runner(int argc, char** argv) {
                       << " depth_sec=" << depth_sec
                       << " next_frontier_size=" << frontier_size << std::endl;
         }
+        if(runtime_depth_timing) std::cout << "runtime_depth_done=" << depth
+            << " depth_sec=" << depth_sec << std::endl;
 #if BEAM_ENABLE_DEPTH_LOGS
         if (emit_depth_log) {
 #if BEAM_DEBUG_STREAM_TIMING
