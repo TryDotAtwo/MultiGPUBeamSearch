@@ -562,6 +562,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         runtime.profile.update(autotuned=selected,pipeline_autotuned=selected,
             pipeline_calibration=downstream,calibration_total_wall_seconds=time.monotonic()-calibration_started)
         if maximum_requested:
+            if selected:capacity['execution_profile']=dict(downstream['environment'])
             capacity['full_step_verified']=measured and downstream.get('measurement_scope')=='full_requested_frontier'
             capacity['capacity_scope']='full-step verified' if capacity['full_step_verified'] else 'native memory admission only'
             (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))

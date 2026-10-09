@@ -427,6 +427,42 @@ not a GPU performance result.
 
 ## Prepare explicitly for repeated searches
 
+### Inference-first automatic sizing
+
+Native automatic calibration first selects a numerically verified inference
+microbatch using repeated slowest-rank measurements. Cache identity includes the
+exact requested beam; a 10M profile does not certify 100M. It then asks the native
+planner to admit that beam on every selected GPU, measures Stream3, concurrent
+Stream4 jobs, final union and NCCL transport at those exact buffer capacities,
+and derives a bounded shortlist from arrival/service and memory constraints.
+The five-stream architecture and global selection semantics remain unchanged.
+
+The default reports best found Stream1 throughput and calibration duration.
+Isolated component timings are a scheduling proxy; they are not a measured
+complete depth or a proof of globally optimal performance. To measure the exact
+full-frontier gap, use `NativeOptions(calibration_full_frontier=True)`; this
+prepares legal unique states and runs five measured complete depths after a
+warmup, followed by matched Stream1 inference on those same files. The report
+distinguishes throughput loss from relative time overhead. Small finite graphs
+or an explicit preparation budget can prevent a full-frontier fixture.
+
+`beam_width="max"` searches native memory admission across shard counts 1–128
+with two staging slots and one active sort slot. This is the largest admitted
+beam within that policy, not a universal maximum over every allocation policy.
+Its receipt remains `full_step_verified=False` until the optional full-frontier
+check actually completes. GPU topology, graph, model, precision and selected
+device cohort remain part of the evidence; 128-GPU planning is not hardware
+validation.
+
+```python
+import cayleypy
+from multigpubeamsearch import beam_search, NativeOptions
+
+result = beam_search(graph, start_state=start, beam_width="max",
+                     native_options=NativeOptions(num_gpus=2),
+                     backend="native", max_steps=100, return_path=True)
+```
+
 ```python
 from cayleypy_native import prepare_native, enable_native
 
