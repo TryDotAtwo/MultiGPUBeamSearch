@@ -3,6 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <limits>
+#include <climits>
 #if BEAM_HAS_CUTLASS
 #include <cutlass/gemm/device/gemm_universal_with_broadcast.h>
 #include <cutlass/epilogue/thread/linear_combination_bias_elementwise.h>
