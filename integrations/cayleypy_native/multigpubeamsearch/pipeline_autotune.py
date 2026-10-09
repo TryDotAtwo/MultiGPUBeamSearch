@@ -84,6 +84,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         actual.planning_session=None
         verify_prepared_model(model,contract)
         data['requested_beam_width']=beam_width
+        (directory/'selection.json').write_text(json.dumps(data,indent=2))
         if options.calibration_full_frontier:
             from dataclasses import replace
             from .calibration_stats import estimate
@@ -115,6 +116,9 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 estimate=estimate(samples[0].profile,samples).__dict__,
                 measurements=[r.__dict__ for r in samples])
             if full_comparison:data['full_comparison_measurements']=full_comparison
+            # Preserve completed native measurements if the independent
+            # matched-inference phase exhausts its time budget.
+            (directory/'selection.json').write_text(json.dumps(data,indent=2))
             if runtime.build_metadata.get('calibration_protocol')=='json-session-v1':
                 from .matched_probe import measure_matched
                 data['matched_stream1']=measure_matched(contract,model,runtime,probe_env,

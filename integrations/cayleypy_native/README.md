@@ -458,6 +458,10 @@ selection; a full timing receipt certifies execution, not global optimality.
 `beam_width="max"` searches native memory admission across shard counts 1–128
 with two staging slots and one active sort slot. This is the largest admitted
 beam within that policy, not a universal maximum over every allocation policy.
+An unknown maximum starts with a bounded inference bootstrap, then repeats
+inference calibration keyed by the actual admitted width. A changed batch or
+memory reserve triggers re-admission; an unstable capacity/batch cycle fails
+explicitly instead of accepting the small-beam cache as a maximum profile.
 Its receipt remains `full_step_verified=False` until the optional full-frontier
 check actually completes. GPU topology, graph, model, precision and selected
 device cohort remain part of the evidence; 128-GPU planning is not hardware
