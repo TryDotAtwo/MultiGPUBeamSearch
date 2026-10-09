@@ -183,7 +183,7 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
     if nccl is not None:
         command += [f"-DNCCL_INCLUDE_DIR={nccl['include_dir']}", f"-DNCCL_LIBRARY={nccl['library']}",
                     f"-DCMAKE_BUILD_RPATH={Path(nccl['library']).parent}"]
-    if inference_backend == "libtorch" or backend == "piece_transformer":
+    if inference_backend == "libtorch" or backend in ("piece_transformer", "ensemble"):
         import torch
         command += ["-DBEAM_ENABLE_LIBTORCH_STREAM1=ON", f"-DCMAKE_PREFIX_PATH={torch.utils.cmake_prefix_path}"]
     elif backend != "mlp":
@@ -210,7 +210,7 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
                      "cutlass_digest": source_digest(cutlass, cutlass=True),
                      "toolchain": toolchain_identity(programs), "target": target, "nccl": nccl,
                      "build_mode": "release-debug-logs-v1", "inference_backend": options.inference_backend}
-    if options.inference_backend == "libtorch" or model.backend == "piece_transformer":
+    if options.inference_backend == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
         import torch
         specification["torch"] = {"version": torch.__version__, "cuda": torch.version.cuda,
                                   "cxx11_abi": bool(torch._C._GLIBCXX_USE_CXX11_ABI),
@@ -260,3 +260,4 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         return runner, validate_runner(runner, contract, model.backend, architectures)
     finally:
         lock.rmdir()
+
