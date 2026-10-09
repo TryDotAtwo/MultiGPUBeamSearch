@@ -1,4 +1,97 @@
-# CayleyPy native beam adapter
+# MultiGPUBeamSearch Python library
+
+## Public package name
+
+Install the multigpubeamsearch wheel and use `import multigpubeamsearch`.
+The historical `cayleypy_native` imports forward to the same objects for compatibility.
+This is the public Python namespace of MultiGPUBeamSearch; no import alias is needed.
+
+## Automatic API (development update, 2026-10-06)
+
+Install from the complete matching repository with
+`pip install ./integrations/cayleypy_native`, or install its built wheel. The wheel
+ships its matching native source; CMake/Ninja, CayleyPy and PyTorch are package
+dependencies. First search obtains checksum-pinned CUTLASS and builds/caches a
+runner for the graph shape and visible CUDA architectures. Linux, an NVIDIA
+driver, CUDA toolkit/nvcc and a C++ compiler are platform prerequisites; failures
+are explicit. No driver installation or model training happens during search.
+
+```python
+from cayleypy import CayleyGraph, PermutationGroups
+from multigpubeamsearch import enable_native, NativeOptions
+
+graph = CayleyGraph(PermutationGroups.lrx(8), device="cuda")
+enable_native(NativeOptions(num_gpus=2))
+result = graph.beam_search(
+    start_state=[1, 0, 2, 3, 4, 5, 6, 7],
+    beam_width=100_000,
+    return_path=True,
+)
+print(result.path_found, result.path_length, result.get_path_as_string() if result.path_found else None)
+```
+
+No predictor means exact Hamming distance to the graph's central state, encoded
+as a fixed untrained native MLP. An unchanged `Predictor(graph, "hamming")` also
+works; a supplied learned predictor is never silently replaced by Hamming.
+Supported learned model exporters remain explicit; arbitrary Python callables
+are not automatically converted to native code.
+
+Search defaults to strict `backend="native"` after `enable_native`.
+`backend="torch"` calls ordinary CayleyPy; `backend="auto"` explicitly permits
+pre-launch capability fallback. `beam_mode` keeps CayleyPy's algorithm meaning;
+our adapter supports simple search. Importing the adapter alone changes nothing.
+
+Inference implementation is selected automatically: T4 uses LibTorch; newer
+supported GPUs use CUTLASS. A mixed set containing T4 uses LibTorch for the whole
+job. `inference_backend` is an optional diagnostic override, separate from search
+`backend`. LibTorch has a conservative row profile; CUTLASS uses the native row
+profile, with native VRAM planning and smaller batches for small beams. This
+policy is not a claim of measured optimal tuning. Requested GPU count is never
+silently reduced. Native allocation alignment may increase effective beam width;
+inspect `result.native_metadata` for requested/effective widths, executor,
+profile, build/model identities and replay validation.
+
+## Ensembles and inference-first calibration (development)
+
+```python
+from multigpubeamsearch import NativeEnsemble, NativeOptions, enable_native
+
+enable_native(NativeOptions(num_gpus=2))
+# model_a/model_b/model_c are supported models or graph-bound NativeModel artifacts.
+predictor = NativeEnsemble((model_a, model_b, model_c), (.6, .3, .1))
+result = graph.beam_search(start_state=start, predictor=predictor,
+                           beam_width=1_000_000, return_path=True)
+```
+
+The ordered ensemble has no fixed two-model limit. Coefficients are explicit
+and are not silently normalized. Supported FP16 heads accumulate in FP32;
+clamping and score quantization happen after the last head. On SM80 and newer,
+the final GEMM performs the weighted accumulation in its CUTLASS epilogue.
+Backbones currently use LibTorch; importing this API does not compile arbitrary
+Python neural architectures. The public artifact adapter currently accepts MLPs;
+additional native C++ families still require public adapter registration.
+
+With ensemble autotuning enabled, Stream1 first measures inference batches on
+all selected GPUs. The downstream stage freezes that inference batch and measures
+complete depths while varying outer batch, rings, shards and sort buffers.
+Every candidate must pass native memory admission for the actual requested beam.
+Default calibration budgets are 180 seconds for inference and 600 seconds for
+the pipeline, with a bounded legal measurement frontier of at most 65,536 states.
+Inspect `result.native_metadata['profile']` for the selected parameters and the
+measured frontier scope. A bounded-frontier measurement is not a measured optimum
+for a larger requested beam. Small finite graphs may report pipeline calibration
+as not measured if they cannot fill a unique legal frontier.
+
+`plan_cluster([8] * 16, beam_width)` computes a 128-rank layout and alignment.
+It does not launch multiple nodes or prove hardware performance; every actual
+rank must independently pass native memory admission. Current hardware evidence
+for this development is from two RTX 3060 GPUs.
+
+The remainder records the older explicit setup API and historical validation.
+Its default-auto and pinned-native setup descriptions do not describe the new
+automatic entry point above. New execution evidence is recorded separately under
+`test_results/cayleypy_api_20261006`; the old T4 acceptance is not evidence for
+these updated bytes.
 
 An optional Python wrapper around this repository's native beam search. Enable
 it once, then keep calling `graph.beam_search(...)`. CayleyPy supplies the graph
@@ -366,3 +459,4 @@ object, while native weights remain the frozen snapshot. Preparation itself
 never falls back. A `NativeModel` constructed manually remains an unpinned
 source declaration unless its optional `expected_artifact_hash` is supplied;
 the per-search execution copy is always content-checked and isolated.
+
