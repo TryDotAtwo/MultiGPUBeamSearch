@@ -58,6 +58,33 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     try:initial_plans=actual.admit(baseline)
     except ValueError as error:
         raise NativeBackendError('requested beam failed all-rank native admission') from error
+    if (not options.calibration_full_frontier and
+            runtime.build_metadata.get('component_calibration_protocol')=='exact-capacity-v1'):
+        from .beam_geometry import Shape,memory_shortlist
+        from .component_autotune import tune_components
+        initial=initial_plans[0]
+        baseline.update(BEAM_SHARD_COUNT=str(initial['SHARD_COUNT']),
+            BEAM_STREAM3_RING_SLOTS=str(initial['STREAM3_RING_SLOTS']),
+            BEAM_STREAM4_ACTIVE_SORT_SLOTS=str(initial['STREAM4_ACTIVE_SORT_SLOTS']),
+            BEAM_STREAM4_BATCH_CANDIDATES=str(initial['STREAM4_BATCH_CANDIDATES']))
+        shape=Shape(beam_width,world,int(baseline['BEAM_B_MICRO']),contract.move_count,storage,
+            alignment=initial['STREAM4_BATCH_ALIGNMENT'],
+            capacity_ppm=int(environment.get('BEAM_SHARD_CAPACITY_SCALE_PPM','1250000')),
+            receive_ppm=int(environment.get('BEAM_GLOBAL_SPILL_SCALE_PPM','2000000')))
+        rows=memory_shortlist(shape,effective_beam=initial['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
+            staging_slots=initial['STREAM3_RING_SLOTS'],sort_slots=initial['STREAM4_ACTIVE_SORT_SLOTS'],
+            budget_bytes=min(p['gpu_budget_bytes'] for p in initial_plans))
+        candidates=[('shards-'+str(r['shards']),dict(baseline,BEAM_SHARD_COUNT=str(r['shards'])))
+            for r in rows if r['shards']!=initial['SHARD_COUNT']][:2]
+        if len(candidates)<2:
+            ring=4 if initial['STREAM3_RING_SLOTS']!=4 else 2
+            candidates.append(('staging-'+str(ring),dict(baseline,BEAM_STREAM3_RING_SLOTS=str(ring))))
+        data=tune_components(actual,session,initial_plans,baseline,candidates,
+            moves=contract.move_count,inference=inference)
+        verify_prepared_model(model,contract)
+        data['requested_beam_width']=beam_width
+        (directory/'selection.json').write_text(json.dumps(data,indent=2))
+        return data
     # A measured small-frontier profile cannot certify or optimize a larger
     # frontier. If an explicit fixture budget is exceeded, decline calibration.
     workload=beam_width

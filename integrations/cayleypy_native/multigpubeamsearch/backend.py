@@ -553,12 +553,13 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
             run_dir,env,runner,calibration)
         measured=downstream.get('phase')=='pipeline_measured'
-        if measured:
+        selected=measured or downstream.get('phase')=='component_calibrated'
+        if selected:
             env.update(downstream['environment'])
             microbatch_metadata['derived_parent_batch']=int(env['BEAM_B_MICRO'])//rows_per_parent
             microbatch_metadata['derived_candidates_per_slot']=microbatch_metadata['derived_parent_batch']*contract.move_count
             microbatch_metadata['inference_parent_batch']=calibration['parent_batch']
-        runtime.profile.update(autotuned=measured,pipeline_autotuned=measured,
+        runtime.profile.update(autotuned=selected,pipeline_autotuned=selected,
             pipeline_calibration=downstream,calibration_total_wall_seconds=time.monotonic()-calibration_started)
         if maximum_requested:
             capacity['full_step_verified']=measured and downstream.get('measurement_scope')=='full_requested_frontier'

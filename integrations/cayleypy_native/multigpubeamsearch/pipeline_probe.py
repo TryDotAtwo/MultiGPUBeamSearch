@@ -80,7 +80,7 @@ class NativePipelineProbe:
         self.puzzle_id = puzzle_id
         self.planning_session = planning_session
 
-    def _run(self, environment, *, planning):
+    def _run(self, environment, *, planning, components=False):
         from .backend import _stop_process_tree
         if time.monotonic() >= self.deadline:
             raise ValueError('pipeline calibration budget expired')
@@ -101,8 +101,11 @@ class NativePipelineProbe:
                    BEAM_NCCL_ID_FILE=str(directory/'nccl-id.bin'))
         env.pop('BEAM_BENCHMARK_PLAN_ONLY', None)
         env.pop('BEAM_BENCHMARK_FRONTIER_FILE', None)
+        env.pop('BEAM_CALIBRATION_COMPONENT_ONLY', None)
         if planning:
             env['BEAM_BENCHMARK_PLAN_ONLY'] = '1'
+        elif components:
+            env['BEAM_CALIBRATION_COMPONENT_ONLY'] = '1'
         else:
             env['BEAM_BENCHMARK_FRONTIER_REPEATS'] = str(self.repeats)
             env['BEAM_HISTORY_DIR'] = str(directory/'history')
@@ -111,7 +114,7 @@ class NativePipelineProbe:
         try:
             for rank in range(self.world):
                 rank_env = dict(env, RANK=str(rank), LOCAL_RANK=str(rank), WORLD_SIZE=str(self.world))
-                if not planning:
+                if not planning and not components:
                     rank_env['BEAM_BENCHMARK_FRONTIER_FILE'] = str(self.fixtures[rank])
                 log = (directory/f'rank-{rank}.log').open('wb')
                 command = [str(self.runner), str(self.puzzle_id), '1' if planning else str(self.repeats),
@@ -136,6 +139,31 @@ class NativePipelineProbe:
                 if process.poll() is None:
                     _stop_process_tree(process)
                 log.close()
+
+    def measure_components(self, environment, plans):
+        with CalibrationTelemetry() as telemetry:
+            texts = self._run(environment, planning=False, components=True)
+        rows=[]
+        for rank,text in enumerate(texts):
+            values=[json.loads(line) for line in text.splitlines()
+                    if line.startswith('{') and 'component_calibration' in line]
+            if len(values)!=1:raise ValueError('missing component calibration receipt')
+            row=values[0]
+            if (row.get('rank')!=rank or row.get('correctness_passed') is not True
+                or row.get('full_step_verified') is not False
+                or row.get('shard_capacity')!=plans[rank]['SHARD_CAPACITY_CANDIDATES']
+                or row.get('outer_candidates')!=int(environment['BEAM_B_MICRO'])*
+                    int(environment['BEAM_STREAM3_RING_SLOTS'])*self.environment_move_count):
+                raise ValueError('component calibration contract mismatch')
+            for name in ('stream3_seconds','stream4_group_seconds','union_seconds'):
+                samples=row[name]
+                if len(samples)<5 or any(not math.isfinite(v) or v<=0 for v in samples):
+                    raise ValueError('invalid component timing cohort')
+            rows.append(row)
+        if telemetry.throttled:raise ValueError('component calibration GPU throttled')
+        (self.directory/str(self.counter)/'gpu-telemetry.json').write_text(
+            json.dumps(telemetry.receipt(),indent=2))
+        return rows
 
     def admit(self, environment):
         plans = (self.planning_session.admit(self.beam, environment) if self.planning_session is not None else

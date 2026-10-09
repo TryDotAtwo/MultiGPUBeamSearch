@@ -2,6 +2,9 @@
 #include "stream1_weight_io.hpp"
 #include "production_score_mode.hpp"
 #include "benchmark_frontier.hpp"
+#if defined(__linux__)
+#include "pipeline_component_probe.cuh"
+#endif
 #include "../cuda/stream1_layout_inventory.hpp"
 #include "../cuda/stream1_execution_contract.hpp"
 #include "../cuda/stream1_execution_shape.hpp"
@@ -4657,6 +4660,13 @@ int run_production_runner(int argc, char** argv) {
     BEAM_CUDA_CHECK(cudaMemset(memory.streams.threshold_request_local, 0, sizeof(std::uint32_t)));
     BEAM_CUDA_CHECK(cudaMemset(memory.streams.threshold_request_global, 0, sizeof(std::uint32_t)));
 
+#if defined(__linux__)
+    if(env_bool("BEAM_CALIBRATION_COMPONENT_ONLY",false)) {
+        std::cout<<component_probe::run(plan,memory,nccl_runtime.comm).dump()<<std::endl;
+        free_static_device_memory(memory);
+        return 0;
+    }
+#endif
     std::size_t free_after = 0;
     std::size_t total_after = 0;
     BEAM_CUDA_CHECK(cudaMemGetInfo(&free_after, &total_after));

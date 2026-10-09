@@ -222,6 +222,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         specification['calibration_protocol'] = 'json-session-v1' if '--session' in helper_source else 'oneshot'
     specification['plan_calibration_protocol'] = ('json-session-v1' if
         'BEAM_CALIBRATION_PLAN_SESSION' in (source / 'tools' / 'production_runner.cu').read_text(encoding='utf-8') else 'oneshot')
+    specification['component_calibration_protocol'] = ('exact-capacity-v1' if
+        'BEAM_CALIBRATION_COMPONENT_ONLY' in (source / 'tools' / 'production_runner.cu').read_text(encoding='utf-8') else None)
     if calibration_target or options.inference_backend == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
         import torch
         specification["torch"] = {"version": torch.__version__, "cuda": torch.version.cuda,
