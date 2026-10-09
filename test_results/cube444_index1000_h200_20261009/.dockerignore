@@ -6,4 +6,5 @@
 !archive.py
 !source/
 !source/**
+!prepare_inputs.py
 

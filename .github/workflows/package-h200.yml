@@ -5,6 +5,8 @@ on:
     paths:
       - 'test_results/cube444_index1000_h200_20261009/runner-h200.tar.gz'
       - '.github/workflows/package-h200.yml'
+      - 'test_results/cube444_index1000_h200_20261009/Dockerfile'
+      - 'test_results/cube444_index1000_h200_20261009/prepare_inputs.py'
 permissions:
   contents: read
   packages: write
@@ -28,7 +30,7 @@ jobs:
         run: |
           printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           image="ghcr.io/trydotatwo/multigpubeamsearch-h200:${GITHUB_SHA}"
-          docker build --build-arg BASE_IMAGE=vastai/pytorch:cuda-12.8.1-auto -t "$image" test_results/cube444_index1000_h200_20261009
+          docker build -t "$image" test_results/cube444_index1000_h200_20261009
           docker push "$image"
           docker inspect --format='{{index .RepoDigests 0}}' "$image" | tee image-digest.txt
       - uses: actions/upload-artifact@v4
