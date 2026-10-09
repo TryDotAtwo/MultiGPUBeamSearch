@@ -1,4 +1,5 @@
 #pragma once
+#include "../src/config.hpp"
 #include "cube444_blend_libtorch.hpp"
 #include "stream1_mlp_libtorch_backend.hpp"
 #include <memory>
