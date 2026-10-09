@@ -520,7 +520,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     inherited_ld = env.get("LD_LIBRARY_PATH", "")
     nccl_dir = str(nccl_library.parent)
     env["LD_LIBRARY_PATH"] = nccl_dir + (os.pathsep + inherited_ld if inherited_ld else "")
-    if runtime.build_metadata.get("inference_backend") == "libtorch" or model.backend == "piece_transformer":
+    if runtime.build_metadata.get("inference_backend") == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
         env["BEAM_STREAM1_EXECUTOR"] = "libtorch_eager"
     # Legacy production_runner writes its solution/no-solution logs here.
     legacy_results = run_dir / "test_results"
