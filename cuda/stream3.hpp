@@ -105,6 +105,9 @@ void stream3_accumulate_score_hist_cuda(
     std::uint32_t stream3_batch_candidates,
     cudaStream_t stream);
 
+// Multi-owner split enqueues remote scatter, then local in-place compaction on
+// the caller stream (also when captured). Both use existing preallocated buffers;
+// the extra kernel node adds no arena bytes. Scratch must live through both passes.
 void stream3_restore_owner_split_cuda(
     const Hash128* unique_key,
     const std::uint64_t* unique_val,
