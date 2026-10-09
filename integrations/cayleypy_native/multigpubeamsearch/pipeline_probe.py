@@ -53,7 +53,7 @@ class NativePipelineProbe:
     One process group per rank is always cleaned up on timeout or failure.
     """
     def __init__(self, runner, environment, beam_width, world_size, directory,
-                 fixtures, physical_bytes, *, deadline, verify, repeats=6):
+                 fixtures, physical_bytes, *, deadline, verify, repeats=6, puzzle_id=0):
         if not 6 <= repeats <= 16:
             raise ValueError('need a warmup depth and at least five measurements')
         self.runner = Path(runner)
@@ -72,6 +72,9 @@ class NativePipelineProbe:
             raise TypeError('independent pipeline correctness verifier is required')
         self.verify = verify
         self.counter = 0
+        if type(puzzle_id) is not int or puzzle_id < 0:
+            raise ValueError('calibration puzzle ID must be nonnegative')
+        self.puzzle_id = puzzle_id
 
     def _run(self, environment, *, planning):
         from .backend import _stop_process_tree
@@ -99,7 +102,7 @@ class NativePipelineProbe:
                 if not planning:
                     rank_env['BEAM_BENCHMARK_FRONTIER_FILE'] = str(self.fixtures[rank])
                 log = (directory/f'rank-{rank}.log').open('wb')
-                command = [str(self.runner), '0', '1' if planning else str(self.repeats),
+                command = [str(self.runner), str(self.puzzle_id), '1' if planning else str(self.repeats),
                            str(self.beam), str(self.world), str(rank)]
                 process = subprocess.Popen(command, env=rank_env, cwd=directory, stdout=log,
                     stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
