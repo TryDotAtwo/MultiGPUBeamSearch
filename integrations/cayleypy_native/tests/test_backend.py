@@ -12,6 +12,14 @@ from cayleypy_native.errors import NativeBackendError, NativeUnavailable
 from cayleypy_native.options import NativeOptions
 
 
+@pytest.fixture(autouse=True)
+def fixture_device_names(monkeypatch):
+    # These protocol fixtures mock CUDA capabilities and runner execution.
+    # Do not accidentally query a physical GPU while describing those devices.
+    import torch
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device: "Protocol fixture GPU")
+
+
 class ReplayContract:
     move_count = 2
 
@@ -242,7 +250,7 @@ def test_q_head_alignment_is_unavailable_before_build_or_launch(tmp_path, output
     model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": outputs})
     with pytest.raises(NativeUnavailable, match="Q-head.*multiple of 8"):
         prepare_runtime(SimpleNamespace(move_count=outputs), model,
-                        NativeOptions(cache_dir=tmp_path), tmp_path, (0,))
+                        NativeOptions(cache_dir=tmp_path, inference_backend="cutlass"), tmp_path, (0,))
 
 
 @pytest.mark.parametrize("outputs", [1, 8, 24])

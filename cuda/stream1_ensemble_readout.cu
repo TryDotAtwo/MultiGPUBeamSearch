@@ -58,17 +58,26 @@ void stream1_ensemble_head_fp16_cuda(const __half* a,const __half* w,const float
     std::uint32_t* error,cudaStream_t stream) {
     if(!rows) return;
     if(!a||!w||!bias||!accumulator||!error||(finalize&&!keys)||!hidden||!outputs||
-       hidden%8||outputs%8||rows>std::uint32_t(INT_MAX)||hidden>std::uint32_t(INT_MAX)||
+       hidden%8||rows>std::uint32_t(INT_MAX)||hidden>std::uint32_t(INT_MAX)||
        outputs>std::uint32_t(INT_MAX)||!std::isfinite(coefficient))
         throw std::invalid_argument("invalid aligned FP16 ensemble readout contract");
-    using Gemm=cutlass::gemm::device::GemmUniversalWithBroadcast<
+    using GemmAligned=cutlass::gemm::device::GemmUniversalWithBroadcast<
         cutlass::half_t,cutlass::layout::RowMajor,cutlass::half_t,cutlass::layout::RowMajor,
         float,cutlass::layout::RowMajor,float,cutlass::arch::OpClassTensorOp,
         cutlass::arch::Sm80,cutlass::gemm::GemmShape<128,32,32>,
         cutlass::gemm::GemmShape<64,32,32>,cutlass::gemm::GemmShape<16,8,16>,EnsembleReadout,
         cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>,3,8,8,
         cutlass::arch::OpMultiplyAdd>;
+    using GemmScalar=cutlass::gemm::device::GemmUniversalWithBroadcast<
+        cutlass::half_t,cutlass::layout::RowMajor,cutlass::half_t,cutlass::layout::RowMajor,
+        float,cutlass::layout::RowMajor,float,cutlass::arch::OpClassTensorOp,
+        cutlass::arch::Sm80,cutlass::gemm::GemmShape<128,32,32>,
+        cutlass::gemm::GemmShape<64,32,32>,cutlass::gemm::GemmShape<16,8,16>,EnsembleReadout,
+        cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>,3,8,1,
+        cutlass::arch::OpMultiplyAdd>;
     auto destination=finalize?static_cast<void*>(keys):static_cast<void*>(accumulator);
+    auto launch=[&](auto gemm) {
+    using Gemm=decltype(gemm);
     typename Gemm::Arguments args(cutlass::gemm::GemmUniversalMode::kGemm,
         {int(rows),int(outputs),int(hidden)},1,EnsembleReadout::Params(coefficient,initialize,finalize),
         reinterpret_cast<const cutlass::half_t*>(a),reinterpret_cast<const cutlass::half_t*>(w),
@@ -76,10 +85,11 @@ void stream1_ensemble_head_fp16_cuda(const __half* a,const __half* w,const float
         std::int64_t(rows)*hidden,std::int64_t(hidden)*outputs,
         std::int64_t(rows)*outputs,std::int64_t(rows)*outputs,0,0,
         hidden,outputs,outputs,outputs,0,outputs);
-    Gemm gemm;
     if(gemm.can_implement(args)!=cutlass::Status::kSuccess||
        gemm(args,nullptr,stream)!=cutlass::Status::kSuccess)
         throw std::runtime_error("CUTLASS ensemble readout launch failed");
+    };
+    if(outputs%8==0) launch(GemmAligned{});else launch(GemmScalar{});
     auto count=std::uint64_t(rows)*outputs;
     check_ensemble<<<unsigned((count+255)/256),256,0,stream>>>(destination,count,finalize,error);
     if(cudaGetLastError()!=cudaSuccess) throw std::runtime_error("ensemble numeric guard launch failed");

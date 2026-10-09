@@ -12,6 +12,7 @@ struct NativeEnsemble {
     struct Head {
         std::string family;
         float coefficient;
+        std::uint32_t output_dim=0;
         std::shared_ptr<Cube444Blend> cube;
         std::unique_ptr<MlpLibTorch> mlp;
         std::unique_ptr<PieceTransformerLibTorch> transformer;
@@ -23,11 +24,19 @@ struct NativeEnsemble {
         }
     };
     std::vector<Head> heads;
+    struct Workspace {torch::Tensor sum,keys;};
+    std::vector<Workspace> workspaces;
+    bool use_cutlass=true;
     torch::Device device;
     std::uint32_t state_len,output_dim,padded_output;
-    NativeEnsemble(const fs::path& directory,const torch::Device& target)
-        :device(target),state_len(STATE_LEN),output_dim(MOVE_COUNT),padded_output((MOVE_COUNT+7)/8*8) {
+    NativeEnsemble(const fs::path& directory,const torch::Device& target,
+                   std::uint32_t max_batch=256,std::uint32_t lanes=1)
+        :device(target),state_len(STATE_LEN),output_dim(MOVE_COUNT),padded_output(MOVE_COUNT) {
         auto manifest=nlohmann::json::parse(read_text_exact(directory/"ensemble.json"));
+        cudaDeviceProp properties{};
+        if(cudaGetDeviceProperties(&properties,target.index())!=cudaSuccess)
+            throw std::runtime_error("cannot inspect ensemble GPU");
+        use_cutlass=properties.major>=8;
         if(manifest.at("schema_version")!=1||manifest.at("state_len")!=state_len||
            manifest.at("output_dim")!=output_dim||manifest.at("score_semantics")!="distance_q"||
            !manifest.at("models").is_array()||manifest.at("models").empty())
@@ -41,13 +50,13 @@ struct NativeEnsemble {
             if(path.is_relative()) path=directory/path;
             if(head.family=="mlp") {
                 head.mlp=std::make_unique<MlpLibTorch>(path,target);
-                if(head.mlp->state_len!=state_len||head.mlp->output_dim!=output_dim||head.mlp->dtype!=torch::kFloat16)
+                if(head.mlp->state_len!=state_len||(head.mlp->output_dim!=output_dim&&head.mlp->output_dim!=1)||head.mlp->dtype!=torch::kFloat16)
                     throw std::runtime_error("ensemble MLP requires matching Q head and FP16");
                 head.weight=head.mlp->output.weight.transpose(0,1).contiguous();
                 head.bias=head.mlp->output.bias.to(torch::kFloat32).contiguous();
             } else if(head.family=="piece_transformer") {
                 head.transformer=std::make_unique<PieceTransformerLibTorch>(path,target);
-                if(head.transformer->state_len!=state_len||head.transformer->output_dim!=output_dim||head.transformer->dtype!=torch::kFloat16)
+                if(head.transformer->state_len!=state_len||(head.transformer->output_dim!=output_dim&&head.transformer->output_dim!=1)||head.transformer->dtype!=torch::kFloat16)
                     throw std::runtime_error("ensemble transformer requires matching Q head and FP16");
                 head.weight=head.transformer->output_weight_kxh.contiguous();
                 head.bias=head.transformer->output_bias.to(torch::kFloat32).contiguous();
@@ -61,6 +70,7 @@ struct NativeEnsemble {
                 head.bias=head.cube->at(std::string(prefix)+"_b").to(torch::kFloat32).contiguous();
             } else throw std::runtime_error("unsupported native ensemble model family: "+head.family);
             if(head.weight.size(0)%8) throw std::runtime_error("ensemble hidden size must be aligned to 8");
+            head.output_dim=head.weight.size(1);
             if(padded_output!=output_dim) {
                 auto w=torch::zeros({head.weight.size(0),padded_output},head.weight.options());
                 w.narrow(1,0,output_dim).copy_(head.weight);head.weight=w;
@@ -69,19 +79,45 @@ struct NativeEnsemble {
             }
             heads.push_back(std::move(head));
         }
+        if(!max_batch||!lanes) throw std::runtime_error("ensemble batch and lanes must be positive");
+        auto options=torch::TensorOptions().device(device).dtype(torch::kFloat32);
+        for(std::uint32_t i=0;i<lanes;++i) workspaces.push_back({
+            torch::empty({max_batch,padded_output},options),
+            torch::empty({max_batch,padded_output},options.dtype(torch::kInt32))});
         if(cudaDeviceSynchronize()!=cudaSuccess) throw std::runtime_error("ensemble startup synchronization failed");
     }
-    void score(const torch::Tensor& states,std::uint32_t* destination,std::uint32_t* error,cudaStream_t stream) const {
+    void score(const torch::Tensor& states,std::uint32_t* destination,std::uint32_t* error,
+               cudaStream_t stream,std::uint32_t lane=0,const std::uint8_t* generators=nullptr) const {
         auto rows=states.size(0);
+        if(lane>=workspaces.size()||rows>workspaces[lane].sum.size(0))
+            throw std::runtime_error("ensemble score exceeds preallocated lane workspace");
         auto options=states.options().dtype(torch::kFloat32);
-        auto sum=torch::empty({rows,padded_output},options);
-        auto padded_keys=torch::empty({rows,padded_output},options.dtype(torch::kInt32));
+        auto sum=workspaces[lane].sum.narrow(0,0,rows);
+        auto padded_keys=workspaces[lane].keys.narrow(0,0,rows);
         auto key_ptr=padded_output==output_dim?destination:reinterpret_cast<std::uint32_t*>(padded_keys.data_ptr<int>());
+        torch::Tensor children;
+        if(std::any_of(heads.begin(),heads.end(),[](const auto& h){return h.output_dim==1;})) {
+            if(!generators) throw std::runtime_error("scalar ensemble head requires ordered graph generators");
+            children=scalar_children(states,generators,MOVE_COUNT,STATE_LEN,STATE_STORAGE_LEN);
+        }
         for(std::size_t i=0;i<heads.size();++i) {
-            const auto& head=heads[i];auto features=head.features(states);
+            const auto& head=heads[i];auto features=head.features(head.output_dim==1?children:states);
+            if(!use_cutlass) {
+                auto value=torch::matmul(features.to(torch::kFloat32),head.weight.to(torch::kFloat32))+head.bias;
+                auto view=sum.reshape({features.size(0),head.output_dim});
+                if(i==0) view.copy_(value*head.coefficient);else view.add_(value,head.coefficient);
+                if(i+1==heads.size()) {
+                    auto finite=torch::isfinite(sum).all();
+                    auto flag=torch::from_blob(error,{1},options.dtype(torch::kInt32));
+                    flag.bitwise_or_(torch::logical_not(finite).to(torch::kInt32));
+                    auto output=torch::from_blob(destination,{rows,output_dim},options.dtype(torch::kInt32));
+                    output.copy_(torch::round(torch::clamp(sum,0.0,kScoreMaxQ)*kScoreScale).to(torch::kInt32),true);
+                }
+                continue;
+            }
             stream1_ensemble_head_fp16_cuda(reinterpret_cast<const __half*>(features.data_ptr<at::Half>()),
                 reinterpret_cast<const __half*>(head.weight.data_ptr<at::Half>()),head.bias.data_ptr<float>(),
-                sum.data_ptr<float>(),key_ptr,rows,head.weight.size(0),padded_output,
+                sum.data_ptr<float>(),key_ptr,features.size(0),head.weight.size(0),head.output_dim,
                 head.coefficient,i==0,i+1==heads.size(),error,stream);
         }
         if(padded_output!=output_dim) {

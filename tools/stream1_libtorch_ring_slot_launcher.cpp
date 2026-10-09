@@ -62,8 +62,7 @@ struct RingSlotLauncher::Impl {
             if(!config.numeric_error) throw std::runtime_error("ensemble requires sticky numeric error flag");
             cudaDeviceProp properties{};
             BEAM_CUDA_CHECK(cudaGetDeviceProperties(&properties,config.device_index));
-            if(properties.major<8) throw std::runtime_error("CUTLASS ensemble requires SM80+");
-            ensemble=std::make_unique<NativeEnsemble>(config.blend_dir,device);
+            ensemble=std::make_unique<NativeEnsemble>(config.blend_dir,device,config.b_micro,config.inference_parallelism);
             std::cout<<"ensemble_model_count="<<ensemble->heads.size()
                      <<" ensemble_schedule=serial execution_precision=fp16 accumulation_precision=fp32"<<std::endl;
         } else if (!config.blend_dir.empty()) {
@@ -197,7 +196,7 @@ struct RingSlotLauncher::Impl {
         const auto outputs = ensemble ? ensemble->output_dim : blend ? 24U : transformer ? transformer->output_dim : mlp->output_dim;
         if (ensemble) {
             ensemble->score(states,config.score_ring+context.candidate_offset,
-                            config.numeric_error,context.stream1_lane);
+                            config.numeric_error,context.stream1_lane,context.lane,config.generators);
         } else if (blend) {
             auto lane=context.lane;
             states=states.narrow(1,0,96).to(torch::kLong).contiguous();

@@ -12,7 +12,9 @@ from cayleypy_native.options import NativeOptions, NativeOutcome
 
 
 @pytest.fixture(autouse=True)
-def clean_install():
+def clean_install(monkeypatch):
+    # Source provisioning has its own tests; dispatch mocks must not download.
+    monkeypatch.setattr("cayleypy_native.bootstrap.prepare_sources", lambda options: options)
     dispatch.disable_native()
     yield
     dispatch.disable_native()
@@ -37,7 +39,7 @@ def test_auto_fallback_preserves_original_result_and_reason(tmp_path, monkeypatc
         raise NativeUnavailable("test: no compatible native runtime")
     monkeypatch.setattr(dispatch, "runtime_devices", unavailable)
     g = graph()
-    dispatch.enable_native(NativeOptions(cache_dir=tmp_path))
+    dispatch.enable_native(NativeOptions(cache_dir=tmp_path), default_backend="auto")
     with pytest.warns(NativeFallbackWarning, match="no compatible native runtime"):
         result = g.beam_search(start_state=[1, 0, 2, 3, 4], return_path=True)
     assert isinstance(result, BeamSearchResult)
@@ -54,6 +56,7 @@ def test_auto_cpu_fallback_does_not_touch_unavailable_cache(tmp_path, monkeypatc
     )
     result = dispatch.beam_search(
         graph(),
+        backend="auto",
         native_options=NativeOptions(cache_dir=blocked_cache, warn_on_fallback=False),
         start_state=[1, 0, 2, 3, 4],
         return_path=True,
@@ -69,6 +72,7 @@ def test_auto_cache_creation_failure_is_a_capability_fallback(tmp_path, monkeypa
     with pytest.warns(NativeFallbackWarning, match="cache run directory"):
         result = dispatch.beam_search(
             graph(),
+            backend="auto",
             native_options=NativeOptions(cache_dir=blocked_cache),
             start_state=[1, 0, 2, 3, 4],
             return_path=True,
@@ -98,7 +102,7 @@ def test_explicit_torch_never_probes_native(tmp_path, monkeypatch):
 def fake_native(monkeypatch, tmp_path, path=(2,)):
     monkeypatch.setattr(dispatch, "runtime_devices", lambda *args: (0,))
     monkeypatch.setattr(dispatch, "prepare_model", lambda *args: SimpleNamespace(artifact_hash="model-sha", manifest={"output_dim": 1}))
-    monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args, **kwargs: SimpleNamespace())
+    monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args, **kwargs: SimpleNamespace(build_metadata={}))
     calls = []
     def run(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None):
         calls.append((contract, beam_width, max_steps, devices))
@@ -126,7 +130,7 @@ def test_dispatch_clamps_touch_bfs_to_the_requested_step_budget(tmp_path, monkey
 
     def prepare(*args, touch_bfs_radius=None):
         observed.append(touch_bfs_radius)
-        return SimpleNamespace()
+        return SimpleNamespace(build_metadata={})
 
     monkeypatch.setattr(dispatch, "prepare_runtime", prepare)
     result = dispatch.beam_search(
@@ -219,7 +223,7 @@ def test_unsupported_build_falls_back_before_worker(tmp_path, monkeypatch):
         raise NativeUnavailable("binary shape mismatch")
     monkeypatch.setattr(dispatch, "prepare_runtime", unsupported)
     with pytest.warns(NativeFallbackWarning, match="shape mismatch"):
-        result = dispatch.beam_search(graph(), native_options=NativeOptions(cache_dir=tmp_path),
+        result = dispatch.beam_search(graph(), backend="auto", native_options=NativeOptions(cache_dir=tmp_path),
                                       start_state=[1, 0, 2, 3, 4], return_path=True)
     assert result.path == [2] and not calls
     assert not list((tmp_path / "runs").glob("*"))
@@ -294,7 +298,7 @@ def test_auto_preserves_unsupported_upstream_kwargs_and_predictor(tmp_path, monk
         seen.append(kwargs)
         return sentinel
     monkeypatch.setattr(CayleyGraph, "beam_search", original)
-    dispatch.enable_native(NativeOptions(cache_dir=tmp_path, warn_on_fallback=False))
+    dispatch.enable_native(NativeOptions(cache_dir=tmp_path, warn_on_fallback=False), default_backend="auto")
     kwargs = dict(start_state=[1, 0, 2, 3, 4], history_depth=3, beam_mode="advanced", predictor=object(), verbose=100)
     assert graph().beam_search(**kwargs) is sentinel
     assert seen == [kwargs]
@@ -324,10 +328,10 @@ def test_native_artifact_fallback_is_explicit(tmp_path, monkeypatch):
     with warnings.catch_warnings():
         warnings.simplefilter("error", NativeFallbackWarning)
         with pytest.raises(NativeUnavailable, match="no CUDA; NativeModel has no fallback"):
-            dispatch.beam_search(g, native_options=opts, start_state=[1, 0, 2, 3, 4], predictor=model)
+            dispatch.beam_search(g, backend="auto", native_options=opts, start_state=[1, 0, 2, 3, 4], predictor=model)
     model = NativeModel.for_graph(g, tmp_path / "weights", fallback=Predictor(g, "hamming"))
     with pytest.warns(NativeFallbackWarning, match="no CUDA"):
-        result = dispatch.beam_search(g, native_options=opts, start_state=[1, 0, 2, 3, 4], predictor=model, return_path=True)
+        result = dispatch.beam_search(g, backend="auto", native_options=opts, start_state=[1, 0, 2, 3, 4], predictor=model, return_path=True)
     assert result.path == [2]
 
 

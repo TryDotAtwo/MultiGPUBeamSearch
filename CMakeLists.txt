@@ -439,6 +439,10 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
         tools/production_runner.cu
         tools/stream1_libtorch_ring_slot_launcher.cpp
         tools/stream1_transformer_libtorch_backend.cpp)
+    add_executable(stream1_ensemble_benchmark tools/stream1_ensemble_benchmark.cpp)
+    target_link_libraries(stream1_ensemble_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")
+    target_include_directories(stream1_ensemble_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
+    set_target_properties(stream1_ensemble_benchmark PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
     target_link_libraries(production_runner_libtorch_stream1 PRIVATE beam_cuda "${TORCH_LIBRARIES}")
     target_include_directories(production_runner_libtorch_stream1 PRIVATE "${TORCH_INCLUDE_DIRS}")
     target_compile_definitions(production_runner_libtorch_stream1 PRIVATE

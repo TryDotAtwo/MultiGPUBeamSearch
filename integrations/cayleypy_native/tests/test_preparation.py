@@ -30,6 +30,7 @@ def make_artifact(directory):
 
 @pytest.fixture
 def configured(tmp_path, monkeypatch):
+    monkeypatch.setattr("cayleypy_native.bootstrap.prepare_sources", lambda options: options)
     graph = CayleyGraph(PermutationGroups.lrx(4), device="cpu", random_seed=1729)
     weights = make_artifact(tmp_path / "source_weights")
     runner = tmp_path / "fake_production_runner"
