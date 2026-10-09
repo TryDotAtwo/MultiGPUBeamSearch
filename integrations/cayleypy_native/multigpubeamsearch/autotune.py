@@ -113,7 +113,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     baseline=candidates[0]
     coarse_candidates=list(candidates)
     refined=[]
-    parents=max(8192,cap)
+    parents=min((beam_width+len(devices)-1)//len(devices),max(8192,cap))
     started=time.monotonic()
     deadline=started+options.calibration_seconds
     coarse_deadline=started+.7*options.calibration_seconds
