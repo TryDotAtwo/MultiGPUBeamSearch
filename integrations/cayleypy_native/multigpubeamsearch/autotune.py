@@ -38,7 +38,7 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             '--format=csv,noheader'],capture_output=True,text=True,timeout=10,check=True).stdout
     except (OSError,subprocess.SubprocessError):hardware='unavailable'
     import platform
-    return {'schema':2,'graph':contract.graph_hash,'models':model.artifact_hash,
+    return {'schema':3,'graph':contract.graph_hash,'models':model.artifact_hash,
             'runner':runtime.build_metadata['binary_sha256'],
             'probe':runtime.build_metadata.get('calibration_binary_sha256'),
             'gpu_properties':[str(torch.cuda.get_device_properties(d)) for d in devices],
@@ -157,6 +157,13 @@ def valid_cached_profile(data, signature, max_batch):
                 or type(data.get('reserve_bytes')) is not int or data['reserve_bytes']<=0):
             return False
         rows=[row for row in data['records'] if row['batch']==batch]
+        if signature.get('schema', 0)>=3:
+            telemetry=data['gpu_telemetry'][str(batch)]
+            if telemetry.get('throttled') is not False:
+                return False
+            if any(row.get('throttled') is not False
+                   for sample in telemetry['samples'] for row in sample):
+                return False
         world=signature['world_size']
         if len(rows)!=world or {row['device'] for row in rows}!=set(range(world)):
             return False
