@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "commit": "15f4f3093f069479e964072f9a47b8b3293e6fd7",
+  "archive_sha256": "6ba8c62dce2174bc2a63012f4af595d1046858db97c93984a04081e526b70a46",
+  "files_verified": 369,
+  "parts_verified": 5,
+  "scope": "completed cases only; larger runs pending"
+}
