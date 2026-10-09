@@ -31,8 +31,8 @@ class SourceArchive:
 # Immutable source snapshots. Native ensemble/autotune development is validated
 # on RTX3060; this pin is not an additional T4 hardware acceptance claim.
 NATIVE_SOURCE = SourceArchive(
-    "native", "TryDotAtwo/MultiGPUBeamSearch", "cc3527cd18f63438671227e2129b001d6339b569",
-    "e34c6eb099b5bcd157be2b182640a1a6619832a9e113b55e3befb2254f9415fd", "MultiGPUBeamSearch-cc3527cd18f63438671227e2129b001d6339b569",
+    "native", "TryDotAtwo/MultiGPUBeamSearch", "d52f81ff7d1b3240996a07fa4ab369b55f84f01f",
+    "a2e616d1ff550e2498d0dc454ebfc7fe7f0f10c2d30a87bebad444454de95ffe", "MultiGPUBeamSearch-d52f81ff7d1b3240996a07fa4ab369b55f84f01f",
 )
 CUTLASS_SOURCE = SourceArchive(
     "cutlass", "NVIDIA/cutlass", "afa1772203677c5118fcd82537a9c8fefbcc7008",
