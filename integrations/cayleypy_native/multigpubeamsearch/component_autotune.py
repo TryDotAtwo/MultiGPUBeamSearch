@@ -94,11 +94,16 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                 # must preserve the exact frontier; no rounded smaller proxy.
                 outer=int(baseline['BEAM_B_MICRO'])
                 if outer*2<=target[0]['frontier_state_capacity']:
-                    proposed.append(('outer-double',dict(baseline,**proposal,BEAM_B_MICRO=str(outer*2))))
+                    # Keep the existing flush batch: changing it as well can
+                    # reject or slow this candidate for an unrelated reason.
+                    # Halve staging to preserve its producer-buffer footprint.
+                    staging=max(2,(int(baseline['BEAM_STREAM3_RING_SLOTS'])+1)//2)
+                    proposed.append(('outer-double',dict(baseline,
+                        BEAM_B_MICRO=str(outer*2),BEAM_STREAM3_RING_SLOTS=str(staging))))
                 lanes=int(baseline['BEAM_STREAM4_ACTIVE_SORT_SLOTS'])
                 alternative=min(target[0]['SHARD_COUNT'],lanes*2) if lanes==1 else max(1,lanes//2)
                 if alternative!=lanes:
-                    proposed.append(('sort-lanes-'+str(alternative),dict(baseline,**proposal,
+                    proposed.append(('sort-lanes-'+str(alternative),dict(baseline,
                         BEAM_STREAM4_ACTIVE_SORT_SLOTS=str(alternative))))
                 # Close all native memory owners before measuring another profile.
                 from .plan_session import NativePlanSession
@@ -141,3 +146,4 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
             'selection_rejections':rejected,
             'selection_objective':'minimize summed service work; proxy only, not full-step wall time',
             'search_policy':'baseline plus at most five exact-capacity candidates; frozen inference microbatch'}
+

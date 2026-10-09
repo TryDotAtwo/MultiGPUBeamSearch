@@ -482,8 +482,11 @@ selection; a full timing receipt certifies execution, not global optimality.
 `beam_width="max"` searches native memory admission across shard counts 1–128
 with two staging slots and one active sort slot. This is the largest admitted
 beam within that policy, not a universal maximum over every allocation policy.
-An unknown maximum starts with a bounded inference bootstrap, then repeats
-inference calibration keyed by the actual admitted width. A changed batch or
+An unknown maximum starts with the smallest measured, numerically verified
+inference memory reserve, then repeats inference calibration keyed by the actual
+admitted width and selects the fastest batch that fits. Maximizing frontier
+capacity can require a slower inference batch than maximizing throughput.
+A changed batch or
 memory reserve triggers re-admission; an unstable capacity/batch cycle fails
 explicitly instead of accepting the small-beam cache as a maximum profile.
 Its receipt remains `full_step_verified=False` until the optional full-frontier
@@ -546,3 +549,4 @@ object, while native weights remain the frozen snapshot. Preparation itself
 never falls back. A `NativeModel` constructed manually remains an unpinned
 source declaration unless its optional `expected_artifact_hash` is supplied;
 the per-search execution copy is always content-checked and isolated.
+

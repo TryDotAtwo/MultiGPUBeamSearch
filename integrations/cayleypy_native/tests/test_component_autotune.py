@@ -70,7 +70,7 @@ def test_outer_and_sort_candidates_keep_exact_frontier_and_inference(monkeypatch
         WORLD_SIZE=2,SHARD_COUNT=4,SHARD_CAPACITY_CANDIDATES=8192,
         STREAM4_BATCH_CANDIDATES=1024,STREAM4_BATCH_ALIGNMENT=1024)
     baseline=dict(BEAM_B_MICRO='256',BEAM_ENSEMBLE_INFERENCE_MICRO='256',
-        BEAM_SHARD_COUNT='4',BEAM_STREAM3_RING_SLOTS='2',BEAM_STREAM4_ACTIVE_SORT_SLOTS='1',
+        BEAM_SHARD_COUNT='4',BEAM_STREAM3_RING_SLOTS='4',BEAM_STREAM4_ACTIVE_SORT_SLOTS='1',
         BEAM_STREAM4_BATCH_CANDIDATES='1024')
     requested=[]
     class Planner:
@@ -89,5 +89,12 @@ def test_outer_and_sort_candidates_keep_exact_frontier_and_inference(monkeypatch
     assert any(env['BEAM_B_MICRO']=='512' for _,env in requested)
     assert any(env['BEAM_STREAM4_ACTIVE_SORT_SLOTS']=='2' for _,env in requested)
     assert any(env['BEAM_STREAM4_BATCH_CANDIDATES']=='2048' for _,env in requested)
+    outer=next(env for _,env in requested if env['BEAM_B_MICRO']=='512')
+    assert outer['BEAM_STREAM3_RING_SLOTS']=='2'
+    assert outer['BEAM_STREAM4_BATCH_CANDIDATES']==baseline['BEAM_STREAM4_BATCH_CANDIDATES']
+    lanes=next(env for _,env in requested if env['BEAM_STREAM4_ACTIVE_SORT_SLOTS']=='2')
+    assert lanes['BEAM_STREAM3_RING_SLOTS']==baseline['BEAM_STREAM3_RING_SLOTS']
+    assert lanes['BEAM_STREAM4_BATCH_CANDIDATES']==baseline['BEAM_STREAM4_BATCH_CANDIDATES']
     assert all(beam==16384 and env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256' for beam,env in requested)
     assert result['workload_parents']==16384
+
