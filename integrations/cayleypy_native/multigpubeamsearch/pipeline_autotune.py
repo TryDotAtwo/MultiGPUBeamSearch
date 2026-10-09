@@ -19,6 +19,9 @@ def tune_downstream(contract, model, runtime, options, devices, beam_width,
     world=len(devices);storage=runtime.build_metadata['shape']['storage_len']
     micro=inference['parent_batch']
     baseline={'BEAM_B_MICRO':str(micro),'BEAM_ENSEMBLE_INFERENCE_MICRO':str(micro)}
+    native_single=model.backend=='mlp' if model is not None else False
+    if native_single:
+        baseline['BEAM_B_MICRO']=str(micro*(contract.move_count if model.manifest['output_dim']==1 else 1))
     fixtures=[directory/'frontiers'/f'frontier-rank-{i}.bin' for i in range(world)]
     # The calibration fixture has no solved-neighborhood shortcut. Ordinary
     # execution retains its original touch-BFS settings and requested beam.
@@ -60,7 +63,8 @@ def tune_downstream(contract, model, runtime, options, devices, beam_width,
         return probe.admit(env)
     try:
         selection=tune_pipeline(micro,baseline,admit=admit,measure=probe.measure,
-            deadline=search_deadline,max_outer=max(micro,min(65536,options.calibration_max_batch*8)))
+            deadline=search_deadline,max_outer=max(micro,min(65536,options.calibration_max_batch*8)),
+            tune_outer=not native_single)
     except ValueError as error:
         raise NativeBackendError('full-pipeline baseline calibration failed: '+str(directory)) from error
     actual.deadline=deadline
