@@ -1,0 +1,10 @@
+{
+  "bytes": 1890157,
+  "sha256": "07eebd82b5be52d0ea060e4a4487a37ed324b1eb0427d456e4235e1a52be1859",
+  "files": 947,
+  "manifest_sha256": "cef62eebaacc07683ead6fb8dccdbf186a7da1bee55857d2e071bb48ffd62c55",
+  "parts": 7,
+  "part_bytes": 300000,
+  "archive": "results-2gpu.tar.gz",
+  "instance": 55029041
+}
