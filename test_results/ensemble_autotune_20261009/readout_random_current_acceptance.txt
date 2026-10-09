@@ -1,0 +1,63 @@
+heads=1 outputs=1 rows=257 reference=PASS device=0
+heads=2 outputs=1 rows=257 reference=PASS device=0
+heads=3 outputs=1 rows=257 reference=PASS device=0
+heads=8 outputs=1 rows=257 reference=PASS device=0
+heads=17 outputs=1 rows=257 reference=PASS device=0
+signed_accumulation=PASS
+nonfinite_guard=PASS outputs=1
+random_cpu_oracle=PASS heads=1 outputs=1 device=0
+random_cpu_oracle=PASS heads=3 outputs=1 device=0
+random_cpu_oracle=PASS heads=17 outputs=1 device=0
+heads=1 outputs=3 rows=257 reference=PASS device=0
+heads=2 outputs=3 rows=257 reference=PASS device=0
+heads=3 outputs=3 rows=257 reference=PASS device=0
+heads=8 outputs=3 rows=257 reference=PASS device=0
+heads=17 outputs=3 rows=257 reference=PASS device=0
+signed_accumulation=PASS
+nonfinite_guard=PASS outputs=3
+random_cpu_oracle=PASS heads=1 outputs=3 device=0
+random_cpu_oracle=PASS heads=3 outputs=3 device=0
+random_cpu_oracle=PASS heads=17 outputs=3 device=0
+heads=1 outputs=24 rows=257 reference=PASS device=0
+heads=2 outputs=24 rows=257 reference=PASS device=0
+heads=3 outputs=24 rows=257 reference=PASS device=0
+heads=8 outputs=24 rows=257 reference=PASS device=0
+heads=17 outputs=24 rows=257 reference=PASS device=0
+signed_accumulation=PASS
+nonfinite_guard=PASS outputs=24
+random_cpu_oracle=PASS heads=1 outputs=24 device=0
+random_cpu_oracle=PASS heads=3 outputs=24 device=0
+random_cpu_oracle=PASS heads=17 outputs=24 device=0
+heads=1 outputs=1 rows=257 reference=PASS device=1
+heads=2 outputs=1 rows=257 reference=PASS device=1
+heads=3 outputs=1 rows=257 reference=PASS device=1
+heads=8 outputs=1 rows=257 reference=PASS device=1
+heads=17 outputs=1 rows=257 reference=PASS device=1
+signed_accumulation=PASS
+nonfinite_guard=PASS outputs=1
+random_cpu_oracle=PASS heads=1 outputs=1 device=1
+random_cpu_oracle=PASS heads=3 outputs=1 device=1
+random_cpu_oracle=PASS heads=17 outputs=1 device=1
+heads=1 outputs=3 rows=257 reference=PASS device=1
+heads=2 outputs=3 rows=257 reference=PASS device=1
+heads=3 outputs=3 rows=257 reference=PASS device=1
+heads=8 outputs=3 rows=257 reference=PASS device=1
+heads=17 outputs=3 rows=257 reference=PASS device=1
+signed_accumulation=PASS
+nonfinite_guard=PASS outputs=3
+random_cpu_oracle=PASS heads=1 outputs=3 device=1
+random_cpu_oracle=PASS heads=3 outputs=3 device=1
+random_cpu_oracle=PASS heads=17 outputs=3 device=1
+heads=1 outputs=24 rows=257 reference=PASS device=1
+heads=2 outputs=24 rows=257 reference=PASS device=1
+heads=3 outputs=24 rows=257 reference=PASS device=1
+heads=8 outputs=24 rows=257 reference=PASS device=1
+heads=17 outputs=24 rows=257 reference=PASS device=1
+signed_accumulation=PASS
+nonfinite_guard=PASS outputs=24
+random_cpu_oracle=PASS heads=1 outputs=24 device=1
+random_cpu_oracle=PASS heads=3 outputs=24 device=1
+random_cpu_oracle=PASS heads=17 outputs=24 device=1
+31c90ef772d4bb34b9b0bdf91b7ce9c567bfe40c45f359ee66c47370eb2553a2  /workspace/readout-random-current-probe
+89851ab7c80beea32ba5bb742745364603b0f7e160470658ef62754a0a3de684  /workspace/source/tests/stream1_ensemble_readout_probe.cu
+42c58cdfe3c6a674fb96b1e3d46f7cc7d639340f1c916aea3e8ef3b52d2773e4  /workspace/source/cuda/stream1_ensemble_readout.cu
