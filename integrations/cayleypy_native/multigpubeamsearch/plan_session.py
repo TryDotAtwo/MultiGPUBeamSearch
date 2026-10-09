@@ -1,5 +1,6 @@
 """Persistent all-rank exact native memory planning with explicit ownership."""
 from pathlib import Path
+import uuid
 from .calibration_session import InferenceSession
 from .beam_capacity import CapacityRejected
 from .pipeline_profiles import validate_rank_plans
@@ -11,6 +12,7 @@ class NativePlanSession:
         directory=Path(directory);directory.mkdir(parents=True,exist_ok=False)
         try:
             env=dict(environment, BEAM_CALIBRATION_PLAN_SESSION='1', BEAM_BENCHMARK_PLAN_ONLY='1',
+                     BEAM_NCCL_RUN_ID='plan-session-'+uuid.uuid4().hex,
                      BEAM_NCCL_ID_FILE=str(directory/'nccl-id.bin'))
             for rank in range(world):
                 rank_env=dict(env,RANK=str(rank),LOCAL_RANK=str(rank),WORLD_SIZE=str(world))
