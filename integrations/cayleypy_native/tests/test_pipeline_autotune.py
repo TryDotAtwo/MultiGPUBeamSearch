@@ -92,4 +92,3 @@ def test_native_scalar_inference_parent_batch_maps_to_child_row_budget(tmp_path,
         {'parent_batch':256,'phase':'inference_verified'})
     assert result['environment']['BEAM_B_MICRO']=='768'
     assert all(env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256' for _,env in calls)
-

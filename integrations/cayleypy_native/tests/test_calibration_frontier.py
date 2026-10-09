@@ -38,4 +38,3 @@ def test_small_graph_declines_unfillable_frontier(tmp_path):
 def test_frontier_budget_does_not_silently_shrink_workload(tmp_path):
     with pytest.raises(ValueError,match='state budget'):
         write_frontiers(graph(),[20,20],16,tmp_path/'too-big',deadline=time.monotonic()+10,max_states=32)
-

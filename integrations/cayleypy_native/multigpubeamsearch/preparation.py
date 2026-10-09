@@ -96,4 +96,3 @@ def prepare_native(graph, predictor=None, *, native_options=None, fallback=None)
         if isinstance(error, OSError):
             raise NativeBackendError(f"cannot create native prepared snapshot; artifacts={directory}: {error}") from error
         raise
-

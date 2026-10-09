@@ -64,4 +64,3 @@ class CalibrationTelemetry:
         return dict(samples=self.samples, errors=self.errors,
                     interval_seconds=self.interval, throttled=self.throttled,
                     scope='sampled visible GPUs; transient events may be missed')
-

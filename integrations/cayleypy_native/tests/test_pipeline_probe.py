@@ -45,4 +45,3 @@ def test_slow_candidate_has_own_timeout_and_cleans_every_rank(tmp_path,monkeypat
         probe._run({},planning=False)
     assert len(launched)==2 and stopped==launched
     assert 0<timeouts[0]<=30
-

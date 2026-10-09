@@ -267,4 +267,3 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         return runner, validate_runner(runner, contract, model.backend, architectures)
     finally:
         lock.rmdir()
-

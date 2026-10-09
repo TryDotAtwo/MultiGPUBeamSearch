@@ -547,4 +547,3 @@ def test_rank_log_collection_does_not_follow_stream_symlink(tmp_path):
     with pytest.raises(NativeBackendError, match="unsafe rank stream"):
         collect_worker_logs(root, launcher, combined, 2, strict=True)
     assert "UNRELATED_LOG_MUST_NOT_BE_READ" not in combined.read_text()
-

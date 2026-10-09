@@ -181,4 +181,3 @@ def valid_cached_profile(data, signature, max_batch):
         return data['reserve_bytes']==expected_reserve
     except (KeyError,TypeError,ValueError):
         return False
-

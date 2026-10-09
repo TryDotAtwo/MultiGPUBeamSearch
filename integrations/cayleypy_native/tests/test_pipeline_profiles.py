@@ -92,4 +92,3 @@ def test_negative_memory_estimate_is_not_admission():
          'SHARD_COUNT':4,'B_MICRO':32,'WORLD_SIZE':1,'STREAM4_BATCH_ALIGNMENT':1024,
          'estimated_required_device_bytes':-1,'gpu_budget_bytes':11}
     with pytest.raises(ValueError,match='values'):validate_rank_plans([row])
-

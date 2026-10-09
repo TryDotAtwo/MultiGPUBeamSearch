@@ -68,4 +68,3 @@ def write_frontiers(contract, rank_counts, storage_len, directory, *, deadline,
              'excluded_center_and_predecessors':True,'files':files}
     (directory/'receipt.json').write_text(json.dumps(receipt,indent=2))
     return receipt
-

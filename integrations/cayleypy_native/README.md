@@ -463,4 +463,3 @@ object, while native weights remain the frozen snapshot. Preparation itself
 never falls back. A `NativeModel` constructed manually remains an unpinned
 source declaration unless its optional `expected_artifact_hash` is supplied;
 the per-search execution copy is always content-checked and isolated.
-

@@ -164,4 +164,3 @@ class NativePipelineProbe:
         return [Measurement('', parents, tuple(row[index] for row in seconds), True, True,
                             throttled=telemetry.throttled)
                 for index in range(1, self.repeats)]
-

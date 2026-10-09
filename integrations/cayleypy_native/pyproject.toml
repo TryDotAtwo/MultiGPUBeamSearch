@@ -3,14 +3,14 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cayleypy-native"
-version = "0.1.0.dev0"
+name = "multigpubeamsearch"
+version = "0.1.0.dev1"
 description = "Optional CayleyPy adapter for the native MultiGPUBeamSearch solver"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
 authors = [{name = "MultiGPUBeamSearch contributors"}]
-dependencies = ["cayleypy>=0.1.0", "torch>=2.6"]
+dependencies = ["cayleypy>=0.1.0", "torch>=2.6", "cmake>=3.28", "ninja>=1.11"]
 
 [project.optional-dependencies]
 test = ["pytest>=7", "build"]
@@ -22,7 +22,7 @@ Issues = "https://github.com/TryDotAtwo/MultiGPUBeamSearch/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cayleypy_native*"]
+include = ["multigpubeamsearch*", "cayleypy_native*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

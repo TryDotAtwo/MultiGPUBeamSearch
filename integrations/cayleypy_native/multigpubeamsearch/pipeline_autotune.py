@@ -77,4 +77,3 @@ def tune_downstream(contract, model, runtime, options, devices, beam_width,
         correctness_scope='fixture legality, accepted model readout, native completion; normal solution replay checked by run_native')
     (directory/'selection.json').write_text(json.dumps(data,indent=2))
     return data
-

@@ -16,4 +16,3 @@ def test_thermal_and_external_power_events_are_rejected():
 def test_unavailable_telemetry_is_never_reported_as_verified(text):
     with pytest.raises(ValueError):
         parse_telemetry(text)
-

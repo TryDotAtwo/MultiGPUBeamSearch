@@ -592,4 +592,3 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     (run_dir / "native-outcome.json").write_text(json.dumps({"path": path, "elapsed_seconds": elapsed,
         "effective_beam_width": effective, "metadata": metadata}, indent=2) + "\n", encoding="utf-8")
     return NativeOutcome(path, elapsed, effective, run_dir, metadata)
-

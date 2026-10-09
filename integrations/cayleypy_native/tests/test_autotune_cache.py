@@ -36,4 +36,3 @@ def test_new_cache_cannot_drop_or_override_observed_throttling():
     assert valid_cached_profile(data, signature, 8192)
     data['gpu_telemetry']['1024']['samples'][0][0]['throttled'] = True
     assert not valid_cached_profile(data, signature, 8192)
-

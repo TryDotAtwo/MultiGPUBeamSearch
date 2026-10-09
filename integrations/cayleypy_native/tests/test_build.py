@@ -150,4 +150,3 @@ def test_build_prerequisites_do_not_download_missing_source(tmp_path):
     with pytest.raises(NativeUnavailable, match="source_dir"):
         prerequisites(NativeOptions(source_dir=tmp_path, cache_dir=tmp_path / "cache"))
     assert list(tmp_path.iterdir()) == []
-

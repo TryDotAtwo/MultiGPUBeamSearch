@@ -70,4 +70,3 @@ class NativeOutcome:
     effective_beam_width: int | None
     run_dir: Path | None
     metadata: dict[str, Any] = field(default_factory=dict)
-

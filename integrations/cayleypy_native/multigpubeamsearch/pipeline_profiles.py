@@ -115,4 +115,3 @@ def tune_pipeline(inference_micro, baseline, *, admit, measure, deadline,
             'rejected': rejected, 'effective_beam': effective,
             'workload_parents': workload, 'world_size': world,
             'measurements': [row.__dict__ for row in samples]}
-

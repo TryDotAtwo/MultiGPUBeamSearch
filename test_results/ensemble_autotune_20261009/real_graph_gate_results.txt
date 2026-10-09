@@ -1,8 +1,0 @@
-Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
-Have fun!
-{"batch":1024,"correctness_passed":true,"device":0,"free_bytes_after":11046617088,"model_count":3,"numeric_error":0,"parents":8192,"readout_oracle_max_key_error":1,"score_input":"graph_states","seconds":[0.5705942993164063,0.5702625122070313,0.5685626831054688,0.5681796875,0.5683455810546875,0.568142822265625,0.5682462768554688],"torch_reserved_peak_bytes":1293942784}
-{"batch":1024,"correctness_passed":true,"device":1,"free_bytes_after":11046617088,"model_count":3,"numeric_error":0,"parents":8192,"readout_oracle_max_key_error":1,"score_input":"graph_states","seconds":[0.5679429931640625,0.568872802734375,0.5688934326171875,0.5686773681640624,0.5688431396484375,0.5687470092773438,0.5690316772460937],"torch_reserved_peak_bytes":1293942784}
-b42cdb59a4845cea85e9c58090ca96d4552742c97aa6974f7493c52e38dc1f70  /workspace/build-ensemble/production_runner_libtorch_stream1
-0aed8e3f7230afc6bfad6df6a9c595d90352618f9270520ab7cc1b02b35b8ce2  /workspace/build-ensemble/stream1_ensemble_benchmark
-4114f35135251d0b41797ee25c2e5a23962f5a78b5039f4b931643eb88bcd96c  /workspace/results/ensemble-real/gpu0.log
-3ebf42c94f24faa0ee30f8c756d713271583e341700e34e8284fab32a642d37f  /workspace/results/ensemble-real/gpu1.log
