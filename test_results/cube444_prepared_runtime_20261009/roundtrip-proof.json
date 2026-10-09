@@ -1,0 +1,20 @@
+{
+  "status": "PASS",
+  "artifact_commit": "bcd6e160ce32ba0d86d1eda80423a682469aad56",
+  "prefix": "test_results/cube444_prepared_runtime_20261009/",
+  "archive_sha256": "4d795402d1a993a62a76eaf081d2f3f02292b4a410c8c7be9034862849cfd819",
+  "bytes": 7189833,
+  "parts": 96,
+  "binaries_verified": {
+    "production_runner_libtorch_stream1": {
+      "bytes": 18567136,
+      "sha256": "c10cd09d551e10e1c23b36018194c4028cfe719c36892f0e7568576d1ffb495d"
+    },
+    "stream1_ensemble_benchmark": {
+      "bytes": 1181176,
+      "sha256": "4fb33cc21be9ec5223b3731d6ee2b6f09c912e27070dc75874d3d6dcf4076803"
+    }
+  },
+  "source_native": "c1917b6c99c0048bd1f309915f7e3cac677be3dd",
+  "verification": "immutable GitHub roundtrip; archive and every binary SHA verified on cheap GPU host"
+}
