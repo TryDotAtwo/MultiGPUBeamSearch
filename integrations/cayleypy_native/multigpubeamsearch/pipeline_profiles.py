@@ -37,8 +37,17 @@ def validate_rank_plans(plans):
     for key in common:
         if len({row[key] for row in plans})!=1:raise ValueError('rank plans disagree on '+key)
     world=plans[0]['WORLD_SIZE']
-    if world!=len(plans):raise ValueError('missing rank admission')
+    if type(world) is not int or world<=0 or world!=len(plans):raise ValueError('missing rank admission')
+    if any('LOCAL_RANK' in row for row in plans):
+        # Native's historical LOCAL_RANK plan field is the communicator rank;
+        # CUDA_DEVICE_LOCAL_RANK is the node-local ordinal and may repeat.
+        ranks=[row.get('LOCAL_RANK') for row in plans]
+        if any(type(rank) is not int for rank in ranks) or set(ranks)!=set(range(world)):
+            raise ValueError('duplicate or missing communicator rank admission')
     for row in plans:
+        if any(type(row[key]) is not int or row[key]<0 for key in
+               ('estimated_required_device_bytes','gpu_budget_bytes')):
+            raise ValueError('invalid native memory admission values')
         if row['estimated_required_device_bytes']>row['gpu_budget_bytes']:
             raise ValueError('rank exceeds exact native memory budget')
     return True
