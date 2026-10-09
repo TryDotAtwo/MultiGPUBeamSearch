@@ -3459,7 +3459,6 @@ DepthDispatchState run_depth_cuda_graphs(
             "cudaEventElapsedTime stream5 exchange");
 #endif
         release_completed_stream4_slots_nonblocking();
-        maybe_run_stream5_threshold_update(false);
         if (recv_total_64 != 0ULL) {
             stream3_collect_remote_recv_cuda(
                 recv_buffer,
@@ -3505,6 +3504,10 @@ DepthDispatchState run_depth_cuda_graphs(
 #endif
             append_stream3_ready_queue();
         }
+        // Every rank reaches this boundary once per exchange round, including
+        // zero-send ranks. Request global filtering before local backpressure
+        // can block the next round on clean buffers that sorting cannot shrink.
+        maybe_run_stream5_threshold_update(!stream3_has_writable_buffer());
         ++completed_exchange_rounds;
     };
 
