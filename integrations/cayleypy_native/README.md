@@ -435,6 +435,11 @@ exact requested beam; a 10M profile does not certify 100M. It then asks the nati
 planner to admit that beam on every selected GPU, measures Stream3, concurrent
 Stream4 jobs, final union and NCCL transport at those exact buffer capacities,
 and derives a bounded shortlist from arrival/service and memory constraints.
+The shortlist also tests a doubled outer dispatch batch and an alternative
+number of concurrent sort lanes, while the inference microbatch stays frozen.
+Every proposal must admit the same effective frontier on all ranks. Native
+component probes share persistent per-GPU processes and use an allocation
+acknowledgement barrier before entering transport collectives.
 The five-stream architecture and global selection semantics remain unchanged.
 
 The default reports best found Stream1 throughput and calibration duration.
