@@ -70,6 +70,16 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                 proposal=service_geometry(rows,target[0],moves=moves,inference=inference)
                 proposed=[('service-batch',dict(baseline,
                     BEAM_STREAM4_BATCH_CANDIDATES=proposal['BEAM_STREAM4_BATCH_CANDIDATES']))]
+                # The service-latency batch is not a throughput upper bound:
+                # repeated C-sized merges can dominate at very large beams.
+                # Compare a bounded larger flush batch at the exact same C.
+                from .beam_geometry import round_up
+                bulk=round_up(min(target[0]['SHARD_CAPACITY_CANDIDATES'],
+                    math.ceil(target[0]['frontier_state_capacity']*moves/target[0]['SHARD_COUNT']/4)),
+                    target[0]['STREAM4_BATCH_ALIGNMENT'])
+                if bulk>int(proposal['BEAM_STREAM4_BATCH_CANDIDATES']):
+                    proposed.append(('throughput-batch',dict(baseline,
+                        BEAM_STREAM4_BATCH_CANDIDATES=str(bulk))))
                 if candidates:
                     candidate_name,candidate_env=candidates[0]
                     proposed.append((candidate_name,dict(candidate_env,**proposal)))
@@ -125,4 +135,4 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
             'pipeline_verified':False,'cache_hit':False,'tested':tested,
             'selection':best['name'],'estimate':best['estimate'],
             'selection_rejections':rejected,
-            'search_policy':'baseline plus at most four exact-capacity candidates; frozen inference microbatch'}
+            'search_policy':'baseline plus at most five exact-capacity candidates; frozen inference microbatch'}

@@ -70,11 +70,12 @@ def test_outer_and_sort_candidates_keep_exact_frontier_and_inference(monkeypatch
         def measure_components(self,env,plans,move_count):
             return [dict(outer_candidates=int(env['BEAM_B_MICRO'])*int(env['BEAM_STREAM3_RING_SLOTS'])*move_count,
                 shard_capacity=8192,sort_jobs_concurrent=int(env['BEAM_STREAM4_ACTIVE_SORT_SLOTS']),
-                stream3_seconds=[.00001]*5,stream4_group_seconds=[.001]*5,
+                stream3_seconds=[.00001]*5,stream4_group_seconds=[.00001]*5,
                 union_seconds=[.0001]*5,transport=[])]*2
     result=tune_components(Probe(),Planner(),[plan]*2,baseline,[],moves=3,
         inference={'estimate':{'median':1e-7},'parent_batch':256})
     assert any(env['BEAM_B_MICRO']=='512' for _,env in requested)
     assert any(env['BEAM_STREAM4_ACTIVE_SORT_SLOTS']=='2' for _,env in requested)
+    assert any(env['BEAM_STREAM4_BATCH_CANDIDATES']=='2048' for _,env in requested)
     assert all(beam==16384 and env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256' for beam,env in requested)
     assert result['workload_parents']==16384
