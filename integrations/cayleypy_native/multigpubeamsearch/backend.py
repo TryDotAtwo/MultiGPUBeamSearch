@@ -495,7 +495,8 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         row_limit=runtime.profile.get("inference_row_limit", 8192))
     env.update(microbatch_env)
     calibrate=options.autotune and (model.backend=='ensemble' or
-        (model.backend=='mlp' and runtime.build_metadata.get('calibration_binary_name')=='stream1_native_mlp_benchmark'))
+        (model.backend=='mlp' and runtime.build_metadata.get('calibration_binary_name') in
+            ('stream1_native_mlp_benchmark','stream1_libtorch_mlp_benchmark')))
     if calibrate:
         from .autotune import tune_inference
         calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env)
