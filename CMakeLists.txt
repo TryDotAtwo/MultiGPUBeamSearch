@@ -440,6 +440,10 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
         tools/stream1_libtorch_ring_slot_launcher.cpp
         tools/stream1_transformer_libtorch_backend.cpp)
     add_executable(stream1_ensemble_benchmark tools/stream1_ensemble_benchmark.cpp)
+    add_executable(stream1_native_mlp_benchmark tools/stream1_native_mlp_benchmark.cpp)
+    target_link_libraries(stream1_native_mlp_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")
+    target_include_directories(stream1_native_mlp_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
+    set_target_properties(stream1_native_mlp_benchmark PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
     target_link_libraries(stream1_ensemble_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")
     target_include_directories(stream1_ensemble_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
     set_target_properties(stream1_ensemble_benchmark PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
@@ -521,3 +525,4 @@ set_tests_properties(threshold_union_cuda_tests PROPERTIES LABELS "gpu;multi_gpu
 add_test(NAME stitched_cuda_tests COMMAND stitched_cuda_tests)
 add_test(NAME dispatcher_cuda_tests COMMAND dispatcher_cuda_tests)
 add_test(NAME static_memory_cuda_tests COMMAND static_memory_cuda_tests)
+
