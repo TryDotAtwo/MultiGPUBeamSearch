@@ -1,0 +1,19 @@
+{
+  "global_parents": 1048576,
+  "inference_micro": 1024,
+  "models": 3,
+  "gpus": "2xRTX3060",
+  "projected_inference_seconds": 36.4091796875,
+  "full_depth_median_seconds": 36.7595,
+  "scope": "Separate measurements normalized by equal parent throughput; not paired overhead attribution or a universal optimum",
+  "pipeline_selection_commit": "c1d67b9bed564c00530f58f723a6dd5282eb0054",
+  "public_acceptance": {
+    "pid": 6052,
+    "observed_live": true,
+    "phase": "downstream_calibration",
+    "runner_built": true,
+    "inference_selection_saved": true,
+    "verified_complete": false
+  },
+  "backend_protocol_tests": "54 passed in 5.54s"
+}
