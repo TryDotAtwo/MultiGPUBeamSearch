@@ -470,10 +470,13 @@ __global__ void stream3_scatter_owner_kernel(
     CandidateMeta* remote_send_buffer,
     const std::uint32_t* send_offset,
     std::uint16_t local_rank,
-    std::uint32_t world_size) {
+    bool local_only) {
     __shared__ std::uint32_t scan[256];
     __shared__ std::uint32_t tile_total;
-    const std::uint32_t peer = blockIdx.x;
+    const std::uint32_t peer = local_only ? static_cast<std::uint32_t>(local_rank) : blockIdx.x;
+    if (!local_only && peer == static_cast<std::uint32_t>(local_rank)) {
+        return;
+    }
     const std::uint32_t tid = threadIdx.x;
     const std::uint32_t count = *unique_count;
     std::uint32_t running = 0;
@@ -1313,6 +1316,10 @@ void stream3_restore_owner_split_cuda(
         local_rank,
         world_size);
     stream3_scan_send_counts_kernel<<<1, 1, 0, stream>>>(send_count, send_offset, world_size);
+    // Remote readers must finish before local in-place compaction overwrites scratch.
+    // Same-stream kernel ordering supplies this dependency without host/device sync
+    // or another CandidateMeta arena. The local pass has one block; its tile loads
+    // precede writes, and compacted output never overwrites a future input tile.
     stream3_scatter_owner_kernel<<<world_size, block, 0, stream>>>(
         local_pending_buffer,
         owner_scratch,
@@ -1320,7 +1327,15 @@ void stream3_restore_owner_split_cuda(
         remote_send_buffer,
         send_offset,
         local_rank,
-        world_size);
+        false);
+    stream3_scatter_owner_kernel<<<1, block, 0, stream>>>(
+        local_pending_buffer,
+        owner_scratch,
+        unique_count,
+        remote_send_buffer,
+        send_offset,
+        local_rank,
+        true);
 }
 
 namespace {
