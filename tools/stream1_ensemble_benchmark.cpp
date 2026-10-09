@@ -108,6 +108,7 @@ int main(int argc,char** argv) {
     nlohmann::json output={{"batch",batch},{"parents",parents},{"device",device},
         {"seconds",samples},{"numeric_error",error},{"model_count",model.heads.size()},
         {"readout_oracle_max_key_error",max_key_error},{"correctness_passed",true},
+        {"torch_allocated_peak_bytes",stats.allocated_bytes[0].peak},
         {"torch_reserved_peak_bytes",stats.reserved_bytes[0].peak},
         {"free_bytes_after",free},{"score_input",full_frontier?"full_frontier_file":identity.contains("calibration_states")?"graph_states":"synthetic_zero_labels"}};
     std::cout<<output.dump()<<std::endl;
