@@ -82,4 +82,3 @@ int main(int argc,char** argv) {
         {"model_count",1},{"executor","libtorch_eager"},{"score_input","graph_states"}}).dump()<<std::endl;
     BEAM_CUDA_CHECK(cudaEventDestroy(begin));BEAM_CUDA_CHECK(cudaEventDestroy(end));
 }
-
