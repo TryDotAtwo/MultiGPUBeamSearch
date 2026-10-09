@@ -6,8 +6,11 @@
 #include <iostream>
 
 int main(int argc,char** argv) {
-    if(argc!=5) throw std::runtime_error("usage: ensemble-benchmark ensemble-dir batch parents device");
-    const unsigned batch=std::stoul(argv[2]),parents=std::stoul(argv[3]);
+    if(argc!=5 && argc!=6) throw std::runtime_error("usage: ensemble-benchmark ensemble-dir batch parents device [--session]");
+    const bool session=argc==6 && std::string(argv[5])=="--session";
+    if(argc==6 && !session) throw std::runtime_error("unknown benchmark option");
+    unsigned batch=std::stoul(argv[2]),parents=std::stoul(argv[3]);
+    const unsigned capacity=batch;
     const int device=std::stoi(argv[4]);
     if(!batch||!parents||batch>parents) throw std::runtime_error("invalid benchmark workload");
     c10::cuda::CUDAGuard guard(device);c10::InferenceMode inference;
@@ -46,19 +49,32 @@ int main(int argc,char** argv) {
         model.score(states.narrow(0,0,count),reinterpret_cast<std::uint32_t*>(keys.data_ptr<int>()),
                     reinterpret_cast<std::uint32_t*>(flag.data_ptr<int>()),stream,0,generator_ptr);
     };
+    if(session) std::cout<<nlohmann::json({{"ready",true},{"device",device},{"capacity",capacity}}).dump()<<std::endl;
+    do {
+    if(session) {
+        std::string command;
+        if(!std::getline(std::cin,command)) break;
+        auto request=nlohmann::json::parse(command);
+        if(request.value("stop",false)) break;
+        batch=request.at("batch").get<unsigned>();parents=request.at("parents").get<unsigned>();
+        if(!batch || batch>capacity || batch>parents) throw std::runtime_error("invalid session workload");
+        model.inference_micro=batch;
+        flag.zero_();
+        c10::cuda::CUDACachingAllocator::resetPeakStats(device);
+    }
     run(batch);cudaDeviceSynchronize();
     auto reference=torch::zeros({batch,beam::MOVE_COUNT},states.options().dtype(torch::kFloat32));
     torch::Tensor children;
     for(const auto& head:model.heads) {
         if(head.output_dim==1 && !children.defined())
-            children=beam::stream1_libtorch::scalar_children(states,generator_ptr,beam::MOVE_COUNT,beam::STATE_LEN,beam::STATE_STORAGE_LEN);
-        auto features=head.features(head.output_dim==1?children:states).to(torch::kFloat32);
+            children=beam::stream1_libtorch::scalar_children(states.narrow(0,0,batch),generator_ptr,beam::MOVE_COUNT,beam::STATE_LEN,beam::STATE_STORAGE_LEN);
+        auto features=head.features(head.output_dim==1?children:states.narrow(0,0,batch)).to(torch::kFloat32);
         auto score=(torch::matmul(features,head.weight.to(torch::kFloat32))+head.bias).reshape({batch,beam::MOVE_COUNT});
         reference.add_(score,head.coefficient);
     }
     if(!torch::isfinite(reference).all().item<bool>()) throw std::runtime_error("nonfinite FP32 readout oracle");
     auto expected=torch::round(torch::clamp(reference,0.0,beam::SCORE_MAX_Q)*beam::SCORE_SCALE).to(torch::kInt32);
-    auto max_key_error=(keys.to(torch::kInt64)-expected.to(torch::kInt64)).abs().max().item<std::int64_t>();
+    auto max_key_error=(keys.narrow(0,0,batch).to(torch::kInt64)-expected.to(torch::kInt64)).abs().max().item<std::int64_t>();
     if(max_key_error>2) throw std::runtime_error("native ensemble disagrees with FP32 readout oracle");
     for(int i=0;i<3;++i) run(batch);
     cudaDeviceSynchronize();
@@ -80,5 +96,7 @@ int main(int argc,char** argv) {
         {"free_bytes_after",free},{"score_input",identity.contains("calibration_states")?"graph_states":"synthetic_zero_labels"}};
     std::cout<<output.dump()<<std::endl;
     cudaEventDestroy(start);cudaEventDestroy(end);
-    return error?2:0;
+    if(error) return 2;
+    } while(session);
+    return 0;
 }

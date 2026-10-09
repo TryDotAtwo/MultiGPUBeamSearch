@@ -64,7 +64,7 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             '--format=csv,noheader'],capture_output=True,text=True,timeout=10,check=True).stdout
     except (OSError,subprocess.SubprocessError):hardware='unavailable'
     import platform
-    return {'schema':4,'search_policy':'coarse-local-v1','graph':contract.graph_hash,'models':model.artifact_hash,
+    return {'schema':5,'search_policy':'coarse-local-v1','graph':contract.graph_hash,'models':model.artifact_hash,
             'runner':runtime.build_metadata['binary_sha256'],
             'probe':runtime.build_metadata.get('calibration_binary_sha256'),
             'gpu_properties':[str(torch.cuda.get_device_properties(d)) for d in devices],
@@ -73,7 +73,7 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             'hardware_sha256':hashlib.sha256(hardware.encode()).hexdigest(),
             'gpu_uuids':[str(getattr(torch.cuda.get_device_properties(d),'uuid','unavailable')) for d in devices],
             'host':{'machine':platform.machine(),'processor':platform.processor()},
-            'beam_anchor_power':max(0,(beam_width-1).bit_length()),'precision':'fp16/fp32'}
+            'requested_beam_width':beam_width,'precision':'fp16/fp32'}
 
 
 def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,environment):
@@ -185,6 +185,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
           'records':records,'rejected':rejected,'stat_rejected':stat_rejected,
           'gpu_telemetry':telemetry_records,
           'coarse_candidates':coarse_candidates,'refinement_candidates':refined,
+          'calibration_wall_seconds':time.monotonic()-started,
           'pipeline_verified':False,'cache_hit':False,'measured_candidates':sorted({int(s.profile) for s in samples})}
     (directory/'inference-selection.json').write_text(json.dumps(data,indent=2))
     cache.parent.mkdir(parents=True,exist_ok=True)
