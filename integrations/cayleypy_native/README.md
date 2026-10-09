@@ -55,6 +55,12 @@ profile, build/model identities and replay validation.
 
 ## Ensembles and inference-first calibration (development)
 
+The current development source is on branch
+[`codex/ensemble-autotune-source-20261009`](https://github.com/TryDotAtwo/MultiGPUBeamSearch/tree/codex/ensemble-autotune-source-20261009).
+Install that matching compact checkout with
+`pip install ./integrations/cayleypy_native`; the default branch is not a release
+of this ensemble/autotune update.
+
 ```python
 from multigpubeamsearch import NativeEnsemble, NativeOptions, enable_native
 
@@ -74,7 +80,11 @@ Python neural architectures. The public artifact adapter currently accepts MLPs;
 additional native C++ families still require public adapter registration.
 
 With autotuning enabled for an MLP or ensemble, Stream1 first measures inference batches on
-all selected GPUs. The downstream stage freezes that inference batch and measures
+all selected GPUs. The bounded sweep includes power-of-two batches, the actual
+user/beam cap and a local refinement around the coarse winner. Selection uses
+the slowest rank, repeated timings and confidence intervals; it finds the best
+verified candidate within its time budget, not a guaranteed global optimum.
+The downstream stage freezes that inference batch and measures
 complete depths while varying outer batch, rings, shards and sort buffers.
 For an ordinary MLP, the native row budget remains fixed too; increasing it
 would change the inference batch that was just calibrated.
