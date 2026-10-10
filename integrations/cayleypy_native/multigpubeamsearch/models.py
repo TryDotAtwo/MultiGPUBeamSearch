@@ -109,6 +109,7 @@ def _validate_ensemble(path: Path, contract: GraphContract) -> PreparedModel:
     digest = hashlib.sha256(raw)
     files = ["ensemble.json"]
     first = None
+    validated_bundles = {}
     for entry in manifest["models"]:
         if not isinstance(entry, dict) or set(entry) != {"weights_dir", "family", "coefficient", "artifact_hash"}:
             raise NativeBackendError("invalid ensemble member fields")
@@ -122,7 +123,12 @@ def _validate_ensemble(path: Path, contract: GraphContract) -> PreparedModel:
         if (isinstance(coefficient, bool) or not isinstance(coefficient, (float, int))
                 or not math.isfinite(coefficient) or abs(coefficient) > 3.402823466e38):
             raise NativeBackendError("nonfinite ensemble coefficient")
-        member = _validate_artifact(member_path, contract, entry["family"])
+        family=entry['family']
+        shared_cube=family in ('cube444_transformer','cube444_mlp')
+        member=validated_bundles.get(member_path) if shared_cube else None
+        if member is None:
+            member = _validate_artifact(member_path, contract, family)
+            if shared_cube:validated_bundles[member_path]=member
         if member.manifest["dtype"] != "fp16":
             raise NativeUnavailable("native ensemble members must use FP16")
         if member.artifact_hash != entry["artifact_hash"]:
@@ -700,10 +706,21 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
         directory.mkdir(parents=True, exist_ok=False)
         members = []
         shared_artifacts = {}
+        shared_cube_snapshots = {}
         for i, (source, coefficient) in enumerate(zip(predictor.models, predictor.coefficients)):
             if isinstance(source, NativeEnsemble):
                 raise NativeUnavailable("flatten nested ensembles explicitly to preserve coefficient order")
-            member = prepare_model(source, contract, options, directory / f"member-{i}")
+            shared_cube=isinstance(source,NativeModel) and source.backend in ('cube444_transformer','cube444_mlp')
+            identity=(source.weights_dir,source.graph_hash) if shared_cube else None
+            member=shared_cube_snapshots.get(identity) if shared_cube else None
+            if member is None:
+                member = prepare_model(source, contract, options, directory / f"member-{i}")
+                if shared_cube:shared_cube_snapshots[identity]=member
+            else:
+                if source.expected_artifact_hash is not None and source.expected_artifact_hash!=member.artifact_hash:
+                    raise NativeBackendError('native artifact hash changed after the model snapshot was prepared')
+                member=PreparedModel(member.weights_dir,member.manifest,source.backend,
+                                     member.artifact_hash,member.artifact_files)
             relative = member.weights_dir.relative_to(directory)
             # Cube444 heads share one immutable bundle and one native model
             # cache. Preserve the member family/coefficient, reuse its path.
@@ -774,4 +791,3 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
         raise
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         raise NativeBackendError(f"native model export failed: {error}") from error
-
