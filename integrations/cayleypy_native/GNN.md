@@ -51,3 +51,11 @@ on T4 through LibTorch and on RTX 3060 through both LibTorch and CUTLASS.
 Full beam-search acceptance is recorded in `test_results/issue5_review_20261010/`.
 Random test weights provide no evidence of trained search quality. Large-graph
 performance and multi-GPU scaling of this model family have not been measured.
+
+
+Measured backend choice: on RTX 3060 with n=100, d_model=256, two layers and
+neighbor hops, native LibTorch outperformed CUTLASS at fitting batches 1–3.
+Use `NativeOptions(inference_backend="libtorch")` for this tested configuration;
+`auto` currently selects by GPU architecture and does not establish the fastest
+GNN backend. See `test_results/gnn_large_20261010/REPORT.md` for the matched
+experiment and limitations.

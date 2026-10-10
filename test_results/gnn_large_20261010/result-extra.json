@@ -1,0 +1,117 @@
+{
+  "metadata": {
+    "source_commit": "83e46be081cae82c071128713bb93c47178f9cf3",
+    "binary_sha256": "52d62d16076a70fb9864d5153b67c6004517d55bf63c8508b6f236c2ac79872a",
+    "arch_flags": "8.6",
+    "gpu": "NVIDIA GeForce RTX 3060",
+    "cc": [
+      8,
+      6
+    ],
+    "torch": "2.11.0+cu128",
+    "cuda": "12.8",
+    "driver": "610.43.02",
+    "model": {
+      "n": 100,
+      "d_model": 256,
+      "layers": 2,
+      "hops": 2,
+      "max_neighbors": 75,
+      "neighbor_counts": [
+        75,
+        38
+      ],
+      "cap": 100000,
+      "parameters": 2983268
+    },
+    "artifact_hash": "e029480ae1d89e0615fb19e04a8b0c7dd0b7f603acb5e29912d56f99fe282669",
+    "seed": 42,
+    "precision": "FP16 body + common FP32 scalar readout",
+    "scope": "one GNN forward including both levels; excludes beam streams, host transfers, loading and compilation",
+    "slots": 1,
+    "streams": 1,
+    "warmup": 2,
+    "repeats": 5,
+    "trained_quality": false
+  },
+  "records": [
+    {
+      "batch": 3,
+      "backend": "python_pytorch",
+      "status": "PASS",
+      "max_error": 0.0,
+      "wall_ms": [
+        700.5451070144773,
+        700.6936110556126,
+        700.344508048147,
+        700.1955611631274,
+        700.8007057011127
+      ],
+      "gpu_ms": [
+        700.4610595703125,
+        700.6265258789062,
+        700.310546875,
+        700.155517578125,
+        700.740234375
+      ],
+      "median_ms": 700.5451070144773,
+      "p95_ms": 700.8007057011127,
+      "items_per_second": 4.282379492714097,
+      "allocated_peak": 9649922560,
+      "reserved_peak": 10018095104,
+      "output_sha": "225261effad3a8cf5d986e12a5b188509a7b9fa9a6366144e5d25bff8e0fcb55"
+    },
+    {
+      "batch": 3,
+      "backend": "native_libtorch",
+      "status": "PASS",
+      "max_error": 7.396191358566284e-05,
+      "wall_ms": [
+        549.544129986316,
+        549.158448819071,
+        549.5068593882024,
+        550.591685809195,
+        550.5297863855958
+      ],
+      "gpu_ms": [
+        549.4925537109375,
+        549.123046875,
+        549.4722290039062,
+        550.5565185546875,
+        550.4945068359375
+      ],
+      "median_ms": 549.544129986316,
+      "p95_ms": 550.591685809195,
+      "items_per_second": 5.459070229855247,
+      "allocated_peak": 9351842816,
+      "reserved_peak": 10018095104,
+      "output_sha": "269c8a2464c05498c7f7acd3c044bca4b7a3e7a29ea8dac63181cd568a8cf319"
+    },
+    {
+      "batch": 3,
+      "backend": "native_cutlass",
+      "status": "PASS",
+      "max_error": 0.00023397430777549744,
+      "wall_ms": [
+        670.6711743026972,
+        671.2686498649418,
+        671.3619329966605,
+        671.4694397523999,
+        670.085655990988
+      ],
+      "gpu_ms": [
+        670.6154174804688,
+        671.2217407226562,
+        671.3190307617188,
+        671.41015625,
+        670.0513305664062
+      ],
+      "median_ms": 671.2686498649418,
+      "p95_ms": 671.4694397523999,
+      "items_per_second": 4.46914957313081,
+      "allocated_peak": 9351842816,
+      "reserved_peak": 10018095104,
+      "output_sha": "3d9e93056fa8a6a125326987e49fb0100f6f74162bfa7d8bbe72239be391b4e6"
+    }
+  ]
+}

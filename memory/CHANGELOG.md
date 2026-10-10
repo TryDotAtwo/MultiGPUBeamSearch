@@ -854,3 +854,7 @@ Own dual-stream GATv2 and multi-hop pancake GNN, FP16 TorchScript export, immuta
 
 ## 2026-10-10 — own pancake GNN GPU acceptance
 Own dual-stream GATv2 plus multi-hop neighbor inference added to native ensembles with LibTorch and aligned FP16 CUTLASS projections. T4 LibTorch and RTX3060 both-backend feature parity passed. RTX3060 full single/three-GNN beam paths replay correctly on both backends; blend readout oracle key error zero. See test_results/issue5_review_20261010/REPORT.md for scope, source commits, artifacts and untested training/performance/multi-GPU boundaries.
+
+
+## 2026-10-10 — large GNN inference comparison
+RTX3060 n100/d256/layers2/hops2 matched FP16 inference: batch3 native LibTorch549.54ms, CUTLASS671.27ms, Python700.55ms. Fitting batches1/2/3 pass parity, batch4 OOM for all. Weights seeded synthetic, no trained quality proof; common FP32 scalar readout, no full beam timing. Evidence and fingerprints in test_results/gnn_large_20261010/REPORT.md.
