@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "artifact_commit": "1b25a1f3512aba6d4077dae45a9ef7272c8ad568",
+  "archive_sha256": "76eb74afce34117fa31102f8a6916e690130d602cd8589380fafc137182dc81f",
+  "parts_verified": 90,
+  "bytes": 6693765,
+  "source_commit": "d474763bcd7dd1130f3f1fc33a902f89b3aa9fff",
+  "runner_sha256": "04f42d17a78be8dc0438df9244f8662c0770c34b1dcfcb790775a014b1808d5e",
+  "build_info": {
+    "schema_version": 1,
+    "state_len": 96,
+    "state_storage_len": 112,
+    "move_count": 24,
+    "candidate_meta_bytes": 32,
+    "debug_stream_timing": false,
+    "depth_logs_enabled": true,
+    "debug_enabled": true,
+    "cuda_architectures": "86"
+  },
+  "host": "real8r",
+  "epoch": 1791596980.496759
+}
