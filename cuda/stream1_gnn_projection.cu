@@ -7,6 +7,25 @@
 #include <cutlass/epilogue/thread/linear_combination.h>
 namespace beam {
 namespace {
+// Broadcast C is the bias vector (row stride zero). Preserve the old
+// GEMM -> FP16 store -> FP16 bias-add rounding without that store/reload.
+struct RoundedBias : cutlass::epilogue::thread::LinearCombination<cutlass::half_t,8,float,float> {
+    using Base=cutlass::epilogue::thread::LinearCombination<cutlass::half_t,8,float,float>;
+    bool bias_enabled;
+    CUTLASS_HOST_DEVICE explicit RoundedBias(Params const& p):Base(p),bias_enabled(p.beta!=0.f) {}
+    CUTLASS_HOST_DEVICE void set_k_partition(int,int) {} // split_k=1 only
+    CUTLASS_HOST_DEVICE FragmentOutput operator()(FragmentAccumulator const& ab) const {
+        return cutlass::NumericArrayConverter<cutlass::half_t,float,8>()(ab);
+    }
+    CUTLASS_HOST_DEVICE FragmentOutput operator()(FragmentAccumulator const& ab,FragmentSource const& bias) const {
+        auto result=operator()(ab);
+        if(bias_enabled) {
+            CUTLASS_PRAGMA_UNROLL
+            for(int i=0;i<8;++i) result[i]=cutlass::half_t(float(result[i])+float(bias[i]));
+        }
+        return result;
+    }
+};
 // Pancake graphs have at most three incoming edges, including the self edge.
 __global__ void gat_incoming(const std::int64_t* edges,int* incoming,int count,int nodes) {
     const auto i=std::uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
@@ -65,10 +84,6 @@ __global__ void gat_reduce(const __half* left,const __half* right,const __half* 
         output[std::int64_t(node)*channels+c]=__hadd(__float2half_rn(mean*.25f),bias[c]);
     }
 }
-__global__ void add_bias(__half* output,const __half* bias,std::uint64_t count,int width) {
-    const auto i=std::uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
-    if(i<count) output[i]=__float2half_rn(__half2float(output[i])+__half2float(bias[i%width]));
-}
 } // anonymous namespace
 void stream1_gnn_gat(const __half* left,const __half* right,const __half* edge,
     const __half* attention,const __half* bias,const std::int64_t* indices,
@@ -89,21 +104,16 @@ void stream1_gnn_projection(const __half* input,const __half* weight,const __hal
         cutlass::arch::OpClassTensorOp,cutlass::arch::Sm80,
         cutlass::gemm::GemmShape<128,64,32>,cutlass::gemm::GemmShape<64,32,32>,
         cutlass::gemm::GemmShape<16,8,16>,
-        cutlass::epilogue::thread::LinearCombination<cutlass::half_t,8,float,float>>;
+        RoundedBias>;
     Gemm gemm;
     typename Gemm::Arguments args({rows,outputs,inputs},
         {reinterpret_cast<const cutlass::half_t*>(input),inputs},
         {reinterpret_cast<const cutlass::half_t*>(weight),inputs},
-        {reinterpret_cast<const cutlass::half_t*>(output),outputs},
-        {reinterpret_cast<cutlass::half_t*>(output),outputs},{1.f,0.f});
+        {reinterpret_cast<const cutlass::half_t*>(bias?bias:output),bias?0:outputs},
+        {reinterpret_cast<cutlass::half_t*>(output),outputs},{1.f,bias?1.f:0.f});
     if(gemm.can_implement(args)!=cutlass::Status::kSuccess||
        gemm(args,nullptr,stream)!=cutlass::Status::kSuccess)
         throw std::runtime_error("GNN CUTLASS projection launch failed");
-    if(bias) {
-        const auto count=std::uint64_t(rows)*outputs;
-        add_bias<<<unsigned((count+255)/256),256,0,stream>>>(output,bias,count,outputs);
-        if(cudaGetLastError()!=cudaSuccess) throw std::runtime_error("GNN projection bias launch failed");
-    }
 }
 }
 #else
