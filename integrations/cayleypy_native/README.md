@@ -509,6 +509,10 @@ selection; a full timing receipt certifies execution, not global optimality.
 `beam_width="max"` searches native memory admission across shard counts 1–128
 with two staging slots and one active sort slot. This is the largest admitted
 beam within that policy, not a universal maximum over every allocation policy.
+Admission also depends on the free-memory snapshot after caller allocations and
+NCCL initialization, less the measured model reserve and GPU headroom. Closing
+other CUDA owners can increase the admitted frontier without changing the batch.
+A fresh plan-only maximum is not a full-step performance certificate.
 Inference throughput takes priority: first measure stable all-rank inference
 candidates and reserve memory for the fastest verified cohort, then size the
 frontier using remaining memory. Repeat inference calibration keyed by the
@@ -578,3 +582,4 @@ object, while native weights remain the frozen snapshot. Preparation itself
 never falls back. A `NativeModel` constructed manually remains an unpinned
 source declaration unless its optional `expected_artifact_hash` is supplied;
 the per-search execution copy is always content-checked and isolated.
+
