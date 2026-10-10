@@ -25,7 +25,7 @@ def receipt():
     plans=[dict(WORLD_SIZE=2,LOCAL_RANK=r,GLOBAL_BEAM_WIDTH_EFFECTIVE=1024,
         frontier_state_capacity=512,BEAM_WIDTH_ALIGNMENT=512,SHARD_COUNT=4,B_MICRO=512,
         STREAM4_BATCH_ALIGNMENT=1024,SHARD_CAPACITY_CANDIDATES=2048,
-        STREAM3_RING_SLOTS=2,STREAM4_ACTIVE_SORT_SLOTS=1,STREAM4_BATCH_CANDIDATES=1024,
+        STREAM3_RING_SLOTS=2,RING_COUNT=16,STREAM4_ACTIVE_SORT_SLOTS=1,STREAM4_BATCH_CANDIDATES=1024,
         estimated_required_device_bytes=100,gpu_budget_bytes=200) for r in range(2)]
     rows=[dict(rank=r,correctness_passed=True,full_step_verified=False,shard_capacity=2048,
         stream3_seconds=[.01]*5,stream4_group_seconds=[.02]*5,union_seconds=[.03]*5,
@@ -73,7 +73,7 @@ def test_width_identity_and_changed_native_geometry_cannot_reuse_receipt(tmp_pat
     identity,data,plans=receipt();path=tmp_path/'cache.json';write_profile(path,identity,data)
     different=copy.deepcopy(identity);different['signature']['requested_beam_width']=4096
     assert read_profile(path,different,lambda env:plans) is None
-    for key,value in (('SHARD_CAPACITY_CANDIDATES',4096),('STREAM3_RING_SLOTS',4),('B_MICRO',256)):
+    for key,value in (('SHARD_CAPACITY_CANDIDATES',4096),('STREAM3_RING_SLOTS',4),('RING_COUNT',8),('B_MICRO',256)):
         fresh=copy.deepcopy(plans)
         for p in fresh:p[key]=value
         assert read_profile(path,identity,lambda env:fresh) is None

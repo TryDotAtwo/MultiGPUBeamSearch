@@ -40,6 +40,40 @@ int main() {
     }
     set_headroom(had_previous ? saved.c_str() : nullptr);
     {
+        const char* names[] = {"BEAM_STREAM1_EXECUTOR", "BEAM_ENSEMBLE_RESERVE_BYTES", "BEAM_BLEND_DIR"};
+        std::string saved_values[3]; bool existed[3];
+        auto set = [](const char* name, const char* value) {
+#ifdef _WIN32
+            _putenv_s(name, value ? value : "");
+#else
+            if (value) setenv(name, value, 1); else unsetenv(name);
+#endif
+        };
+        for (unsigned i=0;i<3;++i) {
+            const char* value=std::getenv(names[i]); existed[i]=value!=nullptr;
+            saved_values[i]=value?value:""; set(names[i],nullptr);
+        }
+        const auto legacy=build_runtime_config_from_budget(1048576,2,0,16ULL<<30);
+        set(names[0],"libtorch_eager");
+        const auto unreserved=build_runtime_config_from_budget(1048576,2,0,16ULL<<30);
+        check(unreserved.estimated_non_static_device_bytes==legacy.estimated_non_static_device_bytes,
+              "unreserved LibTorch retains legacy conservative accounting");
+        set(names[1],"1073741824");
+        const auto reserved=build_runtime_config_from_budget(1048576,2,0,16ULL<<30);
+        check(reserved.estimated_non_static_device_bytes>0 &&
+              reserved.estimated_non_static_device_bytes<legacy.estimated_non_static_device_bytes,
+              "reserved LibTorch retains tables without native weights and scratch");
+        set(names[0],"native_graph");
+        const auto native=build_runtime_config_from_budget(1048576,2,0,16ULL<<30);
+        check(native.estimated_non_static_device_bytes==legacy.estimated_non_static_device_bytes,
+              "Torch reserve setting does not reduce native executor accounting");
+        set(names[0],"libtorch_eager"); set(names[1],nullptr); set(names[2],"/test/blend");
+        const auto blend=build_runtime_config_from_budget(1048576,2,0,16ULL<<30);
+        check(blend.estimated_non_static_device_bytes==reserved.estimated_non_static_device_bytes,
+              "legacy blend reserve uses the same table accounting");
+        for (unsigned i=0;i<3;++i) set(names[i],existed[i]?saved_values[i].c_str():nullptr);
+    }
+    {
         const auto admitted = build_runtime_config_from_budget(1048576, 2, 0, 16ULL << 30);
         const auto& c = admitted.config;
         const auto recv_reserve = (std::uint64_t(c.stream3_batch_candidates) *
@@ -47,6 +81,33 @@ int main() {
         const auto writable_reserve = std::max<std::uint64_t>(c.stream3_batch_candidates,recv_reserve);
         check(c.shard_capacity_candidates >= logical_shard_size_for(c) + writable_reserve,
               "automatic shard capacity retains an entire owner batch reserve");
+    }
+    {
+        const char* key="BEAM_RING_COUNT_LIMIT";
+        const char* old=std::getenv(key);const bool existed=old!=nullptr;
+        const std::string saved_limit=old?old:"";
+        auto set_limit=[&](const char* value) {
+#ifdef _WIN32
+            _putenv_s(key,value?value:"");
+#else
+            if(value)setenv(key,value,1);else unsetenv(key);
+#endif
+        };
+        set_limit(nullptr);
+        const auto original=build_runtime_config_from_budget(4194304,2,0,32ULL<<30);
+        set_limit("1");
+        const auto bounded=build_runtime_config_from_budget(4194304,2,0,32ULL<<30);
+        check(bounded.config.ring_count==1,"physical ring pool is bounded in automatic mode");
+        check(bounded.config.user_global_beam_width==original.config.user_global_beam_width &&
+              local_frontier_capacity(bounded.config)>=4194304/2,
+              "physical ring bound never truncates the logical frontier");
+        for(const char* bad:{"0","-1","4294967296"}) {
+            set_limit(bad);bool rejected=false;
+            try{build_runtime_config_from_budget(4194304,2,0,32ULL<<30);}
+            catch(const std::invalid_argument& e){rejected=std::string(e.what()).find(key)!=std::string::npos;}
+            check(rejected,"invalid physical ring limit rejected");
+        }
+        set_limit(existed?saved_limit.c_str():nullptr);
     }
     check(ceil_div_u64(UINT64_MAX, 2) == (1ULL << 63), "ceil maximum / 2");
     check(ceil_div_u64(UINT64_MAX, UINT64_MAX) == 1, "ceil maximum / maximum");

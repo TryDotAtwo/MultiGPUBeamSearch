@@ -71,7 +71,7 @@ def read_profile(path,identity,admit):
         if plans[0]['B_MICRO']!=int(data['environment']['BEAM_B_MICRO']):return None
         old=next(r['plans'] for r in data['tested'] if r['name']==data['selection'])
         geometry=('GLOBAL_BEAM_WIDTH_EFFECTIVE','frontier_state_capacity','B_MICRO',
-            'WORLD_SIZE','SHARD_COUNT','SHARD_CAPACITY_CANDIDATES','STREAM3_RING_SLOTS',
+            'WORLD_SIZE','SHARD_COUNT','SHARD_CAPACITY_CANDIDATES','STREAM3_RING_SLOTS','RING_COUNT',
             'STREAM4_ACTIVE_SORT_SLOTS','STREAM4_BATCH_CANDIDATES','STREAM4_BATCH_ALIGNMENT')
         if any(a[k]!=b[k] for a,b in zip(old,plans) for k in geometry):return None
         return dict(data,cache_hit=True,current_rank_plans=plans,

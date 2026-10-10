@@ -190,6 +190,13 @@ std::uint64_t estimate_stream1_scratch_b_micro(
 std::uint64_t estimate_non_static_device_bytes(
     const RuntimeConfig& config,
     const Stream1ModelConfig& stream1_model) {
+    // The production runner already subtracts the measured LibTorch reserve.
+    // That executor never uploads native weights or allocates native scratch.
+    // Keep the legacy estimate when no explicit Torch reserve is charged.
+    if (env_equals("BEAM_STREAM1_EXECUTOR", "libtorch_eager") &&
+        (env_present("BEAM_BLEND_DIR") || env_present("BEAM_ENSEMBLE_RESERVE_BYTES"))) {
+        return estimate_read_only_table_bytes();
+    }
     const std::uint32_t scratch_b_micro = estimate_stream1_scratch_b_micro(config, stream1_model);
     return estimate_read_only_table_bytes() +
            estimate_stream1_weight_bytes(stream1_model) +
@@ -245,9 +252,15 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stre
     const std::uint64_t logical_shard_size = ceil_div_u64(local_capacity, config.shard_count);
     const std::uint64_t staging_slots = std::max<std::uint64_t>(1ULL, stream3_staging_ring_slots);
     const std::uint64_t target_ring_candidates = logical_shard_size * staging_slots;
-    config.ring_count = checked_u32(
-        ceil_div_u64(target_ring_candidates, config.stream3_batch_candidates),
-        "ring_count");
+    std::uint64_t physical_rings = ceil_div_u64(target_ring_candidates, config.stream3_batch_candidates);
+    // Dispatcher recycles Free rings until frontier_cursor reaches every parent.
+    // Bound physical buffers/graph executables independently of logical staging.
+    if (env_present("BEAM_RING_COUNT_LIMIT")) {
+        const auto limit = env_u32("BEAM_RING_COUNT_LIMIT", 0);
+        if (limit == 0U) throw std::invalid_argument("BEAM_RING_COUNT_LIMIT must be nonzero");
+        physical_rings = std::min<std::uint64_t>(physical_rings, limit);
+    }
+    config.ring_count = checked_u32(physical_rings, "ring_count");
     if (config.ring_count == 0U) {
         throw std::invalid_argument("derived RING_COUNT must be nonzero");
     }
