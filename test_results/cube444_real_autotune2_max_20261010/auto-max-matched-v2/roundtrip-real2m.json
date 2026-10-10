@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "8bbf9012ff767694c4edbdaf30f76c8c5fbdbf0d",
+  "prefix": "test_results/cube444_real_autotune2_max_20261010/auto-max-matched-v2/",
+  "archive_sha256": "0461084912a5c315d45cf2c7a563010cb48817a8ed5700a685e64ce29e1c170a",
+  "bytes": 525893,
+  "parts_verified": 8,
+  "files_verified": 449,
+  "scope": "independent GitHub download, every part and tar file byte verified; no GPU tensors copied to Windows"
+}
