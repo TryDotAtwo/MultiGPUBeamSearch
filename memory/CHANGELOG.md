@@ -843,3 +843,5 @@ Python memory pruning now applies the eager native physical-ring pool bound (16 
 
 
 2026-10-10: Publish source fe31e073 as main, include independently verified evidence, update simple Kaggle notebook to GitHub install, preserve old branch heads before branch consolidation. Notebook syntax passed; Kaggle version4 GPU acceptance pending.
+
+2026-10-10: Kaggle v4 exposed scalar MLP/Hamming row-budget versus parent-batch receipt mismatch. Validate outer candidates against admitted native parent batch and staging slots; no C++ changes. 14 focused CPU tests passed. Kaggle repeat pending.

@@ -161,8 +161,10 @@ class NativePipelineProbe:
             if (row.get('rank')!=rank or row.get('correctness_passed') is not True
                 or row.get('full_step_verified') is not False
                 or row.get('shard_capacity')!=plans[rank]['SHARD_CAPACITY_CANDIDATES']
-                or row.get('outer_candidates')!=int(environment['BEAM_B_MICRO'])*
-                    int(environment['BEAM_STREAM3_RING_SLOTS'])*move_count):
+                # BEAM_B_MICRO is a scorer row budget for scalar MLPs.
+                # Native B_MICRO records the admitted parent batch instead.
+                or row.get('outer_candidates')!=plans[rank]['B_MICRO']*
+                    plans[rank]['STREAM3_RING_SLOTS']*move_count):
                 raise ValueError('component calibration contract mismatch')
             for name in ('stream3_seconds','stream4_group_seconds','union_seconds'):
                 samples=row[name]
@@ -203,3 +205,4 @@ class NativePipelineProbe:
         return [Measurement('', parents, tuple(row[index] for row in seconds), True, True,
                             throttled=telemetry.throttled)
                 for index in range(1, self.repeats)]
+
