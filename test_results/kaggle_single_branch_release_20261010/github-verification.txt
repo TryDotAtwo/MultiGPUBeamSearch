@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "remaining_branches": [
+    "main"
+  ],
+  "archived_heads_verified": 26,
+  "github_actions_run": 38042607200
+}
+{
+  "status": "PASS",
+  "main_release": "3a76fe8faac5bac50ec4108c720099acf820dbd0",
+  "verified_source": "fe31e073a7d990e46fa016aa5cd09d7d5a9b9db1",
+  "source_blobs_identical": 208,
+  "source_blob_differences": [],
+  "method": "GitHub git tree object IDs, no raw tensor downloads"
+}
