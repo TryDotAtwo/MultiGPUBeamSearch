@@ -13,9 +13,11 @@ from .gnn_linear import NativeLinear
 
 class GATv2(nn.Module):
     __constants__ = ['heads', 'channels']
+    use_cutlass: bool
 
     def __init__(self, dim: int, edge_dim: int):
         super().__init__()
+        self.use_cutlass = False
         self.heads = 4
         self.channels = dim
         self.lin_l = NativeLinear(dim, 4 * dim)
@@ -41,6 +43,14 @@ class GATv2(nn.Module):
         messages = left[source] * weights[:, :, None]
         result = torch.zeros_like(left).index_add(0, target, messages)
         return result.mean(1) + self.bias
+
+    def forward_compact(self,nodes: torch.Tensor,edges: torch.Tensor,
+                        edge_values: torch.Tensor,types: torch.Tensor) -> torch.Tensor:
+        # Only three distinct edge embeddings; project each once, not per edge.
+        left=self.lin_l(nodes).reshape(-1,self.heads,self.channels)
+        right=self.lin_r(nodes).reshape(-1,self.heads,self.channels)
+        edge=self.lin_edge(edge_values).reshape(3,self.heads,self.channels)
+        return torch.ops.multigpubeamsearch_gnn.gat(left,right,edge,self.att,self.bias,edges,types)
 
 
 class DualStreamEncoder(nn.Module):
@@ -86,11 +96,22 @@ class DualStreamEncoder(nn.Module):
                         torch.stack((states[:,1:],states[:,:-1]),-1),
                         torch.stack((values,values),-1)[None,:,:].expand(batch,-1,-1)),1)
         pe = pe.reshape(-1,2).t().contiguous()+offsets[None,:]
-        va = self.value_edge_emb(self.value_edge_type_template.repeat(batch))
-        pa = self.pos_edge_emb(self.pos_edge_type_template.repeat(batch))
+        compact=self.value_convs[0].use_cutlass and self.stream_dim<=1024
+        value_types=self.value_edge_type_template.repeat(batch)
+        pos_types=self.pos_edge_type_template.repeat(batch)
+        if compact:
+            va=self.value_edge_emb.weight
+            pa=self.pos_edge_emb.weight
+        else:
+            va=self.value_edge_emb(value_types)
+            pa=self.pos_edge_emb(pos_types)
         for vc,vn,pc,pn in zip(self.value_convs,self.value_norms,self.pos_convs,self.pos_norms):
-            hv = F.gelu(vn(vc(hv,ve,va)+hv))
-            hp = F.gelu(pn(pc(hp,pe,pa)+hp))
+            if compact:
+                hv=F.gelu(vn(vc.forward_compact(hv,ve,va,value_types)+hv))
+                hp=F.gelu(pn(pc.forward_compact(hp,pe,pa,pos_types)+hp))
+            else:
+                hv = F.gelu(vn(vc(hv,ve,va)+hv))
+                hp = F.gelu(pn(pc(hp,pe,pa)+hp))
         h = torch.cat((hv,hp),-1).reshape(batch,self.n,self.d_model)
         rows = torch.arange(batch,device=states.device)
         special = torch.cat((h[rows,states[:,0]],h[rows,states[:,-1]],h[:,0],h[:,-1]),-1)

@@ -77,3 +77,16 @@ def test_gnn_script_and_batch_invariance():
     with torch.inference_mode():
         torch.testing.assert_close(m(s),torch.jit.script(m)(s),rtol=0,atol=0)
         torch.testing.assert_close(m(s),torch.cat([m(row[None]) for row in s]),rtol=2e-5,atol=2e-6)
+
+
+def test_compact_gat_preserves_both_encoder_graphs():
+    # CPU oracle checks embedding deduplication and complete-network wiring.
+    m=model().half()
+    states=torch.tensor([[3,1,0,2],[1,0,3,2],[2,3,0,1]])
+    with torch.inference_mode():
+        expected=m(states)
+        for module in list(m.state_encoder.value_convs)+list(m.state_encoder.pos_convs):
+            module.use_cutlass=True
+        actual=m(states)
+        torch.testing.assert_close(actual,expected,rtol=0,atol=0)
+        torch.testing.assert_close(torch.jit.script(m)(states),expected,rtol=0,atol=0)
