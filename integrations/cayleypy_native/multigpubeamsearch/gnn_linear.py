@@ -28,8 +28,13 @@ if not hasattr(torch.ops.multigpubeamsearch_gnn, 'linear'):
     _library = torch.library.Library('multigpubeamsearch_gnn', 'DEF')
     _library.define('linear(Tensor input, Tensor weight, Tensor? bias, bool cutlass) -> Tensor')
     _library.impl('linear', _reference, 'CompositeExplicitAutograd')
-    _library.define('gat(Tensor left, Tensor right, Tensor edge, Tensor attention, Tensor bias, Tensor indices, Tensor types) -> Tensor')
-    _library.impl('gat',_gat_reference,'CompositeExplicitAutograd')
+
+# A previously loaded projection-only extension may already own `linear`.
+_gat_library = None
+if not hasattr(torch.ops.multigpubeamsearch_gnn,'gat'):
+    _gat_library=torch.library.Library('multigpubeamsearch_gnn','FRAGMENT')
+    _gat_library.define('gat(Tensor left, Tensor right, Tensor edge, Tensor attention, Tensor bias, Tensor indices, Tensor types) -> Tensor')
+    _gat_library.impl('gat',_gat_reference,'CompositeExplicitAutograd')
 
 class NativeLinear(nn.Linear):
     use_cutlass: bool

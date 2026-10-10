@@ -33,8 +33,9 @@ are not normalized automatically.
 `inference_backend="libtorch"` runs tensor projections through ATen.
 `"cutlass"` runs aligned FP16 GAT/MLP projections through native CUTLASS GEMM
 and uses the existing ensemble readout epilogue. Two-coordinate input layers,
-unaligned projections, graph gather/scatter, normalization and hop attention
-remain ATen. Auto selection uses LibTorch on T4 and CUTLASS on SM80 or newer.
+unaligned projections, normalization and hop attention remain ATen. Aligned
+GAT layers additionally use native fused attention/aggregation and project
+three distinct edge embeddings. Channels above 1024 retain ATen aggregation. Auto selection uses LibTorch on T4 and CUTLASS on SM80 or newer.
 An explicit unsupported CUTLASS device is rejected.
 
 Scope: distinct values 0..n-1, identity target, complete pancake prefix-flip
@@ -53,9 +54,10 @@ Random test weights provide no evidence of trained search quality. Multi-GPU sca
 been measured.
 
 
-Measured backend choice: on RTX 3060 with n=100, d_model=256, two layers and
-neighbor hops, native LibTorch outperformed CUTLASS at fitting batches 1–3.
-Use `NativeOptions(inference_backend="libtorch")` for this tested configuration;
-`auto` currently selects by GPU architecture and does not establish the fastest
-GNN backend. See `test_results/gnn_large_20261010/REPORT.md` for the matched
-experiment and limitations.
+Measured optimized backend: on RTX 3060, n=100, d_model=256, two layers,
+two neighbor hops and state batch3, CUTLASS takes 193.153 ms versus LibTorch
+540.440 ms. This is 3.377x faster than the original CUTLASS implementation.
+See `test_results/gnn_opt_20261010/REPORT.md` for scope and raw evidence.
+Re-export existing TorchScript artifacts to enable fused GAT; raw state-dict
+parameters remain compatible. Auto selection still uses GPU architecture,
+not a universal measured guarantee of the fastest backend.

@@ -1,0 +1,11 @@
+{
+  "state_len": 100,
+  "num_classes": 100,
+  "hidden1": 256,
+  "hidden2": 256,
+  "residual_count": 1,
+  "output_dim": 1,
+  "dtype": "fp16",
+  "normalization": "none",
+  "graph_hash": "c51198e75e30cd75d65cd1d6359d0e39f25c70b6a6087e67882c98a633f150e2"
+}

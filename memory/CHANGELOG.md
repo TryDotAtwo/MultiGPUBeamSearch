@@ -858,3 +858,7 @@ Own dual-stream GATv2 plus multi-hop neighbor inference added to native ensemble
 
 ## 2026-10-10 — large GNN inference comparison
 RTX3060 n100/d256/layers2/hops2 matched FP16 inference: batch3 native LibTorch549.54ms, CUTLASS671.27ms, Python700.55ms. Fitting batches1/2/3 pass parity, batch4 OOM for all. Weights seeded synthetic, no trained quality proof; common FP32 scalar readout, no full beam timing. Evidence and fingerprints in test_results/gnn_large_20261010/REPORT.md.
+
+
+## 2026-10-10: native GNN CUTLASS fusion
+Fused GAT aggregation and compact edge projection preserve both GNN levels and all beam-stream contracts. RTX3060 n100/d256 batch3: 652.268 -> 193.153 ms (3.377x); LibTorch 540.440 ms. 28 GPU parity cases, zero sanitizer errors, single/three-GNN full-beam replay pass. See test_results/gnn_opt_20261010/REPORT.md.
