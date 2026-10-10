@@ -47,3 +47,15 @@ def test_faster_exact_width_batch_shrinks_frontier_then_recalibrates():
     assert calls==[('tune',100),('discover',8192),('tune',60)]
     assert capacity['effective_beam']==60 and chosen['parent_batch']==8192
     assert chosen['signature']['requested_beam_width']==60
+
+
+def test_thermal_invalidated_winner_cannot_expand_frontier():
+    discoveries=[]
+    def tune(width,index):
+        return dict(signature={'requested_beam_width':width},parent_batch=256,
+            reserve_bytes=1<<30,rejected={'8192':'GPU telemetry missing, incomplete or throttled'})
+    with pytest.raises(RuntimeError,match='cannot confirm inference winner'):
+        refine_maximum({'effective_beam':5_000_000},
+            {'parent_batch':8192,'reserve_bytes':9<<30},tune=tune,
+            discover=lambda *args:discoveries.append(args))
+    assert discoveries==[]

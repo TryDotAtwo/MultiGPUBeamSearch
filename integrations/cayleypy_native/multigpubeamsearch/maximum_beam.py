@@ -31,6 +31,11 @@ def refine_maximum(initial_capacity,initial_inference,*,tune,discover,max_rounds
         beam=capacity['effective_beam'];calibration=tune(beam,round_index)
         if calibration.get('signature',{}).get('requested_beam_width')!=beam:
             raise ValueError('maximum inference receipt is not bound to the exact frontier')
+        rejection=calibration.get('rejected',{}).get(str(previous['parent_batch']), '')
+        if 'GPU telemetry' in rejection:
+            raise RuntimeError('cannot confirm inference winner: previous fastest batch '
+                'has missing, incomplete or throttled GPU telemetry; maximum frontier '
+                'must not expand by treating that cohort as a slower batch')
         changed=any(calibration[key]!=previous[key] for key in ('parent_batch','reserve_bytes'))
         if changed:capacity=discover(calibration,round_index)
         history.append(dict(beam=beam,parent_batch=calibration['parent_batch'],
