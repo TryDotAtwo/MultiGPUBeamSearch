@@ -165,7 +165,7 @@ SHARD_CAPACITY_CANDIDATES =
 RING_COUNT =
     ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))
 
-Eager LibTorch/ensemble runtime physical-pool refinement (2026-10-10):
+Automatic eager LibTorch/ensemble physical-pool refinement (2026-10-10):
     RING_COUNT = min(derived RING_COUNT, BEAM_RING_COUNT_LIMIT)
     default BEAM_RING_COUNT_LIMIT = 16, positive uint32 only
 This bounds reusable physical buffers and graph executables, not logical
@@ -175,6 +175,8 @@ derived count unless the limit is explicitly configured. Every changed physical
 geometry requires fresh native memory admission. The same lower-bound pruning
 policy is used in Python; it never replaces native admission or full-depth
 performance validation. A pool upper bound is not an overlap guarantee.
+Manual configuration with explicit BEAM_RING_COUNT retains its requested
+physical count and remains subject to native memory admission.
 
 GLOBAL_SPILL_CAPACITY =
     0

@@ -456,7 +456,7 @@ component probes share persistent per-GPU processes and use an allocation
 acknowledgement barrier before entering transport collectives.
 The five-stream architecture and global selection semantics remain unchanged.
 
-Eager native inference limits the reusable physical ring pool to 16 by default;
+Automatic eager native inference limits the reusable physical ring pool to 16 by default;
 `BEAM_RING_COUNT_LIMIT` can set another positive uint32 limit. This bounds graph
 and buffer owners independently of the logical frontier: the dispatcher keeps
 recycling rings until every parent has been processed. The Python memory
@@ -464,6 +464,8 @@ shortlist uses the same bound, while final admission still comes from the native
 planner on every rank. An older prepared runner can reject a shortlisted profile;
 the pruning hint never overrides its actual memory calculation. This upper bound
 does not guarantee that the derived ring count hides communication latency.
+Manual configurations with an explicit `BEAM_RING_COUNT` retain that requested
+count and must pass their own native memory admission.
 
 The default reports best found Stream1 throughput and calibration duration.
 Inference search is bounded by `calibration_max_batch` (8192 by default); its
