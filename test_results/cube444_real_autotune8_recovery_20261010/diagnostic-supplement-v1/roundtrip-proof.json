@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "artifact_commit": "91859ce8a459d05067231ff0772610c4d72d498c",
+  "archive_sha256": "29ae8b2172ca299b3b0b9cecaf313b6364e17b9741e37896d86d9c93b7360703",
+  "parts_verified": 1,
+  "files_verified": 98,
+  "bytes": 19289,
+  "epoch": 1791595252.689146
+}
