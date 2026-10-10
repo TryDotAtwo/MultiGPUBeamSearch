@@ -494,7 +494,8 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
                 "BEAM_HISTORY_DIR": str(run_dir / "history"), "BEAM_HISTORY_DISK_PATH": str(run_dir / "history")})
     if model.backend == "ensemble":
         env["BEAM_BLEND_DIR"] = str(model.weights_dir)
-        env["BEAM_ENSEMBLE_BACKEND"] = runtime.build_metadata['inference_backend']
+        if runtime.build_metadata.get('inference_backend'):
+            env["BEAM_ENSEMBLE_BACKEND"] = runtime.build_metadata['inference_backend']
         first = model.manifest["ensemble"]["models"][0]
         env["BEAM_WEIGHT_DIR"] = str(model.weights_dir / first["weights_dir"])
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),
