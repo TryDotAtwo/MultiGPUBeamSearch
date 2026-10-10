@@ -23,9 +23,14 @@ def test_native_cohort_identity_and_complete_logs(tmp_path):
     seconds, metadata = launch(tmp_path,
         "import os,sys; assert sys.argv[-2:] == ['2',os.environ['RANK']]; "
         "assert os.environ['LOCAL_RANK']==os.environ['RANK']; "
-        "assert os.environ['OMP_NUM_THREADS']=='1'; print(os.environ['RANK']); print('err',file=sys.stderr)")
+        "assert os.environ['OMP_NUM_THREADS']=='1'; print(os.environ['BEAM_NCCL_RUN_ID']); print('err',file=sys.stderr)")
     assert seconds > 0 and metadata['worker_logs_complete']
     assert len(metadata['worker_streams']) == 4
+    ids=[(tmp_path/'worker-logs/native/attempt_0'/str(rank)/'stdout.log').read_text().strip() for rank in range(2)]
+    assert ids[0] == ids[1] and ids[0].startswith('native-local-')
+    other=tmp_path/'other';other.mkdir()
+    launch(other, "import os; print(os.environ['BEAM_NCCL_RUN_ID'])")
+    assert (other/'worker-logs/native/attempt_0/0/stdout.log').read_text().strip() != ids[0]
 
 
 def test_failure_cancels_other_rank(tmp_path):

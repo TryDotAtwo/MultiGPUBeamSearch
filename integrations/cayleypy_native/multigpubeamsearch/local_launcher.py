@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import uuid
 
 from .errors import NativeBackendError
 
@@ -15,6 +16,7 @@ def run_local_ranks(command, *, world_size, cwd, env, timeout, log_path, worker_
         raise ValueError("invalid local rank launch geometry or timeout")
     started = time.monotonic()
     processes = []
+    rendezvous = "native-local-" + uuid.uuid4().hex
     root = Path(worker_logs) / "native" / "attempt_0"
     root.mkdir(parents=True, exist_ok=False)
     Path(log_path).write_text("single-host direct native ranks\n", encoding="utf-8")
@@ -24,7 +26,8 @@ def run_local_ranks(command, *, world_size, cwd, env, timeout, log_path, worker_
                 directory = root / str(rank)
                 directory.mkdir()
                 rank_env = dict(env, WORLD_SIZE=str(world_size), RANK=str(rank),
-                                LOCAL_RANK=str(rank), OMP_NUM_THREADS="1")
+                                LOCAL_RANK=str(rank), OMP_NUM_THREADS="1",
+                                BEAM_NCCL_RUN_ID=rendezvous)
                 args = [*command, str(world_size), str(rank)]
                 (directory / "command.json").write_text(json.dumps(args) + "\n", encoding="utf-8")
                 stdout = stack.enter_context((directory / "stdout.log").open("wb"))
