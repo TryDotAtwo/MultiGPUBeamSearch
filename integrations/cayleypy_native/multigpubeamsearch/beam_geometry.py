@@ -31,7 +31,19 @@ class Shape:
             if type(value) is not int or value<=0:raise ValueError(name+' must be a positive integer')
         if self.requested_beam>=2**64 or self.gpus>=2**31:raise ValueError('native integer range exceeded')
 
-def geometry(shape,shards,staging_slots=2,sort_slots=1):
+def ring_pool_limit(environment):
+    """Native eager pool policy; this remains a pruning hint, not admission."""
+    value=environment.get('BEAM_RING_COUNT_LIMIT')
+    if value is None:
+        return 16 if (environment.get('BEAM_STREAM1_EXECUTOR')=='libtorch_eager'
+                      or environment.get('BEAM_BLEND_DIR')) else None
+    try:limit=int(value)
+    except (TypeError,ValueError):raise ValueError('invalid BEAM_RING_COUNT_LIMIT') from None
+    if not 1<=limit<2**32:raise ValueError('invalid BEAM_RING_COUNT_LIMIT')
+    return limit
+
+
+def geometry(shape,shards,staging_slots=2,sort_slots=1,*,physical_ring_limit=None):
     for value in (shards,staging_slots,sort_slots):
         if type(value) is not int or value<=0:raise ValueError('positive geometry required')
     effective=round_up(shape.requested_beam,shape.gpus*shards*shape.alignment)
@@ -39,6 +51,10 @@ def geometry(shape,shards,staging_slots=2,sort_slots=1):
     logical=ceil_div(local,shards)
     q=staging_slots*shape.native_b_micro*shape.moves
     rings=ceil_div(logical*staging_slots,q)
+    if physical_ring_limit is not None:
+        if type(physical_ring_limit) is not int or not 1<=physical_ring_limit<2**32:
+            raise ValueError('physical_ring_limit must be a positive uint32')
+        rings=min(rings,physical_ring_limit)
     recv=max(q,ceil_div(q*shape.receive_ppm,1_000_000))
     capacity=round_up(max(logical+max(q,recv),
         ceil_div(logical*shape.capacity_ppm,1_000_000)),shape.alignment)
@@ -67,7 +83,7 @@ def geometry(shape,shards,staging_slots=2,sort_slots=1):
         native_admission_verified=False,performance_verified=False)
 
 def memory_shortlist(shape,*,staging_slots=2,sort_slots=1,limit=3,
-                     effective_beam=None,budget_bytes=None):
+                     effective_beam=None,budget_bytes=None,physical_ring_limit=None):
     """Cheap memory seed only. Never accept a row as native-admitted/fastest.
 
     If geometry is not frozen yet, choose a memory seed then restrict all
@@ -77,7 +93,8 @@ def memory_shortlist(shape,*,staging_slots=2,sort_slots=1,limit=3,
     if type(limit) is not int or not 1<=limit<=3:raise ValueError('limit must be1..3')
     rows=[]
     for s in range(1,129):
-        try:rows.append(geometry(shape,s,staging_slots,sort_slots))
+        try:rows.append(geometry(shape,s,staging_slots,sort_slots,
+                                 physical_ring_limit=physical_ring_limit))
         except ValueError:continue
     if budget_bytes is not None:
         rows=[r for r in rows if r['named_memory_lower_bound_bytes']<=budget_bytes]

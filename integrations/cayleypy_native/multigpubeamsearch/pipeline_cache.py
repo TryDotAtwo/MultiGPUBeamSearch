@@ -17,7 +17,7 @@ def cache_identity(inference, environment, *, beam, world, full_frontier):
     if (signature.get('requested_beam_width')!=beam or signature.get('world_size')!=world
             or not valid_cached_profile(inference,signature,signature.get('max_batch',65536))):
         return None
-    return dict(schema=2,policy='exact-component-service-v2-downstream-objective',signature=signature,
+    return dict(schema=3,policy='exact-component-service-v3-bounded-ring-geometry',signature=signature,
         parent_batch=inference['parent_batch'],reserve_bytes=inference['reserve_bytes'],
         full_frontier=bool(full_frontier),
         policy_environment={k:v for k,v in environment.items()

@@ -71,7 +71,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 verify_prepared_model(model,contract)
                 (directory/'selection.json').write_text(json.dumps(cached,indent=2))
                 return cached
-        from .beam_geometry import Shape,memory_shortlist
+        from .beam_geometry import Shape,memory_shortlist,ring_pool_limit
         from .component_autotune import tune_components
         initial=initial_plans[0]
         baseline.update(BEAM_SHARD_COUNT=str(initial['SHARD_COUNT']),
@@ -84,7 +84,8 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             receive_ppm=int(environment.get('BEAM_GLOBAL_SPILL_SCALE_PPM','2000000')))
         rows=memory_shortlist(shape,effective_beam=initial['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
             staging_slots=initial['STREAM3_RING_SLOTS'],sort_slots=initial['STREAM4_ACTIVE_SORT_SLOTS'],
-            budget_bytes=min(p['gpu_budget_bytes'] for p in initial_plans))
+            budget_bytes=min(p['gpu_budget_bytes'] for p in initial_plans),
+            physical_ring_limit=ring_pool_limit(environment))
         candidates=[('shards-'+str(r['shards']),dict(baseline,BEAM_SHARD_COUNT=str(r['shards'])))
             for r in rows if r['shards']!=initial['SHARD_COUNT']][:2]
         if len(candidates)<2:
@@ -159,7 +160,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         return actual.admit(env)
     fast={}
     if session is not None:
-        from .beam_geometry import Shape,memory_shortlist
+        from .beam_geometry import Shape,memory_shortlist,ring_pool_limit
         initial=initial_plans[0]
         shape=Shape(beam_width,world,int(baseline['BEAM_B_MICRO']),contract.move_count,storage,
             alignment=initial['STREAM4_BATCH_ALIGNMENT'],
@@ -170,7 +171,8 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         baseline['BEAM_STREAM4_ACTIVE_SORT_SLOTS']=str(initial['STREAM4_ACTIVE_SORT_SLOTS'])
         rows=memory_shortlist(shape,effective_beam=initial['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
             staging_slots=initial['STREAM3_RING_SLOTS'],sort_slots=initial['STREAM4_ACTIVE_SORT_SLOTS'],
-            budget_bytes=min(p['gpu_budget_bytes'] for p in initial_plans))
+            budget_bytes=min(p['gpu_budget_bytes'] for p in initial_plans),
+            physical_ring_limit=ring_pool_limit(environment))
         candidates=[('shards-'+str(r['shards']),dict(baseline,BEAM_SHARD_COUNT=str(r['shards'])))
             for r in rows if r['shards']!=initial['SHARD_COUNT']][:2]
         if len(candidates)<2:
