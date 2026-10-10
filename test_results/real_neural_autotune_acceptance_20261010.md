@@ -51,3 +51,25 @@ GPU timings are fixed complete depths on deterministic legal frontier fixtures. 
 - Terminal2-GPU results archive f3debeb1e31fd4da4b955a729b96cff47de5952a, final-public-v3;1465771bytes20parts924files SHA db5e22694e81ef858e08850b83020d3d60fde65e33fde63ea2aa1d6e37010fbf. Independent remote GitHub download and every file-byte verification PASS. Automatic full55M archive8bbf9012ff767694c4edbdaf30f76c8c5fbdbf0d proof8ff9dd0639a264059f1dd7a85ebb04f2c0ae7f7f.
 -2GPU controllers terminal; stop/destroy after proof commit. 8GPU full+matched211.93M still pending. Goal remains active. Main/Kaggle release pending; no128GPU hardware evidence.
 2026-10-10 03:30UTC: own2GPU instance55105798 stopped and destroyed, both provider responses success and status absent verified; final archive verification commit4fb5f2e13d4775d6be5b5b499e7d6a6fb7be818b. Only own8GPU55101031 remains for live max211,927,040. UnrelatedBFS55100364 untouched.
+2026-10-10 continuation: checked authoritative8GPU controller30624 live, all8 full rank logs pending completion, no GPU experiments overlapped. Prepared freeze-final-maximum.py that refuses archiving without PASS211927040/world8, all8 numeric0 exact matched file measurements, full_step_verified and capacity_search_complete. It preserves final raw logs/plans/seeds/replay metadata and references independently verified previous diagnostic/native/public archives; no Windows GPU-tensor copies. Source docs8edeec0f describe actual bounded bootstrap, CUDA-only recovery, memory pressure invalidation and finite-search limits. Final8 matched evidence and teardown remain required.
+2026-10-10 03:36UTC: verified wait for owned controller30624 on8x3060; process live after bounded60s wait, no full-point/report yet. No restart or concurrent GPU work. Full+matched and final8 archive/teardown still required.
+
+
+## Current acceptance 2026-10-10 07:59 UTC — inference first
+Authoritative source: 5d65147dae7ec18a6bc2d58772f4f24a49da15ca on codex/fast-autotune-20261009. Earlier capacity-first maxima/B32 are historical, not current acceptance.
+
+| Requirement | Evidence | Limit |
+|---|---|---|
+| Fastest verified inference batch before frontier | Both 2/8 RTX3060 choose 8192 parents for trained s3 Transformer + mlp_x16 FP16/CUTLASS blend; reserve 9460252672 bytes | Fastest measured safe candidate, not global optimum |
+| 2-GPU full matched frontier | 5,533,696 parents; full 172.775s; pure 171.043171875s; throughput loss 1.00236% | One cold depth/pass, no CI |
+| 8-GPU full matched frontier | 1,703,936 parents; full 13.6402s; pure 13.3145517578125s; throughput loss 2.38742% | One cold depth/pass, no CI |
+| Public CayleyPy API | Strict max native API and three-move path replay PASS on both configurations | Does not solve full index1000 puzzle |
+| Capacity bounds | Fresh 8-GPU plan-only search admits 1,941,504 at same batch8192, 7.92364s,456probes | Not full-step verified; caller-memory-dependent maximum explanation pending |
+| Archive and teardown | 2-GPU artifact c06bbe419bb74c33c183063e04eda45da928e53f; 8-GPU artifact2365de64fad85de38940916fd0f87fe73b337dca, proof6dc8cf4ace9030c4a9b08ba0c2a9e5e1741b3d41: all202files independently byte/hash checked. Both leases destroyed, provider absent verified | No raw weights/frontiers copied to Windows |
+| Architecture | Native source d474763b... is ancestor of current source; comparison shows no native C++ changes | Parallel backbone inference not claimed; blend head CUTLASS accumulation |
+| Universal/128GPU/release | Not verified; source exists on development branch | Main/Kaggle not updated; goal remains active |
+
+Capacity diagnostics: production_runner.cu records cudaMemGetInfo after NCCL initialization and subtracts calibrated ensemble reserve; runtime_config.cpp then subtracts768MiB headroom. Original8 plan budget2022506496 vs fresh2290941952 differs268435456 bytes. This confirms distinct available-memory snapshots, not batch changes. Exact owner/source of256MiB difference remains unproven. runtime_config.cpp defaults final exchange capacity scale to world_size; static_memory.cu applies it to final_chunk. Its contribution to2/8 maximum discrepancy remains to quantify before any architecture-preserving change.
+
+Completion boundary: the active goal (real-model autotuning/full-step verification, VRAM batch and stale allocator-reserve fixes, GitHub archival, own lease teardown within20USD) is supported by the linked GPU/CPU archives. The1.70M versus1.94M admission difference is confirmed to use distinct memory budgets separated by256MiB; do not equate these as same-condition maxima or claim a full1.94M run. Exact allocation owner is unknown and is not required to establish snapshot-dependent admission. All-rental settled billing remains unavailable; conservative quoted-time bound plus reserved traffic stays below20USD. Universal optimum,128GPU hardware,Kaggle/main release,and a full index1000 solve are not established.
+
