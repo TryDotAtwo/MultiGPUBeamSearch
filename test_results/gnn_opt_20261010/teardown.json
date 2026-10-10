@@ -1,0 +1,12 @@
+{
+  "instance": 55201906,
+  "label": "gnn-cutlass-opt-3060-20261010",
+  "created_at": 1791632367,
+  "destroyed_at": 1791633918,
+  "stop_success": true,
+  "destroy_success": true,
+  "api_absent": true,
+  "archives_verified": true,
+  "archive_commit": "4947ce0c1accfba4ba7130f8a2a2a731049fd4e2",
+  "verified_files": 27
+}
