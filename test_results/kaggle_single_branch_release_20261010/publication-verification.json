@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "kaggle_version": 5,
+  "source_commit": "00a3729bc6d7e1743c11d21e68fac06c57216ce5",
+  "published_install_verified": true,
+  "public": true,
+  "gpu_enabled": true,
+  "repeat_gpu_validation": "pending: maximum simultaneous batch GPU sessions2 reached",
+  "previous_gpu_run": "version4 compiled/imported then exposed corrected scalar-parent receipt mismatch"
+}
