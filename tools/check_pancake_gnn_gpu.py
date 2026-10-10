@@ -37,7 +37,7 @@ states=torch.stack([torch.randperm(4) for _ in range(9)]).cuda()
 model=model.half().cuda()
 results={}
 with torch.inference_mode():
-    expected=model.features(states)
+    expected=torch.cat([model.features(states[i:i+4]) for i in range(0,states.size(0),4)])
     actual=torch.ops.multigpubeamsearch_gnn.probe_features(states,str(artifact.weights_dir),False)
     torch.testing.assert_close(actual,expected,rtol=.005,atol=.005)
     results['libtorch_max_error']=(actual-expected).abs().max().item()
@@ -52,3 +52,4 @@ results.update(gpu=torch.cuda.get_device_name(),libtorch='PASS',
                scope='native GNN features; not full beam search or trained quality')
 (out/'result.json').write_text(json.dumps(results,indent=2))
 print(json.dumps(results,indent=2))
+
