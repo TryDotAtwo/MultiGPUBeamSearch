@@ -103,6 +103,29 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             'requested_beam_width':beam_width,'precision':'fp16/fp32'}
 
 
+def free_memory_snapshot(signature):
+    """Selected UUIDs only, without creating additional CUDA contexts."""
+    try:
+        result=subprocess.run(['nvidia-smi','--query-gpu=uuid,memory.free',
+            '--format=csv,noheader,nounits'],capture_output=True,text=True,timeout=5,check=True)
+        observed={}
+        for line in result.stdout.splitlines():
+            uuid,free=line.split(',')
+            observed[uuid.strip().lower().removeprefix('gpu-')]=int(free.strip())
+        uuids=[value.lower().removeprefix('gpu-') for value in signature['gpu_uuids']]
+        if len(set(uuids))!=signature['world_size']:return None
+        return {uuid:observed[uuid] for uuid in uuids}
+    except (OSError,subprocess.SubprocessError,KeyError,TypeError,ValueError):return None
+
+
+def capacity_cache_reusable(data,signature):
+    if not data.get('capacity_limited_search'):return True
+    previous=data.get('initial_free_memory_mib');current=free_memory_snapshot(signature)
+    if not previous or not current or previous.keys()!=current.keys():return False
+    # A previously rejected larger batch must be retried after pressure lifts.
+    return all(current[uuid]<=previous[uuid]+32 for uuid in previous)
+
+
 def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,environment):
     """Use the actual ensemble executable, all selected GPUs, and graph states.
 
@@ -122,9 +145,11 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     if cache.is_file():
         try:
             data=json.loads(cache.read_text())
-            if valid_cached_profile(data,signature,options.calibration_max_batch):
+            if valid_cached_profile(data,signature,options.calibration_max_batch) and capacity_cache_reusable(data,signature):
                 return dict(data,cache_hit=True)
         except (OSError,ValueError):pass
+    initial_free_memory=free_memory_snapshot(signature)
+    capacity_limited=False
     directory=Path(run_dir)/'calibration';directory.mkdir(exist_ok=False)
     probe_dir=directory/'inputs';probe_dir.mkdir()
     if model.backend=='ensemble':
@@ -153,7 +178,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
         for index,batch in enumerate(candidates):
             if time.monotonic()>=deadline:break
             if index>0 and deadline-time.monotonic()<probe_time_allowance(records):break
-            if index<len(coarse_candidates) and index>0 and time.monotonic()>=coarse_deadline:
+            if samples and index<len(coarse_candidates) and index>0 and time.monotonic()>=coarse_deadline:
                 if not refinement_queued:
                     coarse_winner,_=select_inference(samples,baseline=str(baseline))
                     refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
@@ -162,13 +187,14 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                 continue
             # A phase boundary limits starts, never an in-flight healthy rank.
             candidate_deadline=deadline
-            processes=[];rows=[]
+            processes=[];rows=[];capacity_failures=[]
             telemetry=CalibrationTelemetry()
             telemetry.__enter__()
             try:
                 if pool is not None:
                     rows,failures=pool.measure(batch,parents,candidate_deadline)
                     if failures:rejected[str(batch)]='; '.join(failures)
+                    capacity_failures=[('CUDA capacity rejected' in failure) for failure in failures]
                 else:
                     for rank in range(len(devices)):
                         path=directory/f'batch-{batch}-rank-{rank}.log'
@@ -193,6 +219,8 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                             except ValueError:pass
                         if (code or len(parsed)!=1 or not parsed[0].get('correctness_passed')
                                 or parsed[0].get('numeric_error') or len(parsed[0]['seconds'])<5):
+                            from .calibration_session import cuda_capacity_rejection
+                            capacity_failures.append(bool(code) and cuda_capacity_rejection(path.read_text(errors='replace')))
                             rejected[str(batch)]=f'rank {rank} failed admission or timed out';continue
                         rows.append(parsed[0])
             finally:
@@ -206,6 +234,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                 'gpu_telemetry':telemetry_records[str(batch)],
                 'failure':rejected.get(str(batch))},indent=2))
             records.extend(rows)
+            if any(capacity_failures):capacity_limited=True
             if len(rows)==len(devices):
                 telemetry_verified=verified_telemetry(telemetry_records[str(batch)],signature)
                 if not telemetry_verified:
@@ -216,7 +245,14 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                         throttled=not telemetry_verified))
                 reserves[str(batch)]=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
             elif batch==baseline:
-                raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
+                if not capacity_failures or not all(capacity_failures):
+                    raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
+                capacity_limited=True
+                # A proven CUDA allocation failure is a monotone capacity bound.
+                # Preserve the requested frontier; probe smaller inference rows.
+                smaller=sorted({value for value in candidates[index+1:] if value<batch},reverse=True)
+                candidates[index+1:]=smaller
+                coarse_candidates=list(candidates)
             if index+1==len(coarse_candidates) and not refinement_queued and time.monotonic()<deadline:
                 coarse_winner,_=select_inference(samples,baseline=str(baseline))
                 refined=refinement_batches(int(coarse_winner.profile),cap,set(candidates))
@@ -233,6 +269,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
           'coarse_candidates':coarse_candidates,'refinement_candidates':refined,
           'calibration_wall_seconds':time.monotonic()-started,
           'probe_process_starts':pool.starts if pool is not None else len(records),
+          'capacity_limited_search':capacity_limited,'initial_free_memory_mib':initial_free_memory,
           'probe_protocol':runtime.build_metadata.get('calibration_protocol','oneshot'),
           'pipeline_verified':False,'cache_hit':False,'measured_candidates':sorted({int(s.profile) for s in samples})}
     (directory/'inference-selection.json').write_text(json.dumps(data,indent=2))

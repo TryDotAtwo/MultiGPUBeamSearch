@@ -8,6 +8,13 @@ import threading
 import time
 
 
+def cuda_capacity_rejection(text):
+    text=text.lower()
+    return any(marker in text for marker in (
+        'cuda out of memory','cuda error: out of memory',
+        'cudaerrormemoryallocation','cublas_status_alloc_failed'))
+
+
 class InferenceSession:
     def __init__(self, command, environment, log_path, *, deadline):
         self.deadline = deadline
@@ -88,9 +95,13 @@ class EnsembleProbePool:
                 ready=session.receive(deadline)
                 if ready.get('ready') is not True or ready.get('device')!=rank:
                     raise RuntimeError('inference rank did not acknowledge readiness')
-        except BaseException:
+        except BaseException as error:
             # No request is sent until every newly started rank is ready.
+            log=getattr(session,'log',None);path=Path(log.name) if log is not None else None
             self.close()
+            if isinstance(error,RuntimeError) and path is not None and cuda_capacity_rejection(path.read_text(errors='replace')):
+                self.capacity=min(self.capacity,batch)
+                return [],[f'rank {rank}: CUDA capacity rejected before readiness: {error}']
             raise
         for session in self.sessions.values():session.send(batch,parents)
         rows=[];failures=[]
@@ -104,8 +115,10 @@ class EnsembleProbePool:
                     raise ValueError('invalid inference session receipt')
                 rows.append(row)
             except (TimeoutError,RuntimeError,ValueError) as error:
-                failures.append(f'rank {rank}: {error}')
+                log=getattr(session,'log',None);path=Path(log.name) if log is not None else None
                 session.close();del self.sessions[rank]
+                capacity=isinstance(error,RuntimeError) and path is not None and cuda_capacity_rejection(path.read_text(errors='replace'))
+                failures.append(f"rank {rank}: {'CUDA capacity rejected: ' if capacity else ''}{error}")
         return rows,failures
 
     def close(self):
@@ -116,4 +129,3 @@ class EnsembleProbePool:
             except Exception as error:
                 if failure is None:failure=error
         if failure is not None:raise failure
-

@@ -29,8 +29,13 @@ class NativePlanSession:
                 capabilities.append(ready.get('component_protocol')=='persistent-exact-capacity-v1')
             if any(capabilities) and not all(capabilities):raise RuntimeError('mixed native component service cohort')
             self.supports_components=all(capabilities)
-        except BaseException:
+        except BaseException as error:
+            logs=[Path(session.log.name) for session in self.sessions if hasattr(session,'log')]
             self.close()
+            failures=[line.split('=',1)[1] for path in logs for line in path.read_text(errors='replace').splitlines()
+                      if line.startswith('production_runner_error=')]
+            if failures and all(message=='insufficient blend GPU reserve' for message in failures):
+                raise CapacityRejected('native planner initialization rejected measured blend reserve') from error
             raise
 
     def admit(self, beam, environment):
