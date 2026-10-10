@@ -40,6 +40,39 @@ __device__ float warp_sum(float value) {
     for(int offset=16;offset;offset/=2) value+=__shfl_down_sync(0xffffffff,value,offset);
     return __shfl_sync(0xffffffff,value,0);
 }
+template<int Chunks>
+__global__ void residual_norm_gelu(const __half* input,const __half* residual,
+    const __half* weight,const __half* bias,__half* output,int rows,int channels,float epsilon) {
+    const int row=blockIdx.x*4+threadIdx.x/32,lane=threadIdx.x%32;
+    if(row>=rows)return;
+    // Each warp owns one row; the residual sum is rounded before statistics.
+    float values[Chunks];float sum=0;
+    #pragma unroll
+    for(int j=0;j<Chunks;++j) {
+        const int c=lane+j*32;
+        values[j]=0;
+        if(c>=channels)continue;
+        values[j]=__half2float(__hadd(input[std::int64_t(row)*channels+c],residual[std::int64_t(row)*channels+c]));
+        sum+=values[j];
+    }
+    const float mean=warp_sum(sum)/channels;
+    float squares=0;
+    #pragma unroll
+    for(int j=0;j<Chunks;++j) {
+        const int c=lane+j*32;if(c>=channels)continue;
+        const float delta=values[j]-mean;squares+=delta*delta;
+    }
+    const float inverse=rsqrtf(warp_sum(squares)/channels+epsilon);
+    #pragma unroll
+    for(int j=0;j<Chunks;++j) {
+        const int c=lane+j*32;if(c>=channels)continue;
+        const float normalized=(values[j]-mean)*inverse;
+        const float affine=fmaf(normalized,__half2float(weight[c]),__half2float(bias[c]));
+        const float rounded=__half2float(__float2half_rn(affine));
+        const float activated=.5f*rounded*(1.f+erff(rounded*.7071067811865475244f));
+        output[std::int64_t(row)*channels+c]=__float2half_rn(activated);
+    }
+}
 __global__ void gat_reduce(const __half* left,const __half* right,const __half* edge,
     const __half* attention,const __half* bias,const std::int64_t* indices,
     const std::int64_t* types,const int* incoming,__half* output,int nodes,int channels) {
@@ -85,6 +118,20 @@ __global__ void gat_reduce(const __half* left,const __half* right,const __half* 
     }
 }
 } // anonymous namespace
+void stream1_gnn_residual_norm_gelu(const __half* input,const __half* residual,
+    const __half* weight,const __half* bias,__half* output,int rows,int channels,
+    float epsilon,cudaStream_t stream) {
+    const auto grid=unsigned((std::uint64_t(rows)+3)/4);
+    #define BEAM_GNN_NORM_LAUNCH(C) residual_norm_gelu<C><<<grid,128,0,stream>>>(input,residual,weight,bias,output,rows,channels,epsilon)
+    if(channels<=32){BEAM_GNN_NORM_LAUNCH(1);}
+    else if(channels<=64){BEAM_GNN_NORM_LAUNCH(2);}
+    else if(channels<=128){BEAM_GNN_NORM_LAUNCH(4);}
+    else if(channels<=256){BEAM_GNN_NORM_LAUNCH(8);}
+    else if(channels<=512){BEAM_GNN_NORM_LAUNCH(16);}
+    else {BEAM_GNN_NORM_LAUNCH(32);}
+    #undef BEAM_GNN_NORM_LAUNCH
+    if(cudaGetLastError()!=cudaSuccess)throw std::runtime_error("GNN residual norm GELU launch failed");
+}
 void stream1_gnn_gat(const __half* left,const __half* right,const __half* edge,
     const __half* attention,const __half* bias,const std::int64_t* indices,
     const std::int64_t* types,int* incoming,__half* output,
@@ -118,6 +165,9 @@ void stream1_gnn_projection(const __half* input,const __half* weight,const __hal
 }
 #else
 namespace beam {
+void stream1_gnn_residual_norm_gelu(const __half*,const __half*,const __half*,const __half*,__half*,int,int,float,cudaStream_t) {
+    throw std::runtime_error("GNN fused normalization backend was not built");
+}
 void stream1_gnn_gat(const __half*,const __half*,const __half*,const __half*,const __half*,
     const std::int64_t*,const std::int64_t*,int*,__half*,int,int,int,cudaStream_t) {
     throw std::runtime_error("GNN fused GAT backend was not built");

@@ -107,8 +107,8 @@ class DualStreamEncoder(nn.Module):
             pa=self.pos_edge_emb(pos_types)
         for vc,vn,pc,pn in zip(self.value_convs,self.value_norms,self.pos_convs,self.pos_norms):
             if compact:
-                hv=F.gelu(vn(vc.forward_compact(hv,ve,va,value_types)+hv))
-                hp=F.gelu(pn(pc.forward_compact(hp,pe,pa,pos_types)+hp))
+                hv=torch.ops.multigpubeamsearch_gnn.residual_norm_gelu(vc.forward_compact(hv,ve,va,value_types),hv,vn.weight,vn.bias,vn.eps)
+                hp=torch.ops.multigpubeamsearch_gnn.residual_norm_gelu(pc.forward_compact(hp,pe,pa,pos_types),hp,pn.weight,pn.bias,pn.eps)
             else:
                 hv = F.gelu(vn(vc(hv,ve,va)+hv))
                 hp = F.gelu(pn(pc(hp,pe,pa)+hp))

@@ -4,8 +4,28 @@
 #include <c10/cuda/CUDAStream.h>
 #include "../cuda/stream1_gnn_projection.hpp"
 #include <climits>
+#include <cmath>
 
 namespace {
+torch::Tensor residual_norm_gelu(const torch::Tensor& input,const torch::Tensor& residual,
+    const torch::Tensor& weight,const torch::Tensor& bias,double epsilon) {
+    TORCH_CHECK(input.dim()==2 && residual.sizes()==input.sizes(),"invalid GNN normalization shape");
+    const auto rows=input.size(0),channels=input.size(1);
+    TORCH_CHECK(rows>0 && rows<=INT_MAX && channels>0 && channels<=1024 && std::isfinite(epsilon) && epsilon>0,
+        "invalid GNN fused normalization capacity or epsilon");
+    TORCH_CHECK(weight.dim()==1 && bias.dim()==1 && weight.numel()==channels && bias.numel()==channels,
+        "invalid GNN normalization affine shape");
+    for(const auto& tensor:{input,residual,weight,bias})
+        TORCH_CHECK(tensor.is_cuda() && tensor.device()==input.device() && tensor.scalar_type()==torch::kFloat16,
+            "GNN fused normalization requires same-device CUDA FP16 tensors");
+    c10::cuda::CUDAGuard guard(input.device());
+    auto a=input.contiguous(),r=residual.contiguous(),w=weight.contiguous(),b=bias.contiguous();
+    auto output=torch::empty_like(a);
+    const auto half=[](const torch::Tensor& t){return reinterpret_cast<const __half*>(t.data_ptr<at::Half>());};
+    beam::stream1_gnn_residual_norm_gelu(half(a),half(r),half(w),half(b),reinterpret_cast<__half*>(output.data_ptr<at::Half>()),
+        int(rows),int(channels),float(epsilon),c10::cuda::getCurrentCUDAStream(input.get_device()).stream());
+    return output;
+}
 torch::Tensor aggregate(const torch::Tensor& left,const torch::Tensor& right,
     const torch::Tensor& edge,const torch::Tensor& attention,const torch::Tensor& bias,
     const torch::Tensor& indices,const torch::Tensor& types) {
@@ -69,6 +89,8 @@ torch::Tensor projection(const torch::Tensor& input,const torch::Tensor& weight,
 }
 }
 TORCH_LIBRARY(multigpubeamsearch_gnn,m) {
+    m.def("residual_norm_gelu(Tensor input, Tensor residual, Tensor weight, Tensor bias, float epsilon) -> Tensor");
+    m.impl("residual_norm_gelu",TORCH_FN(residual_norm_gelu));
     m.def("linear(Tensor input, Tensor weight, Tensor? bias, bool cutlass) -> Tensor");
     m.impl("linear",TORCH_FN(projection));
     m.def("gat(Tensor left, Tensor right, Tensor edge, Tensor attention, Tensor bias, Tensor indices, Tensor types) -> Tensor");

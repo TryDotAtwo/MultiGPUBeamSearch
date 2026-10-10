@@ -36,6 +36,17 @@ if not hasattr(torch.ops.multigpubeamsearch_gnn,'gat'):
     _gat_library.define('gat(Tensor left, Tensor right, Tensor edge, Tensor attention, Tensor bias, Tensor indices, Tensor types) -> Tensor')
     _gat_library.impl('gat',_gat_reference,'CompositeExplicitAutograd')
 
+def _norm_reference(input,residual,weight,bias,epsilon):
+    if input.is_cuda:
+        raise RuntimeError('CUTLASS GNN normalization requires the native C++ runtime')
+    return F.gelu(F.layer_norm(input+residual,(input.size(-1),),weight,bias,epsilon))
+
+_norm_library=None
+if not hasattr(torch.ops.multigpubeamsearch_gnn,'residual_norm_gelu'):
+    _norm_library=torch.library.Library('multigpubeamsearch_gnn','FRAGMENT')
+    _norm_library.define('residual_norm_gelu(Tensor input, Tensor residual, Tensor weight, Tensor bias, float epsilon) -> Tensor')
+    _norm_library.impl('residual_norm_gelu',_norm_reference,'CompositeExplicitAutograd')
+
 class NativeLinear(nn.Linear):
     use_cutlass: bool
 
