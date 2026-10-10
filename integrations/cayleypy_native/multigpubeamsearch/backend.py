@@ -631,9 +631,6 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         except FileExistsError as error:
             raise NativeBackendError("native worker log directory must be fresh") from error
         process_log = run_dir / "launcher.log"
-        args = [sys.executable, "-m", "torch.distributed.run", "--standalone", "--nnodes=1",
-                f"--nproc-per-node={len(devices)}", f"--log-dir={worker_logs}", "--redirects=3",
-                "--max-restarts=0", "--no-python", *args]
     else:
         args += ["1", "0"]
     failure = None
@@ -641,7 +638,12 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         # Runtime preparation may compile for minutes. Rehash the exact model
         # bytes after that window and immediately before the worker sees them.
         verify_prepared_model(model, contract)
-        elapsed = run_process(args, cwd=run_dir, env=env, timeout=options.timeout_seconds, log_path=process_log)
+        if len(devices) > 1:
+            from .local_launcher import run_local_ranks
+            elapsed = run_local_ranks(args, world_size=len(devices), cwd=run_dir, env=env,
+                timeout=options.timeout_seconds, log_path=process_log, worker_logs=worker_logs)
+        else:
+            elapsed = run_process(args, cwd=run_dir, env=env, timeout=options.timeout_seconds, log_path=process_log)
     except BaseException as error:
         failure = error
         raise
@@ -674,4 +676,3 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     (run_dir / "native-outcome.json").write_text(json.dumps({"path": path, "elapsed_seconds": elapsed,
         "effective_beam_width": effective, "metadata": metadata}, indent=2) + "\n", encoding="utf-8")
     return NativeOutcome(path, elapsed, effective, run_dir, metadata)
-

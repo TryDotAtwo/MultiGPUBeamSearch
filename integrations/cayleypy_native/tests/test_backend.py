@@ -463,6 +463,7 @@ def _rank_stream_fixture(root, rank, *, terminal=False):
 @pytest.mark.parametrize("mode", ["success", "failed_partial", "successful_missing_rank"])
 def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
     import torch
+    import multigpubeamsearch.local_launcher as local_launcher
     import cayleypy_native.backend as backend
     import cayleypy_native.build as build
     contract = SimpleNamespace(state_len=2, move_count=2, start=(1, 0), center=(0, 1), graph_hash="graph",
@@ -484,8 +485,8 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
 
     def fake_process(command, **kwargs):
         assert (kwargs["cwd"] / "test_results").is_dir()
-        assert f"--log-dir={run / 'worker-logs'}" in command
-        assert "--redirects=3" in command and "--max-restarts=0" in command
+        assert kwargs['worker_logs'] == run / 'worker-logs'
+        assert kwargs['world_size'] == 2
         assert str(run / "production_runner") in command
         assert (run / "production_runner").read_bytes() == b"test-only runner bytes"
         assert kwargs["log_path"] == run / "launcher.log"
@@ -497,7 +498,7 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
             raise NativeBackendError("native process failed rc=7")
         return 0.2
 
-    monkeypatch.setattr(backend, "run_process", fake_process)
+    monkeypatch.setattr(local_launcher, "run_local_ranks", fake_process)
     # This log-merging fixture uses a labelled fake model rather than weights.
     monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     if mode == "success":
