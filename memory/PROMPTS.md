@@ -12,3 +12,7 @@ GNN acceptance rental authorized: up to $5 total including disk/traffic. Impleme
 
 ## 2026-10-10: native GNN CUTLASS fusion
 Requirement: improve large GNN native CUTLASS by at least 2x, preserving beam architecture and numerical correctness; profiling rental authorized up to $5.
+
+
+## 2026-10-10: GNN fused rounded bias
+User requested separate bias removal, RTX3060 speed/precision verification, an active goal and authorized $5 total for new tests.

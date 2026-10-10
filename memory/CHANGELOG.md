@@ -862,3 +862,7 @@ RTX3060 n100/d256/layers2/hops2 matched FP16 inference: batch3 native LibTorch54
 
 ## 2026-10-10: native GNN CUTLASS fusion
 Fused GAT aggregation and compact edge projection preserve both GNN levels and all beam-stream contracts. RTX3060 n100/d256 batch3: 652.268 -> 193.153 ms (3.377x); LibTorch 540.440 ms. 28 GPU parity cases, zero sanitizer errors, single/three-GNN full-beam replay pass. See test_results/gnn_opt_20261010/REPORT.md.
+
+
+## 2026-10-10: GNN fused rounded bias
+Removed separate bias launch using broadcast C and a double-rounded FP16 epilogue. RTX3060 full GNN AB/BA: 213.548 -> 178.821 ms (1.1942x). 28 projection cases and full native model outputs bitwise match; memcheck zero errors. See test_results/gnn_bias_20261010/REPORT.md.
