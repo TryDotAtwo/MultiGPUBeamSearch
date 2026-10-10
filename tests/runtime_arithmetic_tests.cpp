@@ -40,8 +40,8 @@ int main() {
     }
     set_headroom(had_previous ? saved.c_str() : nullptr);
     {
-        const char* names[] = {"BEAM_STREAM1_EXECUTOR", "BEAM_ENSEMBLE_RESERVE_BYTES", "BEAM_BLEND_DIR"};
-        std::string saved_values[3]; bool existed[3];
+        const char* names[] = {"BEAM_STREAM1_EXECUTOR", "BEAM_ENSEMBLE_RESERVE_BYTES", "BEAM_BLEND_DIR", "BEAM_RING_COUNT_LIMIT"};
+        std::string saved_values[4]; bool existed[4];
         auto set = [](const char* name, const char* value) {
 #ifdef _WIN32
             _putenv_s(name, value ? value : "");
@@ -49,13 +49,14 @@ int main() {
             if (value) setenv(name, value, 1); else unsetenv(name);
 #endif
         };
-        for (unsigned i=0;i<3;++i) {
+        for (unsigned i=0;i<4;++i) {
             const char* value=std::getenv(names[i]); existed[i]=value!=nullptr;
             saved_values[i]=value?value:""; set(names[i],nullptr);
         }
         const auto legacy=build_runtime_config_from_budget(1048576,2,0,16ULL<<30);
         set(names[0],"libtorch_eager");
         const auto unreserved=build_runtime_config_from_budget(1048576,2,0,16ULL<<30);
+        check(unreserved.config.ring_count<=16,"eager ensemble automatic default bounds physical graphs");
         check(unreserved.estimated_non_static_device_bytes==legacy.estimated_non_static_device_bytes,
               "unreserved LibTorch retains legacy conservative accounting");
         set(names[1],"1073741824");
@@ -71,7 +72,7 @@ int main() {
         const auto blend=build_runtime_config_from_budget(1048576,2,0,16ULL<<30);
         check(blend.estimated_non_static_device_bytes==reserved.estimated_non_static_device_bytes,
               "legacy blend reserve uses the same table accounting");
-        for (unsigned i=0;i<3;++i) set(names[i],existed[i]?saved_values[i].c_str():nullptr);
+        for (unsigned i=0;i<4;++i) set(names[i],existed[i]?saved_values[i].c_str():nullptr);
     }
     {
         const auto admitted = build_runtime_config_from_budget(1048576, 2, 0, 16ULL << 30);

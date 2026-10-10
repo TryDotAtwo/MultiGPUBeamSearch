@@ -255,8 +255,9 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stre
     std::uint64_t physical_rings = ceil_div_u64(target_ring_candidates, config.stream3_batch_candidates);
     // Dispatcher recycles Free rings until frontier_cursor reaches every parent.
     // Bound physical buffers/graph executables independently of logical staging.
-    if (env_present("BEAM_RING_COUNT_LIMIT")) {
-        const auto limit = env_u32("BEAM_RING_COUNT_LIMIT", 0);
+    const bool eager_ensemble = env_equals("BEAM_STREAM1_EXECUTOR", "libtorch_eager") || env_present("BEAM_BLEND_DIR");
+    if (env_present("BEAM_RING_COUNT_LIMIT") || eager_ensemble) {
+        const auto limit = env_u32("BEAM_RING_COUNT_LIMIT", 16);
         if (limit == 0U) throw std::invalid_argument("BEAM_RING_COUNT_LIMIT must be nonzero");
         physical_rings = std::min<std::uint64_t>(physical_rings, limit);
     }
