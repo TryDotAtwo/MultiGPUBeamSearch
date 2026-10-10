@@ -506,8 +506,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if calibrate:
         from .autotune import tune_inference
         calibration_started=time.monotonic()
-        calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env,
-            **({'capacity_bootstrap':True} if maximum_requested else {}))
+        calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env)
         # Native admission may reject this microbatch under the current beam
         # footprint. Never silently shrink the winner or the requested beam.
         rows_per_parent=contract.move_count if model.backend=='mlp' and model.manifest['output_dim']==1 else 1
@@ -560,8 +559,9 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         def exact_inference(width,index):
             directory=run_dir/f'maximum-inference-{index}';directory.mkdir()
             chosen=tune_inference(contract,model,runtime,options,devices,width,directory,env)
-            return admit_inference(contract,model,runtime,options,devices,width,
-                directory,env,runner,chosen)
+            # A maximum frontier must shrink to accommodate the inference
+            # winner. Fixed-width admission would instead downgrade its batch.
+            return chosen
         def readmit_inference(chosen,index):
             env.update(BEAM_B_MICRO=str(chosen['parent_batch']*rows_per_parent),
                 BEAM_ENSEMBLE_INFERENCE_MICRO=str(chosen['parent_batch']),

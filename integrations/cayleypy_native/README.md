@@ -509,16 +509,13 @@ selection; a full timing receipt certifies execution, not global optimality.
 `beam_width="max"` searches native memory admission across shard counts 1–128
 with two staging slots and one active sort slot. This is the largest admitted
 beam within that policy, not a universal maximum over every allocation policy.
-An unknown maximum starts with the smallest measured, numerically verified
-inference memory reserve. Its bootstrap measures one stable all-rank cohort at
-up to 32 parents per inference batch, with a 30-second calibration limit, rather
-than running a full throughput sweep before the width is known. The helper uses
-the same explicit workspace capacity as the later sweep; an earlier admitted
-batch does not restrict a new calibration workspace. It then repeats inference
-calibration keyed by the actual
-admitted width and selects the fastest batch that fits. Maximizing frontier
-capacity can require a slower inference batch than maximizing throughput.
-A changed batch or
+Inference throughput takes priority: first measure stable all-rank inference
+candidates and reserve memory for the fastest verified cohort, then size the
+frontier using remaining memory. Repeat inference calibration keyed by the
+actual admitted width. If its winner requires more memory, shrink the frontier
+rather than downgrading the batch to retain the old width. The helper uses an
+explicit workspace capacity; an earlier admitted batch does not restrict a new
+calibration workspace. A changed batch or
 memory reserve triggers re-admission; an unstable capacity/batch cycle fails
 explicitly instead of accepting the small-beam cache as a maximum profile.
 Its receipt remains `full_step_verified=False` until the optional full-frontier
