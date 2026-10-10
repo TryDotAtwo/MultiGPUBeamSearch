@@ -12,7 +12,10 @@ from .errors import NativeBackendError
 
 
 def tune_downstream(contract, model, runtime, options, devices, beam_width,
-                    run_dir, environment, runner, inference):
+                    run_dir, environment, runner, inference, *, planning_session=None):
+    if planning_session is not None:
+        return _tune_downstream(contract,model,runtime,options,devices,beam_width,
+            run_dir,environment,runner,inference,planning_session)
     if runtime.build_metadata.get('plan_calibration_protocol')=='json-session-v1':
         from .plan_session import NativePlanSession
         with NativePlanSession(runner,environment,len(devices),Path(run_dir)/'plan-session',
@@ -27,6 +30,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                     run_dir, environment, runner, inference, session):
     directory=Path(run_dir)/'pipeline-calibration';directory.mkdir()
     deadline=time.monotonic()+options.calibration_pipeline_seconds
+    if session is not None:session.set_deadline(deadline)
     search_deadline=deadline-min(30.0,options.calibration_pipeline_seconds*.1)
     world=len(devices);storage=runtime.build_metadata['shape']['storage_len']
     micro=inference['parent_batch']

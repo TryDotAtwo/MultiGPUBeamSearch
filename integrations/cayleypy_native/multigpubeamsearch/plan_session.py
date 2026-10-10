@@ -49,6 +49,14 @@ class NativePlanSession:
             raise ValueError('native planner shrank requested frontier')
         return plans
 
+    def set_deadline(self, deadline):
+        """Rebind the retained owner to the downstream phase's bounded budget."""
+        import math
+        import time
+        if not math.isfinite(deadline) or deadline <= time.monotonic():
+            raise ValueError('planning phase deadline must be finite and in the future')
+        for session in self.sessions:session.deadline=deadline
+
     def _environment(self,environment):
         environment=dict(environment)
         if 'BEAM_ENSEMBLE_INFERENCE_MICRO' in environment:

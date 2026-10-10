@@ -540,7 +540,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
     runner = snapshot_runtime_runner(runtime, run_dir)
-    if calibrate:
+    if calibrate and maximum_requested:
         from .inference_admission import admit_inference
         admit_inference(contract,model,runtime,options,devices,beam_width,
             run_dir,env,runner,calibration)
@@ -583,8 +583,21 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
                 f"capacity search {capacity['wall_seconds']:.2f}s; full-step verification pending",flush=True)
     if calibrate:
         from .pipeline_autotune import tune_downstream
-        downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
-            run_dir,env,runner,calibration)
+        if maximum_requested:
+            downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
+                run_dir,env,runner,calibration)
+        else:
+            from .inference_admission import admit_inference
+            calibration,planning_session=admit_inference(contract,model,runtime,options,devices,
+                beam_width,run_dir,env,runner,calibration,retain_session=True)
+            try:
+                downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
+                    run_dir,env,runner,calibration,planning_session=planning_session)
+            finally:
+                planning_session.close()
+            microbatch_metadata.update(configured_row_budget=int(env['BEAM_B_MICRO']),
+                derived_parent_batch=calibration['parent_batch'],
+                derived_candidates_per_slot=calibration['parent_batch']*contract.move_count)
         measured=downstream.get('phase')=='pipeline_measured'
         selected=measured or downstream.get('phase')=='component_calibrated'
         if selected:

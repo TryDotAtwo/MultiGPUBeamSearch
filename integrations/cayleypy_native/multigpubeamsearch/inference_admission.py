@@ -66,7 +66,8 @@ def select_admitted(calibration, admit):
     raise NativeBackendError("no measured inference batch admits the requested frontier")
 
 
-def admit_inference(contract,model,runtime,options,devices,beam,run_dir,environment,runner,calibration):
+def admit_inference(contract,model,runtime,options,devices,beam,run_dir,environment,runner,calibration,
+                    *, retain_session=False):
     """Fresh native memory snapshots use each batch's own calibrated reserve."""
     from .plan_session import NativePlanSession
     from .models import verify_prepared_model
@@ -75,28 +76,40 @@ def admit_inference(contract,model,runtime,options,devices,beam,run_dir,environm
     root.mkdir()
     deadline=time.monotonic()+min(60.0,options.calibration_pipeline_seconds*.25)
     multiplier=contract.move_count if model.backend=="mlp" and model.manifest["output_dim"]==1 else 1
+    retained=[]
     def admit(candidate):
         env=dict(environment,BEAM_B_MICRO=str(candidate["parent_batch"]*multiplier),
             BEAM_ENSEMBLE_INFERENCE_MICRO=str(candidate["parent_batch"]),
             BEAM_ENSEMBLE_RESERVE_BYTES=str(candidate["reserve_bytes"]))
-        with NativePlanSession(runner,env,len(devices),root/str(candidate["parent_batch"]),
-                               deadline=deadline) as session:
-            return session.admit(beam,{"BEAM_B_MICRO":env["BEAM_B_MICRO"],
+        session=NativePlanSession(runner,env,len(devices),root/str(candidate["parent_batch"]),
+                                  deadline=deadline)
+        try:
+            plans=session.admit(beam,{"BEAM_B_MICRO":env["BEAM_B_MICRO"],
                 "BEAM_ENSEMBLE_INFERENCE_MICRO":env["BEAM_ENSEMBLE_INFERENCE_MICRO"]})
-    chosen,plans=select_admitted(calibration,admit)
-    verify_prepared_model(model,contract)
-    chosen["inference_admission"]["requested_beam"]=beam
-    chosen["inference_admission"]["plans"]=plans
-    calibration.clear();calibration.update(chosen)
-    environment.update(BEAM_B_MICRO=str(chosen["parent_batch"]*multiplier),
-        BEAM_ENSEMBLE_INFERENCE_MICRO=str(chosen["parent_batch"]),
-        BEAM_ENSEMBLE_RESERVE_BYTES=str(chosen["reserve_bytes"]))
-    if options.report_calibration and chosen['parent_batch']!=chosen['inference_admission']['unconstrained_batch']:
-        original=chosen['inference_admission']
-        print(f"[MultiGPUBeamSearch] fastest isolated batch {original['unconstrained_batch']} "
-              f"does not admit frontier {beam:,}; fastest measured admitted batch "
-              f"{chosen['parent_batch']}, {1/chosen['estimate']['median']:,.0f} parents/s; "
-              "frontier preserved",flush=True)
-    import json
-    (root/"selection.json").write_text(json.dumps(chosen["inference_admission"],indent=2))
-    return calibration
+        except BaseException:
+            session.close()
+            raise
+        if retain_session:retained.append(session)
+        else:session.close()
+        return plans
+    try:
+        chosen,plans=select_admitted(calibration,admit)
+        verify_prepared_model(model,contract)
+        chosen["inference_admission"]["requested_beam"]=beam
+        chosen["inference_admission"]["plans"]=plans
+        calibration.clear();calibration.update(chosen)
+        environment.update(BEAM_B_MICRO=str(chosen["parent_batch"]*multiplier),
+            BEAM_ENSEMBLE_INFERENCE_MICRO=str(chosen["parent_batch"]),
+            BEAM_ENSEMBLE_RESERVE_BYTES=str(chosen["reserve_bytes"]))
+        if options.report_calibration and chosen['parent_batch']!=chosen['inference_admission']['unconstrained_batch']:
+            original=chosen['inference_admission']
+            print(f"[MultiGPUBeamSearch] fastest isolated batch {original['unconstrained_batch']} "
+                  f"does not admit frontier {beam:,}; fastest measured admitted batch "
+                  f"{chosen['parent_batch']}, {1/chosen['estimate']['median']:,.0f} parents/s; "
+                  "frontier preserved",flush=True)
+        import json
+        (root/"selection.json").write_text(json.dumps(chosen["inference_admission"],indent=2))
+        return (calibration,retained[0]) if retain_session else calibration
+    except BaseException:
+        for session in retained:session.close()
+        raise
