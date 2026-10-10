@@ -471,6 +471,15 @@ The default reports best found Stream1 throughput and calibration duration.
 Inference search is bounded by `calibration_max_batch` (8192 by default); its
 winner is the best verified candidate in that search, not an unbounded optimum.
 The cache includes this bound as well as the exact requested frontier.
+An explicit CUDA allocation failure rejects that inference candidate. If the
+first candidate cannot fit, calibration tries smaller measured batches without
+reducing the requested frontier. Numerical, protocol and timeout failures are
+not treated as allocation failures. If the native planner rejects the selected
+inference reserve, admission can choose another verified batch from the same
+calibration receipt. A cache produced under allocation pressure is recalibrated
+when selected-GPU free memory increases by more than 32 MiB, or its memory
+snapshot cannot be verified; freeing VRAM must not permanently retain a slower
+pressure-limited profile. Ordinary cache hits still require fresh admission.
 Component profiles are cached for the same trained model, GPU cohort, precision,
 frontier and inference reserve. Every reuse requires fresh all-rank native memory
 admission with unchanged buffer geometry. Cached component timings remain a
@@ -501,7 +510,12 @@ selection; a full timing receipt certifies execution, not global optimality.
 with two staging slots and one active sort slot. This is the largest admitted
 beam within that policy, not a universal maximum over every allocation policy.
 An unknown maximum starts with the smallest measured, numerically verified
-inference memory reserve, then repeats inference calibration keyed by the actual
+inference memory reserve. Its bootstrap measures one stable all-rank cohort at
+up to 32 parents per inference batch, with a 30-second calibration limit, rather
+than running a full throughput sweep before the width is known. The helper uses
+the same explicit workspace capacity as the later sweep; an earlier admitted
+batch does not restrict a new calibration workspace. It then repeats inference
+calibration keyed by the actual
 admitted width and selects the fastest batch that fits. Maximizing frontier
 capacity can require a slower inference batch than maximizing throughput.
 A changed batch or
