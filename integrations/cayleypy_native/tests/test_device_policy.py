@@ -32,3 +32,27 @@ def test_requested_gpu_count_never_silently_shrinks(monkeypatch):
     assert runtime_devices(object(),NativeOptions(num_gpus=2)) == (0,1)
     with pytest.raises(NativeUnavailable,match="exceeds"):
         runtime_devices(object(),NativeOptions(num_gpus=3))
+
+
+@pytest.mark.parametrize('backend,capability,expected',[
+    ('auto',(7,5),'libtorch'),('auto',(8,6),'cutlass'),('libtorch',(8,6),'libtorch'),
+    ('cutlass',(8,6),'cutlass')])
+def test_ensemble_backend_selection_is_explicit(monkeypatch,tmp_path,backend,capability,expected):
+    import cayleypy_native.build as build
+    monkeypatch.setattr(torch.cuda,'get_device_capability',lambda d:capability)
+    monkeypatch.setattr(torch.cuda,'get_device_name',lambda d:'Test GPU')
+    selected=[]
+    def ensure(contract,model,options,architectures,run_dir):
+        selected.append(options.inference_backend)
+        return tmp_path/'runner',{'inference_backend':options.inference_backend}
+    monkeypatch.setattr(build,'ensure_runner',ensure)
+    model=SimpleNamespace(backend='ensemble',manifest={'dtype':'fp16','output_dim':1})
+    prepare_runtime(SimpleNamespace(move_count=3),model,NativeOptions(inference_backend=backend),tmp_path,(0,))
+    assert selected==[expected]
+
+
+def test_explicit_ensemble_cutlass_rejects_t4(monkeypatch,tmp_path):
+    monkeypatch.setattr(torch.cuda,'get_device_capability',lambda d:(7,5))
+    model=SimpleNamespace(backend='ensemble',manifest={'dtype':'fp16','output_dim':1})
+    with pytest.raises(NativeUnavailable,match='SM80'):
+        prepare_runtime(SimpleNamespace(move_count=3),model,NativeOptions(inference_backend='cutlass'),tmp_path,(0,))

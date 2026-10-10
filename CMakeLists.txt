@@ -130,6 +130,7 @@ add_library(beam_cuda
     cuda/stream1_transformer.cu
     cuda/stream1_blend_readout.cu
     cuda/stream1_ensemble_readout.cu
+    cuda/stream1_gnn_projection.cu
     cuda/stream1_transformer_fmha.cu
     cuda/stream2.cu
     cuda/stream3.cu
@@ -443,6 +444,8 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
         tools/stream1_libtorch_ring_slot_launcher.cpp
         tools/stream1_transformer_libtorch_backend.cpp)
     add_executable(stream1_ensemble_benchmark tools/stream1_ensemble_benchmark.cpp)
+    target_sources(stream1_ensemble_benchmark PRIVATE tools/stream1_gnn_projection_libtorch.cpp)
+    target_sources(production_runner_libtorch_stream1 PRIVATE tools/stream1_gnn_projection_libtorch.cpp)
     add_executable(stream1_native_mlp_benchmark tools/stream1_native_mlp_benchmark.cpp)
     add_executable(stream1_libtorch_mlp_benchmark tools/stream1_libtorch_mlp_benchmark.cpp)
     target_link_libraries(stream1_libtorch_mlp_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")

@@ -169,14 +169,13 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
     if model.manifest.get("dtype") == "fp16" and any(sm < 75 for sm in architectures):
         raise NativeUnavailable("this native FP16 MLP backend uses SM75+ TensorOp kernels; older GPU executors need a separate adapter")
     executor = options.inference_backend
-    if model.backend == "ensemble":
-        # Backbones use the LibTorch model-family adapters; the final heads
-        # use CUTLASS on SM80+ and LibTorch on older devices.
-        executor = "libtorch"
     if executor == "auto":
         # One runner implementation per job. A mixed T4/newer set uses
         # LibTorch on all ranks; never send a T4 to the newer-only route.
-        executor = "libtorch" if any("T4" in torch.cuda.get_device_name(d).split() for d in devices) else "cutlass"
+        older_ensemble = model.backend == "ensemble" and any(sm < 80 for sm in architectures)
+        executor = "libtorch" if older_ensemble or any("T4" in torch.cuda.get_device_name(d).split() for d in devices) else "cutlass"
+    if model.backend == "ensemble" and executor == "cutlass" and any(sm < 80 for sm in architectures):
+        raise NativeUnavailable("ensemble CUTLASS requires SM80+ on every selected GPU")
     options = replace(options, inference_backend=executor)
     if executor == "cutlass" and model.backend == "mlp" and model.manifest["output_dim"] != 1 and model.manifest["output_dim"] % 8:
         raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
@@ -495,6 +494,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
                 "BEAM_HISTORY_DIR": str(run_dir / "history"), "BEAM_HISTORY_DISK_PATH": str(run_dir / "history")})
     if model.backend == "ensemble":
         env["BEAM_BLEND_DIR"] = str(model.weights_dir)
+        env["BEAM_ENSEMBLE_BACKEND"] = runtime.build_metadata['inference_backend']
         first = model.manifest["ensemble"]["models"][0]
         env["BEAM_WEIGHT_DIR"] = str(model.weights_dir / first["weights_dir"])
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),

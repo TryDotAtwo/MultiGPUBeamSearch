@@ -226,6 +226,9 @@ def _load_unambiguous_manifest(manifest_path: Path) -> tuple[dict, bytes]:
 
 
 def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> PreparedModel:
+    if backend == "pancake_gnn":
+        from .gnn_artifacts import validate_gnn
+        return validate_gnn(path, contract)
     if backend in ("cube444_transformer", "cube444_mlp"):
         from .cube444_artifacts import validate_bundle
         return validate_bundle(path, contract, backend)
@@ -701,6 +704,9 @@ def _unwrap_predictor(predictor, contract: GraphContract):
 
 
 def prepare_model(predictor, contract: GraphContract, options: NativeOptions, run_dir: Path) -> PreparedModel:
+    from .pancake_gnn import PancakeGNN
+    if isinstance(predictor, PancakeGNN):
+        return prepare_model(NativeEnsemble([predictor], [1.0]), contract, options, run_dir)
     if isinstance(predictor, NativeEnsemble):
         directory = Path(run_dir).resolve() / "weights"
         directory.mkdir(parents=True, exist_ok=False)
@@ -714,7 +720,12 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
             identity=(source.weights_dir,source.graph_hash) if shared_cube else None
             member=shared_cube_snapshots.get(identity) if shared_cube else None
             if member is None:
-                member = prepare_model(source, contract, options, directory / f"member-{i}")
+                if isinstance(source, PancakeGNN):
+                    from .gnn_artifacts import export_gnn
+                    _require_no_global_forward_hooks()
+                    member = export_gnn(source, contract, directory / f"member-{i}")
+                else:
+                    member = prepare_model(source, contract, options, directory / f"member-{i}")
                 if shared_cube:shared_cube_snapshots[identity]=member
             else:
                 if source.expected_artifact_hash is not None and source.expected_artifact_hash!=member.artifact_hash:
@@ -746,6 +757,8 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
         return _snapshot_artifact(prepared, contract, run_dir)
     # Unwrap only the exact unchanged wrapper; arbitrary scoring/preprocessing must not disappear.
     model = _unwrap_predictor(predictor, contract)
+    if isinstance(model, PancakeGNN):
+        return prepare_model(NativeEnsemble([model], [1.0]), contract, options, run_dir)
     # Recognize only CayleyPy's actual built-in lambda, after validating the
     # unchanged wrapper and its graph. Never classify arbitrary callables by
     # their output on a few probes.

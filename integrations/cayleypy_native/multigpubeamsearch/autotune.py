@@ -91,7 +91,8 @@ def calibration_signature(contract,model,runtime,devices,beam_width):
             '--format=csv,noheader'],capture_output=True,text=True,timeout=10,check=True).stdout
     except (OSError,subprocess.SubprocessError):hardware='unavailable'
     import platform
-    return {'schema':8,'search_policy':'upper-first-stable-reference-v3','graph':contract.graph_hash,'models':model.artifact_hash,
+    return {'schema':9,'search_policy':'upper-first-stable-reference-v3','graph':contract.graph_hash,'models':model.artifact_hash,
+            'inference_backend':runtime.build_metadata.get('inference_backend','cutlass'),
             'runner':runtime.build_metadata['binary_sha256'],
             'probe':runtime.build_metadata.get('calibration_binary_sha256'),
             'gpu_properties':[str(torch.cuda.get_device_properties(d)) for d in devices],

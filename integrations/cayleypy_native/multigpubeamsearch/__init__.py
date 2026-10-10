@@ -7,7 +7,9 @@ from .preparation import PreparedNative, prepare_native
 from .results import NativeBeamSearchResult
 from .sources import setup_sources
 from .cluster import plan_cluster, ClusterPlan
+from .pancake_gnn import PancakeGNN, NeighborConfig
 
 __all__ = ["beam_search", "enable_native", "disable_native", "NativeOptions", "NativeModel", "NativeEnsemble",
            "NativeBeamSearchResult", "NativeUnavailable", "NativeBackendError", "NativeFallbackWarning",
-           "PreparedNative", "prepare_native", "setup_sources", "plan_cluster", "ClusterPlan"]
+           "PreparedNative", "prepare_native", "setup_sources", "plan_cluster", "ClusterPlan",
+           "PancakeGNN", "NeighborConfig"]

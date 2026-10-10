@@ -2,6 +2,7 @@
 #include "../src/config.hpp"
 #include "cube444_blend_libtorch.hpp"
 #include "stream1_mlp_libtorch_backend.hpp"
+#include "stream1_gnn_libtorch.hpp"
 #include <memory>
 #include <cmath>
 
@@ -16,10 +17,12 @@ struct NativeEnsemble {
         std::shared_ptr<Cube444Blend> cube;
         std::unique_ptr<MlpLibTorch> mlp;
         std::unique_ptr<PieceTransformerLibTorch> transformer;
+        std::unique_ptr<PancakeGnnNative> gnn;
         torch::Tensor weight,bias;
         torch::Tensor features(const torch::Tensor& states) const {
             if(mlp) return mlp->features(states);
             if(transformer) return transformer->features(states);
+            if(gnn) return gnn->features(states);
             return family=="cube444_mlp"?cube->mlp_features(states):cube->transformer_cls(states);
         }
     };
@@ -38,6 +41,14 @@ struct NativeEnsemble {
         if(cudaGetDeviceProperties(&properties,target.index())!=cudaSuccess)
             throw std::runtime_error("cannot inspect ensemble GPU");
         use_cutlass=properties.major>=8;
+        if(const char* backend=std::getenv("BEAM_ENSEMBLE_BACKEND")) {
+            const std::string selected(backend);
+            if(selected=="libtorch") use_cutlass=false;
+            else if(selected=="cutlass") {
+                if(properties.major<8) throw std::runtime_error("ensemble CUTLASS requires SM80 or newer");
+                use_cutlass=true;
+            } else throw std::runtime_error("invalid ensemble inference backend");
+        }
         if(manifest.at("schema_version")!=1||manifest.at("state_len")!=state_len||
            manifest.at("output_dim")!=output_dim||manifest.at("score_semantics")!="distance_q"||
            !manifest.at("models").is_array()||manifest.at("models").empty())
@@ -61,6 +72,10 @@ struct NativeEnsemble {
                     throw std::runtime_error("ensemble transformer requires matching Q head and FP16");
                 head.weight=head.transformer->output_weight_kxh.contiguous();
                 head.bias=head.transformer->output_bias.to(torch::kFloat32).contiguous();
+            } else if(head.family=="pancake_gnn") {
+                head.gnn=std::make_unique<PancakeGnnNative>(path,target,use_cutlass);
+                head.weight=head.gnn->output_weight.transpose(0,1).contiguous();
+                head.bias=head.gnn->output_bias.to(torch::kFloat32).contiguous();
             } else if(head.family=="cube444_mlp"||head.family=="cube444_transformer") {
                 if(state_len!=96||output_dim!=24) throw std::runtime_error("cube adapter requires state96/moves24");
                 auto canonical=fs::canonical(path).string();
