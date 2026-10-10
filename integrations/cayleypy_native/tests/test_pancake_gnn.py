@@ -5,7 +5,7 @@ import pytest
 import torch
 from multigpubeamsearch import PancakeGNN, NeighborConfig, NativeEnsemble, NativeOptions
 from multigpubeamsearch.contracts import GraphContract
-from multigpubeamsearch.models import prepare_model, verify_prepared_model
+from multigpubeamsearch.models import NativeModel, prepare_model, verify_prepared_model
 from multigpubeamsearch.errors import NativeBackendError, NativeUnavailable
 
 torch.set_num_threads(2)
@@ -40,6 +40,15 @@ def test_gnn_blend_arbitrary_member_count(tmp_path):
     prepared=prepare_model(NativeEnsemble([model(),model(),model()],[.2,.3,.5]),
                            contract(),NativeOptions(),tmp_path/'run')
     assert len(prepared.manifest['ensemble']['models'])==3
+    verify_prepared_model(prepared,contract())
+
+
+def test_declared_gnn_artifact_reuses_ensemble_execution(tmp_path):
+    first=prepare_model(model(),contract(),NativeOptions(),tmp_path/'first')
+    entry=first.manifest['ensemble']['models'][0]
+    declared=NativeModel(first.weights_dir/entry['weights_dir'],contract().graph_hash,backend='pancake_gnn')
+    prepared=prepare_model(declared,contract(),NativeOptions(),tmp_path/'second')
+    assert prepared.backend=='ensemble'
     verify_prepared_model(prepared,contract())
 
 def test_gnn_rejects_wrong_graph_and_stochastic_sampling(tmp_path):
