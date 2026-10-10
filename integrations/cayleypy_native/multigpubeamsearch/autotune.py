@@ -126,7 +126,7 @@ def capacity_cache_reusable(data,signature):
     return all(current[uuid]<=previous[uuid]+32 for uuid in previous)
 
 
-def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,environment):
+def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,environment,*,capacity_bootstrap=False):
     """Use the actual ensemble executable, all selected GPUs, and graph states.
 
     Cache hits retain complete source-bound measurement evidence. The native
@@ -139,7 +139,11 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
         raise NativeBackendError('verified Stream1 calibration executable is required for autotuning')
     verify_prepared_model(model,contract)
     signature=calibration_signature(contract,model,runtime,devices,beam_width)
-    signature['max_batch']=options.calibration_max_batch
+    max_batch=min(32,options.calibration_max_batch) if capacity_bootstrap else options.calibration_max_batch
+    signature['max_batch']=max_batch
+    signature['capacity_bootstrap_only']=capacity_bootstrap
+    workspace_capacity=min(options.calibration_max_batch,max(1,(beam_width+len(devices)-1)//len(devices)))
+    signature['probe_capacity']=workspace_capacity
     key=hashlib.sha256(json.dumps(signature,sort_keys=True).encode()).hexdigest()
     cache=options.cache_dir/'profiles'/f'{key}.json'
     if cache.is_file():
@@ -160,23 +164,23 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     manifest['calibration_states']=graph_samples(contract)
     manifest['generators']=[list(x) for x in contract.generators]
     (probe_dir/('ensemble.json' if model.backend=='ensemble' else 'calibration.json')).write_text(json.dumps(manifest))
-    cap=min(options.calibration_max_batch,max(1,(beam_width+len(devices)-1)//len(devices)))
-    candidates=coarse_batches(cap)
+    cap=min(max_batch,max(1,(beam_width+len(devices)-1)//len(devices)))
+    candidates=([cap]+[x for x in (16,8,4,2,1) if x<cap]) if capacity_bootstrap else coarse_batches(cap)
     baseline=candidates[0]
     coarse_candidates=list(candidates)
     refined=[]
-    parents=min((beam_width+len(devices)-1)//len(devices),max(8192,cap))
+    parents=min((beam_width+len(devices)-1)//len(devices),max(8192,workspace_capacity))
     started=time.monotonic()
-    deadline=started+options.calibration_seconds
+    deadline=started+(min(30.,options.calibration_seconds) if capacity_bootstrap else options.calibration_seconds)
     coarse_deadline=started+.7*options.calibration_seconds
-    refinement_queued=False
+    refinement_queued=capacity_bootstrap
     samples=[];records=[];rejected={};reserves={};telemetry_records={}
     probe_environment=dict(environment)
     # A prior admitted batch must not size the next calibration's lane arena.
     # The helper's explicit capacity argument owns that arena instead.
     probe_environment.pop('BEAM_ENSEMBLE_INFERENCE_MICRO',None)
     from .calibration_session import EnsembleProbePool
-    pool=EnsembleProbePool(helper,probe_dir,cap,parents,len(devices),probe_environment,directory,deadline) if (
+    pool=EnsembleProbePool(helper,probe_dir,workspace_capacity,parents,len(devices),probe_environment,directory,deadline) if (
         runtime.build_metadata.get('calibration_protocol')=='json-session-v1') else None
     try:
         for index,batch in enumerate(candidates):
@@ -248,6 +252,12 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                         tuple(row['seconds'][repeat] for row in rows),True,True,
                         throttled=not telemetry_verified))
                 reserves[str(batch)]=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
+                if capacity_bootstrap:
+                    try:estimate(str(batch),samples)
+                    except ValueError:continue
+                    # Verified capacity seed only. The final width receives a
+                    # separate unrestricted performance calibration and key.
+                    break
             elif batch==baseline:
                 if not capacity_failures or not all(capacity_failures):
                     raise NativeBackendError('baseline inference calibration failed; see '+str(directory))

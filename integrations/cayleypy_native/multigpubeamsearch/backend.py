@@ -506,7 +506,8 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if calibrate:
         from .autotune import tune_inference
         calibration_started=time.monotonic()
-        calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env)
+        calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env,
+            **({'capacity_bootstrap':True} if maximum_requested else {}))
         # Native admission may reject this microbatch under the current beam
         # footprint. Never silently shrink the winner or the requested beam.
         rows_per_parent=contract.move_count if model.backend=='mlp' and model.manifest['output_dim']==1 else 1

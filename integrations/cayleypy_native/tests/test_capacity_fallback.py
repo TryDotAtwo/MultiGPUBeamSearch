@@ -82,3 +82,38 @@ def test_capacity_limited_cache_retries_when_memory_pressure_lifts(monkeypatch):
     assert autotune.capacity_cache_reusable({}, {})
 
 
+def test_maximum_bootstrap_measures_one_stable_small_cohort(tmp_path,monkeypatch):
+    calls=[]
+    monkeypatch.setattr(autotune,'verify_prepared_model',lambda *args:None)
+    monkeypatch.setattr(autotune,'calibration_signature',lambda *args:{'world_size':2})
+    monkeypatch.setattr(autotune,'verified_telemetry',lambda *args:True)
+    monkeypatch.setattr(autotune,'free_memory_snapshot',lambda signature:None)
+    class Telemetry:
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def receipt(self):return {'throttled':False}
+    monkeypatch.setattr(autotune,'CalibrationTelemetry',Telemetry)
+    class Pool:
+        starts=2
+        def __init__(self,*args):assert args[2]==8192
+        def close(self):pass
+        def measure(self,batch,parents,deadline):
+            calls.append(batch)
+            return [dict(device=r,batch=batch,parents=parents,seconds=[1.]*7,
+                correctness_passed=True,numeric_error=0,torch_reserved_peak_bytes=1000) for r in range(2)],[]
+    monkeypatch.setattr(calibration_session,'EnsembleProbePool',Pool)
+    helper=tmp_path/'helper';helper.write_bytes(b'test-only executable identity')
+    runtime=SimpleNamespace(runner=tmp_path/'runner',build_metadata={
+        'calibration_binary_name':helper.name,'calibration_binary_sha256':hashlib.sha256(helper.read_bytes()).hexdigest(),
+        'calibration_protocol':'json-session-v1'})
+    model=SimpleNamespace(backend='ensemble',weights_dir=tmp_path,manifest={'ensemble':{'models':[]}})
+    contract=SimpleNamespace(start=(1,0),generators=((0,1),(1,0)),move_count=2)
+    result=autotune.tune_inference(contract,model,runtime,NativeOptions(cache_dir=tmp_path/'cache'),
+        (0,1),131072,tmp_path,{},capacity_bootstrap=True)
+    assert calls==[32] and result['parent_batch']==32
+    assert result['signature']['capacity_bootstrap_only'] is True
+    assert result['signature']['max_batch']==32 and result['refinement_candidates']==[]
+    assert result['signature']['probe_capacity']==8192
+    assert len(result['records'])==2 and all(len(r['seconds'])==7 for r in result['records'])
+
+
