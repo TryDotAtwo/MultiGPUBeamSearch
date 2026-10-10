@@ -1,0 +1,210 @@
+[
+  {
+    "name": "agent/complete-project-work-history",
+    "commit": {
+      "sha": "7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/7efe5a7d990e13ab24b77441ae9e0c2a810b8fa0"
+    },
+    "protected": false
+  },
+  {
+    "name": "cluster/production",
+    "commit": {
+      "sha": "eb69d3b606e96980273df99fe372882acc06f0fe",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/eb69d3b606e96980273df99fe372882acc06f0fe"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/bounded-neural-benchmark-20261009",
+    "commit": {
+      "sha": "b9559d9240b44e6860b1401dc3de9e8662eaa309",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/b9559d9240b44e6860b1401dc3de9e8662eaa309"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/cayleypy-native-backend",
+    "commit": {
+      "sha": "97f9b95c45fbc27f9c2f48e83e6818403361fd70",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/97f9b95c45fbc27f9c2f48e83e6818403361fd70"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/cayleypy-results-ingest",
+    "commit": {
+      "sha": "638fcc90a349f68e01c14dfdca299a87700dadf1",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/638fcc90a349f68e01c14dfdca299a87700dadf1"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/cube4-fp16-parity",
+    "commit": {
+      "sha": "8dcdafda898b935ec10cc77c50e22a1154a1f285",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/8dcdafda898b935ec10cc77c50e22a1154a1f285"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/cube4-public-collector",
+    "commit": {
+      "sha": "4f1aa91339f6800e8cb0235b92e4c2139b190f00",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/4f1aa91339f6800e8cb0235b92e4c2139b190f00"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/cube444-fp16-blend-evidence-20261009",
+    "commit": {
+      "sha": "46007b866129369dc6687e407f046a888b942e80",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/46007b866129369dc6687e407f046a888b942e80"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/cube555-blend-2xt4",
+    "commit": {
+      "sha": "a152738740044b683e1fe6e759ccb5b4b095d188",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/a152738740044b683e1fe6e759ccb5b4b095d188"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/cube555-molab",
+    "commit": {
+      "sha": "45a27a93b940e6feb7e61fd13059c7e13997b30f",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/45a27a93b940e6feb7e61fd13059c7e13997b30f"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/ensemble-autotune-source-20261009",
+    "commit": {
+      "sha": "4c3f5f35293257e4c2ad9098cc7cbdb57fce3b5d",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/4c3f5f35293257e4c2ad9098cc7cbdb57fce3b5d"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/fast-autotune-20261009",
+    "commit": {
+      "sha": "fe31e073a7d990e46fa016aa5cd09d7d5a9b9db1",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/fe31e073a7d990e46fa016aa5cd09d7d5a9b9db1"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/fast-autotune-evidence-20261009",
+    "commit": {
+      "sha": "324484fd4f685fb7b0578682eea07d3fbee30d0b",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/324484fd4f685fb7b0578682eea07d3fbee30d0b"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/hopper-stream1-fusion",
+    "commit": {
+      "sha": "81ed9f0287c1f9057648119a253f208c31f7a872",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/81ed9f0287c1f9057648119a253f208c31f7a872"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/megaminx-native-cluster-release",
+    "commit": {
+      "sha": "2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/2d5f978fcfc1f018813fc49e9d9aeec32ea5e22c"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/profile-capacity-safety",
+    "commit": {
+      "sha": "a0326407ecc58a0b800f34d217a126ce876a7640",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/a0326407ecc58a0b800f34d217a126ce876a7640"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/public-cayleypy-notebook",
+    "commit": {
+      "sha": "4ea681f210d49aa1fbb0c889d1d40431470607f4",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/4ea681f210d49aa1fbb0c889d1d40431470607f4"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/real-neural-autotune-native-20261009",
+    "commit": {
+      "sha": "c1917b6c99c0048bd1f309915f7e3cac677be3dd",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/c1917b6c99c0048bd1f309915f7e3cac677be3dd"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/stream1-generic-seq-align-impl",
+    "commit": {
+      "sha": "108d0b3a8bf33b78007d1caafc0743d881f34ba5",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/108d0b3a8bf33b78007d1caafc0743d881f34ba5"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/stream1-piece-transformer",
+    "commit": {
+      "sha": "df534ebb1ef624abd42443211778b5588916d6d2",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/df534ebb1ef624abd42443211778b5588916d6d2"
+    },
+    "protected": false
+  },
+  {
+    "name": "codex/stream1-real-state-rank-parity",
+    "commit": {
+      "sha": "f769e707dcda2b962bbaf99c62b40a1fd88f8108",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/f769e707dcda2b962bbaf99c62b40a1fd88f8108"
+    },
+    "protected": false
+  },
+  {
+    "name": "kaggle/notebooks",
+    "commit": {
+      "sha": "bfc3448e7a3b08ee98486b2959c39fa8711d412f",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/bfc3448e7a3b08ee98486b2959c39fa8711d412f"
+    },
+    "protected": false
+  },
+  {
+    "name": "main",
+    "commit": {
+      "sha": "25cc25d947a1b51d03b1b635f1d056f9a570099a",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/25cc25d947a1b51d03b1b635f1d056f9a570099a"
+    },
+    "protected": false
+  },
+  {
+    "name": "molab/notebooks",
+    "commit": {
+      "sha": "93c3ad7e1b257dc6779a035f9c77ede684faa7f7",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/93c3ad7e1b257dc6779a035f9c77ede684faa7f7"
+    },
+    "protected": false
+  },
+  {
+    "name": "publishing/results",
+    "commit": {
+      "sha": "2751f1633b8fe7b8b982be29c249f07fd1ac102d",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/2751f1633b8fe7b8b982be29c249f07fd1ac102d"
+    },
+    "protected": false
+  },
+  {
+    "name": "stream1",
+    "commit": {
+      "sha": "cf9d0d3bee836cafbb7bd3198c6e61be69e32c75",
+      "url": "https://api.github.com/repos/TryDotAtwo/MultiGPUBeamSearch/commits/cf9d0d3bee836cafbb7bd3198c6e61be69e32c75"
+    },
+    "protected": false
+  }
+]

@@ -1,0 +1,116 @@
+[
+  {
+    "file": "eight-default-public-1048576.json",
+    "requested_beam": 1048576,
+    "effective_beam": 1048576,
+    "replay_valid": true,
+    "path_length": 4,
+    "public_call_wall_seconds": 62.26271149099921,
+    "calibration_total_wall_seconds": 50.775872216006974,
+    "inference_batch": 8192,
+    "inference_curve_parents_per_second": 48817697.49917506,
+    "inference_calibration_wall_seconds": 14.754019543004688,
+    "pipeline_phase": "pipeline_measured",
+    "environment": {
+      "BEAM_B_MICRO": "8192",
+      "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+      "BEAM_SHARD_COUNT": "4",
+      "BEAM_STREAM3_RING_SLOTS": "8",
+      "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+      "BEAM_STREAM4_BATCH_CANDIDATES": "65536"
+    },
+    "matched": {
+      "parents": 1048576,
+      "world_size": 8,
+      "measurement_scope": "matched_full_frontier",
+      "stream1_seconds": 0.019701663970947265,
+      "full_step_seconds": 0.301368,
+      "stream1_parents_per_second": 53222712.637179546,
+      "full_step_parents_per_second": 3479387.3271216583,
+      "throughput_loss_fraction": 0.9346258926928298,
+      "relative_time_overhead": 14.296575986901786
+    },
+    "selection": "baseline",
+    "search_policy": "baseline plus at most five exact-capacity candidates; frozen inference microbatch",
+    "capacity_fields": {}
+  },
+  {
+    "file": "eight-default-public-65536.json",
+    "requested_beam": 65536,
+    "effective_beam": 65536,
+    "replay_valid": true,
+    "path_length": 4,
+    "public_call_wall_seconds": 64.92045520598185,
+    "calibration_total_wall_seconds": 52.33158719501807,
+    "inference_batch": 8192,
+    "inference_curve_parents_per_second": 48291637.28466748,
+    "inference_calibration_wall_seconds": 21.660642999981064,
+    "pipeline_phase": "pipeline_measured",
+    "environment": {
+      "BEAM_B_MICRO": "8192",
+      "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+      "BEAM_SHARD_COUNT": "4",
+      "BEAM_STREAM3_RING_SLOTS": "2",
+      "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+      "BEAM_STREAM4_BATCH_CANDIDATES": "16384"
+    },
+    "matched": {
+      "parents": 65536,
+      "world_size": 8,
+      "measurement_scope": "matched_full_frontier",
+      "stream1_seconds": 0.0013178880214691161,
+      "full_step_seconds": 0.0362965,
+      "stream1_parents_per_second": 49728048.91795262,
+      "full_step_parents_per_second": 1805573.540148499,
+      "throughput_loss_fraction": 0.9636910439995835,
+      "relative_time_overhead": 26.5414142997813
+    },
+    "selection": "baseline",
+    "search_policy": "baseline plus at most five exact-capacity candidates; frozen inference microbatch",
+    "capacity_fields": {}
+  },
+  {
+    "file": "eight-default-public-max.json",
+    "requested_beam": "max",
+    "effective_beam": 327942144,
+    "replay_valid": true,
+    "path_length": 4,
+    "public_call_wall_seconds": 1154.657721990021,
+    "calibration_total_wall_seconds": 1124.7410352259758,
+    "inference_batch": 8192,
+    "inference_curve_parents_per_second": 49535605.91501591,
+    "inference_calibration_wall_seconds": 13.825773307995405,
+    "pipeline_phase": "pipeline_measured",
+    "environment": {
+      "BEAM_B_MICRO": "8192",
+      "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+      "BEAM_SHARD_COUNT": "3",
+      "BEAM_STREAM3_RING_SLOTS": "2",
+      "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+      "BEAM_STREAM4_BATCH_CANDIDATES": "10248192"
+    },
+    "matched": {
+      "parents": 327942144,
+      "world_size": 8,
+      "measurement_scope": "matched_full_frontier",
+      "stream1_seconds": 6.03995556640625,
+      "full_step_seconds": 104.751,
+      "stream1_parents_per_second": 54295456.381167434,
+      "full_step_parents_per_second": 3130682.7046997165,
+      "throughput_loss_fraction": 0.9423398767896607,
+      "relative_time_overhead": 16.34300837950145
+    },
+    "selection": "throughput-batch",
+    "search_policy": "baseline plus at most five exact-capacity candidates; frozen inference microbatch",
+    "capacity_fields": {
+      "maximum_beam": {
+        "effective_beam": 327942144,
+        "wall_seconds": 8.360497754998505,
+        "full_step_verified": true,
+        "search_complete": true,
+        "upper_rejected_beam": 327966720,
+        "profiles": "shards 1..128, two staging slots, one active sort slot"
+      }
+    }
+  }
+]

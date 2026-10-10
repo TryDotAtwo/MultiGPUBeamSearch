@@ -1,0 +1,11 @@
+{
+  "verified_utc": "2026-10-10 03:30:38 UTC",
+  "status": "destroyed",
+  "archive_commit": "f3debeb1e31fd4da4b955a729b96cff47de5952a",
+  "label": "cube444-real-autotune2-max-20261010",
+  "provider_stop_success": true,
+  "provider_destroy_success": true,
+  "instance": 55105798,
+  "provider_absent_verified": true,
+  "verification_commit": "4fb5f2e13d4775d6be5b5b499e7d6a6fb7be818b"
+}

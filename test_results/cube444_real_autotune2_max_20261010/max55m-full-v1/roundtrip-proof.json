@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "28616e8666261844a26de766885aa71063e8116e",
+  "archive_sha256": "89662b270cb75ed323fe7bfd420c709ff384c31e3cbf564da922d269a670a755",
+  "parts_verified": 5,
+  "files_verified": 260,
+  "bytes": 340812,
+  "epoch": 1791595609.594656,
+  "scope": "completed manual55M full point, previous terminal evidence and native preparation; matched inference not frozen while live"
+}

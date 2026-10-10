@@ -47,6 +47,78 @@ struct Stream1CutlassScratch {
     half* output;
 };
 
+struct Stream1TransformerDims {
+    std::uint32_t state_len;
+    std::uint32_t num_classes;
+    std::uint32_t num_pieces;
+    std::uint32_t max_piece_size;
+    std::uint32_t seq_len;
+    std::uint32_t padded_seq_len;
+    std::uint32_t sequence_alignment;
+    std::uint32_t d_model;
+    std::uint32_t nhead;
+    std::uint32_t head_dim;
+    std::uint32_t transformer_layers;
+    std::uint32_t ff_dim;
+    std::uint32_t output_dim;
+    std::uint32_t dtype;
+    std::uint32_t activation;
+};
+
+struct Stream1TransformerBlockView {
+    const half* ln1_gamma;
+    const half* ln1_beta;
+    const half* attn_qkv_weight;
+    const half* attn_qkv_bias;
+    const half* attn_out_weight;
+    const half* attn_out_bias;
+    const half* ln2_gamma;
+    const half* ln2_beta;
+    const half* ff1_weight;
+    const half* ff1_bias;
+    const half* ff2_weight;
+    const half* ff2_bias;
+    // Zero means ordinary FP16 QKV. Positive scale means offline E4M3 KxN.
+    float qkv_e4m3_scale = 0.f;
+    float ff1_e4m3_scale = 0.f;
+    float ff2_e4m3_scale = 0.f;
+    bool ff2_hopper_fp16 = false;
+    // Physical loaded layout, not a request reconstructed from runtime env.
+    bool qkv_hopper_fp16 = false;
+    bool ff1_hopper_fp16 = false;
+};
+
+struct Stream1TransformerNetworkView {
+    const half* fast_slot_projected;
+    const half* fast_piece_static;
+    const half* cls_token;
+    const half* input_ln_gamma;
+    const half* input_ln_beta;
+    const half* output_ln_gamma;
+    const half* output_ln_beta;
+    const Stream1TransformerBlockView* blocks;
+    const half* output_weight;
+    const half* output_bias;
+    const std::uint16_t* piece_positions;
+    const std::uint8_t* piece_mask;
+    const std::uint8_t* piece_types;
+    Stream1TransformerDims dims;
+};
+
+// Availability of the compiled host launch branch, not a fatbin/device
+// compatibility attestation. Numerical admission must exercise real kernels.
+bool stream1_transformer_has_hopper_launch_path();
+
+struct Stream1TransformerScratchView {
+    half* tokens;
+    half* qkv;
+    half* attention_scores_probs;
+    half* attention_context;
+    half* ff_hidden;
+    half* logits;
+    std::uint32_t* numeric_error = nullptr; // Sticky shared flag across all lanes.
+};
+
 void stream1_score_contract_cuda(
     const State128* current_frontier_states,
     const std::uint64_t* parent_base,
@@ -77,6 +149,30 @@ void stream1_inference_cutlass_cuda(
     const Stream1CutlassScratch& scratch,
     std::uint32_t* score_ring,
     std::uint32_t b_micro,
+    cudaStream_t stream);
+
+void stream1_transformer_inference_cuda(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const Stream1TransformerNetworkView& network,
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t* score_ring,
+    std::uint32_t b_micro,
+    std::uint32_t parent_offset,
+    cudaStream_t stream);
+
+void stream1_transformer_inference_graph_job_cuda(
+    const State128* current_frontier_states,
+    const std::uint64_t* parent_base,
+    const std::uint32_t* count,
+    const std::uint32_t* graph_job_index,
+    const Stream1TransformerNetworkView& network,
+    const Stream1TransformerScratchView& scratch,
+    std::uint32_t* score_ring,
+    std::uint32_t b_micro,
+    std::uint32_t slot_b_micro,
+    std::uint32_t parent_offset,
     cudaStream_t stream);
 
 void stream1_cutlass_linear_cuda(

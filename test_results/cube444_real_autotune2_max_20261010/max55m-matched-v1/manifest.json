@@ -1,0 +1,100 @@
+{
+  "bytes": 9961,
+  "sha256": "5f288f702edae657a4bd6e3f211c32f4f921db2559214aa317f8903e64ad4a62",
+  "files": [
+    {
+      "path": "results/maximum-ring16-v3/admission/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "a74c2dd5429aebea33cdb42cb58a864cb096d95f03bd15007827e33d1a7dfb19"
+    },
+    {
+      "path": "results/maximum-ring16-v3/admission/rank-0.log",
+      "bytes": 799,
+      "sha256": "afd5f01088758dac3024c8a43bede436dd84c43015701650fa724192aac20733"
+    },
+    {
+      "path": "results/maximum-ring16-v3/admission/rank-1.log",
+      "bytes": 799,
+      "sha256": "07f17e9d894eae2d6d63f26d99aef1b7b2cd0ec13e2e70bffe8bd90e382c34c7"
+    },
+    {
+      "path": "results/maximum-ring16-v3/full/env0.json",
+      "bytes": 1561,
+      "sha256": "51dc46d8c7ef6ea5eea2ee0e0eb761da43a673a08c2ead6ec52343df53281b38"
+    },
+    {
+      "path": "results/maximum-ring16-v3/full/env1.json",
+      "bytes": 1561,
+      "sha256": "bbc47e816825bdeba4e33264d5920a3ecbeefccb5335ea3fe7ef81d787b3ca67"
+    },
+    {
+      "path": "results/maximum-ring16-v3/full/nccl",
+      "bytes": 179,
+      "sha256": "ad6367717d05b2f612988a93b5eb794976f207a0a5e1f076b78f4d8bcab8734a"
+    },
+    {
+      "path": "results/maximum-ring16-v3/full/rank0.log",
+      "bytes": 6210,
+      "sha256": "69adfd47062bfe4fb95cdeb4ca06b99984b8c4266d735b1cc97d50784993c822"
+    },
+    {
+      "path": "results/maximum-ring16-v3/full/rank1.log",
+      "bytes": 6214,
+      "sha256": "11d70e350ce9ed2cf968630c15fe6a1875ac69e025dc1d4f721588bc36e2a741"
+    },
+    {
+      "path": "results/maximum-ring16-v3/full/test_results/unsolved_run_1791593582879911944_r1_0/no_solution_p0_d1_b55050240.log",
+      "bytes": 322,
+      "sha256": "f7f7f57962a2a52466f6f2535e1970f71dc5028390260dfb9763158c5d886ec0"
+    },
+    {
+      "path": "results/maximum-ring16-v3/full/test_results/unsolved_run_1791593582901787623_r0_0/no_solution_p0_d1_b55050240.log",
+      "bytes": 322,
+      "sha256": "d30749b3eefdcf1213ef34b2a01fcc9add545929cf55eae44656ddd7f7e0c946"
+    },
+    {
+      "path": "results/maximum-ring16-v3/full-point.json",
+      "bytes": 179,
+      "sha256": "c0de9e29c2bc0d36357cca23497cb602aabe6edb733e693b8c7991640033f30d"
+    },
+    {
+      "path": "results/maximum-ring16-v3/matched-0/ensemble.json",
+      "bytes": 740,
+      "sha256": "0f9ab865627e7bf9118f087c2f9893bb94ccc0ee27ad58a0cf3c13860ce252ed"
+    },
+    {
+      "path": "results/maximum-ring16-v3/matched-0/probe.log",
+      "bytes": 319,
+      "sha256": "7a8bbefc60363bf46070ed20a0e4449a6b54432955db88b0f4013a44c3ec5e26"
+    },
+    {
+      "path": "results/maximum-ring16-v3/matched-1/ensemble.json",
+      "bytes": 740,
+      "sha256": "eb97ef84c6313874d145087733124001e5d5464a50eaf20eb7e48ce42f424d3f"
+    },
+    {
+      "path": "results/maximum-ring16-v3/matched-1/probe.log",
+      "bytes": 320,
+      "sha256": "8e15e1ca198e477e3789c19166b71fb6cfc6403ef8e0006818bcf7bf6cd1f8b0"
+    },
+    {
+      "path": "results/maximum-ring16-v3/prepared.json",
+      "bytes": 3811,
+      "sha256": "258ea7289962070f759b98b480256abf9c2dac59ec3732df135d69fdd4c2f07f"
+    },
+    {
+      "path": "results/maximum-ring16-v3/report.json",
+      "bytes": 42062,
+      "sha256": "b2e91a3a739f5ac9fc6837599b0b88c38c29d201f2eec3d19c1179208c28bec3"
+    }
+  ],
+  "parts": [
+    {
+      "name": "part-000",
+      "bytes": 9961,
+      "sha256": "5f288f702edae657a4bd6e3f211c32f4f921db2559214aa317f8903e64ad4a62"
+    }
+  ],
+  "epoch": 1791595939.6845877,
+  "scope": "one matched full-frontier inference pass and one cold full depth; descriptive, no confidence interval or global profile optimum"
+}

@@ -1,5 +1,42 @@
 # Конфиг
 
+## Действующая параметризованная специализация, 2026-09-30
+
+Эта секция имеет приоритет над числовыми примерами ниже. Имя `State128`
+сохранено как alias `StatePacked`, а не обещание размера128 для всех puzzles.
+Источник размера: `cmake/BeamStateSizing.cmake`, `src/config.hpp`, `src/types.hpp`.
+
+| Специализация | STATE_LEN | STATE_STORAGE_LEN | STATE_ALIGNMENT | MOVE_COUNT |
+|---|---:|---:|---:|---:|
+| Cube4 проверенный native build | 96 | 112 | 16 | 24 |
+| Исторический пример ниже | 120 | 128 | 16 | 24 |
+
+Логические байты: `v[0..STATE_LEN-1]`. Persistent padding:
+`v[STATE_LEN..STATE_STORAGE_LEN-1] == 0`. Временный `FinalResponse`
+хранит target_local_idx в четырёх байтах с `FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET`
+(равен STATE_LEN); padding очищается перед persistent frontier write.
+Числа120..127 и120..123 ниже относятся только к примеру120/128:
+для Cube4 это96..111 и96..99. Generator padding — identity; central padding
+ноль; padding Zobrist — нулевой Hash128. Конкретные размеры подтверждать
+через actual runner `--build-info` и model/input contract, не по имени alias.
+
+`CandidateMeta` остаётся32 bytes/alignment32; `Hash128` — один128-bit key
+`{lo,hi}`. Stream3 payload id — original candidate id, не compact index.
+Stream4 не использует hash-table dedup, shard top-k или semantic shard cap.
+
+Дедупликация и threshold: physical survivor A/B одного logical shard могут
+содержать общий hash. Online lower bound — max(CDF_A,CDF_B), затем сумма
+непересекающихся owner/logical domains; суммировать A/B как unique нельзя.
+Перед exact final global threshold нужна common A/B threshold/compact/CUB
+fixed-temp sort/reduce/compact union с детерминированным winner contract.
+Publication A/B histogram slots и physical survivor A/B — разные сущности.
+
+Для WORLD_SIZE>1 scheduling/collective ownership определяется секцией
+`2026-05-26 Stream5 threshold update contract`: все ranks участвуют в
+request reduction и нужном NCCL histogram SUM в одинаковом порядке.
+Исторические local-only periodic правила ниже superseded. Это уточнение
+контракта не подтверждает H200-производительность или полноту acceptance.
+
 ```text
 STATE_LEN
 STATE_STORAGE_LEN
@@ -45,26 +82,6 @@ SOLVED_RESULT_CAPACITY
 threshold_initialized
 ```
 
-## Compile-time state shape contract
-
-The numeric `120`/`128` state examples in this document describe the default
-Megaminx build. Production builds may specialize the same pipeline at CMake
-configure time:
-
-```text
-STATE_LEN = N
-STATE_STORAGE_LEN = round_up_at_least(N + sizeof(uint32_t), STATE_ALIGNMENT)
-STATE_ALIGNMENT = 16 by default
-```
-
-`State128` is retained as a source-compatibility alias for the build-specific
-`StatePacked`; its size is `STATE_STORAGE_LEN`, not an unconditional 128 bytes.
-For every shape, logical state occupies `v[0..STATE_LEN-1]`, persistent padding
-`v[STATE_LEN..STATE_STORAGE_LEN-1]` is zero, and `FinalResponse` may temporarily
-store `target_local_idx` in the first four padding bytes. Unless a section says
-otherwise, literal `120`/`128` ranges below are the default-profile expansion of
-these formulas.
-
 
 ## 2026-05-26 Stream5 threshold update contract
 
@@ -78,14 +95,16 @@ WORLD_SIZE > 1:
     Stream4 histogram publication remains per-shard A/B:
         Stream4 writes inactive shard_score_hist buffer.
         Stream4 commits shard_score_hist_active_index only after inactive histogram is complete.
-        Stream5 threshold snapshot reads shard_score_hist_active_index, then sums the selected A/B buffers.
+        Stream5 threshold snapshot reads shard_score_hist_active_index (publication slots).
+        Online: max(CDF_physical_A,CDF_physical_B) per logical shard, then sum disjoint logical domains.
+        Final: sum physical histograms only after a common logical A/B sort/reduce has removed duplicates.
     Stream5 owns threshold collective communication.
     Each rank publishes threshold_request_local as a service field after enough completed local Stream4 work.
     Every rank participates in threshold request reduction at Stream5 exchange points.
     Collective request reduction:
         threshold_request_global = ncclAllReduceMax(threshold_request_local)
     If threshold_request_global != 0:
-        every rank builds local_score_hist from committed Stream4 histogram A/B buffers.
+        every rank builds the conservative local_score_hist from committed Stream4 histogram publications.
         every rank participates in NCCL SUM local_score_hist -> global_score_hist.
         every rank computes monotonic current_threshold.
         every rank resets its local processed-work threshold counter.
@@ -146,6 +165,19 @@ SHARD_CAPACITY_CANDIDATES =
 RING_COUNT =
     ceil(LOGICAL_SHARD_SIZE / (B_MICRO * MOVE_COUNT))
 
+Automatic eager LibTorch/ensemble physical-pool refinement (2026-10-10):
+    RING_COUNT = min(derived RING_COUNT, BEAM_RING_COUNT_LIMIT)
+    default BEAM_RING_COUNT_LIMIT = 16, positive uint32 only
+This bounds reusable physical buffers and graph executables, not logical
+frontier width or shard capacity. Dispatcher frontier_cursor must still reach
+every parent by recycling Free rings. Legacy native-graph execution retains the
+derived count unless the limit is explicitly configured. Every changed physical
+geometry requires fresh native memory admission. The same lower-bound pruning
+policy is used in Python; it never replaces native admission or full-depth
+performance validation. A pool upper bound is not an overlap guarantee.
+Manual configuration with explicit BEAM_RING_COUNT retains its requested
+physical count and remains subject to native memory admission.
+
 GLOBAL_SPILL_CAPACITY =
     0
 
@@ -184,24 +216,23 @@ using StateValue = uint8_t;
 ```
 
 ```cpp
-struct alignas(STATE_ALIGNMENT) StatePacked {
+struct alignas(16) State128 {
     StateValue v[STATE_STORAGE_LEN];
 };
-using State128 = StatePacked;
 ```
 
 Контракт `State128`:
 
 ```text
-State128.v[0..STATE_LEN-1]                 = logical_state
-State128.v[STATE_LEN..STATE_STORAGE_LEN-1] = padding / temporary final metadata
+State128.v[0..119]   = logical_state
+State128.v[120..127] = padding / temporary final metadata
 ```
 
 Persistent frontier contract:
 
 ```text
-current_frontier_states[*].v[STATE_LEN..STATE_STORAGE_LEN-1] = 0
-next_frontier_states_tmp[*].v[STATE_LEN..STATE_STORAGE_LEN-1] = 0 before persistent write
+current_frontier_states[*].v[120..127] = 0
+next_frontier_states_tmp[*].v[120..127] = 0 before persistent write
 ```
 
 ```cpp
@@ -1310,6 +1341,24 @@ atomicAdd на каждый кандидат для Stream 4 не использ
 
 # Stream 4: сбор из Stream 3 / Stream 5, дедуп, порог
 
+## Audit follow-up: final logical union (2026-09-28, integration pending)
+
+The final union primitive operates on the two adjacent clean physical buffers of
+one logical shard: threshold, compact, common CUB sort/reduce, compact back into
+the same pair, split counts at physical capacity, then publish exact histograms.
+The representative is ordered by score, parent index, then packed route. There
+is no shard top-k or semantic truncation. The caller must drain all writers and
+wait for both histogram publications before final threshold/selection.
+
+`LayoutUnionView` is a separate sequential phase over the beginning of the static
+scratch pool. `layout_final_budget_bytes` is the maximum of union, selection and
+materialization extents. Survivor storage, clean counts and histogram publications
+are beyond that whole extent. Union scratch includes its own two housekeeping
+dirty/processing cells; dead Stream3/4 transient counters are not union inputs.
+It is sized for one pair (2*physical capacity), reused across logical shards, and
+does not allocate a third persistent frontier. At this checkpoint the primitive
+and memory plan exist but dispatcher integration/acceptance is still pending.
+
 Работает shard job.
 
 Вход:
@@ -1562,6 +1611,21 @@ CPU может асинхронно чистить dead-branch history:
 CPU восстанавливает путь решения по parent_idx + route_packed
 ```
 
+### StaticHybrid history reservations (2026-09-28)
+
+`depth_limit` counts beam expansion iterations. K1/K2 suffix radii do not reduce
+the number of history layers required by an unsolved run. The host planner in
+`src/history_budget.cpp` reserves every layer before the depth loop, using
+`min(local_beam, MOVE_COUNT^(depth+1))` as a conservative entry bound.
+
+Each whole layer has a fixed RAM or disk extent. A smaller actual count does not
+move later extents. Preflight must validate placement, not just combined free
+bytes; disk-failure fallback may use only RAM beyond all planned reservations.
+Failure to reserve or write required history is explicit, never silent pruning.
+Pinned/staging bytes are budgeted separately. This contract does not guarantee
+physical filesystem reservation, checkpoint resume, or tolerance of disk failure
+when the additional fallback reserve is exhausted.
+
 ## FinalRequest
 
 Для каждого финального `CandidateMeta`:
@@ -1691,19 +1755,19 @@ load balancing
 # Итоговые архитектурные инварианты
 
 ```text
-State128.v[0..STATE_LEN-1]                 = логическое состояние.
-State128.v[STATE_LEN..STATE_STORAGE_LEN-1] = padding / служебная зона.
+State128.v[0..119]   = логическое состояние.
+State128.v[120..127] = padding / служебная зона.
 
 persistent frontier states:
-  v[STATE_LEN..STATE_STORAGE_LEN-1] = 0
+  v[120..127] = 0
 
 FinalResponse = State128.
-FinalResponse.v[STATE_LEN..STATE_LEN+3] хранит target_local_idx только в финальном обмене.
+FinalResponse.v[120..123] хранит target_local_idx только в финальном обмене.
 Перед записью в next_frontier_states_tmp padding очищается.
 
-generators[move][STATE_LEN..STATE_STORAGE_LEN-1] = identity padding indices.
-central_state[STATE_LEN..STATE_STORAGE_LEN-1] = 0.
-zobrist[STATE_LEN..STATE_STORAGE_LEN-1][*] = Hash128{0, 0}.
+generators[move][120..127] = 120..127.
+central_state[120..127] = 0.
+zobrist[120..127][*] = Hash128{0, 0}.
 
 Stream 1/2/3/4/5 не материализуют full next_frontier.
 next_frontier_states_tmp существует только в layout_final внутри scratch_pool.
@@ -1725,8 +1789,8 @@ Stream 2 не считает owner.
 owner_ring отсутствует.
 Stream 2 пишет hash_ring с Hash128.
 Stream 2 материализует child_state локально как State128.
-Stream 2 делает goal-check по compile-time STATE_STORAGE_LEN.
-Stream 2 делает hash по compile-time STATE_STORAGE_LEN.
+Stream 2 делает goal-check по STATE_STORAGE_LEN=128.
+Stream 2 делает hash по STATE_STORAGE_LEN=128.
 Padding не влияет на hash из-за нулевых zobrist-строк.
 
 Hash128 = один логический 128-битный хэш,
@@ -1763,10 +1827,10 @@ current_threshold=UINT32_MAX до threshold initialization.
 После threshold_initialized=true threshold не ослабляется.
 
 GLOBAL_THRESHOLD_UPDATE_PERIOD_SHARDS задаёт частоту периодического пересчёта current_threshold.
-WORLD_SIZE > 1 periodic threshold update uses local completed shard histograms only.
-WORLD_SIZE > 1 periodic threshold update does not run NCCL AllReduce and does not require a cross-rank barrier.
-WORLD_SIZE > 1 final global threshold still uses NCCL/global counts after local final flush.
-Финальный global threshold считается только после финального flush и локальной финальной дедупликации.
+WORLD_SIZE > 1 periodic threshold update uses committed conservative local histograms followed by Stream5-owned NCCL SUM when the collective request is set.
+All ranks preserve the same collective order; local-only periodic rules are superseded by the Stream5 contract above.
+WORLD_SIZE > 1 final global threshold uses NCCL/global counts only after common logical A/B union and local final flush.
+Финальный global threshold считается только после финального flush и общей финальной дедупликации обоих physical buffers каждого logical shard.
 
 После финального threshold выполняется балансировка нагрузки по картам.
 

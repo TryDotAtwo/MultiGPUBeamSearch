@@ -45,6 +45,14 @@ def test_cmake_dimensions_are_explicit_not_cached_inference(tmp_path):
     assert command[:2] == ["cmake", "-S"]
 
 
+def test_cutlass_ensemble_enables_libtorch_backbones(tmp_path):
+    command = configure_command(tmp_path, tmp_path / 'build', tmp_path / 'cutlass',
+        contract(8, 3), 'ensemble', (86,),
+        {'cmake': 'cmake', 'cxx': 'c++', 'nvcc': 'nvcc'}, inference_backend='cutlass')
+    assert '-DBEAM_ENABLE_LIBTORCH_STREAM1=ON' in command
+    assert any(value.startswith('-DCMAKE_PREFIX_PATH=') for value in command)
+
+
 def test_pip_nccl_versioned_library_is_selected_and_passed_to_cmake(monkeypatch, tmp_path):
     import cayleypy_native.build as build
     package = tmp_path / "site-packages" / "nvidia" / "nccl"
@@ -109,6 +117,31 @@ def test_existing_binary_requires_matching_digest_shape_and_backend(tmp_path):
     runner.write_bytes(b"modified after sidecar")
     with pytest.raises(NativeBackendError, match="SHA256"):
         validate_runner(runner, contract(), "mlp", (75,))
+
+
+@pytest.mark.parametrize('name',[None,'../outside','/tmp/another-program','unverified-helper'])
+def test_calibration_metadata_cannot_select_another_executable(tmp_path,name):
+    runner=tmp_path/'runner';runner.write_bytes(b'fake runner');runner.chmod(0o755)
+    metadata={'schema_version':1,'shape':shape_contract(contract()),'backend':'mlp',
+        'cuda_architectures':[75],'binary_sha256':file_sha256(runner),
+        'calibration_binary_name':name,'calibration_binary_sha256':'0'*64}
+    (tmp_path/'native-build.json').write_text(json.dumps(metadata))
+    with pytest.raises(NativeBackendError,match='name is invalid'):
+        validate_runner(runner,contract(),'mlp',(75,))
+
+
+@pytest.mark.parametrize('name',['stream1_native_mlp_benchmark','stream1_libtorch_mlp_benchmark'])
+def test_single_model_calibration_executable_is_bound_to_its_digest(tmp_path,name):
+    runner=tmp_path/'runner';runner.write_bytes(b'fake runner');runner.chmod(0o755)
+    helper=tmp_path/name;helper.write_bytes(b'fake measured helper')
+    metadata={'schema_version':1,'shape':shape_contract(contract()),'backend':'mlp',
+        'cuda_architectures':[75],'binary_sha256':file_sha256(runner),
+        'calibration_binary_name':name,'calibration_binary_sha256':file_sha256(helper)}
+    (tmp_path/'native-build.json').write_text(json.dumps(metadata))
+    assert validate_runner(runner,contract(),'mlp',(75,))==metadata
+    helper.write_bytes(b'changed helper')
+    with pytest.raises(NativeBackendError,match='changed or is missing'):
+        validate_runner(runner,contract(),'mlp',(75,))
 
 
 def test_build_prerequisites_do_not_download_missing_source(tmp_path):

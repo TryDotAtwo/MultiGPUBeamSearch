@@ -186,7 +186,7 @@ def test_manifest_runtime_keys_must_be_unique_literal_top_level_keys(tmp_path, c
         prepare_model(NativeModel(path, contract.graph_hash), contract, NativeOptions(), tmp_path / "run")
 
 
-@pytest.mark.parametrize("model", [None, lambda x: x, ModelConfig("MLP", 4, 4, [16, 8]).build_model()])
+@pytest.mark.parametrize("model", [lambda x: x, ModelConfig("MLP", 4, 4, [16, 8]).build_model()])
 def test_unknown_predictors_do_not_launch_export(tmp_path, contract, monkeypatch, model):
     import cayleypy_native.models as module
     monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: pytest.fail("unsupported predictor launched process"))

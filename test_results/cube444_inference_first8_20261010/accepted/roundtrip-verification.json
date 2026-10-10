@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "2365de64fad85de38940916fd0f87fe73b337dca",
+  "prefix": "test_results/cube444_inference_first8_20261010/accepted/",
+  "archive_sha256": "8cdeeff9ca1462ad01f93c8b3fceaf99c27d24c271cae41a5bc29ac64415d0a3",
+  "bytes": 408137,
+  "parts_verified": 6,
+  "files_verified": 202,
+  "scope": "independent GitHub download, every part and tar file byte verified; no GPU tensors copied to Windows"
+}

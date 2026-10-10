@@ -12,6 +12,14 @@ from cayleypy_native.errors import NativeBackendError, NativeUnavailable
 from cayleypy_native.options import NativeOptions
 
 
+@pytest.fixture(autouse=True)
+def fixture_device_names(monkeypatch):
+    # These protocol fixtures mock CUDA capabilities and runner execution.
+    # Do not accidentally query a physical GPU while describing those devices.
+    import torch
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device: "Protocol fixture GPU")
+
+
 class ReplayContract:
     move_count = 2
 
@@ -242,7 +250,7 @@ def test_q_head_alignment_is_unavailable_before_build_or_launch(tmp_path, output
     model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": outputs})
     with pytest.raises(NativeUnavailable, match="Q-head.*multiple of 8"):
         prepare_runtime(SimpleNamespace(move_count=outputs), model,
-                        NativeOptions(cache_dir=tmp_path), tmp_path, (0,))
+                        NativeOptions(cache_dir=tmp_path, inference_backend="cutlass"), tmp_path, (0,))
 
 
 @pytest.mark.parametrize("outputs", [1, 8, 24])
@@ -272,7 +280,8 @@ def test_timeout_kills_descendant_process(tmp_path):
     assert not marker.exists()
 
 
-def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(monkeypatch, tmp_path):
+@pytest.mark.parametrize('model_backend', ['mlp', 'ensemble'])
+def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(monkeypatch, tmp_path, model_backend):
     import torch
     import cayleypy_native.backend as backend
     import cayleypy_native.build as build
@@ -280,6 +289,9 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         replay=lambda path: tuple(path) == (1,),
         to_puzzle_info=lambda: {"central_state": [0, 1], "generators": {"m0": [0, 1], "m1": [1, 0]}})
     model = SimpleNamespace(weights_dir=tmp_path / "weights", backend="mlp", artifact_hash="model", manifest={"dtype": "fp16", "output_dim": 1})
+    model.backend = model_backend
+    if model_backend == 'ensemble':
+        model.manifest['ensemble'] = {'models': [{'weights_dir': 'member'}]}
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (7, 5))
     nccl_dir = tmp_path / "test-only-nccl"
     nccl_dir.mkdir()
@@ -312,13 +324,16 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     # its own artifact-backed regression test below.
     monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12, touch_bfs_max_entries=12345)
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12, touch_bfs_max_entries=12345, autotune=False)
     outcome = backend.run_native(contract, model, options, 1000, 4, tmp_path / "run", (0,))
     assert outcome.path == (1,)
     assert (tmp_path / "run/test.csv").read_text() == 'initial_state_id,initial_state\n0,"1,0"\n'
     assert list(json.loads((tmp_path / "run/puzzle_info.json").read_text())["generators"]) == ["m0", "m1"]
     assert observed["command"][-5:] == ["0", "1", "1000", "1", "0"]
     assert observed["env"]["BEAM_RUNTIME_CONFIG_MODE"] == "auto"
+    if model_backend == 'ensemble':
+        assert observed['env']['BEAM_STREAM1_EXECUTOR'] == 'libtorch_eager'
+        assert observed['env']['BEAM_BLEND_DIR'] == str(model.weights_dir)
     assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_RADIUS"] == "3"
     assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES"] == "12345"
     assert outcome.metadata["requested_max_steps"] == 4
@@ -448,6 +463,7 @@ def _rank_stream_fixture(root, rank, *, terminal=False):
 @pytest.mark.parametrize("mode", ["success", "failed_partial", "successful_missing_rank"])
 def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
     import torch
+    import multigpubeamsearch.local_launcher as local_launcher
     import cayleypy_native.backend as backend
     import cayleypy_native.build as build
     contract = SimpleNamespace(state_len=2, move_count=2, start=(1, 0), center=(0, 1), graph_hash="graph",
@@ -469,8 +485,8 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
 
     def fake_process(command, **kwargs):
         assert (kwargs["cwd"] / "test_results").is_dir()
-        assert f"--log-dir={run / 'worker-logs'}" in command
-        assert "--redirects=3" in command and "--max-restarts=0" in command
+        assert kwargs['worker_logs'] == run / 'worker-logs'
+        assert kwargs['world_size'] == 2
         assert str(run / "production_runner") in command
         assert (run / "production_runner").read_bytes() == b"test-only runner bytes"
         assert kwargs["log_path"] == run / "launcher.log"
@@ -482,7 +498,7 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
             raise NativeBackendError("native process failed rc=7")
         return 0.2
 
-    monkeypatch.setattr(backend, "run_process", fake_process)
+    monkeypatch.setattr(local_launcher, "run_local_ranks", fake_process)
     # This log-merging fixture uses a labelled fake model rather than weights.
     monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     if mode == "success":

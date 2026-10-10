@@ -7,7 +7,14 @@
 namespace beam {
 
 bool stream1_uses_child_rows(const Stream1ModelConfig& model) {
-    return model.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM;
+    switch (model.backend) {
+    case STREAM1_BACKEND_MLP:
+        return model.output_dim == STREAM1_SINGLE_SCORE_OUTPUT_DIM;
+    case STREAM1_BACKEND_PIECE_TRANSFORMER:
+        return false;
+    default:
+        throw std::invalid_argument("unsupported Stream1 backend");
+    }
 }
 
 std::uint32_t stream1_rows_per_parent(const Stream1ModelConfig& model) {
@@ -31,12 +38,20 @@ std::uint64_t round_up(std::uint64_t value, std::uint64_t alignment) {
         return value;
     }
     const std::uint64_t remainder = value % alignment;
-    return remainder == 0 ? value : value + alignment - remainder;
+    const std::uint64_t increment = remainder == 0 ? 0 : alignment - remainder;
+    if (increment > std::numeric_limits<std::uint64_t>::max() - value) {
+        throw std::overflow_error("aligned size exceeds uint64 capacity");
+    }
+    return value + increment;
 }
 
 DerivedConfig derive_config(const RuntimeConfig& config) {
     DerivedConfig derived;
-    const std::uint32_t candidates_per_slot = config.b_micro * static_cast<std::uint32_t>(MOVE_COUNT);
+    const std::uint64_t candidates_wide = static_cast<std::uint64_t>(config.b_micro) * MOVE_COUNT;
+    if (candidates_wide > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("B_MICRO * MOVE_COUNT exceeds uint32 capacity");
+    }
+    const auto candidates_per_slot = static_cast<std::uint32_t>(candidates_wide);
     if (candidates_per_slot == 0U || config.stream3_batch_candidates % candidates_per_slot != 0U) {
         throw std::invalid_argument("STREAM3_BATCH_CANDIDATES must be divisible by B_MICRO * MOVE_COUNT");
     }
@@ -45,10 +60,13 @@ DerivedConfig derive_config(const RuntimeConfig& config) {
         config.inference_parallelism > derived.ring_slot_count) {
         throw std::invalid_argument("STREAM1_CONCURRENCY must be in [1, RING_SLOT_COUNT]");
     }
-    derived.beam_width_alignment =
-        static_cast<std::uint64_t>(config.world_size) *
-        static_cast<std::uint64_t>(config.shard_count) *
-        static_cast<std::uint64_t>(config.stream4_batch_alignment);
+    const std::uint64_t shard_domains =
+        static_cast<std::uint64_t>(config.world_size) * config.shard_count;
+    if (config.stream4_batch_alignment != 0 &&
+        shard_domains > std::numeric_limits<std::uint64_t>::max() / config.stream4_batch_alignment) {
+        throw std::overflow_error("beam width alignment exceeds uint64 capacity");
+    }
+    derived.beam_width_alignment = shard_domains * config.stream4_batch_alignment;
     derived.global_beam_width_effective = round_up(config.user_global_beam_width, derived.beam_width_alignment);
     return derived;
 }

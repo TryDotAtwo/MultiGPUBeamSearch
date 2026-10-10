@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "f66c656a04a2116871f9bdeb789fac809bb45d46",
+  "prefix": "test_results/cube444_real_autotune8_recovery_20261010/final-terminal-v1/",
+  "archive_sha256": "d85dbd65e7d02252af106d8a0cbc215b1f98b85fccd8a9474b2f12c9d22b75ad",
+  "bytes": 699484,
+  "parts_verified": 10,
+  "files_verified": 332,
+  "scope": "Independent remote GitHub roundtrip; every tar member hash verified. Full step PASS, matched comparison PARTIAL; new inference-first policy not GPU-validated."
+}

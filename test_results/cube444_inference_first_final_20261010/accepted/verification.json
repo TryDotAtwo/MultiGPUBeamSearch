@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "artifact_commit": "c06bbe419bb74c33c183063e04eda45da928e53f",
+  "prefix": "test_results/cube444_inference_first_final_20261010/accepted/",
+  "archive_sha256": "0bb4c7556dccab284d696f04ad704f45018200ee78cf21e4ce40f8ae0eeab61f",
+  "bytes": 360593,
+  "parts_verified": 5,
+  "files_verified": 137,
+  "gpu_acceptance": "PASS",
+  "source_commit": "5d65147dae7ec18a6bc2d58772f4f24a49da15ca",
+  "beam": 5533696,
+  "parent_batch": 8192,
+  "outer_parent_batch": 16384,
+  "full_seconds": 172.775,
+  "pure_seconds": 171.043171875,
+  "throughput_loss_percent": 1.0023603675300197,
+  "scope": "Two RTX3060, real trained FP16 s3 + mlp_x16 blend. One cold completed depth and one matched pure pass; not steady-state confidence or full puzzle solve."
+}
