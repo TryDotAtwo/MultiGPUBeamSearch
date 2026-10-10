@@ -540,13 +540,6 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
     runner = snapshot_runtime_runner(runtime, run_dir)
-    if calibrate and maximum_requested:
-        from .inference_admission import admit_inference
-        admit_inference(contract,model,runtime,options,devices,beam_width,
-            run_dir,env,runner,calibration)
-        microbatch_metadata.update(configured_row_budget=int(env['BEAM_B_MICRO']),
-            derived_parent_batch=calibration['parent_batch'],
-            derived_candidates_per_slot=calibration['parent_batch']*contract.move_count)
     if maximum_requested:
         if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
         from .maximum_beam import capacity_seed,discover_capacity,refine_maximum
