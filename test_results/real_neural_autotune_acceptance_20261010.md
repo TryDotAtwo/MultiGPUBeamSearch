@@ -43,3 +43,10 @@ GPU timings are fixed complete depths on deterministic legal frontier fixtures. 
 - New OOM fallback closes owners and retries smaller measured candidates even after coarse expiry. Numerical/protocol/timeouts remain failures. Planner startup reserve rejection is typed CapacityRejected. Pressure-limited cache is retried after selected UUID free-memory increases32MiB; ordinary caches unchanged.
 - 8x3060 largest211,927,040 full depth active PID30624; matched pure still pending. Stop deadline06:45UTC; 2x deadline05:15UTC; prior budget projection18.87USD plus0.75 reserve within20USD. Do not destroy before final archive/roundtrip proof. Unrelated55100364 untouched.
 
+
+2026-10-10 03:29 UTC acceptance:
+- b9f5b40 strict max API PASS53,790,720, independent three-move replay, cold183.310711s/warm40.635562s.
+- Memory pressure PASS:9GiB external/card;8192+4096 explicit CUDA OOM, same1M frontier admission selected512 and replay,98.883463s. Release external allocation ->cache invalidation/recalibration, selected8192,82.342953s; both numeric0 cohorts, native paths replayed.
+- Fast max bootstrap source a558fada2f222d62ef9e99bf3db2032c4c21980e: remote349 passed5 skipped15.19s; strict API cold130.680237s (28.710% shorter than prior descriptive point), warm40.499340s. Both same53,790,720 and verified3move solution. Full calibrated phase120.877317s cold/30.936293s warm; not universally fast or a confidence interval/global optimum.
+- Terminal2-GPU results archive f3debeb1e31fd4da4b955a729b96cff47de5952a, final-public-v3;1465771bytes20parts924files SHA db5e22694e81ef858e08850b83020d3d60fde65e33fde63ea2aa1d6e37010fbf. Independent remote GitHub download and every file-byte verification PASS. Automatic full55M archive8bbf9012ff767694c4edbdaf30f76c8c5fbdbf0d proof8ff9dd0639a264059f1dd7a85ebb04f2c0ae7f7f.
+-2GPU controllers terminal; stop/destroy after proof commit. 8GPU full+matched211.93M still pending. Goal remains active. Main/Kaggle release pending; no128GPU hardware evidence.
