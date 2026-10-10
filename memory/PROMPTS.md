@@ -16,3 +16,7 @@ Requirement: improve large GNN native CUTLASS by at least 2x, preserving beam ar
 
 ## 2026-10-10: GNN fused rounded bias
 User requested separate bias removal, RTX3060 speed/precision verification, an active goal and authorized $5 total for new tests.
+
+
+## 2026-10-10: further GNN optimization with Astra
+Continue improving GNN while measured gains remain, consult Astra as expert, preserve architecture; new GPU-test budget $10 total.

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "family": "pancake_gnn",
+  "graph_hash": "c51198e75e30cd75d65cd1d6359d0e39f25c70b6a6087e67882c98a633f150e2",
+  "n": 100,
+  "d_model": 256,
+  "max_state_batch": 56,
+  "files": {
+    "backbone.pt": "1dff5aa43a9709c9a4e9c0617609287a9c0df13ad6b3345ea3f2562a02ad9583"
+  }
+}

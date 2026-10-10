@@ -1,0 +1,91 @@
+{
+  "metadata": {
+    "source_commit": "b74b6acf599e9a134aa866bbb7bcf61fe01376c0",
+    "binary_sha256": "deba34c2122b2a594a8db008cdb1478c4511473c10624e41bfde5e8f9ffe648a",
+    "arch_flags": "8.6",
+    "gpu": "NVIDIA GeForce RTX 3060",
+    "cc": [
+      8,
+      6
+    ],
+    "torch": "2.11.0+cu128",
+    "cuda": "12.8",
+    "driver": "570.133.07",
+    "model": {
+      "n": 100,
+      "d_model": 256,
+      "layers": 2,
+      "hops": 2,
+      "max_neighbors": 75,
+      "neighbor_counts": [
+        75,
+        38
+      ],
+      "cap": 100000,
+      "parameters": 2983268
+    },
+    "artifact_hash": "124ba0264054a51c097243a8b691ede52fb321d06bf325a94f6e3d47bd835fa2",
+    "seed": 42,
+    "precision": "FP16 body + common FP32 scalar readout",
+    "scope": "one GNN forward including both levels; excludes beam streams, host transfers, loading and compilation",
+    "slots": 1,
+    "streams": 1,
+    "warmup": 2,
+    "repeats": 5,
+    "trained_quality": false
+  },
+  "records": [
+    {
+      "batch": 3,
+      "backend": "python_pytorch",
+      "status": "PASS",
+      "max_error": 0.0,
+      "wall_ms": [
+        701.0595051106066,
+        700.6531171500683,
+        699.9724651686847,
+        700.1453330740333,
+        703.2776330597699
+      ],
+      "gpu_ms": [
+        700.7979736328125,
+        700.5931396484375,
+        699.9172973632812,
+        700.0568237304688,
+        703.0711669921875
+      ],
+      "median_ms": 700.6531171500683,
+      "p95_ms": 703.2776330597699,
+      "items_per_second": 4.281719336670631,
+      "allocated_peak": 9675456000,
+      "reserved_peak": 10018095104,
+      "output_sha": "8a5520f1b156c5f4e65f5a64c2b49c9b1434faa298d7645d12db3992296bcd08"
+    },
+    {
+      "batch": 3,
+      "backend": "native_cutlass",
+      "status": "PASS",
+      "max_error": 0.00011359900236129761,
+      "wall_ms": [
+        165.3332409914583,
+        158.62222597934306,
+        160.10758001357317,
+        161.10192495398223,
+        162.71564597263932
+      ],
+      "gpu_ms": [
+        165.2428741455078,
+        158.5828857421875,
+        160.06040954589844,
+        161.0577850341797,
+        162.6757049560547
+      ],
+      "median_ms": 161.10192495398223,
+      "p95_ms": 165.3332409914583,
+      "items_per_second": 18.621751421386996,
+      "allocated_peak": 1760023040,
+      "reserved_peak": 2296381440,
+      "output_sha": "35cac0ad03b0d8804bf3e076e2ecef6015ab6f7cdc4b7de4e7a242429b345adc"
+    }
+  ]
+}

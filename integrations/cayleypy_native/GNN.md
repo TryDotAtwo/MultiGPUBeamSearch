@@ -33,7 +33,7 @@ are not normalized automatically.
 `inference_backend="libtorch"` runs tensor projections through ATen.
 `"cutlass"` runs aligned FP16 GAT/MLP projections through native CUTLASS GEMM
 and uses the existing ensemble readout epilogue. Two-coordinate input layers,
-unaligned projections, normalization and hop attention remain ATen. Aligned
+unaligned projections, encoder readout normalization and hop attention remain ATen. Aligned
 GAT layers additionally use native fused attention/aggregation and project
 three distinct edge embeddings. Channels above 1024 retain ATen aggregation. Auto selection uses LibTorch on T4 and CUTLASS on SM80 or newer.
 An explicit unsupported CUTLASS device is rejected.
@@ -61,3 +61,12 @@ See `test_results/gnn_opt_20261010/REPORT.md` for scope and raw evidence.
 Re-export existing TorchScript artifacts to enable fused GAT; raw state-dict
 parameters remain compatible. Auto selection still uses GPU architecture,
 not a universal measured guarantee of the fastest backend.
+
+Further optimization: compact CUTLASS GAT now fuses residual addition,
+LayerNorm and exact erf GELU, preserving FP16 materialization boundaries and
+original learned parameters/epsilon. RTX3060 matched full GNN inference
+179.027 ->164.364ms (8.92% more throughput). Floating-point normalization
+reduction order can differ; numerical acceptance and full beam replay pass.
+Re-export older TorchScript GNN artifacts to enable the new path. See
+`test_results/gnn_further_20261010/REPORT.md`. Experimental parallel softmax and
+wider GEMM tiles were measured and rejected; neither is enabled by default.

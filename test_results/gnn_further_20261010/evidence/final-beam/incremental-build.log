@@ -1,0 +1,10 @@
+[ 31%] Built target beam_core
+[ 37%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_gnn_projection.cu.o
+[ 37%] Linking CXX static library libbeam_cuda.a
+[ 81%] Built target beam_cuda
+[ 81%] Linking CXX executable production_runner_libtorch_stream1
+[100%] Built target production_runner_libtorch_stream1
+[ 35%] Built target beam_core
+[ 92%] Built target beam_cuda
+[ 92%] Linking CXX executable stream1_ensemble_benchmark
+[100%] Built target stream1_ensemble_benchmark

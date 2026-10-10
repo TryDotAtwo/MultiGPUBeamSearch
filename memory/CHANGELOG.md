@@ -866,3 +866,7 @@ Fused GAT aggregation and compact edge projection preserve both GNN levels and a
 
 ## 2026-10-10: GNN fused rounded bias
 Removed separate bias launch using broadcast C and a double-rounded FP16 epilogue. RTX3060 full GNN AB/BA: 213.548 -> 178.821 ms (1.1942x). 28 projection cases and full native model outputs bitwise match; memcheck zero errors. See test_results/gnn_bias_20261010/REPORT.md.
+
+
+## 2026-10-10: further GNN optimization with Astra
+Accepted fused residual/LayerNorm/exact-GELU: RTX3060 matched full forward179.027 ->164.364ms, 8.92% throughput improvement. 120 GPU norm cases,9 CPU tests, zero sanitizer errors; final single/three-GNN production replay pass. Rejected parallel-softmax and wider-tile experiments. See test_results/gnn_further_20261010/REPORT.md.

@@ -90,3 +90,15 @@ def test_compact_gat_preserves_both_encoder_graphs():
         actual=m(states)
         torch.testing.assert_close(actual,expected,rtol=0,atol=0)
         torch.testing.assert_close(torch.jit.script(m)(states),expected,rtol=0,atol=0)
+
+def test_fused_normalization_cpu_contract():
+    from torch.nn import functional as F
+    torch.manual_seed(81)
+    for rows,channels in [(1,4),(7,128),(3,132),(5,1024)]:
+        a=torch.randn(rows,channels).half()
+        r=torch.randn_like(a)
+        w=torch.randn(channels).half()
+        b=torch.randn(channels).half()
+        expected=F.gelu(F.layer_norm(a+r,(channels,),w,b,1e-4))
+        actual=torch.ops.multigpubeamsearch_gnn.residual_norm_gelu(a,r,w,b,1e-4)
+        torch.testing.assert_close(actual,expected,rtol=0,atol=0)
