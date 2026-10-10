@@ -1,0 +1,14 @@
+{
+  "new_contract": 55206172,
+  "label": "gnn-cutlass-bias-3060-20261010",
+  "created_at": 1791634315,
+  "destroyed_at": 1791634937,
+  "destroyed": true,
+  "quoted_hourly": 0.08251851851851852,
+  "archive_commit": "133b9f4a83438816ba687c05c6bb9881ae2b3129",
+  "verified_files": 38,
+  "stop_success": true,
+  "destroy_success": true,
+  "api_absent": true,
+  "archives_verified": true
+}
