@@ -26,7 +26,8 @@ def test_initial_batch_capacity_failure_falls_back_even_after_coarse_budget(tmp_
     monkeypatch.setattr(autotune,'CalibrationTelemetry',Telemetry)
     class Pool:
         starts=2
-        def __init__(self,*args):pass
+        def __init__(self,*args):
+            assert 'BEAM_ENSEMBLE_INFERENCE_MICRO' not in args[5]
         def close(self):pass
         def measure(self,batch,parents,deadline):
             calls.append(batch)
@@ -44,7 +45,8 @@ def test_initial_batch_capacity_failure_falls_back_even_after_coarse_budget(tmp_
     model=SimpleNamespace(backend='ensemble',weights_dir=tmp_path,manifest={'ensemble':{'models':[]}})
     contract=SimpleNamespace(start=(1,0),generators=((0,1),(1,0)),move_count=2)
     options=NativeOptions(cache_dir=tmp_path/'cache',calibration_seconds=90,calibration_max_batch=65536)
-    args=(contract,model,runtime,options,(0,1),131072,tmp_path,{})
+    environment={'BEAM_ENSEMBLE_INFERENCE_MICRO':'64'}
+    args=(contract,model,runtime,options,(0,1),131072,tmp_path,environment)
     if not capacity_failure:
         with pytest.raises(NativeBackendError,match='baseline inference calibration failed'):
             autotune.tune_inference(*args)
@@ -54,6 +56,7 @@ def test_initial_batch_capacity_failure_falls_back_even_after_coarse_budget(tmp_
         assert calls==[8192,4096] and result['parent_batch']==4096
         assert result['records'][0]['parents']==65536
         assert '8192' in result['rejected']
+    assert environment['BEAM_ENSEMBLE_INFERENCE_MICRO']=='64'
 
 
 def test_planner_reserve_initialization_is_capacity_not_protocol_failure(tmp_path,monkeypatch):

@@ -171,8 +171,12 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     coarse_deadline=started+.7*options.calibration_seconds
     refinement_queued=False
     samples=[];records=[];rejected={};reserves={};telemetry_records={}
+    probe_environment=dict(environment)
+    # A prior admitted batch must not size the next calibration's lane arena.
+    # The helper's explicit capacity argument owns that arena instead.
+    probe_environment.pop('BEAM_ENSEMBLE_INFERENCE_MICRO',None)
     from .calibration_session import EnsembleProbePool
-    pool=EnsembleProbePool(helper,probe_dir,cap,parents,len(devices),environment,directory,deadline) if (
+    pool=EnsembleProbePool(helper,probe_dir,cap,parents,len(devices),probe_environment,directory,deadline) if (
         runtime.build_metadata.get('calibration_protocol')=='json-session-v1') else None
     try:
         for index,batch in enumerate(candidates):
@@ -201,7 +205,7 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                         log=path.open('wb')
                         command=[str(helper),str(probe_dir),str(batch),str(parents),str(rank)]
                         try:
-                            process=subprocess.Popen(command,env=environment,stdout=log,stderr=subprocess.STDOUT,
+                            process=subprocess.Popen(command,env=probe_environment,stdout=log,stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL,start_new_session=True)
                         except Exception:
                             log.close()
