@@ -76,8 +76,9 @@ and are not silently normalized. Supported FP16 heads accumulate in FP32;
 clamping and score quantization happen after the last head. On SM80 and newer,
 the final GEMM performs the weighted accumulation in its CUTLASS epilogue.
 Backbones currently use LibTorch; importing this API does not compile arbitrary
-Python neural architectures. The public artifact adapter currently accepts MLPs;
-additional native C++ families still require public adapter registration.
+Python neural architectures. Automatic Python-model export currently accepts
+MLPs. Graph-bound artifacts also support the registered Cube444 Transformer and
+MLP families; additional native families still require adapter registration.
 
 With autotuning enabled for an MLP or ensemble, Stream1 first measures inference batches on
 all selected GPUs. The bounded sweep includes power-of-two batches, the actual
@@ -445,13 +446,24 @@ and derives a bounded shortlist from arrival/service and memory constraints.
 The shortlist also tests a doubled outer dispatch batch and an alternative
 number of concurrent sort lanes, while the inference microbatch stays frozen.
 It compares a latency-oriented flush batch with a larger throughput-oriented
-batch at the same admitted shard capacity. Selection minimizes summed measured
-service work; the maximum of stage estimates is retained only as a diagnostic.
+batch at the same admitted shard capacity. An independent staging-only candidate
+keeps the flush batch fixed. Selection minimizes summed measured downstream
+service work; the frozen inference cost is excluded from the improvement
+threshold. The maximum of stage estimates is retained only as a diagnostic.
 This avoids hiding extra sorting work behind a transport-dominated envelope.
 Every proposal must admit the same effective frontier on all ranks. Native
 component probes share persistent per-GPU processes and use an allocation
 acknowledgement barrier before entering transport collectives.
 The five-stream architecture and global selection semantics remain unchanged.
+
+Eager native inference limits the reusable physical ring pool to 16 by default;
+`BEAM_RING_COUNT_LIMIT` can set another positive uint32 limit. This bounds graph
+and buffer owners independently of the logical frontier: the dispatcher keeps
+recycling rings until every parent has been processed. The Python memory
+shortlist uses the same bound, while final admission still comes from the native
+planner on every rank. An older prepared runner can reject a shortlisted profile;
+the pruning hint never overrides its actual memory calculation. This upper bound
+does not guarantee that the derived ring count hides communication latency.
 
 The default reports best found Stream1 throughput and calibration duration.
 Inference search is bounded by `calibration_max_batch` (8192 by default); its
