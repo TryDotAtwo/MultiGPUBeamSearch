@@ -49,8 +49,8 @@ CPU checks cover the reference encoder, both GNN levels, TorchScript, FP16
 export, blend membership and immutable snapshots. Native feature parity passed
 on T4 through LibTorch and on RTX 3060 through both LibTorch and CUTLASS.
 Full beam-search acceptance is recorded in `test_results/issue5_review_20261010/`.
-Random test weights provide no evidence of trained search quality. Large-graph
-performance and multi-GPU scaling of this model family have not been measured.
+Random test weights provide no evidence of trained search quality. Multi-GPU scaling and trained search performance of this model family have not
+been measured.
 
 
 Measured backend choice: on RTX 3060 with n=100, d_model=256, two layers and

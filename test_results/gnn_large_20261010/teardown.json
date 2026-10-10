@@ -1,0 +1,12 @@
+{
+  "new_contract": 55199233,
+  "label": "gnn-large-comparison-3060-20261010",
+  "budget_usd": 5,
+  "quoted_hourly": 0.06442222222222223,
+  "created_at": 1791631151,
+  "destroyed_at": 1791631862,
+  "destroyed": true,
+  "archive_commit": "c4f64b77d3c856902c40594667932754de5f16fd",
+  "archives_verified": true,
+  "absence_verified": true
+}
