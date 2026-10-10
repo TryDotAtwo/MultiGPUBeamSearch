@@ -1,4 +1,4 @@
-# Two-level pancake GNN (candidate; GPU acceptance pending)
+# Two-level pancake GNN
 
 `PancakeGNN` is our implementation of the dual-stream GATv2 encoder and
 multi-hop neighbor GNN described in issue #5. Inference does not import PyG or
@@ -46,6 +46,8 @@ reference's stochastic frontier cap never activates; no hop is silently
 removed. A cap smaller than one root's full expansion is rejected.
 
 CPU checks cover the reference encoder, both GNN levels, TorchScript, FP16
-export, blend membership and immutable snapshots. CUDA compilation, native
-GPU parity, end-to-end search and performance are not yet accepted. Random
-test weights provide no evidence of trained search quality.
+export, blend membership and immutable snapshots. Native feature parity passed
+on T4 through LibTorch and on RTX 3060 through both LibTorch and CUTLASS.
+Full beam-search acceptance is recorded in `test_results/issue5_review_20261010/`.
+Random test weights provide no evidence of trained search quality. Large-graph
+performance and multi-GPU scaling of this model family have not been measured.

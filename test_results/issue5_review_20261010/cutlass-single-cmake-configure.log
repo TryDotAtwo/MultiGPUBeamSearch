@@ -1,0 +1,52 @@
+-- Beam state logical bytes: 4
+-- Beam state physical bytes: 16
+-- Beam state alignment: 16
+-- Beam move count: 3
+-- The CXX compiler identification is GNU 13.3.0
+-- The CUDA compiler identification is NVIDIA 12.8.93 with host compiler GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/x86_64-linux-gnu-g++-13 - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /usr/local/cuda-12.8/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Found CUDA: /usr/local/cuda (found version "12.8")
+-- Found CUDAToolkit: /usr/local/cuda-12.8/include (found version "12.8.93")
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- PyTorch: CUDA detected: 12.8
+-- PyTorch: CUDA nvcc is: /usr/local/cuda/bin/nvcc
+-- PyTorch: CUDA toolkit directory: /usr/local/cuda
+-- PyTorch: Header version is: 12.8
+-- Found Python: /venv/main/bin/python3.12 (found version "3.12.14") found components: Interpreter
+-- /usr/local/cuda/lib64/libnvrtc.so shorthash is 2bb82d1a
+-- USE_CUDNN is set to 0. Compiling without cuDNN support
+-- USE_CUSPARSELT is set to 0. Compiling without cuSPARSELt support
+-- USE_CUDSS is set to 0. Compiling without cuDSS support
+-- USE_CUFILE is set to 0. Compiling without cuFile support
+CMake Warning at /venv/main/lib/python3.12/site-packages/torch/share/cmake/Caffe2/public/cuda.cmake:332 (message):
+  pytorch is not compatible with `CMAKE_CUDA_ARCHITECTURES` and will ignore
+  its value.  Please configure `TORCH_CUDA_ARCH_LIST` instead.
+Call Stack (most recent call first):
+  /venv/main/lib/python3.12/site-packages/torch/share/cmake/Caffe2/Caffe2Config.cmake:86 (include)
+  /venv/main/lib/python3.12/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:62 (find_package)
+  CMakeLists.txt:430 (find_package)
+
+
+-- Added CUDA NVCC flags for: -gencode;arch=compute_86,code=sm_86
+CMake Warning at /venv/main/lib/python3.12/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:22 (message):
+  library kineto not found.
+Call Stack (most recent call first):
+  /venv/main/lib/python3.12/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:119 (append_torchlib_if_found)
+  CMakeLists.txt:430 (find_package)
+
+
+-- Found Torch: /venv/main/lib/python3.12/site-packages/torch/lib/libtorch.so
+-- Configuring done (5.0s)
+-- Generating done (0.3s)
+-- Build files have been written to: /root/gnn-beam-result/cache/builds/a0113fe33b393d33931c27bb674e1a95ca6b75196cc354a2e5116c0bc02002df

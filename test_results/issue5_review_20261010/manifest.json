@@ -1,0 +1,24 @@
+{
+  "source_commit": "ff6c74e6e72aa08391d9e2bc1b8db60a7a67cb01",
+  "files": {
+    "feature-3060.json": "6557e95ede22154a964b9eb90965284ad09aa3184c05e46616af12aea66631b4",
+    "full-beam-3060.json": "6e75cd36912be657b6a143bb0594071beb4333179215b26c8da755bc116b20f3",
+    "readout.json": "eb15c65306b426c28dfe5589eff15a4b6a6a2b86961113b4bf6f9b7752657ca6",
+    "readout-libtorch.log": "0d0e5d31ffc7617dc3c5eb77200e542e6d369c1d347809a206ce88debd316e91",
+    "readout-cutlass.log": "bd3898978d52dc5e52c9741308df4b3688eb8f8fe8bc8253d71cfc6bfc916a84",
+    "libtorch-single-native.log": "dce0d2619cbda257c0565ce10c5c94c8b554fca4ff1bbbaf7f854bdb6145bc25",
+    "libtorch-single-cmake-configure.log": "0770afad607602afdd1d674034f931a13d9e750b9279433c06d29a9853bb7526",
+    "libtorch-single-cmake-build.log": "eebe52ec31fefb7491b32bbe97ca85ee85f29fefec8df15f847e299439f72fe0",
+    "libtorch-blend3-native.log": "0136eba5b3c68afec85a28303bff9131093acc6464c511b3b0469abe9e089a8b",
+    "cutlass-single-native.log": "82a8e715356ce621be45f06ca9c966a302feee48da417bf87f9c18525a5d4274",
+    "cutlass-single-cmake-configure.log": "d333f43a3cd8a89e09120559e36e8a8d65c2412739ed87ed37879b00b2faa8f9",
+    "cutlass-single-cmake-build.log": "a6f239094ad4c4e580b8ab1d840bfc8a9e6f3eba2cbab29064485e88d112c7d4",
+    "cutlass-blend3-native.log": "d5ca2dd8ac9b4c6e6380606649bd0bbb951daf73c67bab5d285bdb0a98da9097"
+  },
+  "scope": "Reproducible seeded synthetic GNN checks; no trained checkpoints",
+  "seed": [
+    11,
+    12,
+    13
+  ]
+}

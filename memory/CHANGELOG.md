@@ -850,3 +850,7 @@ Python memory pruning now applies the eager native physical-ring pool bound (16 
 
 ## 2026-10-10 GNN candidate: GPU acceptance pending
 Own dual-stream GATv2 and multi-hop pancake GNN, FP16 TorchScript export, immutable graph-bound snapshots, arbitrary-count ensemble integration, native LibTorch/CUTLASS projection paths, explicit backend selection and backend-specific calibration cache. CPU reference comparison and 36 focused tests passed. Linux/CUDA compilation and GPU acceptance are still pending; no trained-quality or speed claim.
+
+
+## 2026-10-10 — own pancake GNN GPU acceptance
+Own dual-stream GATv2 plus multi-hop neighbor inference added to native ensembles with LibTorch and aligned FP16 CUTLASS projections. T4 LibTorch and RTX3060 both-backend feature parity passed. RTX3060 full single/three-GNN beam paths replay correctly on both backends; blend readout oracle key error zero. See test_results/issue5_review_20261010/REPORT.md for scope, source commits, artifacts and untested training/performance/multi-GPU boundaries.

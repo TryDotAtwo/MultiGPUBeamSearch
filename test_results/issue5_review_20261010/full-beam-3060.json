@@ -1,0 +1,404 @@
+{
+  "source_commit": "ff6c74e6e72aa08391d9e2bc1b8db60a7a67cb01",
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "records": [
+    {
+      "backend": "libtorch",
+      "model": "single",
+      "path_length": 3,
+      "metadata": {
+        "build": {
+          "schema_version": 1,
+          "shape": {
+            "state_len": 4,
+            "storage_len": 16,
+            "move_count": 3,
+            "alignment": 16
+          },
+          "backend": "ensemble",
+          "cuda_architectures": [
+            86
+          ],
+          "source_digest": "208eacf4f05ccff6c8b8f7bc52a6e523189049f37dd4eb989c7ab390bc566f89",
+          "cutlass_digest": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+          "toolchain": {
+            "cmake": "/venv/main/bin/cmake\ncmake version 4.4.4\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+            "nvcc": "/usr/local/cuda-12.8/bin/nvcc\nnvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+            "cxx": "/usr/bin/x86_64-linux-gnu-g++-13\nx86_64-linux-gnu-g++-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+          },
+          "target": "production_runner_libtorch_stream1",
+          "nccl": {
+            "include_dir": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/include",
+            "library": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2",
+            "header_sha256": "06b934792a70f08cafabd96b8f94015b143a182fbb3bc56ac71c4c6de7deb971",
+            "library_sha256": "1792291e26d2b27fe51e59cf4dbd361dbfa84cbfe8ee8196c087c7ebf5146d48"
+          },
+          "build_mode": "release-debug-logs-v1",
+          "inference_backend": "libtorch",
+          "calibration_binary_name": "stream1_ensemble_benchmark",
+          "calibration_protocol": "json-session-v1",
+          "plan_calibration_protocol": "json-session-v1",
+          "component_calibration_protocol": "exact-capacity-v1",
+          "torch": {
+            "version": "2.11.0+cu128",
+            "cuda": "12.8",
+            "cxx11_abi": true,
+            "cmake_prefix": "/venv/main/lib/python3.12/site-packages/torch/share/cmake"
+          },
+          "build_key": "97149d26ced2f7b8a841f70798526cfb18556cd7f0911c5a90870b8d5a41ddbe",
+          "binary_sha256": "46bdefa0fdaa06def9c4f73308588e3bf921ab8a403b2a6562dade161a2b37c0",
+          "calibration_binary_sha256": "c605a152ed2d074ee15e6d6e7cc8ea9c06aea3bc3b7108b61b2e19ec81547a14"
+        },
+        "profile": {
+          "policy": "libtorch-conservative-v1",
+          "inference_backend": "libtorch",
+          "inference_row_limit": 2048,
+          "cuda_architectures": [
+            86
+          ],
+          "gpu_names": [
+            "NVIDIA GeForce RTX 3060"
+          ],
+          "memory_planning": "native_auto",
+          "autotuned": false
+        },
+        "model_artifact_hash": "da302c5cb59d879d7230a4678f5a130555e68ef60d02d2fdcfbd4cc79897d9ac",
+        "graph_hash": "0c732dfeab67744747ea018c3e8574647957d770aa0d781cd431a4a49409bdd9",
+        "devices": [
+          0
+        ],
+        "requested_beam_width": 1024,
+        "microbatch": {
+          "native_default_row_budget": 2048,
+          "configured_row_budget": 682,
+          "derived_parent_batch": 682,
+          "derived_candidates_per_slot": 2046,
+          "reference_logical_shard": 1024,
+          "reference_shard_storage": 2048,
+          "adjusted_for_small_beam": true
+        },
+        "requested_max_steps": 16,
+        "native_forward_depth_limit": 16,
+        "configured_touch_bfs_radius": 0,
+        "effective_touch_bfs_radius": 0,
+        "touch_bfs_max_entries": 1048576,
+        "touch_bfs_worst_case_entries": 1,
+        "replay_valid": true,
+        "log_path": "/root/gnn-beam-result/cache/runs/8cc5f61f719a459aa7a8e130c8f9f5f3/native.log",
+        "native_seconds": 10.6603,
+        "terminal_records": 1,
+        "observed_parent_batch": 682,
+        "observed_inference_rows": 682,
+        "observed_stream3_batch_candidates": 14322,
+        "backend": "native",
+        "inference_backend": "libtorch",
+        "heuristic": null,
+        "model_hash": "da302c5cb59d879d7230a4678f5a130555e68ef60d02d2fdcfbd4cc79897d9ac",
+        "effective_beam_width": 4096,
+        "elapsed_seconds": 12.249454466975294,
+        "run_dir": "/root/gnn-beam-result/cache/runs/8cc5f61f719a459aa7a8e130c8f9f5f3",
+        "scoring": "scalar_children",
+        "status": "found"
+      }
+    },
+    {
+      "backend": "libtorch",
+      "model": "blend3",
+      "path_length": 3,
+      "metadata": {
+        "build": {
+          "schema_version": 1,
+          "shape": {
+            "state_len": 4,
+            "storage_len": 16,
+            "move_count": 3,
+            "alignment": 16
+          },
+          "backend": "ensemble",
+          "cuda_architectures": [
+            86
+          ],
+          "source_digest": "208eacf4f05ccff6c8b8f7bc52a6e523189049f37dd4eb989c7ab390bc566f89",
+          "cutlass_digest": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+          "toolchain": {
+            "cmake": "/venv/main/bin/cmake\ncmake version 4.4.4\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+            "nvcc": "/usr/local/cuda-12.8/bin/nvcc\nnvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+            "cxx": "/usr/bin/x86_64-linux-gnu-g++-13\nx86_64-linux-gnu-g++-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+          },
+          "target": "production_runner_libtorch_stream1",
+          "nccl": {
+            "include_dir": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/include",
+            "library": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2",
+            "header_sha256": "06b934792a70f08cafabd96b8f94015b143a182fbb3bc56ac71c4c6de7deb971",
+            "library_sha256": "1792291e26d2b27fe51e59cf4dbd361dbfa84cbfe8ee8196c087c7ebf5146d48"
+          },
+          "build_mode": "release-debug-logs-v1",
+          "inference_backend": "libtorch",
+          "calibration_binary_name": "stream1_ensemble_benchmark",
+          "calibration_protocol": "json-session-v1",
+          "plan_calibration_protocol": "json-session-v1",
+          "component_calibration_protocol": "exact-capacity-v1",
+          "torch": {
+            "version": "2.11.0+cu128",
+            "cuda": "12.8",
+            "cxx11_abi": true,
+            "cmake_prefix": "/venv/main/lib/python3.12/site-packages/torch/share/cmake"
+          },
+          "build_key": "97149d26ced2f7b8a841f70798526cfb18556cd7f0911c5a90870b8d5a41ddbe",
+          "binary_sha256": "46bdefa0fdaa06def9c4f73308588e3bf921ab8a403b2a6562dade161a2b37c0",
+          "calibration_binary_sha256": "c605a152ed2d074ee15e6d6e7cc8ea9c06aea3bc3b7108b61b2e19ec81547a14"
+        },
+        "profile": {
+          "policy": "libtorch-conservative-v1",
+          "inference_backend": "libtorch",
+          "inference_row_limit": 2048,
+          "cuda_architectures": [
+            86
+          ],
+          "gpu_names": [
+            "NVIDIA GeForce RTX 3060"
+          ],
+          "memory_planning": "native_auto",
+          "autotuned": false
+        },
+        "model_artifact_hash": "35407add4ac61567d4b1699c2e2fda4907ad93c64b47f9462e24e5964fe40e03",
+        "graph_hash": "0c732dfeab67744747ea018c3e8574647957d770aa0d781cd431a4a49409bdd9",
+        "devices": [
+          0
+        ],
+        "requested_beam_width": 1024,
+        "microbatch": {
+          "native_default_row_budget": 2048,
+          "configured_row_budget": 682,
+          "derived_parent_batch": 682,
+          "derived_candidates_per_slot": 2046,
+          "reference_logical_shard": 1024,
+          "reference_shard_storage": 2048,
+          "adjusted_for_small_beam": true
+        },
+        "requested_max_steps": 16,
+        "native_forward_depth_limit": 16,
+        "configured_touch_bfs_radius": 0,
+        "effective_touch_bfs_radius": 0,
+        "touch_bfs_max_entries": 1048576,
+        "touch_bfs_worst_case_entries": 1,
+        "replay_valid": true,
+        "log_path": "/root/gnn-beam-result/cache/runs/c96c73ce84834e108be2fba7dd16418d/native.log",
+        "native_seconds": 27.4598,
+        "terminal_records": 1,
+        "observed_parent_batch": 682,
+        "observed_inference_rows": 682,
+        "observed_stream3_batch_candidates": 14322,
+        "backend": "native",
+        "inference_backend": "libtorch",
+        "heuristic": null,
+        "model_hash": "35407add4ac61567d4b1699c2e2fda4907ad93c64b47f9462e24e5964fe40e03",
+        "effective_beam_width": 4096,
+        "elapsed_seconds": 29.14773301896639,
+        "run_dir": "/root/gnn-beam-result/cache/runs/c96c73ce84834e108be2fba7dd16418d",
+        "scoring": "scalar_children",
+        "status": "found"
+      }
+    },
+    {
+      "backend": "cutlass",
+      "model": "single",
+      "path_length": 3,
+      "metadata": {
+        "build": {
+          "schema_version": 1,
+          "shape": {
+            "state_len": 4,
+            "storage_len": 16,
+            "move_count": 3,
+            "alignment": 16
+          },
+          "backend": "ensemble",
+          "cuda_architectures": [
+            86
+          ],
+          "source_digest": "208eacf4f05ccff6c8b8f7bc52a6e523189049f37dd4eb989c7ab390bc566f89",
+          "cutlass_digest": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+          "toolchain": {
+            "cmake": "/venv/main/bin/cmake\ncmake version 4.4.4\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+            "nvcc": "/usr/local/cuda-12.8/bin/nvcc\nnvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+            "cxx": "/usr/bin/x86_64-linux-gnu-g++-13\nx86_64-linux-gnu-g++-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+          },
+          "target": "production_runner_libtorch_stream1",
+          "nccl": {
+            "include_dir": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/include",
+            "library": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2",
+            "header_sha256": "06b934792a70f08cafabd96b8f94015b143a182fbb3bc56ac71c4c6de7deb971",
+            "library_sha256": "1792291e26d2b27fe51e59cf4dbd361dbfa84cbfe8ee8196c087c7ebf5146d48"
+          },
+          "build_mode": "release-debug-logs-v1",
+          "inference_backend": "cutlass",
+          "calibration_binary_name": "stream1_ensemble_benchmark",
+          "calibration_protocol": "json-session-v1",
+          "plan_calibration_protocol": "json-session-v1",
+          "component_calibration_protocol": "exact-capacity-v1",
+          "torch": {
+            "version": "2.11.0+cu128",
+            "cuda": "12.8",
+            "cxx11_abi": true,
+            "cmake_prefix": "/venv/main/lib/python3.12/site-packages/torch/share/cmake"
+          },
+          "build_key": "a0113fe33b393d33931c27bb674e1a95ca6b75196cc354a2e5116c0bc02002df",
+          "binary_sha256": "e97f20da52a8b25256ddf4d88287a088c8880c122800e7e020de30ccf0cd1d94",
+          "calibration_binary_sha256": "3b3a07736e180621d9c9d7b5365c404e3196f1b06faa0b3eef4b6bbf3647b3e6"
+        },
+        "profile": {
+          "policy": "cutlass-default-v1",
+          "inference_backend": "cutlass",
+          "inference_row_limit": 8192,
+          "cuda_architectures": [
+            86
+          ],
+          "gpu_names": [
+            "NVIDIA GeForce RTX 3060"
+          ],
+          "memory_planning": "native_auto",
+          "autotuned": false
+        },
+        "model_artifact_hash": "da302c5cb59d879d7230a4678f5a130555e68ef60d02d2fdcfbd4cc79897d9ac",
+        "graph_hash": "0c732dfeab67744747ea018c3e8574647957d770aa0d781cd431a4a49409bdd9",
+        "devices": [
+          0
+        ],
+        "requested_beam_width": 1024,
+        "microbatch": {
+          "native_default_row_budget": 8192,
+          "configured_row_budget": 682,
+          "derived_parent_batch": 682,
+          "derived_candidates_per_slot": 2046,
+          "reference_logical_shard": 1024,
+          "reference_shard_storage": 2048,
+          "adjusted_for_small_beam": true
+        },
+        "requested_max_steps": 16,
+        "native_forward_depth_limit": 16,
+        "configured_touch_bfs_radius": 0,
+        "effective_touch_bfs_radius": 0,
+        "touch_bfs_max_entries": 1048576,
+        "touch_bfs_worst_case_entries": 1,
+        "replay_valid": true,
+        "log_path": "/root/gnn-beam-result/cache/runs/77e2509824b646abb5cc5266db5fc941/native.log",
+        "native_seconds": 10.7764,
+        "terminal_records": 1,
+        "observed_parent_batch": 682,
+        "observed_inference_rows": 682,
+        "observed_stream3_batch_candidates": 14322,
+        "backend": "native",
+        "inference_backend": "cutlass",
+        "heuristic": null,
+        "model_hash": "da302c5cb59d879d7230a4678f5a130555e68ef60d02d2fdcfbd4cc79897d9ac",
+        "effective_beam_width": 4096,
+        "elapsed_seconds": 12.14778485900024,
+        "run_dir": "/root/gnn-beam-result/cache/runs/77e2509824b646abb5cc5266db5fc941",
+        "scoring": "scalar_children",
+        "status": "found"
+      }
+    },
+    {
+      "backend": "cutlass",
+      "model": "blend3",
+      "path_length": 3,
+      "metadata": {
+        "build": {
+          "schema_version": 1,
+          "shape": {
+            "state_len": 4,
+            "storage_len": 16,
+            "move_count": 3,
+            "alignment": 16
+          },
+          "backend": "ensemble",
+          "cuda_architectures": [
+            86
+          ],
+          "source_digest": "208eacf4f05ccff6c8b8f7bc52a6e523189049f37dd4eb989c7ab390bc566f89",
+          "cutlass_digest": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+          "toolchain": {
+            "cmake": "/venv/main/bin/cmake\ncmake version 4.4.4\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+            "nvcc": "/usr/local/cuda-12.8/bin/nvcc\nnvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+            "cxx": "/usr/bin/x86_64-linux-gnu-g++-13\nx86_64-linux-gnu-g++-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+          },
+          "target": "production_runner_libtorch_stream1",
+          "nccl": {
+            "include_dir": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/include",
+            "library": "/venv/main/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2",
+            "header_sha256": "06b934792a70f08cafabd96b8f94015b143a182fbb3bc56ac71c4c6de7deb971",
+            "library_sha256": "1792291e26d2b27fe51e59cf4dbd361dbfa84cbfe8ee8196c087c7ebf5146d48"
+          },
+          "build_mode": "release-debug-logs-v1",
+          "inference_backend": "cutlass",
+          "calibration_binary_name": "stream1_ensemble_benchmark",
+          "calibration_protocol": "json-session-v1",
+          "plan_calibration_protocol": "json-session-v1",
+          "component_calibration_protocol": "exact-capacity-v1",
+          "torch": {
+            "version": "2.11.0+cu128",
+            "cuda": "12.8",
+            "cxx11_abi": true,
+            "cmake_prefix": "/venv/main/lib/python3.12/site-packages/torch/share/cmake"
+          },
+          "build_key": "a0113fe33b393d33931c27bb674e1a95ca6b75196cc354a2e5116c0bc02002df",
+          "binary_sha256": "e97f20da52a8b25256ddf4d88287a088c8880c122800e7e020de30ccf0cd1d94",
+          "calibration_binary_sha256": "3b3a07736e180621d9c9d7b5365c404e3196f1b06faa0b3eef4b6bbf3647b3e6"
+        },
+        "profile": {
+          "policy": "cutlass-default-v1",
+          "inference_backend": "cutlass",
+          "inference_row_limit": 8192,
+          "cuda_architectures": [
+            86
+          ],
+          "gpu_names": [
+            "NVIDIA GeForce RTX 3060"
+          ],
+          "memory_planning": "native_auto",
+          "autotuned": false
+        },
+        "model_artifact_hash": "35407add4ac61567d4b1699c2e2fda4907ad93c64b47f9462e24e5964fe40e03",
+        "graph_hash": "0c732dfeab67744747ea018c3e8574647957d770aa0d781cd431a4a49409bdd9",
+        "devices": [
+          0
+        ],
+        "requested_beam_width": 1024,
+        "microbatch": {
+          "native_default_row_budget": 8192,
+          "configured_row_budget": 682,
+          "derived_parent_batch": 682,
+          "derived_candidates_per_slot": 2046,
+          "reference_logical_shard": 1024,
+          "reference_shard_storage": 2048,
+          "adjusted_for_small_beam": true
+        },
+        "requested_max_steps": 16,
+        "native_forward_depth_limit": 16,
+        "configured_touch_bfs_radius": 0,
+        "effective_touch_bfs_radius": 0,
+        "touch_bfs_max_entries": 1048576,
+        "touch_bfs_worst_case_entries": 1,
+        "replay_valid": true,
+        "log_path": "/root/gnn-beam-result/cache/runs/063475decefa4b289dc4de8bfb503ae2/native.log",
+        "native_seconds": 29.2028,
+        "terminal_records": 1,
+        "observed_parent_batch": 682,
+        "observed_inference_rows": 682,
+        "observed_stream3_batch_candidates": 14322,
+        "backend": "native",
+        "inference_backend": "cutlass",
+        "heuristic": null,
+        "model_hash": "35407add4ac61567d4b1699c2e2fda4907ad93c64b47f9462e24e5964fe40e03",
+        "effective_beam_width": 4096,
+        "elapsed_seconds": 30.93756237498019,
+        "run_dir": "/root/gnn-beam-result/cache/runs/063475decefa4b289dc4de8bfb503ae2",
+        "scoring": "scalar_children",
+        "status": "found"
+      }
+    }
+  ],
+  "status": "PASS",
+  "scope": "synthetic tiny full beam; not trained quality"
+}

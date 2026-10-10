@@ -1,0 +1,8 @@
+{
+  "libtorch_max_error": 0.0003662109375,
+  "cutlass_max_error": 0.0008544921875,
+  "cutlass": "PASS",
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "libtorch": "PASS",
+  "scope": "native GNN features; not full beam search or trained quality"
+}
