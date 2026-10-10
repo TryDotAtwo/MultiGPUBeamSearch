@@ -32,6 +32,7 @@ def service_envelope(rows, plan, *, moves, inference_seconds, parent_batch):
             # ignores sort pressure on the inference producer. Minimize total
             # service work; do not claim its sum is an actual depth duration.
             'service_work_seconds':t1+t3+t4+transport+union,
+            'downstream_service_work_seconds':t3+t4+transport+union,
             'inference_seconds':t1,'stream3_seconds':t3,'stream4_seconds':t4,
             'transport_seconds':transport,'union_seconds':union,
             'scope':'isolated exact-capacity service envelope; not full-step timing'}
@@ -89,6 +90,10 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                     proposed.append((candidate_name,dict(candidate_env,**proposal)))
                 else:
                     proposed.append(('service-staging',dict(baseline,**proposal)))
+                if proposal['BEAM_STREAM3_RING_SLOTS']!=baseline['BEAM_STREAM3_RING_SLOTS']:
+                    # Do not let a smaller flush batch mask a staging gain.
+                    proposed.append(('staging-only',dict(baseline,
+                        BEAM_STREAM3_RING_SLOTS=proposal['BEAM_STREAM3_RING_SLOTS'])))
                 # Keep the inference winner frozen while testing amortization
                 # of dispatch/transport over two inference batches. Admission
                 # must preserve the exact frontier; no rounded smaller proxy.
@@ -129,7 +134,8 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                 value=service_envelope(cohort,target[0],moves=moves,
                     inference_seconds=inference['estimate']['median'],parent_batch=inference['parent_batch'])
                 samples.append(Measurement(name,plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
-                    (value['service_work_seconds'],),True,True))
+                    # Frozen inference is a constant, not an improvement hurdle.
+                    (value['downstream_service_work_seconds'],),True,True))
         except ValueError as error:
             if name=='baseline':raise
             tested.append({'name':name,'rejected':str(error)})
@@ -144,6 +150,5 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
             'pipeline_verified':False,'cache_hit':False,'tested':tested,
             'selection':best['name'],'estimate':best['estimate'],
             'selection_rejections':rejected,
-            'selection_objective':'minimize summed service work; proxy only, not full-step wall time',
-            'search_policy':'baseline plus at most five exact-capacity candidates; frozen inference microbatch'}
-
+            'selection_objective':'minimize summed downstream service work after frozen inference; proxy only, not full-step wall time',
+            'search_policy':'baseline plus at most six exact-capacity candidates; frozen inference microbatch'}

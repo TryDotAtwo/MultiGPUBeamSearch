@@ -98,3 +98,34 @@ def test_outer_and_sort_candidates_keep_exact_frontier_and_inference(monkeypatch
     assert all(beam==16384 and env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256' for beam,env in requested)
     assert result['workload_parents']==16384
 
+
+def test_frozen_expensive_inference_cannot_mask_downstream_improvement():
+    from multigpubeamsearch.component_autotune import tune_components
+    plan=dict(frontier_state_capacity=8192,GLOBAL_BEAM_WIDTH_EFFECTIVE=16384,
+        WORLD_SIZE=2,SHARD_COUNT=4,SHARD_CAPACITY_CANDIDATES=8192,
+        STREAM4_BATCH_CANDIDATES=1024,STREAM4_BATCH_ALIGNMENT=1024)
+    baseline=dict(BEAM_B_MICRO='256',BEAM_ENSEMBLE_INFERENCE_MICRO='256',
+        BEAM_SHARD_COUNT='4',BEAM_STREAM3_RING_SLOTS='4',BEAM_STREAM4_ACTIVE_SORT_SLOTS='1',
+        BEAM_STREAM4_BATCH_CANDIDATES='1024')
+    class Planner:
+        supports_components=True
+        def admit(self,beam,env):
+            assert beam==16384 and env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256'
+            return [dict(plan,STREAM4_BATCH_CANDIDATES=int(env['BEAM_STREAM4_BATCH_CANDIDATES']))]*2
+    class Probe:
+        deadline=time.monotonic()+10;beam=16384
+        def measure_components(self,env,plans,move_count):
+            return [dict(outer_candidates=int(env['BEAM_B_MICRO'])*int(env['BEAM_STREAM3_RING_SLOTS'])*move_count,
+                shard_capacity=8192,sort_jobs_concurrent=int(env['BEAM_STREAM4_ACTIVE_SORT_SLOTS']),
+                stream3_seconds=[.00001]*5,stream4_group_seconds=[.00001]*5,
+                union_seconds=[.0001]*5,transport=[])]*2
+    results=[]
+    for inference_seconds in (1e-7,1.0):
+        results.append(tune_components(Probe(),Planner(),[plan]*2,baseline,[],moves=3,
+            inference={'estimate':{'median':inference_seconds},'parent_batch':256}))
+    assert results[0]['selection']==results[1]['selection']!='baseline'
+    for result in results:
+        base=next(r for r in result['tested'] if r['name']=='baseline')
+        assert result['estimate']['downstream_service_work_seconds']<base['estimate']['downstream_service_work_seconds']
+        assert result['environment']['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256'
+        assert result['pipeline_verified'] is False
