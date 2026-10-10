@@ -1,0 +1,1 @@
+{"instance_id": 55193936, "label": "gnn-libtorch-cutlass-3060-20261010", "budget_usd": 5, "quoted_hourly_usd": 0.0811111111111111, "created_at": 1791629146, "destroyed_at": 1791630920, "archives_verified": true, "archive_commit": "c9660e3fb1ef12e96af20d53ff1f43cff883fb73", "stop_success": true, "destroy_success": true, "absence_verified": true}
