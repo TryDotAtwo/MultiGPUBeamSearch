@@ -643,7 +643,9 @@ def _publish_best_effort(
                 print(f"[publication] archive={archive_index + 1}/{len(archives)} HTTP={published.status_code} ok={published.ok}", flush=True)
         ok = all(status.ok for status in statuses)
         status_payload = {
-            "state": "published" if ok else "failed",
+            "state": "accepted" if ok else "failed",
+            "published": False,
+            "catalog_url": "https://github.com/TryDotAtwo/cayleypy-beam-results/tree/main/data",
             "ok": ok,
             "retryable": any(status.retryable for status in statuses),
             "safe_error": None if ok else "; ".join(
