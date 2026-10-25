@@ -3,8 +3,8 @@
 Equations follow runtime_config.cpp and static_memory.cu. Named allocations
 give a LOWER bound; CUB, models, activations, partition/finalization scratch,
 alignment and driver reserves must still be supplied by the native planner.
-native_b_micro is the native configuration value, NOT necessarily the model
-parent batch (scalar MLP's native value includes child rows).
+native_b_micro is the native outer parent count, NOT the model inference
+microbatch or scalar MLP's BEAM_B_MICRO environment child-row budget.
 """
 from dataclasses import asdict,dataclass
 import math
@@ -46,9 +46,10 @@ def ring_pool_limit(environment):
 def geometry(shape,shards,staging_slots=2,sort_slots=1,*,physical_ring_limit=None):
     for value in (shards,staging_slots,sort_slots):
         if type(value) is not int or value<=0:raise ValueError('positive geometry required')
-    effective=round_up(shape.requested_beam,shape.gpus*shards*shape.alignment)
+    effective=shape.requested_beam
+    aligned=round_up(effective,shape.gpus*shards*shape.alignment)
     local=ceil_div(effective,shape.gpus)
-    logical=ceil_div(local,shards)
+    logical=ceil_div(ceil_div(aligned,shape.gpus),shards)
     q=staging_slots*shape.native_b_micro*shape.moves
     rings=ceil_div(logical*staging_slots,q)
     if physical_ring_limit is not None:
@@ -72,7 +73,7 @@ def geometry(shape,shards,staging_slots=2,sort_slots=1,*,physical_ring_limit=Non
     scratch_named=max(prefix_ring_network+prefix_sort,prefix_union,current_frontier)
     lower=current_frontier+scratch_named+survivors+histograms
     return dict(requested_beam=shape.requested_beam,effective_beam=effective,
-        padding=effective-shape.requested_beam,local_parents=local,shards=shards,
+        padding=aligned-effective,local_parents=local,shards=shards,
         staging_slots=staging_slots,sort_slots=sort_slots,transaction_candidates=q,
         logical_shard=logical,physical_shard_capacity=capacity,ring_count=rings,
         physical_stream1_slots=rings*staging_slots,
@@ -86,9 +87,8 @@ def memory_shortlist(shape,*,staging_slots=2,sort_slots=1,limit=3,
                      effective_beam=None,budget_bytes=None,physical_ring_limit=None):
     """Cheap memory seed only. Never accept a row as native-admitted/fastest.
 
-    If geometry is not frozen yet, choose a memory seed then restrict all
-    comparators to that seed's exact effective frontier. Requested beam is
-    retained. Reject ONLY known-impossible rows from the partial memory bound.
+    All shard geometries preserve the exact requested logical frontier.
+    Alignment changes buffer capacity only. Reject ONLY known-impossible rows from the partial memory bound.
     """
     if type(limit) is not int or not 1<=limit<=3:raise ValueError('limit must be1..3')
     rows=[]

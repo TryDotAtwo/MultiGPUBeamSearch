@@ -77,3 +77,60 @@ def test_width_identity_and_changed_native_geometry_cannot_reuse_receipt(tmp_pat
         fresh=copy.deepcopy(plans)
         for p in fresh:p[key]=value
         assert read_profile(path,identity,lambda env:fresh) is None
+
+def full_receipt():
+    from multigpubeamsearch.calibration_stats import Measurement, select
+    identity,data,plans=receipt()
+    identity['full_frontier']=True
+    data['tested'][0]['name']='baseline'
+    samples=[Measurement('baseline',1024,(.1,.11),True,True) for _ in range(5)]
+    winner,_=select(samples,baseline='baseline')
+    rows=[r.__dict__ for r in samples]
+    data.update(phase='pipeline_measured',pipeline_verified=True,selection='baseline',
+        full_grid_complete=True,measurement_scope='full_requested_frontier',
+        full_comparison_measurements=rows,measurements=rows,estimate=winner.__dict__)
+    return identity,data,plans
+
+
+def test_full_grid_cache_preserves_measured_scope_and_readmits(tmp_path):
+    identity,data,plans=full_receipt();path=tmp_path/'full.json'
+    write_profile(path,identity,data)
+    calls=[]
+    result=read_profile(path,identity,lambda env:(calls.append(env) or plans))
+    assert result['pipeline_verified'] is True and result['cache_hit']
+    assert result['measurement_scope']=='full_requested_frontier'
+    assert len(calls)==1
+    assert read_profile(path,identity,lambda env:plans[:1]) is None
+
+
+def test_full_cache_rejects_unmeasured_grid_bad_timings_and_wrong_winner():
+    identity,data,plans=full_receipt()
+    assert valid_receipt(data,identity)
+    for mutation in (
+        lambda x:x.update(full_grid_complete=False),
+        lambda x:x['full_comparison_measurements'][0].update(parents=2048),
+        lambda x:x['full_comparison_measurements'][0].update(seconds_by_rank=(.1,)),
+        lambda x:x['full_comparison_measurements'][0].update(correctness_passed=False),
+        lambda x:x['estimate'].update(median=.00001),
+        lambda x:x['tested'].append(dict(x['tested'][0],name='unmeasured')),
+    ):
+        corrupt=copy.deepcopy(data);mutation(corrupt)
+        assert not valid_receipt(corrupt,identity)
+
+def test_adaptive_cache_binds_search_trace_and_measured_subset(tmp_path):
+    identity,data,plans=full_receipt()
+    identity.update(policy='hardware-coarse-fine-v1',adaptive_context={'budget_bytes':1024})
+    data['full_tested']=['baseline']
+    data['adaptive_search']=dict(context=identity['adaptive_context'],
+        stop_reason='no_statistically_separated_gain',coarse_full_tested=['baseline'],rounds=[])
+    assert valid_receipt(data,identity)
+    for mutation in (
+        lambda d:d['adaptive_search'].update(stop_reason='time_budget'),
+        lambda d:d['adaptive_search'].update(context={'budget_bytes':2048}),
+        lambda d:d['adaptive_search'].update(coarse_full_tested=[]),
+        lambda d:d.update(full_tested=[]),
+    ):
+        bad=copy.deepcopy(data);mutation(bad)
+        assert not valid_receipt(bad,identity)
+    path=tmp_path/'adaptive.json';write_profile(path,identity,data)
+    assert read_profile(path,identity,lambda env:plans)['cache_hit']

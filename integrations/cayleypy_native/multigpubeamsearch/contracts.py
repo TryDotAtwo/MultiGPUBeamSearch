@@ -57,12 +57,15 @@ class GraphContract:
         # Small states intentionally select a shape-specific native build. The
         # source reserves aligned storage of at least ``size + 4`` bytes, so
         # FinalResponse metadata never overlaps the logical state.
-        if type(size) is not int or not 1 <= size <= 120:
-            raise NativeUnavailable("native logical state length must be in [1, 120]")
+        # Cube555 uses 150 colored facelets and 160-byte aligned storage.
+        # Positions are uint8 gather indices; values remain bounded separately.
+        if type(size) is not int or not 1 <= size <= 150:
+            raise NativeUnavailable("native logical state length must be in [1, 150]")
         center = _integers(definition.central_state, "central_state", size)
         start = _integers(start_state, "start_state", size, single_row=True)
-        if any(not 0 <= x <= 127 for x in center + start):
-            raise NativeUnavailable("native state values must be integers in [0, 127]")
+        value_max = 255 if size > 128 else 127
+        if any(not 0 <= x <= value_max for x in center + start):
+            raise NativeUnavailable(f"native state values must be integers in [0, {value_max}]")
         if Counter(center) != Counter(start):
             raise NativeUnavailable("start_state multiset must exactly match central_state")
         generators = tuple(_integers(g, "generator", size) for g in definition.generators_permutations)

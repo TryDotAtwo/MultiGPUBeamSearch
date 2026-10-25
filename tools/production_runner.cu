@@ -5149,9 +5149,11 @@ int run_production_runner(int argc, char** argv) {
                   << (predict_stats.jsonl_path.empty() ? "" : predict_stats.jsonl_path.string())
                   << "\n";
     }
+    const std::uint64_t benchmark_parent_count =
+        logical_rank_frontier(plan.derived.global_beam_width_effective, world_size, rank);
     std::uint64_t frontier_size = rank == 0U ? 1ULL : 0ULL;
     if(!benchmark_frontier.empty()) {
-        frontier_size=benchmark::load_frontier(benchmark_frontier,memory.current_frontier_states,plan.frontier_states,stream1_model.num_classes);
+        frontier_size=benchmark::load_frontier(benchmark_frontier,memory.current_frontier_states,benchmark_parent_count,stream1_model.num_classes);
         if(world_size>1U) {
             require_nccl(ncclAllReduce(stream1_scratch.transformer_numeric_error,stream1_scratch.transformer_numeric_error,1,ncclUint32,ncclMax,nccl_runtime.comm,streams.stream5),"benchmark ready barrier");
             BEAM_CUDA_CHECK(cudaStreamSynchronize(streams.stream5));
@@ -5177,7 +5179,7 @@ int run_production_runner(int argc, char** argv) {
             // searches never enter this branch; native per-depth resets remain
             // responsible for thresholds, buffers and service counters.
             frontier_size=benchmark::load_frontier(benchmark_frontier,memory.current_frontier_states,
-                plan.frontier_states,stream1_model.num_classes);
+                benchmark_parent_count,stream1_model.num_classes);
             if(world_size>1U) {
                 require_nccl(ncclAllReduce(stream1_scratch.transformer_numeric_error,
                     stream1_scratch.transformer_numeric_error,1,ncclUint32,ncclMax,
@@ -5785,7 +5787,7 @@ int run_production_runner(int argc, char** argv) {
         if (!benchmark_frontier.empty()) {
             std::cout << "calibration_depth=" << depth
                       << " rank=" << rank
-                      << " parents=" << plan.frontier_states
+                      << " parents=" << benchmark_parent_count
                       << " depth_sec=" << depth_sec
                       << " next_frontier_size=" << frontier_size << std::endl;
         }

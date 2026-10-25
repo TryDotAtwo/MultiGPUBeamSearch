@@ -82,8 +82,8 @@ def write_frontiers(contract, rank_counts, storage_len, directory, *, deadline,
     """
     import numpy as np
     counts=tuple(rank_counts)
-    if not counts or any(type(n) is not int or n<=0 for n in counts):
-        raise ValueError('rank frontier counts must be positive integers')
+    if not counts or any(type(n) is not int or n<0 for n in counts) or sum(counts)<=0:
+        raise ValueError('rank frontier counts must be nonnegative integers with positive total')
     if storage_len<contract.state_len or type(storage_len) is not int:
         raise ValueError('invalid native state storage size')
     total=sum(counts)

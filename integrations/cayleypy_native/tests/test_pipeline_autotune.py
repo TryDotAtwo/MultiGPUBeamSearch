@@ -61,34 +61,38 @@ def test_exact_measurement_preserves_requested_beam_and_inference(tmp_path, monk
     assert [beam for beam, _ in calls] == [1000000]*4
 
 
-def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch):
+@pytest.mark.parametrize('beam',[1024,2_097_152])
+def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,beam):
     from multigpubeamsearch.calibration_stats import Measurement
-    from multigpubeamsearch import component_autotune,beam_geometry
-    plan=dict(frontier_state_capacity=512,GLOBAL_BEAM_WIDTH_EFFECTIVE=1024,
+    from multigpubeamsearch import component_autotune,beam_geometry,adaptive_profiles
+    plan=dict(frontier_state_capacity=beam//2,GLOBAL_BEAM_WIDTH_EFFECTIVE=beam,
         SHARD_COUNT=4,STREAM3_RING_SLOTS=2,STREAM4_ACTIVE_SORT_SLOTS=1,
-        STREAM4_BATCH_CANDIDATES=1024,STREAM4_BATCH_ALIGNMENT=1024,gpu_budget_bytes=10**9)
+        STREAM4_BATCH_CANDIDATES=1024,STREAM4_BATCH_ALIGNMENT=1024,gpu_budget_bytes=10**9,
+        estimated_required_device_bytes=100)
     class Probe:
         def __init__(self,*args,**kwargs):pass
         def admit(self,env):return [plan]*2
         def measure(self,env,plans):
             seconds=.01 if env.get('marker')=='base' else .03
-            return [Measurement('unused',1024,(seconds,seconds),True,True)]*5
+            return [Measurement('unused',beam,(seconds,seconds),True,True)]*5
     def components(probe,session,plans,baseline,candidates,**kwargs):
         base=dict(baseline,marker='base');candidate=dict(baseline,marker='candidate')
         return dict(selection='candidate',environment=candidate,
-            tested=[dict(name='baseline',plans=plans,environment=base),
-                    dict(name='candidate',plans=plans,environment=candidate)])
+            tested=[dict(name='baseline',plans=plans,environment=base,estimate={'downstream_service_work_seconds':2}),
+                    dict(name='candidate',plans=plans,environment=candidate,estimate={'downstream_service_work_seconds':1})])
     monkeypatch.setattr(module,'NativePipelineProbe',Probe)
     monkeypatch.setattr(module,'verify_prepared_model',lambda *a:None)
     monkeypatch.setattr(module,'write_frontiers',lambda *a,**kw:{'legal':True})
     monkeypatch.setattr(component_autotune,'tune_components',components)
     monkeypatch.setattr(beam_geometry,'memory_shortlist',lambda *a,**kw:[])
+    monkeypatch.setattr(adaptive_profiles,'context',lambda *a:{})
+    monkeypatch.setattr(adaptive_profiles,'proposals',lambda *a,**kw:([],{}))
     result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
         SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
         SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=True,
-            calibration_frontier_max_states=None,calibration_max_batch=256),[0,1],1024,tmp_path,{},'runner',
+            calibration_frontier_max_states=None,calibration_max_batch=256),[0,1],beam,tmp_path,{},'runner',
         {'parent_batch':256,'phase':'inference_verified'})
-    assert result['selection']=='baseline-full-verified'
+    assert result['selection']=='baseline'
     assert result['environment']['marker']=='base'
     assert result['estimate']['profile']=='baseline'
     assert len(result['full_comparison_measurements'])==10
@@ -125,3 +129,46 @@ def test_native_scalar_inference_parent_batch_maps_to_child_row_budget(tmp_path,
         {'parent_batch':256,'phase':'inference_verified'})
     assert result['environment']['BEAM_B_MICRO']=='768'
     assert all(env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256' for _,env in calls)
+
+def test_full_refinement_uses_measured_winner_and_stops(tmp_path,monkeypatch):
+    from multigpubeamsearch import component_autotune,adaptive_profiles,pipeline_cache
+    from multigpubeamsearch.calibration_stats import Measurement
+    centers=[];measured=[]
+    plan=dict(frontier_state_capacity=4097,GLOBAL_BEAM_WIDTH_EFFECTIVE=4097,
+        SHARD_COUNT=4,STREAM3_RING_SLOTS=2,STREAM4_ACTIVE_SORT_SLOTS=1,
+        STREAM4_BATCH_CANDIDATES=1024,STREAM4_BATCH_ALIGNMENT=1024,
+        gpu_budget_bytes=10**9,estimated_required_device_bytes=100,WORLD_SIZE=1)
+    class Probe:
+        def __init__(self,*args,**kw):self.deadline=kw['deadline']
+        def admit(self,env):return [dict(plan)]
+        def measure_components(self,*a,**kw):return [{}]
+        def measure(self,env,plans):
+            batch=int(env['BEAM_STREAM4_BATCH_CANDIDATES']);measured.append(batch)
+            return [Measurement('x',4097,({1024:10,2048:8,3072:6,4096:6.01}[batch],),True,True)]*5
+    def components(probe,session,plans,baseline,candidates,**kw):
+        env=dict(baseline,BEAM_STREAM4_BATCH_CANDIDATES='2048')
+        rows=[dict(name='baseline',environment=baseline,plans=plans,estimate={'downstream_service_work_seconds':2}),
+              dict(name='coarse',environment=env,plans=plans,estimate={'downstream_service_work_seconds':1})]
+        return dict(tested=rows)
+    def neighbors(shape,env,context,**kw):
+        centers.append(int(env['BEAM_STREAM4_BATCH_CANDIDATES']))
+        value=centers[-1]+1024
+        return [('batch',dict(env,BEAM_STREAM4_BATCH_CANDIDATES=str(value)))],{}
+    monkeypatch.setattr(module,'NativePipelineProbe',Probe)
+    monkeypatch.setattr(module,'verify_prepared_model',lambda *a:None)
+    monkeypatch.setattr(module,'write_frontiers',lambda *a,**kw:{'legal':True})
+    monkeypatch.setattr(component_autotune,'tune_components',components)
+    monkeypatch.setattr(component_autotune,'service_envelope',lambda *a,**kw:{'downstream_service_work_seconds':1})
+    monkeypatch.setattr(adaptive_profiles,'context',lambda *a:{})
+    monkeypatch.setattr(adaptive_profiles,'proposals',neighbors)
+    monkeypatch.setattr(pipeline_cache,'cache_identity',lambda *a,**kw:None)
+    result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
+        SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
+        SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=True,
+            calibration_frontier_max_states=None,calibration_max_batch=256),[0],4097,tmp_path,{},'runner',
+        {'parent_batch':256,'phase':'inference_verified','estimate':{'median':.001}})
+    assert centers==[2048,3072]
+    assert measured==[1024,2048,3072,4096]
+    assert result['environment']['BEAM_STREAM4_BATCH_CANDIDATES']=='3072'
+    assert result['adaptive_search']['stop_reason']=='no_statistically_separated_gain'
+    assert len(result['full_tested'])==4

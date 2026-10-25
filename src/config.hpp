@@ -9,7 +9,9 @@ namespace beam {
 inline constexpr std::size_t STATE_LEN = BEAM_STATE_LOGICAL_BYTES;
 inline constexpr std::size_t STATE_STORAGE_LEN = BEAM_STATE_PHYSICAL_BYTES;
 inline constexpr std::size_t STATE_ALIGNMENT = BEAM_STATE_ALIGNMENT;
-inline constexpr std::size_t STATE_VALUE_PAD = 128;
+// Larger permutation puzzles include sticker IDs 128..149 (Cube555).
+// Keep the historical alphabet/table footprint for <=128-position builds.
+inline constexpr std::size_t STATE_VALUE_PAD = STATE_LEN > 128 ? 256 : 128;
 inline constexpr std::size_t MOVE_COUNT = BEAM_MOVE_COUNT;
 inline constexpr std::size_t FINAL_RESPONSE_TARGET_LOCAL_IDX_OFFSET = STATE_LEN;
 static_assert(STATE_LEN > 0);
@@ -97,6 +99,7 @@ std::uint32_t stream1_parent_batch_from_row_budget(std::uint32_t row_budget, con
 std::uint64_t stream1_inference_rows(std::uint32_t parent_batch, const Stream1ModelConfig& model);
 std::uint64_t round_up(std::uint64_t value, std::uint64_t alignment);
 DerivedConfig derive_config(const RuntimeConfig& config);
+std::uint64_t logical_rank_frontier(std::uint64_t width, std::uint32_t world, std::uint32_t rank);
 std::uint32_t q_to_score_key(float q);
 
 } // namespace beam

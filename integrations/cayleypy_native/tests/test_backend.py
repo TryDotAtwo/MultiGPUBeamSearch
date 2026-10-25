@@ -280,8 +280,8 @@ def test_timeout_kills_descendant_process(tmp_path):
     assert not marker.exists()
 
 
-@pytest.mark.parametrize('model_backend', ['mlp', 'ensemble'])
-def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(monkeypatch, tmp_path, model_backend):
+@pytest.mark.parametrize('model_backend,discover', [('mlp',False),('ensemble',False),('ensemble',True)])
+def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(monkeypatch, tmp_path, model_backend,discover):
     import torch
     import cayleypy_native.backend as backend
     import cayleypy_native.build as build
@@ -316,7 +316,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
         assert Path(loader_dirs[0]) == kwargs["cwd"] / "runtime-libs"
         assert (Path(loader_dirs[0]) / "libnccl.so.2").read_bytes() == original_nccl
         observed.update(command=command, **kwargs)
-        kwargs["log_path"].write_text("GLOBAL_BEAM_WIDTH_EFFECTIVE=1024\npuzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n")
+        kwargs["log_path"].write_text("GLOBAL_BEAM_WIDTH_EFFECTIVE=1000\npuzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n")
         return 0.1
 
     monkeypatch.setattr(backend, "run_process", fake_process)
@@ -324,9 +324,43 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     # its own artifact-backed regression test below.
     monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12, touch_bfs_max_entries=12345, autotune=False)
+    if discover:
+        from multigpubeamsearch import autotune,maximum_beam,inference_admission,pipeline_autotune
+        measured=[]
+        def inference(contract,model,runtime,options,devices,width,*args):
+            return dict(parent_batch=256,reserve_bytes=100,phase='inference_verified',
+                estimate={'median':.0001},signature={'requested_beam_width':width})
+        monkeypatch.setattr(autotune,'tune_inference',inference)
+        monkeypatch.setattr(maximum_beam,'capacity_seed',lambda x:dict(x))
+        def capacity(*args,**kwargs):
+            # Mutating probe state must not leak into the real execution.
+            args[3]['BEAM_SHARD_COUNT']='128'
+            return dict(effective_beam=8192,profile={'BEAM_SHARD_COUNT':'128'},
+                search_complete=False,wall_seconds=.1)
+        monkeypatch.setattr(maximum_beam,'discover_capacity',capacity)
+        class Session:
+            def close(self):pass
+        monkeypatch.setattr(inference_admission,'admit_inference',
+            lambda *args,**kwargs:(args[-1],Session()))
+        def downstream(contract,model,runtime,options,devices,width,run,env,*args,**kwargs):
+            measured.append(width)
+            if width==1000:assert 'BEAM_SHARD_COUNT' not in env
+            return dict(phase='pipeline_measured',pipeline_verified=True,
+                measurement_scope='full_requested_frontier',
+                environment={'BEAM_B_MICRO':'256','BEAM_ENSEMBLE_INFERENCE_MICRO':'256'})
+        monkeypatch.setattr(pipeline_autotune,'tune_downstream',downstream)
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12, touch_bfs_max_entries=12345,
+        autotune=discover,calibration_discover_capacity=discover,calibration_full_frontier=discover,
+        report_calibration=False)
     outcome = backend.run_native(contract, model, options, 1000, 4, tmp_path / "run", (0,))
     assert outcome.path == (1,)
+    if discover:
+        assert measured==[1000]
+        capacity_report=outcome.metadata['profile']['maximum_beam']
+        assert capacity_report.get('full_step_verified',False) is False
+        assert capacity_report['search_complete'] is False
+        assert outcome.metadata['requested_beam_width']==1000
+        assert capacity_report['execution_width_changed'] is False
     assert (tmp_path / "run/test.csv").read_text() == 'initial_state_id,initial_state\n0,"1,0"\n'
     assert list(json.loads((tmp_path / "run/puzzle_info.json").read_text())["generators"]) == ["m0", "m1"]
     assert observed["command"][-5:] == ["0", "1", "1000", "1", "0"]
@@ -450,10 +484,10 @@ def test_worker_uses_private_model_and_runner_snapshots_before_launch(monkeypatc
                            tmp_path / "run-tampered", (0,), runtime=runtime)
 
 
-def _rank_stream_fixture(root, rank, *, terminal=False):
+def _rank_stream_fixture(root, rank, *, terminal=False, beam=8192):
     directory = root / "test-session" / "attempt_0" / str(rank)
     directory.mkdir(parents=True)
-    stdout = f"WORLD_SIZE=2\nLOCAL_RANK={rank}\nCUDA_DEVICE_LOCAL_RANK={rank}\nGLOBAL_BEAM_WIDTH_EFFECTIVE=8192\n"
+    stdout = f"WORLD_SIZE=2\nLOCAL_RANK={rank}\nCUDA_DEVICE_LOCAL_RANK={rank}\nGLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
     if terminal:
         stdout += "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n"
     (directory / "stdout.log").write_text(stdout)
@@ -491,9 +525,9 @@ def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
         assert (run / "production_runner").read_bytes() == b"test-only runner bytes"
         assert kwargs["log_path"] == run / "launcher.log"
         kwargs["log_path"].write_text("test-only launcher diagnostic\n")
-        _rank_stream_fixture(run / "worker-logs", 0, terminal=True)
+        _rank_stream_fixture(run / "worker-logs", 0, terminal=True, beam=7)
         if mode == "success":
-            _rank_stream_fixture(run / "worker-logs", 1)
+            _rank_stream_fixture(run / "worker-logs", 1, beam=7)
         if mode == "failed_partial":
             raise NativeBackendError("native process failed rc=7")
         return 0.2

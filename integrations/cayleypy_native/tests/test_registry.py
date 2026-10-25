@@ -27,9 +27,13 @@ def test_enable_keeps_method_and_restores_previous_backend(tmp_path):
     try:
         dispatch.enable_native(NativeOptions(cache_dir=tmp_path))
         assert CayleyGraph.beam_search is original
-        assert cayleypy.get_default_beam_search_backend() == "auto"
+        assert cayleypy.get_default_beam_search_backend() == "native"
         with pytest.warns(NativeFallbackWarning):
-            assert graph().beam_search(start_state=[1, 0, 2, 3, 4], return_path=True).path == [2]
+            assert graph().beam_search(
+                backend="auto",
+                start_state=[1, 0, 2, 3, 4],
+                return_path=True,
+            ).path == [2]
         dispatch.disable_native()
         assert graph().beam_search() is sentinel
         assert CayleyGraph.beam_search is original
@@ -69,7 +73,7 @@ def test_disable_does_not_overwrite_another_default(tmp_path):
             dispatch.disable_native()
         assert cayleypy.get_default_beam_search_backend() == "torch"
     finally:
-        cayleypy.set_default_beam_search_backend("auto")
+        cayleypy.set_default_beam_search_backend("native")
 
 
 def test_explicit_torch_uses_only_upstream_contract(tmp_path, monkeypatch):

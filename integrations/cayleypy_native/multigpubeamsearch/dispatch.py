@@ -113,10 +113,18 @@ def _torch_call(original, graph, kwargs):
 def _parameters(kwargs):
     # Respect upstream's actual signature; typos must not disappear in **kwargs.
     signature = inspect.signature(BeamSearchAlgorithm.search)
-    bound = signature.bind(None, **kwargs)
+    upstream_kwargs = dict(kwargs)
+    adapter_only = {}
+    if "use_child_scores" not in signature.parameters:
+        # CayleyPy 0.1.0 predates child-scored Torch search, but native Q
+        # models already own this option. Keep validating every other keyword
+        # against the installed upstream signature.
+        adapter_only["use_child_scores"] = upstream_kwargs.pop("use_child_scores", False)
+    bound = signature.bind(None, **upstream_kwargs)
     bound.apply_defaults()
     params = dict(bound.arguments)
     params.pop("self", None)
+    params.update(adapter_only)
     params.setdefault("use_child_scores", False)  # Published CayleyPy 0.1.0 predates this option.
     unknown = set(params) - _SUPPORTED
     if unknown:

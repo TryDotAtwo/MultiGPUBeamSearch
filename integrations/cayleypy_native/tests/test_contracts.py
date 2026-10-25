@@ -63,8 +63,8 @@ def test_matrix_and_state_storage_limit_rejected():
     m = CayleyGraph(MatrixGroups.heisenberg(), device="cpu")
     with pytest.raises(NativeUnavailable, match="permutation"):
         GraphContract.from_graph(m, m.central_state)
-    g = CayleyGraph(PermutationGroups.lrx(121), device="cpu")
-    with pytest.raises(NativeUnavailable, match="120"):
+    g = CayleyGraph(PermutationGroups.lrx(151), device="cpu")
+    with pytest.raises(NativeUnavailable, match="150"):
         GraphContract.from_graph(g, g.central_state)
 
 

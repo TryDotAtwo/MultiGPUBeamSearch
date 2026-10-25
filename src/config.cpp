@@ -67,8 +67,20 @@ DerivedConfig derive_config(const RuntimeConfig& config) {
         throw std::overflow_error("beam width alignment exceeds uint64 capacity");
     }
     derived.beam_width_alignment = shard_domains * config.stream4_batch_alignment;
-    derived.global_beam_width_effective = round_up(config.user_global_beam_width, derived.beam_width_alignment);
+    // Alignment describes storage/dispatch geometry, never the global top-k.
+    // Expanding the logical beam here makes shard tuning change search semantics.
+    derived.global_beam_width_effective = config.user_global_beam_width;
     return derived;
+}
+
+std::uint64_t logical_rank_frontier(std::uint64_t width, std::uint32_t world, std::uint32_t rank) {
+    if (world == 0 || rank >= world) throw std::invalid_argument("invalid frontier rank");
+    const std::uint64_t remainder = width % world;
+    const auto boundary = [world,remainder](std::uint64_t r) {
+        const auto product = r * remainder;
+        return product / world + (product % world != 0);
+    };
+    return width / world + boundary(static_cast<std::uint64_t>(rank)+1) - boundary(rank);
 }
 
 std::uint32_t q_to_score_key(float q) {

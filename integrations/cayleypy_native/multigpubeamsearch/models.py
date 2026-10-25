@@ -226,6 +226,9 @@ def _load_unambiguous_manifest(manifest_path: Path) -> tuple[dict, bytes]:
 
 
 def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> PreparedModel:
+    if backend in ("cube555_transformer", "cube555_mlp"):
+        from .cube555_artifacts import validate_bundle
+        return validate_bundle(path, contract, backend)
     if backend == "pancake_gnn":
         from .gnn_artifacts import validate_gnn
         return validate_gnn(path, contract)

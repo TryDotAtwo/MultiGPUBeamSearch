@@ -29,6 +29,13 @@ def pipeline_candidates(inference_micro, baseline, *, max_outer=65536, tune_oute
     return result
 
 
+def rank_frontier_counts(plans):
+    """Logical rank quotas match native final exchange, excluding spare slots."""
+    width=plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'];world=len(plans)
+    return [((rank+1)*width+world-1)//world-(rank*width+world-1)//world
+            for rank in range(world)]
+
+
 def validate_rank_plans(plans):
     """Common beam/shard protocol plus exact independent memory admission."""
     if not plans:raise ValueError('no rank plans')

@@ -6,7 +6,7 @@ Install the multigpubeamsearch wheel and use `import multigpubeamsearch`.
 The historical `cayleypy_native` imports forward to the same objects for compatibility.
 This is the public Python namespace of MultiGPUBeamSearch; no import alias is needed.
 
-## Automatic API (development update, 2026-10-06)
+## Automatic API (current main, 2026-10-25)
 
 Install from the complete matching repository with
 `pip install ./integrations/cayleypy_native`, or install its built wheel. The wheel
@@ -53,13 +53,19 @@ silently reduced. Native allocation alignment may increase effective beam width;
 inspect `result.native_metadata` for requested/effective widths, executor,
 profile, build/model identities and replay validation.
 
-## Ensembles and inference-first calibration (development)
+`beam_width` is the one semantic global beam. A notebook requesting `3_100_000`
+must pass exactly `beam_width=3_100_000`; `2**20` is a different workload.
+Candidate dispatch batches and inference microbatches are separate autotuned
+execution parameters recorded in the native profile. They never replace or
+silently reduce the requested global beam.
 
-The current development source is on branch
-[`codex/fast-autotune-20261009`](https://github.com/TryDotAtwo/MultiGPUBeamSearch/tree/codex/fast-autotune-20261009).
-Install that matching compact checkout with
-`pip install ./integrations/cayleypy_native`; the default branch is not a release
-of this ensemble/autotune update.
+## Ensembles and inference-first calibration
+
+The ensemble/autotune implementation described here is present in repository
+`main`; the compatibility snapshot used below is
+`1d2a1841a533cabe17c37961c208a2dd14137c00`. Install the adapter from the same
+complete checkout so the Python package and embedded native source match. This
+source snapshot is not a claim that a corresponding PyPI release exists.
 
 ```python
 from multigpubeamsearch import NativeEnsemble, NativeOptions, enable_native
@@ -121,6 +127,15 @@ and public result API; the supported native path runs our existing CUDA/NCCL
 algorithm as a local subprocess. The public CayleyPy backend hook is used when
 available; released CayleyPy 0.1.0 also works through an explicit reversible
 in-memory wrapper. Neither library is patched on disk.
+
+As of 2026-10-25, CayleyPy `main` at
+`3cd11ecefc98e54d6fc0ccdec967d0bcc8ca4a93` does not contain the backend
+registry. CayleyPy PR #207, head
+`d74c3e1b1e80d7c89910d8c81bf21fded924299b`, contains the proposed hook but is
+still open. Therefore released CayleyPy and current upstream `main` use the
+opt-in reversible wrapper after `enable_native(...)`; importing this package
+alone never patches the class. The registry path is used only when those hook
+capabilities are actually installed, for example from the pinned PR head.
 
 This first integration has passed end-to-end validation on **two real Tesla T4**:
 LRX8, explicit prepared-model reuse, and a real N88/G24 Tetraminx artifact. Native
@@ -280,8 +295,8 @@ size are recorded in run metadata.
 
 | Selector | Behavior |
 | --- | --- |
-| `auto` (default) | Prepare a supported native run; otherwise warn with a concrete reason and call the saved original method with the original arguments. |
-| `native` | Reject unsupported graph/model/runtime/options with `NativeUnavailable`. |
+| `native` (default after `enable_native`) | Reject unsupported graph/model/runtime/options with `NativeUnavailable`. |
+| `auto` (explicit fallback) | Prepare a supported native run; otherwise warn with a concrete reason and call the saved original method with the original arguments. |
 | `torch` | Call the original method without probing CUDA or native compatibility. |
 
 Already-solved states and zero-step budgets return directly after graph/argument
@@ -306,8 +321,10 @@ application threads; the process default is resolved at call time.
 Older CayleyPy releases without the hook use a reversible process-wide wrapper;
 in that compatibility mode already captured methods retain their session.
 The PyPI release and the newer source API both report `0.1.0`, so support is
-detected from capabilities rather than the version string. Q-model
-`use_child_scores` requires the newer upstream API.
+detected from capabilities rather than the version string. The strict native
+Q-model path accepts `use_child_scores=True` as an adapter-owned option even on
+released CayleyPy 0.1.0. A Torch call, or an `auto` fallback that needs Torch
+child scoring, requires an upstream CayleyPy API that implements that option.
 
 With the public hook, `graph.beam_search(backend="torch", ...)` accepts only
 upstream arguments and an upstream predictor. For `NativeModel.fallback`
@@ -334,7 +351,7 @@ solution was found within this run's budget, not that the state is unreachable.
 | Component | Supported now |
 | --- | --- |
 | Graph | Permutation generators, one start state, target equal to graph center. |
-| State | 1–120 logical positions; integer labels 0–127; matching center/start multiset. Repeated colors are allowed by the graph boundary. |
+| State | 1–150 logical positions; integer labels 0–127 for lengths up to128, and0–255 above128; matching center/start multiset. Repeated colors are allowed by the graph boundary. |
 | Moves | Ordered gather permutations, 1–255 generators; touch-BFS additionally requires at most 32. |
 | State specialization | Build uses `STATE_LEN=n`, explicit move count, and storage `ceil((n+4)/16)*16`; small states do not retain a fixed 128-byte stride. |
 | Model runtime | Native MLP artifact, scalar or one output per move, FP16/BF16, supported BatchNorm-folded/LayerNorm schema. FP16 requires SM75+, BF16 SM80+. Current Q GEMM requires the move count divisible by 8; scalar output does not. |
@@ -396,12 +413,23 @@ when comparing workloads.
 
 ## Verification
 
-From a source checkout, run CPU tests against the pinned development API:
+From a source checkout, run the full CPU suite against current upstream `main`
+(the reversible-wrapper path):
 
 ```bash
-python -m pip install "git+https://github.com/cayleypy/cayleypy.git@28f3841b34009ea8d51bb36eece3dd0be757a145"
+python -m pip install "git+https://github.com/cayleypy/cayleypy.git@3cd11ecefc98e54d6fc0ccdec967d0bcc8ca4a93"
 python -m pip install -e './integrations/cayleypy_native[test]'
 CUDA_VISIBLE_DEVICES=-1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -B -m pytest integrations/cayleypy_native/tests -q
+```
+
+Test the proposed registry separately; this pin is PR #207, not merged
+upstream API:
+
+```bash
+python -m pip install "git+https://github.com/cayleypy/cayleypy.git@d74c3e1b1e80d7c89910d8c81bf21fded924299b"
+CUDA_VISIBLE_DEVICES=-1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -B -m pytest \
+  integrations/cayleypy_native/tests/test_dispatch.py \
+  integrations/cayleypy_native/tests/test_registry.py -q
 ```
 
 `examples/solve_lrx.py` is an offline smoke example. Without compatible weights it
@@ -425,11 +453,12 @@ Omit `--require-public-hook` when checking the legacy CayleyPy adapter path.
 Logs and generated weights stay local. The smoke checks both GPUs, path replay,
 prepared calls, exhausted budgets, source-cache reuse and two state sizes.
 
-CPU CI separately checks an installed wheel with released CayleyPy 0.1.0 and
-the development API. The public-hook integration and the public GPU acceptance
-harness, including cache-free host shortcuts, are covered by tests when that API
-is installed. Cross-call graph/model identity is compared only for cases that
-launch native workers; deterministic host shortcuts are checked separately.
+The compatibility matrix must separately check released CayleyPy 0.1.0,
+current upstream `main`, and the pinned PR #207 hook. The public-hook integration
+and the public GPU acceptance harness, including cache-free host shortcuts, are
+covered by tests only when that API is installed. Cross-call graph/model identity
+is compared only for cases that launch native workers; deterministic host
+shortcuts are checked separately.
 Native CUDA tests require a real compatible machine; CPU protocol fixtures are
 not a GPU performance result.
 
@@ -583,3 +612,62 @@ never falls back. A `NativeModel` constructed manually remains an unpinned
 source declaration unless its optional `expected_artifact_hash` is supplied;
 the per-search execution copy is always content-checked and isolated.
 
+
+## Cube555 explicit blend (local integration candidate)
+
+`tools.cube555.export.export_native_models(transformer_checkpoint, mlp_checkpoint,
+layout_path, puzzle_info_path, output_dir, contract=contract)` returns two separate
+`NativeModel` artifacts. Pass them in `NativeEnsemble((transformer, mlp), (.8,.2))`
+to the public CayleyPy call. Cube555 uses150 distinct sticker IDs and30 ordered
+moves; arbitrary150-position graphs are not admitted as these pretrained models.
+
+The feature bodies run FP16 TorchScript with scoped graph optimization disabled:
+profiling optimization otherwise changed real Transformer features after the first
+call. Linear heads use the existing FP32 ensemble accumulation/CUTLASS epilogue.
+This does not claim a fully fused native Transformer body.
+
+Bounded RTX A4000 acceptance: real3/4-move cases solved and replayed identically
+to the original FP16 model baseline at beam4096; inference and pipeline profile
+cache hits verified. Notebook index1000 completed two steps without a solution.
+Million-state beams,2xT4, multi-GPU Cube555 and saturated full-step throughput
+were not tested in this acceptance. See `test_results/integration_20261025/REPORT.md`.
+The prepared-source notebook remains unpublished.
+
+### Hardware-specific full-step calibration
+
+`NativeOptions(calibration_discover_capacity=True, calibration_full_frontier=True)`
+uses native admission to report the largest admitted frontier in its bounded
+profile search, reserving memory for measured inference. This diagnostic never
+replaces the requested `beam_width`. `search_complete=False` denotes a lower
+bound; memory admission is not a timing or full-step verification at that maximum.
+
+Profile selection uses complete steps on the requested logical width. Physical
+alignment cannot increase global top-k. Cached full-grid measurements require
+matching hardware/model/runtime/width and fresh all-rank memory admission.
+Changing the width requires its own measured profile. No hidden reduction is
+allowed when the requested width cannot be admitted.
+
+### Adaptive downstream search (local candidate)
+
+With `calibration_full_frontier=True`, the existing tuner builds its candidate
+domain from actual GPU SM count, reported L2 size when available, native VRAM
+budget, GPU count, exact beam, graph move/state sizes and the measured inference
+batch. Model, precision and topology remain part of the calibration identity;
+measured transport/service latency supplies staging and flush proposals.
+
+The coarse phase probes at most 16 candidates at exact native capacities.
+Component work/memory Pareto ranking supplies two full-step challengers plus
+the baseline. Up to two refinement rounds probe neighboring parameters around
+the measured full-step winner and compare at most two new full-step candidates
+per round. The 2% statistical improvement gate, time budget, no-new-neighbor
+condition and round bound provide explicit stopping conditions. This is the
+best measured profile in a bounded domain, not a global optimum guarantee.
+
+`pipeline_calibration.adaptive_search` records context, bounds, pruning, rounds
+and stopping reason; `full_tested` lists the profiles actually timed end to end.
+A time-budget or failed-neighbor-measurement stop preserves the measured result
+but cannot populate a completed-search cache. Cache identity includes a 256 MiB
+available-budget bucket, and every reuse still requires fresh native admission.
+Default component-only calibration remains explicitly unverified for full steps.
+
+Publication validation: [Cube555 adaptive acceptance](../../docs/validation/cube555-adaptive-20261025.md). GPU scope and limits are recorded there.

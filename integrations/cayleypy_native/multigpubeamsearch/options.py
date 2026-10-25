@@ -28,6 +28,7 @@ class NativeOptions:
     calibration_frontier_max_states: int | None = None
     report_calibration: bool = True
     calibration_full_frontier: bool = False
+    calibration_discover_capacity: bool = False
 
     def __post_init__(self):
         if self.inference_backend not in ("auto", "libtorch", "cutlass"):
@@ -54,6 +55,10 @@ class NativeOptions:
             raise ValueError("autotune must be boolean")
         if type(self.report_calibration) is not bool:
             raise ValueError('report_calibration must be boolean')
+        if type(self.calibration_discover_capacity) is not bool:
+            raise ValueError('calibration_discover_capacity must be boolean')
+        if self.calibration_discover_capacity and not self.autotune:
+            raise ValueError('capacity discovery requires autotune')
         if type(self.calibration_full_frontier) is not bool:
             raise ValueError('calibration_full_frontier must be boolean')
         if type(self.calibration_max_batch) is not int or not 1 <= self.calibration_max_batch <= 65536:

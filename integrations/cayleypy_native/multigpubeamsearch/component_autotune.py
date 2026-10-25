@@ -54,7 +54,7 @@ def service_geometry(rows,plan,*,moves,inference):
     return {'BEAM_STREAM4_BATCH_CANDIDATES':str(trigger),'BEAM_STREAM3_RING_SLOTS':str(ring)}
 
 
-def tune_components(probe, session, plans, baseline, candidates, *, moves, inference):
+def tune_components(probe, session, plans, baseline, candidates, *, moves, inference, candidate_factory=None):
     admitted=[('baseline',dict(baseline),plans)]
     persistent=session is not None and session.supports_components
     if not persistent:
@@ -110,6 +110,8 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                 if alternative!=lanes:
                     proposed.append(('sort-lanes-'+str(alternative),dict(baseline,
                         BEAM_STREAM4_ACTIVE_SORT_SLOTS=str(alternative))))
+                if candidate_factory is not None:
+                    proposed=candidate_factory(rows,target[0],proposal)
                 # Close all native memory owners before measuring another profile.
                 from .plan_session import NativePlanSession
                 from contextlib import nullcontext
@@ -121,7 +123,8 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
                             next_plans=planner.admit(probe.beam,next_env)
                             if next_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']==plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']:
                                 admitted.append((next_name,next_env,next_plans))
-                        except ValueError:
+                        except ValueError as error:
+                            tested.append({"name":next_name,"rejected":str(error)})
                             continue
             for repeat in range(5):
                 cohort=[]

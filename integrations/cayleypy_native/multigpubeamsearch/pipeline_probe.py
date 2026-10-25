@@ -10,7 +10,7 @@ import time
 import uuid
 
 from .calibration_stats import Measurement
-from .pipeline_profiles import validate_rank_plans
+from .pipeline_profiles import validate_rank_plans, rank_frontier_counts
 from .calibration_telemetry import CalibrationTelemetry
 
 
@@ -180,13 +180,13 @@ class NativePipelineProbe:
         plans = (self.planning_session.admit(self.beam, environment) if self.planning_session is not None else
                  [parse_plan(text) for text in self._run(environment, planning=True)])
         validate_rank_plans(plans)
-        if plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'] < self.beam:
-            raise ValueError('native admission shrinks requested beam')
+        if plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'] != self.beam:
+            raise ValueError('native admission changes requested logical beam')
         return plans
 
     def measure(self, environment, plans):
         for rank, path in enumerate(self.fixtures):
-            if path.stat().st_size != plans[rank]['frontier_state_capacity'] * self.physical_bytes:
+            if path.stat().st_size != rank_frontier_counts(plans)[rank] * self.physical_bytes:
                 raise ValueError('fixture must fill the exact admitted rank frontier')
         started = time.monotonic()
         with CalibrationTelemetry() as telemetry:
@@ -195,12 +195,12 @@ class NativePipelineProbe:
             json.dumps(telemetry.receipt(), indent=2))
         if self.verify(texts, plans) is not True:
             raise ValueError('full-pipeline correctness verification failed')
-        seconds = [parse_depths(text, plans[rank]['frontier_state_capacity'], self.repeats)
+        seconds = [parse_depths(text, rank_frontier_counts(plans)[rank], self.repeats)
                    for rank, text in enumerate(texts)]
         wall_seconds = time.monotonic()-started
         self.fastest_measure_wall_seconds = min(wall_seconds,
             self.fastest_measure_wall_seconds if self.fastest_measure_wall_seconds is not None else wall_seconds)
-        parents = sum(plan['frontier_state_capacity'] for plan in plans)
+        parents = sum(rank_frontier_counts(plans))
         # First complete depth is warmup. No mean-of-means or summed GPU rates.
         return [Measurement('', parents, tuple(row[index] for row in seconds), True, True,
                             throttled=telemetry.throttled)

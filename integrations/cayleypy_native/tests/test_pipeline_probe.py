@@ -75,3 +75,13 @@ def test_slow_candidate_has_own_timeout_and_cleans_every_rank(tmp_path,monkeypat
     assert len(launched)==2 and stopped==launched
     assert 0<timeouts[0]<=30
 
+
+def test_logical_rank_frontiers_preserve_odd_global_width_without_padding():
+    from multigpubeamsearch.pipeline_profiles import rank_frontier_counts
+    for width,world in ((7,5),(1,8),(1001,2),(65536,1)):
+        plans=[dict(GLOBAL_BEAM_WIDTH_EFFECTIVE=width,
+            frontier_state_capacity=(width+world-1)//world) for _ in range(world)]
+        counts=rank_frontier_counts(plans)
+        expected=[sum(i*world//width==r for i in range(width)) for r in range(world)]
+        assert counts==expected
+        assert sum(counts)==width

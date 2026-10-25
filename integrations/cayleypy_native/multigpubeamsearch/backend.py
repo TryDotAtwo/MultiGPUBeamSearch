@@ -152,8 +152,8 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
     if type(radius) is not int or radius < 0:
         raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
     validate_touch_bfs_contract(contract, radius, options.touch_bfs_max_entries)
-    if model.backend in ("cube444_transformer", "cube444_mlp"):
-        raise NativeUnavailable("Cube444 heads require NativeEnsemble, including a single-head ensemble")
+    if model.backend in ("cube444_transformer", "cube444_mlp", "cube555_transformer", "cube555_mlp"):
+        raise NativeUnavailable("Cube heads require NativeEnsemble, including a single-head ensemble")
     # Stream1's scalar head has a separate kernel. The Q head uses unpadded
     # row-major CUTLASS GEMM with eight-element B/C/D access alignment.
     if options.inference_backend == "cutlass" and model.backend == "mlp" and model.manifest["output_dim"] != 1 and model.manifest["output_dim"] % 8:
@@ -541,6 +541,23 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
         raise NativeBackendError("native result directory must remain inside the private run directory")
     runner = snapshot_runtime_runner(runtime, run_dir)
+    # A capacity probe is diagnostic for a fixed-width request. Keep its
+    # environment and width separate from execution, including when the probe
+    # stopped at its time budget and found only a safe lower bound.
+    if getattr(options,'calibration_discover_capacity',False) and not maximum_requested:
+        if not calibrate:raise NativeUnavailable('capacity discovery requires a supported inference calibrator')
+        from .maximum_beam import discover_capacity,capacity_seed
+        seed=capacity_seed(calibration)
+        capacity_env=dict(env,BEAM_B_MICRO=str(seed['parent_batch']*rows_per_parent),
+            BEAM_ENSEMBLE_INFERENCE_MICRO=str(seed['parent_batch']),
+            BEAM_ENSEMBLE_RESERVE_BYTES=str(seed['reserve_bytes']))
+        capacity=discover_capacity(contract,runtime,devices,capacity_env,runner,run_dir,
+            seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+        capacity.update(requested_execution_beam=beam_width,
+            inference_parent_batch=seed['parent_batch'],execution_width_changed=False,
+            capacity_scope='native memory admission with measured inference reserve; full step verified only at requested width')
+        runtime.profile['maximum_beam']=capacity
+        (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
     if maximum_requested:
         if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
         from .maximum_beam import capacity_seed,discover_capacity,refine_maximum
@@ -675,8 +692,8 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             print(f"[MultiGPUBeamSearch] observed full step {row['full_step_seconds']:.6f}s; "
                   f"throughput loss versus Stream1 curve {100*row['throughput_loss_fraction']:.2f}% "
                   f"(normalized reference)",flush=True)
-    if effective is not None and effective < beam_width:
-        raise NativeBackendError("observed effective global beam is smaller than requested")
+    if effective is not None and effective != beam_width:
+        raise NativeBackendError("observed logical global beam differs from requested")
     metadata = {"build": build_metadata, "profile": runtime.profile, "model_artifact_hash": model.artifact_hash,
                 "graph_hash": contract.graph_hash, "devices": list(devices), "requested_beam_width": beam_width,
                 "microbatch": microbatch_metadata, **search_budget,

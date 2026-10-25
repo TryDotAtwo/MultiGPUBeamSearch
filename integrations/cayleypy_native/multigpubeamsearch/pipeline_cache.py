@@ -17,7 +17,7 @@ def cache_identity(inference, environment, *, beam, world, full_frontier):
     if (signature.get('requested_beam_width')!=beam or signature.get('world_size')!=world
             or not valid_cached_profile(inference,signature,signature.get('max_batch',65536))):
         return None
-    return dict(schema=3,policy='exact-component-service-v3-bounded-ring-geometry',signature=signature,
+    return dict(schema=5,policy='hardware-coarse-fine-v1',signature=signature,
         parent_batch=inference['parent_batch'],reserve_bytes=inference['reserve_bytes'],
         full_frontier=bool(full_frontier),
         policy_environment={k:v for k,v in environment.items()
@@ -34,8 +34,10 @@ def cache_path(root,identity):
 def valid_receipt(data,identity):
     """Reject incomplete cohorts and arbitrary environment injection."""
     try:
-        if data['cache_identity']!=identity or data['phase']!='component_calibrated':return False
-        if data.get('pipeline_verified') is not False:return False
+        if data['cache_identity']!=identity:return False
+        full=identity.get('full_frontier',False)
+        if data['phase']!=('pipeline_measured' if full else 'component_calibrated'):return False
+        if data.get('pipeline_verified') is not full:return False
         env=data['environment'];micro=identity['parent_batch'];world=identity['signature']['world_size']
         if set(env)-KEYS or env.get('BEAM_ENSEMBLE_INFERENCE_MICRO')!=str(micro):return False
         if any(type(v) is not str or not v.isascii() or not v.isdecimal()
@@ -46,7 +48,7 @@ def valid_receipt(data,identity):
         if len(plans)!=world:return False
         if data['requested_beam_width']!=identity['signature']['requested_beam_width']:return False
         if plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']!=data['requested_beam_effective']:return False
-        if plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']<data['requested_beam_width']:return False
+        if plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']!=data['requested_beam_width']:return False
         rows=chosen[0]['rank_measurements']
         if len(rows)!=world or {r['rank'] for r in rows}!=set(range(world)):return False
         for row in rows:
@@ -57,6 +59,25 @@ def valid_receipt(data,identity):
             for transfer in row['transport']:
                 if type(transfer['items']) is not int or transfer['items']<=0:return False
                 if len(transfer['seconds'])<5 or any(not math.isfinite(v) or v<=0 for v in transfer['seconds']):return False
+        if full:
+            from .calibration_stats import Measurement,select
+            if data.get('measurement_scope')!='full_requested_frontier' or data.get('full_grid_complete') is not True:return False
+            samples=[Measurement(**r) for r in data['full_comparison_measurements']]
+            names={r['name'] for r in data['tested'] if 'plans' in r and 'environment' in r}
+            if identity.get('policy')=='hardware-coarse-fine-v1':
+                search=data['adaptive_search']
+                if search['context']!=identity['adaptive_context']:return False
+                if search['stop_reason'] not in {'round_limit','no_new_admissible_neighbors','no_statistically_separated_gain'}:return False
+                measured=data['full_tested']
+                traced=search['coarse_full_tested']+[name for row in search['rounds'] for name in row['full_tested']]
+                if measured!=traced or 'baseline' not in measured:return False
+                if len(measured)!=len(set(measured)) or not set(measured)<=names:return False
+                names=set(measured)
+            if {r.profile for r in samples}!=names:return False
+            if any(r.parents!=data['requested_beam_effective'] or len(r.seconds_by_rank)!=world for r in samples):return False
+            winner,_=select(samples,baseline='baseline',min_improvement=.02)
+            if winner.profile!=data['selection'] or winner.__dict__!=data['estimate']:return False
+            if data['measurements']!=[r for r in data['full_comparison_measurements'] if r['profile']==winner.profile]:return False
         return True
     except (KeyError,ValueError,TypeError,OverflowError):return False
 
@@ -68,14 +89,18 @@ def read_profile(path,identity,admit):
         plans=admit(data['environment'])  # Fresh all-rank VRAM admission is mandatory.
         validate_rank_plans(plans)
         if plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']!=data['requested_beam_effective']:return None
-        if plans[0]['B_MICRO']!=int(data['environment']['BEAM_B_MICRO']):return None
+        row_factor=identity.get('adaptive_context',{}).get('outer_rows_per_parent',1)
+        if plans[0]['B_MICRO']*row_factor!=int(data['environment']['BEAM_B_MICRO']):return None
         old=next(r['plans'] for r in data['tested'] if r['name']==data['selection'])
         geometry=('GLOBAL_BEAM_WIDTH_EFFECTIVE','frontier_state_capacity','B_MICRO',
             'WORLD_SIZE','SHARD_COUNT','SHARD_CAPACITY_CANDIDATES','STREAM3_RING_SLOTS','RING_COUNT',
             'STREAM4_ACTIVE_SORT_SLOTS','STREAM4_BATCH_CANDIDATES','STREAM4_BATCH_ALIGNMENT')
         if any(a[k]!=b[k] for a,b in zip(old,plans) for k in geometry):return None
+        if len(plans)!=len(old):return None
         return dict(data,cache_hit=True,current_rank_plans=plans,
-            measurement_scope='cached_exact_capacities_with_fresh_admission',pipeline_verified=False)
+            cache_validation='fresh_all_rank_admission_and_geometry',
+            measurement_scope=('full_requested_frontier' if identity.get('full_frontier')
+                else 'cached_exact_capacities_with_fresh_admission'))
     except (OSError,ValueError,KeyError,TypeError):return None
 
 

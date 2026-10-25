@@ -3,6 +3,7 @@
 #include "cube444_blend_libtorch.hpp"
 #include "stream1_mlp_libtorch_backend.hpp"
 #include "stream1_gnn_libtorch.hpp"
+#include "stream1_cube555_libtorch.hpp"
 #include <memory>
 #include <cmath>
 
@@ -18,11 +19,13 @@ struct NativeEnsemble {
         std::unique_ptr<MlpLibTorch> mlp;
         std::unique_ptr<PieceTransformerLibTorch> transformer;
         std::unique_ptr<PancakeGnnNative> gnn;
+        std::unique_ptr<Cube555Native> cube555;
         torch::Tensor weight,bias;
         torch::Tensor features(const torch::Tensor& states) const {
             if(mlp) return mlp->features(states);
             if(transformer) return transformer->features(states);
             if(gnn) return gnn->features(states);
+            if(cube555) return cube555->features(states);
             return family=="cube444_mlp"?cube->mlp_features(states):cube->transformer_cls(states);
         }
     };
@@ -76,6 +79,10 @@ struct NativeEnsemble {
                 head.gnn=std::make_unique<PancakeGnnNative>(path,target,use_cutlass);
                 head.weight=head.gnn->output_weight.transpose(0,1).contiguous();
                 head.bias=head.gnn->output_bias.to(torch::kFloat32).contiguous();
+            } else if(head.family=="cube555_mlp"||head.family=="cube555_transformer") {
+                head.cube555=std::make_unique<Cube555Native>(path,target,head.family);
+                head.weight=head.cube555->weight;
+                head.bias=head.cube555->bias;
             } else if(head.family=="cube444_mlp"||head.family=="cube444_transformer") {
                 if(state_len!=96||output_dim!=24) throw std::runtime_error("cube adapter requires state96/moves24");
                 auto canonical=fs::canonical(path).string();

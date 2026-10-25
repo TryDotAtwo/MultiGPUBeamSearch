@@ -317,6 +317,33 @@ def test_q_model_requires_explicit_child_scoring(tmp_path, monkeypatch):
     assert calls and result.native_metadata["scoring"] == "parent_q"
 
 
+def test_legacy_cayleypy_accepts_native_q_child_scoring(tmp_path, monkeypatch):
+    """Native Q scoring remains available when upstream predates that Torch option."""
+    current = dispatch.inspect.signature(dispatch.BeamSearchAlgorithm.search)
+    legacy = current.replace(
+        parameters=[parameter for parameter in current.parameters.values()
+                    if parameter.name != "use_child_scores"]
+    )
+    monkeypatch.setattr(dispatch.inspect, "signature", lambda _target: legacy)
+    calls = fake_native(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        dispatch,
+        "prepare_model",
+        lambda *args: SimpleNamespace(artifact_hash="q", manifest={"output_dim": 3}),
+    )
+
+    result = dispatch.beam_search(
+        graph(),
+        backend="native",
+        native_options=NativeOptions(cache_dir=tmp_path),
+        start_state=[1, 0, 2, 3, 4],
+        use_child_scores=True,
+    )
+
+    assert calls
+    assert result.native_metadata["scoring"] == "parent_q"
+
+
 def test_native_artifact_fallback_is_explicit(tmp_path, monkeypatch):
     from cayleypy_native import NativeModel
     def unavailable(*args):

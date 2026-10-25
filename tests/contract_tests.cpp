@@ -392,7 +392,7 @@ int run_contract_tests() {
     const DerivedConfig derived = derive_config(config);
     require(derived.ring_slot_count == config.stream3_batch_candidates / (config.b_micro * MOVE_COUNT), "ring_slot_count formula failed");
     require(derived.beam_width_alignment == 256, "beam_width_alignment formula failed");
-    require(derived.global_beam_width_effective == 1024, "effective beam width formula failed");
+    require(derived.global_beam_width_effective == 1000, "logical beam must not expand for alignment");
     report << "- config_derivation=pass\n";
 
     require(q_to_score_key(-5.0f) == 0, "negative score clamp failed");

@@ -7,7 +7,7 @@ import time
 from .calibration_frontier import write_frontiers
 from .models import verify_prepared_model
 from .pipeline_probe import NativePipelineProbe
-from .pipeline_profiles import tune_pipeline
+from .pipeline_profiles import tune_pipeline, rank_frontier_counts
 from .errors import NativeBackendError
 
 
@@ -45,13 +45,13 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                    BEAM_STREAM2_SUFFIX_RADIUS='0',BEAM_SOLVE_BUCKET_MODE='0')
     def verify(texts,plans):
         verify_prepared_model(model,contract)
-        for text,plan in zip(texts,plans):
+        for text,count in zip(texts,rank_frontier_counts(plans)):
             fields={}
             for line in text.splitlines():
                 if '=' in line and ' ' not in line:
                     key,value=line.split('=',1);fields[key]=value
             if fields.get('completed_depths')!='6':return False
-            if int(fields.get('last_final_frontier_size','-1'))!=plan['frontier_state_capacity']:return False
+            if int(fields.get('last_final_frontier_size','-1'))!=count:return False
             if 'production_runner_error=' in text:return False
         return inference.get('phase')=='inference_verified'
     actual=NativePipelineProbe(runner,probe_env,beam_width,world,directory/'actual-plans',
@@ -64,12 +64,16 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         raise NativeBackendError('requested beam failed all-rank native admission') from error
     if runtime.build_metadata.get('component_calibration_protocol')=='exact-capacity-v1':
         from .pipeline_cache import cache_identity,cache_path,read_profile,write_profile
+        from . import adaptive_profiles as adaptive
+        adaptive_context=adaptive.context(devices,initial_plans,inference)
+        adaptive_context["outer_rows_per_parent"]=(contract.move_count if native_single and model.manifest["output_dim"]==1 else 1)
         identity=cache_identity(inference,environment,beam=beam_width,world=world,
             full_frontier=getattr(options,'calibration_full_frontier',False))
         if identity is not None:
             identity['runtime_metadata']=runtime.build_metadata
+            identity['adaptive_context']=adaptive_context
         path=cache_path(options.cache_dir,identity) if identity is not None else None
-        if path is not None and not options.calibration_full_frontier:
+        if path is not None:
             cached=read_profile(path,identity,actual.admit)
             if cached is not None:
                 verify_prepared_model(model,contract)
@@ -82,7 +86,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             BEAM_STREAM3_RING_SLOTS=str(initial['STREAM3_RING_SLOTS']),
             BEAM_STREAM4_ACTIVE_SORT_SLOTS=str(initial['STREAM4_ACTIVE_SORT_SLOTS']),
             BEAM_STREAM4_BATCH_CANDIDATES=str(initial['STREAM4_BATCH_CANDIDATES']))
-        shape=Shape(beam_width,world,int(baseline['BEAM_B_MICRO']),contract.move_count,storage,
+        shape=Shape(beam_width,world,int(initial.get('B_MICRO',baseline['BEAM_B_MICRO'])),contract.move_count,storage,
             alignment=initial['STREAM4_BATCH_ALIGNMENT'],
             capacity_ppm=int(environment.get('BEAM_SHARD_CAPACITY_SCALE_PPM','1250000')),
             receive_ppm=int(environment.get('BEAM_GLOBAL_SPILL_SCALE_PPM','2000000')))
@@ -95,8 +99,16 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         if len(candidates)<2:
             ring=4 if initial['STREAM3_RING_SLOTS']!=4 else 2
             candidates.append(('staging-'+str(ring),dict(baseline,BEAM_STREAM3_RING_SLOTS=str(ring))))
+        search_trace=dict(context=adaptive_context,rounds=[],stop_reason=None)
+        def candidate_factory(rows,plan,service):
+            proposed,trace=adaptive.proposals(shape,baseline,adaptive_context,
+                service=service,ring_limit=ring_pool_limit(environment))
+            search_trace['coarse']=trace
+            return [('coarse-'+name,env) for name,env in proposed]
         data=tune_components(actual,session,initial_plans,baseline,candidates,
-            moves=contract.move_count,inference=inference)
+            moves=contract.move_count,inference=inference,candidate_factory=candidate_factory)
+        data['adaptive_search']=search_trace
+        data['search_policy']=adaptive.POLICY
         if session is not None:session.close()
         actual.planning_session=None
         verify_prepared_model(model,contract)
@@ -106,42 +118,89 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         (directory/'selection.json').write_text(json.dumps(data,indent=2))
         if options.calibration_full_frontier:
             from dataclasses import replace
-            from .calibration_stats import estimate
-            chosen=next(r for r in data['tested'] if r['name']==data['selection'])
-            final_plans=chosen['plans']
+            from .calibration_stats import select
+            # Component timings propose the finite grid. Only full-depth times
+            # select its winner, at every width (including widths above 1M).
+            eligible=adaptive.shortlist(data['tested'],count=adaptive.FULL_PER_ROUND)
+            search_trace['coarse_full_tested']=[r['name'] for r in eligible]
+            base=next(r for r in eligible if r['name']=='baseline')
+            final_plans=base['plans']
             actual.deadline=deadline
-            receipt=write_frontiers(contract,[p['frontier_state_capacity'] for p in final_plans],
+            receipt=write_frontiers(contract,rank_frontier_counts(final_plans),
                 storage,directory/'frontiers',deadline=deadline,
                 max_states=options.calibration_frontier_max_states or final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
-            samples=[replace(r,profile='selected') for r in actual.measure(data['environment'],final_plans)]
-            # Component envelopes omit graph-dependent rejection and pressure.
-            # On inexpensive exact frontiers, verify the proxy winner against
-            # the baseline rather than certifying a known avoidable slowdown.
-            full_comparison=[]
-            if data['selection']!='baseline' and final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']<=1048576:
-                from .calibration_stats import select
-                base=next(r for r in data['tested'] if r['name']=='baseline')
-                if base['plans'][0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']!=final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']:
+            samples=[]
+            for row in eligible:
+                if rank_frontier_counts(row['plans']) != rank_frontier_counts(final_plans):
                     raise NativeBackendError('full comparison changed exact frontier')
-                baseline_samples=[replace(r,profile='baseline') for r in actual.measure(base['environment'],base['plans'])]
-                winner,rejections=select(baseline_samples+samples,baseline='baseline',min_improvement=.02)
-                full_comparison=[r.__dict__ for r in baseline_samples+samples]
-                data['full_comparison_rejections']=rejections
-                if winner.profile=='baseline':
-                    data.update(environment=base['environment'],selection='baseline-full-verified')
-                    final_plans=base['plans'];samples=baseline_samples
+                samples.extend(replace(r,profile=row['name'])
+                    for r in actual.measure(row['environment'],row['plans']))
+            winner,rejections=select(samples,baseline='baseline',min_improvement=.02)
+            seen={adaptive.key(r['environment']) for r in data['tested'] if 'environment' in r}
+            from .component_autotune import service_envelope
+            for round_index in range(adaptive.MAX_ROUNDS):
+                center=next(r for r in eligible if r['name']==winner.profile)
+                proposed,trace=adaptive.proposals(shape,center['environment'],adaptive_context,
+                    fine=True,round_index=round_index,ring_limit=ring_pool_limit(environment),seen=seen)
+                trace.update(center=winner.profile,tested=[],full_tested=[])
+                search_trace['rounds'].append(trace)
+                fine_rows=[]
+                for name,env in proposed:
+                    if time.monotonic()>=deadline:
+                        search_trace['stop_reason']='time_budget';break
+                    name=f'fine-{round_index+1}-'+name
+                    seen.add(adaptive.key(env))
+                    try:
+                        target=actual.admit(env)
+                        if rank_frontier_counts(target)!=rank_frontier_counts(final_plans):
+                            raise NativeBackendError('adaptive refinement changed exact frontier')
+                        component_rows=actual.measure_components(env,target,move_count=contract.move_count)
+                        estimate=service_envelope(component_rows,target[0],moves=contract.move_count,
+                            inference_seconds=inference['estimate']['median'],parent_batch=micro)
+                        row=dict(name=name,environment=env,plans=target,
+                            rank_measurements=component_rows,estimate=estimate)
+                        fine_rows.append(row);data['tested'].append(row);trace['tested'].append(name)
+                    except ValueError as error:
+                        data['tested'].append(dict(name=name,rejected=str(error)))
+                previous=winner.profile
+                for row in adaptive.shortlist(fine_rows,baseline=False,count=adaptive.FULL_PER_ROUND):
+                    if time.monotonic()>=deadline:
+                        search_trace['stop_reason']='time_budget';break
+                    try:
+                        measured=[replace(r,profile=row['name']) for r in actual.measure(row['environment'],row['plans'])]
+                    except ValueError as error:
+                        trace.setdefault('full_rejected',[]).append(dict(name=row['name'],reason=str(error)))
+                        continue
+                    samples.extend(measured);eligible.append(row);trace['full_tested'].append(row['name'])
+                winner,rejections=select(samples,baseline='baseline',min_improvement=.02)
+                trace['winner']=winner.profile
+                if search_trace['stop_reason']=='time_budget':break
+                if fine_rows and not trace['full_tested']:
+                    search_trace['stop_reason']='no_valid_neighbor_measurements';break
+                if not proposed or not fine_rows:
+                    search_trace['stop_reason']='no_new_admissible_neighbors';break
+                local_winner,_=select(samples,baseline=previous,min_improvement=.02)
+                if local_winner.profile==previous:
+                    search_trace['stop_reason']='no_statistically_separated_gain';break
+            if search_trace['stop_reason'] is None:search_trace['stop_reason']='round_limit'
+            search_trace['search_complete']=search_trace['stop_reason'] in {
+                'round_limit','no_new_admissible_neighbors','no_statistically_separated_gain'}
+            search_trace['scope']='best statistically separated measured profile in bounded hardware-derived domain'
+            data['full_tested']=[r['name'] for r in eligible]
+            chosen=next(r for r in eligible if r['name']==winner.profile)
+            final_plans=chosen['plans']
             data.update(phase='pipeline_measured',pipeline_verified=True,fixture=receipt,
+                environment=chosen['environment'],selection=winner.profile,
                 measurement_scope='full_requested_frontier',
-                estimate=estimate(samples[0].profile,samples).__dict__,
-                measurements=[r.__dict__ for r in samples])
-            if full_comparison:data['full_comparison_measurements']=full_comparison
-            # Preserve completed native measurements if the independent
-            # matched-inference phase exhausts its time budget.
+                selection_objective='fastest statistically separated full step in hardware-adaptive coarse-to-fine search',
+                full_grid_complete=True,full_comparison_rejections=rejections,
+                estimate=winner.__dict__,
+                measurements=[r.__dict__ for r in samples if r.profile==winner.profile],
+                full_comparison_measurements=[r.__dict__ for r in samples])
+            # Preserve the measured winner and the explicit finite-search stop reason.
             (directory/'selection.json').write_text(json.dumps(data,indent=2))
-            if runtime.build_metadata.get('calibration_protocol')=='json-session-v1':
-                from .matched_probe import measure_matched
-                data['matched_stream1']=measure_matched(contract,model,runtime,probe_env,
-                    directory/'matched-stream1',receipt,data,micro,deadline=deadline,devices=devices)
+        if path is not None and options.calibration_full_frontier:
+            write_profile(path,identity,data)
         (directory/'selection.json').write_text(json.dumps(data,indent=2))
         return data
     # A measured small-frontier profile cannot certify or optimize a larger
@@ -152,7 +211,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     probe.planning_session=session
     try:
         plans=probe.admit(baseline)
-        receipt=write_frontiers(contract,[row['frontier_state_capacity'] for row in plans],
+        receipt=write_frontiers(contract,rank_frontier_counts(plans),
             storage,directory/'frontiers',deadline=deadline,
             max_states=options.calibration_frontier_max_states or plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
     except ValueError as error:
@@ -166,7 +225,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     if session is not None:
         from .beam_geometry import Shape,memory_shortlist,ring_pool_limit
         initial=initial_plans[0]
-        shape=Shape(beam_width,world,int(baseline['BEAM_B_MICRO']),contract.move_count,storage,
+        shape=Shape(beam_width,world,int(initial.get('B_MICRO',baseline['BEAM_B_MICRO'])),contract.move_count,storage,
             alignment=initial['STREAM4_BATCH_ALIGNMENT'],
             capacity_ppm=int(environment.get('BEAM_SHARD_CAPACITY_SCALE_PPM','1250000')),
             receive_ppm=int(environment.get('BEAM_GLOBAL_SPILL_SCALE_PPM','2000000')))

@@ -872,3 +872,6 @@ Removed separate bias launch using broadcast C and a double-rounded FP16 epilogu
 Accepted fused residual/LayerNorm/exact-GELU: RTX3060 matched full forward179.027 ->164.364ms, 8.92% throughput improvement. 120 GPU norm cases,9 CPU tests, zero sanitizer errors; final single/three-GNN production replay pass. Rejected parallel-softmax and wider-tile experiments. See test_results/gnn_further_20261010/REPORT.md.
 
 2026-10-11: Retain compatibility commit 1ee313325a39371492c043a380f0af78cd7713ff as a merge parent while preserving current main source. Only legacy publisher state changes from published to accepted after HTTP 200/202. Three isolated transport-state tests pass (202, duplicate 200, failure 400). Cube555 notebook pins this solver-compatible commit; GitHub-only input metadata retained. No GPU run is claimed.
+
+## 2026-10-25: Cube555 and hardware-adaptive profiles
+Published graph/model/API integration, exact logical beam and hardware-derived coarse-to-fine calibration. Preserved existing beam architecture and frozen inference microbatch. Real single-GPU acceptance, replay and fresh cache reuse passed; see docs/validation/cube555-adaptive-20261025.md for exact workloads and limits.
