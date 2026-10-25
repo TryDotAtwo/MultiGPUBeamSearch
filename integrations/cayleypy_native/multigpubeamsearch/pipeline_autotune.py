@@ -122,23 +122,38 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             # Component timings propose the finite grid. Only full-depth times
             # select its winner, at every width (including widths above 1M).
             eligible=adaptive.shortlist(data['tested'],count=adaptive.FULL_PER_ROUND)
-            search_trace['coarse_full_tested']=[r['name'] for r in eligible]
+            search_trace['coarse_full_candidates']=[r['name'] for r in eligible]
+            search_trace['coarse_full_tested']=[]
             base=next(r for r in eligible if r['name']=='baseline')
             final_plans=base['plans']
             actual.deadline=deadline
             receipt=write_frontiers(contract,rank_frontier_counts(final_plans),
                 storage,directory/'frontiers',deadline=deadline,
                 max_states=options.calibration_frontier_max_states or final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
-            samples=[]
+            samples=[];completed=[]
             for row in eligible:
                 if rank_frontier_counts(row['plans']) != rank_frontier_counts(final_plans):
                     raise NativeBackendError('full comparison changed exact frontier')
-                samples.extend(replace(r,profile=row['name'])
-                    for r in actual.measure(row['environment'],row['plans']))
+                try:
+                    measured=[replace(r,profile=row['name'])
+                        for r in actual.measure(row['environment'],row['plans'])]
+                except ValueError as error:
+                    # Baseline correctness and a complete timing cohort remain mandatory.
+                    # A failed optional challenger must not discard an accepted baseline.
+                    if row['name']=='baseline':raise
+                    search_trace.setdefault('coarse_full_rejected',[]).append(
+                        dict(name=row['name'],reason=str(error)))
+                    search_trace['stop_reason']=('time_budget' if time.monotonic()>=deadline
+                        else 'coarse_measurement_failed')
+                    break
+                samples.extend(measured);completed.append(row)
+                search_trace['coarse_full_tested'].append(row['name'])
+            eligible=completed
             winner,rejections=select(samples,baseline='baseline',min_improvement=.02)
             seen={adaptive.key(r['environment']) for r in data['tested'] if 'environment' in r}
             from .component_autotune import service_envelope
             for round_index in range(adaptive.MAX_ROUNDS):
+                if search_trace['stop_reason'] is not None:break
                 center=next(r for r in eligible if r['name']==winner.profile)
                 proposed,trace=adaptive.proposals(shape,center['environment'],adaptive_context,
                     fine=True,round_index=round_index,ring_limit=ring_pool_limit(environment),seen=seen)
@@ -193,7 +208,8 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 environment=chosen['environment'],selection=winner.profile,
                 measurement_scope='full_requested_frontier',
                 selection_objective='fastest statistically separated full step in hardware-adaptive coarse-to-fine search',
-                full_grid_complete=True,full_comparison_rejections=rejections,
+                full_grid_complete=not search_trace.get('coarse_full_rejected'),
+                full_comparison_rejections=rejections,
                 estimate=winner.__dict__,
                 measurements=[r.__dict__ for r in samples if r.profile==winner.profile],
                 full_comparison_measurements=[r.__dict__ for r in samples])

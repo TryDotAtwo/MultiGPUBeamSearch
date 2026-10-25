@@ -875,3 +875,8 @@ Accepted fused residual/LayerNorm/exact-GELU: RTX3060 matched full forward179.02
 
 ## 2026-10-25: Cube555 and hardware-adaptive profiles
 Published graph/model/API integration, exact logical beam and hardware-derived coarse-to-fine calibration. Preserved existing beam architecture and frozen inference microbatch. Real single-GPU acceptance, replay and fresh cache reuse passed; see docs/validation/cube555-adaptive-20261025.md for exact workloads and limits.
+
+## 2026-10-25 - Preserve a measured baseline after challenger failure
+- An optional coarse-profile timeout no longer discards a verified baseline. Baseline failures still abort.
+- Incomplete search is reported and excluded from complete-profile caching; only completed timing cohorts are selected.
+- Validation: 18 pipeline/autotune cache regression tests passed. Clean Kaggle 2xT4 execution remains in progress.

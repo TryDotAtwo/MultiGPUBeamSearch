@@ -62,7 +62,8 @@ def test_exact_measurement_preserves_requested_beam_and_inference(tmp_path, monk
 
 
 @pytest.mark.parametrize('beam',[1024,2_097_152])
-def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,beam):
+@pytest.mark.parametrize('failure',[None,'candidate','baseline'])
+def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,beam,failure):
     from multigpubeamsearch.calibration_stats import Measurement
     from multigpubeamsearch import component_autotune,beam_geometry,adaptive_profiles
     plan=dict(frontier_state_capacity=beam//2,GLOBAL_BEAM_WIDTH_EFFECTIVE=beam,
@@ -73,6 +74,9 @@ def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,
         def __init__(self,*args,**kwargs):pass
         def admit(self,env):return [plan]*2
         def measure(self,env,plans):
+            if (failure=='candidate' and env.get('marker')=='candidate') or (
+                    failure=='baseline' and env.get('marker')=='base'):
+                raise ValueError('native calibration timed out')
             seconds=.01 if env.get('marker')=='base' else .03
             return [Measurement('unused',beam,(seconds,seconds),True,True)]*5
     def components(probe,session,plans,baseline,candidates,**kwargs):
@@ -87,15 +91,25 @@ def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,
     monkeypatch.setattr(beam_geometry,'memory_shortlist',lambda *a,**kw:[])
     monkeypatch.setattr(adaptive_profiles,'context',lambda *a:{})
     monkeypatch.setattr(adaptive_profiles,'proposals',lambda *a,**kw:([],{}))
-    result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
+    def run():return module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
         SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
         SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=True,
             calibration_frontier_max_states=None,calibration_max_batch=256),[0,1],beam,tmp_path,{},'runner',
         {'parent_batch':256,'phase':'inference_verified'})
+    if failure=='baseline':
+        with pytest.raises(ValueError,match='timed out'):run()
+        return
+    result=run()
     assert result['selection']=='baseline'
     assert result['environment']['marker']=='base'
     assert result['estimate']['profile']=='baseline'
-    assert len(result['full_comparison_measurements'])==10
+    assert len(result['full_comparison_measurements'])==(5 if failure else 10)
+    if failure:
+        assert result['pipeline_verified'] is True
+        assert result['full_grid_complete'] is False
+        assert result['adaptive_search']['search_complete'] is False
+        assert result['full_tested']==['baseline']
+        assert result['adaptive_search']['coarse_full_rejected'][0]['name']=='candidate'
 
 
 def test_real_beam_admission_failure_cannot_be_hidden_by_small_fixture(tmp_path, monkeypatch):
