@@ -103,8 +103,8 @@ certification of a larger requested frontier. A large optional full-frontier
 check may require increasing `calibration_pipeline_seconds`.
 Inspect `result.native_metadata['profile']` for the selected parameters and the
 measured frontier scope. Isolated component probes are a scheduling proxy,
-not a measured complete step or a global optimum. Small finite graphs can
-prevent a unique legal fixture for the optional complete-step measurement.
+not a measured complete step or a global optimum. Small finite graphs or an early solution can prevent the search from filling
+the requested beam for optional complete-step measurement.
 
 `plan_cluster([8] * 16, beam_width)` computes a 128-rank layout and alignment.
 It does not launch multiple nodes or prove hardware performance; every actual
@@ -516,12 +516,12 @@ scheduling proxy; they do not certify a measured complete search step.
 Isolated component timings are a scheduling proxy; they are not a measured
 complete depth or a proof of globally optimal performance. To measure the exact
 full-frontier gap, use `NativeOptions(calibration_full_frontier=True)`; this
-prepares legal unique states and runs five measured complete depths after a
-warmup, followed by matched Stream1 inference on those same files. The report
-distinguishes throughput loss from relative time overhead. Small finite graphs
-or an explicit preparation budget can prevent a full-frontier fixture.
+grows the ordinary native search to the requested beam, then measures five
+complete saturated steps after one warmup step. Incomplete growth, an early
+solution or an exhausted time budget cannot certify a complete frontier.
+Isolated Stream1 calibration is a separate workload, not a same-state comparison.
 Full-frontier verification is optional and can take minutes on a maximum beam:
-its preparation and repeated full steps are included in the reported total
+its growth and repeated full steps are included in the reported total
 calibration duration. The default component calibration does not generate those
 large frontier files. Small beams need not benefit from more GPUs: dispatch,
 collectives and final selection can dominate a very fast inference pass.

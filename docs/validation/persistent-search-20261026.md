@@ -22,8 +22,7 @@ RTX 3060 12 GiB, real Cube555 Transformer + MLP FP16 blend (0.8/0.2), LibTorch:
 One-GPU evidence archive SHA256:
 0683a7ffac15c6367b85ebc53c514199302c775c90109e1b68769ee0ab2650b3
 All 477 manifest members were hash-verified. No long solve or performance sweep
-was run. Multi-GPU LibTorch acceptance is recorded below. A separate CUTLASS resident
-GPU acceptance was not completed.
+was run. Multi-GPU LibTorch acceptance is recorded below. Separate CUTLASS resident GPU acceptance is recorded below.
 
 This change does not certify the unrelated maximum-working-frontier candidate,
 128-GPU operation, or a persistent service across different physical machines.
@@ -79,7 +78,7 @@ A native regression checks fixed-flush admission and memory monotonicity; its
 source is included, but its execution is still pending.
 
 New full-frontier calibration checks its projected inference cost against the
-time budget before constructing a large fixture. Existing validated profile
+time budget before starting full-frontier verification. Existing validated profile
 cache hits bypass this new-work check. The projection is an estimate, not a
 performance measurement or capacity guarantee. Twelve pipeline calibration
 unit tests passed, including this cache ordering regression.
@@ -97,3 +96,21 @@ completed on a CPU-only Kaggle worker (no GPU allocation), source
 `5c4c48ee6262138160f13db00382f269a8535c2a31f7e0d4f4a68bf7d19a8002`.
 The binaries are ready for remote execution; their build success is not GPU
 acceptance. No paid instances remain active at this checkpoint.
+
+
+## Completed CUTLASS 2xRTX3060 acceptance
+
+Python source6dd8564, native sourcecae5b9d, CUDA12.8, driver580.178.04:
+real Cube555 Transformer+MLP FP16 blend0.8/0.2 on two RTX3060 GPUs.
+Five calls retained PIDs519/520: paths [16,8,1], [16,8,1], [11,0],
+not-found, [16,8,1]. All found paths independently replayed. Beam8192
+created PIDs561/562 and replayed [16,8,1]. All workers exited on close.
+Native arithmetic regression reported zero failures.
+Evidence archive:163 members, SHA256
+b89c3f5f85778cac6d40c05cb9536f23e8d0eaac19e73e0c69474372fdf1fcd1.
+
+Natural frontier calibration in8a3395b grows the ordinary native search
+and measures six saturated steps (one warmup, five measured). An early solution,
+finite graph, timeout, or incomplete cohort cannot certify full-frontier timing.
+Python fixture generation is bypassed when the native build advertises this
+protocol. Targeted CPU tests:24 passed. Native build/GPU validation pending.

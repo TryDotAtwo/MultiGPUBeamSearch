@@ -298,7 +298,10 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         fixture=receipt,pipeline_verified=True,cache_hit=False,
         measurement_scope='full_requested_frontier' if selection['workload_parents']==final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'] else 'bounded_legal_frontier',
         correctness_scope='fixture legality, accepted model readout, native completion; normal solution replay checked by run_native')
-    if runtime.build_metadata.get('calibration_protocol')=='json-session-v1':
+    if grow:
+        data['matched_stream1']={'measurement_scope':'unavailable',
+            'reason':'natural search does not export its evolving frontier; isolated inference is a separate workload'}
+    elif runtime.build_metadata.get('calibration_protocol')=='json-session-v1':
         from .matched_probe import measure_matched
         try:
             data['matched_stream1']=measure_matched(contract,model,runtime,probe_env,
