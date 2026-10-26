@@ -4196,7 +4196,13 @@ void reset_static_memory_for_task(
 
 } // namespace
 
+#include "resident_search.hpp"
+
 int run_production_runner(int argc, char** argv) {
+    if(argc==2 && std::string(argv[1])=="--resident-protocol-info") {
+        std::cout << "{\"protocol\":\"resident-search-v1\"}\n";
+        return 0;
+    }
     if(argc>=2 && std::string(argv[1])=="--validate-stream1-scores")
         return beam::score_mode::run_production_score_mode(argc,argv);
     if (argc == 2 && std::string(argv[1]) == "--runtime-library-info") {
@@ -5044,13 +5050,41 @@ int run_production_runner(int argc, char** argv) {
         std::cout << "repair_k1_prefetch_tasks=" << repair_k1_prefetch_tasks << "\n";
     }
 
-    for (std::size_t task_index = 0; task_index < repair_tasks.size(); ++task_index) {
-    const RepairTask& repair_task = repair_tasks[task_index];
+    beam::resident::Mailbox resident(env_path("BEAM_SESSION_DIR", ""),rank);
+    if(resident.enabled() && (repair_resident_mode || solve_bucket_mode || !benchmark_frontier.empty()))
+        throw std::runtime_error("resident session cannot combine with repair/bucket/benchmark modes");
+    for (std::size_t task_index = 0; resident.enabled() || task_index < repair_tasks.size(); ++task_index) {
+    RepairTask resident_task;
+    if(resident.enabled()) {
+        nlohmann::json request;
+        if(!resident.next(task_index,request)) break;
+        resident_task=repair_tasks.front();
+        const auto values=request.at("start").get<std::vector<int>>();
+        if(values.size()!=STATE_LEN) throw std::runtime_error("resident state length mismatch");
+        resident_task.start_state=State128{};
+        for(std::size_t i=0;i<values.size();++i) {
+            if(values[i]<0 || values[i]>=static_cast<int>(stream1_model.num_classes))
+                throw std::runtime_error("resident state value outside model alphabet");
+            resident_task.start_state.v[i]=static_cast<std::uint8_t>(values[i]);
+        }
+        beam::input::validate_state(resident_task.start_state,host_central,stream1_model.num_classes,"resident_initial_state");
+        const auto directory=std::filesystem::path(request.at("run_dir").get<std::string>());
+        std::filesystem::current_path(directory);
+        std::filesystem::create_directories(directory/"test_results");
+#if defined(__linux__)
+        setenv("BEAM_HISTORY_DIR",(directory/"history").c_str(),1);
+        setenv("BEAM_HISTORY_DISK_PATH",(directory/"history").c_str(),1);
+#endif
+        std::cout << "GLOBAL_BEAM_WIDTH_EFFECTIVE=" << plan.derived.global_beam_width_effective << "\n";
+        if(stream1_scratch.transformer_numeric_error)
+            BEAM_CUDA_CHECK(cudaMemset(stream1_scratch.transformer_numeric_error,0,sizeof(std::uint32_t)));
+    }
+    const RepairTask& repair_task = resident.enabled()?resident_task:repair_tasks[task_index];
     const std::uint64_t puzzle_id = repair_task.repair_id;
     const std::uint32_t depth_limit = repair_task.depth_limit;
     host_initial = repair_task.start_state;
     host_target = repair_task.target_state;
-    if (task_index != 0U) {
+    if (task_index != 0U && !resident.enabled()) {
         HostSolvedNeighborhood next_solved_neighborhood =
             repair_k1_prefetch
                 ? repair_k1_prefetch->take(task_index)
@@ -6004,6 +6038,10 @@ int run_production_runner(int argc, char** argv) {
             << repair_task.prefix_path << '\t'
             << repair_task.suffix_path << '\n';
         repair_result.flush();
+    }
+    if(resident.enabled()) {
+        BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+        resident.complete(task_index);
     }
     }
     destroy_cuda_graph_job_templates(graphs);

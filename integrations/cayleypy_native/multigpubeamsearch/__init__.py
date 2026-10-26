@@ -13,3 +13,6 @@ __all__ = ["beam_search", "enable_native", "disable_native", "NativeOptions", "N
            "NativeBeamSearchResult", "NativeUnavailable", "NativeBackendError", "NativeFallbackWarning",
            "PreparedNative", "prepare_native", "setup_sources", "plan_cluster", "ClusterPlan",
            "PancakeGNN", "NeighborConfig"]
+
+from .persistent import NativeSession
+__all__.append("NativeSession")

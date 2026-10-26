@@ -679,3 +679,55 @@ available-budget bucket, and every reuse still requires fresh native admission.
 Default component-only calibration remains explicitly unverified for full steps.
 
 Publication validation: [Cube555 adaptive acceptance](../../docs/validation/cube555-adaptive-20261025.md). GPU scope and limits are recorded there.
+
+
+### Reuse GPU resources across searches
+
+```python
+from multigpubeamsearch import NativeSession, enable_native
+
+enable_native(options)
+with NativeSession():
+    first = graph.beam_search(start_state=start_a, predictor=model,
+                              beam_width=beam, max_steps=depth,
+                              use_child_scores=True, return_path=True)
+    second = graph.beam_search(start_state=start_b, predictor=model,
+                               beam_width=beam, max_steps=depth,
+                               use_child_scores=True, return_path=True)
+# All session-owned native workers and GPU allocations are released here.
+```
+
+The session retains model weights, static GPU buffers, streams and CUDA Graphs
+between compatible calls. Each search gets fresh frontier/threshold/stop state,
+history and separate result logs. A reused live session skips inference and
+pipeline tuning; a cold session still uses matching validated disk profiles.
+The context does not activate the CayleyPy backend: call `enable_native` first,
+or use the standalone `multigpubeamsearch.beam_search` function inside it.
+
+Graph/model artifacts, native binary, selected devices, beam, depth or options
+changes close the old worker group before preparing another search. Changing
+only the initial state preserves the group. A session owns one sequential group;
+concurrent searches and nested sessions are rejected. `session.close()` explicitly
+releases resources; context exit also closes on exceptions. A timeout, failed rank
+or invalid result destroys the entire group. Metadata `persistent_session` records
+worker PIDs, request count and whether resources were reused. This is a local
+multi-GPU session; it does not introduce a multi-node service.
+
+`prepare_native` freezes exported artifacts; it is separate from `NativeSession`,
+which owns live GPU resources. Process termination loses GPU resources, while
+compatible profile files remain reusable through the same `cache_dir`.
+
+For separate notebook cells, use an explicit session object:
+
+```python
+session = NativeSession()
+result = session.beam_search(graph, native_options=options,
+                            start_state=start_a, predictor=model,
+                            beam_width=beam, max_steps=depth,
+                            use_child_scores=True, return_path=True)
+# Call session.beam_search again with another start when needed.
+session.close()  # Release GPUs when finished.
+```
+
+The explicit call does not require `enable_native()`. Do not recreate `session`
+in the search cell if the intent is to reuse it across cell executions.

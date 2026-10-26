@@ -455,6 +455,14 @@ def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int
 
 
 def run_native(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
+    from .persistent import current_session
+    session=current_session()
+    if session is not None:
+        return session.run(_run_native_once,contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+    return _run_native_once(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+
+
+def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
     maximum_requested=type(beam_width) is str and beam_width=='max'
     if (not maximum_requested and (type(beam_width) is not int or beam_width <= 0)) or type(max_steps) is not int or max_steps < 0:
         raise NativeUnavailable("native beam_width must be positive and max_steps nonnegative integers")
@@ -649,7 +657,9 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     log = run_dir / "native.log"
     process_log = log
     log_metadata = {}
-    if len(devices) > 1:
+    from .persistent import current_session
+    resident_session=current_session()
+    if len(devices) > 1 and resident_session is None:
         worker_logs = run_dir / "worker-logs"
         try:
             worker_logs.mkdir()
@@ -663,7 +673,10 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         # Runtime preparation may compile for minutes. Rehash the exact model
         # bytes after that window and immediately before the worker sees them.
         verify_prepared_model(model, contract)
-        if len(devices) > 1:
+        if resident_session is not None:
+            elapsed=resident_session.launch(args[:4],contract=contract,run_dir=run_dir,env=env,
+                world=len(devices),timeout=options.timeout_seconds)
+        elif len(devices) > 1:
             from .local_launcher import run_local_ranks
             elapsed = run_local_ranks(args, world_size=len(devices), cwd=run_dir, env=env,
                 timeout=options.timeout_seconds, log_path=process_log, worker_logs=worker_logs)
@@ -673,7 +686,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         failure = error
         raise
     finally:
-        if len(devices) > 1:
+        if len(devices) > 1 and resident_session is None:
             try:
                 log_metadata = collect_worker_logs(worker_logs, process_log, log, len(devices), strict=failure is None)
             except Exception as log_error:
