@@ -62,3 +62,38 @@ used a CPU Docker pin and failed preflight; the GPU image pin is now corrected.
 The previous full Cube555 notebook160 solve remains separate evidence; it was
 not repeated for this change. Compatible profile disk reuse and forbidden warm
 recalibration were separately verified on RTX3060 as described above.
+
+## Follow-up validation boundaries
+
+The working-frontier planner fix in `0b32691ae81a9ad8cc8bfe98b3ecf9d939fd272c`
+compiled and ran on two Tesla T4 GPUs with the real Cube555 FP16
+Transformer+MLP blend. Native admission selected 55,173,120 parents in 2.46s.
+This is a memory-admission result, not a completed full-step result or a verified
+efficient maximum. The subsequent six-depth-per-profile verification was
+cancelled because the measured inference throughput projected hours of work.
+
+The derived physical shard slab now reserves the configured flush and trigger,
+so decreasing a logical frontier does not invalidate a frozen flush geometry.
+Explicit manually supplied capacities remain strict. Logical top-k is unchanged.
+A native regression checks fixed-flush admission and memory monotonicity; its
+source is included, but its execution is still pending.
+
+New full-frontier calibration checks its projected inference cost against the
+time budget before constructing a large fixture. Existing validated profile
+cache hits bypass this new-work check. The projection is an estimate, not a
+performance measurement or capacity guarantee. Twelve pipeline calibration
+unit tests passed, including this cache ordering regression.
+
+CUTLASS ensemble resident acceptance remains pending. An SM86 executable was
+built on Kaggle, but compilation does not prove execution. A requested Kaggle
+L4 session actually received two T4 GPUs and correctly failed the SM80+ hardware
+preflight. The paid test machines were removed; their setup failures are not
+successful CUTLASS tests. Loader diagnostics now preserve the failing exit code
+and missing-library error; its targeted regression passed.
+
+A replacement SM86 package including the native planner regression executable
+completed on a CPU-only Kaggle worker (no GPU allocation), source
+`cae5b9d4925fae2cda728d4163246e444980c2ea`. Archive SHA256:
+`5c4c48ee6262138160f13db00382f269a8535c2a31f7e0d4f4a68bf7d19a8002`.
+The binaries are ready for remote execution; their build success is not GPU
+acceptance. No paid instances remain active at this checkpoint.
