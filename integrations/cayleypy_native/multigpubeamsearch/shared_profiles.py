@@ -14,12 +14,13 @@ MAX_BYTES = 2 << 20
 
 def compatibility(contract, model, runtime, devices, beam):
     import torch
+    from .profile_identity import portable_model_key
     hardware=[]
     for device in devices:
         p=torch.cuda.get_device_properties(device)
         hardware.append(dict(name=p.name,compute=[p.major,p.minor],
             sm_count=p.multi_processor_count,total_memory=p.total_memory))
-    return dict(schema=SCHEMA,graph=contract.graph_hash,models=model.artifact_hash,
+    return dict(schema=SCHEMA,graph=contract.graph_hash,models=portable_model_key(model),
         native_source=runtime.build_metadata['source_digest'],
         cutlass_source=runtime.build_metadata.get('cutlass_digest'),
         build_mode=runtime.build_metadata.get('build_mode'),

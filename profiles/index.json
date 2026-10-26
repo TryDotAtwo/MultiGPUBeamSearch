@@ -31,7 +31,7 @@
             "total_memory": 12488343552
           }
         ],
-        "models": "c0cd75fef8cf5a58b0cb1371e04c7c750d6308f367a340be86fad375bb850321",
+        "models": "cube555-ts-v1:433e0a0e051e403377f296f8102502559c28e1bdb4485204b58454561cd52345",
         "native_source": "750a0607dbadac13373a0a03051b57cacef1a565dc61c5f092b15b98d0cad641",
         "precision": "fp16/fp32",
         "schema": 1,
@@ -44,7 +44,7 @@
         "torch": "2.10.0+cu128",
         "world_size": 2
       },
-      "sha256": "571aa6bc7780d629c2fb89870867bc6e79db0694538dc4243187fa141776c640"
+      "sha256": "2c24c6c1711cc27f8d8c54e4ae87282f6b7589445a84dc907d8467eda6247c20"
     }
   ],
   "schema": 1
