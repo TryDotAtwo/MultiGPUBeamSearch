@@ -21,6 +21,9 @@ def compatibility(contract, model, runtime, devices, beam):
             sm_count=p.multi_processor_count,total_memory=p.total_memory))
     return dict(schema=SCHEMA,graph=contract.graph_hash,models=model.artifact_hash,
         native_source=runtime.build_metadata['source_digest'],
+        cutlass_source=runtime.build_metadata.get('cutlass_digest'),
+        build_mode=runtime.build_metadata.get('build_mode'),
+        cuda_architectures=runtime.build_metadata.get('cuda_architectures'),
         shape=runtime.build_metadata['shape'],backend=runtime.build_metadata['inference_backend'],
         torch=torch.__version__,cuda=torch.version.cuda,precision='fp16/fp32',
         hardware=hardware,world_size=len(devices),beam=beam)

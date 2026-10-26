@@ -1,0 +1,176 @@
+{
+  "compatibility": {
+    "backend": "cutlass",
+    "beam": 825344,
+    "build_mode": "release-debug-logs-v1",
+    "cuda": "12.8",
+    "cuda_architectures": [
+      86
+    ],
+    "cutlass_source": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+    "graph": "df70390b05802912137dd83897aaeb9c4e305a115d434addf5075df8019eec0d",
+    "hardware": [
+      {
+        "compute": [
+          8,
+          6
+        ],
+        "name": "NVIDIA GeForce RTX 3060",
+        "sm_count": 28,
+        "total_memory": 12488343552
+      },
+      {
+        "compute": [
+          8,
+          6
+        ],
+        "name": "NVIDIA GeForce RTX 3060",
+        "sm_count": 28,
+        "total_memory": 12488343552
+      }
+    ],
+    "models": "c0cd75fef8cf5a58b0cb1371e04c7c750d6308f367a340be86fad375bb850321",
+    "native_source": "750a0607dbadac13373a0a03051b57cacef1a565dc61c5f092b15b98d0cad641",
+    "precision": "fp16/fp32",
+    "schema": 1,
+    "shape": {
+      "alignment": 16,
+      "move_count": 30,
+      "state_len": 150,
+      "storage_len": 160
+    },
+    "torch": "2.10.0+cu128",
+    "world_size": 2
+  },
+  "evidence": {
+    "acceptance_sha256": "cd72750fa0fb8987b208225a3d1dfa65ab18612b8a3aff26f788e59835dc7233",
+    "native_source_commit": "ad344234322fcebf9519a9a24dcc93ef86d9a48c",
+    "pipeline_receipt_sha256": "aa5b4a5fa577451dde8365775dfe99b070ad989e9f2cd71e5ff8283f9c5ab65b",
+    "scope": "real Cube555 Transformer 0.8 + MLP 0.2; exact-width full-step cohort and normal CayleyPy API search; not a universal optimum",
+    "source_commit": "de53e6eb6b21f5d253d8742ead47f1ea2a6a5cf3",
+    "status": "verified"
+  },
+  "inference": {
+    "estimate": {
+      "high": 6.34632483124733e-05,
+      "low": 6.343387812376022e-05,
+      "median": 6.345031410455703e-05,
+      "profile": "8192",
+      "relative_mad": 0.00020384781539381977,
+      "repeats": 7
+    },
+    "parent_batch": 8192,
+    "rank_measurements": [
+      {
+        "batch": 8192,
+        "correctness_passed": true,
+        "device": 0,
+        "numeric_error": 0,
+        "parents": 8192,
+        "seconds": [
+          1.0287943115234375,
+          1.0276204833984375,
+          1.02931005859375,
+          1.0285465087890624,
+          1.0291064453125,
+          1.0288240966796875,
+          1.0292275390625
+        ],
+        "torch_reserved_peak_bytes": 9453961216
+      },
+      {
+        "batch": 8192,
+        "correctness_passed": true,
+        "device": 1,
+        "numeric_error": 0,
+        "parents": 8192,
+        "seconds": [
+          1.0393006591796874,
+          1.0391142578125,
+          1.0395699462890624,
+          1.039415283203125,
+          1.0396661376953125,
+          1.03998876953125,
+          1.0397818603515625
+        ],
+        "torch_reserved_peak_bytes": 9453961216
+      }
+    ]
+  },
+  "pipeline": {
+    "environment": {
+      "BEAM_B_MICRO": "8192",
+      "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+      "BEAM_SHARD_COUNT": "1",
+      "BEAM_STREAM3_RING_SLOTS": "2",
+      "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+      "BEAM_STREAM4_BATCH_CANDIDATES": "1887232"
+    },
+    "estimate": {
+      "high": 6.438636495812655e-05,
+      "low": 6.428083320409429e-05,
+      "median": 6.434965299317618e-05,
+      "profile": "baseline",
+      "relative_mad": 0.00024853795664151135,
+      "repeats": 5
+    },
+    "measurements": [
+      {
+        "correctness_passed": true,
+        "memory_admitted": true,
+        "parents": 825344,
+        "profile": "baseline",
+        "seconds_by_rank": [
+          53.0537,
+          53.0538
+        ],
+        "throttled": false
+      },
+      {
+        "correctness_passed": true,
+        "memory_admitted": true,
+        "parents": 825344,
+        "profile": "baseline",
+        "seconds_by_rank": [
+          53.1237,
+          53.1238
+        ],
+        "throttled": false
+      },
+      {
+        "correctness_passed": true,
+        "memory_admitted": true,
+        "parents": 825344,
+        "profile": "baseline",
+        "seconds_by_rank": [
+          53.1408,
+          53.1409
+        ],
+        "throttled": false
+      },
+      {
+        "correctness_passed": true,
+        "memory_admitted": true,
+        "parents": 825344,
+        "profile": "baseline",
+        "seconds_by_rank": [
+          53.1106,
+          53.1106
+        ],
+        "throttled": false
+      },
+      {
+        "correctness_passed": true,
+        "memory_admitted": true,
+        "parents": 825344,
+        "profile": "baseline",
+        "seconds_by_rank": [
+          53.1023,
+          53.1024
+        ],
+        "throttled": false
+      }
+    ]
+  },
+  "schema": 1
+}
