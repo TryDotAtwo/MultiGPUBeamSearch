@@ -1,7 +1,7 @@
 """Install the pinned example into a private environment; usable on Kaggle or Linux."""
 from pathlib import Path
 import os
-CODE_COMMIT = "427d79091a8c3e33a7e242ff94395926ad72068f"
+CODE_COMMIT = "611d3272f4fb075aae55ff8b11a0b923673198ef"
 WORK_ROOT = Path(os.environ.get("MULTIGPUBEAMSEARCH_HOME", Path.home() / ".cache/multigpubeamsearch/cube555")).expanduser().resolve()
 PREPARED_SOURCE_DIR = WORK_ROOT / "sources" / CODE_COMMIT
 import subprocess, sys
@@ -45,3 +45,5 @@ if not torch.cuda.is_available() or NUM_GPUS < 1 or torch.cuda.device_count() < 
     raise RuntimeError(f"Requested {NUM_GPUS} GPUs, available {torch.cuda.device_count()}; request GPU resources before starting the notebook")
 print("Source:", actual_commit)
 print("GPUs:", [torch.cuda.get_device_name(i) for i in range(NUM_GPUS)])
+
+os.environ["MULTIGPUBEAMSEARCH_SOURCE_COMMIT"] = actual_commit
