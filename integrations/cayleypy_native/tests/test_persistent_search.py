@@ -126,6 +126,17 @@ def test_backend_reuses_only_compatible_resources_and_replays(tmp_path, monkeypa
         assert allocations[-1].closed
 
 
+def test_loader_failure_preserves_diagnostic_before_starting_workers(tmp_path, monkeypatch):
+    import subprocess
+    from multigpubeamsearch.errors import NativeBackendError
+    monkeypatch.setattr(subprocess, 'run', lambda *a, **k: subprocess.CompletedProcess(
+        a[0], 127, '', 'error while loading shared libraries: libcudart.so.12'))
+    with NativeSession() as session:
+        with pytest.raises(NativeBackendError, match='exit 127.*libcudart'):
+            session.launch(['runner'], contract=None, run_dir=tmp_path, env={}, world=2, timeout=30)
+        assert session._workers is None
+
+
 def test_timeout_terminates_workers(tmp_path):
     from multigpubeamsearch.resident_transport import ResidentWorkers
     from multigpubeamsearch.errors import NativeBackendError

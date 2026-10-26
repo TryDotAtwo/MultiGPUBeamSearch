@@ -84,7 +84,11 @@ class NativeSession:
         if self._workers is not None:raise NativeBackendError('resident workers already exist')
         probe=subprocess.run([command[0],'--resident-protocol-info'],env=env,cwd=run_dir,
             capture_output=True,text=True,timeout=min(timeout,15),check=False)
-        if probe.returncode or probe.stdout.strip()!='{"protocol":"resident-search-v1"}':
+        if probe.returncode:
+            detail=(probe.stderr or probe.stdout).strip()[-4000:]
+            raise NativeBackendError(
+                f'resident runner probe failed (exit {probe.returncode}): {detail}')
+        if probe.stdout.strip()!='{"protocol":"resident-search-v1"}':
             raise NativeBackendError('runner lacks resident-search-v1; rebuild native sources')
         self._workers = ResidentWorkers(command, world=world,
             directory=Path(run_dir)/'resident-session',cwd=run_dir,env=env)
