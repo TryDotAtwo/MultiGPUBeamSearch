@@ -9,7 +9,7 @@ def maximum_options(options):
     return replace(options,calibration_full_frontier=True)
 
 
-def verification_cost(beam,inference,seconds,*,repeats=6):
+def verification_cost(beam,inference,seconds,*,repeats=6,include_reference=True):
     """Conservative planning estimate, never a full-step performance receipt.
 
     A baseline and a half-width reference are mandatory. Use the optimistic
@@ -19,7 +19,7 @@ def verification_cost(beam,inference,seconds,*,repeats=6):
     per_parent=float(inference['estimate']['low'])
     if not math.isfinite(per_parent) or per_parent<=0 or seconds<=0:
         raise ValueError('invalid verification budget or inference estimate')
-    predicted=per_parent*(beam+beam//2)*repeats
+    predicted=per_parent*(beam+(beam//2 if include_reference else 0))*repeats
     return dict(predicted_inference_seconds=predicted,budget_seconds=seconds,
         repeats=repeats,fits=predicted<=seconds,
         scope='optimistic inference-only planning estimate; not a measured full step')

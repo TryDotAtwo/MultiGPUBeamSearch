@@ -95,7 +95,7 @@ def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,
         SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
         SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=True,
             calibration_frontier_max_states=None,calibration_max_batch=256),[0,1],beam,tmp_path,{},'runner',
-        {'parent_batch':256,'phase':'inference_verified'})
+        {'parent_batch':256,'phase':'inference_verified','estimate':{'low':1e-8,'median':1e-8}})
     if failure=='baseline':
         with pytest.raises(ValueError,match='timed out'):run()
         return
@@ -143,7 +143,7 @@ def test_native_scalar_inference_parent_batch_maps_to_child_row_budget(tmp_path,
     result=module.tune_downstream(SimpleNamespace(move_count=3),
         SimpleNamespace(backend='mlp',manifest={'output_dim':1}),runtime,options,
         [0,1],1000000,tmp_path,{},'runner',
-        {'parent_batch':256,'phase':'inference_verified'})
+        {'parent_batch':256,'phase':'inference_verified','estimate':{'low':1e-8,'median':1e-8}})
     assert result['environment']['BEAM_B_MICRO']=='768'
     assert all(env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256' for _,env in calls)
 
@@ -183,9 +183,26 @@ def test_full_refinement_uses_measured_winner_and_stops(tmp_path,monkeypatch):
         SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
         SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=True,
             calibration_frontier_max_states=None,calibration_max_batch=256),[0],4097,tmp_path,{},'runner',
-        {'parent_batch':256,'phase':'inference_verified','estimate':{'median':.001}})
+        {'parent_batch':256,'phase':'inference_verified','estimate':{'low':.001,'median':.001}})
     assert centers==[2048,3072]
     assert measured==[1024,2048,3072,4096]
     assert result['environment']['BEAM_STREAM4_BATCH_CANDIDATES']=='3072'
     assert result['adaptive_search']['stop_reason']=='no_statistically_separated_gain'
     assert len(result['full_tested'])==4
+
+
+def test_cached_full_profile_is_reused_before_expensive_verification_budget(tmp_path,monkeypatch):
+    from multigpubeamsearch import pipeline_cache,adaptive_profiles,working_capacity
+    setup_probe(monkeypatch)
+    cached=dict(phase='pipeline_measured',cache_hit=True)
+    monkeypatch.setattr(pipeline_cache,'cache_identity',lambda *a,**kw:{})
+    monkeypatch.setattr(pipeline_cache,'cache_path',lambda *a:tmp_path/'cached.json')
+    monkeypatch.setattr(pipeline_cache,'read_profile',lambda *a:cached)
+    monkeypatch.setattr(adaptive_profiles,'context',lambda *a:{})
+    def forbidden(*a,**kw):raise AssertionError('cache hit must not budget or rerun full verification')
+    monkeypatch.setattr(working_capacity,'verification_cost',forbidden)
+    options=SimpleNamespace(cache_dir=tmp_path,calibration_pipeline_seconds=1,calibration_full_frontier=True)
+    runtime=SimpleNamespace(build_metadata={'shape':{'storage_len':16},'component_calibration_protocol':'exact-capacity-v1'})
+    result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
+        runtime,options,[0,1],1000000,tmp_path,{},'runner',{'parent_batch':256,'phase':'inference_verified'})
+    assert result is cached

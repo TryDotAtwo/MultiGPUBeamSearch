@@ -606,18 +606,6 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     if calibrate:
         from .pipeline_autotune import tune_downstream
         if maximum_requested:
-            from .working_capacity import verification_cost
-            cost=verification_cost(beam_width,calibration,options.calibration_pipeline_seconds)
-            capacity['verification_cost']=cost
-            if not cost['fits']:
-                capacity['full_step_verified']=False
-                capacity['capacity_scope']='native memory admission only; full-step verification exceeds time budget'
-                (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
-                raise NativeBackendError(
-                    f"maximum frontier {beam_width:,} was admitted, but full-step verification "
-                    f"has projected inference time {cost['predicted_inference_seconds']:.0f}s "
-                    f"of inference versus calibration_pipeline_seconds={options.calibration_pipeline_seconds}; "
-                    "no full-frontier benchmark started and no smaller beam was substituted")
             downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
                 run_dir,env,runner,calibration)
         else:

@@ -79,6 +79,17 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 verify_prepared_model(model,contract)
                 (directory/'selection.json').write_text(json.dumps(cached,indent=2))
                 return cached
+        if options.calibration_full_frontier:
+            from .working_capacity import verification_cost
+            cost=verification_cost(beam_width,inference,max(.001,deadline-time.monotonic()),
+                                   include_reference=False)
+            (directory/'verification-budget.json').write_text(json.dumps(cost,indent=2))
+            if not cost['fits']:
+                raise NativeBackendError(
+                    f"full-frontier verification for {beam_width:,} parents has projected "
+                    f"inference time {cost['predicted_inference_seconds']:.0f}s versus "
+                    f"remaining calibration budget {cost['budget_seconds']:.0f}s; "
+                    "no full-frontier benchmark started and no smaller beam substituted")
         from .beam_geometry import Shape,memory_shortlist,ring_pool_limit
         from .component_autotune import tune_components
         initial=initial_plans[0]
