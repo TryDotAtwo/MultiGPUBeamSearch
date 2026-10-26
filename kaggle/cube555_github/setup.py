@@ -1,7 +1,7 @@
 """Install the pinned example into a private environment; usable on Kaggle or Linux."""
 from pathlib import Path
 import os
-CODE_COMMIT = "fc75cad08cb90cdf49bd56f92f95f1a45b50808d"
+CODE_COMMIT = "427d79091a8c3e33a7e242ff94395926ad72068f"
 WORK_ROOT = Path(os.environ.get("MULTIGPUBEAMSEARCH_HOME", Path.home() / ".cache/multigpubeamsearch/cube555")).expanduser().resolve()
 PREPARED_SOURCE_DIR = WORK_ROOT / "sources" / CODE_COMMIT
 import subprocess, sys
