@@ -4,7 +4,7 @@
 Run the cells in order with GPU acceleration enabled. The first cell controls
 puzzle index, exact global beam, GPU count, depth limit and explicit blend weights.
 The setup cell fetches immutable solver commit
-`7b4f01ff19a5d88328e35e454fbc3b4946fedc56`, installs the adapter and pinned CayleyPy,
+`ed343a4f84c0e6900941bd057504683e044741bb`, installs the adapter and pinned CayleyPy,
 and checks the requested GPUs. Checkpoints and inputs are checksummed GitHub assets.
 No Kaggle dataset or competition attachment is required.
 
