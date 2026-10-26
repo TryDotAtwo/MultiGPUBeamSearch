@@ -85,3 +85,50 @@ def test_logical_rank_frontiers_preserve_odd_global_width_without_padding():
         expected=[sum(i*world//width==r for i in range(width)) for r in range(world)]
         assert counts==expected
         assert sum(counts)==width
+
+
+@pytest.mark.parametrize('complete', [True, False])
+def test_natural_growth_requires_saturated_cohort_without_fixture(tmp_path, monkeypatch, complete):
+    import time
+    from multigpubeamsearch import pipeline_probe as module
+    class Telemetry:
+        throttled=False
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def receipt(self):return {}
+    monkeypatch.setattr(module,'CalibrationTelemetry',Telemetry)
+    probe=module.NativePipelineProbe('runner',{},8192,2,tmp_path,
+        [tmp_path/'missing-0',tmp_path/'missing-1'],16,
+        deadline=time.monotonic()+60,verify=lambda *args:True,grow=True)
+    def run(*args,**kwargs):
+        probe.counter+=1;(tmp_path/str(probe.counter)).mkdir()
+        return ['\n'.join([f'calibration_depth={i} rank={rank} parents=4096 depth_sec=1 search_depth={i+7}'
+                   for i in range(6 if complete else 2)]+[
+                   f'calibration_saturated_steps={6 if complete else 2}']) for rank in range(2)]
+    monkeypatch.setattr(probe,'_run',run)
+    plans=[dict(GLOBAL_BEAM_WIDTH_EFFECTIVE=8192,frontier_state_capacity=4096)]*2
+    if complete:
+        assert len(probe.measure({},plans))==5
+    else:
+        with pytest.raises(ValueError,match='saturated frontier'):
+            probe.measure({},plans)
+
+
+def test_natural_growth_launches_bounded_search_without_frontier_file(tmp_path,monkeypatch):
+    import time
+    from multigpubeamsearch import pipeline_probe as module
+    launched=[]
+    class Process:
+        def __init__(self,command,**kwargs):launched.append((command,kwargs['env']))
+        def wait(self,**kwargs):return 0
+        def poll(self):return 0
+    monkeypatch.setattr(module.subprocess,'Popen',Process)
+    probe=module.NativePipelineProbe('runner',{'BEAM_BENCHMARK_FRONTIER_FILE':'stale'},8192,2,tmp_path,
+        [tmp_path/'missing-0',tmp_path/'missing-1'],16,
+        deadline=time.monotonic()+60,verify=lambda *args:True,grow=True)
+    probe._run({},planning=False)
+    assert len(launched)==2
+    for command,env in launched:
+        assert command[2]=='38'
+        assert env['BEAM_BENCHMARK_GROW_STEPS']=='6'
+        assert 'BEAM_BENCHMARK_FRONTIER_FILE' not in env

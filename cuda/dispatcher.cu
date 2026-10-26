@@ -4615,6 +4615,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         const std::uint64_t total_available = global_less + global_equal;
         const std::uint64_t global_keep_count =
             std::min<std::uint64_t>(plan.derived.global_beam_width_effective, total_available);
+        result.final_global_keep_count = global_keep_count;
 #if BEAM_DEBUG_DEPTH_FLOW_TRACE
         result.local_clean_before_final = sum_u32_device_array_host(
             memory.streams.clean_count,
@@ -4623,7 +4624,6 @@ FinalizeDepthState finalize_depth_single_gpu(
         result.final_global_less = global_less;
         result.final_global_equal = global_equal;
         result.final_total_available = total_available;
-        result.final_global_keep_count = global_keep_count;
 #endif
 #if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
         log_final_histogram_trace(

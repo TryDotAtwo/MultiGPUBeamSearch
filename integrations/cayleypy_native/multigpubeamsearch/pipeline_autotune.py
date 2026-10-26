@@ -38,6 +38,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     native_single=model.backend=='mlp' if model is not None else False
     if native_single:
         baseline['BEAM_B_MICRO']=str(micro*(contract.move_count if model.manifest['output_dim']==1 else 1))
+    grow=runtime.build_metadata.get('frontier_calibration_protocol')=='natural-growth-v1'
     fixtures=[directory/'frontiers'/f'frontier-rank-{i}.bin' for i in range(world)]
     # The calibration fixture has no solved-neighborhood shortcut. Ordinary
     # execution retains its original touch-BFS settings and requested beam.
@@ -50,12 +51,12 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             for line in text.splitlines():
                 if '=' in line and ' ' not in line:
                     key,value=line.split('=',1);fields[key]=value
-            if fields.get('completed_depths')!='6':return False
+            if fields.get('calibration_saturated_steps' if grow else 'completed_depths')!='6':return False
             if int(fields.get('last_final_frontier_size','-1'))!=count:return False
             if 'production_runner_error=' in text:return False
         return inference.get('phase')=='inference_verified'
     actual=NativePipelineProbe(runner,probe_env,beam_width,world,directory/'actual-plans',
-        fixtures,storage,deadline=search_deadline,verify=verify)
+        fixtures,storage,deadline=search_deadline,verify=verify,grow=grow)
     actual.planning_session=session
     # Failure to admit the real requested beam is an execution error, never a
     # reason to benchmark a smaller beam and silently run that instead.
@@ -146,7 +147,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             base=next(r for r in eligible if r['name']=='baseline')
             final_plans=base['plans']
             actual.deadline=deadline
-            receipt=write_frontiers(contract,rank_frontier_counts(final_plans),
+            receipt=dict(kind='native-natural-growth-v1', requested_beam=beam_width) if grow else write_frontiers(contract,rank_frontier_counts(final_plans),
                 storage,directory/'frontiers',deadline=deadline,
                 max_states=options.calibration_frontier_max_states or final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
             samples=[];completed=[]
@@ -244,11 +245,11 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     # frontier. If an explicit fixture budget is exceeded, decline calibration.
     workload=beam_width
     probe=NativePipelineProbe(runner,probe_env,workload,world,directory/'measurements',
-        fixtures,storage,deadline=search_deadline,verify=verify)
+        fixtures,storage,deadline=search_deadline,verify=verify,grow=grow)
     probe.planning_session=session
     try:
         plans=probe.admit(baseline)
-        receipt=write_frontiers(contract,rank_frontier_counts(plans),
+        receipt=dict(kind='native-natural-growth-v1', requested_beam=beam_width) if grow else write_frontiers(contract,rank_frontier_counts(plans),
             storage,directory/'frontiers',deadline=deadline,
             max_states=options.calibration_frontier_max_states or plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
     except ValueError as error:

@@ -94,18 +94,19 @@ def measure_reference(contract,model,runtime,options,devices,runner,environment,
     storage=runtime.build_metadata['shape']['storage_len'];world=len(devices)
     env=dict(environment,BEAM_SOLVED_NEIGHBORHOOD_RADIUS='0',
              BEAM_STREAM2_SUFFIX_RADIUS='0',BEAM_SOLVE_BUCKET_MODE='0')
+    grow=runtime.build_metadata.get('frontier_calibration_protocol')=='natural-growth-v1'
     fixtures=[directory/'frontiers'/f'frontier-rank-{rank}.bin' for rank in range(world)]
     def verify(texts,plans):
         verify_prepared_model(model,contract)
         for text,count in zip(texts,rank_frontier_counts(plans)):
             fields=dict(line.split('=',1) for line in text.splitlines() if '=' in line and ' ' not in line)
-            if fields.get('completed_depths')!='6' or int(fields.get('last_final_frontier_size','-1'))!=count:return False
+            if fields.get('calibration_saturated_steps' if grow else 'completed_depths')!='6' or int(fields.get('last_final_frontier_size','-1'))!=count:return False
             if 'production_runner_error=' in text:return False
         return True
     probe=NativePipelineProbe(runner,env,beam,world,directory/'probe',fixtures,
-        storage,deadline=deadline,verify=verify)
+        storage,deadline=deadline,verify=verify,grow=grow)
     profile=dict(pipeline['environment']);plans=probe.admit(profile)
-    fixture=write_frontiers(contract,rank_frontier_counts(plans),storage,
+    fixture=dict(kind='native-natural-growth-v1', requested_beam=beam) if grow else write_frontiers(contract,rank_frontier_counts(plans),storage,
         directory/'frontiers',deadline=deadline,max_states=beam)
     samples=[replace(row,profile='working-reference') for row in probe.measure(profile,plans)]
     measured=estimate('working-reference',samples)

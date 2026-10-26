@@ -283,6 +283,7 @@ struct FinalizeDepthState {
     std::uint32_t final_threshold = 0;
     std::uint32_t final_candidate_count = 0;
     std::uint32_t final_request_count = 0;
+    std::uint64_t final_global_keep_count = 0;
     bool tracked_prefinal_enabled = false;
     std::uint32_t tracked_prefinal_matches = 0;
     std::uint32_t tracked_prefinal_best_score_key = UINT32_MAX;
@@ -297,7 +298,6 @@ struct FinalizeDepthState {
     std::uint64_t final_global_less = 0;
     std::uint64_t final_global_equal = 0;
     std::uint64_t final_total_available = 0;
-    std::uint64_t final_global_keep_count = 0;
 #endif
     double stream5_threshold_ms = 0.0;
     double stream3_final_filter_ms = 0.0;

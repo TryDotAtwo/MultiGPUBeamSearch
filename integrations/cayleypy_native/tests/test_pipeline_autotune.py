@@ -11,7 +11,7 @@ def setup_probe(monkeypatch, fail_actual=False, fail_fixture=False):
 
     class Probe:
         def __init__(self, runner, env, beam, world, directory, fixtures, storage,
-                     deadline, verify):
+                     deadline, verify, grow=False):
             self.beam, self.deadline = beam, deadline
 
         def admit(self, env):
@@ -41,11 +41,12 @@ def setup_probe(monkeypatch, fail_actual=False, fail_fixture=False):
     return calls
 
 
-def invoke(tmp_path):
+def invoke(tmp_path, grow=False):
     options = SimpleNamespace(calibration_pipeline_seconds=600,
                               calibration_frontier_max_states=None,
                               calibration_max_batch=1024)
-    runtime = SimpleNamespace(build_metadata={'shape': {'storage_len': 112}})
+    runtime = SimpleNamespace(build_metadata={'shape': {'storage_len': 112},
+        'frontier_calibration_protocol': 'natural-growth-v1' if grow else 'fixture-v1'})
     return module.tune_downstream(None, None, runtime, options, [0, 1],
         1000000, tmp_path, {}, 'runner',
         {'parent_batch': 1024, 'phase': 'inference_verified'})
@@ -206,3 +207,12 @@ def test_cached_full_profile_is_reused_before_expensive_verification_budget(tmp_
     result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
         runtime,options,[0,1],1000000,tmp_path,{},'runner',{'parent_batch':256,'phase':'inference_verified'})
     assert result is cached
+
+
+def test_natural_growth_tuner_never_builds_python_frontier(tmp_path,monkeypatch):
+    setup_probe(monkeypatch)
+    def forbidden(*args,**kwargs):raise AssertionError('Python frontier generation forbidden')
+    monkeypatch.setattr(module,'write_frontiers',forbidden)
+    result=invoke(tmp_path,grow=True)
+    assert result['fixture']['kind']=='native-natural-growth-v1'
+    assert result['requested_beam_effective']==1000000

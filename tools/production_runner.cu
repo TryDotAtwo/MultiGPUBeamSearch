@@ -4576,6 +4576,9 @@ int run_production_runner(int argc, char** argv) {
         std::cout << "benchmark_plan_only=1 admitted_global_beam=" << plan.derived.global_beam_width_effective << "\n";
         return 0;
     }
+    const auto benchmark_grow_steps=env_u32("BEAM_BENCHMARK_GROW_STEPS",0);
+    if(benchmark_grow_steps && (benchmark_grow_steps>16 || cli_depth_limit>64 || cli_depth_limit<benchmark_grow_steps || !benchmark_frontier.empty() || repair_resident_mode || solve_bucket_mode))
+        throw std::runtime_error("natural calibration requires bounded ordinary search without fixture/repair/collection");
     const auto benchmark_repeats=env_u32("BEAM_BENCHMARK_FRONTIER_REPEATS",1);
     if(!benchmark_frontier.empty() && (benchmark_repeats==0 || benchmark_repeats>16 || cli_depth_limit!=benchmark_repeats || repair_resident_mode || solve_bucket_mode))
         throw std::runtime_error("benchmark frontier requires bounded repeats without repair/solution collection");
@@ -5051,7 +5054,7 @@ int run_production_runner(int argc, char** argv) {
     }
 
     beam::resident::Mailbox resident(env_path("BEAM_SESSION_DIR", ""),rank);
-    if(resident.enabled() && (repair_resident_mode || solve_bucket_mode || !benchmark_frontier.empty()))
+    if(resident.enabled() && (repair_resident_mode || solve_bucket_mode || !benchmark_frontier.empty() || benchmark_grow_steps))
         throw std::runtime_error("resident session cannot combine with repair/bucket/benchmark modes");
     for (std::size_t task_index = 0; resident.enabled() || task_index < repair_tasks.size(); ++task_index) {
     RepairTask resident_task;
@@ -5199,6 +5202,8 @@ int run_production_runner(int argc, char** argv) {
     [[maybe_unused]] std::uint32_t last_final_threshold = UINT32_THRESHOLD_MAX;
     std::uint32_t total_threshold_updates = 0;
     std::uint32_t completed_depths = 0;
+    std::uint32_t calibration_saturated_steps = 0;
+    bool calibration_global_full = plan.derived.global_beam_width_effective == 1ULL;
     bool solution_found = false;
     std::string task_solution_path;
     std::int64_t task_solution_length = -1;
@@ -5230,6 +5235,8 @@ int run_production_runner(int argc, char** argv) {
         const bool runtime_depth_timing=env_bool("BEAM_RUNTIME_DEPTH_TIMING",false);
         if(runtime_depth_timing) std::cout << "runtime_depth_start=" << depth
             << " frontier_size=" << frontier_size << std::endl;
+        const auto calibration_input_parents = frontier_size;
+        const bool calibration_input_full = calibration_global_full;
         const auto depth_start = std::chrono::steady_clock::now();
         history.pump_completed(false);
         [[maybe_unused]] const bool emit_depth_log = (depth_log_every != 0U) && ((depth % depth_log_every) == 0U);
@@ -5825,6 +5832,19 @@ int run_production_runner(int argc, char** argv) {
                       << " depth_sec=" << depth_sec
                       << " next_frontier_size=" << frontier_size << std::endl;
         }
+        if(benchmark_grow_steps) {
+            // The global keep count is shared by every rank. Local fullness
+            // alone must never decide when ranks stop collective execution.
+            calibration_global_full = final_state.final_global_keep_count == plan.derived.global_beam_width_effective;
+            if(calibration_input_full) {
+                if(calibration_input_parents != benchmark_parent_count)
+                    throw std::runtime_error("natural calibration rank frontier mismatch");
+                std::cout << "calibration_depth=" << calibration_saturated_steps++
+                          << " rank=" << rank << " parents=" << calibration_input_parents
+                          << " depth_sec=" << depth_sec << " search_depth=" << depth
+                          << " next_frontier_size=" << frontier_size << std::endl;
+            }
+        }
         if(runtime_depth_timing) std::cout << "runtime_depth_done=" << depth
             << " depth_sec=" << depth_sec << std::endl;
 #if BEAM_ENABLE_DEPTH_LOGS
@@ -5898,6 +5918,7 @@ int run_production_runner(int argc, char** argv) {
 #endif
         }
 #endif
+        if(benchmark_grow_steps && calibration_saturated_steps == benchmark_grow_steps) break;
         if (propagate_frontier_live(frontier_size, memory, streams,
                 nccl_runtime.comm, world_size) == 0U) {
             break;
@@ -5927,6 +5948,8 @@ int run_production_runner(int argc, char** argv) {
     const auto end = std::chrono::steady_clock::now();
     const double elapsed_sec = std::chrono::duration<double>(end - start).count();
     const auto history_flush_start = std::chrono::steady_clock::now();
+    if(benchmark_grow_steps)
+        std::cout << "calibration_saturated_steps=" << calibration_saturated_steps << std::endl;
     history.finish_all();
     const auto history_flush_end = std::chrono::steady_clock::now();
     const double history_flush_sec = std::chrono::duration<double>(history_flush_end - history_flush_start).count();
