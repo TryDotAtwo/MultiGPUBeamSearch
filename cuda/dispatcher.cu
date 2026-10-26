@@ -2412,7 +2412,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 static_cast<std::uint32_t>(stream4_busy_slots.size()));
     };
 
-    const auto stream3_has_writable_buffer = [&](std::uint32_t incoming_bound = 0U) -> bool {
+    const auto stream3_has_writable_buffer = [&](std::uint64_t incoming_bound = 0ULL) -> bool {
         NvtxRange service_range("Dispatcher_Stream3_writable_metadata");
         if (plan.config.shard_buffer_count <= 1U) {
             return true;
@@ -2452,7 +2452,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 logical_processing =
                     logical_processing || host_processing[physical_shard] != 0U;
             }
-            const std::uint32_t required_available = incoming_bound != 0U ? incoming_bound :
+            const std::uint64_t required_available = incoming_bound != 0ULL ? incoming_bound :
                 logical_processing
                     ? std::min(
                           plan.config.stream3_batch_candidates,
@@ -3489,18 +3489,20 @@ DepthDispatchState run_depth_cuda_graphs(
             "cudaEventElapsedTime stream5 exchange");
 #endif
         release_completed_stream4_slots_nonblocking();
-        // All ranks enter this gate, including zero-receive ranks. The payload
-        // has arrived but has not been appended: no shard storage is overwritten
-        // while its sibling sort is active. A whole receive is a conservative
-        // upper bound for any one destination shard, independent of hash skew.
-        const auto incoming_bound = static_cast<std::uint32_t>(recv_total_64);
-        const bool receive_room = incoming_bound == 0U || stream3_has_writable_buffer(incoming_bound);
+        // Reuse the existing once-per-exchange pressure collective BEFORE
+        // append. Reserve this received payload plus one following local
+        // Stream3 batch, so local backpressure cannot strand a rank before its
+        // next exchange. No additional collective is introduced on the hot path.
+        const std::uint64_t append_reserve = recv_total_64 + plan.config.stream3_batch_candidates;
+        const bool receive_room = stream3_has_writable_buffer(append_reserve);
         maybe_run_stream5_threshold_update(!receive_room);
-        release_completed_stream4_slots_nonblocking();
-        if(incoming_bound != 0U && !stream3_has_writable_buffer(incoming_bound)) {
-            throw std::runtime_error("remote receive has no safe shard capacity after global pressure filtering: recv=" +
-                std::to_string(incoming_bound) + " shard_capacity=" +
-                std::to_string(plan.config.shard_capacity_candidates));
+        if(!receive_room) {
+            release_completed_stream4_slots_nonblocking();
+            if(!stream3_has_writable_buffer(append_reserve)) {
+                throw std::runtime_error("remote receive has no safe shard capacity after global pressure filtering: required=" +
+                    std::to_string(append_reserve) + " shard_capacity=" +
+                    std::to_string(plan.config.shard_capacity_candidates));
+            }
         }
         if (recv_total_64 != 0ULL) {
             progress_trace("remote-collect-begin");
@@ -3552,13 +3554,6 @@ DepthDispatchState run_depth_cuda_graphs(
             append_stream3_ready_queue();
             progress_trace("remote-ready-queue-ready");
         }
-        // Every rank reaches this boundary once per exchange round, including
-        // zero-send ranks. Request global filtering before local backpressure
-        // can block the next round on clean buffers that sorting cannot shrink.
-        progress_trace("writable-buffer-check-begin");
-        const bool writable=stream3_has_writable_buffer();
-        progress_trace("writable-buffer-check-ready");
-        maybe_run_stream5_threshold_update(!writable);
         ++completed_exchange_rounds;
     };
 
