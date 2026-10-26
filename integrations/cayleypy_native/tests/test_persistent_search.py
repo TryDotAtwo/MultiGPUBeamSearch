@@ -85,7 +85,8 @@ def test_worker_failure_closes_whole_group(tmp_path):
     assert all(p.poll() is not None for p in workers.processes)
 
 
-def test_backend_reuses_only_compatible_resources_and_replays(tmp_path, monkeypatch):
+@pytest.mark.parametrize("world", [1, 2])
+def test_backend_reuses_only_compatible_resources_and_replays(tmp_path, monkeypatch, world):
     from types import SimpleNamespace
     from multigpubeamsearch import models
     from multigpubeamsearch.options import NativeOptions, NativeOutcome
@@ -111,7 +112,7 @@ def test_backend_reuses_only_compatible_resources_and_replays(tmp_path, monkeypa
     contract=SimpleNamespace(graph_hash='g',start=(1,0),move_count=2,replay=lambda path:tuple(path)==(1,))
     model=SimpleNamespace(artifact_hash='m',backend='mlp')
     runtime=SimpleNamespace(build_metadata={'binary_sha256':'a'})
-    args=(execute,contract,model,NativeOptions(),64,4,tmp_path,(0,))
+    args=(execute,contract,model,NativeOptions(),64,4,tmp_path,tuple(range(world)))
     with session:
         first=session.run(*args,runtime=runtime)
         second=session.run(*args,runtime=runtime)

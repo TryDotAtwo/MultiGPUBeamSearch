@@ -41,7 +41,8 @@ def prepare_native(graph, predictor=None, *, native_options=None, fallback=None)
 
     Subsequent searches still verify artifact and executable integrity, device
     capability and each start state. They create fresh workers/history and replay
-    paths. There is no persistent CUDA worker or GPU-memory sharing.
+    paths by default. An explicit NativeSession can retain compatible workers
+    and device memory between searches; preparation alone does not retain them.
     """
     options = NativeOptions() if native_options is None else native_options
     if not isinstance(options, NativeOptions):

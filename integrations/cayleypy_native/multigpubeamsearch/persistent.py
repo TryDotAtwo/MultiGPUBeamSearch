@@ -125,8 +125,12 @@ class NativeSession:
                 metadata['profile']['calibration_total_wall_seconds']=0.0
                 outcome=NativeOutcome(path,elapsed,effective,directory,metadata)
                 reused=True
-            if self._workers is not None and outcome.metadata.get('terminal_records') != len(devices):
-                raise NativeBackendError('resident search requires one terminal record per rank')
+            # Distributed reconstruction prints the solved path only on its
+            # controller. Unsolved searches print one record on every rank.
+            # ResidentWorkers separately requires a completion receipt from all ranks.
+            expected_records = 1 if outcome.path is not None else len(devices)
+            if self._workers is not None and outcome.metadata.get('terminal_records') != expected_records:
+                raise NativeBackendError('resident search has unexpected terminal record count')
             outcome.metadata['persistent_session']=dict(reused=reused,
                 worker_pids=[] if self._workers is None else self._workers.pids,
                 request_count=0 if self._workers is None else self._workers.sequence)
