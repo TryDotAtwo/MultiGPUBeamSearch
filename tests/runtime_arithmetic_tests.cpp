@@ -79,9 +79,10 @@ int main() {
         const auto& c = admitted.config;
         const auto recv_reserve = (std::uint64_t(c.stream3_batch_candidates) *
             c.stream5_recv_capacity_scale_ppm + 999999ULL) / 1000000ULL;
-        const auto writable_reserve = std::max<std::uint64_t>(c.stream3_batch_candidates,recv_reserve);
+        const auto writable_reserve = c.stream3_batch_candidates +
+            std::max<std::uint64_t>(c.stream3_batch_candidates,recv_reserve);
         check(c.shard_capacity_candidates >= logical_shard_size_for(c) + writable_reserve,
-              "automatic shard capacity retains an entire owner batch reserve");
+              "automatic shard capacity reserves local plus remote contributions");
     }
     {
         const char* key="BEAM_RING_COUNT_LIMIT";

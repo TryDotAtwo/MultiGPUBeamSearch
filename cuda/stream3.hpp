@@ -284,6 +284,7 @@ void stream3_build_ready_shard_queue_cuda(
     std::uint32_t stream4_trigger_candidates,
     bool force_dirty_flush,
     bool force_clean_flush,
-    cudaStream_t stream);
+    cudaStream_t stream,
+    std::uint64_t receive_reserve = 0ULL);
 
 } // namespace beam

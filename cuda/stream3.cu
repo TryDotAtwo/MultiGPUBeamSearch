@@ -816,7 +816,8 @@ __global__ void stream3_build_ready_shard_queue_kernel(
     std::uint32_t stream3_batch_candidates,
     std::uint32_t stream4_trigger_candidates,
     std::uint32_t force_dirty_flush,
-    std::uint32_t force_clean_flush) {
+    std::uint32_t force_clean_flush,
+    std::uint64_t receive_reserve) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
         return;
     }
@@ -881,6 +882,12 @@ __global__ void stream3_build_ready_shard_queue_kernel(
                     const std::uint32_t available = shard_capacity - sibling_total;
                     sibling_available = available > sibling_available ? available : sibling_available;
                 }
+            }
+            // Do not transfer the only receive-capable bank to Stream4.
+            // This is a credit/ownership decision, not a wait in the receive path.
+            if (!force_dirty_flush && !force_clean_flush &&
+                shard_buffer_count > 1U && sibling_available < receive_reserve) {
+                continue;
             }
             const bool better_candidate =
                 selected_shard == UINT32_MAX ||
@@ -1801,7 +1808,8 @@ void stream3_build_ready_shard_queue_cuda(
     std::uint32_t stream4_trigger_candidates,
     bool force_dirty_flush,
     bool force_clean_flush,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    std::uint64_t receive_reserve) {
     NvtxRange range("Stream3_build_ready_shard_queue_launch");
     stream3_build_ready_shard_queue_kernel<<<1, 1, 0, stream>>>(
         clean_count,
@@ -1817,7 +1825,8 @@ void stream3_build_ready_shard_queue_cuda(
         stream3_batch_candidates,
         stream4_trigger_candidates,
         force_dirty_flush ? 1U : 0U,
-        force_clean_flush ? 1U : 0U);
+        force_clean_flush ? 1U : 0U,
+        receive_reserve);
 }
 
 } // namespace beam

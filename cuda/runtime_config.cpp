@@ -270,9 +270,11 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stre
 
 void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
     const std::uint64_t logical_shard_size = logical_shard_size_for(config);
-    const std::uint64_t owner_batch_reserve = std::max<std::uint64_t>(
+    // A round appends the local contribution AND the remote receive slab.
+    const std::uint64_t receive_reserve = config.world_size > 1U ? std::max<std::uint64_t>(
         config.stream3_batch_candidates,
-        scaled_round_up(config.stream3_batch_candidates, config.stream5_recv_capacity_scale_ppm));
+        scaled_round_up(config.stream3_batch_candidates, config.stream5_recv_capacity_scale_ppm)) : 0ULL;
+    const std::uint64_t owner_batch_reserve = config.stream3_batch_candidates + receive_reserve;
     if (logical_shard_size > UINT64_MAX - owner_batch_reserve)
         throw std::overflow_error("shard writable reserve exceeds uint64");
     const std::uint64_t scaled_capacity =
