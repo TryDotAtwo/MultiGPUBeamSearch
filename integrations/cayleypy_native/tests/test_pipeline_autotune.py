@@ -216,3 +216,30 @@ def test_natural_growth_tuner_never_builds_python_frontier(tmp_path,monkeypatch)
     result=invoke(tmp_path,grow=True)
     assert result['fixture']['kind']=='native-natural-growth-v1'
     assert result['requested_beam_effective']==1000000
+
+
+def test_shared_pipeline_validates_exact_beam_without_parameter_sweep(tmp_path, monkeypatch):
+    from multigpubeamsearch import pipeline_cache, adaptive_profiles, shared_profiles, component_autotune
+    calls = setup_probe(monkeypatch)
+    env={'BEAM_B_MICRO':'512','BEAM_ENSEMBLE_INFERENCE_MICRO':'256',
+         'BEAM_STREAM3_RING_SLOTS':'2','BEAM_SHARD_COUNT':'4',
+         'BEAM_STREAM4_BATCH_CANDIDATES':'8192','BEAM_STREAM4_ACTIVE_SORT_SLOTS':'2'}
+    shared={'inference':{'parent_batch':256},'pipeline':{'environment':env},'registry_sha256':'a'*64}
+    monkeypatch.setattr(shared_profiles,'lookup',lambda *args:shared)
+    monkeypatch.setattr(adaptive_profiles,'context',lambda *args:{})
+    monkeypatch.setattr(pipeline_cache,'cache_identity',lambda *args,**kw:None)
+    measured=[]
+    def components(probe,session,plans,baseline,candidates,**kwargs):
+        measured.append((probe.beam,baseline,candidates))
+        assert kwargs['candidate_factory']([],plans[0],{})==[]
+        return dict(phase='component_calibrated',environment=baseline,pipeline_verified=False,cache_hit=False)
+    monkeypatch.setattr(component_autotune,'tune_components',components)
+    session=SimpleNamespace(supports_components=True,set_deadline=lambda *args:None,close=lambda:None)
+    result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
+        SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
+        SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=False),
+        [0,1],1000000,tmp_path,{},'runner',{'parent_batch':256,'phase':'inference_verified'},planning_session=session)
+    assert measured==[(1000000,env,[])]
+    assert calls[-1]==(1000000,env)
+    assert result['shared_profile_validated'] and not result['pipeline_verified']
+    assert not result['cache_hit']

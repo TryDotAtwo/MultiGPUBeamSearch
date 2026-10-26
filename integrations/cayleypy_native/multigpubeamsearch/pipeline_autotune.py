@@ -80,6 +80,34 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 verify_prepared_model(model,contract)
                 (directory/'selection.json').write_text(json.dumps(cached,indent=2))
                 return cached
+        # GitHub records are proposals, not current-host timing receipts. Reuse
+        # requires fresh all-rank admission and exact-capacity component probes.
+        from .shared_profiles import lookup, pipeline_environment
+        shared = lookup(contract, model, runtime, options, devices, beam_width)
+        shared_env = pipeline_environment(shared, micro) if shared else None
+        if (shared_env is not None and not options.calibration_full_frontier
+                and session is not None and session.supports_components):
+            from .component_autotune import tune_components
+            try:
+                shared_plans = actual.admit(shared_env)
+                data = tune_components(actual, session, shared_plans, shared_env, [],
+                    moves=contract.move_count, inference=inference,
+                    candidate_factory=lambda *args: [])
+            except ValueError as error:
+                (directory/'shared-profile-rejected.json').write_text(json.dumps({
+                    'sha256':shared['registry_sha256'], 'reason':str(error)}))
+                initial_plans = actual.admit(baseline)
+            else:
+                verify_prepared_model(model, contract)
+                data.update(requested_beam_width=beam_width,
+                    shared_profile_sha256=shared['registry_sha256'],
+                    shared_profile_validated=True,
+                    search_policy='verified GitHub candidate; fresh exact-capacity validation')
+                if path is not None:write_profile(path, identity, data)
+                (directory/'selection.json').write_text(json.dumps(data, indent=2))
+                session.close()
+                actual.planning_session = None
+                return data
         if options.calibration_full_frontier:
             from .working_capacity import verification_cost
             cost=verification_cost(beam_width,inference,max(.001,deadline-time.monotonic()),
