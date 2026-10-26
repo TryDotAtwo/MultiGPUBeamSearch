@@ -655,9 +655,17 @@ budget, GPU count, exact beam, graph move/state sizes and the measured inference
 batch. Model, precision and topology remain part of the calibration identity;
 measured transport/service latency supplies staging and flush proposals.
 
-The coarse phase probes at most 16 candidates at exact native capacities.
-Component work/memory Pareto ranking supplies two full-step challengers plus
-the baseline. Up to two refinement rounds probe neighboring parameters around
+The coarse domain is pruned to at most four complementary component challengers
+using measured downstream service pressure. When isolated downstream work is at
+most 5% of inference time, component work/memory ranking supplies one full-step
+challenger plus the baseline; otherwise it supplies up to two. This ratio is a
+proposal heuristic, not proof that all downstream work overlaps inference.
+Smaller flush thresholds are omitted because they repeatedly sort survivor
+buffers. Outer batching, staging, sort lanes and shards remain subject to native
+memory admission. The trace includes analytical per-rank job counts (outer
+dispatch, model forwards and gross sorting), not measured CUDA kernel counts.
+If the coarse full comparison does not improve baseline, refinement stops.
+Otherwise up to two refinement rounds probe neighboring parameters around
 the measured full-step winner and compare at most two new full-step candidates
 per round. The 2% statistical improvement gate, time budget, no-new-neighbor
 condition and round bound provide explicit stopping conditions. This is the

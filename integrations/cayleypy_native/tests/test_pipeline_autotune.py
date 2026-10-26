@@ -104,6 +104,9 @@ def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,
     assert result['environment']['marker']=='base'
     assert result['estimate']['profile']=='baseline'
     assert len(result['full_comparison_measurements'])==(5 if failure else 10)
+    if not failure:
+        assert result['adaptive_search']['rounds']==[]
+        assert result['adaptive_search']['stop_reason']=='no_statistically_separated_gain'
     if failure:
         assert result['pipeline_verified'] is True
         assert result['full_grid_complete'] is False

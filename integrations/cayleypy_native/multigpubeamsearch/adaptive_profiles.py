@@ -5,8 +5,8 @@ Inference microbatch is immutable; outer transactions may contain several forwar
 """
 from dataclasses import replace
 from .beam_geometry import geometry, round_up, ceil_div
+from .profile_heuristics import POLICY
 
-POLICY='hardware-coarse-fine-v1'
 MAX_COARSE=16
 MAX_FINE=10
 MAX_ROUNDS=2

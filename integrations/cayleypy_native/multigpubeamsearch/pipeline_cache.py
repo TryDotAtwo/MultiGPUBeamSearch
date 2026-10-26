@@ -17,7 +17,8 @@ def cache_identity(inference, environment, *, beam, world, full_frontier):
     if (signature.get('requested_beam_width')!=beam or signature.get('world_size')!=world
             or not valid_cached_profile(inference,signature,signature.get('max_batch',65536))):
         return None
-    return dict(schema=5,policy='hardware-coarse-fine-v1',signature=signature,
+    from .profile_heuristics import POLICY
+    return dict(schema=6,policy=POLICY,signature=signature,
         parent_batch=inference['parent_batch'],reserve_bytes=inference['reserve_bytes'],
         full_frontier=bool(full_frontier),
         policy_environment={k:v for k,v in environment.items()
@@ -64,7 +65,7 @@ def valid_receipt(data,identity):
             if data.get('measurement_scope')!='full_requested_frontier' or data.get('full_grid_complete') is not True:return False
             samples=[Measurement(**r) for r in data['full_comparison_measurements']]
             names={r['name'] for r in data['tested'] if 'plans' in r and 'environment' in r}
-            if identity.get('policy')=='hardware-coarse-fine-v1':
+            if identity.get('policy') in {'hardware-coarse-fine-v1','service-guided-shortlist-v2'}:
                 search=data['adaptive_search']
                 if search['context']!=identity['adaptive_context']:return False
                 if search['stop_reason'] not in {'round_limit','no_new_admissible_neighbors','no_statistically_separated_gain'}:return False

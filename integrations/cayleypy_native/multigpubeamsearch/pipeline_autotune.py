@@ -101,8 +101,14 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             candidates.append(('staging-'+str(ring),dict(baseline,BEAM_STREAM3_RING_SLOTS=str(ring))))
         search_trace=dict(context=adaptive_context,rounds=[],stop_reason=None)
         def candidate_factory(rows,plan,service):
+            from .component_autotune import service_envelope
+            from .profile_heuristics import narrow
             proposed,trace=adaptive.proposals(shape,baseline,adaptive_context,
                 service=service,ring_limit=ring_pool_limit(environment))
+            pressure=service_envelope(rows,plan,moves=contract.move_count,
+                inference_seconds=inference['estimate']['median'],parent_batch=micro)
+            proposed,heuristic=narrow(proposed,baseline,pressure,plan=plan,moves=contract.move_count)
+            search_trace['heuristic']=heuristic
             search_trace['coarse']=trace
             return [('coarse-'+name,env) for name,env in proposed]
         data=tune_components(actual,session,initial_plans,baseline,candidates,
@@ -121,7 +127,9 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             from .calibration_stats import select
             # Component timings propose the finite grid. Only full-depth times
             # select its winner, at every width (including widths above 1M).
-            eligible=adaptive.shortlist(data['tested'],count=adaptive.FULL_PER_ROUND)
+            from .profile_heuristics import full_challengers
+            eligible=adaptive.shortlist(data['tested'],
+                count=full_challengers(search_trace.get('heuristic',{})))
             search_trace['coarse_full_candidates']=[r['name'] for r in eligible]
             search_trace['coarse_full_tested']=[]
             base=next(r for r in eligible if r['name']=='baseline')
@@ -150,6 +158,8 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 search_trace['coarse_full_tested'].append(row['name'])
             eligible=completed
             winner,rejections=select(samples,baseline='baseline',min_improvement=.02)
+            if winner.profile=='baseline' and search_trace['stop_reason'] is None:
+                search_trace['stop_reason']='no_statistically_separated_gain'
             seen={adaptive.key(r['environment']) for r in data['tested'] if 'environment' in r}
             from .component_autotune import service_envelope
             for round_index in range(adaptive.MAX_ROUNDS):

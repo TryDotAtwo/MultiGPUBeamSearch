@@ -880,3 +880,7 @@ Published graph/model/API integration, exact logical beam and hardware-derived c
 - An optional coarse-profile timeout no longer discards a verified baseline. Baseline failures still abort.
 - Incomplete search is reported and excluded from complete-profile caching; only completed timing cohorts are selected.
 - Validation: 18 pipeline/autotune cache regression tests passed. Clean Kaggle 2xT4 execution remains in progress.
+
+
+## 2026-10-26 Service-guided profile shortlist and clean Kaggle validation
+Measured-pressure shortlist reduces downstream tuning work while preserving inference batch and exact beam. Same-host Quadro RTX5000 paired checks at65536/262144 retained baseline full-step speed with about2.4-2.6x shorter tuning; replay and real cache validation passed. New trace distinguishes analytical jobs from CUDA kernels. Separate public notebook160 cells passed from scratch on2xT4: index1020 solved116moves, exact1048576beam, independent replay. See docs/validation/profile-shortlist-20261026.md and cube555-adaptive-20261025.md for evidence and limits.

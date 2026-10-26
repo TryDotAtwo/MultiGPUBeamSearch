@@ -29,10 +29,32 @@ This bounded measured search does not certify a global optimum.
 
 Maximum28,474,368 on the A4000 was admitted and allocated with one-parent model
 execution, not timed as a full maximum frontier. The notebook default competition
-index1020, beam1,048,576, two T4s and140 steps has not been executed in this
-acceptance. No full default solve, multi-GPU Cube555 throughput or matched-inference
-overlap claim is made. A notebook publication is not runtime acceptance.
+index1020, beam1,048,576, two T4s and140 steps was not executed in the October25
+acceptance. The separate October26 clean run is recorded below. Maximum-width
+throughput and matched-inference overlap remain unverified.
 
 Evidence archive SHA256 (adaptive run):
 `749d2c93a67de1d433fb658a61c801adf70b3515a8a6ab531b2466b05983f84e`.
 The155 member hashes were verified before the owned test machine was deleted.
+
+## Clean Kaggle 2xT4 acceptance — October26
+
+Public `trydotatwo/cube555-native-2xt4-blend`, version160, source commit
+`7b4f01ff19a5d88328e35e454fbc3b4946fedc56`: all six original code cells were
+executed unchanged in a fresh private validation kernel, version3. All cell
+SHA256 values were compared with the published source. Kaggle status COMPLETE.
+
+Both real Tesla T4 devices were used, with automatic LibTorch selection and
+FP16 Transformer/MLP blend. Exact requested/effective beam1,048,576. Cube555
+index1020 returned116 moves before the140-depth limit. Notebook replay and an
+independent replay from archived ordered generators and the initial state passed.
+The final output cell completed. Total13931.73s includes setup, build,
+calibration and search; this is not a per-step or tuning-speed measurement.
+
+Calibration reached its time budget, retained the measured baseline and marked
+the bounded search incomplete. The repaired timeout handling therefore passed
+the real two-GPU end-to-end case. No globally optimal profile or shortest-path
+claim is made. This run predates the service-guided shortlist candidate.
+
+Diagnostics archive159 files, SHA256:
+`915dd715b5c2896279a0d6e2a58d76dcaf6cd3497df517470adac05101b956eb`.
