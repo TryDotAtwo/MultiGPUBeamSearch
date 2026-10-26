@@ -212,9 +212,13 @@ def runtime_devices(graph, options) -> tuple[int, ...]:
             configured = () if device is None else (device,)
         else:
             configured = getattr(config, "devices", ())
-        if not configured or any(torch.device(d).type != "cuda" for d in configured):
-            raise NativeUnavailable("graph does not select CUDA devices; set explicit native devices")
-        devices = tuple(0 if torch.device(d).index is None else torch.device(d).index for d in configured)
+        if not configured or all(torch.device(d).type == "cpu" for d in configured):
+            # A CPU graph describes the puzzle; native search uses visible GPUs.
+            devices = tuple(range(torch.cuda.device_count()))
+        elif any(torch.device(d).type != "cuda" for d in configured):
+            raise NativeUnavailable("graph mixes CPU and CUDA devices; set explicit native devices")
+        else:
+            devices = tuple(0 if torch.device(d).index is None else torch.device(d).index for d in configured)
     if not devices or len(set(devices)) != len(devices) or len(devices) > 128 or any(
         type(d) is not int or d < 0 or d >= torch.cuda.device_count() for d in devices
     ):
