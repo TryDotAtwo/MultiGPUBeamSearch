@@ -5025,20 +5025,6 @@ int run_production_runner(int argc, char** argv) {
             << "solution_job_id\trepair_id\tpuzzle_id\tstart_step\ttarget_step\told_segment_len"
             << "\tsegment_solved\tsegment_len\tsegment_delta\tsegment_path\tprefix_path\tsuffix_path\n";
     }
-    std::ofstream solve_bucket_result;
-    if (solve_bucket_mode && rank == 0U) {
-        const std::filesystem::path parent = solve_bucket_result_path.parent_path();
-        if (!parent.empty()) {
-            std::filesystem::create_directories(parent);
-        }
-        solve_bucket_result.open(solve_bucket_result_path, std::ios::out | std::ios::trunc);
-        if (!solve_bucket_result) {
-            throw std::runtime_error("cannot open solve bucket result tsv: " + solve_bucket_result_path.string());
-        }
-        solve_bucket_result
-            << "puzzle_id\tdepth_index\tfound_depth\ttotal_depth\tknown_length\tdelta"
-            << "\towner_rank\tsolution_path\n";
-    }
     const std::size_t repair_k1_prefetch_tasks =
         repair_resident_mode ? static_cast<std::size_t>(env_u64("BEAM_REPAIR_K1_PREFETCH_TASKS", 10)) : 0U;
     std::unique_ptr<RepairSolvedNeighborhoodPrefetch> repair_k1_prefetch;
@@ -5054,8 +5040,8 @@ int run_production_runner(int argc, char** argv) {
     }
 
     beam::resident::Mailbox resident(env_path("BEAM_SESSION_DIR", ""),rank);
-    if(resident.enabled() && (repair_resident_mode || solve_bucket_mode || !benchmark_frontier.empty()))
-        throw std::runtime_error("resident session cannot combine with repair/bucket/fixture modes");
+    if(resident.enabled() && (repair_resident_mode || !benchmark_frontier.empty()))
+        throw std::runtime_error("resident session cannot combine with repair/fixture modes");
     for (std::size_t task_index = 0; resident.enabled() || task_index < repair_tasks.size(); ++task_index) {
     RepairTask resident_task;
     if(resident.enabled()) {
@@ -5081,6 +5067,20 @@ int run_production_runner(int argc, char** argv) {
         std::cout << "GLOBAL_BEAM_WIDTH_EFFECTIVE=" << plan.derived.global_beam_width_effective << "\n";
         if(stream1_scratch.transformer_numeric_error)
             BEAM_CUDA_CHECK(cudaMemset(stream1_scratch.transformer_numeric_error,0,sizeof(std::uint32_t)));
+    }
+    std::ofstream solve_bucket_result;
+    if (solve_bucket_mode && rank == 0U) {
+        const std::filesystem::path parent = solve_bucket_result_path.parent_path();
+        if (!parent.empty()) {
+            std::filesystem::create_directories(parent);
+        }
+        solve_bucket_result.open(solve_bucket_result_path, std::ios::out | std::ios::trunc);
+        if (!solve_bucket_result) {
+            throw std::runtime_error("cannot open solve bucket result tsv: " + solve_bucket_result_path.string());
+        }
+        solve_bucket_result
+            << "puzzle_id\tdepth_index\tfound_depth\ttotal_depth\tknown_length\tdelta"
+            << "\towner_rank\tsolution_path\n";
     }
     const RepairTask& repair_task = resident.enabled()?resident_task:repair_tasks[task_index];
     const std::uint64_t puzzle_id = repair_task.repair_id;
@@ -5971,6 +5971,7 @@ int run_production_runner(int argc, char** argv) {
     std::cout << "history_bytes_pruned=" << history.bytes_pruned << "\n";
     std::cout << "history_flush_sec=" << history_flush_sec << "\n";
 #endif
+    if (solve_bucket_mode) solution_found = solve_bucket_found_any;
     if (solve_bucket_mode && rank == 0U) {
         std::cout << "solve_bucket_summary=1"
                   << " puzzle_id=" << repair_task.puzzle_id

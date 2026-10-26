@@ -9,6 +9,7 @@ import shutil
 import threading
 import uuid
 import warnings
+from dataclasses import replace
 
 from cayleypy import CayleyGraph
 import cayleypy
@@ -179,6 +180,18 @@ def _discard_fallback_run(run_dir: Path | None) -> None:
 
 def _search(original, graph, kwargs, options, mode):
     mode = _mode(mode)
+    if 'reflect_mode' in kwargs or 'reflection_source' in kwargs:
+        from .reflection import reflected_search
+        return reflected_search(lambda values: _search(original, graph, values, options, mode), graph, kwargs, mode)
+    native_fields = {"bfs_radius": "touch_bfs_radius", "bfs_max_entries": "touch_bfs_max_entries",
+                     "solution_mode": "solution_mode", "collect_extra_depths": "collect_extra_depths",
+                     "max_collected_solutions": "max_collected_solutions"}
+    supplied = {name: kwargs[name] for name in native_fields if name in kwargs}
+    if supplied:
+        if mode != "native":
+            raise ValueError("native search controls require backend='native'; they cannot silently fall back")
+        kwargs = {name: value for name, value in kwargs.items() if name not in supplied}
+        options = replace(options, **{native_fields[name]: value for name, value in supplied.items()})
     if mode == "torch":
         return _torch_call(original, graph, kwargs)
     # NativeUnavailable is recoverable only inside the capability/preparation phase.
@@ -237,8 +250,11 @@ def _search(original, graph, kwargs, options, mode):
         if run_dir is not None:
             _write_metadata(run_dir / "adapter-result.json", metadata)
         path = list(outcome.path) if found and (params["return_path"] or not outcome.path) else None
+        solutions = tuple(tuple(row['path']) for row in metadata.get('collected_solutions', []))
+        if not solutions and found:
+            solutions = (tuple(outcome.path),)
         return NativeBeamSearchResult(found, len(outcome.path) if found else 0, path, {}, graph.definition,
-                                      native_metadata=metadata)
+                                      native_metadata=metadata, solutions=solutions)
     except BaseException as exc:
         if run_dir is not None:
             try:

@@ -745,3 +745,24 @@ The portable [Cube555 notebook](../../kaggle/cube555_github/cube555-native-2xt4-
 uses `graph.beam_search` inside `NativeSession.activate()`. It uses all visible allocated GPUs by default
 and a configurable user cache, without Kaggle-specific paths. Driver installation and cluster resource
 allocation remain prerequisites; the notebook operates on one allocated GPU node.
+
+
+### Search policy through the CayleyPy call
+
+```python
+result = graph.beam_search(
+    start_state=start, predictor=predictor, backend="native",
+    beam_width=1_048_576, max_steps=140, return_path=True,
+    solution_mode="collect", collect_extra_depths=1,
+    max_collected_solutions=2000, bfs_radius=0, bfs_max_entries=1_048_576,
+    reflect_mode="off", reflection_source=None,
+)
+```
+
+`solution_mode="first"` stops at the first hit; `collect` keeps the native collection window and capacity. `result.path` is the best collected path, and `result.solutions` contains all unique replay-checked paths. `collect_extra_depths` counts forward depths after the first hit. `bfs_radius` reserves a suffix within `max_steps`; the entry budget fails explicitly if insufficient. These native extensions require `backend="native"` and are never silently dropped on Torch fallback. `beam_mode="simple"` remains a distinct upstream search policy.
+
+Reflection accepts `off`, `after_original`, or `only`. `only` requires a replay-valid original solution as `reflection_source` (move indices); `after_original` uses the original search's best solution. Inverse generators must exist. Reflected solutions are transformed back and independently replayed in the original frame. Collection capacity applies separately to each orientation.
+
+The Cube555 notebook restores model paths, blend weight, index range/list/random selection, search policy, BFS, reflection, timeout/cache/output and publishing in its first cell. `Puzzle.blend` accepts `transformer_checkpoint`, `mlp_checkpoint`, `layout_path`, and `puzzle_info`; paths may be absolute or relative to the model folder. Arbitrary supported models can still be passed directly as `predictor`.
+
+`multigpubeamsearch.publication.publish_result` uses the pinned public cayleypy-beam-results client, sends only replay-checked solution envelopes, and keeps payload/receipts on failure. No user GitHub token is needed. The existing Cube555 v1 submission format requires two GPUs and Kaggle owner/slug/version/notebook provenance; other runtime outputs remain available locally and must not be mislabeled as Kaggle submissions.

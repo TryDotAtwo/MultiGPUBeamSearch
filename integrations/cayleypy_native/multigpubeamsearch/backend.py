@@ -387,12 +387,28 @@ def parse_terminal(log_path: Path, contract, *,
     if max_steps is not None and (type(max_steps) is not int or max_steps < 0):
         raise ValueError("max_steps must be a nonnegative integer")
     records, effective = [], set()
+    collected, collection_counts, collection_status = [], [], None
     terminal = re.compile(r"puzzle_solved=([01])\s+puzzle_id=(\d+)\s+seconds=([^\s]+)\s+solution_length=(-?\d+)(.*?)\s+solution=([^\s]*)\s*$")
     width = re.compile(r"(?:GLOBAL_BEAM_WIDTH_EFFECTIVE|global_beam_width_effective)=(\d+)")
     batch_values = {"B_MICRO": set(), "STREAM1_ROWS_PER_JOB": set(), "STREAM3_BATCH_CANDIDATES": set()}
     batches = re.compile(r"\b(B_MICRO|STREAM1_ROWS_PER_JOB|STREAM3_BATCH_CANDIDATES)=(\d+)")
     with log_path.open(encoding="utf-8", errors="replace") as handle:
         for line in handle:
+            if line.startswith("solve_bucket_solution=1 "):
+                row = dict(part.split('=', 1) for part in line.strip().split())
+                tokens = row['solution'].split('.') if row['solution'] else []
+                if any(re.fullmatch(r'm\d+', token) is None for token in tokens):
+                    raise NativeBackendError('invalid collected move token')
+                moves = tuple(int(token[1:]) for token in tokens)
+                if (int(row['puzzle_id']) != 0 or len(moves) != int(row['solution_length'])
+                        or (max_steps is not None and len(moves) > max_steps) or not contract.replay(moves)):
+                    raise NativeBackendError('collected solution failed independent replay/depth validation')
+                collected.append(dict(path=list(moves), solved_depth=int(row['found_depth']),
+                                      touch_depth=len(moves)-int(row['found_depth']), owner_rank=int(row['owner_rank'])))
+            if line.startswith('solve_bucket_summary=1 '):
+                collection_counts.append(int(dict(part.split('=',1) for part in line.split())['records']))
+            if line.startswith('collection_status='):
+                collection_status = line.strip().split('=',1)[1]
             effective.update(int(m.group(1)) for m in width.finditer(line))
             for match in batches.finditer(line):
                 batch_values[match.group(1)].add(int(match.group(2)))
@@ -431,6 +447,14 @@ def parse_terminal(log_path: Path, contract, *,
     if len(effective) > 1 or 0 in effective:
         raise NativeBackendError("native ranks emitted inconsistent effective global beam widths")
     metadata = {"native_seconds": max(r[1] for r in records), "terminal_records": len(records)}
+    if collection_counts:
+        if collection_counts != [len(collected)] or len({tuple(row['path']) for row in collected}) != len(collected):
+            raise NativeBackendError('collection summary/count/unique-path mismatch')
+        if bool(collected) != (records[0][0] is not None):
+            raise NativeBackendError('collection and terminal result disagree')
+        if collected and list(records[0][0]) not in [row['path'] for row in collected]:
+            raise NativeBackendError('terminal path missing from collection')
+        metadata.update(collected_solutions=collected, collection_status=collection_status or 'depth_reached')
     for label, name in (("B_MICRO", "observed_parent_batch"), ("STREAM1_ROWS_PER_JOB", "observed_inference_rows"),
                         ("STREAM3_BATCH_CANDIDATES", "observed_stream3_batch_candidates")):
         values = batch_values[label]
@@ -679,6 +703,11 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
             {'mode':'auto','profile':runtime.profile,'microbatch':microbatch_metadata,
              'search_budget':search_budget},indent=2)+'\n',encoding='utf-8')
     args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
+    # Apply search policy only after calibration: probes must not collect solutions.
+    env.update(BEAM_SOLVE_BUCKET_MODE=str(int(options.solution_mode == 'collect')),
+               BEAM_SOLVE_BUCKET_EXTRA_DEPTHS=str(options.collect_extra_depths),
+               BEAM_SOLVE_BUCKET_MAX_SOLUTIONS=str(options.max_collected_solutions),
+               BEAM_SOLVE_BUCKET_RESULT_TSV='collected-solutions.tsv')
     if calibrate:env['BEAM_RUNTIME_DEPTH_TIMING']='1'
     log = run_dir / "native.log"
     process_log = log
@@ -737,6 +766,14 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
                 "graph_hash": contract.graph_hash, "devices": list(devices), "requested_beam_width": beam_width,
                 "microbatch": microbatch_metadata, **search_budget,
                 "replay_valid": path is not None, "log_path": str(log), **log_metadata, **terminal_metadata}
+    import re
+    execution_parameters = {}
+    for file in [log, *run_dir.glob('resident-session/bootstrap-*.log')]:
+        for name, value in re.findall(r'^([A-Z][A-Z0-9_]+)=(\d+)$', file.read_text(errors='replace'), re.M):
+            execution_parameters[name] = int(value)
+    metadata.update(execution_parameters=execution_parameters, model_manifest=model.manifest,
+                    solution_mode=options.solution_mode, collect_extra_depths=options.collect_extra_depths,
+                    max_collected_solutions=options.max_collected_solutions)
     (run_dir / "native-outcome.json").write_text(json.dumps({"path": path, "elapsed_seconds": elapsed,
         "effective_beam_width": effective, "metadata": metadata}, indent=2) + "\n", encoding="utf-8")
     return NativeOutcome(path, elapsed, effective, run_dir, metadata)

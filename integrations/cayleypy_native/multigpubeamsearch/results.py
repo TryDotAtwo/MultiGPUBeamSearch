@@ -9,3 +9,4 @@ from cayleypy.algo.beam_search_result import BeamSearchResult
 class NativeBeamSearchResult(BeamSearchResult):
     backend: str = field(default="native", init=False)
     native_metadata: dict[str, Any] = field(default_factory=dict)
+    solutions: tuple[tuple[int, ...], ...] = field(default_factory=tuple)

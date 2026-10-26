@@ -190,8 +190,7 @@ def test_runtime_devices_supports_pypi_graph_device_and_explicit_override(monkey
         monkeypatch.delenv(key, raising=False)
     options = NativeOptions(cache_dir=tmp_path)
     assert runtime_devices(SimpleNamespace(device=torch.device("cuda:1")), options) == (1,)
-    with pytest.raises(NativeUnavailable, match="does not select CUDA"):
-        runtime_devices(SimpleNamespace(device=torch.device("cpu")), options)
+    assert runtime_devices(SimpleNamespace(device=torch.device("cpu")), options) == (0, 1)
     assert runtime_devices(SimpleNamespace(device=torch.device("cpu")),
                            NativeOptions(cache_dir=tmp_path, devices=(0,))) == (0,)
 
