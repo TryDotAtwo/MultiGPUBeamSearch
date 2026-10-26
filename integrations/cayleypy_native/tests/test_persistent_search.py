@@ -146,3 +146,22 @@ def test_timeout_terminates_workers(tmp_path):
     with pytest.raises(NativeBackendError,match='timed out'):
         workers.submit([0],tmp_path,timeout=.05)
     assert all(p.poll() is not None for p in workers.processes)
+
+
+def test_activation_preserves_notebook_lifetime_and_restores_after_error():
+    session=NativeSession()
+    for _ in range(2):
+        with session.activate():
+            assert current_session() is session
+        assert current_session() is None and not session.closed
+    with pytest.raises(ValueError):
+        with session.activate():
+            raise ValueError('caller failure')
+    assert current_session() is None and not session.closed
+    with session.activate():
+        with pytest.raises(RuntimeError,match='nested'):
+            with NativeSession().activate():pass
+        assert current_session() is session
+    session.close()
+    with pytest.raises(RuntimeError,match='closed'):
+        with session.activate():pass

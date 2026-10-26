@@ -1,5 +1,6 @@
 """Explicit lifetime for sequential searches on one native GPU worker group."""
 from contextvars import ContextVar
+from contextlib import contextmanager
 from copy import deepcopy
 import json
 import os
@@ -50,17 +51,27 @@ class NativeSession:
             _ACTIVE.reset(self._token)
             self._token = None
 
-    def beam_search(self, graph, **kwargs):
-        """Explicit session call, also usable across separate notebook cells."""
-        from .dispatch import beam_search
+    @contextmanager
+    def activate(self):
+        """Route CayleyPy graph calls through this session without closing it.
+
+        Suitable for separate notebook cells. Explicit close remains required;
+        ``with NativeSession()`` still owns and closes the complete lifetime.
+        """
         self._check_owner()
         if self.closed:raise RuntimeError('native session is closed')
         active=current_session()
         if active is not None and active is not self:
             raise RuntimeError('nested native sessions are unsupported')
         token=_ACTIVE.set(self)
-        try:return beam_search(graph,**kwargs)
+        try:yield self
         finally:_ACTIVE.reset(token)
+
+    def beam_search(self, graph, **kwargs):
+        """Explicit session call, also usable across separate notebook cells."""
+        from .dispatch import beam_search
+        with self.activate():
+            return beam_search(graph,**kwargs)
 
     def _release(self):
         if self._workers is not None:self._workers.close()
