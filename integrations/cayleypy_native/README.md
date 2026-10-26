@@ -731,3 +731,17 @@ session.close()  # Release GPUs when finished.
 
 The explicit call does not require `enable_native()`. Do not recreate `session`
 in the search cell if the intent is to reuse it across cell executions.
+
+
+### Shared profiles from GitHub
+
+The matching source checkout or installed source bundle includes the [profile registry](../../profiles/README.md).
+Lookup order is local cache, exact-compatible verified registry proposal, then normal automatic calibration.
+A registry proposal still receives fresh all-GPU numerical/timing and memory checks; a transferred profile
+is never a fabricated current-host full-step measurement. Profile identity includes the exact graph,
+model/blend, frontier, native source and hardware cohort. Changing the beam or model triggers its own lookup.
+
+The portable [Cube555 notebook](../../kaggle/cube555_github/cube555-native-2xt4-blend.ipynb)
+uses `graph.beam_search` inside `NativeSession.activate()`. It uses all visible allocated GPUs by default
+and a configurable user cache, without Kaggle-specific paths. Driver installation and cluster resource
+allocation remain prerequisites; the notebook operates on one allocated GPU node.
