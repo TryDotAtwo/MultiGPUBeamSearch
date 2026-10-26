@@ -47,7 +47,7 @@ def refine_maximum(initial_capacity,initial_inference,*,tune,discover,max_rounds
     raise RuntimeError('maximum frontier/inference calibration did not converge')
 
 
-def discover_capacity(contract,runtime,devices,environment,runner,run_dir,*,seconds):
+def discover_capacity(contract,runtime,devices,environment,runner,run_dir,*,seconds,working=False):
     import torch
     if runtime.build_metadata.get('plan_calibration_protocol')!='json-session-v1':
         raise RuntimeError('maximum beam requires the verified persistent native planner')
@@ -65,7 +65,7 @@ def discover_capacity(contract,runtime,devices,environment,runner,run_dir,*,seco
     ceiling=min(ceiling,max(0,state_bound-len(excluded)))
     alignment=int(environment.get('BEAM_STREAM4_BATCH_ALIGNMENT','1024'))
     deadline=time.monotonic()+seconds;started=time.monotonic()
-    best=None;probes=0;complete=True;rejections=[]
+    best=None;memory_best=None;probes=0;complete=True;rejections=[]
     with NativePlanSession(runner,environment,world,Path(run_dir)/'capacity-session',deadline=deadline) as session:
         for shards in range(1,129):
             if time.monotonic()>=deadline:
@@ -81,6 +81,20 @@ def discover_capacity(contract,runtime,devices,environment,runner,run_dir,*,seco
             except CapacityRejected as error:
                 rejections.append(dict(shards=shards,reason=str(error)));continue
             probes+=result.probes
+            if memory_best is None or result.effective_beam>memory_best.effective_beam:
+                memory_best=result
+            if working:
+                # Freeze a throughput-sized flush before binary searching. The
+                # tiny flush above measures the memory ceiling, not a useful
+                # execution geometry: repeatedly sorting a large survivor slab
+                # for just 8K arrivals can collapse throughput.
+                profile=working_profile(result,alignment)
+                try:
+                    result=find_capacity([profile],admit=session.admit,
+                        upper_bound=result.effective_beam,alignment=stride,deadline=deadline)
+                except CapacityRejected as error:
+                    rejections.append(dict(shards=shards,reason=str(error),phase='working'));continue
+                probes+=result.probes
             complete=complete and result.search_complete
             if best is None or result.effective_beam>best.effective_beam:best=result
             if not result.search_complete:break
@@ -88,7 +102,16 @@ def discover_capacity(contract,runtime,devices,environment,runner,run_dir,*,seco
     data=asdict(best)
     data.update(probes=probes,search_complete=complete,wall_seconds=time.monotonic()-started,
         profiles='shards 1..128, two staging slots, one active sort slot',
+        flush_policy='at least one admitted survivor slab per flush' if working else 'minimum allocation flush',
+        memory_ceiling=None if memory_best is None else asdict(memory_best),
         upper_bound_source='minimum of smallest GPU VRAM / state storage and multiset permutation bound',
         capacity_scope='native memory admission; full-step verification pending',rejected=rejections)
     (Path(run_dir)/'maximum-beam.json').write_text(json.dumps(data,indent=2))
     return data
+
+
+def working_profile(memory_capacity,alignment):
+    """Freeze enough arrivals to amortize a survivor-slab sort, preserving batch."""
+    capacity=max(int(p['SHARD_CAPACITY_CANDIDATES']) for p in memory_capacity.plans)
+    flush=max(8*alignment,((capacity+alignment-1)//alignment)*alignment)
+    return dict(memory_capacity.profile,BEAM_STREAM4_BATCH_CANDIDATES=str(flush))

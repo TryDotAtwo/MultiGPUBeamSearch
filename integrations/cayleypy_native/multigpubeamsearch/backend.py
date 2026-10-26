@@ -468,6 +468,8 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         raise NativeUnavailable("native beam_width must be positive and max_steps nonnegative integers")
     if maximum_requested:
         if not options.autotune:raise NativeUnavailable('maximum beam requires autotuning')
+        from .working_capacity import maximum_options
+        options=maximum_options(options)
         beam_width=1_048_576  # Bounded inference curve; capacity uses actual native plans below.
     if contract.replay(()):
         return NativeOutcome((), 0.0, None, None, {"already_solved": True, "replay_valid": True})
@@ -574,7 +576,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
             BEAM_ENSEMBLE_INFERENCE_MICRO=str(calibration['parent_batch']),
             BEAM_ENSEMBLE_RESERVE_BYTES=str(calibration['reserve_bytes']))
         capacity=discover_capacity(contract,runtime,devices,env,runner,run_dir,
-            seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+            seconds=min(60.0,options.calibration_pipeline_seconds*.25),working=True)
         def exact_inference(width,index):
             directory=run_dir/f'maximum-inference-{index}';directory.mkdir()
             chosen=tune_inference(contract,model,runtime,options,devices,width,directory,env)
@@ -587,7 +589,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
                 BEAM_ENSEMBLE_RESERVE_BYTES=str(chosen['reserve_bytes']))
             directory=run_dir/f'maximum-capacity-{index}';directory.mkdir()
             return discover_capacity(contract,runtime,devices,env,runner,directory,
-                seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+                seconds=min(60.0,options.calibration_pipeline_seconds*.25),working=True)
         capacity,calibration=refine_maximum(capacity,calibration,
             tune=exact_inference,discover=readmit_inference)
         runtime.profile['inference_calibration']=calibration
@@ -630,8 +632,28 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
             pipeline_calibration=downstream,calibration_total_wall_seconds=time.monotonic()-calibration_started)
         if maximum_requested:
             if selected:capacity['execution_profile']=dict(downstream['environment'])
-            capacity['full_step_verified']=measured and downstream.get('measurement_scope')=='full_requested_frontier'
-            capacity['capacity_scope']='full-step verified' if capacity['full_step_verified'] else 'native memory admission only'
+            from .working_capacity import choose_working_capacity,measure_reference
+            try:
+                selected_width,downstream,working=choose_working_capacity(
+                    capacity,downstream,calibration,options.cache_dir,
+                    measure=lambda width,profile:measure_reference(contract,model,runtime,
+                        options,devices,runner,env,profile,width,run_dir))
+                capacity['full_step_boundary_beam']=beam_width
+                capacity['effective_beam']=selected_width
+                capacity['working_capacity']=working
+                beam_width=selected_width
+                env.update(downstream['environment'])
+                runtime.profile['pipeline_calibration']=downstream
+                runtime.profile['calibration_total_wall_seconds']=time.monotonic()-calibration_started
+            except ValueError as error:
+                verified=measured and downstream.get('pipeline_verified') is True and downstream.get('measurement_scope')=='full_requested_frontier'
+                capacity.update(full_step_verified=verified,
+                    capacity_scope='full-step verified; efficiency unconfirmed' if verified else 'native memory admission only',
+                    working_capacity_failure=str(error))
+                (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
+                raise NativeBackendError(str(error)) from error
+            capacity['full_step_verified']=True
+            capacity['capacity_scope']='full-step verified; efficiency has a separate evidence flag'
             (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
         if options.report_calibration:
             report=downstream.get('matched_stream1',{})
