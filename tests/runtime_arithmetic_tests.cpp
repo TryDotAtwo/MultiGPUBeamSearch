@@ -133,6 +133,42 @@ int main() {
     config.world_size = UINT32_MAX; config.shard_count = UINT32_MAX;
     config.stream4_batch_alignment = UINT32_MAX;
     overflow([&] { local_frontier_capacity(config); }, "alignment product overflow");
+    {
+        const char* names[] = {"BEAM_STREAM4_BATCH_CANDIDATES", "BEAM_SHARD_COUNT",
+            "BEAM_STREAM3_RING_SLOTS", "BEAM_B_MICRO"};
+        const char* values[] = {"262144", "8", "2", "256"};
+        std::string saved[4]; bool existed[4];
+        auto set = [](const char* name, const char* value) {
+#ifdef _WIN32
+            _putenv_s(name, value ? value : "");
+#else
+            if (value) setenv(name, value, 1); else unsetenv(name);
+#endif
+        };
+        for (unsigned i=0;i<4;++i) {
+            const char* value=std::getenv(names[i]); existed[i]=value!=nullptr;
+            saved[i]=value?value:""; set(names[i],values[i]);
+        }
+        std::uint64_t previous_bytes=0;
+        // Frozen flush must remain legal below its logical shard size. Physical
+        // storage, not semantic beam width, must grow to cover that flush.
+        for (std::uint64_t width : {16384ULL, 65536ULL, 262144ULL, 1048576ULL}) {
+            try {
+                const auto plan=build_runtime_config_from_budget(width,2,0,64ULL<<30);
+                check(plan.config.shard_capacity_candidates>=262144,
+                      "small frontier reserves fixed flush capacity");
+                check(plan.config.user_global_beam_width==width,
+                      "flush floor preserves requested logical beam");
+                const auto bytes=make_static_memory_plan(plan.config).total_device_bytes;
+                check(bytes>=previous_bytes,"fixed-flush memory is monotone");
+                previous_bytes=bytes;
+            } catch (const std::exception& e) {
+                check(false,"fixed-flush small frontier admitted");
+                std::cerr << e.what() << '\n';
+            }
+        }
+        for (unsigned i=0;i<4;++i) set(names[i],existed[i]?saved[i].c_str():nullptr);
+    }
     std::cout << "runtime_arithmetic failures=" << failures << '\n';
     return failures ? 1 : 0;
 }

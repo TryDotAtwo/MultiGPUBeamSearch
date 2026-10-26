@@ -285,7 +285,14 @@ void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
             throw std::invalid_argument("BEAM_SHARD_CAPACITY_CANDIDATES must be at least LOGICAL_SHARD_SIZE");
         }
     } else {
-        config.shard_capacity_candidates = round_up_u32(scaled_capacity, config.stream4_batch_alignment);
+        // A fixed flush remains legal when the logical frontier shrinks. Reserve
+        // its physical slab explicitly; make_static_memory_plan accounts for it.
+        // Without this floor, capacity admission is not monotone: a smaller beam
+        // can reject because its derived slab is smaller than the frozen flush.
+        const std::uint64_t physical_capacity = std::max<std::uint64_t>(
+            scaled_capacity, std::max(config.stream4_batch_candidates,
+                                      config.stream4_trigger_candidates));
+        config.shard_capacity_candidates = round_up_u32(physical_capacity, config.stream4_batch_alignment);
     }
 }
 
