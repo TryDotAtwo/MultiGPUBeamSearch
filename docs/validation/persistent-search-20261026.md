@@ -24,8 +24,9 @@ One-GPU evidence archive SHA256:
 All 477 manifest members were hash-verified. No long solve or performance sweep
 was run. Multi-GPU LibTorch acceptance is recorded below. Separate CUTLASS resident GPU acceptance is recorded below.
 
-This change does not certify the unrelated maximum-working-frontier candidate,
-128-GPU operation, or a persistent service across different physical machines.
+Working-frontier acceptance is recorded below for one concrete model/hardware
+cohort. This does not certify128-GPU operation or a persistent service across
+different physical machines.
 
 Two RTX 3060 host: both resident and cold control failed before search at
 CUB MergeSort during CUDA Graph capture (invalid device ordinal), on driver
@@ -74,8 +75,8 @@ cancelled because the measured inference throughput projected hours of work.
 The derived physical shard slab now reserves the configured flush and trigger,
 so decreasing a logical frontier does not invalidate a frozen flush geometry.
 Explicit manually supplied capacities remain strict. Logical top-k is unchanged.
-A native regression checks fixed-flush admission and memory monotonicity; its
-source is included, but its execution is still pending.
+The native regression for fixed-flush admission and memory monotonicity passed
+on RTX3060 (runtime_arithmetic failures=0).
 
 New full-frontier calibration checks its projected inference cost against the
 time budget before starting full-frontier verification. Existing validated profile
@@ -83,20 +84,11 @@ cache hits bypass this new-work check. The projection is an estimate, not a
 performance measurement or capacity guarantee. Twelve pipeline calibration
 unit tests passed, including this cache ordering regression.
 
-CUTLASS ensemble resident acceptance remains pending. An SM86 executable was
-built on Kaggle, but compilation does not prove execution. A requested Kaggle
-L4 session actually received two T4 GPUs and correctly failed the SM80+ hardware
-preflight. The paid test machines were removed; their setup failures are not
-successful CUTLASS tests. Loader diagnostics now preserve the failing exit code
-and missing-library error; its targeted regression passed.
-
-A replacement SM86 package including the native planner regression executable
-completed on a CPU-only Kaggle worker (no GPU allocation), source
-`cae5b9d4925fae2cda728d4163246e444980c2ea`. Archive SHA256:
-`5c4c48ee6262138160f13db00382f269a8535c2a31f7e0d4f4a68bf7d19a8002`.
-The binaries are ready for remote execution; their build success is not GPU
-acceptance. No paid instances remain active at this checkpoint.
-
+An earlier Kaggle request for L4 received two T4 GPUs and correctly failed
+SM80+ preflight. Successful CUTLASS acceptance subsequently used RTX3060 below.
+Loader diagnostics preserve the failing exit code and missing-library error;
+the targeted regression passed. CUDA packages were built on CPU-only Kaggle
+workers; paid hosts only executed the supplied binaries.
 
 ## Completed CUTLASS 2xRTX3060 acceptance
 
@@ -113,4 +105,46 @@ Natural frontier calibration in8a3395b grows the ordinary native search
 and measures six saturated steps (one warmup, five measured). An early solution,
 finite graph, timeout, or incomplete cohort cannot certify full-frontier timing.
 Python fixture generation is bypassed when the native build advertises this
-protocol. Targeted CPU tests:24 passed. Native build/GPU validation pending.
+protocol. Targeted CPU tests:24 passed; the subsequent Python guard change
+passed all13 pipeline-autotune tests. Native build and GPU acceptance completed.
+
+## Working frontier: completed natural-growth validation
+
+Source4cf894b470138fbc736403379b44c9dcefef78ad; native source8a3395b;
+two RTX3060 12GiB, actual pretrained Cube555 MLP through CUTLASS.
+The inference batch remained5120 parents throughout the downstream comparison.
+
+| Global frontier | Median full step | Measured steps after warmup |
+| --- | ---: | ---: |
+| 19,994,624 |33.6795s|5|
+| 39,989,248 |68.3022s|5|
+
+Each cohort grew through ordinary native search, filled the exact global beam,
+and completed six saturated steps per rank (one warmup plus five measurements).
+The larger width retained98.619% of the smaller width's throughput. It is the
+largest admitted width tested with this inference reserve and profile domain,
+not proof of a globally optimal maximum over all possible configurations.
+Baseline beat the two-sort-lane challenger; bounded search stopped with
+no statistically separated gain. Capacity admission took2.96s. Full calibration,
+including inference refinement, profile comparison and half-width validation,
+took1177.89s. This optional maximum certification is not a subsecond operation.
+Compatible profiles are reused before expensive recalibration.
+
+Isolated Stream1 measured665,115 parents/s; complete search measured585,475
+parents/s, about12% lower. These are separate workloads; this is not a
+same-state measurement attributing the difference to cache or pipeline overhead.
+The short production call also completed; this test did not attempt a deep solve.
+
+Raw summarized measurements: [working-frontier-20261026.json](working-frontier-20261026.json).
+Final evidence archive:283 verified members, SHA256
+90b47e050a6828e6c80bbf995a643959b111e40161c34014e46428fa82479e0b.
+The owned Vast instance57835090 was deleted and absence verified.
+
+## Published notebooks
+
+The simple Kaggle notebook is v7; Cube555 blend is v163. Both pin source4cf894b,
+contain no dataset/competition attachments, and their downloaded published cells
+match the reviewed source. Publication used QUICK_SAVE, without repeating the
+already passed2xT4 acceptance. Clean2xT4 runtime acceptance above applies to
+7c38e298; later natural-growth validation applies to2xRTX3060, not a new2xT4 run.
+

@@ -1,0 +1,85 @@
+{
+  "source": "4cf894b470138fbc736403379b44c9dcefef78ad",
+  "native_source": "8a3395b384e63fb290c919bcc7e016292ef15268",
+  "gpu": "2xRTX3060 12GiB",
+  "model": "Cube555 pretrained MLP",
+  "backend": "CUTLASS",
+  "beam": 39989248,
+  "parent_batch": 5120,
+  "rank_step_seconds": [
+    [
+      70.0214,
+      69.5569,
+      68.192,
+      68.23,
+      68.426,
+      68.297
+    ],
+    [
+      70.0267,
+      69.5621,
+      68.1973,
+      68.2352,
+      68.4312,
+      68.3022
+    ]
+  ],
+  "full_step_median_seconds": 68.3022,
+  "isolated_inference_parents_per_second": 665114.7147336884,
+  "inference_extrapolated_step_seconds": 60.12383595514298,
+  "throughput_loss_relative_to_isolated_inference": 0.11973793003529931,
+  "comparison_scope": "separate inference workload; not same-state overhead attribution",
+  "working_capacity_status": "passed",
+  "working_capacity": {
+    "tested_beam": 39989248,
+    "full_step_verified": true,
+    "full_step_seconds": 68.3022,
+    "parents_per_second": 585475.2555554579,
+    "efficiency_verified": true,
+    "efficient_working_beam": 39989248,
+    "scope": "largest suitable measured width; not an exhaustive efficient maximum",
+    "reference": {
+      "beam": 19994624,
+      "seconds_per_parent": 1.684427774185701e-06,
+      "profile": "working-reference",
+      "receipt": "working-reference-19994624"
+    },
+    "throughput_retention": 0.9861907815560845,
+    "near_linear": true,
+    "efficiency_policy": "retain at least 80% of smaller measured-width throughput",
+    "comparisons": [
+      {
+        "tested_beam": 39989248,
+        "full_step_verified": true,
+        "full_step_seconds": 68.3022,
+        "parents_per_second": 585475.2555554579,
+        "efficiency_verified": true,
+        "efficient_working_beam": 39989248,
+        "scope": "largest suitable measured width; not an exhaustive efficient maximum",
+        "reference": {
+          "beam": 19994624,
+          "seconds_per_parent": 1.684427774185701e-06,
+          "profile": "working-reference",
+          "receipt": "working-reference-19994624"
+        },
+        "throughput_retention": 0.9861907815560845,
+        "near_linear": true,
+        "efficiency_policy": "retain at least 80% of smaller measured-width throughput"
+      }
+    ]
+  },
+  "calibration_seconds": 1177.8923438820057,
+  "full_profiles": [
+    "baseline",
+    "coarse-lanes-2"
+  ],
+  "profile_search_stop": "no_statistically_separated_gain",
+  "profile_search_complete": true,
+  "archive": {
+    "files": 283,
+    "sha256": "90b47e050a6828e6c80bbf995a643959b111e40161c34014e46428fa82479e0b",
+    "bytes": 593367
+  },
+  "instance_deleted": true,
+  "half_width_step_seconds": 33.6795
+}
