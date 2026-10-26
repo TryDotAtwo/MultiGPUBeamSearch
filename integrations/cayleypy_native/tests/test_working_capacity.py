@@ -11,6 +11,16 @@ def test_maximum_requires_full_frontier_without_mutating_fixed_width_options():
     assert options.calibration_full_frontier is False
 
 
+def test_large_frontier_verification_is_budgeted_before_full_benchmark():
+    from multigpubeamsearch.working_capacity import verification_cost
+    model={'estimate':{'low':8.46e-5}}
+    cost=verification_cost(55173120,model,7200)
+    assert not cost['fits'] and cost['predicted_inference_seconds']>40000
+    assert verification_cost(100000,model,300)['fits']
+    with pytest.raises(ValueError):
+        verification_cost(100,{'estimate':{'low':float('nan')}},300)
+
+
 def full(beam,seconds_per_parent):
     return dict(phase='pipeline_measured',pipeline_verified=True,
         measurement_scope='full_requested_frontier',requested_beam_effective=beam,
