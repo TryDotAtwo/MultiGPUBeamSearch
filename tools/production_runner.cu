@@ -5054,8 +5054,8 @@ int run_production_runner(int argc, char** argv) {
     }
 
     beam::resident::Mailbox resident(env_path("BEAM_SESSION_DIR", ""),rank);
-    if(resident.enabled() && (repair_resident_mode || solve_bucket_mode || !benchmark_frontier.empty() || benchmark_grow_steps))
-        throw std::runtime_error("resident session cannot combine with repair/bucket/benchmark modes");
+    if(resident.enabled() && (repair_resident_mode || solve_bucket_mode || !benchmark_frontier.empty()))
+        throw std::runtime_error("resident session cannot combine with repair/bucket/fixture modes");
     for (std::size_t task_index = 0; resident.enabled() || task_index < repair_tasks.size(); ++task_index) {
     RepairTask resident_task;
     if(resident.enabled()) {
