@@ -889,3 +889,5 @@ Measured-pressure shortlist reduces downstream tuning work while preserving infe
 
 ## 2026-10-27 — Retry noisy full-capacity component calibration
 When Stream 3/4 component timing makes the baseline cohort exceed the relative-MAD guard, preserve the requested beam and retry that baseline cohort once. A recovered retry is recorded in calibration output; a second unstable cohort or exhausted budget fails explicitly. Added regression coverage. Focused integration validation: 23 tests passed. Kaggle 2×T4 long-puzzle rerun is pending; no full-step or long-puzzle success is claimed yet.
+
+The public Cube555 notebook now fetches the pinned setup script that installs the retry-capable source commit; the example's editable search settings are unchanged.
