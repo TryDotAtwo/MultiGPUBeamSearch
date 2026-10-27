@@ -129,3 +129,50 @@ def test_frozen_expensive_inference_cannot_mask_downstream_improvement():
         assert result['estimate']['downstream_service_work_seconds']<base['estimate']['downstream_service_work_seconds']
         assert result['environment']['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256'
         assert result['pipeline_verified'] is False
+
+
+def _retry_test_row(values):
+    return dict(rank=0,correctness_passed=True,full_step_verified=False,
+        shard_capacity=100,outer_candidates=100,sort_jobs_concurrent=1,
+        stream3_seconds=list(values),stream4_group_seconds=[1.0]*5,
+        union_seconds=[1.0]*5,transport=[])
+
+
+def _run_retry_test(measurements):
+    from types import SimpleNamespace
+    from multigpubeamsearch.component_autotune import tune_components
+    plan=dict(frontier_state_capacity=100,GLOBAL_BEAM_WIDTH_EFFECTIVE=100,
+        WORLD_SIZE=1,SHARD_COUNT=1,SHARD_CAPACITY_CANDIDATES=100,
+        STREAM4_BATCH_CANDIDATES=100,STREAM4_BATCH_ALIGNMENT=1,
+        STREAM4_ACTIVE_SORT_SLOTS=1,STREAM3_RING_SLOTS=2)
+    class Probe:
+        deadline=float('inf')
+        def __init__(self):self.calls=0
+        def measure_components(self,environment,plans,*,move_count):
+            self.calls+=1
+            return [_retry_test_row(measurements[min(self.calls-1,len(measurements)-1)])]
+    probe=Probe()
+    result=tune_components(probe,SimpleNamespace(supports_components=True),[plan],
+        {'BEAM_B_MICRO':'1','BEAM_STREAM3_RING_SLOTS':'2',
+         'BEAM_STREAM4_BATCH_CANDIDATES':'100','BEAM_STREAM4_ACTIVE_SORT_SLOTS':'1'},
+        [],moves=1,inference={'estimate':{'median':1e-3},'parent_batch':1},
+        candidate_factory=lambda *args:[])
+    return probe,result
+
+
+def test_unstable_baseline_gets_one_bounded_retry_and_keeps_exact_beam():
+    unstable=[1.0,1.0,5.0,10.0,10.0]
+    stable=[1.0,1.01,0.99,1.0,1.0]
+    probe,result=_run_retry_test([unstable,stable])
+    assert probe.calls==2
+    assert result['requested_beam_effective']==100
+    assert result['baseline_retry']['status']=='recovered'
+    assert result['baseline_retry']['attempts']==1
+    assert result['baseline_retry']['initial_error']=='unstable timing samples'
+
+
+def test_unstable_baseline_retry_failure_is_explicit():
+    import pytest
+    unstable=[1.0,1.0,5.0,10.0,10.0]
+    with pytest.raises(ValueError,match='baseline component calibration unstable after 1 retry'):
+        _run_retry_test([unstable,unstable])

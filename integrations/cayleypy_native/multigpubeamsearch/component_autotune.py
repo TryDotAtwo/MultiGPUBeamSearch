@@ -62,7 +62,7 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
         probe.planning_session=None
     tested=[]
     samples=[]
-    from .calibration_stats import Measurement,select
+    from .calibration_stats import Measurement,estimate as estimate_samples,select
     for name,env,target in admitted:
         if time.monotonic()>=probe.deadline:break
         try:
@@ -144,6 +144,55 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
             tested.append({'name':name,'rejected':str(error)})
     valid=[r for r in tested if 'estimate' in r]
     if not valid:raise ValueError('no verified component profile')
+    baseline_retry={'status':'not_needed','attempts':0}
+    try:
+        estimate_samples('baseline',samples)
+    except ValueError as initial_error:
+        if str(initial_error)!='unstable timing samples':
+            raise
+        if time.monotonic()>=probe.deadline:
+            raise ValueError('baseline component calibration unstable; retry skipped because calibration budget expired') from initial_error
+        baseline_result=next((row for row in tested if row['name']=='baseline'),None)
+        if baseline_result is None:
+            raise ValueError('baseline component calibration unstable; no baseline receipt is available for retry') from initial_error
+        try:
+            retry_rows=probe.measure_components(baseline_result['environment'],
+                baseline_result['plans'],move_count=moves)
+        except ValueError as retry_error:
+            baseline_result['baseline_retry']={'status':'failed','attempts':1,
+                'initial_error':str(initial_error),'retry_error':str(retry_error)}
+            raise ValueError('baseline component calibration retry failed after initial instability: '+str(retry_error)) from retry_error
+        retry_samples=[]
+        for repeat in range(5):
+            cohort=[]
+            for row in retry_rows:
+                item=dict(row)
+                for key in ('stream3_seconds','stream4_group_seconds','union_seconds'):
+                    item[key]=[row[key][repeat]]
+                item['transport']=[dict(t,seconds=[t['seconds'][repeat]]) for t in row['transport']]
+                cohort.append(item)
+            value=service_envelope(cohort,baseline_result['plans'][0],moves=moves,
+                inference_seconds=inference['estimate']['median'],parent_batch=inference['parent_batch'])
+            retry_samples.append(Measurement('baseline',
+                baseline_result['plans'][0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'],
+                (value['downstream_service_work_seconds'],),True,True))
+        try:
+            retry_estimate=estimate_samples('baseline',retry_samples)
+        except ValueError as retry_error:
+            baseline_result['baseline_retry']={'status':'failed','attempts':1,
+                'initial_error':str(initial_error),'retry_error':str(retry_error),
+                'rank_measurements':retry_rows}
+            raise ValueError('baseline component calibration unstable after 1 retry: '+str(retry_error)) from retry_error
+        baseline_result['initial_rank_measurements']=baseline_result['rank_measurements']
+        baseline_result['rank_measurements']=retry_rows
+        baseline_result['initial_estimate']=baseline_result['estimate']
+        baseline_result['estimate']=service_envelope(retry_rows,baseline_result['plans'][0],
+            moves=moves,inference_seconds=inference['estimate']['median'],
+            parent_batch=inference['parent_batch'])
+        baseline_retry={'status':'recovered','attempts':1,'initial_error':str(initial_error),
+            'estimate':retry_estimate.__dict__}
+        baseline_result['baseline_retry']=baseline_retry
+        samples=[row for row in samples if row.profile!='baseline']+retry_samples
     winner,rejected=select(samples,baseline='baseline',min_improvement=.05)
     best=next(r for r in valid if r['name']==winner.profile)
     return {'phase':'component_calibrated','environment':best['environment'],
@@ -154,4 +203,5 @@ def tune_components(probe, session, plans, baseline, candidates, *, moves, infer
             'selection':best['name'],'estimate':best['estimate'],
             'selection_rejections':rejected,
             'selection_objective':'minimize summed downstream service work after frozen inference; proxy only, not full-step wall time',
-            'search_policy':'baseline plus at most six exact-capacity candidates; frozen inference microbatch'}
+            'search_policy':'baseline plus at most six exact-capacity candidates; frozen inference microbatch',
+            'baseline_retry':baseline_retry}
