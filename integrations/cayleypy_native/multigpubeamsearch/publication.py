@@ -6,12 +6,16 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 import urllib.request
 from urllib.parse import quote
 import uuid
 
 CLIENT_COMMIT = '73937259b360ff9abead62bc90f4cca433114b0a'
 CLIENT_SHA256 = '3f206bf21d0314faf4caf7867e637e49423088473814b4ddb1473c0ead62b26f'
+PUBLISH_TIMEOUT_SECONDS = 7_200
+PUBLISH_SUBMIT_PROCESS_TIMEOUT_SECONDS = 120
+PUBLISH_POLL_PROCESS_GRACE_SECONDS = 60
 
 
 def kaggle_run_url(owner, slug):
@@ -99,22 +103,79 @@ def prepare_publication(result, graph, start_state, *, puzzle_id, predictor, aut
 
 
 def publish_result(result, graph, start_state, **kwargs):
-    """Publish all solutions; retain payload and receipts on network/ingest failure."""
+    """Submit bounded chunks, then poll all receipts against one shared deadline."""
     path = prepare_publication(result,graph,start_state,**kwargs)
     if path is None:
         print('No solutions to publish.'); return None
     client = client_module(path.parent/'publisher')
     envelopes=json.loads(path.read_text())['results']
     receipts=[]
+    part_manifests=[]
+    parts=[]
+    endpoint_origin=None
+    deadline=time.monotonic()+PUBLISH_TIMEOUT_SECONDS
     for offset in range(0,len(envelopes),100):
         part=path.with_name(path.stem+f'-part{offset//100}.json')
         part.write_bytes(client.canonical_bytes(dict(schema_version=1,results=envelopes[offset:offset+100])))
         receipt=part.with_suffix('.receipts.json');receipts.append(str(receipt))
-        completed=subprocess.run([sys.executable,client.__file__,'submit',str(part),'--wait',
-            '--manifest',str(receipt),'--timeout','300'],capture_output=True,text=True,timeout=360)
+        remaining=deadline-time.monotonic()
+        if remaining<=0:
+            return dict(status='pending_or_failed',payload=str(path),receipts=receipts)
+        completed=subprocess.run([sys.executable,client.__file__,'submit',str(part),
+            '--manifest',str(receipt)],capture_output=True,text=True,
+            timeout=min(PUBLISH_SUBMIT_PROCESS_TIMEOUT_SECONDS,max(1,remaining)))
         part.with_suffix('.publish.log').write_text(completed.stdout+'\n'+completed.stderr,encoding='utf-8')
         if completed.returncode:
             print(f'Publication not confirmed; saved payload {path} and receipts {receipt}')
             return dict(status='pending_or_failed',payload=str(path),receipts=receipts)
-        print('Publication confirmed:',completed.stdout.strip())
-    return dict(status='published',payload=str(path),receipts=receipts)
+        manifest=json.loads(receipt.read_text(encoding='utf-8'))
+        current_origin=manifest.get('endpoint_origin')
+        if not isinstance(current_origin,str) or (endpoint_origin is not None and current_origin!=endpoint_origin):
+            return dict(status='pending_or_failed',payload=str(path),receipts=receipts)
+        endpoint_origin=current_origin
+        parts.extend(manifest.get('parts',[]))
+        receipts_in_part=manifest.get('receipts',[])
+        if not isinstance(receipts_in_part,list):
+            return dict(status='pending_or_failed',payload=str(path),receipts=receipts)
+        part_manifests.append(receipt)
+        # Preserve each part receipt immediately; accepted means queued, not published.
+        print('Submitted part:',completed.stdout.strip())
+
+    poll_manifest=path.with_name(path.stem+'-poll-manifest.json')
+    combined=dict(manifest_version=1,endpoint_origin=endpoint_origin,
+        input_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),parts=parts,receipts=[])
+    for manifest_path in part_manifests:
+        combined['receipts'].extend(json.loads(manifest_path.read_text(encoding='utf-8'))['receipts'])
+    poll_manifest.write_text(json.dumps(combined,indent=2),encoding='utf-8')
+    remaining=max(0,int(deadline-time.monotonic()))
+    if remaining<=0:
+        return dict(status='pending_or_failed',payload=str(path),receipts=[str(p) for p in part_manifests],
+                    poll_manifest=str(poll_manifest),unresolved=len(combined['receipts']))
+    try:
+        completed=subprocess.run([sys.executable,client.__file__,'poll','--manifest',str(poll_manifest),
+            '--timeout',str(remaining)],capture_output=True,text=True,
+            timeout=remaining+PUBLISH_POLL_PROCESS_GRACE_SECONDS)
+    except subprocess.TimeoutExpired:
+        print(f'Publication polling timed out; saved {poll_manifest}')
+        return dict(status='pending_or_failed',payload=str(path),receipts=[str(p) for p in part_manifests],
+                    poll_manifest=str(poll_manifest),unresolved=len(combined['receipts']))
+    poll_manifest_path=poll_manifest
+    combined=json.loads(poll_manifest_path.read_text(encoding='utf-8'))
+    states={item.get('submission_id'):item.get('state') for item in combined['receipts']}
+    for manifest_path in part_manifests:
+        part_receipts=json.loads(manifest_path.read_text(encoding='utf-8'))
+        for item in part_receipts['receipts']:
+            if item.get('submission_id') in states:
+                item['state']=states[item['submission_id']]
+        manifest_path.write_text(json.dumps(part_receipts,indent=2),encoding='utf-8')
+    published=sum(item.get('state')=='published' for item in combined['receipts'])
+    duplicate=sum(item.get('state')=='duplicate' for item in combined['receipts'])
+    rejected=sum(item.get('state')=='rejected' for item in combined['receipts'])
+    unresolved=len(combined['receipts'])-published-duplicate-rejected
+    status='published' if completed.returncode==0 and rejected==0 and unresolved==0 else 'pending_or_failed'
+    print(f'Publication poll: {published} published, {duplicate} duplicate, '
+          f'{rejected} rejected, {unresolved} unresolved')
+    return dict(status=status,payload=str(path),receipts=[str(p) for p in part_manifests],
+                poll_manifest=str(poll_manifest_path),published=published,duplicate=duplicate,
+                rejected=rejected,unresolved=unresolved)
+
