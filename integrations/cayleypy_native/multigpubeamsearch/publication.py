@@ -10,8 +10,8 @@ import urllib.request
 from urllib.parse import quote
 import uuid
 
-CLIENT_COMMIT = '52063b499c0f9f3c6218007ef473c55bcb438783'
-CLIENT_SHA256 = 'b2ddb0d2c348630539eed5adb768214c120000e60cecbdba0824253a48f2beb5'
+CLIENT_COMMIT = '73937259b360ff9abead62bc90f4cca433114b0a'
+CLIENT_SHA256 = '3f206bf21d0314faf4caf7867e637e49423088473814b4ddb1473c0ead62b26f'
 
 
 def kaggle_run_url(owner, slug):
