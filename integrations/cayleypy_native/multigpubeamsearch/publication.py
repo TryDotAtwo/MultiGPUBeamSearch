@@ -7,10 +7,16 @@ from pathlib import Path
 import subprocess
 import sys
 import urllib.request
+from urllib.parse import quote
 import uuid
 
 CLIENT_COMMIT = 'f683dc64ca86408e2f3d4b54bb207b8d75ee5e51'
 CLIENT_SHA256 = '34959e8e007a27f1d723c5ec5885dae24eb1dbd4295589fa69c0e891ae97f3dd'
+
+
+def kaggle_run_url(owner, slug):
+    """Return the canonical public Kaggle notebook URL for result provenance."""
+    return f'https://www.kaggle.com/code/{quote(str(owner), safe="")}/{quote(str(slug), safe="")}'
 
 
 def client_module(cache):
@@ -57,7 +63,8 @@ def prepare_publication(result, graph, start_state, *, puzzle_id, predictor, aut
     runtime.update(touch_bfs_radius=m['effective_touch_bfs_radius'], solution_mode=m['solution_mode'],
                    max_depth=m['requested_max_steps'], max_collected_solutions=m['max_collected_solutions'])
     common = dict(author=dict(name=author, verification='claimed', kaggle_username=kaggle_owner),
-        kaggle=dict(owner=kaggle_owner,slug=kaggle_slug,version=kaggle_version,notebook_sha256=client._sha(cells)),
+        kaggle=dict(owner=kaggle_owner,slug=kaggle_slug,version=kaggle_version,
+            run_url=kaggle_run_url(kaggle_owner,kaggle_slug),notebook_sha256=client._sha(cells)),
         competition='cayley-py-555-cube', run_id='cube555-'+uuid.uuid4().hex, solver_commit=solver_commit,
         profile=dict(requested_beam=requested,effective_beam=width,alignment_delta=width-requested,
             selected_profile=m['profile']['pipeline_calibration']['selection'],evidence='native-auto-admitted',
