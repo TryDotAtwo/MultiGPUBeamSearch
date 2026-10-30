@@ -166,3 +166,42 @@ def source_solution(csv_path, puzzle_id, graph):
     names = GraphContract.from_graph(graph, graph.definition.central_state).generator_names
     paths = [[names.index(move) for move in row.get('solution', row.get('moves', '')).split('.') if move] for row in rows]
     return min(paths, key=len)
+
+
+
+def finish_result(result, graph, start_state, *, publish=False, directory="cube555_runs",
+                  puzzle_id=None, predictor=None, author=None, kaggle_owner=None,
+                  kaggle_slug=None, kaggle_version=None, notebook_path=None,
+                  solver_commit=None):
+    """Replay, save and optionally publish a result with its receipt."""
+    saved = save_result(result, graph, start_state, directory)
+    if not publish:
+        return dict(saved=saved, publication_status="disabled")
+    if not result.path_found:
+        return dict(saved=saved, publication_status="no_solution")
+    notebook = Path(notebook_path) if notebook_path is not None else None
+    devices = result.native_metadata.get("devices", ())
+    if len(devices) != 2 or notebook is None or not notebook.is_file():
+        return dict(saved=saved, publication_status="not_published")
+
+    from .publication import publish_result
+    publication = publish_result(result, graph, start_state, puzzle_id=puzzle_id,
+        predictor=predictor, author=author, kaggle_owner=kaggle_owner,
+        kaggle_slug=kaggle_slug, kaggle_version=kaggle_version,
+        notebook_path=str(notebook), solver_commit=solver_commit, directory=directory)
+    status_path = Path(directory) / "publication_status.json"
+    status = publication.get("status") if isinstance(publication, dict) else None
+    status_record = dict(
+        puzzle_id=int(puzzle_id), kaggle_owner=kaggle_owner, kaggle_slug=kaggle_slug,
+        kaggle_version=kaggle_version, solver_commit=solver_commit, status=status,
+        payload=publication.get("payload") if isinstance(publication, dict) else None,
+        receipts=publication.get("receipts", []) if isinstance(publication, dict) else [],
+        poll_manifest=publication.get("poll_manifest") if isinstance(publication, dict) else None,
+        published_count=publication.get("published") if isinstance(publication, dict) else None,
+        duplicate_count=publication.get("duplicate") if isinstance(publication, dict) else None,
+        rejected_count=publication.get("rejected") if isinstance(publication, dict) else None,
+        unresolved_count=publication.get("unresolved") if isinstance(publication, dict) else None)
+    status_path.write_text(json.dumps(status_record, indent=2), encoding="utf-8")
+    if status != "published":
+        raise RuntimeError(f"Publication was requested but not confirmed; inspect {status_path}")
+    return dict(saved=saved, publication_status=status, publication=publication)

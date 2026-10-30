@@ -37,3 +37,34 @@ def test_bad_download_is_not_installed(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="corrupted"):
         cube555._inputs(tmp_path)
     assert not (tmp_path / "cube555-inputs.zip").exists()
+
+
+def test_finish_result_saves_without_publishing_when_disabled(tmp_path, graph, monkeypatch):
+    def unexpected_publish(*args, **kwargs):
+        raise AssertionError("publisher should not run")
+
+    monkeypatch.setattr("multigpubeamsearch.publication.publish_result", unexpected_publish)
+    result = SimpleNamespace(path_found=False, path=None, native_metadata={"devices": [0, 1]})
+    report = cube555.finish_result(result, graph, [1, 0], publish=False, directory=tmp_path)
+    assert json.loads(report["saved"].read_text())["path_found"] is False
+    assert report["publication_status"] == "disabled"
+
+
+def test_finish_result_publishes_and_saves_receipt(tmp_path, graph, monkeypatch):
+    notebook = tmp_path / "notebook.ipynb"
+    notebook.write_text("{}")
+    result = SimpleNamespace(path_found=True, path=[0], native_metadata={"devices": [0, 1]})
+    monkeypatch.setattr("multigpubeamsearch.publication.publish_result", lambda *a, **k: {
+        "status": "published", "payload": "payload.json", "receipts": ["receipt.json"],
+        "poll_manifest": "poll.json", "published": 1, "duplicate": 0,
+        "rejected": 0, "unresolved": 0,
+    })
+    report = cube555.finish_result(
+        result, graph, [1, 0], publish=True, directory=tmp_path, puzzle_id=1020,
+        author="alice", kaggle_owner="alice", kaggle_slug="cube555", kaggle_version=7,
+        notebook_path=notebook, solver_commit="deadbeef",
+    )
+    saved_status = json.loads((tmp_path / "publication_status.json").read_text())
+    assert report["publication_status"] == "published"
+    assert saved_status["kaggle_version"] == 7
+    assert saved_status["solver_commit"] == "deadbeef"
