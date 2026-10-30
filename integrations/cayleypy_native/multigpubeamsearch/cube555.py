@@ -171,7 +171,8 @@ def source_solution(csv_path, puzzle_id, graph):
 
 def finish_result(result, graph, start_state, *, publish=False, directory="cube555_runs",
                   puzzle_id=None, predictor=None, author=None, kaggle_owner=None,
-                  kaggle_slug=None, kaggle_version=None, notebook_path=None,
+                  kaggle_slug=None, kaggle_version=None,
+                  notebook_path="/kaggle/working/__notebook__.ipynb",
                   solver_commit=None):
     """Replay, save and optionally publish a result with its receipt."""
     saved = save_result(result, graph, start_state, directory)
@@ -185,6 +186,7 @@ def finish_result(result, graph, start_state, *, publish=False, directory="cube5
         return dict(saved=saved, publication_status="not_published")
 
     from .publication import publish_result
+    solver_commit = solver_commit or os.environ.get("MULTIGPUBEAMSEARCH_SOURCE_COMMIT")
     publication = publish_result(result, graph, start_state, puzzle_id=puzzle_id,
         predictor=predictor, author=author, kaggle_owner=kaggle_owner,
         kaggle_slug=kaggle_slug, kaggle_version=kaggle_version,
@@ -205,3 +207,4 @@ def finish_result(result, graph, start_state, *, publish=False, directory="cube5
     if status != "published":
         raise RuntimeError(f"Publication was requested but not confirmed; inspect {status_path}")
     return dict(saved=saved, publication_status=status, publication=publication)
+
