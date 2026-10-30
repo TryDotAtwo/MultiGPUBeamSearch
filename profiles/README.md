@@ -11,15 +11,20 @@ Only completed, source-bound GPU results are published. An empty index means no 
 
 ## Accepted records
 
-| Workload | Hardware | Global beam | Inference batch | Full step median |
+| Workload | Hardware | Global beam | Inference batch | Full step measurement |
 |---|---|---:|---:|---:|
-| Cube555 Transformer 0.8 + MLP 0.2, FP16 / FP32 accumulation | 2 x RTX3060 12GB, CUTLASS, PyTorch 2.10.0+cu128 | 825,344 | 8,192 parents | 53.1106 s |
+| Cube555 Transformer 0.8 + MLP 0.2, FP16 / FP32 accumulation | 2 x RTX3060 12GB, CUTLASS, PyTorch 2.10.0+cu128 | 825,344 | 8,192 parents | 53.1106 s (median, 5 runs) |
 
 The [record](records/2c24c6c1711cc27f8d8c54e4ae87282f6b7589445a84dc907d8467eda6247c20.json)
 contains the exact compatibility key and raw selected-cohort timings. Fresh-cache validation on the measured
 host took 19.88 s for the original export and 20.34 s for independently exported notebook models. Two short CayleyPy searches with persistent worker reuse completed in 27.46 s total in the latter check.
 The full width retained 99.96% of the half-width reference throughput. These measurements
 apply to this workload and machine; the width is the largest suitable width found in the bounded search,
-not a universal maximum. No T4 profile is claimed for this native source revision yet.
+not a universal maximum. The 2 x Tesla T4 profile below is a candidate for the exact 1,048,576 beam and PyTorch 2.11.0+cu128 build; it was checked with one full frontier step. It is not claimed to be a universal optimum.
 
 Cube555 profile keys retain executable TorchScript code, tensors and constants while excluding source debug maps, serialization IDs and the order of independent literal Final declarations. Loading and local artifact integrity still use exact byte hashes. A different executable payload does not match the shared profile.
+
+| Cube555 Transformer 0.8 + MLP 0.2, FP16 / FP32 accumulation | 2 x Tesla T4, LibTorch, PyTorch 2.11.0+cu128 | 1,048,576 | 256 parents | 101.642 s (one full step) |
+
+The T4 record is `21d3e9953857ba60c9ef8669267712f1c48ad612ff6cb3f31bb931fdbff01015`. Its compatibility is exact for this beam, models, source, runtime and GPU memory. The library still performs fresh all-rank admission and component validation before reuse.
+
