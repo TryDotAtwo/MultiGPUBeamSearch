@@ -1,8 +1,9 @@
-# Cube555 blend with CayleyPy
+# CayleyPy native beam search (Cube555 default)
 
-[Open the Kaggle notebook](https://www.kaggle.com/code/trydotatwo/cube555-native-2xt4-blend/178).
+[Open the Kaggle notebook](https://www.kaggle.com/code/trydotatwo/cube555-native-2xt4-blend/180).
 
 Edit the first visible cell and choose **Run All**. Select GPU T4 x2 and enable Internet on Kaggle.
 
-The notebook uses the CayleyPy `graph.beam_search` API with the Transformer/MLP blend. Set the puzzle, beam, model weight, collect/BFS/reflection options and result publishing in the first cell. The GitHub source includes a verified 2×T4 profile for the default beam of 1,048,576. The library loads exact matches and checks them against the current GPUs; if none matches, it tunes for the requested beam. Solutions are replayed, saved and published from a two-GPU Kaggle run.
+The first cell accepts a CayleyPy `GRAPH`, a `PREDICTOR`, and a start state directly. The same `graph.beam_search` call then runs on any native-supported permutation graph and registered model family. The bundled Cube555 Transformer/MLP model remains the default example. Beam width, collect, BFS, reflection, GPU count and result output stay configurable in that cell.
 
+Native search requires permutation generators, states of up to 150 entries, and a registered model exporter (or a matching `NativeModel` artifact). New model architectures need an exporter. Local solutions are replay-checked and saved. Publication requires the catalog competition and puzzle type; the catalog also enforces its model and two-GPU schema. The GitHub profile registry contains the verified 2×T4 profile for the bundled Cube555 default beam of 1,048,576; a profile is reused only for a matching graph, model, beam and GPU configuration.

@@ -28,3 +28,6 @@ Continue improving GNN while measured gains remain, consult Astra as expert, pre
 2026-10-27: Run two Cube555 Kaggle searches at beam 2,500,000 on 2×T4 using the reference blend notebook settings: a legal scramble around 10–12 moves and a puzzle around 100 moves. Do not silently reduce requested beam. For unstable component-calibration baseline timings, permit one bounded retry and report failure explicitly if still unstable.
 
 2026-10-31: Ivan asked whether the Cube555 helper can be omitted so the notebook is “through CayleyPy” rather than exposing unfamiliar MultiGPUBeamSearch modules. Keep graph search on CayleyPy's graph.beam_search API; puzzle/model loading and result handling may be optional convenience helpers, while native multi-GPU activation/session still requires the current adapter. Do not claim the public interface is CayleyPy-only until CayleyPy or its official optional backend exposes that native integration.
+
+
+2026-10-31 clarification: Keep `import multigpubeamsearch`. Remove only the puzzle-specific `multigpubeamsearch.cube555` helper; configure other problems with a CayleyPy graph, supported predictor/model, and start state, then use the common beam-search API.

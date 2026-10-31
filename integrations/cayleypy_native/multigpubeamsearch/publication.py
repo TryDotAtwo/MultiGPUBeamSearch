@@ -39,23 +39,72 @@ def client_module(cache):
 
 def prepare_publication(result, graph, start_state, *, puzzle_id, predictor, author,
                         kaggle_owner, kaggle_slug, kaggle_version, notebook_path,
-                        solver_commit, directory='cube555_runs', client=None):
-    """Create the established v1 Cube555 envelope. Never send credentials or logs."""
+                        solver_commit, directory='beam_results', client=None,
+                        competition=None, puzzle_type=None,
+                        model_metadata=None):
+    """Create a replay-checked Kaggle result using the catalog's v1 schema.
+
+    Graph identity and move definitions come from the supplied CayleyPy graph.
+    A caller may supply a schema-compatible model object for another registered
+    model family. The Cube555 blend metadata is inferred for the default example.
+    """
     from .contracts import GraphContract
     from .models import NativeEnsemble
     contract = GraphContract.from_graph(graph, start_state)
     paths = result.solutions
     if not paths: return None
+    if not isinstance(competition, str) or not competition.strip():
+        raise ValueError('competition must be a nonempty catalog identifier')
+    if not isinstance(puzzle_type, str) or not puzzle_type.strip():
+        raise ValueError('puzzle_type must be a nonempty graph/puzzle label')
     if not all(contract.replay(path) for path in paths): raise ValueError('Publication replay failed')
     m = result.native_metadata
-    if len(m['devices']) != 2:
-        raise ValueError('The current Cube555 publication schema requires 2 GPUs; solutions remain saved locally')
-    if not isinstance(predictor, NativeEnsemble) or len(predictor.models) != 2:
-        raise ValueError('Cube555 publication requires the Transformer/MLP ensemble metadata')
-    manifests = [json.loads((model.weights_dir/'manifest.json').read_text()) for model in predictor.models]
-    scripts = [hashlib.sha256((model.weights_dir/'features.ts').read_bytes()).hexdigest() for model in predictor.models]
+    if len(m.get('devices', ())) != 2:
+        raise ValueError('The Kaggle results catalog v1 requires exactly 2 GPUs')
     directory = Path(directory); directory.mkdir(parents=True, exist_ok=True)
     client = client or client_module(directory/'publisher')
+    if model_metadata is None:
+        is_cube555_blend = (
+            isinstance(predictor, NativeEnsemble)
+            and len(predictor.models) == 2
+            and tuple(getattr(model, "backend", None) for model in predictor.models)
+            == ("cube555_transformer", "cube555_mlp")
+        )
+        if is_cube555_blend:
+            manifests = [json.loads((model.weights_dir/'manifest.json').read_text()) for model in predictor.models]
+            if all('checkpoint_sha256' in manifest for manifest in manifests):
+                scripts = [hashlib.sha256((model.weights_dir/'features.ts').read_bytes()).hexdigest()
+                           for model in predictor.models]
+                model_metadata = dict(filename='cube555-native-blend', sha256=m['model_artifact_hash'],
+                    format='cube555-q-blend', manifest=dict(state_len=contract.state_len,
+                        num_classes=manifests[0]['num_classes'], output_dim=contract.move_count,
+                        dtype='fp16', model_family='cube555_q_blend',
+                        blend_weights=list(predictor.coefficients),
+                        checkpoint_sha256=[v['checkpoint_sha256'] for v in manifests],
+                        script_sha256=client._sha(scripts),
+                        score_contract='parent_q_fp32_blend_then_clamp_round'))
+        if model_metadata is None:
+            manifest = m.get('model_manifest', {})
+            normalization = manifest.get('normalization')
+            formats = {'batchnorm_folded': 'batchnorm-folded', 'layernorm': 'resmlp-layernorm'}
+            model_format = formats.get(normalization)
+            if not model_format or manifest.get('dtype') != 'fp16' or 'ensemble' in manifest:
+                raise ValueError('This model needs explicit model_metadata supported by the CayleyPy catalog schema')
+            model_keys = ('state_len', 'num_classes', 'hd1', 'hd2', 'nrd', 'output_dim',
+                          'dtype', 'normalization', 'layout', 'batchnorm', 'embeddingbag', 'embedding')
+            model_manifest = {key: manifest[key] for key in model_keys if key in manifest}
+            model_metadata = dict(filename='native-model', sha256=m['model_artifact_hash'],
+                                  format=model_format, manifest=model_manifest)
+    if not isinstance(model_metadata, dict):
+        raise ValueError('model_metadata must be the model object required by the CayleyPy catalog schema')
+    model_manifest = model_metadata.get('manifest')
+    if (not isinstance(model_manifest, dict) or type(model_manifest.get('output_dim')) is not int
+            or model_manifest['output_dim'] <= 0):
+        raise ValueError('model_metadata.manifest.output_dim must describe the selected predictor')
+    if (not isinstance(model_metadata.get('filename'), str)
+            or not isinstance(model_metadata.get('format'), str)
+            or not isinstance(model_metadata.get('sha256'), str)):
+        raise ValueError('model_metadata needs filename, format, and sha256 for the catalog')
     notebook = json.loads(Path(notebook_path).read_text(encoding='utf-8'))
     cells = [dict(cell_type=c['cell_type'], source=c['source']) for c in notebook['cells']]
     width = m['effective_beam_width']; requested = m['requested_beam_width']
@@ -69,18 +118,15 @@ def prepare_publication(result, graph, start_state, *, puzzle_id, predictor, aut
     common = dict(author=dict(name=author, verification='claimed', kaggle_username=kaggle_owner),
         kaggle=dict(owner=kaggle_owner,slug=kaggle_slug,version=kaggle_version,
             run_url=kaggle_run_url(kaggle_owner,kaggle_slug),notebook_sha256=client._sha(cells)),
-        competition='cayley-py-555-cube', run_id='cube555-'+uuid.uuid4().hex, solver_commit=solver_commit,
+        competition=competition, run_id='cayleypy-'+uuid.uuid4().hex, solver_commit=solver_commit,
         profile=dict(requested_beam=requested,effective_beam=width,alignment_delta=width-requested,
             selected_profile=m['profile']['pipeline_calibration']['selection'],evidence='native-auto-admitted',
-            profile_evidence_version=1,profile_power=max(1,(width-1).bit_length()),model_class='output_move_count',world_size=2),
-        runtime=runtime, model=dict(filename='cube555-native-blend',sha256=m['model_artifact_hash'],format='cube555-q-blend',
-            manifest=dict(state_len=150,num_classes=manifests[0]['num_classes'],output_dim=30,dtype='fp16',
-                model_family='cube555_q_blend',blend_weights=list(predictor.coefficients),
-                checkpoint_sha256=[v['checkpoint_sha256'] for v in manifests],script_sha256=client._sha(scripts),
-                score_contract='parent_q_fp32_blend_then_clamp_round')),
+            profile_evidence_version=1,profile_power=max(1,(width-1).bit_length()),
+            model_class='output1' if model_manifest['output_dim'] == 1 else 'output_move_count',world_size=2),
+        runtime=runtime, model=model_metadata,
         hardware=dict(platform='kaggle',gpu_names=m['profile']['gpu_names'],accelerator_count=2,world_size=2),
         timings=dict(solve_us=round(m['native_seconds']*1e6),wall_us=round(m['elapsed_seconds']*1e6)))
-    context = {str(puzzle_id):dict(puzzle_type='cube_5/5/5',initial_state=list(contract.start),
+    context = {str(puzzle_id):dict(puzzle_type=puzzle_type,initial_state=list(contract.start),
         central_state=list(contract.center), generators=dict(zip(contract.generator_names,map(list,contract.generators))))}
     config = client.PublisherConfig(1,common,context,{})
     details = {tuple(row['path']): row for row in m.get('collected_solutions',[])}
@@ -178,4 +224,3 @@ def publish_result(result, graph, start_state, **kwargs):
     return dict(status=status,payload=str(path),receipts=[str(p) for p in part_manifests],
                 poll_manifest=str(poll_manifest_path),published=published,duplicate=duplicate,
                 rejected=rejected,unresolved=unresolved)
-

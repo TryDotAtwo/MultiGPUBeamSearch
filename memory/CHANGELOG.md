@@ -904,3 +904,9 @@ The public Cube555 notebook now fetches the pinned setup script that installs th
 - Saved public Kaggle notebook version 179 with Kaggle CLI 2.2.5 `--no-run`. Pulled v179 back and confirmed the seven notebook cell sources match; no cells or GPU work ran during this save.
 - Raw grid artifacts and measurement limitations remain under test_results/kaggle_t4_profile_grid_20261030/; save receipt and report are under test_results/kaggle_quicksave_20261031/.
 - The notebook still imports the native adapter and Cube555 helper; the requested CayleyPy-only public API is a separate unfinished integration.
+
+
+## 2026-10-31 — Generic CayleyPy graph and model API
+- Kept `import multigpubeamsearch` as the public native execution package and removed the puzzle-specific `multigpubeamsearch.cube555` helper.
+- The notebook can use a caller-supplied CayleyPy graph, supported predictor/model, and start state. Search, collect, BFS, reflection, replay validation, saving, and publication use the shared API; Cube555 remains the example model.
+- Focused local checks: 10 passed. Public source and Kaggle notebook save are being verified separately; no GPU search was launched for this change.
