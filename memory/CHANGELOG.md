@@ -910,3 +910,9 @@ The public Cube555 notebook now fetches the pinned setup script that installs th
 - Kept `import multigpubeamsearch` as the public native execution package and removed the puzzle-specific `multigpubeamsearch.cube555` helper.
 - The notebook can use a caller-supplied CayleyPy graph, supported predictor/model, and start state. Search, collect, BFS, reflection, replay validation, saving, and publication use the shared API; Cube555 remains the example model.
 - Focused local checks: 10 passed. Public source and Kaggle notebook save are being verified separately; no GPU search was launched for this change.
+
+
+## 2026-10-31 — Generic CayleyPy notebook verification complete
+- Published source changes on main at `5f00f003d87374ee704f3629aef770ae8f20e420`; the generic API commit removes the Cube555 package helper and preserves existing profile records.
+- Saved Kaggle notebook v180 with CLI 2.2.5 `--no-run`. Pull-back verified all seven cell sources and valid code-cell syntax; version-specific status is COMPLETE. No GPU execution occurred.
+- Ten focused local tests passed. Native support remains limited to permutation graphs up to 150 entries and supported model exporters; custom graph/model GPU acceptance was not run.
