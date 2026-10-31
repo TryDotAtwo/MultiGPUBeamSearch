@@ -897,3 +897,10 @@ The public Cube555 notebook now fetches the pinned setup script that installs th
 - All 72 archived Kaggle output files matched the SHA-256 manifest; independent rank checks confirm one saturated full step per rank at each width. Times are single-step measurements, not medians or global-optimum claims. Stream1 slowdown is a derived estimate, not a second full-step benchmark. No solution was found.
 - The previous 1,048,576 T4 entry remains unchanged under its legacy source/runtime key. The new profiles are exact-match proposals and still require fresh GPU admission, correctness, and timing validation.
 - Public profile evidence summary: profiles/evidence/cube555-t4-grid-20261031.md. Detailed raw logs remain in the local test_results/kaggle_t4_profile_grid_20261030 archive.
+
+## 2026-10-31 — Cube555 2xT4 profiles published and Kaggle v179 Quick Save
+- Published seven exact-source 2xT4 profile records for beams 65,536–4,194,304 in commit a5dbf0bc; the README and evidence summary describe one full-step timing per width and derived Stream1 estimates.
+- Pinned the public setup script to the profile-bearing source commit and updated the repository notebook in commits 92205f1e and aed7e4aa.
+- Saved public Kaggle notebook version 179 with Kaggle CLI 2.2.5 `--no-run`. Pulled v179 back and confirmed the seven notebook cell sources match; no cells or GPU work ran during this save.
+- Raw grid artifacts and measurement limitations remain under test_results/kaggle_t4_profile_grid_20261030/; save receipt and report are under test_results/kaggle_quicksave_20261031/.
+- The notebook still imports the native adapter and Cube555 helper; the requested CayleyPy-only public API is a separate unfinished integration.
