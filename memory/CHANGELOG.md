@@ -891,3 +891,9 @@ Measured-pressure shortlist reduces downstream tuning work while preserving infe
 When Stream 3/4 component timing makes the baseline cohort exceed the relative-MAD guard, preserve the requested beam and retry that baseline cohort once. A recovered retry is recorded in calibration output; a second unstable cohort or exhausted budget fails explicitly. Added regression coverage. Focused integration validation: 23 tests passed. Kaggle 2×T4 long-puzzle rerun is pending; no full-step or long-puzzle success is claimed yet.
 
 The public Cube555 notebook now fetches the pinned setup script that installs the retry-capable source commit; the example's editable search settings are unchanged.
+
+## 2026-10-31 — Cube555 2xT4 profile grid
+- Added seven source-matched 2xTesla T4 profile records for global beams 65,536 through 4,194,304. Native source digest c00b842d2baedd7028f2c736af7a07c297b2cad7b652dea000ed0c625a59cad1 is reproduced from solver commit 804efdc28d84f1d547d5f0e7fe47b2c81ec3b928 after the pinned wheel's CRLF normalization and source allowlist.
+- All 72 archived Kaggle output files matched the SHA-256 manifest; independent rank checks confirm one saturated full step per rank at each width. Times are single-step measurements, not medians or global-optimum claims. Stream1 slowdown is a derived estimate, not a second full-step benchmark. No solution was found.
+- The previous 1,048,576 T4 entry remains unchanged under its legacy source/runtime key. The new profiles are exact-match proposals and still require fresh GPU admission, correctness, and timing validation.
+- Public profile evidence summary: profiles/evidence/cube555-t4-grid-20261031.md. Detailed raw logs remain in the local test_results/kaggle_t4_profile_grid_20261030 archive.

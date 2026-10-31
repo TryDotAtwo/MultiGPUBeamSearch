@@ -26,3 +26,5 @@ Continue improving GNN while measured gains remain, consult Astra as expert, pre
 2026-10-25: User authorized publishing the verified Cube555/API/autotuner changes to GitHub and updating the existing public Kaggle notebook. Use GitHub-pinned source and inputs; preserve requested beam and explicit blend.
 
 2026-10-27: Run two Cube555 Kaggle searches at beam 2,500,000 on 2×T4 using the reference blend notebook settings: a legal scramble around 10–12 moves and a puzzle around 100 moves. Do not silently reduce requested beam. For unstable component-calibration baseline timings, permit one bounded retry and report failure explicitly if still unstable.
+
+2026-10-31: Ivan asked whether the Cube555 helper can be omitted so the notebook is “through CayleyPy” rather than exposing unfamiliar MultiGPUBeamSearch modules. Keep graph search on CayleyPy's graph.beam_search API; puzzle/model loading and result handling may be optional convenience helpers, while native multi-GPU activation/session still requires the current adapter. Do not claim the public interface is CayleyPy-only until CayleyPy or its official optional backend exposes that native integration.

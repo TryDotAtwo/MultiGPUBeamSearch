@@ -49,6 +49,190 @@
     {
       "compatibility": {
         "backend": "libtorch",
+        "beam": 65536,
+        "build_mode": "release-debug-logs-v1",
+        "cuda": "12.8",
+        "cuda_architectures": [
+          75
+        ],
+        "cutlass_source": "54d50ab67e115d741ccc1f0d5ebf655ff04ade04ab916a6b55e7590b720d65fa",
+        "graph": "df70390b05802912137dd83897aaeb9c4e305a115d434addf5075df8019eec0d",
+        "hardware": [
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          },
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          }
+        ],
+        "models": "cube555-ts-v1:433e0a0e051e403377f296f8102502559c28e1bdb4485204b58454561cd52345",
+        "native_source": "c00b842d2baedd7028f2c736af7a07c297b2cad7b652dea000ed0c625a59cad1",
+        "precision": "fp16/fp32",
+        "schema": 1,
+        "shape": {
+          "alignment": 16,
+          "move_count": 30,
+          "state_len": 150,
+          "storage_len": 160
+        },
+        "torch": "2.10.0+cu128",
+        "world_size": 2
+      },
+      "sha256": "0a38c3135c10fe131943ebfe92a3fe7116c22d91a05f7403fb92b2ef4288d357"
+    },
+    {
+      "compatibility": {
+        "backend": "libtorch",
+        "beam": 131072,
+        "build_mode": "release-debug-logs-v1",
+        "cuda": "12.8",
+        "cuda_architectures": [
+          75
+        ],
+        "cutlass_source": "54d50ab67e115d741ccc1f0d5ebf655ff04ade04ab916a6b55e7590b720d65fa",
+        "graph": "df70390b05802912137dd83897aaeb9c4e305a115d434addf5075df8019eec0d",
+        "hardware": [
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          },
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          }
+        ],
+        "models": "cube555-ts-v1:433e0a0e051e403377f296f8102502559c28e1bdb4485204b58454561cd52345",
+        "native_source": "c00b842d2baedd7028f2c736af7a07c297b2cad7b652dea000ed0c625a59cad1",
+        "precision": "fp16/fp32",
+        "schema": 1,
+        "shape": {
+          "alignment": 16,
+          "move_count": 30,
+          "state_len": 150,
+          "storage_len": 160
+        },
+        "torch": "2.10.0+cu128",
+        "world_size": 2
+      },
+      "sha256": "8cae81192c852054bd29c3d99a5c7854134884230e1d595e50fd505cc2897c63"
+    },
+    {
+      "compatibility": {
+        "backend": "libtorch",
+        "beam": 262144,
+        "build_mode": "release-debug-logs-v1",
+        "cuda": "12.8",
+        "cuda_architectures": [
+          75
+        ],
+        "cutlass_source": "54d50ab67e115d741ccc1f0d5ebf655ff04ade04ab916a6b55e7590b720d65fa",
+        "graph": "df70390b05802912137dd83897aaeb9c4e305a115d434addf5075df8019eec0d",
+        "hardware": [
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          },
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          }
+        ],
+        "models": "cube555-ts-v1:433e0a0e051e403377f296f8102502559c28e1bdb4485204b58454561cd52345",
+        "native_source": "c00b842d2baedd7028f2c736af7a07c297b2cad7b652dea000ed0c625a59cad1",
+        "precision": "fp16/fp32",
+        "schema": 1,
+        "shape": {
+          "alignment": 16,
+          "move_count": 30,
+          "state_len": 150,
+          "storage_len": 160
+        },
+        "torch": "2.10.0+cu128",
+        "world_size": 2
+      },
+      "sha256": "56fa043745f96749a9508b3ca532a48768f7d41636110160fc86b8c2baec9be1"
+    },
+    {
+      "compatibility": {
+        "backend": "libtorch",
+        "beam": 524288,
+        "build_mode": "release-debug-logs-v1",
+        "cuda": "12.8",
+        "cuda_architectures": [
+          75
+        ],
+        "cutlass_source": "54d50ab67e115d741ccc1f0d5ebf655ff04ade04ab916a6b55e7590b720d65fa",
+        "graph": "df70390b05802912137dd83897aaeb9c4e305a115d434addf5075df8019eec0d",
+        "hardware": [
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          },
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          }
+        ],
+        "models": "cube555-ts-v1:433e0a0e051e403377f296f8102502559c28e1bdb4485204b58454561cd52345",
+        "native_source": "c00b842d2baedd7028f2c736af7a07c297b2cad7b652dea000ed0c625a59cad1",
+        "precision": "fp16/fp32",
+        "schema": 1,
+        "shape": {
+          "alignment": 16,
+          "move_count": 30,
+          "state_len": 150,
+          "storage_len": 160
+        },
+        "torch": "2.10.0+cu128",
+        "world_size": 2
+      },
+      "sha256": "671935376ea216e524b17be1c20d222ac368a84be1f7bdfdc94de7b685a36c8f"
+    },
+    {
+      "compatibility": {
+        "backend": "libtorch",
         "beam": 1048576,
         "build_mode": "release-debug-logs-v1",
         "cuda": "12.8",
@@ -91,6 +275,144 @@
         "world_size": 2
       },
       "sha256": "21d3e9953857ba60c9ef8669267712f1c48ad612ff6cb3f31bb931fdbff01015"
+    },
+    {
+      "compatibility": {
+        "backend": "libtorch",
+        "beam": 1048576,
+        "build_mode": "release-debug-logs-v1",
+        "cuda": "12.8",
+        "cuda_architectures": [
+          75
+        ],
+        "cutlass_source": "54d50ab67e115d741ccc1f0d5ebf655ff04ade04ab916a6b55e7590b720d65fa",
+        "graph": "df70390b05802912137dd83897aaeb9c4e305a115d434addf5075df8019eec0d",
+        "hardware": [
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          },
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          }
+        ],
+        "models": "cube555-ts-v1:433e0a0e051e403377f296f8102502559c28e1bdb4485204b58454561cd52345",
+        "native_source": "c00b842d2baedd7028f2c736af7a07c297b2cad7b652dea000ed0c625a59cad1",
+        "precision": "fp16/fp32",
+        "schema": 1,
+        "shape": {
+          "alignment": 16,
+          "move_count": 30,
+          "state_len": 150,
+          "storage_len": 160
+        },
+        "torch": "2.10.0+cu128",
+        "world_size": 2
+      },
+      "sha256": "130761d804c4a66f454fe72af06fd39081aa1a3ee0887f9ef97434c77be4a0c5"
+    },
+    {
+      "compatibility": {
+        "backend": "libtorch",
+        "beam": 2097152,
+        "build_mode": "release-debug-logs-v1",
+        "cuda": "12.8",
+        "cuda_architectures": [
+          75
+        ],
+        "cutlass_source": "54d50ab67e115d741ccc1f0d5ebf655ff04ade04ab916a6b55e7590b720d65fa",
+        "graph": "df70390b05802912137dd83897aaeb9c4e305a115d434addf5075df8019eec0d",
+        "hardware": [
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          },
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          }
+        ],
+        "models": "cube555-ts-v1:433e0a0e051e403377f296f8102502559c28e1bdb4485204b58454561cd52345",
+        "native_source": "c00b842d2baedd7028f2c736af7a07c297b2cad7b652dea000ed0c625a59cad1",
+        "precision": "fp16/fp32",
+        "schema": 1,
+        "shape": {
+          "alignment": 16,
+          "move_count": 30,
+          "state_len": 150,
+          "storage_len": 160
+        },
+        "torch": "2.10.0+cu128",
+        "world_size": 2
+      },
+      "sha256": "523b7e1bf87db04c9c4e50f6ecf71e85742b2e511f68b3fb04be56c6a8ddb6c1"
+    },
+    {
+      "compatibility": {
+        "backend": "libtorch",
+        "beam": 4194304,
+        "build_mode": "release-debug-logs-v1",
+        "cuda": "12.8",
+        "cuda_architectures": [
+          75
+        ],
+        "cutlass_source": "54d50ab67e115d741ccc1f0d5ebf655ff04ade04ab916a6b55e7590b720d65fa",
+        "graph": "df70390b05802912137dd83897aaeb9c4e305a115d434addf5075df8019eec0d",
+        "hardware": [
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          },
+          {
+            "compute": [
+              7,
+              5
+            ],
+            "name": "Tesla T4",
+            "sm_count": 40,
+            "total_memory": 15636037632
+          }
+        ],
+        "models": "cube555-ts-v1:433e0a0e051e403377f296f8102502559c28e1bdb4485204b58454561cd52345",
+        "native_source": "c00b842d2baedd7028f2c736af7a07c297b2cad7b652dea000ed0c625a59cad1",
+        "precision": "fp16/fp32",
+        "schema": 1,
+        "shape": {
+          "alignment": 16,
+          "move_count": 30,
+          "state_len": 150,
+          "storage_len": 160
+        },
+        "torch": "2.10.0+cu128",
+        "world_size": 2
+      },
+      "sha256": "55925abe05c900c73e6607acf4188260836e0d8bfbd76a3bbdacfc1328cd7883"
     }
   ],
   "schema": 1
