@@ -31,3 +31,6 @@ Continue improving GNN while measured gains remain, consult Astra as expert, pre
 
 
 2026-10-31 clarification: Keep `import multigpubeamsearch`. Remove only the puzzle-specific `multigpubeamsearch.cube555` helper; configure other problems with a CayleyPy graph, supported predictor/model, and start state, then use the common beam-search API.
+
+
+2026-10-31 clarification: Keep `import multigpubeamsearch`. Make the public notebook specifically for Cube555, with a straight-line graph/model flow and no generic input branches or repeated guard code. Retain the useful first-cell puzzle, model/blend, beam, collect, BFS, reflection, GPU and publication settings. Save a Kaggle Quick Save without running the search.

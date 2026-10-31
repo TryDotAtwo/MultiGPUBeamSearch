@@ -916,3 +916,9 @@ The public Cube555 notebook now fetches the pinned setup script that installs th
 - Published source changes on main at `5f00f003d87374ee704f3629aef770ae8f20e420`; the generic API commit removes the Cube555 package helper and preserves existing profile records.
 - Saved Kaggle notebook v180 with CLI 2.2.5 `--no-run`. Pull-back verified all seven cell sources and valid code-cell syntax; version-specific status is COMPLETE. No GPU execution occurred.
 - Ten focused local tests passed. Native support remains limited to permutation graphs up to 150 entries and supported model exporters; custom graph/model GPU acceptance was not run.
+
+
+## 2026-10-31 — Simplify Cube555 notebook
+- Replaced the generic graph/predictor configuration branches with a single Cube555 input, graph, state and Transformer/MLP flow.
+- Kept the first-cell controls for puzzle range, model weights, beam, collect, BFS, reflection, GPU count, output and publication.
+- Preserved the generic `multigpubeamsearch` library API. Notebook publication to Kaggle is pending; no GPU search was started.
