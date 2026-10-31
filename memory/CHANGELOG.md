@@ -922,3 +922,9 @@ The public Cube555 notebook now fetches the pinned setup script that installs th
 - Replaced the generic graph/predictor configuration branches with a single Cube555 input, graph, state and Transformer/MLP flow.
 - Kept the first-cell controls for puzzle range, model weights, beam, collect, BFS, reflection, GPU count, output and publication.
 - Preserved the generic `multigpubeamsearch` library API. Notebook publication to Kaggle is pending; no GPU search was started.
+
+
+## 2026-10-31 — Cube555 Kaggle v181 Quick Save
+- Published the four-cell Cube555 notebook on main at `64f4270c3eafd38f9348c315fd8bf29063289fd1`; its setup pins source `534f63516552081e48f5c575c6471a888c9db5b9`.
+- Saved Kaggle v181 with CLI 2.2.5 `--no-run`. Pull-back confirmed all four cell sources match GitHub, code cells parse, and version-specific status is COMPLETE.
+- No GPU search or pytest suite was run. The first visible cell retains the model/blend, beam, collect, BFS, reflection, GPU, output and publication settings.
