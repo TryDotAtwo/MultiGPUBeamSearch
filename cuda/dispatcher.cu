@@ -2,6 +2,7 @@
 #include "stream1_transformer_chunk_launch.hpp"
 
 #include "config.hpp"
+#include "distributed_rank.hpp"
 #include "final_materialize.hpp"
 #include "hash.hpp"
 #include "nvtx_ranges.hpp"
@@ -78,7 +79,7 @@ void check_nccl_dispatcher(ncclResult_t status, const char* op) {
     }
 }
 
-constexpr std::uint32_t kFinalExchangeMaxWorldSize = 128;
+constexpr std::uint32_t kFinalExchangeMaxWorldSize = beam::distributed::max_world_size;
 
 struct alignas(64) FinalExchangePlan {
     std::array<std::uint32_t, kFinalExchangeMaxWorldSize> count{};

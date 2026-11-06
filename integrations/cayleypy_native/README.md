@@ -3,6 +3,8 @@
 ## Public package name
 
 Install the multigpubeamsearch wheel and use `import multigpubeamsearch`.
+For synthesis of directed CNOT circuits from binary matrices, see the
+[packed CNOT API and cluster examples](CNOT.md).
 The historical `cayleypy_native` imports forward to the same objects for compatibility.
 This is the public Python namespace of MultiGPUBeamSearch; no import alias is needed.
 
@@ -49,8 +51,8 @@ native MLPs measure CUDA Graph replay, LibTorch MLPs measure the eager path,
 and ensembles measure their actual ordered readout. Other registered families
 retain conservative profiles until they have an executor-specific probe.
 Native VRAM planning still admits the requested beam. Requested GPU count is never
-silently reduced. Native allocation alignment may increase effective beam width;
-inspect `result.native_metadata` for requested/effective widths, executor,
+silently reduced. The global top-k equals the requested width; native storage
+has its own alignment. Inspect `result.native_metadata` for beam width, executor,
 profile, build/model identities and replay validation.
 
 `beam_width` is the one semantic global beam. A notebook requesting `3_100_000`
@@ -106,11 +108,11 @@ measured frontier scope. Isolated component probes are a scheduling proxy,
 not a measured complete step or a global optimum. Small finite graphs or an early solution can prevent the search from filling
 the requested beam for optional complete-step measurement.
 
-`plan_cluster([8] * 16, beam_width)` computes a 128-rank layout and alignment.
-It does not launch multiple nodes or prove hardware performance; every actual
-rank must independently pass native memory admission. Current hardware evidence
-for this development is from two and eight RTX 3060 GPUs; the exact workload
-and measured scopes are recorded in the linked evidence branch below.
+`plan_cluster([8] * 16, beam_width)` computes a 128-rank layout, the exact
+global top-k, and the per-rank frontier capacity. Use the external worker to
+launch the native solver with torchrun or Slurm across hosts. See the
+[two-node, 16-GPU example](CLUSTER.md). The hardware evidence linked below
+covers two and eight RTX 3060 GPUs.
 
 Raw receipts and SHA256-verified archives are on
 [`codex/fast-autotune-evidence-20261009`](https://github.com/TryDotAtwo/MultiGPUBeamSearch/tree/codex/fast-autotune-evidence-20261009/test_results/fast_autotune_20261009).
@@ -357,8 +359,8 @@ solution was found within this run's budget, not that the state is unreachable.
 | Model runtime | Native MLP artifact, scalar or one output per move, FP16/BF16, supported BatchNorm-folded/LayerNorm schema. FP16 requires SM75+, BF16 SM80+. Current Q GEMM requires the move count divisible by 8; scalar output does not. |
 | MLP dimensions | `num_classes >= max(state_len, max_label+1)`, 1–1024 residual blocks, hidden widths divisible by 8, hidden1 >= hidden2, and square hidden2 residual blocks. This can rule out an otherwise supported colored graph. |
 | Search options | Simple mode, global beam width, strict maximum path length, return path. Native touch-BFS uses `NativeOptions(touch_bfs_radius=..., touch_bfs_max_entries=...)`; its suffix stays inside `max_steps` and host expansion has a finite entry cap. |
-| Device placement | Local Linux CUDA devices, one native rank per selected GPU, up to 128. Graph CUDA devices are used by default; explicit `devices=(0,1)` overrides them. |
-| Not yet supported natively | Matrix graphs, arbitrary models/tokenizers, PieceTransformer artifacts, custom destination, advanced/history taboo policy, reusing an upstream BfsResult, existing torchrun ranks, multi-node launch. |
+| Device placement | The CayleyPy adapter manages local Linux CUDA devices. The [external rank worker](CLUSTER.md) runs an existing native binary on 1–128 scheduler-assigned GPUs across nodes. |
+| Not yet supported by this CayleyPy adapter | Matrix graphs, arbitrary models/tokenizers, PieceTransformer artifacts, custom destination, advanced/history taboo policy, reusing an upstream BfsResult, invoking local `graph.beam_search` inside a running torchrun worker. |
 
 There is no puzzle-name whitelist. Representation/model/runtime capabilities
 decide support. A compatible graph alone does not imply a compatible model.

@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-06",
+  "source_base": "e53558fb90",
+  "platform": "Windows, Python 3.11.5, PyTorch 2.8.0+cu128",
+  "native_cuda": {"gpu": "NVIDIA GeForce RTX 3070 Laptop GPU", "sm": 86, "driver": "572.70", "nvcc": "12.5", "msvc": "14.44.35207"},
+  "host_contract": {
+    "source": "tests/cnot_domain_contract_tests.cpp",
+    "qubits": [2, 256],
+    "ordered_gate_encode_decode_pairs": 5592320,
+    "candidate_meta_bytes": 32,
+    "final_request_bytes": 16,
+    "round_trip_physical_move": 20591,
+    "passed": true
+  },
+  "domain_suite": {
+    "command": "python -B -m pytest -p no:cacheprovider -q integrations/cayleypy_native/tests/test_cnot_native.py --maxfail=1 --tb=short",
+    "passed": 33,
+    "skipped": 0,
+    "seconds": 44.35,
+    "exit_code": 0,
+    "devices": ["cpu", "cuda:0"],
+    "checks": [
+      "All 20592 physical 144-qubit transitions versus an independently enumerated identity-row oracle in batches of at most 257",
+      "Directed noncommuting high-ID history replay through 16-bit moves and 32-bit packed routes",
+      "Dense XOR oracle, immutable parents, canonical dirty tails, high-bit words and the 256-qubit maximum",
+      "Native owner distribution versus the CPU implementation",
+      "Closed/child duplicates, full last-row differences, stable first occurrence and 3966 ordinal CUB multi-tile sort/compact"
+    ]
+  }
+}

@@ -36,3 +36,6 @@ Continue improving GNN while measured gains remain, consult Astra as expert, pre
 2026-10-31 clarification: Keep `import multigpubeamsearch`. Make the public notebook specifically for Cube555, with a straight-line graph/model flow and no generic input branches or repeated guard code. Retain the useful first-cell puzzle, model/blend, beam, collect, BFS, reflection, GPU and publication settings. Save a Kaggle Quick Save without running the search.
 
 2026-11-06: Ivan requested completion and closure of GNN issue #5. Compare both Level-1 encoders and the existing baseline under matched training and evaluation conditions. Separately assess the architecture required for CNOT issue #6.
+
+
+2026-11-06: Ivan asked to implement what is feasible for issue #6 and ensure the code works with more than eight GPUs, including GPUs distributed across multiple nodes.

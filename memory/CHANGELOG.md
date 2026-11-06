@@ -933,3 +933,10 @@ The public Cube555 notebook now fetches the pinned setup script that installs th
 - Added the alternate Level-1 Transformer to PancakeGNN with the same Level-2 GNN, trained weights and graph-bound native exporter. Restored GAT attention dropout and differentiable eager training projections.
 - Trained Pilgrim, GATv2 and Transformer with the upstream Pilgrim protocol at a shared reduced budget on one RTX 3070. Across three initializations and 100 state-disjoint starts, solved counts were 300, 300 and 294. Optimal counts were 219, 268 and 107.
 - Checkpoints, exact distances, independent path replay, source parity and reproduction scripts are in `test_results/issue5_training_20261106/`.
+
+
+## 2026-11-06 — packed CNOT search and external multi-node ranks
+
+- Added a packed GF(2) domain, CUDA row XOR, exact full-matrix CUB deduplication, native Stream 5 exchange and a distributed raw-value top B. History preserves the physical 16-bit gate ID through independent replay.
+- Added an opt-in binding for the consumer's pinned 102-feature trained scorer, an independent small-instance oracle and runnable torchrun/Slurm examples.
+- Split node-local CUDA assignment and RAM budgets from communicator-wide rank and width. The permutation launcher admits one shared geometry and preserves the requested global width on uneven partitions. Verification is recorded in `test_results/issue6_cnot/`.

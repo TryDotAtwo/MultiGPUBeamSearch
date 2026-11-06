@@ -15,6 +15,7 @@
 #include "native_rank_status.hpp"
 #include "../cuda/dispatcher.hpp"
 #include "../cuda/runtime_config.hpp"
+#include "../src/distributed_rank.hpp"
 #include "../src/hash.hpp"
 #include "../src/history_budget.hpp"
 #include "../src/native_input.hpp"
@@ -289,12 +290,12 @@ struct PredictStatsSummary {
     double mean_key = 0.0;
 };
 
-PredictStatsConfig predict_stats_config_from_env() {
+PredictStatsConfig predict_stats_config_from_env(std::uint32_t rank, std::uint32_t cuda_ordinal) {
     PredictStatsConfig config{};
     config.verbose = env_u32("BEAM_PREDICT_STATS_VERBOSE", 0);
     config.jsonl_path = env_path("BEAM_PREDICT_STATS_PATH", "");
-    config.rank = env_or_default_u32("RANK", 0);
-    config.device_local_rank = env_or_default_u32("LOCAL_RANK", config.rank);
+    config.rank = rank;
+    config.device_local_rank = cuda_ordinal;
     if (!config.jsonl_path.empty()) {
         config.jsonl_path += ".rank" + std::to_string(config.rank) + ".jsonl";
     }
@@ -4014,7 +4015,8 @@ struct NcclRuntime {
 
     ~NcclRuntime() {
         if (comm != nullptr) {
-            ncclCommDestroy(comm);
+            if (std::uncaught_exceptions() > 0) ncclCommAbort(comm);
+            else ncclCommDestroy(comm);
         }
     }
 };
@@ -4038,7 +4040,10 @@ std::string nccl_session_token() {
 
 ncclUniqueId read_nccl_id_file(const std::filesystem::path& path, const std::string& session) {
     ncclUniqueId id{};
-    for (std::uint32_t attempt = 0; attempt < 600U; ++attempt) {
+    const auto timeout = env_u32("BEAM_NCCL_RENDEZVOUS_TIMEOUT_SECONDS", 60);
+    if (!timeout) throw std::invalid_argument("NCCL rendezvous timeout must be positive");
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout);
+    while (std::chrono::steady_clock::now() < deadline) {
         std::ifstream in(path, std::ios::binary);
         if (in) {
             std::string header;
@@ -4083,6 +4088,27 @@ NcclRuntime create_nccl_runtime(std::uint32_t world_size, std::uint32_t rank) {
         ncclCommInitRank(&runtime.comm, static_cast<int>(world_size), id, static_cast<int>(rank)),
         "ncclCommInitRank");
     return runtime;
+}
+
+// Startup only. A common memory floor keeps the automatic profile search
+// deterministic across nodes. Compare its result before any depth collective.
+template<std::size_t N>
+std::vector<std::array<std::uint64_t, N>> gather_cluster_fields(
+    const std::array<std::uint64_t, N>& local, std::uint32_t world, ncclComm_t comm) {
+    std::vector<std::array<std::uint64_t, N>> rows(world);
+    std::uint64_t* scratch = nullptr;
+    BEAM_CUDA_CHECK(cudaMalloc(&scratch, (world + 1) * N * sizeof(std::uint64_t)));
+    try {
+        BEAM_CUDA_CHECK(cudaMemcpy(scratch, local.data(), sizeof(local), cudaMemcpyHostToDevice));
+        require_nccl(ncclAllGather(scratch, scratch + N, N, ncclUint64, comm, nullptr),
+                     "ncclAllGather cluster admission");
+        BEAM_CUDA_CHECK(cudaMemcpy(rows.data(), scratch + N, rows.size() * sizeof(local), cudaMemcpyDeviceToHost));
+    } catch (...) {
+        cudaFree(scratch);
+        throw;
+    }
+    BEAM_CUDA_CHECK(cudaFree(scratch));
+    return rows;
 }
 
 std::uint32_t propagate_stop_flag(
@@ -4245,20 +4271,20 @@ int run_production_runner(int argc, char** argv) {
         return 0;
     }
     if (argc != 4 && argc != 6) {
-        std::cerr << "usage: production_runner <puzzle_id> <depth> <beam> [world_size] [local_rank]\n";
+        std::cerr << "usage: production_runner <puzzle_id> <depth> <beam> [world_size global_rank]\n";
         return 2;
     }
     const std::uint64_t cli_puzzle_id = parse_u64(argv[1], "puzzle_id");
     const std::uint32_t cli_depth_limit = beam::input::parse_u32(argv[2], "depth");
     const std::uint64_t beam = parse_u64(argv[3], "beam");
     const std::uint32_t world_size_arg = argc == 6 ? beam::input::parse_u32(argv[4], "world_size") : 1U;
-    const std::uint32_t rank_arg = argc == 6 ? beam::input::parse_u32(argv[5], "local_rank") : 0U;
+    const std::uint32_t rank_arg = argc == 6 ? beam::input::parse_u32(argv[5], "global_rank") : 0U;
     const std::uint32_t world_size = env_or_default_u32("WORLD_SIZE", world_size_arg);
     const std::uint32_t rank = env_or_default_u32("RANK", rank_arg);
-    const std::uint32_t device_local_rank = env_or_default_u32("LOCAL_RANK", rank);
-    if (world_size == 0 || world_size > 255 || rank >= world_size) {
-        throw std::invalid_argument("world_size must be in [1,255] and rank must be less than world_size");
-    }
+    const distributed::Rank placement(world_size, rank,
+        env_or_default_u32("LOCAL_WORLD_SIZE", world_size), env_or_default_u32("LOCAL_RANK", rank));
+    if (placement.local_world_size < world_size && !env_present("BEAM_NCCL_ID_FILE"))
+        throw std::invalid_argument("multi-node NCCL requires BEAM_NCCL_ID_FILE on the shared filesystem");
     std::cout << std::unitbuf;
 
     auto native_available_ram = beam::host_memory::available_bytes(
@@ -4271,8 +4297,7 @@ int run_production_runner(int argc, char** argv) {
         native_available_ram = std::min(native_available_ram, cap);
     }
     const auto native_history_ram = env_u64("BEAM_HISTORY_RAM_BYTES", 0);
-    const auto native_headroom = env_u64("BEAM_HOST_RAM_HEADROOM_BYTES",
-        (static_cast<std::uint64_t>(world_size) + 2) * (std::uint64_t{1} << 30));
+    const auto native_headroom = env_u64("BEAM_HOST_RAM_HEADROOM_BYTES", placement.default_host_headroom());
     beam::host_memory::require_budget(native_available_ram, native_history_ram, native_headroom);
     std::cout << "native_host_memory_available_bytes=" << native_available_ram
               << " native_host_memory_history_budget=" << native_history_ram
@@ -4396,7 +4421,13 @@ int run_production_runner(int argc, char** argv) {
             throw std::runtime_error("BEAM_STREAM1_EXECUTOR=libtorch_eager requires scalar or MOVE_COUNT outputs");
         }
     }
-    BEAM_CUDA_CHECK(cudaSetDevice(static_cast<int>(device_local_rank)));
+    int visible_devices = 0;
+    BEAM_CUDA_CHECK(cudaGetDeviceCount(&visible_devices));
+    const int device_local_rank = placement.cuda_ordinal(visible_devices);
+    BEAM_CUDA_CHECK(cudaSetDevice(device_local_rank));
+    std::cout << "communicator_rank=" << rank << " world_size=" << world_size
+              << " node_local_rank=" << placement.local_rank << " local_world_size=" << placement.local_world_size
+              << " cuda_ordinal=" << device_local_rank << '\n';
     NcclRuntime nccl_runtime = create_nccl_runtime(world_size, rank);
     DispatcherCollective collective{nccl_runtime.comm};
     const DispatcherCollective* collective_ptr = world_size > 1U ? &collective : nullptr;
@@ -4488,8 +4519,15 @@ int run_production_runner(int argc, char** argv) {
         if(component_memory) free_static_device_memory(*component_memory);
         return 0;
     }
+    const bool cluster_search = world_size > 1U &&
+        (placement.local_world_size < world_size || env_bool("BEAM_CLUSTER_LAUNCH", false));
+    std::size_t planning_free = free_before;
+    if (cluster_search) {
+        for (const auto& row : gather_cluster_fields<1>({free_before}, world_size, nccl_runtime.comm))
+            planning_free = std::min(planning_free, static_cast<std::size_t>(row[0]));
+    }
     const RuntimeConfigBuild config_build =
-        build_runtime_config_from_budget(beam, world_size, rank, stream1_model, free_before);
+        build_runtime_config_from_budget(beam, world_size, rank, stream1_model, planning_free);
     const RuntimeConfig config = config_build.config;
     const std::uint32_t stream1_transformer_micro =
         stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER
@@ -4500,6 +4538,21 @@ int run_production_runner(int argc, char** argv) {
         throw std::runtime_error("BEAM_STREAM1_TRANSFORMER_MICRO must be in [1, B_MICRO]");
     }
     const StaticMemoryPlan plan = config_build.plan;
+    if (cluster_search) {
+        const std::array<std::uint64_t, 22> protocol{
+            cli_puzzle_id, cli_depth_limit, beam, plan.derived.global_beam_width_effective,
+            config.shard_count, config.stream4_batch_alignment, config.b_micro, config.ring_count,
+            config.stream3_batch_candidates, config.stream4_batch_candidates,
+            config.stream4_active_sort_slots, config.global_threshold_update_period_shards,
+            plan.stream5_slot_count, plan.stream5_send_slot_capacity, plan.stream5_recv_slot_capacity,
+            plan.final_materialize_chunk_capacity, plan.final_materialize_exchange_capacity,
+            static_cast<std::uint64_t>(solve_bucket_mode), static_cast<std::uint64_t>(repair_resident_mode),
+            solve_bucket_extra_depths, solve_bucket_stop_depth, solve_bucket_max_solutions};
+        for (const auto& row : gather_cluster_fields(protocol, world_size, nccl_runtime.comm))
+            if (row != protocol) throw std::runtime_error("cluster ranks disagree on search or exchange geometry");
+        std::cout << "cluster_plan_admitted=1 planning_free_bytes=" << planning_free
+                  << " global_beam=" << plan.derived.global_beam_width_effective << '\n';
+    }
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "puzzle_id=" << cli_puzzle_id << "\n";
     std::cout << "depth_limit=" << cli_depth_limit << "\n";
@@ -5114,14 +5167,14 @@ int run_production_runner(int argc, char** argv) {
 
     const auto start = std::chrono::steady_clock::now();
     CpuCandidateHistory history;
-    const PredictStatsConfig predict_stats = predict_stats_config_from_env();
+    const PredictStatsConfig predict_stats = predict_stats_config_from_env(rank, device_local_rank);
     const CandidateHistoryMode history_mode = parse_history_mode();
     const std::uint32_t history_slot_count = env_u32("BEAM_HISTORY_SLOT_COUNT", 3);
     const std::uint32_t history_worker_count = env_u32("BEAM_HISTORY_WORKERS", 1);
     const std::uint64_t history_ram_budget_total = env_u64("BEAM_HISTORY_RAM_BYTES", 0);
     const std::uint64_t history_disk_budget_total = env_u64("BEAM_HISTORY_DISK_BYTES", 0);
     const std::uint64_t history_ram_budget_per_rank =
-        history_ram_budget_total == 0ULL ? 0ULL : history_ram_budget_total / static_cast<std::uint64_t>(world_size);
+        placement.node_share(history_ram_budget_total);
     const std::uint64_t history_disk_budget_per_rank =
         history_disk_budget_total == 0ULL ? 0ULL : history_disk_budget_total / static_cast<std::uint64_t>(world_size);
     const std::filesystem::path history_disk_root =
