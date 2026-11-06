@@ -8,6 +8,14 @@ namespace beam::distributed {
 // The final exchange owns one fixed host slot per communicator rank.
 inline constexpr std::uint32_t max_world_size = 128;
 
+inline int cuda_ordinal(std::uint32_t local_rank, int visible_devices) {
+    // A scheduler can give a task a private one-device CUDA namespace.
+    if (visible_devices == 1) return 0;
+    if (visible_devices <= 0 || local_rank >= static_cast<std::uint32_t>(visible_devices))
+        throw std::invalid_argument("LOCAL_RANK exceeds the CUDA devices visible to this task");
+    return static_cast<int>(local_rank);
+}
+
 struct Rank {
     std::uint32_t world_size;
     std::uint32_t global_rank;
@@ -20,14 +28,6 @@ struct Rank {
             throw std::invalid_argument("WORLD_SIZE must be in [1,128] and RANK in [0,WORLD_SIZE)");
         if (local_size == 0 || local_size > world || local >= local_size)
             throw std::invalid_argument("invalid LOCAL_RANK or LOCAL_WORLD_SIZE");
-    }
-
-    int cuda_ordinal(int visible_devices) const {
-        // A scheduler can give a task a private one-device CUDA namespace.
-        if (visible_devices == 1) return 0;
-        if (visible_devices <= 0 || local_rank >= static_cast<std::uint32_t>(visible_devices))
-            throw std::invalid_argument("LOCAL_RANK exceeds the CUDA devices visible to this task");
-        return static_cast<int>(local_rank);
     }
 
     std::uint64_t node_share(std::uint64_t bytes) const { return bytes / local_world_size; }

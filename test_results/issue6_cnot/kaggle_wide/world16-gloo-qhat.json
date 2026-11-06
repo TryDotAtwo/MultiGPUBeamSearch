@@ -1,0 +1,255 @@
+{
+  "n": 144,
+  "width": 1,
+  "shortlist": 3,
+  "mode": "qhat",
+  "world": 16,
+  "scorer": "WireFixture",
+  "model": null,
+  "layers": [
+    {
+      "depth": 1,
+      "distinct": 3,
+      "retained": 1,
+      "winners_sha256": "703e1fbaa7df402479486c844ed33481ca763043d31750ed8671c78e5743ffde",
+      "by_rank": [
+        [
+          1,
+          3,
+          3,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  ],
+  "physical_ids": [
+    18592,
+    428
+  ],
+  "directed_gates": [
+    [
+      130,
+      2
+    ],
+    [
+      2,
+      143
+    ]
+  ],
+  "length": 2,
+  "bitwise_replay": true,
+  "routes": [
+    {
+      "source": 0,
+      "hash_owner": 3,
+      "target": 0,
+      "move": 428
+    }
+  ],
+  "devices": [
+    {
+      "rank": 0,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 1,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 2,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 3,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 4,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 5,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 6,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 7,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 8,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 9,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 10,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 11,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 12,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 13,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 14,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 15,
+      "host": "45d84dbb14f7",
+      "device": "cpu",
+      "gpu": null
+    }
+  ],
+  "torch": "2.11.0+cu130",
+  "backend": "gloo"
+}

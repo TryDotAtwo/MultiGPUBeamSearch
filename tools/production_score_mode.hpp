@@ -1,5 +1,6 @@
 #pragma once
 #include "production_score_request.hpp"
+#include "native_cuda_device.hpp"
 #include "stream1_weight_io.hpp"
 #include "stream1_graph_inventory.hpp"
 #include "graph_transfer_inventory.hpp"
@@ -92,11 +93,8 @@ inline int run_production_score_mode(int argc,char** argv) {
     if(host.verified_transformer_manifest!=manifest ||
        bounded_text(r.weight_dir/"manifest.json")!=manifest)
         throw std::runtime_error("weight manifest changed during load");
-    const auto local_rank=profile_u32("LOCAL_RANK",0);
-    if(local_rank>static_cast<unsigned>(std::numeric_limits<int>::max()))
-        throw std::invalid_argument("invalid production-score device ordinal");
-    BEAM_CUDA_CHECK(cudaSetDevice(static_cast<int>(local_rank)));
-    cudaDeviceProp props{};BEAM_CUDA_CHECK(cudaGetDeviceProperties(&props,static_cast<int>(local_rank)));
+    const int cuda_ordinal = distributed::select_cuda_device(profile_u32("LOCAL_RANK", 0));
+    cudaDeviceProp props{};BEAM_CUDA_CHECK(cudaGetDeviceProperties(&props, cuda_ordinal));
     std::size_t free=0,total=0;BEAM_CUDA_CHECK(cudaMemGetInfo(&free,&total));
     const auto required=stream1_weights::stream1_scratch_bytes(host.model,r.inner,r.lanes)+
         stream1_weights::total_device_weight_bytes(host)+
@@ -246,7 +244,7 @@ inline int run_production_score_mode(int argc,char** argv) {
        bounded_text(r.weight_dir/"manifest.json")!=manifest)
         throw std::runtime_error("production-score input changed during invocation");
     std::ostringstream device,loaded;
-    write_stream1_device_identity(device,static_cast<int>(local_rank),props.major*10+props.minor,props.uuid.bytes);
+    write_stream1_device_identity(device, cuda_ordinal, props.major*10+props.minor,props.uuid.bytes);
     write_stream1_loaded_view_inventory(loaded,network);
     nlohmann::json requested=nlohmann::json::object(),kernels=nlohmann::json::array();
     for(const auto& entry:policies.values())requested[entry.first]=entry.second?nlohmann::json(*entry.second):nlohmann::json(nullptr);

@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "engine": "e2f75771ed79de59cf87ff16b801980d5e1461fe",
+  "cayley": "3cd11ecefc98e54d6fc0ccdec967d0bcc8ca4a93",
+  "gpu_modes": [
+    "qhat",
+    "proposal"
+  ],
+  "cpu16_mode": "qhat",
+  "mandatory": [
+    "gloo16_qhat",
+    "gloo2_regressions",
+    "gpu_inventory",
+    "native_prebuild",
+    "native_toolchain",
+    "nccl2_proposal",
+    "nccl2_qhat"
+  ]
+}

@@ -15,7 +15,7 @@
 #include "native_rank_status.hpp"
 #include "../cuda/dispatcher.hpp"
 #include "../cuda/runtime_config.hpp"
-#include "../src/distributed_rank.hpp"
+#include "native_cuda_device.hpp"
 #include "../src/hash.hpp"
 #include "../src/history_budget.hpp"
 #include "../src/native_input.hpp"
@@ -4421,10 +4421,7 @@ int run_production_runner(int argc, char** argv) {
             throw std::runtime_error("BEAM_STREAM1_EXECUTOR=libtorch_eager requires scalar or MOVE_COUNT outputs");
         }
     }
-    int visible_devices = 0;
-    BEAM_CUDA_CHECK(cudaGetDeviceCount(&visible_devices));
-    const int device_local_rank = placement.cuda_ordinal(visible_devices);
-    BEAM_CUDA_CHECK(cudaSetDevice(device_local_rank));
+    const int device_local_rank = distributed::select_cuda_device(placement.local_rank);
     std::cout << "communicator_rank=" << rank << " world_size=" << world_size
               << " node_local_rank=" << placement.local_rank << " local_world_size=" << placement.local_world_size
               << " cuda_ordinal=" << device_local_rank << '\n';

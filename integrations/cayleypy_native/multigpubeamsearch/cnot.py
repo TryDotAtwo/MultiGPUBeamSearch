@@ -167,8 +167,10 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         input_rows, raw = world.checked("validate CNOT input",
                                         lambda: _input(root, width, shortlist, max_depth, mode))
         metadata = getattr(scorer, "metadata", {})
+        fingerprints = ("upstream_commit", "checkpoint_sha256", "feature_registry_sha256",
+                        "training_manifest_sha256", "training_result_sha256")
         config = (width, shortlist, max_depth, mode, audit, tuple(root.shape),
-                  metadata.get("checkpoint_sha256"), metadata.get("feature_registry_sha256"))
+                  tuple(metadata.get(key) for key in fingerprints))
         digest = hashlib.sha256(raw + json.dumps(config).encode()).digest()
         identities = world.gather_fixed(world.longs(list(digest)))
         if not (identities == identities[0]).all().item():

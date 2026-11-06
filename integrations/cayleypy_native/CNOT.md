@@ -16,6 +16,9 @@ files to each rank. Private checkpoints and donor source are supplied separately
 Build the bridge with Rust, CMake, a CUDA toolkit and CUDA PyTorch 2.9.0.
 The packed-domain and Stream 5 operators build on first use with nvcc, Ninja,
 the PyTorch headers and, for distributed CUDA, NCCL headers and the library.
+To provision compute nodes from a build host, set `MGBS_CNOT_DOMAIN_LIBRARY`
+and `MGBS_CNOT_STREAM5_LIBRARY` to the matching compiled operators. Build for
+each target SM and the PyTorch/CUDA ABI used by the workers.
 
 ```bash
 python integrations/cnot_scorer/build.py --source "$TQP" --build-dir "$PRIVATE_BUILD"

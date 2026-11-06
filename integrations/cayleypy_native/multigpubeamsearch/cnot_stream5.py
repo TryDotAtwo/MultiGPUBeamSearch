@@ -4,6 +4,7 @@ from __future__ import annotations
 import ctypes as C
 from functools import lru_cache
 import hashlib
+import os
 from pathlib import Path
 import sys
 
@@ -11,8 +12,7 @@ import torch
 import torch.distributed as dist
 
 
-@lru_cache(maxsize=1)
-def load_stream5():
+def _build_stream5():
     from torch.utils.cpp_extension import load
 
     package = Path(__file__).resolve().parent
@@ -33,12 +33,20 @@ def load_stream5():
         if files:
             libraries = [str(files[0])]
             break
-    path = load(name="beam_cnot_stream5_" + digest.hexdigest()[:16],
+    return load(name="beam_cnot_stream5_" + digest.hexdigest()[:16],
                 sources=[str(s) for s in sources], extra_include_paths=includes,
                 extra_cuda_cflags=["-O2", "-DBEAM_STATE_LOGICAL_BYTES=120",
                                    "-DBEAM_STATE_PHYSICAL_BYTES=128", "-DBEAM_STATE_ALIGNMENT=16",
                                    "-DBEAM_MOVE_COUNT=1"], extra_ldflags=libraries, is_python_module=False)
-    lib = C.CDLL(str(path))
+
+
+@lru_cache(maxsize=1)
+def load_stream5():
+    # Prebuilt libraries let compute nodes share a tested binary without nvcc.
+    path = os.environ.get("MGBS_CNOT_STREAM5_LIBRARY") or _build_stream5()
+    lib = C.CDLL(str(Path(path).resolve(strict=True)))
+    if lib.cnot_s5_abi() != 1:
+        raise RuntimeError("incompatible native Stream 5 CNOT ABI")
     ptr, integer = C.c_void_p, C.c_int
     for name, args in {"id": [ptr], "init": [ptr, ptr, integer, integer], "close": [ptr, integer],
                        "counts": [ptr, ptr, integer, integer, ptr, ptr],

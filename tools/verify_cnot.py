@@ -37,6 +37,11 @@ def float_value(bits):
     return struct.unpack("=d", struct.pack("=q", bits))[0]
 
 
+def require(condition, message):
+    if not condition:
+        raise AssertionError(message)
+
+
 def verify_layers(root, scorer, mode, width, k, layers, device):
     """Enumerate on Python integers. Compare the entire eligible union, path representatives,
     measured values, and every ordered survivor against the independent single-beam result."""
@@ -60,11 +65,11 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
         measured = {}
         for bits, parent, _lex, _generation, route, *lanes in layer["candidates"]:
             child = rows_of(lanes, n)
-            assert child not in measured and child in eligible, "duplicate or extraneous child"
+            require(child not in measured and child in eligible, "duplicate or extraneous child")
             i, word = eligible[child]
-            assert parent == i and (route & 65535) == word[-1], "wrong stable representative"
+            require(parent == i and (route & 65535) == word[-1], "wrong stable representative")
             measured[child] = float_value(bits)
-        assert set(measured) == set(eligible), "candidate missing from the global union"
+        require(set(measured) == set(eligible), "candidate missing from the global union")
         if measured:
             children = torch.cat([pack_rows(rows, device=device) for rows in measured])
             actual = scorer.child_values(children).double().cpu()
@@ -72,7 +77,7 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
                                        rtol=1e-6, atol=1e-7)
         expected = sorted(eligible, key=lambda rows: (measured[rows], eligible[rows][1]))[:width]
         winners = [rows_of(item[5:], n) for item in layer["winners"]]
-        assert winners == expected, "global top B differs"
+        require(winners == expected, "global top B differs")
         digest = hashlib.sha256(json.dumps(winners, separators=(",", ":")).encode()).hexdigest()
         reports.append(dict(depth=layer["depth"], distinct=len(eligible), retained=len(winners),
                             winners_sha256=digest, by_rank=layer["by_rank"]))
@@ -115,18 +120,18 @@ def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_ran
         if world.rank:
             return None
         layers = verify_layers(rows, scorer, mode, width, k, result.layers, device)
-        assert result.status == "solved"
+        require(result.status == "solved", f"expected a solution, got {result.status}")
         pairs = gate_pairs(len(rows))
         replay = tuple(1 << i for i in range(len(rows)))
         for action in result.gates:
             replay = apply(replay, pairs[action])
-        assert replay == rows
+        require(replay == rows, "independent construction does not match the input")
         if require_cross_rank and world.size > 1:
-            assert any(edge["move"] > 255 and len({edge["source"], edge["hash_owner"], edge["target"]}) > 1
-                       for edge in result.path_routes), "large physical move never crossed a rank"
-        assert any(layer["distinct"] > width and layer["retained"] == width and
-                   (world.size == 1 or sum(rank[3] > 0 for rank in layer["by_rank"]) >= 2)
-                   for layer in layers), "missing a saturated layer with participating owners"
+            require(any(edge["move"] > 255 and len({edge["source"], edge["hash_owner"], edge["target"]}) > 1
+                        for edge in result.path_routes), "large physical move never crossed a rank")
+        require(any(layer["distinct"] > width and layer["retained"] == width and
+                    (world.size == 1 or sum(rank[3] > 0 for rank in layer["by_rank"]) >= 2)
+                    for layer in layers), "missing a saturated layer with participating owners")
         return dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
                     scorer=type(scorer).__name__, model=getattr(scorer, "metadata", None),
                     layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
@@ -134,9 +139,34 @@ def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_ran
     return world.checked("independent validation", inspect)
 
 
+def validate_distribution(device):
+    """Exercise every rank as a parent source, value owner and frontier recipient."""
+    world = World(device)
+    n = 6
+    rows = tuple(1 << i for i in reversed(range(n)))
+    width, k = 17, 25
+    if world.size > width:
+        raise ValueError("this small all-rank fixture covers up to 17 workers")
+    scorer = WireFixture(29)
+    result = search_cnot(pack_rows(rows, device=device), scorer, width=width, shortlist=k,
+                         max_depth=3, audit=True)
+    def inspect():
+        if world.rank:
+            return None
+        layers = verify_layers(rows, scorer, "qhat", width, k, result.layers, device)
+        require(len(layers) == 2, "expected two complete expansions before the depth bound")
+        per_rank = layers[1]["by_rank"]
+        require(all(row[0] and row[3] and row[4] for row in per_rank),
+                "a rank did not expand parents, score distinct candidates or retain winners")
+        require(layers[1]["retained"] == width and layers[1]["distinct"] > width, "unsaturated frontier")
+        return dict(n=n, width=width, shortlist=k, mode="qhat", world=world.size,
+                    scorer=type(scorer).__name__, status=result.status, layers=layers)
+    return world.checked("all-rank validation", inspect)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", choices=("trained", "wide"), required=True)
+    parser.add_argument("--case", choices=("trained", "wide", "topology"), required=True)
     parser.add_argument("--backend", choices=("nccl", "gloo"), default="nccl")
     parser.add_argument("--mode", choices=("qhat", "proposal"), default="qhat")
     parser.add_argument("--width", type=int)
@@ -151,11 +181,14 @@ def main():
             rows, k, width = (1, 2, 7, 8), 11, 8 if args.width is None else args.width
             context = world.checked("load trained scorer", lambda:
                 TQPScorer(args.library, args.manifest, n=len(rows), device=device, inference_batch=4))
-        else:
+        elif args.case == "wide":
             rows, scorer = wide_case()
             context, k, width = nullcontext(scorer), 3, 1 if args.width is None else args.width
+        else:
+            context = nullcontext()
         with context as scorer:
-            output = validate_case(rows, scorer, args.mode, width, k, 3, device, args.case == "wide")
+            output = (validate_distribution(device) if args.case == "topology" else
+                      validate_case(rows, scorer, args.mode, width, k, 3, device, args.case == "wide"))
             hardware = dict(rank=world.rank, host=socket.gethostname(), device=str(device),
                             gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None)
             devices = [None] * world.size

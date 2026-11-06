@@ -34,6 +34,7 @@ std::vector<std::uint32_t> offsets(const std::uint32_t* counts, int world) {
 } // namespace
 
 extern "C" {
+int cnot_s5_abi() { return 1; }
 const char* cnot_s5_error() { return last_error.c_str(); }
 int cnot_s5_id_bytes() { return sizeof(ncclUniqueId); }
 int cnot_s5_id(ncclUniqueId* out) {

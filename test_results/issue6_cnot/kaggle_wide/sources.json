@@ -1,0 +1,10 @@
+{
+  "engine": {
+    "url": "https://github.com/TryDotAtwo/MultiGPUBeamSearch",
+    "commit": "e2f75771ed79de59cf87ff16b801980d5e1461fe"
+  },
+  "cayley": {
+    "url": "https://github.com/cayleypy/cayleypy",
+    "commit": "3cd11ecefc98e54d6fc0ccdec967d0bcc8ca4a93"
+  }
+}
