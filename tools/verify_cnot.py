@@ -42,6 +42,18 @@ def require(condition, message):
         raise AssertionError(message)
 
 
+def small_exact_distance(target, pairs, bound):
+    start = tuple(1 << i for i in range(len(target)))
+    frontier, seen = {start}, {start}
+    for depth in range(bound + 1):
+        if target in frontier:
+            return depth
+        if depth < bound:
+            frontier = {apply(rows, pair) for rows in frontier for pair in pairs} - seen
+            seen.update(frontier)
+    raise AssertionError("target is outside the exact BFS ball")
+
+
 def verify_layers(root, scorer, mode, width, k, layers, device):
     """Enumerate on Python integers. Compare the entire eligible union, path representatives,
     measured values, and every ordered survivor against the independent single-beam result."""
@@ -132,10 +144,13 @@ def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_ran
         require(any(layer["distinct"] > width and layer["retained"] == width and
                     (world.size == 1 or sum(rank[3] > 0 for rank in layer["by_rank"]) >= 2)
                     for layer in layers), "missing a saturated layer with participating owners")
-        return dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
-                    scorer=type(scorer).__name__, model=getattr(scorer, "metadata", None),
-                    layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
-                    length=result.length, bitwise_replay=True, routes=result.path_routes)
+        report = dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
+                      scorer=type(scorer).__name__, model=getattr(scorer, "metadata", None),
+                      layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
+                      length=result.length, bitwise_replay=True, routes=result.path_routes)
+        if len(rows) == 4 and result.length <= 3:
+            report["exact_distance_bfs"] = small_exact_distance(rows, pairs, result.length)
+        return report
     return world.checked("independent validation", inspect)
 
 
@@ -166,7 +181,7 @@ def validate_distribution(device):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", choices=("trained", "wide", "topology"), required=True)
+    parser.add_argument("--case", choices=("trained", "trained-deep", "wide", "topology"), required=True)
     parser.add_argument("--backend", choices=("nccl", "gloo"), default="nccl")
     parser.add_argument("--mode", choices=("qhat", "proposal"), default="qhat")
     parser.add_argument("--width", type=int)
@@ -177,8 +192,9 @@ def main():
     device = initialize_world(args.backend)
     world = World(device)
     try:
-        if args.case == "trained":
-            rows, k, width = (1, 2, 7, 8), 11, 8 if args.width is None else args.width
+        if args.case in ("trained", "trained-deep"):
+            rows, k, default_width = ((1, 7, 4, 10), 3, 2) if args.case == "trained-deep" else ((1, 2, 7, 8), 11, 8)
+            width = default_width if args.width is None else args.width
             context = world.checked("load trained scorer", lambda:
                 TQPScorer(args.library, args.manifest, n=len(rows), device=device, inference_batch=4))
         elif args.case == "wide":
@@ -189,6 +205,13 @@ def main():
         with context as scorer:
             output = (validate_distribution(device) if args.case == "topology" else
                       validate_case(rows, scorer, args.mode, width, k, 3, device, args.case == "wide"))
+            if args.case == "trained-deep" and world.size == 2:
+                def check_participation():
+                    if world.rank == 0:
+                        require(any(all(rank[0] and rank[3] and rank[4] for rank in layer["by_rank"])
+                                    and layer["distinct"] > layer["retained"] == width for layer in output["layers"]),
+                                "both GPUs must expand, score and retain in the same saturated layer")
+                world.checked("trained layer participation", check_participation)
             hardware = dict(rank=world.rank, host=socket.gethostname(), device=str(device),
                             gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None)
             devices = [None] * world.size

@@ -15,7 +15,8 @@ coverage checks and three model heads. Supply its model manifest and associated
 files to each rank. Private checkpoints and donor source are supplied separately.
 Build the bridge with Rust, CMake, a CUDA toolkit and CUDA PyTorch 2.9.0.
 The packed-domain and Stream 5 operators build on first use with nvcc, Ninja,
-the PyTorch headers and, for distributed CUDA, NCCL headers and the library.
+the PyTorch headers and, for distributed CUDA, the CUDA NVTX3 headers,
+NCCL headers and the NCCL library.
 To provision compute nodes from a build host, set `MGBS_CNOT_DOMAIN_LIBRARY`
 and `MGBS_CNOT_STREAM5_LIBRARY` to the matching compiled operators. Build for
 each target SM and the PyTorch/CUDA ABI used by the workers.
@@ -86,6 +87,11 @@ The adapter reports the offending rank and feature and stops the collective sear
 For a bounded acceptance run, use `tools/verify_cnot.py --case trained` with
 the same launcher, library and manifest plus `--output receipt.json`. Its
 independent Python enumerator checks every eligible matrix, the ordered top B,
-and the returned physical gates. `--case wide` exercises n=144 with a diagnostic
+and the returned physical gates. `--case trained-deep --mode qhat` checks a
+three-gate GL(4,2) input with B=2 and K=3. On two GPUs it requires both ranks
+to expand, score and retain in the same saturated layer.
+`--case wide` exercises n=144 with a diagnostic
 scorer. The latter can also run with `--backend gloo` on CPU to check routing.
+For a 16-rank occupancy test use `--case topology`, with B=17 and K=25.
+Its second layer requires all ranks to expand, score, and keep states.
 For the permutation runner's external launcher, see [cluster setup](CLUSTER.md).

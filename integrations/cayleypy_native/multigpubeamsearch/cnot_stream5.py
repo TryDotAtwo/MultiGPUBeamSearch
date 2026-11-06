@@ -26,7 +26,11 @@ def _build_stream5():
         digest.update(path.read_bytes())
     includes, libraries = [str(root / "src")], ["-lnccl"]
     for entry in sys.path:
-        vendor = Path(entry) / "nvidia/nccl"
+        vendor_root = Path(entry) / "nvidia"
+        nvtx = vendor_root / "nvtx/include"
+        if (nvtx / "nvtx3/nvToolsExt.h").is_file():
+            includes.append(str(nvtx))
+        vendor = vendor_root / "nccl"
         if (vendor / "include/nccl.h").is_file():
             includes.append(str(vendor / "include"))
         files = sorted((vendor / "lib").glob("libnccl.so*"))

@@ -1,0 +1,47 @@
+{
+  "date": "2026-11-06",
+  "suite": "integrations/cayleypy_native/tests",
+  "platform": "Windows / PyTorch 2.8.0+cu128 / CUDA_VISIBLE_DEVICES=-1",
+  "cayleypy_commit": "3cd11ecefc98e54d6fc0ccdec967d0bcc8ca4a93",
+  "grouping": "all test_*.py in sorted name order, nine files per fresh pytest process",
+  "passed": 501.0,
+  "skipped": 28.0,
+  "batches": [
+    {
+      "file_offset": 0,
+      "passed": 105,
+      "skipped": 2,
+      "output": "105 passed, 2 skipped, 2 warnings in 90.64s (0:01:30)"
+    },
+    {
+      "file_offset": 9,
+      "passed": 82,
+      "skipped": 20,
+      "output": "82 passed, 20 skipped, 2 warnings in 31.10s"
+    },
+    {
+      "file_offset": 18,
+      "passed": 78,
+      "skipped": 1,
+      "output": "78 passed, 1 skipped, 2 warnings in 24.32s"
+    },
+    {
+      "file_offset": 27,
+      "passed": 150,
+      "skipped": 0,
+      "output": "150 passed, 2 warnings in 72.54s (0:01:12)"
+    },
+    {
+      "file_offset": 36,
+      "passed": 42,
+      "skipped": 5,
+      "output": "42 passed, 5 skipped, 2 warnings in 27.06s"
+    },
+    {
+      "file_offset": 45,
+      "passed": 44,
+      "skipped": 0,
+      "output": "44 passed, 2 warnings in 28.94s"
+    }
+  ]
+}

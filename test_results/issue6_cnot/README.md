@@ -1,5 +1,16 @@
 # Issue 6 evidence
 
+## Consumer scorer
+
+On an RTX 3070 Laptop GPU the adapter restored the original one-update GL(4,2)
+checkpoint with all 102 input features. Both raw action heads and the scalar
+value head were exercised. Scalar values agreed with the donor CLI on the
+two held-out matrices. With input rows `[1,2,7,8]`, K=11 and global B=8,
+both head modes returned the two physical gates `1 → 2, 0 → 2`. The measured
+ordered frontiers differed between the heads. See the [scorer and build
+receipt](checkpoint_scorer_rtx3070.md), [Qhat](trained_single_qhat_rtx3070.json)
+and [proposal](trained_single_proposal_rtx3070.json).
+
 ## Physical gate routing at 144 wires
 
 The input is the identity followed by gates `130 → 2` and `2 → 143`.
@@ -29,3 +40,7 @@ Slurm placement was also tested with an 8+6 task distribution and one
 visible GPU per task. The [cluster report](cluster_20261106.md) records
 the rank, device, process-failure and native runner checks. A physical
 multi-host run and throughput measurements above eight GPUs remain open.
+
+The complete Python adapter suite ran in fresh batches on Windows with CUDA
+hidden. It passed 501 tests and skipped 28. The Linux Gloo and physical CUDA
+checks above ran separately. [Adapter regression counts](adapter_regression.json)

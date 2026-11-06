@@ -22,7 +22,7 @@ The shared library is `/private/mgbs-cnot-build/target/release/libcnot103_native
 
 ## Load and score
 
-The scorer takes a `cnot103_dev_search_v1` manifest, such as `search-qhat.json` from the privately supplied `device-search-gl4-fixture.tar.gz`. Keep all files referenced by the manifest at their relative paths. The upstream loader verifies the training manifest, result, dataset, registry, objective, exposure audit and checkpoint before scoring. Its frozen dev indices bind the available feature-plan dimensions. Search accepts any admitted matrix of that width.
+The scorer takes a `cnot103_dev_search_v1` manifest, such as `search-qhat.json` from the privately supplied `device-search-gl4-fixture.tar.gz`. For that fixture, keep eight files at their original relative paths: the search manifest, `run.json`, `training-result.json`, `dataset.json`, `dataset.sha256`, `catalogs.json`, `catalogs.sha256`, and the exact `checkpoint/step-*.qcp` named by the training result. The upstream loader verifies the training manifest, result, dataset, registry, objective, exposure audit and checkpoint before scoring. Its frozen dev indices bind the available feature-plan dimensions. Search accepts any admitted matrix of that width.
 
 ```python
 import torch
