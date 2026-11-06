@@ -102,3 +102,29 @@ def test_fused_normalization_cpu_contract():
         expected=F.gelu(F.layer_norm(a+r,(channels,),w,b,1e-4))
         actual=torch.ops.multigpubeamsearch_gnn.residual_norm_gelu(a,r,w,b,1e-4)
         torch.testing.assert_close(actual,expected,rtol=0,atol=0)
+
+
+def test_transformer_encoder_trains_both_levels_and_exports(tmp_path):
+    network = PancakeGNN(4, 16, 2, 0., NeighborConfig(num_hops=2), encoder_type='transformer')
+    states = torch.tensor([[3, 2, 0, 1], [1, 0, 2, 3], [0, 1, 2, 3]])
+    network(states).square().mean().backward()
+    for parameter in (network.state_encoder.value_emb.weight, network.neighbor_agg.hop_query):
+        assert parameter.grad is not None and parameter.grad.abs().sum() > 0
+    network.eval()
+    prepared = prepare_model(network, contract(), NativeOptions(), tmp_path/'export')
+    member = prepared.manifest['ensemble']['models'][0]
+    directory = prepared.weights_dir / member['weights_dir']
+    assert json.loads((directory / 'gnn.json').read_text())['encoder_type'] == 'transformer'
+    saved = torch.jit.load(str(directory / 'backbone.pt'))
+    with torch.inference_mode():
+        torch.testing.assert_close(saved(states), network.half()(states), rtol=0, atol=0)
+
+
+def test_value_graph_attention_dropout_only_during_training():
+    network = PancakeGNN(4, 16, 1, 1.0, NeighborConfig(num_hops=1))
+    conv = network.state_encoder.value_convs[0]
+    nodes = torch.randn(4, 8)
+    edges = torch.tensor([[0, 1, 2, 3], [0, 1, 2, 3]])
+    attributes = torch.randn(4, 16)
+    torch.testing.assert_close(conv(nodes, edges, attributes), conv.bias.expand_as(nodes))
+    assert not torch.equal(conv.eval()(nodes, edges, attributes), conv.bias.expand_as(nodes))

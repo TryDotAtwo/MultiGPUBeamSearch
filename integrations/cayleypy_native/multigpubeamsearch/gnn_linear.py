@@ -55,4 +55,6 @@ class NativeLinear(nn.Linear):
         self.use_cutlass = False
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
+        if self.training and not self.use_cutlass:
+            return F.linear(input, self.weight, self.bias)
         return torch.ops.multigpubeamsearch_gnn.linear(input, self.weight, self.bias, self.use_cutlass)

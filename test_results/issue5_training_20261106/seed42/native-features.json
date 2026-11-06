@@ -1,0 +1,17 @@
+{
+  "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU",
+  "torch": "2.8.0+cu128",
+  "states": 17,
+  "feature_max_abs": {
+    "value_graph": {
+      "libtorch": 0.00390625,
+      "cutlass": 0.005859375
+    },
+    "transformer": {
+      "libtorch": 0.0,
+      "cutlass": 0.001953125
+    }
+  },
+  "atol": 0.02,
+  "rtol": 0.02
+}

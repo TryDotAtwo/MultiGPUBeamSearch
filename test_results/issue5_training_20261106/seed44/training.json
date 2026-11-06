@@ -1,0 +1,92 @@
+{
+  "seed": 44,
+  "pilgrim_commit": "f02604fa7b665b82e5fbe5692b336a4fe4a01bdc",
+  "group": "p044-t000",
+  "epochs": 8,
+  "walkers_per_depth": 256,
+  "depths": [
+    1,
+    15
+  ],
+  "batch": 64,
+  "lr": 0.001,
+  "samples_per_arm": 30720,
+  "neighbor_hops": 2,
+  "neighbors": 3,
+  "d_model": 32,
+  "data_seeds": [
+    73000,
+    73001,
+    73002,
+    73003,
+    73004,
+    73005,
+    73006,
+    73007
+  ],
+  "data_sha256": [
+    "a25836e422bd92f32cc70c21e8f0dee8560cb23bd3ef92efeb8374a203387522",
+    "f59a8028d3e53ce3066fbac30b4fac79ec2233ce93ad7ea881a3ceb082cad272",
+    "5d52b6fa5473dfbb227673729568a79ce0b0f4268844e4f190a288f183012f4c",
+    "50b7a60cb4e4d739c1abee075fa88185b58fe2d44717329a77bf7c251253b125",
+    "acfb00486ef0e8b9a70f70e80ea987968ec84c64dc8ed46b0157ebf64373b857",
+    "d79c0df87fa805404366ad09e3b71371a680a8a07cc9b814f0e42c85cf3726da",
+    "d40d739c4fe2e7d7c00d3586ac97919341864e0c438c89358bf2a695dfe00d06",
+    "300ffb94576ff4c338eae4ade43e59f8c3d9f10ffd887ba95ecc40398d8c84b3"
+  ],
+  "test_indices_seen_in_training": [],
+  "test_sha256": "1250a897248a8731e775893e2f2c4910ef03a3c6ed9ac3b1cd210110d11c66bf",
+  "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU",
+  "torch": "2.8.0+cu128",
+  "cuda": "12.8",
+  "arms": {
+    "pilgrim": {
+      "parameters": 501249,
+      "optimizer_steps": 480,
+      "losses": [
+        21.55107202529907,
+        8.72085341612498,
+        8.390562963485717,
+        8.059020392100017,
+        7.716136686007181,
+        7.566420976320902,
+        7.477041578292846,
+        7.1277702649434405
+      ],
+      "train_seconds": 4.907000000006519,
+      "weights_sha256": "6f07cb4a24d307b66976de173eae3ea23073520861f4ea1be2c9a931a9fb9b10"
+    },
+    "value_graph": {
+      "parameters": 48170,
+      "optimizer_steps": 480,
+      "losses": [
+        16.19971397717794,
+        13.299058977762858,
+        11.132161164283753,
+        9.488704562187195,
+        8.136798858642578,
+        8.060171397527059,
+        7.626843722661336,
+        6.7323198318481445
+      ],
+      "train_seconds": 76.00199999999313,
+      "weights_sha256": "fed37ae9570d95d7555d172f4e0d0262fc75775e6bdb573a70f3b0f693148016"
+    },
+    "transformer": {
+      "parameters": 48490,
+      "optimizer_steps": 480,
+      "losses": [
+        16.90913543701172,
+        13.373975245157878,
+        12.464469114939371,
+        12.239997561772665,
+        11.74372215270996,
+        11.382222676277161,
+        10.65065040588379,
+        10.173881721496581
+      ],
+      "train_seconds": 29.03200000000652,
+      "weights_sha256": "edcc5fd9552eea9751548998556c8f0767c8777ed286f06d54cca7dbccff7f91"
+    }
+  }
+}

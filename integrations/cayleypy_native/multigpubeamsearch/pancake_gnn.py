@@ -12,14 +12,15 @@ from .gnn_linear import NativeLinear
 
 
 class GATv2(nn.Module):
-    __constants__ = ['heads', 'channels']
+    __constants__ = ['heads', 'channels', 'dropout']
     use_cutlass: bool
 
-    def __init__(self, dim: int, edge_dim: int):
+    def __init__(self, dim: int, edge_dim: int, dropout: float = 0.):
         super().__init__()
         self.use_cutlass = False
         self.heads = 4
         self.channels = dim
+        self.dropout = float(dropout)
         self.lin_l = NativeLinear(dim, 4 * dim)
         self.lin_r = NativeLinear(dim, 4 * dim)
         self.lin_edge = NativeLinear(edge_dim, 4 * dim, bias=False)
@@ -40,6 +41,7 @@ class GATv2(nn.Module):
         numerators = torch.exp(logits - maxima[target])
         denominators = torch.zeros_like(maxima).index_add(0, target, numerators)
         weights = (numerators / denominators[target]).to(left.dtype)
+        weights = F.dropout(weights, self.dropout, training=self.training)
         messages = left[source] * weights[:, :, None]
         result = torch.zeros_like(left).index_add(0, target, messages)
         return result.mean(1) + self.bias
@@ -63,8 +65,8 @@ class DualStreamEncoder(nn.Module):
         self.value_node_emb = nn.Sequential(NativeLinear(2,d),nn.GELU(),NativeLinear(d,d))
         self.position_node_emb = nn.Sequential(NativeLinear(2,d),nn.GELU(),NativeLinear(d,d))
         self.value_edge_emb, self.pos_edge_emb = nn.Embedding(3,dim),nn.Embedding(3,dim)
-        self.value_convs = nn.ModuleList([GATv2(d,dim) for _ in range(layers)])
-        self.pos_convs = nn.ModuleList([GATv2(d,dim) for _ in range(layers)])
+        self.value_convs = nn.ModuleList([GATv2(d,dim,dropout) for _ in range(layers)])
+        self.pos_convs = nn.ModuleList([GATv2(d,dim,dropout) for _ in range(layers)])
         self.value_norms = nn.ModuleList([nn.LayerNorm(d) for _ in range(layers)])
         self.pos_norms = nn.ModuleList([nn.LayerNorm(d) for _ in range(layers)])
         a = torch.arange(n-1)
@@ -118,6 +120,26 @@ class DualStreamEncoder(nn.Module):
         return self.out_norm(self.readout_proj(torch.cat((h.mean(1),h.max(1).values,special),-1)))
 
 
+class TransformerStateEncoder(nn.Module):
+    """Encode the ordered stack with the issue #5 value/position Transformer."""
+
+    def __init__(self, n: int, dim: int, layers: int, dropout: float):
+        super().__init__()
+        self.value_emb = nn.Embedding(n, dim // 2)
+        self.pos_emb = nn.Embedding(n, dim // 2)
+        layer = nn.TransformerEncoderLayer(
+            d_model=dim, nhead=4, dim_feedforward=4 * dim, dropout=float(dropout),
+            activation="gelu", batch_first=True, norm_first=True,
+        )
+        self.transformer = nn.TransformerEncoder(layer, layers, enable_nested_tensor=False)
+        self.out_norm = nn.LayerNorm(dim)
+
+    def forward(self, states: torch.Tensor) -> torch.Tensor:
+        positions = torch.arange(states.size(1), device=states.device).expand_as(states)
+        tokens = torch.cat((self.value_emb(states), self.pos_emb(positions)), dim=-1)
+        return self.out_norm(self.transformer(tokens).mean(dim=1))
+
+
 @dataclass(frozen=True)
 class NeighborConfig:
     max_neighbors_per_hop: int = 49
@@ -144,7 +166,7 @@ class NeighborParameters(nn.Module):
 
 
 class PancakeGNN(nn.Module):
-    """Own GNN→GNN scorer with issue-compatible weight names.
+    """Two selectable element encoders with one shared neighbor GNN and value head.
 
 The native-export path requires deterministic stratified actions and bounds
 the inference batch so the reference's random frontier cap never activates.
@@ -152,7 +174,8 @@ the inference batch so the reference's random frontier cap never activates.
     __constants__ = ['n','d_model','neighbor_counts','max_frontier_states']
 
     def __init__(self,n: int,d_model: int=128,num_layers: int=2,
-                 dropout: float=.1,neighbors: NeighborConfig=NeighborConfig()):
+                 dropout: float=.1,neighbors: NeighborConfig=NeighborConfig(), *,
+                 encoder_type: str='value_graph'):
         super().__init__()
         if n<2 or d_model<=0 or d_model%8 or num_layers<1 or neighbors.num_hops<1:
             raise ValueError('requires n>=2, positive layers/hops and d_model divisible by8')
@@ -164,7 +187,13 @@ the inference batch so the reference's random frontier cap never activates.
             k=min(neighbors.max_neighbors_per_hop,n-1)
             if neighbors.adaptive_to_n:k=max(1,math.ceil(k/(hop+1)))
             self.neighbor_counts.append(min(max(1,k),n-1))
-        self.state_encoder=DualStreamEncoder(n,d_model,num_layers,dropout)
+        self.encoder_type = encoder_type
+        if encoder_type == 'value_graph':
+            self.state_encoder = DualStreamEncoder(n, d_model, num_layers, dropout)
+        elif encoder_type == 'transformer':
+            self.state_encoder = TransformerStateEncoder(n, d_model, num_layers, dropout)
+        else:
+            raise ValueError("encoder_type must be 'value_graph' or 'transformer'")
         self.neighbor_agg=NeighborParameters(d_model,n-1,neighbors.num_hops,dropout)
         self.value_head=nn.Sequential(NativeLinear(d_model*2,d_model),nn.GELU(),
                                      nn.Dropout(dropout),NativeLinear(d_model,1))

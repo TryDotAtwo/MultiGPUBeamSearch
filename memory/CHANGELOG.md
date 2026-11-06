@@ -928,3 +928,8 @@ The public Cube555 notebook now fetches the pinned setup script that installs th
 - Published the four-cell Cube555 notebook on main at `64f4270c3eafd38f9348c315fd8bf29063289fd1`; its setup pins source `534f63516552081e48f5c575c6471a888c9db5b9`.
 - Saved Kaggle v181 with CLI 2.2.5 `--no-run`. Pull-back confirmed all four cell sources match GitHub, code cells parse, and version-specific status is COMPLETE.
 - No GPU search or pytest suite was run. The first visible cell retains the model/blend, beam, collect, BFS, reflection, GPU, output and publication settings.
+
+## 2026-11-06 — issue #5 trained Pancake-10 comparison
+- Added the alternate Level-1 Transformer to PancakeGNN with the same Level-2 GNN, trained weights and graph-bound native exporter. Restored GAT attention dropout and differentiable eager training projections.
+- Trained Pilgrim, GATv2 and Transformer with the upstream Pilgrim protocol at a shared reduced budget on one RTX 3070. Across three initializations and 100 state-disjoint starts, solved counts were 300, 300 and 294. Optimal counts were 219, 268 and 107.
+- Checkpoints, exact distances, independent path replay, source parity and reproduction scripts are in `test_results/issue5_training_20261106/`.

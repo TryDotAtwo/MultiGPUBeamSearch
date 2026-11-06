@@ -1,8 +1,10 @@
 # Two-level pancake GNN
 
-`PancakeGNN` is our implementation of the dual-stream GATv2 encoder and
-multi-hop neighbor GNN described in issue #5. Inference does not import PyG or
-the author's training script. Both levels stay enabled.
+`PancakeGNN` implements both Level-1 encoders from issue #5. Set
+`encoder_type="value_graph"` for the dual-stream GATv2 encoder (default) or
+`encoder_type="transformer"` for the value/position Transformer. Both use the
+same multi-hop neighbor GNN and scalar value head. The runtime uses PyTorch and
+the native operators shipped with this project.
 
 ```python
 import torch
@@ -16,6 +18,7 @@ graph = cp.CayleyGraph(cp.CayleyGraphDef.create(moves), device="cuda")
 
 # These dimensions and sampling settings MUST match the trained checkpoint.
 model = beam.PancakeGNN(n, d_model=128, num_layers=2,
+    encoder_type="value_graph",
     neighbors=beam.NeighborConfig(max_neighbors_per_hop=11, num_hops=2))
 model.load_state_dict(torch.load("checkpoint_state_dict.pt", weights_only=True))
 model.eval()
@@ -36,12 +39,14 @@ and uses the existing ensemble readout epilogue. Two-coordinate input layers,
 unaligned projections, encoder readout normalization and hop attention remain ATen. Aligned
 GAT layers additionally use native fused attention/aggregation and project
 three distinct edge embeddings. Channels above 1024 retain ATen aggregation. Auto selection uses LibTorch on T4 and CUTLASS on SM80 or newer.
+With the Transformer encoder, its self-attention and feedforward layers run through
+LibTorch. The shared neighbor GNN can use the aligned CUTLASS projections.
 An explicit unsupported CUTLASS device is rejected.
 
 Scope: distinct values 0..n-1, identity target, complete pancake prefix-flip
 generator set (arbitrary declared generator order is preserved). State-dict
-names match the issue's value-graph model; configuration is not inferable from
-weights, so specify the checkpoint's neighbor settings. Random and policy
+names match the author's corresponding encoder and shared Level-2 model.
+Specify the checkpoint's encoder type, dimensions and neighbor settings. Random and policy
 sampling are currently rejected. Internal state batches are bounded so the
 reference's stochastic frontier cap never activates; no hop is silently
 removed. A cap smaller than one root's full expansion is rejected.
@@ -50,8 +55,11 @@ CPU checks cover the reference encoder, both GNN levels, TorchScript, FP16
 export, blend membership and immutable snapshots. Native feature parity passed
 on T4 through LibTorch and on RTX 3060 through both LibTorch and CUTLASS.
 Full beam-search acceptance is recorded in `test_results/issue5_review_20261010/`.
-Random test weights provide no evidence of trained search quality. Multi-GPU scaling and trained search performance of this model family have not
-been measured.
+Those October acceptance runs used random weights. The November
+[Pancake-10 comparison](../../test_results/issue5_training_20261106/REPORT.md)
+trains both variants and the supported Pilgrim baseline with Pilgrim's upstream
+trainer and compares replay-verified solutions on its 100 published starts.
+The report gives the training budget, beam, checkpoints and individual paths.
 
 
 Measured optimized backend: on RTX 3060, n=100, d_model=256, two layers,

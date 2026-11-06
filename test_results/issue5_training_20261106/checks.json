@@ -1,0 +1,27 @@
+{
+  "adapter_suite": {
+    "cayleypy_commit": "3cd11ecefc98e54d6fc0ccdec967d0bcc8ca4a93",
+    "command": "python -B -m pytest -p no:cacheprovider -q integrations/cayleypy_native/tests",
+    "environment": {"CUDA_VISIBLE_DEVICES": "-1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+    "platform": "Windows, Python 3.11, PyTorch 2.8.0+cu128",
+    "exit_code": 0,
+    "passed": 465,
+    "skipped": 8,
+    "warnings": 2
+  },
+  "training_and_search": {
+    "exit_code": 0,
+    "weight_seeds": [42, 43, 44],
+    "checkpoints": 9,
+    "searches": 900,
+    "independently_replayed_solutions": 894,
+    "audit": "summary.json"
+  },
+  "trained_checkpoint_verification": {
+    "author_parity": "seed42/reference-parity.json",
+    "native_cpp_features": "seed42/native-features.json",
+    "cutlass_commit": "7107b05535f8977f5ecb9d01ee203205b1fd9bc4",
+    "cuda_compiler": "12.5",
+    "sm": 86
+  }
+}

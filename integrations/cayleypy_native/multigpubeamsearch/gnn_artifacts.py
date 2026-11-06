@@ -38,7 +38,7 @@ def export_gnn(model, contract, run_dir):
     if maximum<1:
         raise NativeUnavailable('GNN frontier cap activates even for one root; stochastic cap is unsupported')
     metadata = dict(schema_version=1,family='pancake_gnn',graph_hash=contract.graph_hash,
-                    n=model.n,d_model=model.d_model,max_state_batch=maximum,
+                    n=model.n,d_model=model.d_model,max_state_batch=maximum,encoder_type=model.encoder_type,
                     files={'backbone.pt':hashlib.sha256((directory/'backbone.pt').read_bytes()).hexdigest()})
     manifest = dict(state_len=model.n,num_classes=model.n,hidden1=model.d_model,
                     hidden2=model.d_model,residual_count=1,output_dim=1,dtype='fp16',
@@ -57,6 +57,7 @@ def validate_gnn(directory, contract):
         if (type(n) is not int or type(d) is not int or d<=0 or d%8 or
                 type(batch) is not int or not 1<=batch<=2147483647 or
                 metadata['schema_version']!=1 or metadata['family']!='pancake_gnn' or
+                metadata.get('encoder_type','value_graph') not in ('value_graph','transformer') or
                 metadata['graph_hash']!=contract.graph_hash or manifest.get('graph_hash')!=contract.graph_hash or
                 manifest.get('state_len')!=n or manifest.get('num_classes')!=n or
                 manifest.get('hidden1')!=d or manifest.get('hidden2')!=d or
