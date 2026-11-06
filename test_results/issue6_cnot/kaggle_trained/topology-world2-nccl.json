@@ -1,0 +1,71 @@
+{
+  "n": 6,
+  "width": 17,
+  "shortlist": 25,
+  "mode": "qhat",
+  "world": 2,
+  "scorer": "WireFixture",
+  "status": "depth_limit",
+  "layers": [
+    {
+      "depth": 1,
+      "distinct": 25,
+      "retained": 17,
+      "winners_sha256": "22a6cd2d449b5e5dad01c6d7b7b386dc842a76202adb0a827f1c41098253bddf",
+      "by_rank": [
+        [
+          1,
+          25,
+          13,
+          12,
+          9
+        ],
+        [
+          0,
+          0,
+          0,
+          13,
+          8
+        ]
+      ]
+    },
+    {
+      "depth": 2,
+      "distinct": 313,
+      "retained": 17,
+      "winners_sha256": "b15a07b793ddefced72c977e25457bbb1a87fd049296880af4c5ec29bce83e8f",
+      "by_rank": [
+        [
+          9,
+          225,
+          116,
+          159,
+          9
+        ],
+        [
+          8,
+          200,
+          101,
+          154,
+          8
+        ]
+      ]
+    }
+  ],
+  "devices": [
+    {
+      "rank": 0,
+      "host": "a6183bc760b9",
+      "device": "cuda:0",
+      "gpu": "Tesla T4"
+    },
+    {
+      "rank": 1,
+      "host": "a6183bc760b9",
+      "device": "cuda:1",
+      "gpu": "Tesla T4"
+    }
+  ],
+  "torch": "2.9.0+cu128",
+  "backend": "nccl"
+}

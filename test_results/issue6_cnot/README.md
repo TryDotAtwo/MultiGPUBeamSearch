@@ -1,5 +1,25 @@
 # Issue 6 evidence
 
+## Two physical GPU acceptance
+
+The private Kaggle run on two Tesla T4s used engine
+`98bd0d1ed44db8906744d4f21e6bfeff60a8d2b0`, CUDA PyTorch 2.9.0 and the
+original GL(4,2) checkpoint with its 102 input features. A separate
+enumerator expanded Python integer rows, checked every eligible child,
+re-evaluated its scalar value and compared both the membership and order
+of the global frontier. It also replayed the returned construction and
+computed the exact distance by BFS.
+
+| Input rows | Head | K / global B | Measured layer | Returned construction |
+| --- | --- | --- | --- | --- |
+| `[1,2,7,8]` | Qhat | 11 / 8 | 11 distinct, 8 retained. Ranks scored 7+4 and retained 4+4. | `1→2, 0→2`. Length and exact distance 2. |
+| `[1,2,7,8]` | Proposal | 11 / 8 | 11 distinct, 8 retained. Ranks scored 8+3 and retained 4+4. | `1→2, 0→2`. Length and exact distance 2. |
+| `[1,7,4,10]` | Qhat | 3 / 2 | At depth two each GPU expanded a parent and proposed three moves. Hash owners scored 1+3 unique children. Each GPU received one of the two global winners. | `1→3, 2→1, 0→1` (physical IDs `[5,7,0]`). Length and exact distance 3. |
+
+The deep fixture exercised both GPUs as sources, value owners and recipients
+on the same saturated layer. See the [two-GPU trained results](kaggle_trained/)
+and the [reproduction commands](../../integrations/cayleypy_native/CNOT.md).
+
 ## Consumer scorer
 
 On an RTX 3070 Laptop GPU the adapter restored the original one-update GL(4,2)
@@ -37,7 +57,11 @@ and [wide_single_rtx3070.json](wide_single_rtx3070.json).
 
 Two torchrun agents started a 2×8 process layout on one physical host.
 Slurm placement was also tested with an 8+6 task distribution and one
-visible GPU per task. The [cluster report](cluster_20261106.md) records
+visible GPU per task. In a separate 16-process Gloo run, a six-wire search
+with K=25 and B=17 generated 425 candidates on its second layer. There were
+313 distinct eligible matrices and exactly 17 winners. All 16 ranks expanded
+parents, evaluated children and received winners. The same ordered frontier
+was obtained on two physical GPUs. The [cluster report](cluster_20261106.md) records
 the rank, device, process-failure and native runner checks. A physical
 multi-host run and throughput measurements above eight GPUs remain open.
 

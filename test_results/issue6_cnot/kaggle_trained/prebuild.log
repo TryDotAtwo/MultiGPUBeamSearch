@@ -1,0 +1,7 @@
+$ ['/tmp/issue6-cnot-thxvh9_1/torch29/bin/python', '-c', "import torch, cayleypy, json; print(torch.__file__,torch.__version__,torch.version.cuda,flush=True); assert torch.__version__=='2.9.0+cu128' and torch.version.cuda=='12.8'; assert torch.cuda.device_count()==2 and torch.compiled_with_cxx11_abi(); print('CPU/GPU',torch.get_num_threads(),torch.cuda.nccl.version(),torch.cuda.get_device_capability(0)); from multigpubeamsearch.cnot_native import cnot_children,cnot_identity,cnot_first_unseen; from multigpubeamsearch.cnot_stream5 import load_stream5; p=cnot_identity(4,device='cuda:0'); i=torch.tensor([0],device=p.device); print('native unique',cnot_first_unseen(p,cnot_children(p,i,i)).tolist(),flush=True); print('native NCCL ID bytes',load_stream5().cnot_s5_id_bytes(),flush=True)"]
+Error in sitecustomize; set PYTHONVERBOSE for traceback:
+ModuleNotFoundError: No module named 'wrapt'
+/tmp/issue6-cnot-thxvh9_1/torch29/lib/python3.13/site-packages/torch/__init__.py 2.9.0+cu128 12.8
+CPU/GPU 1 (2, 27, 5) (7, 5)
+native unique [0]
+native NCCL ID bytes 128

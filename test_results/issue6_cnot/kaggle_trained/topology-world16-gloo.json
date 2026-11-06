@@ -1,0 +1,351 @@
+{
+  "n": 6,
+  "width": 17,
+  "shortlist": 25,
+  "mode": "qhat",
+  "world": 16,
+  "scorer": "WireFixture",
+  "status": "depth_limit",
+  "layers": [
+    {
+      "depth": 1,
+      "distinct": 25,
+      "retained": 17,
+      "winners_sha256": "22a6cd2d449b5e5dad01c6d7b7b386dc842a76202adb0a827f1c41098253bddf",
+      "by_rank": [
+        [
+          1,
+          25,
+          24,
+          1,
+          2
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          3,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          3,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "depth": 2,
+      "distinct": 313,
+      "retained": 17,
+      "winners_sha256": "b15a07b793ddefced72c977e25457bbb1a87fd049296880af4c5ec29bce83e8f",
+      "by_rank": [
+        [
+          2,
+          50,
+          48,
+          19,
+          2
+        ],
+        [
+          1,
+          25,
+          25,
+          10,
+          1
+        ],
+        [
+          1,
+          25,
+          25,
+          10,
+          1
+        ],
+        [
+          1,
+          25,
+          24,
+          22,
+          1
+        ],
+        [
+          1,
+          25,
+          24,
+          26,
+          1
+        ],
+        [
+          1,
+          25,
+          22,
+          23,
+          1
+        ],
+        [
+          1,
+          25,
+          21,
+          19,
+          1
+        ],
+        [
+          1,
+          25,
+          23,
+          22,
+          1
+        ],
+        [
+          1,
+          25,
+          25,
+          17,
+          1
+        ],
+        [
+          1,
+          25,
+          22,
+          20,
+          1
+        ],
+        [
+          1,
+          25,
+          23,
+          29,
+          1
+        ],
+        [
+          1,
+          25,
+          24,
+          22,
+          1
+        ],
+        [
+          1,
+          25,
+          25,
+          17,
+          1
+        ],
+        [
+          1,
+          25,
+          22,
+          14,
+          1
+        ],
+        [
+          1,
+          25,
+          24,
+          22,
+          1
+        ],
+        [
+          1,
+          25,
+          24,
+          21,
+          1
+        ]
+      ]
+    }
+  ],
+  "devices": [
+    {
+      "rank": 0,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 1,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 2,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 3,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 4,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 5,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 6,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 7,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 8,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 9,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 10,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 11,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 12,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 13,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 14,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    },
+    {
+      "rank": 15,
+      "host": "a6183bc760b9",
+      "device": "cpu",
+      "gpu": null
+    }
+  ],
+  "torch": "2.11.0+cu130",
+  "backend": "gloo"
+}

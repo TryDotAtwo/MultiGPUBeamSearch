@@ -8,6 +8,8 @@ The three GPU tests passed in 30.570 s. They exercised raw Qhat, raw proposal lo
 
 For the supplied rows `[1,2,7,8]`, both modes generated 11 distinct candidates and retained the global top 8 at depth one. They selected different sets. Both returned the length-two construction `1→2, 0→2` from the identity, independently replayed bit for bit. The JSON files record each survivor digest, route and hardware identity.
 
+A separate demonstration selected `[1,7,4,10]` from the exact GL(4,2) distance-three layer under the frozen feature policy. With Qhat, width 2 and shortlist 3, the public validator retained 2 of 3 distinct children at depth one and 2 of 4 at depth two. The second expansion processed two parents and six proposals. The returned construction was `1→3, 2→1, 0→1`; direct enumeration excluded every word of lengths 0, 1 and 2. Applying the CUDA owner hash for two buckets to those single-GPU audit rows gave counts `[1,2]` and `[1,3]` at the two layers.
+
 | Local binary | Bytes | SHA-256 | CUDA images |
 | --- | ---: | --- | --- |
 | `libcnot103_native.so` | 8,881,376 | `efd751477ade2bcd73c79876b732341244ef26df0fa2485b76054ddf20ac8332` | 22 each for sm_75 and sm_86 |
@@ -29,4 +31,7 @@ for mode in qhat proposal; do
     --library "$MGBS_TQP_LIBRARY" --manifest "$MGBS_TQP_MANIFEST" \
     --output "trained_single_${mode}_rtx3070.json"
 done
+python tools/verify_cnot.py --case trained-deep --mode qhat --width 2 \
+  --library "$MGBS_TQP_LIBRARY" --manifest "$MGBS_TQP_MANIFEST" \
+  --output trained_deep_single_qhat_rtx3070.json
 ```
