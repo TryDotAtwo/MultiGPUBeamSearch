@@ -79,6 +79,10 @@ def ensure_native_library(contract, model, options, architectures, run_dir, runn
     if (metadata != runner_metadata or resolved_backend not in ('cutlass', 'libtorch')
             or options.inference_backend not in ('auto', resolved_backend)):
         raise NativeBackendError('runner build metadata does not match the native library request')
+    needs_torch = (resolved_backend == 'libtorch' or model.backend in ('piece_transformer', 'ensemble')
+                   or bool(metadata.get('calibration_binary_name')))
+    if needs_torch and not isinstance(metadata.get('torch'), dict):
+        raise NativeBackendError('PyTorch build identity is required for this runner')
     build_dir = runner.parent
     if not (build_dir / 'CMakeCache.txt').is_file():
         raise NativeUnavailable('native runner has no managed CMake build directory')

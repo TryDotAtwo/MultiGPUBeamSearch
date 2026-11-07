@@ -3,6 +3,13 @@ Total output lines: 5789
 
 # Changelog
 
+## 2026-11-08 reject incomplete PyTorch-dependent runner metadata
+- The on-demand native library builder now requires a PyTorch build identity
+  for LibTorch, transformer/ensemble, and calibration runner configurations.
+  Existing identity comparisons continue to detect changed PyTorch dependencies.
+- The scoped CPU, packaging and 1/2-GPU session evidence is recorded in
+  `test_results/refactor_20261107/STAGE5_NATIVE_TORCH_IDENTITY.md`.
+
 ## 2026-11-08 resolve the native library backend from the verified runner
 - On-demand library preparation now accepts the default `auto` inference
   setting and uses the verified runner's resolved CUTLASS or LibTorch backend.

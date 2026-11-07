@@ -1,0 +1,4 @@
+Processing ./wheel/multigpubeamsearch-0.1.0.dev1-cp310-abi3-linux_x86_64.whl
+Installing collected packages: multigpubeamsearch
+Successfully installed multigpubeamsearch-0.1.0.dev1
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.

@@ -57,7 +57,8 @@ def fixture(tmp_path, monkeypatch):
                   candidate_bytes=32, candidate_alignment=32, hash_bytes=16, hash_alignment=16)
     def run_probe(command, **kwargs):
         assert command == [str(worker), '--native-abi-info']
-        target = 'beam_native_libtorch' if metadata['inference_backend'] == 'libtorch' else 'beam_native'
+        target = ('beam_native_libtorch' if metadata['inference_backend'] == 'libtorch'
+                  or model.backend != 'mlp' else 'beam_native')
         assert kwargs['env']['BEAM_NATIVE_LIBRARY'] == str(directory / f'lib{target}.so')
         return SimpleNamespace(returncode=0, stdout=json.dumps(layout), stderr='')
     monkeypatch.setattr(native_library.subprocess, 'run', run_probe)
@@ -135,6 +136,23 @@ def test_unresolved_runner_backend_is_rejected(tmp_path, monkeypatch, backend):
     metadata['inference_backend'] = backend
     (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
     with pytest.raises(NativeBackendError, match='metadata'):
+        native.ensure_native_library(graph, model, replace(options, inference_backend='auto'),
+                                     (86,), tmp_path, runner, metadata)
+    assert not calls
+
+
+@pytest.mark.parametrize(('executor', 'model_backend', 'calibration'), (
+    ('libtorch', 'mlp', None),
+    ('cutlass', 'ensemble', None),
+    ('cutlass', 'piece_transformer', None),
+    ('cutlass', 'mlp', 'stream1_native_mlp_benchmark'),
+))
+def test_torch_dependent_runner_requires_pytorch_identity(tmp_path, monkeypatch, executor, model_backend, calibration):
+    native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+    model.backend = model_backend
+    metadata.update(backend=model_backend, inference_backend=executor, calibration_binary_name=calibration)
+    (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+    with pytest.raises(NativeBackendError, match='PyTorch build identity'):
         native.ensure_native_library(graph, model, replace(options, inference_backend='auto'),
                                      (86,), tmp_path, runner, metadata)
     assert not calls

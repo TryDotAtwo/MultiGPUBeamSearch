@@ -1,0 +1,93 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+___ test_torch_dependent_runner_requires_pytorch_identity[libtorch-mlp-None] ___
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-38/test_torch_dependent_runner_re0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f95a83e4110>
+executor = 'libtorch', model_backend = 'mlp', calibration = None
+
+    @pytest.mark.parametrize(('executor', 'model_backend', 'calibration'), (
+        ('libtorch', 'mlp', None),
+        ('cutlass', 'ensemble', None),
+        ('cutlass', 'piece_transformer', None),
+        ('cutlass', 'mlp', 'stream1_native_mlp_benchmark'),
+    ))
+    def test_torch_dependent_runner_requires_pytorch_identity(tmp_path, monkeypatch, executor, model_backend, calibration):
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        model.backend = model_backend
+        metadata.update(backend=model_backend, inference_backend=executor, calibration_binary_name=calibration)
+        (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+>       with pytest.raises(NativeBackendError, match='PyTorch build identity'):
+E       Failed: DID NOT RAISE NativeBackendError
+
+integrations/cayleypy_native/tests/test_native_library.py:155: Failed
+_ test_torch_dependent_runner_requires_pytorch_identity[cutlass-ensemble-None] _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-38/test_torch_dependent_runner_re1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9379754f50>
+executor = 'cutlass', model_backend = 'ensemble', calibration = None
+
+    @pytest.mark.parametrize(('executor', 'model_backend', 'calibration'), (
+        ('libtorch', 'mlp', None),
+        ('cutlass', 'ensemble', None),
+        ('cutlass', 'piece_transformer', None),
+        ('cutlass', 'mlp', 'stream1_native_mlp_benchmark'),
+    ))
+    def test_torch_dependent_runner_requires_pytorch_identity(tmp_path, monkeypatch, executor, model_backend, calibration):
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        model.backend = model_backend
+        metadata.update(backend=model_backend, inference_backend=executor, calibration_binary_name=calibration)
+        (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+>       with pytest.raises(NativeBackendError, match='PyTorch build identity'):
+E       Failed: DID NOT RAISE NativeBackendError
+
+integrations/cayleypy_native/tests/test_native_library.py:155: Failed
+_ test_torch_dependent_runner_requires_pytorch_identity[cutlass-piece_transformer-None] _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-38/test_torch_dependent_runner_re2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f95a83e3f90>
+executor = 'cutlass', model_backend = 'piece_transformer', calibration = None
+
+    @pytest.mark.parametrize(('executor', 'model_backend', 'calibration'), (
+        ('libtorch', 'mlp', None),
+        ('cutlass', 'ensemble', None),
+        ('cutlass', 'piece_transformer', None),
+        ('cutlass', 'mlp', 'stream1_native_mlp_benchmark'),
+    ))
+    def test_torch_dependent_runner_requires_pytorch_identity(tmp_path, monkeypatch, executor, model_backend, calibration):
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        model.backend = model_backend
+        metadata.update(backend=model_backend, inference_backend=executor, calibration_binary_name=calibration)
+        (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+>       with pytest.raises(NativeBackendError, match='PyTorch build identity'):
+E       Failed: DID NOT RAISE NativeBackendError
+
+integrations/cayleypy_native/tests/test_native_library.py:155: Failed
+_ test_torch_dependent_runner_requires_pytorch_identity[cutlass-mlp-stream1_native_mlp_benchmark] _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-38/test_torch_dependent_runner_re3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9379502b10>
+executor = 'cutlass', model_backend = 'mlp'
+calibration = 'stream1_native_mlp_benchmark'
+
+    @pytest.mark.parametrize(('executor', 'model_backend', 'calibration'), (
+        ('libtorch', 'mlp', None),
+        ('cutlass', 'ensemble', None),
+        ('cutlass', 'piece_transformer', None),
+        ('cutlass', 'mlp', 'stream1_native_mlp_benchmark'),
+    ))
+    def test_torch_dependent_runner_requires_pytorch_identity(tmp_path, monkeypatch, executor, model_backend, calibration):
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        model.backend = model_backend
+        metadata.update(backend=model_backend, inference_backend=executor, calibration_binary_name=calibration)
+        (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+>       with pytest.raises(NativeBackendError, match='PyTorch build identity'):
+E       Failed: DID NOT RAISE NativeBackendError
+
+integrations/cayleypy_native/tests/test_native_library.py:155: Failed
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_torch_dependent_runner_requires_pytorch_identity[libtorch-mlp-None]
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_torch_dependent_runner_requires_pytorch_identity[cutlass-ensemble-None]
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_torch_dependent_runner_requires_pytorch_identity[cutlass-piece_transformer-None]
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_torch_dependent_runner_requires_pytorch_identity[cutlass-mlp-stream1_native_mlp_benchmark]
+4 failed, 9 deselected in 5.28s

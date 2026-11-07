@@ -28,6 +28,18 @@ compared with its original. The restoring program is retained at
 `.local/consolidation/restore-vast-rescue.py`; it reconstructs files into a new
 directory and checks each restored blob.
 
+After the final tests, a second supplement captured the then-current temporary
+model files: `.local/cache/vast-59551108/owned-work-supplement-20261107-v3.tar.gz`,
+SHA-256 `aec8735e1a400a8c4ae3de03e3fa34f66f3b081e7da536ef881a10d0c9b4cbcb`.
+All 130 blobs and 1,095 records were checked. Pytest had rotated temporary
+directories between snapshots; six blob hashes occur only in v2 and six only
+in v3, so both verified supplements are retained.
+
+A final inventory compared the SHA-256 of all 31 top-level remote tar archives
+against local files; all 31 had an exact local match. This includes the original
+`source-delta.tar.gz`, saved locally as `source-delta-vast-original.tar.gz` with
+SHA-256 `100cd36273e7d0a25b56facd745199fb93195d3fe201cd399bff4fb8fb5fe9f3`.
+
 Rebuildable object files, shared libraries, ELF binaries and interpreter caches
 were excluded from the first inventory; the native libraries, runners, wheels
 and synthetic fixtures used by the published acceptance runs are preserved in

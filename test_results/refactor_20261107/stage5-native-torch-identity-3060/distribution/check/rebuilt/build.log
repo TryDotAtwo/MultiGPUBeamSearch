@@ -1,0 +1,9 @@
+Processing /workspace/beam-results/native-torch-identity/distribution/check/sdist/multigpubeamsearch-0.1.0.dev1.tar.gz
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: multigpubeamsearch
+  Building wheel for multigpubeamsearch (pyproject.toml): started
+  Building wheel for multigpubeamsearch (pyproject.toml): finished with status 'done'
+  Created wheel for multigpubeamsearch: filename=multigpubeamsearch-0.1.0.dev1-cp310-abi3-linux_x86_64.whl size=2820450 sha256=34b72d090d3bebc057e30c0a6e28640d9aadbc249001324530a1656dfedd3139
+  Stored in directory: /root/.cache/pip/wheels/91/6d/ff/17978fb4dc66434ad88190586ab229786f60e17e4501827d7f
+Successfully built multigpubeamsearch
