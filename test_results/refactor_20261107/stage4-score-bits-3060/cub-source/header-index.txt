@@ -1,0 +1,16 @@
+121:  SCAN_TILE_OOB, // Out-of-bounds (e.g., padding)
+535:  _CCCL_DEVICE _CCCL_FORCEINLINE void WaitForValid(int tile_idx, StatusWord& status, T& value, DelayT delay = {})
+537:    tile_state.template WaitForValid<DelayT, Order>(tile_idx, status, value, delay);
+633:  _CCCL_DEVICE _CCCL_FORCEINLINE void InitializeStatus(int num_tiles)
+650:      descriptor->status              = StatusWord(SCAN_TILE_OOB);
+729:  WaitForValid(int tile_idx, StatusWord& status, T& value, DelayT delay_or_prevent_hoisting = {})
+769:struct ScanTileState<T, false>
+874:  _CCCL_DEVICE _CCCL_FORCEINLINE void InitializeStatus(int num_tiles)
+886:      d_tile_status[threadIdx.x] = StatusWord(SCAN_TILE_OOB);
+916:  _CCCL_DEVICE _CCCL_FORCEINLINE void WaitForValid(int tile_idx, StatusWord& status, T& value, DelayT delay = {})
+927:      value = ThreadLoad<LOAD_CG>(d_tile_partial + TILE_STATUS_PADDING + tile_idx);
+931:      value = ThreadLoad<LOAD_CG>(d_tile_inclusive + TILE_STATUS_PADDING + tile_idx);
+1070:  _CCCL_DEVICE _CCCL_FORCEINLINE void InitializeStatus(int num_tiles)
+1086:      descriptor->status              = StatusWord(SCAN_TILE_OOB);
+1125:  WaitForValid(int tile_idx, StatusWord& status, KeyValuePairT& value, DelayT delay_or_prevent_hoisting = {})
+1240:    tile_status.WaitForValid(predecessor_idx, predecessor_status, value, delay);

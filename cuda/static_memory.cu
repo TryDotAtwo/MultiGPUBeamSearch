@@ -1,6 +1,7 @@
 #include "static_memory.hpp"
 #include "cub_compat.hpp"
 #include "hash_sort.cuh"
+#include "score_sort_bits.cuh"
 #include "stream4_index.cuh"
 #include "stream4_scan.cuh"
 #include "stream3.hpp"
@@ -144,7 +145,7 @@ std::size_t stream3_cub_temp_bytes(std::uint32_t stream3_batch_candidates) {
         score_count_out,
         item_count,
         0,
-        32,
+        detail::SCORE_HISTOGRAM_SORT_END_BIT,
         0);
     if (status != cudaSuccess) {
         throw std::runtime_error(cudaGetErrorString(status));
@@ -304,7 +305,7 @@ std::size_t stream4_cub_temp_bytes(std::uint32_t stream4_capacity) {
         score_counts_out,
         item_count,
         0,
-        32,
+        detail::SCORE_HISTOGRAM_SORT_END_BIT,
         0);
     if (status != cudaSuccess) {
         throw std::runtime_error(cudaGetErrorString(status));

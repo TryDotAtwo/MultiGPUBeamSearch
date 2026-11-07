@@ -31,6 +31,7 @@ option(BEAM_EXPERIMENTAL_RADIX128 "Use experimental full-width CUB radix sort fo
 option(BEAM_EXPERIMENTAL_INDEX_SORT "Sort Stream 4 metadata indices instead of metadata records" OFF)
 option(BEAM_EXPERIMENTAL_STREAM4_SCAN "Use CUB device and block scans for Stream 4 compaction" OFF)
 option(BEAM_EXPERIMENTAL_OWNER_RADIX "Use stable CUB radix partition for Stream 3 owner routing" OFF)
+option(BEAM_EXPERIMENTAL_SCORE_BITS "Restrict score histogram radix sort to sentinel-aware key bits" OFF)
 if(BEAM_ENABLE_LIBTORCH_STREAM1)
     find_package(Torch REQUIRED)
     # The engine/control transport exchange C++ objects internally. Compile all
@@ -186,6 +187,8 @@ set_property(SOURCE cuda/stream4.cu cuda/static_memory.cu APPEND PROPERTY
     COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_STREAM4_SCAN=$<BOOL:${BEAM_EXPERIMENTAL_STREAM4_SCAN}>")
 set_property(SOURCE cuda/stream3.cu cuda/static_memory.cu cuda/dispatcher.cu APPEND PROPERTY
     COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_OWNER_RADIX=$<BOOL:${BEAM_EXPERIMENTAL_OWNER_RADIX}>")
+set_property(SOURCE cuda/stream3.cu cuda/stream4.cu cuda/static_memory.cu APPEND PROPERTY
+    COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_SCORE_BITS=$<BOOL:${BEAM_EXPERIMENTAL_SCORE_BITS}>")
 target_compile_definitions(beam_cuda PUBLIC
     BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
     BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
@@ -300,6 +303,11 @@ target_compile_features(stream1_transformer_autotune_contract_tests PRIVATE cxx_
 add_executable(stream3_cuda_tests tests/stream3_cuda_tests.cu)
 target_link_libraries(stream3_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream3_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(score_histogram_cuda_tests EXCLUDE_FROM_ALL tests/score_histogram_cuda_tests.cu)
+target_link_libraries(score_histogram_cuda_tests PRIVATE beam_cuda)
+target_compile_definitions(score_histogram_cuda_tests PRIVATE BEAM_EXPERIMENTAL_SCORE_BITS=$<BOOL:${BEAM_EXPERIMENTAL_SCORE_BITS}>)
+set_target_properties(score_histogram_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 if(BEAM_EXPERIMENTAL_RADIX128)
     add_executable(radix128_cuda_tests tests/radix128_cuda_tests.cu)

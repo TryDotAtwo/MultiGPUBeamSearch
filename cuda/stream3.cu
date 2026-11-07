@@ -5,6 +5,7 @@
 #include "hash.hpp"
 #include "hash_sort.cuh"
 #include "nvtx_ranges.hpp"
+#include "score_sort_bits.cuh"
 
 #include <cub/device/device_radix_sort.cuh>
 #include <cub/device/device_merge_sort.cuh>
@@ -1339,7 +1340,7 @@ void stream3_accumulate_score_hist_cuda(
             score_count_b,
             static_cast<int>(stream3_batch_candidates),
             0,
-            32,
+            detail::SCORE_HISTOGRAM_SORT_END_BIT,
             stream),
         "cub::DeviceRadixSort::SortPairs stream3 score hist");
     std::size_t reduce_temp_bytes = cub_temp_storage_bytes;

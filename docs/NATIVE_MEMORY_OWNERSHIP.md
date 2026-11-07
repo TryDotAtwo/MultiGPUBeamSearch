@@ -54,6 +54,11 @@ resident across compatible jobs.
 | Pinned history host slot | slot capacity / committed count | D2H stream | D2H complete **and** file/RAM writer finished reading the slot |
 | CPU packed history | planned RAM/disk entries / committed depth ranges | history writer | path reconstruction and adjacent-depth pruning readers finish |
 
+The Stream 4 hash-reduction test reproduced initcheck reads from uninitialized
+CUB scratch with both full and bounded score keys. Preinitializing the test
+scratch removes the reports; initialization and phase-overlay ownership in the
+production arena need separate validation. See `STAGE4_SCORE_BITS.md`.
+
 Capacity errors must report both required and available sizes. Physical alignment
 does not change logical beam width. Stream4 has no semantic shard cap or shard
 top-k. Permutation padding is zero in persistent storage. CNOT matrices use a

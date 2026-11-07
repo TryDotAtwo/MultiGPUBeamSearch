@@ -1,0 +1,1 @@
+EXPECTED_RED: score bit contract and public cache control absent

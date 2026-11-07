@@ -1,0 +1,2 @@
+[1/2] Building CUDA object CMakeFiles/score_histogram_cuda_tests.dir/tests/score_histogram_cuda_tests.cu.o
+[2/2] Linking CXX executable score_histogram_cuda_tests

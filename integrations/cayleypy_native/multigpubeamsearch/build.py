@@ -187,6 +187,7 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                "-DBEAM_EXPERIMENTAL_INDEX_SORT=OFF",
                "-DBEAM_EXPERIMENTAL_STREAM4_SCAN=OFF",
                "-DBEAM_EXPERIMENTAL_OWNER_RADIX=OFF",
+               "-DBEAM_EXPERIMENTAL_SCORE_BITS=OFF",
                "-DBEAM_ENABLE_DEBUG=ON", "-DBEAM_ENABLE_DEBUG_LOGS=ON",
                "-DBEAM_ENABLE_DEPTH_LOGS=OFF", "-DBEAM_DEBUG_STREAM_TIMING=OFF",
                "-DBEAM_DEBUG_INFERENCE_TRACE=OFF", "-DBEAM_DEBUG_PATH_TRACE=OFF"]

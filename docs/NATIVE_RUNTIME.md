@@ -34,6 +34,11 @@ owner using stable CUB radix sorting with the sentinel included in the key width
 It reuses preallocated Stream 3 partition planes and scratch on the same stream;
 the single-GPU short path is unchanged. Automatic Python builds leave it OFF.
 
+`BEAM_EXPERIMENTAL_SCORE_BITS=ON` narrows only score-histogram radix sorts to the
+sentinel-aware bit width. The Python build leaves it OFF; see
+`test_results/refactor_20261107/STAGE4_SCORE_BITS.md` for measurements and the
+separately reproduced CUB scratch initialization diagnostic.
+
 ## Build
 
 Rust workspace builds do not require CUDA. `cargo build --release --workspace`

@@ -1,0 +1,24 @@
+[1/18] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+[2/18] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream3.cu.o
+/workspace/beam-native-source/cuda/stream3.cu(132): warning #177-D: function "beam::<unnamed>::stream3_debug_store_count_kernel" was declared but never referenced
+  __attribute__((global)) void stream3_debug_store_count_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[3/18] Building CUDA object CMakeFiles/score_histogram_cuda_tests.dir/tests/score_histogram_cuda_tests.cu.o
+[4/18] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+[5/18] Linking CXX static library libbeam_cuda.a
+[6/18] Linking CXX executable stream3_cuda_tests
+[7/18] Linking CXX executable score_histogram_cuda_tests
+[8/18] Linking CXX executable stream3_owner_scatter_cuda_tests
+[9/18] Linking CXX executable stream4_cuda_tests
+[10/18] Linking CXX executable stream4_scan_large_union_cuda_tests
+[11/18] Linking CXX executable stream4_logical_union_cuda_tests
+[12/18] Linking CXX executable stream4_logical_union_graph_cuda_tests
+[13/18] Linking CXX executable stream4_logical_union_bounded_graph_cuda_tests
+[14/18] Linking CXX executable stream4_bounded_graph_cuda_tests
+[15/18] Linking CXX executable final_union_dispatcher_cuda_tests
+[16/18] Linking CXX executable stitched_cuda_tests
+[17/18] Linking CXX executable static_memory_cuda_tests
+[18/18] Linking CXX executable production_runner

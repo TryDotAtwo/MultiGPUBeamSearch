@@ -1027,3 +1027,8 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - The experimental owner router now records count-capacity failure in the existing fatal trace, preserving an earlier failure and returning exact required/available counts before NCCL exchange. It suppresses output on failure without poisoning the CUDA context.
 - On each RTX3060, capacity+1 and UINT32_MAX count injection passed in eager and CUDA Graph tests for one/two logical owners, followed by 1,848 normal checks. Scoped memcheck/initcheck, combined owner/index/scan memcheck, the default regression and repeated one/two-GPU native sessions passed. End-to-end injected multi-rank failure and public error text remain untested.
 - Five fresh full-step pairs measured median -0.13% throughput with unchanged planned memory. The option remains off; details and limitations: test_results/refactor_20261107/STAGE4_OWNER_COUNT.md.
+
+## 2026-11-07 - Experimental bounded score-histogram radix bits
+- Added a sentinel-aware score sort width shared by Stream3/4 launches and actual CUB scratch queries. The current 19-bit path is opt-in; Hash128 and inference precision are unchanged.
+- CPU-oracle histogram, eager/graph, one/two-GPU session, default and combined-option regressions passed. Scoped memcheck passed. Uninitialized-scratch initcheck reported the same 9,912 CUB scratch reads with score bits OFF and ON; explicit test scratch initialization removed the reports. Production arena initialization and semantic impact remain to validate.
+- Five paired full-step trials measured median +0.85% throughput and unchanged planned memory, below the speed threshold. The option remains off. See test_results/refactor_20261107/STAGE4_SCORE_BITS.md.

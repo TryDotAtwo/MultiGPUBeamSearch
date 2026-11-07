@@ -45,6 +45,8 @@ rank processes after their ABI/layout and specialization checks.
   width includes the sentinel for every supported world size. The preallocated
   partition buffers and scratch cannot be reused until routing readers complete.
   One-GPU dispatch retains its existing short path.
+- Experimental bounded score histogram sorts include all bits of the sentinel;
+  launch and CUB scratch queries use the same range. Hash identity remains 128-bit.
 - Reuse requires completion of every reader. GPU-source and pinned-host-history
   reader completion are distinct. Cross-process messages contain no device pointers.
 - Only explicit native capacity rejection bounds a capacity search. Rank failure,

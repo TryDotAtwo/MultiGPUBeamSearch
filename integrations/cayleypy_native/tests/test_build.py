@@ -58,6 +58,7 @@ def test_cmake_dimensions_are_explicit_not_cached_inference(tmp_path):
     assert "-DBEAM_EXPERIMENTAL_INDEX_SORT=OFF" in command
     assert "-DBEAM_EXPERIMENTAL_STREAM4_SCAN=OFF" in command
     assert "-DBEAM_EXPERIMENTAL_OWNER_RADIX=OFF" in command
+    assert "-DBEAM_EXPERIMENTAL_SCORE_BITS=OFF" in command
     assert command[:2] == ["cmake", "-S"]
 
 

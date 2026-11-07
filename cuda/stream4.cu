@@ -2,6 +2,7 @@
 
 #include "hash_sort.cuh"
 #include "nvtx_ranges.hpp"
+#include "score_sort_bits.cuh"
 #include "stream4_index.cuh"
 #include "stream4_scan.cuh"
 
@@ -518,7 +519,7 @@ void stream4_write_shard_histogram(
             score_count_b,
             static_cast<int>(capacity),
             0,
-            32,
+            detail::SCORE_HISTOGRAM_SORT_END_BIT,
             stream),
         "cub::DeviceRadixSort::SortPairs stream4 score histogram");
 
