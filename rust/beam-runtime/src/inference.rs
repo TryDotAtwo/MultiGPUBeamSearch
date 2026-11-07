@@ -122,6 +122,15 @@ impl InferencePool {
     pub fn cancellation(&self) -> Arc<AtomicBool> {
         self.cancel.clone()
     }
+    pub fn bind_cancellation(&mut self, cancel: Arc<AtomicBool>) -> Result<()> {
+        if self.starts != 0 || self.closed {
+            return Err(Error::Message(
+                "cannot replace active inference cancellation".into(),
+            ));
+        }
+        self.cancel = cancel;
+        Ok(())
+    }
     pub fn starts(&self) -> u64 {
         self.starts
     }
@@ -174,7 +183,6 @@ impl InferencePool {
     }
     pub fn close(&mut self) -> Result<()> {
         self.closed = true;
-        self.cancel.store(true, Ordering::Release);
         self.clear()
     }
     fn start(&mut self, batch: u64, deadline: Instant) -> Result<Vec<usize>> {

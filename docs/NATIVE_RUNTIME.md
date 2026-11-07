@@ -64,6 +64,26 @@ runtime components; the public calibration policy has not switched yet.
 
 ## Calibration ownership
 
+`inference_job::Request` combines typed public options, graph/model descriptors,
+content-bound artifacts, device identity and the native probe protocol. Rust
+prepares inputs, validates cache evidence, owns all probe/selection loops and
+publishes the result atomically. `rust_control.tune_inference` is the thin
+comparison adapter; the public default remains gated on the final switch.
+
+The versioned cache key includes the graph, deterministic center-based samples,
+helper, protocol and all model files. Cached estimates are recomputed from the
+complete all-rank receipts and unthrottled telemetry. A capacity-limited entry
+needs a current selected-UUID free-memory snapshot; more than 32 MiB of released
+pressure invalidates it. Every execution still needs fresh native admission.
+Model/helper hashes are checked even on a cache hit. Hashing streams through a
+64 KiB host buffer. `sha2` 0.10.9 and its dependency tree are pinned in Cargo.lock.
+
+Coarse PyO3 inference-job and search-session calls run on a scoped Rust thread.
+The Python thread checks signals every 20 ms, forwards cancellation and joins
+owned cleanup before propagating KeyboardInterrupt. This avoids deferring a
+notebook interruption until a long search timeout. An extra thread is created
+per coarse call, never per candidate or kernel launch.
+
 `PlanningSession` owns one retained process per rank and the exact-capacity
 protocol. It validates every rank, preserves the requested logical beam exactly,
 freezes the model microbatch, and permits only the five scheduling overrides.

@@ -1,0 +1,17 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0432]: unresolved import `beam_runtime::artifacts`
+ --> rust/beam-runtime/tests/profile_cache.rs:1:19
+  |
+1 | use beam_runtime::artifacts::{sha256_file, Artifact};
+  |                   ^^^^^^^^^ could not find `artifacts` in `beam_runtime`
+
+error[E0432]: unresolved import `beam_runtime::profile_cache`
+ --> rust/beam-runtime/tests/profile_cache.rs:2:19
+  |
+2 | use beam_runtime::profile_cache::{cache_key, read_inference, write_inference};
+  |                   ^^^^^^^^^^^^^ could not find `profile_cache` in `beam_runtime`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-runtime` (test "profile_cache") due to 2 previous errors

@@ -50,7 +50,12 @@ for line in sys.stdin:
     assert_eq!(pool.starts(), 3);
     assert_eq!(pool.pids()[0], pids[0]);
     assert_ne!(pool.pids()[1], pids[1]);
+    let cancel = pool.cancellation();
     pool.close().unwrap();
+    assert!(
+        !cancel.load(std::sync::atomic::Ordering::Acquire),
+        "ordinary cleanup must not cancel the parent job before publication"
+    );
     assert!(pool.pids().iter().all(Option::is_none));
     fs::remove_dir_all(root).unwrap();
 }

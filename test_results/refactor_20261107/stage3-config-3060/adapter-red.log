@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/rust/beam-python/tests/config.py", line 6, in <module>
+    assert hasattr(runtime,'InferenceCalibration') and hasattr(runtime,'validate_options')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

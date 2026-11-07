@@ -122,8 +122,7 @@ impl Receipt {
         })
     }
 }
-fn query() -> Result<Vec<Row>> {
-    let fields="index,uuid,temperature.gpu,clocks_event_reasons.sw_thermal_slowdown,clocks_event_reasons.hw_thermal_slowdown,clocks_event_reasons.hw_power_brake_slowdown";
+fn query_output(fields: &str) -> Result<String> {
     let mut child = Command::new("nvidia-smi")
         .arg(format!("--query-gpu={fields}"))
         .arg("--format=csv,noheader,nounits")
@@ -149,7 +148,42 @@ fn query() -> Result<Vec<Row>> {
     if !output.status.success() {
         return Err(Error::Message("GPU telemetry query failed".into()));
     }
-    parse(&String::from_utf8_lossy(&output.stdout))
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+fn query() -> Result<Vec<Row>> {
+    let fields="index,uuid,temperature.gpu,clocks_event_reasons.sw_thermal_slowdown,clocks_event_reasons.hw_thermal_slowdown,clocks_event_reasons.hw_power_brake_slowdown";
+    parse(&query_output(fields)?)
+}
+pub fn free_memory(uuids: &[String]) -> Option<crate::profile_cache::FreeMemory> {
+    let text = query_output("uuid,memory.free").ok()?;
+    let mut observed = crate::profile_cache::FreeMemory::new();
+    for line in text.lines() {
+        let (uuid, memory) = line.split_once(',')?;
+        let uuid = uuid
+            .trim()
+            .to_ascii_lowercase()
+            .trim_start_matches("gpu-")
+            .to_owned();
+        if observed.insert(uuid, memory.trim().parse().ok()?).is_some() {
+            return None;
+        }
+    }
+    let mut selected = crate::profile_cache::FreeMemory::new();
+    for uuid in uuids {
+        let uuid = uuid
+            .to_ascii_lowercase()
+            .trim_start_matches("gpu-")
+            .to_owned();
+        let value = *observed.get(&uuid)?;
+        if selected.insert(uuid, value).is_some() {
+            return None;
+        }
+    }
+    if selected.is_empty() {
+        None
+    } else {
+        Some(selected)
+    }
 }
 fn sample(receipt: &Arc<Mutex<Receipt>>) {
     let value = query();

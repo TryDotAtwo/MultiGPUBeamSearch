@@ -1,0 +1,2 @@
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+    Finished `release` profile [optimized] target(s) in 4.28s

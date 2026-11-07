@@ -1,0 +1,5041 @@
+{
+  "records": [
+    {
+      "backend": "native_mlp",
+      "world": 1,
+      "first": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 1.881841259,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 3.1847499776631596e-06,
+          "low": 3.180749947205186e-06,
+          "median": 3.181499894708395e-06,
+          "profile": "16",
+          "relative_mad": 0.0002357213666599057,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 34,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013049663543701172
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013033408164978028
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013044735908508302
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013031423568725586
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013030400276184082
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013028351783752442
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013028351783752442
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 4096,
+            "score_input": "graph_states",
+            "seconds": [
+              0.013049663543701172,
+              0.013033408164978028,
+              0.013044735908508302,
+              0.013031423568725586,
+              0.013030400276184082,
+              0.013028351783752442,
+              0.013028351783752442
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 536870912,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "native_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "afe001194b5851a1c1cd7252c28e4f9e3fa1884da5d6ad6e66bbdf90b0197146",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "hit": {
+        "cache_hit": true,
+        "calibration_wall_seconds": 1.881841259,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 3.1847499776631596e-06,
+          "low": 3.180749947205186e-06,
+          "median": 3.181499894708395e-06,
+          "profile": "16",
+          "relative_mad": 0.0002357213666599057,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 34,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013049663543701172
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013033408164978028
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013044735908508302
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013031423568725586
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013030400276184082
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013028351783752442
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013028351783752442
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 4096,
+            "score_input": "graph_states",
+            "seconds": [
+              0.013049663543701172,
+              0.013033408164978028,
+              0.013044735908508302,
+              0.013031423568725586,
+              0.013030400276184082,
+              0.013028351783752442,
+              0.013028351783752442
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 536870912,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "native_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "afe001194b5851a1c1cd7252c28e4f9e3fa1884da5d6ad6e66bbdf90b0197146",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "retest": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 1.7111311740000001,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 3.1820000149309634e-06,
+          "low": 3.1806952320039272e-06,
+          "median": 3.1812500674277544e-06,
+          "profile": "16",
+          "relative_mad": 0.00023573987813394056,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 37,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013049792289733887
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013030400276184082
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013033472061157226
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013029024124145508
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013033472061157226
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013025279998779296
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.013028127670288086
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 4096,
+            "score_input": "graph_states",
+            "seconds": [
+              0.013049792289733887,
+              0.013030400276184082,
+              0.013033472061157226,
+              0.013029024124145508,
+              0.013033472061157226,
+              0.013025279998779296,
+              0.013028127670288086
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 536870912,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "native_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "afe001194b5851a1c1cd7252c28e4f9e3fa1884da5d6ad6e66bbdf90b0197146",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      }
+    },
+    {
+      "backend": "libtorch_mlp",
+      "world": 1,
+      "first": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 2.797776886,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 4.2180180549621585e-05,
+          "low": 4.194274917244911e-05,
+          "median": 4.199625179171562e-05,
+          "profile": "16",
+          "relative_mad": 0.00127398558166234,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 37,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17277001953125
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17201664733886718
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17205453491210937
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17188453674316406
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17179750061035157
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17355162048339845
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.1715917053222656
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 4096,
+            "score_input": "graph_states",
+            "seconds": [
+              0.17277001953125,
+              0.17201664733886718,
+              0.17205453491210937,
+              0.17188453674316406,
+              0.17179750061035157,
+              0.17355162048339845,
+              0.1715917053222656
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "libtorch_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "88a5389a86e70fb5933e5da01a96d8df97a8cb804538e05aaee2c72aae376d69",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "hit": {
+        "cache_hit": true,
+        "calibration_wall_seconds": 2.797776886,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 4.2180180549621585e-05,
+          "low": 4.194274917244911e-05,
+          "median": 4.199625179171562e-05,
+          "profile": "16",
+          "relative_mad": 0.00127398558166234,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 37,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17277001953125
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17201664733886718
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17205453491210937
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17188453674316406
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17179750061035157
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17355162048339845
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.1715917053222656
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 4096,
+            "score_input": "graph_states",
+            "seconds": [
+              0.17277001953125,
+              0.17201664733886718,
+              0.17205453491210937,
+              0.17188453674316406,
+              0.17179750061035157,
+              0.17355162048339845,
+              0.1715917053222656
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "libtorch_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "88a5389a86e70fb5933e5da01a96d8df97a8cb804538e05aaee2c72aae376d69",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "retest": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 2.843836755,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 4.2537249624729154e-05,
+          "low": 4.2415961623191835e-05,
+          "median": 4.2435500770807264e-05,
+          "profile": "16",
+          "relative_mad": 0.0006480445024502357,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 37,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17401651000976562
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17370317077636718
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.1737840576171875
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17373577880859375
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17423257446289062
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17597132873535157
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.17381581115722655
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 4096,
+            "score_input": "graph_states",
+            "seconds": [
+              0.17401651000976562,
+              0.17370317077636718,
+              0.1737840576171875,
+              0.17373577880859375,
+              0.17423257446289062,
+              0.17597132873535157,
+              0.17381581115722655
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "libtorch_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "88a5389a86e70fb5933e5da01a96d8df97a8cb804538e05aaee2c72aae376d69",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      }
+    },
+    {
+      "backend": "ensemble",
+      "world": 1,
+      "first": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 3.315636576,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 5.713324993848801e-05,
+          "low": 5.6830048561096194e-05,
+          "median": 5.7087749242782594e-05,
+          "profile": "16",
+          "relative_mad": 0.0018655245733985996,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 41,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 34,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.2338314208984375
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23339520263671876
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23277587890625
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.2343970184326172
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23248895263671876
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.2339735107421875
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23401779174804688
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "json-session-v1",
+        "records": [
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12283936768,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 4096,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.2338314208984375,
+              0.23339520263671876,
+              0.23277587890625,
+              0.2343970184326172,
+              0.23248895263671876,
+              0.2339735107421875,
+              0.23401779174804688
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "ensemble",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "144b0fe068320a6f8b02275f956f80f198f1cfbe6092b84623d28d01eb302c37",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "models": [
+              {
+                "coefficient": 0.75,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              },
+              {
+                "coefficient": 0.25,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              }
+            ],
+            "output_dim": 24,
+            "schema_version": 1,
+            "score_semantics": "distance_q",
+            "state_len": 96
+          },
+          "probe_protocol": "json-session-v1",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "hit": {
+        "cache_hit": true,
+        "calibration_wall_seconds": 3.315636576,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 5.713324993848801e-05,
+          "low": 5.6830048561096194e-05,
+          "median": 5.7087749242782594e-05,
+          "profile": "16",
+          "relative_mad": 0.0018655245733985996,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 41,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 34,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.2338314208984375
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23339520263671876
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23277587890625
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.2343970184326172
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23248895263671876
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.2339735107421875
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23401779174804688
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "json-session-v1",
+        "records": [
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12283936768,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 4096,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.2338314208984375,
+              0.23339520263671876,
+              0.23277587890625,
+              0.2343970184326172,
+              0.23248895263671876,
+              0.2339735107421875,
+              0.23401779174804688
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "ensemble",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "144b0fe068320a6f8b02275f956f80f198f1cfbe6092b84623d28d01eb302c37",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "models": [
+              {
+                "coefficient": 0.75,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              },
+              {
+                "coefficient": 0.25,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              }
+            ],
+            "output_dim": 24,
+            "schema_version": 1,
+            "score_semantics": "distance_q",
+            "state_len": 96
+          },
+          "probe_protocol": "json-session-v1",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "retest": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 3.288878394,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 5.6812498718500136e-05,
+          "low": 5.646193772554398e-05,
+          "median": 5.651874095201492e-05,
+          "profile": "16",
+          "relative_mad": 0.002654229597154811,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 34,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 41,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 33,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23150076293945313
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23226908874511715
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23301596069335936
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23270399475097656
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.2308863067626953
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23126809692382813
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.23145368957519533
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 1,
+        "probe_protocol": "json-session-v1",
+        "records": [
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12283936768,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 4096,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.23150076293945313,
+              0.23226908874511715,
+              0.23301596069335936,
+              0.23270399475097656,
+              0.2308863067626953,
+              0.23126809692382813,
+              0.23145368957519533
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "ensemble",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "144b0fe068320a6f8b02275f956f80f198f1cfbe6092b84623d28d01eb302c37",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "models": [
+              {
+                "coefficient": 0.75,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              },
+              {
+                "coefficient": 0.25,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              }
+            ],
+            "output_dim": 24,
+            "schema_version": 1,
+            "score_semantics": "distance_q",
+            "state_len": 96
+          },
+          "probe_protocol": "json-session-v1",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 1
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      }
+    },
+    {
+      "backend": "native_mlp",
+      "world": 2,
+      "first": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 1.954531515,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 1.5942499740049244e-06,
+          "low": 1.5927499625831843e-06,
+          "median": 1.593414111994207e-06,
+          "profile": "16",
+          "relative_mad": 0.0004706544880981546,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 39,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 34,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 35,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006544415950775147,
+              0.0065335679054260255
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006523903846740723,
+              0.006514368057250977
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.00653004789352417,
+              0.006510591983795166
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006526624202728272,
+              0.006519807815551758
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006529695987701416,
+              0.0065136318206787105
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006525887966156006,
+              0.006523712158203125
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006523551940917968,
+              0.0065136637687683106
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.006544415950775147,
+              0.006523903846740723,
+              0.00653004789352417,
+              0.006526624202728272,
+              0.006529695987701416,
+              0.006525887966156006,
+              0.006523551940917968
+            ],
+            "torch_reserved_peak_bytes": 0
+          },
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0065335679054260255,
+              0.006514368057250977,
+              0.006510591983795166,
+              0.006519807815551758,
+              0.0065136318206787105,
+              0.006523712158203125,
+              0.0065136637687683106
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 536870912,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "native_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "afe001194b5851a1c1cd7252c28e4f9e3fa1884da5d6ad6e66bbdf90b0197146",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "hit": {
+        "cache_hit": true,
+        "calibration_wall_seconds": 1.954531515,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 1.5942499740049244e-06,
+          "low": 1.5927499625831843e-06,
+          "median": 1.593414111994207e-06,
+          "profile": "16",
+          "relative_mad": 0.0004706544880981546,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 39,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 34,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 35,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006544415950775147,
+              0.0065335679054260255
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006523903846740723,
+              0.006514368057250977
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.00653004789352417,
+              0.006510591983795166
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006526624202728272,
+              0.006519807815551758
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006529695987701416,
+              0.0065136318206787105
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006525887966156006,
+              0.006523712158203125
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006523551940917968,
+              0.0065136637687683106
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.006544415950775147,
+              0.006523903846740723,
+              0.00653004789352417,
+              0.006526624202728272,
+              0.006529695987701416,
+              0.006525887966156006,
+              0.006523551940917968
+            ],
+            "torch_reserved_peak_bytes": 0
+          },
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0065335679054260255,
+              0.006514368057250977,
+              0.006510591983795166,
+              0.006519807815551758,
+              0.0065136318206787105,
+              0.006523712158203125,
+              0.0065136637687683106
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 536870912,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "native_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "afe001194b5851a1c1cd7252c28e4f9e3fa1884da5d6ad6e66bbdf90b0197146",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "retest": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 1.9927553759999999,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 1.595234381966293e-06,
+          "low": 1.593249966390431e-06,
+          "median": 1.5934765106067062e-06,
+          "profile": "16",
+          "relative_mad": 0.00014216978710840847,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 35,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 35,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006542592048645019,
+              0.006540351867675781
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.00652672004699707,
+              0.006516704082489014
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.0065268797874450685,
+              0.006513567924499511
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006525631904602051,
+              0.006512479782104492
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006525951862335205,
+              0.006512639999389648
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006526976108551025,
+              0.006511583805084229
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.006534080028533936,
+              0.006512639999389648
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.006542592048645019,
+              0.00652672004699707,
+              0.0065268797874450685,
+              0.006525631904602051,
+              0.006525951862335205,
+              0.006526976108551025,
+              0.006534080028533936
+            ],
+            "torch_reserved_peak_bytes": 0
+          },
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.006540351867675781,
+              0.006516704082489014,
+              0.006513567924499511,
+              0.006512479782104492,
+              0.006512639999389648,
+              0.006511583805084229,
+              0.006512639999389648
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 536870912,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "native_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "afe001194b5851a1c1cd7252c28e4f9e3fa1884da5d6ad6e66bbdf90b0197146",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      }
+    },
+    {
+      "backend": "libtorch_mlp",
+      "world": 2,
+      "first": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 2.543478189,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 2.1825531497597695e-05,
+          "low": 2.1713249385356902e-05,
+          "median": 2.1750468760728835e-05,
+          "profile": "16",
+          "relative_mad": 0.0022427477012029007,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 35,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08906034851074218,
+              0.08908992004394531
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08893746948242187,
+              0.08890038299560547
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08883168029785156,
+              0.0887642593383789
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.0887162857055664,
+              0.0889793930053711
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08905010986328125,
+              0.08939737701416016
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08888832092285157,
+              0.08928972625732422
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08889241790771485,
+              0.08958745574951171
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.08906034851074218,
+              0.08893746948242187,
+              0.08883168029785156,
+              0.0887162857055664,
+              0.08905010986328125,
+              0.08888832092285157,
+              0.08889241790771485
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          },
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.08908992004394531,
+              0.08890038299560547,
+              0.0887642593383789,
+              0.0889793930053711,
+              0.08939737701416016,
+              0.08928972625732422,
+              0.08958745574951171
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "libtorch_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "88a5389a86e70fb5933e5da01a96d8df97a8cb804538e05aaee2c72aae376d69",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "hit": {
+        "cache_hit": true,
+        "calibration_wall_seconds": 2.543478189,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 2.1825531497597695e-05,
+          "low": 2.1713249385356902e-05,
+          "median": 2.1750468760728835e-05,
+          "profile": "16",
+          "relative_mad": 0.0022427477012029007,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 35,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08906034851074218,
+              0.08908992004394531
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08893746948242187,
+              0.08890038299560547
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08883168029785156,
+              0.0887642593383789
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.0887162857055664,
+              0.0889793930053711
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08905010986328125,
+              0.08939737701416016
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08888832092285157,
+              0.08928972625732422
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08889241790771485,
+              0.08958745574951171
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.08906034851074218,
+              0.08893746948242187,
+              0.08883168029785156,
+              0.0887162857055664,
+              0.08905010986328125,
+              0.08888832092285157,
+              0.08889241790771485
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          },
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.08908992004394531,
+              0.08890038299560547,
+              0.0887642593383789,
+              0.0889793930053711,
+              0.08939737701416016,
+              0.08928972625732422,
+              0.08958745574951171
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "libtorch_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "88a5389a86e70fb5933e5da01a96d8df97a8cb804538e05aaee2c72aae376d69",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "retest": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 2.62649799,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 2.1915461868047713e-05,
+          "low": 2.185096964240074e-05,
+          "median": 2.1885452792048455e-05,
+          "profile": "16",
+          "relative_mad": 0.0013711882630164768,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 39,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.09025228881835938,
+              0.08916377258300781
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08976573181152343,
+              0.08920365142822266
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.0895467529296875,
+              0.08884950256347657
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08935017395019532,
+              0.08867123413085938
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08964281463623047,
+              0.08888547515869141
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08950157165527343,
+              0.08875312042236329
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.08975154876708985,
+              0.08902041625976563
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "oneshot",
+        "records": [
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.09025228881835938,
+              0.08976573181152343,
+              0.0895467529296875,
+              0.08935017395019532,
+              0.08964281463623047,
+              0.08950157165527343,
+              0.08975154876708985
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          },
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 2048,
+            "score_input": "graph_states",
+            "seconds": [
+              0.08916377258300781,
+              0.08920365142822266,
+              0.08884950256347657,
+              0.08867123413085938,
+              0.08888547515869141,
+              0.08875312042236329,
+              0.08902041625976563
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "libtorch_mlp",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "88a5389a86e70fb5933e5da01a96d8df97a8cb804538e05aaee2c72aae376d69",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "weights_dir": "/workspace/beam-results/config/gpu/weights"
+          },
+          "probe_protocol": "oneshot",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      }
+    },
+    {
+      "backend": "ensemble",
+      "world": 2,
+      "first": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 2.809772697,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 2.9362250119447704e-05,
+          "low": 2.9260195791721348e-05,
+          "median": 2.929075062274933e-05,
+          "profile": "16",
+          "relative_mad": 0.0010825830798571385,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 42,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 39,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.1202677764892578,
+              0.11953663635253908
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12010479736328124,
+              0.11912278747558594
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.11976579284667968,
+              0.11919769287109376
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.11997491455078126,
+              0.11901116943359374
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.11984976196289064,
+              0.11900518035888671
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12168492889404296,
+              0.12078284454345704
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.11985919952392578,
+              0.11921510314941408
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "json-session-v1",
+        "records": [
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12283936768,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 2048,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.1202677764892578,
+              0.12010479736328124,
+              0.11976579284667968,
+              0.11997491455078126,
+              0.11984976196289064,
+              0.12168492889404296,
+              0.11985919952392578
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          },
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 1,
+            "free_bytes_after": 12286033920,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 2048,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.11953663635253908,
+              0.11912278747558594,
+              0.11919769287109376,
+              0.11901116943359374,
+              0.11900518035888671,
+              0.12078284454345704,
+              0.11921510314941408
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "ensemble",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "144b0fe068320a6f8b02275f956f80f198f1cfbe6092b84623d28d01eb302c37",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "models": [
+              {
+                "coefficient": 0.75,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              },
+              {
+                "coefficient": 0.25,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              }
+            ],
+            "output_dim": 24,
+            "schema_version": 1,
+            "score_semantics": "distance_q",
+            "state_len": 96
+          },
+          "probe_protocol": "json-session-v1",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "hit": {
+        "cache_hit": true,
+        "calibration_wall_seconds": 2.809772697,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 2.9362250119447704e-05,
+          "low": 2.9260195791721348e-05,
+          "median": 2.929075062274933e-05,
+          "profile": "16",
+          "relative_mad": 0.0010825830798571385,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 36,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 42,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 39,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.1202677764892578,
+              0.11953663635253908
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12010479736328124,
+              0.11912278747558594
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.11976579284667968,
+              0.11919769287109376
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.11997491455078126,
+              0.11901116943359374
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.11984976196289064,
+              0.11900518035888671
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12168492889404296,
+              0.12078284454345704
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.11985919952392578,
+              0.11921510314941408
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "json-session-v1",
+        "records": [
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12283936768,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 2048,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.1202677764892578,
+              0.12010479736328124,
+              0.11976579284667968,
+              0.11997491455078126,
+              0.11984976196289064,
+              0.12168492889404296,
+              0.11985919952392578
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          },
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 1,
+            "free_bytes_after": 12286033920,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 2048,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.11953663635253908,
+              0.11912278747558594,
+              0.11919769287109376,
+              0.11901116943359374,
+              0.11900518035888671,
+              0.12078284454345704,
+              0.11921510314941408
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "ensemble",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "144b0fe068320a6f8b02275f956f80f198f1cfbe6092b84623d28d01eb302c37",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "models": [
+              {
+                "coefficient": 0.75,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              },
+              {
+                "coefficient": 0.25,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              }
+            ],
+            "output_dim": 24,
+            "schema_version": 1,
+            "score_semantics": "distance_q",
+            "state_len": 96
+          },
+          "probe_protocol": "json-session-v1",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      },
+      "retest": {
+        "cache_hit": false,
+        "calibration_wall_seconds": 2.977701519,
+        "capacity_limited_search": false,
+        "coarse_candidates": [
+          16,
+          32
+        ],
+        "estimate": {
+          "high": 2.9502000659704208e-05,
+          "low": 2.936724945902824e-05,
+          "median": 2.9437499120831494e-05,
+          "profile": "16",
+          "relative_mad": 0.0023269223748189015,
+          "repeats": 7
+        },
+        "gpu_telemetry": {
+          "16": {
+            "errors": [],
+            "interval_seconds": 5.0,
+            "samples": [
+              [
+                {
+                  "index": 0,
+                  "temperature": 39,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 37,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ],
+              [
+                {
+                  "index": 0,
+                  "temperature": 43,
+                  "throttled": false,
+                  "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe"
+                },
+                {
+                  "index": 1,
+                  "temperature": 38,
+                  "throttled": false,
+                  "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+                }
+              ]
+            ],
+            "scope": "sampled visible GPUs; transient events may be missed",
+            "throttled": false
+          }
+        },
+        "initial_free_memory_mib": {
+          "a1d72707-5bf6-9fd2-6fa1-d180c01d19fe": 11909,
+          "eea9c6a4-fc70-c3d6-598d-9f4dde6f0632": 11911
+        },
+        "measured_candidates": [
+          16
+        ],
+        "measurements": [
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12058419036865234,
+              0.12067737579345704
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12034758758544922,
+              0.1205759963989258
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12024639892578123,
+              0.12027801513671876
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12073062133789064,
+              0.12084019470214843
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12022988891601565,
+              0.12028825378417968
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12198912048339844,
+              0.12212019348144532
+            ],
+            "throttled": false
+          },
+          {
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "parents": 4096,
+            "profile": "16",
+            "seconds_by_rank": [
+              0.12029542541503906,
+              0.12026771545410156
+            ],
+            "throttled": false
+          }
+        ],
+        "parent_batch": 16,
+        "phase": "inference_verified",
+        "pipeline_verified": false,
+        "probe_process_starts": 2,
+        "probe_protocol": "json-session-v1",
+        "records": [
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12283936768,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 2048,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.12058419036865234,
+              0.12034758758544922,
+              0.12024639892578123,
+              0.12073062133789064,
+              0.12022988891601565,
+              0.12198912048339844,
+              0.12029542541503906
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          },
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 1,
+            "free_bytes_after": 12286033920,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 2048,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.12067737579345704,
+              0.1205759963989258,
+              0.12027801513671876,
+              0.12084019470214843,
+              0.12028825378417968,
+              0.12212019348144532,
+              0.12026771545410156
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "refinement_candidates": [],
+        "rejected": {},
+        "reserve_bytes": 589299712,
+        "search_policy": "rust-inference-v1-splitmix64",
+        "shared_profile": {
+          "inference": {
+            "parent_batch": 16
+          },
+          "registry_sha256": "proposal-only"
+        },
+        "shared_profile_validated": true,
+        "signature": {
+          "artifact_files": [
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/hidden_weight_hxk.fp16",
+              "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/input_bias.fp16",
+              "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+            },
+            {
+              "bytes": 147456,
+              "path": "/workspace/beam-results/config/gpu/weights/input_weight_hxk.fp16",
+              "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+            },
+            {
+              "bytes": 293,
+              "path": "/workspace/beam-results/config/gpu/weights/manifest.json",
+              "sha256": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026"
+            },
+            {
+              "bytes": 2,
+              "path": "/workspace/beam-results/config/gpu/weights/output_bias.fp16",
+              "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/output_weight_hxk.fp16",
+              "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc1_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            },
+            {
+              "bytes": 16,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_bias.fp16",
+              "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+            },
+            {
+              "bytes": 128,
+              "path": "/workspace/beam-results/config/gpu/weights/residual0_fc2_weight_hxk.fp16",
+              "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+            }
+          ],
+          "backend": "ensemble",
+          "capacity_bootstrap_only": false,
+          "device_indices": [
+            0,
+            1
+          ],
+          "gpu_uuids": [
+            "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+            "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632"
+          ],
+          "graph_contract_sha256": "2159f3b788890ff710b26adacbea7273a4b197382652f29b8b309174f156d756",
+          "max_batch": 32,
+          "probe": "144b0fe068320a6f8b02275f956f80f198f1cfbe6092b84623d28d01eb302c37",
+          "probe_capacity": 32,
+          "probe_manifest": {
+            "models": [
+              {
+                "coefficient": 0.75,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              },
+              {
+                "coefficient": 0.25,
+                "family": "mlp",
+                "weights_dir": "/workspace/beam-results/config/gpu/weights"
+              }
+            ],
+            "output_dim": 24,
+            "schema_version": 1,
+            "score_semantics": "distance_q",
+            "state_len": 96
+          },
+          "probe_protocol": "json-session-v1",
+          "requested_beam_width": 4096,
+          "sample_policy": "center-splitmix64-128x16-v1",
+          "sample_sha256": "3130a029562904f454f8ae9e362f1f574d546916e70b6487f087af820a09fb05",
+          "schema": 10,
+          "search_policy": "rust-calibration-owner-v1",
+          "world_size": 2
+        },
+        "stat_rejected": {
+          "32": "invalid no profile measurements"
+        }
+      }
+    }
+  ],
+  "cancellation": {
+    "errors": [
+      "inference calibration cancelled or closed"
+    ],
+    "pids": [
+      52690,
+      52692
+    ]
+  }
+}

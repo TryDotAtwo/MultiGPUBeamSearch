@@ -45,7 +45,7 @@ impl SearchSession {
         let identity = serde_json::from_str(identity).map_err(error)?;
         let launch = serde_json::from_str(launch).map_err(error)?;
         let metadata = serde_json::from_str(metadata).map_err(error)?;
-        py.allow_threads(|| {
+        crate::interrupt::run(py, &self.cancel, || {
             let mut inner = self.inner.try_lock().map_err(|_| {
                 PyRuntimeError::new_err("concurrent native session searches are unsupported")
             })?;

@@ -80,6 +80,7 @@ These are source-derived volumes; measured bus traffic must come from profiling.
 | RAM history pruning → remapped adjacent depths | old/current valid entries | RAM pruning only | semantic path-index rewrite; cannot remove without replacement |
 | GPU service counters / flags → host | mostly 4/8-byte fields and rank arrays | scheduling, errors and final selection | batch where dependencies permit; do not remove required NCCL count reads |
 | Host rank offsets/counts → GPU | O(R) | exchange setup | small control transfer; separate from payload cost |
+| Artifact files → hash accumulator | 64 KiB reusable host buffer per file | prepared model/helper verification, including cache hits | content binding; no model-sized host copy or device transfer |
 | GPU error/solution records → host | valid diagnostic/solution count | error or solution | retain complete records and path replay checks |
 | History entry routing host ↔ GPU/NCCL ↔ host | requested 16-byte entries plus routing fields | distributed path reconstruction | necessary cross-rank dependency; preserve rank/local-index identity |
 

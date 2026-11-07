@@ -42,6 +42,15 @@ rank processes after their ABI/layout and specialization checks.
   never used as an inference memory bound. Every accepted inference candidate
   requires complete rank identity, at least five positive finite timings,
   numerical-oracle success and complete unthrottled GPU telemetry.
+- Public options have a strict Rust representation, including integer/duration
+  bounds and incompatible option combinations. Python only serializes descriptors
+  at the new coarse adapter. Model export and its semantic checks stay in PyTorch.
+- A cached inference profile requires complete source/device-bound receipts and
+  recomputed timing statistics. Changed model/helper bytes invalidate the request;
+  released memory pressure invalidates a capacity-limited cached profile.
+- Notebook SIGINT must cancel the owned coarse job and reap its workers before
+  KeyboardInterrupt is propagated. Normal probe cleanup must not cancel its parent
+  before the verified result can be published.
 
 ## Performance and switching
 

@@ -981,3 +981,10 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Remote Rust41 CPU tests, PyO3 cancellation, 24 native/LibTorch eager one/two-GPU cases and independent baseline eager comparisons passed. All-rank cleanup passed for cancellation and one missing-library rank; exact widths, legal collections and retained/replaced PIDs were checked.
 - Corrected earlier STAGE2/STAGE3_HOST wording: their LibTorch-linked session libraries used native_cuda_graph, because selecting libtorch_eager requires an explicit environment setting. Historical raw evidence is unchanged. The new tests assert the actual executor in every rank log.
 - Public orchestration/default migration, CNOT, CUDA optimizations and full hardware/performance gates remain in progress; see test_results/refactor_20261107/STAGE3_SESSION.md.
+
+## 2026-11-07 - Typed Rust configuration and complete inference jobs
+- Added strict NativeOptions, streaming SHA-256 artifact checks, complete inference-job preparation and validated atomic profile caches. Cache hits recompute statistics from complete rank receipts and telemetry; changed weights/helpers and released capacity pressure cannot reuse old acceptance.
+- Added the thin rust_control adapter. Calibration samples use a versioned deterministic walk from the graph center, with sample/artifact/graph/device identity in the new key. Existing specialized kernels and precision are unchanged.
+- Reproduced and fixed normal probe teardown setting its parent's cancellation token. Reproduced delayed notebook SIGINT; coarse PyO3 search/inference jobs now check Python signals while Rust works, cancel owned processes and join cleanup before KeyboardInterrupt.
+- Remote verification: Rust44 CPU tests, Python527pass9skip, actual native/LibTorch/ensemble jobs and cache failure/reuse on1/2RTX3060; actual public-model/options adapter; 24search-session cases and all-rank failure cleanup rerun. Raw evidence is in test_results/refactor_20261107/STAGE3_CONFIG.md.
+- Public default switching, downstream policy/cache transfer, CNOT control, CUDA optimization and other GPU-family/performance acceptance remain in progress.

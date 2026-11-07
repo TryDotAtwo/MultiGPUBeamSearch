@@ -1,0 +1,9 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0432]: unresolved import `beam_runtime::inference_job`
+ --> rust/beam-runtime/tests/inference_job.rs:2:60
+  |
+2 | use beam_runtime::{artifacts::Artifact,inference::Protocol,inference_job::{prepare,Request}};
+  |                                                            ^^^^^^^^^^^^^ could not find `inference_job` in `beam_runtime`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-runtime` (test "inference_job") due to 1 previous error
