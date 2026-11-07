@@ -2032,7 +2032,7 @@ as:
 
 Specialization:
     key   = Hash128
-    value = CandidateMeta
+    value = CandidateMeta (default), or uint32 index into stationary CandidateMeta (experimental)
     input = survivor_shard[shard][0 : clean_count[shard] + dirty_count[shard]]
     capacity = SHARD_CAPACITY_CANDIDATES
     sort scratch slots = STREAM4_ACTIVE_SORT_SLOTS
@@ -2058,6 +2058,16 @@ Output contract remains:
 
 This clarification changes implementation mechanics only.
 Stream semantics remain threshold + dedup by Hash128 + best CandidateMeta.
+
+The experimental index path keeps the compacted CandidateMeta array immutable
+through sort, reduction and gather. Two non-overlapping index arrays occupy the
+existing value-B arena; their offsets use the physical capacity, including in
+bounded graph bodies. A separate device count bounds every reducer access:
+CUB may evaluate inactive lanes with arbitrary index values, so a sentinel-only
+check is insufficient. The compacted count stays live until reduction finishes;
+the old block-offset slot receives CUB's unique count and is reused only after
+its reader completes. The final gather writes to the distinct survivor arena.
+This path is opt-in and must pass the full-step promotion gate.
 ```
 
 ---

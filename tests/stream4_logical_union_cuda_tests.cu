@@ -104,6 +104,25 @@ struct Fixture {
         enqueue();
 #endif
         check(cudaGetLastError()); check(cudaStreamSynchronize(stream));
+#ifdef BEAM_TEST_INDEX_SORT
+        // The index-sort variant keeps threshold-compacted metadata stationary
+        // throughout sorting and reduction; only the index arrays may move.
+        std::vector<CandidateMeta> expected_stationary;
+        for (const auto* candidates : {&a, &b}) for (const auto& c : *candidates)
+            if (c.score_key <= threshold) expected_stationary.push_back(c);
+        std::vector<CandidateMeta> actual_stationary(expected_stationary.size());
+        if (!actual_stationary.empty())
+            check(cudaMemcpy(actual_stationary.data(), value,
+                             actual_stationary.size() * sizeof(CandidateMeta), cudaMemcpyDeviceToHost));
+        for (std::size_t i = 0; i < expected_stationary.size(); ++i) {
+            const auto& x = expected_stationary[i];
+            const auto& y = actual_stationary[i];
+            if (!(x.hash == y.hash) || x.parent_idx != y.parent_idx ||
+                x.score_key != y.score_key || x.route_packed != y.route_packed)
+                throw std::runtime_error("index sort modified stationary metadata at " + std::to_string(i));
+        }
+        std::cout << "stationary_metadata=verified count=" << expected_stationary.size() << '\n';
+#endif
     }
     bool verify(const std::vector<CandidateMeta>& a, const std::vector<CandidateMeta>& b, unsigned threshold) {
         using Key = std::pair<std::uint64_t, std::uint64_t>;
@@ -181,6 +200,12 @@ int main() {
             a.clear(); b.clear(); replay_edge();
             a.push_back(CandidateMeta{{UINT64_MAX, UINT64_MAX}, SCORE_MAX_KEY, 7, 3});
             b.push_back(CandidateMeta{{UINT64_MAX, UINT64_MAX}, SCORE_MAX_KEY, 8, 2});
+            replay_edge();
+            // Full-width key identity and the score/parent/route tie chain.
+            a = {{{7, UINT64_MAX}, 5, 3, 9}, {{UINT64_MAX, 7}, 5, 3, 9},
+                 {{17, 19}, 6, 4, 8}, {{17, 19}, 5, 4, 7}};
+            b = {{{7, UINT64_MAX}, 4, 3, 11}, {{UINT64_MAX, 7}, 5, 3, 2},
+                 {{17, 19}, 5, 4, 6}, {{17, 20}, 5, 4, 6}};
             replay_edge();
             a.clear(); b.clear(); replay_edge();
             std::mt19937 rng(918U + gpu);

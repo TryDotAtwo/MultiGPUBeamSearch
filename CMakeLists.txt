@@ -28,6 +28,7 @@ option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnos
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
 option(BEAM_EXPERIMENTAL_RADIX128 "Use experimental full-width CUB radix sort for hash pairs" OFF)
+option(BEAM_EXPERIMENTAL_INDEX_SORT "Sort Stream 4 metadata indices instead of metadata records" OFF)
 if(BEAM_ENABLE_LIBTORCH_STREAM1)
     find_package(Torch REQUIRED)
     # The engine/control transport exchange C++ objects internally. Compile all
@@ -177,6 +178,8 @@ target_link_libraries(beam_cuda PUBLIC beam_core)
 target_compile_options(beam_cuda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 set_source_files_properties(cuda/stream3.cu cuda/stream4.cu cuda/static_memory.cu PROPERTIES
     COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_RADIX128=$<BOOL:${BEAM_EXPERIMENTAL_RADIX128}>")
+set_property(SOURCE cuda/stream4.cu cuda/static_memory.cu APPEND PROPERTY
+    COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_INDEX_SORT=$<BOOL:${BEAM_EXPERIMENTAL_INDEX_SORT}>")
 target_compile_definitions(beam_cuda PUBLIC
     BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
     BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
@@ -328,6 +331,16 @@ foreach(union_scope IN ITEMS graph single_graph bounded_graph single_bounded_gra
     endif()
     set_target_properties(${union_target} PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 endforeach()
+
+if(BEAM_EXPERIMENTAL_INDEX_SORT)
+    add_executable(stream4_index_reducer_cuda_tests tests/stream4_index_reducer_cuda_tests.cu)
+    target_link_libraries(stream4_index_reducer_cuda_tests PRIVATE beam_core)
+    set_target_properties(stream4_index_reducer_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    target_compile_definitions(stream4_logical_union_cuda_tests PRIVATE BEAM_TEST_INDEX_SORT=1)
+    foreach(union_scope IN ITEMS graph single_graph bounded_graph single_bounded_graph)
+        target_compile_definitions(stream4_logical_union_${union_scope}_cuda_tests PRIVATE BEAM_TEST_INDEX_SORT=1)
+    endforeach()
+endif()
 
 add_executable(union_memory_cuda_tests tests/union_memory_cuda_tests.cu)
 add_executable(runtime_arithmetic_tests tests/runtime_arithmetic_tests.cpp)

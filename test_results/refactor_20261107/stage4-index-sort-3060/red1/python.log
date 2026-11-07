@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_cmake_dimensions_are_explicit_not_cached_inference ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-13/test_cmake_dimensions_are_expl0')
+
+    def test_cmake_dimensions_are_explicit_not_cached_inference(tmp_path):
+        command = configure_command(tmp_path, tmp_path / "build", tmp_path / "cutlass", contract(72, 18),
+                                    "mlp", (75, 86), {"cmake": "cmake", "cxx": "c++", "nvcc": "nvcc"})
+        assert "-DBEAM_STATE_LOGICAL_BYTES=72" in command
+        assert "-DBEAM_MOVE_COUNT=18" in command
+        assert "-DBEAM_STATE_ALIGNMENT=16" in command
+        assert "-DBEAM_CUDA_ARCHITECTURES=75;86" in command
+        assert "-DBEAM_EXPERIMENTAL_RADIX128=OFF" in command
+>       assert "-DBEAM_EXPERIMENTAL_INDEX_SORT=OFF" in command
+E       AssertionError: assert '-DBEAM_EXPERIMENTAL_INDEX_SORT=OFF' in ['cmake', '-S', '/tmp/pytest-of-root/pytest-13/test_cmake_dimensions_are_expl0', '-B', '/tmp/pytest-of-root/pytest-13/test_cmake_dimensions_are_expl0/build', '-DCMAKE_BUILD_TYPE=Release', ...]
+
+integrations/cayleypy_native/tests/test_build.py:58: AssertionError
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_build.py::test_cmake_dimensions_are_explicit_not_cached_inference
+1 failed in 5.14s

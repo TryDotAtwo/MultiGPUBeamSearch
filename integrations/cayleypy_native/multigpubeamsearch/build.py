@@ -184,6 +184,7 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                f"-DBEAM_MOVE_COUNT={shape['move_count']}",
                "-DBEAM_CUDA_ARCHITECTURES=" + ";".join(map(str, architectures)),
                "-DBEAM_EXPERIMENTAL_RADIX128=OFF",
+               "-DBEAM_EXPERIMENTAL_INDEX_SORT=OFF",
                "-DBEAM_ENABLE_DEBUG=ON", "-DBEAM_ENABLE_DEBUG_LOGS=ON",
                "-DBEAM_ENABLE_DEPTH_LOGS=OFF", "-DBEAM_DEBUG_STREAM_TIMING=OFF",
                "-DBEAM_DEBUG_INFERENCE_TRACE=OFF", "-DBEAM_DEBUG_PATH_TRACE=OFF"]

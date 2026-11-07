@@ -1,0 +1,7 @@
+PAIR 1 speedup_percent=3.603
+PAIR 2 speedup_percent=2.237
+PAIR 3 speedup_percent=5.227
+PAIR 4 speedup_percent=-2.702
+PAIR 5 speedup_percent=-1.740
+RADIX_PAIRED_FULL_STEP_OK
+INDEX_MEMORY_PAIRS_OK

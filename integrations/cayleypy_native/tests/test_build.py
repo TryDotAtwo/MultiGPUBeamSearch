@@ -55,6 +55,7 @@ def test_cmake_dimensions_are_explicit_not_cached_inference(tmp_path):
     assert "-DBEAM_STATE_ALIGNMENT=16" in command
     assert "-DBEAM_CUDA_ARCHITECTURES=75;86" in command
     assert "-DBEAM_EXPERIMENTAL_RADIX128=OFF" in command
+    assert "-DBEAM_EXPERIMENTAL_INDEX_SORT=OFF" in command
     assert command[:2] == ["cmake", "-S"]
 
 

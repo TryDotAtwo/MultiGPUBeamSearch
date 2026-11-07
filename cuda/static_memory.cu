@@ -1,6 +1,7 @@
 #include "static_memory.hpp"
 #include "cub_compat.hpp"
 #include "hash_sort.cuh"
+#include "stream4_index.cuh"
 #include "stream3.hpp"
 
 #include <cub/device/device_merge_sort.cuh>
@@ -236,6 +237,16 @@ std::size_t stream4_cub_temp_bytes(std::uint32_t stream4_capacity) {
     std::size_t sort_bytes = 0;
     std::size_t reduce_bytes = 0;
     const int item_count = static_cast<int>(stream4_capacity);
+#if BEAM_EXPERIMENTAL_INDEX_SORT
+    std::uint32_t* indices = nullptr;
+    std::uint32_t* unique_indices = nullptr;
+    cudaError_t status = radix128_sort_pairs(
+        nullptr, sort_bytes, keys, unique_keys, indices, unique_indices, item_count, 0);
+    if (status != cudaSuccess) throw std::runtime_error(cudaGetErrorString(status));
+    status = cub::DeviceReduce::ReduceByKey(
+        nullptr, reduce_bytes, unique_keys, keys, unique_indices, indices,
+        unique_count, Stream4BestIndex{values, unique_count, stream4_capacity}, item_count, 0);
+#else
     cudaError_t status = hash_sort_pairs(
         nullptr,
         sort_bytes,
@@ -257,6 +268,7 @@ std::size_t stream4_cub_temp_bytes(std::uint32_t stream4_capacity) {
         Stream4BestCandidateForCubTemp{},
         item_count,
         0);
+#endif
     if (status != cudaSuccess) {
         throw std::runtime_error(cudaGetErrorString(status));
     }

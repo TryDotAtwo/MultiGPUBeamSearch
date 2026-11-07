@@ -2,6 +2,7 @@
 
 #include "hash_sort.cuh"
 #include "nvtx_ranges.hpp"
+#include "stream4_index.cuh"
 
 #include <cub/device/device_merge_sort.cuh>
 #include <cub/device/device_radix_sort.cuh>
@@ -329,6 +330,114 @@ __global__ void stream4_compact_valid_unique_kernel(
     }
 }
 
+#if BEAM_EXPERIMENTAL_INDEX_SORT
+__global__ void stream4_fill_index_pairs_kernel(
+    Hash128* keys, std::uint32_t* indices,
+    const std::uint32_t* compact_count, std::uint32_t sort_items) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= sort_items) return;
+    if (i == 0 && *compact_count > sort_items) asm("trap;");
+    if (i < *compact_count) {
+        indices[i] = i;
+    } else {
+        keys[i] = Hash128{UINT64_MAX, UINT64_MAX};
+        indices[i] = UINT32_MAX;
+    }
+}
+
+__global__ void stream4_mark_valid_unique_indices_kernel(
+    const CandidateMeta* metadata, const std::uint32_t* indices,
+    std::uint32_t* keep_flags, std::uint32_t* block_counts,
+    const std::uint32_t* reduced_count, const std::uint32_t* compact_count,
+    std::uint32_t sort_items) {
+    __shared__ std::uint32_t flags[256];
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t i = blockIdx.x * blockDim.x + tid;
+    std::uint32_t keep = 0;
+    if (i < sort_items) {
+        if (i < *reduced_count) {
+            const std::uint32_t index = indices[i];
+            if (index != UINT32_MAX) {
+                if (index >= sort_items || index >= *compact_count) asm("trap;");
+                else keep = metadata[index].score_key != UINT32_MAX ? 1U : 0U;
+            }
+        }
+        keep_flags[i] = keep;
+    }
+    flags[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) flags[tid] += flags[tid + stride];
+        __syncthreads();
+    }
+    if (tid == 0) block_counts[blockIdx.x] = flags[0];
+}
+
+__global__ void stream4_compact_valid_unique_indices_kernel(
+    const CandidateMeta* metadata, const std::uint32_t* indices,
+    const std::uint32_t* keep_flags, const std::uint32_t* block_offsets,
+    CandidateMeta* output, std::uint32_t* clean_count, std::uint32_t* dirty_count,
+    const std::uint32_t* output_count, std::uint32_t sort_items) {
+    __shared__ std::uint32_t scan[256];
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t i = blockIdx.x * blockDim.x + tid;
+    const std::uint32_t keep = i < sort_items ? keep_flags[i] : 0U;
+    scan[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t offset = 1; offset < blockDim.x; offset <<= 1) {
+        const std::uint32_t add = tid >= offset ? scan[tid - offset] : 0U;
+        __syncthreads();
+        scan[tid] += add;
+        __syncthreads();
+    }
+    if (keep) output[block_offsets[blockIdx.x] + scan[tid] - 1U] = metadata[indices[i]];
+    if (blockIdx.x == 0 && tid == 0) {
+        *clean_count = *output_count;
+        *dirty_count = 0;
+    }
+}
+
+void stream4_sort_reduce_indices(
+    Hash128* sort_key, Hash128* reduce_key, CandidateMeta* metadata,
+    CandidateMeta* value_workspace, CandidateMeta* output,
+    std::uint32_t* clean_count, std::uint32_t* dirty_count,
+    std::uint32_t* keep_flags, std::uint32_t* block_counts,
+    std::uint32_t* block_offsets, std::uint32_t* scratch_count,
+    std::uint32_t physical_capacity, std::uint32_t sort_items,
+    void* temp, std::size_t temp_bytes, cudaStream_t stream) {
+    if (!sort_items || sort_items > physical_capacity || sort_items > static_cast<std::uint32_t>(INT_MAX))
+        throw std::invalid_argument("stream4 index sort exceeds fixed capacity or CUB count range");
+    static_assert(sizeof(CandidateMeta) >= 2 * sizeof(std::uint32_t));
+    static_assert(alignof(CandidateMeta) >= alignof(std::uint32_t));
+    // The existing value-B arena is capacity * sizeof(CandidateMeta) bytes.
+    // These two disjoint uint32 arrays use its first 8 * capacity bytes; the
+    // metadata-A arena remains read-only until the gather to output completes.
+    auto* index_a = reinterpret_cast<std::uint32_t*>(value_workspace);
+    auto* index_b = index_a + physical_capacity;
+    const std::uint32_t blocks = sort_items / 256U + (sort_items % 256U != 0U);
+    stream4_fill_index_pairs_kernel<<<blocks, 256, 0, stream>>>(sort_key, index_a, scratch_count, sort_items);
+    std::size_t bytes = temp_bytes;
+    check_cub(radix128_sort_pairs(temp, bytes, sort_key, reduce_key, index_a, index_b,
+                                  static_cast<int>(sort_items), stream),
+              "CUB stream4 index sort");
+    bytes = temp_bytes;
+    check_cub(cub::DeviceReduce::ReduceByKey(temp, bytes, reduce_key, sort_key,
+        index_b, index_a, block_offsets,
+        Stream4BestIndex{metadata, scratch_count, sort_items},
+        static_cast<int>(sort_items), stream), "CUB stream4 index reduction");
+    // block_offsets held the first compaction offsets, which are dead now.
+    // CUB writes the unique count there while scratch_count remains an
+    // immutable bound for every reducer invocation. The next scan overwrites
+    // both only after the marker kernel has finished reading them.
+    stream4_mark_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, index_a, keep_flags, block_counts, block_offsets, scratch_count, sort_items);
+    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(block_counts, block_offsets, scratch_count, blocks);
+    stream4_compact_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, index_a, keep_flags, block_offsets, output,
+        clean_count, dirty_count, scratch_count, sort_items);
+}
+#endif
+
 void stream4_write_shard_histogram(
     CandidateMeta* survivor_shard,
     const std::uint32_t* clean_count,
@@ -432,6 +541,10 @@ void stream4_finalize_logical_shard_union_cuda(
         survivors, keep, offsets, sort_key, sort_value, capacity);
     if (sort_item_bound != 0)
         stream4_check_sort_bound_kernel<<<1, 1, 0, stream>>>(scratch_count, sort_items);
+#if BEAM_EXPERIMENTAL_INDEX_SORT
+    stream4_sort_reduce_indices(sort_key, reduce_key, sort_value, reduce_value, survivors,
+        clean, dirty, keep, counts, offsets, scratch_count, capacity, sort_items, temp, temp_bytes, stream);
+#else
     stream4_fill_sort_tail_kernel<<<blocks, 256, 0, stream>>>(sort_key, sort_value, scratch_count, capacity);
     const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
     const auto hash_views = hash_reduction_views(hash_buffers);
@@ -447,6 +560,7 @@ void stream4_finalize_logical_shard_union_cuda(
     stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(counts, offsets, scratch_count, blocks);
     stream4_compact_valid_unique_kernel<<<blocks, 256, 0, stream>>>(
         hash_views.reduced_values, keep, offsets, survivors, clean, dirty, scratch_count, capacity);
+#endif
     stream4_split_union_counts_kernel<<<1, 1, 0, stream>>>(clean, dirty, processing, scratch_count, physical_capacity);
     // No reader may consume histograms until both publications complete.
     for (unsigned physical = 0; physical < 2; ++physical) {
@@ -517,6 +631,11 @@ void stream4_shard_job_cuda(
         sort_key,
         sort_value,
         capacity);
+#if BEAM_EXPERIMENTAL_INDEX_SORT
+    stream4_sort_reduce_indices(sort_key, reduce_key, sort_value, reduce_value, survivor_shard,
+        clean_count, dirty_count, keep_flags, block_counts, block_offsets, scratch_count,
+        capacity, capacity, cub_temp_storage, cub_temp_storage_bytes, stream);
+#else
     stream4_fill_sort_tail_kernel<<<grid, block, 0, stream>>>(sort_key, sort_value, scratch_count, capacity);
 
     const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
@@ -561,6 +680,7 @@ void stream4_shard_job_cuda(
         dirty_count,
         scratch_count,
         capacity);
+#endif
     stream4_write_shard_histogram(
         survivor_shard,
         clean_count,
@@ -642,6 +762,11 @@ void stream4_shard_job_device_threshold_cuda(
     const auto finish = [&](std::uint32_t sort_items, cudaStream_t stream) {
         const auto sort_blocks = sort_items / block_size + (sort_items % block_size != 0U);
         const dim3 sort_grid(sort_blocks);
+#if BEAM_EXPERIMENTAL_INDEX_SORT
+    stream4_sort_reduce_indices(sort_key, reduce_key, sort_value, reduce_value, survivor_shard,
+        clean_count, dirty_count, keep_flags, block_counts, block_offsets, scratch_count,
+        capacity, sort_items, cub_temp_storage, cub_temp_storage_bytes, stream);
+#else
     stream4_fill_sort_tail_kernel<<<sort_grid, block, 0, stream>>>(sort_key, sort_value, scratch_count, sort_items);
 
     const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
@@ -686,6 +811,7 @@ void stream4_shard_job_device_threshold_cuda(
         dirty_count,
         scratch_count,
         sort_items);
+#endif
     stream4_write_shard_histogram(
         survivor_shard,
         clean_count,

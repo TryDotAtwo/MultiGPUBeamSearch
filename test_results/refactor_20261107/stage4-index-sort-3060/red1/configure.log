@@ -1,0 +1,41 @@
+-- Beam state logical bytes: 96
+-- Beam state physical bytes: 112
+-- Beam state alignment: 16
+-- Beam move count: 24
+-- PyTorch: CUDA detected: 12.8
+-- PyTorch: CUDA nvcc is: /usr/local/cuda/bin/nvcc
+-- PyTorch: CUDA toolkit directory: /usr/local/cuda
+-- PyTorch: Header version is: 12.8
+CMake Warning at /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Caffe2/public/cuda.cmake:140 (message):
+  Failed to compute shorthash for libnvrtc.so
+Call Stack (most recent call first):
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Caffe2/Caffe2Config.cmake:86 (include)
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)
+  CMakeLists.txt:32 (find_package)
+
+
+-- USE_CUDNN is set to 0. Compiling without cuDNN support
+-- USE_CUSPARSELT is set to 0. Compiling without cuSPARSELt support
+-- USE_CUDSS is set to 0. Compiling without cuDSS support
+-- USE_CUFILE is set to 0. Compiling without cuFile support
+-- Autodetected CUDA architecture(s):  8.6 8.6
+CMake Warning at /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Caffe2/public/cuda.cmake:323 (message):
+  pytorch is not compatible with `CMAKE_CUDA_ARCHITECTURES` and will ignore
+  its value.  Please configure `TORCH_CUDA_ARCH_LIST` instead.
+Call Stack (most recent call first):
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Caffe2/Caffe2Config.cmake:86 (include)
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)
+  CMakeLists.txt:32 (find_package)
+
+
+-- Added CUDA NVCC flags for: -gencode;arch=compute_86,code=sm_86
+CMake Warning at /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:22 (message):
+  static library kineto_LIBRARY-NOTFOUND not found.
+Call Stack (most recent call first):
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:125 (append_torchlib_if_found)
+  CMakeLists.txt:32 (find_package)
+
+
+-- Configuring done (2.4s)
+-- Generating done (0.1s)
+-- Build files have been written to: /workspace/build-work

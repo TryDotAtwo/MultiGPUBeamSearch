@@ -33,6 +33,9 @@ rank processes after their ABI/layout and specialization checks.
   capacities. Buffer overflow reports required/available sizes, never a smaller search.
 - Stream4 uses threshold, compaction, fixed-scratch sort/reduce and compaction;
   there is no shard top-k, semantic shard cap or hash-table replacement.
+- Experimental index reduction must reject all indices outside the live compacted
+  metadata range, including arbitrary values from inactive CUB lanes. Its live
+  count and CUB's unique-count output occupy distinct device locations.
 - Reuse requires completion of every reader. GPU-source and pinned-host-history
   reader completion are distinct. Cross-process messages contain no device pointers.
 - Only explicit native capacity rejection bounds a capacity search. Rank failure,

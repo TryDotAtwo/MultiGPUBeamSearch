@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_index_memory_pair_gpu.py", line 121, in <module>
+    main()
+  File "/workspace/beam-work/tests/native_index_memory_pair_gpu.py", line 100, in main
+    paired.main()
+  File "/workspace/beam-work/tests/native_radix128_pair_gpu.py", line 83, in main
+    rows = probes[name].measure(profile, plans[name])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/tests/native_index_memory_pair_gpu.py", line 92, in measure_with_memory
+    receipt = sampler.receipt()
+              ^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/tests/native_index_memory_pair_gpu.py", line 78, in receipt
+    raise RuntimeError('GPU memory was not idle at both measurement boundaries')
+RuntimeError: GPU memory was not idle at both measurement boundaries

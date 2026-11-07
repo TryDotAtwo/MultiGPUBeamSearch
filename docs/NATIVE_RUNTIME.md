@@ -13,6 +13,17 @@ radix sorting in Stream 3/4 and the logical union. It requires CUB 2.7 / CUDA
 experiment was slower on its measured RTX 3060 full-step fixture and is not a
 default; see `test_results/refactor_20261107/STAGE4_RADIX128.md`.
 
+`BEAM_EXPERIMENTAL_INDEX_SORT=ON` additionally sorts Stream 4 indices while
+retaining compacted metadata in place. The Stream 3 radix and Stream 4 index
+options can be selected independently; either experimental radix path requires
+CUB 2.7 / CUDA 12.8 or newer. Ordinary Python builds turn both options off. The
+index path preserves the full
+hash and deterministic representative, reuses the existing value-B arena for
+the two index arrays and gathers to the distinct survivor arena. A matched
+two-RTX3060 fixture showed a lower sampled peak and no median slowdown when
+Stream 3 remained at the default. Profile-specific public selection is not yet
+implemented; see `test_results/refactor_20261107/STAGE4_INDEX_SORT.md`.
+
 ## Build
 
 Rust workspace builds do not require CUDA. `cargo build --release --workspace`
