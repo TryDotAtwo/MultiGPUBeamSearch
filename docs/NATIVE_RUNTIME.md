@@ -7,6 +7,12 @@ The frontier controller is available for comparative validation; public launch
 and CNOT orchestration are still being transferred. No
 CUDA sorting optimization or precision policy is enabled here.
 
+An opt-in `BEAM_EXPERIMENTAL_RADIX128=ON` CMake build exercises full-key CUB
+radix sorting in Stream 3/4 and the logical union. It requires CUB 2.7 / CUDA
+12.8 or newer. The normal Python build explicitly sets the option OFF. The
+experiment was slower on its measured RTX 3060 full-step fixture and is not a
+default; see `test_results/refactor_20261107/STAGE4_RADIX128.md`.
+
 ## Build
 
 Rust workspace builds do not require CUDA. `cargo build --release --workspace`

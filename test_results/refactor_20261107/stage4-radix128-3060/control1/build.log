@@ -1,0 +1,54 @@
+[1/18] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+[2/18] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream3.cu.o
+/workspace/beam-native-source/cuda/stream3.cu(130): warning #177-D: function "beam::<unnamed>::stream3_debug_store_count_kernel" was declared but never referenced
+  __attribute__((global)) void stream3_debug_store_count_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[3/18] Building CUDA object CMakeFiles/stream3_cuda_tests.dir/tests/stream3_cuda_tests.cu.o
+[4/18] Building CUDA object CMakeFiles/stream4_logical_union_graph_cuda_tests.dir/tests/stream4_logical_union_cuda_tests.cu.o
+[5/18] Building CUDA object CMakeFiles/stream4_logical_union_bounded_graph_cuda_tests.dir/tests/stream4_logical_union_cuda_tests.cu.o
+[6/18] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+[7/18] Linking CXX static library libbeam_cuda.a
+[8/18] Linking CXX executable stream3_cuda_tests
+[9/18] Linking CXX executable stream4_cuda_tests
+[10/18] Linking CXX executable stream4_logical_union_cuda_tests
+[11/18] Linking CXX executable stream4_logical_union_graph_cuda_tests
+[12/18] Linking CXX executable stream4_logical_union_bounded_graph_cuda_tests
+[13/18] Linking CXX executable final_union_dispatcher_cuda_tests
+[14/18] Linking CXX executable stream4_bounded_graph_cuda_tests
+[15/18] Linking CXX executable stitched_cuda_tests
+[16/18] Linking CXX executable static_memory_cuda_tests
+[17/18] Building CUDA object CMakeFiles/production_runner.dir/tools/production_runner.cu.o
+/workspace/beam-native-source/tools/production_runner.cu(4026): warning #177-D: variable "tracked_solution" was declared but never referenced
+      TrackedSolutionPrefix tracked_solution;
+                            ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/workspace/beam-native-source/tools/production_runner.cu(515): warning #177-D: function "<unnamed>::parse_next_u32" was declared but never referenced
+  std::uint32_t parse_next_u32(const std::string& text, std::size_t& pos, const char* context) {
+                ^
+
+/workspace/beam-native-source/tools/production_runner.cu(1285): warning #177-D: function "<unnamed>::build_solved_neighborhood_runtime" was declared but never referenced
+  SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
+                            ^
+
+/workspace/beam-native-source/tools/production_runner.cu(1328): warning #177-D: function "<unnamed>::RepairSolvedNeighborhoodPrefetch::enabled" was declared but never referenced
+      bool enabled() const {
+           ^
+
+/workspace/beam-native-source/tools/production_runner.cu(1584): warning #177-D: function "<unnamed>::track_location_name" was declared but never referenced
+  const char* track_location_name(std::uint32_t location) {
+              ^
+
+/workspace/beam-native-source/tools/production_runner.cu(1601): warning #177-D: function "<unnamed>::track_stream4_phase_name" was declared but never referenced
+  const char* track_stream4_phase_name(std::uint32_t phase) {
+              ^
+
+/workspace/beam-native-source/tools/production_runner.cu(3204): warning #177-D: function "<unnamed>::NcclRuntime::operator=(<unnamed>::NcclRuntime &&) noexcept" was declared but never referenced
+      NcclRuntime& operator=(NcclRuntime&& other) noexcept {
+                   ^
+
+[18/18] Linking CXX executable production_runner

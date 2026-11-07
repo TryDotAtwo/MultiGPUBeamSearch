@@ -1,5 +1,6 @@
 #include "static_memory.hpp"
 #include "cub_compat.hpp"
+#include "hash_sort.cuh"
 #include "stream3.hpp"
 
 #include <cub/device/device_merge_sort.cuh>
@@ -98,11 +99,10 @@ std::size_t stream3_cub_temp_bytes(std::uint32_t stream3_batch_candidates) {
     std::size_t score_reduce_bytes = 0;
     const int item_count = static_cast<int>(stream3_batch_candidates);
     const int block_count = static_cast<int>((stream3_batch_candidates + 255U) / 256U);
-    cudaError_t status = cub::DeviceMergeSort::SortPairs(
+    cudaError_t status = hash_sort_pairs(
         nullptr,
         sort_bytes,
-        keys,
-        values,
+        HashSortBuffers<std::uint64_t>{keys, unique_keys, values, unique_values},
         item_count,
         Stream3HashLessForCubTemp{},
         0);
@@ -236,11 +236,10 @@ std::size_t stream4_cub_temp_bytes(std::uint32_t stream4_capacity) {
     std::size_t sort_bytes = 0;
     std::size_t reduce_bytes = 0;
     const int item_count = static_cast<int>(stream4_capacity);
-    cudaError_t status = cub::DeviceMergeSort::SortPairs(
+    cudaError_t status = hash_sort_pairs(
         nullptr,
         sort_bytes,
-        keys,
-        values,
+        HashSortBuffers<CandidateMeta>{keys, unique_keys, values, unique_values},
         item_count,
         Stream4HashLessForCubTemp{},
         0);

@@ -72,6 +72,10 @@ three refinement/comparison rounds may run; uncertainty/failure must propagate.
 CNOT control and public launch switching need separate comparisons. CPU or source
 checks do not establish GPU acceptance.
 
+Experimental CUDA sort variants must remain explicit build choices until the
+matched full-step promotion gate is met. The public automatic build must select
+the accepted default even when a build directory contains an older CMake cache.
+
 Promote a CUDA variant only for a measured profile with identical models, inputs,
 logical beam, precision and rank count: warmup plus at least five paired complete
 steps; at least 5% time improvement, or measured memory reduction with no more

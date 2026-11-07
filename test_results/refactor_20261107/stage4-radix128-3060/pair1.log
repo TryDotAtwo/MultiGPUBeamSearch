@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_radix128_pair_gpu.py", line 95, in <module>
+    main()
+  File "/workspace/beam-work/tests/native_radix128_pair_gpu.py", line 55, in main
+    plans[name] = probes[name].admit(profile)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/pipeline_probe.py", line 186, in admit
+    validate_rank_plans(plans)
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/pipeline_profiles.py", line 45, in validate_rank_plans
+    if len({row[key] for row in plans})!=1:raise ValueError('rank plans disagree on '+key)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/pipeline_profiles.py", line 45, in <setcomp>
+    if len({row[key] for row in plans})!=1:raise ValueError('rank plans disagree on '+key)
+            ~~~^^^^^
+KeyError: 'STREAM4_BATCH_ALIGNMENT'

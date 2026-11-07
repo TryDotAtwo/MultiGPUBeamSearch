@@ -27,6 +27,7 @@ option(BEAM_DEBUG_FINAL_HISTOGRAM_TRACE "Compile final histogram-vs-survivor dia
 option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
+option(BEAM_EXPERIMENTAL_RADIX128 "Use experimental full-width CUB radix sort for hash pairs" OFF)
 if(BEAM_ENABLE_LIBTORCH_STREAM1)
     find_package(Torch REQUIRED)
     # The engine/control transport exchange C++ objects internally. Compile all
@@ -174,6 +175,8 @@ else()
 endif()
 target_link_libraries(beam_cuda PUBLIC beam_core)
 target_compile_options(beam_cuda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+set_source_files_properties(cuda/stream3.cu cuda/stream4.cu cuda/static_memory.cu PROPERTIES
+    COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_RADIX128=$<BOOL:${BEAM_EXPERIMENTAL_RADIX128}>")
 target_compile_definitions(beam_cuda PUBLIC
     BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
     BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
@@ -288,6 +291,14 @@ target_compile_features(stream1_transformer_autotune_contract_tests PRIVATE cxx_
 add_executable(stream3_cuda_tests tests/stream3_cuda_tests.cu)
 target_link_libraries(stream3_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream3_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+if(BEAM_EXPERIMENTAL_RADIX128)
+    add_executable(radix128_cuda_tests tests/radix128_cuda_tests.cu)
+    target_link_libraries(radix128_cuda_tests PRIVATE beam_core)
+    target_compile_options(radix128_cuda_tests PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+    set_target_properties(radix128_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_test(NAME radix128_cuda_tests COMMAND radix128_cuda_tests)
+endif()
 
 # Bounded owner-scatter acceptance: opt-in and never promoted by host checks.
 add_executable(stream3_owner_scatter_cuda_tests EXCLUDE_FROM_ALL tests/stream3_owner_scatter_cuda_tests.cu)

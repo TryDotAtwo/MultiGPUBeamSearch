@@ -1,0 +1,12 @@
+rank=0
+world_size=2
+solution_found=0
+completed_depths=10
+history_mode=ram
+history_dir=/workspace/beam-results/radix128/pair4/radix/5/history/rank-0
+history_depth_count=10
+history_bytes_received=496352
+history_bytes_stored=248176
+history_bytes_stored_ram=248176
+history_bytes_stored_disk=0
+history_bytes_pruned=0

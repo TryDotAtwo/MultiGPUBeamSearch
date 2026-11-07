@@ -3,6 +3,7 @@
 #include "config.hpp"
 #include "cub_compat.hpp"
 #include "hash.hpp"
+#include "hash_sort.cuh"
 #include "nvtx_ranges.hpp"
 
 #include <cub/device/device_radix_sort.cuh>
@@ -1016,33 +1017,29 @@ void stream3_pack_threshold_cuda(
         compact_val,
         unique_count,
         stream3_batch_candidates);
+    const HashSortBuffers<std::uint64_t> hash_buffers{
+        compact_key, reduce_key_scratch, compact_val, reduce_val_scratch};
+    const auto hash_views = hash_reduction_views(hash_buffers);
     std::size_t sort_temp_bytes = cub_temp_storage_bytes;
-    check_cub(
-        cub::DeviceMergeSort::SortPairs(
-            cub_temp_storage,
-            sort_temp_bytes,
-            compact_key,
-            compact_val,
-            stream3_batch_candidates,
-            Stream3HashLess{},
-            stream),
-        "cub::DeviceMergeSort::SortPairs stream3");
+    check_cub(hash_sort_pairs(cub_temp_storage, sort_temp_bytes, hash_buffers,
+                              stream3_batch_candidates, Stream3HashLess{}, stream),
+              "CUB hash sort stream3");
     std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
     check_cub(
         cub::DeviceReduce::ReduceByKey(
             cub_temp_storage,
             reduce_temp_bytes,
-            compact_key,
-            reduce_key_scratch,
-            compact_val,
-            reduce_val_scratch,
+            hash_views.sorted_keys,
+            hash_views.reduced_keys,
+            hash_views.sorted_values,
+            hash_views.reduced_values,
             unique_count,
             Stream3MinValue{},
             stream3_batch_candidates,
             stream),
         "cub::DeviceReduce::ReduceByKey stream3");
     stream3_mark_valid_unique_counts_kernel<<<grid, block, 0, stream>>>(
-        reduce_val_scratch,
+        hash_views.reduced_values,
         keep_flags,
         block_counts,
         unique_count,
@@ -1065,8 +1062,8 @@ void stream3_pack_threshold_cuda(
     (void)debug_ring;
 #endif
     stream3_compact_valid_unique_kernel<<<grid, block, 0, stream>>>(
-        reduce_key_scratch,
-        reduce_val_scratch,
+        hash_views.reduced_keys,
+        hash_views.reduced_values,
         keep_flags,
         block_offsets,
         unique_key,
@@ -1146,33 +1143,29 @@ void stream3_pack_threshold_device_threshold_cuda(
         compact_val,
         unique_count,
         stream3_batch_candidates);
+    const HashSortBuffers<std::uint64_t> hash_buffers{
+        compact_key, reduce_key_scratch, compact_val, reduce_val_scratch};
+    const auto hash_views = hash_reduction_views(hash_buffers);
     std::size_t sort_temp_bytes = cub_temp_storage_bytes;
-    check_cub(
-        cub::DeviceMergeSort::SortPairs(
-            cub_temp_storage,
-            sort_temp_bytes,
-            compact_key,
-            compact_val,
-            stream3_batch_candidates,
-            Stream3HashLess{},
-            stream),
-        "cub::DeviceMergeSort::SortPairs stream3");
+    check_cub(hash_sort_pairs(cub_temp_storage, sort_temp_bytes, hash_buffers,
+                              stream3_batch_candidates, Stream3HashLess{}, stream),
+              "CUB hash sort stream3");
     std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
     check_cub(
         cub::DeviceReduce::ReduceByKey(
             cub_temp_storage,
             reduce_temp_bytes,
-            compact_key,
-            reduce_key_scratch,
-            compact_val,
-            reduce_val_scratch,
+            hash_views.sorted_keys,
+            hash_views.reduced_keys,
+            hash_views.sorted_values,
+            hash_views.reduced_values,
             unique_count,
             Stream3MinValue{},
             stream3_batch_candidates,
             stream),
         "cub::DeviceReduce::ReduceByKey stream3");
     stream3_mark_valid_unique_counts_kernel<<<grid, block, 0, stream>>>(
-        reduce_val_scratch,
+        hash_views.reduced_values,
         keep_flags,
         block_counts,
         unique_count,
@@ -1195,8 +1188,8 @@ void stream3_pack_threshold_device_threshold_cuda(
     (void)debug_ring;
 #endif
     stream3_compact_valid_unique_kernel<<<grid, block, 0, stream>>>(
-        reduce_key_scratch,
-        reduce_val_scratch,
+        hash_views.reduced_keys,
+        hash_views.reduced_values,
         keep_flags,
         block_offsets,
         unique_key,

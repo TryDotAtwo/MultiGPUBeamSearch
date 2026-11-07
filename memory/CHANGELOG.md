@@ -1001,3 +1001,8 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Added finite multiset/VRAM ceilings without claiming an orbit proof. The existing calibration fixture-state budget remains separate from the optional explicit diagnostic descriptor ceiling; it never silently caps search width.
 - Reproduced and fixed acceptance of an incomplete admission rank cohort. The regression covers rank count and ordering; per-rank runtime errors remain errors, not implicit capacity reductions.
 - Rust CPU, Python regression and actual native CUDA Graph/LibTorch eager one/two-RTX3060 tests are recorded in test_results/refactor_20261107/STAGE3_FRONTIER.md. Public launch switching, CNOT orchestration, CUDA optimization and other hardware/performance gates remain pending.
+
+## 2026-11-07 - Experimental full-hash CUB radix sorting
+- Added an opt-in full-128-bit radix path for Stream 3/4 and final logical union, preserving deterministic reduction and using existing disjoint A/B arrays with actual CUB scratch queries. The default comparison-sort path remains selected; the Python build explicitly requests the default.
+- Both builds passed Stream 3/4, graph, union, static-memory and stitched GPU checks on RTX3060. Memcheck reported zero errors/leaks for radix, Stream 3 and captured union. A standalone test compiled for SM75/80/90/120; those are not full-engine or physical-hardware acceptance.
+- Five alternating full-step pairs at width4096 with the same FP16 fixture and two RTX3060 showed a median 13.99% throughput reduction and 365,568 additional planned bytes per GPU for the radix variant. It is not promoted. Raw evidence and measurement limits are in test_results/refactor_20261107/STAGE4_RADIX128.md.

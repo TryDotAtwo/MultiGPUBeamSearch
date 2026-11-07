@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
+#include <map>
 #include <stdexcept>
 #include <array>
 #include <vector>
@@ -612,6 +614,58 @@ int main() {
     BEAM_CUDA_CHECK(cudaMemcpy(survivor_shard.data(), d_survivor_shard, survivor_shard.size() * sizeof(CandidateMeta), cudaMemcpyDeviceToHost));
     require(dirty_count[0] == 1, "stream3 remote recv collector dirty count failed");
     require(survivor_shard[0].parent_idx == 77 && survivor_shard[0].score_key == 4, "stream3 remote recv collector write failed");
+
+    if (total >= 16) {
+        // Compare both threshold entry points against the full 128-bit CPU key.
+        // The input contains holes, equal scores, duplicate keys and a valid key
+        // equal to the all-ones tail sentinel. IDs must remain input indices.
+        std::fill(score.begin(), score.end(), 100);
+        const std::array<std::uint32_t, 8> ids{1, 3, 5, 7, 9, 11, 13, 15};
+        const std::array<Hash128, 8> hashes{{{0, 0}, {1, 0}, {0, 1},
+            {UINT64_MAX, UINT64_MAX}, {1, 0}, {1, 0}, {0, 1}, {UINT64_MAX, UINT64_MAX}}};
+        const std::array<std::uint32_t, 8> scores{4, 4, 4, 7, 4, 3, 4, 8};
+        std::map<std::pair<std::uint64_t, std::uint64_t>, std::uint64_t> expected;
+        for (std::size_t j = 0; j < ids.size(); ++j) {
+            const auto i = ids[j];
+            score[i] = scores[j];
+            hash[i] = hashes[j];
+            const auto k = std::make_pair(hash[i].hi, hash[i].lo);
+            const auto value = (static_cast<std::uint64_t>(score[i]) << 32) | i;
+            const auto [it, inserted] = expected.emplace(k, value);
+            if (!inserted) it->second = std::min(it->second, value);
+        }
+        BEAM_CUDA_CHECK(cudaMemcpy(d_score, score.data(), score.size() * sizeof(score[0]), cudaMemcpyHostToDevice));
+        BEAM_CUDA_CHECK(cudaMemcpy(d_hash, hash.data(), hash.size() * sizeof(hash[0]), cudaMemcpyHostToDevice));
+        const std::uint32_t threshold = 10;
+        BEAM_CUDA_CHECK(cudaMemcpy(d_partition_unique_count, &threshold, sizeof(threshold), cudaMemcpyHostToDevice));
+        for (int device_threshold = 0; device_threshold < 2; ++device_threshold) {
+            if (device_threshold) {
+                stream3_pack_threshold_device_threshold_cuda(d_score, d_hash, nullptr, nullptr,
+                    d_key, d_val, d_reduce_key, d_reduce_val, d_unique_key, d_unique_val,
+                    d_keep_flags, d_block_counts, d_block_offsets, d_count, d_cub_temp, cub_temp_bytes,
+                    d_partition_unique_count, nullptr, b_micro, total, 0);
+            } else {
+                stream3_pack_threshold_cuda(d_score, d_hash, nullptr, nullptr, d_key, d_val,
+                    d_reduce_key, d_reduce_val, d_unique_key, d_unique_val, d_keep_flags,
+                    d_block_counts, d_block_offsets, d_count, d_cub_temp, cub_temp_bytes,
+                    threshold, b_micro, total, 0);
+            }
+            BEAM_CUDA_CHECK(cudaGetLastError());
+            BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+            BEAM_CUDA_CHECK(cudaMemcpy(&compact_count, d_count, sizeof(compact_count), cudaMemcpyDeviceToHost));
+            BEAM_CUDA_CHECK(cudaMemcpy(key.data(), d_unique_key, key.size() * sizeof(Hash128), cudaMemcpyDeviceToHost));
+            BEAM_CUDA_CHECK(cudaMemcpy(val.data(), d_unique_val, val.size() * sizeof(std::uint64_t), cudaMemcpyDeviceToHost));
+            require(compact_count == expected.size(), "stream3 full-hash unique count mismatch");
+            auto remaining = expected;
+            for (std::uint32_t i = 0; i < compact_count; ++i) {
+                const auto it = remaining.find({key[i].hi, key[i].lo});
+                require(it != remaining.end() && it->second == val[i], "stream3 full-hash or original ID mismatch");
+                remaining.erase(it);
+            }
+            require(remaining.empty(), "stream3 omitted full-hash key");
+        }
+        report << "- full_hash_sentinel_and_original_ids=pass\n";
+    }
     report << "- threshold_compact=pass\n";
     report << "- hash_sort_dedup=pass\n";
     report << "- payload_id_original_index=pass\n";

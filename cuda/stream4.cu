@@ -1,5 +1,6 @@
 #include "stream4.hpp"
 
+#include "hash_sort.cuh"
 #include "nvtx_ranges.hpp"
 
 #include <cub/device/device_merge_sort.cuh>
@@ -432,17 +433,20 @@ void stream4_finalize_logical_shard_union_cuda(
     if (sort_item_bound != 0)
         stream4_check_sort_bound_kernel<<<1, 1, 0, stream>>>(scratch_count, sort_items);
     stream4_fill_sort_tail_kernel<<<blocks, 256, 0, stream>>>(sort_key, sort_value, scratch_count, capacity);
+    const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
+    const auto hash_views = hash_reduction_views(hash_buffers);
     auto bytes = temp_bytes;
-    check_cub(cub::DeviceMergeSort::SortPairs(temp, bytes, sort_key, sort_value, sort_items,
-                                            Stream4HashLess{}, stream), "CUB final logical union sort");
+    check_cub(hash_sort_pairs(temp, bytes, hash_buffers, sort_items, Stream4HashLess{}, stream),
+              "CUB final logical union sort");
     bytes = temp_bytes;
-    check_cub(cub::DeviceReduce::ReduceByKey(temp, bytes, sort_key, reduce_key, sort_value,
-        reduce_value, scratch_count, Stream4BestCandidate{}, sort_items, stream), "CUB final logical union reduce");
+    check_cub(cub::DeviceReduce::ReduceByKey(temp, bytes, hash_views.sorted_keys,
+        hash_views.reduced_keys, hash_views.sorted_values, hash_views.reduced_values,
+        scratch_count, Stream4BestCandidate{}, sort_items, stream), "CUB final logical union reduce");
     stream4_mark_valid_unique_counts_kernel<<<blocks, 256, 0, stream>>>(
-        reduce_value, keep, counts, scratch_count, capacity);
+        hash_views.reduced_values, keep, counts, scratch_count, capacity);
     stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(counts, offsets, scratch_count, blocks);
     stream4_compact_valid_unique_kernel<<<blocks, 256, 0, stream>>>(
-        reduce_value, keep, offsets, survivors, clean, dirty, scratch_count, capacity);
+        hash_views.reduced_values, keep, offsets, survivors, clean, dirty, scratch_count, capacity);
     stream4_split_union_counts_kernel<<<1, 1, 0, stream>>>(clean, dirty, processing, scratch_count, physical_capacity);
     // No reader may consume histograms until both publications complete.
     for (unsigned physical = 0; physical < 2; ++physical) {
@@ -515,27 +519,22 @@ void stream4_shard_job_cuda(
         capacity);
     stream4_fill_sort_tail_kernel<<<grid, block, 0, stream>>>(sort_key, sort_value, scratch_count, capacity);
 
+    const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
+    const auto hash_views = hash_reduction_views(hash_buffers);
     std::size_t sort_temp_bytes = cub_temp_storage_bytes;
-    check_cub(
-        cub::DeviceMergeSort::SortPairs(
-            cub_temp_storage,
-            sort_temp_bytes,
-            sort_key,
-            sort_value,
-            capacity,
-            Stream4HashLess{},
-            stream),
-        "cub::DeviceMergeSort::SortPairs stream4");
+    check_cub(hash_sort_pairs(cub_temp_storage, sort_temp_bytes, hash_buffers,
+                              capacity, Stream4HashLess{}, stream),
+              "CUB hash sort stream4");
 
     std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
     check_cub(
         cub::DeviceReduce::ReduceByKey(
             cub_temp_storage,
             reduce_temp_bytes,
-            sort_key,
-            reduce_key,
-            sort_value,
-            reduce_value,
+            hash_views.sorted_keys,
+            hash_views.reduced_keys,
+            hash_views.sorted_values,
+            hash_views.reduced_values,
             scratch_count,
             Stream4BestCandidate{},
             capacity,
@@ -543,7 +542,7 @@ void stream4_shard_job_cuda(
         "cub::DeviceReduce::ReduceByKey stream4");
 
     stream4_mark_valid_unique_counts_kernel<<<grid, block, 0, stream>>>(
-        reduce_value,
+        hash_views.reduced_values,
         keep_flags,
         block_counts,
         scratch_count,
@@ -554,7 +553,7 @@ void stream4_shard_job_cuda(
         scratch_count,
         block_count);
     stream4_compact_valid_unique_kernel<<<grid, block, 0, stream>>>(
-        reduce_value,
+        hash_views.reduced_values,
         keep_flags,
         block_offsets,
         survivor_shard,
@@ -645,27 +644,22 @@ void stream4_shard_job_device_threshold_cuda(
         const dim3 sort_grid(sort_blocks);
     stream4_fill_sort_tail_kernel<<<sort_grid, block, 0, stream>>>(sort_key, sort_value, scratch_count, sort_items);
 
+    const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
+    const auto hash_views = hash_reduction_views(hash_buffers);
     std::size_t sort_temp_bytes = cub_temp_storage_bytes;
-    check_cub(
-        cub::DeviceMergeSort::SortPairs(
-            cub_temp_storage,
-            sort_temp_bytes,
-            sort_key,
-            sort_value,
-            sort_items,
-            Stream4HashLess{},
-            stream),
-        "cub::DeviceMergeSort::SortPairs stream4");
+    check_cub(hash_sort_pairs(cub_temp_storage, sort_temp_bytes, hash_buffers,
+                              sort_items, Stream4HashLess{}, stream),
+              "CUB hash sort stream4");
 
     std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
     check_cub(
         cub::DeviceReduce::ReduceByKey(
             cub_temp_storage,
             reduce_temp_bytes,
-            sort_key,
-            reduce_key,
-            sort_value,
-            reduce_value,
+            hash_views.sorted_keys,
+            hash_views.reduced_keys,
+            hash_views.sorted_values,
+            hash_views.reduced_values,
             scratch_count,
             Stream4BestCandidate{},
             sort_items,
@@ -673,7 +667,7 @@ void stream4_shard_job_device_threshold_cuda(
         "cub::DeviceReduce::ReduceByKey stream4");
 
     stream4_mark_valid_unique_counts_kernel<<<sort_grid, block, 0, stream>>>(
-        reduce_value,
+        hash_views.reduced_values,
         keep_flags,
         block_counts,
         scratch_count,
@@ -684,7 +678,7 @@ void stream4_shard_job_device_threshold_cuda(
         scratch_count,
         sort_blocks);
     stream4_compact_valid_unique_kernel<<<sort_grid, block, 0, stream>>>(
-        reduce_value,
+        hash_views.reduced_values,
         keep_flags,
         block_offsets,
         survivor_shard,
