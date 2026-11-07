@@ -40,6 +40,10 @@ CUB header SHA-256 and the successful preinitialized controls are retained in
 are not a clean uninitialized-production-scratch initcheck or multi-node/CNOT
 acceptance.
 
+Subsequent production-arena work initialized the union of CUB scratch ranges
+and repeated the production-pointer reduction and final-union initchecks; see
+`STAGE4_CUB_INITIALIZATION.md`. The historical failing logs above are unchanged.
+
 ## Paired full-step measurement
 
 Five alternating process pairs used two RTX 3060 GPUs, the same Hamming96

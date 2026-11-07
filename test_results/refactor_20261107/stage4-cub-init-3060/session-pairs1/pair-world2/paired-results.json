@@ -1,0 +1,247 @@
+{
+  "world": 2,
+  "beam": 4096,
+  "precision": "fp16",
+  "profile": {
+    "BEAM_B_MICRO": "768",
+    "BEAM_ENSEMBLE_INFERENCE_MICRO": "32"
+  },
+  "runners": {
+    "control": {
+      "path": "/workspace/beam-results/score-bits/default1/production_runner",
+      "sha256": "22be70c62e2d1dad4efef79685eb0a00685980c8bd12ba60e5338fde58834730"
+    },
+    "radix": {
+      "path": "/workspace/beam-results/cub-init/green1/production_runner",
+      "sha256": "56ddc5b431be1c76569d8e51bc9d7bed6fa31106560ab0055a99b0de0e1bb95c"
+    }
+  },
+  "input_sha256": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc",
+  "model_files_sha256": {
+    "hidden_bias.fp16": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+    "hidden_weight_hxk.fp16": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511",
+    "input_bias.fp16": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6",
+    "input_weight_hxk.fp16": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8",
+    "manifest.json": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026",
+    "output_bias.fp16": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+    "output_weight_hxk.fp16": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6",
+    "residual0_fc1_bias.fp16": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+    "residual0_fc1_weight_hxk.fp16": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca",
+    "residual0_fc2_bias.fp16": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+    "residual0_fc2_weight_hxk.fp16": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+  },
+  "plans": {
+    "control": [
+      {
+        "BEAM_WIDTH_ALIGNMENT": 2048,
+        "B_MICRO": 32,
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": 4096,
+        "LOCAL_RANK": 0,
+        "RING_COUNT": 3,
+        "SHARD_CAPACITY_CANDIDATES": 131072,
+        "SHARD_COUNT": 1,
+        "STREAM3_RING_SLOTS": 2,
+        "STREAM4_ACTIVE_SORT_SLOTS": 1,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "STREAM4_BATCH_CANDIDATES": 131072,
+        "WORLD_SIZE": 2,
+        "estimated_required_device_bytes": 64007106,
+        "frontier_state_capacity": 2048,
+        "gpu_budget_bytes": 11482824704
+      },
+      {
+        "BEAM_WIDTH_ALIGNMENT": 2048,
+        "B_MICRO": 32,
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": 4096,
+        "LOCAL_RANK": 1,
+        "RING_COUNT": 3,
+        "SHARD_CAPACITY_CANDIDATES": 131072,
+        "SHARD_COUNT": 1,
+        "STREAM3_RING_SLOTS": 2,
+        "STREAM4_ACTIVE_SORT_SLOTS": 1,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "STREAM4_BATCH_CANDIDATES": 131072,
+        "WORLD_SIZE": 2,
+        "estimated_required_device_bytes": 64007106,
+        "frontier_state_capacity": 2048,
+        "gpu_budget_bytes": 11484921856
+      }
+    ],
+    "radix": [
+      {
+        "BEAM_WIDTH_ALIGNMENT": 2048,
+        "B_MICRO": 32,
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": 4096,
+        "LOCAL_RANK": 0,
+        "RING_COUNT": 3,
+        "SHARD_CAPACITY_CANDIDATES": 131072,
+        "SHARD_COUNT": 1,
+        "STREAM3_RING_SLOTS": 2,
+        "STREAM4_ACTIVE_SORT_SLOTS": 1,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "STREAM4_BATCH_CANDIDATES": 131072,
+        "WORLD_SIZE": 2,
+        "estimated_required_device_bytes": 64007106,
+        "frontier_state_capacity": 2048,
+        "gpu_budget_bytes": 11482824704
+      },
+      {
+        "BEAM_WIDTH_ALIGNMENT": 2048,
+        "B_MICRO": 32,
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": 4096,
+        "LOCAL_RANK": 1,
+        "RING_COUNT": 3,
+        "SHARD_CAPACITY_CANDIDATES": 131072,
+        "SHARD_COUNT": 1,
+        "STREAM3_RING_SLOTS": 2,
+        "STREAM4_ACTIVE_SORT_SLOTS": 1,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "STREAM4_BATCH_CANDIDATES": 131072,
+        "WORLD_SIZE": 2,
+        "estimated_required_device_bytes": 64007106,
+        "frontier_state_capacity": 2048,
+        "gpu_budget_bytes": 11484921856
+      }
+    ]
+  },
+  "gpu": "NVIDIA GeForce RTX 3060, GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe, 595.91.07, 12288 MiB\nNVIDIA GeForce RTX 3060, GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632, 595.91.07, 12288 MiB\n",
+  "pairs": [
+    {
+      "control": {
+        "seconds": [
+          0.0209361,
+          0.0207576,
+          0.0206284,
+          0.0203013,
+          0.0199755
+        ],
+        "median": 0.0206284,
+        "wall_seconds": 1.724221051990753,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/control/1"
+      },
+      "radix": {
+        "seconds": [
+          0.0205416,
+          0.0202543,
+          0.0201733,
+          0.0198102,
+          0.0196677
+        ],
+        "median": 0.0201733,
+        "wall_seconds": 1.7404261030023918,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/radix/1"
+      },
+      "speedup_percent": 2.2559521744087485
+    },
+    {
+      "radix": {
+        "seconds": [
+          0.0208401,
+          0.0203245,
+          0.0201686,
+          0.0198247,
+          0.0194712
+        ],
+        "median": 0.0201686,
+        "wall_seconds": 1.723705369993695,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/radix/2"
+      },
+      "control": {
+        "seconds": [
+          0.020549,
+          0.0203264,
+          0.0201572,
+          0.0198896,
+          0.0198171
+        ],
+        "median": 0.0201572,
+        "wall_seconds": 1.6091097540047485,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/control/2"
+      },
+      "speedup_percent": -0.05652350683734708
+    },
+    {
+      "control": {
+        "seconds": [
+          0.0206382,
+          0.0203393,
+          0.0202137,
+          0.0199532,
+          0.019596
+        ],
+        "median": 0.0202137,
+        "wall_seconds": 1.8231586059991969,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/control/3"
+      },
+      "radix": {
+        "seconds": [
+          0.0206749,
+          0.0205084,
+          0.0202646,
+          0.0201752,
+          0.0197778
+        ],
+        "median": 0.0202646,
+        "wall_seconds": 1.683894171990687,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/radix/3"
+      },
+      "speedup_percent": -0.2511769292263377
+    },
+    {
+      "radix": {
+        "seconds": [
+          0.020994,
+          0.0209396,
+          0.0206313,
+          0.0203822,
+          0.0201369
+        ],
+        "median": 0.0206313,
+        "wall_seconds": 1.7466067479981575,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/radix/4"
+      },
+      "control": {
+        "seconds": [
+          0.0203045,
+          0.0200678,
+          0.0199022,
+          0.0196993,
+          0.0196603
+        ],
+        "median": 0.0199022,
+        "wall_seconds": 1.7556203569984064,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/control/4"
+      },
+      "speedup_percent": -3.5339508416823096
+    },
+    {
+      "control": {
+        "seconds": [
+          0.0206252,
+          0.0204692,
+          0.0201664,
+          0.0202577,
+          0.0199167
+        ],
+        "median": 0.0202577,
+        "wall_seconds": 1.7633311160025187,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/control/5"
+      },
+      "radix": {
+        "seconds": [
+          0.0206724,
+          0.0202196,
+          0.0198911,
+          0.0198468,
+          0.0197496
+        ],
+        "median": 0.0198911,
+        "wall_seconds": 1.7073890549945645,
+        "run": "/workspace/beam-results/cub-init/session-pairs1/pair-world2/radix/5"
+      },
+      "speedup_percent": 1.8430353273574784
+    }
+  ],
+  "median_speedup_percent": -0.05652350683734708,
+  "scope": "five alternating independent process pairs; each uses one warmup and five full steps"
+}

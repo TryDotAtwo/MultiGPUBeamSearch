@@ -43,7 +43,13 @@ int main() {
         const auto temp_end = reinterpret_cast<std::uintptr_t>(memory.final_union.cub_temp) + plan.union_cub_temp_bytes;
         if (temp_end > end || !memory.final_union.count) throw std::runtime_error("bad union scratch allocation");
         auto check = [](cudaError_t e) { if (e != cudaSuccess) throw std::runtime_error(cudaGetErrorString(e)); };
-        check(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
+        // Initialize only the live histogram inputs. CUB temp must already be
+        // initialized by the production arena; clearing the entire allocation
+        // here would hide a broken initialization or overlapping layout.
+        const auto histogram_bytes = 2ULL * SCORE_BIN_COUNT * sizeof(std::uint32_t);
+        check(cudaMemset(memory.streams.shard_score_hist_a, 0, histogram_bytes));
+        check(cudaMemset(memory.streams.shard_score_hist_b, 0, histogram_bytes));
+        check(cudaMemset(memory.streams.shard_score_hist_active_index, 0, 2 * sizeof(std::uint32_t)));
         // Exercise the primitive with the exact planner-provided pointers/temp,
         // not a separately overprovisioned test arena.
         std::vector<CandidateMeta> input(2ULL * config.shard_capacity_candidates);

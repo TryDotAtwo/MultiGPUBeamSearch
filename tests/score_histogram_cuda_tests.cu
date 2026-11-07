@@ -1,6 +1,7 @@
 #include "../cuda/stream3.hpp"
 #include "../cuda/stream4.hpp"
 #include "../cuda/score_sort_bits.cuh"
+#include "../cuda/static_memory.hpp"
 #include "config.hpp"
 #include <cuda_runtime.h>
 #include <algorithm>
@@ -51,6 +52,30 @@ int main() {
   Buffer<std::uint32_t> scores(cap), parents(slots), key_a(cap), key_b(cap), unique(1);
   Buffer<std::uint64_t> val_a(cap), val_b(cap), hist3(SCORE_BIN_COUNT);
   Buffer<std::byte> scratch(scratch_bytes);
+  // Exercise either independently owned test scratch or the exact production
+  // arena extents. The latter must need no test-side initialization.
+  struct Arena {
+   StaticDeviceMemory memory;
+   ~Arena() { free_static_device_memory(memory); }
+  } arena;
+  void* scratch3 = scratch.p; std::size_t scratch3_bytes = scratch_bytes;
+  void* scratch4 = scratch.p; std::size_t scratch4_bytes = scratch_bytes;
+  if (std::getenv("BEAM_TEST_USE_ARENA_SCRATCH")) {
+   RuntimeConfig config;
+   config.b_micro=micro; config.stream3_batch_candidates=slots*per;
+   config.stream4_batch_candidates=64; config.stream4_active_sort_slots=2;
+   config.ring_count=2; config.shard_count=4; config.shard_capacity_candidates=640;
+   config.global_spill_capacity=640; config.stream4_batch_alignment=1;
+   config.user_global_beam_width=256; config.solved_result_capacity=16;
+   const auto plan=make_static_memory_plan(config);
+   allocate_static_device_memory(plan,arena.memory);
+   scratch3=arena.memory.streams.stream3_cub_temp;
+   scratch3_bytes=arena.memory.streams.stream3_cub_temp_bytes;
+   scratch4=arena.memory.streams.stream4_cub_temp;
+   scratch4_bytes=arena.memory.streams.stream4_cub_temp_bytes;
+   std::cout << "using production arena CUB scratch stream3=" << scratch3_bytes
+             << " stream4=" << scratch4_bytes << '\n';
+  }
   if (std::getenv("BEAM_TEST_ZERO_SCRATCH")) {
    cu(cudaMemset(scratch.p, 0, scratch_bytes));
    cu(cudaDeviceSynchronize());
@@ -58,7 +83,7 @@ int main() {
   auto s3=[&] {
    cu(cudaMemsetAsync(hist3.p,0,SCORE_BIN_COUNT*sizeof(std::uint64_t),stream));
    stream3_accumulate_score_hist_cuda(scores.p,parents.p,key_a.p,key_b.p,val_a.p,val_b.p,
-       unique.p,hist3.p,scratch.p,scratch_bytes,micro,cap,stream);
+       unique.p,hist3.p,scratch3,scratch3_bytes,micro,cap,stream);
   };
   cudaGraph_t graph3=nullptr; cudaGraphExec_t exec3=nullptr;
   cu(cudaStreamBeginCapture(stream,cudaStreamCaptureModeThreadLocal)); s3();
@@ -99,7 +124,7 @@ int main() {
   auto s4=[&] {
    stream4_shard_job_cuda(survivors.p,clean.p,dirty.p,processing.p,SCORE_MAX_KEY,cap,
     sort_key.p,reduce_key.p,sort_val.p,reduce_val.p,key_a.p,key_b.p,val_a.p,val_b.p,
-    keep.p,blocks.p,offsets.p,unique.p,hist_a.p,hist_b.p,active.p,scratch.p,scratch_bytes,stream);
+    keep.p,blocks.p,offsets.p,unique.p,hist_a.p,hist_b.p,active.p,scratch4,scratch4_bytes,stream);
   };
   cudaGraph_t graph4=nullptr; cudaGraphExec_t exec4=nullptr;
   cu(cudaStreamBeginCapture(stream,cudaStreamCaptureModeThreadLocal)); s4();

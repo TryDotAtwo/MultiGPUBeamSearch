@@ -202,6 +202,8 @@ struct StaticDeviceMemory {
 };
 
 StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config);
+// On success, all present CUB scratch ranges are initialized and ready for
+// use by nonblocking streams. The context retains ownership of the arena.
 void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMemory& memory);
 void free_static_device_memory(StaticDeviceMemory& memory);
 

@@ -55,9 +55,17 @@ resident across compatible jobs.
 | CPU packed history | planned RAM/disk entries / committed depth ranges | history writer | path reconstruction and adjacent-depth pruning readers finish |
 
 The Stream 4 hash-reduction test reproduced initcheck reads from uninitialized
-CUB scratch with both full and bounded score keys. Preinitializing the test
-scratch removes the reports; initialization and phase-overlay ownership in the
-production arena need separate validation. See `STAGE4_SCORE_BITS.md`.
+CUB scratch with both full and bounded score keys. The static arena now
+initializes the union of the Stream 3, all Stream 4 slot, final-union and
+present final-materialization CUB ranges once, before any overlapping phase is
+live. Overlap is merged on the host; a dedicated nonblocking initialization
+stream is synchronized before the arena is returned. No full-arena or per-step
+clear is introduced. The arena's owner still waits for each operation's readers
+before reusing overlapping views. A caller that supplies its own scratch to a
+low-level primitive must initialize it before first use and retain it until all
+readers complete. Scoped production-arena initcheck and comparison evidence is
+in `test_results/refactor_20261107/STAGE4_CUB_INITIALIZATION.md`; it does not
+establish a clean initcheck for every application path or GPU family.
 
 Capacity errors must report both required and available sizes. Physical alignment
 does not change logical beam width. Stream4 has no semantic shard cap or shard

@@ -1,0 +1,5 @@
+========= COMPUTE-SANITIZER
+using production arena CUB scratch stream3=2560 stream4=1024
+score_histograms stream3_stream4_cpu_oracle_and_graph=PASS
+========= LEAK SUMMARY: 0 bytes leaked in 0 allocations
+========= ERROR SUMMARY: 0 errors

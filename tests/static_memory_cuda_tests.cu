@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 using namespace beam;
 
@@ -21,6 +22,33 @@ void require(bool condition, const char* message) {
 
 std::uintptr_t addr(const void* ptr) {
     return reinterpret_cast<std::uintptr_t>(ptr);
+}
+
+// Called before any blanket test initialization, including for overlapping
+// phase views. With compute-sanitizer initcheck this also checks initialization
+// state, not merely the values returned by cudaMalloc on a particular driver.
+void require_cub_scratch_initialized(const StaticMemoryPlan& plan, const StaticDeviceMemory& memory) {
+    const auto check = [&](const void* ptr, std::size_t bytes, const char* name) {
+        if (bytes == 0) return;
+        require(ptr != nullptr, "nonempty CUB scratch has no pointer");
+        const auto base = addr(memory.scratch_pool);
+        const auto start = addr(ptr);
+        require(start >= base, "CUB scratch precedes the scratch pool");
+        const auto offset = start - base;
+        require(offset <= memory.scratch_pool_bytes && bytes <= memory.scratch_pool_bytes - offset,
+                "CUB scratch exceeds the scratch pool");
+        std::vector<unsigned char> values(bytes, 0xff);
+        BEAM_CUDA_CHECK(cudaMemcpy(values.data(), ptr, bytes, cudaMemcpyDeviceToHost));
+        if (!std::all_of(values.begin(), values.end(), [](unsigned char x) { return x == 0; })) {
+            throw std::runtime_error(std::string(name) + " CUB scratch was not initialized");
+        }
+        std::cout << "initialized_cub_scratch " << name << " bytes=" << bytes << '\n';
+    };
+    check(memory.streams.stream3_cub_temp, plan.stream3_cub_temp_bytes, "stream3");
+    check(memory.streams.stream4_cub_temp,
+          plan.stream4_cub_temp_bytes * plan.config.stream4_active_sort_slots, "stream4");
+    check(memory.final_union.cub_temp, plan.union_cub_temp_bytes, "final_union");
+    check(memory.final.final_mat_cub_temp, memory.final.final_mat_cub_temp_bytes, "final_materialize");
 }
 
 bool ranges_overlap(std::uintptr_t a, std::size_t a_bytes, std::uintptr_t b, std::size_t b_bytes) {
@@ -159,6 +187,7 @@ int main() {
 
     StaticDeviceMemory memory;
     allocate_static_device_memory(plan, memory);
+    require_cub_scratch_initialized(plan, memory);
     require(memory.allocation != nullptr, "static allocation must exist");
     require(memory.current_frontier_states != nullptr, "current frontier must exist outside scratch");
     require(memory.scratch_pool != nullptr, "scratch pool must exist");
@@ -279,6 +308,7 @@ int main() {
 
     StaticDeviceMemory multi_memory;
     allocate_static_device_memory(multi_plan, multi_memory);
+    require_cub_scratch_initialized(multi_plan, multi_memory);
     require(
         addr(multi_memory.final.final_candidate_buffer) == addr(multi_memory.final.final_keep_flags),
         "multi rank phase2 and phase3 temp layouts must overlay after selected buffer");

@@ -12,8 +12,10 @@
 #include <cub/device/device_scan.cuh>
 
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 namespace beam {
 
@@ -22,6 +24,70 @@ namespace {
 std::size_t align_up_size(std::size_t value, std::size_t alignment) {
     const std::size_t remainder = value % alignment;
     return remainder == 0 ? value : value + alignment - remainder;
+}
+
+// Phase layouts overlap. Initialize only the union of CUB scratch ranges,
+// before any of the views contain live data. Later writes to an overlapping
+// phase keep those bytes initialized; no per-step memset is necessary.
+void initialize_cub_scratch(const StaticMemoryPlan& plan, const StaticDeviceMemory& memory) {
+    struct Range { std::size_t first, last; };
+    std::array<Range, 4> ranges{};
+    std::size_t count = 0;
+    const auto base = reinterpret_cast<std::uintptr_t>(memory.scratch_pool);
+    const auto add = [&](const void* ptr, std::size_t bytes, const char* name) {
+        if (bytes == 0) return;
+        const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+        if (ptr == nullptr || address < base) {
+            throw std::logic_error(std::string(name) + " CUB scratch is outside its arena");
+        }
+        const auto offset = address - base;
+        if (offset > memory.scratch_pool_bytes || bytes > memory.scratch_pool_bytes - offset) {
+            throw std::logic_error(std::string(name) + " CUB scratch exceeds its arena");
+        }
+        ranges[count++] = Range{offset, offset + bytes};
+    };
+    if (plan.config.stream4_active_sort_slots != 0 &&
+        plan.stream4_cub_temp_bytes > std::numeric_limits<std::size_t>::max() /
+            plan.config.stream4_active_sort_slots) {
+        throw std::overflow_error("Stream 4 CUB scratch slot bytes overflow size_t");
+    }
+    add(memory.streams.stream3_cub_temp, memory.streams.stream3_cub_temp_bytes, "Stream 3");
+    add(memory.streams.stream4_cub_temp,
+        memory.streams.stream4_cub_temp_bytes * plan.config.stream4_active_sort_slots, "Stream 4");
+    add(memory.final_union.cub_temp, plan.layout_union_bytes ? plan.union_cub_temp_bytes : 0, "final union");
+    add(memory.final.final_mat_cub_temp, memory.final.final_mat_cub_temp_bytes, "final materialization");
+    if (count == 0) return;
+    std::sort(ranges.begin(), ranges.begin() + count,
+              [](const Range& a, const Range& b) { return a.first < b.first; });
+    std::size_t merged = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        if (merged && ranges[i].first <= ranges[merged - 1].last) {
+            ranges[merged - 1].last = std::max(ranges[merged - 1].last, ranges[i].last);
+        } else {
+            ranges[merged++] = ranges[i];
+        }
+    }
+
+    const auto check = [](cudaError_t status, const char* action) {
+        if (status != cudaSuccess) {
+            throw std::runtime_error(std::string("CUB scratch ") + action + ": " + cudaGetErrorString(status));
+        }
+    };
+    cudaStream_t stream = nullptr;
+    check(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), "initialization stream creation failed");
+    try {
+        for (std::size_t i = 0; i < merged; ++i) {
+            auto* start = reinterpret_cast<std::byte*>(memory.scratch_pool) + ranges[i].first;
+            check(cudaMemsetAsync(start, 0, ranges[i].last - ranges[i].first, stream), "initialization failed");
+        }
+        // The stream is nonblocking, so explicit completion is required before
+        // handing the arena to any dispatcher streams or CUDA graph.
+        check(cudaStreamSynchronize(stream), "initialization synchronization failed");
+    } catch (...) {
+        cudaStreamDestroy(stream);
+        throw;
+    }
+    check(cudaStreamDestroy(stream), "initialization stream destruction failed");
 }
 
 struct Stream3HashLessForCubTemp {
@@ -930,6 +996,12 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
         memory.final.final_mat_cub_temp =
             final_materialize.take<std::byte>(plan.final_materialize_cub_temp_bytes, 256);
         memory.final.final_mat_cub_temp_bytes = plan.final_materialize_cub_temp_bytes;
+    }
+    try {
+        initialize_cub_scratch(plan, memory);
+    } catch (...) {
+        free_static_device_memory(memory);
+        throw;
     }
 }
 

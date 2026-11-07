@@ -1,0 +1,6 @@
+PAIR 1 speedup_percent=2.256
+PAIR 2 speedup_percent=-0.057
+PAIR 3 speedup_percent=-0.251
+PAIR 4 speedup_percent=-3.534
+PAIR 5 speedup_percent=1.843
+RADIX_PAIRED_FULL_STEP_OK

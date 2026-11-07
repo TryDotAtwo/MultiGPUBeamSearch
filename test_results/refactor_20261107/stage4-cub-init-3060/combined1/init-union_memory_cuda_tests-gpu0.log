@@ -1,0 +1,4 @@
+========= COMPUTE-SANITIZER
+union_array_floor=1015808 phase_budget=1202176
+PASS: logical union scratch budget
+========= ERROR SUMMARY: 0 errors

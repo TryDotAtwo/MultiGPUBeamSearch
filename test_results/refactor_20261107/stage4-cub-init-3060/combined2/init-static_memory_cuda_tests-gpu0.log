@@ -1,0 +1,10 @@
+========= COMPUTE-SANITIZER
+initialized_cub_scratch stream3 bytes=1024
+initialized_cub_scratch stream4 bytes=2048
+initialized_cub_scratch final_union bytes=1024
+initialized_cub_scratch stream3 bytes=1024
+initialized_cub_scratch stream4 bytes=2048
+initialized_cub_scratch final_union bytes=1024
+initialized_cub_scratch final_materialize bytes=256
+static_memory_cuda_tests=pass
+========= ERROR SUMMARY: 0 errors
