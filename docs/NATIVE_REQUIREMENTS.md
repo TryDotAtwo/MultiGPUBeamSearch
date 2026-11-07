@@ -37,6 +37,11 @@ rank processes after their ABI/layout and specialization checks.
   reader completion are distinct. Cross-process messages contain no device pointers.
 - Only explicit native capacity rejection bounds a capacity search. Rank failure,
   malformed receipts, timeout and cancellation close owned processes and propagate.
+- Independent inference probes can restart a failed rank while retaining healthy
+  ranks. NCCL planning/search cohorts still fail together. A quality failure is
+  never used as an inference memory bound. Every accepted inference candidate
+  requires complete rank identity, at least five positive finite timings,
+  numerical-oracle success and complete unthrottled GPU telemetry.
 
 ## Performance and switching
 

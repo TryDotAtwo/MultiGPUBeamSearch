@@ -2,6 +2,8 @@
 #![forbid(unsafe_code)]
 pub mod calibration;
 pub mod history;
+pub mod inference;
+pub mod inference_tuning;
 pub mod pipeline;
 pub mod planning;
 pub mod probes;

@@ -174,7 +174,7 @@ impl ProbeSession {
         input.flush()?;
         Ok(())
     }
-    fn try_receive(&mut self) -> Result<Option<Value>> {
+    pub(crate) fn try_receive(&mut self) -> Result<Option<Value>> {
         self.owner()?;
         if self.cancellation.load(Ordering::Acquire) {
             return Err(Error::Message("probe cancelled".into()));
@@ -213,14 +213,14 @@ impl ProbeSession {
         }
         result
     }
-    fn begin_close(&mut self) -> Result<()> {
+    pub(crate) fn begin_close(&mut self) -> Result<()> {
         self.owner()?;
         self.closed = true;
         self.input.take();
         self.rows.take();
         Ok(())
     }
-    fn finish_close(&mut self, deadline: Instant) -> Result<()> {
+    pub(crate) fn finish_close(&mut self, deadline: Instant) -> Result<()> {
         self.owner()?;
         while self.child.try_wait()?.is_none() && Instant::now() < deadline {
             thread::sleep(Duration::from_millis(5));
@@ -242,6 +242,38 @@ impl ProbeSession {
     pub fn close(&mut self) -> Result<()> {
         self.begin_close()?;
         self.finish_close(Instant::now() + Duration::from_secs(2))
+    }
+    pub(crate) fn bind_cancellation(&mut self, cancellation: Arc<AtomicBool>) {
+        self.cancellation = cancellation;
+    }
+    pub(crate) fn finish(&mut self, timeout: Duration) -> Result<()> {
+        let result = (|| {
+            let deadline = until(timeout)?.min(self.deadline);
+            self.owner()?;
+            self.input.take();
+            loop {
+                if self.cancellation.load(Ordering::Acquire) {
+                    return Err(Error::Message("probe cancelled".into()));
+                }
+                if let Some(status) = self.child.try_wait()? {
+                    return if status.success() {
+                        Ok(())
+                    } else {
+                        Err(Error::Message(format!(
+                            "probe exited with {}",
+                            status.code().unwrap_or(-1)
+                        )))
+                    };
+                }
+                if Instant::now() >= deadline {
+                    return Err(Error::Message("probe timed out".into()));
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+        })();
+        let cleanup = self.close();
+        result?;
+        cleanup
     }
 }
 impl Drop for ProbeSession {

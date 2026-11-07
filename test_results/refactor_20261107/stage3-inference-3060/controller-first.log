@@ -1,0 +1,19 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.49s
+     Running tests/inference.rs (/workspace/target/debug/deps/inference-02038fc53ac3fe8d)
+
+running 2 tests
+test one_shot_inference_validates_receipts_and_reaps_helpers ... ok
+test inference_starts_all_ranks_before_requests_and_restarts_only_failed_rank ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+
+     Running tests/inference_tuning.rs (/workspace/target/debug/deps/inference_tuning-8f3ce5b066e2b8bb)
+
+running 3 tests
+test shared_proposal_and_capacity_seed_require_fresh_verified_cohorts ... ok
+test inference_control_owns_coarse_refinement_reserve_and_complete_rank_statistics ... ok
+test explicit_capacity_rejection_uses_smaller_rows_and_throttling_rejects_entire_selection ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

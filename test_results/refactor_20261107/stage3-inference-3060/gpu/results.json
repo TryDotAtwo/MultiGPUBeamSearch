@@ -1,0 +1,1409 @@
+{
+  "scope": "inference control and numerical oracle compatibility; no production performance promotion",
+  "records": [
+    {
+      "backend": "native_mlp",
+      "world": 1,
+      "batch": 8,
+      "reference": [
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 8,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0006648640036582946,
+            0.000657151997089386,
+            0.0006594560146331787,
+            0.0006562560200691223,
+            0.0006543359756469726,
+            0.0006553599834442139,
+            0.0006562880277633667
+          ],
+          "torch_reserved_peak_bytes": 0
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 8,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0006649280190467834,
+              0.0006563839912414551,
+              0.0006562880277633667,
+              0.0006553599834442139,
+              0.0006551039814949036,
+              0.0006553599834442139,
+              0.0006553599834442139
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "native_mlp",
+      "world": 1,
+      "batch": 32,
+      "reference": [
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.00032707199454307557,
+            0.000319487988948822,
+            0.00031724798679351804,
+            0.0003202559947967529,
+            0.0003182080090045929,
+            0.000317440003156662,
+            0.00031727999448776244
+          ],
+          "torch_reserved_peak_bytes": 0
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 32,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.00032607999444007874,
+              0.0003184640109539032,
+              0.0003182080090045929,
+              0.000317440003156662,
+              0.0003184640109539032,
+              0.0003184640109539032,
+              0.000317440003156662
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "native_mlp",
+      "world": 1,
+      "batch": 16,
+      "reference": [
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 16,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0004749760031700134,
+            0.00046489599347114563,
+            0.00046489599347114563,
+            0.0004647040069103241,
+            0.0004638719856739044,
+            0.0004638719856739044,
+            0.00046796798706054686
+          ],
+          "torch_reserved_peak_bytes": 0
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0004744319915771485,
+              0.0004648959934711456,
+              0.0004648959934711456,
+              0.00046457600593566897,
+              0.0004625279903411865,
+              0.0004648639857769012,
+              0.00046454399824142457
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "libtorch_mlp",
+      "world": 1,
+      "batch": 8,
+      "reference": [
+        {
+          "batch": 8,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.02427187156677246,
+            0.011523072242736816,
+            0.01130799961090088,
+            0.011387904167175293,
+            0.011366399765014648,
+            0.011316224098205567,
+            0.01131929588317871
+          ],
+          "torch_reserved_peak_bytes": 37748736
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 8,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.02510540771484375,
+              0.011668479919433594,
+              0.011507712364196777,
+              0.01155078411102295,
+              0.011487232208251954,
+              0.011552576065063476,
+              0.01150233554840088
+            ],
+            "torch_reserved_peak_bytes": 37748736
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "libtorch_mlp",
+      "world": 1,
+      "batch": 32,
+      "reference": [
+        {
+          "batch": 32,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0035153920650482177,
+            0.003432447910308838,
+            0.003406912088394165,
+            0.0034027519226074218,
+            0.003403775930404663,
+            0.0033966081142425535,
+            0.0034058239459991454
+          ],
+          "torch_reserved_peak_bytes": 130023424
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 32,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0035543038845062256,
+              0.0034229118824005127,
+              0.0034816000461578367,
+              0.003440608024597168,
+              0.0034363200664520263,
+              0.003440608024597168,
+              0.003469151973724365
+            ],
+            "torch_reserved_peak_bytes": 130023424
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "libtorch_mlp",
+      "world": 1,
+      "batch": 16,
+      "reference": [
+        {
+          "batch": 16,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.018958335876464845,
+            0.006259712219238281,
+            0.0061972479820251464,
+            0.006088704109191895,
+            0.00617574405670166,
+            0.006070015907287597,
+            0.006074368000030517
+          ],
+          "torch_reserved_peak_bytes": 52428800
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.01918976020812988,
+              0.006178815841674804,
+              0.006076416015625,
+              0.006048927783966065,
+              0.006165215969085694,
+              0.006107967853546142,
+              0.006050816059112549
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "ensemble",
+      "world": 1,
+      "batch": 8,
+      "reference": [
+        {
+          "batch": 8,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12298616832,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.027884256362915038,
+            0.015560704231262207,
+            0.015401856422424316,
+            0.015465472221374512,
+            0.015605759620666505,
+            0.0155032320022583,
+            0.015493120193481445
+          ],
+          "torch_allocated_peak_bytes": 27770368,
+          "torch_reserved_peak_bytes": 37748736
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 8,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12112887808,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.028803071975708007,
+              0.015811424255371093,
+              0.015756287574768067,
+              0.0156876802444458,
+              0.01564774417877197,
+              0.015614975929260254,
+              0.015598591804504394
+            ],
+            "torch_allocated_peak_bytes": 27770368,
+            "torch_reserved_peak_bytes": 37748736
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "ensemble",
+      "world": 1,
+      "batch": 32,
+      "reference": [
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12060459008,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004671487808227539,
+            0.00470527982711792,
+            0.004701183795928955,
+            0.004655104160308838,
+            0.004711423873901367,
+            0.004639616012573242,
+            0.004675583839416504
+          ],
+          "torch_allocated_peak_bytes": 81935872,
+          "torch_reserved_peak_bytes": 90177536
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 32,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12008030208,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.004791168212890625,
+              0.004696063995361328,
+              0.0046919679641723635,
+              0.004675583839416504,
+              0.00470630407333374,
+              0.004687871932983399,
+              0.004703231811523437
+            ],
+            "torch_allocated_peak_bytes": 81935872,
+            "torch_reserved_peak_bytes": 90177536
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "ensemble",
+      "world": 1,
+      "batch": 16,
+      "reference": [
+        {
+          "batch": 16,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12031098880,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.008333312034606934,
+            0.008302592277526855,
+            0.008302592277526855,
+            0.008282112121582032,
+            0.008229887962341309,
+            0.008295424461364746,
+            0.008260607719421387
+          ],
+          "torch_allocated_peak_bytes": 46699008,
+          "torch_reserved_peak_bytes": 67108864
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12054167552,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.008404800415039063,
+              0.008355839729309082,
+              0.008379232406616212,
+              0.008353792190551757,
+              0.008438783645629883,
+              0.008365951538085937,
+              0.008326144218444824
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 67108864
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "native_mlp",
+      "world": 2,
+      "batch": 8,
+      "reference": [
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 8,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0006654080152511596,
+            0.0006571199893951416,
+            0.0006573439836502075,
+            0.0006553599834442139,
+            0.0006562240123748779,
+            0.0006563839912414551,
+            0.0006553599834442139
+          ],
+          "torch_reserved_peak_bytes": 0
+        },
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 8,
+          "correctness_passed": true,
+          "device": 1,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0006613439917564392,
+            0.0006533120274543762,
+            0.0006540799736976623,
+            0.0006594560146331787,
+            0.0006532800197601318,
+            0.0006533120274543762,
+            0.0006574079990386963
+          ],
+          "torch_reserved_peak_bytes": 0
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 8,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0006644160151481628,
+              0.0006591359972953797,
+              0.0006584320068359376,
+              0.0006574079990386963,
+              0.0006656000018119813,
+              0.0006591039896011353,
+              0.0006573759913444519
+            ],
+            "torch_reserved_peak_bytes": 0
+          },
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 8,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0006609280109405517,
+              0.0006529920101165772,
+              0.0006574079990386963,
+              0.000652288019657135,
+              0.0006512640118598938,
+              0.000652288019657135,
+              0.000652288019657135
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "native_mlp",
+      "world": 2,
+      "batch": 32,
+      "reference": [
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.00032700800895690916,
+            0.000319487988948822,
+            0.000317440003156662,
+            0.000317440003156662,
+            0.00032051199674606323,
+            0.0003184640109539032,
+            0.0003171840012073517
+          ],
+          "torch_reserved_peak_bytes": 0
+        },
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 1,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.00032703998684883117,
+            0.0003184640109539032,
+            0.00031641599535942077,
+            0.0003153919875621796,
+            0.00031731200218200684,
+            0.0003184640109539032,
+            0.0003153919875621796
+          ],
+          "torch_reserved_peak_bytes": 0
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 32,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.00032607999444007874,
+              0.00031939199566841125,
+              0.000317440003156662,
+              0.000317440003156662,
+              0.00031724798679351804,
+              0.000317440003156662,
+              0.000317440003156662
+            ],
+            "torch_reserved_peak_bytes": 0
+          },
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 32,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.00032585600018501283,
+              0.0003184640109539032,
+              0.000317440003156662,
+              0.00031641599535942077,
+              0.00031641599535942077,
+              0.00031641599535942077,
+              0.00031625598669052127
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "native_mlp",
+      "world": 2,
+      "batch": 16,
+      "reference": [
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 16,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0004747839868068695,
+            0.00046592000126838686,
+            0.0004666880071163177,
+            0.00046489599347114563,
+            0.00046489599347114563,
+            0.00046489599347114563,
+            0.00046489599347114563
+          ],
+          "torch_reserved_peak_bytes": 0
+        },
+        {
+          "backbone_oracle_max_key_error": 0,
+          "batch": 16,
+          "correctness_passed": true,
+          "device": 1,
+          "executor": "native_cuda_graph",
+          "model_count": 1,
+          "native_scalar_score_offset": 3.0,
+          "numeric_error": 0,
+          "oracle_parent_chunk": 128,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.00047440001368522644,
+            0.0004638719856739044,
+            0.00046592000126838686,
+            0.0004668479859828949,
+            0.0004628480076789856,
+            0.0004618239998817444,
+            0.0004628480076789856
+          ],
+          "torch_reserved_peak_bytes": 0
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0004731520116329193,
+              0.0004792320132255554,
+              0.00046592000126838686,
+              0.0004648959934711456,
+              0.0004638719856739044,
+              0.0004646399915218353,
+              0.0004647679924964905
+            ],
+            "torch_reserved_peak_bytes": 0
+          },
+          {
+            "backbone_oracle_max_key_error": 0,
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "native_cuda_graph",
+            "model_count": 1,
+            "native_scalar_score_offset": 3.0,
+            "numeric_error": 0,
+            "oracle_parent_chunk": 128,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.00047283199429512025,
+              0.0004648959934711456,
+              0.00046796798706054686,
+              0.0004646080136299133,
+              0.0004637759923934937,
+              0.0004627520143985748,
+              0.0004638719856739044
+            ],
+            "torch_reserved_peak_bytes": 0
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "libtorch_mlp",
+      "world": 2,
+      "batch": 8,
+      "reference": [
+        {
+          "batch": 8,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.024845312118530274,
+            0.011822079658508301,
+            0.01164902400970459,
+            0.011709728240966798,
+            0.011685728073120117,
+            0.011688896179199219,
+            0.011749216079711914
+          ],
+          "torch_reserved_peak_bytes": 37748736
+        },
+        {
+          "batch": 8,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 1,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.025281503677368165,
+            0.011965120315551758,
+            0.011818943977355957,
+            0.011889887809753417,
+            0.011926560401916505,
+            0.01197772789001465,
+            0.011997183799743653
+          ],
+          "torch_reserved_peak_bytes": 37748736
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 8,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.025005056381225587,
+              0.012040191650390624,
+              0.01186406421661377,
+              0.01185497570037842,
+              0.011806528091430664,
+              0.011829248428344728,
+              0.011833248138427734
+            ],
+            "torch_reserved_peak_bytes": 37748736
+          },
+          {
+            "batch": 8,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.025005056381225587,
+              0.01204028797149658,
+              0.01184444808959961,
+              0.011788288116455076,
+              0.011782976150512697,
+              0.011809951782226562,
+              0.011801600456237791
+            ],
+            "torch_reserved_peak_bytes": 37748736
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "libtorch_mlp",
+      "world": 2,
+      "batch": 32,
+      "reference": [
+        {
+          "batch": 32,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.003705856084823608,
+            0.0035727360248565673,
+            0.003556191921234131,
+            0.003586047887802124,
+            0.0036239359378814695,
+            0.0035842878818511965,
+            0.003545151948928833
+          ],
+          "torch_reserved_peak_bytes": 130023424
+        },
+        {
+          "batch": 32,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 1,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0036669440269470215,
+            0.0035233919620513915,
+            0.003505151987075806,
+            0.0035174400806427,
+            0.003510080099105835,
+            0.0035174400806427,
+            0.0034969921112060548
+          ],
+          "torch_reserved_peak_bytes": 130023424
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 32,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.0036159679889678953,
+              0.0035392000675201415,
+              0.0035386879444122316,
+              0.003507136106491089,
+              0.003474431991577149,
+              0.0035458559989929197,
+              0.003526976108551025
+            ],
+            "torch_reserved_peak_bytes": 130023424
+          },
+          {
+            "batch": 32,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.003681279897689819,
+              0.0035911679267883303,
+              0.0035727360248565673,
+              0.0035655679702758787,
+              0.0035460801124572753,
+              0.0036103999614715576,
+              0.0035420479774475096
+            ],
+            "torch_reserved_peak_bytes": 130023424
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "libtorch_mlp",
+      "world": 2,
+      "batch": 16,
+      "reference": [
+        {
+          "batch": 16,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 0,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.019701759338378907,
+            0.006379519939422608,
+            0.006293248176574707,
+            0.006285312175750732,
+            0.006397952079772949,
+            0.0062791681289672855,
+            0.006231040000915527
+          ],
+          "torch_reserved_peak_bytes": 52428800
+        },
+        {
+          "batch": 16,
+          "batch_invariance_max_key_error": 0,
+          "correctness_passed": true,
+          "device": 1,
+          "executor": "libtorch_eager",
+          "model_count": 1,
+          "numeric_error": 0,
+          "parents": 129,
+          "score_input": "graph_states",
+          "seconds": [
+            0.019631103515625,
+            0.006392799854278565,
+            0.006240255832672119,
+            0.0062360320091247555,
+            0.006257535934448243,
+            0.006225855827331543,
+            0.006182720184326172
+          ],
+          "torch_reserved_peak_bytes": 52428800
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 0,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.019118080139160155,
+              0.00651855993270874,
+              0.006408192157745361,
+              0.006494336128234864,
+              0.006577023983001709,
+              0.006451039791107178,
+              0.006545375823974609
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          },
+          {
+            "batch": 16,
+            "batch_invariance_max_key_error": 0,
+            "correctness_passed": true,
+            "device": 1,
+            "executor": "libtorch_eager",
+            "model_count": 1,
+            "numeric_error": 0,
+            "parents": 129,
+            "score_input": "graph_states",
+            "seconds": [
+              0.019393600463867188,
+              0.00643177604675293,
+              0.006456319808959961,
+              0.006333600044250489,
+              0.006346591949462891,
+              0.006339583873748779,
+              0.006326272010803223
+            ],
+            "torch_reserved_peak_bytes": 52428800
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "ensemble",
+      "world": 2,
+      "batch": 8,
+      "reference": [
+        {
+          "batch": 8,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12298616832,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.029074432373046875,
+            0.016013311386108398,
+            0.01601740837097168,
+            0.016003999710083008,
+            0.015921152114868165,
+            0.015866880416870118,
+            0.015862655639648438
+          ],
+          "torch_allocated_peak_bytes": 27770368,
+          "torch_reserved_peak_bytes": 37748736
+        },
+        {
+          "batch": 8,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12300713984,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.029069311141967775,
+            0.016054271697998047,
+            0.016113664627075194,
+            0.016079584121704103,
+            0.01600102424621582,
+            0.0158535680770874,
+            0.015895392417907713
+          ],
+          "torch_allocated_peak_bytes": 27770368,
+          "torch_reserved_peak_bytes": 37748736
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 8,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12112887808,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.02956390380859375,
+              0.01617407989501953,
+              0.016119808197021485,
+              0.016035839080810545,
+              0.01603993606567383,
+              0.016012287139892577,
+              0.01597439956665039
+            ],
+            "torch_allocated_peak_bytes": 27770368,
+            "torch_reserved_peak_bytes": 37748736
+          },
+          {
+            "batch": 8,
+            "correctness_passed": true,
+            "device": 1,
+            "free_bytes_after": 12114984960,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.029510656356811524,
+              0.016320415496826172,
+              0.016293792724609374,
+              0.016126976013183594,
+              0.016125728607177734,
+              0.016146240234375,
+              0.01637046432495117
+            ],
+            "torch_allocated_peak_bytes": 27770368,
+            "torch_reserved_peak_bytes": 37748736
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "ensemble",
+      "world": 2,
+      "batch": 32,
+      "reference": [
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12060459008,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004846271991729737,
+            0.0048455681800842285,
+            0.004861760139465332,
+            0.004867072105407715,
+            0.004808703899383545,
+            0.004769792079925537,
+            0.004846303939819336
+          ],
+          "torch_allocated_peak_bytes": 81935872,
+          "torch_reserved_peak_bytes": 90177536
+        },
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12062556160,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004853759765625,
+            0.004836351871490479,
+            0.00483622407913208,
+            0.004886271953582763,
+            0.004817920207977295,
+            0.004767519950866699,
+            0.004846591949462891
+          ],
+          "torch_allocated_peak_bytes": 81935872,
+          "torch_reserved_peak_bytes": 90177536
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 32,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12008030208,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.004874239921569825,
+              0.004934656143188477,
+              0.0048527359962463375,
+              0.0048855037689208985,
+              0.004820864200592041,
+              0.004829184055328369,
+              0.00486195182800293
+            ],
+            "torch_allocated_peak_bytes": 81935872,
+            "torch_reserved_peak_bytes": 90177536
+          },
+          {
+            "batch": 32,
+            "correctness_passed": true,
+            "device": 1,
+            "free_bytes_after": 12010127360,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.00487014389038086,
+              0.004955135822296143,
+              0.004853759765625,
+              0.0049090561866760255,
+              0.0048371520042419435,
+              0.004832191944122315,
+              0.004871007919311524
+            ],
+            "torch_allocated_peak_bytes": 81935872,
+            "torch_reserved_peak_bytes": 90177536
+          }
+        ],
+        "failures": []
+      }
+    },
+    {
+      "backend": "ensemble",
+      "world": 2,
+      "batch": 16,
+      "reference": [
+        {
+          "batch": 16,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12031098880,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.008607744216918945,
+            0.008540160179138183,
+            0.008568672180175782,
+            0.008529760360717774,
+            0.008527711868286133,
+            0.008477439880371094,
+            0.008476672172546386
+          ],
+          "torch_allocated_peak_bytes": 46699008,
+          "torch_reserved_peak_bytes": 67108864
+        },
+        {
+          "batch": 16,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12033196032,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 129,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.008593119621276856,
+            0.008570591926574707,
+            0.008584959983825684,
+            0.008542176246643066,
+            0.008572928428649903,
+            0.008519680023193359,
+            0.008527872085571288
+          ],
+          "torch_allocated_peak_bytes": 46699008,
+          "torch_reserved_peak_bytes": 67108864
+        }
+      ],
+      "rust": {
+        "rows": [
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 0,
+            "free_bytes_after": 12054167552,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.008768287658691407,
+              0.008647680282592773,
+              0.008660863876342774,
+              0.008630271911621093,
+              0.008762368202209473,
+              0.008554495811462403,
+              0.008629216194152831
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 67108864
+          },
+          {
+            "batch": 16,
+            "correctness_passed": true,
+            "device": 1,
+            "free_bytes_after": 12056264704,
+            "model_count": 2,
+            "numeric_error": 0,
+            "parents": 129,
+            "readout_oracle_max_key_error": 0,
+            "score_input": "graph_states",
+            "seconds": [
+              0.008763392448425293,
+              0.008653823852539062,
+              0.008687616348266602,
+              0.008675456047058105,
+              0.008752127647399903,
+              0.008594304084777833,
+              0.008605695724487305
+            ],
+            "torch_allocated_peak_bytes": 46699008,
+            "torch_reserved_peak_bytes": 67108864
+          }
+        ],
+        "failures": []
+      }
+    }
+  ]
+}

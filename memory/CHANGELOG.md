@@ -968,3 +968,9 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Added cancellation tokens independent of PyO3 locks and fail-fast one-shot rank supervision with bounded log draining.
 - Fixed the existing single-GPU finalizer's missing global keep count, which prevented natural-growth calibration from observing a full frontier. Added partial/full single-GPU counter checks and retained multi-rank final-union checks.
 - Validation evidence is recorded separately under test_results/refactor_20261107; full-plan and architecture-wide acceptance remain pending.
+
+## 2026-11-07 - Rust inference calibration control
+- Added rank-local inference pools and PyO3 ownership. Ensemble probes retain weights/processes across compatible batches; existing native and LibTorch MLP probes preserve their one-shot protocol. All ranks start before readiness, and only a failed independent scorer rank restarts.
+- Moved coarse/refinement microbatch search, capacity bootstrap, fresh shared-proposal checks, all-rank timing statistics, telemetry and reserve calculation into Rust. Preserved numerical kernels and the existing inference-only selection threshold; CUDA promotion still requires paired full-step evidence.
+- Reproduced and fixed retained-session deadline poisoning and incorrect OOM classification of failed quality receipts. Added active Python-thread cancellation, phase cleanup and telemetry serialization compatibility.
+- Native MLP, LibTorch MLP and ensemble control comparisons passed on one/two RTX3060, including partial final batches and independent numerical oracles. Evidence and final source-bound checks are recorded under test_results/refactor_20261107. Public configuration/cache migration, CNOT orchestration, CUDA optimization and final switching remain in progress.

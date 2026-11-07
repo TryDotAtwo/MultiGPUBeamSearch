@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 pub mod calibration;
 pub mod history;
+pub mod inference;
 pub mod planning;
 
 #[derive(Debug, thiserror::Error)]

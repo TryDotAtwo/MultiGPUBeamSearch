@@ -1,0 +1,9 @@
+INFERENCE_COMPARE_OK native_mlp world=1
+INFERENCE_COMPARE_OK libtorch_mlp world=1
+INFERENCE_COMPARE_OK ensemble world=1
+INFERENCE_TUNE_OK world=1 micro=32
+INFERENCE_COMPARE_OK native_mlp world=2
+INFERENCE_COMPARE_OK libtorch_mlp world=2
+INFERENCE_COMPARE_OK ensemble world=2
+INFERENCE_TUNE_OK world=2 micro=32
+NATIVE_INFERENCE_GPU_OK

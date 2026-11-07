@@ -1,0 +1,9 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0432]: unresolved import `beam_runtime::inference_tuning`
+ --> rust/beam-runtime/tests/inference_tuning.rs:1:51
+  |
+1 | use beam_runtime::{inference::{Batch,RankFailure},inference_tuning::{tune_inference,InferenceEvaluator,ProbeResult,TuneConfig},teleme...
+  |                                                   ^^^^^^^^^^^^^^^^ could not find `inference_tuning` in `beam_runtime`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-runtime` (test "inference_tuning") due to 1 previous error

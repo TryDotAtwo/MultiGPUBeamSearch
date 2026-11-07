@@ -89,6 +89,29 @@ so its confidence interval endpoints need not be bit-identical to the Python
 reference's RNG. Neither policy changes inference arithmetic. The public cache
 and candidate-generation policy still require migration before default switching.
 
+`InferencePool` owns one independent scorer probe per rank. The ensemble protocol
+retains model/arena processes across batches; existing native MLP and LibTorch
+MLP helpers remain one-shot executables. All ranks start before readiness is
+awaited or work is sent. A failed inference process is reaped independently;
+healthy ranks are retained because these probes do not run NCCL collectives.
+Cancellation and phase timeout close all owned processes. A per-measurement
+deadline never becomes the retained process's lifetime limit.
+
+The Rust inference controller owns coarse candidates, one bounded refinement,
+capacity-bootstrap and fresh shared-proposal verification, telemetry, slowest-rank
+statistics and reserve calculation. Only explicit CUDA allocation failure allows
+the baseline to retreat to smaller rows; an invalid quality/identity receipt
+cannot be reclassified as OOM by unrelated log text. Missing/duplicate ranks,
+nonfinite timings, numeric errors and throttling reject evidence. The existing
+microbatch threshold remains 2%; it cannot promote a CUDA optimization, whose
+paired full-step gate is separate. Candidate ordering/bootstrap use the versioned
+SplitMix64 policy. Numerical inference kernels are unchanged.
+
+PyO3 exposes this complete controller and releases the GIL while it runs. The
+public package still uses its Python reference policy until the final adapter
+switch. Persisted inference receipts retain the established row/telemetry format;
+the legacy cache validator accepts the produced real one/two-GPU receipts.
+
 `paired_promotion` is a separate optimization gate: identical model/input/beam/
 precision/ranks, at least five warmed complete-step pairs, and a conservative
 upper time-ratio bound of 0.95, or measured peak-memory reduction in every pair
@@ -118,6 +141,12 @@ despite a valid frontier. The selected states and inference policy are unchanged
   repeated components and bounded capacity search on one/two GPUs.
 - `tests/native_pipeline_gpu.py`: reference/Rust complete steps, explicit legal
   frontier and natural growth, followed by the Rust-owned shortlist loop.
+- `tests/native_inference_gpu.py`: native MLP, LibTorch MLP and ensemble probes on
+  one/two GPUs, all seven timing samples and partial final batches, retained PIDs,
+  independent numerical oracles and the Rust-owned inference search loop.
+- `rust/beam-python/tests/inference.py`: retained rank PIDs and active cancellation
+  from another Python thread. Rust tests also reproduce deadline poisoning and
+  distinguish startup OOM from an invalid quality receipt.
 - Rust history tests cover disk-first reservations, out-of-order ready batches,
   empty batches, capacity diagnostics, RAM pruning and injected disk-write failure
   without overwriting future RAM reservations. Probe tests cover retained PIDs,

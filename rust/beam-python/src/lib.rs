@@ -1,5 +1,6 @@
 //! Thin Python adapter; runtime implementation lives in beam-runtime.
 #![forbid(unsafe_code)]
+mod inference;
 mod pipeline;
 mod planning;
 mod probes;
@@ -116,6 +117,7 @@ fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     probes::register(module)?;
     planning::register(module)?;
     pipeline::register(module)?;
+    inference::register(module)?;
     module.add("ABI_VERSION", 1)?;
     Ok(())
 }

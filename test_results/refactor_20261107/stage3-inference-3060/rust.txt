@@ -1,0 +1,180 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.63s
+     Running unittests src/main.rs (/workspace/target/debug/deps/beam_runner-4ff893dd9332a300)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/target/debug/deps/beam_core-db5cd96cb8aaa3f9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/calibration.rs (/workspace/target/debug/deps/calibration-b3682335006feb31)
+
+running 2 tests
+test complete_slow_rank_cohorts_select_stable_gains_only ... ok
+test optimization_promotion_needs_five_matching_pairs_and_material_full_step_gain ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/contracts.rs (/workspace/target/debug/deps/contracts-e7d9a091bbbac993)
+
+running 3 tests
+test binary_layout_and_complete_hash_order ... ok
+test domains_do_not_confuse_matrix_words_and_permutation_padding ... ok
+test exact_global_width_and_overflow_diagnostics ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/history.rs (/workspace/target/debug/deps/history-83dfad703be46342)
+
+running 2 tests
+test exact_history_reservations_and_tail_fallback ... ok
+test full_depth_placement_zero_and_arithmetic_limits ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/inference.rs (/workspace/target/debug/deps/inference-85be6a2eec0c8180)
+
+running 2 tests
+test bounded_inference_candidates_preserve_non_power_of_two_cap ... ok
+test noisy_baseline_does_not_disqualify_complete_stable_inference_cohort ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/planning.rs (/workspace/target/debug/deps/planning-c74ca61a9410a29b)
+
+running 2 tests
+test admission_requires_every_rank_and_identical_protocol ... ok
+test exact_width_quotas_do_not_overflow_or_include_spare_slots ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/target/debug/deps/beam_native_sys-7fd6c9a5203a67a9)
+
+running 3 tests
+test history::tests::views_empty_alignment_and_panic_boundary ... ok
+test tests::c_layout ... ok
+test tests::absent_library_is_an_error_not_a_cuda_import ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/context.rs (/workspace/target/debug/deps/context-49a14835581394fb)
+
+running 1 test
+test real_ffi_context_reuses_copied_jobs_and_propagates_errors ... ignored, requires BEAM_TEST_LIBRARY built from the CPU ABI fixture
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/target/debug/deps/_beam_runtime-5be3bde6f206432e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/target/debug/deps/beam_runtime-d22299a4a669e9b0)
+
+running 1 test
+test history::tests::disk_error_fallback_cannot_overwrite_future_ram_layer ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/calibration.rs (/workspace/target/debug/deps/calibration-1c74e036a6eda7fe)
+
+running 2 tests
+test capacity_only_retreats_on_explicit_rejection_and_keeps_exact_lower_bound ... ok
+test rust_owns_admit_release_measure_select_sequence_and_freezes_microbatch ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/history.rs (/workspace/target/debug/deps/history-afd7dd5211955a64)
+
+running 3 tests
+test ram_pruning_preserves_reconstructed_routes ... ok
+test invalid_parent_and_memory_budget_fail_explicitly ... ok
+test formats_bounds_and_out_of_order_batches ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/inference.rs (/workspace/target/debug/deps/inference-02038fc53ac3fe8d)
+
+running 2 tests
+test one_shot_inference_validates_receipts_and_reaps_helpers ... ok
+test inference_starts_all_ranks_before_requests_and_restarts_only_failed_rank ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+
+     Running tests/inference_tuning.rs (/workspace/target/debug/deps/inference_tuning-8f3ce5b066e2b8bb)
+
+running 3 tests
+test shared_proposal_and_capacity_seed_require_fresh_verified_cohorts ... ok
+test inference_control_owns_coarse_refinement_reserve_and_complete_rank_statistics ... ok
+test explicit_capacity_rejection_uses_smaller_rows_and_throttling_rejects_entire_selection ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/pipeline.rs (/workspace/target/debug/deps/pipeline-df7a5b0585b7020e)
+
+running 1 test
+test complete_depth_parser_rejects_missing_reordered_and_changed_workloads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/planning.rs (/workspace/target/debug/deps/planning-d90a770c83352213)
+
+running 1 test
+test planning_preserves_exact_width_freezes_inference_and_cancels_all_preparations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/probes.rs (/workspace/target/debug/deps/probes-9df0617ad1df1b5d)
+
+running 4 tests
+test retained_probe_ignores_logs_and_reuses_process ... ok
+test one_shot_cohort_drains_json_logs_and_fails_fast_on_any_rank ... ok
+test cancellation_interrupts_a_wait_without_holding_the_session_lock ... ok
+test deadline_and_one_rank_failure_close_owned_cohort ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.09s
+
+     Running tests/resident.rs (/workspace/target/debug/deps/resident-814528252f1e30ca)
+
+running 3 tests
+test a_failed_rank_closes_the_entire_owned_group ... ok
+test repeated_jobs_keep_rank_pids_and_merge_logs ... ok
+test timeout_and_cancellation_are_terminal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.16s
+
+     Running tests/telemetry.rs (/workspace/target/debug/deps/telemetry-f3e3a81dc2ea5f49)
+
+running 1 test
+test telemetry_requires_selected_cohorts_and_rejects_missing_or_throttled_rows ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests beam_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests beam_native_sys
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests beam_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

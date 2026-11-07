@@ -15,11 +15,29 @@ pub struct Row {
     pub temperature: i32,
     pub throttled: bool,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Receipt {
     pub samples: Vec<Vec<Row>>,
     pub errors: Vec<String>,
     pub interval_seconds: f64,
+}
+impl Serialize for Receipt {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut value = serializer.serialize_struct("Receipt", 5)?;
+        value.serialize_field("samples", &self.samples)?;
+        value.serialize_field("errors", &self.errors)?;
+        value.serialize_field("interval_seconds", &self.interval_seconds)?;
+        value.serialize_field("throttled", &self.throttled())?;
+        value.serialize_field(
+            "scope",
+            "sampled visible GPUs; transient events may be missed",
+        )?;
+        value.end()
+    }
 }
 pub fn parse(text: &str) -> Result<Vec<Row>> {
     let mut rows = Vec::new();
@@ -57,8 +75,15 @@ pub fn parse(text: &str) -> Result<Vec<Row>> {
     Ok(rows)
 }
 impl Receipt {
+    pub fn throttled(&self) -> bool {
+        self.samples.iter().flatten().any(|row| row.throttled)
+    }
     pub fn verified(&self, uuids: &[String], indices: &[u32]) -> bool {
-        if !self.errors.is_empty() || self.samples.len() < 2 || indices.is_empty() {
+        if !self.errors.is_empty()
+            || self.samples.len() < 2
+            || indices.is_empty()
+            || self.throttled()
+        {
             return false;
         }
         let normalize = |s: &str| s.to_ascii_lowercase().trim_start_matches("gpu-").to_owned();

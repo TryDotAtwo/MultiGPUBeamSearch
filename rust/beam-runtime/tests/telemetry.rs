@@ -8,7 +8,9 @@ fn telemetry_requires_selected_cohorts_and_rejects_missing_or_throttled_rows() {
         interval_seconds: 5.,
     };
     assert!(receipt.verified(&["abc".into(), "def".into()], &[0, 1]));
+    assert_eq!(serde_json::to_value(&receipt).unwrap()["throttled"], false);
     receipt.samples[1][1].throttled = true;
+    assert_eq!(serde_json::to_value(&receipt).unwrap()["throttled"], true);
     assert!(!receipt.verified(&["abc".into(), "def".into()], &[0, 1]));
     assert!(!receipt.verified(&["unknown".into()], &[0]));
     assert!(parse("0, GPU-a, 60, N/A, Not Active, Not Active").is_err());
