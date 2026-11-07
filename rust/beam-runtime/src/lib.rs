@@ -1,14 +1,20 @@
 //! Persistent session, rank process and history ownership.
 #![forbid(unsafe_code)]
+pub mod calibration;
 pub mod history;
+pub mod pipeline;
+pub mod planning;
 pub mod probes;
 mod resident;
+pub mod telemetry;
 mod worker;
 pub use resident::ResidentWorkers;
 pub use worker::run_native_worker;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("capacity rejected: {0}")]
+    CapacityRejected(String),
     #[error("{0}")]
     Message(String),
     #[error(transparent)]

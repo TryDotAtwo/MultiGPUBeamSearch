@@ -1,0 +1,970 @@
+{
+  "archive_sha256": "ea40072c8feb17564c2119cd53df7e99e0090fd0362f05604b3aad1da96cafab",
+  "files": [
+    {
+      "path": "red.txt",
+      "bytes": 470,
+      "sha256": "353baad4b559ce5939a4e6aa2a714c1bbf917df5a1d924b9571d41959c439f9a"
+    },
+    {
+      "path": "rust.txt",
+      "bytes": 4911,
+      "sha256": "cd0880518507747bca11a779f0e7859e77da9cf8660d4c54e6396f9a238db305"
+    },
+    {
+      "path": "release.txt",
+      "bytes": 591,
+      "sha256": "cc5c2d9c3bb7066366ab322c1b4bb90212c1ca15c48787f14f53b34e78e49bd2"
+    },
+    {
+      "path": "gpu.txt",
+      "bytes": 1328,
+      "sha256": "84d1a4b0d56c9d9f8c541f16b32ad604179f5e10ce2b2ff8a0ccdf6854241673"
+    },
+    {
+      "path": "gpu/weights/input_weight_hxk.fp16",
+      "bytes": 147456,
+      "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+    },
+    {
+      "path": "gpu/weights/input_bias.fp16",
+      "bytes": 16,
+      "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+    },
+    {
+      "path": "gpu/weights/hidden_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+    },
+    {
+      "path": "gpu/weights/hidden_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu/weights/residual0_fc1_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+    },
+    {
+      "path": "gpu/weights/residual0_fc1_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu/weights/residual0_fc2_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+    },
+    {
+      "path": "gpu/weights/residual0_fc2_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu/weights/output_weight_hxk.fp16",
+      "bytes": 16,
+      "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+    },
+    {
+      "path": "gpu/weights/output_bias.fp16",
+      "bytes": 2,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "path": "gpu/weights/manifest.json",
+      "bytes": 293,
+      "sha256": "81b5df79aa6143d0b38edd9eb106c21eb2c1773d510d99dfd6be13a0a5af9459"
+    },
+    {
+      "path": "gpu/puzzle.json",
+      "bytes": 9505,
+      "sha256": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc"
+    },
+    {
+      "path": "gpu/test.csv",
+      "bytes": 227,
+      "sha256": "b3136207553957eeb4c254adef2924ea1e0e50b715a397aca7568153b5e7f4ab"
+    },
+    {
+      "path": "gpu/python-1/rank-0.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "gpu-final.txt",
+      "bytes": 23,
+      "sha256": "15722342d25a950c462584d7c3730dc4172128dfb0be66814ca2acd0b6091075"
+    },
+    {
+      "path": "gpu-final/weights/input_weight_hxk.fp16",
+      "bytes": 147456,
+      "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+    },
+    {
+      "path": "gpu-final/weights/input_bias.fp16",
+      "bytes": 16,
+      "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+    },
+    {
+      "path": "gpu-final/weights/hidden_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+    },
+    {
+      "path": "gpu-final/weights/hidden_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu-final/weights/residual0_fc1_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+    },
+    {
+      "path": "gpu-final/weights/residual0_fc1_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu-final/weights/residual0_fc2_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+    },
+    {
+      "path": "gpu-final/weights/residual0_fc2_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu-final/weights/output_weight_hxk.fp16",
+      "bytes": 16,
+      "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+    },
+    {
+      "path": "gpu-final/weights/output_bias.fp16",
+      "bytes": 2,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "path": "gpu-final/weights/manifest.json",
+      "bytes": 293,
+      "sha256": "81b5df79aa6143d0b38edd9eb106c21eb2c1773d510d99dfd6be13a0a5af9459"
+    },
+    {
+      "path": "gpu-final/puzzle.json",
+      "bytes": 9505,
+      "sha256": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc"
+    },
+    {
+      "path": "gpu-final/test.csv",
+      "bytes": 227,
+      "sha256": "b3136207553957eeb4c254adef2924ea1e0e50b715a397aca7568153b5e7f4ab"
+    },
+    {
+      "path": "gpu-final/python-1/rank-0.log",
+      "bytes": 1557,
+      "sha256": "d8937697b0b01a74ed0e65fef27cbe5610b5b1b848bcdc9b92cd9ff915f5f610"
+    },
+    {
+      "path": "gpu-final/rust-1/rank-0.log",
+      "bytes": 3311,
+      "sha256": "515898158c8486bedb58ee09cc66500e17732422830ab7504498bbf60e49e720"
+    },
+    {
+      "path": "gpu-final/python-2/rank-0.log",
+      "bytes": 1560,
+      "sha256": "6aadc309a0998eddb261426ef41250812f1483221f427b21c766418300b2be2a"
+    },
+    {
+      "path": "gpu-final/python-2/rank-1.log",
+      "bytes": 1560,
+      "sha256": "bb131e99ace187cfc04d393fb2bddb232d5ab0554a27c8daf6e4c881570be6f2"
+    },
+    {
+      "path": "gpu-final/python-2/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "1e1c95912bf21f760952207c8722b9c0e5aad998f1d3f72eeda65c90a2ff32d7"
+    },
+    {
+      "path": "gpu-final/rust-2/rank-0.log",
+      "bytes": 3880,
+      "sha256": "7cd061b8885954773c3c10707f5161a1dedd785d17a6a5c3f33f682619e813f8"
+    },
+    {
+      "path": "gpu-final/rust-2/rank-1.log",
+      "bytes": 3868,
+      "sha256": "ec086f6d6af1ad0e47fc5b42199e4941b4e3e5b050164037b223984984e5a396"
+    },
+    {
+      "path": "gpu-final/rust-2/nccl-id.bin",
+      "bytes": 167,
+      "sha256": "13d7c66d78889b60bfb9cc7d52cc4c68bb740f652fe7efd92a30e5e058286399"
+    },
+    {
+      "path": "gpu-final/results.json",
+      "bytes": 14948,
+      "sha256": "e176b39e3f27462d5c72670e55a4070d8aee07bf6a5d6ee2888b7ece3329596b"
+    },
+    {
+      "path": "calibration-red.txt",
+      "bytes": 513,
+      "sha256": "5bc3ef4a69423310d47fcc1f2e1b0857fe0a5e2786d99779ec4711a55dd135f1"
+    },
+    {
+      "path": "sweep-red.txt",
+      "bytes": 664,
+      "sha256": "84a479ab469e2fe191802827e6e5b409a9ad35e170b7b04ee7a9792240c4b861"
+    },
+    {
+      "path": "statistics.txt",
+      "bytes": 501,
+      "sha256": "c31421e621812291d0a535a1dc8d99cc7fb4c093406ac72a61e1c365c1f6238b"
+    },
+    {
+      "path": "pipeline-red.txt",
+      "bytes": 466,
+      "sha256": "5de06d84c21fc6ee6138bfdf6143d784bbdd97390cc65838a823c314c84fa278"
+    },
+    {
+      "path": "sweep.txt",
+      "bytes": 522,
+      "sha256": "15fdb99de9607c7290bc0cfc8743da23013a847c21a867cacb098a18bc3e672c"
+    },
+    {
+      "path": "telemetry-red.txt",
+      "bytes": 463,
+      "sha256": "4e25395050c7d1c2705d82ac3ded54ffae1a83f39b03d15d4d923a46b972cfd2"
+    },
+    {
+      "path": "process-pipeline.txt",
+      "bytes": 894,
+      "sha256": "f2b8f6d5ef6d0221db0e97a3ca58389bcdb38dcb49596b3b929fde914f811580"
+    },
+    {
+      "path": "pipeline-gpu-red.txt",
+      "bytes": 454,
+      "sha256": "4adab2b9b8e5731025cbc5b50e1a6fe00b16a5ca4835fcfe1bbfee250ddadfb1"
+    },
+    {
+      "path": "rust-final.txt",
+      "bytes": 6309,
+      "sha256": "f4f39d117adb161cc1554691e0de88ee8a11489095341e5fe81ef4e92a4bd86c"
+    },
+    {
+      "path": "release-final.txt",
+      "bytes": 444,
+      "sha256": "e4d715802678608575c869200c7fc9e915b427b9c0bed15c959c9d9037534047"
+    },
+    {
+      "path": "pipeline-gpu.txt",
+      "bytes": 1362,
+      "sha256": "e069005e48b0d2ae6afb5322a662d52d494d0d966cb5a7987869bd93f0eb097c"
+    },
+    {
+      "path": "pipeline-gpu/test.csv",
+      "bytes": 227,
+      "sha256": "e023ac1d36dd15c590ce0389226568dfb407ce7a3973c80df6623496c7c0c268"
+    },
+    {
+      "path": "pipeline-gpu/world-1/reference-plans/rank-0.log",
+      "bytes": 731,
+      "sha256": "690b7f3cf033e5568268b01714a2f70630b22acb60ab89f60fd16738ff236aaa"
+    },
+    {
+      "path": "pipeline-gpu/world-1/frontiers/frontier-rank-0.bin",
+      "bytes": 7168,
+      "sha256": "cadc9d060c82b9e9e240324a592d5d5c23a28d6b5d8d4c2b2627d7abef2a5a7c"
+    },
+    {
+      "path": "pipeline-gpu/world-1/frontiers/receipt.json",
+      "bytes": 572,
+      "sha256": "58669ffb3ccc1f3ffa9a5b7f4a3c3e01872ef223faacf79f8955916475119dfa"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-fixture/1/test_results/unsolved_run_1794055990560526173_r0_0/no_solution_p0_d6_b64.log",
+      "bytes": 325,
+      "sha256": "a6fd8e5da9232926c96910936b855ae2c23532777e093f5df6342f12403e928e"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-fixture/1/rank-0.log",
+      "bytes": 1233,
+      "sha256": "0e6bb6dfd4475dfc5fe6ef8a7dfd8a0911067f7c4455822f0130ba7988af40f5"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-fixture/1/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "d203881796d8ec9d36accfc3ac1b93227cd538ec547994897a1870cd24ab7965"
+    },
+    {
+      "path": "pipeline-gpu/world-1/rust-fixture/planning/rank-0.log",
+      "bytes": 731,
+      "sha256": "c38c6175f1758ff490862ae8868ec2369ff5d4e59587d293f304f967d571f2d6"
+    },
+    {
+      "path": "pipeline-gpu/world-1/rust-fixture/1/test_results/unsolved_run_1794055991736070168_r0_0/no_solution_p0_d6_b64.log",
+      "bytes": 323,
+      "sha256": "d64b219ec06be7420ce3ec7ad379384b22a1c7deff6291fbcdd6ccd2f3e3143e"
+    },
+    {
+      "path": "pipeline-gpu/world-1/rust-fixture/1/ranks/rank-0.log",
+      "bytes": 1232,
+      "sha256": "c9c95a07e184ebf756c31f3675c58663b9140dee1410c2db2f391070f9079377"
+    },
+    {
+      "path": "pipeline-gpu/world-1/rust-fixture/1/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "7499ba9128ec3403c8e32c0f3a89d2fdb78dca420f7c2fcf106cd105ae94b707"
+    },
+    {
+      "path": "pipeline-gpu/world-1/rust-fixture/1/measurements.json",
+      "bytes": 895,
+      "sha256": "3f9b7baa890bbb1f30d202e576dbd8a923d801cf4870f71f365bdc52c1d91ac6"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-growth/1/test_results/solution_p0_d38_b64_1794055992.log",
+      "bytes": 650,
+      "sha256": "e4445b282fbf0e1d7875fb21a6e5c85e9388b57d3bf28da3d26036db231ca5b2"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-growth/1/test_results/submit_p0_d38_b64.csv",
+      "bytes": 94,
+      "sha256": "7377c711f273ba58ecb7a3b2254b0ecc42b64829f1c4a48eaf7ad56eee75b6c7"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-growth/1/test_results/solution_path_p0_d38_b64.csv",
+      "bytes": 94,
+      "sha256": "7377c711f273ba58ecb7a3b2254b0ecc42b64829f1c4a48eaf7ad56eee75b6c7"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-growth/1/rank-0.log",
+      "bytes": 826,
+      "sha256": "61592c6ed4d603c8f6af371ea5d377d92913628915112251ab66aec4aaa3b6df"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-growth/1/submit.csv",
+      "bytes": 94,
+      "sha256": "7377c711f273ba58ecb7a3b2254b0ecc42b64829f1c4a48eaf7ad56eee75b6c7"
+    },
+    {
+      "path": "pipeline-gpu/world-1/python-growth/1/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "79faf98400a92a2e8e988b238bfe9988aa12e9b0135c008b9ebfd78811912a5f"
+    },
+    {
+      "path": "single-count-build.txt",
+      "bytes": 184,
+      "sha256": "e60d9a15d161ec0f31c11c6e68968055450ebcda7f32859ed9c4c8d3dfd1ee1c"
+    },
+    {
+      "path": "single-count-red.txt",
+      "bytes": 116,
+      "sha256": "075d7d0aa4131f35ba1b85b25134afc8cdfe500769830ef5154b30b83f6b6126"
+    },
+    {
+      "path": "source-manifest.json",
+      "bytes": 173090,
+      "sha256": "c2b491393c76e168ddebf2ce21ba3ff3e2891ae96df748f58a49d7b7c760915a"
+    },
+    {
+      "path": "adapter.txt",
+      "bytes": 61,
+      "sha256": "ca38e9ab543335c46f0cf6444db0794a7d9643b9d33f677f44d386af59a72964"
+    },
+    {
+      "path": "native-build.txt",
+      "bytes": 4140,
+      "sha256": "4b2ed61f4779a4fbda2d256ca73a06c9675515429df66474402f21985925f0d1"
+    },
+    {
+      "path": "ctest.txt",
+      "bytes": 8857,
+      "sha256": "441acb5654318ee9c36956730df067ce47c5fbdebac95074abd7f502fb328ded"
+    },
+    {
+      "path": "union-prefinal.txt",
+      "bytes": 509,
+      "sha256": "9248087eb6c28ef6877f7d1d4a0f8395be224e20b08d3f255718422759520f91"
+    },
+    {
+      "path": "union-prefinal.nccl",
+      "bytes": 128,
+      "sha256": "2a0ab84375f9fc643cd9ef89439d0168bf1aa6565f4c3b4be55957b65154ea3b"
+    },
+    {
+      "path": "union-collect.txt",
+      "bytes": 525,
+      "sha256": "ac84cc709c6f5b5cdd24cf7b84132b07eead549ba38be16ae2b2321e3b6daf38"
+    },
+    {
+      "path": "union-collect.nccl",
+      "bytes": 128,
+      "sha256": "2e105b1030357a769d1cc29025790dc8a0eb8e9e7d38936e1c94301ba2ae2607"
+    },
+    {
+      "path": "union-pipeline.txt",
+      "bytes": 805,
+      "sha256": "ea8cbd7ded3eb6a3e4becf4e2704c377394556f541945c60b4d4f58b198fb979"
+    },
+    {
+      "path": "union-pipeline.nccl",
+      "bytes": 128,
+      "sha256": "4155c0db6d7f0441965e1bd99164627fe2bde89653a60a66b4ef332344fa7646"
+    },
+    {
+      "path": "union-pipeline_empty_rank.txt",
+      "bytes": 845,
+      "sha256": "b5092860ae2fe5f59af023502a918cefa6a8fa825d8c687eeddab2257d023005"
+    },
+    {
+      "path": "union-pipeline_empty_rank.nccl",
+      "bytes": 128,
+      "sha256": "335e0ff29b2a96d311fae0677526ce525f2b99b925e00f3f83a83efd6d88783a"
+    },
+    {
+      "path": "gpu-capacity.txt",
+      "bytes": 23,
+      "sha256": "15722342d25a950c462584d7c3730dc4172128dfb0be66814ca2acd0b6091075"
+    },
+    {
+      "path": "gpu-capacity/weights/input_weight_hxk.fp16",
+      "bytes": 147456,
+      "sha256": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8"
+    },
+    {
+      "path": "gpu-capacity/weights/input_bias.fp16",
+      "bytes": 16,
+      "sha256": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6"
+    },
+    {
+      "path": "gpu-capacity/weights/hidden_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511"
+    },
+    {
+      "path": "gpu-capacity/weights/hidden_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu-capacity/weights/residual0_fc1_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+    },
+    {
+      "path": "gpu-capacity/weights/residual0_fc1_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu-capacity/weights/residual0_fc2_weight_hxk.fp16",
+      "bytes": 128,
+      "sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+    },
+    {
+      "path": "gpu-capacity/weights/residual0_fc2_bias.fp16",
+      "bytes": 16,
+      "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb"
+    },
+    {
+      "path": "gpu-capacity/weights/output_weight_hxk.fp16",
+      "bytes": 16,
+      "sha256": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6"
+    },
+    {
+      "path": "gpu-capacity/weights/output_bias.fp16",
+      "bytes": 2,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "path": "gpu-capacity/weights/manifest.json",
+      "bytes": 293,
+      "sha256": "81b5df79aa6143d0b38edd9eb106c21eb2c1773d510d99dfd6be13a0a5af9459"
+    },
+    {
+      "path": "gpu-capacity/puzzle.json",
+      "bytes": 9505,
+      "sha256": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc"
+    },
+    {
+      "path": "gpu-capacity/test.csv",
+      "bytes": 227,
+      "sha256": "b3136207553957eeb4c254adef2924ea1e0e50b715a397aca7568153b5e7f4ab"
+    },
+    {
+      "path": "gpu-capacity/python-1/rank-0.log",
+      "bytes": 1557,
+      "sha256": "3b2ef0f8d18866a4575de7d40dacb6a4469f23e08824d74d14be30e65f9fe406"
+    },
+    {
+      "path": "gpu-capacity/rust-1/rank-0.log",
+      "bytes": 5383,
+      "sha256": "6b9baf2d8510df5a43820402461a52ec56d95d008c07929902b4923ff57d9cca"
+    },
+    {
+      "path": "gpu-capacity/python-2/rank-0.log",
+      "bytes": 1560,
+      "sha256": "ea6d56f79c0bd13dcbbde710eb0631e13b64ea1a07b72470a5fab5206fa917e8"
+    },
+    {
+      "path": "gpu-capacity/python-2/rank-1.log",
+      "bytes": 1560,
+      "sha256": "27de355754307fac27d959a9da44eadb1b9ea0e83937c750fdb9efa3a579fbfc"
+    },
+    {
+      "path": "gpu-capacity/python-2/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "16c7ec1f0729f3beffa1075b25ef67441dfdee26c5110fa0920022ee03a5f814"
+    },
+    {
+      "path": "gpu-capacity/rust-2/rank-0.log",
+      "bytes": 5938,
+      "sha256": "0400063e738388232996e1f25088bb3d0a725e197da1c3ed21581fee17a1e1e1"
+    },
+    {
+      "path": "gpu-capacity/rust-2/rank-1.log",
+      "bytes": 5943,
+      "sha256": "a53a1692cf9204bf582fc08034cf9cf692f55c302dbb9e017c0d8fec80597cc4"
+    },
+    {
+      "path": "gpu-capacity/rust-2/nccl-id.bin",
+      "bytes": 167,
+      "sha256": "05b0246fba452b6f93dce6643111970f0d80210c4a6d405394064d6db95a15f5"
+    },
+    {
+      "path": "gpu-capacity/results.json",
+      "bytes": 17837,
+      "sha256": "d7eb0112e4c93b6339a88f6166a7d576afd768716a92c71d5f80d919c6e8d81f"
+    },
+    {
+      "path": "pipeline-gpu-final.txt",
+      "bytes": 23,
+      "sha256": "d665c43c739f8aa11e6626d2ea8628151c575ebf5daf67c52443d2976a6cb689"
+    },
+    {
+      "path": "pipeline-gpu-final/test.csv",
+      "bytes": 227,
+      "sha256": "e023ac1d36dd15c590ce0389226568dfb407ce7a3973c80df6623496c7c0c268"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/reference-plans/rank-0.log",
+      "bytes": 731,
+      "sha256": "f088f524b6c050cf1244958be84ae3eacc8654b504a870fd1a2898666d0659f5"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/frontiers/frontier-rank-0.bin",
+      "bytes": 7168,
+      "sha256": "cadc9d060c82b9e9e240324a592d5d5c23a28d6b5d8d4c2b2627d7abef2a5a7c"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/frontiers/receipt.json",
+      "bytes": 578,
+      "sha256": "7affd576436fbbdd7f3327246ffea807c85b46481cab628628e2b6d744b705d9"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/python-fixture/1/test_results/unsolved_run_1794056619961941358_r0_0/no_solution_p0_d6_b64.log",
+      "bytes": 331,
+      "sha256": "828a5e52d3b5db09825aa00b72b38f9ff6580b57ed05160b23b0e7e2e722df63"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/python-fixture/1/rank-0.log",
+      "bytes": 1233,
+      "sha256": "f91404e19b4ff1163f940b905027a70dea38e05d4cacd7c8ebe7bbba29d175a2"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/python-fixture/1/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "f8169e38d2c11f532e5021fc84d4b324d07d51d583f4527a4c2ea9603c6b4108"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-fixture/planning/rank-0.log",
+      "bytes": 731,
+      "sha256": "46d3a1ee52877ee3b34fc0fdb2bf26d98775e8e8feb894143d8c8815ec62191f"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-fixture/1/test_results/unsolved_run_1794056621112654990_r0_0/no_solution_p0_d6_b64.log",
+      "bytes": 329,
+      "sha256": "3e3f3207bef96aabfe66785090b5b1bd43186f2740c5109d85e02f5662b0bede"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-fixture/1/ranks/rank-0.log",
+      "bytes": 1232,
+      "sha256": "a8bd8a19a75f0f9042fb738bd70313049beec3cd64acd4c49eb22cfb5a1fe3a8"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-fixture/1/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "c186da004d58522907c04a616c061ce6517691e5a4ad14a78952664fdb26063e"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-fixture/1/measurements.json",
+      "bytes": 895,
+      "sha256": "98843bf132d95f308947934c528433aec079ebd58ae061c0526aa831bfc15d40"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/python-growth/1/test_results/unsolved_run_1794056621909155025_r0_0/no_solution_p0_d38_b64.log",
+      "bytes": 330,
+      "sha256": "79ff3be3f711239e3e3ebb622f2a66ce56c1e4e5bf391e455e29f97306ee6ae9"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/python-growth/1/rank-0.log",
+      "bytes": 1296,
+      "sha256": "14fe01afb775d49a384f32073da59bda479b8d119320719a4aa7114ed758de45"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/python-growth/1/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "5e0190b438593ba120958d64dcd974ee7939704d67fad98826853d0842e49a99"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-growth/planning/rank-0.log",
+      "bytes": 731,
+      "sha256": "6a051ca77b6a227d84305beb5e6b30319cc0d818d5ba3e1b728a1eec459d84b7"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-growth/1/test_results/unsolved_run_1794056623146464042_r0_0/no_solution_p0_d38_b64.log",
+      "bytes": 328,
+      "sha256": "5f3d4687e14edacd026a42612a29bfce1a1e06d771e17cd70ba550ce6fd55273"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-growth/1/ranks/rank-0.log",
+      "bytes": 1297,
+      "sha256": "cc0c6b2a54ab1134c42e3c44432d57c83750a781b2f4e1c9b5a925c63e804da2"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-growth/1/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "1281b4e111d6d7699a2c51b37c6ec35a7d28e89b47a232c72ca737c8a5cdbf6c"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-growth/1/measurements.json",
+      "bytes": 896,
+      "sha256": "f3eb9a553e66717621e3340180438087a9a373daa9332d683510224b75ccd65f"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/planning/rank-0.log",
+      "bytes": 1146,
+      "sha256": "f3798d3f73e64a8f86264b1020a5a9f03a2618104ef95aeab8f5f93661159da0"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/1/test_results/unsolved_run_1794056624365071209_r0_0/no_solution_p0_d38_b64.log",
+      "bytes": 326,
+      "sha256": "4dbecb74c38550ba1be858fa49311d0476e17747e51f20b865107e6d393d8957"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/1/ranks/rank-0.log",
+      "bytes": 1295,
+      "sha256": "6af744a256f69c8c7348c55abe15fa9f79f04402e760d483f4348a7be700ca3d"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/1/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "1281b4e111d6d7699a2c51b37c6ec35a7d28e89b47a232c72ca737c8a5cdbf6c"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/1/measurements.json",
+      "bytes": 895,
+      "sha256": "7d8b7436dbf6077cc20a6ed429df3e523708c37ecdd16b335569bcfcef67263f"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/2/test_results/unsolved_run_1794056625094140612_r0_0/no_solution_p0_d38_b64.log",
+      "bytes": 326,
+      "sha256": "0a4c90a50650748f56cf09c14b10c0898bd74d42fca841ef7d6a36bfde0d7142"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/2/ranks/rank-0.log",
+      "bytes": 1295,
+      "sha256": "7277b42c971a40a590814be2a35f963db29905e8ddc97c2862ec7f4d760aae46"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/2/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "1281b4e111d6d7699a2c51b37c6ec35a7d28e89b47a232c72ca737c8a5cdbf6c"
+    },
+    {
+      "path": "pipeline-gpu-final/world-1/rust-tune/2/measurements.json",
+      "bytes": 897,
+      "sha256": "24920f0bab8ef5e24ce8620ca56f2bb64c4468c396e399e6a0763438d9660ca0"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/reference-plans/rank-0.log",
+      "bytes": 732,
+      "sha256": "87a51433c91bd476b81e41ce7adc99188af9a9e82600fc21ff39bc7c9cd5698e"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/reference-plans/rank-1.log",
+      "bytes": 732,
+      "sha256": "da31cc05f278f7de93ec93a026eb932fdb90f2ee9e6468bd15a55a0eb134b761"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/reference-plans/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "9e08429d51022d2913320a7e81a5fc3b5d5a9040f54a8392f2068a3980a1f2f8"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/frontiers/frontier-rank-0.bin",
+      "bytes": 3584,
+      "sha256": "bbb38dd73cbd0c59b574e90097c8e16d1c6e3d4cbb252986ebaec6b5e89007db"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/frontiers/frontier-rank-1.bin",
+      "bytes": 3584,
+      "sha256": "0a1a02c732c8bea6ffe5ace9c6df43ce92faf7bf8613d3624a845ef9d14c83cf"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/frontiers/receipt.json",
+      "bytes": 840,
+      "sha256": "a329e1215ebf122b9ce55cfaff9fac8e31be8304c4167fbcd8eaca46eb23e1a8"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-fixture/1/test_results/unsolved_run_1794056627452081446_r0_0/no_solution_p0_d6_b64.log",
+      "bytes": 334,
+      "sha256": "3cc7341363ab92b4ebf3cf5021f55de9fc3929c0bf4a7714371ed96991b65dd9"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-fixture/1/test_results/unsolved_run_1794056627452087045_r1_0/no_solution_p0_d6_b64.log",
+      "bytes": 334,
+      "sha256": "a2d56c396e4bf7e49c493cbb1ab1ca766d638ba682ef3a89220b702305ff7fd9"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-fixture/1/rank-0.log",
+      "bytes": 1237,
+      "sha256": "b4b219a2ccc5e54fb73fd4ee56ec8863f81bf639ec5b99cdb4c9834c64cde30b"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-fixture/1/rank-1.log",
+      "bytes": 1238,
+      "sha256": "384687c24e601896836409f8c68feb415e02c4d4f88e57ff119d243f4c4ee0ea"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-fixture/1/nccl-id.bin",
+      "bytes": 191,
+      "sha256": "33f4f429a714ce41131a314bd54228f87aa03a0976135614d8422b915cec3372"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-fixture/1/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "2cc25170dcdf7784a6b671781a1b06eb71da52027ee73814a9bf320e06fe31cf"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/planning/rank-0.log",
+      "bytes": 732,
+      "sha256": "45ccf9353e9089642581a0d6f90f81f884c2c08b43c9243bdd04a48d38b9849e"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/planning/rank-1.log",
+      "bytes": 732,
+      "sha256": "2bc01b76ecdc0251c86033da0432584cbddb757f4875361907269373e73c3e4f"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/planning/nccl-id.bin",
+      "bytes": 167,
+      "sha256": "c6dce4c32fd661c4b984e254b9d6bcbc436241d8a52de1de449baa2d26c22e73"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/1/test_results/unsolved_run_1794056630832002289_r0_0/no_solution_p0_d6_b64.log",
+      "bytes": 332,
+      "sha256": "09759a1d0bcceaa75b1ade4973c84e2fd029304d2e5856304be445ce547f1ace"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/1/test_results/unsolved_run_1794056630832004717_r1_0/no_solution_p0_d6_b64.log",
+      "bytes": 332,
+      "sha256": "8bad56d1157f9243b4fe3b5b552f8aba8822dc0fd889ab5b62af040c6e46aa2c"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/1/ranks/rank-0.log",
+      "bytes": 1239,
+      "sha256": "95f2c4926ae58e71fee9fcd925efdfb44bedfcd7ec14fa9a47451c327225eaa3"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/1/ranks/rank-1.log",
+      "bytes": 1238,
+      "sha256": "02bd46b9d5ba478ba34e1d17806debafa0148649d02b64a28e65c54cc3c45a4b"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/1/nccl-id.bin",
+      "bytes": 236,
+      "sha256": "3997df588c911d62b90317596430d92643ab0838c23f20395b269ceb7f953910"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/1/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "2093fa8e7fbddecfdec5f83977706305a75d214796a91ead0de17f4700ae47d2"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-fixture/1/measurements.json",
+      "bytes": 991,
+      "sha256": "2a08b476430a343c2503bce4092fbc89db4cda83e1824d9245f4b2790a19cb8e"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-growth/1/test_results/unsolved_run_1794056632654286838_r1_0/no_solution_p0_d38_b64.log",
+      "bytes": 333,
+      "sha256": "0031bf5fc9910b05916ab7bc618d78064ce6205e9b3ba82ffa6cd0af7dc91eca"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-growth/1/test_results/unsolved_run_1794056632654372419_r0_0/no_solution_p0_d38_b64.log",
+      "bytes": 333,
+      "sha256": "18bc552321d61e43a8adee63c43b1533a796adaa7409318b883e5af8dcb31643"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-growth/1/rank-0.log",
+      "bytes": 1304,
+      "sha256": "aaa63660219bdb94dcd67d97623f81d59ad08b3ed0f41aafb12b7f09c070da00"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-growth/1/rank-1.log",
+      "bytes": 1304,
+      "sha256": "01c97a5f055875076e859b31dff7559323a10a8fcbb7f73ee78a7ab8e2b6b69f"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-growth/1/nccl-id.bin",
+      "bytes": 191,
+      "sha256": "962e46cf450b0743c87caa66f083aed99553701065e571b3954ab12dde83a3d0"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/python-growth/1/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "5a4359bb0c84e0ff63db0d18097ebabb9b514cbc5636fc5baef73b497a7644fa"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/planning/rank-0.log",
+      "bytes": 732,
+      "sha256": "8cb5138e5451e99f87c830e4c9f3283cdb613e79cbbf44ee70cf5923483b7564"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/planning/rank-1.log",
+      "bytes": 732,
+      "sha256": "72eb46ca131de55abbf57fb3046c424c01a76cc87178347d202f52fa2296048b"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/planning/nccl-id.bin",
+      "bytes": 167,
+      "sha256": "7cf928e0a03c9921372c3cc016100de18ae15328e70cd406162068f86d59538d"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/1/test_results/unsolved_run_1794056636089813691_r0_0/no_solution_p0_d38_b64.log",
+      "bytes": 331,
+      "sha256": "3728e454680cf578855392e0052bd28b4fe175824384748a6b54954e141c874c"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/1/test_results/unsolved_run_1794056636089862723_r1_0/no_solution_p0_d38_b64.log",
+      "bytes": 331,
+      "sha256": "3ee3ba9f371a59a2f83a45c8d76ceb80766b262b759dcc16133f3afc0845cc16"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/1/ranks/rank-0.log",
+      "bytes": 1304,
+      "sha256": "115bbdf120da603a76af5135b352040cffe10d57e9e437417f2e08e04f1448c4"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/1/ranks/rank-1.log",
+      "bytes": 1304,
+      "sha256": "d94842529d935fb7748a05587b15eb092a8962d5dac9d347634c17fb57676a14"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/1/nccl-id.bin",
+      "bytes": 235,
+      "sha256": "bf28c0081271920230feb0882b5afbaf0a4ac68e8fdccc34a209d158c9a007c2"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/1/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "495fd57d479afbf109f2d60a70256decbff7990bbf005914f7a5007824f60c01"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-growth/1/measurements.json",
+      "bytes": 992,
+      "sha256": "1284ca3f4499505457055d39894d206d2c854d51c65b59a21db19e1545b7980a"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/planning/rank-0.log",
+      "bytes": 1147,
+      "sha256": "d7c7ac4c8f29ee5239c702ad011577ff2a18813f4224da873942df7ad592723d"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/planning/rank-1.log",
+      "bytes": 1147,
+      "sha256": "542aea9ede962b317df8622e2fadc01b95252a0ca221349f91853162b6f4fbeb"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/planning/nccl-id.bin",
+      "bytes": 167,
+      "sha256": "d189106657da2c351b176af1678a0f4c0a1983a0b8285039c8a21201de6d63e7"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/1/test_results/unsolved_run_1794056639466662031_r0_0/no_solution_p0_d38_b64.log",
+      "bytes": 329,
+      "sha256": "a3770b588592d6ed41db67a34c32b7f5970897e49eee7e716c5de4caef972922"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/1/test_results/unsolved_run_1794056639466709269_r1_0/no_solution_p0_d38_b64.log",
+      "bytes": 329,
+      "sha256": "093acaff3776e6d1e9b61989cc29c58409bd9bef2d05f211d7fb9b86606d69e1"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/1/ranks/rank-0.log",
+      "bytes": 1302,
+      "sha256": "78a1459a3c5aa95784b00d680b584db303db146cfcdaf22e9aad04d4d0ad99ac"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/1/ranks/rank-1.log",
+      "bytes": 1302,
+      "sha256": "23338f6a66fdde31bba0a013d6d471ec4e282ed06d411840d9ab90da302bca76"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/1/nccl-id.bin",
+      "bytes": 233,
+      "sha256": "82b6f835dbcf4a998a117f4eedb8bdc7d0acc085e223678ecebac4e8ce752976"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/1/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "ed7087b76faed2c265b19613e6dae681fbcdbf90d9a8e28fe52786bb82b8d081"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/1/measurements.json",
+      "bytes": 988,
+      "sha256": "3f7c83bc7dbb47ba56f990e7801b06305fe1c76975a3491bd6112e4fcfd57ae6"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/2/test_results/unsolved_run_1794056641176285274_r0_0/no_solution_p0_d38_b64.log",
+      "bytes": 329,
+      "sha256": "d18e94105156452b10ec9117e6cd3c562b64a64a80ebc3f78f9710d8253e94c6"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/2/test_results/unsolved_run_1794056641176331206_r1_0/no_solution_p0_d38_b64.log",
+      "bytes": 329,
+      "sha256": "ab6ebc2625e560fade7bae80adf22a41390bd4bb692eef22b7b4f84c00bb9c9d"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/2/ranks/rank-0.log",
+      "bytes": 1301,
+      "sha256": "1c4f5db58b155a360b4237cd8e1f398233fe4afc7411075f581a10b8e35add54"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/2/ranks/rank-1.log",
+      "bytes": 1300,
+      "sha256": "1a00a15a456b7e9d8741cbfa48f2fe692e7f7e67768569bdecda61fd5377a292"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/2/nccl-id.bin",
+      "bytes": 233,
+      "sha256": "0954b0e5633384a6d83dc48afd3709f53a6a363bc12a2eec8ee3d27971346365"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/2/gpu-telemetry.json",
+      "bytes": 692,
+      "sha256": "d1ef1ec3059cbda40131dbf64b88b441c3768f464d7773d39004d70976e77e03"
+    },
+    {
+      "path": "pipeline-gpu-final/world-2/rust-tune/2/measurements.json",
+      "bytes": 992,
+      "sha256": "66746e6ae407b3735831da5e8e70a7b0b44722ba06acd9570749b0d3e49cd30b"
+    },
+    {
+      "path": "pipeline-gpu-final/results.json",
+      "bytes": 21262,
+      "sha256": "bfeb2ad7f8aa1b18fe227f1282f881c1defbbab37573f65b05451a978d9d40ba"
+    }
+  ]
+}

@@ -2,7 +2,15 @@ use pyo3::{
     exceptions::{PyRuntimeError, PyTimeoutError, PyValueError},
     prelude::*,
 };
-use std::{collections::BTreeMap, path::PathBuf, sync::Mutex, time::Duration};
+use std::{
+    collections::BTreeMap,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::Duration,
+};
 
 fn error(error: impl std::fmt::Display) -> PyErr {
     let text = error.to_string();
@@ -21,6 +29,7 @@ fn duration(seconds: f64) -> PyResult<Duration> {
 #[pyclass]
 struct ProbeSession {
     inner: Mutex<beam_runtime::probes::ProbeSession>,
+    cancellation: Arc<AtomicBool>,
 }
 #[pymethods]
 impl ProbeSession {
@@ -40,6 +49,7 @@ impl ProbeSession {
             })
             .map_err(error)?;
         Ok(Self {
+            cancellation: inner.cancellation(),
             inner: Mutex::new(inner),
         })
     }
@@ -80,13 +90,18 @@ impl ProbeSession {
         self.inner.lock().map_err(error)?.exit_code().map_err(error)
     }
     fn close(&self, py: Python<'_>) -> PyResult<()> {
+        self.cancellation.store(true, Ordering::Release);
         py.allow_threads(|| self.inner.lock().map_err(error)?.close().map_err(error))
+    }
+    fn cancel(&self) {
+        self.cancellation.store(true, Ordering::Release);
     }
 }
 
 #[pyclass]
 struct ProbeCohort {
     inner: Mutex<beam_runtime::probes::ProbeCohort>,
+    cancellation: Arc<AtomicBool>,
 }
 #[pymethods]
 impl ProbeCohort {
@@ -112,6 +127,7 @@ impl ProbeCohort {
             })
             .map_err(error)?;
         Ok(Self {
+            cancellation: inner.cancellation(),
             inner: Mutex::new(inner),
         })
     }
@@ -156,7 +172,11 @@ impl ProbeCohort {
             .map_err(error)
     }
     fn close(&self, py: Python<'_>) -> PyResult<()> {
+        self.cancellation.store(true, Ordering::Release);
         py.allow_threads(|| self.inner.lock().map_err(error)?.close().map_err(error))
+    }
+    fn cancel(&self) {
+        self.cancellation.store(true, Ordering::Release);
     }
 }
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -1,0 +1,602 @@
+{
+  "scope": "planner/protocol correctness; no performance promotion",
+  "results": [
+    {
+      "world": 1,
+      "beam": 5,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 1024,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 5,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 7168,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 1,
+          "estimated_required_device_bytes": 20404674,
+          "frontier_state_capacity": 5,
+          "gpu_budget_bytes": 11564613632
+        }
+      ],
+      "pids": [
+        30871
+      ]
+    },
+    {
+      "world": 1,
+      "beam": 64,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 1024,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 64,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 7168,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 1,
+          "estimated_required_device_bytes": 20411074,
+          "frontier_state_capacity": 64,
+          "gpu_budget_bytes": 11564613632
+        }
+      ],
+      "pids": [
+        30871
+      ]
+    },
+    {
+      "world": 1,
+      "beam": 65,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 1024,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 7168,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 1,
+          "estimated_required_device_bytes": 20411330,
+          "frontier_state_capacity": 65,
+          "gpu_budget_bytes": 11564613632
+        }
+      ],
+      "pids": [
+        30871
+      ]
+    },
+    {
+      "world": 1,
+      "components": [
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 0,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 7168,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            0.0001109120026230812,
+            9.625600278377532e-05,
+            9.510400146245956e-05,
+            9.510400146245956e-05,
+            9.523200243711472e-05
+          ],
+          "stream4_group_seconds": [
+            0.0003417600095272064,
+            0.00033587199449539186,
+            0.00035107201337814334,
+            0.00035225600004196167,
+            0.00033587199449539186
+          ],
+          "transport": [],
+          "union_seconds": [
+            0.00026214399933815005,
+            0.00026214399933815005,
+            0.00026214399933815005,
+            0.00026211199164390565,
+            0.0002629759907722473
+          ]
+        }
+      ]
+    },
+    {
+      "world": 1,
+      "components": [
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 0,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 7168,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            9.443199634552002e-05,
+            9.523200243711472e-05,
+            9.523200243711472e-05,
+            9.625600278377532e-05,
+            9.523200243711472e-05
+          ],
+          "stream4_group_seconds": [
+            0.0003246079981327057,
+            0.00032358399033546447,
+            0.0003234879970550537,
+            0.0003389439880847931,
+            0.00033379200100898745
+          ],
+          "transport": [],
+          "union_seconds": [
+            0.00025497600436210634,
+            0.00024371199309825895,
+            0.00024063999950885777,
+            0.000241567999124527,
+            0.00024268800020217895
+          ]
+        }
+      ]
+    },
+    {
+      "world": 1,
+      "capacity": {
+        "requested_beam": 68,
+        "effective_beam": 68,
+        "profile": {
+          "BEAM_B_MICRO": "768",
+          "BEAM_SHARD_COUNT": "1",
+          "BEAM_STREAM3_RING_SLOTS": "2",
+          "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+          "BEAM_STREAM4_BATCH_CANDIDATES": "1024"
+        },
+        "plans": [
+          {
+            "BEAM_WIDTH_ALIGNMENT": 1024,
+            "B_MICRO": 32,
+            "GLOBAL_BEAM_WIDTH_EFFECTIVE": 68,
+            "LOCAL_RANK": 0,
+            "RING_COUNT": 2,
+            "SHARD_CAPACITY_CANDIDATES": 3072,
+            "SHARD_COUNT": 1,
+            "STREAM3_RING_SLOTS": 2,
+            "STREAM4_ACTIVE_SORT_SLOTS": 1,
+            "STREAM4_BATCH_ALIGNMENT": 1024,
+            "STREAM4_BATCH_CANDIDATES": 1024,
+            "WORLD_SIZE": 1,
+            "estimated_required_device_bytes": 14047682,
+            "frontier_state_capacity": 68,
+            "gpu_budget_bytes": 11564613632
+          }
+        ],
+        "probes": 5,
+        "upper_rejected_beam": null,
+        "search_complete": true,
+        "full_step_verified": false
+      }
+    },
+    {
+      "world": 2,
+      "beam": 5,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 5,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30236354,
+          "frontier_state_capacity": 3,
+          "gpu_budget_bytes": 11482824704
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 5,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30236354,
+          "frontier_state_capacity": 3,
+          "gpu_budget_bytes": 11484921856
+        }
+      ],
+      "pids": [
+        30896,
+        30898
+      ]
+    },
+    {
+      "world": 2,
+      "beam": 64,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 64,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30239426,
+          "frontier_state_capacity": 32,
+          "gpu_budget_bytes": 11482824704
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 64,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30239426,
+          "frontier_state_capacity": 32,
+          "gpu_budget_bytes": 11484921856
+        }
+      ],
+      "pids": [
+        30896,
+        30898
+      ]
+    },
+    {
+      "world": 2,
+      "beam": 65,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30239682,
+          "frontier_state_capacity": 33,
+          "gpu_budget_bytes": 11482824704
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30239682,
+          "frontier_state_capacity": 33,
+          "gpu_budget_bytes": 11484921856
+        }
+      ],
+      "pids": [
+        30896,
+        30898
+      ]
+    },
+    {
+      "world": 2,
+      "components": [
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 0,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 19456,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            0.0001005759984254837,
+            0.0001003519967198372,
+            0.00010016000270843506,
+            0.0001010880023241043,
+            0.0001003519967198372
+          ],
+          "stream4_group_seconds": [
+            0.00044236800074577335,
+            0.00044646400213241576,
+            0.0004505600035190582,
+            0.0004577279984951019,
+            0.00044438400864601135
+          ],
+          "transport": [
+            {
+              "items": 3072,
+              "seconds": [
+                4.198399931192398e-05,
+                3.7888001650571824e-05,
+                3.993599861860275e-05,
+                3.686400130391121e-05,
+                3.98080013692379e-05
+              ]
+            },
+            {
+              "items": 6144,
+              "seconds": [
+                5.2223999053239826e-05,
+                5.2223999053239826e-05,
+                5.2223999053239826e-05,
+                6.115199998021126e-05,
+                4.915200173854828e-05
+              ]
+            }
+          ],
+          "union_seconds": [
+            0.0004116480052471161,
+            0.0004116480052471161,
+            0.0004106239974498749,
+            0.00041369599103927615,
+            0.0004116480052471161
+          ]
+        },
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 1,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 19456,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            0.0001013759970664978,
+            0.0001003519967198372,
+            9.929600358009338e-05,
+            0.0001003519967198372,
+            0.0001003519967198372
+          ],
+          "stream4_group_seconds": [
+            0.00043494400382041934,
+            0.00044742399454116824,
+            0.00045987200736999513,
+            0.00043935999274253846,
+            0.0004373759925365448
+          ],
+          "transport": [
+            {
+              "items": 3072,
+              "seconds": [
+                3.7888001650571824e-05,
+                4.095999896526337e-05,
+                3.7119999527931215e-05,
+                3.971200063824654e-05,
+                3.891199827194214e-05
+              ]
+            },
+            {
+              "items": 6144,
+              "seconds": [
+                5.119999870657921e-05,
+                5.2223999053239826e-05,
+                5.939200147986412e-05,
+                5.2223999053239826e-05,
+                5.2223999053239826e-05
+              ]
+            }
+          ],
+          "union_seconds": [
+            0.0004106239974498749,
+            0.0004114879965782166,
+            0.0004106239974498749,
+            0.0004116480052471161,
+            0.0004095999896526337
+          ]
+        }
+      ]
+    },
+    {
+      "world": 2,
+      "components": [
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 0,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 19456,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            0.00010121600329875946,
+            0.0001003519967198372,
+            0.00010000000149011611,
+            9.92320030927658e-05,
+            0.0001003519967198372
+          ],
+          "stream4_group_seconds": [
+            0.0004147199988365173,
+            0.0004166400134563446,
+            0.0004259839951992035,
+            0.0004290559887886047,
+            0.0004188160002231598
+          ],
+          "transport": [
+            {
+              "items": 3072,
+              "seconds": [
+                3.558399900794029e-05,
+                4.1919998824596406e-05,
+                3.891199827194214e-05,
+                3.891199827194214e-05,
+                3.9744000881910326e-05
+              ]
+            },
+            {
+              "items": 6144,
+              "seconds": [
+                5.398400127887726e-05,
+                4.915200173854828e-05,
+                5.2223999053239826e-05,
+                4.908800125122071e-05,
+                5.427199974656105e-05
+              ]
+            }
+          ],
+          "union_seconds": [
+            0.0003778559863567352,
+            0.0003789440095424652,
+            0.00037859201431274416,
+            0.000377920001745224,
+            0.0003776639997959137
+          ]
+        },
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 1,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 19456,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            9.830400347709655e-05,
+            9.913600236177444e-05,
+            9.932799637317656e-05,
+            9.849599748849869e-05,
+            9.728000313043596e-05
+          ],
+          "stream4_group_seconds": [
+            0.00041574400663375855,
+            0.00041574400663375855,
+            0.0004256959855556488,
+            0.00041545599699020384,
+            0.0004177919924259186
+          ],
+          "transport": [
+            {
+              "items": 3072,
+              "seconds": [
+                4.198399931192398e-05,
+                3.7888001650571824e-05,
+                3.7888001650571824e-05,
+                3.993599861860275e-05,
+                3.7888001650571824e-05
+              ]
+            },
+            {
+              "items": 6144,
+              "seconds": [
+                5.001600086688996e-05,
+                5.292800068855286e-05,
+                4.915200173854828e-05,
+                5.2223999053239826e-05,
+                4.915200173854828e-05
+              ]
+            }
+          ],
+          "union_seconds": [
+            0.0003829759955406189,
+            0.0003797760009765625,
+            0.0003801279962062835,
+            0.00038092800974845887,
+            0.0003798399865627289
+          ]
+        }
+      ]
+    },
+    {
+      "world": 2,
+      "capacity": {
+        "requested_beam": 68,
+        "effective_beam": 68,
+        "profile": {
+          "BEAM_B_MICRO": "768",
+          "BEAM_SHARD_COUNT": "1",
+          "BEAM_STREAM3_RING_SLOTS": "2",
+          "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+          "BEAM_STREAM4_BATCH_CANDIDATES": "1024"
+        },
+        "plans": [
+          {
+            "BEAM_WIDTH_ALIGNMENT": 2048,
+            "B_MICRO": 32,
+            "GLOBAL_BEAM_WIDTH_EFFECTIVE": 68,
+            "LOCAL_RANK": 0,
+            "RING_COUNT": 2,
+            "SHARD_CAPACITY_CANDIDATES": 6144,
+            "SHARD_COUNT": 1,
+            "STREAM3_RING_SLOTS": 2,
+            "STREAM4_ACTIVE_SORT_SLOTS": 1,
+            "STREAM4_BATCH_ALIGNMENT": 1024,
+            "STREAM4_BATCH_CANDIDATES": 1024,
+            "WORLD_SIZE": 2,
+            "estimated_required_device_bytes": 14916546,
+            "frontier_state_capacity": 34,
+            "gpu_budget_bytes": 11482824704
+          },
+          {
+            "BEAM_WIDTH_ALIGNMENT": 2048,
+            "B_MICRO": 32,
+            "GLOBAL_BEAM_WIDTH_EFFECTIVE": 68,
+            "LOCAL_RANK": 1,
+            "RING_COUNT": 2,
+            "SHARD_CAPACITY_CANDIDATES": 6144,
+            "SHARD_COUNT": 1,
+            "STREAM3_RING_SLOTS": 2,
+            "STREAM4_ACTIVE_SORT_SLOTS": 1,
+            "STREAM4_BATCH_ALIGNMENT": 1024,
+            "STREAM4_BATCH_CANDIDATES": 1024,
+            "WORLD_SIZE": 2,
+            "estimated_required_device_bytes": 14916546,
+            "frontier_state_capacity": 34,
+            "gpu_budget_bytes": 11484921856
+          }
+        ],
+        "probes": 5,
+        "upper_rejected_beam": null,
+        "search_complete": true,
+        "full_step_verified": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "state_len": 96,
+  "num_classes": 96,
+  "hidden1": 8,
+  "hidden2": 8,
+  "residual_count": 1,
+  "output_dim": 1,
+  "dtype": "fp16",
+  "normalization": "none",
+  "graph_hash": "f3a5de9902fb43cd4c999aee1c29d794ecf4a38cb722018291781dd346e8e13a",
+  "heuristic": "hamming",
+  "trained": false
+}

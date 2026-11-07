@@ -960,3 +960,11 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Added Rust ProbeSession/ProbeCohort and thin PyO3 bindings for retained calibration process groups, bounded JSON/log transport, deadlines and whole-cohort cleanup. Public profile policy and launch defaults are not switched yet.
 - RTX3060 one/two-GPU history comparisons passed in RAM/disk/static-hybrid modes and with LibTorch. Cancellation and exact one-rank failure passed. Memory-only Compute Sanitizer with full leak checking reported zero errors and zero leaked bytes; API reporting was disabled for the separately recorded, explicitly handled NCCL kernel-query diagnostics.
 - Python regression suite: 510 passed,25 skipped. Rust CPU/FFI/probe tests and Python adapter passed. Paired performance, CNOT control transfer and other GPU-family acceptance remain outstanding.
+
+
+## 2026-11-07 - Rust exact planning and complete-step calibration control
+- Added typed all-rank planning contracts, exact logical quotas without integer overflow, retained prepare-all/run-all component protocol, frozen inference microbatch and explicit-capacity-only bounded search.
+- Added Rust-owned complete-step calibration processes, telemetry, warmup exclusion, conservative shortlist statistics and a separate paired optimization-promotion gate. The bootstrap RNG is explicitly versioned; inference precision is unchanged. Public candidate generation/cache and inference calibration still use their reference paths until migration/switching.
+- Added cancellation tokens independent of PyO3 locks and fail-fast one-shot rank supervision with bounded log draining.
+- Fixed the existing single-GPU finalizer's missing global keep count, which prevented natural-growth calibration from observing a full frontier. Added partial/full single-GPU counter checks and retained multi-rank final-union checks.
+- Validation evidence is recorded separately under test_results/refactor_20261107; full-plan and architecture-wide acceptance remain pending.

@@ -1,0 +1,11 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0432]: unresolved import `beam_runtime::calibration`
+ --> rust/beam-runtime/tests/calibration.rs:2:19
+  |
+2 | use beam_runtime::calibration::{find_capacity, tune_profiles, Profile, ProfileEvaluator};
+  |                   ^^^^^^^^^^^ could not find `calibration` in `beam_runtime`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-runtime` (test "calibration") due to 1 previous error

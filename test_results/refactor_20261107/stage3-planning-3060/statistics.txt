@@ -1,0 +1,10 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running tests/calibration.rs (/workspace/target/debug/deps/calibration-b3682335006feb31)
+
+running 2 tests
+test complete_slow_rank_cohorts_select_stable_gains_only ... ok
+test optimization_promotion_needs_five_matching_pairs_and_material_full_step_gain ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,57 @@
+[
+  {
+    "profile": "",
+    "parents": 64,
+    "seconds_by_rank": [
+      0.00676235,
+      0.00675368
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  },
+  {
+    "profile": "",
+    "parents": 64,
+    "seconds_by_rank": [
+      0.00648223,
+      0.00648133
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  },
+  {
+    "profile": "",
+    "parents": 64,
+    "seconds_by_rank": [
+      0.00632673,
+      0.00632077
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  },
+  {
+    "profile": "",
+    "parents": 64,
+    "seconds_by_rank": [
+      0.00606669,
+      0.00606195
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  },
+  {
+    "profile": "",
+    "parents": 64,
+    "seconds_by_rank": [
+      0.00584308,
+      0.00584474
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  }
+]

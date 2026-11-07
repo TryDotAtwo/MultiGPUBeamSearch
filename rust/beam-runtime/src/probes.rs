@@ -7,7 +7,11 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     path::Path,
     process::{Child, ChildStdin, Command, Stdio},
-    sync::mpsc::{self, Receiver, TryRecvError},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, Receiver, TryRecvError},
+        Arc,
+    },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
@@ -29,6 +33,7 @@ pub struct ProbeSession {
     deadline: Instant,
     owner: u32,
     closed: bool,
+    cancellation: Arc<AtomicBool>,
 }
 impl ProbeSession {
     pub fn launch(
@@ -121,6 +126,7 @@ impl ProbeSession {
             deadline,
             owner: std::process::id(),
             closed: false,
+            cancellation: Arc::new(AtomicBool::new(false)),
         })
     }
     fn owner(&self) -> Result<()> {
@@ -135,6 +141,9 @@ impl ProbeSession {
     pub fn pid(&self) -> u32 {
         self.child.id()
     }
+    pub fn cancellation(&self) -> Arc<AtomicBool> {
+        self.cancellation.clone()
+    }
     pub fn exit_code(&mut self) -> Result<Option<i32>> {
         self.owner()?;
         Ok(self.child.try_wait()?.map(|s| s.code().unwrap_or(-1)))
@@ -146,6 +155,9 @@ impl ProbeSession {
     }
     pub fn send(&mut self, request: &Value) -> Result<()> {
         self.owner()?;
+        if self.cancellation.load(Ordering::Acquire) {
+            return Err(Error::Message("probe cancelled".into()));
+        }
         if self.closed || self.exit_code()?.is_some() {
             return Err(Error::Message("probe is no longer running".into()));
         }
@@ -164,6 +176,9 @@ impl ProbeSession {
     }
     fn try_receive(&mut self) -> Result<Option<Value>> {
         self.owner()?;
+        if self.cancellation.load(Ordering::Acquire) {
+            return Err(Error::Message("probe cancelled".into()));
+        }
         let rows = self
             .rows
             .as_ref()
@@ -237,8 +252,15 @@ impl Drop for ProbeSession {
 
 pub struct ProbeCohort {
     sessions: Vec<ProbeSession>,
+    cancellation: Arc<AtomicBool>,
 }
 impl ProbeCohort {
+    pub fn bind_cancellation(&mut self, cancellation: Arc<AtomicBool>) {
+        self.cancellation = cancellation;
+        for session in &mut self.sessions {
+            session.cancellation = self.cancellation.clone();
+        }
+    }
     pub fn launch(
         commands: &[Vec<String>],
         environments: &[BTreeMap<String, String>],
@@ -252,20 +274,26 @@ impl ProbeCohort {
         fs::create_dir(directory)?;
         let mut group = Self {
             sessions: Vec::new(),
+            cancellation: Arc::new(AtomicBool::new(false)),
         };
         for (rank, (command, env)) in commands.iter().zip(environments).enumerate() {
-            group.sessions.push(ProbeSession::launch(
+            let mut session = ProbeSession::launch(
                 command,
                 cwd,
                 env,
                 &directory.join(format!("rank-{rank}.log")),
                 timeout,
-            )?);
+            )?;
+            session.cancellation = group.cancellation.clone();
+            group.sessions.push(session);
         }
         Ok(group)
     }
     pub fn pids(&self) -> Vec<u32> {
         self.sessions.iter().map(ProbeSession::pid).collect()
+    }
+    pub fn cancellation(&self) -> Arc<AtomicBool> {
+        self.cancellation.clone()
     }
     pub fn set_deadline(&mut self, timeout: Duration) -> Result<()> {
         for session in &mut self.sessions {
@@ -314,6 +342,58 @@ impl ProbeCohort {
             let _ = self.close();
         }
         result
+    }
+    /// Finish ordinary coarse native jobs, draining JSON diagnostics without
+    /// blocking their stdout reader. Poll every rank so a late rank's failure
+    /// cannot leave an earlier rank waiting inside NCCL until the deadline.
+    pub fn finish(&mut self, timeout: Duration) -> Result<()> {
+        let result = (|| {
+            let deadline = until(timeout)?;
+            for session in &mut self.sessions {
+                session.owner()?;
+                session.input.take();
+            }
+            loop {
+                if self.cancellation.load(Ordering::Acquire) {
+                    return Err(Error::Message("probe cohort cancelled".into()));
+                }
+                let mut complete = true;
+                for (rank, session) in self.sessions.iter_mut().enumerate() {
+                    if let Some(rows) = &session.rows {
+                        loop {
+                            match rows.try_recv() {
+                                Ok(Err(error)) => return Err(Error::Message(error)),
+                                Ok(Ok(_)) => {}
+                                Err(_) => break,
+                            }
+                        }
+                    }
+                    match session.child.try_wait()? {
+                        Some(status) if !status.success() => {
+                            return Err(Error::Message(format!(
+                                "rank {rank} exited with {}",
+                                status.code().unwrap_or(-1)
+                            )))
+                        }
+                        None => complete = false,
+                        _ => {}
+                    }
+                    if Instant::now() >= session.deadline && !complete {
+                        return Err(Error::Message("probe cohort timed out".into()));
+                    }
+                }
+                if complete {
+                    return Ok(());
+                }
+                if Instant::now() >= deadline {
+                    return Err(Error::Message("probe cohort timed out".into()));
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+        })();
+        let cleanup = self.close();
+        result?;
+        cleanup
     }
     pub fn close(&mut self) -> Result<()> {
         let deadline = Instant::now() + Duration::from_secs(2);

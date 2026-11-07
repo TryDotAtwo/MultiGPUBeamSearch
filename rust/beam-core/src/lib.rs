@@ -2,7 +2,9 @@
 #![forbid(unsafe_code)]
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+pub mod calibration;
 pub mod history;
+pub mod planning;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ContractError {

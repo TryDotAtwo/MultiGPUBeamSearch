@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "graph_hash": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc",
+  "global_parents": 64,
+  "unique_states": 64,
+  "seed": 20261009,
+  "walk_length": 64,
+  "walk_length_min": 32,
+  "state_len": 96,
+  "storage_len": 112,
+  "excluded_center_and_predecessors": true,
+  "files": [
+    {
+      "rank": 0,
+      "parents": 64,
+      "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-1/frontiers/frontier-rank-0.bin",
+      "sha256": "cadc9d060c82b9e9e240324a592d5d5c23a28d6b5d8d4c2b2627d7abef2a5a7c",
+      "bytes": 7168
+    }
+  ]
+}

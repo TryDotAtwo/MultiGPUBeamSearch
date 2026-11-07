@@ -100,3 +100,81 @@ fn deadline_and_one_rank_failure_close_owned_cohort() {
     assert!(session.exit_code().unwrap().is_some());
     fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn cancellation_interrupts_a_wait_without_holding_the_session_lock() {
+    let (dir, command, env) = fixture("cancel");
+    let mut session = ProbeSession::launch(
+        &command,
+        &dir,
+        &env,
+        &dir.join("cancel.log"),
+        Duration::from_secs(60),
+    )
+    .unwrap();
+    session.receive(Duration::from_secs(2)).unwrap();
+    let cancel = session.cancellation();
+    session.send(&json!({"delay":30})).unwrap();
+    let trigger = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(50));
+        cancel.store(true, std::sync::atomic::Ordering::Release);
+    });
+    let began = Instant::now();
+    assert!(session
+        .receive(Duration::from_secs(30))
+        .unwrap_err()
+        .to_string()
+        .contains("cancelled"));
+    assert!(began.elapsed() < Duration::from_secs(3));
+    trigger.join().unwrap();
+    assert!(session.exit_code().unwrap().is_some());
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn one_shot_cohort_drains_json_logs_and_fails_fast_on_any_rank() {
+    let (dir, _, env) = fixture("oneshot");
+    let commands = vec![
+        vec![
+            "python".into(),
+            "-c".into(),
+            "import json;[print(json.dumps({'row':i}),flush=True) for i in range(200)]".into()
+        ];
+        2
+    ];
+    let mut group = ProbeCohort::launch(
+        &commands,
+        &[env.clone(), env.clone()],
+        &dir,
+        &dir.join("ok"),
+        Duration::from_secs(10),
+    )
+    .unwrap();
+    group.finish(Duration::from_secs(5)).unwrap();
+    assert_eq!(group.exit_codes().unwrap(), vec![Some(0), Some(0)]);
+    let commands = vec![
+        vec![
+            "python".into(),
+            "-c".into(),
+            "import time;time.sleep(60)".into(),
+        ],
+        vec!["python".into(), "-c".into(), "raise SystemExit(7)".into()],
+    ];
+    let mut group = ProbeCohort::launch(
+        &commands,
+        &[env.clone(), env],
+        &dir,
+        &dir.join("fail"),
+        Duration::from_secs(10),
+    )
+    .unwrap();
+    let start = Instant::now();
+    assert!(group
+        .finish(Duration::from_secs(5))
+        .unwrap_err()
+        .to_string()
+        .contains("rank 1 exited with 7"));
+    assert!(start.elapsed() < Duration::from_secs(3));
+    assert!(group.exit_codes().unwrap().iter().all(Option::is_some));
+    fs::remove_dir_all(dir).unwrap();
+}

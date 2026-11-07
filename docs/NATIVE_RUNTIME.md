@@ -3,7 +3,7 @@
 The approved migration is in progress. Existing public Python entry points are
 switched only after their comparative acceptance stage. Rust now owns host history
 for its resident workers and ordinary CLI, plus calibration process primitives.
-Full profile-selection and CNOT orchestration are still being transferred. No
+Profile control and CNOT orchestration are still being transferred. No
 CUDA sorting optimization or precision policy is enabled here.
 
 ## Build
@@ -62,6 +62,43 @@ requests/responses and bounded log readers. Rank failures and deadlines close th
 entire owned cohort. PyO3 releases the GIL for blocking operations. These are
 runtime components; the public calibration policy has not switched yet.
 
+## Calibration ownership
+
+`PlanningSession` owns one retained process per rank and the exact-capacity
+protocol. It validates every rank, preserves the requested logical beam exactly,
+freezes the model microbatch, and permits only the five scheduling overrides.
+Component probes use prepare-all/run-all; a rejected preparation is cancelled on
+all ranks before another request. Capacity search retreats only on an explicit
+native capacity rejection. Transport errors and rank failures abort the cohort.
+The capacity API requires all five scheduling fields to be frozen and never
+labels admission as full-step verification.
+
+`PipelineProbe` owns admission, release of planning allocations, one coarse native
+job per rank, deadlines, complete-step log validation and GPU telemetry. Both
+legal frontier fixtures and saturated natural search are supported. The first
+step is warmup; each following sample is global parents divided by the slowest
+rank's complete-step duration. Missing ranks, changed width, incomplete output
+frontiers, missing telemetry and throttling cannot produce an accepted profile.
+One rank's early failure reaps the entire group without waiting for another rank's
+NCCL timeout. Cancellation is an atomic token independent of the Python mutex.
+
+`tune_profiles` runs the bounded shortlist in Rust. The generic evaluator trait is
+implemented by the native PipelineProbe; Python is only the JSON/config adapter.
+Its deterministic 2,000-resample bootstrap uses the versioned SplitMix64 policy,
+so its confidence interval endpoints need not be bit-identical to the Python
+reference's RNG. Neither policy changes inference arithmetic. The public cache
+and candidate-generation policy still require migration before default switching.
+
+`paired_promotion` is a separate optimization gate: identical model/input/beam/
+precision/ranks, at least five warmed complete-step pairs, and a conservative
+upper time-ratio bound of 0.95, or measured peak-memory reduction in every pair
+with an upper slowdown bound of 1.03. Incomplete/unstable evidence keeps a variant
+experimental. It does not promote a component timing or a compilation result.
+
+The single-GPU finalizer now fills `final_global_keep_count`, as the multi-GPU
+path already did. Previously natural-growth calibration saw zero saturated steps
+despite a valid frontier. The selected states and inference policy are unchanged.
+
 - `cargo test --workspace`: layout, complete-hash order, domains, bounds, repeated
   jobs, stable worker PIDs, timeouts, cancellation and one-rank failure.
 - `native_abi_tests`: the actual C ABI with an independent CPU engine fixture,
@@ -77,6 +114,10 @@ runtime components; the public calibration policy has not switched yet.
   library in exactly one rank; all owned workers must be reaped.
 - `tests/native_cli_gpu.py`: ordinary Rust CLI and two-rank torchrun with Rust
   history, exact global width and independent solution replay.
+- `tests/native_planning_gpu.py`: reference/Rust exact plans, retained PIDs,
+  repeated components and bounded capacity search on one/two GPUs.
+- `tests/native_pipeline_gpu.py`: reference/Rust complete steps, explicit legal
+  frontier and natural growth, followed by the Rust-owned shortlist loop.
 - Rust history tests cover disk-first reservations, out-of-order ready batches,
   empty batches, capacity diagnostics, RAM pruning and injected disk-write failure
   without overwriting future RAM reservations. Probe tests cover retained PIDs,

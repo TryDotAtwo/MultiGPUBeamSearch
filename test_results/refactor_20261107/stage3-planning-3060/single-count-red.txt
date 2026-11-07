@@ -1,0 +1,1 @@
+rank=0 final_threshold=4294967295 global_hits=1,1,0,0 dispatcher_union=FAIL final_global_keep=0 input_mode=prefinal

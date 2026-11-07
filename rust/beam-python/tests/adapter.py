@@ -61,3 +61,22 @@ with tempfile.TemporaryDirectory() as directory:
     finally:cohort.close()
     assert all(code is not None for code in cohort.exit_codes())
 print('PYO3_PROBE_OK')
+
+with tempfile.TemporaryDirectory() as directory:
+    import threading,time
+    root=Path(directory)
+    probe=runtime.ProbeSession([sys.executable,'-c','import time;time.sleep(30)'],root,dict(os.environ),root/'cancel.log',60.)
+    failures=[]
+    def wait():
+        try:probe.receive(30.)
+        except RuntimeError as error:failures.append(str(error))
+    worker=threading.Thread(target=wait);worker.start();time.sleep(.05)
+    began=time.monotonic();probe.cancel();worker.join(timeout=3.)
+    assert not worker.is_alive() and time.monotonic()-began<3 and any('cancelled' in text for text in failures)
+    probe.close();assert probe.exit_code() is not None
+rows=[dict(profile='baseline',parents=64,seconds_by_rank=[.01,.02],correctness_passed=True,memory_admitted=True,throttled=False)]*5
+rows+= [dict(row,profile='fast',seconds_by_rank=[.01,.015]) for row in rows]
+selection=json.loads(runtime.select_profile(json.dumps(rows),'baseline',.05))
+assert selection['estimate']['profile']=='fast'
+assert not json.loads(runtime.promote_optimization('[]'))['accepted']
+print('PYO3_PLANNING_STATS_CANCEL_OK')

@@ -5411,6 +5411,9 @@ FinalizeDepthState finalize_depth_single_gpu(
 #endif
 
     result.next_frontier_size = final_request_count;
+    // On one GPU the selected local frontier is the complete global frontier.
+    // Natural-growth calibration consumes the same field as multi-rank runs.
+    result.final_global_keep_count = final_request_count;
     result.final_threshold = final_threshold;
     result.final_candidate_count = final_candidate_count;
     result.final_request_count = final_request_count;

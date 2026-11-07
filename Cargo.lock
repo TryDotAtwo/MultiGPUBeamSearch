@@ -38,6 +38,7 @@ dependencies = [
 name = "beam-python"
 version = "0.1.0"
 dependencies = [
+ "beam-core",
  "beam-runtime",
  "pyo3",
  "serde_json",

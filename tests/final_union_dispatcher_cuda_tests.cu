@@ -71,24 +71,26 @@ static void collect_two_arrivals(const StaticMemoryPlan& plan, StaticDeviceMemor
 // prefinal candidates. This is not an inference or Stream3 scheduling test.
 int main(int argc, char** argv) {
     try {
-        if ((argc != 2 && argc != 3) || env("WORLD_SIZE") != 2) throw std::runtime_error("requires torchrun 2 ranks and rendezvous path");
+        const int world = env("WORLD_SIZE");
+        if ((argc != 2 && argc != 3) || (world != 1 && world != 2)) throw std::runtime_error("requires one/two ranks and rendezvous path");
         const bool collect_mode = argc == 3 && std::string(argv[2]) == "collect";
+        const bool single_full = argc == 3 && world == 1 && std::string(argv[2]) == "single_full";
         const bool empty_rank_mode = argc == 3 && std::string(argv[2]) == "pipeline_empty_rank";
         const bool pipeline_mode = argc == 3 && (std::string(argv[2]) == "pipeline" || empty_rank_mode);
-        if (argc == 3 && !collect_mode && !pipeline_mode) throw std::runtime_error("unknown fixture mode");
+        if (argc == 3 && !collect_mode && !pipeline_mode && !single_full) throw std::runtime_error("unknown fixture mode");
         const int rank = env("RANK"), device = env("LOCAL_RANK");
         const std::uint64_t local_parent_count = empty_rank_mode && rank == 1 ? 0U : 2U;
-        if (rank != device || rank < 0 || rank > 1) throw std::runtime_error("requires distinct local devices 0 and 1");
+        if (rank != device || rank < 0 || rank >= world) throw std::runtime_error("requires distinct local devices");
         cu(cudaSetDevice(device));
         ncclUniqueId id{};
         const std::filesystem::path rendezvous(argv[1]);
-        if (rank == 0) {
+        if (world > 1 && rank == 0) {
             nc(ncclGetUniqueId(&id));
             auto temp = rendezvous.string() + ".tmp";
             { std::ofstream f(temp, std::ios::binary); f.write(reinterpret_cast<const char*>(&id), sizeof(id));
               if (!f) throw std::runtime_error("NCCL rendezvous write failed"); }
             std::filesystem::rename(temp, rendezvous);
-        } else {
+        } else if (world > 1) {
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
             while (!std::filesystem::exists(rendezvous)) {
                 if (std::chrono::steady_clock::now() > deadline) throw std::runtime_error("NCCL rendezvous timeout");
@@ -99,14 +101,14 @@ int main(int argc, char** argv) {
             if (!f) throw std::runtime_error("NCCL rendezvous read failed");
         }
         DispatcherCollective collective{};
-        nc(ncclCommInitRank(&collective.comm, 2, id, rank));
+        if (world > 1) nc(ncclCommInitRank(&collective.comm, world, id, rank));
         RuntimeConfig config;
-        config.world_size = 2; config.local_rank = rank;
+        config.world_size = world; config.local_rank = rank;
         config.b_micro = 1; config.ring_count = 1;
         config.stream3_batch_candidates = 2 * MOVE_COUNT;
         config.stream4_batch_candidates = 4; config.stream4_batch_alignment = 1;
         config.shard_count = 1; config.shard_buffer_count = 2;
-        config.shard_capacity_candidates = 256; config.user_global_beam_width = 4;
+        config.shard_capacity_candidates = 256; config.user_global_beam_width = single_full ? 2 : 4;
         config.global_spill_capacity = 0; config.final_materialize_chunk_candidates = 2;
         if (pipeline_mode) {
             config.ring_count = 2;
@@ -114,7 +116,7 @@ int main(int argc, char** argv) {
             config.stream4_trigger_candidates = 1;
         }
         const auto plan = make_static_memory_plan(config);
-        if (plan.derived.global_beam_width_effective != 4) throw std::runtime_error("fixture beam rounded unexpectedly");
+        if (plan.derived.global_beam_width_effective != config.user_global_beam_width) throw std::runtime_error("fixture beam rounded unexpectedly");
         StaticDeviceMemory memory;
         allocate_static_device_memory(plan, memory);
         cu(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
@@ -205,7 +207,8 @@ int main(int argc, char** argv) {
         cu(cudaMemcpy(output.data(), memory.current_frontier_states, output.size() * sizeof(State128), cudaMemcpyDeviceToHost));
         int hits[4]{}, global_hits[4]{};
         bool valid = result.next_frontier_size == (empty_rank_mode ? 1U : 2U) &&
-            result.final_threshold == (pipeline_mode && !empty_rank_mode ? 0U : empty_rank_mode ? UINT32_THRESHOLD_MAX : 2U);
+            result.final_global_keep_count == (world == 1 || empty_rank_mode ? 2U : 4U) &&
+            result.final_threshold == (world == 1 && !single_full ? UINT32_THRESHOLD_MAX : pipeline_mode && !empty_rank_mode ? 0U : empty_rank_mode ? UINT32_THRESHOLD_MAX : 2U);
         for (std::size_t i = 0; i < output.size(); ++i) {
             unsigned value = output[i].v[0];
             if (value < 1 || value > 4) valid = false; else ++hits[value - 1];
@@ -217,21 +220,23 @@ int main(int argc, char** argv) {
         int *send = nullptr, *recv = nullptr;
         cu(cudaMalloc(&send, sizeof(hits))); cu(cudaMalloc(&recv, sizeof(hits)));
         cu(cudaMemcpy(send, hits, sizeof(hits), cudaMemcpyHostToDevice));
-        nc(ncclAllReduce(send, recv, 4, ncclInt, ncclSum, collective.comm, streams.stream5));
+        if (world > 1) nc(ncclAllReduce(send, recv, 4, ncclInt, ncclSum, collective.comm, streams.stream5));
+        else cu(cudaMemcpyAsync(recv, send, sizeof(hits), cudaMemcpyDeviceToDevice, streams.stream5));
         cu(cudaStreamSynchronize(streams.stream5));
         cu(cudaMemcpy(global_hits, recv, sizeof(global_hits), cudaMemcpyDeviceToHost));
         for (unsigned i = 0; i < 4; ++i)
-            if (global_hits[i] != (empty_rank_mode && i >= 2 ? 0 : 1)) valid = false;
+            if (global_hits[i] != ((world == 1 || empty_rank_mode) && i >= 2 ? 0 : 1)) valid = false;
         std::cout << "rank=" << rank << " final_threshold=" << result.final_threshold << " global_hits="
                   << global_hits[0] << ',' << global_hits[1] << ',' << global_hits[2] << ',' << global_hits[3]
                   << " dispatcher_union=" << (valid ? "PASS" : "FAIL")
+                  << " final_global_keep=" << result.final_global_keep_count
                   << " input_mode=" << (empty_rank_mode ? "uniform_pipeline_empty_rank" : pipeline_mode ? "uniform_pipeline" : collect_mode ? "stream3_arrivals" : "prefinal") << std::endl;
         cu(cudaFree(send)); cu(cudaFree(recv)); cu(cudaFreeHost(history));
         cu(cudaEventDestroy(history_done)); cu(cudaStreamDestroy(history_stream));
         if (pipeline_mode) { destroy_cuda_graph_job_templates(graphs); destroy_dispatcher_events(events); }
         destroy_dispatcher_streams(streams); free_static_device_memory(memory);
         cu(cudaFree(central)); cu(cudaFree(zobrist_device));
-        cu(cudaFree(device_generators)); nc(ncclCommDestroy(collective.comm));
+        cu(cudaFree(device_generators)); if (world > 1) nc(ncclCommDestroy(collective.comm));
         return valid ? 0 : 1;
     } catch (const std::exception& e) { std::cerr << "ERROR: " << e.what() << std::endl; return 2; }
 }
