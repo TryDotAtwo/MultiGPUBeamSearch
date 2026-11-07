@@ -1,0 +1,10 @@
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.87s
+     Running tests/search_session.rs (/workspace/target/debug/deps/search_session-a164626524f3248f)
+
+running 1 test
+test session_reuses_compatible_jobs_and_releases_before_model_or_geometry_change ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

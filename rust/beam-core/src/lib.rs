@@ -5,7 +5,9 @@ use std::cmp::Ordering;
 pub mod calibration;
 pub mod history;
 pub mod inference;
+mod permutation;
 pub mod planning;
+pub mod search;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ContractError {

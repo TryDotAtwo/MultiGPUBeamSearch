@@ -1,0 +1,22 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running tests/search_session.rs (/workspace/target/debug/deps/search_session-a164626524f3248f)
+
+running 1 test
+test session_timeout_includes_protocol_preparation_and_reaps_delayed_workers ... FAILED
+
+failures:
+
+---- session_timeout_includes_protocol_preparation_and_reaps_delayed_workers stdout ----
+
+thread 'session_timeout_includes_protocol_preparation_and_reaps_delayed_workers' (39858) panicked at rust/beam-runtime/tests/search_session.rs:164:5:
+request deadline was restarted after protocol preparation
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    session_timeout_includes_protocol_preparation_and_reaps_delayed_workers
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.69s
+
+error: test failed, to rerun pass `-p beam-runtime --test search_session`

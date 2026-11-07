@@ -1,0 +1,15 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0432]: unresolved import `beam_core::search`
+ --> rust/beam-runtime/tests/search_session.rs:1:16
+  |
+1 | use beam_core::search::PermutationGraph;
+  |                ^^^^^^ could not find `search` in `beam_core`
+
+error[E0432]: unresolved import `beam_runtime::search_session`
+ --> rust/beam-runtime/tests/search_session.rs:2:19
+  |
+2 | use beam_runtime::search_session::{Launch,SearchSession,SessionIdentity};
+  |                   ^^^^^^^^^^^^^^ could not find `search_session` in `beam_runtime`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-runtime` (test "search_session") due to 2 previous errors

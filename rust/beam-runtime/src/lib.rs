@@ -8,6 +8,7 @@ pub mod pipeline;
 pub mod planning;
 pub mod probes;
 mod resident;
+pub mod search_session;
 pub mod telemetry;
 mod worker;
 pub use resident::ResidentWorkers;

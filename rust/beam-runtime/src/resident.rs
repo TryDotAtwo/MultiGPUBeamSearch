@@ -22,6 +22,7 @@ pub struct ResidentWorkers {
     closed: bool,
     owner_pid: u32,
     cancel: Arc<AtomicBool>,
+    parent_cancel: Option<Arc<AtomicBool>>,
 }
 impl ResidentWorkers {
     pub fn launch(
@@ -51,6 +52,7 @@ impl ResidentWorkers {
             closed: false,
             owner_pid: std::process::id(),
             cancel: Arc::new(AtomicBool::new(false)),
+            parent_cancel: None,
         };
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -104,6 +106,9 @@ impl ResidentWorkers {
     pub fn cancellation(&self) -> Arc<AtomicBool> {
         self.cancel.clone()
     }
+    pub(crate) fn bind_parent_cancellation(&mut self, cancel: Arc<AtomicBool>) {
+        self.parent_cancel = Some(cancel);
+    }
     pub fn exit_codes(&mut self) -> Result<Vec<Option<i32>>> {
         self.check_owner()?;
         self.children
@@ -149,7 +154,12 @@ impl ResidentWorkers {
         }
         atomic_json(&path, &request)?;
         loop {
-            if self.cancel.load(Ordering::Acquire) {
+            if self.cancel.load(Ordering::Acquire)
+                || self
+                    .parent_cancel
+                    .as_ref()
+                    .is_some_and(|v| v.load(Ordering::Acquire))
+            {
                 return Err(Error::Message("resident search cancelled".into()));
             }
             let codes = self.exit_codes()?;

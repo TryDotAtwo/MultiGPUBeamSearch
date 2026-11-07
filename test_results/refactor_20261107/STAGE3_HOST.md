@@ -32,10 +32,16 @@ in STAGE2.md. Raw outputs, source-archive identities and SHA-256 are under
 | Native CTest, CUDA and LibTorch builds | 57 passed, 1 optional Transformer fixture skipped |
 | Python regression suite | 510 passed, 25 skipped |
 | RAM, disk, static-hybrid history: baseline vs Rust on one/two GPUs | paths, width and stable resident PIDs matched for solved/unsolved jobs |
-| Same session comparison with LibTorch | passed |
+| Same session comparison with the LibTorch-linked library | passed with `native_cuda_graph`; eager executor not selected in this run |
 | Cancellation and failure of exactly one rank | all owned workers reaped |
 | Ordinary Rust CLI and real two-rank torchrun | legal 3-move path and exact global width 64 |
 | Static-hybrid session under memcheck, full leak checking | 0 errors; 0 bytes leaked in 0 allocations; exit 0 |
+
+Retrospective scope correction: the earlier LibTorch-linked session test did not
+set `BEAM_STREAM1_EXECUTOR=libtorch_eager`. It verifies that library's default
+native executor. Raw evidence remains unchanged; STAGE3_SESSION.md records the
+later explicit eager comparisons. The standalone LibTorch inference benchmark
+in STAGE3_INFERENCE.md already uses its actual eager provider.
 
 The sanitizer used `--report-api-errors no`. The retained unfiltered stage-2 log
 contains NCCL kernel-query diagnostics explicitly handled by the matching upstream

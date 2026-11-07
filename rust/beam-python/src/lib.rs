@@ -4,6 +4,7 @@ mod inference;
 mod pipeline;
 mod planning;
 mod probes;
+mod search_session;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -118,6 +119,7 @@ fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     planning::register(module)?;
     pipeline::register(module)?;
     inference::register(module)?;
+    search_session::register(module)?;
     module.add("ABI_VERSION", 1)?;
     Ok(())
 }

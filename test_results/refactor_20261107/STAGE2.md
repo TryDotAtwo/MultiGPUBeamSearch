@@ -19,10 +19,15 @@ hash recorded by the native build binds the uploaded source used by that build.
 | Rust workspace CPU tests | 8 passed; real-FFI test separately enabled and passed |
 | Built PyO3 module and isolated wheel install/import | passed |
 | Reference vs Rust/native session, one/two physical GPUs | 3 successive jobs per session, stable PIDs, same paths, exact global width 64 |
-| Same session comparison using LibTorch provider | passed |
+| Same session comparison using the LibTorch-linked library | passed with the default `native_cuda_graph` executor; not LibTorch eager acceptance |
 | Active cancellation and failure of exactly one rank | entire owned process group reaped |
 | Unfiltered Compute Sanitizer memcheck | 16 CUDA API errors from NCCL kernel-attribute queries; not a clean pass |
 | Memcheck with `--report-api-errors no` | zero reported memory errors, exit 0; narrower evidence |
+
+Retrospective scope correction: linking LibTorch does not select `libtorch_eager`.
+Those earlier session runs omitted `BEAM_STREAM1_EXECUTOR`; their bootstrap logs
+show the native default. Raw evidence and hashes are unchanged. Explicit eager
+executor assertions and baseline comparisons are recorded in STAGE3_SESSION.md.
 
 The sanitizer's unfiltered errors are `cudaErrorNoKernelImageForDevice` at
 `ncclInitKernelsForDevice`/`cudaFuncGetAttributes`, in both the unchanged baseline

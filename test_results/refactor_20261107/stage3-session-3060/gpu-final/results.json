@@ -1,0 +1,1241 @@
+{
+  "scope": "Rust resource identity and result correctness; tiny fixture, no speed promotion",
+  "records": [
+    {
+      "backend": "native",
+      "world": 1,
+      "mode": "first",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 0.481524719,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-1/first/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.0916883,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45285
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 1,
+      "mode": "repeat",
+      "result": {
+        "path": [
+          3,
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 0.132547003,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-1/repeat/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.113517,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 2,
+            "reused": true,
+            "worker_pids": [
+              45285
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 0.0,
+            "original_calibration_wall_seconds": 3.0,
+            "resident_profile_reused": true
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 1,
+      "mode": "unsolved",
+      "result": {
+        "path": null,
+        "elapsed_seconds": 0.152504405,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-1/unsolved/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.141337,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 3,
+            "reused": true,
+            "worker_pids": [
+              45285
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 0.0,
+            "original_calibration_wall_seconds": 3.0,
+            "resident_profile_reused": true
+          },
+          "replay_valid": false,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 1,
+      "mode": "model-change",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 0.492091546,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-1/model-change/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.0867057,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45302
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 1,
+      "mode": "beam-change",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 0.481765391,
+        "effective_beam_width": 65,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-1/beam-change/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.08769,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45312
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 65,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 1,
+      "mode": "collect",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 0.654331168,
+        "effective_beam_width": 65,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "collected_solutions": [
+            {
+              "owner_rank": 0,
+              "path": [
+                0,
+                1,
+                2
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            },
+            {
+              "owner_rank": 0,
+              "path": [
+                1,
+                2,
+                0
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            },
+            {
+              "owner_rank": 0,
+              "path": [
+                0,
+                2,
+                1
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            }
+          ],
+          "collection_status": "depth_reached",
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-1/collect/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.140446,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45322
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 65,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 2,
+      "mode": "first",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 1.088383376,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-2/first/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.146064,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45333,
+              45334
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 2,
+      "mode": "repeat",
+      "result": {
+        "path": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "elapsed_seconds": 0.051426455,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-2/repeat/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.0378713,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 2,
+            "reused": true,
+            "worker_pids": [
+              45333,
+              45334
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 0.0,
+            "original_calibration_wall_seconds": 3.0,
+            "resident_profile_reused": true
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 2,
+      "mode": "unsolved",
+      "result": {
+        "path": null,
+        "elapsed_seconds": 0.051156982,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-2/unsolved/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.0409514,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 3,
+            "reused": true,
+            "worker_pids": [
+              45333,
+              45334
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 0.0,
+            "original_calibration_wall_seconds": 3.0,
+            "resident_profile_reused": true
+          },
+          "replay_valid": false,
+          "requested_beam_width": 64,
+          "terminal_records": 2
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 2,
+      "mode": "model-change",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 1.543497355,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-2/model-change/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.166379,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45376,
+              45377
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 2,
+      "mode": "beam-change",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 1.603221698,
+        "effective_beam_width": 65,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-2/beam-change/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.200313,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45405,
+              45406
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 65,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "native",
+      "world": 2,
+      "mode": "collect",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 1.604739859,
+        "effective_beam_width": 65,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "161395bc10ea94019817929565a4e81798bcf6aade5e29b42d9fac765d477fb1"
+          },
+          "collected_solutions": [
+            {
+              "owner_rank": 0,
+              "path": [
+                0,
+                1,
+                2
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            },
+            {
+              "owner_rank": 0,
+              "path": [
+                1,
+                2,
+                0
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            },
+            {
+              "owner_rank": 0,
+              "path": [
+                0,
+                2,
+                1
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            }
+          ],
+          "collection_status": "depth_reached",
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/native-2/collect/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.193203,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45434,
+              45435
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 65,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 1,
+      "mode": "first",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 1.278432161,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-1/first/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.406197,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45465
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 1,
+      "mode": "repeat",
+      "result": {
+        "path": [
+          3,
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 0.132098818,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-1/repeat/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.118654,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 2,
+            "reused": true,
+            "worker_pids": [
+              45465
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 0.0,
+            "original_calibration_wall_seconds": 3.0,
+            "resident_profile_reused": true
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 1,
+      "mode": "unsolved",
+      "result": {
+        "path": null,
+        "elapsed_seconds": 0.162768943,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-1/unsolved/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.143203,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 3,
+            "reused": true,
+            "worker_pids": [
+              45465
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 0.0,
+            "original_calibration_wall_seconds": 3.0,
+            "resident_profile_reused": true
+          },
+          "replay_valid": false,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 1,
+      "mode": "model-change",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 1.571297005,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-1/model-change/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.400485,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45493
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 1,
+      "mode": "beam-change",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 1.58147364,
+        "effective_beam_width": 65,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-1/beam-change/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.411828,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45514
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 65,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 1,
+      "mode": "collect",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 1.6521445,
+        "effective_beam_width": 65,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "collected_solutions": [
+            {
+              "owner_rank": 0,
+              "path": [
+                0,
+                1,
+                2
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            },
+            {
+              "owner_rank": 0,
+              "path": [
+                1,
+                2,
+                0
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            },
+            {
+              "owner_rank": 0,
+              "path": [
+                0,
+                2,
+                1
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            }
+          ],
+          "collection_status": "depth_reached",
+          "devices": [
+            0
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-1/collect/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.484788,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45535
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 65,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 2,
+      "mode": "first",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 2.299137401,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-2/first/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.828028,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45557,
+              45558
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 2,
+      "mode": "repeat",
+      "result": {
+        "path": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "elapsed_seconds": 0.051768479,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-2/repeat/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.0413613,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 2,
+            "reused": true,
+            "worker_pids": [
+              45557,
+              45558
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 0.0,
+            "original_calibration_wall_seconds": 3.0,
+            "resident_profile_reused": true
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 2,
+      "mode": "unsolved",
+      "result": {
+        "path": null,
+        "elapsed_seconds": 0.051773454,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-2/unsolved/native.log",
+          "model_artifact_hash": "824a9c144e6c37dd889e8970aa1a4e64add2c0b3bef0efb2962fb556a757d014",
+          "native_seconds": 0.0434552,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 3,
+            "reused": true,
+            "worker_pids": [
+              45557,
+              45558
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 0.0,
+            "original_calibration_wall_seconds": 3.0,
+            "resident_profile_reused": true
+          },
+          "replay_valid": false,
+          "requested_beam_width": 64,
+          "terminal_records": 2
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 2,
+      "mode": "model-change",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 2.5425629990000003,
+        "effective_beam_width": 64,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-2/model-change/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.799611,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45622,
+              45623
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 64,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 2,
+      "mode": "beam-change",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 2.693286382,
+        "effective_beam_width": 65,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-2/beam-change/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.794887,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45673,
+              45674
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 65,
+          "terminal_records": 1
+        }
+      }
+    },
+    {
+      "backend": "libtorch",
+      "world": 2,
+      "mode": "collect",
+      "result": {
+        "path": [
+          0,
+          1,
+          2
+        ],
+        "elapsed_seconds": 2.784541808,
+        "effective_beam_width": 65,
+        "metadata": {
+          "build": {
+            "abi_version": 1,
+            "binary_sha256": "7aac3de97c95543cfd6d6d211cf6c05e502601bdf82fbbfbe4fa6f2a8c8e0431",
+            "native_library_sha256": "998bc6ee2a7f7b1768f0525cfbd593098955c1dbcf9e20ccb0f6320b44309eb8"
+          },
+          "collected_solutions": [
+            {
+              "owner_rank": 0,
+              "path": [
+                0,
+                1,
+                2
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            },
+            {
+              "owner_rank": 0,
+              "path": [
+                1,
+                2,
+                0
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            },
+            {
+              "owner_rank": 0,
+              "path": [
+                0,
+                2,
+                1
+              ],
+              "solved_depth": 3,
+              "touch_depth": 0
+            }
+          ],
+          "collection_status": "depth_reached",
+          "devices": [
+            0,
+            1
+          ],
+          "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+          "log_path": "/workspace/beam-results/session/gpu-final/libtorch-2/collect/native.log",
+          "model_artifact_hash": "81ad1b82c1533ed1388887850aab0c57a4e5b87dac5341c94bc6bd90a5a107d1",
+          "native_seconds": 0.812672,
+          "observed_inference_rows": null,
+          "observed_parent_batch": null,
+          "observed_stream3_batch_candidates": null,
+          "persistent_session": {
+            "request_count": 1,
+            "reused": false,
+            "worker_pids": [
+              45724,
+              45725
+            ]
+          },
+          "profile": {
+            "calibration_total_wall_seconds": 3.0
+          },
+          "replay_valid": true,
+          "requested_beam_width": 65,
+          "terminal_records": 1
+        }
+      }
+    }
+  ],
+  "failures": [
+    {
+      "mode": "cancel",
+      "error": "resident search cancelled",
+      "pids": [
+        45779,
+        45778
+      ],
+      "elapsed_seconds": 1.7070358990022214
+    },
+    {
+      "mode": "failed_rank",
+      "error": "resident worker exited: [None, Some(1)]; logs=/workspace/beam-results/session/gpu-final/failure-failed_rank/resident-session",
+      "pids": [
+        45807,
+        45806
+      ],
+      "elapsed_seconds": 2.1889031099999556
+    }
+  ]
+}

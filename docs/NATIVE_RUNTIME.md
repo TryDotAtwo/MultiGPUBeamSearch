@@ -144,6 +144,14 @@ despite a valid frontier. The selected states and inference policy are unchanged
 - `tests/native_inference_gpu.py`: native MLP, LibTorch MLP and ensemble probes on
   one/two GPUs, all seven timing samples and partial final batches, retained PIDs,
   independent numerical oracles and the Rust-owned inference search loop.
+- `tests/native_search_owner_gpu.py`: typed Rust session/result ownership, actual
+  executor assertions, repeated jobs, model/beam changes, solution collections,
+  cancellation and rank failure on one/two GPUs. `native_session_gpu.py --executor
+  libtorch_eager` independently compares the eager executor with the baseline.
+- Rust `SearchSession` validates complete permutation/collection paths, exact
+  width and all-rank completion, owns compatibility/restart decisions and writes
+  outcomes atomically. One deadline covers protocol preparation and execution;
+  a separate parent cancellation token survives normal worker replacement.
 - `rust/beam-python/tests/inference.py`: retained rank PIDs and active cancellation
   from another Python thread. Rust tests also reproduce deadline poisoning and
   distinguish startup OOM from an invalid quality receipt.
