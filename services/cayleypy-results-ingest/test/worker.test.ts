@@ -1,4 +1,6 @@
 import { maintainSubmissions } from "../src/maintenance.js";
+import { findStagedSubmissions } from "../src/db.js";
+import { cleanupRawPayload } from "../src/raw-cleanup.js";
 import { handleIngestBody } from "../src/ingest.js";
 import { createHash } from "node:crypto";
 import { env } from "cloudflare:workers";
@@ -732,7 +734,7 @@ describe("mode-gated scheduled recovery", () => {
     ).bind(submissionId).first<{ raw_r2_key: string }>();
     expect(await env.RAW_RESULTS.head(row!.raw_r2_key)).not.toBeNull();
 
-    await scheduled(controller(), customBindings("normal"), context());
+    await scheduled(controller(Math.floor(Date.now() / 600_000) * 600_000), customBindings("normal"), context());
 
     expect(await env.RESULTS_DB.prepare(
       "SELECT submission_id, state FROM submissions WHERE submission_id = ?",
@@ -741,6 +743,49 @@ describe("mode-gated scheduled recovery", () => {
       state: "staged",
     });
     expect(await env.RAW_RESULTS.head(row!.raw_r2_key)).toBeNull();
+    expect(await findStagedSubmissions(env.RESULTS_DB, 100)).toEqual([]);
+  });
+
+  test("completed cleanup advances past the first page and retains every idempotency record", async () => {
+    for (let i = 0; i < 103; i++) await seedSubmission(8000 + i, "staged", "2000-01-01T00:00:00.000Z", null);
+    const tick = Math.floor(Date.now() / 600_000) * 600_000;
+    await scheduled(controller(tick), customBindings("normal"), context());
+    expect(await findStagedSubmissions(env.RESULTS_DB, 100)).toHaveLength(3);
+    await scheduled(controller(tick + 600_000), customBindings("normal"), context());
+    expect(await findStagedSubmissions(env.RESULTS_DB, 100)).toEqual([]);
+    expect(await rowCount()).toBe(103);
+    expect(await rawCount()).toBe(0);
+  });
+
+  test("R2 deletion failure keeps cleanup pending; successful retry marks it once", async () => {
+    await seedSubmission(9000, "staged", "2000-01-01T00:00:00.000Z", null);
+    const [row] = await findStagedSubmissions(env.RESULTS_DB, 100);
+    const failingBucket = { delete: async () => { throw new Error("r2_unavailable"); } } as unknown as R2Bucket;
+    await expect(cleanupRawPayload(env.RESULTS_DB, failingBucket, row)).rejects.toThrow("r2_unavailable");
+    expect(await findStagedSubmissions(env.RESULTS_DB, 100)).toHaveLength(1);
+    await cleanupRawPayload(env.RESULTS_DB, env.RAW_RESULTS, row);
+    expect(await findStagedSubmissions(env.RESULTS_DB, 100)).toEqual([]);
+    // Retrying after a crash between R2 deletion and the marker is also safe.
+    await cleanupRawPayload(env.RESULTS_DB, env.RAW_RESULTS, row);
+    expect(await rowCount()).toBe(1);
+  });
+
+  test("backup cleanup is skipped between ten-minute boundaries", async () => {
+    await seedSubmission(9001, "staged", "2000-01-01T00:00:00.000Z", null);
+    const tick = Math.floor(Date.now() / 600_000) * 600_000;
+    await scheduled(controller(tick + 60_000), customBindings("normal"), context());
+    expect(await findStagedSubmissions(env.RESULTS_DB, 100)).toHaveLength(1);
+    expect(await rawCount()).toBe(1);
+  });
+
+  test("empty cleanup queue does not scan retained history", async () => {
+    await env.RESULTS_DB.exec("INSERT INTO submissions (submission_id,idempotency_key,run_id,author_name,competition,puzzle_type,puzzle_id,state,raw_r2_key,created_at,updated_at,raw_deleted_at) WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<2002) SELECT 'history-'||x,'history-'||x,'run','author','competition','puzzle',x,'staged','history/'||x,'2000','2000','2001' FROM n");
+    const sql = "SELECT submission_id FROM submissions INDEXED BY submissions_raw_cleanup WHERE raw_deleted_at IS NULL AND state IN ('staged', 'published') ORDER BY updated_at, submission_id LIMIT 100";
+    const result = await env.RESULTS_DB.prepare(sql).all();
+    expect(result.results).toEqual([]);
+    expect(result.meta.rows_read).toBeLessThan(10);
+    const plan = await env.RESULTS_DB.prepare("EXPLAIN QUERY PLAN " + sql).all<{ detail: string }>();
+    expect(plan.results.some(row => row.detail.includes('submissions_raw_cleanup'))).toBe(true);
   });
   test.each(["store_only", "reject", undefined, "", "Normal", "unknown"])(
     "mode %s is a strict recovery no-op",

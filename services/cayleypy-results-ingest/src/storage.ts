@@ -425,6 +425,7 @@ export async function receiveEnvelope(
       updated_at: timestamp,
       github_path: null,
       github_commit_sha: null,
+      raw_deleted_at: null,
     },
     false,
   );

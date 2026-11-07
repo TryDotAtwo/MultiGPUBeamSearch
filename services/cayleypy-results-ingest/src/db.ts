@@ -26,6 +26,7 @@ export interface SubmissionRow {
   updated_at: string;
   github_path: string | null;
   github_commit_sha: string | null;
+  raw_deleted_at: string | null;
 }
 
 export interface TransitionPatch {
@@ -37,14 +38,14 @@ export interface TransitionPatch {
 
 export async function findByIdempotency(db: D1Database, key: string): Promise<SubmissionRow | null> {
   return db
-    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE idempotency_key = ?")
+    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha, raw_deleted_at FROM submissions WHERE idempotency_key = ?")
     .bind(key)
     .first<SubmissionRow>();
 }
 
 export async function findBySubmissionId(db: D1Database, id: string): Promise<SubmissionRow | null> {
   return db
-    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE submission_id = ?")
+    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha, raw_deleted_at FROM submissions WHERE submission_id = ?")
     .bind(id)
     .first<SubmissionRow>();
 }
@@ -56,7 +57,7 @@ export async function findStaleRecoverable(
 ): Promise<SubmissionRow[]> {
   const result = await db
     .prepare(
-      "SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE state IN (?,?,?,?) AND updated_at <= ? ORDER BY updated_at, submission_id LIMIT ?",
+      "SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha, raw_deleted_at FROM submissions WHERE state IN (?,?,?,?) AND updated_at <= ? ORDER BY updated_at, submission_id LIMIT ?",
     )
     .bind("received", "queued", "retryable", "validating", staleBefore, limit)
     .all<SubmissionRow>();
@@ -67,7 +68,7 @@ export async function findStaleRecoverable(
 export async function findDeadLetters(db: D1Database, limit: number): Promise<SubmissionRow[]> {
   const result = await db
     .prepare(
-      "SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE state = ? ORDER BY updated_at, submission_id LIMIT ?",
+      "SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha, raw_deleted_at FROM submissions WHERE state = ? ORDER BY updated_at, submission_id LIMIT ?",
     )
     .bind("dead_letter", limit)
     .all<SubmissionRow>();
@@ -75,7 +76,7 @@ export async function findDeadLetters(db: D1Database, limit: number): Promise<Su
 }
 export async function findValidatedSubmissions(db: D1Database, limit: number): Promise<SubmissionRow[]> {
   const result = await db
-    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE state = ? ORDER BY updated_at, submission_id LIMIT ?")
+    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha, raw_deleted_at FROM submissions WHERE state = ? ORDER BY updated_at, submission_id LIMIT ?")
     .bind("validated", limit)
     .all<SubmissionRow>();
   return result.results;
@@ -83,10 +84,20 @@ export async function findValidatedSubmissions(db: D1Database, limit: number): P
 
 export async function findStagedSubmissions(db: D1Database, limit: number): Promise<SubmissionRow[]> {
   const result = await db
-    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha FROM submissions WHERE state IN (?,?) ORDER BY updated_at, submission_id LIMIT ?")
-    .bind("staged", "published", limit)
+    .prepare("SELECT submission_id, idempotency_key, run_id, author_name, competition, puzzle_type, puzzle_id, state, raw_r2_key, safe_error, retry_count, updated_at, github_path, github_commit_sha, raw_deleted_at FROM submissions INDEXED BY submissions_raw_cleanup WHERE raw_deleted_at IS NULL AND state IN ('staged', 'published') ORDER BY updated_at, submission_id LIMIT ?")
+    .bind(limit)
     .all<SubmissionRow>();
   return result.results;
+}
+
+/** A successful R2 deletion precedes this marker; submission history remains intact. */
+export async function markRawDeleted(db: D1Database, id: string): Promise<void> {
+  const result = await db.prepare("UPDATE submissions SET raw_deleted_at = ? WHERE submission_id = ? AND raw_deleted_at IS NULL AND state IN ('staged', 'published')")
+    .bind(new Date().toISOString(), id).run();
+  if (result.meta.changes === 1) return;
+  const retained = await db.prepare("SELECT state, raw_deleted_at FROM submissions WHERE submission_id = ?")
+    .bind(id).first<{ state: string; raw_deleted_at: string | null }>();
+  if (!retained?.raw_deleted_at || !['staged', 'published'].includes(retained.state)) throw new Error('raw_cleanup_conflict');
 }
 
 export async function deleteStagedSubmission(db: D1Database, id: string): Promise<boolean> {

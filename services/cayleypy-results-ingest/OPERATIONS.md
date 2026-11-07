@@ -22,3 +22,7 @@ The operator-only replayDeadLetters(env, options) primitive has this contract:
 
 Before apply, snapshot the selected D1 rows and R2 keys; alert on skipped raw objects or any remaining dead letters. Do not use a public HTTP endpoint for replay.
 The GET status limiter uses 256 deterministic FNV-1a hash buckets in D1, so its stored scope cardinality is at most 256. Different IPs can collide and share a 30-request/minute status budget; this conservative false-positive tradeoff prevents unbounded D1 rows from an anonymous endpoint.
+
+## Completed R2 cleanup and D1 budget
+
+Migration 0004 must precede deployment of this version. raw_deleted_at is set only after a successful R2 deletion; failed deletions remain pending. Submission and idempotency records are retained. The partial submissions_raw_cleanup index contains only staged/published rows still awaiting deletion and orders them by updated_at, submission_id. The existing every-minute Cron continues recovery; backup raw cleanup runs only on ten-minute boundaries, up to 100 records per run. The writer also marks cleanup immediately after its successful publication path. Existing historical records drain progressively; do not backfill completion markers without verifying R2 deletion.

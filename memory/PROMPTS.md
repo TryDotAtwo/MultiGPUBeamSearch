@@ -651,3 +651,9 @@ Make the Cube555 notebook public, grant CayleyPy Can edit, audit memory/speed/pr
 2026-10-01 Ivan/Astra: compare same-instance short base -> variant -> base blocks with identical work/warmup, keep both rank times and slower-rank completion. Baseline disagreement greater than sought gain means no winner; reverse-order leader confirmations. Save clocks/temperature without asserting overheating cause.
 
 2026-10-01 Ivan: Easy public Cube555 notebook; jointly tune microbatch/concurrency then full-step Stream3/4 with fixed work, paired/reverse controls and drift exclusions; collect2000, extra depths after first solution, depth140, BFS5, beam<=4000000, exactGit pin, replay/memory/Cloudflare, public+CayleyPy Editor. Maximumtwo own Kaggle slots, no subagents. Retain baseline when no confirmed improvement.
+
+- 2026-10-01: Ivan requested fixing D1 free-tier read exhaustion, recurring R2 cleanup, its SQL query, and cleanup schedule while preserving submission/idempotency records and existing publication behavior.
+
+2026-10-01 user: Set BEAM_WIDTH3100000 and publish. Add warning against larger widths for Kaggle12h; retain truthful extrapolation limits.
+
+- 2026-10-01: Ivan explicitly approved applying additive Molab provenance support to the current Worker and sending its exact deployment version to the Cube555 notebook chat.

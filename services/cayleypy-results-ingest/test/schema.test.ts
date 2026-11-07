@@ -7,6 +7,18 @@ import { canonicalJson, computeIdempotency, sha256Hex } from "../src/ids.js";
 const clone = (value: object): ResultEnvelopeV1 => structuredClone(value) as ResultEnvelopeV1;
 
 describe("canonical CayleyPy results v1 schema", () => {
+  test("accepts truthful one-rank Molab provenance and rejects fake rank counts", async () => {
+    const envelope = clone(canonicalGolden.cases[0].envelope);
+    delete envelope.kaggle;
+    envelope.molab = { notebook_url: "https://molab.marimo.io/notebooks/nb_test", notebook_sha256: "a".repeat(64) };
+    envelope.profile.world_size = 1;
+    envelope.hardware = { platform: "molab", gpu_names: ["NVIDIA GPU"], accelerator_count: 1, world_size: 1 };
+    envelope.idempotency_key = await computeIdempotency(envelope);
+    expect(validateBatch({ schema_version: 1, results: [envelope] })).toMatchObject({ ok: true });
+    expect(await validateEnvelopeIntegrity(envelope)).toEqual([]);
+    envelope.hardware.world_size = 2;
+    expect(validateBatch({ schema_version: 1, results: [envelope] })).toMatchObject({ ok: false });
+  });
   test("accepts shared UTF-8, slash, reflected, and empty-source fixtures", async () => {
     expect(canonicalGolden.cases).toHaveLength(3);
     for (const fixture of canonicalGolden.cases) {

@@ -15,6 +15,19 @@ const post=(path:string,value:unknown)=>fetchRequest(new Request(`${URL}${path}`
 beforeEach(async()=>{await env.RESULTS_DB.exec("DELETE FROM submissions");await env.RESULTS_DB.exec("DELETE FROM ingest_rate_limits");const listed=await env.RAW_RESULTS.list({prefix:"raw/"});if(listed.objects.length)await env.RAW_RESULTS.delete(listed.objects.map(x=>x.key));});
 
 describe("SLURM v2 route isolation",()=>{
+ test("local Worker accepts explicit Molab v1 provenance without Kaggle credentials",async()=>{
+   const envelope=structuredClone(v1Golden.cases[0].envelope) as any;
+   delete envelope.kaggle;
+   envelope.molab={notebook_url:"https://molab.marimo.io/notebooks/nb_test",notebook_sha256:"a".repeat(64)};
+   envelope.profile.world_size=1;
+   envelope.hardware={platform:"molab",gpu_names:["NVIDIA GPU"],accelerator_count:1,world_size:1};
+   envelope.idempotency_key=await computeIdempotency(envelope);
+   const response=await post("/v1/results",{schema_version:1,results:[envelope]});
+   expect(response.status).toBe(202);
+   const body=await response.json() as any;
+   expect(body.receipts).toHaveLength(1);
+   expect(await env.RESULTS_DB.prepare("SELECT state FROM submissions WHERE idempotency_key=?").bind(envelope.idempotency_key).first<string>("state")).toBe("queued");
+ });
  test("POST /v2/results accepts only v2 and returns shared safe status receipts",async()=>{const response=await post("/v2/results",{schema_version:2,results:[golden.cases[0].envelope]});expect(response.status).toBe(202);const body=await response.json() as any;expect(body.receipts).toHaveLength(1);expect(body.receipts[0].status_url).toMatch(/\/v1\/submissions\/[0-9a-f-]+$/);});
  test("v1 and v2 endpoints reject the other schema",async()=>{expect((await post("/v1/results",{schema_version:2,results:[golden.cases[0].envelope]})).status).toBe(400);expect((await post("/v2/results",{schema_version:1,results:[v1Golden.cases[0].envelope]})).status).toBe(400);});
  test("accepts a bounded gzip v2 batch", async () => {
