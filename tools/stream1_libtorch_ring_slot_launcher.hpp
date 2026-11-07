@@ -12,6 +12,8 @@ namespace beam::stream1_libtorch {
 
 struct RingSlotLauncherConfig {
     std::filesystem::path weight_dir;
+    std::filesystem::path blend_dir;
+    std::uint32_t* numeric_error = nullptr;
     int device_index = 0;
     std::uint32_t inference_parallelism = 0;
     std::uint32_t local_rank = 0;

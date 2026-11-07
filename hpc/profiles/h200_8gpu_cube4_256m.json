@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "profile_id": "h200_8gpu_cube4_256m_20260923",
+  "status": "historically_measured",
+  "parameters": {
+    "H200_WORLD_SIZE": 8,
+    "BEAM_WIDTH": 256000000,
+    "BEAM_B_MICRO": 2048,
+    "BEAM_STREAM1_TRANSFORMER_MICRO": 1024,
+    "BEAM_STREAM1_CONCURRENCY": 4,
+    "BEAM_STREAM3_RING_SLOTS": 8,
+    "BEAM_SHARD_COUNT": 64,
+    "BEAM_STREAM4_BATCH_ALIGNMENT": 1024,
+    "BEAM_STREAM4_BATCH_CANDIDATES": 262144,
+    "BEAM_STREAM4_TRIGGER_CANDIDATES": 393216,
+    "BEAM_STREAM4_ACTIVE_SORT_SLOTS": 4
+  },
+  "historical_evidence": {
+    "report": "test_results/h200_8x_256m_2026-09-23.md",
+    "archive_sha256": "bbcc4e9ecc213a836924474d847a9e497367414b08515c5e50882ba255801bd4",
+    "runner_sha256": "f2a9b033ed22f6371ee8d943e2bef31d9de0f1f98e6ba7371de3b3d71b0148a8",
+    "model_manifest_sha256": "03f55e5b617874cbbfaace5796f7e348588eb2c0b5ef079e45c06b05d84d0cb0",
+    "puzzle_info_sha256": "2ae03f88108d9818315a1b36abf383bfab450bc6c1aeb6c0b6a2e502c8f05f48",
+    "test_csv_sha256": "e9a734df2a63656477c2c6f9920f490188fdfa8a780027f1b91783e82b77419e",
+    "cuda_arch": "sm_90a",
+    "gpu_name": "NVIDIA H200",
+    "gpu_memory_mib": 143771,
+    "peer_topology": "NV18",
+    "numerical_quality_accepted": false
+  }
+}

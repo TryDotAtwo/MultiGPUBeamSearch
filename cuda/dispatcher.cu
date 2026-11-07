@@ -1,4 +1,5 @@
 #include "dispatcher.hpp"
+#include "stream1_transformer_chunk_launch.hpp"
 
 #include "config.hpp"
 #include "final_materialize.hpp"
@@ -1061,20 +1062,44 @@ void update_threshold_global(
     bool periodic,
     const DispatcherCollective* collective,
     bool local_histogram_only = false,
-    const char* debug_label = "threshold_update") {
+    const char* debug_label = "threshold_update",
+    bool exact_banks = false) {
     const std::uint64_t threshold_width = plan.derived.global_beam_width_effective;
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
     log_threshold_trace(plan, debug_label, "entry", periodic, local_histogram_only, threshold_width);
     log_threshold_trace(plan, debug_label, "local_histogram_begin", periodic, local_histogram_only, threshold_width);
 #endif
-    threshold_build_local_histogram_cuda(
-        memory.streams.shard_score_hist_a,
-        memory.streams.shard_score_hist_b,
-        memory.streams.shard_score_hist_active_index,
-        memory.streams.threshold_hist_active_snapshot,
-        memory.streams.local_score_hist,
-        plan.storage_shard_count,
-        stream);
+    if (exact_banks) {
+        if(plan.config.shard_buffer_count!=2U) throw std::runtime_error("exact pressure histogram requires two banks");
+        threshold_build_exact_bank_union_histogram_cuda(memory.streams.survivor_shard,
+            memory.streams.clean_count,memory.streams.local_score_hist,plan.config.shard_count,
+            plan.config.shard_capacity_candidates,stream);
+    } else if (periodic) {
+        // Physical A/B survivors can share hashes. Summing their counts could
+        // irreversibly prune unique candidates. max(CDF_A,CDF_B) is a lower
+        // bound on the logical union; owner/shard domains remain disjoint.
+        // Callers synchronize this stream before scheduling another Stream4
+        // job, so a captured histogram publication cannot be reused mid-read.
+        threshold_build_conservative_histogram_cuda(
+            memory.streams.shard_score_hist_a,
+            memory.streams.shard_score_hist_b,
+            memory.streams.shard_score_hist_active_index,
+            memory.streams.threshold_hist_active_snapshot,
+            memory.streams.local_score_hist,
+            plan.config.shard_count,
+            plan.config.shard_buffer_count,
+            stream);
+    } else {
+        // Exact summation is valid only after final logical A/B union.
+        threshold_build_local_histogram_cuda(
+            memory.streams.shard_score_hist_a,
+            memory.streams.shard_score_hist_b,
+            memory.streams.shard_score_hist_active_index,
+            memory.streams.threshold_hist_active_snapshot,
+            memory.streams.local_score_hist,
+            plan.storage_shard_count,
+            stream);
+    }
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
     log_threshold_trace(plan, debug_label, "local_histogram_enqueued", periodic, local_histogram_only, threshold_width);
     check_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize threshold trace local histogram");
@@ -1410,39 +1435,14 @@ void instantiate_cuda_graph_job_templates(
             } else if (network.backend == DispatcherStream1Backend::PieceTransformer) {
                 const std::uint32_t transformer_micro =
                     network.transformer_micro == 0U ? plan.config.b_micro : network.transformer_micro;
-                if (transformer_micro == 0U || transformer_micro > plan.config.b_micro) {
-                    throw std::invalid_argument("Stream1 transformer micro must be in [1, B_MICRO]");
-                }
-                for (std::uint32_t parent_offset = 0; parent_offset < plan.config.b_micro;
-                     parent_offset += transformer_micro) {
-                    const std::uint32_t chunk = std::min(transformer_micro, plan.config.b_micro - parent_offset);
-                    if (graphs.ring_slot_windowed) {
-                        stream1_transformer_inference_graph_job_cuda(
-                            memory.current_frontier_states,
-                            memory.streams.parent_base,
-                            memory.streams.count,
-                            graph_job_index,
-                            network.transformer_view,
-                            network.transformer_scratch_lanes[lane],
-                            memory.streams.score_ring,
-                            chunk,
-                            plan.config.b_micro,
-                            parent_offset,
-                            stream1_lane);
-                    } else {
-                        stream1_transformer_inference_cuda(
-                            memory.current_frontier_states,
-                            memory.streams.parent_base + graph_job,
-                            memory.streams.count + graph_job,
-                            network.transformer_view,
-                            network.transformer_scratch_lanes[lane],
-                            memory.streams.score_ring + candidate_offset +
-                                static_cast<std::uint64_t>(parent_offset) * MOVE_COUNT,
-                            chunk,
-                            parent_offset,
-                            stream1_lane);
-                    }
-                }
+                launch_stream1_transformer_chunks_cuda(memory.current_frontier_states,
+                    memory.streams.parent_base + (graphs.ring_slot_windowed ? 0U : graph_job),
+                    memory.streams.count + (graphs.ring_slot_windowed ? 0U : graph_job),
+                    graph_job_index, graphs.ring_slot_windowed, network.transformer_view,
+                    network.transformer_scratch_lanes[lane],
+                    memory.streams.score_ring + (graphs.ring_slot_windowed ? 0ULL : candidate_offset),
+                    plan.config.b_micro, transformer_micro, stream1_lane,
+                    Stream1NoChunkObserver{}, network.transformer_policy_snapshot, network.transformer_execution_contract);
             } else {
                 throw std::invalid_argument("unknown Stream1 dispatcher backend");
             }
@@ -1833,6 +1833,11 @@ DepthDispatchState run_depth_cuda_graphs(
         frontier_size == 0U
             ? 0U
             : (frontier_size + parents_per_stream3_round - 1ULL) / parents_per_stream3_round;
+    const bool calibration_progress=std::getenv("BEAM_CALIBRATION_PROGRESS")!=nullptr;
+    const auto progress_trace=[&](const char* phase){
+        if(calibration_progress) std::cerr << "calibration_progress rank=" << plan.config.local_rank
+            << " phase=" << phase << std::endl;
+    };
     std::uint64_t global_exchange_rounds = local_exchange_rounds;
     if (multi_rank) {
         check_cuda(cudaMemcpyAsync(
@@ -1857,7 +1862,9 @@ DepthDispatchState run_depth_cuda_graphs(
             sizeof(global_exchange_rounds),
             cudaMemcpyDeviceToHost,
             streams.stream5), "cudaMemcpyAsync global stream5 round count");
+        progress_trace("round-count-wait");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 round count");
+        progress_trace("round-count-ready");
     }
 
     DepthDispatchState state;
@@ -1909,6 +1916,10 @@ DepthDispatchState run_depth_cuda_graphs(
     }
     std::uint32_t stream4_jobs_since_threshold_update = 0;
     const bool pipeline_stats_enabled = std::getenv("BEAM_DEBUG_PIPELINE_STATS") != nullptr;
+    const char* prefill_selector = std::getenv("BEAM_STREAM5_PREFILL_BEFORE_WAIT");
+    if (prefill_selector && std::strcmp(prefill_selector, "0") && std::strcmp(prefill_selector, "1"))
+        throw std::invalid_argument("BEAM_STREAM5_PREFILL_BEFORE_WAIT must be 0 or 1");
+    const bool prefill_before_wait = prefill_selector && !std::strcmp(prefill_selector, "1");
     const bool ring_graph_debug_sync_enabled = ring_graph_debug_sync_enabled_from_env();
 
     std::vector<cudaEvent_t> ring_done(plan.config.ring_count, nullptr);
@@ -2402,13 +2413,15 @@ DepthDispatchState run_depth_cuda_graphs(
     };
 
     const auto stream3_has_writable_buffer = [&]() -> bool {
+        NvtxRange service_range("Dispatcher_Stream3_writable_metadata");
         if (plan.config.shard_buffer_count <= 1U) {
             return true;
         }
         const std::uint32_t average_shard_write =
             plan.config.shard_count == 0U ? plan.config.stream3_batch_candidates :
-            (plan.config.stream3_batch_candidates + plan.config.shard_count - 1U) / plan.config.shard_count;
-        const std::uint32_t write_margin = (average_shard_write + 3U) / 4U;
+            plan.config.stream3_batch_candidates / plan.config.shard_count +
+                (plan.config.stream3_batch_candidates % plan.config.shard_count != 0U);
+        const std::uint32_t write_margin = average_shard_write / 4U + (average_shard_write % 4U != 0U);
         const std::uint32_t unclamped_write_reserve =
             average_shard_write > UINT32_MAX - write_margin ? UINT32_MAX : average_shard_write + write_margin;
         const std::uint32_t write_reserve =
@@ -2516,17 +2529,17 @@ DepthDispatchState run_depth_cuda_graphs(
 
     const auto release_completed_stream4_slots_nonblocking = [&]() -> bool {
         bool progressed = false;
-        while (!stream4_busy_slots.empty()) {
-            const std::uint32_t slot = stream4_busy_slots.front();
+        for (auto pending = stream4_busy_slots.begin(); pending != stream4_busy_slots.end();) {
+            const std::uint32_t slot = *pending;
             const cudaError_t status = cudaEventQuery(streams.stream4_slot_done[slot]);
             if (status == cudaSuccess) {
-                stream4_busy_slots.pop_front();
+                pending = stream4_busy_slots.erase(pending);
                 mark_stream4_slot_complete(slot);
                 progressed = true;
             } else if (status != cudaErrorNotReady) {
                 check_cuda(status, "cudaEventQuery stream4 slot done");
             } else {
-                break;
+                ++pending;
             }
         }
         return progressed;
@@ -2535,6 +2548,7 @@ DepthDispatchState run_depth_cuda_graphs(
     const auto wait_all_stream4_slots = [&]() {
         while (!stream4_busy_slots.empty()) {
             const std::uint32_t slot = stream4_busy_slots.front();
+            progress_trace("stream4-slot-wait");
             check_cuda(cudaEventSynchronize(streams.stream4_slot_done[slot]), "cudaEventSynchronize stream4 drain slot");
             stream4_busy_slots.pop_front();
             mark_stream4_slot_complete(slot);
@@ -2542,15 +2556,24 @@ DepthDispatchState run_depth_cuda_graphs(
         }
     };
 
-    const auto wait_oldest_stream4_slot = [&]() -> bool {
+    const auto wait_completed_stream4_slot = [&]() -> bool {
+        NvtxRange wait_range("Dispatcher_Stream4_no_free_slot_wait");
         if (stream4_busy_slots.empty()) {
             return false;
         }
-        const std::uint32_t slot = stream4_busy_slots.front();
-        check_cuda(cudaEventSynchronize(streams.stream4_slot_done[slot]), "cudaEventSynchronize stream4 sort slot");
-        stream4_busy_slots.pop_front();
-        mark_stream4_slot_complete(slot);
-        release_completed_stream4_slots_nonblocking();
+        if (stream4_busy_slots.size() == 1U) {
+            const std::uint32_t slot = stream4_busy_slots.front();
+            check_cuda(cudaEventSynchronize(streams.stream4_slot_done[slot]), "cudaEventSynchronize stream4 sort slot");
+            stream4_busy_slots.pop_front();
+            mark_stream4_slot_complete(slot);
+            return true;
+        }
+        // No dependency requires the oldest physical slot to finish first.
+        // Reuse any finished slot through the existing ownership callback.
+        // Querying events does not read candidate counts back to the host.
+        while (!release_completed_stream4_slots_nonblocking()) {
+            std::this_thread::yield();
+        }
         return true;
     };
 
@@ -2569,7 +2592,7 @@ DepthDispatchState run_depth_cuda_graphs(
         if (free_slot < plan.config.stream4_active_sort_slots) {
             return free_slot;
         }
-        if (!wait_oldest_stream4_slot()) {
+        if (!wait_completed_stream4_slot()) {
             throw std::runtime_error("stream4 blocking slot acquire has no busy slot to wait on");
         }
         const std::uint32_t acquired_slot = stream4_free_slots.front();
@@ -3249,13 +3272,15 @@ DepthDispatchState run_depth_cuda_graphs(
         return local_period != 0U && stream4_jobs_since_threshold_update >= local_period;
     };
 
-    const auto maybe_run_stream5_threshold_update = [&](bool force_local_request) -> bool {
+    std::function<void()> pressure_flush_stream4;
+    const auto maybe_run_stream5_threshold_update = [&](bool force_local_request,bool capacity_pressure=true) -> bool {
         if (!multi_rank) {
             return false;
         }
         const std::uint32_t local_request =
-            (force_local_request || periodic_threshold_due()) ? 1U : 0U;
+            force_local_request ? (capacity_pressure ? 2U : 1U) : (periodic_threshold_due() ? 1U : 0U);
         std::uint32_t global_request = 0;
+        progress_trace("threshold-request-begin");
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         std::cout << "threshold_trace"
                   << " rank=" << plan.config.local_rank
@@ -3290,6 +3315,7 @@ DepthDispatchState run_depth_cuda_graphs(
             cudaMemcpyDeviceToHost,
             streams.stream5), "cudaMemcpyAsync stream5 threshold global request");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 threshold request");
+        progress_trace("threshold-request-ready");
 #if BEAM_DEBUG_FINAL_EXCHANGE_TRACE
         std::cout << "threshold_trace"
                   << " rank=" << plan.config.local_rank
@@ -3302,14 +3328,20 @@ DepthDispatchState run_depth_cuda_graphs(
         if (global_request == 0U) {
             return false;
         }
+        const bool exact_pressure=global_request==2U && plan.config.shard_buffer_count==2U;
+        if(exact_pressure) pressure_flush_stream4();
+        progress_trace("threshold-update-begin");
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_start[0], streams.stream5), "cudaEventRecord stream5 threshold timing start");
 #endif
-        update_threshold_global(plan, memory, streams.stream5, true, collective, false, "stream5_collective_periodic");
+        update_threshold_global(plan, memory, streams.stream5, true, collective, false,
+            "stream5_collective_periodic",exact_pressure);
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 threshold timing stop");
 #endif
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 threshold update");
+        progress_trace("threshold-update-ready");
+        if(exact_pressure) pressure_flush_stream4();
 #if BEAM_DEBUG_STREAM_TIMING
         accumulate_elapsed_ms(
             stream5_timing_start[0],
@@ -3339,9 +3371,13 @@ DepthDispatchState run_depth_cuda_graphs(
 
     std::uint64_t completed_exchange_rounds = 0;
     const auto run_stream5_exchange_and_collect = [&](std::uint32_t ring, bool zero_send) {
+        NvtxRange service_range("Dispatcher_Stream5_exchange_collect");
         if (!multi_rank) {
             return;
         }
+        if(calibration_progress) std::cerr << "calibration_progress rank=" << plan.config.local_rank
+            << " phase=exchange-start round=" << completed_exchange_rounds
+            << " cursor=" << state.frontier_cursor << std::endl;
         if (ring >= plan.stream5_slot_count) {
             throw std::runtime_error("stream5 exchange ring exceeds slot count");
         }
@@ -3390,7 +3426,13 @@ DepthDispatchState run_depth_cuda_graphs(
             plan.config.world_size,
             collective->comm,
             streams.stream5);
+        // Stream1 uses independent lane/ring ownership. Refill available rings
+        // before the host waits for the collective's dynamic receive metadata.
+        // This does not launch Stream3 or change the collective sequence.
+        if (prefill_before_wait) launch_free_rings();
+        progress_trace("exchange-count-wait");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 count exchange");
+        progress_trace("exchange-count-ready");
         check_cuda(cudaMemcpy(
             host_recv_count.data(),
             memory.streams.recv_count,
@@ -3434,7 +3476,10 @@ DepthDispatchState run_depth_cuda_graphs(
 #if BEAM_DEBUG_STREAM_TIMING
         check_cuda(cudaEventRecord(stream5_timing_stop[0], streams.stream5), "cudaEventRecord stream5 exchange timing stop");
 #endif
+        if (prefill_before_wait) launch_free_rings();
+        progress_trace("exchange-payload-wait");
         check_cuda(cudaStreamSynchronize(streams.stream5), "cudaStreamSynchronize stream5 payload exchange");
+        progress_trace("exchange-payload-ready");
 #if BEAM_DEBUG_STREAM_TIMING
         accumulate_elapsed_ms(
             stream5_timing_start[0],
@@ -3444,8 +3489,8 @@ DepthDispatchState run_depth_cuda_graphs(
             "cudaEventElapsedTime stream5 exchange");
 #endif
         release_completed_stream4_slots_nonblocking();
-        maybe_run_stream5_threshold_update(false);
         if (recv_total_64 != 0ULL) {
+            progress_trace("remote-collect-begin");
             stream3_collect_remote_recv_cuda(
                 recv_buffer,
                 memory.streams.recv_count,
@@ -3483,13 +3528,24 @@ DepthDispatchState run_depth_cuda_graphs(
                 memory.streams.fatal_error_flag,
                 memory.streams.fatal_error_trace);
             check_cuda(cudaStreamSynchronize(streams.stream3), "cudaStreamSynchronize stream3 remote recv collect");
+            progress_trace("remote-collect-ready");
             throw_if_stream_fatal_error("stream3_remote_recv_collect");
+            progress_trace("remote-fatal-gate-ready");
             update_global_spill_peak();
+            progress_trace("remote-spill-peak-ready");
 #if BEAM_DEBUG_DEPTH_FLOW_TRACE
             accumulate_stream3_remote_flow(recv_total_64);
 #endif
             append_stream3_ready_queue();
+            progress_trace("remote-ready-queue-ready");
         }
+        // Every rank reaches this boundary once per exchange round, including
+        // zero-send ranks. Request global filtering before local backpressure
+        // can block the next round on clean buffers that sorting cannot shrink.
+        progress_trace("writable-buffer-check-begin");
+        const bool writable=stream3_has_writable_buffer();
+        progress_trace("writable-buffer-check-ready");
+        maybe_run_stream5_threshold_update(!writable);
         ++completed_exchange_rounds;
     };
 
@@ -3658,6 +3714,21 @@ DepthDispatchState run_depth_cuda_graphs(
         return launched;
     };
 
+    pressure_flush_stream4=[&]() {
+        // Global request already agreed on Stream5. Pause only local writers;
+        // sorting here introduces no additional NCCL sequence or shard top-k.
+        drain_pending_stream4_shards();wait_all_stream4_slots();
+        const std::uint32_t one=1;
+        for(std::uint32_t shard=0;shard<plan.storage_shard_count;++shard) {
+            const auto slot=acquire_stream4_slot_blocking();
+            check_cuda(cudaMemcpyAsync(memory.streams.processing_flag+shard,&one,sizeof(one),cudaMemcpyHostToDevice,
+                streams.stream4_slot_streams[slot]),"pressure Stream4 ownership");
+            launch_stream4_shard_on_slot(shard,slot,"pressure_compact_sort");
+            wait_all_stream4_slots();
+        }
+        throw_if_stream_fatal_error("pressure_compact_sort");
+    };
+
     const auto any_active_ring = [&]() -> bool {
         for (RingState value : ring_state) {
             if (value != RingState::Free) {
@@ -3759,7 +3830,10 @@ DepthDispatchState run_depth_cuda_graphs(
         if (stream3_active || stream3_ready_rings.empty()) {
             return false;
         }
-        if (!multi_rank && !stream3_has_writable_buffer()) {
+        // Local shard capacity applies before owner exchange as well. Waiting
+        // for local Stream4 slots adds no collective and preserves Stream5's
+        // exchange-round order across ranks.
+        if (!stream3_has_writable_buffer()) {
             if (stop_stage != DepthDispatchStopStage::Full) {
                 throw std::runtime_error("dispatcher stop-stage smoke hit Stream3 shard backpressure; increase BEAM_SHARD_CAPACITY_CANDIDATES or reduce BEAM_PIPELINE_SMOKE_RINGS");
             }
@@ -3852,6 +3926,7 @@ DepthDispatchState run_depth_cuda_graphs(
             return false;
         }
         const std::uint32_t ring = stream1_running_rings.front();
+        progress_trace("stream1-ring-wait");
         check_cuda(cudaEventSynchronize(ring_done[ring]), "cudaEventSynchronize ring done");
         stream1_running_rings.pop_front();
 #if BEAM_DEBUG_STREAM_TIMING
@@ -3918,6 +3993,7 @@ DepthDispatchState run_depth_cuda_graphs(
         if (!stream3_active) {
             return false;
         }
+        progress_trace("stream3-wait");
         check_cuda(cudaEventSynchronize(stream3_done[stream3_active_ring]), "cudaEventSynchronize stream3 done");
         complete_stream3_ring();
         return true;
@@ -3992,7 +4068,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 } else if (!stream1_running_rings.empty()) {
                     wait_oldest_ring();
                 } else if (!stream4_busy_slots.empty()) {
-                    wait_oldest_stream4_slot();
+                    wait_completed_stream4_slot();
                 } else {
                     discard_ready_rings_after_stop();
                 }
@@ -4017,7 +4093,7 @@ DepthDispatchState run_depth_cuda_graphs(
             } else if (!stream1_running_rings.empty()) {
                 wait_oldest_ring();
             } else if (!stream4_busy_slots.empty()) {
-                wait_oldest_stream4_slot();
+                wait_completed_stream4_slot();
             } else {
                 std::this_thread::yield();
             }
@@ -4043,7 +4119,7 @@ DepthDispatchState run_depth_cuda_graphs(
         // Every rank must enter the boundary request collective. A rank with no
         // local Stream4 work can still receive a global threshold request from
         // another rank before final spill drain starts.
-        maybe_run_stream5_threshold_update(stream4_jobs_since_threshold_update != 0U);
+        maybe_run_stream5_threshold_update(stream4_jobs_since_threshold_update != 0U,false);
     }
 
     drain_pending_stream4_shards();
@@ -4194,6 +4270,12 @@ DepthDispatchState run_depth_cuda_graphs(
         state.threshold_end_initialized = threshold_end.initialized;
     }
 #endif
+    for (const auto clean : host_clean) {
+        if (clean > plan.config.shard_capacity_candidates) {
+            throw std::runtime_error("final clean snapshot exceeds physical shard capacity");
+        }
+    }
+    state.final_clean_counts = std::move(host_clean);
     state.depth_drained = true;
     return state;
 }
@@ -4209,7 +4291,8 @@ FinalizeDepthState finalize_depth_single_gpu(
     cudaStream_t history_stream,
     cudaEvent_t history_copy_done,
     const Hash128* tracked_prefinal_hash,
-    const DispatcherCollective* collective) {
+    const DispatcherCollective* collective,
+    const std::vector<std::uint32_t>* final_clean_counts) {
     NvtxRange range("Dispatcher_finalize_depth_single_gpu");
     const bool multi_rank = plan.config.world_size > 1U;
     if (!multi_rank && plan.config.local_rank != 0) {
@@ -4220,6 +4303,16 @@ FinalizeDepthState finalize_depth_single_gpu(
     }
     if (tables.generators == nullptr) {
         throw std::invalid_argument("finalization requires generators");
+    }
+    if (final_clean_counts != nullptr) {
+        if (final_clean_counts->size() != plan.storage_shard_count) {
+            throw std::invalid_argument("final clean snapshot has wrong storage shard count");
+        }
+        for (const auto clean : *final_clean_counts) {
+            if (clean > plan.config.shard_capacity_candidates) {
+                throw std::invalid_argument("final clean snapshot exceeds physical shard capacity");
+            }
+        }
     }
 
     FinalizeDepthState result{};
@@ -4262,6 +4355,36 @@ FinalizeDepthState finalize_depth_single_gpu(
               << " current_frontier_size=" << current_frontier_size
               << "\n";
 #endif
+    if (plan.config.shard_buffer_count == 2U) {
+        // run_depth_cuda_graphs has drained all writers before this boundary.
+        // One sequential union arena overlays dead Stream1/3/4 scratch; do not
+        // pass the old transient dirty/processing counters into this phase.
+        auto& u = memory.final_union;
+        for (std::uint32_t logical = 0; logical < plan.config.shard_count; ++logical) {
+            const std::uint64_t physical = 2ULL * logical;
+            const std::uint64_t sort_bound = final_clean_counts == nullptr ? 0ULL :
+                std::max<std::uint64_t>(1ULL,
+                    static_cast<std::uint64_t>((*final_clean_counts)[physical]) +
+                    (*final_clean_counts)[physical + 1ULL]);
+            if (sort_bound > INT_MAX) {
+                throw std::invalid_argument("final union sort bound exceeds CUB item limit");
+            }
+            stream4_finalize_logical_shard_union_cuda(
+                memory.streams.survivor_shard + physical * plan.config.shard_capacity_candidates,
+                memory.streams.clean_count + physical, u.dirty, u.processing,
+                // Retain all already-clean candidates here. Exact final
+                // selection applies the cutoff after dedup; no host readback.
+                UINT32_THRESHOLD_MAX, plan.config.shard_capacity_candidates,
+                u.key_a, u.key_b, u.value_a, u.value_b,
+                u.score_a, u.score_b, u.score_count_a, u.score_count_b,
+                u.keep, u.blocks, u.offsets, u.count,
+                memory.streams.shard_score_hist_a + physical * SCORE_BIN_COUNT,
+                memory.streams.shard_score_hist_b + physical * SCORE_BIN_COUNT,
+                memory.streams.shard_score_hist_active_index + physical,
+                u.cub_temp, plan.union_cub_temp_bytes, streams.stream5,
+                static_cast<std::uint32_t>(sort_bound));
+        }
+    }
     update_threshold_global(plan, memory, streams.stream5, false, collective, false, "final_select");
 #if BEAM_DEBUG_STREAM_TIMING
     record_timing_stop_and_sync(

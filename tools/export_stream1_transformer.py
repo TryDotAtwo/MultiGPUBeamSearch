@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
+import io
 import json
 import re
 import sys
@@ -54,9 +56,17 @@ def strip_state_prefixes(sd: Mapping[str, Any]) -> TensorDict:
 
 
 def load_checkpoint_state(weights_path: Path) -> TensorDict:
-    checkpoint = torch.load(weights_path, map_location="cpu", weights_only=False)
+    return load_checkpoint_snapshot(weights_path)[0]
+
+
+def load_checkpoint_snapshot(weights_path: Path) -> tuple[TensorDict, str]:
+    # Hash and deserialize the same immutable bytes, even if the path is replaced.
+    payload = weights_path.read_bytes()
+    source_sha256 = hashlib.sha256(payload).hexdigest()
+    checkpoint = torch.load(io.BytesIO(payload), map_location="cpu", weights_only=False)
     sd = strip_state_prefixes(unwrap_state_dict(checkpoint))
-    return {key: value.detach().cpu() if isinstance(value, torch.Tensor) else value for key, value in sd.items()}
+    return ({key: value.detach().cpu() if isinstance(value, torch.Tensor) else value for key, value in sd.items()},
+            source_sha256)
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -448,11 +458,41 @@ def export_tensors(
     write_u8(out_dir / "piece_types.u8", fast["piece_types"])
 
 
-def make_reference_states(state_len: int, count: int, seed: int) -> torch.Tensor:
+def make_reference_states(state_len: int, count: int, seed: int, *,
+                          num_classes: int | None = None,
+                          central_state: list[int] | None = None,
+                          moves: list[list[int]] | None = None) -> torch.Tensor:
     if count <= 0:
         raise ValueError(f"reference-count must be positive when --reference-out is provided: {count}")
     generator = torch.Generator(device="cpu")
     generator.manual_seed(int(seed))
+    if num_classes is None:
+        if state_len != 120:
+            raise ValueError("non-p900 reference requires explicit alphabet, central state and moves")
+        num_classes = state_len
+    if state_len <= 0 or num_classes <= 0:
+        raise ValueError("reference dimensions must be positive")
+    if central_state is not None or moves is not None or num_classes != state_len:
+        if not isinstance(central_state, list) or len(central_state) != state_len:
+            raise ValueError("reference requires exact central_state")
+        if any(type(v) is not int or not 0 <= v < num_classes for v in central_state):
+            raise ValueError("central_state exceeds reference alphabet")
+        if not isinstance(moves, list) or not moves:
+            raise ValueError("reference requires nonempty move permutations")
+        for move in moves:
+            if (not isinstance(move, list) or len(move) != state_len or
+                    any(type(v) is not int for v in move) or sorted(move) != list(range(state_len))):
+                raise ValueError("reference move is not a bijective permutation")
+        permutations = torch.tensor(moves, dtype=torch.int64)
+        state = torch.tensor(central_state, dtype=torch.int64)
+        rows = [state.clone()]
+        # Only actual generator walks; arbitrary sticker shuffles are not cube states.
+        for _ in range(1, count):
+            steps = int(torch.randint(1, 65, (), generator=generator))
+            for index in torch.randint(len(moves), (steps,), generator=generator).tolist():
+                state = state[permutations[index]]
+            rows.append(state.clone())
+        return torch.stack(rows)
     rows = [torch.randperm(state_len, generator=generator, dtype=torch.int64) for _ in range(count)]
     return torch.stack(rows, dim=0)
 
@@ -464,7 +504,7 @@ def instantiate_reference_model(
     num_classes: int,
 ):
     model_module = import_model_module(source_root)
-    return model_module.PilgrimPieceTransformer(
+    kwargs = dict(
         state_size=int(metadata["state_size"]),
         output_dim=int(output_dim),
         num_classes=int(num_classes),
@@ -475,10 +515,15 @@ def instantiate_reference_model(
         dropout_rate=float(metadata.get("dropout", 0.0)),
         activation=str(metadata["transformer_activation"]),
         pooling=str(metadata["transformer_pooling"]),
+    )
+    if str(metadata["piece_layout"]) == "cube4":
+        return model_module.PilgrimCube4PieceTransformer(**kwargs)
+    kwargs.update(
         piece_layout=str(metadata["piece_layout"]),
         piece_embed_mode=str(metadata["piece_embed_mode"]),
         max_inference_batch_size=int(metadata.get("transformer_max_inference_batch_size", 32768)),
     )
+    return model_module.PilgrimPieceTransformer(**kwargs)
 
 
 def write_reference(
@@ -490,16 +535,39 @@ def write_reference(
     count: int,
     seed: int,
     weights_path: Path,
+    reference_states: torch.Tensor | None = None,
+    reference_pair_contract: Mapping[str, Any] | None = None,
+    source_weights_sha256: str | None = None,
 ) -> None:
+    pair_provenance = None
+    if reference_pair_contract is not None:
+        if reference_states is not None:
+            raise ValueError("reference pairs and explicit states are mutually exclusive")
+        try:
+            from tools.reference_pair_cohort import prepare_reference_pairs
+        except ModuleNotFoundError:
+            from reference_pair_cohort import prepare_reference_pairs
+        paired_states, pair_provenance = prepare_reference_pairs(reference_pair_contract,
+            state_len=int(arch["state_len"]), num_classes=int(arch["num_classes"]))
+        reference_states = torch.tensor(paired_states, dtype=torch.int64)
+    if reference_states is not None and (
+        reference_states.ndim != 2 or reference_states.shape[0] != count or
+        reference_states.shape[1] != int(arch["state_len"])):
+        raise ValueError("explicit reference shape/count mismatch")
     model = instantiate_reference_model(source_root, metadata, int(arch["output_dim"]), int(arch["num_classes"]))
     model.load_state_dict(dict(sd), strict=True)
     model.eval()
     if hasattr(model, "set_fast_inference") and hasattr(model, "supports_fast_inference"):
         if model.supports_fast_inference():
             model.set_fast_inference(True)
-    states = make_reference_states(int(arch["state_len"]), count, seed)
+    states = reference_states if reference_states is not None else make_reference_states(
+        int(arch["state_len"]), count, seed, num_classes=int(arch["num_classes"]))
     with torch.inference_mode():
         scores = model(states).float().cpu()
+    if scores.ndim != 2 or tuple(scores.shape) != (count, int(arch["output_dim"])):
+        raise ValueError("reference scores shape/count mismatch")
+    if not torch.isfinite(scores).all().item():
+        raise ValueError("reference scores contain nonfinite values")
     reference = {
         "states": states.tolist(),
         "scores_fp32": scores.tolist(),
@@ -510,11 +578,16 @@ def write_reference(
             "output_dim": int(arch["output_dim"]),
             "reference_count": int(count),
             "reference_seed": int(seed),
+            "state_generation": "explicit_states" if reference_states is not None else "p900_permutation",
+            "source_weights_sha256": source_weights_sha256,
             "source_weights": str(weights_path),
         },
     }
     reference_out.parent.mkdir(parents=True, exist_ok=True)
-    reference_out.write_text(json.dumps(reference, indent=2) + "\n", encoding="utf-8")
+    if pair_provenance is not None:
+        reference["metadata"]["state_generation"] = "replay_bound_original_reflected_pairs"
+        reference["metadata"]["pair_provenance"] = pair_provenance
+    reference_out.write_text(json.dumps(reference, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
 def export_piece_transformer(
@@ -528,9 +601,11 @@ def export_piece_transformer(
     reference_out: Path | None = None,
     reference_count: int = 0,
     reference_seed: int = 0,
+    reference_puzzle_info: Path | None = None,
+    reference_pairs: Path | None = None,
 ) -> None:
     weights_path = Path(weights_path)
-    sd = load_checkpoint_state(weights_path)
+    sd, source_weights_sha256 = load_checkpoint_snapshot(weights_path)
     metadata_path = locate_metadata(weights_path, metadata_path)
     metadata = normalize_metadata(read_json(metadata_path))
     generator_path = locate_generator(weights_path, metadata, generator_path)
@@ -538,6 +613,29 @@ def export_piece_transformer(
     move_names = load_move_names(generator)
     source_root = locate_source_root(weights_path, metadata_path, source_root)
     arch = infer_architecture(sd, metadata, move_names, num_classes)
+    reference_states = None
+    pair_contract = None
+    if reference_pairs is not None:
+        if reference_out is None or reference_puzzle_info is not None:
+            raise ValueError("reference pairs require reference-out and exclude reference-puzzle-info")
+        pair_contract = read_json(reference_pairs)
+        try:
+            from tools.reference_pair_cohort import validate_pair_generator_identity
+        except ModuleNotFoundError:
+            from reference_pair_cohort import validate_pair_generator_identity
+        validate_pair_generator_identity(pair_contract, generator, move_names)
+    if reference_out is not None:
+        if pair_contract is not None:
+            pass  # write_reference replay-validates and constructs both variants.
+        elif reference_puzzle_info is not None:
+            central = read_json(reference_puzzle_info)["central_state"]
+            moves = generator.get("moves", generator.get("actions"))
+            if moves is None and isinstance(generator.get("generators"), dict):
+                moves = list(generator["generators"].values())
+            reference_states = make_reference_states(int(arch["state_len"]), reference_count,
+                reference_seed, num_classes=int(arch["num_classes"]), central_state=central, moves=moves)
+        elif int(arch["num_classes"]) != int(arch["state_len"]):
+            raise ValueError("class-valued reference requires --reference-puzzle-info")
     piece_positions, piece_mask, piece_types = load_piece_layout(source_root, str(arch["piece_layout"]))
     if tuple(piece_positions.shape) != (arch["num_pieces"], arch["max_piece_size"]):
         raise ValueError(f"piece layout shape mismatch: {tuple(piece_positions.shape)}")
@@ -547,10 +645,28 @@ def export_piece_transformer(
         raise ValueError("piece types shape must match num_pieces")
 
     export_tensors(sd, out_dir, dtype, piece_positions, piece_mask, piece_types, int(arch["num_layers"]))
+    # Bind exactly the tensors written by this export, not stale/unrelated files
+    # that may already exist in the output directory. No runtime re-sealing.
+    suffix = weight_suffix(dtype)
+    names = [name + suffix for name in (
+        'fast_slot_projected', 'fast_piece_static', 'cls_token', 'input_ln_gamma',
+        'input_ln_beta', 'output_ln_gamma', 'output_ln_beta', 'output_weight_hxk', 'output_bias')]
+    for block in range(int(arch['num_layers'])):
+        names.extend(f'block{block}_{name}{suffix}' for name in (
+            'ln1_gamma', 'ln1_beta', 'attn_qkv_weight_hxk', 'attn_qkv_bias',
+            'attn_out_weight_hxk', 'attn_out_bias', 'ln2_gamma', 'ln2_beta',
+            'ff1_weight_hxk', 'ff1_bias', 'ff2_weight_hxk', 'ff2_bias'))
+    names += ['piece_positions.u16', 'piece_mask.u8', 'piece_types.u8']
+    tensor_files = {}
+    for name in names:
+        content = (out_dir / name).read_bytes()
+        tensor_files[name] = {'size_bytes': len(content), 'sha256': hashlib.sha256(content).hexdigest()}
     manifest = {
         **arch,
         "dtype": dtype,
+        "tensor_files": tensor_files,
         "source_weights": str(weights_path),
+        "source_weights_sha256": source_weights_sha256,
         "source_metadata": str(metadata_path),
         "source_generators": str(generator_path),
         "source_root": str(source_root),
@@ -559,7 +675,9 @@ def export_piece_transformer(
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     if reference_out is not None:
-        write_reference(reference_out, sd, metadata, source_root, arch, reference_count, reference_seed, weights_path)
+        write_reference(reference_out, sd, metadata, source_root, arch, reference_count, reference_seed,
+                        weights_path, reference_states=reference_states, reference_pair_contract=pair_contract,
+                        source_weights_sha256=source_weights_sha256)
     print(
         "stream1_export_done"
         f" out_dir={out_dir}"
@@ -584,6 +702,10 @@ def main() -> None:
     parser.add_argument("--reference-out", type=Path)
     parser.add_argument("--reference-count", type=int, default=0)
     parser.add_argument("--reference-seed", type=int, default=0)
+    parser.add_argument("--reference-puzzle-info", type=Path,
+                        help="Puzzle JSON with central_state; generate reachable reference states using its move generators.")
+    parser.add_argument("--reference-pairs", type=Path,
+                        help="JSON central_state/generators/cases with replay-valid original solutions; export both variants.")
     args = parser.parse_args()
     export_piece_transformer(
         weights_path=args.weights,
@@ -596,6 +718,8 @@ def main() -> None:
         reference_out=args.reference_out,
         reference_count=args.reference_count,
         reference_seed=args.reference_seed,
+        reference_puzzle_info=args.reference_puzzle_info,
+        reference_pairs=args.reference_pairs,
     )
 
 

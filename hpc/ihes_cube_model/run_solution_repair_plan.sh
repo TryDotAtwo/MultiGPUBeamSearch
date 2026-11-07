@@ -23,8 +23,15 @@ if [ ! -x "${RUNNER_PATH}" ]; then
 fi
 
 RANK_ID="${RANK:-0}"
+NCCL_SESSION_BASE="${BEAM_NCCL_RUN_ID:-${TORCHELASTIC_RUN_ID:-}}"
+NCCL_FILE_BASE="${BEAM_NCCL_ID_FILE:-${JOB_DIR_ARG}/beam_solver_nccl_${SLURM_JOB_ID:-manual}_ihes_solution_repair.bin}"
+segment_index=0
 
 tail -n +2 "${PLAN_TSV}" | while IFS=$'\t' read -r REPAIR_ID SEARCH_DEPTH WINDOW START_STEP TARGET_STEP OLD_SEGMENT_LEN OLD_SEGMENT_PATH TARGET_STATE; do
+  segment_index=$((segment_index + 1))
+  if [ -n "${NCCL_SESSION_BASE}" ]; then
+    export BEAM_NCCL_RUN_ID="${NCCL_SESSION_BASE}/segment-${segment_index}"
+  fi
   export PUZZLE_ID="${REPAIR_ID}"
   export DEPTH_LIMIT="${SEARCH_DEPTH}"
   export BEAM_TARGET_STATE_TEXT="${TARGET_STATE}"
@@ -32,7 +39,7 @@ tail -n +2 "${PLAN_TSV}" | while IFS=$'\t' read -r REPAIR_ID SEARCH_DEPTH WINDOW
   export BEAM_HISTORY_DISK_PATH="${HISTORY_DIR}"
   export BEAM_PREDICT_STATS_VERBOSE=0
   export BEAM_PREDICT_STATS_PATH="${JOB_DIR_ARG}/predict_stats_solution_repair_${REPAIR_ID}_${SLURM_JOB_ID:-manual}.jsonl"
-  export BEAM_NCCL_ID_FILE="${JOB_DIR_ARG}/beam_solver_nccl_${SLURM_JOB_ID:-manual}_ihes_solution_repair_${REPAIR_ID}.bin"
+  export BEAM_NCCL_ID_FILE="${NCCL_FILE_BASE}.segment-${segment_index}"
 
   if [ "${RANK_ID}" = "0" ]; then
     rm -f "${BEAM_NCCL_ID_FILE}"

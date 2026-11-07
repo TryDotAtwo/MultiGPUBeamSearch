@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 using namespace beam;
 
@@ -161,10 +162,28 @@ void write_transformer_weight_fixture_files(const std::filesystem::path& dir, bo
         write_zero_file(dir / (prefix + "_ff2_weight_hxk" + suffix), 256ULL * 1024ULL * elem);
         write_zero_file(dir / (prefix + "_ff2_bias" + suffix), 256ULL * elem);
     }
-    write_zero_file(dir / ("output_weight_hxk" + suffix), 24ULL * 256ULL * elem);
-    write_zero_file(dir / ("output_bias" + suffix), 24ULL * elem);
-    write_zero_file(dir / "piece_positions.u16", 50ULL * 3ULL * sizeof(std::uint16_t));
-    write_zero_file(dir / "piece_mask.u8", 50ULL * 3ULL);
+    write_zero_file(dir / ("output_weight_hxk" + suffix), MOVE_COUNT * 256ULL * elem);
+    write_zero_file(dir / ("output_bias" + suffix), MOVE_COUNT * elem);
+    // The positive fixture must partition the logical state into nonempty pieces.
+    static_assert(STATE_LEN >= 50 && STATE_LEN <= 50 * 3);
+    std::vector<std::uint16_t> positions(50 * 3, 0);
+    std::vector<std::uint8_t> mask(50 * 3, 0);
+    std::uint16_t position = 0;
+    for (std::size_t piece = 0; piece < 50; ++piece) {
+        const auto size = STATE_LEN / 50 + (piece < STATE_LEN % 50 ? 1 : 0);
+        for (std::size_t slot = 0; slot < size; ++slot) {
+            positions[piece * 3 + slot] = position++;
+            mask[piece * 3 + slot] = 1;
+        }
+    }
+    std::ofstream positions_file(dir / "piece_positions.u16", std::ios::binary);
+    positions_file.write(reinterpret_cast<const char*>(positions.data()),
+        static_cast<std::streamsize>(positions.size() * sizeof(positions[0])));
+    std::ofstream mask_file(dir / "piece_mask.u8", std::ios::binary);
+    mask_file.write(reinterpret_cast<const char*>(mask.data()),
+        static_cast<std::streamsize>(mask.size()));
+    require(static_cast<bool>(positions_file) && static_cast<bool>(mask_file),
+        "failed to write positive piece fixture");
     write_zero_file(dir / "piece_types.u8", 50ULL);
 }
 

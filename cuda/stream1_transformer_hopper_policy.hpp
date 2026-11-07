@@ -5,6 +5,15 @@
 
 namespace beam {
 
+// Physical packed layout has no legacy fallback, regardless of batch rows.
+inline bool resolve_stream1_packed_fp16_hopper(
+    bool packed, bool fp16, int sm, bool compiled_sm90) {
+    if (!packed) return false;
+    if (!fp16 || sm != 90 || !compiled_sm90)
+        throw std::invalid_argument("Packed FP16 weights require FP16 SM90 and compiled Hopper kernel");
+    return true;
+}
+
 inline bool stream1_transformer_hopper_epilogue_128x64(const char* value) {
     if (value == nullptr || value[0] == '\0' || std::strcmp(value, "auto") == 0) return false;
     if (std::strcmp(value, "128x64") == 0) return true;

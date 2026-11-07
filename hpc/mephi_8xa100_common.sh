@@ -267,9 +267,19 @@ beam_export_manual_config() {
 }
 
 beam_prepare_nccl_file() {
-  NCCL_ID_FILE="${JOB_DIR}/beam_solver_nccl_${SLURM_JOB_ID:-manual}_${1:-run}.bin"
-  rm -f "${NCCL_ID_FILE}"
+  local session_dir
+  session_dir=$(mktemp -d "${JOB_DIR}/beam_nccl_session.XXXXXX") || return
+  NCCL_ID_FILE="${session_dir}/nccl.bin"
+  export BEAM_NCCL_RUN_ID="${session_dir}"
   export BEAM_NCCL_ID_FILE="${NCCL_ID_FILE}"
+}
+
+beam_host_memory_preflight() {
+  "${NINJA_VENV_DIR}/bin/python" "${REPO_DIR}/tools/host_memory_budget.py" \
+    --meminfo "${BEAM_HOST_MEMINFO_PATH:-/proc/meminfo}" \
+    --cgroup-root "${BEAM_HOST_CGROUP_ROOT:-/sys/fs/cgroup}" \
+    --history-ram-bytes "${BEAM_HISTORY_RAM_BYTES}" \
+    --headroom-bytes "${BEAM_HOST_RAM_HEADROOM_BYTES:-$(((WORLD_SIZE_EFFECTIVE+2)*1073741824))}"
 }
 
 beam_torchrun_production() {
@@ -278,6 +288,7 @@ beam_torchrun_production() {
   local rank_log_dir="${LOG_DIR}/ranks_${SLURM_JOB_ID:-manual}_${run_tag}"
   local gpu_log="${TUNING_DIR}/nvidia_smi_${run_tag}.log"
   local gpu_monitor_pid=""
+  beam_host_memory_preflight || return $?
   mkdir -p "${rank_log_dir}"
   export BEAM_RANK_LOG_DIR="${rank_log_dir}"
   echo "run_tag=${run_tag}"
@@ -394,6 +405,7 @@ beam_torchrun_segment_plan() {
   local gpu_log="${TUNING_DIR}/nvidia_smi_${run_tag}.log"
   local gpu_monitor_pid=""
   local world_size="${WORLD_SIZE_EFFECTIVE:-${TORCHRUN_NPROC_PER_NODE:-8}}"
+  beam_host_memory_preflight || return $?
   mkdir -p "${rank_log_dir}"
   export BEAM_RANK_LOG_DIR="${rank_log_dir}"
   echo "run_tag=${run_tag}"

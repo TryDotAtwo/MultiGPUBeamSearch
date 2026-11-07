@@ -1,4 +1,5 @@
 #include "stream_benchmark_common.hpp"
+#include "../src/native_input.hpp"
 
 using namespace beam;
 using namespace beam::bench;
@@ -16,21 +17,26 @@ int main(int argc, char** argv) {
     std::size_t total_before = 0;
     BEAM_CUDA_CHECK(cudaMemGetInfo(&free_before, &total_before));
 
-    const std::filesystem::path generator_path = "FullBeamNice/generators/p900.json";
-    const std::filesystem::path puzzle_info_path = "data/puzzle_info.json";
-    const std::filesystem::path test_csv_path = "data/test.csv";
+    const auto input_path = [](const char* name, const char* fallback) {
+        const char* value = std::getenv(name);
+        return std::filesystem::path(value && value[0] ? value : fallback);
+    };
+    const auto generator_path = input_path("BEAM_GENERATOR_PATH", "FullBeamNice/generators/p900.json");
+    const auto puzzle_info_path = input_path("BEAM_PUZZLE_INFO_JSON", "data/puzzle_info.json");
+    const auto test_csv_path = input_path("BEAM_TEST_CSV", "data/test.csv");
     const char* weight_dir_env = std::getenv("BEAM_WEIGHT_DIR");
     const std::filesystem::path weight_dir =
         weight_dir_env != nullptr && weight_dir_env[0] != '\0'
             ? std::filesystem::path(weight_dir_env)
             : std::filesystem::path("build-docker/stream1_weights");
-    const std::vector<std::uint8_t> host_generators = load_p900_generators(generator_path);
-    const State128 host_central = load_central_state(puzzle_info_path);
-    const State128 host_initial = load_initial_state_from_test_csv(test_csv_path, puzzle_id);
+    const std::vector<std::uint8_t> host_generators = beam::input::load_p900_generators(generator_path);
+    const State128 host_central = beam::input::load_central_state(puzzle_info_path);
+    const State128 host_initial = beam::input::load_initial_state_from_test_csv(test_csv_path, puzzle_id);
     const ZobristTable host_zobrist = make_deterministic_zobrist(0xC0DEC0DEULL);
     const stream1_weights::HostWeightBytes host_weights =
         stream1_weights::load_stream1_weights(weight_dir);
     const Stream1ModelConfig& stream1_model = host_weights.model;
+    beam::input::validate_state(host_initial, host_central, stream1_model.num_classes, "benchmark_initial_state");
     const std::uint32_t max_states =
         stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER
             ? TRANSFORMER_B_MICRO_SWEEP.back() * TRANSFORMER_STREAM1_CONCURRENCY_SWEEP.back()

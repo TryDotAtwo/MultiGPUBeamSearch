@@ -1,0 +1,17 @@
+{
+  "id": "trydotatwo/cayleypy-native-graph-acceptance",
+  "title": "CayleyPy Native Graph Acceptance",
+  "code_file": "validation.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [
+    "trydotatwo/cayleypy-native-runtime"
+  ],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

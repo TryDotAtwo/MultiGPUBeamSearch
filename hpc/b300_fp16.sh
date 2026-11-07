@@ -72,6 +72,13 @@ else
   run_dir=$(mktemp -d "$root/b300_run.XXXXXX")
   echo "run_dir=$run_dir world_size=$world requested_beam=$beam effective_beam=$((BEAM_SHARD_CAPACITY_CANDIDATES*world*BEAM_SHARD_COUNT))"
   export BEAM_NCCL_ID_FILE="$run_dir/nccl.bin" BEAM_HISTORY_DIR="$run_dir/history"
+  export BEAM_NCCL_RUN_ID="$run_dir"
+  "${B300_PYTHON:-python3}" tools/host_memory_budget.py \
+    --meminfo "${B300_MEMINFO_PATH:-/proc/meminfo}" \
+    --cgroup-root "${BEAM_HOST_CGROUP_ROOT:-/sys/fs/cgroup}" \
+    --history-ram-bytes "$BEAM_HISTORY_RAM_BYTES" \
+    --headroom-bytes "${BEAM_HOST_RAM_HEADROOM_BYTES:-$(((world+2)*1073741824))}" \
+    > "$run_dir/host_memory_preflight.json"
   pids=()
   for ((rank=0; rank<world; rank++)); do
     RANK=$rank LOCAL_RANK=$rank "$build/production_runner" \

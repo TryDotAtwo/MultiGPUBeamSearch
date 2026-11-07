@@ -1,0 +1,1 @@
+Exact CayleyPy native beam wheel with bundled matching CUDA/C++ source. SHA256: 9d91f4e0c66ee927d5343726f6c34574529656a0a73b6a8eb093cfd535ebbd13. Native Hamming search; auto T4 LibTorch / newer supported GPU CUTLASS. Linux/CUDA toolkit/compiler prerequisites apply. License included. RTX3060 1/2/3/4/8 acceptance; updated physical T4 acceptance is pending.

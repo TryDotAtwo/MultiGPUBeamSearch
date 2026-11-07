@@ -16,6 +16,8 @@
 #endif
 
 namespace beam {
+class Stream1PolicySnapshot;
+class Stream1ExecutionContract;
 
 struct DispatcherStreams {
     cudaStream_t stream1 = nullptr;
@@ -76,6 +78,10 @@ struct DispatcherNetwork {
     Stream1TransformerNetworkView transformer_view{};
     std::vector<Stream1TransformerScratchView> transformer_scratch_lanes;
     std::uint32_t transformer_micro = 0;
+    // Host-only, immutable owner must outlive capture and eager launch callbacks.
+    // Never add this host pointer to the device-facing network view.
+    const Stream1PolicySnapshot* transformer_policy_snapshot = nullptr;
+    const Stream1ExecutionContract* transformer_execution_contract = nullptr;
     bool uniform_score = false;
 };
 
@@ -225,6 +231,8 @@ struct Stream3TrackResult {
 };
 
 struct DepthDispatchState {
+    // Owned final post-drain snapshot; empty on diagnostic/stop early returns.
+    std::vector<std::uint32_t> final_clean_counts;
     std::uint64_t frontier_cursor = 0;
     std::uint64_t frontier_size = 0;
     std::uint32_t ring_slot_jobs_launched = 0;
@@ -326,6 +334,9 @@ DepthDispatchState run_depth_cuda_graphs(
     const DispatcherRingSlotLauncher* ring_slot_launcher = nullptr,
     DepthDispatchStopStage stop_stage = DepthDispatchStopStage::Full);
 
+// Phase boundary: all producer/collector/Stream4 writers must be drained, as
+// guaranteed by a successful full run_depth_cuda_graphs(). Final union reuses
+// their temporary arena before exact global selection and materialization.
 FinalizeDepthState finalize_depth_single_gpu(
     const StaticMemoryPlan& plan,
     StaticDeviceMemory& memory,
@@ -337,6 +348,7 @@ FinalizeDepthState finalize_depth_single_gpu(
     cudaStream_t history_stream = nullptr,
     cudaEvent_t history_copy_done = nullptr,
     const Hash128* tracked_prefinal_hash = nullptr,
-    const DispatcherCollective* collective = nullptr);
+    const DispatcherCollective* collective = nullptr,
+    const std::vector<std::uint32_t>* final_clean_counts = nullptr);
 
 } // namespace beam

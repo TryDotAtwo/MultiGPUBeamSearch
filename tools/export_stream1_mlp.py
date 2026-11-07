@@ -247,7 +247,10 @@ def export_resmlp_layernorm(weights_path: Path, out_dir: Path, dtype: ExportDTyp
         block = first_weight[:, pos * embed_dim:(pos + 1) * embed_dim]
         folded[:, pos * num_classes:(pos + 1) * num_classes] = (embedding @ block.t()).t()
     write_hxk(out_dir / f"input_weight_hxk{suffix}", folded, dtype)
-    write_vec(out_dir / f"input_bias{suffix}", sd["input_stack.0.bias"].detach().float(), dtype)
+    first_bias = sd.get("input_stack.0.bias")
+    if first_bias is None:
+        first_bias = torch.zeros(first_weight.shape[0], dtype=torch.float32)
+    write_vec(out_dir / f"input_bias{suffix}", first_bias.detach().float(), dtype)
     write_vec(out_dir / f"input_ln_gamma{suffix}", sd["input_stack.1.weight"].detach().float(), dtype)
     write_vec(out_dir / f"input_ln_beta{suffix}", sd["input_stack.1.bias"].detach().float(), dtype)
 

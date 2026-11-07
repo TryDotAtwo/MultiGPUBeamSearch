@@ -1,6 +1,9 @@
 from pathlib import Path
+import hashlib
+import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import torch
 import torch.nn.functional as F
@@ -12,6 +15,7 @@ from tools.export_stream1_transformer import (
     locate_metadata,
     normalize_metadata,
     strip_state_prefixes,
+    export_piece_transformer,
 )
 
 
@@ -86,6 +90,29 @@ def make_cube4_metadata():
 
 
 class Stream1TransformerExporterTests(unittest.TestCase):
+    def test_export_binds_written_tensors_to_hashes_and_sizes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checkpoint, metadata, generators = root / 'model.pth', root / 'model.json', root / 'moves.json'
+            torch.save(make_cube4_state(), checkpoint)
+            metadata.write_text(json.dumps(make_cube4_metadata()))
+            generators.write_text(json.dumps({'names': [f'm{i}' for i in range(24)]}))
+            # Only the external Pilgrim layout provider is substituted. Actual
+            # checkpoint load, conversion, binary writes and manifest are used.
+            layout = (torch.zeros((56, 3), dtype=torch.int64),
+                      torch.ones((56, 3), dtype=torch.bool), torch.zeros(56, dtype=torch.int64))
+            out = root / 'export'; out.mkdir()
+            (out / 'unrelated.fp16').write_bytes(b'not an exported tensor')
+            with patch('tools.export_stream1_transformer.load_piece_layout', return_value=layout):
+                export_piece_transformer(checkpoint, out, 'fp16', 6, metadata, generators, root)
+            manifest = json.loads((out / 'manifest.json').read_text())
+            self.assertIn('tensor_files', manifest)
+            self.assertEqual(len(manifest['tensor_files']), 60)
+            self.assertNotIn('unrelated.fp16', manifest['tensor_files'])
+            for name, record in manifest['tensor_files'].items():
+                content = (out / name).read_bytes()
+                self.assertEqual(record, {'size_bytes': len(content), 'sha256': hashlib.sha256(content).hexdigest()})
+
     def test_locates_bundle_metadata_next_to_checkpoint(self):
         with tempfile.TemporaryDirectory() as temporary:
             model_dir = Path(temporary) / "model"

@@ -60,7 +60,7 @@ class Stream1TransformerParityTests(unittest.TestCase):
             [("pytorch", "eager"), ("libtorch", "cuda_graph"), ("native_cutlass", "graph")],
         )
 
-    def test_compare_passes_matching_digest_with_first_row_tolerance(self) -> None:
+    def test_first_row_and_digest_are_diagnostic_not_full_quality(self) -> None:
         result = compare_runs(
             [
                 run("pytorch", first_score_keys=[100, 200]),
@@ -68,9 +68,9 @@ class Stream1TransformerParityTests(unittest.TestCase):
             ],
             tolerance=2,
         )
-        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["status"], "diagnostic_only")
 
-    def test_compare_allows_digest_mismatch_without_exact_gate_when_row_matches(self) -> None:
+    def test_matching_first_row_cannot_accept_digest_mismatch_as_quality(self) -> None:
         result = compare_runs(
             [
                 run("pytorch", checksum=100, digest=111, first_score_keys=[1, 2, 3]),
@@ -78,7 +78,7 @@ class Stream1TransformerParityTests(unittest.TestCase):
             ],
             tolerance=0,
         )
-        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["status"], "diagnostic_only")
         self.assertFalse(result["comparisons"][1]["exact_score_key_digest_match"])
 
     def test_compare_fails_digest_mismatch_when_exact_gate_enabled(self) -> None:

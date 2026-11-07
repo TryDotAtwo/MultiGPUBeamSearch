@@ -311,7 +311,9 @@ def preflight_history_runtime(
     if per_rank_ram <= pinned_slot_bytes + staging_bytes:
         raise ValueError("history RAM budget cannot fit pinned slots and staging")
 
-    effective_depth = max(config.max_depth - config.touch_bfs_radius, 0)
+    # The native runner commits every expansion, including the final suffix
+    # radius worth of iterations when no goal is reached.
+    effective_depth = config.max_depth
     frontier_bound = 1
     states_before_target = 0
     required_entries = 0
@@ -324,12 +326,28 @@ def preflight_history_runtime(
     else:
         required_entries = states_before_target
     required_history_bytes = required_entries * _HISTORY_ENTRY_BYTES
-    usable_history_bytes = per_rank_ram - pinned_slot_bytes - staging_bytes + per_rank_disk
+    ram_arena_entries = (per_rank_ram - pinned_slot_bytes - staging_bytes) // _HISTORY_ENTRY_BYTES
+    disk_arena_entries = per_rank_disk // _HISTORY_ENTRY_BYTES
+    usable_history_bytes = (ram_arena_entries + disk_arena_entries) * _HISTORY_ENTRY_BYTES
     if required_history_bytes > usable_history_bytes:
         raise ValueError(
             "static hybrid history budget is too small for the requested depth/beam/move count "
             f"({required_history_bytes} > {usable_history_bytes} bytes per rank)"
         )
+    # Match native plan_history: reserve complete, upper-bounded layers before
+    # launch. Combined free bytes alone do not guarantee whole-layer placement.
+    ram_reserved = disk_reserved = 0
+    frontier_bound = 1
+    for depth in range(effective_depth):
+        frontier_bound = min(plan.local_beam, frontier_bound * move_count)
+        if frontier_bound <= disk_arena_entries - disk_reserved:
+            disk_reserved += frontier_bound
+        elif frontier_bound <= ram_arena_entries - ram_reserved:
+            ram_reserved += frontier_bound
+        else:
+            raise ValueError(
+                f"static hybrid history cannot place whole depth={depth} entries={frontier_bound}"
+            )
     return HistoryRuntimePreflight(
         required_history_bytes=required_history_bytes,
         usable_history_bytes=usable_history_bytes,

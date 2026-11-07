@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Literal, Mapping, Sequence
+from time import monotonic
 
 
 State = tuple[int, ...]
@@ -66,16 +67,22 @@ def _inverse_names(generators: Generators) -> dict[str, str]:
     return result
 
 
-def apply_path(state: Sequence[int], path: str, generators: Generators) -> State:
+def apply_path(state: Sequence[int], path: str, generators: Generators, *, deadline: float | None = None) -> State:
     """Replay a standard dot-separated CayleyPy path on ``state``."""
+    def check_deadline():
+        if deadline is not None and monotonic() >= deadline:
+            raise TimeoutError('replay deadline exceeded')
+    check_deadline()
     current = tuple(state)
     normalized = _validated_generators(generators, len(current))
     for move in tokenize_path(path):
+        check_deadline()
         try:
             permutation = normalized[move]
         except KeyError as error:
             raise ValueError(f"unknown move token {move!r}") from error
         current = tuple(current[index] for index in permutation)
+    check_deadline()
     return current
 
 

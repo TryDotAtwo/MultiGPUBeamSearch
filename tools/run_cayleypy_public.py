@@ -18,6 +18,7 @@ from typing import Iterable, Mapping, Sequence
 import uuid
 
 import pandas as pd
+from tools.host_memory_budget import clamp_memory_to_cgroup, clamp_explicit_ram_cap
 
 from tools.cayleypy_public.config import PublicRunConfig
 from tools.cayleypy_public.data import PuzzleContract, load_puzzle_contract
@@ -54,12 +55,12 @@ def _available_ram_bytes() -> int:
             raise RuntimeError(
                 "/proc/meminfo or psutil is required to derive the history RAM budget"
             ) from error
-        return int(psutil.virtual_memory().available)
+        return clamp_explicit_ram_cap(clamp_memory_to_cgroup(int(psutil.virtual_memory().available), Path("/sys/fs/cgroup")))
     for line in meminfo.read_text(encoding="utf-8").splitlines():
         if line.startswith("MemAvailable:"):
             fields = line.split()
             if len(fields) >= 2 and fields[1].isdigit():
-                return int(fields[1]) * 1024
+                return clamp_explicit_ram_cap(clamp_memory_to_cgroup(int(fields[1]) * 1024, Path("/sys/fs/cgroup")))
     raise RuntimeError("MemAvailable is missing from /proc/meminfo")
 
 

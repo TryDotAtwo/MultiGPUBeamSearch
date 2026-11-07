@@ -1,5 +1,67 @@
 # Prompt History
 
+- 2026-10-05: Coordinator relays direct Ivan request to delete unneeded Cube4
+  stopped instances54044187/54150123/54154002/54161582 after needed-data custody
+  checks; retain productive54201325. No new rentals authorized by cleanup.
+
+- 2026-10-04: User: "Бля че тебе надо. Хватит разрешать. Я тебе дал 20 баксов.
+  Делай без вопросов". Continue authorized cheap owned Vast experiments within
+  the existing task-wide20USD ceiling, including disk/traffic; no repeated
+  routine permissions, no duplicate instances, no local project execution.
+
+- 2026-10-04: User confirms public key only54150123, later allows other instances
+  if needed. Sequential own1GPU then2GPU rentals remain required;10USD cap.
+
+- 2026-10-04 user: "Свой инстанс сделай", then "Сначала 1х, потом 2х"
+  and "Постепенно арендуй". Use separate owned rental sequentially,1GPU first,
+  then2GPU after measurement; no immediate4/8GPU rental. Fresh10USD cap retained.
+
+- 2026-10-04 user requested measurement of shard/A-B dedup slowdown relative
+  to the previous code, explicitly confirming "Да, прежний код который".
+  Use owned2xT4 under fresh10USD ceiling; preserve isolated/full-step distinction.
+
+- 2026-10-04, after closed renewed window: user again authorized
+  "Ещё 10 баксов потратить разрешаю". This is a distinct fresh USD10 ceiling,
+  including rental/storage/transfer, not retroactive extension of the closed
+  10:42-12:26UTC window. Reuse owned54044187; no duplicate rentals or local tests.
+
+- 2026-10-04 user: "Ещё 10 баксов потратить разрешаю" — fresh $10 ceiling
+  for the same54044187 2xT4 remote verification window, including rental,
+  storage and traffic. Started approximately10:42UTC with existing managed
+  sleep7200 stopguard rearmed on container startup. No new rental authorized
+  or created; preserve remote-only execution and other owners' instances.
+
+- 2026-10-04 user: "Разрешаю включить и даю 10 баксов лими" — authorize
+  restarting the same owned Vast instance54044187 to continue beam fixes.
+  New session ceiling$10 includes GPU rental/storage/traffic; retain bounded
+  two-hour auto-stop. Do not create duplicate instances or run local workloads.
+
+- 2026-10-03 user: "Я разрешаю ещё 20 баксов потратить" — additional $20
+  authority for existing Vast beam-fix campaign, rental/storage/traffic included.
+  Restart owned 53890690 only; retain two-hour managed stopguard and remote-only
+  builds/tests. No duplicate rental or unrelated instance changes.
+
+- 2026-10-02 user: "Ещё 10 баксов потратить можешь" — additional$10 ceiling
+  for this approved beam-fix campaign, including rental/storage/traffic.
+  Reuse owned53890690; no duplicate lease or unrelated resource takeover.
+
+- 2026-10-02 user: "Подтверждаю" — continue approved fix plan within existing
+  remote-only execution and owned lease budget; no implicit guard extension.
+
+## 2026-10-02 Current operating requirements
+
+- User confirms continued approved beam-search fix plan. No subagents.
+- Execute builds/tests/inference on owned Vast lease, not locally.
+- Preserve current $10 total rental/disk/traffic authority and stopguard;
+  do not extend runtime or create duplicate leases implicitly.
+- Earlier local-regression allowance below is historical and superseded.
+
+## 2026-09-28 Debug server and browser restriction
+- 2026-09-30 user approved total$10 for the reviewed cheap2GPU Vast diagnostic instance including disk/traffic. One instance53542680 created; this chat owns lifecycle. No duplicate rentals.
+- Latest correction: perform further remote tests on Vast, not Kaggle. Do not submit additional Kaggle jobs under the older goal text; retain prior Kaggle results only as historical validation. Local regressions remain permitted while Vast access is unavailable.
+- User requests a cheap Vast server with exactly two GPUs for experiments/debugging. No server rented yet; quote actual configuration/cost and enforce bounded spending before paid use. Do not infer that a cheap debug host validates H200 performance.
+- User says Vast was opened in the wrong browser and explicitly forbids Playwright. Do not use Playwright tools/CLI/fallback for further access. Existing user browser access currently fails with kernel-assets path error; no authentication or rental performed.
+
 ## 2026-09-20 Bounded H200 profile campaign
 - User clarifies mandatory order: first find the fastest isolated Stream1 configuration, then tune beam-search parameters to retain that measured throughput. Do not treat a narrow initial comparison as a completed Stream1 sweep.
 - User requests sequential 2xH200 then 8xH200 rentals, pipeline profile tuning through depth8, global256M beam on8GPU, preserving isolated Stream1 throughput. Total budget $50 including disk and transfers. No duplicate active rentals; no subagents. Reuse native FP16 and puzzle1000, no full solve beyond this benchmark scope.
@@ -617,3 +679,197 @@ User reported that an interactive game had been running during part of the recen
 - User requested adapting and checking the existing launcher for an 8xH200 256M beam test.
 - 2026-09-23: With 8xH200 unavailable, user requested B300 preparation and cost-controlled staged work: rent 1xB300 first, benchmark isolated Stream1 and improve native inference on one GPU, then test 2xB300. FlashAttention-4 may be considered on B300, subject to measured end-to-end benefit.
 - 2026-09-23: With B300 offers unavailable, user requested preparing Cube4 beam search to launch on whichever supported GPU offer becomes available, while retaining real hardware, memory and speed validation before a paid full run.
+- 2026-09-23: User paused B300 work and requested resuming the prior 2xH200 Cube4 256M campaign. Reuse saved isolated-first results and do not mix H200 SXM and NVL hardware profiles.
+- 2026-09-23: User selected the established native-FP16 H200 path, authorized a $50 Vast campaign, requested a quick 8xH200 256M depth-8 profile, and preferred a 1024x4 Stream1 point with lower cache/buffer pressure. Report full-pipeline speed as a percentage of isolated Stream1 and estimate the cost of 60 depths for Cube4 puzzle 1000 without claiming an unrun solve.
+
+## 2026-09-28 - Improve beam search from the audit
+- Follow-up: set an active goal and continue; validate on real Kaggle 2xT4. User explicitly approved uploading needed source/tests. Use a separate private diagnostic notebook, exclude secrets and avoid modifying existing notebooks. T4 validation does not qualify H200-specific kernels or performance.
+- User: "Посмотри аудит и поработай над улучшением бимсерча пж". Implement and verify scoped improvements from the root audit/plan, preserving the search algorithm and existing dirty work. Work inline without subagents. This request does not renew a GPU-rental budget.
+- Begin with history correctness and deterministic host gates; keep unverified A/B CUDA changes and target-hardware acceptance explicitly separate from completed CPU fixes.
+
+## 2026-09-30 - Delegated minimal correctness slice
+- User authorized necessary fixes within existing MultiGPUBeamSearch and Astra Ultra T1-T7 plan; preserve dirty edits and algorithm/architecture. UI association is not a prerequisite; a second Codex process alone does not prove same-file contention. Observe targeted file hashes and guard writes.
+- Repair the invalid positive empty-piece host fixture against the strict loader; investigate historical Stream3 owner-scatter aliasing with an isolated CPU schedule model. No GPU/Kaggle/rental/publication or T8. Future remote hardware preference remains Vast, without new payment authority.
+
+## 2026-09-30 - Continue original T2 owner-scatter correctness
+- User authorized a narrow race-free correction of confirmed in-place owner-scatter aliasing, preserving algorithm/dedup semantics and dirty edits. Prove model correspondence and legal conflicting block schedule before fixing; use hash guards. Account any new buffers in preallocation/planner and disclose peak VRAM/graph costs; avoid global sync without justification.
+- Run CPU regressions, host builds and available compile-only CUDA checks. Prepare bounded hardware test and exact source/binary manifests marked never-run; no GPU/paid/external runs. Future authorized platform remains Vast. No T8 progression.
+
+## 2026-09-30 - Local T2 full-build and happens-before acceptance
+- User requested full CUDA/NCCL compile/link if dependencies already available, no automatic unknown installs and no GPU execution. Audit all peer reads/remote scatter/local compaction/NCCL, graph replay, empty buckets and multiple ranks; reconcile patch/model/source/binary/planner hashes. Preserve dirty edits;0 arena bytes is distinct from unmeasured launch/runtime graph metadata overhead. No commits/publication.
+# 2026-09-30: paid debugging budget clarification
+
+User confirmed a total $10 ceiling for the cheap two-GPU Vast debugging lease, including rental, disk, and transfer costs. Coordinate with existing owners before renting to avoid duplicate paid instances; no new lease was created by this clarification.
+
+## 2026-10-02 - No local execution
+- User "Подтверждаю" approved the explicit new total $10 ceiling for a cheap
+  two-GPU Vast instance, including disk and traffic, after old53677081 removal.
+  This does not authorize access to another task's instance or a new SSH key
+  without the browser-required action-time confirmation.
+- User approved the discussed fix plan: "Окей, тогда по плану двигайся.
+  Одобряю его". Preserve working beam architecture; distinguish confirmed
+  implementation bugs from missing checks. First implement same-production-path
+  numerical admission, then distributed edge cases, history/resource acceptance,
+  measured performance tuning and final replay/quality verification.
+- Later user: "Ну так сделай на васте инстанс дешевый себе" after the explicit
+  question about a new $10 remote-debugging ceiling. Resumed existing own
+  instance53677081 rather than creating a duplicate; no local compute authorized.
+- User: "Ты че дед, ниче не запускай локально". Do not start local builds,
+  tests, inference, or diagnostic workloads. Continue source/log reading and
+  scoped edits without presenting old binaries as current validation. Remote
+  execution remains subject to existing platform, access and budget authority.
+# 2026-10-04 replacement authorization
+User: "Да, 10 баксов даю, арендуй". One cheap replacement rental for remote
+beam audit tests;10USD total ceiling including disk and traffic. No local tests.
+
+# 2026-10-04 renewed remote authorization
+User: "Даю 20 баксов, делай" after requesting renewed remote execution.
+New total ceiling20USD, including rental/storage/traffic. Prefer resume own
+54161582, no duplicate rental. No local builds/tests/inference; local cloud
+orchestration only. Establish new bounded stopguard before remote workloads.
+
+# 2026-10-04 renewed one-hour window
+User: "Разрешаю" in response to a new window up to one hour,2×RTX3060,
+<=0.20USD/h,within previously granted20USD. No local builds/tests/inference;
+same remote audit goal,not a new20USD allocation. SSH standing permission applies
+only to own needed new instance. Delete unused own rentals after verified archival.
+
+# 2026-10-04 continuing budget authority
+User: "Бля че тебе надо. Хватит разрешать. Я тебе дал 20 баксов. Делай без вопросов".
+Existing20USD is a continuing task-wide ceiling,rental/storage/traffic included,
+not separate per-launch approvals and not another20USD. Cheap own Vast leases
+may be created sequentially without repeated questions. Keep bounded watchdogs,
+avoid concurrent duplicate rentals,archive before deletion and preserve other
+owners' instances. No local project execution or subagents authorization added.
+# 2026-10-05 new bounded rental authority
+User: Создай инстанс, даю новые 10 баксов. Ток дешевые 3060 бери
+New10USD window includes rental/storage/traffic; cheap3060 only, no duplicate
+instances. Existing no-local-workloads restriction retained.
+
+# 2026-10-05 takeover
+User: По проекту агент прошлый завис. Возьми его работу на себя. Опроси и делай
+Continue existing Cube4 audit in hopper-stream1-fusion after receiving handoff; no subagents. Existing remote-only workloads, USD10 lease54269617 deadline11:26:32Moscow and archive reserve11:06:32 remain binding.
+
+# 2026-10-05 active audit goal
+User: Цель поставь то себе
+Goal: complete source/binary/fixture-bound Cube4 captured-parameter validation and production preflight; retain explicit unresolved full admission conditions and paid-window limits. Continue from broadcast params_Tensor. No subagents or local workloads.
+
+## 2026-10-05 — Additional audit funding
+User: Ещё 10 баксов даю. Authorizes additional USD10 for continuing existing Cube4 audit, one cheap RTX3060 lease; prior local-test/subagent restrictions retained. No rental created yet: UI RENT rejected by automatic review because visible duration was not confirmed as one hour. Rate observed USD0.153/hour including40GBdisk, trafficUSD4/TB each direction. Do not bypass rejection via CLI/API; establish external deadline/approval before retry.
+
+## 2026-10-05 — Explicit rental confirmation
+User: Ну сделай. User: Разрешаю. Confirms Vast2RTX3060 USD0.153/hour plusUSD4/TB each direction, additionalUSD10, external one-hour stop/delete. Automatic UI review nevertheless rejects RENT until external guard exists and current button identity is proven. No rental created. Existing prior watcherPID26228 is absent; local VastCLI/config not found in checked standard paths. Browser offer54148056 machine151944 shown for manual user creation, without changing template cuda12.8.1-auto. Do not ask repeated budget authorization or bypass rejection via another mutation route.
+
+User: Сделал. Manual creation confirmed by authenticatedUI:54290295 machine151944. New window hardstop13:11MoscowOct5, archive12:51. AdditionalUSD10; prior restrictions unchanged.
+
+2026-10-05: «Цель поставь и работай» — создать новую активную цель полного допуска и продолжать оставшиеся проверки без субагентов и локальных тестов.
+
+2026-10-05 human authorization: «На 4 часа арендуй», then «10 баксов даю». One new remote lease for4hours, totalUSD10 incl compute/disk/network; no automatic restart/extension.
+`n2026-10-05: Human explicitly answered «Да, создай контроль» to temporary 4h own-lease checks, archive before expiry, stop and delete after verified download.
+
+2026-10-05 Иван: '10 баков даю тести на васте'. Новый отдельный лимит USD10 суммарно для удалённых тестов. Создан только Cube4 экземпляр54325358, offer45120305 machine143816, 2RTX3060/40GB, USD0.1808888889/hour, traffic0.0390625/GB. Четырёхчасовой deadline1791222828; archive reserve1791221628. Другой экземпляр54324903 не затрагивать. Продолжить32-row cohort и независимые admission gates без production promotion/локальных тестов/субагентов.
+
+2026-10-05 Иван: 'Не, если всё работает то и похуй, не?' then 'Не нужен' regarding H200/8GPU/large beam. Explicit current-scope closure on verified2RTX3060 mode; do not continue pursuing H200 acceptance or new rentals for this task.
+
+2026-10-05 Иван: 'Окей. Весь аудит прочитай и скажи что ты сделал'; 'Делай'. Требуется полная сверка A01–A14 с исправлениями/доказательствами, не новый GPU запуск.
+
+2026-10-05 Иван: доделать весь аудит полностью, удалённые проверки на Vast 2xRTX3060 и 8xRTX3060. Новый суммарный лимит USD20 включая хранение/трафик. Без H200, субагентов и локальных builds/tests/inference. Нужен новый source-bound build и честный положительный ограниченный admission-path, A08/A09 и сверка A01–A14.
+
+2026-10-05 budget reply: Ivan explicitly authorized USD20 total for new2xRTX3060 and8xRTX3060 Vast.ai rentals; prior USD10 window excluded. Finish full audit with actual target-device tests. Do not use subagents.
+
+2026-10-05 Иван: Проанализируй где хуйню делал, наладь работу, поставь цель и делай. Продолжить полное завершение аудита и 2/8 RTX3060 в USD20; без субагентов.
+
+2026-10-06: User requests verifying CayleyPy-compatible beam search: user provides graph/frontier width and selected number of GPUs; native program should automatically provision dependencies, detect GPUs, choose profiles and launch. Mode means selecting ordinary CayleyPy beam or our native beam. User asks how CayleyPy handles missing predictor; upstream default Hamming confirmed, no implicit training. Preserve source/profile/model evidence boundaries and existing no-local-tests instruction.
+
+2026-10-06: User confirms Hamming default is required, prefers native backend, mentions LibTorch for old models, requests audit of CayleyPy beam_search specifically API plus remaining automatic preparation. Engine backend and inference implementation must remain distinct.
+
+2026-10-06: User specifies automatic inference implementation selection: NVIDIA T4 -> LibTorch; newer supported GPUs -> CUTLASS. This is separate from native-vs-CayleyPy search selection. Preserve model compatibility validation; unsupported model/runtime must not silently substitute Hamming.
+
+2026-10-06: User authorizes implementation of the agreed CayleyPy API design: default Hamming, strict native search selection and automatic T4 LibTorch/newer CUTLASS inference choice; advanced mode not required. Preserve remote-only execution constraint and combined USD20 ceiling.
+
+2026-10-06: Automatic CayleyPy API acceptance exposed local-empty-frontier rank exit / collective hang on 4 GPUs. Replaced local termination with NCCL global nonempty reduction; requires repeated 1/2/3/4/8 acceptance on the final wheel.
+
+2026-10-06 final API implementation acceptance: installed wheel 9d91f4e passed 1/2/3/4/8 physical RTX3060 CUTLASS, forced LibTorch 1/2 GPU, 230 contract tests (5 skips), public CayleyPy gates. Global empty-frontier collective deadlock fixed. 448 native files + 13 modules match wheel. Verified evidence archives and deleted all three owned leases (54485683, 54489014, 54491145); API absence confirmed. Physical T4 and final full leak cleanliness remain unverified; details test_results/cayleypy_api_20261006/REPORT.md.
+
+2026-10-07: User requested brief usage and Kaggle notebook. Created kaggle/cayleypy_native_auto with config-first notebook, accepted wheel 9d91f4e, checksum install, GPU/toolchain preflight, automatic native dispatch and bounded diagnostic outputs. JSON/AST checked only; no local product execution or external upload. Physical T4 acceptance still pending.
+
+2026-10-07: User asks to verify different CayleyPy graphs as inputs. Remote-only 2xRTX3060 lease 54579447, rate $0.1465185/h, four-hour ceiling total $12.050222 incl prior lease ceilings (transfer separate, $20 authorization). Matrix includes 16 graph definitions, different state/move counts, directed generators, repeated/sparse labels and nonidentity goals; compare generator application to CayleyPy and independently replay each native path. Test artifacts under test_results/cayleypy_graphs_20261007.
+
+2026-10-07: User explicitly requests direct Kaggle notebook publication, public rather than private, and Can edit for CayleyPy team. Public dataset trydotatwo/cayleypy-native-runtime created with accepted wheel 9d91f4e (source included; user authorized export/publication). Public notebook trydotatwo/cayleypy-native-auto-beam-search v1 pushed on T4x2. Via Chrome sharing UI CayleyPy (Private Group), slug cayleypy, was given Can edit; saved toast and reopened persisted permission verified; screenshot test_results/kaggle_public_auto_20261007/cayleypy_can_edit.png. Runtime still pending. Separate full graph matrix push rejected due maximum two batch GPU sessions; retry after public run frees slot.
+
+2026-10-07: Public native auto Kaggle v1 completed on actual T4x2 with Torch2.11/CUDA12.8. Automatic LibTorch selection, LRX4 reversed start, four-move native path, independent replay and both rank logs passed. Physical T4 proof now available for wheel 9d91f4e; old Torch versions and leak cleanliness are separate. Details test_results/kaggle_public_auto_20261007/REPORT.md. Private full graph acceptance notebook v1 pushed after GPU slot freed.
+
+2026-10-07: User cancels precompiled/universal kernel work for now. Keep source compilation on first use; library installation must bring Python/build-helper dependencies and matching native sources, fetch checked CUTLASS automatically, detect GPU/executor/profile and build/cache without manual native setup. Platform support and driver/CUDA toolkit/C++ compiler prerequisites remain explicit; do not claim compiler/driver can be imported as Python modules.
+
+2026-10-07: User requests a very simple public notebook: import CayleyPy, import MultiGPUBeamSearch, graph and search. Preserve actual package identity via import cayleypy_native as multigpubeamsearch; do not imply a nonexistent package. Keep installation and diagnostic saving outside the main visible workflow.
+
+2026-10-07: User requests actual package rename to match MultiGPUBeamSearch, not a notebook alias. Canonical public Python import/distribution multigpubeamsearch; preserve old cayleypy_native imports for compatibility. Update public simple Kaggle notebook and verify real installation/runtime.
+
+2026-10-08: User requests initial cube444 index1000 run at256M beam using latest alexandervc/cube444-q-beam-tpu-256m-len46, explicitly check blend and everything first. New all-inclusive rental budgetUSD20. Preflight/data checks first; no rental until actual scorer compatibility and resource gates established.
+
+2026-10-08: User authorizes implementing native s3+PairQMLP blend. Both networks receive the same parent batch, run on separate CUDA streams, and synchronize before final readout. User specifically chooses CUTLASS last-GEMM epilogue to blend raw Q with output bias and quantize once, avoiding a separate blend kernel. Preserve search semantics and validate remotely before paid256M execution.
+
+2026-10-08: Пользователь разрешил отдельные $10 суммарно на тестовую аренду 2xRTX3060 для нативного blend; основной запуск index1000/268435456 до проверок не запускать.
+
+2026-10-08: Измерить замедление одного полного шага глубины от blend относительно Transformer-only на одинаковом заполненном фронтире, на предельном допустимом луче 2xRTX3060. Использовать остаток общего разрешённого лимита USD10 на тесты.
+# 2026-10-08 FP16 blend and slowdown attribution
+User: «Сделай фп16, как и положено в бимсерче моём. Также выясни — это увеличение связанно чисто с тем, что больше вычислений стало, или потому что есть ещё задержки на бленд и занимание кэшей всякие?»
+Keep pinned model identity, verify FP16 numerical/ranking quality before timing. Separate model work, readout/blend, event/stream overhead and measured concurrent resource contention. No new budget: remaining original USD10 for 2x3060 tests.
+
+## 2026-10-09 archive transport
+
+User explicitly stopped H200 benchmarks: 'Не, стопай. И так понятно'. Stop owned54984071 immediately; no further benchmark or rental restart.
+User requires GitHub/HF archival without downloading results to Windows; use connected GitHub tools.
+
+## 2026-10-09 cheapest index1000 preflight
+User authorized cheapest-first8x3090 rental for memory admission and bounded timing at268435456 beam, before full search. Shared new solve budgetUSD20; no full search before cost assessment; archive via GitHub/HF, no results download toWindows.
+
+User additionally requires1M,10M,100M tests besides2^28. Native beam alignment/world/shards must be reported, not hidden.
+
+User now authorizes8xH200, one complete frontier each at1M/10M/100M/200M/268435456, then stop. Prepare Docker image before expensive rental, compile only on inexpensive remote instance, never locally. OriginalUSD20 shared budget remains assumed.
+
+## 2026-10-09 ensemble and inference-first calibration
+Arbitrary model-count CUTLASS blend; preserve beam architecture. First measure Stream1 inference microbatch, then minimize full-depth overhead. Statistical calibration; 128-GPU planning without hardware acceptance. New cheap 2-GPU rental budget USD20 total. GitHub/HF result transport. Delete obsolete owned rentals after archive verification.
+2026-10-09: User rejects transferring a measured10M frontier profile to100M. First understand native sizing dependencies and calculate heuristics, so actual user calibration is very fast. Exact target-frontier identity and architecture preservation remain mandatory.
+
+2026-10-09: Fast exact-frontier autotuning, measured best Stream1 vs matched full-step throughput, maximum admitted and full-step-verified beam; real 2x3060 and 8x3060 tests. New total rental/storage/traffic budget USD20. No subagents; preserve five-stream architecture. No result archives copied to Windows.
+
+2026-10-09: User authorizes USD20 total for NEW 2x3060 and 8x3060 rentals incl preparation/disk/traffic. Fast inference-first calibration at each exact requested frontier; report Stream1 maximum found and measured matched full-step throughput loss. Discover maximum admitted frontier and verify a complete step; preserve five-stream architecture, no subagents, GPU archives via GitHub/HF only.
+
+### 2026-10-09 fast exact-frontier tuning acceptance
+User: finish automatic inference-first tuning for any frontier, report best Stream1 and matched full-step loss, discover maximum supported beam; test multiple beams on 2x3060 and 8x3060. New rentals authorized USD20 total including preparation, disk and traffic. Keep architecture. Do not use subagents. Publish GPU evidence through GitHub/HF rather than copying archives to Windows.
+
+2026-10-09 Ivan: Это слишком мелкие лучи, чтобы что-то кроме инференса мешало. Проверяй профили почему так. Всё за инференсом скрываться должно в норме. Requirement: investigate actual overlap and profile geometry, not infer the bottleneck from total-step ratios; separate measured component bottlenecks, globally dependent tail and profiler perturbation.
+
+2026-10-09: User requires real trained Cube444 Transformer s3 and MLP mlp_x16, FP16 blend, inference-first tuning and matched full step, not Hamming proxies. Existing shared budget USD20.
+2026-10-10 Ivan: Цель поставь и работай чтобы на реальных нейронках автоподбор профиля идеально и быстро работал. Refinement of active goal: exercise the actual bounded inference-first calibration path on trained FP16 Transformer/MLP ensembles, quantify cold calibration and cache-hit latency, preserve exact requested frontier and verify whole-step loss; do not substitute Hamming timing or promise an unmeasured global optimum. Existing USD20 rental budget and architecture/no-subagent constraints persist.
+
+2026-10-10 requirement reaffirmed: Goal and autonomous work to make automatic profiles fast and effective on actual trained neural networks, preserving architecture and USD20 current budget.
+
+2026-10-10: User: Цель поставь и работай чтобы на реальных нейронках автоподбор профиля идеально и быстро работал. Preserve real trained Transformer plus MLP FP16 workload, inference-first exact-frontier tuning, fast cold/warm paths, 2/8x3060 and largest frontier acceptance, architecture unchanged, existing USD20 total and no subagents.
+
+2026-10-10: Цель — быстро и надёжно подбирать профили на реальных Transformer s3 + MLP mlp_x16; исправлять обнаруженные на максимальном полном фронтире ошибки, не менять архитектуру и не заявлять успех по одному статическому допуску.
+
+2026-10-10: Критерий после подбора Stream1 должен оценивать именно замедление остальных этапов относительно фиксированного инференса; не требовать5% от всей длительности тяжёлой нейронки для улучшения параметров конвейера.
+
+2026-10-10: Continue active goal: fast inference-first autotuning on real trained Cube444 Transformer s3 and MLP mlp_x16 FP16/CUTLASS blend; exact beam admission, cold/cache public API acceptance, maximum completed step on 2/8 RTX3060; preserve five-stream architecture and $20 total limit, no subagents, GPU evidence remote through GitHub/HF.
+
+2026-10-10: User requests goal-driven fast high-quality automatic profile selection on real trained neural networks; no subagents; preserve architecture.
+2026-10-10 user: Цель поставь и работай чтобы на реальных нейронках автоподбор профиля идеально и быстро работал. Active goal uses trained Cube444 Transformer+MLP FP16, bounded inference-first tuning, exact frontier sizing, matched full-step evidence, fastest safe cache reuse,20USD existing budget; no subagents.
+2026-10-10 user correction: Нужно фронтир понизить было. Батч первичен. Maximum-frontier policy must reserve fastest stable Stream1 batch first and reduce frontier when memory conflicts, preserving exact-width recalibration and five-stream architecture.
+
+2026-10-10 user: Update existing public Kaggle notebook and leave only one GitHub repository branch. Preserve checked source and reproducibility archives; old heads may be retained as archival tags. No additional rentals.
+
+## 2026-10-10 GNN requirement
+Сделай поддержку GNN из issue #5; именно собственную поддержку, без импорта присланной реализации. Нужны LibTorch и CUTLASS. Пять потоков и дедупликацию не менять.
+
+
+
+2026-10-10: Run a large GNN comparison: native CUTLASS, native LibTorch and Python/PyTorch; new rental limit  total authorized. Same weights/input/precision, bounded batch sweep, retain results on GitHub and tear down the exact own rental.
+
+
+2026-10-10: Optimize native CUTLASS GNN by at least2x versus the measured n100/d256/batch3 671.27ms baseline; preserve model semantics and beam architecture, verify GPU parity and timing. New rental limit  total approved.
+
+2026-10-10: Fuse separate GNN projection bias into CUTLASS epilogue, measure speed on RTX3060 and verify accuracy. User authorizes new tests up to $5 and explicitly requests an active goal.
+
+2026-10-10: Continue accelerating GNN while measurable gains remain; consult Astra as expert. New GPU tests budget $10 total. Preserve model semantics and beam architecture.

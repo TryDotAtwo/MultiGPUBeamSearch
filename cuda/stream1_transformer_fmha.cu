@@ -1,4 +1,6 @@
 #include "stream1_transformer_fmha.hpp"
+#include "stream1_policy_snapshot.hpp"
+#include "stream1_resolved_launch.hpp"
 #include "stream1_transformer_attention_policy.hpp"
 
 #include "config.hpp"
@@ -165,13 +167,13 @@ void stream1_transformer_fmha_attention_cuda(
     }
 #if BEAM_HAS_CUTLASS && BEAM_HAS_CUTLASS_FMHA
     (void)packed_qkv;
-    const auto max_k_policy = parse_stream1_transformer_attention_max_k_policy(
-        std::getenv("BEAM_STREAM1_TRANSFORMER_ATTENTION_MAX_K_POLICY"));
+    const auto max_k_policy = stream1_resolved_attention_max_k(
+        stream1_policy_value("BEAM_STREAM1_TRANSFORMER_ATTENTION_MAX_K_POLICY"));
     if (sm75_fp16) {
         if (dims.dtype != STREAM1_DTYPE_FP16) {
             throw std::invalid_argument("Stream1 piece_transformer SM75 CUTLASS FMHA requires fp16");
         }
-        const auto policy = parse_stream1_transformer_attention_tile_policy(std::getenv("BEAM_STREAM1_TRANSFORMER_ATTENTION_TILE_POLICY"));
+        const auto policy = stream1_resolved_attention_tile(stream1_policy_value("BEAM_STREAM1_TRANSFORMER_ATTENTION_TILE_POLICY"));
         if (policy == Stream1TransformerAttentionTilePolicy::Q64K64V4) {
             stream1_transformer_fmha_launch_policy<cutlass::half_t, cutlass::arch::Sm75, 64, 64, false>(qkv, context, dims, b_micro, stream, max_k_policy);
         } else if (policy == Stream1TransformerAttentionTilePolicy::Q32K64) {
@@ -182,7 +184,7 @@ void stream1_transformer_fmha_attention_cuda(
         return;
     }
     if (dims.dtype == STREAM1_DTYPE_BF16) {
-        const auto policy = parse_stream1_transformer_attention_tile_policy(std::getenv("BEAM_STREAM1_TRANSFORMER_ATTENTION_TILE_POLICY"));
+        const auto policy = stream1_resolved_attention_tile(stream1_policy_value("BEAM_STREAM1_TRANSFORMER_ATTENTION_TILE_POLICY"));
         if (policy == Stream1TransformerAttentionTilePolicy::Q64K64V4) {
             stream1_transformer_fmha_launch_policy<cutlass::bfloat16_t, cutlass::arch::Sm80, 64, 64, false>(qkv, context, dims, b_micro, stream, max_k_policy);
         } else if (policy == Stream1TransformerAttentionTilePolicy::Q32K64) {
@@ -193,7 +195,7 @@ void stream1_transformer_fmha_attention_cuda(
         return;
     }
     if (dims.dtype == STREAM1_DTYPE_FP16) {
-        const auto policy = parse_stream1_transformer_attention_tile_policy(std::getenv("BEAM_STREAM1_TRANSFORMER_ATTENTION_TILE_POLICY"));
+        const auto policy = stream1_resolved_attention_tile(stream1_policy_value("BEAM_STREAM1_TRANSFORMER_ATTENTION_TILE_POLICY"));
         if (policy == Stream1TransformerAttentionTilePolicy::Q64K64V4) {
             stream1_transformer_fmha_launch_policy<cutlass::half_t, cutlass::arch::Sm80, 64, 64, false>(qkv, context, dims, b_micro, stream, max_k_policy);
         } else if (policy == Stream1TransformerAttentionTilePolicy::Q32K64) {
@@ -233,8 +235,8 @@ void stream1_transformer_fmha_cls_attention_cuda(
         throw std::invalid_argument("Stream1 piece_transformer CUTLASS CLS FMHA requires qkv and cls_context");
     }
 #if BEAM_HAS_CUTLASS && BEAM_HAS_CUTLASS_FMHA
-    const auto cls_policy = parse_stream1_transformer_cls_attention_policy(
-        std::getenv("BEAM_STREAM1_TRANSFORMER_CLS_ATTENTION_POLICY"));
+    const auto cls_policy = stream1_resolved_cls_attention(
+        stream1_policy_value("BEAM_STREAM1_TRANSFORMER_CLS_ATTENTION_POLICY"));
     if (cls_policy == Stream1TransformerClsAttentionPolicy::Q32K64) {
         if (sm75_fp16) {
             stream1_transformer_fmha_cls_launch_typed<cutlass::half_t, cutlass::arch::Sm75, 32, 64>(nullptr, qkv, cls_context, dims, b_micro, stream);
@@ -283,8 +285,8 @@ void stream1_transformer_fmha_cls_attention_split_q_cuda(
         throw std::invalid_argument("Stream1 split-Q CLS FMHA requires query, qkv, and context");
     }
 #if BEAM_HAS_CUTLASS && BEAM_HAS_CUTLASS_FMHA
-    const auto cls_policy = parse_stream1_transformer_cls_attention_policy(
-        std::getenv("BEAM_STREAM1_TRANSFORMER_CLS_ATTENTION_POLICY"));
+    const auto cls_policy = stream1_resolved_cls_attention(
+        stream1_policy_value("BEAM_STREAM1_TRANSFORMER_CLS_ATTENTION_POLICY"));
     if (sm75_fp16 && dims.dtype != STREAM1_DTYPE_FP16) {
         throw std::invalid_argument("Stream1 split-Q SM75 CLS FMHA requires fp16");
     }

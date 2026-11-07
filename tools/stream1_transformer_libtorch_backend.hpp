@@ -326,7 +326,7 @@ struct PieceTransformerLibTorch {
         return torch::cat({cls, pieces}, 1);
     }
 
-    torch::Tensor forward(const torch::Tensor& state_u8) const {
+    torch::Tensor features(const torch::Tensor& state_u8) const {
         const std::int64_t batch = state_u8.size(0);
         torch::Tensor x = layer_norm(build_tokens(state_u8), input_ln_gamma, input_ln_beta);
         for (const TransformerBlock& block : blocks) {
@@ -357,7 +357,10 @@ struct PieceTransformerLibTorch {
             x = x + linear_kxh(y, block.ff2_weight_kxh, block.ff2_bias);
         }
         torch::Tensor cls = layer_norm(x.index({torch::indexing::Slice(), 0, torch::indexing::Slice()}), output_ln_gamma, output_ln_beta);
-        return linear_kxh(cls, output_weight_kxh, output_bias);
+        return cls.contiguous();
+    }
+    torch::Tensor forward(const torch::Tensor& state_u8) const {
+        return linear_kxh(features(state_u8), output_weight_kxh, output_bias);
     }
 };
 

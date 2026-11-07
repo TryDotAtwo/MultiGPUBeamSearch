@@ -148,8 +148,8 @@ int main() {
     require(plan.derived.ring_slot_count == 2, "ring slot count must follow stream3 batch formula");
     require(plan.layout_phase1_streams_bytes == plan.layout_streams_bytes, "phase1 layout must alias streams layout");
     require(
-        plan.layout_final_bytes == std::max(plan.layout_phase2_select_bytes, plan.layout_phase3_materialize_bytes),
-        "final layout must be max of phase2 and phase3 layouts");
+        plan.layout_final_bytes == std::max({plan.layout_phase2_select_bytes, plan.layout_phase3_materialize_bytes, plan.layout_union_bytes}),
+        "final layout must fit union, select and materialize phases");
     require(plan.scratch_pool_bytes >= plan.layout_streams_bytes, "scratch pool must fit streams layout");
     require(plan.scratch_pool_bytes >= plan.layout_phase2_select_bytes, "scratch pool must fit final select layout");
     require(
@@ -210,6 +210,20 @@ int main() {
     require(memory.streams.current_threshold_active_index != nullptr, "current threshold active index missing");
     require(memory.streams.threshold_request_local != nullptr, "threshold local request missing");
     require(memory.streams.threshold_request_global != nullptr, "threshold global request missing");
+    const auto require_stream_extent = [&](const void* pointer, std::size_t bytes) {
+        const auto offset = addr(pointer) - addr(memory.scratch_pool);
+        require(addr(pointer) >= addr(memory.scratch_pool), "stream pointer before scratch pool");
+        require(offset <= plan.layout_phase1_streams_bytes &&
+                bytes <= plan.layout_phase1_streams_bytes - offset,
+                "threshold metadata exceeds planned streams extent");
+        require(offset <= memory.scratch_pool_bytes && bytes <= memory.scratch_pool_bytes - offset,
+                "threshold metadata exceeds allocated scratch extent");
+    };
+    require_stream_extent(memory.streams.current_threshold, 2 * sizeof(std::uint32_t));
+    require_stream_extent(memory.streams.threshold_initialized, 2 * sizeof(std::uint32_t));
+    require_stream_extent(memory.streams.current_threshold_active_index, sizeof(std::uint32_t));
+    require_stream_extent(memory.streams.threshold_request_local, sizeof(std::uint32_t));
+    require_stream_extent(memory.streams.threshold_request_global, sizeof(std::uint32_t));
     require(addr(memory.streams.survivor_shard) % alignof(CandidateMeta) == 0, "candidate alignment failed");
     require(addr(memory.streams.stream4_key_a) % alignof(Hash128) == 0, "stream4 sort key alignment failed");
     require(addr(memory.streams.stream4_val_a) % alignof(CandidateMeta) == 0, "stream4 sort value alignment failed");

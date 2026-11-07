@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Compare explicit Stream1 piece-transformer backends on one synthetic batch.
 
-This tool is a correctness gate, not a fallback path. It runs selected backends
-through ``tools.stream1_transformer_backends`` and compares the first row of
-quantized score keys. Full tensor dumps can be added later; the first-row gate is
-small enough to keep in normal benchmark logs and catches backend contract drift.
+This is a diagnostic, not a full numerical correctness gate. It compares the
+first row of quantized keys and records digests. Successful diagnostics return
+diagnostic_only (nonzero CLI exit); production acceptance requires full tensors.
 """
 
 from __future__ import annotations
@@ -217,7 +216,9 @@ def compare_runs(runs: List[BackendRun], tolerance: int, require_exact_digest: b
             "exact_score_key_digest_match": exact_digest_match,
         })
     return {
-        "status": overall,
+        "status": "diagnostic_only" if overall == "pass" else overall,
+        "quality_accepted": False,
+        "scope": "first-row quantized keys and digest diagnostics only",
         "baseline": {"backend": baseline.backend, "mode": baseline.mode},
         "tolerance": tolerance,
         "require_exact_digest": require_exact_digest,
@@ -279,7 +280,7 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--require-exact-digest",
         action="store_true",
-        help="Fail when full score_key_digest differs. By default digest is required and reported, but cross-backend pass/fail uses first-row score-key tolerance.",
+        help="Reject digest mismatch in diagnostics. Even matching digests do not constitute full floating-point quality acceptance.",
     )
     return parser
 

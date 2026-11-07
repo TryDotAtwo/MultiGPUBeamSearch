@@ -3,6 +3,7 @@
 #include "config.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 
 namespace beam {
@@ -52,6 +53,8 @@ std::uint32_t histogram_threshold(
     }
     std::uint64_t cumulative = 0;
     for (std::uint32_t score = 0; score < SCORE_BIN_COUNT; ++score) {
+        if (global_score_hist[score] > std::numeric_limits<std::uint64_t>::max() - cumulative)
+            throw std::overflow_error("global histogram cumulative overflow");
         cumulative += global_score_hist[score];
         if (cumulative >= global_beam_width_effective) {
             return score;

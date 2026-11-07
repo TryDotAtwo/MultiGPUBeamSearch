@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -13,6 +14,13 @@ from tools.cayleypy_public.results import PublishStatus
 from tools.cayleypy_public.runner import PublicSearchRunError
 from tools.cayleypy_public.runner import RunArtifacts
 import tools.run_cayleypy_public as public_cli
+
+
+@pytest.fixture(autouse=True)
+def deterministic_resource_probes(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Preserve the real budget/preflight code; isolate only host resource reads.
+    monkeypatch.setattr(public_cli, "_available_ram_bytes", lambda: 64 * 1024**3)
+    monkeypatch.setattr(public_cli.shutil, "disk_usage", lambda _: SimpleNamespace(free=128 * 1024**3))
 
 
 def test_public_cli_uses_only_config_and_output_and_materializes_fake_run(

@@ -14,13 +14,28 @@ namespace beam {
 
 namespace {
 
+std::uint64_t checked_product(std::uint64_t a, std::uint64_t b, const char* context) {
+    if (b != 0 && a > std::numeric_limits<std::uint64_t>::max() / b)
+        throw std::overflow_error(std::string(context) + " exceeds uint64");
+    return a * b;
+}
+
 std::uint64_t parse_u64(const char* text, const char* name) {
-    char* end = nullptr;
-    const unsigned long long value = std::strtoull(text, &end, 10);
-    if (end == text || *end != '\0') {
+    if (text == nullptr || *text == '\0') {
         throw std::invalid_argument(std::string("invalid numeric argument: ") + name);
     }
-    return static_cast<std::uint64_t>(value);
+    std::uint64_t value = 0;
+    for (const char* cursor = text; *cursor != '\0'; ++cursor) {
+        if (*cursor < '0' || *cursor > '9') {
+            throw std::invalid_argument(std::string("invalid numeric argument: ") + name);
+        }
+        const auto digit = static_cast<std::uint64_t>(*cursor - '0');
+        if (value > (std::numeric_limits<std::uint64_t>::max() - digit) / 10) {
+            throw std::invalid_argument(std::string("numeric argument exceeds uint64: ") + name);
+        }
+        value = value * 10 + digit;
+    }
+    return value;
 }
 
 std::uint32_t env_u32(const char* name, std::uint32_t default_value) {
@@ -73,7 +88,17 @@ std::uint32_t round_up_u32(std::uint64_t value, std::uint32_t alignment) {
 
 std::uint64_t scaled_round_up(std::uint64_t value, std::uint64_t ppm) {
     constexpr std::uint64_t scale = 1'000'000ULL;
-    return (value * ppm + scale - 1ULL) / scale;
+    // Decompose both factors: reject only overflow of the final result,
+    // not an intermediate product that would become representable after /scale.
+    const auto whole = checked_product(value / scale, ppm, "PPM scale");
+    const auto remainder = value % scale;
+    const auto tail_whole = checked_product(remainder, ppm / scale, "PPM scale");
+    const auto tail_product = remainder * (ppm % scale); // strictly below 10^12
+    const auto tail_fraction = tail_product / scale + (tail_product % scale != 0ULL);
+    const auto maximum = std::numeric_limits<std::uint64_t>::max();
+    if (tail_whole > maximum - whole || tail_fraction > maximum - whole - tail_whole)
+        throw std::overflow_error("PPM scale exceeds uint64");
+    return whole + tail_whole + tail_fraction;
 }
 
 std::uint64_t ceil_log2_u64(std::uint64_t value) {
@@ -165,6 +190,13 @@ std::uint64_t estimate_stream1_scratch_b_micro(
 std::uint64_t estimate_non_static_device_bytes(
     const RuntimeConfig& config,
     const Stream1ModelConfig& stream1_model) {
+    // The production runner already subtracts the measured LibTorch reserve.
+    // That executor never uploads native weights or allocates native scratch.
+    // Keep the legacy estimate when no explicit Torch reserve is charged.
+    if (env_equals("BEAM_STREAM1_EXECUTOR", "libtorch_eager") &&
+        (env_present("BEAM_BLEND_DIR") || env_present("BEAM_ENSEMBLE_RESERVE_BYTES"))) {
+        return estimate_read_only_table_bytes();
+    }
     const std::uint32_t scratch_b_micro = estimate_stream1_scratch_b_micro(config, stream1_model);
     return estimate_read_only_table_bytes() +
            estimate_stream1_weight_bytes(stream1_model) +
@@ -175,9 +207,9 @@ std::uint64_t estimate_non_static_device_bytes(
 }
 
 std::uint64_t beam_alignment_for(const RuntimeConfig& config) {
-    return static_cast<std::uint64_t>(config.world_size) *
-           static_cast<std::uint64_t>(config.shard_count) *
-           static_cast<std::uint64_t>(config.stream4_batch_alignment);
+    return checked_product(
+        static_cast<std::uint64_t>(config.world_size) * config.shard_count,
+        config.stream4_batch_alignment, "beam alignment");
 }
 
 std::uint64_t ring_slot_candidate_count(const RuntimeConfig& config) {
@@ -220,9 +252,16 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stre
     const std::uint64_t logical_shard_size = ceil_div_u64(local_capacity, config.shard_count);
     const std::uint64_t staging_slots = std::max<std::uint64_t>(1ULL, stream3_staging_ring_slots);
     const std::uint64_t target_ring_candidates = logical_shard_size * staging_slots;
-    config.ring_count = checked_u32(
-        ceil_div_u64(target_ring_candidates, config.stream3_batch_candidates),
-        "ring_count");
+    std::uint64_t physical_rings = ceil_div_u64(target_ring_candidates, config.stream3_batch_candidates);
+    // Dispatcher recycles Free rings until frontier_cursor reaches every parent.
+    // Bound physical buffers/graph executables independently of logical staging.
+    const bool eager_ensemble = env_equals("BEAM_STREAM1_EXECUTOR", "libtorch_eager") || env_present("BEAM_BLEND_DIR");
+    if (env_present("BEAM_RING_COUNT_LIMIT") || eager_ensemble) {
+        const auto limit = env_u32("BEAM_RING_COUNT_LIMIT", 16);
+        if (limit == 0U) throw std::invalid_argument("BEAM_RING_COUNT_LIMIT must be nonzero");
+        physical_rings = std::min<std::uint64_t>(physical_rings, limit);
+    }
+    config.ring_count = checked_u32(physical_rings, "ring_count");
     if (config.ring_count == 0U) {
         throw std::invalid_argument("derived RING_COUNT must be nonzero");
     }
@@ -231,9 +270,14 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stre
 
 void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
     const std::uint64_t logical_shard_size = logical_shard_size_for(config);
+    const std::uint64_t owner_batch_reserve = std::max<std::uint64_t>(
+        config.stream3_batch_candidates,
+        scaled_round_up(config.stream3_batch_candidates, config.stream5_recv_capacity_scale_ppm));
+    if (logical_shard_size > UINT64_MAX - owner_batch_reserve)
+        throw std::overflow_error("shard writable reserve exceeds uint64");
     const std::uint64_t scaled_capacity =
         std::max<std::uint64_t>(
-            logical_shard_size,
+            logical_shard_size + owner_batch_reserve,
             scaled_round_up(logical_shard_size, config.shard_capacity_scale_ppm));
     if (env_present("BEAM_SHARD_CAPACITY_CANDIDATES")) {
         config.shard_capacity_candidates = env_u32("BEAM_SHARD_CAPACITY_CANDIDATES", 1);
@@ -597,7 +641,7 @@ std::uint64_t ceil_div_u64(std::uint64_t numerator, std::uint64_t denominator) {
     if (denominator == 0) {
         throw std::invalid_argument("ceil_div denominator is zero");
     }
-    return (numerator + denominator - 1ULL) / denominator;
+    return numerator / denominator + (numerator % denominator != 0ULL);
 }
 
 std::uint64_t local_frontier_capacity(const RuntimeConfig& config) {
@@ -609,7 +653,7 @@ std::uint64_t logical_shard_size_for(const RuntimeConfig& config) {
 }
 
 std::uint64_t gross_generated_candidates_per_depth(const RuntimeConfig& config) {
-    return local_frontier_capacity(config) * static_cast<std::uint64_t>(MOVE_COUNT);
+    return checked_product(local_frontier_capacity(config), MOVE_COUNT, "generated candidates");
 }
 
 std::uint64_t estimated_stream3_jobs_per_depth(const RuntimeConfig& config) {
@@ -643,7 +687,7 @@ std::uint64_t estimated_stream4_jobs_per_depth(
 }
 
 std::uint64_t estimated_sort_work_units(std::uint64_t items, std::uint64_t batch) {
-    return items * std::max<std::uint64_t>(ceil_log2_u64(batch), 1ULL);
+    return checked_product(items, std::max<std::uint64_t>(ceil_log2_u64(batch), 1ULL), "sort work");
 }
 
 RuntimeConfigBuild build_runtime_config_from_budget(

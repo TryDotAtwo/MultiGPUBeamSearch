@@ -1,11 +1,13 @@
 #pragma once
 
 #include "../src/config.hpp"
+#include "../src/native_input.hpp"
 #include "../cuda/stream1_transformer_shape.hpp"
 #include "../cuda/stream1_transformer_hopper_policy.hpp"
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 #include "cuda_check.hpp"
+#include "../cuda/device_weight_verification.cuh"
 #include "../cuda/stream1.hpp"
 
 #include <cuda_fp16.h>
@@ -72,6 +74,9 @@ struct HostTransformerBytes {
 
 struct HostWeightBytes {
     Stream1ModelConfig model;
+    // Assigned only after every transformer tensor passed this exact seal
+    // and TensorBinding::finish() established complete manifest coverage.
+    std::string verified_transformer_manifest;
     std::vector<std::byte> input_weight;
     std::vector<std::byte> input_bias;
     std::vector<std::byte> input_ln_gamma;
@@ -96,6 +101,8 @@ struct HostWeightBytes {
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
 struct DeviceTransformerBlockWeights {
     bool ff2_hopper_fp16 = false;
+    bool qkv_hopper_fp16 = false;
+    bool ff1_hopper_fp16 = false;
     float qkv_e4m3_scale = 0.f;
     float ff1_e4m3_scale = 0.f;
     float ff2_e4m3_scale = 0.f;
@@ -170,6 +177,7 @@ struct ScratchAllocation {
     half* transformer_attention_context = nullptr;
     half* transformer_ff_hidden = nullptr;
     half* transformer_logits = nullptr;
+    std::uint32_t* transformer_numeric_error = nullptr;
 };
 #endif
 
@@ -201,42 +209,30 @@ inline std::vector<std::byte> read_binary_exact(
             " expected=" + std::to_string(bytes.size()) +
             " actual_read=" + std::to_string(actual));
     }
+    const std::string extension = path.extension().string();
+    if (extension == ".fp16" || extension == ".bf16") {
+        if (bytes.size() % 2 != 0) {
+            throw std::runtime_error("misaligned 16-bit tensor: " + path.string());
+        }
+        const std::uint16_t exponent_mask = extension == ".fp16" ? 0x7c00U : 0x7f80U;
+        for (std::size_t i = 0; i < bytes.size(); i += 2) {
+            const auto bits = static_cast<std::uint16_t>(std::to_integer<unsigned>(bytes[i]) |
+                (std::to_integer<unsigned>(bytes[i + 1]) << 8U));
+            if ((bits & exponent_mask) == exponent_mask) {
+                throw std::runtime_error("nonfinite tensor value: " + path.string() +
+                    " element=" + std::to_string(i / 2));
+            }
+        }
+    }
     return bytes;
 }
 
 inline bool manifest_has_key(const std::string& text, const char* key) {
-    const std::string quoted = std::string("\"") + key + "\"";
-    return text.find(quoted) != std::string::npos;
+    return beam::input::json_has_field(text, key);
 }
 
 inline std::uint32_t parse_manifest_u32(const std::string& text, const char* key) {
-    const std::string quoted = std::string("\"") + key + "\"";
-    std::size_t pos = text.find(quoted);
-    if (pos == std::string::npos) {
-        throw std::runtime_error("stream1 manifest missing key: " + std::string(key));
-    }
-    pos = text.find(':', pos + quoted.size());
-    if (pos == std::string::npos) {
-        throw std::runtime_error("stream1 manifest malformed key: " + std::string(key));
-    }
-    ++pos;
-    while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' || text[pos] == '\n')) {
-        ++pos;
-    }
-    std::uint64_t value = 0;
-    std::size_t digits = 0;
-    while (pos < text.size() && text[pos] >= '0' && text[pos] <= '9') {
-        value = value * 10ULL + static_cast<std::uint64_t>(text[pos] - '0');
-        if (value > std::numeric_limits<std::uint32_t>::max()) {
-            throw std::runtime_error("stream1 manifest key exceeds uint32: " + std::string(key));
-        }
-        ++pos;
-        ++digits;
-    }
-    if (digits == 0) {
-        throw std::runtime_error("stream1 manifest key is not uint32: " + std::string(key));
-    }
-    return static_cast<std::uint32_t>(value);
+    return beam::input::json_u32_field(text, key);
 }
 
 inline std::uint32_t parse_manifest_u32_any(
@@ -263,36 +259,14 @@ inline std::uint32_t parse_manifest_u32_any(
 }
 
 inline std::string parse_manifest_string(const std::string& text, const char* key) {
-    const std::string quoted = std::string("\"") + key + "\"";
-    std::size_t pos = text.find(quoted);
-    if (pos == std::string::npos) {
-        throw std::runtime_error("stream1 manifest missing key: " + std::string(key));
-    }
-    pos = text.find(':', pos + quoted.size());
-    if (pos == std::string::npos) {
-        throw std::runtime_error("stream1 manifest malformed key: " + std::string(key));
-    }
-    pos = text.find('"', pos + 1);
-    if (pos == std::string::npos) {
-        throw std::runtime_error("stream1 manifest string missing opening quote: " + std::string(key));
-    }
-    const std::size_t start = pos + 1;
-    pos = text.find('"', start);
-    if (pos == std::string::npos) {
-        throw std::runtime_error("stream1 manifest string missing closing quote: " + std::string(key));
-    }
-    return text.substr(start, pos - start);
+    return beam::input::json_string_field(text, key);
 }
 
 inline std::string parse_manifest_string_default(
     const std::string& text,
     const char* key,
     const std::string& default_value) {
-    try {
-        return parse_manifest_string(text, key);
-    } catch (const std::runtime_error&) {
-        return default_value;
-    }
+    return manifest_has_key(text, key) ? parse_manifest_string(text, key) : default_value;
 }
 
 inline void require_manifest_u32(
@@ -534,6 +508,12 @@ inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::p
     weights.model = model;
     const std::string suffix = weight_suffix(model);
     const std::string artifact = read_text_exact(dir / "manifest.json");
+    input::TensorBinding binding(artifact, model.state_len == 96 && model.num_classes == 6);
+    const auto read_bound = [&](const std::filesystem::path& path, std::uint64_t size) {
+        auto bytes = read_binary_exact(path, size);
+        binding.verify(path.filename().string(), bytes);
+        return bytes;
+    };
     const bool native_fp8 = manifest_has_key(artifact, "schema");
     const bool native_ffn = native_fp8 && parse_manifest_string(artifact,"schema")=="hopper_native_e4m3_experimental_v2";
     if (native_fp8) {
@@ -547,61 +527,89 @@ inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::p
             throw std::runtime_error("Native FP8 FFN requires offline hidden inverse scale16");
     }
     HostTransformerBytes& t = weights.transformer;
-    t.fast_slot_projected = read_binary_exact(
+    t.fast_slot_projected = read_bound(
         dir / ("fast_slot_projected" + suffix),
         fp16_bytes(static_cast<std::uint64_t>(model.max_piece_size) * model.num_classes * model.d_model));
-    t.fast_piece_static = read_binary_exact(
+    t.fast_piece_static = read_bound(
         dir / ("fast_piece_static" + suffix),
         fp16_bytes(static_cast<std::uint64_t>(model.num_pieces) * model.d_model));
-    t.cls_token = read_binary_exact(dir / ("cls_token" + suffix), fp16_bytes(model.d_model));
-    t.input_ln_gamma = read_binary_exact(dir / ("input_ln_gamma" + suffix), fp16_bytes(model.d_model));
-    t.input_ln_beta = read_binary_exact(dir / ("input_ln_beta" + suffix), fp16_bytes(model.d_model));
-    t.output_ln_gamma = read_binary_exact(dir / ("output_ln_gamma" + suffix), fp16_bytes(model.d_model));
-    t.output_ln_beta = read_binary_exact(dir / ("output_ln_beta" + suffix), fp16_bytes(model.d_model));
+    t.cls_token = read_bound(dir / ("cls_token" + suffix), fp16_bytes(model.d_model));
+    t.input_ln_gamma = read_bound(dir / ("input_ln_gamma" + suffix), fp16_bytes(model.d_model));
+    t.input_ln_beta = read_bound(dir / ("input_ln_beta" + suffix), fp16_bytes(model.d_model));
+    t.output_ln_gamma = read_bound(dir / ("output_ln_gamma" + suffix), fp16_bytes(model.d_model));
+    t.output_ln_beta = read_bound(dir / ("output_ln_beta" + suffix), fp16_bytes(model.d_model));
     t.blocks.resize(model.transformer_layers);
     for (std::uint32_t block = 0; block < model.transformer_layers; ++block) {
         const std::string prefix = "block" + std::to_string(block);
         HostTransformerBlockBytes& b = t.blocks[block];
-        b.ln1_gamma = read_binary_exact(dir / (prefix + "_ln1_gamma" + suffix), fp16_bytes(model.d_model));
-        b.ln1_beta = read_binary_exact(dir / (prefix + "_ln1_beta" + suffix), fp16_bytes(model.d_model));
+        b.ln1_gamma = read_bound(dir / (prefix + "_ln1_gamma" + suffix), fp16_bytes(model.d_model));
+        b.ln1_beta = read_bound(dir / (prefix + "_ln1_beta" + suffix), fp16_bytes(model.d_model));
         if (native_fp8 && block < 3) {
             b.qkv_e4m3_scale=hopper_e4m3_scale_record(artifact,prefix+"_attn_qkv_weight_hxk.fp16",256);
-            b.attn_qkv_weight=read_binary_exact(dir/(prefix+"_attn_qkv_weight_hxk.e4m3"),3ULL*256*256);
+            b.attn_qkv_weight=read_bound(dir/(prefix+"_attn_qkv_weight_hxk.e4m3"),3ULL*256*256);
         } else {
-            b.attn_qkv_weight = read_binary_exact(
+            b.attn_qkv_weight = read_bound(
                 dir / (prefix + "_attn_qkv_weight_hxk" + suffix),
                 fp16_bytes(3ULL * model.d_model * model.d_model));
         }
-        b.attn_qkv_bias = read_binary_exact(dir / (prefix + "_attn_qkv_bias" + suffix), fp16_bytes(3ULL * model.d_model));
-        b.attn_out_weight = read_binary_exact(
+        b.attn_qkv_bias = read_bound(dir / (prefix + "_attn_qkv_bias" + suffix), fp16_bytes(3ULL * model.d_model));
+        b.attn_out_weight = read_bound(
             dir / (prefix + "_attn_out_weight_hxk" + suffix),
             fp16_bytes(static_cast<std::uint64_t>(model.d_model) * model.d_model));
-        b.attn_out_bias = read_binary_exact(dir / (prefix + "_attn_out_bias" + suffix), fp16_bytes(model.d_model));
-        b.ln2_gamma = read_binary_exact(dir / (prefix + "_ln2_gamma" + suffix), fp16_bytes(model.d_model));
-        b.ln2_beta = read_binary_exact(dir / (prefix + "_ln2_beta" + suffix), fp16_bytes(model.d_model));
+        b.attn_out_bias = read_bound(dir / (prefix + "_attn_out_bias" + suffix), fp16_bytes(model.d_model));
+        b.ln2_gamma = read_bound(dir / (prefix + "_ln2_gamma" + suffix), fp16_bytes(model.d_model));
+        b.ln2_beta = read_bound(dir / (prefix + "_ln2_beta" + suffix), fp16_bytes(model.d_model));
         if(native_ffn && block<3){
             b.ff1_e4m3_scale=hopper_e4m3_scale_record(artifact,prefix+"_ff1_weight_hxk.fp16",256);
             b.ff2_e4m3_scale=hopper_e4m3_scale_record(artifact,prefix+"_ff2_weight_hxk.fp16",1024);
-            b.ff1_weight=read_binary_exact(dir/(prefix+"_ff1_weight_hxk.e4m3"),256ULL*1024);
-            b.ff2_weight=read_binary_exact(dir/(prefix+"_ff2_weight_hxk.e4m3"),256ULL*1024);
+            b.ff1_weight=read_bound(dir/(prefix+"_ff1_weight_hxk.e4m3"),256ULL*1024);
+            b.ff2_weight=read_bound(dir/(prefix+"_ff2_weight_hxk.e4m3"),256ULL*1024);
         }else{
-            b.ff1_weight = read_binary_exact(dir / (prefix + "_ff1_weight_hxk" + suffix),fp16_bytes(static_cast<std::uint64_t>(model.ff_dim) * model.d_model));
-            b.ff2_weight = read_binary_exact(dir / (prefix + "_ff2_weight_hxk" + suffix),fp16_bytes(static_cast<std::uint64_t>(model.d_model) * model.ff_dim));
+            b.ff1_weight = read_bound(dir / (prefix + "_ff1_weight_hxk" + suffix),fp16_bytes(static_cast<std::uint64_t>(model.ff_dim) * model.d_model));
+            b.ff2_weight = read_bound(dir / (prefix + "_ff2_weight_hxk" + suffix),fp16_bytes(static_cast<std::uint64_t>(model.d_model) * model.ff_dim));
         }
-        b.ff1_bias = read_binary_exact(dir / (prefix + "_ff1_bias" + suffix), fp16_bytes(model.ff_dim));
-        b.ff2_bias = read_binary_exact(dir / (prefix + "_ff2_bias" + suffix), fp16_bytes(model.d_model));
+        b.ff1_bias = read_bound(dir / (prefix + "_ff1_bias" + suffix), fp16_bytes(model.ff_dim));
+        b.ff2_bias = read_bound(dir / (prefix + "_ff2_bias" + suffix), fp16_bytes(model.d_model));
     }
-    t.output_weight = read_binary_exact(
+    t.output_weight = read_bound(
         dir / ("output_weight_hxk" + suffix),
         fp16_bytes(static_cast<std::uint64_t>(model.output_dim) * model.d_model));
-    t.output_bias = read_binary_exact(dir / ("output_bias" + suffix), fp16_bytes(model.output_dim));
-    t.piece_positions = read_binary_exact(
+    t.output_bias = read_bound(dir / ("output_bias" + suffix), fp16_bytes(model.output_dim));
+    t.piece_positions = read_bound(
         dir / "piece_positions.u16",
         static_cast<std::uint64_t>(model.num_pieces) * model.max_piece_size * sizeof(std::uint16_t));
-    t.piece_mask = read_binary_exact(
+    t.piece_mask = read_bound(
         dir / "piece_mask.u8",
         static_cast<std::uint64_t>(model.num_pieces) * model.max_piece_size);
-    t.piece_types = read_binary_exact(dir / "piece_types.u8", model.num_pieces);
+    t.piece_types = read_bound(dir / "piece_types.u8", model.num_pieces);
+    // Validate semantic indices as well as byte integrity before GPU access.
+    std::vector<bool> covered(model.state_len, false);
+    const bool has_type_count = manifest_has_key(artifact, "num_piece_types");
+    const auto type_count = has_type_count
+        ? parse_manifest_u32(artifact, "num_piece_types") : 0U;
+    for (std::uint32_t piece = 0; piece < model.num_pieces; ++piece) {
+        bool nonempty = false;
+        for (std::uint32_t slot = 0; slot < model.max_piece_size; ++slot) {
+            const auto i = static_cast<std::size_t>(piece) * model.max_piece_size + slot;
+            const auto mask = std::to_integer<unsigned>(t.piece_mask[i]);
+            if (mask > 1U) throw std::runtime_error("piece mask must be binary");
+            if (mask == 0U) continue;
+            const auto pos = std::to_integer<unsigned>(t.piece_positions[2 * i]) |
+                (std::to_integer<unsigned>(t.piece_positions[2 * i + 1]) << 8U);
+            if (pos >= model.state_len || covered[pos])
+                throw std::runtime_error("piece positions must partition logical state");
+            covered[pos] = true;
+            nonempty = true;
+        }
+        if (!nonempty) throw std::runtime_error("empty piece");
+        if (has_type_count &&
+            std::to_integer<unsigned>(t.piece_types[piece]) >= type_count)
+            throw std::runtime_error("piece type out of range");
+    }
+    for (const bool present : covered)
+        if (!present) throw std::runtime_error("piece positions omit logical state");
+    binding.finish();
+    weights.verified_transformer_manifest = artifact;
     return weights;
 }
 
@@ -698,7 +706,7 @@ inline std::uint64_t stream1_scratch_bytes(
     case STREAM1_BACKEND_MLP:
         return fp16_bytes(rows * (static_cast<std::uint64_t>(model.hidden1) + 2ULL * model.hidden2 + model.output_dim));
     case STREAM1_BACKEND_PIECE_TRANSFORMER:
-        return transformer_scratch_bytes_for_rows(model, rows);
+        return transformer_scratch_bytes_for_rows(model, rows) + sizeof(std::uint32_t);
     default:
         throw std::runtime_error("unsupported Stream1 backend in scratch byte helper");
     }
@@ -718,6 +726,7 @@ inline void copy_bytes_to_device(void* dst, const std::vector<std::byte>& bytes,
         throw std::runtime_error(std::string("invalid device copy input: ") + name);
     }
     BEAM_CUDA_CHECK(cudaMemcpy(dst, bytes.data(), bytes.size(), cudaMemcpyHostToDevice));
+    verify_device_weight_bytes(dst, bytes, name);
 }
 
 inline void require_aligned(const void* ptr, std::uintptr_t alignment, const char* name) {
@@ -847,6 +856,8 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
             qkv_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
         const bool pack_ff1 = hb.ff1_e4m3_scale == 0 && stream1_transformer_hopper_uses_packed_full_token_weight(
             ff1_hopper_mode, static_cast<unsigned>(i), static_cast<unsigned>(h.blocks.size()));
+        db.qkv_hopper_fp16 = pack_qkv;
+        db.ff1_hopper_fp16 = pack_ff1;
         const std::vector<std::byte> qkv_packed = pack_qkv
             ? pack_kxn_column_major_2byte(hb.attn_qkv_weight, host.model.d_model, 3U * host.model.d_model)
             : std::vector<std::byte>{};
@@ -1039,6 +1050,8 @@ inline ScratchAllocation alloc_stream1_scratch(
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_attention_context, plan.context_bytes));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_ff_hidden, plan.ff_hidden_bytes));
             BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_logits, plan.logits_bytes));
+            BEAM_CUDA_CHECK(cudaMalloc(&scratch.transformer_numeric_error, sizeof(std::uint32_t)));
+            BEAM_CUDA_CHECK(cudaMemset(scratch.transformer_numeric_error, 0, sizeof(std::uint32_t)));
             return scratch;
         }
         throw std::runtime_error("unsupported Stream1 backend in scratch allocation");
@@ -1058,6 +1071,7 @@ inline void free_stream1_scratch(ScratchAllocation& scratch) {
     cudaFree(scratch.transformer_attention_context);
     cudaFree(scratch.transformer_ff_hidden);
     cudaFree(scratch.transformer_logits);
+    cudaFree(scratch.transformer_numeric_error);
     scratch = ScratchAllocation{};
 }
 
@@ -1136,7 +1150,9 @@ inline TransformerNetworkViewHolder transformer_network_view(
             b.qkv_e4m3_scale,
             b.ff1_e4m3_scale,
             b.ff2_e4m3_scale,
-            b.ff2_hopper_fp16};
+            b.ff2_hopper_fp16,
+            b.qkv_hopper_fp16,
+            b.ff1_hopper_fp16};
     }
     holder.view = Stream1TransformerNetworkView{
         weights.fast_slot_projected,
@@ -1184,7 +1200,8 @@ inline Stream1TransformerScratchView transformer_scratch_view(const ScratchAlloc
         scratch.transformer_attention_scores_probs,
         scratch.transformer_attention_context,
         scratch.transformer_ff_hidden,
-        scratch.transformer_logits};
+        scratch.transformer_logits,
+        scratch.transformer_numeric_error};
 }
 
 inline Stream1TransformerScratchView transformer_scratch_view(
@@ -1204,7 +1221,8 @@ inline Stream1TransformerScratchView transformer_scratch_view(
         scratch.transformer_attention_scores_probs + lane_rows * model.nhead * transformer_attention_score_stride(model),
         scratch.transformer_attention_context + lane_rows * sequence.padded_seq_len * model.d_model,
         scratch.transformer_ff_hidden + lane_rows * sequence.padded_seq_len * model.ff_dim,
-        scratch.transformer_logits + lane_rows * model.output_dim};
+        scratch.transformer_logits + lane_rows * model.output_dim,
+        scratch.transformer_numeric_error};
 }
 #endif
 

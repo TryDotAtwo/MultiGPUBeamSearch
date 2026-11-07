@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 import hashlib
 import io
 import os
@@ -22,6 +23,13 @@ GENERATORS = {
     "clockwise": (1, 2, 0),
     "counterclockwise": (2, 0, 1),
 }
+
+
+@pytest.fixture(autouse=True)
+def deterministic_disk_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Invocation tests run fake children; physical host free space is not their
+    # subject. Resource-rejection tests pass explicit values or override this.
+    monkeypatch.setattr(runner.shutil, "disk_usage", lambda _: SimpleNamespace(free=128 * 1024**3))
 
 
 def _config(tmp_path: Path, *, solution_mode: str = "first", reflect_mode: str = "off",
@@ -182,6 +190,28 @@ def test_first_invocation_uses_exact_two_rank_torchrun_and_runtime_contract(tmp_
     }
     assert invocation.env["BEAM_HISTORY_DIR"].startswith("/tmp/beam_history_public/")
     assert not {"WORLD_SIZE", "RANK", "LOCAL_RANK"}.intersection(invocation.env)
+
+
+def test_history_preflight_keeps_all_expansion_depths(tmp_path: Path) -> None:
+    config = replace(_config(tmp_path), max_depth=3, touch_bfs_radius=4)
+    result = runner.preflight_history_runtime(
+        config, _plan(local_beam=10), move_count=2,
+        history_dir=Path("/tmp/beam_history_public/run/7/original"),
+        tmp_free_bytes=128 * 1024**3,
+    )
+    assert result.required_history_bytes == 224  # (2 + 4 + 8) * 16
+
+
+def test_history_preflight_rejects_whole_layer_fragmentation(tmp_path: Path) -> None:
+    config = replace(_config(tmp_path), max_depth=1, touch_bfs_radius=0)
+    with pytest.raises(ValueError, match="whole depth"):
+        runner.preflight_history_runtime(
+            config, _plan(local_beam=10), move_count=24,
+            history_dir=Path("/tmp/beam_history_public/run/7/original"),
+            tmp_free_bytes=1024**3,
+            history_ram_bytes=2112,  # per rank: 960 staging/pin + 96 arena
+            history_disk_bytes=192,  # per rank: 96 arena; 6 + 6 < one layer10
+        )
 
 
 def test_history_defaults_preflight_budget_and_tmp_space(tmp_path: Path) -> None:

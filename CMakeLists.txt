@@ -87,6 +87,8 @@ add_library(beam_core
     src/state.cpp
     src/hash.cpp
     src/history.cpp
+    src/history_budget.cpp
+    src/native_input.cpp
     src/stream3.cpp
     src/stream4.cpp
     src/frontier_cpu.cpp
@@ -105,9 +107,30 @@ target_link_libraries(contract_tests PRIVATE beam_core)
 add_executable(history_tests tests/history_tests.cpp)
 target_link_libraries(history_tests PRIVATE beam_core)
 
+add_executable(history_budget_tests tests/history_budget_tests.cpp)
+add_executable(history_prefault_tests tests/history_prefault_tests.cpp)
+target_include_directories(history_prefault_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(history_budget_tests PRIVATE beam_core)
+
+add_executable(config_limits_tests tests/config_limits_tests.cpp)
+target_link_libraries(config_limits_tests PRIVATE beam_core)
+
+add_executable(unique_frontier_tests tests/unique_frontier_tests.cpp)
+target_link_libraries(unique_frontier_tests PRIVATE beam_core)
+
+add_executable(native_input_tests tests/native_input_tests.cpp)
+target_link_libraries(native_input_tests PRIVATE beam_core)
+add_executable(native_manifest_tests tests/native_manifest_tests.cpp)
+target_link_libraries(native_manifest_tests PRIVATE beam_core)
+add_executable(tensor_binding_tests tests/tensor_binding_tests.cpp)
+target_link_libraries(tensor_binding_tests PRIVATE beam_core)
+
 add_library(beam_cuda
     cuda/stream1.cu
     cuda/stream1_transformer.cu
+    cuda/stream1_blend_readout.cu
+    cuda/stream1_ensemble_readout.cu
+    cuda/stream1_gnn_projection.cu
     cuda/stream1_transformer_fmha.cu
     cuda/stream2.cu
     cuda/stream3.cu
@@ -163,6 +186,9 @@ set_target_properties(beam_cuda PROPERTIES
 )
 
 add_executable(stream2_cuda_tests tests/stream2_cuda_tests.cu)
+add_executable(threshold_bank_union_cuda_tests EXCLUDE_FROM_ALL tests/threshold_bank_union_cuda_tests.cu)
+target_link_libraries(threshold_bank_union_cuda_tests PRIVATE beam_cuda)
+set_target_properties(threshold_bank_union_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 target_link_libraries(stream2_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream2_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
@@ -171,6 +197,12 @@ target_link_libraries(stream1_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream1_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stream1_transformer_cuda_tests tests/stream1_transformer_cuda_tests.cu)
+add_executable(device_weight_verification_cuda_tests tests/device_weight_verification_cuda_tests.cu)
+target_include_directories(device_weight_verification_cuda_tests PRIVATE cuda)
+set_target_properties(device_weight_verification_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+add_executable(frontier_native_score_probe EXCLUDE_FROM_ALL tests/frontier_native_score_probe.cu)
+target_link_libraries(frontier_native_score_probe PRIVATE beam_cuda)
+set_target_properties(frontier_native_score_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 target_link_libraries(stream1_transformer_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream1_transformer_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
@@ -196,7 +228,27 @@ target_compile_options(stream1_transformer_hopper_gemm_cuda_tests PRIVATE $<$<CO
 set_target_properties(stream1_transformer_hopper_gemm_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stream1_transformer_gemm_policy_tests tests/stream1_transformer_gemm_policy_tests.cpp)
+add_executable(stream1_resolved_gemm_tests tests/stream1_resolved_gemm_tests.cpp)
+add_executable(production_score_request_tests tests/production_score_request_tests.cpp)
+target_link_libraries(production_score_request_tests PRIVATE beam_core)
+target_compile_features(production_score_request_tests PRIVATE cxx_std_17)
+target_compile_features(stream1_resolved_gemm_tests PRIVATE cxx_std_17)
+if(UNIX)
+    add_executable(stream1_policy_snapshot_tests tests/stream1_policy_snapshot_tests.cpp)
+    target_compile_features(stream1_policy_snapshot_tests PRIVATE cxx_std_17)
+endif()
 add_executable(stream1_transformer_hopper_policy_tests tests/stream1_transformer_hopper_policy_tests.cpp)
+add_executable(stream1_layout_metadata_tests tests/stream1_layout_metadata_tests.cpp)
+add_executable(stream1_loaded_execution_admission_tests tests/stream1_loaded_execution_admission_tests.cpp)
+add_executable(stream1_execution_contract_tests tests/stream1_execution_contract_tests.cpp)
+target_compile_features(stream1_execution_contract_tests PRIVATE cxx_std_17)
+target_link_libraries(stream1_execution_contract_tests PRIVATE beam_core)
+target_include_directories(stream1_execution_contract_tests PRIVATE cuda ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+target_compile_features(stream1_loaded_execution_admission_tests PRIVATE cxx_std_17)
+target_link_libraries(stream1_loaded_execution_admission_tests PRIVATE beam_core)
+target_include_directories(stream1_loaded_execution_admission_tests PRIVATE cuda ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+target_link_libraries(stream1_layout_metadata_tests PRIVATE beam_core)
+target_include_directories(stream1_layout_metadata_tests PRIVATE cuda ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_include_directories(stream1_transformer_hopper_policy_tests PRIVATE cuda)
 target_include_directories(stream1_transformer_gemm_policy_tests PRIVATE cuda)
 target_compile_features(stream1_transformer_gemm_policy_tests PRIVATE cxx_std_17)
@@ -223,9 +275,40 @@ add_executable(stream3_cuda_tests tests/stream3_cuda_tests.cu)
 target_link_libraries(stream3_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream3_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
+# Bounded owner-scatter acceptance: opt-in and never promoted by host checks.
+add_executable(stream3_owner_scatter_cuda_tests EXCLUDE_FROM_ALL tests/stream3_owner_scatter_cuda_tests.cu)
+target_link_libraries(stream3_owner_scatter_cuda_tests PRIVATE beam_cuda)
+set_target_properties(stream3_owner_scatter_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
 add_executable(stream4_cuda_tests tests/stream4_cuda_tests.cu)
 target_link_libraries(stream4_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream4_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(stream4_logical_union_cuda_tests tests/stream4_logical_union_cuda_tests.cu)
+target_link_libraries(stream4_logical_union_cuda_tests PRIVATE beam_cuda)
+target_compile_definitions(stream4_logical_union_cuda_tests PRIVATE BEAM_TEST_LOGICAL_UNION=1)
+set_target_properties(stream4_logical_union_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+# Separate opt-in scopes: single GPU must not masquerade as two-GPU acceptance.
+foreach(union_scope IN ITEMS graph single_graph bounded_graph single_bounded_graph)
+    set(union_target stream4_logical_union_${union_scope}_cuda_tests)
+    add_executable(${union_target} EXCLUDE_FROM_ALL tests/stream4_logical_union_cuda_tests.cu)
+    target_link_libraries(${union_target} PRIVATE beam_cuda)
+    target_compile_definitions(${union_target} PRIVATE BEAM_TEST_LOGICAL_UNION=1 BEAM_TEST_UNION_GRAPH=1)
+    if(union_scope MATCHES "^single_")
+        target_compile_definitions(${union_target} PRIVATE BEAM_TEST_SINGLE_GPU=1)
+    endif()
+    if(union_scope MATCHES "bounded_graph$")
+        target_compile_definitions(${union_target} PRIVATE BEAM_TEST_UNION_SORT_BOUND=1)
+    endif()
+    set_target_properties(${union_target} PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+endforeach()
+
+add_executable(union_memory_cuda_tests tests/union_memory_cuda_tests.cu)
+add_executable(runtime_arithmetic_tests tests/runtime_arithmetic_tests.cpp)
+target_link_libraries(runtime_arithmetic_tests PRIVATE beam_cuda)
+target_link_libraries(union_memory_cuda_tests PRIVATE beam_cuda)
+set_target_properties(union_memory_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stream5_cuda_tests tests/stream5_cuda_tests.cu)
 target_link_libraries(stream5_cuda_tests PRIVATE beam_cuda)
@@ -238,6 +321,78 @@ set_target_properties(final_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD
 add_executable(threshold_cuda_tests tests/threshold_cuda_tests.cu)
 target_link_libraries(threshold_cuda_tests PRIVATE beam_cuda)
 set_target_properties(threshold_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(final_union_dispatcher_cuda_tests EXCLUDE_FROM_ALL tests/final_union_dispatcher_cuda_tests.cu)
+add_executable(stream4_bounded_graph_cuda_tests tests/stream4_bounded_graph_cuda_tests.cu)
+target_link_libraries(stream4_bounded_graph_cuda_tests PRIVATE beam_cuda)
+set_target_properties(stream4_bounded_graph_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+add_executable(final_snapshot_validation_cuda_tests tests/final_snapshot_validation_cuda_tests.cu)
+add_executable(stream1_execution_shape_tests tests/stream1_execution_shape_tests.cpp)
+add_executable(stream1_executor_contract_tests tests/stream1_executor_contract_tests.cpp)
+add_executable(stream1_chunk_plan_tests tests/stream1_chunk_plan_tests.cpp)
+target_include_directories(stream1_chunk_plan_tests PRIVATE cuda)
+target_compile_features(stream1_chunk_plan_tests PRIVATE cxx_std_17)
+add_test(NAME stream1_chunk_plan_tests COMMAND stream1_chunk_plan_tests)
+add_executable(stream1_kernel_description_tests tests/stream1_kernel_description_tests.cpp)
+target_include_directories(stream1_kernel_description_tests PRIVATE cuda)
+target_compile_features(stream1_kernel_description_tests PRIVATE cxx_std_17)
+add_test(NAME stream1_kernel_description_tests COMMAND stream1_kernel_description_tests)
+add_executable(stream1_nonfinite_score_cuda_tests tests/stream1_nonfinite_score_cuda_tests.cu)
+target_link_libraries(stream1_nonfinite_score_cuda_tests PRIVATE beam_cuda)
+set_target_properties(stream1_nonfinite_score_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+foreach(score_case IN ITEMS finite nan posinf neginf)
+    add_test(NAME stream1_nonfinite_score_${score_case} COMMAND stream1_nonfinite_score_cuda_tests ${score_case})
+    add_test(NAME stream1_nonfinite_graph_job_score_${score_case} COMMAND stream1_nonfinite_score_cuda_tests ${score_case} --graph-job)
+endforeach()
+target_compile_features(stream1_executor_contract_tests PRIVATE cxx_std_17)
+target_compile_features(stream1_execution_shape_tests PRIVATE cxx_std_17)
+add_executable(cuda_visible_device_probe EXCLUDE_FROM_ALL tools/cuda_visible_device_probe.cu)
+set_target_properties(cuda_visible_device_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+add_executable(stream1_parameter_storage_probe EXCLUDE_FROM_ALL tools/stream1_parameter_storage_probe.cu)
+target_link_libraries(stream1_parameter_storage_probe PRIVATE beam_core)
+set_target_properties(stream1_parameter_storage_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+add_executable(stream1_gemm_parameter_probe EXCLUDE_FROM_ALL tools/stream1_gemm_parameter_storage_probe.cu)
+target_include_directories(stream1_gemm_parameter_probe PRIVATE "${CUTLASS_DIR}/include")
+target_compile_options(stream1_gemm_parameter_probe PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+set_target_properties(stream1_gemm_parameter_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+add_executable(stream1_gemm_iterator_probe EXCLUDE_FROM_ALL tools/stream1_gemm_iterator_probe.cu)
+add_executable(stream1_transfer_geometry_probe EXCLUDE_FROM_ALL tools/stream1_transfer_geometry_probe.cu)
+set_target_properties(stream1_transfer_geometry_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+add_executable(stream1_elementwise_arguments_probe EXCLUDE_FROM_ALL tools/stream1_elementwise_arguments_probe.cu)
+add_executable(stream1_gemm_field_ledger_probe EXCLUDE_FROM_ALL tools/stream1_gemm_field_ledger_probe.cu)
+add_executable(stream1_gemm_nested_storage_probe EXCLUDE_FROM_ALL tools/stream1_gemm_nested_storage_probe.cu)
+target_include_directories(stream1_gemm_nested_storage_probe PRIVATE "${CUTLASS_DIR}/include")
+set_target_properties(stream1_gemm_nested_storage_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+target_include_directories(stream1_gemm_field_ledger_probe PRIVATE "${CUTLASS_DIR}/include")
+set_target_properties(stream1_gemm_field_ledger_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+add_executable(stream1_attention_field_ledger_probe EXCLUDE_FROM_ALL tools/stream1_attention_field_ledger_probe.cu)
+target_include_directories(stream1_attention_field_ledger_probe PRIVATE "${CUTLASS_DIR}/include" "${CUTLASS_DIR}/examples/41_fused_multi_head_attention")
+set_target_properties(stream1_attention_field_ledger_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+target_include_directories(stream1_elementwise_arguments_probe PRIVATE "${CUTLASS_DIR}/include")
+set_target_properties(stream1_elementwise_arguments_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+target_include_directories(stream1_gemm_iterator_probe PRIVATE "${CUTLASS_DIR}/include")
+target_compile_options(stream1_gemm_iterator_probe PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+set_target_properties(stream1_gemm_iterator_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+if(EXISTS "${CUTLASS_DIR}/examples/41_fused_multi_head_attention/kernel_forward.h")
+    add_executable(stream1_attention_storage_probe EXCLUDE_FROM_ALL tools/stream1_attention_storage_probe.cu)
+    target_include_directories(stream1_attention_storage_probe PRIVATE "${CUTLASS_DIR}/include" "${CUTLASS_DIR}/examples/41_fused_multi_head_attention")
+    target_compile_options(stream1_attention_storage_probe PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+    set_target_properties(stream1_attention_storage_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_attention_parameter_probe EXCLUDE_FROM_ALL tools/stream1_attention_storage_probe.cu)
+    target_include_directories(stream1_attention_parameter_probe PRIVATE "${CUTLASS_DIR}/include" "${CUTLASS_DIR}/examples/41_fused_multi_head_attention")
+    target_compile_definitions(stream1_attention_parameter_probe PRIVATE STREAM1_ATTENTION_PARAMETER_LAYOUT_PROBE=1)
+    target_compile_options(stream1_attention_parameter_probe PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+    set_target_properties(stream1_attention_parameter_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+endif()
+target_link_libraries(final_snapshot_validation_cuda_tests PRIVATE beam_cuda)
+set_target_properties(final_snapshot_validation_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+target_link_libraries(final_union_dispatcher_cuda_tests PRIVATE beam_cuda)
+set_target_properties(final_union_dispatcher_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(threshold_union_cuda_tests tests/threshold_union_cuda_tests.cu)
+target_link_libraries(threshold_union_cuda_tests PRIVATE beam_cuda)
+target_compile_definitions(threshold_union_cuda_tests PRIVATE BEAM_TEST_CONSERVATIVE=1)
+set_target_properties(threshold_union_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stitched_cuda_tests tests/stitched_cuda_tests.cu)
 target_link_libraries(stitched_cuda_tests PRIVATE beam_cuda)
@@ -252,8 +407,10 @@ target_link_libraries(static_memory_cuda_tests PRIVATE beam_cuda)
 set_target_properties(static_memory_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(production_runner tools/production_runner.cu)
-target_link_libraries(production_runner PRIVATE beam_cuda)
+string(REPLACE ";" "," BEAM_BUILD_CUDA_ARCHES "${BEAM_CUDA_ARCHITECTURES}")
+target_link_libraries(production_runner PRIVATE beam_cuda ${CMAKE_DL_LIBS})
 target_compile_definitions(production_runner PRIVATE
+    BEAM_BUILD_CUDA_ARCHES="${BEAM_BUILD_CUDA_ARCHES}"
     BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
     BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>
 )
@@ -286,9 +443,24 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
         tools/production_runner.cu
         tools/stream1_libtorch_ring_slot_launcher.cpp
         tools/stream1_transformer_libtorch_backend.cpp)
+    add_executable(stream1_ensemble_benchmark tools/stream1_ensemble_benchmark.cpp)
+    target_sources(stream1_ensemble_benchmark PRIVATE tools/stream1_gnn_projection_libtorch.cpp)
+    target_sources(production_runner_libtorch_stream1 PRIVATE tools/stream1_gnn_projection_libtorch.cpp)
+    add_executable(stream1_native_mlp_benchmark tools/stream1_native_mlp_benchmark.cpp)
+    add_executable(stream1_libtorch_mlp_benchmark tools/stream1_libtorch_mlp_benchmark.cpp)
+    target_link_libraries(stream1_libtorch_mlp_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")
+    target_include_directories(stream1_libtorch_mlp_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
+    set_target_properties(stream1_libtorch_mlp_benchmark PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+    target_link_libraries(stream1_native_mlp_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")
+    target_include_directories(stream1_native_mlp_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
+    set_target_properties(stream1_native_mlp_benchmark PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+    target_link_libraries(stream1_ensemble_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")
+    target_include_directories(stream1_ensemble_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
+    set_target_properties(stream1_ensemble_benchmark PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
     target_link_libraries(production_runner_libtorch_stream1 PRIVATE beam_cuda "${TORCH_LIBRARIES}")
     target_include_directories(production_runner_libtorch_stream1 PRIVATE "${TORCH_INCLUDE_DIRS}")
     target_compile_definitions(production_runner_libtorch_stream1 PRIVATE
+        BEAM_BUILD_CUDA_ARCHES="${BEAM_BUILD_CUDA_ARCHES}"
         BEAM_HAS_LIBTORCH_STREAM1=1
         BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
         BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>
@@ -303,10 +475,35 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
 endif()
 
 enable_testing()
+add_test(NAME production_score_request_tests COMMAND production_score_request_tests)
+add_test(NAME stream1_loaded_execution_admission_tests COMMAND stream1_loaded_execution_admission_tests)
+add_test(NAME stream1_execution_contract_tests COMMAND stream1_execution_contract_tests)
+add_test(NAME stream1_resolved_gemm_tests COMMAND stream1_resolved_gemm_tests)
+if(UNIX)
+    add_test(NAME stream1_policy_snapshot_tests COMMAND stream1_policy_snapshot_tests)
+endif()
+add_test(NAME stream1_layout_metadata_tests COMMAND stream1_layout_metadata_tests)
 add_test(NAME contract_tests COMMAND contract_tests)
 add_test(NAME history_tests COMMAND history_tests)
+add_test(NAME history_budget_tests COMMAND history_budget_tests)
+add_test(NAME history_prefault_tests COMMAND history_prefault_tests)
+add_test(NAME native_input_tests COMMAND native_input_tests)
+add_test(NAME native_manifest_tests COMMAND native_manifest_tests)
+add_test(NAME production_runner_build_info COMMAND production_runner --build-info)
+add_test(NAME tensor_binding_tests COMMAND tensor_binding_tests)
+add_test(NAME config_limits_tests COMMAND config_limits_tests)
+add_test(NAME unique_frontier_tests COMMAND unique_frontier_tests)
 add_test(NAME stream1_cuda_tests COMMAND stream1_cuda_tests)
 add_test(NAME stream1_transformer_cuda_tests COMMAND stream1_transformer_cuda_tests)
+add_test(NAME device_weight_verification_cuda_tests COMMAND device_weight_verification_cuda_tests)
+set_tests_properties(stream1_transformer_cuda_tests PROPERTIES SKIP_RETURN_CODE 77)
+# A skipped optional CTest must never satisfy the required inference gate.
+add_custom_target(check_stream1_reference_required
+    COMMAND $<TARGET_FILE:stream1_transformer_cuda_tests> --require-reference
+    DEPENDS stream1_transformer_cuda_tests
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    USES_TERMINAL
+)
 add_test(NAME stream1_transformer_dual_ln_cuda_tests COMMAND stream1_transformer_dual_ln_cuda_tests)
 add_test(NAME stream1_transformer_gemm_policy_tests COMMAND stream1_transformer_gemm_policy_tests)
 add_test(NAME stream1_transformer_attention_policy_tests COMMAND stream1_transformer_attention_policy_tests)
@@ -318,9 +515,23 @@ add_test(NAME stream1_transformer_autotune_contract_tests COMMAND stream1_transf
 add_test(NAME stream2_cuda_tests COMMAND stream2_cuda_tests)
 add_test(NAME stream3_cuda_tests COMMAND stream3_cuda_tests)
 add_test(NAME stream4_cuda_tests COMMAND stream4_cuda_tests)
+add_test(NAME stream4_logical_union_cuda_tests COMMAND stream4_logical_union_cuda_tests)
+add_test(NAME stream4_bounded_graph_cuda_tests COMMAND stream4_bounded_graph_cuda_tests)
+add_test(NAME final_snapshot_validation_cuda_tests COMMAND final_snapshot_validation_cuda_tests)
+add_test(NAME stream1_execution_shape_tests COMMAND stream1_execution_shape_tests)
+add_test(NAME stream1_executor_contract_tests COMMAND stream1_executor_contract_tests)
+set_tests_properties(stream1_executor_contract_tests PROPERTIES LABELS "host" TIMEOUT 30)
+set_tests_properties(stream1_execution_shape_tests PROPERTIES LABELS "host" TIMEOUT 30)
+set_tests_properties(final_snapshot_validation_cuda_tests PROPERTIES LABELS "host;cuda_linked" TIMEOUT 30)
+add_test(NAME union_memory_cuda_tests COMMAND union_memory_cuda_tests)
+add_test(NAME runtime_arithmetic_tests COMMAND runtime_arithmetic_tests)
+set_tests_properties(union_memory_cuda_tests PROPERTIES LABELS "gpu" TIMEOUT 120)
+set_tests_properties(stream4_logical_union_cuda_tests PROPERTIES LABELS "gpu;multi_gpu" TIMEOUT 120)
 add_test(NAME stream5_cuda_tests COMMAND stream5_cuda_tests)
 add_test(NAME final_cuda_tests COMMAND final_cuda_tests)
 add_test(NAME threshold_cuda_tests COMMAND threshold_cuda_tests)
+add_test(NAME threshold_union_cuda_tests COMMAND threshold_union_cuda_tests)
+set_tests_properties(threshold_union_cuda_tests PROPERTIES LABELS "gpu;multi_gpu" TIMEOUT 120)
 add_test(NAME stitched_cuda_tests COMMAND stitched_cuda_tests)
 add_test(NAME dispatcher_cuda_tests COMMAND dispatcher_cuda_tests)
 add_test(NAME static_memory_cuda_tests COMMAND static_memory_cuda_tests)

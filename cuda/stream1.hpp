@@ -83,6 +83,9 @@ struct Stream1TransformerBlockView {
     float ff1_e4m3_scale = 0.f;
     float ff2_e4m3_scale = 0.f;
     bool ff2_hopper_fp16 = false;
+    // Physical loaded layout, not a request reconstructed from runtime env.
+    bool qkv_hopper_fp16 = false;
+    bool ff1_hopper_fp16 = false;
 };
 
 struct Stream1TransformerNetworkView {
@@ -102,6 +105,10 @@ struct Stream1TransformerNetworkView {
     Stream1TransformerDims dims;
 };
 
+// Availability of the compiled host launch branch, not a fatbin/device
+// compatibility attestation. Numerical admission must exercise real kernels.
+bool stream1_transformer_has_hopper_launch_path();
+
 struct Stream1TransformerScratchView {
     half* tokens;
     half* qkv;
@@ -109,6 +116,7 @@ struct Stream1TransformerScratchView {
     half* attention_context;
     half* ff_hidden;
     half* logits;
+    std::uint32_t* numeric_error = nullptr; // Sticky shared flag across all lanes.
 };
 
 void stream1_score_contract_cuda(

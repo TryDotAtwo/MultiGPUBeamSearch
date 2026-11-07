@@ -123,7 +123,14 @@ available_ram_kib=$(awk '/^MemAvailable:/ {print $2}' "${PORTABLE_MEMINFO_PATH:-
 (( BEAM_HISTORY_DISK_BYTES < available_disk )) || { echo 'insufficient disk for requested history' >&2; exit 2; }
 (( BEAM_HISTORY_RAM_BYTES < available_ram_kib*1024 )) || { echo 'insufficient host RAM for requested history' >&2; exit 2; }
 run_dir=$(mktemp -d "$root/cube4_run.XXXXXX")
+"$python" "$repo/tools/host_memory_budget.py" \
+  --meminfo "${PORTABLE_MEMINFO_PATH:-/proc/meminfo}" \
+  --cgroup-root "${BEAM_HOST_CGROUP_ROOT:-/sys/fs/cgroup}" \
+  --history-ram-bytes "$BEAM_HISTORY_RAM_BYTES" \
+  --headroom-bytes "${BEAM_HOST_RAM_HEADROOM_BYTES:-$(((world+2)*1073741824))}" \
+  > "$run_dir/host_memory_preflight.json"
 export BEAM_NCCL_ID_FILE="$run_dir/nccl.bin" BEAM_HISTORY_DIR="$run_dir/history"
+export BEAM_NCCL_RUN_ID="$run_dir"
 echo "run_dir=$run_dir arch=$arch world_size=$world requested_beam=$BEAM_WIDTH effective_beam=$((BEAM_SHARD_CAPACITY_CANDIDATES*world*BEAM_SHARD_COUNT))"
 pids=()
 cleanup(){ for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done; }
