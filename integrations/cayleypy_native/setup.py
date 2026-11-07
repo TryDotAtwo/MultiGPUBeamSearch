@@ -15,7 +15,7 @@ class BuildWithNativeSource(build_py):
         target = Path(self.build_lib) / "multigpubeamsearch/_native_source"
         extensions = {".py", ".cu", ".cuh", ".cpp", ".hpp", ".h", ".cmake", ".sh", ".json", ".txt"}
         files = [root / "CMakeLists.txt", Path(__file__).parent / "LICENSE"]
-        for folder in ("cuda", "src", "tools", "tests", "cmake", "configs", "schemas", "third_party"):
+        for folder in ("cuda", "src", "tools", "tests", "cmake", "configs", "schemas", "third_party", "profiles"):
             files.extend(path for path in (root / folder).rglob("*") if path.is_file()
                          and (path.suffix in extensions or path.name.startswith("LICENSE"))
                          and not any(part in (".git", "__pycache__", ".pytest_cache") for part in path.parts))

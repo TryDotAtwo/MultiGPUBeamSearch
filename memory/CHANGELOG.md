@@ -873,5 +873,162 @@ Accepted fused residual/LayerNorm/exact-GELU: RTX3060 matched full forward179.02
 
 2026-10-11: Retain compatibility commit 1ee313325a39371492c043a380f0af78cd7713ff as a merge parent while preserving current main source. Only legacy publisher state changes from published to accepted after HTTP 200/202. Three isolated transport-state tests pass (202, duplicate 200, failure 400). Cube555 notebook pins this solver-compatible commit; GitHub-only input metadata retained. No GPU run is claimed.
 
-## 2026-10-25: Cube555 and hardware-adaptive profiles
-Published graph/model/API integration, exact logical beam and hardware-derived coarse-to-fine calibration. Preserved existing beam architecture and frozen inference microbatch. Real single-GPU acceptance, replay and fresh cache reuse passed; see docs/validation/cube555-adaptive-20261025.md for exact workloads and limits.
+## 2026-10-25 - Cube555 public API notebook skeleton (incomplete)
+- Notebook owner prepared kaggle/cube555_github candidate from preserved original: unique beam1048576, publication off, checksummed GitHub inputs, public API ensemble/autotune skeleton replacing direct legacy CLI. Explicit local source mode and release blockers prevent presenting baseline1d2a184 as unpublished corrected source.
+- Four CPU contract tests pass; report test_results/cube555_github_api_20261025/REPORT.md. Cube555 graph/model bindings, collect/reflection API and independent replay/export pending other owners. No GPU/publication/commit. This is not runnable end-to-end acceptance.
+- Notebook follow-up: replaced binding placeholders with actual ordered CayleyGraph construction, CSV ID selection, export_native_models, explicit two-model ensemble, public API child-score call, independent replay and JSON summary. Removed unconditional release blockers and collect/reflection from new example; local prepared source provenance remains explicit. Synthetic CPU cell-execution tests cover real exporter/API trivial cases and clearly labelled simulated-worker nontrivial replay. Release/GPU acceptance remains pending.
+
+## 2026-10-25 Cube555 model owner
+- Added graph-bound cube555_transformer/cube555_mlp feature-script artifacts, explicit FP32 linear ensemble readout weights, file/graph/layout validation and private-snapshot admission. CPU model+ensemble tests19passed/1CUDA-skipped; opt-in local tiny CUDA1passed. Existing real checkpoint CPU factoring exact with legacy FP16 heads, but FP32 readout changes131/240 keys on8probes (max4), so search-quality acceptance remains open. Evidence test_results/cube555_models_20261025/MODEL_HANDOFF.md. No commit/push/Molab/GPU benchmark.
+
+## 2026-10-25 Cube555 integration verification
+- Added native feature loader/ensemble wiring and150-byte graph admission with256-value Zobrist alphabet above128logical bytes.24contracttests pass. Local C++CUDA synthetic loader/readout parity error0; wheel import and190sourcehashes pass. Full Linux/NCCL search, CUTLASS runtime, autotuner/cache and real search quality remain open. See test_results/integration_20261025/REPORT.md. No publication/rental/commit.
+
+- Vast acceptance found TorchScript warmup-dependent Transformer features (delta0.0078125), causing both readout backends to fail oracle by14keys. Scoped Cube555 GraphOptimizerEnabledGuard(false) restores repeatable FP16 features; CUTLASS diagnostic maxkeyerror1. Production acceptance pending. Fixed notebook touch radius5->0 because30-move radius5 exceeds default BFS budget;4notebookCPUtests pass.
+
+- Completed bounded Vast A4000 real Cube555 acceptance: native3/4-move paths match original FP16 CayleyPy baseline and replay; inference+pipeline cache hits verified; actual notebook index1000/beam4096/maxsteps2 terminates correctly without solution. Defaultmillion/2T4 and saturated throughput remain unverified. Own57689019 deleted after168archive hashes verified; estimatedUSD0.10-0.12, exactbilling unavailable(no billing_read). Final report and wheel provenance in test_results/integration_20261025/.
+
+- Final local handoff: notebook README now lists exact candidate/wheel paths and SHA256, prepared Linux prerequisites, pinned CayleyPy install command, source-checkout requirement, verified4096/1GPU/2step settings and expected not_found, separate unverified million/2GPU defaults. No new GPU tests or publication.
+
+- Notebook/API owners reviewed final handoff without rerunning tests. Confirmed38wheelPythonfiles and3Cube555tool files match checkout; fixed README same-version reinstall and explicit bounded settings before Run All.
+
+## 2026-10-25: full-frontier calibration continuation
+- Requirement: hardware-aware admitted maximum and a measured full-step profile grid, then execute the user's requested width unchanged. Capacity bounds stopped by budget remain lower bounds. No new autotuner or search architecture replacement.
+- Added opt-in `calibration_discover_capacity`, reusing native maximum discovery and exact-width inference refinement independently of execution. With `calibration_full_frontier`, verify that frontier before requested-width calibration.
+- Full-frontier selection now compares every admitted component candidate on identical real frontiers, including widths over 1M; component proxy cannot select the execution winner.
+- Added strict full-grid receipts with fresh all-rank admission, geometry validation, and recomputed statistical selection on cache reuse.
+- Local targeted validation: 65 passed, 2 Windows/POSIX skips. GPU acceptance still pending; defaults remain unchanged until validated.
+- Critical runtime finding: `derive_config` rounded the semantic global top-k to shard alignment (65536 became 66560). Fixed exact logical width; existing global final exchange and CUB selection remain unchanged. Calibration fixtures now use exact logical rank quotas, including uneven distributions. API rejects a runner that changes the requested logical width.
+- Updated scope from user: admission for maximum; full-step comparison only at requested width. Removed expensive full-grid-at-maximum coupling and independent matched-inference campaign from this path.
+- Narrow exact-width Python checks: 70 passed, 2 platform skips. Native CPU arithmetic and saturated GPU runtime pending.
+- GPU acceptance complete on A4000: exact 65536/131072, 7 measured profiles each; full-step medians 5.76661/11.1153 s. Cached calibration 0.900/0.936 s. Ordinary 16-depth search retained exactly 65536 on 12 saturated depths; separate solved paths replayed at both widths.
+- Maximum admitted 28,474,368 allocated with real model execution (2.32 s), not benchmarked as a full maximum frontier. Capacity search 0.378 s.
+- Wheel SHA256 2b134c05f01ba1b6feada2de8628f2b0cfd320627d172eb72dcf2fbfb28262b7; notebook full calibration enabled. Artifact/report under test_results/integration_20261025. Archive 411 member hashes verified; instance57699493 deleted and absence confirmed. No publication/commit.
+
+### 2026-10-25 — adaptive profile search (bounded GPU acceptance complete)
+- Fixed Python geometry: logical beam remains exact for arbitrary shard counts; aligned buffer capacity is separate.
+- Existing component tuner now accepts hardware-derived candidates; full-step selection shortlists measured component profiles and performs up to two neighbor-refinement rounds around the full-step winner. Frozen inference microbatch, native admission, exact-width fixture and statistical gates retained.
+- Pipeline cache policy v5 binds hardware search context, available-memory bucket and measured search trace. Incomplete time-budget runs are not cached as completed searches.
+- New deterministic grid/refinement/cache tests; GPU acceptance and final artifact receipts recorded in test_results/integration_20261025/adaptive-vast.
+
+- Adaptive acceptance: RTX4060Ti16GB, real Cube555 blend, exact65,536;17 component/5 full profiles,5.656s selected step,283.43s fresh calibration/2.670s cached. Replay and both cache hits passed.155 archive hashes verified; instance57712832 deleted and absent. See ADAPTIVE_REPORT.md and ADAPTIVE_RESULTS.json.
+
+2026-10-25 publication completed: source67cc5ccec73555815270cc38bf44b2203a83c015; notebook/main04972524f7ff3e971e7002927e3487d627951cc1. Public Kaggle trydotatwo/cube555-native-2xt4-blend version159 saved with QUICK_SAVE (no new GPU run). Downloaded cells and GitHub41files matched exact publication payload; GitHub-only inputs verified. Receipts: test_results/publication_20261025/verification.json.
+
+2026-10-25: Started clean Kaggle2xT4 validation of published Cube555 notebook; results pending under test_results/kaggle_clean_2t4_20261025.
+
+## 2026-10-25 - Kaggle clean validation: bounded calibration recovery
+- Reproduced an optional coarse-profile timeout discarding an already measured baseline; baseline failure still fails closed.
+- Preserve only complete measured cohorts, mark coarse search incomplete, and decline complete-profile caching after a failed challenger. CUDA/beam semantics unchanged.
+- Clean 2xT4 validation remains running on published source 67cc5cc; runtime acceptance of this repair is pending.
+
+
+## 2026-10-26 Service-guided profile shortlist (candidate, GPU acceptance pending)
+- Retain native admission and frozen inference batch; cap component challengers at four complementary probes chosen by measured service pressure.
+- Suppress latency-derived smaller flushes that repeatedly sort survivor capacity. Low-pressure regime compares baseline plus one full challenger, otherwise up to two.
+- Stop refinement when no coarse full-step candidate improves baseline. Exact width, complete cohorts, replay and failure fallback unchanged.
+- Version cache policy and retain trace; 25 initial changed-path tests passed. Historical A4000/4060Ti samples favor baseline; this is retrospective evidence, not a new hardware acceptance.
+
+2026-10-26: Clean publicnotebook160 cells passed on fresh Kaggle2xT4, code7b4f01f. Index1020 solved116moves, exactbeam1048576; independent archived-input replay passed. Finalcells completed; timeout fallbackverified, not globaltuningoptimum. Evidence test_results/kaggle_clean_2t4_20261025/v3-result-receipt.json.
+
+2026-10-26 final: GPU shortlist accepted at65536/262144 onQuadroRTX5000 with frozenbatch1024, exactwidth, fullsteps andindependent replay. Tuning2.4-2.6xfaster, fullstepnearunchanged;4xwidth->4.071xtime. CurrentefficientVRAMlimit unverified. Evidence592hashes verified; leased57804171deleted, inventoryempty. Publisheded343a4f, notebookpin06605295, Kaggle161pulledmatched. Fullclean2T4run validatedprior160; no repeatedlongsolve for161.
+
+2026-10-26 working-capacity candidate: max mode forces exact full-frontier verification; component/admission-only cannot certify it. Remove search-only tinyflush override before freshnative admission. Separate validated smaller-width cache comparison from allocation/full-step flags; never silently lower explicit numericwidth. Initial71tests passed2platformskips. GPU boundary validation pending onsole57812021,75min remaindercap, watchdogsession70857.
+
+2026-10-26: Working-capacity candidate local tests pass; GPU boundary acceptance incomplete because instance 57812021 rejected SSH. Deleted and verified absent; no remote work. Candidate not published. See test_results/working_capacity_20261026/REPORT.md.
+
+2026-10-26: Implemented candidate NativeSession, private atomic multi-rank request transport and resident production-runner task loop using existing resets. CPU subprocess and adapter tests pass; native GPU acceptance in progress.
+
+2026-10-26 persistent session: published source 4e86bf1394dfa197b2f986bf47c4d0a704a31fe4, all 9 files remotely byte-verified. 55 CPU adapter/session/preparation tests pass with short Windows temporary paths. Real 1x3060 FP16 Transformer+MLP reuse, invalidation, teardown and profile cache accepted. 2x3060 resident and cold control both fail at CUB graph capture; 357 archive hashes verified and owned lease57817680 deleted/absent. Clean Kaggle 2xT4 real-blend and simple notebook validation v2 running; v1 mistakenly had CPU accelerator and failed preflight. No completed 2GPU acceptance yet.
+
+2026-10-26 persistent follow-up: Kaggle v3 confirmed actual2xT4 and reached valid found paths on both simple and real-blend workloads. Fixed erroneous per-rank solved-record expectation: native distributed reconstruction prints only on controller; retain all-rank completion receipts and unsolved records. Published7c38e298,2targeted tests passed; v4GPUsequence running. Corrected simple notebook CPU Docker pin to previously validated GPUimage.
+
+2026-10-26: NativeSession retains compatible GPU workers, model weights and buffers across calls. Compatible profiles are reused. One RTX3060 and clean two-T4 simple/real FP16 blend acceptance passed, including changed starts, not-found recovery, beam invalidation and teardown. Corrected controller-only solved terminal handling. Both public notebook examples use explicit sessions and pinned source7c38e298. See docs/validation/persistent-search-20261026.md for scope and evidence.
+
+2026-10-26 persistent publication complete: GitHub main7b7648ea6030d9184327068e2ee8ac64bb5c7475; simple Kaggle v6 and Cube555 v162 QUICK_SAVE. Downloaded all cells and GPU metadata match local payload; 5 GitHub files byte-verified. Both private2xT4 v4 validations COMPLETE with independent replay, same-PID reuse, not-found recovery, beam invalidation and worker teardown. Receipts test_results/persistent_20261026/kaggle-acceptance.json and final-publication.json. No new paid instances; owned leases deleted. No CUTLASS-specific persistent GPU acceptance claimed.
+
+2026-10-26 working maximum: separate tiny-flush allocation ceiling from frozen throughput-sized flush capacity. Preserve fastest inference batch. Require exact full-frontier evidence and bounded half-width throughput comparison; only max mode may select a smaller measured working width.7focusedtests passed; GPU validation pending. CUTLASS SM86 prebuild running on free Kaggle before bounded Vast acceptance.
+
+2026-10-26: Working-max GPU v1 rejected all large-flush profiles because shrinking frontiers also shrank physical shard slabs below the fixed flush. Native derived slab now reserves max(scaled logical capacity, flush, trigger); explicit manual capacity unchanged. Added real planner monotonic-memory regression. GPU validation pending.
+
+2026-10-26: Resident protocol probe now preserves nonzero process exit and loader stderr instead of misreporting missing protocol. Targeted loader regression passed. Kaggle requested L4 but allocated 2xT4; CUTLASS ensemble acceptance remains unverified, hardware preflight rejected it.
+
+2026-10-26: Fixed-slab native admission compiled and executed on Kaggle 2xT4, source0b32691: 55,173,120 parents admitted in2.46s. Full verification cancelled (CANCEL_ACKNOWLEDGED): six-depth cohorts at that model throughput would exceed hours. Added preflight inference-only verification-cost guard; focused budget test1passed. This is not full-step or efficient-maximum acceptance.
+
+2026-10-26: Verification budget guard moved after validated disk-profile lookup, so an existing matching full profile bypasses estimation and rebenchmarking. All12 pipeline_autotune tests passed, including cache-hit regression.
+
+2026-10-26: Added opt-in native natural-growth calibration protocol and Python probe/tuner/reference routing. Shared global keep count is now available without debug macros. Incomplete/early-solved cohorts rejected; GPU validation pending.
+
+2026-10-26: Natural-growth baseline on2xRTX3060, Cube555 MLP, batch5120, beam39,989,248: six saturated steps completed on both ranks after native growth (12 total depths). Measured five-step median68.3022s global. Optional profile comparison and half-width working-capacity check still running; not final efficient-maximum acceptance.
+
+2026-10-26: Natural-growth working-max acceptance passed on2xRTX3060 real Cube555 MLP: beam39,989,248 batch5120 median68.3022s; half-width33.6795s; retention98.619%. Final283-file archive verified, ownedinstance57835090 deleted/absent. Public Kagglev7/v163 pulled and cell equality verified. Full calibration1177.89s; no new2xT4 rerun.
+
+2026-10-26: Added NativeSession.activate context for persistent direct CayleyPy graph calls; three focused lifetime/context tests passed. Portable Cube555 notebook draft now uses visible GPUs, persistent configurable cache, cwd outputs and component tuning by default. Shared GitHub profile registry remains pending.
+
+2026-10-26: Shared GitHub profile registry reader draft adds exact hardware/model/beam/source identity and SHA256 validation; matched records remain candidates, not fabricated current-host cache receipts. Runtime integration and measured registry population remain pending.
+
+2026-10-26: Actual Transformer+MLP blend hit remote Stream3 overflow at beam845824. Remote append lacked the local writable-buffer precheck. Draft fix gates every exchange rank before append using actual received count and existing global pressure filtering; no shard top-k, new spill or changed layouts. Native build and GPU acceptance pending. Owned instance stopped after verified69-file archive.
+
+2026-10-26: Receive gate revised to move the existing pressure collective before append rather than add another collective. Reserve actual receive count plus next local Stream3 batch to avoid stranding ranks before next exchange. Pending GPU correctness/performance acceptance.
+
+2026-10-26: Draft Stream3 round admission moves the existing collective before local append, adds local+receive capacity floor and prevents ready-queue ownership from revoking receive credits. CUDA/GPU validation pending; universal progress with arbitrary score ties remains unproved.
+
+2026-10-26: Added source-pinned shared-profile loader and fresh all-rank inference/component validation hooks after local cache lookup. Registry rejects mismatched beam/model/native/hardware and arbitrary environment keys. 26 focused CPU tests passed; no new GPU-ready profile claimed.
+
+2026-10-26: Native round-credit candidate ad344234 compiled on Kaggle CPU; RTX3060 arithmetic failures=0 and full real Cube555 blend acceptance passed. Beam 825344, batch8192, full53.1106s, half-width throughput retention99.96%. Verified GitHub profile571aa6bc transferred to fresh cache and validated in19.88s; two graph.beam_search calls replayed with same resident workers and clean shutdown. Portable notebook PEP668 install failure found; private-venv setup added, end-to-end cell validation pending.
+
+2026-10-26: Finished real blend, portable notebook-cell, and fresh-cache profile checks. Fixed PEP668 notebook setup using private virtualenv. Added stable execution-content profile key for independently serialized Cube555 TorchScript; raw artifact integrity unchanged. Independent notebook exports reuse profile in20.34s; paths and persistent close passed. Archive318files SHA5fe93ed8... verified. Owned Vast57843950 deleted and absence confirmed; watchdog stopped. Final publication pending.
+
+2026-10-26: Published GitHub main11292618 and public Kaggle Cube555 v164. Downloaded notebook cells exactly match local reviewed payload; public metadata has no dataset/kernel/model inputs. Remote native/profile files byte-match local files. Only main branch exists. Owned instance absence and archive verification confirmed.
+`n2026-10-26: Started exact public Cube555 v165 cold Run All on Kaggle2xT4, puzzle1020 beam1048576 max140steps, no injected runner. Setup/build/input checks/autotune passed:83.23s batch256 Stream1 11397parents/s. Full search RUNNING; terminal acceptance pending. Heartbeat cube555-run-all-2xt4-acceptance continues every5min silently until actionable result. Evidence test_results/kaggle_cold_t4_20261026.
+
+2026-10-26: Simplified public Cube555 notebook to33visible code lines plus folded installation. Added multigpubeamsearch.cube555 load/blend/save_result helpers; input verification internal, replay preserved. Six focused CPU tests pass. GitHub main e7a363aa; Kaggle quick-save v167. Older v165 full GPU run remains distinct; heartbeat updated to preserve it then validate the simplified notebook cold. No native/CUDA algorithm changes.
+
+2026-10-27: User explicitly stopped the excessive140step validation. Kaggle v165 cancelled via Stop Session; UI confirms Cancelled and0ActiveEvents. Heartbeat cube555-run-all-2xt4-acceptance deleted. No replacement run started; full-frontier acceptance remains unverified.
+
+2026-10-27: One-full-step private Kaggle v1 exposed num_gpus=None CPU graph rejecting native GPU discovery. Fixed runtime_devices: CPU/unspecified graph selects visible CUDA devices while explicit CUDA/native choices remain.12tests passed. Private v2 launched cold2xT4 sourcefc75cad0 with existing native natural-growth stop1, depthcap16, searchtimeout900s. No140step run.
+
+2026-10-27: Private one-full-step v2 failed because resident guard rejected natural-growth benchmark flag. Removed only that guard term; per-request counters already reset inside resident loop. Algorithms unchanged. Private v3 launched on T4 with same beam1048576/full-step1/depthcap16 and30min total cap. Native bootstrap logs now recursively archived.
+
+2026-10-27: PASS cold simplified Cube555 on2xT4, privatev3. Natural globalfrontier1048576, exactly1fullstep110.36s,6depths total,search160.489s,cold~650s,sessionclosed. Evidence test_results/kaggle_one_full_step_20261027/REPORT.md. Publicv168 quick-save pinupdated,downloadedcells match. No140step run.
+
+2026-10-27: Restored full user settings in public Cube555 CayleyPy notebook first cell (puzzle/model/blend/search/collect/BFS/reflection/GPU/cache/publish); published GitHub main d07dd8d4 and Kaggle QUICK_SAVE v169. Added cluster-safe result publishing guard: existing v1 schema only accepts two-GPU Kaggle provenance; unsupported cluster results remain replay-checked locally with a visible explanation. Short private 2xT4 native LibTorch collect run built and replay-validated four paths; follow-up GPU API harness stopped on a test-call positional-argument typo, so cross-call GPU reuse/BFS/reflection not claimed. Focused local suite 28 passed; publication schema and independent integrity/replay preflight passed. Prior one-full-frontier-step acceptance was not repeated; no 140-step search.
+
+
+2026-10-27: Final short cold Run All of the published Cube555 CayleyPy notebook completed on Kaggle 2xT4 (beam4096, max depth5, Transformer/MLP 0.8/0.2, collect). Native setup/source pin verified; both JSONs confirm expected settings and persistent worker reuse across two calls. 101 focused local tests passed. No path found at the deliberately short depth, so live GitHub result submission was not exercised; publication preflight remains the available evidence. Kaggle nbconvert emitted a markdown-cell schema warning after successful search/export. Evidence test_results/api_controls_20261027/runall-output and REPORT.md. No repeat of one-full-frontier-step acceptance or 140-step search.
+
+
+2026-10-27: Fixed private GPU harness invocation by regenerating stale payload. Kaggle API-control v6 passed on 2xT4 at beam4096/depth5: 8 collected paths replayed, persistent worker reuse across calls, first+BFS-radius1, reflect-only+BFS-radius1 with 12 replay-valid paths, NativeSession closed. Real publication payload passed v1 schema and independent replay preflight; no public submission of acceptance scrambles. Prior v5 failure was stale notebook payload, not library behavior. Evidence test_results/api_controls_20261027/gpu-output-v6 and REPORT.md.
+
+
+2026-10-28: Cube555 result publisher now submits all chunks before polling with one shared 7200s deadline, preserves part/aggregate receipt manifests, and marks success only for terminal published/duplicate receipts with zero rejects/unresolved. Targeted publisher tests: 4 passed. GitHub main 45dad741; setup pins solver d0f8170, public notebook v174 exposes poll summary. Kaggle CLI push also runs the kernel: v174 is currently RUNNING with default beam1048576/max_steps140; actual depth unknown, logs empty. This launch was unintended and must be stopped via Kaggle UI before a bounded cold acceptance. See test_results/kaggle_publication_audit_20261028/CURRENT_ACCEPTANCE.md.
+
+2026-10-29: Added opt-in CUDA Nsight ranges and measured native dispatch-job counters for portable full-frontier profiling. On one 2xRTX4060Ti host, Transformer/MLP 0.8/0.2 full steps passed at global beams 825344 and 1650688 with 1.65% and 0.85% time overhead over isolated Stream1. The 825344 bounded comparison selected baseline; 1650688 challenger cohort timed out, so it is not marked optimal and no cache profile was saved. All archives/hash manifests verified; exact temporary Vast lease stopped and destroyed. See test_results/profile_portability_20261029/REPORT.md.
+
+2026-10-30: Audited publication tail for completed Cube555 2.5M runs, without new GPU execution. Long result remains published (5 records) with mismatched Kaggle slug/notebook SHA; publisher has no metadata-correction operation, so no duplicate resend. Short 12-move result is replay-valid but remains unpublished because exact v3 notebook SHA/canonical Kaggle envelope were unavailable. Evidence and exact limitation appended to test_results/kaggle_two_puzzles_20261027/TWO_RUNS_AUDIT_20261030.md.
+
+2026-10-30: Published concise Cube555 CayleyPy blend notebook with explicit exact-profile auto mode, calibration controls and short profile diagnostics. Moved replay/save/publish receipt plumbing to cube555.finish_result. GitHub main 314188c2; focused helper/profile checks 15 passed. 2xT4 uses calibration; no shared T4 profile claimed.
+
+2026-10-30: Replaced Cube555 notebook with five cells and 75 visible lines: concise settings, CayleyPy graph search, hidden install, internal profile choice and result helper. No visible validation branches or profile table. Kaggle v176 QUICK_SAVE; source synced to GitHub main f7b52f35. Focused checks 15 passed; no GPU search started.
+
+2026-10-30: Clarified the public Cube555 notebook: removed the run-timeout setting, explained CayleyPy simple mode, added comments and whitespace around configuration/model/search/publish steps, and pinned the current GitHub setup revision. Existing accepted profiles remain bundled from GitHub; the registry contains 2xRTX3060 only, so no 2xT4 match is claimed.
+
+2026-10-31: Retrospectively audited the completed private Kaggle 2xT4 Cube555 grid for beams 65,536–4,194,304. All 72 archived files matched the manifest; independent rank-log checks passed at all seven widths with exactly one saturated full step per rank. Reproduced the pinned wheel's source digest with CRLF normalization, removed unsupported local draft keys, and rebuilt seven exact-source profile records. Each record is timing-only; no solution or global-optimality claim. GitHub publication and notebook repinning are pending. Evidence: profiles/evidence/cube555-t4-grid-20261031.md and test_results/kaggle_t4_profile_grid_20261030/PROFILE_REGISTRY_RECONSTRUCTION_20261031.json.
+
+2026-10-30: Added a source-pinned 2xTesla T4 Cube555 profile for beam 1,048,576 from a private one-full-step Kaggle acceptance. Inference batch256; selected pipeline candidate passed one full step in 101.642s. Added record to GitHub profiles, repinned setup, updated public notebook comments (simple mode, no run-timeout) and saved Kaggle v178 by QUICK_SAVE.
+
+2026-10-31: Published Cube555 2xT4 profile grid and saved Kaggle Quick Save v179.
+- Published seven 2xT4 exact-source profile records and evidence in GitHub commit a5dbf0bc; setup pin and repository notebook are commits 92205f1e and aed7e4aa.
+- Saved Kaggle public notebook version 179 with Kaggle CLI 2.2.5 `--no-run`; pulling v179 confirmed all seven notebook cell sources match the published local source. No GPU execution occurred during publication.
+- Timing and validity limits are recorded in test_results/kaggle_quicksave_20261031/REPORT.md: one full step per width, no solution, no global-optimality claim.
+- The CayleyPy-only API request remains separate: v179 still exposes the native adapter and Cube555 helper imports.
+
+2026-10-31 clarification: Keep the public `multigpubeamsearch` import. The requested generalization removes only the puzzle-specific `multigpubeamsearch.cube555` module; users set a CayleyPy graph, supported predictor/model and start state, then reuse the common search, collect/BFS/reflection, replay and save APIs. Cube555 remains the example notebook's default model.
+
+2026-10-31: Published and statically verified the generic CayleyPy graph/model workflow. Implementation release: `5f00f003d87374ee704f3629aef770ae8f20e420`; GitHub main verification-log follow-up: `0a18735939dca0c1867e76931acfabeb0be16c56`. The Cube555 package helper and its example test are removed while the published GPU profile records remain. Kaggle v180 was Quick Saved with `--no-run`; the pulled notebook matches all seven published cell sources, and its version-specific status is COMPLETE. Ten focused local tests pass. No GPU run was started; support remains limited to permutation graphs up to state length 150 and model families with a supported exporter.
+
+2026-10-31: Simplifying the public Cube555 notebook per user clarification. The notebook will use one fixed Cube555 input/model flow, keep its first-cell search/model/collect/BFS/reflection/publication controls, and remove generic graph selection and repeated guards. Publish with Kaggle Quick Save only; do not run a GPU search.
+
+2026-10-31: Published the simplified Cube555 notebook on GitHub at `64f4270c3eafd38f9348c315fd8bf29063289fd1` and saved Kaggle v181 with CLI `--no-run`. Pull-back confirmed all four cells match GitHub and code-cell ASTs parse. Version-specific status is COMPLETE; no search ran. Profile settings and model/search controls remain available in the first visible cell.
+
+GitHub main's final verification-log commit is `de59281ca5fe6f32b04685a9c999118ca1c6c6c2`.

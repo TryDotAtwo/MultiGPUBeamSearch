@@ -1255,6 +1255,29 @@ remote_send_buffer[
 ]
 ```
 
+## Multi-rank round admission and receive credits (2026-10-26)
+
+Before launching local Stream3 collection, reserve `B + R` free entries in at least
+one non-processing physical bank of every logical shard. `B` is the local Stream3
+batch bound; `R` is the admitted remote receive-slot capacity. The automatic
+physical capacity floor includes both contributions, not `max(B, R)`.
+
+The existing once-per-round threshold-request collective runs at this admission
+point, including ranks with no local send work. If filtering cannot admit the
+round, fail before local collection and payload exchange; receiving into a full
+bank and waiting for capacity is not a valid execution path.
+
+After local collection, its captured ready-queue may transfer a bank to Stream4
+only if a non-processing sibling still has `R` free entries. Stream3 remains the
+sole writer; no following local batch launches before this round's receive
+collection completes. Stream4 only reduces the occupancy of its owned bank.
+This preserves the receive credit without an additional receive-side collective
+or metadata synchronization. The device overflow guard remains diagnostic.
+
+This is a guarantee for each admitted round, not a proof that every arbitrary
+score distribution can be admitted by the current average-based planner. Ties
+and adversarial shard skew are not silently discarded or handled by shard top-k.
+
 ## Collector для Stream 4
 
 `Stream 3 collector` — единственный писатель в shard-буферы Stream 4.

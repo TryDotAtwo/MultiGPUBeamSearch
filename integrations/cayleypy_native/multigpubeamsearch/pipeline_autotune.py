@@ -38,6 +38,7 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     native_single=model.backend=='mlp' if model is not None else False
     if native_single:
         baseline['BEAM_B_MICRO']=str(micro*(contract.move_count if model.manifest['output_dim']==1 else 1))
+    grow=runtime.build_metadata.get('frontier_calibration_protocol')=='natural-growth-v1'
     fixtures=[directory/'frontiers'/f'frontier-rank-{i}.bin' for i in range(world)]
     # The calibration fixture has no solved-neighborhood shortcut. Ordinary
     # execution retains its original touch-BFS settings and requested beam.
@@ -50,12 +51,12 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             for line in text.splitlines():
                 if '=' in line and ' ' not in line:
                     key,value=line.split('=',1);fields[key]=value
-            if fields.get('completed_depths')!='6':return False
+            if fields.get('calibration_saturated_steps' if grow else 'completed_depths')!='6':return False
             if int(fields.get('last_final_frontier_size','-1'))!=count:return False
             if 'production_runner_error=' in text:return False
         return inference.get('phase')=='inference_verified'
     actual=NativePipelineProbe(runner,probe_env,beam_width,world,directory/'actual-plans',
-        fixtures,storage,deadline=search_deadline,verify=verify)
+        fixtures,storage,deadline=search_deadline,verify=verify,grow=grow)
     actual.planning_session=session
     # Failure to admit the real requested beam is an execution error, never a
     # reason to benchmark a smaller beam and silently run that instead.
@@ -79,6 +80,45 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 verify_prepared_model(model,contract)
                 (directory/'selection.json').write_text(json.dumps(cached,indent=2))
                 return cached
+        # GitHub records are proposals, not current-host timing receipts. Reuse
+        # requires fresh all-rank admission and exact-capacity component probes.
+        from .shared_profiles import lookup, pipeline_environment
+        shared = lookup(contract, model, runtime, options, devices, beam_width)
+        shared_env = pipeline_environment(shared, micro) if shared else None
+        if (shared_env is not None and not options.calibration_full_frontier
+                and session is not None and session.supports_components):
+            from .component_autotune import tune_components
+            try:
+                shared_plans = actual.admit(shared_env)
+                data = tune_components(actual, session, shared_plans, shared_env, [],
+                    moves=contract.move_count, inference=inference,
+                    candidate_factory=lambda *args: [])
+            except ValueError as error:
+                (directory/'shared-profile-rejected.json').write_text(json.dumps({
+                    'sha256':shared['registry_sha256'], 'reason':str(error)}))
+                initial_plans = actual.admit(baseline)
+            else:
+                verify_prepared_model(model, contract)
+                data.update(requested_beam_width=beam_width,
+                    shared_profile_sha256=shared['registry_sha256'],
+                    shared_profile_validated=True,
+                    search_policy='verified GitHub candidate; fresh exact-capacity validation')
+                if path is not None:write_profile(path, identity, data)
+                (directory/'selection.json').write_text(json.dumps(data, indent=2))
+                session.close()
+                actual.planning_session = None
+                return data
+        if options.calibration_full_frontier:
+            from .working_capacity import verification_cost
+            cost=verification_cost(beam_width,inference,max(.001,deadline-time.monotonic()),
+                                   include_reference=False)
+            (directory/'verification-budget.json').write_text(json.dumps(cost,indent=2))
+            if not cost['fits']:
+                raise NativeBackendError(
+                    f"full-frontier verification for {beam_width:,} parents has projected "
+                    f"inference time {cost['predicted_inference_seconds']:.0f}s versus "
+                    f"remaining calibration budget {cost['budget_seconds']:.0f}s; "
+                    "no full-frontier benchmark started and no smaller beam substituted")
         from .beam_geometry import Shape,memory_shortlist,ring_pool_limit
         from .component_autotune import tune_components
         initial=initial_plans[0]
@@ -101,8 +141,14 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             candidates.append(('staging-'+str(ring),dict(baseline,BEAM_STREAM3_RING_SLOTS=str(ring))))
         search_trace=dict(context=adaptive_context,rounds=[],stop_reason=None)
         def candidate_factory(rows,plan,service):
+            from .component_autotune import service_envelope
+            from .profile_heuristics import narrow
             proposed,trace=adaptive.proposals(shape,baseline,adaptive_context,
                 service=service,ring_limit=ring_pool_limit(environment))
+            pressure=service_envelope(rows,plan,moves=contract.move_count,
+                inference_seconds=inference['estimate']['median'],parent_batch=micro)
+            proposed,heuristic=narrow(proposed,baseline,pressure,plan=plan,moves=contract.move_count)
+            search_trace['heuristic']=heuristic
             search_trace['coarse']=trace
             return [('coarse-'+name,env) for name,env in proposed]
         data=tune_components(actual,session,initial_plans,baseline,candidates,
@@ -121,24 +167,43 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
             from .calibration_stats import select
             # Component timings propose the finite grid. Only full-depth times
             # select its winner, at every width (including widths above 1M).
-            eligible=adaptive.shortlist(data['tested'],count=adaptive.FULL_PER_ROUND)
-            search_trace['coarse_full_tested']=[r['name'] for r in eligible]
+            from .profile_heuristics import full_challengers
+            eligible=adaptive.shortlist(data['tested'],
+                count=full_challengers(search_trace.get('heuristic',{})))
+            search_trace['coarse_full_candidates']=[r['name'] for r in eligible]
+            search_trace['coarse_full_tested']=[]
             base=next(r for r in eligible if r['name']=='baseline')
             final_plans=base['plans']
             actual.deadline=deadline
-            receipt=write_frontiers(contract,rank_frontier_counts(final_plans),
+            receipt=dict(kind='native-natural-growth-v1', requested_beam=beam_width) if grow else write_frontiers(contract,rank_frontier_counts(final_plans),
                 storage,directory/'frontiers',deadline=deadline,
                 max_states=options.calibration_frontier_max_states or final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
-            samples=[]
+            samples=[];completed=[]
             for row in eligible:
                 if rank_frontier_counts(row['plans']) != rank_frontier_counts(final_plans):
                     raise NativeBackendError('full comparison changed exact frontier')
-                samples.extend(replace(r,profile=row['name'])
-                    for r in actual.measure(row['environment'],row['plans']))
+                try:
+                    measured=[replace(r,profile=row['name'])
+                        for r in actual.measure(row['environment'],row['plans'])]
+                except ValueError as error:
+                    # Baseline correctness and a complete timing cohort remain mandatory.
+                    # A failed optional challenger must not discard an accepted baseline.
+                    if row['name']=='baseline':raise
+                    search_trace.setdefault('coarse_full_rejected',[]).append(
+                        dict(name=row['name'],reason=str(error)))
+                    search_trace['stop_reason']=('time_budget' if time.monotonic()>=deadline
+                        else 'coarse_measurement_failed')
+                    break
+                samples.extend(measured);completed.append(row)
+                search_trace['coarse_full_tested'].append(row['name'])
+            eligible=completed
             winner,rejections=select(samples,baseline='baseline',min_improvement=.02)
+            if winner.profile=='baseline' and search_trace['stop_reason'] is None:
+                search_trace['stop_reason']='no_statistically_separated_gain'
             seen={adaptive.key(r['environment']) for r in data['tested'] if 'environment' in r}
             from .component_autotune import service_envelope
             for round_index in range(adaptive.MAX_ROUNDS):
+                if search_trace['stop_reason'] is not None:break
                 center=next(r for r in eligible if r['name']==winner.profile)
                 proposed,trace=adaptive.proposals(shape,center['environment'],adaptive_context,
                     fine=True,round_index=round_index,ring_limit=ring_pool_limit(environment),seen=seen)
@@ -193,7 +258,8 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
                 environment=chosen['environment'],selection=winner.profile,
                 measurement_scope='full_requested_frontier',
                 selection_objective='fastest statistically separated full step in hardware-adaptive coarse-to-fine search',
-                full_grid_complete=True,full_comparison_rejections=rejections,
+                full_grid_complete=not search_trace.get('coarse_full_rejected'),
+                full_comparison_rejections=rejections,
                 estimate=winner.__dict__,
                 measurements=[r.__dict__ for r in samples if r.profile==winner.profile],
                 full_comparison_measurements=[r.__dict__ for r in samples])
@@ -207,11 +273,11 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
     # frontier. If an explicit fixture budget is exceeded, decline calibration.
     workload=beam_width
     probe=NativePipelineProbe(runner,probe_env,workload,world,directory/'measurements',
-        fixtures,storage,deadline=search_deadline,verify=verify)
+        fixtures,storage,deadline=search_deadline,verify=verify,grow=grow)
     probe.planning_session=session
     try:
         plans=probe.admit(baseline)
-        receipt=write_frontiers(contract,rank_frontier_counts(plans),
+        receipt=dict(kind='native-natural-growth-v1', requested_beam=beam_width) if grow else write_frontiers(contract,rank_frontier_counts(plans),
             storage,directory/'frontiers',deadline=deadline,
             max_states=options.calibration_frontier_max_states or plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'])
     except ValueError as error:
@@ -260,7 +326,10 @@ def _tune_downstream(contract, model, runtime, options, devices, beam_width,
         fixture=receipt,pipeline_verified=True,cache_hit=False,
         measurement_scope='full_requested_frontier' if selection['workload_parents']==final_plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'] else 'bounded_legal_frontier',
         correctness_scope='fixture legality, accepted model readout, native completion; normal solution replay checked by run_native')
-    if runtime.build_metadata.get('calibration_protocol')=='json-session-v1':
+    if grow:
+        data['matched_stream1']={'measurement_scope':'unavailable',
+            'reason':'natural search does not export its evolving frontier; isolated inference is a separate workload'}
+    elif runtime.build_metadata.get('calibration_protocol')=='json-session-v1':
         from .matched_probe import measure_matched
         try:
             data['matched_stream1']=measure_matched(contract,model,runtime,probe_env,

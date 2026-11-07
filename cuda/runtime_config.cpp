@@ -270,9 +270,11 @@ void set_ring_count_from_logical_shard(RuntimeConfig& config, std::uint32_t stre
 
 void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
     const std::uint64_t logical_shard_size = logical_shard_size_for(config);
-    const std::uint64_t owner_batch_reserve = std::max<std::uint64_t>(
+    // A round appends the local contribution AND the remote receive slab.
+    const std::uint64_t receive_reserve = config.world_size > 1U ? std::max<std::uint64_t>(
         config.stream3_batch_candidates,
-        scaled_round_up(config.stream3_batch_candidates, config.stream5_recv_capacity_scale_ppm));
+        scaled_round_up(config.stream3_batch_candidates, config.stream5_recv_capacity_scale_ppm)) : 0ULL;
+    const std::uint64_t owner_batch_reserve = config.stream3_batch_candidates + receive_reserve;
     if (logical_shard_size > UINT64_MAX - owner_batch_reserve)
         throw std::overflow_error("shard writable reserve exceeds uint64");
     const std::uint64_t scaled_capacity =
@@ -285,7 +287,14 @@ void set_shard_capacity_from_logical_shard(RuntimeConfig& config) {
             throw std::invalid_argument("BEAM_SHARD_CAPACITY_CANDIDATES must be at least LOGICAL_SHARD_SIZE");
         }
     } else {
-        config.shard_capacity_candidates = round_up_u32(scaled_capacity, config.stream4_batch_alignment);
+        // A fixed flush remains legal when the logical frontier shrinks. Reserve
+        // its physical slab explicitly; make_static_memory_plan accounts for it.
+        // Without this floor, capacity admission is not monotone: a smaller beam
+        // can reject because its derived slab is smaller than the frozen flush.
+        const std::uint64_t physical_capacity = std::max<std::uint64_t>(
+            scaled_capacity, std::max(config.stream4_batch_candidates,
+                                      config.stream4_trigger_candidates));
+        config.shard_capacity_candidates = round_up_u32(physical_capacity, config.stream4_batch_alignment);
     }
 }
 

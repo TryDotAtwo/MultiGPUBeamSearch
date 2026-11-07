@@ -168,6 +168,15 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
     cap=min(max_batch,max(1,(beam_width+len(devices)-1)//len(devices)))
     candidates=([cap]+[x for x in (16,8,4,2,1) if x<cap]) if capacity_bootstrap else coarse_batches(cap)
     baseline=candidates[0]
+    from .shared_profiles import lookup
+    shared = None if capacity_bootstrap else lookup(contract, model, runtime, options, devices, beam_width)
+    shared_batch = shared['inference']['parent_batch'] if shared else None
+    if shared_batch is not None and shared_batch <= cap:
+        candidates = [shared_batch] + [value for value in candidates if value != shared_batch]
+    else:
+        shared = None
+        shared_batch = None
+    shared_used = False
     coarse_candidates=list(candidates)
     refined=[]
     parents=min((beam_width+len(devices)-1)//len(devices),max(8192,workspace_capacity))
@@ -253,13 +262,21 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
                         tuple(row['seconds'][repeat] for row in rows),True,True,
                         throttled=not telemetry_verified))
                 reserves[str(batch)]=max(row['torch_reserved_peak_bytes'] for row in rows)+(512<<20)
+                if shared is not None and index == 0 and batch == shared_batch:
+                    try:
+                        estimate(str(batch), samples)
+                    except ValueError:
+                        pass  # Unstable/throttled remote proposal: ordinary tuning follows.
+                    else:
+                        shared_used = True
+                        break
                 if capacity_bootstrap:
                     try:estimate(str(batch),samples)
                     except ValueError:continue
                     # Verified capacity seed only. The final width receives a
                     # separate unrestricted performance calibration and key.
                     break
-            elif batch==baseline:
+            elif batch==baseline and not (shared is not None and index == 0):
                 if not capacity_failures or not all(capacity_failures):
                     raise NativeBackendError('baseline inference calibration failed; see '+str(directory))
                 capacity_limited=True
@@ -277,7 +294,9 @@ def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env
         if pool is not None:pool.close()
     winner,stat_rejected=select_inference(samples,baseline=str(baseline))
     verify_prepared_model(model,contract)
-    data={'signature':signature,'phase':'inference_verified','parent_batch':int(winner.profile),
+    data={'shared_profile':shared if shared_used else None,
+          'shared_profile_validated':shared_used,
+          'signature':signature,'phase':'inference_verified','parent_batch':int(winner.profile),
           'reserve_bytes':reserves[winner.profile],'estimate':winner.__dict__,
           'records':records,'rejected':rejected,'stat_rejected':stat_rejected,
           'gpu_telemetry':telemetry_records,

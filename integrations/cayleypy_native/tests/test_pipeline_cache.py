@@ -1,5 +1,6 @@
 import copy
 import json
+import pytest
 
 from multigpubeamsearch.pipeline_cache import read_profile,valid_receipt,write_profile,cache_identity
 
@@ -117,9 +118,10 @@ def test_full_cache_rejects_unmeasured_grid_bad_timings_and_wrong_winner():
         corrupt=copy.deepcopy(data);mutation(corrupt)
         assert not valid_receipt(corrupt,identity)
 
-def test_adaptive_cache_binds_search_trace_and_measured_subset(tmp_path):
+@pytest.mark.parametrize('policy',['hardware-coarse-fine-v1','service-guided-shortlist-v2'])
+def test_adaptive_cache_binds_search_trace_and_measured_subset(tmp_path,policy):
     identity,data,plans=full_receipt()
-    identity.update(policy='hardware-coarse-fine-v1',adaptive_context={'budget_bytes':1024})
+    identity.update(policy=policy,adaptive_context={'budget_bytes':1024})
     data['full_tested']=['baseline']
     data['adaptive_search']=dict(context=identity['adaptive_context'],
         stop_reason='no_statistically_separated_gain',coarse_full_tested=['baseline'],rounds=[])

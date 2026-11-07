@@ -30,6 +30,7 @@
 #endif
 
 #include <cuda_fp16.h>
+#include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
 
 #include <algorithm>
@@ -96,6 +97,34 @@ using namespace beam;
 #endif
 
 namespace {
+
+struct ScopedCudaProfilerCapture {
+    bool active = false;
+
+    void start() {
+        if (active) throw std::runtime_error("CUDA profiler capture is already active");
+        const auto status = cudaProfilerStart();
+        if (status != cudaSuccess) {
+            throw std::runtime_error(std::string("cudaProfilerStart failed: ") +
+                                     cudaGetErrorString(status));
+        }
+        active = true;
+    }
+
+    void stop() {
+        if (!active) return;
+        const auto status = cudaProfilerStop();
+        active = false;
+        if (status != cudaSuccess) {
+            throw std::runtime_error(std::string("cudaProfilerStop failed: ") +
+                                     cudaGetErrorString(status));
+        }
+    }
+
+    ~ScopedCudaProfilerCapture() {
+        if (active) cudaProfilerStop();
+    }
+};
 
 struct NativeEagerRingSlotLauncherState {
     StaticDeviceMemory* memory = nullptr;
@@ -4196,7 +4225,13 @@ void reset_static_memory_for_task(
 
 } // namespace
 
+#include "resident_search.hpp"
+
 int run_production_runner(int argc, char** argv) {
+    if(argc==2 && std::string(argv[1])=="--resident-protocol-info") {
+        std::cout << "{\"protocol\":\"resident-search-v1\"}\n";
+        return 0;
+    }
     if(argc>=2 && std::string(argv[1])=="--validate-stream1-scores")
         return beam::score_mode::run_production_score_mode(argc,argv);
     if (argc == 2 && std::string(argv[1]) == "--runtime-library-info") {
@@ -4570,6 +4605,13 @@ int run_production_runner(int argc, char** argv) {
         std::cout << "benchmark_plan_only=1 admitted_global_beam=" << plan.derived.global_beam_width_effective << "\n";
         return 0;
     }
+    const auto benchmark_grow_steps=env_u32("BEAM_BENCHMARK_GROW_STEPS",0);
+    const auto profile_saturated_index=env_u32("BEAM_CUDA_PROFILE_SATURATED_INDEX",UINT32_MAX);
+    if(profile_saturated_index!=UINT32_MAX &&
+       (!benchmark_grow_steps || profile_saturated_index>=benchmark_grow_steps))
+        throw std::runtime_error("CUDA profiling requires an in-range saturated natural-growth step");
+    if(benchmark_grow_steps && (benchmark_grow_steps>16 || cli_depth_limit>64 || cli_depth_limit<benchmark_grow_steps || !benchmark_frontier.empty() || repair_resident_mode || solve_bucket_mode))
+        throw std::runtime_error("natural calibration requires bounded ordinary search without fixture/repair/collection");
     const auto benchmark_repeats=env_u32("BEAM_BENCHMARK_FRONTIER_REPEATS",1);
     if(!benchmark_frontier.empty() && (benchmark_repeats==0 || benchmark_repeats>16 || cli_depth_limit!=benchmark_repeats || repair_resident_mode || solve_bucket_mode))
         throw std::runtime_error("benchmark frontier requires bounded repeats without repair/solution collection");
@@ -5016,20 +5058,6 @@ int run_production_runner(int argc, char** argv) {
             << "solution_job_id\trepair_id\tpuzzle_id\tstart_step\ttarget_step\told_segment_len"
             << "\tsegment_solved\tsegment_len\tsegment_delta\tsegment_path\tprefix_path\tsuffix_path\n";
     }
-    std::ofstream solve_bucket_result;
-    if (solve_bucket_mode && rank == 0U) {
-        const std::filesystem::path parent = solve_bucket_result_path.parent_path();
-        if (!parent.empty()) {
-            std::filesystem::create_directories(parent);
-        }
-        solve_bucket_result.open(solve_bucket_result_path, std::ios::out | std::ios::trunc);
-        if (!solve_bucket_result) {
-            throw std::runtime_error("cannot open solve bucket result tsv: " + solve_bucket_result_path.string());
-        }
-        solve_bucket_result
-            << "puzzle_id\tdepth_index\tfound_depth\ttotal_depth\tknown_length\tdelta"
-            << "\towner_rank\tsolution_path\n";
-    }
     const std::size_t repair_k1_prefetch_tasks =
         repair_resident_mode ? static_cast<std::size_t>(env_u64("BEAM_REPAIR_K1_PREFETCH_TASKS", 10)) : 0U;
     std::unique_ptr<RepairSolvedNeighborhoodPrefetch> repair_k1_prefetch;
@@ -5044,13 +5072,55 @@ int run_production_runner(int argc, char** argv) {
         std::cout << "repair_k1_prefetch_tasks=" << repair_k1_prefetch_tasks << "\n";
     }
 
-    for (std::size_t task_index = 0; task_index < repair_tasks.size(); ++task_index) {
-    const RepairTask& repair_task = repair_tasks[task_index];
+    beam::resident::Mailbox resident(env_path("BEAM_SESSION_DIR", ""),rank);
+    if(resident.enabled() && (repair_resident_mode || !benchmark_frontier.empty()))
+        throw std::runtime_error("resident session cannot combine with repair/fixture modes");
+    for (std::size_t task_index = 0; resident.enabled() || task_index < repair_tasks.size(); ++task_index) {
+    RepairTask resident_task;
+    if(resident.enabled()) {
+        nlohmann::json request;
+        if(!resident.next(task_index,request)) break;
+        resident_task=repair_tasks.front();
+        const auto values=request.at("start").get<std::vector<int>>();
+        if(values.size()!=STATE_LEN) throw std::runtime_error("resident state length mismatch");
+        resident_task.start_state=State128{};
+        for(std::size_t i=0;i<values.size();++i) {
+            if(values[i]<0 || values[i]>=static_cast<int>(stream1_model.num_classes))
+                throw std::runtime_error("resident state value outside model alphabet");
+            resident_task.start_state.v[i]=static_cast<std::uint8_t>(values[i]);
+        }
+        beam::input::validate_state(resident_task.start_state,host_central,stream1_model.num_classes,"resident_initial_state");
+        const auto directory=std::filesystem::path(request.at("run_dir").get<std::string>());
+        std::filesystem::current_path(directory);
+        std::filesystem::create_directories(directory/"test_results");
+#if defined(__linux__)
+        setenv("BEAM_HISTORY_DIR",(directory/"history").c_str(),1);
+        setenv("BEAM_HISTORY_DISK_PATH",(directory/"history").c_str(),1);
+#endif
+        std::cout << "GLOBAL_BEAM_WIDTH_EFFECTIVE=" << plan.derived.global_beam_width_effective << "\n";
+        if(stream1_scratch.transformer_numeric_error)
+            BEAM_CUDA_CHECK(cudaMemset(stream1_scratch.transformer_numeric_error,0,sizeof(std::uint32_t)));
+    }
+    std::ofstream solve_bucket_result;
+    if (solve_bucket_mode && rank == 0U) {
+        const std::filesystem::path parent = solve_bucket_result_path.parent_path();
+        if (!parent.empty()) {
+            std::filesystem::create_directories(parent);
+        }
+        solve_bucket_result.open(solve_bucket_result_path, std::ios::out | std::ios::trunc);
+        if (!solve_bucket_result) {
+            throw std::runtime_error("cannot open solve bucket result tsv: " + solve_bucket_result_path.string());
+        }
+        solve_bucket_result
+            << "puzzle_id\tdepth_index\tfound_depth\ttotal_depth\tknown_length\tdelta"
+            << "\towner_rank\tsolution_path\n";
+    }
+    const RepairTask& repair_task = resident.enabled()?resident_task:repair_tasks[task_index];
     const std::uint64_t puzzle_id = repair_task.repair_id;
     const std::uint32_t depth_limit = repair_task.depth_limit;
     host_initial = repair_task.start_state;
     host_target = repair_task.target_state;
-    if (task_index != 0U) {
+    if (task_index != 0U && !resident.enabled()) {
         HostSolvedNeighborhood next_solved_neighborhood =
             repair_k1_prefetch
                 ? repair_k1_prefetch->take(task_index)
@@ -5165,6 +5235,11 @@ int run_production_runner(int argc, char** argv) {
     [[maybe_unused]] std::uint32_t last_final_threshold = UINT32_THRESHOLD_MAX;
     std::uint32_t total_threshold_updates = 0;
     std::uint32_t completed_depths = 0;
+    std::uint32_t calibration_saturated_steps = 0;
+    std::uint32_t calibration_full_steps_seen = 0;
+    bool cuda_profile_capture_completed = false;
+    ScopedCudaProfilerCapture cuda_profiler_capture;
+    bool calibration_global_full = plan.derived.global_beam_width_effective == 1ULL;
     bool solution_found = false;
     std::string task_solution_path;
     std::int64_t task_solution_length = -1;
@@ -5196,7 +5271,12 @@ int run_production_runner(int argc, char** argv) {
         const bool runtime_depth_timing=env_bool("BEAM_RUNTIME_DEPTH_TIMING",false);
         if(runtime_depth_timing) std::cout << "runtime_depth_start=" << depth
             << " frontier_size=" << frontier_size << std::endl;
+        const auto calibration_input_parents = frontier_size;
+        const bool calibration_input_full = calibration_global_full;
+        const bool profile_this_depth = profile_saturated_index != UINT32_MAX &&
+            calibration_input_full && calibration_full_steps_seen == profile_saturated_index;
         const auto depth_start = std::chrono::steady_clock::now();
+        if(profile_this_depth) cuda_profiler_capture.start();
         history.pump_completed(false);
         [[maybe_unused]] const bool emit_depth_log = (depth_log_every != 0U) && ((depth % depth_log_every) == 0U);
 #if BEAM_ENABLE_DEPTH_LOGS
@@ -5784,15 +5864,44 @@ int run_production_runner(int argc, char** argv) {
 #endif
         const auto depth_end = std::chrono::steady_clock::now();
         const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();
+        if(profile_this_depth) {
+            cuda_profiler_capture.stop();
+            cuda_profile_capture_completed = true;
+            std::cout << "cuda_profile_capture=complete depth=" << depth
+                      << " saturated_index=" << profile_saturated_index << std::endl;
+        }
         if (!benchmark_frontier.empty()) {
             std::cout << "calibration_depth=" << depth
                       << " rank=" << rank
                       << " parents=" << benchmark_parent_count
                       << " depth_sec=" << depth_sec
+                      << " ring_slot_jobs=" << state.ring_slot_jobs_launched
+                      << " stream3_jobs=" << state.stream3_jobs_launched
+                      << " stream4_jobs=" << state.stream4_jobs_launched
                       << " next_frontier_size=" << frontier_size << std::endl;
         }
+        if(benchmark_grow_steps) {
+            // The global keep count is shared by every rank. Local fullness
+            // alone must never decide when ranks stop collective execution.
+            calibration_global_full = final_state.final_global_keep_count == plan.derived.global_beam_width_effective;
+            if(calibration_input_full) {
+                if(calibration_input_parents != benchmark_parent_count)
+                    throw std::runtime_error("natural calibration rank frontier mismatch");
+                std::cout << "calibration_depth=" << calibration_saturated_steps++
+                          << " rank=" << rank << " parents=" << calibration_input_parents
+                          << " depth_sec=" << depth_sec << " search_depth=" << depth
+                          << " ring_slot_jobs=" << state.ring_slot_jobs_launched
+                          << " stream3_jobs=" << state.stream3_jobs_launched
+                          << " stream4_jobs=" << state.stream4_jobs_launched
+                          << " next_frontier_size=" << frontier_size << std::endl;
+                ++calibration_full_steps_seen;
+            }
+        }
         if(runtime_depth_timing) std::cout << "runtime_depth_done=" << depth
-            << " depth_sec=" << depth_sec << std::endl;
+            << " depth_sec=" << depth_sec
+            << " ring_slot_jobs=" << state.ring_slot_jobs_launched
+            << " stream3_jobs=" << state.stream3_jobs_launched
+            << " stream4_jobs=" << state.stream4_jobs_launched << std::endl;
 #if BEAM_ENABLE_DEPTH_LOGS
         if (emit_depth_log) {
 #if BEAM_DEBUG_STREAM_TIMING
@@ -5864,6 +5973,7 @@ int run_production_runner(int argc, char** argv) {
 #endif
         }
 #endif
+        if(benchmark_grow_steps && calibration_saturated_steps == benchmark_grow_steps) break;
         if (propagate_frontier_live(frontier_size, memory, streams,
                 nccl_runtime.comm, world_size) == 0U) {
             break;
@@ -5893,6 +6003,10 @@ int run_production_runner(int argc, char** argv) {
     const auto end = std::chrono::steady_clock::now();
     const double elapsed_sec = std::chrono::duration<double>(end - start).count();
     const auto history_flush_start = std::chrono::steady_clock::now();
+    if(benchmark_grow_steps)
+        std::cout << "calibration_saturated_steps=" << calibration_saturated_steps << std::endl;
+    if(profile_saturated_index!=UINT32_MAX && !cuda_profile_capture_completed)
+        throw std::runtime_error("requested CUDA profiler capture did not reach a saturated full step");
     history.finish_all();
     const auto history_flush_end = std::chrono::steady_clock::now();
     const double history_flush_sec = std::chrono::duration<double>(history_flush_end - history_flush_start).count();
@@ -5914,6 +6028,7 @@ int run_production_runner(int argc, char** argv) {
     std::cout << "history_bytes_pruned=" << history.bytes_pruned << "\n";
     std::cout << "history_flush_sec=" << history_flush_sec << "\n";
 #endif
+    if (solve_bucket_mode) solution_found = solve_bucket_found_any;
     if (solve_bucket_mode && rank == 0U) {
         std::cout << "solve_bucket_summary=1"
                   << " puzzle_id=" << repair_task.puzzle_id
@@ -6004,6 +6119,10 @@ int run_production_runner(int argc, char** argv) {
             << repair_task.prefix_path << '\t'
             << repair_task.suffix_path << '\n';
         repair_result.flush();
+    }
+    if(resident.enabled()) {
+        BEAM_CUDA_CHECK(cudaDeviceSynchronize());
+        resident.complete(task_index);
     }
     }
     destroy_cuda_graph_job_templates(graphs);

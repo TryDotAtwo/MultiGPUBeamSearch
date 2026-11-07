@@ -103,8 +103,8 @@ certification of a larger requested frontier. A large optional full-frontier
 check may require increasing `calibration_pipeline_seconds`.
 Inspect `result.native_metadata['profile']` for the selected parameters and the
 measured frontier scope. Isolated component probes are a scheduling proxy,
-not a measured complete step or a global optimum. Small finite graphs can
-prevent a unique legal fixture for the optional complete-step measurement.
+not a measured complete step or a global optimum. Small finite graphs or an early solution can prevent the search from filling
+the requested beam for optional complete-step measurement.
 
 `plan_cluster([8] * 16, beam_width)` computes a 128-rank layout and alignment.
 It does not launch multiple nodes or prove hardware performance; every actual
@@ -516,12 +516,12 @@ scheduling proxy; they do not certify a measured complete search step.
 Isolated component timings are a scheduling proxy; they are not a measured
 complete depth or a proof of globally optimal performance. To measure the exact
 full-frontier gap, use `NativeOptions(calibration_full_frontier=True)`; this
-prepares legal unique states and runs five measured complete depths after a
-warmup, followed by matched Stream1 inference on those same files. The report
-distinguishes throughput loss from relative time overhead. Small finite graphs
-or an explicit preparation budget can prevent a full-frontier fixture.
+grows the ordinary native search to the requested beam, then measures five
+complete saturated steps after one warmup step. Incomplete growth, an early
+solution or an exhausted time budget cannot certify a complete frontier.
+Isolated Stream1 calibration is a separate workload, not a same-state comparison.
 Full-frontier verification is optional and can take minutes on a maximum beam:
-its preparation and repeated full steps are included in the reported total
+its growth and repeated full steps are included in the reported total
 calibration duration. The default component calibration does not generate those
 large frontier files. Small beams need not benefit from more GPUs: dispatch,
 collectives and final selection can dominate a very fast inference pass.
@@ -655,9 +655,17 @@ budget, GPU count, exact beam, graph move/state sizes and the measured inference
 batch. Model, precision and topology remain part of the calibration identity;
 measured transport/service latency supplies staging and flush proposals.
 
-The coarse phase probes at most 16 candidates at exact native capacities.
-Component work/memory Pareto ranking supplies two full-step challengers plus
-the baseline. Up to two refinement rounds probe neighboring parameters around
+The coarse domain is pruned to at most four complementary component challengers
+using measured downstream service pressure. When isolated downstream work is at
+most 5% of inference time, component work/memory ranking supplies one full-step
+challenger plus the baseline; otherwise it supplies up to two. This ratio is a
+proposal heuristic, not proof that all downstream work overlaps inference.
+Smaller flush thresholds are omitted because they repeatedly sort survivor
+buffers. Outer batching, staging, sort lanes and shards remain subject to native
+memory admission. The trace includes analytical per-rank job counts (outer
+dispatch, model forwards and gross sorting), not measured CUDA kernel counts.
+If the coarse full comparison does not improve baseline, refinement stops.
+Otherwise up to two refinement rounds probe neighboring parameters around
 the measured full-step winner and compare at most two new full-step candidates
 per round. The 2% statistical improvement gate, time budget, no-new-neighbor
 condition and round bound provide explicit stopping conditions. This is the
@@ -671,3 +679,94 @@ available-budget bucket, and every reuse still requires fresh native admission.
 Default component-only calibration remains explicitly unverified for full steps.
 
 Publication validation: [Cube555 adaptive acceptance](../../docs/validation/cube555-adaptive-20261025.md). GPU scope and limits are recorded there.
+
+
+### Reuse GPU resources across searches
+
+```python
+from multigpubeamsearch import NativeSession, enable_native
+
+enable_native(options)
+with NativeSession():
+    first = graph.beam_search(start_state=start_a, predictor=model,
+                              beam_width=beam, max_steps=depth,
+                              use_child_scores=True, return_path=True)
+    second = graph.beam_search(start_state=start_b, predictor=model,
+                               beam_width=beam, max_steps=depth,
+                               use_child_scores=True, return_path=True)
+# All session-owned native workers and GPU allocations are released here.
+```
+
+The session retains model weights, static GPU buffers, streams and CUDA Graphs
+between compatible calls. Each search gets fresh frontier/threshold/stop state,
+history and separate result logs. A reused live session skips inference and
+pipeline tuning; a cold session still uses matching validated disk profiles.
+The context does not activate the CayleyPy backend: call `enable_native` first,
+or use the standalone `multigpubeamsearch.beam_search` function inside it.
+
+Graph/model artifacts, native binary, selected devices, beam, depth or options
+changes close the old worker group before preparing another search. Changing
+only the initial state preserves the group. A session owns one sequential group;
+concurrent searches and nested sessions are rejected. `session.close()` explicitly
+releases resources; context exit also closes on exceptions. A timeout, failed rank
+or invalid result destroys the entire group. Metadata `persistent_session` records
+worker PIDs, request count and whether resources were reused. This is a local
+multi-GPU session; it does not introduce a multi-node service.
+
+`prepare_native` freezes exported artifacts; it is separate from `NativeSession`,
+which owns live GPU resources. Process termination loses GPU resources, while
+compatible profile files remain reusable through the same `cache_dir`.
+
+For separate notebook cells, use an explicit session object:
+
+```python
+session = NativeSession()
+result = session.beam_search(graph, native_options=options,
+                            start_state=start_a, predictor=model,
+                            beam_width=beam, max_steps=depth,
+                            use_child_scores=True, return_path=True)
+# Call session.beam_search again with another start when needed.
+session.close()  # Release GPUs when finished.
+```
+
+The explicit call does not require `enable_native()`. Do not recreate `session`
+in the search cell if the intent is to reuse it across cell executions.
+
+
+### Shared profiles from GitHub
+
+The matching source checkout or installed source bundle includes the [profile registry](../../profiles/README.md).
+Lookup order is local cache, exact-compatible verified registry proposal, then normal automatic calibration.
+A registry proposal still receives fresh all-GPU numerical/timing and memory checks; a transferred profile
+is never a fabricated current-host full-step measurement. Profile identity includes the exact graph,
+model/blend, frontier, native source and hardware cohort. Changing the beam or model triggers its own lookup.
+
+The portable [Cube555 notebook](../../kaggle/cube555_github/cube555-native-2xt4-blend.ipynb)
+uses `graph.beam_search` inside `NativeSession.activate()`. It uses all visible allocated GPUs by default
+and a configurable user cache, without Kaggle-specific paths. Driver installation and cluster resource
+allocation remain prerequisites; the notebook operates on one allocated GPU node.
+
+
+### Search policy through the CayleyPy call
+
+```python
+result = graph.beam_search(
+    start_state=start, predictor=predictor, backend="native",
+    beam_width=1_048_576, max_steps=140, return_path=True,
+    solution_mode="collect", collect_extra_depths=1,
+    max_collected_solutions=2000, bfs_radius=0, bfs_max_entries=1_048_576,
+    reflect_mode="off", reflection_source=None,
+)
+```
+
+`solution_mode="first"` stops at the first hit; `collect` keeps the native collection window and capacity. `result.path` is the best collected path, and `result.solutions` contains all unique replay-checked paths. `collect_extra_depths` counts forward depths after the first hit. `bfs_radius` reserves a suffix within `max_steps`; the entry budget fails explicitly if insufficient. These native extensions require `backend="native"` and are never silently dropped on Torch fallback. `beam_mode="simple"` remains a distinct upstream search policy.
+
+Reflection accepts `off`, `after_original`, or `only`. `only` requires a replay-valid original solution as `reflection_source` (move indices); `after_original` uses the original search's best solution. Inverse generators must exist. Reflected solutions are transformed back and independently replayed in the original frame. Collection capacity applies separately to each orientation.
+
+The public Kaggle notebook is a focused Cube555 example. It loads the bundled graph and scramble states, builds the Transformer/MLP blend, and calls CayleyPy's `graph.beam_search`. Its first cell exposes the puzzle range, model files and blend weight, beam, collect, BFS, reflection, GPU, output and publication settings. Profile selection remains automatic.
+
+For another problem, use `multigpubeamsearch` directly: build or load a CayleyPy graph, provide a supported predictor/model, then call `graph.beam_search` with `backend="native"`. The package's graph loading, replay, saving and publication helpers stay generic; this notebook does not add a generic graph/model configuration layer.
+
+Native execution supports permutation graphs with state length up to 150 and model families with a registered exporter, including a compatible `NativeModel` artifact. New model architectures need an exporter. The results catalog requires compatible model metadata and two-GPU Kaggle provenance; other replay-checked results can be saved locally.
+
+`multigpubeamsearch.publication.publish_result` uses the pinned cayleypy-beam-results client and submits only replay-checked solution envelopes. It preserves payloads and receipts on failure; users do not need a GitHub token.

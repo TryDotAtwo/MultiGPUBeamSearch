@@ -1680,7 +1680,8 @@ void instantiate_cuda_graph_job_templates(
             plan.config.stream4_trigger_candidates,
             false,
             false,
-            streams.stream3);
+            streams.stream3,
+            plan.config.world_size > 1U ? plan.stream5_recv_slot_capacity : 0ULL);
         instantiate_captured_graph(streams.stream3, graphs.stream3_ring_graphs[ring], graphs.stream3_ring_execs[ring]);
     }
 
@@ -2412,7 +2413,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 static_cast<std::uint32_t>(stream4_busy_slots.size()));
     };
 
-    const auto stream3_has_writable_buffer = [&]() -> bool {
+    const auto stream3_has_writable_buffer = [&](std::uint64_t incoming_bound = 0ULL) -> bool {
         NvtxRange service_range("Dispatcher_Stream3_writable_metadata");
         if (plan.config.shard_buffer_count <= 1U) {
             return true;
@@ -2452,7 +2453,7 @@ DepthDispatchState run_depth_cuda_graphs(
                 logical_processing =
                     logical_processing || host_processing[physical_shard] != 0U;
             }
-            const std::uint32_t required_available =
+            const std::uint64_t required_available = incoming_bound != 0ULL ? incoming_bound :
                 logical_processing
                     ? std::min(
                           plan.config.stream3_batch_candidates,
@@ -3369,12 +3370,30 @@ DepthDispatchState run_depth_cuda_graphs(
         return true;
     };
 
+    bool stream3_round_reserved = false;
+    const auto reserve_stream3_round = [&]() {
+        if (!multi_rank || stream3_round_reserved) return;
+        release_completed_stream4_slots_nonblocking();
+        const std::uint64_t required = plan.config.stream3_batch_candidates + plan.stream5_recv_slot_capacity;
+        const bool room = stream3_has_writable_buffer(required);
+        // Move the existing once-per-round collective to admission, before any
+        // local append. Stream1 keeps its independent lane/ring ownership.
+        maybe_run_stream5_threshold_update(!room);
+        if (!room && !stream3_has_writable_buffer(required)) {
+            throw std::runtime_error("Stream3 round cannot reserve local plus remote capacity before launch: required=" +
+                std::to_string(required) + " shard_capacity=" + std::to_string(plan.config.shard_capacity_candidates));
+        }
+        stream3_round_reserved = true;
+    };
     std::uint64_t completed_exchange_rounds = 0;
     const auto run_stream5_exchange_and_collect = [&](std::uint32_t ring, bool zero_send) {
         NvtxRange service_range("Dispatcher_Stream5_exchange_collect");
         if (!multi_rank) {
             return;
         }
+        // Ranks with no remaining local work still participate in round admission.
+        if (zero_send) reserve_stream3_round();
+        if (!stream3_round_reserved) throw std::runtime_error("unreserved Stream3 exchange");
         if(calibration_progress) std::cerr << "calibration_progress rank=" << plan.config.local_rank
             << " phase=exchange-start round=" << completed_exchange_rounds
             << " cursor=" << state.frontier_cursor << std::endl;
@@ -3488,7 +3507,9 @@ DepthDispatchState run_depth_cuda_graphs(
             nullptr,
             "cudaEventElapsedTime stream5 exchange");
 #endif
-        release_completed_stream4_slots_nonblocking();
+        // Local collection preserves the pre-admitted receive credit. The
+        // existing device overflow guard diagnoses violations without another
+        // host metadata copy, pressure flush or capacity wait on this path.
         if (recv_total_64 != 0ULL) {
             progress_trace("remote-collect-begin");
             stream3_collect_remote_recv_cuda(
@@ -3539,13 +3560,7 @@ DepthDispatchState run_depth_cuda_graphs(
             append_stream3_ready_queue();
             progress_trace("remote-ready-queue-ready");
         }
-        // Every rank reaches this boundary once per exchange round, including
-        // zero-send ranks. Request global filtering before local backpressure
-        // can block the next round on clean buffers that sorting cannot shrink.
-        progress_trace("writable-buffer-check-begin");
-        const bool writable=stream3_has_writable_buffer();
-        progress_trace("writable-buffer-check-ready");
-        maybe_run_stream5_threshold_update(!writable);
+        stream3_round_reserved = false;
         ++completed_exchange_rounds;
     };
 
@@ -3830,10 +3845,11 @@ DepthDispatchState run_depth_cuda_graphs(
         if (stream3_active || stream3_ready_rings.empty()) {
             return false;
         }
+        reserve_stream3_round();
         // Local shard capacity applies before owner exchange as well. Waiting
         // for local Stream4 slots adds no collective and preserves Stream5's
         // exchange-round order across ranks.
-        if (!stream3_has_writable_buffer()) {
+        if (!multi_rank && !stream3_has_writable_buffer()) {
             if (stop_stage != DepthDispatchStopStage::Full) {
                 throw std::runtime_error("dispatcher stop-stage smoke hit Stream3 shard backpressure; increase BEAM_SHARD_CAPACITY_CANDIDATES or reduce BEAM_PIPELINE_SMOKE_RINGS");
             }
@@ -4615,6 +4631,7 @@ FinalizeDepthState finalize_depth_single_gpu(
         const std::uint64_t total_available = global_less + global_equal;
         const std::uint64_t global_keep_count =
             std::min<std::uint64_t>(plan.derived.global_beam_width_effective, total_available);
+        result.final_global_keep_count = global_keep_count;
 #if BEAM_DEBUG_DEPTH_FLOW_TRACE
         result.local_clean_before_final = sum_u32_device_array_host(
             memory.streams.clean_count,
@@ -4623,7 +4640,6 @@ FinalizeDepthState finalize_depth_single_gpu(
         result.final_global_less = global_less;
         result.final_global_equal = global_equal;
         result.final_total_available = total_available;
-        result.final_global_keep_count = global_keep_count;
 #endif
 #if BEAM_DEBUG_FINAL_HISTOGRAM_TRACE
         log_final_histogram_trace(

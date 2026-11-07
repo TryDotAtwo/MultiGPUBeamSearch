@@ -212,9 +212,13 @@ def runtime_devices(graph, options) -> tuple[int, ...]:
             configured = () if device is None else (device,)
         else:
             configured = getattr(config, "devices", ())
-        if not configured or any(torch.device(d).type != "cuda" for d in configured):
-            raise NativeUnavailable("graph does not select CUDA devices; set explicit native devices")
-        devices = tuple(0 if torch.device(d).index is None else torch.device(d).index for d in configured)
+        if not configured or all(torch.device(d).type == "cpu" for d in configured):
+            # A CPU graph describes the puzzle; native search uses visible GPUs.
+            devices = tuple(range(torch.cuda.device_count()))
+        elif any(torch.device(d).type != "cuda" for d in configured):
+            raise NativeUnavailable("graph mixes CPU and CUDA devices; set explicit native devices")
+        else:
+            devices = tuple(0 if torch.device(d).index is None else torch.device(d).index for d in configured)
     if not devices or len(set(devices)) != len(devices) or len(devices) > 128 or any(
         type(d) is not int or d < 0 or d >= torch.cuda.device_count() for d in devices
     ):
@@ -383,12 +387,28 @@ def parse_terminal(log_path: Path, contract, *,
     if max_steps is not None and (type(max_steps) is not int or max_steps < 0):
         raise ValueError("max_steps must be a nonnegative integer")
     records, effective = [], set()
+    collected, collection_counts, collection_status = [], [], None
     terminal = re.compile(r"puzzle_solved=([01])\s+puzzle_id=(\d+)\s+seconds=([^\s]+)\s+solution_length=(-?\d+)(.*?)\s+solution=([^\s]*)\s*$")
     width = re.compile(r"(?:GLOBAL_BEAM_WIDTH_EFFECTIVE|global_beam_width_effective)=(\d+)")
     batch_values = {"B_MICRO": set(), "STREAM1_ROWS_PER_JOB": set(), "STREAM3_BATCH_CANDIDATES": set()}
     batches = re.compile(r"\b(B_MICRO|STREAM1_ROWS_PER_JOB|STREAM3_BATCH_CANDIDATES)=(\d+)")
     with log_path.open(encoding="utf-8", errors="replace") as handle:
         for line in handle:
+            if line.startswith("solve_bucket_solution=1 "):
+                row = dict(part.split('=', 1) for part in line.strip().split())
+                tokens = row['solution'].split('.') if row['solution'] else []
+                if any(re.fullmatch(r'm\d+', token) is None for token in tokens):
+                    raise NativeBackendError('invalid collected move token')
+                moves = tuple(int(token[1:]) for token in tokens)
+                if (int(row['puzzle_id']) != 0 or len(moves) != int(row['solution_length'])
+                        or (max_steps is not None and len(moves) > max_steps) or not contract.replay(moves)):
+                    raise NativeBackendError('collected solution failed independent replay/depth validation')
+                collected.append(dict(path=list(moves), solved_depth=int(row['found_depth']),
+                                      touch_depth=len(moves)-int(row['found_depth']), owner_rank=int(row['owner_rank'])))
+            if line.startswith('solve_bucket_summary=1 '):
+                collection_counts.append(int(dict(part.split('=',1) for part in line.split())['records']))
+            if line.startswith('collection_status='):
+                collection_status = line.strip().split('=',1)[1]
             effective.update(int(m.group(1)) for m in width.finditer(line))
             for match in batches.finditer(line):
                 batch_values[match.group(1)].add(int(match.group(2)))
@@ -427,6 +447,14 @@ def parse_terminal(log_path: Path, contract, *,
     if len(effective) > 1 or 0 in effective:
         raise NativeBackendError("native ranks emitted inconsistent effective global beam widths")
     metadata = {"native_seconds": max(r[1] for r in records), "terminal_records": len(records)}
+    if collection_counts:
+        if collection_counts != [len(collected)] or len({tuple(row['path']) for row in collected}) != len(collected):
+            raise NativeBackendError('collection summary/count/unique-path mismatch')
+        if bool(collected) != (records[0][0] is not None):
+            raise NativeBackendError('collection and terminal result disagree')
+        if collected and list(records[0][0]) not in [row['path'] for row in collected]:
+            raise NativeBackendError('terminal path missing from collection')
+        metadata.update(collected_solutions=collected, collection_status=collection_status or 'depth_reached')
     for label, name in (("B_MICRO", "observed_parent_batch"), ("STREAM1_ROWS_PER_JOB", "observed_inference_rows"),
                         ("STREAM3_BATCH_CANDIDATES", "observed_stream3_batch_candidates")):
         values = batch_values[label]
@@ -455,11 +483,21 @@ def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int
 
 
 def run_native(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
+    from .persistent import current_session
+    session=current_session()
+    if session is not None:
+        return session.run(_run_native_once,contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+    return _run_native_once(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+
+
+def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
     maximum_requested=type(beam_width) is str and beam_width=='max'
     if (not maximum_requested and (type(beam_width) is not int or beam_width <= 0)) or type(max_steps) is not int or max_steps < 0:
         raise NativeUnavailable("native beam_width must be positive and max_steps nonnegative integers")
     if maximum_requested:
         if not options.autotune:raise NativeUnavailable('maximum beam requires autotuning')
+        from .working_capacity import maximum_options
+        options=maximum_options(options)
         beam_width=1_048_576  # Bounded inference curve; capacity uses actual native plans below.
     if contract.replay(()):
         return NativeOutcome((), 0.0, None, None, {"already_solved": True, "replay_valid": True})
@@ -566,7 +604,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             BEAM_ENSEMBLE_INFERENCE_MICRO=str(calibration['parent_batch']),
             BEAM_ENSEMBLE_RESERVE_BYTES=str(calibration['reserve_bytes']))
         capacity=discover_capacity(contract,runtime,devices,env,runner,run_dir,
-            seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+            seconds=min(60.0,options.calibration_pipeline_seconds*.25),working=True)
         def exact_inference(width,index):
             directory=run_dir/f'maximum-inference-{index}';directory.mkdir()
             chosen=tune_inference(contract,model,runtime,options,devices,width,directory,env)
@@ -579,7 +617,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
                 BEAM_ENSEMBLE_RESERVE_BYTES=str(chosen['reserve_bytes']))
             directory=run_dir/f'maximum-capacity-{index}';directory.mkdir()
             return discover_capacity(contract,runtime,devices,env,runner,directory,
-                seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+                seconds=min(60.0,options.calibration_pipeline_seconds*.25),working=True)
         capacity,calibration=refine_maximum(capacity,calibration,
             tune=exact_inference,discover=readmit_inference)
         runtime.profile['inference_calibration']=calibration
@@ -622,8 +660,28 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             pipeline_calibration=downstream,calibration_total_wall_seconds=time.monotonic()-calibration_started)
         if maximum_requested:
             if selected:capacity['execution_profile']=dict(downstream['environment'])
-            capacity['full_step_verified']=measured and downstream.get('measurement_scope')=='full_requested_frontier'
-            capacity['capacity_scope']='full-step verified' if capacity['full_step_verified'] else 'native memory admission only'
+            from .working_capacity import choose_working_capacity,measure_reference
+            try:
+                selected_width,downstream,working=choose_working_capacity(
+                    capacity,downstream,calibration,options.cache_dir,
+                    measure=lambda width,profile:measure_reference(contract,model,runtime,
+                        options,devices,runner,env,profile,width,run_dir))
+                capacity['full_step_boundary_beam']=beam_width
+                capacity['effective_beam']=selected_width
+                capacity['working_capacity']=working
+                beam_width=selected_width
+                env.update(downstream['environment'])
+                runtime.profile['pipeline_calibration']=downstream
+                runtime.profile['calibration_total_wall_seconds']=time.monotonic()-calibration_started
+            except ValueError as error:
+                verified=measured and downstream.get('pipeline_verified') is True and downstream.get('measurement_scope')=='full_requested_frontier'
+                capacity.update(full_step_verified=verified,
+                    capacity_scope='full-step verified; efficiency unconfirmed' if verified else 'native memory admission only',
+                    working_capacity_failure=str(error))
+                (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
+                raise NativeBackendError(str(error)) from error
+            capacity['full_step_verified']=True
+            capacity['capacity_scope']='full-step verified; efficiency has a separate evidence flag'
             (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
         if options.report_calibration:
             report=downstream.get('matched_stream1',{})
@@ -645,11 +703,18 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
             {'mode':'auto','profile':runtime.profile,'microbatch':microbatch_metadata,
              'search_budget':search_budget},indent=2)+'\n',encoding='utf-8')
     args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
+    # Apply search policy only after calibration: probes must not collect solutions.
+    env.update(BEAM_SOLVE_BUCKET_MODE=str(int(options.solution_mode == 'collect')),
+               BEAM_SOLVE_BUCKET_EXTRA_DEPTHS=str(options.collect_extra_depths),
+               BEAM_SOLVE_BUCKET_MAX_SOLUTIONS=str(options.max_collected_solutions),
+               BEAM_SOLVE_BUCKET_RESULT_TSV='collected-solutions.tsv')
     if calibrate:env['BEAM_RUNTIME_DEPTH_TIMING']='1'
     log = run_dir / "native.log"
     process_log = log
     log_metadata = {}
-    if len(devices) > 1:
+    from .persistent import current_session
+    resident_session=current_session()
+    if len(devices) > 1 and resident_session is None:
         worker_logs = run_dir / "worker-logs"
         try:
             worker_logs.mkdir()
@@ -663,7 +728,10 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         # Runtime preparation may compile for minutes. Rehash the exact model
         # bytes after that window and immediately before the worker sees them.
         verify_prepared_model(model, contract)
-        if len(devices) > 1:
+        if resident_session is not None:
+            elapsed=resident_session.launch(args[:4],contract=contract,run_dir=run_dir,env=env,
+                world=len(devices),timeout=options.timeout_seconds)
+        elif len(devices) > 1:
             from .local_launcher import run_local_ranks
             elapsed = run_local_ranks(args, world_size=len(devices), cwd=run_dir, env=env,
                 timeout=options.timeout_seconds, log_path=process_log, worker_logs=worker_logs)
@@ -673,7 +741,7 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
         failure = error
         raise
     finally:
-        if len(devices) > 1:
+        if len(devices) > 1 and resident_session is None:
             try:
                 log_metadata = collect_worker_logs(worker_logs, process_log, log, len(devices), strict=failure is None)
             except Exception as log_error:
@@ -698,6 +766,14 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
                 "graph_hash": contract.graph_hash, "devices": list(devices), "requested_beam_width": beam_width,
                 "microbatch": microbatch_metadata, **search_budget,
                 "replay_valid": path is not None, "log_path": str(log), **log_metadata, **terminal_metadata}
+    import re
+    execution_parameters = {}
+    for file in [log, *run_dir.glob('resident-session/bootstrap-*.log')]:
+        for name, value in re.findall(r'^([A-Z][A-Z0-9_]+)=(\d+)$', file.read_text(errors='replace'), re.M):
+            execution_parameters[name] = int(value)
+    metadata.update(execution_parameters=execution_parameters, model_manifest=model.manifest,
+                    solution_mode=options.solution_mode, collect_extra_depths=options.collect_extra_depths,
+                    max_collected_solutions=options.max_collected_solutions)
     (run_dir / "native-outcome.json").write_text(json.dumps({"path": path, "elapsed_seconds": elapsed,
         "effective_beam_width": effective, "metadata": metadata}, indent=2) + "\n", encoding="utf-8")
     return NativeOutcome(path, elapsed, effective, run_dir, metadata)

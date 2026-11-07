@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import time
 import uuid
@@ -28,7 +29,7 @@ def parse_plan(text):
     return result
 
 
-def parse_depths(text, expected_parents, repeats):
+def parse_depth_records(text, expected_parents, repeats):
     rows = []
     for line in text.splitlines():
         if not line.startswith('calibration_depth='):
@@ -41,23 +42,36 @@ def parse_depths(text, expected_parents, repeats):
         seconds = float(fields['depth_sec'])
         if not math.isfinite(seconds) or seconds <= 0:
             raise ValueError('invalid complete-depth timing')
-        rows.append(seconds)
+        jobs={}
+        for name in ('ring_slot_jobs','stream3_jobs','stream4_jobs'):
+            if name in fields:
+                count=int(fields[name])
+                if count<0:raise ValueError('invalid native calibration job count')
+                jobs[name]=count
+        if jobs and len(jobs)!=3:raise ValueError('partial native calibration job counts')
+        rows.append(dict(seconds=seconds,native_job_counts=jobs or None,
+            search_depth=int(fields['search_depth']) if 'search_depth' in fields else None))
     if len(rows) != repeats:
         raise ValueError('native run did not complete all calibration depths')
     return rows
 
 
+def parse_depths(text, expected_parents, repeats):
+    return [row['seconds'] for row in parse_depth_records(text,expected_parents,repeats)]
+
+
 class NativePipelineProbe:
     """Runs the actual native planner and pipeline, without timing estimates.
 
-    Fixtures must be independently verified legal full-frontier files. Their
-    provenance belongs to the caller; this adapter checks exact physical size.
+    Natural growth measures saturated steps of an ordinary search. Legacy
+    fixtures require independently verified legal states and exact physical size.
     One process group per rank is always cleaned up on timeout or failure.
     """
     def __init__(self, runner, environment, beam_width, world_size, directory,
-                 fixtures, physical_bytes, *, deadline, verify, repeats=6, puzzle_id=0, planning_session=None):
+                 fixtures, physical_bytes, *, deadline, verify, repeats=6, puzzle_id=0, planning_session=None, grow=False):
         if not 6 <= repeats <= 16:
             raise ValueError('need a warmup depth and at least five measurements')
+        self.grow = bool(grow)
         self.runner = Path(runner)
         self.environment = dict(environment)
         self.beam = beam_width
@@ -79,6 +93,13 @@ class NativePipelineProbe:
             raise ValueError('calibration puzzle ID must be nonnegative')
         self.puzzle_id = puzzle_id
         self.planning_session = planning_session
+        # This opt-in driver variable must survive backend.child_environment,
+        # which deliberately strips BEAM_* controls before native launches.
+        profile_dir=environment.get('MULTIGPUBEAMSEARCH_NSYS_PROFILE_DIR')
+        self.nsys_profile_dir=Path(profile_dir) if profile_dir else None
+        self.nsys_capture_done=False
+        if self.nsys_profile_dir is not None:
+            self.nsys_profile_dir.mkdir(parents=True, exist_ok=True)
 
     def _run(self, environment, *, planning, components=False):
         from .backend import _stop_process_tree
@@ -101,24 +122,41 @@ class NativePipelineProbe:
                    BEAM_NCCL_ID_FILE=str(directory/'nccl-id.bin'))
         env.pop('BEAM_BENCHMARK_PLAN_ONLY', None)
         env.pop('BEAM_BENCHMARK_FRONTIER_FILE', None)
+        env.pop('BEAM_BENCHMARK_GROW_STEPS', None)
         env.pop('BEAM_CALIBRATION_COMPONENT_ONLY', None)
+        env.pop('BEAM_CUDA_PROFILE_SATURATED_INDEX', None)
         if planning:
             env['BEAM_BENCHMARK_PLAN_ONLY'] = '1'
         elif components:
             env['BEAM_CALIBRATION_COMPONENT_ONLY'] = '1'
         else:
             env['BEAM_BENCHMARK_FRONTIER_REPEATS'] = str(self.repeats)
+            if self.grow:
+                env['BEAM_BENCHMARK_GROW_STEPS'] = str(self.repeats)
             env['BEAM_HISTORY_DIR'] = str(directory/'history')
             env['BEAM_HISTORY_DISK_PATH'] = str(directory/'history')
         processes = []
+        capture_this_run=(not planning and not components and self.nsys_profile_dir is not None
+                          and not self.nsys_capture_done)
+        profile_outputs=[]
         try:
             for rank in range(self.world):
                 rank_env = dict(env, RANK=str(rank), LOCAL_RANK=str(rank), WORLD_SIZE=str(self.world))
-                if not planning and not components:
+                if capture_this_run:
+                    rank_env['BEAM_CUDA_PROFILE_SATURATED_INDEX'] = '0'
+                if not planning and not components and not self.grow:
                     rank_env['BEAM_BENCHMARK_FRONTIER_FILE'] = str(self.fixtures[rank])
                 log = (directory/f'rank-{rank}.log').open('wb')
-                command = [str(self.runner), str(self.puzzle_id), '1' if planning else str(self.repeats),
+                command = [str(self.runner), str(self.puzzle_id), '1' if planning else str(32+self.repeats if self.grow and not components else self.repeats),
                            str(self.beam), str(self.world), str(rank)]
+                if capture_this_run:
+                    nsys=shutil.which('nsys')
+                    if not nsys:raise ValueError('Nsight capture requested but nsys is unavailable')
+                    profile=self.nsys_profile_dir/f'full-step-{self.counter}-rank-{rank}'
+                    command=[nsys,'profile','--force-overwrite=true','--trace=cuda',
+                        '--capture-range=cudaProfilerApi','--capture-range-end=stop',
+                        '--sample=none','--output',str(profile),*command]
+                    profile_outputs.append(profile.with_suffix('.nsys-rep'))
                 process = subprocess.Popen(command, env=rank_env, cwd=directory, stdout=log,
                     stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
                 processes.append((process, log, directory/f'rank-{rank}.log'))
@@ -133,6 +171,10 @@ class NativePipelineProbe:
                 if code or 'production_runner_error=' in text:
                     raise ValueError('native calibration failed: '+str(path))
                 texts.append(text)
+            if capture_this_run:
+                missing=[str(path) for path in profile_outputs if not path.is_file()]
+                if missing:raise ValueError('Nsight did not save every rank trace: '+', '.join(missing))
+                self.nsys_capture_done=True
             return texts
         finally:
             for process, log, _ in processes:
@@ -185,7 +227,7 @@ class NativePipelineProbe:
         return plans
 
     def measure(self, environment, plans):
-        for rank, path in enumerate(self.fixtures):
+        for rank, path in enumerate(() if self.grow else self.fixtures):
             if path.stat().st_size != rank_frontier_counts(plans)[rank] * self.physical_bytes:
                 raise ValueError('fixture must fill the exact admitted rank frontier')
         started = time.monotonic()
@@ -195,14 +237,21 @@ class NativePipelineProbe:
             json.dumps(telemetry.receipt(), indent=2))
         if self.verify(texts, plans) is not True:
             raise ValueError('full-pipeline correctness verification failed')
-        seconds = [parse_depths(text, rank_frontier_counts(plans)[rank], self.repeats)
-                   for rank, text in enumerate(texts)]
+        if self.grow and any(f'calibration_saturated_steps={self.repeats}' not in text.splitlines() for text in texts):
+            raise ValueError('natural search did not complete the saturated frontier cohort')
+        depth_rows=[parse_depth_records(text,rank_frontier_counts(plans)[rank],self.repeats)
+                    for rank,text in enumerate(texts)]
+        seconds=[[row['seconds'] for row in rows] for rows in depth_rows]
         wall_seconds = time.monotonic()-started
         self.fastest_measure_wall_seconds = min(wall_seconds,
             self.fastest_measure_wall_seconds if self.fastest_measure_wall_seconds is not None else wall_seconds)
         parents = sum(rank_frontier_counts(plans))
         # First complete depth is warmup. No mean-of-means or summed GPU rates.
-        return [Measurement('', parents, tuple(row[index] for row in seconds), True, True,
-                            throttled=telemetry.throttled)
-                for index in range(1, self.repeats)]
+        measurements=[]
+        for index in range(1,self.repeats):
+            per_rank=tuple(rows[index]['native_job_counts'] for rows in depth_rows)
+            if any(row is None for row in per_rank):per_rank=None
+            measurements.append(Measurement('',parents,tuple(row[index] for row in seconds),
+                True,True,throttled=telemetry.throttled,native_job_counts_by_rank=per_rank))
+        return measurements
 

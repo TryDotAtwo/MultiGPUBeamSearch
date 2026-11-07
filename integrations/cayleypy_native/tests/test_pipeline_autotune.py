@@ -11,7 +11,7 @@ def setup_probe(monkeypatch, fail_actual=False, fail_fixture=False):
 
     class Probe:
         def __init__(self, runner, env, beam, world, directory, fixtures, storage,
-                     deadline, verify):
+                     deadline, verify, grow=False):
             self.beam, self.deadline = beam, deadline
 
         def admit(self, env):
@@ -41,11 +41,12 @@ def setup_probe(monkeypatch, fail_actual=False, fail_fixture=False):
     return calls
 
 
-def invoke(tmp_path):
+def invoke(tmp_path, grow=False):
     options = SimpleNamespace(calibration_pipeline_seconds=600,
                               calibration_frontier_max_states=None,
                               calibration_max_batch=1024)
-    runtime = SimpleNamespace(build_metadata={'shape': {'storage_len': 112}})
+    runtime = SimpleNamespace(build_metadata={'shape': {'storage_len': 112},
+        'frontier_calibration_protocol': 'natural-growth-v1' if grow else 'fixture-v1'})
     return module.tune_downstream(None, None, runtime, options, [0, 1],
         1000000, tmp_path, {}, 'runner',
         {'parent_batch': 1024, 'phase': 'inference_verified'})
@@ -62,7 +63,8 @@ def test_exact_measurement_preserves_requested_beam_and_inference(tmp_path, monk
 
 
 @pytest.mark.parametrize('beam',[1024,2_097_152])
-def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,beam):
+@pytest.mark.parametrize('failure',[None,'candidate','baseline'])
+def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,beam,failure):
     from multigpubeamsearch.calibration_stats import Measurement
     from multigpubeamsearch import component_autotune,beam_geometry,adaptive_profiles
     plan=dict(frontier_state_capacity=beam//2,GLOBAL_BEAM_WIDTH_EFFECTIVE=beam,
@@ -73,6 +75,9 @@ def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,
         def __init__(self,*args,**kwargs):pass
         def admit(self,env):return [plan]*2
         def measure(self,env,plans):
+            if (failure=='candidate' and env.get('marker')=='candidate') or (
+                    failure=='baseline' and env.get('marker')=='base'):
+                raise ValueError('native calibration timed out')
             seconds=.01 if env.get('marker')=='base' else .03
             return [Measurement('unused',beam,(seconds,seconds),True,True)]*5
     def components(probe,session,plans,baseline,candidates,**kwargs):
@@ -87,15 +92,28 @@ def test_full_frontier_rejects_slow_component_proxy_winner(tmp_path,monkeypatch,
     monkeypatch.setattr(beam_geometry,'memory_shortlist',lambda *a,**kw:[])
     monkeypatch.setattr(adaptive_profiles,'context',lambda *a:{})
     monkeypatch.setattr(adaptive_profiles,'proposals',lambda *a,**kw:([],{}))
-    result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
+    def run():return module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
         SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
         SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=True,
             calibration_frontier_max_states=None,calibration_max_batch=256),[0,1],beam,tmp_path,{},'runner',
-        {'parent_batch':256,'phase':'inference_verified'})
+        {'parent_batch':256,'phase':'inference_verified','estimate':{'low':1e-8,'median':1e-8}})
+    if failure=='baseline':
+        with pytest.raises(ValueError,match='timed out'):run()
+        return
+    result=run()
     assert result['selection']=='baseline'
     assert result['environment']['marker']=='base'
     assert result['estimate']['profile']=='baseline'
-    assert len(result['full_comparison_measurements'])==10
+    assert len(result['full_comparison_measurements'])==(5 if failure else 10)
+    if not failure:
+        assert result['adaptive_search']['rounds']==[]
+        assert result['adaptive_search']['stop_reason']=='no_statistically_separated_gain'
+    if failure:
+        assert result['pipeline_verified'] is True
+        assert result['full_grid_complete'] is False
+        assert result['adaptive_search']['search_complete'] is False
+        assert result['full_tested']==['baseline']
+        assert result['adaptive_search']['coarse_full_rejected'][0]['name']=='candidate'
 
 
 def test_real_beam_admission_failure_cannot_be_hidden_by_small_fixture(tmp_path, monkeypatch):
@@ -126,7 +144,7 @@ def test_native_scalar_inference_parent_batch_maps_to_child_row_budget(tmp_path,
     result=module.tune_downstream(SimpleNamespace(move_count=3),
         SimpleNamespace(backend='mlp',manifest={'output_dim':1}),runtime,options,
         [0,1],1000000,tmp_path,{},'runner',
-        {'parent_batch':256,'phase':'inference_verified'})
+        {'parent_batch':256,'phase':'inference_verified','estimate':{'low':1e-8,'median':1e-8}})
     assert result['environment']['BEAM_B_MICRO']=='768'
     assert all(env['BEAM_ENSEMBLE_INFERENCE_MICRO']=='256' for _,env in calls)
 
@@ -166,9 +184,62 @@ def test_full_refinement_uses_measured_winner_and_stops(tmp_path,monkeypatch):
         SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
         SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=True,
             calibration_frontier_max_states=None,calibration_max_batch=256),[0],4097,tmp_path,{},'runner',
-        {'parent_batch':256,'phase':'inference_verified','estimate':{'median':.001}})
+        {'parent_batch':256,'phase':'inference_verified','estimate':{'low':.001,'median':.001}})
     assert centers==[2048,3072]
     assert measured==[1024,2048,3072,4096]
     assert result['environment']['BEAM_STREAM4_BATCH_CANDIDATES']=='3072'
     assert result['adaptive_search']['stop_reason']=='no_statistically_separated_gain'
     assert len(result['full_tested'])==4
+
+
+def test_cached_full_profile_is_reused_before_expensive_verification_budget(tmp_path,monkeypatch):
+    from multigpubeamsearch import pipeline_cache,adaptive_profiles,working_capacity
+    setup_probe(monkeypatch)
+    cached=dict(phase='pipeline_measured',cache_hit=True)
+    monkeypatch.setattr(pipeline_cache,'cache_identity',lambda *a,**kw:{})
+    monkeypatch.setattr(pipeline_cache,'cache_path',lambda *a:tmp_path/'cached.json')
+    monkeypatch.setattr(pipeline_cache,'read_profile',lambda *a:cached)
+    monkeypatch.setattr(adaptive_profiles,'context',lambda *a:{})
+    def forbidden(*a,**kw):raise AssertionError('cache hit must not budget or rerun full verification')
+    monkeypatch.setattr(working_capacity,'verification_cost',forbidden)
+    options=SimpleNamespace(cache_dir=tmp_path,calibration_pipeline_seconds=1,calibration_full_frontier=True)
+    runtime=SimpleNamespace(build_metadata={'shape':{'storage_len':16},'component_calibration_protocol':'exact-capacity-v1'})
+    result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
+        runtime,options,[0,1],1000000,tmp_path,{},'runner',{'parent_batch':256,'phase':'inference_verified'})
+    assert result is cached
+
+
+def test_natural_growth_tuner_never_builds_python_frontier(tmp_path,monkeypatch):
+    setup_probe(monkeypatch)
+    def forbidden(*args,**kwargs):raise AssertionError('Python frontier generation forbidden')
+    monkeypatch.setattr(module,'write_frontiers',forbidden)
+    result=invoke(tmp_path,grow=True)
+    assert result['fixture']['kind']=='native-natural-growth-v1'
+    assert result['requested_beam_effective']==1000000
+
+
+def test_shared_pipeline_validates_exact_beam_without_parameter_sweep(tmp_path, monkeypatch):
+    from multigpubeamsearch import pipeline_cache, adaptive_profiles, shared_profiles, component_autotune
+    calls = setup_probe(monkeypatch)
+    env={'BEAM_B_MICRO':'512','BEAM_ENSEMBLE_INFERENCE_MICRO':'256',
+         'BEAM_STREAM3_RING_SLOTS':'2','BEAM_SHARD_COUNT':'4',
+         'BEAM_STREAM4_BATCH_CANDIDATES':'8192','BEAM_STREAM4_ACTIVE_SORT_SLOTS':'2'}
+    shared={'inference':{'parent_batch':256},'pipeline':{'environment':env},'registry_sha256':'a'*64}
+    monkeypatch.setattr(shared_profiles,'lookup',lambda *args:shared)
+    monkeypatch.setattr(adaptive_profiles,'context',lambda *args:{})
+    monkeypatch.setattr(pipeline_cache,'cache_identity',lambda *args,**kw:None)
+    measured=[]
+    def components(probe,session,plans,baseline,candidates,**kwargs):
+        measured.append((probe.beam,baseline,candidates))
+        assert kwargs['candidate_factory']([],plans[0],{})==[]
+        return dict(phase='component_calibrated',environment=baseline,pipeline_verified=False,cache_hit=False)
+    monkeypatch.setattr(component_autotune,'tune_components',components)
+    session=SimpleNamespace(supports_components=True,set_deadline=lambda *args:None,close=lambda:None)
+    result=module.tune_downstream(SimpleNamespace(move_count=3),SimpleNamespace(backend='ensemble'),
+        SimpleNamespace(build_metadata={'shape':{'storage_len':32},'component_calibration_protocol':'exact-capacity-v1'}),
+        SimpleNamespace(calibration_pipeline_seconds=600,calibration_full_frontier=False),
+        [0,1],1000000,tmp_path,{},'runner',{'parent_batch':256,'phase':'inference_verified'},planning_session=session)
+    assert measured==[(1000000,env,[])]
+    assert calls[-1]==(1000000,env)
+    assert result['shared_profile_validated'] and not result['pipeline_verified']
+    assert not result['cache_hit']

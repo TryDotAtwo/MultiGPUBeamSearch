@@ -1,0 +1,8 @@
+cayleypy>=0.1.0
+torch>=2.6
+cmake>=3.28
+ninja>=1.11
+
+[test]
+pytest>=7
+build

@@ -1,5 +1,5 @@
 import pytest
-from multigpubeamsearch.pipeline_probe import parse_plan, parse_depths
+from multigpubeamsearch.pipeline_probe import parse_plan, parse_depths, parse_depth_records
 
 
 def test_native_plan_rejects_conflicting_values():
@@ -9,8 +9,11 @@ def test_native_plan_rejects_conflicting_values():
 
 
 def test_depth_measurements_require_exact_workload_and_completion():
-    text='\n'.join(f'calibration_depth={i} rank=0 parents=4096 depth_sec=1.25 next_frontier_size=4096' for i in range(6))
+    text='\n'.join(f'calibration_depth={i} rank=0 parents=4096 depth_sec=1.25 ring_slot_jobs=2 stream3_jobs=3 stream4_jobs=4 search_depth={i+1} next_frontier_size=4096' for i in range(6))
     assert parse_depths(text,4096,6)==[1.25]*6
+    rows=parse_depth_records(text,4096,6)
+    assert rows[0]['native_job_counts']==dict(ring_slot_jobs=2,stream3_jobs=3,stream4_jobs=4)
+    assert rows[0]['search_depth']==1
     with pytest.raises(ValueError,match='workload'):
         parse_depths(text,8192,6)
     with pytest.raises(ValueError,match='all calibration'):
@@ -85,3 +88,77 @@ def test_logical_rank_frontiers_preserve_odd_global_width_without_padding():
         expected=[sum(i*world//width==r for i in range(width)) for r in range(world)]
         assert counts==expected
         assert sum(counts)==width
+
+
+@pytest.mark.parametrize('complete', [True, False])
+def test_natural_growth_requires_saturated_cohort_without_fixture(tmp_path, monkeypatch, complete):
+    import time
+    from multigpubeamsearch import pipeline_probe as module
+    class Telemetry:
+        throttled=False
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def receipt(self):return {}
+    monkeypatch.setattr(module,'CalibrationTelemetry',Telemetry)
+    probe=module.NativePipelineProbe('runner',{},8192,2,tmp_path,
+        [tmp_path/'missing-0',tmp_path/'missing-1'],16,
+        deadline=time.monotonic()+60,verify=lambda *args:True,grow=True)
+    def run(*args,**kwargs):
+        probe.counter+=1;(tmp_path/str(probe.counter)).mkdir()
+        return ['\n'.join([f'calibration_depth={i} rank={rank} parents=4096 depth_sec=1 search_depth={i+7}'
+                   for i in range(6 if complete else 2)]+[
+                   f'calibration_saturated_steps={6 if complete else 2}']) for rank in range(2)]
+    monkeypatch.setattr(probe,'_run',run)
+    plans=[dict(GLOBAL_BEAM_WIDTH_EFFECTIVE=8192,frontier_state_capacity=4096)]*2
+    if complete:
+        assert len(probe.measure({},plans))==5
+    else:
+        with pytest.raises(ValueError,match='saturated frontier'):
+            probe.measure({},plans)
+
+
+def test_natural_growth_launches_bounded_search_without_frontier_file(tmp_path,monkeypatch):
+    import time
+    from multigpubeamsearch import pipeline_probe as module
+    launched=[]
+    class Process:
+        def __init__(self,command,**kwargs):launched.append((command,kwargs['env']))
+        def wait(self,**kwargs):return 0
+        def poll(self):return 0
+    monkeypatch.setattr(module.subprocess,'Popen',Process)
+    probe=module.NativePipelineProbe('runner',{'BEAM_BENCHMARK_FRONTIER_FILE':'stale'},8192,2,tmp_path,
+        [tmp_path/'missing-0',tmp_path/'missing-1'],16,
+        deadline=time.monotonic()+60,verify=lambda *args:True,grow=True)
+    probe._run({},planning=False)
+    assert len(launched)==2
+    for command,env in launched:
+        assert command[2]=='38'
+        assert env['BEAM_BENCHMARK_GROW_STEPS']=='6'
+        assert 'BEAM_BENCHMARK_FRONTIER_FILE' not in env
+
+
+def test_nsight_capture_wraps_only_the_first_natural_growth_cohort(tmp_path,monkeypatch):
+    import time
+    from pathlib import Path
+    from multigpubeamsearch import pipeline_probe as module
+    launched=[]
+    class Process:
+        def __init__(self,command,**kwargs):
+            launched.append((command,kwargs['env']))
+            output=Path(command[command.index('--output')+1])
+            output.with_suffix('.nsys-rep').write_bytes(b'trace')
+            kwargs['stdout'].write(b'cuda_profile_capture=complete depth=8 saturated_index=0\n')
+        def wait(self,**kwargs):return 0
+        def poll(self):return 0
+    monkeypatch.setattr(module.subprocess,'Popen',Process)
+    monkeypatch.setattr(module.shutil,'which',lambda name:'/fake/nsys' if name=='nsys' else None)
+    traces=tmp_path/'traces'
+    probe=module.NativePipelineProbe('runner',{
+        'MULTIGPUBEAMSEARCH_NSYS_PROFILE_DIR':str(traces)},8192,2,tmp_path/'probe',
+        [tmp_path/'missing-0',tmp_path/'missing-1'],16,
+        deadline=time.monotonic()+60,verify=lambda *args:True,grow=True)
+    probe._run({},planning=False)
+    assert len(launched)==2 and probe.nsys_capture_done
+    assert all(command[0]=='/fake/nsys' for command,_ in launched)
+    assert all(env['BEAM_CUDA_PROFILE_SATURATED_INDEX']=='0' for _,env in launched)
+    assert len(list(traces.glob('*.nsys-rep')))==2

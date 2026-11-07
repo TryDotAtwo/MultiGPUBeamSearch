@@ -19,6 +19,9 @@ class NativeOptions:
     build_timeout_seconds: float = 1800.0
     touch_bfs_radius: int = 0
     touch_bfs_max_entries: int = 1_048_576
+    solution_mode: str = "first"
+    collect_extra_depths: int = 1
+    max_collected_solutions: int = 2000
     build_jobs: int = 2
     warn_on_fallback: bool = True
     autotune: bool = True
@@ -31,6 +34,12 @@ class NativeOptions:
     calibration_discover_capacity: bool = False
 
     def __post_init__(self):
+        if self.solution_mode not in ("first", "collect"):
+            raise ValueError("solution_mode must be first or collect")
+        if type(self.collect_extra_depths) is not int or not 0 <= self.collect_extra_depths < 2**32:
+            raise ValueError("collect_extra_depths must be a nonnegative uint32")
+        if type(self.max_collected_solutions) is not int or not 1 <= self.max_collected_solutions <= 1_000_000:
+            raise ValueError("max_collected_solutions must be in [1, 1000000]")
         if self.inference_backend not in ("auto", "libtorch", "cutlass"):
             raise ValueError("inference_backend must be auto, libtorch, or cutlass")
         if self.num_gpus is not None and (type(self.num_gpus) is not int or self.num_gpus < 1):

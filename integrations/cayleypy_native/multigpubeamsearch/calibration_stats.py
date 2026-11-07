@@ -21,6 +21,7 @@ class Measurement:
     correctness_passed: bool
     memory_admitted: bool
     throttled: bool = False
+    native_job_counts_by_rank: tuple[dict[str, int], ...] | None = None
 
     @property
     def seconds_per_parent(self) -> float:
