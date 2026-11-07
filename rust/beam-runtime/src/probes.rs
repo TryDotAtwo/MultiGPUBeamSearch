@@ -286,6 +286,37 @@ pub struct ProbeCohort {
     sessions: Vec<ProbeSession>,
     cancellation: Arc<AtomicBool>,
 }
+
+/// Preserve precise native capacity/error diagnostics after the ranks are reaped.
+/// Only the bounded log tail is read; the complete logs remain the primary trace.
+pub(crate) fn rank_error(error: Error, directory: &Path, world: usize) -> Error {
+    use std::io::{Seek, SeekFrom};
+    let mut messages = Vec::new();
+    for rank in 0..world {
+        let read = (|| -> std::io::Result<String> {
+            let mut file = std::fs::File::open(directory.join(format!("rank-{rank}.log")))?;
+            let start = file.metadata()?.len().saturating_sub(64 << 10);
+            file.seek(SeekFrom::Start(start))?;
+            let mut bytes = Vec::new();
+            file.take(64 << 10).read_to_end(&mut bytes)?;
+            Ok(String::from_utf8_lossy(&bytes).into_owned())
+        })();
+        if let Ok(text) = read {
+            if let Some(line) = text
+                .lines()
+                .rev()
+                .find(|l| l.starts_with("production_runner_error="))
+            {
+                messages.push(format!("rank {rank}: {line}"));
+            }
+        }
+    }
+    if messages.is_empty() {
+        error
+    } else {
+        Error::Message(format!("{error}; {}", messages.join("; ")))
+    }
+}
 impl ProbeCohort {
     pub fn bind_cancellation(&mut self, cancellation: Arc<AtomicBool>) {
         self.cancellation = cancellation;

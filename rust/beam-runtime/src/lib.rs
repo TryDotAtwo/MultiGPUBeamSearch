@@ -2,11 +2,16 @@
 #![forbid(unsafe_code)]
 pub mod artifacts;
 pub mod calibration;
+pub mod component_probe;
+pub mod component_tuning;
+mod downstream_full;
+pub mod downstream_job;
 pub mod history;
 pub mod inference;
 pub mod inference_job;
 pub mod inference_tuning;
 pub mod pipeline;
+pub mod pipeline_cache;
 pub mod planning;
 pub mod probes;
 pub mod profile_cache;

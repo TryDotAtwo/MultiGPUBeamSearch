@@ -30,3 +30,31 @@ def test_thin_adapter_passes_validated_model_and_options_to_one_rust_call(monkey
     assert len(request['artifacts'])==2 and request['helper']['sha256']==runtime.build_metadata['calibration_binary_sha256']
     assert request['probe_manifest']==dict(weights_dir=str(weights))
     assert not list(tmp_path.glob('calibration*'))
+
+
+def test_downstream_adapter_only_transfers_model_hardware_and_job_descriptor(monkeypatch,tmp_path):
+    from multigpubeamsearch import rust_control,models
+    import torch
+    runner=tmp_path/'runner';runner.write_bytes(b'runner')
+    weights=tmp_path/'weights';weights.mkdir();(weights/'manifest.json').write_text('{}')
+    contract=SimpleNamespace(center=(0,1,2),generators=((1,0,2),(0,2,1)),move_count=2)
+    model=SimpleNamespace(weights_dir=weights,backend='mlp',manifest={'output_dim':1},artifact_files=('manifest.json',))
+    runtime=SimpleNamespace(runner=runner,build_metadata=dict(binary_sha256=hashlib.sha256(b'runner').hexdigest(),
+        shape=dict(storage_len=16),frontier_calibration_protocol='natural-growth-v1'))
+    monkeypatch.setattr(torch.cuda,'get_device_properties',lambda dev:SimpleNamespace(multi_processor_count=28,L2_cache_size=3<<20))
+    verified=[];monkeypatch.setattr(models,'verify_prepared_model',lambda *args:verified.append(args))
+    calls=[]
+    class Job:
+        def __init__(self,request):calls.append(json.loads(request))
+        def run(self):return json.dumps(dict(phase='component_calibrated',pipeline_verified=False))
+    monkeypatch.setattr(rust_control,'extension',lambda:SimpleNamespace(DownstreamCalibration=Job))
+    inference=dict(parent_batch=16,signature={'bound':'input'})
+    result=rust_control.tune_downstream(contract,model,runtime,NativeOptions(cache_dir=tmp_path/'cache'),
+        (0,1),65,tmp_path,{'BEAM_TEST_CSV':'/input/test.csv'},runner,inference)
+    assert result['pipeline_verified'] is False and len(calls)==1 and len(verified)==2
+    request=calls[0]
+    assert request['row_factor']==2 and request['physical_bytes']==16 and request['beam_width']==65
+    assert request['hardware']==dict(sm_count=28,l2_bytes=3<<20)
+    assert request['inference']==inference and request['grow'] is True
+    assert request['environment']['BEAM_TEST_CSV']=='/input/test.csv'
+    assert not (tmp_path/'pipeline-calibration').exists()

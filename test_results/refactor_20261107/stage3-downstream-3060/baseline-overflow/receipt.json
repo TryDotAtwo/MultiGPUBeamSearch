@@ -1,0 +1,30 @@
+{
+  "baseline": "0eafb19369262a7d254058a0b4839bea7dfa3334",
+  "returncode": 1,
+  "errors": [
+    "production_runner_error=cuda stream fatal error: phase=stream3_ring_complete flag=3002 code=3002 shard=1 group=0 existing=4465 available=655 raw_count=756 write_count=655 spill_count=101 spill_offset=0 spill_end=101 spill_capacity=0 clean_count=3717 dirty_count=748 processing_flag=0 shard_capacity_candidates=5120 stream4_batch_candidates=1024 append_to_active_spill=1 logical_shard=0 selected_buffer=1 sibling_shard=0 sibling_existing=4706 sibling_available=414 sibling_clean_count=4706 sibling_dirty_count=0 sibling_processing_flag=0 shard_buffer_count=2"
+  ],
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "0",
+    "BEAM_GENERATOR_PATH": "/workspace/beam-results/history/gpu-disk/puzzle.json",
+    "BEAM_PUZZLE_INFO_JSON": "/workspace/beam-results/history/gpu-disk/puzzle.json",
+    "BEAM_TEST_CSV": "/workspace/beam-results/downstream/gpu/test.csv",
+    "BEAM_WEIGHT_DIR": "/workspace/beam-results/history/gpu-disk/weights",
+    "BEAM_RUNTIME_CONFIG_MODE": "auto",
+    "BEAM_B_MICRO": "384",
+    "BEAM_ENSEMBLE_INFERENCE_MICRO": "16",
+    "BEAM_SHARD_COUNT": "1",
+    "BEAM_STREAM3_RING_SLOTS": "2",
+    "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+    "BEAM_STREAM4_BATCH_CANDIDATES": "1024",
+    "BEAM_STREAM1_EXECUTOR": "native_cuda_graph",
+    "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": "0",
+    "BEAM_STREAM2_SUFFIX_RADIUS": "0",
+    "BEAM_SOLVE_BUCKET_MODE": "0",
+    "BEAM_BENCHMARK_GROW_STEPS": "6",
+    "BEAM_BENCHMARK_FRONTIER_REPEATS": "6",
+    "BEAM_ENSEMBLE_RESERVE_BYTES": "536871912",
+    "BEAM_HISTORY_DIR": "/workspace/beam-results/downstream/baseline-overflow/history",
+    "BEAM_HISTORY_DISK_PATH": "/workspace/beam-results/downstream/baseline-overflow/history"
+  }
+}

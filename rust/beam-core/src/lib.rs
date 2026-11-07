@@ -3,11 +3,13 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 pub mod calibration;
+pub mod components;
 pub mod config;
 pub mod history;
 pub mod inference;
 mod permutation;
 pub mod planning;
+pub mod profile_policy;
 pub mod search;
 
 #[derive(Debug, thiserror::Error)]

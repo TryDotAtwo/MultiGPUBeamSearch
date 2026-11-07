@@ -1,0 +1,4 @@
+native_host_memory_available_bytes=84881539072 native_host_memory_history_budget=0 native_host_memory_headroom=3221225472
+communicator_rank=0 world_size=1 node_local_rank=0 local_world_size=1 cuda_ordinal=0
+{"component_protocol":"persistent-exact-capacity-v1","free_bytes_snapshot":12369920000,"rank":0,"ready":true}
+{"admitted":true,"plan":{"BEAM_WIDTH_ALIGNMENT":1024,"B_MICRO":32,"GLOBAL_BEAM_WIDTH_EFFECTIVE":4096,"LOCAL_RANK":0,"RING_COUNT":6,"SHARD_CAPACITY_CANDIDATES":131072,"SHARD_COUNT":1,"STREAM3_RING_SLOTS":2,"STREAM4_ACTIVE_SORT_SLOTS":1,"STREAM4_BATCH_ALIGNMENT":1024,"STREAM4_BATCH_CANDIDATES":131072,"WORLD_SIZE":1,"estimated_required_device_bytes":64236482,"frontier_state_capacity":4096,"gpu_budget_bytes":11564613632}}

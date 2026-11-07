@@ -26,6 +26,22 @@ fn fixture() -> (Value, Value, BTreeMap<String, u64>) {
 }
 
 #[test]
+fn native_timing_receipts_keep_float_bits_and_content_keys_across_json_cache() {
+    // Real GPU receipt values that drifted one ULP under the default parser,
+    // invalidating a full-step cache on every otherwise compatible read.
+    let values = [0.014777312278747559f64, 0.009699328422546387f64];
+    let original = json!({"timings":values});
+    let restored: Value = serde_json::from_slice(&serde_json::to_vec(&original).unwrap()).unwrap();
+    for (index, expected) in values.iter().enumerate() {
+        assert_eq!(
+            expected.to_bits(),
+            restored["timings"][index].as_f64().unwrap().to_bits()
+        );
+    }
+    assert_eq!(cache_key(&original).unwrap(), cache_key(&restored).unwrap());
+}
+
+#[test]
 fn artifacts_hash_bound_and_cache_requires_complete_evidence() {
     let root = std::env::temp_dir().join(format!("beam-cache-{}", std::process::id()));
     fs::create_dir(&root).unwrap();

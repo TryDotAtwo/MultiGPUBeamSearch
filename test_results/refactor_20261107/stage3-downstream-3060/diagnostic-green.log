@@ -1,0 +1,11 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.54s
+     Running tests/pipeline.rs (/workspace/target/debug/deps/pipeline-d7c67769813c9f40)
+
+running 3 tests
+test complete_depth_parser_rejects_missing_reordered_and_changed_workloads ... ok
+test normal_pipeline_cleanup_does_not_cancel_parent_job ... ok
+test native_capacity_diagnostics_survive_coarse_rank_failure ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+

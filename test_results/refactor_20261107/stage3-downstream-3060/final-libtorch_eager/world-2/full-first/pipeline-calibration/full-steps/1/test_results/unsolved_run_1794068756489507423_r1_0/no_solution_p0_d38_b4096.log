@@ -1,0 +1,12 @@
+rank=1
+world_size=2
+solution_found=0
+completed_depths=10
+history_mode=ram
+history_dir=/workspace/beam-results/downstream/final-libtorch_eager/world-2/full-first/pipeline-calibration/full-steps/1/history/rank-1
+history_depth_count=10
+history_bytes_received=496320
+history_bytes_stored=248160
+history_bytes_stored_ram=248160
+history_bytes_stored_disk=0
+history_bytes_pruned=0

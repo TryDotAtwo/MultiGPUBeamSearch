@@ -1,6 +1,44 @@
 use beam_runtime::planning::PlanningSession;
 use std::{collections::BTreeMap, fs, time::Duration};
 
+#[test]
+fn external_cancellation_reaps_ranks_during_planner_startup() {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+    let dir = std::env::temp_dir().join(format!("beam-plan-cancel-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let worker = dir.join("worker.py");
+    fs::write(&worker,"import os,time,pathlib\npathlib.Path('pid-'+os.environ['RANK']).write_text(str(os.getpid()))\ntime.sleep(30)\n").unwrap();
+    let command = vec!["python".into(), worker.to_string_lossy().into_owned()];
+    let token = Arc::new(AtomicBool::new(false));
+    let cancel = token.clone();
+    let signal = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(200));
+        cancel.store(true, Ordering::Release);
+    });
+    let began = std::time::Instant::now();
+    assert!(PlanningSession::launch_cancellable(
+        &command,
+        &std::env::vars().collect(),
+        2,
+        &dir,
+        &dir.join("ranks"),
+        Duration::from_secs(20),
+        token
+    )
+    .is_err());
+    signal.join().unwrap();
+    assert!(began.elapsed() < Duration::from_secs(4));
+    #[cfg(unix)]
+    for rank in 0..2 {
+        let pid = fs::read_to_string(dir.join(format!("pid-{rank}"))).unwrap();
+        assert!(!std::path::Path::new(&format!("/proc/{pid}")).exists());
+    }
+    fs::remove_dir_all(dir).unwrap();
+}
+
 // Protocol adversary: rank 1 rejects preparation while rank 0 is prepared.
 // A run request before cohort-wide preparation is a fatal error in this fixture.
 #[test]

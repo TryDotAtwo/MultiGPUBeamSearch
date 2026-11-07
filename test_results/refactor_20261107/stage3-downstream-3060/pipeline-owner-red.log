@@ -1,0 +1,15 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0599]: no associated function or constant named `launch_cancellable` found for struct `PipelineProbe` in the current scope
+  --> rust/beam-runtime/tests/pipeline.rs:37:24
+   |
+37 |         PipelineProbe::launch_cancellable(config, Duration::from_secs(5), token.clone()).unwrap();
+   |                        ^^^^^^^^^^^^^^^^^^ associated function or constant not found in `PipelineProbe`
+   |
+note: if you're trying to build a new `PipelineProbe`, consider using `PipelineProbe::launch` which returns `Result<PipelineProbe, beam_runtime::Error>`
+  --> rust/beam-runtime/src/pipeline.rs:53:5
+   |
+53 |     pub fn launch(mut config: Config, timeout: Duration) -> Result<Self> {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `beam-runtime` (test "pipeline") due to 1 previous error

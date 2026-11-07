@@ -1,0 +1,9 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+error[E0432]: unresolved import `beam_core::components`
+ --> rust/beam-core/tests/components.rs:1:16
+  |
+1 | use beam_core::components::{ComponentPlan,ComponentReceipt,service_envelope,validate_components};
+  |                ^^^^^^^^^^ could not find `components` in `beam_core`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-core` (test "components") due to 1 previous error

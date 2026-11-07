@@ -1,0 +1,10 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.15s
+     Running tests/component_tuning.rs (/workspace/target/debug/deps/component_tuning-b31858116bdc687f)
+
+running 2 tests
+test bounded_component_tuning_keeps_exact_admission_raw_receipts_and_no_full_step_claim ... ok
+test cancellation_or_rank_failure_does_not_become_capacity_and_bad_cohorts_never_select ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

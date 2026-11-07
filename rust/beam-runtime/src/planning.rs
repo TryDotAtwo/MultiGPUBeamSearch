@@ -30,7 +30,26 @@ impl PlanningSession {
         directory: &Path,
         timeout: Duration,
     ) -> Result<Self> {
-        if world == 0 {
+        Self::launch_cancellable(
+            command,
+            environment,
+            world,
+            cwd,
+            directory,
+            timeout,
+            Arc::new(AtomicBool::new(false)),
+        )
+    }
+    pub fn launch_cancellable(
+        command: &[String],
+        environment: &BTreeMap<String, String>,
+        world: u32,
+        cwd: &Path,
+        directory: &Path,
+        timeout: Duration,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<Self> {
+        if world == 0 || cancel.load(Ordering::Acquire) {
             return Err(Error::Message("empty planning cohort".into()));
         }
         let deadline = Instant::now()
@@ -72,7 +91,8 @@ impl PlanningSession {
             environments.push(env);
         }
         let mut group = ProbeCohort::launch(&commands, &environments, cwd, &directory, timeout)?;
-        let ready = match group.collect(timeout) {
+        group.bind_cancellation(cancel);
+        let ready = match group.collect(deadline.saturating_duration_since(Instant::now())) {
             Ok(ready) => ready,
             Err(error) => {
                 let _ = group.close();

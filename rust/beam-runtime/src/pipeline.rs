@@ -50,7 +50,14 @@ pub struct PipelineProbe {
     closed: bool,
 }
 impl PipelineProbe {
-    pub fn launch(mut config: Config, timeout: Duration) -> Result<Self> {
+    pub fn launch(config: Config, timeout: Duration) -> Result<Self> {
+        Self::launch_cancellable(config, timeout, Arc::new(AtomicBool::new(false)))
+    }
+    pub fn launch_cancellable(
+        mut config: Config,
+        timeout: Duration,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<Self> {
         if config.beam == 0
             || !(1..=65535).contains(&config.world)
             || !(6..=16).contains(&config.repeats)
@@ -83,15 +90,15 @@ impl PipelineProbe {
             "1".into(),
             "1024".into(),
         ];
-        let planner = PlanningSession::launch(
+        let planner = PlanningSession::launch_cancellable(
             &command,
             &config.environment,
             config.world,
             &config.cwd,
             &config.directory.join("planning"),
             timeout,
+            cancel.clone(),
         )?;
-        let cancel = planner.cancellation();
         Ok(Self {
             config,
             planner: Some(planner),
@@ -122,7 +129,6 @@ impl PipelineProbe {
     }
     pub fn close(&mut self) -> Result<()> {
         self.closed = true;
-        self.cancel.store(true, Ordering::Release);
         self.finish_planning()
     }
     fn run(&mut self, environment: &Environment) -> Result<(Vec<String>, PathBuf, Duration, bool)> {
@@ -247,7 +253,9 @@ impl PipelineProbe {
             serde_json::to_vec_pretty(&receipt)?,
         )?;
         let verified = receipt.verified(&self.config.gpu_uuids, &self.config.device_indices);
-        let texts = run?;
+        let texts = run.map_err(|error| {
+            crate::probes::rank_error(error, &directory.join("ranks"), self.config.world as usize)
+        })?;
         Ok((texts, directory, began.elapsed(), verified))
     }
 }

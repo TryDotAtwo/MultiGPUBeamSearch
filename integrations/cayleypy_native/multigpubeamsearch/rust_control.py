@@ -64,3 +64,32 @@ def tune_inference(contract, model, runtime, options, devices, beam_width,
         raise NativeBackendError(str(error)) from error
     verify_prepared_model(model, contract)
     return result
+
+
+def tune_downstream(contract, model, runtime, options, devices, beam_width,
+                    run_dir, environment, runner, inference):
+    import torch
+    from .build import file_sha256
+    from .models import verify_prepared_model
+    verify_prepared_model(model, contract)
+    files = []
+    for name in model.artifact_files:
+        path = model.weights_dir / name
+        files.append(dict(path=str(path), sha256=file_sha256(path), bytes=path.stat().st_size))
+    hardware = [torch.cuda.get_device_properties(device) for device in devices]
+    row_factor = contract.move_count if model.backend == 'mlp' and model.manifest['output_dim'] == 1 else 1
+    request = dict(options=options_descriptor(options),
+        graph=dict(center=contract.center, generators=contract.generators),
+        runner=dict(path=str(Path(runner).resolve()), sha256=runtime.build_metadata['binary_sha256'], bytes=None),
+        artifacts=files, inference=inference, environment=dict(environment), beam_width=beam_width,
+        row_factor=row_factor, hardware=dict(sm_count=min(p.multi_processor_count for p in hardware),
+            l2_bytes=min(getattr(p, 'L2_cache_size', getattr(p, 'l2_cache_size', 0)) for p in hardware)),
+        run_dir=str(Path(run_dir).resolve()), cwd=str(Path.cwd()),
+        physical_bytes=runtime.build_metadata['shape']['storage_len'], puzzle_id=0,
+        grow=runtime.build_metadata.get('frontier_calibration_protocol') == 'natural-growth-v1', fixtures=[])
+    try:
+        result = json.loads(extension().DownstreamCalibration(json.dumps(request)).run())
+    except (RuntimeError, ValueError) as error:
+        raise NativeBackendError(str(error)) from error
+    verify_prepared_model(model, contract)
+    return result

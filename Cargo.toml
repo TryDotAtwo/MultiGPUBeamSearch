@@ -9,7 +9,8 @@ license = "MIT"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# Timing receipts and content-bound cache identities must survive f64 JSON I/O.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "2"
 sha2 = "=0.10.9"
 libloading = "0.8"

@@ -1,0 +1,10 @@
+DOWNSTREAM_JOB_OK world=1 full=False attempt=first
+DOWNSTREAM_JOB_OK world=1 full=False attempt=hit
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_downstream_job_gpu.py", line 92, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/beam-work/tests/native_downstream_job_gpu.py", line 51, in main
+    result=json.loads(native.DownstreamCalibration(json.dumps(request)).run())
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: rank 0 exited with 1

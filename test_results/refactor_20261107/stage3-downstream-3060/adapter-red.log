@@ -1,0 +1,33 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+___ test_downstream_adapter_only_transfers_model_hardware_and_job_descriptor ___
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f755c4761d0>
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-8/test_downstream_adapter_only_t0')
+
+    def test_downstream_adapter_only_transfers_model_hardware_and_job_descriptor(monkeypatch,tmp_path):
+        from multigpubeamsearch import rust_control,models
+        import torch
+        runner=tmp_path/'runner';runner.write_bytes(b'runner')
+        weights=tmp_path/'weights';weights.mkdir();(weights/'manifest.json').write_text('{}')
+        contract=SimpleNamespace(center=(0,1,2),generators=((1,0,2),(0,2,1)),move_count=2)
+        model=SimpleNamespace(weights_dir=weights,backend='mlp',manifest={'output_dim':1},artifact_files=('manifest.json',))
+        runtime=SimpleNamespace(runner=runner,build_metadata=dict(binary_sha256=hashlib.sha256(b'runner').hexdigest(),
+            shape=dict(storage_len=16),frontier_calibration_protocol='natural-growth-v1'))
+        monkeypatch.setattr(torch.cuda,'get_device_properties',lambda dev:SimpleNamespace(multi_processor_count=28,L2_cache_size=3<<20))
+        verified=[];monkeypatch.setattr(models,'verify_prepared_model',lambda *args:verified.append(args))
+        calls=[]
+        class Job:
+            def __init__(self,request):calls.append(json.loads(request))
+            def run(self):return json.dumps(dict(phase='component_calibrated',pipeline_verified=False))
+        monkeypatch.setattr(rust_control,'extension',lambda:SimpleNamespace(DownstreamCalibration=Job))
+        inference=dict(parent_batch=16,signature={'bound':'input'})
+>       result=rust_control.tune_downstream(contract,model,runtime,NativeOptions(cache_dir=tmp_path/'cache'),
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            (0,1),65,tmp_path,{'BEAM_TEST_CSV':'/input/test.csv'},runner,inference)
+E       AttributeError: module 'multigpubeamsearch.rust_control' has no attribute 'tune_downstream'
+
+integrations/cayleypy_native/tests/test_rust_control.py:52: AttributeError
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_rust_control.py::test_downstream_adapter_only_transfers_model_hardware_and_job_descriptor
+1 failed, 1 passed in 4.79s

@@ -54,8 +54,16 @@ rank processes after their ABI/layout and specialization checks.
 
 ## Performance and switching
 
-Preserve inference arithmetic while moving control. Candidate-generation/cache
-policy, CNOT control and public adapters must pass their own comparisons before
+Downstream component timings only nominate profiles. Keep raw all-rank receipts,
+frozen inference microbatch and the exact row/parent conversion for scalar MLPs.
+Every candidate and every cache hit needs current native memory admission.
+Cached full-step results require the same physical geometry and complete timing
+cohort. A bounded shortlist is not a global optimum guarantee. Preserve native
+required/available diagnostics when an admitted profile overflows during execution;
+never reduce the requested beam implicitly to complete calibration.
+
+Preserve inference arithmetic while moving control. Inference/frontier admission,
+maximum/working-width policy, CNOT control and public adapters need their comparisons before
 switching. CPU or source checks do not establish GPU acceptance.
 
 Promote a CUDA variant only for a measured profile with identical models, inputs,

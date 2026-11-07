@@ -1,0 +1,10 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running tests/planning.rs (/workspace/target/debug/deps/planning-f5f1a67b6283b442)
+
+running 2 tests
+test planning_preserves_exact_width_freezes_inference_and_cancels_all_preparations ... ok
+test external_cancellation_reaps_ranks_during_planner_startup ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s
+

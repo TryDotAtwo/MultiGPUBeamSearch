@@ -1,0 +1,15 @@
+native_host_memory_available_bytes=85890949120 native_host_memory_history_budget=0 native_host_memory_headroom=3221225472
+communicator_rank=0 world_size=1 node_local_rank=0 local_world_size=1 cuda_ordinal=0
+stream1_mode=model
+stream1_executor=native_cuda_graph
+runtime_ring_count=11
+runtime_ring_slot_count=2
+runtime_ring_slot_physical_jobs=22
+runtime_ring_graph_execs_per_lane_requested=
+runtime_ring_graph_debug_sync=
+stream1_backend=mlp
+runtime_ring_slot_graph_windowed=0
+runtime_ring_slot_graph_window_rings=11
+runtime_ring_slot_graph_window_jobs=22
+runtime_ring_slot_graph_physical_jobs=22
+production_runner_error=cuda stream fatal error: phase=stream3_ring_complete flag=3002 code=3002 shard=1 group=0 existing=4465 available=655 raw_count=756 write_count=655 spill_count=101 spill_offset=0 spill_end=101 spill_capacity=0 clean_count=3717 dirty_count=748 processing_flag=0 shard_capacity_candidates=5120 stream4_batch_candidates=1024 append_to_active_spill=1 logical_shard=0 selected_buffer=1 sibling_shard=0 sibling_existing=4706 sibling_available=414 sibling_clean_count=4706 sibling_dirty_count=0 sibling_processing_flag=0 shard_buffer_count=2

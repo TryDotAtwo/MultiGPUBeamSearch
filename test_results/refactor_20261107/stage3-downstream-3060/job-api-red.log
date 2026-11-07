@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_downstream_job_gpu.py", line 92, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/beam-work/tests/native_downstream_job_gpu.py", line 16, in main
+    assert hasattr(native,'DownstreamCalibration'),'Rust downstream coarse owner is missing'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Rust downstream coarse owner is missing

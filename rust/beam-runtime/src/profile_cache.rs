@@ -17,7 +17,7 @@ pub fn cache_key(identity: &Value) -> Result<String> {
 fn invalid() -> Error {
     Error::Message("invalid or incomplete cached inference evidence".into())
 }
-fn normalize(data: &Value, signature: &Value, max_batch: u64) -> Result<Value> {
+pub(crate) fn normalize(data: &Value, signature: &Value, max_batch: u64) -> Result<Value> {
     if data["signature"] != *signature || data["phase"] != "inference_verified" {
         return Err(invalid());
     }

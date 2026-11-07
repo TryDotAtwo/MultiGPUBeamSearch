@@ -3,7 +3,7 @@
 The approved migration is in progress. Existing public Python entry points are
 switched only after their comparative acceptance stage. Rust now owns host history
 for its resident workers and ordinary CLI, plus calibration process primitives.
-Profile control and CNOT orchestration are still being transferred. No
+Maximum/working-capacity policy and CNOT orchestration are still being transferred. No
 CUDA sorting optimization or precision policy is enabled here.
 
 ## Build
@@ -78,7 +78,27 @@ pressure invalidates it. Every execution still needs fresh native admission.
 Model/helper hashes are checked even on a cache hit. Hashing streams through a
 64 KiB host buffer. `sha2` 0.10.9 and its dependency tree are pinned in Cargo.lock.
 
-Coarse PyO3 inference-job and search-session calls run on a scoped Rust thread.
+`downstream_job::Request` owns exact-capacity component calibration and the optional
+complete-step comparison. Typed component receipts retain all 128-bit-key probe
+checks in the existing native implementation. Rust validates every rank, records
+telemetry, preserves the raw rows and computes the original service-work proxy.
+Scalar MLP input-row batches are explicitly distinct from native parent batches.
+
+The versioned proposal policy nominates at most four coarse challengers and asks
+the native allocator to admit each one; it does not duplicate Python's layout-byte
+memory prefilter. Full-step mode measures the baseline and at most two nominated
+challengers, with one warmup and five complete repeats on the requested width.
+It uses 5% statistical separation; the existing inference-only threshold is 2%.
+Neither policy substitutes for the paired CUDA-optimization promotion gate.
+
+Component caches recompute selection from every original receipt and fresh
+all-rank admission with identical geometry. Full-step caches also recompute the
+whole measured comparison. Missing ranks, quality failures and throttling cannot
+become capacity rejections. An unstable baseline has one recorded retry. Native
+overflow diagnostics survive process failure; a VRAM admission is not proof of
+operational capacity for a particular graph/frontier.
+
+Coarse PyO3 inference/downstream jobs and search-session calls run on a scoped Rust thread.
 The Python thread checks signals every 20 ms, forwards cancellation and joins
 owned cleanup before propagating KeyboardInterrupt. This avoids deferring a
 notebook interruption until a long search timeout. An extra thread is created

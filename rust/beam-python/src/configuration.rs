@@ -21,6 +21,40 @@ struct InferenceCalibration {
     cancel: Arc<AtomicBool>,
     running: Mutex<()>,
 }
+#[pyclass]
+struct DownstreamCalibration {
+    request: beam_runtime::downstream_job::Request,
+    cancel: Arc<AtomicBool>,
+    running: Mutex<()>,
+}
+#[pymethods]
+impl DownstreamCalibration {
+    #[new]
+    fn new(request: &str) -> PyResult<Self> {
+        let request =
+            serde_json::from_str(request).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        beam_runtime::downstream_job::prepare(&request)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(Self {
+            request,
+            cancel: Arc::new(AtomicBool::new(false)),
+            running: Mutex::new(()),
+        })
+    }
+    fn run(&self, py: Python<'_>) -> PyResult<String> {
+        crate::interrupt::run(py, &self.cancel, || {
+            let _guard = self.running.try_lock().map_err(|_| {
+                PyRuntimeError::new_err("concurrent downstream calibration is unsupported")
+            })?;
+            let result = beam_runtime::downstream_job::run(&self.request, self.cancel.clone())
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+            serde_json::to_string(&result).map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        })
+    }
+    fn cancel(&self) {
+        self.cancel.store(true, Ordering::Release);
+    }
+}
 #[pymethods]
 impl InferenceCalibration {
     #[new]
@@ -52,5 +86,6 @@ impl InferenceCalibration {
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
     module.add_class::<InferenceCalibration>()?;
+    module.add_class::<DownstreamCalibration>()?;
     Ok(())
 }
