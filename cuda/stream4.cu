@@ -3,6 +3,7 @@
 #include "hash_sort.cuh"
 #include "nvtx_ranges.hpp"
 #include "stream4_index.cuh"
+#include "stream4_scan.cuh"
 
 #include <cub/device/device_merge_sort.cuh>
 #include <cub/device/device_radix_sort.cuh>
@@ -208,6 +209,7 @@ __global__ void stream4_split_union_counts_kernel(
     }
 }
 
+#if !BEAM_EXPERIMENTAL_STREAM4_SCAN
 __global__ void stream4_scan_block_counts_kernel(
     const std::uint32_t* block_counts,
     std::uint32_t* block_offsets,
@@ -223,6 +225,25 @@ __global__ void stream4_scan_block_counts_kernel(
     }
     *output_count = running;
 }
+#endif
+
+void stream4_scan_block_counts(const std::uint32_t* counts, std::uint32_t* offsets,
+                               std::uint32_t* total, std::uint32_t blocks,
+                               void* temp, std::size_t temp_bytes, cudaStream_t stream) {
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    const auto status = detail::stream4_scan_counts(counts, offsets, total, blocks, temp, temp_bytes, stream);
+    if (status != cudaSuccess) {
+        std::size_t required = 0;
+        const auto query = detail::stream4_scan_temp_bytes(blocks, required);
+        throw std::runtime_error(std::string("CUB stream4 block-count scan: ") + cudaGetErrorString(status) +
+            " required=" + (query == cudaSuccess ? std::to_string(required) : std::string("unknown")) +
+            " available=" + std::to_string(temp_bytes));
+    }
+#else
+    (void)temp; (void)temp_bytes;
+    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(counts, offsets, total, blocks);
+#endif
+}
 
 __global__ void stream4_compact_threshold_kernel(
     const CandidateMeta* input,
@@ -231,10 +252,13 @@ __global__ void stream4_compact_threshold_kernel(
     Hash128* compact_key,
     CandidateMeta* compact_value,
     std::uint32_t capacity) {
-    __shared__ std::uint32_t scan[256];
     const std::uint32_t tid = threadIdx.x;
     const std::uint32_t i = blockIdx.x * blockDim.x + tid;
     const std::uint32_t keep = i < capacity ? keep_flags[i] : 0U;
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    const std::uint32_t prefix = detail::stream4_block_prefix(keep);
+#else
+    __shared__ std::uint32_t scan[256];
     scan[tid] = keep;
     __syncthreads();
     for (std::uint32_t offset = 1; offset < blockDim.x; offset <<= 1) {
@@ -243,9 +267,11 @@ __global__ void stream4_compact_threshold_kernel(
         scan[tid] += add;
         __syncthreads();
     }
+    const std::uint32_t prefix = scan[tid] - keep;
+#endif
     if (keep != 0U) {
         const CandidateMeta candidate = input[i];
-        const std::uint32_t out = block_offsets[blockIdx.x] + scan[tid] - 1U;
+        const std::uint32_t out = block_offsets[blockIdx.x] + prefix;
         compact_key[out] = candidate.hash;
         compact_value[out] = candidate;
     }
@@ -309,10 +335,13 @@ __global__ void stream4_compact_valid_unique_kernel(
     std::uint32_t* dirty_count,
     const std::uint32_t* output_count,
     std::uint32_t capacity) {
-    __shared__ std::uint32_t scan[256];
     const std::uint32_t tid = threadIdx.x;
     const std::uint32_t i = blockIdx.x * blockDim.x + tid;
     const std::uint32_t keep = i < capacity ? keep_flags[i] : 0U;
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    const std::uint32_t prefix = detail::stream4_block_prefix(keep);
+#else
+    __shared__ std::uint32_t scan[256];
     scan[tid] = keep;
     __syncthreads();
     for (std::uint32_t offset = 1; offset < blockDim.x; offset <<= 1) {
@@ -321,8 +350,10 @@ __global__ void stream4_compact_valid_unique_kernel(
         scan[tid] += add;
         __syncthreads();
     }
+    const std::uint32_t prefix = scan[tid] - keep;
+#endif
     if (keep != 0U) {
-        output[block_offsets[blockIdx.x] + scan[tid] - 1U] = reduced_value[i];
+        output[block_offsets[blockIdx.x] + prefix] = reduced_value[i];
     }
     if (blockIdx.x == 0 && threadIdx.x == 0) {
         *clean_count = *output_count;
@@ -378,10 +409,13 @@ __global__ void stream4_compact_valid_unique_indices_kernel(
     const std::uint32_t* keep_flags, const std::uint32_t* block_offsets,
     CandidateMeta* output, std::uint32_t* clean_count, std::uint32_t* dirty_count,
     const std::uint32_t* output_count, std::uint32_t sort_items) {
-    __shared__ std::uint32_t scan[256];
     const std::uint32_t tid = threadIdx.x;
     const std::uint32_t i = blockIdx.x * blockDim.x + tid;
     const std::uint32_t keep = i < sort_items ? keep_flags[i] : 0U;
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    const std::uint32_t prefix = detail::stream4_block_prefix(keep);
+#else
+    __shared__ std::uint32_t scan[256];
     scan[tid] = keep;
     __syncthreads();
     for (std::uint32_t offset = 1; offset < blockDim.x; offset <<= 1) {
@@ -390,7 +424,9 @@ __global__ void stream4_compact_valid_unique_indices_kernel(
         scan[tid] += add;
         __syncthreads();
     }
-    if (keep) output[block_offsets[blockIdx.x] + scan[tid] - 1U] = metadata[indices[i]];
+    const std::uint32_t prefix = scan[tid] - keep;
+#endif
+    if (keep) output[block_offsets[blockIdx.x] + prefix] = metadata[indices[i]];
     if (blockIdx.x == 0 && tid == 0) {
         *clean_count = *output_count;
         *dirty_count = 0;
@@ -431,7 +467,7 @@ void stream4_sort_reduce_indices(
     // both only after the marker kernel has finished reading them.
     stream4_mark_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
         metadata, index_a, keep_flags, block_counts, block_offsets, scratch_count, sort_items);
-    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(block_counts, block_offsets, scratch_count, blocks);
+    stream4_scan_block_counts(block_counts, block_offsets, scratch_count, blocks, temp, temp_bytes, stream);
     stream4_compact_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
         metadata, index_a, keep_flags, block_offsets, output,
         clean_count, dirty_count, scratch_count, sort_items);
@@ -536,7 +572,7 @@ void stream4_finalize_logical_shard_union_cuda(
     const auto blocks = (capacity + 255U) / 256U;
     stream4_mark_union_counts_kernel<<<blocks, 256, 0, stream>>>(
         survivors, clean, keep, counts, threshold, physical_capacity);
-    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(counts, offsets, scratch_count, blocks);
+    stream4_scan_block_counts(counts, offsets, scratch_count, blocks, temp, temp_bytes, stream);
     stream4_compact_threshold_kernel<<<blocks, 256, 0, stream>>>(
         survivors, keep, offsets, sort_key, sort_value, capacity);
     if (sort_item_bound != 0)
@@ -557,7 +593,7 @@ void stream4_finalize_logical_shard_union_cuda(
         scratch_count, Stream4BestCandidate{}, sort_items, stream), "CUB final logical union reduce");
     stream4_mark_valid_unique_counts_kernel<<<blocks, 256, 0, stream>>>(
         hash_views.reduced_values, keep, counts, scratch_count, capacity);
-    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(counts, offsets, scratch_count, blocks);
+    stream4_scan_block_counts(counts, offsets, scratch_count, blocks, temp, temp_bytes, stream);
     stream4_compact_valid_unique_kernel<<<blocks, 256, 0, stream>>>(
         hash_views.reduced_values, keep, offsets, survivors, clean, dirty, scratch_count, capacity);
 #endif
@@ -619,11 +655,11 @@ void stream4_shard_job_cuda(
         nullptr,
         threshold,
         capacity);
-    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
+    stream4_scan_block_counts(
         block_counts,
         block_offsets,
         scratch_count,
-        block_count);
+        block_count, cub_temp_storage, cub_temp_storage_bytes, stream);
     stream4_compact_threshold_kernel<<<grid, block, 0, stream>>>(
         survivor_shard,
         keep_flags,
@@ -666,11 +702,11 @@ void stream4_shard_job_cuda(
         block_counts,
         scratch_count,
         capacity);
-    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
+    stream4_scan_block_counts(
         block_counts,
         block_offsets,
         scratch_count,
-        block_count);
+        block_count, cub_temp_storage, cub_temp_storage_bytes, stream);
     stream4_compact_valid_unique_kernel<<<grid, block, 0, stream>>>(
         hash_views.reduced_values,
         keep_flags,
@@ -747,11 +783,11 @@ void stream4_shard_job_device_threshold_cuda(
         threshold_active_index,
         UINT32_MAX,
         capacity);
-    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
+    stream4_scan_block_counts(
         block_counts,
         block_offsets,
         scratch_count,
-        block_count);
+        block_count, cub_temp_storage, cub_temp_storage_bytes, stream);
     stream4_compact_threshold_kernel<<<grid, block, 0, stream>>>(
         survivor_shard,
         keep_flags,
@@ -797,11 +833,11 @@ void stream4_shard_job_device_threshold_cuda(
         block_counts,
         scratch_count,
         sort_items);
-    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(
+    stream4_scan_block_counts(
         block_counts,
         block_offsets,
         scratch_count,
-        sort_blocks);
+        sort_blocks, cub_temp_storage, cub_temp_storage_bytes, stream);
     stream4_compact_valid_unique_kernel<<<sort_grid, block, 0, stream>>>(
         hash_views.reduced_values,
         keep_flags,

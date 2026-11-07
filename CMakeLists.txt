@@ -29,6 +29,7 @@ option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics w
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
 option(BEAM_EXPERIMENTAL_RADIX128 "Use experimental full-width CUB radix sort for hash pairs" OFF)
 option(BEAM_EXPERIMENTAL_INDEX_SORT "Sort Stream 4 metadata indices instead of metadata records" OFF)
+option(BEAM_EXPERIMENTAL_STREAM4_SCAN "Use CUB device and block scans for Stream 4 compaction" OFF)
 if(BEAM_ENABLE_LIBTORCH_STREAM1)
     find_package(Torch REQUIRED)
     # The engine/control transport exchange C++ objects internally. Compile all
@@ -180,6 +181,8 @@ set_source_files_properties(cuda/stream3.cu cuda/stream4.cu cuda/static_memory.c
     COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_RADIX128=$<BOOL:${BEAM_EXPERIMENTAL_RADIX128}>")
 set_property(SOURCE cuda/stream4.cu cuda/static_memory.cu APPEND PROPERTY
     COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_INDEX_SORT=$<BOOL:${BEAM_EXPERIMENTAL_INDEX_SORT}>")
+set_property(SOURCE cuda/stream4.cu cuda/static_memory.cu APPEND PROPERTY
+    COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_STREAM4_SCAN=$<BOOL:${BEAM_EXPERIMENTAL_STREAM4_SCAN}>")
 target_compile_definitions(beam_cuda PUBLIC
     BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
     BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
@@ -311,6 +314,16 @@ set_target_properties(stream3_owner_scatter_cuda_tests PROPERTIES CUDA_STANDARD 
 add_executable(stream4_cuda_tests tests/stream4_cuda_tests.cu)
 target_link_libraries(stream4_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream4_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(stream4_scan_cuda_tests EXCLUDE_FROM_ALL tests/stream4_scan_cuda_tests.cu)
+set_target_properties(stream4_scan_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(stream4_scan_large_union_cuda_tests EXCLUDE_FROM_ALL tests/stream4_scan_large_union_cuda_tests.cu)
+target_link_libraries(stream4_scan_large_union_cuda_tests PRIVATE beam_cuda)
+if(BEAM_EXPERIMENTAL_INDEX_SORT)
+    target_compile_definitions(stream4_scan_large_union_cuda_tests PRIVATE BEAM_TEST_INDEX_SORT=1)
+endif()
+set_target_properties(stream4_scan_large_union_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stream4_logical_union_cuda_tests tests/stream4_logical_union_cuda_tests.cu)
 target_link_libraries(stream4_logical_union_cuda_tests PRIVATE beam_cuda)

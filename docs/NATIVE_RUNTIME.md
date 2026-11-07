@@ -24,6 +24,11 @@ two-RTX3060 fixture showed a lower sampled peak and no median slowdown when
 Stream 3 remained at the default. Profile-specific public selection is not yet
 implemented; see `test_results/refactor_20261107/STAGE4_INDEX_SORT.md`.
 
+`BEAM_EXPERIMENTAL_STREAM4_SCAN=ON` independently selects CUB DeviceScan for
+block counts and BlockScan for stable compaction. Counts remain on the device;
+slot scratch is preallocated from actual CUB queries and reused in stream order.
+The normal Python build explicitly leaves it OFF pending the measured profile gate.
+
 ## Build
 
 Rust workspace builds do not require CUDA. `cargo build --release --workspace`

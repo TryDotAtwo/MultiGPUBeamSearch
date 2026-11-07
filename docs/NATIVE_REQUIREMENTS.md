@@ -36,6 +36,10 @@ rank processes after their ABI/layout and specialization checks.
 - Experimental index reduction must reject all indices outside the live compacted
   metadata range, including arbitrary values from inactive CUB lanes. Its live
   count and CUB's unique-count output occupy distinct device locations.
+- Experimental Stream4 scans use disjoint input counts, output offsets and total;
+  each block participates fully in BlockScan, including inactive tail lanes. CUB
+  scratch is queried before execution and is reused only in stream order. An
+  insufficient allocation must fail with required and available byte counts.
 - Reuse requires completion of every reader. GPU-source and pinned-host-history
   reader completion are distinct. Cross-process messages contain no device pointers.
 - Only explicit native capacity rejection bounds a capacity search. Rank failure,

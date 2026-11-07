@@ -1,0 +1,15 @@
+[1/15] Building CUDA object CMakeFiles/stream4_scan_large_union_cuda_tests.dir/tests/stream4_scan_large_union_cuda_tests.cu.o
+[2/15] Linking CUDA executable stream4_scan_cuda_tests
+[3/15] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+[4/15] Linking CXX static library libbeam_cuda.a
+[5/15] Linking CXX executable stream4_cuda_tests
+[6/15] Linking CXX executable stream3_cuda_tests
+[7/15] Linking CXX executable stream4_scan_large_union_cuda_tests
+[8/15] Linking CXX executable stream4_logical_union_cuda_tests
+[9/15] Linking CXX executable stream4_logical_union_graph_cuda_tests
+[10/15] Linking CXX executable stream4_logical_union_bounded_graph_cuda_tests
+[11/15] Linking CXX executable stream4_bounded_graph_cuda_tests
+[12/15] Linking CXX executable final_union_dispatcher_cuda_tests
+[13/15] Linking CXX executable stitched_cuda_tests
+[14/15] Linking CXX executable static_memory_cuda_tests
+[15/15] Linking CXX executable production_runner

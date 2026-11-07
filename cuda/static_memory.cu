@@ -2,6 +2,7 @@
 #include "cub_compat.hpp"
 #include "hash_sort.cuh"
 #include "stream4_index.cuh"
+#include "stream4_scan.cuh"
 #include "stream3.hpp"
 
 #include <cub/device/device_merge_sort.cuh>
@@ -308,7 +309,21 @@ std::size_t stream4_cub_temp_bytes(std::uint32_t stream4_capacity) {
     if (status != cudaSuccess) {
         throw std::runtime_error(cudaGetErrorString(status));
     }
-    return align_up_size(std::max(std::max(sort_bytes, reduce_bytes), std::max(score_sort_bytes, score_reduce_bytes)), 256);
+    std::size_t scan_bytes = 0;
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    // Include the full capacity and both bounded-graph body sizes. The scan
+    // uses this slot's scratch only after preceding readers in its stream.
+    for (const auto items : {stream4_capacity, stream4_capacity / 2U + (stream4_capacity % 2U != 0U),
+                             stream4_capacity / 4U + (stream4_capacity % 4U != 0U)}) {
+        const auto blocks = items / 256U + (items % 256U != 0U);
+        std::size_t required = 0;
+        status = detail::stream4_scan_temp_bytes(blocks, required);
+        if (status != cudaSuccess) throw std::runtime_error(cudaGetErrorString(status));
+        scan_bytes = std::max(scan_bytes, required);
+    }
+#endif
+    return align_up_size(std::max(scan_bytes, std::max(std::max(sort_bytes, reduce_bytes),
+                                                      std::max(score_sort_bytes, score_reduce_bytes))), 256);
 }
 
 std::size_t final_materialize_cub_temp_bytes(std::uint32_t max_requests) {

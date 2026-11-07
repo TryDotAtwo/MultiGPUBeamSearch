@@ -1,0 +1,2 @@
+gpu=0 index_reducer=pass
+gpu=1 index_reducer=pass
