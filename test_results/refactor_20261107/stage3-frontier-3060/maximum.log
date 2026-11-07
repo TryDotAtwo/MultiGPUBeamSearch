@@ -1,0 +1,9 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.60s
+     Running tests/maximum_beam.rs (/workspace/target/debug/deps/maximum_beam-fcfe4c3d0507f622)
+
+running 1 test
+test every_shard_profile_has_its_own_frozen_search_and_only_capacity_rejection_is_a_bound ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

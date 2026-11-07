@@ -1,0 +1,57 @@
+[
+  {
+    "profile": "",
+    "parents": 8192,
+    "seconds_by_rank": [
+      0.257561,
+      0.257585
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  },
+  {
+    "profile": "",
+    "parents": 8192,
+    "seconds_by_rank": [
+      0.255954,
+      0.255969
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  },
+  {
+    "profile": "",
+    "parents": 8192,
+    "seconds_by_rank": [
+      0.257369,
+      0.257396
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  },
+  {
+    "profile": "",
+    "parents": 8192,
+    "seconds_by_rank": [
+      0.260355,
+      0.260376
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  },
+  {
+    "profile": "",
+    "parents": 8192,
+    "seconds_by_rank": [
+      0.257283,
+      0.257306
+    ],
+    "correctness_passed": true,
+    "memory_admitted": true,
+    "throttled": false
+  }
+]

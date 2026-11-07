@@ -29,13 +29,12 @@ def options_descriptor(options):
             for name, value in asdict(options).items()}
 
 
-def tune_inference(contract, model, runtime, options, devices, beam_width,
-                   run_dir, environment, *, capacity_bootstrap=False):
+def _inference_request(contract, model, runtime, options, devices, beam_width,
+                       run_dir, environment, *, capacity_bootstrap=False):
     from .autotune import calibration_signature
     from .build import file_sha256
     from .models import verify_prepared_model
     from .shared_profiles import lookup
-    owner = extension()
     verify_prepared_model(model, contract)
     helper = runtime.runner.parent / runtime.build_metadata.get(
         'calibration_binary_name', 'stream1_ensemble_benchmark')
@@ -58,8 +57,42 @@ def tune_inference(contract, model, runtime, options, devices, beam_width,
         capacity_bootstrap=capacity_bootstrap, run_dir=str(Path(run_dir).resolve()),
         environment=dict(environment), shared_profile=None if capacity_bootstrap else
             lookup(contract, model, runtime, options, devices, beam_width))
+    return request
+
+
+def tune_inference(contract, model, runtime, options, devices, beam_width,
+                   run_dir, environment, *, capacity_bootstrap=False):
+    from .models import verify_prepared_model
+    request = _inference_request(contract, model, runtime, options, devices, beam_width,
+                                 run_dir, environment, capacity_bootstrap=capacity_bootstrap)
     try:
-        result = json.loads(owner.InferenceCalibration(json.dumps(request)).run())
+        result = json.loads(extension().InferenceCalibration(json.dumps(request)).run())
+    except (RuntimeError, ValueError) as error:
+        raise NativeBackendError(str(error)) from error
+    verify_prepared_model(model, contract)
+    return result
+
+
+def calibrate_frontier(contract, model, runtime, options, devices, beam_width,
+                       run_dir, environment, runner):
+    """Transfer one job; Rust owns all admission, calibration and width loops."""
+    import torch
+    from .models import verify_prepared_model
+    initial = 1_048_576 if beam_width == 'max' else beam_width
+    inference = _inference_request(contract, model, runtime, options, devices, initial,
+        run_dir, environment, capacity_bootstrap=beam_width == 'max')
+    hardware = [torch.cuda.get_device_properties(device) for device in devices]
+    execution = dict(runner=dict(path=str(Path(runner).resolve()),
+            sha256=runtime.build_metadata['binary_sha256'], bytes=None),
+        row_factor=contract.move_count if model.backend == 'mlp' and model.manifest['output_dim'] == 1 else 1,
+        hardware=dict(sm_count=min(p.multi_processor_count for p in hardware),
+            l2_bytes=min(getattr(p, 'L2_cache_size', getattr(p, 'l2_cache_size', 0)) for p in hardware)),
+        physical_bytes=runtime.build_metadata['shape']['storage_len'], puzzle_id=0,
+        grow=runtime.build_metadata.get('frontier_calibration_protocol') == 'natural-growth-v1',
+        fixtures=[], cwd=str(Path.cwd()), gpu_memory_bytes=[p.total_memory for p in hardware])
+    try:
+        result = json.loads(extension().FrontierCalibration(json.dumps(dict(
+            beam_width=beam_width, inference=inference, execution=execution))).run())
     except (RuntimeError, ValueError) as error:
         raise NativeBackendError(str(error)) from error
     verify_prepared_model(model, contract)

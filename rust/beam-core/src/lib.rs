@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 pub mod calibration;
+pub mod capacity;
 pub mod components;
 pub mod config;
 pub mod history;

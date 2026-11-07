@@ -3,7 +3,8 @@
 The approved migration is in progress. Existing public Python entry points are
 switched only after their comparative acceptance stage. Rust now owns host history
 for its resident workers and ordinary CLI, plus calibration process primitives.
-Maximum/working-capacity policy and CNOT orchestration are still being transferred. No
+The frontier controller is available for comparative validation; public launch
+and CNOT orchestration are still being transferred. No
 CUDA sorting optimization or precision policy is enabled here.
 
 ## Build
@@ -63,6 +64,30 @@ entire owned cohort. PyO3 releases the GIL for blocking operations. These are
 runtime components; the public calibration policy has not switched yet.
 
 ## Calibration ownership
+
+`FrontierCalibration` / `rust_control.calibrate_frontier` submits one complete
+Rust job for inference, exact native admission and downstream selection. Numeric
+widths are never reduced; a capacity rejection can only select another already
+measured, quality- and telemetry-verified inference batch. Runtime/rank errors
+propagate. The same cancellation token and overall deadline cover all phases.
+
+Symbolic `max` separately records the finite multiset/VRAM/explicit descriptor
+ceiling, shard-profile memory search, exact-width inference refinement and full
+steps. A changed batch or reserve triggers fresh admission (at most three rounds).
+The working search preserves an explicit larger arrival-batch floor and measures
+fresh half-width full steps under the same execution profile, requiring at least
+80% throughput retention and a saturated microbatch on every rank. It performs
+at most three comparisons; it does not claim an exhaustive efficient maximum.
+The existing `calibration_frontier_max_states` is a fixture-generation budget;
+it is not implicitly turned into an execution-width limit. The private coarse
+descriptor has a separate explicit ceiling for bounded diagnostic requests.
+This policy does not reuse older smaller-width cache entries. The bounded fresh
+comparison is easier to audit but costs a new full-step cohort on a repeated max
+request. Only the current natural-growth native protocol supports this max job;
+fixed-width jobs can also receive explicit full-frontier fixture artifacts.
+
+The Python public launcher is not switched merely by exposing this job. Its
+default transition and build orchestration require their own comparative checks.
 
 `inference_job::Request` combines typed public options, graph/model descriptors,
 content-bound artifacts, device identity and the native probe protocol. Rust

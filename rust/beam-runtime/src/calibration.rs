@@ -21,7 +21,7 @@ fn validate(plans: &[Value], beam: u64) -> Result<()> {
     validate_rank_plans(&typed, beam)?;
     Ok(())
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CapacityResult {
     pub requested_beam: u64,
     pub effective_beam: u64,

@@ -1,0 +1,7 @@
+FRONTIER_JOB_OK world=1 mode=4097 attempt=first selected=4097
+FRONTIER_JOB_OK world=1 mode=4097 attempt=hit selected=4097
+FRONTIER_JOB_OK world=1 mode=max attempt=first selected=8192
+FRONTIER_JOB_OK world=2 mode=4097 attempt=first selected=4097
+FRONTIER_JOB_OK world=2 mode=4097 attempt=hit selected=4097
+FRONTIER_JOB_OK world=2 mode=max attempt=first selected=8192
+NATIVE_FRONTIER_JOB_GPU_OK

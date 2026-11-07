@@ -1,0 +1,9 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+error[E0432]: unresolved import `beam_core::capacity`
+ --> rust/beam-core/tests/capacity.rs:1:17
+  |
+1 | use beam_core::{capacity::{frontier_ceiling, BeamWidth}, search::PermutationGraph};
+  |                 ^^^^^^^^ could not find `capacity` in `beam_core`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-core` (test "capacity") due to 1 previous error

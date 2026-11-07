@@ -62,9 +62,15 @@ cohort. A bounded shortlist is not a global optimum guarantee. Preserve native
 required/available diagnostics when an admitted profile overflows during execution;
 never reduce the requested beam implicitly to complete calibration.
 
-Preserve inference arithmetic while moving control. Inference/frontier admission,
-maximum/working-width policy, CNOT control and public adapters need their comparisons before
-switching. CPU or source checks do not establish GPU acceptance.
+Preserve inference arithmetic while moving control. Numeric-width admission may
+replace only a complete verified measured microbatch and must preserve the exact
+frontier. Symbolic max keeps memory, full-step and efficiency evidence separate;
+changed inference reserves require readmission. A multiset upper bound is not a
+reachable-orbit certificate. A working-width reference uses the same execution
+profile, a fresh complete-step cohort and saturated per-rank batches. At most
+three refinement/comparison rounds may run; uncertainty/failure must propagate.
+CNOT control and public launch switching need separate comparisons. CPU or source
+checks do not establish GPU acceptance.
 
 Promote a CUDA variant only for a measured profile with identical models, inputs,
 logical beam, precision and rank count: warmup plus at least five paired complete

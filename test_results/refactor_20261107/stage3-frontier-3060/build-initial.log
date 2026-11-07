@@ -1,0 +1,4 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+    Finished `release` profile [optimized] target(s) in 12.44s
