@@ -12,11 +12,18 @@ This is the public Python namespace of MultiGPUBeamSearch; no import alias is ne
 
 Install from the complete matching repository with
 `pip install ./integrations/cayleypy_native`, or install its built wheel. The wheel
-ships its matching native source; CMake/Ninja, CayleyPy and PyTorch are package
+ships the Rust Python extension and its matching native source. Building from a
+checkout or source distribution requires a Rust toolchain; CMake/Ninja, CayleyPy and PyTorch are package
 dependencies. First search obtains checksum-pinned CUTLASS and builds/caches a
 runner for the graph shape and visible CUDA architectures. Linux, an NVIDIA
 driver, CUDA toolkit/nvcc and a C++ compiler are platform prerequisites; failures
 are explicit. No driver installation or model training happens during search.
+
+Build distributions with `python -m build ./integrations/cayleypy_native`. The
+PEP 517 backend stages the matching native source for maturin without changing
+the checkout. The extension is available to the Rust runtime adapters; the
+public search still uses the existing Python orchestration until the migration
+is validated and switched separately.
 
 ```python
 from cayleypy import CayleyGraph, PermutationGroups

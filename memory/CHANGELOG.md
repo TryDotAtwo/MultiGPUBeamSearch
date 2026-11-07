@@ -3,6 +3,20 @@ Total output lines: 5789
 
 # Changelog
 
+## 2026-11-08 Rust Python distribution and matching native sources
+- Replaced the setuptools-only wheel with a PEP 517 maturin wrapper that stages
+  the matching native tree without modifying the checkout. Wheels include the
+  ABI3 PyO3 extension and both public package names. Source distributions retain
+  and verify the bundled native-source SHA-256 manifest before rebuilding.
+- On the owned 2x RTX 3060 machine, checkout and sdist wheels had identical
+  329-file native manifests; isolated and editable installs passed. The installed
+  package passed 528 Python tests (9 skips), plus 33 focused CNOT CPU/CUDA tests.
+  A newly built bundled-source CUDA library and installed extension passed repeated
+  Rust/native reference sessions on one and two physical GPUs. These checks do
+  not switch the public Python orchestration or establish performance gains.
+- The wheel does not yet bundle a ready `beam-runner` or CUDA library; artifact
+  discovery/building and public runtime switching remain migration stages.
+
 ## 2026-10-05 captured GEMM launch fields observation
 - Actual new native typed graph probe RED missinglaunchvalues, then collector
   exposes tiled grid/swizzle/k-size/semaphore-null plus universal mode,batch

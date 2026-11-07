@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/rust_distribution_check.py", line 88, in <module>
+    main()
+  File "/workspace/beam-work/tests/rust_distribution_check.py", line 52, in main
+    raise AssertionError(f"wheel is missing matching native sources: {sorted(native_required - names)}")
+AssertionError: wheel is missing matching native sources: ['multigpubeamsearch/_native_source/CMakeLists.txt', 'multigpubeamsearch/_native_source/cuda/cnot_domain.cu', 'multigpubeamsearch/_native_source/rust/beam-cli/Cargo.toml', 'multigpubeamsearch/_native_source/source_manifest.json', 'multigpubeamsearch/_native_source/tools/production_runner.cu']

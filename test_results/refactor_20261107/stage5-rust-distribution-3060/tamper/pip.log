@@ -1,0 +1,37 @@
+Processing /workspace/beam-results/rust-wheel/tamper/extracted/multigpubeamsearch-0.1.0.dev1
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'error'
+  error: subprocess-exited-with-error
+  
+  × Preparing metadata (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [19 lines of output]
+      Traceback (most recent call last):
+        File "/opt/conda/lib/python3.11/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 389, in <module>
+          main()
+        File "/opt/conda/lib/python3.11/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 373, in main
+          json_out["return_val"] = hook(**hook_input["kwargs"])
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File "/opt/conda/lib/python3.11/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 175, in prepare_metadata_for_build_wheel
+          return hook(metadata_directory, config_settings)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File "/workspace/beam-results/rust-wheel/tamper/extracted/multigpubeamsearch-0.1.0.dev1/build_backend.py", line 98, in prepare_metadata_for_build_wheel
+          with _staged_project() as project, _working_directory(project):
+        File "/opt/conda/lib/python3.11/contextlib.py", line 137, in __enter__
+          return next(self.gen)
+                 ^^^^^^^^^^^^^^
+        File "/workspace/beam-results/rust-wheel/tamper/extracted/multigpubeamsearch-0.1.0.dev1/build_backend.py", line 66, in _staged_project
+          _verify_bundle(_PROJECT / _BUNDLE)
+        File "/workspace/beam-results/rust-wheel/tamper/extracted/multigpubeamsearch-0.1.0.dev1/build_backend.py", line 58, in _verify_bundle
+          raise RuntimeError(f"source distribution contains modified native source: {name}")
+      RuntimeError: source distribution contains modified native source: cuda/cnot_domain.cu
+      [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: metadata-generation-failed
+
+× Encountered error while generating package metadata.
+╰─> See above for output.
+
+note: This is an issue with the package mentioned above, not pip.
+hint: See above for details.

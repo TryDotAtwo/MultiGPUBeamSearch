@@ -1,6 +1,7 @@
 [build-system]
-requires = ["setuptools>=64"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.12.2,<2"]
+build-backend = "build_backend"
+backend-path = ["."]
 
 [project]
 name = "multigpubeamsearch"
@@ -20,9 +21,17 @@ Homepage = "https://github.com/TryDotAtwo/MultiGPUBeamSearch"
 Documentation = "https://github.com/TryDotAtwo/MultiGPUBeamSearch/tree/main/integrations/cayleypy_native"
 Issues = "https://github.com/TryDotAtwo/MultiGPUBeamSearch/issues"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["multigpubeamsearch*", "cayleypy_native*"]
+[tool.maturin]
+manifest-path = "../../rust/beam-python/Cargo.toml"
+python-source = "."
+python-packages = ["multigpubeamsearch", "cayleypy_native"]
+module-name = "multigpubeamsearch._beam_runtime"
+bindings = "pyo3"
+locked = true
+include = [
+  {path = "build_backend.py", format = "sdist"},
+  "multigpubeamsearch/_native_source/**/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

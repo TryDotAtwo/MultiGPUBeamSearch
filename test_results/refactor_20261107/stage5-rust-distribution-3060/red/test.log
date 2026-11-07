@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/rust_distribution_check.py", line 82, in <module>
+    main()
+  File "/workspace/beam-work/tests/rust_distribution_check.py", line 34, in main
+    subprocess.run(["maturin", "build", "--locked", "--release", "--offline",
+  File "/opt/conda/lib/python3.11/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['maturin', 'build', '--locked', '--release', '--offline', '--auditwheel', 'skip', '--interpreter', '/opt/conda/bin/python', '--out', '/workspace/beam-results/rust-wheel/red/check/wheel']' returned non-zero exit status 1.
