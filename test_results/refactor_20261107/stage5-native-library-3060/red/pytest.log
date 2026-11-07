@@ -1,0 +1,46 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______________ test_build_once_reuse_and_detect_library_tampering ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-35/test_build_once_reuse_and_dete0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f978978c490>
+
+    def test_build_once_reuse_and_detect_library_tampering(tmp_path, monkeypatch):
+>       native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+integrations/cayleypy_native/tests/test_native_library.py:64: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-35/test_build_once_reuse_and_dete0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f978978c490>
+
+    def fixture(tmp_path, monkeypatch):
+>       from multigpubeamsearch import native_library
+E       ImportError: cannot import name 'native_library' from 'multigpubeamsearch' (/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/__init__.py)
+
+integrations/cayleypy_native/tests/test_native_library.py:14: ImportError
+_____________ test_wrong_abi_layout_or_changed_source_is_rejected ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-35/test_wrong_abi_layout_or_chang0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9789772f90>
+
+    def test_wrong_abi_layout_or_changed_source_is_rejected(tmp_path, monkeypatch):
+>       native, graph, model, options, runner, metadata, calls, layout = fixture(tmp_path, monkeypatch)
+                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+integrations/cayleypy_native/tests/test_native_library.py:77: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-35/test_wrong_abi_layout_or_chang0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f9789772f90>
+
+    def fixture(tmp_path, monkeypatch):
+>       from multigpubeamsearch import native_library
+E       ImportError: cannot import name 'native_library' from 'multigpubeamsearch' (/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/__init__.py)
+
+integrations/cayleypy_native/tests/test_native_library.py:14: ImportError
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_build_once_reuse_and_detect_library_tampering
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_wrong_abi_layout_or_changed_source_is_rejected
+2 failed in 0.31s

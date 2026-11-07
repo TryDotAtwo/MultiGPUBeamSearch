@@ -14,6 +14,25 @@ fn run() -> Result<i32, Box<dyn std::error::Error>> {
                 .with_file_name("libbeam_native.so")
         });
     let native = beam_native_sys::NativeLibrary::load(&library)?;
+    if args.get(1).map(String::as_str) == Some("--native-abi-info") {
+        if args.len() != 2 {
+            return Err("--native-abi-info takes no arguments".into());
+        }
+        let layout = native.layout()?;
+        println!(
+            "{{\"abi_version\":{},\"state_len\":{},\"storage_len\":{},\"state_alignment\":{},\"move_count\":{},\"candidate_bytes\":{},\"candidate_alignment\":{},\"hash_bytes\":{},\"hash_alignment\":{}}}",
+            beam_native_sys::ABI_VERSION,
+            layout.state_len,
+            layout.storage_len,
+            layout.state_alignment,
+            layout.move_count,
+            layout.candidate_bytes,
+            layout.candidate_alignment,
+            layout.hash_bytes,
+            layout.hash_alignment
+        );
+        return Ok(0);
+    }
     if let Some(root) = env::var_os("BEAM_SESSION_DIR") {
         beam_runtime::run_native_worker(&native, &args, &PathBuf::from(root))?;
         Ok(0)

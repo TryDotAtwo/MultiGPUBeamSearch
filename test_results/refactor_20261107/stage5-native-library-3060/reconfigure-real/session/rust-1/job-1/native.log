@@ -1,0 +1,58 @@
+[rank 0]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+history_provider=rust
+candidate_history_dir=/workspace/beam-results/native-library/reconfigure-real/session/rust-1/job-1/history
+candidate_history_mode=disk
+candidate_history_prune_enabled=0
+candidate_history_slots=3
+candidate_history_workers=1
+candidate_history_ram_budget_total=16777216
+candidate_history_disk_budget_total=1048576
+candidate_history_ram_budget_per_rank=16777216
+candidate_history_disk_budget_per_rank=1048576
+candidate_history_pinned_slot_bytes=6144
+candidate_history_slot_staging_bytes=3072
+candidate_history_static_ram_arena_bytes=0
+candidate_history_static_disk_arena_bytes=0
+candidate_history_budget_formula=all_expansion_depths_fixed_reservations
+candidate_history_ram_reserved_entries=0
+candidate_history_disk_reserved_entries=0
+candidate_history_prefull_estimator=move_count_upper_bound
+candidate_history_effective_depth=0
+candidate_history_target_beam_depth=0
+candidate_history_states_before_target_beam=0
+candidate_history_required_entries=0
+candidate_history_required_bytes=0
+runtime_depth_start=0 frontier_size=1
+runtime_depth_done=0 depth_sec=0.05563
+runtime_depth_start=1 frontier_size=24
+runtime_depth_done=1 depth_sec=0.0277565
+runtime_depth_start=2 frontier_size=64
+runtime_depth_done=2 depth_sec=0.0273151
+runtime_depth_start=3 frontier_size=64
+solution_log=test_results/solution_p0_d4_b64_1794089795.log
+submit_csv=submit.csv
+submit_path_copy=test_results/submit_p0_d4_b64.csv
+solution_path_copy=test_results/solution_path_p0_d4_b64.csv
+solution_found=1
+solution_valid=1
+solution_depth=4
+solution_path=m3.m0.m1.m2
+solution_state="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5"
+puzzle_solved=1 puzzle_id=0 seconds=0.112267 solution_length=4 found_depth=4 touch_depth=0 solution=m3.m0.m1.m2
+elapsed_sec=0.112612
+avg_depth_sec=0.028153
+completed_depths=4
+last_final_frontier_size=64
+last_final_threshold=9216
+threshold_updates=3
+solution_found=1
+history_mode=disk
+history_depth_count=3
+history_bytes_received=4864
+history_bytes_stored=2432
+history_bytes_stored_ram=0
+history_bytes_stored_disk=2432
+history_bytes_pruned=0
+history_flush_sec=2.24e-07
+

@@ -1,0 +1,58 @@
+{
+  "runner": "/workspace/beam-results/native-library/actual/build/cache/builds/781fea7ede40aa0238becdd7943374a36f32606b7ea29b4cac7ea86a5b687985/production_runner",
+  "runner_sha256": "0604cc3ee441eca899b6bfcd6dd401c4bf2a5379f108d5ddc7a6eb99e381eb53",
+  "library": "/workspace/beam-results/native-library/actual/build/cache/builds/781fea7ede40aa0238becdd7943374a36f32606b7ea29b4cac7ea86a5b687985/libbeam_native.so",
+  "library_sha256": "437c60072e5c8f3e2a8e0c1f49aaf057b60356f7a580606320b95832bd227d29",
+  "worker": "/workspace/beam-results/native-library/distribution3/check/checkout/installed/multigpubeamsearch/_bin/beam-runner",
+  "worker_sha256": "8f4034f653f44f542286506fff7c8900cdac8c2fb79660e71d0b5568ca89865b",
+  "receipt": {
+    "schema_version": 1,
+    "specification": {
+      "abi_version": 1,
+      "target": "beam_native",
+      "runner_build_key": "781fea7ede40aa0238becdd7943374a36f32606b7ea29b4cac7ea86a5b687985",
+      "runner_sha256": "0604cc3ee441eca899b6bfcd6dd401c4bf2a5379f108d5ddc7a6eb99e381eb53",
+      "worker_sha256": "8f4034f653f44f542286506fff7c8900cdac8c2fb79660e71d0b5568ca89865b",
+      "shape": {
+        "state_len": 96,
+        "storage_len": 112,
+        "move_count": 24,
+        "alignment": 16
+      },
+      "backend": "mlp",
+      "inference_backend": "cutlass",
+      "cuda_architectures": [
+        86
+      ],
+      "source_digest": "555a6d3f2bec2b94f948b4a8d28524630edf0e4da7e86d05619747b4acc4300d",
+      "cutlass_digest": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+      "toolchain": {
+        "cmake": "/opt/conda/bin/cmake\ncmake version 4.1.0\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+        "nvcc": "/usr/local/cuda-12.8/bin/nvcc\nnvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+        "cxx": "/usr/bin/x86_64-linux-gnu-g++-11\nx86_64-linux-gnu-g++-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+      },
+      "nccl": {
+        "include_dir": "/opt/conda/lib/python3.11/site-packages/nvidia/nccl/include",
+        "library": "/opt/conda/lib/python3.11/site-packages/nvidia/nccl/lib/libnccl.so.2",
+        "header_sha256": "4b240a1fa79858ca8cdffcf5c2fc40aeaca8b3eaec61728213715f0902aba3a8",
+        "library_sha256": "1d9c10322efacde695cf640db1f29fc1586c929f1087f0e1202d2d5e70fb7168"
+      },
+      "torch": null
+    },
+    "library_sha256": "437c60072e5c8f3e2a8e0c1f49aaf057b60356f7a580606320b95832bd227d29",
+    "layout": {
+      "abi_version": 1,
+      "state_len": 96,
+      "storage_len": 112,
+      "state_alignment": 16,
+      "move_count": 24,
+      "candidate_bytes": 32,
+      "candidate_alignment": 32,
+      "hash_bytes": 16,
+      "hash_alignment": 16
+    }
+  },
+  "cold_seconds": 446.9155600640079,
+  "cached_seconds": 3.9629657399927964,
+  "scope": "build and cache lifetime; not a search-step benchmark"
+}

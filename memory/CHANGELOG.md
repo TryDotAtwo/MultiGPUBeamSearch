@@ -3,6 +3,16 @@ Total output lines: 5789
 
 # Changelog
 
+## 2026-11-08 lazy native library build and ABI inspection
+- Added an explicit on-demand CUDA shared-library builder for a compatible
+  managed runner. It reconfigures the managed CMake options before building,
+  verifies dependencies and binary hashes, and inspects the actual ABI layout
+  in a separate Rust worker. Cache hits validate the receipt and binary again;
+  CUDA is not loaded into the Python process by this operation.
+- The preparatory builder is not connected to the public Python search path.
+  Hardware and test scope are recorded in the associated `test_results` report;
+  no end-to-end performance claim or unsupported hardware acceptance is made.
+
 ## 2026-11-08 package and discover the Rust worker
 - Wheels now build and ship `beam-runner` from the same bundled Rust workspace
   as the PyO3 extension. PEP 517 builds stage outside the checkout; editable

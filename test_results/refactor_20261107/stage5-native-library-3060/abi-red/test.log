@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_abi_probe.py", line 37, in <module>
+    main()
+  File "/workspace/beam-work/tests/native_abi_probe.py", line 19, in main
+    result = subprocess.run([str(args.runner.resolve()), '--native-abi-info'],
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/lib/python3.11/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/beam-results/rust-runner-wheel/final/check/checkout/installed/multigpubeamsearch/_bin/beam-runner', '--native-abi-info']' returned non-zero exit status 2.
