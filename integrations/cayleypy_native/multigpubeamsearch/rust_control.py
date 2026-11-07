@@ -6,6 +6,7 @@ switching is a separate acceptance stage.
 from dataclasses import asdict
 import importlib
 import json
+import os
 from pathlib import Path
 from .errors import NativeBackendError, NativeUnavailable
 
@@ -22,6 +23,15 @@ def extension():
             raise NativeUnavailable('Rust runtime is incompatible; rebuild the matching PyO3 module')
         return module
     raise NativeUnavailable('the matching Rust/PyO3 runtime is not installed')
+
+
+def worker_executable():
+    """Return this distribution's worker without loading the CUDA engine."""
+    name = 'beam-runner.exe' if os.name == 'nt' else 'beam-runner'
+    path = Path(__file__).resolve().parent / '_bin' / name
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise NativeUnavailable('the matching Rust worker is missing or not executable; reinstall the package')
+    return path
 
 
 def options_descriptor(options):

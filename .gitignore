@@ -44,3 +44,4 @@ __pycache__/
 /publish_receipts.json
 /publish_status.json
 /skills-lock.json
+integrations/cayleypy_native/multigpubeamsearch/_bin/

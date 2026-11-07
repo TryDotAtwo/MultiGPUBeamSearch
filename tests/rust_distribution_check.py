@@ -38,7 +38,9 @@ def check_wheel(wheel: Path, source: Path, out: Path, env: dict[str, str]) -> di
         if len(members) != len(set(members)):
             raise AssertionError("wheel contains duplicate archive paths")
         names = set(members)
-        required = {"multigpubeamsearch/__init__.py", "cayleypy_native/__init__.py"}
+        worker_name = "beam-runner.exe" if sys.platform == "win32" else "beam-runner"
+        required = {"multigpubeamsearch/__init__.py", "cayleypy_native/__init__.py",
+                    "multigpubeamsearch/_bin/" + worker_name}
         native_required = {prefix + name for name in (
             "source_manifest.json", "CMakeLists.txt", "cuda/cnot_domain.cu",
             "tools/production_runner.cu", "rust/beam-cli/Cargo.toml")}
@@ -62,7 +64,7 @@ def check_wheel(wheel: Path, source: Path, out: Path, env: dict[str, str]) -> di
     run([sys.executable, "-m", "pip", "install", "--no-deps", "--no-index",
          "--target", str(target), str(wheel)], log=out / "install.log", cwd=out, env=env)
     code = r'''
-import importlib, json, pathlib, sys
+import importlib, json, os, pathlib, subprocess, sys
 sys.path.insert(0, sys.argv[1])
 import multigpubeamsearch as primary
 import cayleypy_native as compat
@@ -71,15 +73,20 @@ assert runtime.ABI_VERSION == 1
 assert all(hasattr(runtime, n) for n in ("SearchSession", "ResidentWorkers", "FrontierCalibration"))
 assert primary.NativeOptions is compat.NativeOptions
 assert primary.NativeSession is compat.NativeSession
-from multigpubeamsearch.rust_control import extension
+from multigpubeamsearch.rust_control import extension, worker_executable
 assert extension() is runtime
+worker = pathlib.Path(primary.__file__).parent / "_bin" / ("beam-runner.exe" if sys.platform == "win32" else "beam-runner")
+assert worker.is_file() and os.access(worker, os.X_OK)
+assert worker_executable() == worker
+probe = subprocess.run([str(worker), "--resident-protocol-info"], check=True, capture_output=True, text=True)
+assert json.loads(probe.stdout) == {"protocol": "resident-search-v1"}
 from multigpubeamsearch.bootstrap import prepare_sources
 options = prepare_sources(primary.NativeOptions(cutlass_dir=pathlib.Path(sys.argv[1])))
 assert options.source_dir == pathlib.Path(primary.__file__).parent / "_native_source"
 if sys.platform.startswith("linux"):
     maps = open("/proc/self/maps", encoding="utf8").read()
     assert "libbeam_native.so" not in maps and "libbeam_native_libtorch.so" not in maps
-print(json.dumps({"abi": runtime.ABI_VERSION, "module": runtime.__file__,
+print(json.dumps({"abi": runtime.ABI_VERSION, "module": runtime.__file__, "worker": str(worker),
                   "bundled_source": str(options.source_dir), "both_package_names": True,
                   "native_cuda_library_loaded": False}))
 '''

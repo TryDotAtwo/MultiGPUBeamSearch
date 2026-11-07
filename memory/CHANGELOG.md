@@ -3,6 +3,18 @@ Total output lines: 5789
 
 # Changelog
 
+## 2026-11-08 package and discover the Rust worker
+- Wheels now build and ship `beam-runner` from the same bundled Rust workspace
+  as the PyO3 extension. PEP 517 builds stage outside the checkout; editable
+  installs put generated worker/extension artifacts in the ignored package
+  directory. The adapter discovers an executable worker without loading CUDA.
+- Checkout, source-distribution, isolated and editable installs passed. On one
+  and two RTX 3060 devices the worker matched a previous runner across repeated
+  searches. Rust SearchSession also passed model/beam changes, collection,
+  cancellation and injected rank failure in a bounded fixture with CUTLASS and
+  LibTorch native libraries. These checks do not switch public orchestration or
+  establish a search-step performance gain.
+
 ## 2026-11-08 Rust Python distribution and matching native sources
 - Replaced the setuptools-only wheel with a PEP 517 maturin wrapper that stages
   the matching native tree without modifying the checkout. Wheels include the

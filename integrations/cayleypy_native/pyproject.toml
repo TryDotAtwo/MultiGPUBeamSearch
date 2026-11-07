@@ -31,6 +31,7 @@ locked = true
 include = [
   {path = "build_backend.py", format = "sdist"},
   "multigpubeamsearch/_native_source/**/*",
+  "multigpubeamsearch/_bin/*",
 ]
 
 [tool.pytest.ini_options]

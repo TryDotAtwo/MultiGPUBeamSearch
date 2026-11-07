@@ -1,0 +1,22 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_packaged_worker_discovery_requires_an_executable _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f13f93419d0>
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-33/test_packaged_worker_discovery0')
+
+    def test_packaged_worker_discovery_requires_an_executable(monkeypatch, tmp_path):
+        from multigpubeamsearch import rust_control
+        from multigpubeamsearch.errors import NativeUnavailable
+        package = tmp_path / 'package'
+        package.mkdir()
+        monkeypatch.setattr(rust_control, '__file__', str(package / 'rust_control.py'))
+        with pytest.raises(NativeUnavailable, match='Rust worker'):
+>           rust_control.worker_executable()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: module 'multigpubeamsearch.rust_control' has no attribute 'worker_executable'
+
+integrations/cayleypy_native/tests/test_rust_control.py:15: AttributeError
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_rust_control.py::test_packaged_worker_discovery_requires_an_executable
+1 failed in 0.31s

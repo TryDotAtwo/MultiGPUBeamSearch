@@ -1,6 +1,28 @@
 import hashlib,json
+import os
+import pytest
 from types import SimpleNamespace
 from multigpubeamsearch.options import NativeOptions
+
+
+def test_packaged_worker_discovery_requires_an_executable(monkeypatch, tmp_path):
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+    package = tmp_path / 'package'
+    package.mkdir()
+    monkeypatch.setattr(rust_control, '__file__', str(package / 'rust_control.py'))
+    with pytest.raises(NativeUnavailable, match='Rust worker'):
+        rust_control.worker_executable()
+    directory = package / '_bin'
+    directory.mkdir()
+    worker = directory / ('beam-runner.exe' if os.name == 'nt' else 'beam-runner')
+    worker.write_bytes(b'fixture')
+    worker.chmod(0o755)
+    assert rust_control.worker_executable() == worker
+    if os.name != 'nt':
+        worker.chmod(0o644)
+        with pytest.raises(NativeUnavailable, match='Rust worker'):
+            rust_control.worker_executable()
 
 def test_thin_adapter_passes_validated_model_and_options_to_one_rust_call(monkeypatch,tmp_path):
     from multigpubeamsearch import rust_control
