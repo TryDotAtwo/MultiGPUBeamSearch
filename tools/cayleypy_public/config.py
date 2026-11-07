@@ -176,11 +176,14 @@ class PublicRunConfig:
 
         positive_values = {
             name: integer(name)
-            for name in ("beam_width", "max_depth", "max_collected_solutions")
+            for name in ("beam_width", "max_depth")
         }
         for name, value in positive_values.items():
             if value <= 0:
                 raise ValueError(f"{name.upper()} must be positive")
+        max_collected_solutions = integer("max_collected_solutions")
+        if max_collected_solutions < 0:
+            raise ValueError("MAX_COLLECTED_SOLUTIONS must be non-negative")
 
         collect_until_depth = integer("collect_until_depth")
         if collect_until_depth < 0 or collect_until_depth > positive_values["max_depth"]:
@@ -284,7 +287,7 @@ class PublicRunConfig:
             reflect_source_csv=Path(reflect_source) if reflect_source is not None else None,
             solution_mode=solution_mode,
             collect_until_depth=collect_until_depth,
-            max_collected_solutions=positive_values["max_collected_solutions"],
+            max_collected_solutions=max_collected_solutions,
             touch_bfs_radius=touch_bfs_radius,
             publish_results=publish_results,
             results_ingest_url=ingest_url or "",

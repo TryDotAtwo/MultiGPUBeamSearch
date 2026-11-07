@@ -37,10 +37,20 @@ def test_only_requires_reflection_source():
         PublicRunConfig.from_mapping({**BASE, "reflect_mode": "only"})
 
 
-@pytest.mark.parametrize("field,value", [("beam_width", 0), ("max_depth", 0), ("max_collected_solutions", 0)])
+@pytest.mark.parametrize("field,value", [("beam_width", 0), ("max_depth", 0)])
 def test_positive_config_fields_reject_zero(field, value):
     with pytest.raises(ValueError, match=field.upper()):
         PublicRunConfig.from_mapping({**BASE, field: value})
+
+
+def test_collect_zero_max_solutions_means_unbounded_collection() -> None:
+    config = PublicRunConfig.from_mapping({
+        **BASE,
+        "solution_mode": "collect",
+        "max_collected_solutions": 0,
+    })
+
+    assert config.max_collected_solutions == 0
 
 
 def test_touch_radius_rejects_out_of_range_value():

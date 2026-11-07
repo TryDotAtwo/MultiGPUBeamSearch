@@ -1,0 +1,17 @@
+{
+  "state_len": 120,
+  "num_classes": 120,
+  "hd1": 1536,
+  "hd2": 512,
+  "original_hd1": 1536,
+  "original_hd2": 512,
+  "hidden_alignment": 8,
+  "nrd": 2,
+  "output_dim": 24,
+  "dtype": "fp16",
+  "normalization": "batchnorm_folded",
+  "layout": "row-major input activations times weight_hxk",
+  "batchnorm": "folded into preceding linear weights",
+  "embeddingbag": "removed from runtime; input layer exported as position-class table",
+  "source_weights": "p900-t000-q-sym_1777988767_best.pth"
+}

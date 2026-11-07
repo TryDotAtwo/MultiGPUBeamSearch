@@ -102,7 +102,7 @@ REFLECT_MODE = "off"                # off | after_original | only
 REFLECT_SOURCE_CSV = None            # required only for REFLECT_MODE == "only"
 SOLUTION_MODE = "first"             # first | collect
 COLLECT_UNTIL_DEPTH = MAX_DEPTH      # meaningful when SOLUTION_MODE == "collect"
-MAX_COLLECTED_SOLUTIONS = 100
+MAX_COLLECTED_SOLUTIONS = 0          # 0 = collect every validated solution available
 TOUCH_BFS_RADIUS = 0
 
 AUTHOR_NAME = "replace-with-author"

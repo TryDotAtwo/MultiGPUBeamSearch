@@ -64,6 +64,7 @@ def test_all_public_examples_share_the_universal_contract(tmp_path: Path) -> Non
         assert f'PUZZLE_ID_START = {spec["puzzle_id"]}' in config
         assert f'PUZZLE_ID_END = {spec["puzzle_id"]}' in config
         assert 'SOLUTION_MODE = "first"' in config
+        assert "MAX_COLLECTED_SOLUTIONS = 0" in config
         assert f'COMPETITION = "{spec["competition"]}"' in config
         assert metadata["id"] == f'trydotatwo/{spec["slug"]}'
         assert 'Path("/kaggle/input").rglob("puzzle_info.json")' in config

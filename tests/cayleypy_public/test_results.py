@@ -263,6 +263,58 @@ def test_build_result_envelope_accepts_piece_transformer_format() -> None:
     assert envelope["model"]["format"] == "piece-transformer"
 
 
+
+def test_build_result_envelope_preserves_supported_piece_transformer_manifest() -> None:
+    central_state = list(range(6)) * 16
+    identity = list(range(96))
+    context = _context()
+    context["model"] = {
+        **context["model"],
+        "format": "piece-transformer",
+        "manifest": {
+            "backend": "piece_transformer",
+            "model_arch": "piece_transformer",
+            "state_len": 96,
+            "num_classes": 6,
+            "move_count": 24,
+            "output_dim": 24,
+            "num_pieces": 56,
+            "max_piece_size": 3,
+            "num_piece_types": 3,
+            "seq_len": 57,
+            "d_model": 256,
+            "nhead": 8,
+            "head_dim": 32,
+            "num_layers": 4,
+            "ff_dim": 1024,
+            "activation": "relu",
+            "pooling": "cls",
+            "piece_layout": "cube4",
+            "piece_embed_mode": "piece_local",
+            "input_embedding": "fast_slot_projected",
+            "move_names": [f"m{index}" for index in range(24)],
+            "dtype": "fp16",
+        },
+    }
+    context["proof"] = {
+        "initial_state": central_state,
+        "central_state": central_state,
+        "generators": {f"m{index}": identity for index in range(24)},
+    }
+    context["profile"] = {**context["profile"], "model_class": "output_move_count"}
+    solution = {
+        **_solution(),
+        "path": "",
+        "original_oriented_path": "",
+        "reached_state": central_state,
+    }
+
+    envelope = build_result_envelope(context, solution)
+
+    assert envelope["model"]["manifest"]["seq_len"] == 57
+    assert envelope["model"]["manifest"]["num_layers"] == 4
+    assert envelope["model"]["manifest"]["move_names"] == [f"m{index}" for index in range(24)]
+
 @pytest.mark.parametrize(
     ("model_class", "output_dim", "message"),
     [
