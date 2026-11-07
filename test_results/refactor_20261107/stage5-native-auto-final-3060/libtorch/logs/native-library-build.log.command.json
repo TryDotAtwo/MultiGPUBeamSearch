@@ -1,0 +1,1 @@
+["/opt/conda/bin/cmake", "--build", "/workspace/beam-results/native-auto/libtorch/cache/builds/349789a449b8d543e00d858ad27d5d545003e224a3b6995bccd074c8863b56cc", "--target", "beam_native_libtorch", "--parallel", "2"]

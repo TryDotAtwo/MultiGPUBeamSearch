@@ -75,7 +75,9 @@ def ensure_native_library(contract, model, options, architectures, run_dir, runn
     runner, run_dir = Path(runner).resolve(), Path(run_dir).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
     metadata = validate_runner(runner, contract, model.backend, tuple(architectures))
-    if metadata != runner_metadata or metadata.get('inference_backend') != options.inference_backend:
+    resolved_backend = metadata.get('inference_backend')
+    if (metadata != runner_metadata or resolved_backend not in ('cutlass', 'libtorch')
+            or options.inference_backend not in ('auto', resolved_backend)):
         raise NativeBackendError('runner build metadata does not match the native library request')
     build_dir = runner.parent
     if not (build_dir / 'CMakeCache.txt').is_file():
@@ -83,13 +85,13 @@ def ensure_native_library(contract, model, options, architectures, run_dir, runn
     programs = prerequisites(options)
     worker = worker_executable().resolve()
     _check_inputs(options, metadata, programs, worker)
-    target = 'beam_native_libtorch' if options.inference_backend == 'libtorch' or model.backend != 'mlp' else 'beam_native'
+    target = 'beam_native_libtorch' if resolved_backend == 'libtorch' or model.backend != 'mlp' else 'beam_native'
     library = build_dir / f'lib{target}.so'
     sidecar = build_dir / 'native-library-build.json'
     specification = dict(abi_version=1, target=target, runner_build_key=metadata.get('build_key'),
                          runner_sha256=metadata['binary_sha256'], worker_sha256=file_sha256(worker),
                          shape=metadata['shape'], backend=model.backend,
-                         inference_backend=options.inference_backend,
+                         inference_backend=resolved_backend,
                          cuda_architectures=metadata['cuda_architectures'], source_digest=metadata['source_digest'],
                          cutlass_digest=metadata['cutlass_digest'], toolchain=metadata['toolchain'], nccl=metadata['nccl'],
                          torch=metadata.get('torch'))
@@ -124,7 +126,7 @@ def ensure_native_library(contract, model, options, architectures, run_dir, runn
         env['TORCH_CUDA_ARCH_LIST'] = ';'.join(f'{sm // 10}.{sm % 10}' for sm in metadata['cuda_architectures'])
         run_process(configure_command(options.source_dir, build_dir, options.cutlass_dir,
                                       contract, model.backend, tuple(metadata['cuda_architectures']), programs,
-                                      nccl=metadata['nccl'], inference_backend=options.inference_backend,
+                                      nccl=metadata['nccl'], inference_backend=resolved_backend,
                                       calibration=bool(metadata.get('calibration_binary_name'))),
                     cwd=run_dir, env=env, timeout=options.build_timeout_seconds,
                     log_path=run_dir / 'native-library-configure.log')

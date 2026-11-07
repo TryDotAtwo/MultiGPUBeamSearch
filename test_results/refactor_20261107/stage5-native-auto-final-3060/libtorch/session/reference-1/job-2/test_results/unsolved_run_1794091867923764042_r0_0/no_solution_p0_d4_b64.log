@@ -1,0 +1,12 @@
+rank=0
+world_size=1
+solution_found=0
+completed_depths=4
+history_mode=disk
+history_dir=/workspace/beam-results/native-auto/libtorch/session/reference-1/job-2/history
+history_depth_count=4
+history_bytes_received=6912
+history_bytes_stored=3456
+history_bytes_stored_ram=0
+history_bytes_stored_disk=3456
+history_bytes_pruned=0

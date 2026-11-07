@@ -1,0 +1,104 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+________ test_auto_backend_uses_the_verified_runner_resolution[cutlass] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-37/test_auto_backend_uses_the_ver0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7e3d3ec1d0>
+resolved = 'cutlass'
+
+    @pytest.mark.parametrize('resolved', ('cutlass', 'libtorch'))
+    def test_auto_backend_uses_the_verified_runner_resolution(tmp_path, monkeypatch, resolved):
+        import torch
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        metadata['inference_backend'] = resolved
+        if resolved == 'libtorch':
+            metadata['torch'] = dict(version=torch.__version__, cuda=torch.version.cuda,
+                                     cxx11_abi=bool(torch._C._GLIBCXX_USE_CXX11_ABI),
+                                     cmake_prefix=str(torch.utils.cmake_prefix_path))
+        (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+        options = replace(options, inference_backend='auto')
+>       library, receipt = native.ensure_native_library(graph, model, options, (86,), tmp_path, runner, metadata)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+integrations/cayleypy_native/tests/test_native_library.py:117: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+contract = namespace(state_len=96, move_count=24)
+model = namespace(backend='mlp')
+options = NativeOptions(source_dir=PosixPath('/tmp/pytest-of-root/pytest-37/test_auto_backend_uses_the_ver0/source'), cache_dir=...rontier_max_states=None, report_calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False)
+architectures = (86,)
+run_dir = PosixPath('/tmp/pytest-of-root/pytest-37/test_auto_backend_uses_the_ver0')
+runner = PosixPath('/tmp/pytest-of-root/pytest-37/test_auto_backend_uses_the_ver0/build/production_runner')
+runner_metadata = {'schema_version': 1, 'shape': {'state_len': 96, 'storage_len': 112, 'move_count': 24, 'alignment': 16}, 'backend': 'mlp', 'cuda_architectures': [86], ...}
+
+    def ensure_native_library(contract, model, options, architectures, run_dir, runner, runner_metadata):
+        """Return a verified shared library for the already verified runner build.
+    
+        This explicit preparatory operation does not switch the public search path.
+        The returned library is loaded later by a dedicated rank process.
+        """
+        if sys.platform != 'linux':
+            raise NativeUnavailable('native CUDA shared-library builds require Linux')
+        if options.runner_path is not None:
+            raise NativeUnavailable('native shared-library build requires a managed source build, not an external runner')
+        runner, run_dir = Path(runner).resolve(), Path(run_dir).resolve()
+        run_dir.mkdir(parents=True, exist_ok=True)
+        metadata = validate_runner(runner, contract, model.backend, tuple(architectures))
+        if metadata != runner_metadata or metadata.get('inference_backend') != options.inference_backend:
+>           raise NativeBackendError('runner build metadata does not match the native library request')
+E           multigpubeamsearch.errors.NativeBackendError: runner build metadata does not match the native library request
+
+integrations/cayleypy_native/multigpubeamsearch/native_library.py:79: NativeBackendError
+_______ test_auto_backend_uses_the_verified_runner_resolution[libtorch] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-37/test_auto_backend_uses_the_ver1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f7c0e50ba10>
+resolved = 'libtorch'
+
+    @pytest.mark.parametrize('resolved', ('cutlass', 'libtorch'))
+    def test_auto_backend_uses_the_verified_runner_resolution(tmp_path, monkeypatch, resolved):
+        import torch
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        metadata['inference_backend'] = resolved
+        if resolved == 'libtorch':
+            metadata['torch'] = dict(version=torch.__version__, cuda=torch.version.cuda,
+                                     cxx11_abi=bool(torch._C._GLIBCXX_USE_CXX11_ABI),
+                                     cmake_prefix=str(torch.utils.cmake_prefix_path))
+        (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+        options = replace(options, inference_backend='auto')
+>       library, receipt = native.ensure_native_library(graph, model, options, (86,), tmp_path, runner, metadata)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+integrations/cayleypy_native/tests/test_native_library.py:117: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+contract = namespace(state_len=96, move_count=24)
+model = namespace(backend='mlp')
+options = NativeOptions(source_dir=PosixPath('/tmp/pytest-of-root/pytest-37/test_auto_backend_uses_the_ver1/source'), cache_dir=...rontier_max_states=None, report_calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False)
+architectures = (86,)
+run_dir = PosixPath('/tmp/pytest-of-root/pytest-37/test_auto_backend_uses_the_ver1')
+runner = PosixPath('/tmp/pytest-of-root/pytest-37/test_auto_backend_uses_the_ver1/build/production_runner')
+runner_metadata = {'schema_version': 1, 'shape': {'state_len': 96, 'storage_len': 112, 'move_count': 24, 'alignment': 16}, 'backend': 'mlp', 'cuda_architectures': [86], ...}
+
+    def ensure_native_library(contract, model, options, architectures, run_dir, runner, runner_metadata):
+        """Return a verified shared library for the already verified runner build.
+    
+        This explicit preparatory operation does not switch the public search path.
+        The returned library is loaded later by a dedicated rank process.
+        """
+        if sys.platform != 'linux':
+            raise NativeUnavailable('native CUDA shared-library builds require Linux')
+        if options.runner_path is not None:
+            raise NativeUnavailable('native shared-library build requires a managed source build, not an external runner')
+        runner, run_dir = Path(runner).resolve(), Path(run_dir).resolve()
+        run_dir.mkdir(parents=True, exist_ok=True)
+        metadata = validate_runner(runner, contract, model.backend, tuple(architectures))
+        if metadata != runner_metadata or metadata.get('inference_backend') != options.inference_backend:
+>           raise NativeBackendError('runner build metadata does not match the native library request')
+E           multigpubeamsearch.errors.NativeBackendError: runner build metadata does not match the native library request
+
+integrations/cayleypy_native/multigpubeamsearch/native_library.py:79: NativeBackendError
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_auto_backend_uses_the_verified_runner_resolution[cutlass]
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_auto_backend_uses_the_verified_runner_resolution[libtorch]
+2 failed, 4 deselected in 5.29s

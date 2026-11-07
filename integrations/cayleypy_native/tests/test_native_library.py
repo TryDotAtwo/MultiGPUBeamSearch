@@ -1,5 +1,6 @@
 """Contract tests for the on-demand shared library; no CUDA is loaded here."""
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -49,13 +50,15 @@ def fixture(tmp_path, monkeypatch):
     def run_build(command, **kwargs):
         calls.append(command)
         if '--build' in command:
-            (directory / 'libbeam_native.so').write_bytes(b'library')
+            target = command[command.index('--target') + 1]
+            (directory / f'lib{target}.so').write_bytes(b'library')
     monkeypatch.setattr(native_library, 'run_process', run_build)
     layout = dict(abi_version=1, state_len=96, storage_len=112, state_alignment=16, move_count=24,
                   candidate_bytes=32, candidate_alignment=32, hash_bytes=16, hash_alignment=16)
     def run_probe(command, **kwargs):
         assert command == [str(worker), '--native-abi-info']
-        assert kwargs['env']['BEAM_NATIVE_LIBRARY'] == str(directory / 'libbeam_native.so')
+        target = 'beam_native_libtorch' if metadata['inference_backend'] == 'libtorch' else 'beam_native'
+        assert kwargs['env']['BEAM_NATIVE_LIBRARY'] == str(directory / f'lib{target}.so')
         return SimpleNamespace(returncode=0, stdout=json.dumps(layout), stderr='')
     monkeypatch.setattr(native_library.subprocess, 'run', run_probe)
     return native_library, graph, model, options, runner, metadata, calls, layout
@@ -97,4 +100,41 @@ def test_changed_pytorch_dependency_is_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(torch, '__version__', 'changed-version')
     with pytest.raises(NativeBackendError, match='PyTorch changed'):
         native.ensure_native_library(graph, model, options, (86,), tmp_path, runner, metadata)
+    assert not calls
+
+
+@pytest.mark.parametrize('resolved', ('cutlass', 'libtorch'))
+def test_auto_backend_uses_the_verified_runner_resolution(tmp_path, monkeypatch, resolved):
+    import torch
+    native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+    metadata['inference_backend'] = resolved
+    if resolved == 'libtorch':
+        metadata['torch'] = dict(version=torch.__version__, cuda=torch.version.cuda,
+                                 cxx11_abi=bool(torch._C._GLIBCXX_USE_CXX11_ABI),
+                                 cmake_prefix=str(torch.utils.cmake_prefix_path))
+    (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+    options = replace(options, inference_backend='auto')
+    library, receipt = native.ensure_native_library(graph, model, options, (86,), tmp_path, runner, metadata)
+    assert library.name == ('libbeam_native_libtorch.so' if resolved == 'libtorch' else 'libbeam_native.so')
+    assert receipt['specification']['inference_backend'] == resolved
+    assert native.ensure_native_library(graph, model, options, (86,), tmp_path, runner, metadata) == (library, receipt)
+    assert len(calls) == 2
+
+
+def test_explicit_backend_mismatch_is_rejected(tmp_path, monkeypatch):
+    native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+    with pytest.raises(NativeBackendError, match='metadata'):
+        native.ensure_native_library(graph, model, replace(options, inference_backend='libtorch'),
+                                     (86,), tmp_path, runner, metadata)
+    assert not calls
+
+
+@pytest.mark.parametrize('backend', ('auto', 'unexpected', None))
+def test_unresolved_runner_backend_is_rejected(tmp_path, monkeypatch, backend):
+    native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+    metadata['inference_backend'] = backend
+    (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+    with pytest.raises(NativeBackendError, match='metadata'):
+        native.ensure_native_library(graph, model, replace(options, inference_backend='auto'),
+                                     (86,), tmp_path, runner, metadata)
     assert not calls

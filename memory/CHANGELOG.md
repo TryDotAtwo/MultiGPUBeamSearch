@@ -3,6 +3,13 @@ Total output lines: 5789
 
 # Changelog
 
+## 2026-11-08 resolve the native library backend from the verified runner
+- On-demand library preparation now accepts the default `auto` inference
+  setting and uses the verified runner's resolved CUTLASS or LibTorch backend.
+  Explicit mismatches and unresolved runner metadata still fail before build.
+- See `test_results/refactor_20261107/STAGE5_NATIVE_AUTO.md` for CPU and GPU
+  test scope. This does not switch public search to the Rust owner.
+
 ## 2026-11-08 lazy native library build and ABI inspection
 - Added an explicit on-demand CUDA shared-library builder for a compatible
   managed runner. It reconfigures the managed CMake options before building,
