@@ -624,3 +624,20 @@ Acceptance must come from real Molab-side execution and artifacts, not from loca
 - First validate and benchmark one example, including actual search speed; only then tune runtime profiles and find the maximum stable beam boundary.
 - Benchmark materially larger beams, at least `2**22`, and select Molab profiles from measured search speed as was done for Kaggle.
 - Treat the profile row-budget `B_MICRO`, the derived output-1 parent batch, and the Transformer-specific inference microbatch as distinct controls; inspect the implementation before tuning them.
+- User corrected the Molab target contract: use only `output_dim=24` / move-count-output models. Do not benchmark, tune, publish, or select profiles from `output_dim=1`; the prior IHES output-1 sweep is non-target evidence only.
+- User selected Cube 4x4x4 as the primary Molab tuning workload and requested testing its `piece_transformer` directly. Use the accepted `trydotatwo/cube4-full-transformer-inference` bundle (`output_dim=24`) and tune the exact production transformer executor before full beam `2**22+` profiling; do not substitute an MLP or output-1 workload.
+## 2026-08-21 - Molab Cube4 native tuning boundary
+
+- Benchmark the Cube4 4x4x4 Transformer with `output_dim=24`; do not use the
+  one-output model family.
+- Prefer the native inference path and first tune isolated Stream 1
+  microbatch/concurrency through 32K before a full `2**22` beam run.
+- Do not change beam-search/CUDA architecture without explicit user approval.
+
+## 2026-08-21 - Cube4 benchmark acceptance criterion
+
+- Run through and include `depth_done=8`; rank profiles by the time of depth 8
+  itself, not depth 6/7 or startup wall time.
+- Keep at least two inference rings so Transformer inference stays continuous.
+- Increase Stream3 accumulation until a full beam layer uses about 400 Stream3
+  jobs; approximately 0.4% timing difference is acceptable for this structure.

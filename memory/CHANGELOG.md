@@ -1106,3 +1106,36 @@
 - Kept the complete benchmark driver inside the foreground `marimo-pair` SSE execution and emitted 10-second heartbeats. This prevented idle reclaim and completed six real `2**22` runs before Molab eventually terminated the whole free sandbox with HTTP 410.
 - On one NVIDIA RTX PRO 6000 Blackwell Server Edition, radius 0, IHES puzzle 1, the full-frontier depth-6 timings were: parent 512 / row budget 12,288 = 7.22447 s; parent 768 / 18,432 = 7.69060 s; parent 1,024 / 24,576 = 7.80013 s; parent 1,280 / 30,720 = 7.97574 s; parent 1,536 / 36,864 = 8.15151 s; parent 1,792 / 43,008 = 8.44756 s; parent 2,048 / 49,152 = 9.02126 s; parent 3,072 / 73,728 = 9.30904 s. All completed runs solved puzzle 1 at depth 8 without OOM or overflow and reached 100% sampled GPU utilization.
 - The best measured candidate is currently parent batch 512 (`BEAM_B_MICRO=12288`), 19.9% faster than the inherited 2,048-parent Kaggle seed at the steady full frontier, while using only about 2.07 GiB sampled VRAM versus 2.84 GiB. The lower boundary and larger beam powers remain to be measured in a fresh Molab sandbox before publishing a final profile registry.
+- A fresh visible marimo benchmark cell confirmed the `2**22` lower boundary: parent 256 = 7.62404 s, 384 = 7.39497 s, and 512 = 7.23221 s, leaving 512 as the measured optimum. At `2**23`, parent 384/512/768 measured 18.5218/18.2789/18.2024 s respectively; the 512-to-768 gain was only 0.42%, so 512 remains the conservative choice.
+- Molab then returned HTTP 410 before the visible cell could start `2**24`. Because the workload was neither detached nor scratchpad-only and continuously used the GPU, the repeated early termination is a platform-side sandbox reclaim/lease failure rather than simple notebook idleness. Future capacity steps must run one beam power per fresh sandbox and checkpoint evidence immediately.
+- 2026-08-21: Diagnosed repeated native Molab pair failures on Windows. DNS and TCP 443 were healthy and authenticated `/api/sessions` returned 200 through .NET/Python, while both Windows and Git-Bash Schannel curl timed out before TLS; therefore `execute-code.sh` was failing in its curl transport rather than at Molab auth/session discovery. Added and verified a narrow Python `requests` SSE adapter under `test_results/`: stdout/done parsing passed and a live marimo toast returned `TOAST_OK`. Explicit Python 3.11 is required because `py.exe` mishandled the helper's Unix shebang on this host.
+## 2026-08-21 - Cube4 Molab native Stream 1 preflight exposed seq_len contract
+
+- Added a visible-marimo isolated Cube4 Stream 1 sweep harness for the
+  `output_dim=24` piece Transformer, covering proposed microbatches through
+  32K and concurrency through 32.
+- Verified the export on RTX PRO 6000 Blackwell (`seq_len=57`, `d_model=256`,
+  4 layers, fp16, 24 outputs) and forced the otherwise-disabled native
+  transformer CMake target on Molab without changing CUDA source.
+- The base Molab branch rejected Cube4 because it lacked the existing cluster
+  generic-sequence implementation. Located and cleanly reused commits
+  `3459c700..d319f6db` from `codex/stream1-generic-seq-align-impl`; native
+  Cube4 then compiled and entered the real CUTLASS sweep. The Molab sandbox
+  expired with HTTP 410 during the 20-by-7 matrix, so no incomplete timing is
+  reported. Evidence and the restart procedure are documented in
+  `test_results/molab_cube4_native_stream1_blocker_2026-08-21.md`.
+- A second fresh Molab sandbox vanished during the native CUDA build while
+  using four compiler jobs. Reduced only the isolated harness build parallelism
+  to `-j1` for the 32 GiB Molab host; inference configuration remains unchanged.
+
+## 2026-08-21 - Clean persistent Cube4 Molab benchmark and 400-job Stream3 profile
+
+- Rebuilt the live notebook into five named cells: overview, profile, detached
+  persistent launcher, refresh control, and live dashboard. Artifacts remain
+  under `/marimo/storage/cayleypy-cube4` across frontend reconnects.
+- Corrected the runner limit to 9 so acceptance uses exactly `depth_done=8`.
+- Two logical inference rings plus a 24-slot accumulator reduced full-layer
+  Stream3 jobs from 2,341 to 391 while sampled GPU utilization stayed at 100%.
+- Exact depth-8 time was 124.367 seconds at beam `2**25`, return code 0, about
+  12.8 GiB sampled VRAM, with no OOM/overflow. See
+  `test_results/molab_cube4_p25_depth8_stream3_400_2026-08-21.md`.
