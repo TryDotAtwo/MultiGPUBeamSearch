@@ -28,6 +28,7 @@ public:
     Job pending;
     bool has_pending = false;
     bool stop = false;
+    beam_history_api_v1 history{};
 
     bool next(Job& job) {
         std::unique_lock lock(mutex);
@@ -60,6 +61,7 @@ public:
     }
 };
 Control* current_control() noexcept;
+const beam_history_api_v1* current_history() noexcept;
 inline void cancellation_point() {
     if(auto* control = current_control()) control->throw_if_cancelled();
 }

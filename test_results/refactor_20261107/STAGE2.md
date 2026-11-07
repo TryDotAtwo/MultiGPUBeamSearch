@@ -30,6 +30,12 @@ and the new library. The application fixtures still completed. The raw unfiltere
 log is retained in `sanitizer/session-memcheck.txt`; disabling API reporting in the
 second run does not close the unfiltered gate or validate all NCCL behavior.
 
+Source follow-up: the matching upstream NCCL 2.27.5 implementation explicitly
+continues past `cudaErrorNoKernelImageForDevice` while querying available kernels
+([NVIDIA source, lines 37–39](https://github.com/NVIDIA/nccl/blob/v2.27.5-1/src/enqueue.cc#L37-L39)).
+This explains the recorded API diagnostics; it does not change the raw sanitizer
+result or turn the API-disabled run into full API-error coverage.
+
 `stream1_transformer_cuda_tests` was skipped because its model fixture was absent.
 The GPU session fixture uses an exact Hamming MLP, not a trained quality benchmark.
 It covers solved and unsolved requests and independently replays each solved path.

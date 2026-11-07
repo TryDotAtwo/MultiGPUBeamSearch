@@ -952,3 +952,11 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Verified remote builds on 2xRTX3060: native CTest57 pass/1 skip, Python510 pass/25 skip, Rust8 CPU tests plus real FFI/PyO3 checks. Native and LibTorch one/two-GPU repeated jobs match reference paths; cancellation and one-rank failure reap the whole group. Narrow memcheck passes; unfiltered NCCL API diagnostics remain recorded. See test_results/refactor_20261107/STAGE2.md.
 - Fixed a baseline CPU test's FP32 operation-order assumption using an independent FP64 roundoff oracle while retaining exact export checks. No numerical inference policy change.
 - History/profile/CNOT control transfer, CUDA optimization, public switching and full hardware/performance acceptance remain in progress.
+
+
+## 2026-11-07 - Rust host history and calibration process ownership
+- Moved host history planning/storage/pruning into beam-core/runtime. The optional ABI-1 callback table borrows ready pinned CandidateMeta batches without an extra record copy; C++ retains CUDA events and pinned-slot reader lifetimes. Rust contains callback panics and owns RAM/disk resources, including disk-failure fallback after all future RAM reservations.
+- Extracted native history transport from production_runner into tools/history/candidate_history.hpp. Added the same provider to standalone Rust CLI calls. Reference C++ history remains until the public-switch gate.
+- Added Rust ProbeSession/ProbeCohort and thin PyO3 bindings for retained calibration process groups, bounded JSON/log transport, deadlines and whole-cohort cleanup. Public profile policy and launch defaults are not switched yet.
+- RTX3060 one/two-GPU history comparisons passed in RAM/disk/static-hybrid modes and with LibTorch. Cancellation and exact one-rank failure passed. Memory-only Compute Sanitizer with full leak checking reported zero errors and zero leaked bytes; API reporting was disabled for the separately recorded, explicitly handled NCCL kernel-query diagnostics.
+- Python regression suite: 510 passed,25 skipped. Rust CPU/FFI/probe tests and Python adapter passed. Paired performance, CNOT control transfer and other GPU-family acceptance remain outstanding.

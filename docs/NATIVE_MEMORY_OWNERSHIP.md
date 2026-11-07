@@ -25,6 +25,16 @@ generator data and lookup tables in reverse dependency order. Cancellation is
 cooperative at a depth boundary. The rank supervisor must terminate all its
 workers after a bounded grace period if an external collective cannot finish.
 
+Rust-owned history is installed through the optional ABI-1 host-history table.
+The table and its boxed owner outlive every native writer callback. Native code
+waits for D2H, dispatches a complete pinned batch to Rust, then releases the host
+slot after the callback returns. Rust reads the aligned host view directly and
+converts it into 16-byte history entries; it never retains the borrowed pointer.
+Rust owns the RAM arena, reserved file, depth files, parent remapping and exact
+capacity checks. Native pinned-slot futures still provide the transport-side
+completion condition. RAM/disk history is reset per job; CUDA resources remain
+resident across compatible jobs.
+
 ## Buffer contracts
 
 | Buffer | Capacity / valid range | Writer and ready condition | Reuse condition |

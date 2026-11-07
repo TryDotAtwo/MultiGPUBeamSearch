@@ -1,5 +1,6 @@
 //! The only crate permitted to dereference native FFI pointers.
 use libloading::Library;
+pub mod history;
 use std::{
     ffi::{c_char, c_void, CString},
     marker::PhantomData,
@@ -62,6 +63,8 @@ type Cancel = unsafe extern "C" fn(*mut c_void) -> i32;
 type GetError = unsafe extern "C" fn(*mut c_void, *mut c_char, u64, *mut u64) -> i32;
 type Destroy = unsafe extern "C" fn(*mut c_void) -> i32;
 type Run = unsafe extern "C" fn(i32, *const *const c_char) -> i32;
+type RunWithHistory = unsafe extern "C" fn(i32, *const *const c_char, *const history::Api) -> i32;
+type SetHistory = unsafe extern "C" fn(*mut c_void, *const history::Api) -> i32;
 
 struct Bindings {
     _library: Library,
@@ -75,6 +78,8 @@ struct Bindings {
     destroy: Destroy,
     run: Run,
     layout: GetLayout,
+    set_history: Option<SetHistory>,
+    run_with_history: Option<RunWithHistory>,
 }
 #[derive(Clone)]
 pub struct NativeLibrary(Arc<Bindings>);
@@ -113,6 +118,14 @@ impl NativeLibrary {
                 destroy: symbol!("beam_context_destroy", Destroy),
                 run: symbol!("beam_native_main", Run),
                 layout: symbol!("beam_native_layout", GetLayout),
+                set_history: library
+                    .get::<SetHistory>(b"beam_context_set_history\0")
+                    .ok()
+                    .map(|s| *s),
+                run_with_history: library
+                    .get::<RunWithHistory>(b"beam_native_main_with_history\0")
+                    .ok()
+                    .map(|s| *s),
                 _library: library,
             };
             Ok(Self(Arc::new(bindings)))
@@ -142,6 +155,7 @@ impl NativeLibrary {
             ptr,
             api: self.0.clone(),
             _thread_owner: PhantomData,
+            history: None,
         })
     }
     pub fn run(&self, args: &[String]) -> Result<i32> {
@@ -149,6 +163,23 @@ impl NativeLibrary {
         let views = argument_views(&storage);
         // SAFETY: strings are owned until the blocking coarse call returns.
         Ok(unsafe { (self.0.run)(storage.len() as i32, views.as_ptr()) })
+    }
+    pub fn run_with_history(
+        &self,
+        args: &[String],
+        sink: Box<dyn history::HistorySink>,
+    ) -> Result<i32> {
+        let run = self
+            .0
+            .run_with_history
+            .ok_or_else(|| Error("native library lacks CLI host-history extension".into()))?;
+        let storage = arguments(args)?;
+        let views = argument_views(&storage);
+        let mut bridge = Box::new(history::Bridge::new(sink));
+        let table = bridge.table();
+        // Native's coarse call joins every host reader before returning. The
+        // table, boxed callback owner, argv and library all outlive this call.
+        Ok(unsafe { run(storage.len() as i32, views.as_ptr(), &table) })
     }
 }
 fn arguments(args: &[String]) -> Result<Vec<CString>> {
@@ -171,8 +202,22 @@ pub struct Context {
     api: Arc<Bindings>,
     // A context cannot be sent/shared across Rust threads or processes.
     _thread_owner: PhantomData<Rc<()>>,
+    history: Option<Box<history::Bridge>>,
 }
 impl Context {
+    pub fn set_history(&mut self, sink: Box<dyn history::HistorySink>) -> Result<()> {
+        let install = self
+            .api
+            .set_history
+            .ok_or_else(|| Error("native library lacks host-history extension".into()))?;
+        let mut bridge = Box::new(history::Bridge::new(sink));
+        let table = bridge.table();
+        // Native copies the table. The stable boxed owner is retained until
+        // native destroy joins every callback; replacing it requires CREATED.
+        self.check(unsafe { install(self.ptr.as_ptr(), &table) })?;
+        self.history = Some(bridge);
+        Ok(())
+    }
     fn check(&self, code: i32) -> Result<()> {
         if code == OK {
             return Ok(());
@@ -301,6 +346,36 @@ pub fn parent_process_id() -> u32 {
     #[cfg(not(unix))]
     {
         0
+    }
+}
+
+/// Reserve physical disk blocks before search; set_len alone creates a sparse
+/// file and does not prove that subsequent history writes fit on the device.
+pub fn reserve_file(file: &std::fs::File, bytes: u64) -> std::io::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::fd::AsRawFd;
+        let bytes = i64::try_from(bytes)
+            .map_err(|_| std::io::Error::other("history disk reservation exceeds off_t"))?;
+        file.set_len(bytes as u64)?;
+        loop {
+            let result = unsafe { libc::posix_fallocate(file.as_raw_fd(), 0, bytes) };
+            if result == libc::EINTR {
+                continue;
+            }
+            return if result == 0 {
+                Ok(())
+            } else {
+                Err(std::io::Error::from_raw_os_error(result))
+            };
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (file, bytes);
+        Err(std::io::Error::other(
+            "physical history reservation requires Linux",
+        ))
     }
 }
 

@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_cli_gpu.py", line 62, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/beam-work/tests/native_cli_gpu.py", line 56, in main
+    assert width==64
+           ^^^^^^^^^
+AssertionError

@@ -1,5 +1,7 @@
 //! Persistent session, rank process and history ownership.
 #![forbid(unsafe_code)]
+pub mod history;
+pub mod probes;
 mod resident;
 mod worker;
 pub use resident::ResidentWorkers;

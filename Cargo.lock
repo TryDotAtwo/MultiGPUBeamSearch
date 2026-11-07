@@ -28,6 +28,7 @@ dependencies = [
 name = "beam-native-sys"
 version = "0.1.0"
 dependencies = [
+ "beam-core",
  "libc",
  "libloading",
  "thiserror",
@@ -39,6 +40,7 @@ version = "0.1.0"
 dependencies = [
  "beam-runtime",
  "pyo3",
+ "serde_json",
 ]
 
 [[package]]

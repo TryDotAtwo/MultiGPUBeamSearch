@@ -1,0 +1,6 @@
+tests/native_abi_tests.cpp: In function 'int main()':
+tests/native_abi_tests.cpp:58:52: warning: missing initializer for member 'beam_status_v1::phase' [-Wmissing-field-initializers]
+   58 |     beam_status_v1 status{1, sizeof(beam_status_v1)};
+      |                                                    ^
+tests/native_abi_tests.cpp:58:52: warning: missing initializer for member 'beam_status_v1::result' [-Wmissing-field-initializers]
+tests/native_abi_tests.cpp:58:52: warning: missing initializer for member 'beam_status_v1::completed_jobs' [-Wmissing-field-initializers]

@@ -1,0 +1,265 @@
+{
+  "scope": "correctness and resident lifetime; no performance promotion",
+  "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+  "history_mode": "disk",
+  "results": [
+    {
+      "variant": "reference",
+      "world": 1,
+      "sequence": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.46461411099880934,
+      "worker_pids": [
+        15117
+      ],
+      "terminal": {
+        "native_seconds": 0.0923768,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 1,
+      "sequence": 1,
+      "path": [
+        3,
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.1419250879989704,
+      "worker_pids": [
+        15117
+      ],
+      "terminal": {
+        "native_seconds": 0.114438,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 1,
+      "sequence": 2,
+      "path": null,
+      "beam_width": 64,
+      "elapsed_seconds": 0.16215637099958258,
+      "worker_pids": [
+        15117
+      ],
+      "terminal": {
+        "native_seconds": 0.139956,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 1,
+      "sequence": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.47483213,
+      "worker_pids": [
+        15131
+      ],
+      "terminal": {
+        "native_seconds": 0.0875701,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 1,
+      "sequence": 1,
+      "path": [
+        3,
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.132273946,
+      "worker_pids": [
+        15131
+      ],
+      "terminal": {
+        "native_seconds": 0.112065,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 1,
+      "sequence": 2,
+      "path": null,
+      "beam_width": 64,
+      "elapsed_seconds": 0.16263261,
+      "worker_pids": [
+        15131
+      ],
+      "terminal": {
+        "native_seconds": 0.139845,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 2,
+      "sequence": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 1.0735125029968913,
+      "worker_pids": [
+        15146,
+        15147
+      ],
+      "terminal": {
+        "native_seconds": 0.155572,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 2,
+      "sequence": 1,
+      "path": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.06116979299986269,
+      "worker_pids": [
+        15146,
+        15147
+      ],
+      "terminal": {
+        "native_seconds": 0.0407313,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 2,
+      "sequence": 2,
+      "path": null,
+      "beam_width": 64,
+      "elapsed_seconds": 0.0611888120038202,
+      "worker_pids": [
+        15146,
+        15147
+      ],
+      "terminal": {
+        "native_seconds": 0.041776,
+        "terminal_records": 2,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 2,
+      "sequence": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 1.11205699,
+      "worker_pids": [
+        15185,
+        15186
+      ],
+      "terminal": {
+        "native_seconds": 0.153804,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 2,
+      "sequence": 1,
+      "path": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.05143444,
+      "worker_pids": [
+        15185,
+        15186
+      ],
+      "terminal": {
+        "native_seconds": 0.0403149,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 2,
+      "sequence": 2,
+      "path": null,
+      "beam_width": 64,
+      "elapsed_seconds": 0.06147727,
+      "worker_pids": [
+        15185,
+        15186
+      ],
+      "terminal": {
+        "native_seconds": 0.0435119,
+        "terminal_records": 2,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    }
+  ]
+}

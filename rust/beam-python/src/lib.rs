@@ -1,5 +1,6 @@
 //! Thin Python adapter; runtime implementation lives in beam-runtime.
 #![forbid(unsafe_code)]
+mod probes;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -110,6 +111,7 @@ impl ResidentWorkers {
 #[pymodule]
 fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ResidentWorkers>()?;
+    probes::register(module)?;
     module.add("ABI_VERSION", 1)?;
     Ok(())
 }

@@ -36,3 +36,28 @@ while not (d/'stop').exists():
     finally:group.close()
     assert group.closed and all(code is not None for code in group.exit_codes())
 print('PYO3_RESIDENT_OK')
+
+with tempfile.TemporaryDirectory() as directory:
+    root=Path(directory)
+    worker=root/'probe.py'
+    worker.write_text('import sys,json\nprint(json.dumps({"ready": True}), flush=True)\nfor line in sys.stdin: print(line.strip(),flush=True)\n')
+    probe=runtime.ProbeSession([sys.executable,str(worker)],root,dict(os.environ),root/'probe.log',5.)
+    try:
+        import json
+        assert json.loads(probe.receive(2.))=={'ready': True}
+        pid=probe.pid
+        for value in (3,1,8):
+            probe.send_request(json.dumps({'batch':value}))
+            assert json.loads(probe.receive(2.))=={'batch':value}
+            assert probe.pid==pid
+    finally:probe.close()
+    assert probe.exit_code() is not None
+    command=[sys.executable,str(worker)]
+    cohort=runtime.ProbeCohort([command,command],[dict(os.environ)]*2,root,root/'cohort',5.)
+    try:
+        assert json.loads(cohort.collect(2.))==[{'ready':True}]*2
+        cohort.send_requests('[{"batch":1},{"batch":2}]')
+        assert json.loads(cohort.collect(2.))==[{'batch':1},{'batch':2}]
+    finally:cohort.close()
+    assert all(code is not None for code in cohort.exit_codes())
+print('PYO3_PROBE_OK')

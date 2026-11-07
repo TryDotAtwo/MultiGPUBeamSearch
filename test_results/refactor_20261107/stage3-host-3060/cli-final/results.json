@@ -1,0 +1,34 @@
+[
+  {
+    "world": 1,
+    "path": [
+      0,
+      1,
+      2
+    ],
+    "width": 64,
+    "terminal": {
+      "native_seconds": 0.103706,
+      "terminal_records": 1,
+      "observed_parent_batch": null,
+      "observed_inference_rows": null,
+      "observed_stream3_batch_candidates": null
+    }
+  },
+  {
+    "world": 2,
+    "path": [
+      0,
+      1,
+      2
+    ],
+    "width": 64,
+    "terminal": {
+      "native_seconds": 0.188846,
+      "terminal_records": 1,
+      "observed_parent_batch": null,
+      "observed_inference_rows": null,
+      "observed_stream3_batch_candidates": null
+    }
+  }
+]

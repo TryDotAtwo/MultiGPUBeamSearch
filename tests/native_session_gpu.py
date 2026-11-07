@@ -22,6 +22,7 @@ def main():
     parser=argparse.ArgumentParser()
     for name in ('baseline','rust-runner','library','extension','out'):
         parser.add_argument('--'+name,required=True,type=Path)
+    parser.add_argument('--history-mode',choices=('ram','disk','static_hybrid'),default='disk')
     args=parser.parse_args()
     root=args.out.resolve();root.mkdir(parents=True,exist_ok=False)
     spec=importlib.util.spec_from_file_location('_beam_runtime',args.extension)
@@ -49,7 +50,8 @@ def main():
             env.update(BEAM_GENERATOR_PATH=str(puzzle),BEAM_PUZZLE_INFO_JSON=str(puzzle),
                 BEAM_TEST_CSV=str(csv),BEAM_WEIGHT_DIR=str(weights),BEAM_RUNTIME_CONFIG_MODE='auto',
                 BEAM_SOLVED_NEIGHBORHOOD_RADIUS='0',BEAM_STREAM2_SUFFIX_RADIUS='0',
-                BEAM_SOLVE_BUCKET_MODE='0',BEAM_HISTORY_MODE='disk',BEAM_RUNTIME_DEPTH_TIMING='1',
+                BEAM_SOLVE_BUCKET_MODE='0',BEAM_HISTORY_MODE=args.history_mode,BEAM_RUNTIME_DEPTH_TIMING='1',
+                BEAM_HISTORY_RAM_BYTES=str(16<<20),BEAM_HISTORY_DISK_BYTES=str(1<<20),
                 BEAM_HISTORY_DIR=str(directory/'history'),BEAM_HISTORY_DISK_PATH=str(directory/'history'),
                 BEAM_NCCL_ID_FILE=str(directory/'nccl-id.bin'),BEAM_B_MICRO='768',
                 BEAM_SHARD_COUNT='1',BEAM_STREAM4_BATCH_CANDIDATES='1024',
@@ -68,6 +70,7 @@ def main():
                 for sequence,start in enumerate(starts):
                     out=directory/f'job-{sequence}';out.mkdir()
                     elapsed=group.submit(start,out,timeout=120.0)
+                    if variant=='rust':assert 'history_provider=rust' in (out/'native.log').read_text()
                     assert group.pids==pids, 'compatible job changed worker PIDs'
                     task=replace(contract,start=start)
                     path,width,terminal=parse_terminal(out/'native.log',task,max_steps=4)
@@ -87,7 +90,7 @@ def main():
             pair=[row for row in results if row['world']==world and row['sequence']==sequence]
             assert pair[0]['path']==pair[1]['path'],pair
     (root/'results.json').write_text(json.dumps(dict(scope='correctness and resident lifetime; no performance promotion',
-        graph_hash=graph_hash,results=results),indent=2))
+        graph_hash=graph_hash,history_mode=args.history_mode,results=results),indent=2))
     print('NATIVE_SESSION_GPU_OK',flush=True)
 
 

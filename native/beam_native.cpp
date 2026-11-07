@@ -12,6 +12,12 @@ void beam_engine_layout(beam_layout_v1&);
 namespace {
 std::atomic<bool> occupied{false};
 thread_local beam::native::Control* active_control = nullptr;
+thread_local const beam_history_api_v1* coarse_history = nullptr;
+bool valid_history(const beam_history_api_v1* api) {
+    return api && api->abi_version == BEAM_NATIVE_ABI_VERSION &&
+        api->struct_size >= sizeof(*api) && api->user_data && api->initialize &&
+        api->write && api->read && api->stats && api->close && api->error;
+}
 std::vector<std::string> copy_arguments(int argc, const char* const* argv) {
     if(argc < 1 || argc > 4096 || !argv) throw std::invalid_argument("invalid native argv");
     std::vector<std::string> args;
@@ -35,6 +41,9 @@ struct beam_context {
     std::thread worker;
 };
 beam::native::Control* beam::native::current_control() noexcept { return active_control; }
+const beam_history_api_v1* beam::native::current_history() noexcept {
+    return active_control ? &active_control->history : coarse_history;
+}
 
 extern "C" {
 uint32_t beam_native_abi_version() { return BEAM_NATIVE_ABI_VERSION; }
@@ -77,6 +86,15 @@ beam_result beam_context_prepare(beam_context* ctx, int argc, const char* const*
         return BEAM_OK;
     } catch(const std::invalid_argument&) { return BEAM_INVALID; }
       catch(...) { ctx->control.finish(BEAM_FAILED, "cannot start native worker"); return BEAM_FAILED; }
+}
+beam_result beam_context_set_history(beam_context* ctx, const beam_history_api_v1* api) {
+    if(!ctx || !valid_history(api)) return BEAM_INVALID;
+    try {
+        std::lock_guard lock(ctx->control.mutex);
+        if(ctx->control.phase != BEAM_CREATED) return BEAM_BUSY;
+        ctx->control.history = *api;
+        return BEAM_OK;
+    } catch(...) { return BEAM_FAILED; }
 }
 beam_result beam_context_submit(beam_context* ctx, const beam_job_v1* job) {
     if(!ctx || !job || job->abi_version != BEAM_NATIVE_ABI_VERSION ||
@@ -156,8 +174,10 @@ beam_result beam_context_destroy(beam_context* ctx) {
         return BEAM_OK;
     } catch(...) { return BEAM_FAILED; }
 }
-int beam_native_main(int argc, const char* const* argv) {
+int beam_native_main_with_history(int argc, const char* const* argv, const beam_history_api_v1* history) {
+    if(history && !valid_history(history)) return 1;
     if(occupied.exchange(true)) return 1;
+    coarse_history=history;
     int result = 1;
     try {
         auto args = copy_arguments(argc, argv);
@@ -166,7 +186,11 @@ int beam_native_main(int argc, const char* const* argv) {
     } catch(const std::exception& error) {
         std::cerr << "production_runner_error=" << error.what() << '\n';
     } catch(...) { std::cerr << "production_runner_error=unknown exception\n"; }
+    coarse_history=nullptr;
     occupied = false;
     return result;
+}
+int beam_native_main(int argc, const char* const* argv) {
+    return beam_native_main_with_history(argc,argv,nullptr);
 }
 }

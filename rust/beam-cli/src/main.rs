@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use std::{env, path::PathBuf};
 fn run() -> Result<i32, Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -17,7 +18,10 @@ fn run() -> Result<i32, Box<dyn std::error::Error>> {
         beam_runtime::run_native_worker(&native, &args, &PathBuf::from(root))?;
         Ok(0)
     } else {
-        Ok(native.run(&args)?)
+        Ok(native.run_with_history(
+            &args,
+            Box::<beam_runtime::history::HistoryService>::default(),
+        )?)
     }
 }
 fn main() {

@@ -62,6 +62,7 @@ pub fn run_native_worker(library: &NativeLibrary, args: &[String], root: &Path) 
     let owner = beam_native_sys::parent_process_id();
     let stopped = || root.join("stop").exists() || beam_native_sys::parent_process_id() != owner;
     let mut context = library.context()?;
+    context.set_history(Box::<crate::history::HistoryService>::default())?;
     context.prepare(args)?;
     while !context.wait(Duration::from_millis(20))? {
         if stopped() {

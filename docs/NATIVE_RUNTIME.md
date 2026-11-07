@@ -1,9 +1,10 @@
 # Rust/native runtime
 
-This is the first integration stage of the approved migration. Existing public
-Python entry points are switched only after their comparative acceptance stage.
-Profile selection, full history ownership and CNOT orchestration are still being
-transferred. No CUDA sorting optimization or precision policy is enabled here.
+The approved migration is in progress. Existing public Python entry points are
+switched only after their comparative acceptance stage. Rust now owns host history
+for its resident workers and ordinary CLI, plus calibration process primitives.
+Full profile-selection and CNOT orchestration are still being transferred. No
+CUDA sorting optimization or precision policy is enabled here.
 
 ## Build
 
@@ -47,6 +48,20 @@ shared across Rust threads, and its native library cannot unload before it.
 
 ## Verification
 
+The ABI-1 optional history extension installs six host callbacks before context
+preparation. The coarse CLI entry has an equivalent blocking extension. Rust
+owns RAM, disk reservations, whole-layer placement, fallback and parent remapping;
+native code owns CUDA copies and pinned slots. A callback receives a borrowed
+aligned CandidateMeta slice only after D2H completes, and contains every Rust
+panic. The slot cannot be reused until that call returns. No extra CandidateMeta
+array is copied at the boundary. Host history currently serializes commits;
+performance promotion requires the paired measurements below.
+
+`ProbeSession` and `ProbeCohort` own persistent calibration child processes, JSON
+requests/responses and bounded log readers. Rank failures and deadlines close the
+entire owned cohort. PyO3 releases the GIL for blocking operations. These are
+runtime components; the public calibration policy has not switched yet.
+
 - `cargo test --workspace`: layout, complete-hash order, domains, bounds, repeated
   jobs, stable worker PIDs, timeouts, cancellation and one-rank failure.
 - `native_abi_tests`: the actual C ABI with an independent CPU engine fixture,
@@ -60,6 +75,12 @@ shared across Rust threads, and its native library cannot unload before it.
   resource reuse. Its exact Hamming MLP is a lifetime/correctness fixture.
 - `tests/native_session_failure_gpu.py`: active cancellation and a missing native
   library in exactly one rank; all owned workers must be reaped.
+- `tests/native_cli_gpu.py`: ordinary Rust CLI and two-rank torchrun with Rust
+  history, exact global width and independent solution replay.
+- Rust history tests cover disk-first reservations, out-of-order ready batches,
+  empty batches, capacity diagnostics, RAM pruning and injected disk-write failure
+  without overwriting future RAM reservations. Probe tests cover retained PIDs,
+  deadlines, line parsing and cleanup when one rank exits.
 
 The private extension can be packaged with `maturin build --release --manifest-path
 rust/beam-python/Cargo.toml --out <wheel-directory>`. This component wheel does not

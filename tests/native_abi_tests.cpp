@@ -1,5 +1,6 @@
 #include "beam_native.h"
 #include "engine_control.hpp"
+#include "history_bridge.hpp"
 #include <cassert>
 #include <chrono>
 #include <filesystem>
@@ -16,7 +17,19 @@ int run_production_runner(int argc, char** argv) {
     if(argc == 2 && std::string(argv[1]) == "fail-prepare")
         throw std::runtime_error("prepare failure preserved");
     auto* control = beam::native::current_control();
-    if (!control) return 7;
+    beam::native::HistoryBridge history;
+    if (!control) {
+        if(history) {
+            history.initialize("{}");
+            struct alignas(32) Meta {uint64_t lo,hi,parent;uint32_t score,route;};
+            const Meta value{0,0,0,0,37};
+            history.write(0,&value,1);
+            assert(history.read(0,0).route==37);
+            history.close();
+        }
+        return 7;
+    }
+    if(history) history.initialize("{}");
     beam::native::Job job;
     while(control->next(job)) {
         if(job.state.at(0) == 255) throw std::runtime_error("job failure preserved");
@@ -25,8 +38,17 @@ int run_production_runner(int argc, char** argv) {
             control->throw_if_cancelled();
         }
         if(job.state.at(0) == 253) std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        if(history) {
+            struct alignas(32) Meta {uint64_t lo,hi,parent;uint32_t score,route;};
+            const Meta value{0,0,job.sequence,0,37};
+            history.write(static_cast<uint32_t>(job.sequence),&value,1);
+            const auto restored=history.read(static_cast<uint32_t>(job.sequence),job.sequence);
+            assert(restored.parent_idx==job.sequence && restored.route==37 && restored.pad==0);
+            (void)history.stats();
+        }
         control->complete(job.sequence);
     }
+    if(history) history.close();
     return 0;
 }
 beam_context* prepared(const char* mode = "ok") {

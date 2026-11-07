@@ -38,4 +38,5 @@ Total authorization: USD 50, including associated costs. Initial allocations: US
 - Build/cache directories moved under `.local/cache/pre-consolidation/`. Original model files retained at their canonical root paths.
 - The first Rust/native integration stage now has CPU, one/two-GPU session and lifecycle evidence on RTX 3060. The specialized inference kernels and default public launch paths are unchanged.
 - Native ABI/layout, copied job views, persistent worker groups, cancellation and one-rank failure are covered. Full details and limitations are in `test_results/refactor_20261107/STAGE2.md`.
-- Host history/profile transfer, native CNOT orchestration, CUDA bulk-operation improvements, architecture-wide acceptance and public launch switching remain pending. Source availability does not establish those acceptance gates.
+- Host history (RAM/disk/static hybrid) now runs in Rust through borrowed ready pinned batches; reference GPU comparisons and a memory/leak sanitizer run passed within the documented API-reporting scope. Runtime calibration process ownership and PyO3 bindings are implemented and CPU-tested.
+- Full profile selection, native CNOT orchestration, CUDA bulk-operation improvements, architecture-wide acceptance and public launch switching remain pending. Source availability does not establish those acceptance gates.
