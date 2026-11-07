@@ -21,7 +21,7 @@
     "typescript": "5.8.3",
     "undici": "7.28.0",
     "vitest": "4.1.10",
-    "wrangler": "4.115.0"
+    "wrangler": "^4.115.0"
   },
   "overrides": {
     "workerd": "1.20260729.1"
