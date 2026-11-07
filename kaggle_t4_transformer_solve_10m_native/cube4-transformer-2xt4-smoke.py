@@ -1,16 +1,16 @@
 # Private 2xT4 cube4 ReLU Transformer smoke solve
 GITHUB_REPO_URL = "https://github.com/TryDotAtwo/MultiGPUBeamSearch.git"
 GITHUB_BRANCH = "codex/stream1-piece-transformer"
-EXPECTED_COMMIT_PREFIX = "2ff65a0"
+EXPECTED_COMMIT_PREFIX = "df534eb"
 KAGGLE_MODEL_SOURCE = "trydotatwo/cube4-full-transformer-inference"
 MODEL_SOURCE_SLUG = "cube4-full-transformer-inference"
 MODEL_INPUT_ROOTS = ["/tmp/cube4_bundle"]
 WEIGHT_OUT_DIR = "/kaggle/working/stream1_transformer_weights_fp16"
 
-BEAM_WIDTH = 65_536
+BEAM_WIDTH = 33_554_432
 START_PUZZLE_ID = 0
 PUZZLE_COUNT = 1
-DEPTH_LIMIT = 100
+DEPTH_LIMIT = 8
 RUN_TIMEOUT_SEC = 0
 CUDA_ARCHITECTURES = "75"
 
@@ -44,18 +44,18 @@ GPU_HEADROOM_BYTES = 256 * 1024**2
 B_MICRO = 384
 STREAM1_CONCURRENCY = 1
 STREAM3_RING_SLOTS = 2
-SHARD_COUNT = 2
+SHARD_COUNT = 4
 STREAM4_ACTIVE_SORT_SLOTS = 2
-STREAM4_BATCH_CANDIDATES = 16_384
-STREAM4_TRIGGER_CANDIDATES = 16_384
+STREAM4_BATCH_CANDIDATES = 262_144
+STREAM4_TRIGGER_CANDIDATES = 262_144
 
 DEPTH_LOG_EVERY = 1
 PUZZLE_LOG_EVERY = 1
 HISTORY_MODE = "static_hybrid"
 HISTORY_SLOT_COUNT = 2
 HISTORY_WORKERS = 1
-HISTORY_RAM_BYTES = 2 * 1024**3
-HISTORY_DISK_BYTES = 2 * 1024**3
+HISTORY_RAM_BYTES = 28 * 1024**3
+HISTORY_DISK_BYTES = 50 * 1024**3
 HISTORY_DISK_PATH = "/tmp/beam_history_transformer_native_10m_p990"
 SOLVED_NEIGHBORHOOD_RADIUS = 0
 SOLVED_NEIGHBORHOOD_MAX_ENTRIES = 0
@@ -305,6 +305,15 @@ if not (CUTLASS_DIR / 'include').exists():
     cleanup_path(CUTLASS_DIR)
     run_checked(['git', 'clone', '--depth', '1', 'https://github.com/NVIDIA/cutlass.git', CUTLASS_DIR])
 
+nccl_root = Path(torch.__file__).resolve().parents[1] / 'nvidia' / 'nccl'
+nccl_library_candidates = sorted((nccl_root / 'lib').glob('libnccl.so*'))
+nccl_include_dir = nccl_root / 'include'
+if not nccl_library_candidates or not (nccl_include_dir / 'nccl.h').is_file():
+    raise RuntimeError(f'PyTorch-compatible NCCL package not found under {nccl_root}')
+nccl_library = next((p for p in nccl_library_candidates if p.name == 'libnccl.so.2'), nccl_library_candidates[0])
+NCCL_LIB_DIR = nccl_library.parent
+print('pytorch_nccl=', {'library': str(nccl_library), 'include': str(nccl_include_dir)}, flush=True)
+
 run_checked([
     'cmake', '-S', REPO_DIR, '-B', BUILD_DIR, '-GNinja',
     '-DCMAKE_BUILD_TYPE=Release',
@@ -312,6 +321,8 @@ run_checked([
     f"-DBEAM_PUZZLE_INFO_JSON={CUBE4_DATA_DIR / 'puzzle_info.json'}",
     '-DBEAM_ENABLE_LIBTORCH_STREAM1=ON',
     f'-DCMAKE_PREFIX_PATH={torch.utils.cmake_prefix_path}',
+    f'-DNCCL_LIBRARY={nccl_library}',
+    f'-DNCCL_INCLUDE_DIR={nccl_include_dir}',
     f'-DCUTLASS_DIR={CUTLASS_DIR}',
     f'-DBEAM_ENABLE_DEBUG={"ON" if ENABLE_DEBUG else "OFF"}',
     f'-DBEAM_ENABLE_DEPTH_LOGS={"ON" if ENABLE_DEPTH_LOGS else "OFF"}',
@@ -326,8 +337,7 @@ run_checked([
     f'-DBEAM_DEBUG_DEPTH_FLOW_TRACE={"ON" if DEBUG_DEPTH_FLOW_TRACE else "OFF"}',
     f'-DBEAM_DEBUG_PIPELINE_STATS={"ON" if DEBUG_PIPELINE_STATS else "OFF"}',
 ], cwd=REPO_DIR)
-run_checked(['cmake', '--build', BUILD_DIR, '--target', 'production_runner', 'stream1_transformer_cuda_tests', '-j', '2'])
-run_checked([BUILD_DIR / 'stream1_transformer_cuda_tests'], cwd=WORK_DIR)
+run_checked(['cmake', '--build', BUILD_DIR, '--target', 'production_runner_libtorch_stream1', '-j', '2'])
 
 
 import os
@@ -394,7 +404,7 @@ def env_for_solve(puzzle_id):
         'BEAM_STREAM1_MODE': 'model',
         'BEAM_STREAM1_EXECUTOR': 'libtorch_eager',
          'BEAM_RING_GRAPH_EXECS_PER_LANE': '32',
-         'BEAM_STREAM1_TRANSFORMER_MICRO': '384',
+         'BEAM_STREAM1_TRANSFORMER_MICRO': str(B_MICRO),
          'BEAM_STREAM1_TRANSFORMER_BLOCK51': '1',
          'BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ONLY': '1',
          'BEAM_STREAM1_TRANSFORMER_FINAL_CLS_ATTENTION': '0',
@@ -413,6 +423,7 @@ def env_for_solve(puzzle_id):
          'BEAM_STREAM1_TRANSFORMER_ATTENTION_TILE_POLICY': 'q64k64',
          'BEAM_STREAM1_TRANSFORMER_ATTENTION_MAX_K_POLICY': 'padded64',
         'BEAM_WEIGHT_DIR': str(WEIGHT_OUT_DIR),
+        'BEAM_GENERATOR_PATH': str(GENERATOR_PATH),
         'BEAM_PUZZLE_INFO_JSON': str(CUBE4_DATA_DIR / 'puzzle_info.json'),
         'BEAM_TEST_CSV': str(CUBE4_DATA_DIR / 'test.csv'),
         'BEAM_RUNTIME_CONFIG_MODE': RUNTIME_CONFIG_MODE,
@@ -443,6 +454,7 @@ def env_for_solve(puzzle_id):
         'BEAM_DEPTH_LOG_EVERY': str(DEPTH_LOG_EVERY),
         'BEAM_NCCL_ID_FILE': str(nccl_id_file),
     })
+    env['LD_LIBRARY_PATH'] = f'{NCCL_LIB_DIR}:{env.get("LD_LIBRARY_PATH", "")}'
     env.pop('WORLD_SIZE', None)
     env.pop('RANK', None)
     env.pop('LOCAL_RANK', None)

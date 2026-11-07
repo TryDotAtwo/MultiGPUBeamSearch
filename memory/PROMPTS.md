@@ -1,6 +1,7 @@
 # Prompt History
 
 ## 2026-07-22
+- User requested a paired private Kaggle 2xT4 end-to-end solve comparison on Megaminx puzzle 990 with global beam 10,000,000: first the selected exact native SM75 transformer backend, then Vlad Kuznetsov's original `single_phase_submission.py` inference path, measuring wall/depth speed, solution outcome, and actual two-GPU utilization.
 - User explicitly approved launching the updated private Kaggle 2xT4 pipeline gate for the SM75 transformer follow-up; correctness remains complete byte-exact score comparison and performance changes are accepted only after the integrated repeated gate.
 - User explicitly approved pushing transformer commit `18e5996` and its reproducible tag to the existing GitHub repository for a private Kaggle 2xT4 run, then asked to launch immediately when the T4 slot became available.
 - User set the persistent goal to optimize native transformer inference sequentially on local RTX 3070 using the profiler-equipped long-lived Docker GPU queue, preserving byte-exact math and measured speed gates; only after 3070 improvements are exhausted should work move to independent 2xT4 profiling and tuning.
@@ -540,3 +541,8 @@ User approved optimizing native transformer inference around memory-system effic
 ## 2026-07-22 — RTX 3070 benchmark validity
 
 User reported that an interactive game had been running during part of the recent transformer tuning and required checking that the GPU is free for every performance measurement. Suspect overlapping timings must be discarded. Accepted local RTX 3070 performance series require an immediate utilization/process idle check, and longer acceptance series should be bookended by another idle check; correctness dumps remain independently gated by the canonical full-score SHA.
+
+## 2026-07-30 - Supplied cube4 Transformer
+
+- User supplied `cube4_full_transformer_inference.tar.gz` and asked to run its 4x4x4 Transformer through the project Kaggle 2xT4 beam-search notebook.
+- Preserve the beam-search architecture; model export/runtime adapters and private Kaggle validation are authorized.
