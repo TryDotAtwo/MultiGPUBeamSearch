@@ -15,10 +15,10 @@ scratch and finishes before the next same-stream borrower; no large arena is
 added. The planner and the launch query actual CUB scratch. Insufficient scratch
 is rejected before enqueueing work with required and available byte counts.
 
-The device guard for a corrupted unique count above capacity currently traps
-without reporting required and available counts. This is a known diagnostic
-gap that must be closed before this experimental path is promoted. It does not
-silently truncate the input. The measured and regression inputs satisfy the
+In this initial measured build, the device guard for a corrupted unique count
+above capacity trapped without reporting the required and available counts.
+The follow-up implementation and tests for this diagnostic are documented in
+`STAGE4_OWNER_COUNT.md`. The measured and regression inputs here satisfy the
 upstream count-capacity contract.
 
 ## Correctness

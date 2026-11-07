@@ -53,6 +53,10 @@ int main() {
         auto* key_b = allocate<std::uint32_t>(capacity);
         auto* val_a = allocate<CandidateMeta>(capacity);
         auto* val_b = allocate<CandidateMeta>(capacity);
+        auto* fatal_flag = allocate<std::uint32_t>(1);
+        auto* fatal_trace = allocate<std::uint64_t>(STREAM_FATAL_TRACE_WORDS);
+        cu(cudaMemset(fatal_flag, 0, sizeof(*fatal_flag)));
+        cu(cudaMemset(fatal_trace, 0, STREAM_FATAL_TRACE_WORDS * sizeof(*fatal_trace)));
         std::size_t owner_temp_bytes = 0;
         cu(cub::DeviceRadixSort::SortPairs(nullptr, owner_temp_bytes, key_a, key_b,
                                             val_a, val_b, capacity, 0, 9, stream));
@@ -69,7 +73,7 @@ int main() {
                 stream3_restore_owner_radix_cuda(key, value, count_device, parent_device,
                     local, local_count_device, remote, send_count_device, send_offset_device,
                     key_a, key_b, val_a, val_b, owner_temp, available,
-                    0, 2, b_micro, capacity, stream);
+                    0, 2, b_micro, capacity, stream, fatal_flag, fatal_trace);
             } catch (const std::runtime_error& error) {
                 const std::string message = error.what();
                 rejected = message.find("required=" + std::to_string(required_for_two)) != std::string::npos &&
@@ -82,6 +86,80 @@ int main() {
 #endif
         const std::array<std::uint64_t, 4> parents{1000, 10000, 100000, 1000000};
         upload(parent_device, parents.data(), parents.size());
+#ifdef BEAM_TEST_OWNER_RADIX
+        // Deliberately corrupt the device count. Eager execution and graph replay
+        // must report exact sizes, preserve the context, and emit no output.
+        for (unsigned world : {1U, 2U}) {
+            for (unsigned bad_count : {capacity + 1U, UINT32_MAX}) {
+                for (bool captured : {false, true}) {
+                    const unsigned zero = 0;
+                    upload(fatal_flag, &zero, 1);
+                    upload(count_device, &bad_count, 1);
+                    cu(cudaMemset(fatal_trace, 0, STREAM_FATAL_TRACE_WORDS * sizeof(*fatal_trace)));
+                    cu(cudaMemset(local, 0xa5, capacity * sizeof(*local)));
+                    cu(cudaMemset(remote, 0xa5, capacity * sizeof(*remote)));
+                    cu(cudaMemset(send_count_device, 0xff, world * sizeof(unsigned)));
+                    cu(cudaMemset(send_offset_device, 0xff, (world + 1) * sizeof(unsigned)));
+                    cu(cudaDeviceSynchronize());
+                    auto enqueue_bad = [&] {
+                        stream3_restore_owner_radix_cuda(key, value, count_device, parent_device,
+                            local, local_count_device, remote, send_count_device, send_offset_device,
+                            key_a, key_b, val_a, val_b, owner_temp, owner_temp_bytes,
+                            0, world, b_micro, capacity, stream, fatal_flag, fatal_trace);
+                    };
+                    cudaGraph_t graph = nullptr; cudaGraphExec_t executable = nullptr;
+                    if (captured) {
+                        cu(cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal));
+                        enqueue_bad();
+                        cu(cudaStreamEndCapture(stream, &graph));
+                        cu(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0));
+                        cu(cudaGraphLaunch(executable, stream));
+                    } else enqueue_bad();
+                    cu(cudaStreamSynchronize(stream));
+                    unsigned flag = 0, local_count = UINT32_MAX;
+                    std::array<std::uint64_t, STREAM_FATAL_TRACE_WORDS> trace{};
+                    std::vector<unsigned> counts(world, UINT32_MAX), offsets(world + 1, UINT32_MAX);
+                    std::array<unsigned char, sizeof(CandidateMeta)> local_canary{}, remote_canary{};
+                    cu(cudaMemcpy(&flag, fatal_flag, sizeof(flag), cudaMemcpyDeviceToHost));
+                    cu(cudaMemcpy(trace.data(), fatal_trace, sizeof(trace), cudaMemcpyDeviceToHost));
+                    cu(cudaMemcpy(&local_count, local_count_device, sizeof(local_count), cudaMemcpyDeviceToHost));
+                    cu(cudaMemcpy(counts.data(), send_count_device, world * sizeof(unsigned), cudaMemcpyDeviceToHost));
+                    cu(cudaMemcpy(offsets.data(), send_offset_device, (world + 1) * sizeof(unsigned), cudaMemcpyDeviceToHost));
+                    cu(cudaMemcpy(local_canary.data(), local, local_canary.size(), cudaMemcpyDeviceToHost));
+                    cu(cudaMemcpy(remote_canary.data(), remote, remote_canary.size(), cudaMemcpyDeviceToHost));
+                    require(flag == STREAM_FATAL_STREAM3_OWNER_COUNT_OVERFLOW, "owner count overflow code mismatch");
+                    require(trace[FatalTraceCode] == flag && trace[FatalTraceRawCount] == bad_count &&
+                            trace[FatalTraceAvailable] == capacity, "owner count overflow sizes mismatch");
+                    require(local_count == 0 && std::all_of(counts.begin(), counts.end(), [](unsigned x) { return x == 0; }) &&
+                            std::all_of(offsets.begin(), offsets.end(), [](unsigned x) { return x == 0; }),
+                            "owner count overflow emitted nonzero counts");
+                    require(std::all_of(local_canary.begin(), local_canary.end(), [](unsigned char x) { return x == 0xa5; }) &&
+                            std::all_of(remote_canary.begin(), remote_canary.end(), [](unsigned char x) { return x == 0xa5; }),
+                            "owner count overflow overwrote outputs");
+                    if (captured) { cu(cudaGraphExecDestroy(executable)); cu(cudaGraphDestroy(graph)); }
+                }
+            }
+        }
+        // A prior failure must retain its trace even if the count is corrupt.
+        const unsigned prior = STREAM_FATAL_STREAM3_DOUBLE_BUFFER_OVERFLOW;
+        const unsigned bad_count = capacity + 1U;
+        std::array<std::uint64_t, STREAM_FATAL_TRACE_WORDS> marker{};
+        marker.fill(0x123456789abcdef0ULL);
+        upload(fatal_flag, &prior, 1); upload(fatal_trace, marker.data(), marker.size());
+        upload(count_device, &bad_count, 1);
+        stream3_restore_owner_radix_cuda(key, value, count_device, parent_device,
+            local, local_count_device, remote, send_count_device, send_offset_device,
+            key_a, key_b, val_a, val_b, owner_temp, owner_temp_bytes,
+            0, 2, b_micro, capacity, stream, fatal_flag, fatal_trace);
+        cu(cudaStreamSynchronize(stream));
+        unsigned observed_prior = 0;
+        std::array<std::uint64_t, STREAM_FATAL_TRACE_WORDS> observed_marker{};
+        cu(cudaMemcpy(&observed_prior, fatal_flag, sizeof(observed_prior), cudaMemcpyDeviceToHost));
+        cu(cudaMemcpy(observed_marker.data(), fatal_trace, sizeof(observed_marker), cudaMemcpyDeviceToHost));
+        require(observed_prior == prior && observed_marker == marker, "earlier fatal trace was overwritten");
+        cu(cudaMemset(fatal_flag, 0, sizeof(*fatal_flag)));
+        std::cout << "owner_count_overflow eager_and_graph=PASS prior_error_preserved=PASS\n";
+#endif
         unsigned checks = 0;
         for (unsigned world : {1U, 2U, 3U, 5U, 8U, 256U}) {
             for (unsigned rank = 0; rank < world; ++rank) {
@@ -122,7 +200,7 @@ int main() {
                                 send_count_device, send_offset_device, key_a, key_b,
                                 val_a, val_b, owner_temp, owner_temp_bytes,
                                 static_cast<std::uint16_t>(rank), world, b_micro,
-                                capacity, stream);
+                                capacity, stream, fatal_flag, fatal_trace);
 #else
                             stream3_restore_owner_split_cuda(key, value, count_device,
                                 parent_device, local, local_count_device, remote,
@@ -177,6 +255,7 @@ int main() {
 #ifdef BEAM_TEST_OWNER_RADIX
         cu(cudaFree(owner_temp)); cu(cudaFree(key_a)); cu(cudaFree(key_b));
         cu(cudaFree(val_a)); cu(cudaFree(val_b));
+        cu(cudaFree(fatal_flag)); cu(cudaFree(fatal_trace));
 #endif
         std::cout << "owner_scatter checks=" << checks << " eager_and_graph=PASS\n";
         return 0;

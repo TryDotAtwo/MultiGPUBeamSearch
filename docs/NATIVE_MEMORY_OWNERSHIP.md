@@ -44,6 +44,7 @@ resident across compatible jobs.
 | Stream2 hash rings | same original candidate range | expansion/hash lane; hash-ready event | Stream3 consumer releases ring slot |
 | Stream3 sort/reduce planes | planned accumulator capacity / GPU compact count | Stream3 job on its stream | reduction and owner partition complete |
 | Stream3 partition key/value A/B | max of batch and spill capacities / operation count | owner radix or shard partition on Stream3 | its sort and output gather complete before the next same-stream partition |
+| Stream3 fatal flag and trace | one flag and 26 trace words / first failure | Stream3 operations in stream order | dispatcher reads the trace after the Stream3 completion event before exchange |
 | Stream4 physical A/B | planned shard capacity / valid count | owner Stream4 job | all readers of old survivor version complete |
 | Published histogram A/B | full score-bin count / active bank | Stream4 publishes inactive bank after writes | Stream5 finished reading selected bank |
 | CUB temporary storage | exact queried byte capacity / operation-specific extent | stream that launches CUB | every previous reader/writer completes; graph overlap must not alias |

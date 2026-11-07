@@ -9,6 +9,7 @@ namespace beam {
 constexpr std::uint32_t STREAM_FATAL_TRACE_WORDS = 26;
 constexpr std::uint32_t STREAM_FATAL_STREAM3_SPILL_OVERFLOW = 3001;
 constexpr std::uint32_t STREAM_FATAL_STREAM3_DOUBLE_BUFFER_OVERFLOW = 3002;
+constexpr std::uint32_t STREAM_FATAL_STREAM3_OWNER_COUNT_OVERFLOW = 3003;
 
 enum StreamFatalTraceSlot : std::uint32_t {
     FatalTraceCode = 0,
@@ -138,7 +139,8 @@ void stream3_restore_owner_radix_cuda(
     CandidateMeta* owner_val_a, CandidateMeta* owner_val_b,
     void* cub_temp_storage, std::size_t cub_temp_storage_bytes,
     std::uint16_t local_rank, std::uint32_t world_size, std::uint32_t b_micro,
-    std::uint32_t max_candidates, cudaStream_t stream);
+    std::uint32_t max_candidates, cudaStream_t stream,
+    std::uint32_t* fatal_error_flag, std::uint64_t* fatal_error_trace);
 
 void stream3_collect_local_pending_cuda(
     const CandidateMeta* local_pending_buffer,

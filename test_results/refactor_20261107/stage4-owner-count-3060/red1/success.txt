@@ -1,0 +1,1 @@
+EXPECTED_RED: owner count overflow contract is absent

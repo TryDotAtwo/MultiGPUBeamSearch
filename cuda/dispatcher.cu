@@ -610,6 +610,12 @@ std::string stream_fatal_error_message(
     const char* phase,
     std::uint32_t flag,
     const std::array<std::uint64_t, STREAM_FATAL_TRACE_WORDS>& trace) {
+    if (flag == STREAM_FATAL_STREAM3_OWNER_COUNT_OVERFLOW) {
+        return std::string("cuda stream fatal error: phase=") + phase +
+            " code=" + std::to_string(flag) +
+            " required=" + std::to_string(trace[FatalTraceRawCount]) +
+            " available=" + std::to_string(trace[FatalTraceAvailable]);
+    }
     return std::string("cuda stream fatal error: phase=") + phase +
         " flag=" + std::to_string(flag) +
         " code=" + std::to_string(trace[FatalTraceCode]) +
@@ -1552,7 +1558,8 @@ void instantiate_cuda_graph_job_templates(
                 memory.streams.stream3_partition_val_a, memory.streams.stream3_partition_val_b,
                 memory.streams.stream3_cub_temp, memory.streams.stream3_cub_temp_bytes,
                 static_cast<std::uint16_t>(plan.config.local_rank), plan.config.world_size,
-                plan.config.b_micro, plan.config.stream3_batch_candidates, streams.stream3);
+                plan.config.b_micro, plan.config.stream3_batch_candidates, streams.stream3,
+                memory.streams.fatal_error_flag, memory.streams.fatal_error_trace);
 #else
             stream3_restore_owner_split_cuda(
                 memory.streams.unique_key,

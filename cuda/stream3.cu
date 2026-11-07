@@ -339,9 +339,11 @@ __global__ void stream3_restore_single_owner_kernel(
     std::uint32_t* send_count,
     std::uint32_t* send_offset,
     std::uint16_t local_rank,
-    std::uint32_t b_micro) {
+    std::uint32_t b_micro,
+    const std::uint32_t* fatal_error_flag) {
     const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    const std::uint32_t count = *unique_count;
+    const bool failed = fatal_error_flag != nullptr && *fatal_error_flag != 0U;
+    const std::uint32_t count = failed ? 0U : *unique_count;
     if (blockIdx.x == 0 && threadIdx.x == 0) {
         *local_pending_count = count;
         send_count[0] = 0;
@@ -512,23 +514,28 @@ __global__ void stream3_scatter_owner_kernel(
 }
 
 #if BEAM_EXPERIMENTAL_OWNER_RADIX
-__global__ void stream3_owner_radix_check_capacity_kernel(const std::uint32_t* count,
-                                                           std::uint32_t capacity) {
-    if (blockIdx.x == 0 && threadIdx.x == 0 && *count > capacity) asm("trap;");
+__global__ void stream3_owner_radix_check_capacity_kernel(
+    const std::uint32_t* count, std::uint32_t capacity,
+    std::uint32_t* fatal_error_flag, std::uint64_t* fatal_error_trace) {
+    if (blockIdx.x != 0 || threadIdx.x != 0 || *fatal_error_flag != 0U) return;
+    const auto required = *count;
+    if (required <= capacity) return;
+    for (std::uint32_t i = 0; i < STREAM_FATAL_TRACE_WORDS; ++i) fatal_error_trace[i] = 0;
+    fatal_error_trace[FatalTraceCode] = STREAM_FATAL_STREAM3_OWNER_COUNT_OVERFLOW;
+    fatal_error_trace[FatalTraceRawCount] = required;
+    fatal_error_trace[FatalTraceAvailable] = capacity;
+    *fatal_error_flag = STREAM_FATAL_STREAM3_OWNER_COUNT_OVERFLOW;
 }
 
 __global__ void stream3_owner_radix_fill_kernel(
     const Hash128* unique_key, const std::uint64_t* unique_val,
     const std::uint32_t* unique_count, const std::uint64_t* parent_base,
     std::uint32_t* owner_keys, CandidateMeta* metadata, std::uint16_t local_rank,
-    std::uint32_t world_size, std::uint32_t b_micro, std::uint32_t capacity) {
+    std::uint32_t world_size, std::uint32_t b_micro, std::uint32_t capacity,
+    const std::uint32_t* fatal_error_flag) {
     const auto i = blockIdx.x * blockDim.x + threadIdx.x;
-    const auto count = *unique_count;
-    if (count > capacity) {
-        if (i == 0) asm("trap;");
-        return;
-    }
     if (i >= capacity) return;
+    const auto count = *fatal_error_flag == 0U ? *unique_count : 0U;
     if (i >= count) {
         owner_keys[i] = world_size; // Sentinel sorts after every valid owner.
         metadata[i] = CandidateMeta{};
@@ -564,11 +571,16 @@ __device__ std::uint32_t stream3_owner_lower_bound(const std::uint32_t* keys,
 __global__ void stream3_owner_radix_counts_kernel(
     const std::uint32_t* keys, const std::uint32_t* unique_count,
     std::uint32_t* local_count, std::uint32_t* send_count,
-    std::uint32_t local_rank, std::uint32_t world_size, std::uint32_t capacity) {
+    std::uint32_t local_rank, std::uint32_t world_size,
+    const std::uint32_t* fatal_error_flag) {
     const auto peer = blockIdx.x * blockDim.x + threadIdx.x;
     if (peer >= world_size) return;
+    if (*fatal_error_flag != 0U) {
+        if (peer == local_rank) *local_count = 0;
+        send_count[peer] = 0;
+        return;
+    }
     const auto count = *unique_count;
-    if (count > capacity) { if (peer == 0) asm("trap;"); return; }
     const auto first = stream3_owner_lower_bound(keys, count, peer);
     const auto last = stream3_owner_lower_bound(keys, count, peer + 1U);
     if (peer == local_rank) {
@@ -583,10 +595,11 @@ __global__ void stream3_owner_radix_copy_kernel(
     const std::uint32_t* keys, const CandidateMeta* metadata,
     const std::uint32_t* unique_count, const std::uint32_t* local_count,
     const std::uint32_t* send_offset, CandidateMeta* local, CandidateMeta* remote,
-    std::uint32_t local_rank, std::uint32_t world_size, std::uint32_t capacity) {
+    std::uint32_t local_rank, std::uint32_t world_size,
+    const std::uint32_t* fatal_error_flag) {
     const auto i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (*fatal_error_flag != 0U) return;
     const auto count = *unique_count;
-    if (count > capacity) { if (i == 0) asm("trap;"); return; }
     if (i >= count) return;
     const auto owner = keys[i];
     if (owner >= world_size) { asm("trap;"); return; }
@@ -1382,7 +1395,8 @@ void stream3_restore_owner_split_cuda(
             send_count,
             send_offset,
             local_rank,
-            b_micro);
+            b_micro,
+            nullptr);
         return;
     }
     stream3_restore_owner_split_kernel<<<grid, block, 0, stream>>>(
@@ -1435,20 +1449,22 @@ void stream3_restore_owner_radix_cuda(
     CandidateMeta* owner_val_a, CandidateMeta* owner_val_b,
     void* cub_temp_storage, std::size_t cub_temp_storage_bytes,
     std::uint16_t local_rank, std::uint32_t world_size, std::uint32_t b_micro,
-    std::uint32_t max_candidates, cudaStream_t stream) {
+    std::uint32_t max_candidates, cudaStream_t stream,
+    std::uint32_t* fatal_error_flag, std::uint64_t* fatal_error_trace) {
     NvtxRange range("Stream3_restore_owner_radix_launch");
     if (!world_size || world_size > 256U || local_rank >= world_size || !b_micro ||
         !max_candidates || max_candidates > static_cast<std::uint32_t>(INT_MAX))
         throw std::invalid_argument("stream3 owner radix geometry is outside supported bounds");
     if (!unique_key || !unique_val || !unique_count || !local_pending_buffer ||
-        !local_pending_count || !send_count || !send_offset)
-        throw std::invalid_argument("stream3 owner radix requires input and count buffers");
+        !local_pending_count || !send_count || !send_offset || !fatal_error_flag || !fatal_error_trace)
+        throw std::invalid_argument("stream3 owner radix requires input, count and fatal-trace buffers");
     if (world_size == 1U) {
         const auto blocks = max_candidates / 256U + (max_candidates % 256U != 0U);
-        stream3_owner_radix_check_capacity_kernel<<<1, 1, 0, stream>>>(unique_count, max_candidates);
+        stream3_owner_radix_check_capacity_kernel<<<1, 1, 0, stream>>>(
+            unique_count, max_candidates, fatal_error_flag, fatal_error_trace);
         stream3_restore_single_owner_kernel<<<blocks, 256, 0, stream>>>(unique_key, unique_val,
             unique_count, parent_base, local_pending_buffer, local_pending_count,
-            send_count, send_offset, local_rank, b_micro);
+            send_count, send_offset, local_rank, b_micro, fatal_error_flag);
         return;
     }
     if (!remote_send_buffer || !owner_key_a || !owner_key_b || !owner_val_a || !owner_val_b ||
@@ -1466,9 +1482,11 @@ void stream3_restore_owner_radix_cuda(
         throw std::runtime_error("CUB stream3 owner radix scratch required=" + std::to_string(required) +
                                  " available=" + std::to_string(cub_temp_storage_bytes));
     const auto blocks = max_candidates / 256U + (max_candidates % 256U != 0U);
+    stream3_owner_radix_check_capacity_kernel<<<1, 1, 0, stream>>>(
+        unique_count, max_candidates, fatal_error_flag, fatal_error_trace);
     stream3_owner_radix_fill_kernel<<<blocks, 256, 0, stream>>>(unique_key, unique_val,
         unique_count, parent_base, owner_key_a, owner_val_a, local_rank,
-        world_size, b_micro, max_candidates);
+        world_size, b_micro, max_candidates, fatal_error_flag);
     auto bytes = cub_temp_storage_bytes;
     const auto status = cub::DeviceRadixSort::SortPairs(cub_temp_storage, bytes,
         owner_key_a, owner_key_b, owner_val_a, owner_val_b,
@@ -1478,11 +1496,11 @@ void stream3_restore_owner_radix_cuda(
             " required=" + std::to_string(required) + " available=" + std::to_string(cub_temp_storage_bytes));
     }
     stream3_owner_radix_counts_kernel<<<1, 256, 0, stream>>>(owner_key_b, unique_count,
-        local_pending_count, send_count, local_rank, world_size, max_candidates);
+        local_pending_count, send_count, local_rank, world_size, fatal_error_flag);
     stream3_scan_send_counts_kernel<<<1, 1, 0, stream>>>(send_count, send_offset, world_size);
     stream3_owner_radix_copy_kernel<<<blocks, 256, 0, stream>>>(owner_key_b, owner_val_b,
         unique_count, local_pending_count, send_offset, local_pending_buffer,
-        remote_send_buffer, local_rank, world_size, max_candidates);
+        remote_send_buffer, local_rank, world_size, fatal_error_flag);
 }
 #endif
 

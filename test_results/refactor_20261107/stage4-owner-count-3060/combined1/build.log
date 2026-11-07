@@ -1,0 +1,56 @@
+[1/20] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+/workspace/beam-native-source/cuda/stream4.cu(24): warning #177-D: function "beam::<unnamed>::Stream4HashLess::operator()" was declared but never referenced
+      __attribute__((host)) __attribute__((device)) bool operator()(Hash128 a, Hash128 b) const {
+                                                         ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/workspace/beam-native-source/cuda/stream4.cu(33): warning #177-D: function "beam::<unnamed>::Stream4BestCandidate::operator()" was declared but never referenced
+      __attribute__((host)) __attribute__((device)) CandidateMeta operator()(CandidateMeta a, CandidateMeta b) const {
+                                                                  ^
+
+/workspace/beam-native-source/cuda/stream4.cu(286): warning #177-D: function "beam::<unnamed>::stream4_fill_sort_tail_kernel" was declared but never referenced
+  __attribute__((global)) void stream4_fill_sort_tail_kernel(
+                               ^
+
+/workspace/beam-native-source/cuda/stream4.cu(299): warning #177-D: function "beam::<unnamed>::stream4_mark_valid_unique_counts_kernel" was declared but never referenced
+  __attribute__((global)) void stream4_mark_valid_unique_counts_kernel(
+                               ^
+
+/workspace/beam-native-source/cuda/stream4.cu(329): warning #177-D: function "beam::<unnamed>::stream4_compact_valid_unique_kernel" was declared but never referenced
+  __attribute__((global)) void stream4_compact_valid_unique_kernel(
+                               ^
+
+[2/20] Building CUDA object CMakeFiles/stream4_scan_large_union_cuda_tests.dir/tests/stream4_scan_large_union_cuda_tests.cu.o
+[3/20] Building CUDA object CMakeFiles/stream4_logical_union_cuda_tests.dir/tests/stream4_logical_union_cuda_tests.cu.o
+[4/20] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+/workspace/beam-native-source/cuda/static_memory.cu(250): warning #177-D: variable "unique_values" was declared but never referenced
+      CandidateMeta* unique_values = nullptr;
+                     ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/workspace/beam-native-source/cuda/static_memory.cu(42): warning #177-D: function "beam::<unnamed>::Stream4HashLessForCubTemp::operator()" was declared but never referenced
+      __attribute__((host)) __attribute__((device)) bool operator()(Hash128 a, Hash128 b) const {
+                                                         ^
+
+/workspace/beam-native-source/cuda/static_memory.cu(51): warning #177-D: function "beam::<unnamed>::Stream4BestCandidateForCubTemp::operator()" was declared but never referenced
+      __attribute__((host)) __attribute__((device)) CandidateMeta operator()(CandidateMeta a, CandidateMeta b) const {
+                                                                  ^
+
+[5/20] Linking CXX static library libbeam_cuda.a
+[6/20] Building CUDA object CMakeFiles/stream4_logical_union_graph_cuda_tests.dir/tests/stream4_logical_union_cuda_tests.cu.o
+[7/20] Linking CXX executable stream3_cuda_tests
+[8/20] Linking CXX executable stream3_owner_scatter_cuda_tests
+[9/20] Linking CXX executable stream3_owner_radix_cuda_tests
+[10/20] Linking CXX executable stream4_cuda_tests
+[11/20] Linking CXX executable stream4_scan_large_union_cuda_tests
+[12/20] Linking CXX executable stream4_logical_union_cuda_tests
+[13/20] Linking CXX executable stream4_logical_union_graph_cuda_tests
+[14/20] Linking CXX executable final_union_dispatcher_cuda_tests
+[15/20] Building CUDA object CMakeFiles/stream4_logical_union_bounded_graph_cuda_tests.dir/tests/stream4_logical_union_cuda_tests.cu.o
+[16/20] Linking CXX executable stream4_bounded_graph_cuda_tests
+[17/20] Linking CXX executable stream4_logical_union_bounded_graph_cuda_tests
+[18/20] Linking CXX executable stitched_cuda_tests
+[19/20] Linking CXX executable static_memory_cuda_tests
+[20/20] Linking CXX executable production_runner
