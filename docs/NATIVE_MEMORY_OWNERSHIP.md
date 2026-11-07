@@ -67,6 +67,12 @@ readers complete. Scoped production-arena initcheck and comparison evidence is
 in `test_results/refactor_20261107/STAGE4_CUB_INITIALIZATION.md`; it does not
 establish a clean initcheck for every application path or GPU family.
 
+An allocation that fails while constructing a phase layout or initializing
+scratch is rolled back and the memory view is reset. Rejecting an allocation
+over an already-owned arena leaves the original view unchanged. Scoped failure
+injection and sanitizer evidence is in
+`test_results/refactor_20261107/STAGE4_ARENA_ROLLBACK.md`.
+
 Capacity errors must report both required and available sizes. Physical alignment
 does not change logical beam width. Stream4 has no semantic shard cap or shard
 top-k. Permutation padding is zero in persistent storage. CNOT matrices use a

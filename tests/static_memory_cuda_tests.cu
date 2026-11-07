@@ -185,9 +185,40 @@ int main() {
         "scratch pool must fit final materialize layout");
     require(plan.scratch_pool_bytes >= plan.layout_final_bytes, "scratch pool must fit final layout");
 
+    // Deliberately invalidate each phase's advertised extent after producing a
+    // valid plan. The allocator must roll back the cudaMalloc on either error.
+    const auto require_failed_allocation_released = [](const StaticMemoryPlan& invalid, const char* message) {
+        StaticDeviceMemory failed;
+        bool threw = false;
+        try {
+            allocate_static_device_memory(invalid, failed);
+        } catch (const std::exception&) {
+            threw = true;
+        }
+        const bool released = failed.allocation == nullptr && failed.scratch_pool == nullptr;
+        if (!released) free_static_device_memory(failed); // keep the red test leak-free
+        require(threw, "invalid layout unexpectedly allocated successfully");
+        require(released, message);
+    };
+    auto invalid_union = plan;
+    invalid_union.layout_union_bytes = 1;
+    require_failed_allocation_released(invalid_union, "union layout failure leaked the arena");
+    auto invalid_streams = plan;
+    invalid_streams.layout_phase1_streams_bytes = 1;
+    require_failed_allocation_released(invalid_streams, "streams layout failure leaked the arena");
+
     StaticDeviceMemory memory;
     allocate_static_device_memory(plan, memory);
     require_cub_scratch_initialized(plan, memory);
+    const auto original_allocation = memory.allocation;
+    bool rejected_reallocation = false;
+    try {
+        allocate_static_device_memory(plan, memory);
+    } catch (const std::invalid_argument&) {
+        rejected_reallocation = true;
+    }
+    require(rejected_reallocation && memory.allocation == original_allocation,
+            "reallocation rejection must preserve the original arena");
     require(memory.allocation != nullptr, "static allocation must exist");
     require(memory.current_frontier_states != nullptr, "current frontier must exist outside scratch");
     require(memory.scratch_pool != nullptr, "scratch pool must exist");

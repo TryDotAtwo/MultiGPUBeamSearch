@@ -788,10 +788,21 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
     if (memory.allocation != nullptr) {
         throw std::invalid_argument("static device memory must be freed before reallocation");
     }
-    cudaError_t err = cudaMalloc(&memory.allocation, plan.total_device_bytes);
+    void* allocation = nullptr;
+    cudaError_t err = cudaMalloc(&allocation, plan.total_device_bytes);
     if (err != cudaSuccess) {
         throw std::runtime_error(cudaGetErrorString(err));
     }
+    memory.allocation = allocation;
+    // All layout construction and scratch initialization below can throw.
+    // Keep the allocation owned until the complete arena has been published.
+    struct AllocationRollback {
+        StaticDeviceMemory& memory;
+        bool committed = false;
+        ~AllocationRollback() {
+            if (!committed) free_static_device_memory(memory);
+        }
+    } rollback{memory};
     memory.allocation_bytes = plan.total_device_bytes;
     Cursor root{reinterpret_cast<std::byte*>(memory.allocation), 0};
     memory.current_frontier_states = root.take<State128>(plan.frontier_states, 256);
@@ -997,12 +1008,8 @@ void allocate_static_device_memory(const StaticMemoryPlan& plan, StaticDeviceMem
             final_materialize.take<std::byte>(plan.final_materialize_cub_temp_bytes, 256);
         memory.final.final_mat_cub_temp_bytes = plan.final_materialize_cub_temp_bytes;
     }
-    try {
-        initialize_cub_scratch(plan, memory);
-    } catch (...) {
-        free_static_device_memory(memory);
-        throw;
-    }
+    initialize_cub_scratch(plan, memory);
+    rollback.committed = true;
 }
 
 void free_static_device_memory(StaticDeviceMemory& memory) {
