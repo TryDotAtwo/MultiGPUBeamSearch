@@ -70,3 +70,15 @@ and 1,279,312 uncompressed bytes, SHA-256
 Build products are retained in the ignored local cache and on the owned lease;
 the Git evidence archive excludes executables, object files and ephemeral binary
 transport files.
+
+## Independent repeat after reconnection
+
+The same hashed runners, input, model and two-GPU profile were run again in
+five alternating pairs. The median paired throughput change was **-14.73%**
+(individual pairs: -12.22%, -14.73%, -16.69%, -14.90% and -12.64%). The
+medians of pair medians were 20.192 ms for control and 23.727 ms for radix.
+The runner hashes, plans, complete rank logs and sampled telemetry are in
+`stage4-radix128-repeat-3060/`. The 69-file repeat archive has SHA-256
+`09278c458da4d4d906fa3e07c4cd7aec759caf49b8b7d4c881be8139ee4af788`.
+This is a repeat of the same limited fixture; it does not expand the hardware
+or workload acceptance described above.
