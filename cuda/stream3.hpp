@@ -125,6 +125,21 @@ void stream3_restore_owner_split_cuda(
     std::uint32_t max_candidates,
     cudaStream_t stream);
 
+// Stable owner partition. Key/value A/B and CUB scratch are borrowed until
+// all enqueued work completes; they must not alias the input or either output.
+// The caller may then reuse them in the same stream. The one-owner path avoids
+// the partition entirely. Compiled only in the experimental owner-radix build.
+void stream3_restore_owner_radix_cuda(
+    const Hash128* unique_key, const std::uint64_t* unique_val,
+    const std::uint32_t* unique_count, const std::uint64_t* parent_base,
+    CandidateMeta* local_pending_buffer, std::uint32_t* local_pending_count,
+    CandidateMeta* remote_send_buffer, std::uint32_t* send_count, std::uint32_t* send_offset,
+    std::uint32_t* owner_key_a, std::uint32_t* owner_key_b,
+    CandidateMeta* owner_val_a, CandidateMeta* owner_val_b,
+    void* cub_temp_storage, std::size_t cub_temp_storage_bytes,
+    std::uint16_t local_rank, std::uint32_t world_size, std::uint32_t b_micro,
+    std::uint32_t max_candidates, cudaStream_t stream);
+
 void stream3_collect_local_pending_cuda(
     const CandidateMeta* local_pending_buffer,
     const std::uint32_t* local_pending_count,

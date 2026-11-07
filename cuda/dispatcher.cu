@@ -1540,6 +1540,20 @@ void instantiate_cuda_graph_job_templates(
 #endif
             ring);
         if (plan.config.world_size != 1U) {
+#if BEAM_EXPERIMENTAL_OWNER_RADIX
+            // These partition arrays and CUB scratch are next used by the
+            // shard collector on this same stream, after routing has finished.
+            stream3_restore_owner_radix_cuda(
+                memory.streams.unique_key, memory.streams.unique_val, memory.streams.unique_count,
+                memory.streams.parent_base + static_cast<std::uint64_t>(ring) * plan.derived.ring_slot_count,
+                memory.streams.local_pending_buffer, memory.streams.local_pending_count,
+                ring_remote_send_buffer, memory.streams.send_count, memory.streams.send_offset,
+                memory.streams.stream3_partition_key_a, memory.streams.stream3_partition_key_b,
+                memory.streams.stream3_partition_val_a, memory.streams.stream3_partition_val_b,
+                memory.streams.stream3_cub_temp, memory.streams.stream3_cub_temp_bytes,
+                static_cast<std::uint16_t>(plan.config.local_rank), plan.config.world_size,
+                plan.config.b_micro, plan.config.stream3_batch_candidates, streams.stream3);
+#else
             stream3_restore_owner_split_cuda(
                 memory.streams.unique_key,
                 memory.streams.unique_val,
@@ -1556,6 +1570,7 @@ void instantiate_cuda_graph_job_templates(
                 plan.config.b_micro,
                 plan.config.stream3_batch_candidates,
                 streams.stream3);
+#endif
         }
         if (plan.config.shard_buffer_count == 1U) {
             stream3_drain_global_spill_cuda(

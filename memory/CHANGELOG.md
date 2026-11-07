@@ -1017,3 +1017,8 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Added an opt-in CUB DeviceScan/BlockScan path with stream-ordered shared scratch, device-resident totals and actual temporary-size queries. Public builds explicitly leave it off.
 - Scan-only and scan plus index sorting passed scoped two-RTX3060 tests including large CPU-oracle union, graph replay, insufficient scratch, memcheck, initcheck and primitive racecheck. Repeated native sessions matched the reference on one and two GPUs.
 - Five paired complete-step trials measured median +0.28% for scan alone and +0.94% with index sorting, with no change in planned memory. Both fall short of the speed-promotion threshold. See test_results/refactor_20261107/STAGE4_SCAN.md for exact scope and evidence.
+
+## 2026-11-07 - Experimental stable owner partition
+- Added opt-in stable owner radix partitioning with existing same-stream scratch, sentinel-aware key width and the original single-rank production path. Scratch is queried and validated before enqueue; the first underallocated CUB attempt was corrected after sanitizer exposed CUDA API errors.
+- CPU-oracle tests cover 1 through 256 logical owners and graph replays on each physical RTX3060; one/two-GPU repeated sessions match the reference. Scoped memcheck and initcheck passed, including combined owner/index/scan memcheck. This is not 256-GPU, CNOT or multi-node acceptance.
+- Five paired full-step trials show median -0.20% throughput and unchanged planned memory on this profile, so the option remains off. A corrupted device count exceeding capacity still traps without exact required/available counts; fix before promotion. Details: test_results/refactor_20261107/STAGE4_OWNER_RADIX.md.

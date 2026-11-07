@@ -29,6 +29,11 @@ block counts and BlockScan for stable compaction. Counts remain on the device;
 slot scratch is preallocated from actual CUB queries and reused in stream order.
 The normal Python build explicitly leaves it OFF pending the measured profile gate.
 
+`BEAM_EXPERIMENTAL_OWNER_RADIX=ON` independently groups Stream 3 candidates by
+owner using stable CUB radix sorting with the sentinel included in the key width.
+It reuses preallocated Stream 3 partition planes and scratch on the same stream;
+the single-GPU short path is unchanged. Automatic Python builds leave it OFF.
+
 ## Build
 
 Rust workspace builds do not require CUDA. `cargo build --release --workspace`

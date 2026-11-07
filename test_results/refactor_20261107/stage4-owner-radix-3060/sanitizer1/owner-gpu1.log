@@ -1,0 +1,4 @@
+========= COMPUTE-SANITIZER
+owner_scatter checks=1848 eager_and_graph=PASS
+========= LEAK SUMMARY: 0 bytes leaked in 0 allocations
+========= ERROR SUMMARY: 0 errors

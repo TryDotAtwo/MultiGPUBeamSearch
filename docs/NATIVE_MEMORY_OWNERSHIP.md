@@ -43,6 +43,7 @@ resident across compatible jobs.
 | Stream1 score rings | configured ring geometry / original candidate range | inference lane; score-ready event | Stream3 consumer releases ring slot |
 | Stream2 hash rings | same original candidate range | expansion/hash lane; hash-ready event | Stream3 consumer releases ring slot |
 | Stream3 sort/reduce planes | planned accumulator capacity / GPU compact count | Stream3 job on its stream | reduction and owner partition complete |
+| Stream3 partition key/value A/B | max of batch and spill capacities / operation count | owner radix or shard partition on Stream3 | its sort and output gather complete before the next same-stream partition |
 | Stream4 physical A/B | planned shard capacity / valid count | owner Stream4 job | all readers of old survivor version complete |
 | Published histogram A/B | full score-bin count / active bank | Stream4 publishes inactive bank after writes | Stream5 finished reading selected bank |
 | CUB temporary storage | exact queried byte capacity / operation-specific extent | stream that launches CUB | every previous reader/writer completes; graph overlap must not alias |
@@ -71,7 +72,8 @@ These are source-derived volumes; measured bus traffic must come from profiling.
 | Host solved-neighborhood/suffix tables → device tables | exact table capacities | preparation / repair target change | retain compatible tables; record target changes separately |
 | Initial/target state host → device | S each | job start or target change | necessary control input, not a full frontier copy |
 | Score/hash rings → compact/sort/reduce planes | operation-dependent N | each candidate batch | retain original candidate IDs; materialize full states only after selection |
-| Stream4 sort metadata payload → ping-pong payload | currently 32 × N per logical pass, plus 16 × N keys | shard dedup | replace with 4 × N indices; count immutable source and final gather too |
+| Stream4 sort metadata payload → ping-pong payload | 32 × N per logical pass, plus 16 × N keys; experimental index variant uses 4 × N indices | shard dedup | account for the immutable source and final gather; physical traffic remains unmeasured |
+| Stream3 unique hash/value → owner key/value A/B → local or send ranges | input 24 × N; logical radix pair 36 × C per pass; gather reads and writes 32 × N | experimental multi-rank owner routing | reuses existing A/B planes; C includes sentinel tail and actual CUB traffic is unmeasured |
 | Shard A/B → final logical union | at most combined valid entries | final exact dedup | necessary for cross-bank identity; full Hash128 and deterministic winner |
 | Selected parent states → generated final states | S × selected states plus parent reads | each depth | necessary state transformation; preserve late materialization |
 | Owner send slots → remote receive slots | valid packet bytes per rank | NCCL exchange | stable owner ranges avoid repeated full-array classification |

@@ -216,6 +216,20 @@ std::size_t stream3_partition_cub_temp_bytes(std::uint32_t max_candidates, std::
     return align_up_size(std::max(sort_bytes, reduce_bytes), 256);
 }
 
+std::size_t stream3_total_cub_temp_bytes(const RuntimeConfig& config, std::uint32_t partition_capacity) {
+    auto bytes = std::max(stream3_cub_temp_bytes(config.stream3_batch_candidates),
+                          stream3_partition_cub_temp_bytes(partition_capacity, config.shard_count));
+#if BEAM_EXPERIMENTAL_OWNER_RADIX
+    if (config.world_size > 1U) {
+        // This query uses the owner count including its sentinel and the same
+        // CandidateMeta value type and item count as the routing sort.
+        bytes = std::max(bytes, stream3_partition_cub_temp_bytes(
+            config.stream3_batch_candidates, config.world_size));
+    }
+#endif
+    return bytes;
+}
+
 std::uint32_t storage_shard_count_for(const RuntimeConfig& config) {
     const std::uint64_t storage =
         static_cast<std::uint64_t>(config.shard_count) *
@@ -460,10 +474,7 @@ std::size_t bytes_streams(const RuntimeConfig& config, const DerivedConfig& deri
     cursor.take<std::uint64_t>(stream3);
     cursor.take<std::uint32_t>(1);
     cursor.take<std::uint64_t>(SCORE_BIN_COUNT);
-    cursor.take_bytes(std::max(
-        stream3_cub_temp_bytes(config.stream3_batch_candidates),
-        stream3_partition_cub_temp_bytes(static_cast<std::uint32_t>(stream3_partition), config.shard_count)),
-        256);
+    cursor.take_bytes(stream3_total_cub_temp_bytes(config, static_cast<std::uint32_t>(stream3_partition)), 256);
     cursor.take<Hash128>(stream3);
     cursor.take<std::uint64_t>(stream3);
     cursor.take<std::uint32_t>(1);
@@ -678,9 +689,7 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
     plan.final_state_count = plan.frontier_states;
     const std::uint32_t stream3_partition_count = static_cast<std::uint32_t>(
         std::max<std::uint64_t>(plan.stream3_count, config.global_spill_capacity));
-    plan.stream3_cub_temp_bytes = std::max(
-        stream3_cub_temp_bytes(config.stream3_batch_candidates),
-        stream3_partition_cub_temp_bytes(stream3_partition_count, config.shard_count));
+    plan.stream3_cub_temp_bytes = stream3_total_cub_temp_bytes(config, stream3_partition_count);
     plan.stream4_cub_temp_bytes = stream4_cub_temp_bytes(config.shard_capacity_candidates);
     plan.layout_union_bytes = bytes_union(config);
     plan.union_cub_temp_bytes = union_capacity(config) ? stream4_cub_temp_bytes(union_capacity(config)) : 0;

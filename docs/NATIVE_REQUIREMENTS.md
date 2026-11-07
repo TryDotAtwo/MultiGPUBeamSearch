@@ -40,6 +40,11 @@ rank processes after their ABI/layout and specialization checks.
   each block participates fully in BlockScan, including inactive tail lanes. CUB
   scratch is queried before execution and is reused only in stream order. An
   insufficient allocation must fail with required and available byte counts.
+- Experimental Stream3 owner radix keeps original candidate IDs, stable order
+  within each owner and separate contiguous local/remote outputs. Its owner key
+  width includes the sentinel for every supported world size. The preallocated
+  partition buffers and scratch cannot be reused until routing readers complete.
+  One-GPU dispatch retains its existing short path.
 - Reuse requires completion of every reader. GPU-source and pinned-host-history
   reader completion are distinct. Cross-process messages contain no device pointers.
 - Only explicit native capacity rejection bounds a capacity search. Rank failure,
