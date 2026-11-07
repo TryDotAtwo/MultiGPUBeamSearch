@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hpp"
+#include "stream1_transformer_sm120_nvfp4_ffn.hpp"
 
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -82,6 +83,14 @@ struct Stream1TransformerBlockView {
     const float* attn_qkv_weight_scales = nullptr;
     const std::uint8_t* ff1_weight_fp8 = nullptr;
     const float* ff1_weight_scales = nullptr;
+    const std::uint8_t* ff1_weight_nvfp4 = nullptr;
+    const std::uint8_t* ff1_weight_nvfp4_scales = nullptr;
+    const std::uint8_t* ff2_weight_nvfp4 = nullptr;
+    const std::uint8_t* ff2_weight_nvfp4_scales = nullptr;
+    const std::uint8_t* attn_qkv_weight_nvfp4 = nullptr;
+    const std::uint8_t* attn_qkv_weight_nvfp4_scales = nullptr;
+    const std::uint8_t* attn_out_weight_nvfp4 = nullptr;
+    const std::uint8_t* attn_out_weight_nvfp4_scales = nullptr;
 };
 
 struct Stream1TransformerNetworkView {
@@ -94,12 +103,16 @@ struct Stream1TransformerNetworkView {
     const half* output_ln_beta;
     const Stream1TransformerBlockView* blocks;
     const half* output_weight;
+    const std::uint8_t* output_weight_nvfp4 = nullptr;
+    const std::uint8_t* output_weight_nvfp4_scales = nullptr;
     const half* output_bias;
     const std::uint16_t* piece_positions;
     const std::uint8_t* piece_mask;
     const std::uint8_t* piece_types;
     Stream1TransformerDims dims;
     std::uint32_t fp16_gemm_backend = 0U;
+    std::uint32_t nvfp4_ffn_layer_mask = 0U;
+    std::uint32_t nvfp4_execution_kind = STREAM1_SM120_NVFP4_EXECUTION_NONE;
 };
 
 struct Stream1TransformerScratchView {
@@ -114,6 +127,10 @@ struct Stream1TransformerScratchView {
     void* fp8_workspace = nullptr;
     std::size_t fp8_workspace_bytes = 0U;
 };
+
+// Initializes optional attention backends before CUDA graph capture.  It is a
+// no-op for the portable CUTLASS backend.
+void stream1_transformer_prepare_attention_backend(std::uint32_t dtype);
 
 void stream1_score_contract_cuda(
     const State128* current_frontier_states,

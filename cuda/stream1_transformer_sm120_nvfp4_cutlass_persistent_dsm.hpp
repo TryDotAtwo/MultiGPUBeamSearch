@@ -2,9 +2,122 @@
 
 #include "stream1_transformer_sm120_nvfp4_cutlass_dsm_fused.cuh"
 
+#include <cuda/barrier>
+
 namespace stream1_sm120_nvfp4_cutlass_dsm {
 
 using PersistentClusterShape = Shape<_1, _2, _1>;
+
+// A stock SM120 block-scaled FF1 collective consumes a complete 384-thread
+// CTA.  It therefore cannot be placed in the 128-thread producer warpgroup of
+// PersistentWorkTilePlan without replacing the measured CUTLASS mainloop.
+// The production fusion candidate keeps both measured collectives intact and
+// separates their ownership at CTA granularity:
+//
+//   rank 0/1: FF1 for the two adjacent H128 slices (ping/pong producers)
+//   rank 2/3: FF2 for the two adjacent D128 output tiles (consumers)
+//
+// Each consumer reads both producer slots.  This is deliberately a 2x2
+// physical cluster with logical-singleton CUTLASS collectives; SM120 does not
+// provide the programmatic TMA multicast used by SM100 schedules, so A/SFA is
+// published through explicit DSM while B/SFB remains local TMA.
+using RoleSeparatedClusterShape = Shape<_2, _2, _1>;
+
+struct RoleSeparatedCtaPlan {
+    static constexpr std::uint32_t kProducerCtas = 2U;
+    static constexpr std::uint32_t kConsumerCtas = 2U;
+    static constexpr std::uint32_t kClusterCtas =
+        kProducerCtas + kConsumerCtas;
+    static constexpr std::uint32_t kThreadsPerCta = 384U;
+
+    CUTLASS_HOST_DEVICE static constexpr bool is_producer(
+        std::uint32_t rank) {
+        return rank < kProducerCtas;
+    }
+
+    CUTLASS_HOST_DEVICE static constexpr bool is_consumer(
+        std::uint32_t rank) {
+        return rank >= kProducerCtas && rank < kClusterCtas;
+    }
+
+    CUTLASS_HOST_DEVICE static constexpr std::uint32_t producer_slot(
+        std::uint32_t rank) {
+        return rank;
+    }
+
+    CUTLASS_HOST_DEVICE static constexpr std::uint32_t consumer_n_tile(
+        std::uint32_t rank) {
+        return rank - kProducerCtas;
+    }
+
+    CUTLASS_HOST_DEVICE static constexpr std::uint32_t slice_for_pair(
+        std::uint32_t pair, std::uint32_t producer_rank) {
+        return pair * kProducerCtas + producer_slot(producer_rank);
+    }
+};
+
+static_assert(cute::size(RoleSeparatedClusterShape{}) ==
+              RoleSeparatedCtaPlan::kClusterCtas);
+static_assert(RoleSeparatedCtaPlan::slice_for_pair(3U, 1U) == 7U);
+
+// Static, zero-atomic work ownership for the production topology.  One
+// physical two-CTA cluster owns two interleaved persistent work streams.  WG0
+// is the only producer; WG1 and WG2 consume different M tiles and advance by
+// the total number of active MMA work streams.  The formula is deliberately
+// independent of barrier state so a tile can never be claimed twice.
+struct PersistentWorkTilePlan {
+    static constexpr std::uint32_t kProducerWarpGroup = 0U;
+    static constexpr std::uint32_t kFirstMmaWarpGroup = 1U;
+    static constexpr std::uint32_t kMmaWarpGroups = 2U;
+    static constexpr std::uint32_t kThreadsPerWarpGroup = 128U;
+    static constexpr std::uint32_t kThreads =
+        (1U + kMmaWarpGroups) * kThreadsPerWarpGroup;
+
+    CUTLASS_HOST_DEVICE static constexpr std::uint32_t cluster_index(
+        std::uint32_t physical_block) {
+        return physical_block / 2U;
+    }
+
+    CUTLASS_HOST_DEVICE static constexpr std::uint32_t first_tile(
+        std::uint32_t cluster, std::uint32_t mma_slot) {
+        return cluster * kMmaWarpGroups + mma_slot;
+    }
+
+    CUTLASS_HOST_DEVICE static constexpr std::uint32_t next_tile(
+        std::uint32_t tile, std::uint32_t cluster_count) {
+        return tile + cluster_count * kMmaWarpGroups;
+    }
+};
+
+static_assert(PersistentWorkTilePlan::kThreads == 384U);
+
+using PersistentBlockBarrier = cuda::barrier<cuda::thread_scope_block>;
+
+// Two physical slots are sufficient because the tile scheduler permanently
+// binds one slot to each MMA warpgroup.  Ready/free generations let WG0 fill
+// the next FF1 result while the other consumer is executing FF2, without an
+// atomic work queue and without allocating one full hidden buffer per logical
+// transaction.
+struct PersistentFf1Ff2Ring {
+    static constexpr std::uint32_t kSlots =
+        PersistentWorkTilePlan::kMmaWarpGroups;
+    DsmASlot hidden[kSlots];
+    PersistentBlockBarrier ready[kSlots];
+    PersistentBlockBarrier free[kSlots];
+    std::uint32_t generation[kSlots];
+
+    CUTLASS_HOST_DEVICE static constexpr std::uint32_t slot_for_tile(
+        std::uint32_t tile) {
+        return tile % kSlots;
+    }
+
+    CUTLASS_HOST_DEVICE static constexpr std::uint32_t generation_for_tile(
+        std::uint32_t tile, std::uint32_t cluster_count) {
+        return tile / (cluster_count * kSlots);
+    }
+};
+
+static_assert(PersistentFf1Ff2Ring::kSlots == 2U);
 
 // The FF1 epilogue writes the exact physical layout consumed by FF2.  Keeping
 // the views here makes the layout contract shared by both collectives and
@@ -36,7 +149,7 @@ struct Ff1HiddenRingWriter {
         CUTLASS_PRAGMA_UNROLL
         for (std::uint32_t i = 0; i < Contract::kScaleVector; ++i) {
             const std::uint32_t nibble = static_cast<std::uint32_t>(
-                Ff2StageLayoutA{}(row, first_column + i));
+                Ff2PhysicalStageLayoutA{}(row, first_column + i));
             const std::uint32_t byte = nibble >> 1U;
             const std::uint8_t value = raw[i] & 0x0fU;
             if ((nibble & 1U) == 0U) {
@@ -71,9 +184,9 @@ struct Ff1HiddenRingWriter {
         DsmASlot& slot, std::uint32_t row, std::uint32_t column,
         std::uint8_t packed) {
         const std::uint32_t low = static_cast<std::uint32_t>(
-            Ff2StageLayoutA{}(row, column));
+            Ff2PhysicalStageLayoutA{}(row, column));
         const std::uint32_t high = static_cast<std::uint32_t>(
-            Ff2StageLayoutA{}(row, column + 1U));
+            Ff2PhysicalStageLayoutA{}(row, column + 1U));
         if ((low & 1U) == 0U && high == low + 1U) {
             slot.values[low >> 1U] = packed;
         } else {
@@ -93,6 +206,8 @@ struct Ff1HiddenRingWriter {
 // promoted operand is DSM, not TMA multicast.
 using PersistentFf2Epilogue = Ff2Epilogue;
 using PersistentBaseFf2Mainloop = Ff2Mainloop;
+using PersistentBaseFf2TensorStorage =
+    typename PersistentBaseFf2Mainloop::TensorStorage;
 
 // Drop-in replacement for the stock mainloop producer.  The consumer MMA,
 // two-MMA-warpgroup ping-pong kernel and persistent tile scheduler are inherited
@@ -106,13 +221,19 @@ struct PersistentBulkDsmFf2Collective : PersistentBaseFf2Mainloop {
     using Params = typename Base::Params;
     using ClusterShape = PersistentClusterShape;
 
-    struct TensorStorage : Base::TensorStorage {
-        DsmASlot hidden[Contract::kRingSlots];
+    // Qualify the parent explicitly.  Once this nested class name is injected,
+    // `Base::TensorStorage` is diagnosed by optimized nvcc passes as the
+    // incomplete class currently being declared rather than the parent
+    // collective storage.
+    struct TensorStorage : PersistentBaseFf2TensorStorage {
+        PersistentFf1Ff2Ring ff1_ff2;
     };
 
     static constexpr bool kUsesStockPersistentScheduler = true;
-    static constexpr std::uint32_t kMmaWarpGroups = 2U;
-    static constexpr std::uint32_t kThreads = 384U;
+    static constexpr std::uint32_t kMmaWarpGroups =
+        PersistentWorkTilePlan::kMmaWarpGroups;
+    static constexpr std::uint32_t kThreads =
+        PersistentWorkTilePlan::kThreads;
     static constexpr bool kLoadsGlobalAOnlyOnOwner = true;
     static constexpr bool kPublishesAWithBulkDsm = true;
     static constexpr bool kUsesSameTransactionBarrier = true;
@@ -190,11 +311,13 @@ struct PersistentBulkDsmFf2Collective : PersistentBaseFf2Mainloop {
                         auto* target_barrier = cluster.map_shared_rank(barrier, target);
                         cuda::ptx::cp_async_bulk(
                             cuda::ptx::space_cluster, cuda::ptx::space_shared,
-                            target_a, storage.hidden[slice % Contract::kRingSlots].values,
+                            target_a, storage.ff1_ff2.hidden[
+                                slice % Contract::kRingSlots].values,
                             values_per_slot, target_barrier);
                         cuda::ptx::cp_async_bulk(
                             cuda::ptx::space_cluster, cuda::ptx::space_shared,
-                            target_sfa, storage.hidden[slice % Contract::kRingSlots].scales,
+                            target_sfa, storage.ff1_ff2.hidden[
+                                slice % Contract::kRingSlots].scales,
                             scales_per_slot, target_barrier);
                     }
                 }

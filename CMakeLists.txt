@@ -27,7 +27,11 @@ option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnos
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
 option(BEAM_ENABLE_SM120_FP8 "Build the opt-in SM120 block-scaled FP8 Transformer path" OFF)
+option(BEAM_ENABLE_SM120_FA4_AOT "Build the opt-in SM120 FlashAttention-4 AOT backend" OFF)
 option(BEAM_BUILD_PRODUCTION_RUNNER_SHARED "Build the in-process production runner C ABI" OFF)
+set(BEAM_SM120_FA4_AOT_DIR "" CACHE PATH "Directory containing fa4_cube4_q64_direct.h/.o")
+set(BEAM_SM120_CUTE_DSL_RUNTIME_LIBRARY "" CACHE FILEPATH "libcute_dsl_runtime used by the FA4 AOT object")
+set(BEAM_SM120_TVM_FFI_LIBRARY "" CACHE FILEPATH "libtvm_ffi used by the FA4 AOT object")
 
 set(BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE OFF)
 set(BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE OFF)
@@ -145,6 +149,29 @@ if(NOT CUBLASLT_LIBRARY)
     message(FATAL_ERROR "cuBLASLt is required for the Transformer FP16 benchmark path")
 endif()
 target_link_libraries(beam_cuda PUBLIC beam_core ${CUBLASLT_LIBRARY})
+if(BEAM_ENABLE_SM120_FA4_AOT)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        message(FATAL_ERROR "BEAM_ENABLE_SM120_FA4_AOT currently requires a Linux AOT object")
+    endif()
+    set(BEAM_SM120_FA4_AOT_HEADER "${BEAM_SM120_FA4_AOT_DIR}/fa4_cube4_q64_direct.h")
+    set(BEAM_SM120_FA4_AOT_OBJECT "${BEAM_SM120_FA4_AOT_DIR}/fa4_cube4_q64_direct.o")
+    if(NOT EXISTS "${BEAM_SM120_FA4_AOT_HEADER}" OR NOT EXISTS "${BEAM_SM120_FA4_AOT_OBJECT}")
+        message(FATAL_ERROR
+            "BEAM_ENABLE_SM120_FA4_AOT requires fa4_cube4_q64_direct.h/.o in BEAM_SM120_FA4_AOT_DIR")
+    endif()
+    if(NOT BEAM_SM120_CUTE_DSL_RUNTIME_LIBRARY OR NOT EXISTS "${BEAM_SM120_CUTE_DSL_RUNTIME_LIBRARY}")
+        message(FATAL_ERROR "BEAM_SM120_CUTE_DSL_RUNTIME_LIBRARY must name libcute_dsl_runtime.so")
+    endif()
+    if(NOT BEAM_SM120_TVM_FFI_LIBRARY OR NOT EXISTS "${BEAM_SM120_TVM_FFI_LIBRARY}")
+        message(FATAL_ERROR "BEAM_SM120_TVM_FFI_LIBRARY must name libtvm_ffi.so")
+    endif()
+    set_source_files_properties("${BEAM_SM120_FA4_AOT_OBJECT}" PROPERTIES EXTERNAL_OBJECT TRUE)
+    target_sources(beam_cuda PRIVATE "${BEAM_SM120_FA4_AOT_OBJECT}")
+    target_include_directories(beam_cuda PRIVATE "${BEAM_SM120_FA4_AOT_DIR}")
+    target_link_libraries(beam_cuda PUBLIC
+        "${BEAM_SM120_CUTE_DSL_RUNTIME_LIBRARY}"
+        "${BEAM_SM120_TVM_FFI_LIBRARY}")
+endif()
 target_compile_definitions(beam_cuda PUBLIC
     BEAM_ENABLE_DEBUG=$<BOOL:${BEAM_ENABLE_DEBUG}>
     BEAM_DEBUG_STREAM_TIMING=$<BOOL:${BEAM_DEBUG_STREAM_TIMING_EFFECTIVE}>
@@ -155,6 +182,7 @@ target_compile_definitions(beam_cuda PUBLIC
     BEAM_DEBUG_FINAL_HISTOGRAM_TRACE=$<BOOL:${BEAM_DEBUG_FINAL_HISTOGRAM_TRACE_EFFECTIVE}>
     BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE=$<BOOL:${BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE_EFFECTIVE}>
     BEAM_DEBUG_DEPTH_FLOW_TRACE=$<BOOL:${BEAM_DEBUG_DEPTH_FLOW_TRACE_EFFECTIVE}>
+    BEAM_HAS_SM120_FA4_AOT=$<BOOL:${BEAM_ENABLE_SM120_FA4_AOT}>
 )
 find_path(NCCL_INCLUDE_DIR nccl.h REQUIRED)
 find_library(NCCL_LIBRARY nccl REQUIRED)
@@ -169,6 +197,12 @@ set_target_properties(beam_cuda PROPERTIES
     CUDA_STANDARD_REQUIRED ON
     CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
 )
+if(BEAM_ENABLE_SM120_FP8)
+    # CUTLASS SM120 collectives use C++20 requires-expressions in CUDA
+    # translation units.  Keep the portable/T4 build on C++17 and raise the
+    # language level only for the explicitly enabled Blackwell path.
+    set_target_properties(beam_cuda PROPERTIES CUDA_STANDARD 20)
+endif()
 
 add_executable(stream2_cuda_tests tests/stream2_cuda_tests.cu)
 target_link_libraries(stream2_cuda_tests PRIVATE beam_cuda)
@@ -187,8 +221,16 @@ target_link_libraries(stream1_transformer_final_cls_cuda_tests PRIVATE beam_cuda
 set_target_properties(stream1_transformer_final_cls_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 if(BEAM_ENABLE_SM120_FP8)
-    target_sources(beam_cuda PRIVATE cuda/stream1_transformer_sm120_fp8.cu cuda/stream1_transformer_cublaslt_fp16.cu)
-    target_compile_definitions(beam_cuda PUBLIC BEAM_ENABLE_SM120_FP8=1)
+    target_sources(beam_cuda PRIVATE
+        cuda/stream1_transformer_sm120_fp8.cu
+        cuda/stream1_transformer_sm120_nvfp4_stock.cu
+        cuda/stream1_transformer_cublaslt_fp16.cu)
+    set_source_files_properties(
+        cuda/stream1_transformer_sm120_nvfp4_stock.cu
+        PROPERTIES COMPILE_OPTIONS "--expt-relaxed-constexpr;--threads=8")
+    target_compile_definitions(beam_cuda PUBLIC
+        BEAM_ENABLE_SM120_FP8=1
+        CUTLASS_ENABLE_GDC_FOR_SM100=1)
     add_executable(stream1_transformer_sm120_fp8_cuda_tests tests/stream1_transformer_sm120_fp8_cuda_tests.cu)
     target_link_libraries(stream1_transformer_sm120_fp8_cuda_tests PRIVATE beam_cuda)
     set_target_properties(stream1_transformer_sm120_fp8_cuda_tests PROPERTIES
@@ -239,7 +281,47 @@ if(BEAM_ENABLE_SM120_FP8)
     target_compile_options(stream1_transformer_sm120_sparse_nvfp4_benchmark PRIVATE
         $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
     set_target_properties(stream1_transformer_sm120_sparse_nvfp4_benchmark PROPERTIES
-        CUDA_STANDARD 17
+        CUDA_STANDARD 20
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
+    )
+    add_executable(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_benchmark
+        tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
+    # This is a standalone CUTLASS microbenchmark.  Keeping it independent of
+    # beam_cuda avoids rebuilding the full production runtime when iterating on
+    # the coded FF1 physical shapes.
+    target_include_directories(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_benchmark PRIVATE
+        "${CUTLASS_DIR}/include"
+        "${CUTLASS_DIR}/tools/util/include"
+        "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
+        "${CUTLASS_DIR}/test/unit/gemm/device"
+        "${CUTLASS_DIR}/test/unit/common")
+    target_compile_definitions(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_benchmark PRIVATE
+        BEAM_BENCH_NVFP4=1
+        BEAM_BENCH_CODED_FF1=1)
+    target_compile_options(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_benchmark PROPERTIES
+        CUDA_STANDARD 20
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
+    )
+    add_executable(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_concurrent_benchmark
+        tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
+    target_include_directories(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_concurrent_benchmark PRIVATE
+        "${CUTLASS_DIR}/include"
+        "${CUTLASS_DIR}/tools/util/include"
+        "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
+        "${CUTLASS_DIR}/test/unit/gemm/device"
+        "${CUTLASS_DIR}/test/unit/common")
+    target_compile_definitions(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_concurrent_benchmark PRIVATE
+        BEAM_BENCH_NVFP4=1
+        BEAM_BENCH_CODED_FF1=1
+        BEAM_BENCH_CONCURRENT_SLOTS=1)
+    target_compile_options(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_concurrent_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_sparse_nvfp4_pair_ff1_concurrent_benchmark PROPERTIES
+        CUDA_STANDARD 20
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}"
     )
@@ -352,6 +434,26 @@ if(BEAM_ENABLE_SM120_FP8)
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_dense_nvfp4_ffn_pdl_pipeline_benchmark
+        tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
+    target_link_libraries(stream1_transformer_sm120_dense_nvfp4_ffn_pdl_pipeline_benchmark PRIVATE beam_cuda)
+    target_include_directories(stream1_transformer_sm120_dense_nvfp4_ffn_pdl_pipeline_benchmark PRIVATE
+        "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
+        "${CUTLASS_DIR}/test/unit/gemm/device"
+        "${CUTLASS_DIR}/test/unit/common")
+    target_compile_definitions(stream1_transformer_sm120_dense_nvfp4_ffn_pdl_pipeline_benchmark PRIVATE
+        BEAM_BENCH_DENSE_NVFP4=1
+        BEAM_BENCH_DENSE_NVFP4_OUTPUT=1
+        BEAM_BENCH_DENSE_NVFP4_PIPELINE=1
+        BEAM_BENCH_STATIC_SCHEDULER=1
+        BEAM_BENCH_PDL=1
+        CUTLASS_ENABLE_GDC_FOR_SM100=1)
+    target_compile_options(stream1_transformer_sm120_dense_nvfp4_ffn_pdl_pipeline_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_dense_nvfp4_ffn_pdl_pipeline_benchmark PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
     add_executable(stream1_transformer_sm120_dense_nvfp4_ffn_pingpong_pipeline_benchmark
         tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
     target_link_libraries(stream1_transformer_sm120_dense_nvfp4_ffn_pingpong_pipeline_benchmark PRIVATE beam_cuda)
@@ -371,10 +473,31 @@ if(BEAM_ENABLE_SM120_FP8)
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_dense_mxfp4_ffn_pingpong_pipeline_benchmark
+        tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
+    target_link_libraries(stream1_transformer_sm120_dense_mxfp4_ffn_pingpong_pipeline_benchmark PRIVATE beam_cuda)
+    target_include_directories(stream1_transformer_sm120_dense_mxfp4_ffn_pingpong_pipeline_benchmark PRIVATE
+        "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
+        "${CUTLASS_DIR}/test/unit/gemm/device"
+        "${CUTLASS_DIR}/test/unit/common")
+    target_compile_definitions(stream1_transformer_sm120_dense_mxfp4_ffn_pingpong_pipeline_benchmark PRIVATE
+        BEAM_BENCH_DENSE_NVFP4=1
+        BEAM_BENCH_DENSE_NVFP4_OUTPUT=1
+        BEAM_BENCH_DENSE_NVFP4_PIPELINE=1
+        BEAM_BENCH_MXFP4=1
+        BEAM_BENCH_PINGPONG=1
+        BEAM_BENCH_STATIC_SCHEDULER=1)
+    target_compile_options(stream1_transformer_sm120_dense_mxfp4_ffn_pingpong_pipeline_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_dense_mxfp4_ffn_pingpong_pipeline_benchmark PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
     add_executable(stream1_transformer_sm120_dense_nvfp4_ffn_pingpong_concurrent_benchmark
         tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
-    target_link_libraries(stream1_transformer_sm120_dense_nvfp4_ffn_pingpong_concurrent_benchmark PRIVATE beam_cuda)
     target_include_directories(stream1_transformer_sm120_dense_nvfp4_ffn_pingpong_concurrent_benchmark PRIVATE
+        "${CUTLASS_DIR}/include"
+        "${CUTLASS_DIR}/tools/util/include"
         "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
         "${CUTLASS_DIR}/test/unit/gemm/device"
         "${CUTLASS_DIR}/test/unit/common")
@@ -384,13 +507,49 @@ if(BEAM_ENABLE_SM120_FP8)
         BEAM_BENCH_DENSE_NVFP4_PIPELINE=1
         BEAM_BENCH_PIPELINE_CONCURRENT=1
         BEAM_BENCH_PINGPONG=1
-        BEAM_BENCH_STATIC_SCHEDULER=1)
+        BEAM_BENCH_STATIC_SCHEDULER=1
+        BEAM_BENCH_PDL=1
+        CUTLASS_ENABLE_GDC_FOR_SM100=1)
     target_compile_options(stream1_transformer_sm120_dense_nvfp4_ffn_pingpong_concurrent_benchmark PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=1>)
     set_target_properties(stream1_transformer_sm120_dense_nvfp4_ffn_pingpong_concurrent_benchmark PROPERTIES
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    foreach(_ffn_concurrent_tile IN ITEMS m256 n256)
+        set(_ffn_concurrent_target
+            "stream1_transformer_sm120_dense_nvfp4_ffn_pingpong_concurrent_${_ffn_concurrent_tile}_benchmark")
+        add_executable(${_ffn_concurrent_target}
+            tests/stream1_transformer_sm120_sparse_mxfp8_benchmark.cu)
+        target_include_directories(${_ffn_concurrent_target} PRIVATE
+            "${CUTLASS_DIR}/include"
+            "${CUTLASS_DIR}/tools/util/include"
+            "${CMAKE_SOURCE_DIR}/tests/cutlass_test_stub"
+            "${CUTLASS_DIR}/test/unit/gemm/device"
+            "${CUTLASS_DIR}/test/unit/common")
+        target_compile_definitions(${_ffn_concurrent_target} PRIVATE
+            BEAM_BENCH_DENSE_NVFP4=1
+            BEAM_BENCH_DENSE_NVFP4_OUTPUT=1
+            BEAM_BENCH_DENSE_NVFP4_PIPELINE=1
+            BEAM_BENCH_PIPELINE_CONCURRENT=1
+            BEAM_BENCH_PINGPONG=1
+            BEAM_BENCH_STATIC_SCHEDULER=1
+            BEAM_BENCH_PDL=1
+            CUTLASS_ENABLE_GDC_FOR_SM100=1)
+        if(_ffn_concurrent_tile STREQUAL "m256")
+            target_compile_definitions(${_ffn_concurrent_target} PRIVATE
+                BEAM_BENCH_TILE_M256=1)
+        else()
+            target_compile_definitions(${_ffn_concurrent_target} PRIVATE
+                BEAM_BENCH_TILE_N256=1)
+        endif()
+        target_compile_options(${_ffn_concurrent_target} PRIVATE
+            $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=1>)
+        set_target_properties(${_ffn_concurrent_target} PROPERTIES
+            CUDA_STANDARD 20
+            CUDA_STANDARD_REQUIRED ON
+            CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    endforeach()
     add_executable(stream1_sm120_nvfp4_mma_peak_benchmark
         tests/stream1_sm120_nvfp4_mma_peak_benchmark.cu)
     target_include_directories(stream1_sm120_nvfp4_mma_peak_benchmark PRIVATE
@@ -398,6 +557,17 @@ if(BEAM_ENABLE_SM120_FP8)
     target_compile_options(stream1_sm120_nvfp4_mma_peak_benchmark PRIVATE
         $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr -Xptxas=-v>)
     set_target_properties(stream1_sm120_nvfp4_mma_peak_benchmark PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_sm120_cutlass_nvfp4_tma_benchmark
+        tests/stream1_sm120_cutlass_nvfp4_tma_benchmark.cu)
+    target_include_directories(stream1_sm120_cutlass_nvfp4_tma_benchmark PRIVATE
+        "${CUTLASS_DIR}/include"
+        "${CUTLASS_DIR}/tools/util/include")
+    target_compile_options(stream1_sm120_cutlass_nvfp4_tma_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=4>)
+    set_target_properties(stream1_sm120_cutlass_nvfp4_tma_benchmark PROPERTIES
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
@@ -518,9 +688,187 @@ if(BEAM_ENABLE_SM120_FP8)
     target_link_libraries(stream1_transformer_sm120_nvfp4_ffn_policy_tests PRIVATE beam_core)
     target_include_directories(stream1_transformer_sm120_nvfp4_ffn_policy_tests PRIVATE cuda)
     target_compile_features(stream1_transformer_sm120_nvfp4_ffn_policy_tests PRIVATE cxx_std_17)
+    add_executable(stream1_transformer_sm120_nvfp4_stock_cuda_tests
+        tests/stream1_transformer_sm120_nvfp4_stock_cuda_tests.cu)
+    target_link_libraries(stream1_transformer_sm120_nvfp4_stock_cuda_tests PRIVATE beam_cuda)
+    target_compile_options(stream1_transformer_sm120_nvfp4_stock_cuda_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_nvfp4_stock_cuda_tests PROPERTIES
+        CUDA_STANDARD 20
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
     add_executable(stream1_transformer_sm120_nvfp4_ffn_shared_pipeline_probe
         tests/stream1_transformer_sm120_nvfp4_ffn_shared_pipeline_probe.cu)
     set_target_properties(stream1_transformer_sm120_nvfp4_ffn_shared_pipeline_probe PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_pack_tests
+        tests/stream1_transformer_sm120_nvfp4_pack_tests.cu)
+    target_link_libraries(stream1_transformer_sm120_nvfp4_pack_tests PRIVATE beam_core)
+    target_include_directories(stream1_transformer_sm120_nvfp4_pack_tests PRIVATE
+        cuda
+        "${CUTLASS_DIR}/include")
+    set_target_properties(stream1_transformer_sm120_nvfp4_pack_tests PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+    add_executable(stream1_transformer_sm120_nvfp4_raw_mma_tests
+        tests/stream1_transformer_sm120_nvfp4_raw_mma_tests.cu)
+    target_link_libraries(stream1_transformer_sm120_nvfp4_raw_mma_tests PRIVATE beam_core)
+    target_include_directories(stream1_transformer_sm120_nvfp4_raw_mma_tests PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda"
+        "${CUTLASS_DIR}/include")
+    target_compile_options(stream1_transformer_sm120_nvfp4_raw_mma_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_nvfp4_raw_mma_tests PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+    add_executable(stream1_transformer_sm120_nvfp4_fused_ffn_tests
+        tests/stream1_transformer_sm120_nvfp4_fused_ffn_tests.cu)
+    target_link_libraries(stream1_transformer_sm120_nvfp4_fused_ffn_tests PRIVATE beam_core)
+    target_include_directories(stream1_transformer_sm120_nvfp4_fused_ffn_tests PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda" "${CUTLASS_DIR}/include")
+    target_compile_options(stream1_transformer_sm120_nvfp4_fused_ffn_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(stream1_transformer_sm120_nvfp4_fused_ffn_tests PROPERTIES
+        CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_cutlass_dsm_contract_tests
+        tests/stream1_transformer_sm120_nvfp4_cutlass_dsm_contract_tests.cu)
+    target_link_libraries(
+        stream1_transformer_sm120_nvfp4_cutlass_dsm_contract_tests PRIVATE beam_core)
+    target_include_directories(
+        stream1_transformer_sm120_nvfp4_cutlass_dsm_contract_tests PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda" "${CUTLASS_DIR}/include")
+    target_compile_options(
+        stream1_transformer_sm120_nvfp4_cutlass_dsm_contract_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(
+        stream1_transformer_sm120_nvfp4_cutlass_dsm_contract_tests PROPERTIES
+        CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_tests
+        tests/stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_tests.cu)
+    target_link_libraries(
+        stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_tests PRIVATE beam_core)
+    target_include_directories(
+        stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_tests PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda" "${CUTLASS_DIR}/include")
+    target_compile_options(
+        stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(
+        stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_tests PROPERTIES
+        CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_deep_tests
+        tests/stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_deep_tests.cu)
+    target_link_libraries(
+        stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_deep_tests PRIVATE beam_core)
+    target_include_directories(
+        stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_deep_tests PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda" "${CUTLASS_DIR}/include")
+    target_compile_options(
+        stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_deep_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(
+        stream1_transformer_sm120_nvfp4_cutlass_bulk_dsm_deep_tests PROPERTIES
+        CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_cutlass_wide_tile_probe
+        tests/stream1_transformer_sm120_nvfp4_cutlass_wide_tile_probe.cu)
+    target_link_libraries(
+        stream1_transformer_sm120_nvfp4_cutlass_wide_tile_probe PRIVATE beam_core)
+    target_include_directories(
+        stream1_transformer_sm120_nvfp4_cutlass_wide_tile_probe PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda" "${CUTLASS_DIR}/include")
+    target_compile_options(
+        stream1_transformer_sm120_nvfp4_cutlass_wide_tile_probe PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(
+        stream1_transformer_sm120_nvfp4_cutlass_wide_tile_probe PROPERTIES
+        CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_cutlass_wide_tile_benchmark
+        tests/stream1_transformer_sm120_nvfp4_cutlass_wide_tile_benchmark.cu)
+    target_link_libraries(
+        stream1_transformer_sm120_nvfp4_cutlass_wide_tile_benchmark PRIVATE beam_core)
+    target_include_directories(
+        stream1_transformer_sm120_nvfp4_cutlass_wide_tile_benchmark PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda"
+        "${CUTLASS_DIR}/include"
+        "${CUTLASS_DIR}/tools/util/include")
+    target_compile_options(
+        stream1_transformer_sm120_nvfp4_cutlass_wide_tile_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(
+        stream1_transformer_sm120_nvfp4_cutlass_wide_tile_benchmark PROPERTIES
+        CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    foreach(_ff1_screen_orientation IN ITEMS rows transposed)
+        set(_ff1_screen_target
+            stream1_transformer_sm120_nvfp4_cutlass_ff1_no_store_${_ff1_screen_orientation})
+        add_executable(${_ff1_screen_target}
+            tests/stream1_transformer_sm120_nvfp4_cutlass_ff1_no_store_tile_screen.cu)
+        target_link_libraries(${_ff1_screen_target} PRIVATE beam_core)
+        target_include_directories(${_ff1_screen_target} PRIVATE
+            "${CMAKE_SOURCE_DIR}/cuda"
+            "${CUTLASS_DIR}/include"
+            "${CUTLASS_DIR}/tools/util/include")
+        target_compile_options(${_ff1_screen_target} PRIVATE
+            $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+        if(_ff1_screen_orientation STREQUAL "transposed")
+            target_compile_definitions(${_ff1_screen_target} PRIVATE
+                STREAM1_FF1_SCREEN_TRANSPOSED=1)
+        endif()
+        set_target_properties(${_ff1_screen_target} PROPERTIES
+            # The patched SM120 CUTLASS collectives used by this diagnostic
+            # contain constrained templates (`requires`).  Keep this target on
+            # C++20 so the Molab build exercises the real full-output path
+            # instead of failing before the orientation gate can run.
+            CUDA_STANDARD 20 CUDA_STANDARD_REQUIRED ON
+            CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    endforeach()
+    add_executable(stream1_transformer_sm120_nvfp4_cutlass_persistent_dsm_contract_tests
+        tests/stream1_transformer_sm120_nvfp4_cutlass_persistent_dsm_contract_tests.cu)
+    target_link_libraries(
+        stream1_transformer_sm120_nvfp4_cutlass_persistent_dsm_contract_tests PRIVATE beam_core)
+    target_include_directories(
+        stream1_transformer_sm120_nvfp4_cutlass_persistent_dsm_contract_tests PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda" "${CUTLASS_DIR}/include")
+    target_compile_options(
+        stream1_transformer_sm120_nvfp4_cutlass_persistent_dsm_contract_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(
+        stream1_transformer_sm120_nvfp4_cutlass_persistent_dsm_contract_tests PROPERTIES
+        CUDA_STANDARD 20 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_dsm_operand_tests
+        tests/stream1_transformer_sm120_nvfp4_dsm_operand_tests.cu)
+    target_link_libraries(
+        stream1_transformer_sm120_nvfp4_dsm_operand_tests PRIVATE beam_core)
+    target_include_directories(
+        stream1_transformer_sm120_nvfp4_dsm_operand_tests PRIVATE
+        "${CMAKE_SOURCE_DIR}/cuda" "${CUTLASS_DIR}/include")
+    target_compile_options(
+        stream1_transformer_sm120_nvfp4_dsm_operand_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --threads=8>)
+    set_target_properties(
+        stream1_transformer_sm120_nvfp4_dsm_operand_tests PROPERTIES
+        CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+    add_executable(stream1_transformer_sm120_nvfp4_export
+        tools/stream1_transformer_sm120_nvfp4_export.cu)
+    target_link_libraries(stream1_transformer_sm120_nvfp4_export PRIVATE beam_core)
+    target_include_directories(stream1_transformer_sm120_nvfp4_export PRIVATE
+        cuda
+        tools
+        "${CUTLASS_DIR}/include")
+    set_target_properties(stream1_transformer_sm120_nvfp4_export PROPERTIES
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
@@ -614,6 +962,9 @@ add_executable(stream_benchmark
     tools/stream_benchmark_mlp.cu
     tools/stream_benchmark_transformer.cu)
 target_link_libraries(stream_benchmark PRIVATE beam_cuda)
+string(REPLACE ";" "," BEAM_CUDA_ARCHITECTURES_REPORT "${BEAM_CUDA_ARCHITECTURES}")
+target_compile_definitions(stream_benchmark PRIVATE
+    BEAM_CUDA_ARCHITECTURES_REPORT="${BEAM_CUDA_ARCHITECTURES_REPORT}")
 set_target_properties(stream_benchmark PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stream_pipeline_benchmark tools/stream_pipeline_benchmark.cu)

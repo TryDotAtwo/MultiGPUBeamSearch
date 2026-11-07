@@ -36,6 +36,19 @@ void require_no_overlap(
     require(!ranges_overlap(a, a_bytes, addr(b), b_bytes), message);
 }
 
+void require_within_allocation(
+    const StaticDeviceMemory& memory,
+    const void* ptr,
+    std::size_t bytes,
+    const char* message) {
+    const std::uintptr_t allocation_begin = addr(memory.allocation);
+    const std::uintptr_t allocation_end = allocation_begin + memory.allocation_bytes;
+    const std::uintptr_t range_begin = addr(ptr);
+    require(
+        range_begin >= allocation_begin && range_begin + bytes <= allocation_end,
+        message);
+}
+
 void require_final_layout_preserves_persistent_stream_storage(
     const StaticMemoryPlan& plan,
     const StaticDeviceMemory& memory) {
@@ -210,6 +223,11 @@ int main() {
     require(memory.streams.current_threshold_active_index != nullptr, "current threshold active index missing");
     require(memory.streams.threshold_request_local != nullptr, "threshold local request missing");
     require(memory.streams.threshold_request_global != nullptr, "threshold global request missing");
+    require_within_allocation(
+        memory,
+        memory.streams.threshold_request_global,
+        sizeof(std::uint32_t),
+        "threshold global request must fit inside static allocation");
     require(addr(memory.streams.survivor_shard) % alignof(CandidateMeta) == 0, "candidate alignment failed");
     require(addr(memory.streams.stream4_key_a) % alignof(Hash128) == 0, "stream4 sort key alignment failed");
     require(addr(memory.streams.stream4_val_a) % alignof(CandidateMeta) == 0, "stream4 sort value alignment failed");
@@ -245,6 +263,32 @@ int main() {
     BEAM_CUDA_CHECK(cudaDeviceSynchronize());
     free_static_device_memory(memory);
     require(memory.allocation == nullptr, "free must reset memory struct");
+
+    RuntimeConfig cube4_config;
+    cube4_config.b_micro = 3584;
+    cube4_config.inference_parallelism = 4;
+    cube4_config.stream3_batch_candidates = 3584 * static_cast<std::uint32_t>(MOVE_COUNT) * 4;
+    cube4_config.stream4_batch_candidates = 262144;
+    cube4_config.stream4_active_sort_slots = 4;
+    cube4_config.ring_count = 4;
+    cube4_config.shard_count = 32;
+    cube4_config.shard_buffer_count = 2;
+    cube4_config.shard_capacity_candidates = 1048576;
+    cube4_config.global_spill_capacity = 0;
+    cube4_config.stream4_batch_alignment = 1024;
+    cube4_config.user_global_beam_width = 1ULL << 25;
+    cube4_config.final_materialize_chunk_candidates = 88064;
+    cube4_config.stream5_recv_capacity_scale_ppm = 1250000;
+    cube4_config.solved_result_capacity = 1;
+    const StaticMemoryPlan cube4_plan = make_static_memory_plan(cube4_config);
+    StaticDeviceMemory cube4_memory;
+    allocate_static_device_memory(cube4_plan, cube4_memory);
+    require_within_allocation(
+        cube4_memory,
+        cube4_memory.streams.threshold_request_global,
+        sizeof(std::uint32_t),
+        "Cube4 2^25 threshold global request must fit inside static allocation");
+    free_static_device_memory(cube4_memory);
 
     RuntimeConfig multi_config = config;
     multi_config.world_size = 2;

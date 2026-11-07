@@ -5,6 +5,11 @@
 #include <cstddef>
 #include <cstdint>
 
+enum Stream1Sm120Nvfp4ExecutionKind : std::uint32_t {
+    STREAM1_SM120_NVFP4_EXECUTION_NONE = 0U,
+    STREAM1_SM120_NVFP4_EXECUTION_PERSISTENT_FULL_STREAM1 = 1U,
+};
+
 // Fixed-shape native contract for one non-final Cube4 Transformer FFN layer.
 // Deliberately absent: a global-memory FF1 hidden pointer.  A conforming SM120
 // implementation must retain the 256->1024 ReLU intermediate in registers or
@@ -33,6 +38,24 @@ struct Stream1Sm120Nvfp4FfnMemoryPlan {
     std::size_t next_activation_bytes = 0;
     std::size_t next_scale_bytes = 0;
 };
+
+inline constexpr std::size_t stream1_sm120_nvfp4_weight_value_bytes(
+    std::uint32_t input_cols, std::uint32_t output_cols) {
+    return (static_cast<std::size_t>(input_cols) * output_cols + 1U) / 2U;
+}
+
+// CUTLASS SM120 stores one logical UE4M3 factor per N/K16 pair in a tiled
+// SFB atom.  The physical atom pads N to 128 and reserves four bytes per K16
+// group; callers must size and fingerprint the physical artifact, not the
+// smaller logical matrix.
+inline constexpr std::size_t stream1_sm120_nvfp4_weight_scale_bytes(
+    std::uint32_t input_cols, std::uint32_t output_cols) {
+    const std::size_t padded_n =
+        (static_cast<std::size_t>(output_cols) + 127U) / 128U * 128U;
+    const std::size_t k16_groups =
+        (static_cast<std::size_t>(input_cols) + 15U) / 16U;
+    return padded_n * k16_groups * 4U;
+}
 
 inline constexpr Stream1Sm120Nvfp4FfnMemoryPlan
 stream1_sm120_nvfp4_ffn_memory_plan(std::uint32_t rows) {

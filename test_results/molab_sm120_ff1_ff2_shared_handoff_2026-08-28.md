@@ -273,3 +273,31 @@ gate using the selected SM120 collective's `load`, `mma`, `mma_tail`, and
 shared-only epilogue APIs.  Reintroducing the universal scheduler would undo
 the isolation and is not justified by these results.  No end-to-end numerical
 or throughput claim is made yet.
+
+## 2026-08-29 — direct register-fragment FF1 to native FF2 ring
+
+The scheduler-free direct collective now executes both 128-column FF1 slices
+inside the physical two-CTA cluster and bypasses the invalid nested universal
+kernel boundary. Compiler type evidence established that RTX PRO 6000 / SM120
+uses a register `ArrayEngine<FrgTypeC>` accumulator for this collective, not
+the SM100 TMEM accumulator path. The implementation therefore partitions an
+identity tile with the same MMA thread slice, scatters registers to one shared
+FP32 tile, applies bias plus ReLU, and writes UE4M3-scaled E2M1 values directly
+into the CUTLASS-native FF2 `DsmASlot` layout.
+
+Molab foreground evidence from sandbox `sb-6fc995c801b42cf0`:
+
+- compile: 60.428 s, return code 0, binary size 3,241,744 bytes;
+- both-CTA materialization gate: no launch failure or timeout;
+- full FF1 -> packed shared ring -> bulk-DSM FF2: return code 0;
+- FF2 checksums: rank 0 = `2.76824e+08`, rank 1 = `2.76824e+08`;
+- packed ring hashes: rank 0 = `10330644259222927235`, rank 1 =
+  `10330644259222927235`;
+- shared-memory allocation: 86,016 bytes.
+
+The equal nonzero slice hashes are expected for identical test operands, but
+do not establish numerical correctness or determinism across repeated runs.
+This is only a two-slice runtime/checksum smoke, not a numerical integration
+gate, end-to-end solution-quality result, or throughput result. The 2026-08-31
+audit requires full logical outputs against an independent reference before
+either writer optimization or performance promotion.

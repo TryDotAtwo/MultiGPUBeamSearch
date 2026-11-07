@@ -188,6 +188,7 @@ std::vector<Stream1Result> benchmark_stream1_transformer(
     std::vector<Stream1Result> results;
     stream1_weights::TransformerNetworkViewHolder view_holder =
         stream1_weights::transformer_network_view(weights.transformer, model);
+    stream1_transformer_prepare_attention_backend(view_holder.view.dims.dtype);
 
     const bool graph_bench = std::getenv("BEAM_STREAM1_TRANSFORMER_GRAPH_BENCH") != nullptr;
     const char* only_b_micro_env = std::getenv("BEAM_STREAM1_TRANSFORMER_B_MICRO");

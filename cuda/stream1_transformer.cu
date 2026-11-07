@@ -6,6 +6,7 @@
 #include "stream1_transformer_sm120_fp8.hpp"
 #if BEAM_ENABLE_SM120_FP8
 #include "stream1_transformer_cublaslt_fp16.hpp"
+#include "stream1_transformer_sm120_nvfp4_stock.hpp"
 #endif
 
 #include "config.hpp"
@@ -15,6 +16,13 @@
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
+
+#ifndef BEAM_HAS_SM120_FA4_AOT
+#define BEAM_HAS_SM120_FA4_AOT 0
+#endif
+#if BEAM_HAS_SM120_FA4_AOT
+#include "fa4_cube4_q64_direct.h"
+#endif
 
 #if BEAM_HAS_CUTLASS
 #include <cutlass/bfloat16.h>
@@ -35,6 +43,7 @@
 #include <cstring>
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -1477,6 +1486,7 @@ void stream1_transformer_qkv_linear_bias_dispatch(
         scratch.fp8_input_scales == nullptr || block.attn_qkv_weight_scales == nullptr) {
         throw std::runtime_error("SM120 FP8 QKV profile is missing required fp16 scratch or scales");
     }
+#if BEAM_ENABLE_SM120_FP8
     stream1_transformer_sm120_fp8_linear_cuda(
         input, scratch.fp8_quantized_input, scratch.fp8_input_scales,
         block.attn_qkv_weight_fp8, block.attn_qkv_weight_scales, output,
@@ -1484,6 +1494,9 @@ void stream1_transformer_qkv_linear_bias_dispatch(
         scratch.fp8_workspace, scratch.fp8_workspace_bytes, stream);
     stream1_transformer_bias_add_launch(
         output, block.attn_qkv_bias, rows, output_cols, dtype, stream);
+#else
+    throw std::runtime_error("SM120 FP8 QKV profile requires BEAM_ENABLE_SM120_FP8 build");
+#endif
 }
 
 void stream1_transformer_ff1_linear_bias_silu_dispatch(
@@ -1517,6 +1530,7 @@ void stream1_transformer_ff1_linear_bias_silu_dispatch(
         scratch.fp8_input_scales == nullptr || block.ff1_weight_scales == nullptr) {
         throw std::runtime_error("SM120 FP8 FF1 profile is missing required fp16 scratch or scales");
     }
+#if BEAM_ENABLE_SM120_FP8
     stream1_transformer_sm120_fp8_linear_cuda(
         input, scratch.fp8_quantized_input, scratch.fp8_input_scales,
         block.ff1_weight_fp8, block.ff1_weight_scales, output,
@@ -1524,6 +1538,9 @@ void stream1_transformer_ff1_linear_bias_silu_dispatch(
         scratch.fp8_workspace, scratch.fp8_workspace_bytes, stream);
     stream1_transformer_bias_silu_kernel<<<(rows * output_cols + 255U) / 256U, 256, 0, stream>>>(
         output, block.ff1_bias, rows, output_cols, dtype);
+#else
+    throw std::runtime_error("SM120 FP8 FF1 profile requires BEAM_ENABLE_SM120_FP8 build");
+#endif
 }
 
 void stream1_transformer_ff1_linear_bias_activation_dispatch(
@@ -1566,6 +1583,7 @@ void stream1_transformer_ff1_linear_bias_activation_dispatch(
         scratch.fp8_input_scales == nullptr || block.ff1_weight_scales == nullptr) {
         throw std::runtime_error("SM120 FP8 FF1 profile is missing required fp16 scratch or scales");
     }
+#if BEAM_ENABLE_SM120_FP8
     stream1_transformer_sm120_fp8_linear_cuda(
         input, scratch.fp8_quantized_input, scratch.fp8_input_scales,
         block.ff1_weight_fp8, block.ff1_weight_scales, output,
@@ -1573,6 +1591,9 @@ void stream1_transformer_ff1_linear_bias_activation_dispatch(
         scratch.fp8_workspace, scratch.fp8_workspace_bytes, stream);
     stream1_transformer_bias_relu_kernel<<<(count + 255U) / 256U, 256, 0, stream>>>(
         output, block.ff1_bias, rows, output_cols, dtype);
+#else
+    throw std::runtime_error("SM120 FP8 FF1 profile requires BEAM_ENABLE_SM120_FP8 build");
+#endif
 }
 constexpr std::uint32_t STREAM1_TRANSFORMER_SEQ51 = 51U;
 constexpr std::uint32_t STREAM1_TRANSFORMER_DMODEL256 = 256U;
@@ -1672,13 +1693,99 @@ enum class Stream1TransformerAttentionBackend : std::uint32_t {
     Sm75Fp16Fmha,
     Sm80Fp16Fmha,
     Sm80Bf16Fmha,
+    Sm120Fp16Fa4Aot,
 };
+
+bool stream1_transformer_fa4_aot_requested() {
+    const char* value = std::getenv("BEAM_STREAM1_TRANSFORMER_ATTENTION_BACKEND");
+    if (value == nullptr || value[0] == '\0' || std::strcmp(value, "cutlass") == 0) {
+        return false;
+    }
+    if (std::strcmp(value, "fa4_aot") == 0) {
+        return true;
+    }
+    throw std::invalid_argument(
+        "BEAM_STREAM1_TRANSFORMER_ATTENTION_BACKEND must be cutlass or fa4_aot");
+}
+
+#if BEAM_HAS_SM120_FA4_AOT
+fa4_cube4_q64_direct_Kernel_Module_t stream1_transformer_fa4_aot_module{};
+std::once_flag stream1_transformer_fa4_aot_init_once;
+
+void stream1_transformer_fa4_aot_prepare() {
+    std::call_once(stream1_transformer_fa4_aot_init_once, []() {
+        fa4_cube4_q64_direct_Kernel_Module_Load(&stream1_transformer_fa4_aot_module);
+        BEAM_CUDA_CHECK(cudaGetLastError());
+    });
+}
+
+void stream1_transformer_fa4_aot_launch(
+    const half* qkv,
+    half* context,
+    Stream1TransformerDims dims,
+    std::uint32_t b_micro,
+    cudaStream_t stream) {
+    if (dims.dtype != STREAM1_DTYPE_FP16 || dims.seq_len != 57U ||
+        (dims.padded_seq_len != 57U && dims.padded_seq_len != 64U) ||
+        dims.d_model != 256U || dims.nhead != 8U ||
+        dims.head_dim != 32U) {
+        throw std::invalid_argument(
+            "SM120 FA4 AOT currently requires Cube4 fp16 shape seq=57/padded=57-or-64/d_model=256/nhead=8/head_dim=32");
+    }
+    const std::int64_t qkv_batch_stride =
+        static_cast<std::int64_t>(dims.padded_seq_len) * 3LL * dims.d_model;
+    const std::int64_t qkv_sequence_stride = 3LL * dims.d_model;
+    const std::int64_t context_batch_stride =
+        static_cast<std::int64_t>(dims.padded_seq_len) * dims.d_model;
+    fa4_cube4_q64_direct_Tensor_mQ_t q_desc{
+        const_cast<half*>(qkv),
+        {static_cast<std::int32_t>(b_micro), static_cast<std::int32_t>(dims.padded_seq_len), 8, 32},
+        {qkv_batch_stride, qkv_sequence_stride, 32}};
+    fa4_cube4_q64_direct_Tensor_mK_t k_desc{
+        const_cast<half*>(qkv + dims.d_model),
+        {static_cast<std::int32_t>(b_micro), 57, 8, 32},
+        {qkv_batch_stride, qkv_sequence_stride, 32}};
+    fa4_cube4_q64_direct_Tensor_mV_t v_desc{
+        const_cast<half*>(qkv + 2U * dims.d_model),
+        {static_cast<std::int32_t>(b_micro), 57, 8, 32},
+        {qkv_batch_stride, qkv_sequence_stride, 32}};
+    fa4_cube4_q64_direct_Tensor_mO_t o_desc{
+        context,
+        {static_cast<std::int32_t>(b_micro), static_cast<std::int32_t>(dims.padded_seq_len), 8, 32},
+        {context_batch_stride, static_cast<std::int64_t>(dims.d_model), 32}};
+    constexpr float softmax_scale = 0.1767766952966369f;
+    const std::int32_t status = cute_dsl_fa4_cube4_q64_direct_wrapper(
+        &stream1_transformer_fa4_aot_module,
+        &q_desc,
+        &k_desc,
+        &v_desc,
+        &o_desc,
+        softmax_scale,
+        stream);
+    if (status != 0) {
+        throw std::runtime_error("SM120 FA4 AOT attention launch failed with status " +
+                                 std::to_string(status));
+    }
+}
+#endif
 
 Stream1TransformerAttentionBackend stream1_transformer_select_attention_backend(std::uint32_t dtype) {
     int device = 0;
     BEAM_CUDA_CHECK(cudaGetDevice(&device));
     cudaDeviceProp prop{};
     BEAM_CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+    if (stream1_transformer_fa4_aot_requested()) {
+#if BEAM_HAS_SM120_FA4_AOT
+        if (dtype != STREAM1_DTYPE_FP16 || prop.major != 12) {
+            throw std::invalid_argument("SM120 FA4 AOT requires fp16 on an SM120 GPU");
+        }
+        stream1_transformer_fa4_aot_prepare();
+        return Stream1TransformerAttentionBackend::Sm120Fp16Fa4Aot;
+#else
+        throw std::invalid_argument(
+            "fa4_aot requested but this build does not include BEAM_ENABLE_SM120_FA4_AOT");
+#endif
+    }
 #if BEAM_HAS_CUTLASS_FMHA
     if (dtype == STREAM1_DTYPE_BF16) {
         if (prop.major >= 8) {
@@ -1707,6 +1814,10 @@ Stream1TransformerAttentionBackend stream1_transformer_select_attention_backend(
     }
 #endif
     throw std::invalid_argument("Stream1 piece_transformer dtype must be fp16 or bf16");
+}
+
+void stream1_transformer_prepare_attention_backend(std::uint32_t dtype) {
+    (void)stream1_transformer_select_attention_backend(dtype);
 }
 
 #if BEAM_HAS_CUTLASS
@@ -2900,6 +3011,13 @@ void stream1_transformer_attention_launch(
         scratch.attention_context == nullptr) {
         throw std::invalid_argument("Stream1 piece_transformer tensor attention requires qkv, score scratch, and attention_context");
     }
+#if BEAM_HAS_SM120_FA4_AOT
+    if (attention_backend == Stream1TransformerAttentionBackend::Sm120Fp16Fa4Aot) {
+        stream1_transformer_fa4_aot_launch(
+            qkv, scratch.attention_context, dims, b_micro, stream);
+        return;
+    }
+#endif
 #if BEAM_HAS_CUTLASS
     stream1_transformer_fmha_attention_cuda(
         qkv,
@@ -3263,6 +3381,79 @@ public:
                       << "\n";
         }
         std::cout << "stream1_transformer_stage_profile_total_ms=" << total_ms << "\n";
+        std::cout.flush();
+    }
+
+private:
+    cudaStream_t stream_ = nullptr;
+    bool enabled_ = false;
+    std::vector<cudaEvent_t> events_;
+    std::vector<std::string> labels_;
+};
+
+class Stream1TransformerFinalClsProfiler {
+public:
+    explicit Stream1TransformerFinalClsProfiler(cudaStream_t stream) : stream_(stream) {
+        if (!stream1_transformer_env_flag("BEAM_STREAM1_TRANSFORMER_FINAL_CLS_PROFILE")) {
+            return;
+        }
+        cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+        BEAM_CUDA_CHECK(cudaStreamIsCapturing(stream_, &capture_status));
+        if (capture_status != cudaStreamCaptureStatusNone) {
+            throw std::invalid_argument(
+                "BEAM_STREAM1_TRANSFORMER_FINAL_CLS_PROFILE requires eager execution; CUDA Graph capture is active");
+        }
+        static std::atomic<std::uint32_t> call_count{0U};
+        const std::uint32_t call_index = call_count.fetch_add(1U, std::memory_order_relaxed);
+        if (call_index < stream1_transformer_stage_profile_skip_calls()) {
+            return;
+        }
+        static std::atomic<bool> claimed{false};
+        if (claimed.exchange(true, std::memory_order_relaxed)) {
+            return;
+        }
+        enabled_ = true;
+        mark("start");
+    }
+
+    Stream1TransformerFinalClsProfiler(const Stream1TransformerFinalClsProfiler&) = delete;
+    Stream1TransformerFinalClsProfiler& operator=(const Stream1TransformerFinalClsProfiler&) = delete;
+
+    ~Stream1TransformerFinalClsProfiler() {
+        for (cudaEvent_t event : events_) {
+            if (event != nullptr) {
+                cudaEventDestroy(event);
+            }
+        }
+    }
+
+    void mark(std::string label) {
+        if (!enabled_) {
+            return;
+        }
+        cudaEvent_t event = nullptr;
+        BEAM_CUDA_CHECK(cudaEventCreate(&event));
+        BEAM_CUDA_CHECK(cudaEventRecord(event, stream_));
+        events_.push_back(event);
+        labels_.push_back(std::move(label));
+    }
+
+    void finish() {
+        if (!enabled_ || events_.size() < 2U) {
+            return;
+        }
+        BEAM_CUDA_CHECK(cudaEventSynchronize(events_.back()));
+        float total_ms = 0.0F;
+        for (std::size_t i = 1; i < events_.size(); ++i) {
+            float elapsed_ms = 0.0F;
+            BEAM_CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, events_[i - 1U], events_[i]));
+            total_ms += elapsed_ms;
+            std::cout << "stream1_transformer_final_cls_profile"
+                      << " stage=" << labels_[i]
+                      << " ms=" << elapsed_ms
+                      << "\n";
+        }
+        std::cout << "stream1_transformer_final_cls_profile_total_ms=" << total_ms << "\n";
         std::cout.flush();
     }
 
@@ -3685,6 +3876,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
     const Stream1TransformerBlockView block = network.blocks[final_layer];
     const Stream1TransformerBlockView previous_block = network.blocks[final_layer - 1U];
     const std::uint32_t token_rows = b_micro * dims.padded_seq_len;
+    Stream1TransformerFinalClsProfiler profiler(stream);
 
     stream1_transformer_bias_layernorm_copy_launch(
         scratch.tokens,
@@ -3696,6 +3888,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.dtype,
         stream);
+    profiler.mark("ln1_all_tokens");
     const bool split_qkv = stream1_transformer_final_cls_split_qkv_requested();
     if (split_qkv) {
         if (!stream1_transformer_final_cls_attention_requested()) {
@@ -3711,6 +3904,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
             dims,
             b_micro,
             stream);
+        profiler.mark("split_q_full_kv");
     } else {
         stream1_transformer_qkv_linear_bias_dispatch(
             scratch.attention_context,
@@ -3722,6 +3916,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
             3U * dims.d_model,
             dims.dtype,
             stream);
+        profiler.mark("full_qkv");
     }
     if (stream1_transformer_final_cls_attention_requested()) {
         if (split_qkv) {
@@ -3733,6 +3928,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
                 attention_backend == Stream1TransformerAttentionBackend::Sm75Fp16Fmha,
                 b_micro,
                 stream);
+            profiler.mark("cls_attention_split_q");
         } else {
             stream1_transformer_fmha_cls_attention_cuda(
                 scratch.qkv,
@@ -3741,6 +3937,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
                 attention_backend == Stream1TransformerAttentionBackend::Sm75Fp16Fmha,
                 b_micro,
                 stream);
+            profiler.mark("cls_attention");
         }
     } else {
         stream1_transformer_attention_launch(
@@ -3757,6 +3954,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
             dims,
             b_micro,
             dims.padded_seq_len);
+        profiler.mark("full_attention_gather_cls");
     }
     stream1_transformer_gather_cls256_kernel<<<b_micro, 128, 0, stream>>>(
         scratch.tokens,
@@ -3764,6 +3962,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims,
         b_micro,
         dims.padded_seq_len);
+    profiler.mark("gather_cls_residual");
     stream1_transformer_linear_residual_cuda(
         scratch.attention_scores_probs,
         block.attn_out_weight,
@@ -3773,6 +3972,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.dtype,
         stream);
+    profiler.mark("attention_out_residual");
     stream1_transformer_bias_layernorm_copy_launch(
         scratch.qkv,
         scratch.attention_context,
@@ -3783,6 +3983,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.dtype,
         stream);
+    profiler.mark("ln2");
     stream1_transformer_ff1_linear_bias_activation_dispatch(
         scratch.attention_context,
         block,
@@ -3794,6 +3995,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.dtype,
         dims.activation,
         stream);
+    profiler.mark("ff1");
     stream1_transformer_linear_residual_cuda(
         scratch.ff_hidden,
         block.ff2_weight,
@@ -3803,6 +4005,7 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.dtype,
         stream);
+    profiler.mark("ff2_residual");
     stream1_transformer_bias_layernorm_copy_launch(
         scratch.qkv,
         scratch.attention_context,
@@ -3813,6 +4016,8 @@ void stream1_transformer_final_layer_cls_only_generic_cuda(
         dims.d_model,
         dims.dtype,
         stream);
+    profiler.mark("output_ln");
+    profiler.finish();
 }
 
 void stream1_transformer_generic_run_layers_cuda(
@@ -3832,41 +4037,71 @@ void stream1_transformer_generic_run_layers_cuda(
     for (std::uint32_t layer = 0; layer < full_token_layer_count; ++layer) {
         const std::string layer_prefix = "layer" + std::to_string(layer) + "_";
         const Stream1TransformerBlockView block = network.blocks[layer];
-        if (layer == 0U) {
-            stream1_transformer_layernorm_copy_launch(
+        const bool fused_nvfp4_ln1_qkv =
+#if BEAM_ENABLE_SM120_FP8
+            dims.dtype == STREAM1_DTYPE_FP16 && dims.d_model == 256U &&
+            block.attn_qkv_weight_nvfp4 != nullptr &&
+            block.attn_qkv_weight_nvfp4_scales != nullptr;
+#else
+            false;
+#endif
+        if (fused_nvfp4_ln1_qkv) {
+#if BEAM_ENABLE_SM120_FP8
+            const half* deferred_residual_bias = layer == 0U
+                ? nullptr
+                : network.blocks[layer - 1U].ff2_bias;
+            stream1_transformer_sm120_nvfp4_stock_layernorm_qkv_cuda(
                 scratch.tokens,
-                scratch.attention_context,
+                deferred_residual_bias,
                 block.ln1_gamma,
                 block.ln1_beta,
+                block.attn_qkv_weight_nvfp4,
+                block.attn_qkv_weight_nvfp4_scales,
+                block.attn_qkv_bias,
+                scratch.qkv,
+                scratch.ff_hidden,
+                static_cast<std::size_t>(token_rows) * dims.ff_dim * sizeof(half),
                 token_rows,
-                dims.d_model,
-                dims.dtype,
                 stream);
+            stage_profiler.mark(layer_prefix + "ln1_qkv_nvfp4_fused");
+#endif
         } else {
-            const Stream1TransformerBlockView previous_block = network.blocks[layer - 1U];
-            stream1_transformer_bias_layernorm_copy_launch(
-                scratch.tokens,
+            if (layer == 0U) {
+                stream1_transformer_layernorm_copy_launch(
+                    scratch.tokens,
+                    scratch.attention_context,
+                    block.ln1_gamma,
+                    block.ln1_beta,
+                    token_rows,
+                    dims.d_model,
+                    dims.dtype,
+                    stream);
+            } else {
+                const Stream1TransformerBlockView previous_block = network.blocks[layer - 1U];
+                stream1_transformer_bias_layernorm_copy_launch(
+                    scratch.tokens,
+                    scratch.attention_context,
+                    previous_block.ff2_bias,
+                    block.ln1_gamma,
+                    block.ln1_beta,
+                    token_rows,
+                    dims.d_model,
+                    dims.dtype,
+                    stream);
+            }
+            stage_profiler.mark(layer_prefix + "ln1");
+            stream1_transformer_qkv_linear_bias_dispatch(
                 scratch.attention_context,
-                previous_block.ff2_bias,
-                block.ln1_gamma,
-                block.ln1_beta,
+                block,
+                scratch,
+                scratch.qkv,
                 token_rows,
                 dims.d_model,
+                3U * dims.d_model,
                 dims.dtype,
                 stream);
+            stage_profiler.mark(layer_prefix + "qkv");
         }
-        stage_profiler.mark(layer_prefix + "ln1");
-        stream1_transformer_qkv_linear_bias_dispatch(
-            scratch.attention_context,
-            block,
-            scratch,
-            scratch.qkv,
-            token_rows,
-            dims.d_model,
-            3U * dims.d_model,
-            dims.dtype,
-            stream);
-        stage_profiler.mark(layer_prefix + "qkv");
         stream1_transformer_attention_launch(
             scratch.qkv,
             scratch,
@@ -3886,40 +4121,100 @@ void stream1_transformer_generic_run_layers_cuda(
             dims.dtype,
             stream);
         stage_profiler.mark(layer_prefix + "attention_out");
-        stream1_transformer_bias_layernorm_copy_launch(
-            scratch.tokens,
-            scratch.attention_context,
-            block.attn_out_bias,
-            block.ln2_gamma,
-            block.ln2_beta,
-            token_rows,
-            dims.d_model,
-            dims.dtype,
-            stream);
-        stage_profiler.mark(layer_prefix + "ln2");
-        stream1_transformer_ff1_linear_bias_activation_dispatch(
-            scratch.attention_context,
-            block,
-            scratch,
-            scratch.ff_hidden,
-            token_rows,
-            dims.d_model,
-            dims.ff_dim,
-            dims.dtype,
-            dims.activation,
-            stream);
-        stage_profiler.mark(layer_prefix + "ff1");
-        stream1_transformer_linear_residual_cuda(
-            scratch.ff_hidden,
-            block.ff2_weight,
-            scratch.tokens,
-            token_rows,
-            dims.ff_dim,
-            dims.d_model,
-            dims.dtype,
-            stream);
+        bool nvfp4_layer_selected = false;
+#if BEAM_ENABLE_SM120_FP8
+        nvfp4_layer_selected =
+            (network.nvfp4_ffn_layer_mask & (1U << layer)) != 0U;
+#endif
+        const bool fused_nvfp4_ln2_input =
+            nvfp4_layer_selected && stream1_transformer_env_flag(
+                "BEAM_STREAM1_SM120_NVFP4_FUSED_LN2_QUANT");
+        if (!fused_nvfp4_ln2_input) {
+            stream1_transformer_bias_layernorm_copy_launch(
+                scratch.tokens,
+                scratch.attention_context,
+                block.attn_out_bias,
+                block.ln2_gamma,
+                block.ln2_beta,
+                token_rows,
+                dims.d_model,
+                dims.dtype,
+                stream);
+            stage_profiler.mark(layer_prefix + "ln2");
+        }
+        bool used_nvfp4_ffn = false;
+#if BEAM_ENABLE_SM120_FP8
+        if (nvfp4_layer_selected) {
+            if (dims.d_model != 256U || dims.ff_dim != 1024U ||
+                dims.dtype != STREAM1_DTYPE_FP16 ||
+                dims.activation != STREAM1_ACTIVATION_RELU) {
+                throw std::runtime_error(
+                    "SM120 NVFP4 FFN runtime contract diverged after profile validation");
+            }
+            if (fused_nvfp4_ln2_input) {
+                stream1_transformer_sm120_nvfp4_stock_bias_layernorm_ffn_cuda(
+                    scratch.tokens,
+                    block.attn_out_bias,
+                    block.ln2_gamma,
+                    block.ln2_beta,
+                    block.ff1_weight_nvfp4,
+                    block.ff1_weight_nvfp4_scales,
+                    block.ff1_bias,
+                    block.ff2_weight_nvfp4,
+                    block.ff2_weight_nvfp4_scales,
+                    scratch.qkv,
+                    static_cast<std::size_t>(token_rows) * 3U * dims.d_model * sizeof(half),
+                    scratch.ff_hidden,
+                    static_cast<std::size_t>(token_rows) * dims.ff_dim * sizeof(half),
+                    token_rows,
+                    stream);
+                stage_profiler.mark(layer_prefix + "ln2_ffn_nvfp4_fused_input");
+            } else {
+                stream1_transformer_sm120_nvfp4_stock_ffn_cuda(
+                    scratch.attention_context,
+                    scratch.tokens,
+                    block.ff1_weight_nvfp4,
+                    block.ff1_weight_nvfp4_scales,
+                    block.ff1_bias,
+                    block.ff2_weight_nvfp4,
+                    block.ff2_weight_nvfp4_scales,
+                    scratch.tokens,
+                    scratch.qkv,
+                    static_cast<std::size_t>(token_rows) * 3U * dims.d_model * sizeof(half),
+                    scratch.ff_hidden,
+                    static_cast<std::size_t>(token_rows) * dims.ff_dim * sizeof(half),
+                    token_rows,
+                    stream);
+                stage_profiler.mark(layer_prefix + "ffn_nvfp4");
+            }
+            used_nvfp4_ffn = true;
+        }
+#endif
+        if (!used_nvfp4_ffn) {
+            stream1_transformer_ff1_linear_bias_activation_dispatch(
+                scratch.attention_context,
+                block,
+                scratch,
+                scratch.ff_hidden,
+                token_rows,
+                dims.d_model,
+                dims.ff_dim,
+                dims.dtype,
+                dims.activation,
+                stream);
+            stage_profiler.mark(layer_prefix + "ff1");
+            stream1_transformer_linear_residual_cuda(
+                scratch.ff_hidden,
+                block.ff2_weight,
+                scratch.tokens,
+                token_rows,
+                dims.ff_dim,
+                dims.d_model,
+                dims.dtype,
+                stream);
+            stage_profiler.mark(layer_prefix + "ff2");
+        }
         stream1_transformer_zero_padded_rows_launch(scratch.tokens, dims, b_micro, stream);
-        stage_profiler.mark(layer_prefix + "ff2");
     }
 
     if (final_cls_only) {
@@ -3952,6 +4247,21 @@ void stream1_transformer_generic_run_layers_cuda(
         stage_profiler.mark("output_cls_layernorm");
     }
     stage_profiler.finish();
+}
+
+void stream1_transformer_require_available_nvfp4_execution(
+    const Stream1TransformerNetworkView& network) {
+    if (network.nvfp4_execution_kind ==
+        STREAM1_SM120_NVFP4_EXECUTION_NONE) {
+        return;
+    }
+    if (network.nvfp4_execution_kind ==
+        STREAM1_SM120_NVFP4_EXECUTION_PERSISTENT_FULL_STREAM1) {
+        throw std::runtime_error(
+            "schema-4 SM120 NVFP4 profile requires the persistent full-Stream1 "
+            "entrypoint; refusing to execute the stock global-hidden FFN path");
+    }
+    throw std::runtime_error("unknown SM120 NVFP4 execution kind");
 }
 
 void stream1_transformer_inference_graph_job_cuda(
@@ -3989,6 +4299,7 @@ void stream1_transformer_inference_graph_job_cuda(
     if (b_micro == 0U) {
         return;
     }
+    stream1_transformer_require_available_nvfp4_execution(network);
     if (stream1_transformer_block51_requested() && dims.seq_len == 51U && dims.padded_seq_len >= 51U) {
         stream1_transformer_inference_block51_graph_job_cuda(
             current_frontier_states,
@@ -4115,6 +4426,7 @@ void stream1_transformer_inference_cuda(
     if (b_micro == 0U) {
         return;
     }
+    stream1_transformer_require_available_nvfp4_execution(network);
     if (stream1_transformer_block51_requested() && dims.seq_len == 51U && dims.padded_seq_len >= 51U) {
         stream1_transformer_inference_block51_cuda(
             current_frontier_states,

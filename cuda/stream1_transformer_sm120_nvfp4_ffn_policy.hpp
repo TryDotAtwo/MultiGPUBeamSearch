@@ -37,6 +37,13 @@ struct Stream1Sm120Nvfp4FfnPolicy {
     static constexpr std::uint32_t kFp16Dtype = beam::STREAM1_DTYPE_FP16;
     static constexpr std::uint32_t kReluActivation = beam::STREAM1_ACTIVATION_RELU;
     static constexpr std::uint32_t kScaleVector = 16U;
+    static constexpr std::uint32_t kFusedLn2Threads = 128U;
+    static constexpr std::uint32_t kFusedLn2ValuesPerThread = 2U;
+    static constexpr std::uint32_t kFusedLn2ThreadsPerScale =
+        kScaleVector / kFusedLn2ValuesPerThread;
+    // Interleaved Molab SM120 measurements selected K128 over K256 for the
+    // stock CUTLASS FF1->FF2 production control path.
+    static constexpr std::uint32_t kStockMainloopKTile = 128U;
     static constexpr std::uint32_t kProducerTiles = 8U;
     static constexpr std::uint32_t kColumnsPerProducerTile = 128U;
     static constexpr std::uint32_t kProducerTileBuffers = 2U;
@@ -86,3 +93,46 @@ struct Stream1Sm120Nvfp4FfnPolicy {
         return reject_reason(contract) == Stream1Sm120Nvfp4FfnRejectReason::None;
     }
 };
+
+// Ownership contract for the SM120 persistent FF1 -> ReLU/NVFP4 -> FF2
+// handoff.  A producer publishes one K128 hidden slice into a two-generation
+// CTA-local ring; the consumer releases that generation before the producer
+// may reuse it.  No hidden payload is addressable in global memory.
+struct Stream1Sm120Nvfp4PersistentFfnPipeline {
+    static constexpr std::uint32_t kRowsPerCta = 128U;
+    static constexpr std::uint32_t kThreads = 256U;
+    static constexpr std::uint32_t kProducerWarps = 4U;
+    static constexpr std::uint32_t kConsumerWarps = 4U;
+    static constexpr std::uint32_t kHiddenSlices = 8U;
+    static constexpr std::uint32_t kRingBuffers = 2U;
+    static constexpr std::uint32_t kReadyBarriers = kRingBuffers;
+    static constexpr std::uint32_t kFreeBarriers = kRingBuffers;
+    static constexpr std::uint32_t kValuesPerSlice = kRowsPerCta * 128U;
+    static constexpr std::uint32_t kValueBytesPerBuffer = kValuesPerSlice / 2U;
+    static constexpr std::uint32_t kScaleBytesPerBuffer =
+        kRowsPerCta * (128U / Stream1Sm120Nvfp4FfnPolicy::kScaleVector);
+    static constexpr std::uint32_t kHandoffBytes =
+        kRingBuffers * (kValueBytesPerBuffer + kScaleBytesPerBuffer);
+    static constexpr std::uint32_t kGlobalHiddenBytes = 0U;
+
+    static constexpr std::uint32_t producer_buffer(std::uint32_t slice) {
+        return slice % kRingBuffers;
+    }
+
+    static constexpr std::uint32_t consumer_stage(std::uint32_t slice) {
+        return slice + 1U;
+    }
+
+    static constexpr std::uint32_t consumer_buffer(std::uint32_t stage) {
+        return (stage - 1U) % kRingBuffers;
+    }
+};
+
+inline constexpr std::uint32_t stream1_sm120_nvfp4_ffn_bit(std::uint32_t layer) {
+    return layer < 3U ? (1U << layer) : 0U;
+}
+
+inline constexpr std::uint32_t STREAM1_SM120_NVFP4_FFN_VALID_LAYER_MASK =
+    stream1_sm120_nvfp4_ffn_bit(0U) |
+    stream1_sm120_nvfp4_ffn_bit(1U) |
+    stream1_sm120_nvfp4_ffn_bit(2U);

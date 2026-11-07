@@ -1,0 +1,3 @@
+#define STREAM1_HANDOFF_NO_MAIN 1
+#include "stream1_transformer_sm120_nvfp4_cutlass_ff1_shared_handoff_contract_tests.cu"
+#include "stream1_transformer_sm120_nvfp4_cutlass_ff1_shared_handoff_numeric_tests.cu"

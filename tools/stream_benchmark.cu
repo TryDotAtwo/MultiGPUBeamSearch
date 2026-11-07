@@ -3,6 +3,10 @@
 using namespace beam;
 using namespace beam::bench;
 
+#ifndef BEAM_CUDA_ARCHITECTURES_REPORT
+#define BEAM_CUDA_ARCHITECTURES_REPORT "unknown"
+#endif
+
 int main(int argc, char** argv) {
     if (argc != 1 && argc != 2) {
         std::cerr << "usage: stream_benchmark [puzzle_id]\n";
@@ -74,7 +78,7 @@ int main(int argc, char** argv) {
     report << "- stream1_model_residual_count=" << stream1_model.residual_count << "\n";
     report << "- stream1_model_output_dim=" << stream1_model.output_dim << "\n";
     report << "- stream1_model_weight_bytes=" << stream1_weights::total_host_weight_bytes(host_weights) << "\n";
-    report << "- cuda_architectures=75,86\n";
+    report << "- cuda_architectures=" << BEAM_CUDA_ARCHITECTURES_REPORT << "\n";
     report << "- stream1_gemm=TensorOp_runtime_arch_dispatch_sm80_or_sm75\n";
     if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
         report << "- stream1_backend=piece_transformer\n\n";

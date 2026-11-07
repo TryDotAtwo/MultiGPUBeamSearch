@@ -5,7 +5,7 @@ import unittest
 import torch
 import torch.nn.functional as F
 
-from tools.export_stream1 import detect_format_from_state_dict
+from tools.export_stream1 import detect_format_from_state_dict, validate_export_dtype
 from tools.export_stream1_transformer import (
     build_fast_input_tables,
     infer_architecture,
@@ -86,6 +86,11 @@ def make_cube4_metadata():
 
 
 class Stream1TransformerExporterTests(unittest.TestCase):
+    def test_wrapper_allows_fp32_only_for_piece_transformer(self):
+        validate_export_dtype("piece-transformer", "fp32")
+        with self.assertRaisesRegex(ValueError, "fp32 export is only supported"):
+            validate_export_dtype("resmlp-layernorm", "fp32")
+
     def test_locates_bundle_metadata_next_to_checkpoint(self):
         with tempfile.TemporaryDirectory() as temporary:
             model_dir = Path(temporary) / "model"

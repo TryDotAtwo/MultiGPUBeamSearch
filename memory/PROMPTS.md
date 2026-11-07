@@ -1,5 +1,178 @@
 # Prompt History
 
+## 2026-09-09 — Continue with an explicit FFN goal
+
+- User: "Окей, делай. Цель поставь и батрач".
+- Goal: diagnose and improve complete FFN against the eligible control;
+  preserve output, independent oracle and seven alternating trials. GPU
+  compilation/execution stays on Molab; no beam-search/Stream3/4 changes.
+
+## 2026-09-05 — Explicit goal and continued execution
+
+- User: "Поставь цель себе и делай".
+- Active goal: diagnose the retained complete SM120 FFN, then at most two
+  evidence-led candidates with full output and seven alternating comparisons.
+  Keep Molab-only GPU execution and unchanged beam/Stream3/4 semantics.
+
+## 2026-09-05 — Audit before more speculative tuning
+
+- User requests a thorough audit of the agent's work and plugin updates, including
+  whether substantial acceleration may be infeasible.
+- Review evidence, failed routes and measurement scope; do not substitute a
+  desired throughput target for a demonstrated feasible hardware budget.
+
+## 2026-09-04 — Continue the explicit 1-PFLOP Stream1 goal
+
+- Continue autonomously rather than stopping at an unmeasured intermediate.
+- Keep the goal active: full correct Cube4 Transformer Stream1 at 1 PFLOP/s
+  dense-equivalent on Molab SM120, or a reproducible quantitative no-go.
+- Benchmark and validate on Molab; never promote deadlocking or truncated-output
+  component paths.
+
+## 2026-09-03 — Implement LN/QKV/attention boundary
+
+- User authorizes next native producer-consumer boundary. Keep all attention blocks/heads and benchmark the complete boundary, not only GEMM; reject slower implementations.
+
+## 2026-09-03 — Consumer-native producer outputs
+
+- User requires each block to emit the physical input format/layout needed by the next block. Remove avoidable intermediate conversion and layout passes without changing attention count or weights. First matched experiment: existing fused LN2-to-NVFP4 producer versus separate PyTorch LN2 and activation pack.
+
+## 2026-09-03 — Profile unchanged graph and minimize intermediate memory traffic
+
+- User requests profiling and reasoning with idealfinal-output-onlyVRAMwrites. Distinguish globaladdresses/logicaltensorbytes from actualDRAMtransactions; optimize without removingweights/layers.
+
+## 2026-09-03 — No architecture or weight-count reductions
+
+- User rejects reducing attention as acceleration. Keep4attention256/8heads and4FFN256->1024->256. Optimize execution,packing,fusion; qualify NVFP4quality separately. Reduced architectures are not credited as speeding up the original model.
+
+## 2026-09-03 — Reuse native NVFP4 FFN in architecture experiment
+
+- User approved continuing from historical~660TF/s FFN toward integration into selected architecture. Preserve component-versus-full-model measurement scopes and validate bias/residual semantics before timing.
+
+## 2026-09-03 — Retain FFN capacity and reduce attention cost
+
+- User approved trying architectural changes retaining attention with hardware-efficient NVFP4 as the target. Isolate narrowed attention and less frequent attention while retaining residual256 and fourFFN1024 blocks; measure before training. Total capacity is not guaranteed preserved.
+
+## 2026-09-03 — Architecture search and teacher-based training
+
+- User confirms complete Stream1 states/s is primary; TFLOP/s guides hardware efficiency. Authorizes using existing weights to train a new model.
+- Keep input and24-output semantics, compare compact internal widths and hardware-efficient wide controls, then distill shortlisted architectures. Existing quality gates remain. Design: `test_results/transformer_architecture_distillation_design_20260903.md`.
+
+
+## 2026-09-03 — Continue without Kaggriculture expert
+
+- User requested Molab lifecycle advice from Kaggriculture and architecture tuning toward hardware throughput limits, then authorized independent continuation when that expert was absent from the tool registry.
+- Preserve useful-output timing and oracle checks; distinguish physical-K benchmark changes from the existing model and full Stream1. No subagents.
+
+
+## 2026-09-03 — Compare alternative CUDA tiles
+
+- User: "Окей, а попробуй разные" after discussing whether1PF is a hardware ceiling.
+- Compare full packed-output FF1 tile variants on Molab, keeping real output work and corrected initialization. No replacement of the model or beam-search changes.
+
+## 2026-09-03 — Screen hardware-efficient K dimensions
+
+- User: "Давай ща потестим какие K лучше всего будут" after discussing model widening/distillation.
+- Measure packed FF1 at fixed M/N over K256..8192 on Molab. Report wall latency separately from TFLOP/s; this is a shape experiment, not authorization to replace the trained model or claim equivalent arithmetic.
+
+## 2026-09-03 — Measure FF1 epilogue diagnostics
+
+- User: "Измеряй", then "Делай" after reconnection.
+- Restore the existing Molab notebook and measure FF1 operations. Separate full packed-output FF1 from a BF16-output diagnostic and short-K scaling; do not label altered output contracts as production acceleration or pure store cost.
+
+## 2026-09-03 — Diagnose Molab and obtain real stage evidence
+
+- User: "Разбери нормально пж и с молабом разберись".
+- Distinguish browser snapshot/transport faults from actual sandbox termination. Restore natively, compile and measure on Molab, retain completed rows; do not substitute an untested instrumentation patch for diagnosis.
+
+## 2026-09-03 — Identify slow operations before further optimization
+
+- User: "Ну так надо понять какие операции тормозят в процессе этом", followed by "Делай".
+- Diagnose the retained fast FF1->FF2 path with stage measurements rather than infer the cause from aggregate TFLOP/s or a different slower kernel. GPU testing remains Molab-only.
+
+## 2026-09-03 — Expert disclosure approved and FFN continuation
+
+- User explicitly approved sending FF1/FF2 implementation, synchronization and benchmark details to the Telegram expert after disclosure was explained, then requested execution.
+- Continue the setup-hoist investigation without weakening lifetime/reader-ack correctness; preserve the fastest stock comparator and run GPU checks on Molab.
+
+## 2026-09-03 — Thorough retrospective and plugin update
+
+- User requested a meticulous analysis of completed work and plugin updates, following concern that the recent 130 TFLOP/s result was much slower than the earlier nearly 700 TFLOP/s result.
+- Preserve separation between general GPU, neural-inference and Molab knowledge; record failed paths, invalidated evidence and remaining gates rather than treating every local improvement as project progress.
+
+## 2026-09-03 — Identify current Molab and continue
+
+- User requested comparing notebook versions and continuing in the newest
+  working notebook. Compare actual experiment cells rather than title alone.
+  Preserve earlier notebooks and unrelated work; resume real FF1/FF2 gates.
+
+
+## 2026-09-03 — Recover high-throughput comparator and pursue1PF
+
+- User: "Да, но учти, что раньше почти 700 ТФлопс было" and
+  "Делай. 1Петафлопс жду". Recover the real historical FFN comparator and
+  retain the1PF useful FF1+FF2 target; no no-output or mismatched-scope claims.
+
+## 2026-09-03 — Integrate retained FF1 with FF2
+
+- User: "Понял, значит текущий вариант пробуем с ФФ2 объединить", then
+  "Делай". Integrate the real-write FF1 variant with FF2 and verify numerical
+  correctness and actual combined latency on Molab. Keep diagnostic no-write
+  throughput separate; preserve unrelated work and production defaults.
+
+## 2026-09-03 — Restore real writes to the 733 control
+
+- User: "Окей, посмотри что там с 733 было и попробуй с записью реализовать".
+  Audit omitted work, then implement/test a real FP4 payload writer while
+  keeping the same GEMM/scales path. No no-output speed claim allowed.
+
+## 2026-09-03 — Continue wide shared payload experiment
+
+- User: "Делай". Continue the measured FF1 optimization after the retained
+  591TF/s explicit-byte baseline; prove wide-store ownership and compare on
+  Molab without eliding payload. No change to beam-search semantics.
+
+## 2026-09-03 — Follow expert experiment sequence
+
+- User: "Отлично, делай". Finish exact value/scale gates for fixed-affine
+  FF1, then isolate scheduling and staging costs. Target remains true1PF/s.
+
+## 2026-09-02 — Continue until target FF1 speed
+
+- User: "Делай пока не получишь нужную скорость". Continue measured FF1
+  optimization toward 1 PFLOP/s; no diagnostic-only ceiling counts as FF1.
+- Test fixed alpha=1,beta=0 fusion independently, preserving runtime defaults.
+
+## 2026-09-02 — Continue FF1 spill reduction
+
+- User: "Делай". Continue measured FF1 optimization with retained control,
+  target-only GPU tests and explicit correctness/performance boundaries.
+
+## 2026-09-02 — Continue local-memory investigation
+
+- User: "Делай". Continue investigation of real FF1 spills and profiler
+  compatibility; retain proven baseline and reject measured regressions.
+
+## 2026-09-02 — Observable FF1 control and profiling
+
+- User: "Молодец, делай". Implement a checksum control that cannot lose MMA
+  under dead-code elimination; verify SASS before timing on Molab. Prepare
+  Nsight Compute profiling without modifying Molab's platform driver.
+
+## 2026-09-02 — Compare FF1 machine code and resources
+
+- User: "Отлично, сравнивай". Compare complete shared-output FF1 against
+  discard-output control before attributing the gap to epilogue overhead.
+- Use disassembly and target profiling evidence; no new production change
+  requested in this comparison.
+
+## 2026-09-02 — Continue FF1-first verification
+
+- User: "Продолжай". Continue the FF1-first performance work toward 1 PFLOP/s.
+- Keep GPU execution on Molab and distinguish compute-only ceilings from
+  useful FF1 throughput including its shared output. Preserve unrelated edits.
+
+
 ## 2026-08-28 - Integrate verified DSM primitives into fast CUTLASS
 
 - User approved embedding the verified bulk-DSM and mbarrier primitives
@@ -838,6 +1011,10 @@ User reported that an interactive game had been running during part of the recen
 - Preserve the final quality objective: replay-valid solutions of the same length as FP32/FP16; numerical state comparisons are diagnostic gates rather than the final acceptance metric.
 - Use small-beam solve samples of 10-100 states for quality/scaling curves when the native NVFP4 execution path is ready.
 - Minimize all VRAM traffic during Stream1 computation; keep transient data in registers, shared memory or L2 whenever possible. A persistent back-to-back FF1→ReLU/NVFP4→FF2 kernel is required, with two inference rings minimum and no global hidden materialization.
+- 2026-09-02: Continue the 1-PFLOP/s Stream1 implementation without stopping
+  on ordinary engineering obstacles.  If an architecture question is truly
+  blocked, consult relevant experts; otherwise keep implementing and measure
+  every candidate on Molab SM120.
 - Keep long Molab builds in the visible foreground with regular notebook heartbeats; do not use detached subprocess jobs. Tune the true Cube4 Transformer shape and at least two inference rings, while judging final acceptance by same-length replay-valid solves.
 - Reuse the previously measured fast CUTLASS/TMA path instead of replacing it with the slower raw-MMA prototype; embed only the on-chip FF1-to-FF2 handoff needed to remove global hidden traffic.
 
@@ -897,3 +1074,219 @@ User reported that an interactive game had been running during part of the recen
   identify the actual CUTLASS specialization selected by the FF1 builder, and
   advance the fused path only through bounded foreground gates with explicit
   runtime evidence.
+
+## 2026-08-31 — inspect current implementation and restore Molab
+
+- "Посмотри че там, проанализируй текущие решения и доведи до ума. Молаб сам подними"
+- Continue autonomously in the existing worktree. Reassess earlier evidence,
+  fix confirmed errors, and restore the authorized Molab notebook via supported
+  UI/native pairing. Preserve the standing Molab-only GPU-test requirement,
+  no detached compute, no subagents, and the full-Stream1 throughput goal.
+
+## 2026-08-31 — approved restoration of the existing Molab notebook
+
+- "Да, разрешаю конечно"
+- Explicit approval to reload only the existing authorized Molab notebook
+  after its old sandbox returned HTTP 410. No other notebooks, paid resources,
+  or local GPU execution are in scope.
+- Continue inspecting and fixing the current NVFP4 handoff with native pairing
+  and awaited foreground jobs; do not promote a component smoke to an
+  end-to-end Stream1 performance or model-quality result.
+
+## 2026-08-31 — eight-slice continuation and project publication approval
+
+- "Отлично, делай срезы и прочее. Я тебе разрешаю что хочешь публиковать в рамках проекта и работать с молабом как требуется тебе"
+- Extend the verified FF1/FF2 reference from H256 to H1024 with all eight
+  distinct slices and two physical packed slots. Preserve explicit numerical
+  gates, foreground Molab-only GPU tests and no-subagent operation.
+- Project-scoped publication/upload is authorized. This does not turn an
+  unmeasured component into an accepted production speed/quality result or
+  authorize bypassing platform/security limits.
+
+## 2026-08-31 — autonomous session recovery and benchmark continuation
+
+- "Окей, делай. Сессию сам пробуй восстанавливать"
+- Restore the existing authorized notebook through supported browser/native
+  controls without asking for a new sandbox URL. Continue the pending bounded
+  H1024 benchmark and H256/H512 regressions. Preserve foreground Molab-only GPU
+  execution, no detached restart loops, no subagents and no paid resources.
+- Report the measured component scope honestly; full Stream1 throughput and
+  model/solve quality remain separate acceptance gates.
+
+## 2026-08-31 — continue direct-register FF1/FF2 optimization
+
+- "Окей, делай дальше"
+- Continue the measured serial-pair reference toward a direct-register
+  bias/ReLU/NVFP4 handoff and shorter accumulator lifetimes. Preserve the
+  original correct binary for A/B; test only on foreground Molab, not locally.
+- Keep failed compiler, numerical and timing experiments as distinct evidence.
+  Do not relabel one M128 cluster's FFN latency as full-card or full-Stream1
+  throughput, and do not change production beam defaults to an unproven path.
+
+## 2026-08-31 — multi-cluster FFN measurement gate
+
+- "Отлично, делай"
+- Continue from the corrected eight-slice serial reference: measure independent
+  M tiles across physical clusters, separate CPU enqueue cost from GPU time,
+  and compare with the retained large-M CUTLASS FFN before promoting changes.
+- Preserve Molab-only foreground tests, autonomous supported restoration of the
+  same notebook, no subagents, no new worktrees and no paid resources. Keep
+  platform loss separate from CUDA failure; complete Stream1 remains the goal.
+
+## 2026-09-02 — implement the full-Stream1 1-PFLOP/s plan
+
+- Implement the approved SM120 Cube4 Transformer plan in the existing
+  `codex/stream1-generic-seq-align-impl` worktree.
+- The success boundary is complete Stream1 at B896/concurrency 1: median at
+  most 0.333252 ms, p95 at most 0.350 ms, seven alternating A/B trials, and no
+  OOM, NaN, race or barrier failure.
+- Finish the zero-global-hidden two-slot FFN, statically encode the complete
+  linear graph in immutable NVFP4 artifacts, remove avoidable intermediate
+  VRAM traffic, retain FP16 FA4 until profiling proves a blocking boundary,
+  and add a fail-closed schema-4 runtime profile.
+- GPU compilation, execution and profiling are strictly Molab SM120 foreground
+  work.  Do not change Stream3/4 or beam-search semantics, create worktrees or
+  temporary clones, use subagents, or revive previously rejected topologies
+  without new evidence.
+- Promotion additionally requires replay-valid solve tests on 10/30/100 states,
+  B25 depth 8, and a matched full-solve length comparison.
+
+## 2026-09-02 — continue the approved 1-PFLOP/s plan
+
+- "Продолжай по плану"
+- Continue autonomously from the exact fused-epilogue checkpoint.  Keep all GPU
+  compilation/execution on foreground Molab SM120, preserve the inherited dirty
+  tree and beam-search semantics, and do not use subagents.
+- Complete the offline full-linear-graph artifact and loader contracts without
+  mislabelling FFN-only evidence as accepted full Stream1.  Maintain fail-closed
+  production dispatch until the real persistent entrypoint passes both the
+  quantitative B896 gate and the solve-quality ladder.
+
+## 2026-09-02 — keep progressing and consult experts only when needed
+
+- "Продолжай. Не нужно останавливаться просто так. Если затуп - обсуди с экспертами"
+- Continue autonomously through measurable SM120 component and integration
+  gates. Do not stop at infrastructure failures: recover the supported Molab
+  session, preserve foreground execution and distinguish platform loss from a
+  CUDA failure. Experts may be consulted, but do not disclose proprietary
+  project source or architecture details without separate authorization.
+2026-09-02: Continue the 1-PFLOP Stream1 implementation without stopping on
+ordinary optimization dead ends; consult experts when genuinely stuck.
+
+## 2026-09-02 — continue through infrastructure blockers
+
+- Continue rather than stopping at ordinary failures.  If a real technical
+  dead end remains, consult suitable experts without disclosing project details
+  across an unapproved external security boundary.
+## 2026-09-02
+
+- "Продолжай. Не нужно останавливаться просто так. Если затуп - обсуди с экспертами"
+  Continue the 1-PFLOP/s Stream1 plan autonomously; preserve evidence and use
+  experts for substantive blockers.  Expert transmission was refused by the
+  security boundary, so no project details were sent externally.
+## 2026-09-02
+
+- "Так попробуй молаб восстановить токен себе"
+- Restore the authorized Molab pairing session autonomously, do not expose or
+  persist the token, and continue the SM120 implementation plan.
+
+## 2026-09-02 - FF1-only sparse packing
+
+- "Вот. Пробуй. Сейчас четко ФФ1 смотрим"
+- Measure and optimize FF1 in isolation.  Test the proposed non-diagonal
+  structured-sparse packing of multiple independent FF1 operations; do not
+  include FF2 or other Stream1 work in this experiment or its numerator.
+
+## 2026-09-02 - test the generalized FF1 coding
+
+- "Ну вот, другое дело. Теперь тестируй всё это"
+- Build and run the proposed non-diagonal width-2/4/8 FF1 encodings on Molab
+  SM120, report physical and useful throughput separately, require repeated
+  measurements and use the result to accept or reject increased physical K.
+
+## 2026-09-02 - test independent accumulators and K=512
+
+- "Давай потестим это и К=512"
+- Test independent accumulator/concurrency behavior and K=512, but preserve
+  the sparse-MMA contraction semantics: a layout permutation cannot split two
+  K contributions after accumulation.  Compare against the exact N-packed
+  `W^T * X^T` K=256 construction where jobs occupy free output columns.
+
+## 2026-09-02 - verify FF1 correctly before fusion work
+
+- "Да, но сначала нам нужно правильно ФФ1 проверить"
+- Establish a standalone FF1 correctness and performance gate before FF2 work:
+  no global hidden output, independent numerical oracle, explicit proof of no
+  snapshot/materialization traffic, repeated Molab SM120 timing and a launch
+  geometry containing no idle FF2 consumer CTAs.
+# 2026-09-02 - Verify FF1 before further fusion
+
+- User required first validating FF1 correctly before continuing FF1-to-FF2 or
+  full-Stream1 integration.  The hot path must not materialize hidden values or
+  scale factors in VRAM; transient output belongs in registers/shared/DSM.
+- Measure the exact Cube4 FF1 shape on Molab, include the required two-ring
+  concurrency gate, and distinguish isolated FF1 throughput from aggregate FFN
+  and full Stream1 throughput.
+# 2026-09-03: combine retained complete FF1 with FF2
+
+User: «Понял, значит текущий вариант пробуем с ФФ2 объединить».
+Use the verified explicit byte/shared writer (~574 TF/s in matched recent
+session), not the 733 TF/s no-payload diagnostic or slower direct pack.
+Preserve FF1 ReLU and block-scale layout, consume with FF2 without global
+hidden materialization. Correctness gates precede paired throughput claims.
+# 2026-09-03: continue role-separated native FFN
+
+User: «Делай» after the native serial FF1→FF2 correctness pass and slow
+21.4 TF/s screen. Proceed with separate FF1 producer and FF2 consumer roles,
+preserving numerical gates and measuring actual throughput on Molab.
+# 2026-09-03 - Continue full Stream1 optimization after recovered baseline
+
+- User: «Окей, делай дальше».
+- Continue the approved 1-PFLOP/s Stream1 plan autonomously, benchmarking each
+  boundary on Molab and retaining only correctness-checked end-to-end wins.
+
+# 2026-09-03 - Continue after production QKV boundary
+
+- User: «Отлично, делай дальше».
+- Continue the SM120 full-Stream1 plan after integrating the production
+  deferred-bias LN1-to-NVFP4 QKV boundary.  Compile and benchmark GPU changes
+  on Molab, preserve all non-NVFP4 paths, and retain only replay-validated
+  improvements.
+## 2026-09-04 - Continue SM120 full-Stream1 implementation
+
+- Continue autonomously from the recovered Molab work.
+- Compile and benchmark all GPU paths strictly on Molab SM120.
+- Preserve the schema-4 fail-closed production boundary: a raw offline NVFP4
+  export is not an accepted runtime profile.
+- Keep the target model fixed at Cube4 Transformer, ReLU, output dimension 24,
+  and use end-to-end Stream1 latency plus task-level solve quality as the
+  promotion criteria.
+# 2026-09-04 — Continue the 1-PF Stream1 implementation
+
+User instruction: continue implementation without stopping, benchmark every
+step on Molab, and preserve the full numerical/output contract rather than
+crediting diagnostic or dead-output FLOP rates.
+
+# 2026-09-04 — Automate and continue Molab work
+
+- User requested a recurring heartbeat so manual nudges are unnecessary, then
+  instructed the task to continue.
+- The automation must stay quiet during unchanged/long foreground work and
+  report only measured progress, terminal failure or required user action.
+
+# 2026-09-04 — Set the concrete 1-PF goal
+
+- User requested continued work and an explicit goal.
+- Goal: full correct Cube4 Stream1 on Molab SM120 at 1 PFLOP/s
+  dense-equivalent for B=896 (median <=0.333252 ms, p95 <=0.350 ms), or a
+  reproducible quantitative physical no-go.
+- Immediate gate: a real dual-math-warpgroup zero-global-hidden FF1-to-FF2
+  candidate must beat the eligible 615.89-TFLOP/s CUTLASS control.  Idle
+  threads or dead-output arithmetic do not qualify.
+## 2026-09-04 - Continue autonomous 1 PF Stream1 work
+
+User requested to continue, keep the explicit 1 PFLOP/s end-to-end Stream1
+goal active, benchmark throughout, and proceed autonomously from measured
+bottlenecks on Molab SM120.
+2026-09-04: User requested continued autonomous work toward the active 1-PFLOP/s
+Stream1 goal and asked that the goal be set and pursued without stopping.

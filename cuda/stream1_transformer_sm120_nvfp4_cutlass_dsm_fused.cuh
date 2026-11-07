@@ -156,13 +156,21 @@ struct alignas(1024) DsmASlot {
 
 using Ff2StageLayoutA = decltype(
     typename Ff2Mainloop::SmemLayoutA{}(_, _, Int<0>{}));
+// The flagged TMA layout keeps its swizzle in BYTE address units. Applying
+// operator()(row,col) directly to it incorrectly swizzles FP4 nibble indices.
+// Raw byte writers need the explicitly recast, position-independent layout;
+// make_tensor(smem_ptr, Ff2StageLayoutA{}) performs this conversion implicitly.
+using Ff2PhysicalStageLayoutA = decltype(
+    as_position_independent_swizzle_layout(Ff2StageLayoutA{}));
 using Ff2StageLayoutSFA = decltype(
     typename Ff2Mainloop::SmemLayoutSFA{}(_, _, Int<0>{}));
 
 CUTLASS_DEVICE auto make_dsm_a_stage_view(std::uint8_t* values) {
     using Storage = typename Ff2Mainloop::SmemAllocTypeA;
     return make_tensor(
-        make_smem_ptr(reinterpret_cast<Storage*>(values)),
+        // Explicit recast creates CUTLASS's subbyte_iterator for FP4. A typed
+        // C++ Storage* advances one byte and reads beyond the packed buffer.
+        make_smem_ptr<Storage>(static_cast<void*>(values)),
         Ff2StageLayoutA{});
 }
 
@@ -585,6 +593,210 @@ static __global__ __cluster_dims__(2, 1, 1) void dsm_pingpong_overlap_kernel(
         // Publishes the current slice, completes the previous consumption and
         // makes the slot from two stages ago reusable in one operation.
         cluster.sync();
+    }
+}
+
+// Role-separated relay contract for the next production experiment.  Rank 0
+// owns FF1 and the two packed hidden slots; rank 1 owns FF2 and its CUTLASS
+// pipeline stages.  The hot loop contains no full-cluster rendezvous.  Each
+// slot instead advances through three independent mbarrier generations:
+// consumer armed its receive transaction -> producer completed bulk DSM ->
+// consumer released the source slot.  This keeps FF1 and FF2 register
+// lifetimes in different CTAs while preserving the native M128/N128 geometry.
+struct RoleSeparatedDsmPlan : Contract {
+    static constexpr std::uint32_t kProducerRank = 0U;
+    static constexpr std::uint32_t kConsumerRank = 1U;
+    static constexpr std::uint32_t kContractThreads = 256U;
+    static constexpr std::uint32_t kProductionThreads = 384U;
+    static constexpr std::uint32_t kHotLoopClusterSyncs = 0U;
+    static constexpr std::uint32_t kGlobalHiddenBytes = 0U;
+    static constexpr std::uint32_t kTransactionBytes =
+        kValuesPerSlot + kScalesPerSlot;
+};
+
+struct alignas(1024) RoleSeparatedDsmStorage {
+    DsmASlot produced[RoleSeparatedDsmPlan::kRingSlots];
+    DsmASlot received[RoleSeparatedDsmPlan::kRingSlots];
+    alignas(8) std::uint64_t receive[
+        RoleSeparatedDsmPlan::kRingSlots];
+    alignas(8) std::uint64_t armed[
+        RoleSeparatedDsmPlan::kRingSlots];
+    alignas(8) std::uint64_t free[
+        RoleSeparatedDsmPlan::kRingSlots];
+};
+
+static_assert(RoleSeparatedDsmPlan::kClusterCtas == 2U);
+static_assert(RoleSeparatedDsmPlan::kRingSlots == 2U);
+static_assert(RoleSeparatedDsmPlan::kSlices == 8U);
+static_assert(RoleSeparatedDsmPlan::kTransactionBytes == 9216U);
+static_assert(sizeof(RoleSeparatedDsmStorage) <=
+              ArchTag::kSharedMemoryCapacityBytes);
+
+static __global__ __launch_bounds__(RoleSeparatedDsmPlan::kContractThreads, 1)
+__cluster_dims__(2, 1, 1) void role_separated_dsm_pipeline_kernel(
+    std::uint64_t* slice_checksums,
+    std::uint32_t* violations) {
+    namespace cg = cooperative_groups;
+    extern __shared__ __align__(1024) unsigned char shared_bytes[];
+    auto& storage = *reinterpret_cast<RoleSeparatedDsmStorage*>(shared_bytes);
+    const auto cluster = cg::this_cluster();
+    const std::uint32_t rank = cluster.block_rank();
+
+    if (threadIdx.x == 0U) {
+        for (std::uint32_t slot = 0;
+             slot < RoleSeparatedDsmPlan::kRingSlots; ++slot) {
+            if (rank == RoleSeparatedDsmPlan::kProducerRank) {
+                cutlass::arch::ClusterBarrier::init(
+                    &storage.armed[slot], 1U);
+                cutlass::arch::ClusterBarrier::init(
+                    &storage.free[slot], 1U);
+            } else {
+                cutlass::arch::ClusterTransactionBarrier::init(
+                    &storage.receive[slot], 1U);
+            }
+        }
+    }
+    __syncthreads();
+    cutlass::arch::fence_barrier_init();
+    cluster.sync();
+
+    for (std::uint32_t slice = 0;
+         slice < RoleSeparatedDsmPlan::kSlices; ++slice) {
+        const std::uint32_t slot =
+            slice % RoleSeparatedDsmPlan::kRingSlots;
+        const std::uint32_t generation =
+            slice / RoleSeparatedDsmPlan::kRingSlots;
+
+        if (rank == RoleSeparatedDsmPlan::kConsumerRank) {
+            if (threadIdx.x == 0U) {
+                cutlass::arch::ClusterTransactionBarrier::
+                    arrive_and_expect_tx(
+                        &storage.receive[slot],
+                        RoleSeparatedDsmPlan::kTransactionBytes);
+                cutlass::arch::ClusterBarrier::arrive(
+                    &storage.armed[slot],
+                    RoleSeparatedDsmPlan::kProducerRank, 1U);
+                cutlass::arch::ClusterTransactionBarrier::wait(
+                    &storage.receive[slot], generation & 1U);
+            }
+            __syncthreads();
+
+            std::uint64_t local = 0U;
+            for (std::uint32_t byte = threadIdx.x;
+                 byte < RoleSeparatedDsmPlan::kValuesPerSlot;
+                 byte += blockDim.x) {
+                const auto expected = static_cast<std::uint8_t>(
+                    (slice * 29U + byte * 7U) & 0xffU);
+                const auto actual = storage.received[slot].values[byte];
+                local += actual;
+                if (actual != expected) {
+                    atomicAdd(violations, 1U);
+                }
+            }
+            for (std::uint32_t byte = threadIdx.x;
+                 byte < RoleSeparatedDsmPlan::kScalesPerSlot;
+                 byte += blockDim.x) {
+                const auto expected = static_cast<std::uint8_t>(
+                    (slice * 13U + byte * 3U) & 0xffU);
+                const auto actual = storage.received[slot].scales[byte];
+                local += actual;
+                if (actual != expected) {
+                    atomicAdd(violations, 1U);
+                }
+            }
+            atomicAdd(
+                reinterpret_cast<unsigned long long*>(
+                    slice_checksums + slice),
+                static_cast<unsigned long long>(local));
+            __syncthreads();
+            if (threadIdx.x == 0U) {
+                cutlass::arch::ClusterBarrier::arrive(
+                    &storage.free[slot],
+                    RoleSeparatedDsmPlan::kProducerRank, 1U);
+            }
+        } else {
+            if (threadIdx.x == 0U) {
+                cutlass::arch::ClusterBarrier::wait(
+                    &storage.armed[slot], generation & 1U);
+                if (generation > 0U) {
+                    cutlass::arch::ClusterBarrier::wait(
+                        &storage.free[slot], (generation - 1U) & 1U);
+                }
+            }
+            __syncthreads();
+
+            for (std::uint32_t byte = threadIdx.x;
+                 byte < RoleSeparatedDsmPlan::kValuesPerSlot;
+                 byte += blockDim.x) {
+                storage.produced[slot].values[byte] =
+                    static_cast<std::uint8_t>(
+                        (slice * 29U + byte * 7U) & 0xffU);
+            }
+            for (std::uint32_t byte = threadIdx.x;
+                 byte < RoleSeparatedDsmPlan::kScalesPerSlot;
+                 byte += blockDim.x) {
+                storage.produced[slot].scales[byte] =
+                    static_cast<std::uint8_t>(
+                        (slice * 13U + byte * 3U) & 0xffU);
+            }
+            __syncthreads();
+            asm volatile("fence.proxy.async.shared::cta;" ::: "memory");
+            if (threadIdx.x == 0U) {
+                constexpr std::uint32_t values_bytes =
+                    Contract::kValuesPerSlot;
+                constexpr std::uint32_t scales_bytes =
+                    Contract::kScalesPerSlot;
+                auto* target_values = cluster.map_shared_rank(
+                    storage.received[slot].values,
+                    RoleSeparatedDsmPlan::kConsumerRank);
+                auto* target_scales = cluster.map_shared_rank(
+                    storage.received[slot].scales,
+                    RoleSeparatedDsmPlan::kConsumerRank);
+                auto* target_barrier = cluster.map_shared_rank(
+                    &storage.receive[slot],
+                    RoleSeparatedDsmPlan::kConsumerRank);
+                cuda::ptx::cp_async_bulk(
+                    cuda::ptx::space_cluster, cuda::ptx::space_shared,
+                    target_values, storage.produced[slot].values,
+                    values_bytes,
+                    target_barrier);
+                cuda::ptx::cp_async_bulk(
+                    cuda::ptx::space_cluster, cuda::ptx::space_shared,
+                    target_scales, storage.produced[slot].scales,
+                    scales_bytes,
+                    target_barrier);
+            }
+        }
+    }
+
+    // Keep the producer CTA and its shared slots alive until both final
+    // generations have been released by the consumer.
+    if (rank == RoleSeparatedDsmPlan::kProducerRank && threadIdx.x == 0U) {
+        constexpr std::uint32_t final_generation =
+            RoleSeparatedDsmPlan::kSlices /
+                RoleSeparatedDsmPlan::kRingSlots - 1U;
+        for (std::uint32_t slot = 0;
+             slot < RoleSeparatedDsmPlan::kRingSlots; ++slot) {
+            cutlass::arch::ClusterBarrier::wait(
+                &storage.free[slot], final_generation & 1U);
+        }
+    }
+    __syncthreads();
+    cluster.sync();
+
+    if (threadIdx.x == 0U) {
+        for (std::uint32_t slot = 0;
+             slot < RoleSeparatedDsmPlan::kRingSlots; ++slot) {
+            if (rank == RoleSeparatedDsmPlan::kProducerRank) {
+                cutlass::arch::ClusterBarrier::invalidate(
+                    &storage.armed[slot]);
+                cutlass::arch::ClusterBarrier::invalidate(
+                    &storage.free[slot]);
+            } else {
+                cutlass::arch::ClusterBarrier::invalidate(
+                    &storage.receive[slot]);
+            }
+        }
     }
 }
 

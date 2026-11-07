@@ -4,6 +4,7 @@
 #include "../tools/stream1_weight_io.hpp"
 
 #include <filesystem>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -134,6 +135,18 @@ void write_zero_file(const std::filesystem::path& path, std::uint64_t bytes) {
         out.seekp(static_cast<std::streamoff>(bytes - 1));
         out.put('\0');
     }
+}
+
+void set_test_environment(const char* name, const std::string& value) {
+#if defined(_WIN32)
+    if (_putenv_s(name, value.c_str()) != 0) {
+        throw std::runtime_error("failed to set test environment");
+    }
+#else
+    if (setenv(name, value.c_str(), 1) != 0) {
+        throw std::runtime_error("failed to set test environment");
+    }
+#endif
 }
 
 void write_transformer_weight_fixture_files(const std::filesystem::path& dir, bool bad_fast_static_size = false) {
@@ -310,6 +323,163 @@ void test_stream1_mlp_weight_loading_still_works() {
     require(weights.output_bias.size() == weights.model.output_dim * sizeof(std::uint16_t), "MLP output_bias size mismatch");
 }
 
+void test_sm120_nvfp4_runtime_artifact_contract() {
+    namespace sw = beam::stream1_weights;
+    const std::filesystem::path root =
+        std::filesystem::path("test_results") / "sm120_nvfp4_runtime_artifact_contract";
+    const std::filesystem::path base = root / "base";
+    const std::filesystem::path profile = root / "profile";
+    std::filesystem::create_directories(base);
+    std::filesystem::create_directories(profile / "weights");
+    const std::string checkpoint(64U, 'a');
+    {
+        std::ofstream manifest(base / "manifest.json");
+        manifest << "{\"checkpoint_sha256\":\"" << checkpoint << "\"}\n";
+    }
+    {
+        std::ofstream manifest(profile / "runtime_manifest.txt");
+        manifest << "schema_version=4\n"
+                 << "backend=sm120a_nvfp4_persistent\n"
+                 << "encoding=sm120_nvfp4_e2m1_k16_ue4m3_sfb\n"
+                 << "weights=offline_immutable\n"
+                 << "target_sm=120\n"
+                 << "target_arch=sm120a\n"
+                 << "profile_scope=full_stream1\n"
+                 << "promotion_state=accepted\n"
+                 << "microbatch=896\n"
+                 << "physical_slots=2\n"
+                 << "operator_count=17\n"
+                 << "checkpoint_sha256=" << checkpoint << "\n";
+        auto record = [&](const char* name, std::uint32_t input_cols,
+                          std::uint32_t logical_output_cols,
+                          std::uint32_t physical_output_cols) {
+            const auto values = profile / (std::string("weights/") + name + ".e2m1");
+            const auto scales = profile / (std::string("weights/") + name + ".ue4m3_sfb");
+            write_zero_file(values, stream1_sm120_nvfp4_weight_value_bytes(
+                input_cols, physical_output_cols));
+            write_zero_file(scales, stream1_sm120_nvfp4_weight_scale_bytes(
+                input_cols, physical_output_cols));
+            manifest << "operator." << name << ".input_cols=" << input_cols << "\n"
+                     << "operator." << name << ".logical_output_cols="
+                     << logical_output_cols << "\n"
+                     << "operator." << name << ".physical_output_cols="
+                     << physical_output_cols << "\n"
+                     << "operator." << name << ".value_file="
+                     << std::filesystem::relative(values, profile).generic_string() << "\n"
+                     << "operator." << name << ".value_sha256=" << beam::sha256::file_hex(values) << "\n"
+                     << "operator." << name << ".scale_file="
+                     << std::filesystem::relative(scales, profile).generic_string() << "\n"
+                     << "operator." << name << ".scale_sha256=" << beam::sha256::file_hex(scales) << "\n";
+        };
+        for (std::uint32_t layer = 0U; layer < 4U; ++layer) {
+            const std::string base = "block" + std::to_string(layer);
+            record((base + "_attn_qkv").c_str(), 256U, 768U, 768U);
+            record((base + "_attn_out").c_str(), 256U, 256U, 256U);
+            record((base + "_ff1").c_str(), 256U, 1024U, 1024U);
+            record((base + "_ff2").c_str(), 1024U, 256U, 256U);
+        }
+        record("output_head", 256U, 24U, 128U);
+    }
+    sw::HostWeightBytes host;
+    host.model.backend = STREAM1_BACKEND_PIECE_TRANSFORMER;
+    host.model.dtype = STREAM1_DTYPE_FP16;
+    host.model.output_dim = 24U;
+    host.model.d_model = 256U;
+    host.model.ff_dim = 1024U;
+    host.model.transformer_layers = 4U;
+    host.model.activation = STREAM1_ACTIVATION_RELU;
+    host.transformer.blocks.resize(4U);
+    set_test_environment("BEAM_STREAM1_SM120_PROFILE_DIR", profile.string());
+    sw::load_sm120_offline_artifacts(base, host);
+    sw::load_sm120_nvfp4_ffn_artifacts(base, host);
+    set_test_environment("BEAM_STREAM1_SM120_PROFILE_DIR", "");
+    require(host.sm120_nvfp4_ffn_layer_mask == 15U, "NVFP4 full-graph layer mask mismatch");
+    require(
+        host.sm120_nvfp4_execution_kind ==
+            STREAM1_SM120_NVFP4_EXECUTION_PERSISTENT_FULL_STREAM1,
+        "schema-4 profile must preserve persistent full-Stream1 execution kind");
+    require(host.transformer.blocks[0].ff1_weight_nvfp4.size() == 131072U,
+            "NVFP4 FF1 packed value size mismatch");
+    require(host.transformer.blocks[0].ff2_weight_nvfp4_scales.size() == 65536U,
+            "NVFP4 FF2 physical scale-factor size mismatch");
+    require(host.transformer.blocks[3].attn_qkv_weight_nvfp4.size() == 98304U,
+            "NVFP4 QKV packed value size mismatch");
+    require(host.transformer.output_weight_nvfp4.size() == 16384U,
+            "NVFP4 padded output-head value size mismatch");
+
+    std::string component_manifest = sw::read_text_exact(profile / "runtime_manifest.txt");
+    const std::string accepted_line = "promotion_state=accepted";
+    const std::size_t accepted_position = component_manifest.find(accepted_line);
+    require(accepted_position != std::string::npos, "accepted fixture promotion state missing");
+    component_manifest.replace(
+        accepted_position,
+        accepted_line.size(),
+        "promotion_state=component_candidate");
+    {
+        std::ofstream manifest(profile / "runtime_manifest.txt", std::ios::trunc);
+        manifest << component_manifest;
+    }
+    sw::HostWeightBytes component;
+    component.model = host.model;
+    component.transformer.blocks.resize(4U);
+    bool component_rejected = false;
+    set_test_environment("BEAM_STREAM1_SM120_PROFILE_DIR", profile.string());
+    try {
+        sw::load_sm120_nvfp4_ffn_artifacts(base, component);
+    } catch (const std::runtime_error& error) {
+        component_rejected = error_contains(error, "component_candidate");
+    }
+    set_test_environment("BEAM_STREAM1_SM120_PROFILE_DIR", "");
+    require(
+        component_rejected,
+        "component-candidate NVFP4 profile must never enter production dispatch");
+
+    const std::string component_line = "promotion_state=component_candidate";
+    const std::size_t component_position = component_manifest.find(component_line);
+    require(component_position != std::string::npos, "component fixture state missing");
+    component_manifest.replace(
+        component_position,
+        component_line.size(),
+        "promotion_state=accepted");
+    const std::string two_slots_line = "physical_slots=2";
+    const std::size_t slots_position = component_manifest.find(two_slots_line);
+    require(slots_position != std::string::npos, "two-slot fixture geometry missing");
+    component_manifest.replace(slots_position, two_slots_line.size(), "physical_slots=3");
+    {
+        std::ofstream manifest(profile / "runtime_manifest.txt", std::ios::trunc);
+        manifest << component_manifest;
+    }
+    sw::HostWeightBytes wrong_slots;
+    wrong_slots.model = host.model;
+    wrong_slots.transformer.blocks.resize(4U);
+    bool wrong_slots_rejected = false;
+    set_test_environment("BEAM_STREAM1_SM120_PROFILE_DIR", profile.string());
+    try {
+        sw::load_sm120_nvfp4_ffn_artifacts(base, wrong_slots);
+    } catch (const std::runtime_error& error) {
+        wrong_slots_rejected = error_contains(error, "physical_slots");
+    }
+    set_test_environment("BEAM_STREAM1_SM120_PROFILE_DIR", "");
+    require(
+        wrong_slots_rejected,
+        "schema-4 production profile must require exactly two physical slots");
+
+    sw::HostWeightBytes legacy;
+    legacy.model = host.model;
+    legacy.transformer.blocks.resize(4U);
+    bool legacy_rejected = false;
+    set_test_environment("BEAM_STREAM1_SM120_NVFP4_PROFILE_DIR", profile.string());
+    try {
+        sw::load_sm120_nvfp4_ffn_artifacts(base, legacy);
+    } catch (const std::runtime_error& error) {
+        legacy_rejected = error_contains(error, "BEAM_STREAM1_SM120_PROFILE_DIR");
+    }
+    set_test_environment("BEAM_STREAM1_SM120_NVFP4_PROFILE_DIR", "");
+    require(
+        legacy_rejected,
+        "legacy NVFP4 profile environment must fail closed instead of silently falling back");
+}
+
 void test_stream1_backend_row_modes() {
     Stream1ModelConfig default_mlp;
     require(default_mlp.backend == STREAM1_BACKEND_MLP, "default Stream1 backend must be MLP");
@@ -388,6 +558,8 @@ int run_contract_tests() {
     report << "- stream1_transformer_weight_size_contract=pass\n";
     test_stream1_mlp_weight_loading_still_works();
     report << "- stream1_mlp_weight_loading=pass\n";
+    test_sm120_nvfp4_runtime_artifact_contract();
+    report << "- sm120_nvfp4_runtime_artifact_contract=pass\n";
 
     State128 state = make_state128(std::vector<std::uint8_t>(STATE_LEN, 7));
     require(padding_is_zero(state), "state padding must be zero");

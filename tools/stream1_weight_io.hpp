@@ -3,6 +3,7 @@
 #include "../src/config.hpp"
 #include "../cuda/stream1_transformer_shape.hpp"
 #include "../cuda/stream1_transformer_sm120_fp8_policy.hpp"
+#include "../cuda/stream1_transformer_sm120_nvfp4_ffn.hpp"
 #include "sha256.hpp"
 
 #ifndef BEAM_STREAM1_WEIGHT_IO_MANIFEST_ONLY
@@ -79,6 +80,14 @@ struct HostTransformerBlockBytes {
     std::vector<std::byte> attn_qkv_weight_scales;
     std::vector<std::byte> ff1_weight_fp8;
     std::vector<std::byte> ff1_weight_scales;
+    std::vector<std::byte> ff1_weight_nvfp4;
+    std::vector<std::byte> ff1_weight_nvfp4_scales;
+    std::vector<std::byte> ff2_weight_nvfp4;
+    std::vector<std::byte> ff2_weight_nvfp4_scales;
+    std::vector<std::byte> attn_qkv_weight_nvfp4;
+    std::vector<std::byte> attn_qkv_weight_nvfp4_scales;
+    std::vector<std::byte> attn_out_weight_nvfp4;
+    std::vector<std::byte> attn_out_weight_nvfp4_scales;
 };
 
 struct HostTransformerBytes {
@@ -91,6 +100,8 @@ struct HostTransformerBytes {
     std::vector<std::byte> output_ln_beta;
     std::vector<HostTransformerBlockBytes> blocks;
     std::vector<std::byte> output_weight;
+    std::vector<std::byte> output_weight_nvfp4;
+    std::vector<std::byte> output_weight_nvfp4_scales;
     std::vector<std::byte> output_bias;
     std::vector<std::byte> piece_positions;
     std::vector<std::byte> piece_mask;
@@ -100,6 +111,9 @@ struct HostTransformerBytes {
 struct HostWeightBytes {
     Stream1ModelConfig model;
     std::uint32_t sm120_fp8_operator_mask = 0U;
+    std::uint32_t sm120_nvfp4_ffn_layer_mask = 0U;
+    std::uint32_t sm120_nvfp4_execution_kind =
+        STREAM1_SM120_NVFP4_EXECUTION_NONE;
     std::uint32_t transformer_fp16_gemm_backend = TRANSFORMER_FP16_GEMM_CUTLASS;
     std::vector<std::byte> input_weight;
     std::vector<std::byte> input_bias;
@@ -140,6 +154,14 @@ struct DeviceTransformerBlockWeights {
     float* attn_qkv_weight_scales = nullptr;
     std::uint8_t* ff1_weight_fp8 = nullptr;
     float* ff1_weight_scales = nullptr;
+    std::uint8_t* ff1_weight_nvfp4 = nullptr;
+    std::uint8_t* ff1_weight_nvfp4_scales = nullptr;
+    std::uint8_t* ff2_weight_nvfp4 = nullptr;
+    std::uint8_t* ff2_weight_nvfp4_scales = nullptr;
+    std::uint8_t* attn_qkv_weight_nvfp4 = nullptr;
+    std::uint8_t* attn_qkv_weight_nvfp4_scales = nullptr;
+    std::uint8_t* attn_out_weight_nvfp4 = nullptr;
+    std::uint8_t* attn_out_weight_nvfp4_scales = nullptr;
 };
 
 struct DeviceTransformerWeights {
@@ -152,11 +174,16 @@ struct DeviceTransformerWeights {
     half* output_ln_beta = nullptr;
     std::vector<DeviceTransformerBlockWeights> blocks;
     half* output_weight = nullptr;
+    std::uint8_t* output_weight_nvfp4 = nullptr;
+    std::uint8_t* output_weight_nvfp4_scales = nullptr;
     half* output_bias = nullptr;
     std::uint16_t* piece_positions = nullptr;
     std::uint8_t* piece_mask = nullptr;
     std::uint8_t* piece_types = nullptr;
     std::uint32_t fp16_gemm_backend = TRANSFORMER_FP16_GEMM_CUTLASS;
+    std::uint32_t nvfp4_ffn_layer_mask = 0U;
+    std::uint32_t nvfp4_execution_kind =
+        STREAM1_SM120_NVFP4_EXECUTION_NONE;
 };
 
 struct DeviceWeights {
@@ -276,6 +303,143 @@ inline const char* sm120_profile_dir_environment() {
     return value;
 }
 
+inline std::string parse_manifest_string(const std::string& text, const char* key);
+
+inline std::uint32_t parse_sm120_nvfp4_ffn_layers(const std::string& csv) {
+    if (csv.empty()) {
+        throw std::runtime_error("SM120 NVFP4 runtime profile selects no FFN layers");
+    }
+    std::uint32_t mask = 0U;
+    std::size_t begin = 0U;
+    while (begin <= csv.size()) {
+        const std::size_t comma = csv.find(',', begin);
+        const std::string item = trim_ascii(csv.substr(
+            begin, comma == std::string::npos ? comma : comma - begin));
+        if (item.size() != 1U || item[0] < '0' || item[0] > '2') {
+            throw std::runtime_error("SM120 NVFP4 FFN layers must be unique values from 0 to 2");
+        }
+        const std::uint32_t bit = stream1_sm120_nvfp4_ffn_bit(
+            static_cast<std::uint32_t>(item[0] - '0'));
+        if ((mask & bit) != 0U) {
+            throw std::runtime_error("SM120 NVFP4 FFN layer list contains a duplicate");
+        }
+        mask |= bit;
+        if (comma == std::string::npos) {
+            break;
+        }
+        begin = comma + 1U;
+    }
+    return mask;
+}
+
+inline void load_sm120_nvfp4_ffn_artifacts(
+    const std::filesystem::path& weight_dir,
+    HostWeightBytes& weights) {
+    const char* legacy =
+        std::getenv("BEAM_STREAM1_SM120_NVFP4_PROFILE_DIR");
+    if (legacy != nullptr && *legacy != '\0') {
+        throw std::runtime_error(
+            "BEAM_STREAM1_SM120_NVFP4_PROFILE_DIR is no longer accepted; use only BEAM_STREAM1_SM120_PROFILE_DIR");
+    }
+    const char* raw = sm120_profile_dir_environment();
+    if (raw == nullptr || *raw == '\0') {
+        return;
+    }
+    const std::filesystem::path profile_dir(raw);
+    const std::string manifest = read_text_exact(profile_dir / "runtime_manifest.txt");
+    const std::string schema = runtime_manifest_value(manifest, "schema_version");
+    if (schema == "3") {
+        return;
+    }
+    if (schema != "4" ||
+        runtime_manifest_value(manifest, "backend") !=
+            "sm120a_nvfp4_persistent" ||
+        runtime_manifest_value(manifest, "encoding") !=
+            "sm120_nvfp4_e2m1_k16_ue4m3_sfb" ||
+        runtime_manifest_value(manifest, "weights") != "offline_immutable" ||
+        runtime_manifest_value(manifest, "target_sm") != "120" ||
+        runtime_manifest_value(manifest, "target_arch") != "sm120a") {
+        throw std::runtime_error("SM120 NVFP4 FFN runtime contract is incompatible");
+    }
+    const std::string profile_scope =
+        runtime_manifest_value(manifest, "profile_scope");
+    const std::string promotion_state =
+        runtime_manifest_value(manifest, "promotion_state");
+    if (profile_scope != "full_stream1" || promotion_state != "accepted") {
+        throw std::runtime_error(
+            "SM120 NVFP4 profile cannot enter production dispatch: profile_scope=" +
+            profile_scope + " promotion_state=" + promotion_state);
+    }
+    if (runtime_manifest_value(manifest, "physical_slots") != "2") {
+        throw std::runtime_error(
+            "SM120 NVFP4 production profile physical_slots must be exactly 2");
+    }
+    if (runtime_manifest_value(manifest, "microbatch") != "896") {
+        throw std::runtime_error(
+            "SM120 NVFP4 production profile microbatch must match canonical B=896");
+    }
+    if (weights.model.backend != STREAM1_BACKEND_PIECE_TRANSFORMER ||
+        weights.model.d_model != 256U || weights.model.ff_dim != 1024U ||
+        weights.model.transformer_layers != 4U || weights.model.output_dim != 24U ||
+        weights.model.activation != STREAM1_ACTIVATION_RELU ||
+        weights.model.dtype != STREAM1_DTYPE_FP16) {
+        throw std::runtime_error("SM120 NVFP4 FFN requires exact FP16 Cube4 ReLU output-24 runtime");
+    }
+    const std::string base_manifest = read_text_exact(weight_dir / "manifest.json");
+    if (parse_manifest_string(base_manifest, "checkpoint_sha256") !=
+        runtime_manifest_value(manifest, "checkpoint_sha256")) {
+        throw std::runtime_error("SM120 NVFP4 checkpoint fingerprint does not match runtime weights");
+    }
+    if (runtime_manifest_value(manifest, "operator_count") != "17") {
+        throw std::runtime_error(
+            "SM120 NVFP4 full-Stream1 profile must contain exactly 17 linear operators");
+    }
+    auto load = [&](const std::string& base, std::uint32_t input_cols,
+                    std::uint32_t logical_output_cols,
+                    std::uint32_t physical_output_cols,
+                    std::vector<std::byte>& values,
+                    std::vector<std::byte>& scales) {
+            const std::string prefix = "operator." + base + ".";
+            if (runtime_manifest_value(manifest, prefix + "input_cols") !=
+                    std::to_string(input_cols) ||
+                runtime_manifest_value(manifest, prefix + "logical_output_cols") !=
+                    std::to_string(logical_output_cols) ||
+                runtime_manifest_value(manifest, prefix + "physical_output_cols") !=
+                    std::to_string(physical_output_cols)) {
+                throw std::runtime_error("SM120 NVFP4 artifact shape mismatch for " + base);
+            }
+            const std::filesystem::path value_path =
+                profile_dir / runtime_manifest_value(manifest, prefix + "value_file");
+            const std::filesystem::path scale_path =
+                profile_dir / runtime_manifest_value(manifest, prefix + "scale_file");
+            require_sha256(value_path, runtime_manifest_value(manifest, prefix + "value_sha256"));
+            require_sha256(scale_path, runtime_manifest_value(manifest, prefix + "scale_sha256"));
+            values = read_binary_exact(
+                value_path, stream1_sm120_nvfp4_weight_value_bytes(input_cols, physical_output_cols));
+            scales = read_binary_exact(
+                scale_path, stream1_sm120_nvfp4_weight_scale_bytes(input_cols, physical_output_cols));
+        };
+    const std::uint32_t mask = (1U << 4U) - 1U;
+    for (std::uint32_t layer = 0U; layer < 4U; ++layer) {
+        auto& block = weights.transformer.blocks.at(layer);
+        const std::string base = "block" + std::to_string(layer);
+        load(base + "_attn_qkv", 256U, 768U, 768U,
+             block.attn_qkv_weight_nvfp4, block.attn_qkv_weight_nvfp4_scales);
+        load(base + "_attn_out", 256U, 256U, 256U,
+             block.attn_out_weight_nvfp4, block.attn_out_weight_nvfp4_scales);
+        load(base + "_ff1", 256U, 1024U, 1024U,
+             block.ff1_weight_nvfp4, block.ff1_weight_nvfp4_scales);
+        load(base + "_ff2", 1024U, 256U, 256U,
+             block.ff2_weight_nvfp4, block.ff2_weight_nvfp4_scales);
+    }
+    load("output_head", 256U, 24U, 128U,
+         weights.transformer.output_weight_nvfp4,
+         weights.transformer.output_weight_nvfp4_scales);
+    weights.sm120_nvfp4_ffn_layer_mask = mask;
+    weights.sm120_nvfp4_execution_kind =
+        STREAM1_SM120_NVFP4_EXECUTION_PERSISTENT_FULL_STREAM1;
+}
+
 inline std::uint32_t effective_sm120_fp8_operator_mask() {
     const char* raw_operators = std::getenv("BEAM_STREAM1_SM120_FP8_OPERATORS");
     const std::uint32_t explicit_mask = parse_stream1_sm120_fp8_operator_policy(raw_operators);
@@ -289,6 +453,13 @@ inline std::uint32_t effective_sm120_fp8_operator_mask() {
         return explicit_mask;
     }
     const std::string manifest = read_text_exact(manifest_path);
+    if (runtime_manifest_value(manifest, "schema_version") == "4") {
+        if (explicit_mask != 0U) {
+            throw std::runtime_error(
+                "schema-4 SM120 NVFP4 runtime profile cannot be combined with FP8 operators");
+        }
+        return 0U;
+    }
     const std::uint32_t profile_mask = parse_stream1_sm120_fp8_operator_policy(
         runtime_manifest_value(manifest, "operators").c_str());
     if (explicit_mask != 0U && explicit_mask != profile_mask) {
@@ -313,7 +484,11 @@ inline void load_sm120_offline_artifacts(
     const std::filesystem::path runtime_manifest = profile_dir /
         (has_low_precision_manifest ? "runtime_manifest.txt" : "runtime_execution.txt");
     const std::string manifest = read_text_exact(runtime_manifest);
-    if (runtime_manifest_value(manifest, "schema_version") != "3") {
+    const std::string schema = runtime_manifest_value(manifest, "schema_version");
+    if (schema == "4") {
+        return;
+    }
+    if (schema != "3") {
         throw std::runtime_error("unsupported SM120 runtime manifest schema");
     }
     if (runtime_manifest_value(manifest, "target_sm") != "120" ||
@@ -770,6 +945,7 @@ inline HostWeightBytes load_stream1_weights(const std::filesystem::path& dir) {
     case STREAM1_BACKEND_PIECE_TRANSFORMER: {
         HostWeightBytes weights = load_stream1_transformer_weights(dir, model);
         load_sm120_offline_artifacts(dir, weights);
+        load_sm120_nvfp4_ffn_artifacts(dir, weights);
         return weights;
     }
     default:
@@ -797,7 +973,12 @@ inline std::uint64_t total_host_weight_bytes(const HostWeightBytes& weights) {
         total += b.ln1_gamma.size() + b.ln1_beta.size() + b.attn_qkv_weight.size() + b.attn_qkv_bias.size() +
             b.attn_out_weight.size() + b.attn_out_bias.size() + b.ln2_gamma.size() + b.ln2_beta.size() +
             b.ff1_weight.size() + b.ff1_bias.size() + b.ff2_weight.size() + b.ff2_bias.size();
+        total += b.ff1_weight_nvfp4.size() + b.ff1_weight_nvfp4_scales.size() +
+            b.ff2_weight_nvfp4.size() + b.ff2_weight_nvfp4_scales.size() +
+            b.attn_qkv_weight_nvfp4.size() + b.attn_qkv_weight_nvfp4_scales.size() +
+            b.attn_out_weight_nvfp4.size() + b.attn_out_weight_nvfp4_scales.size();
     }
+    total += t.output_weight_nvfp4.size() + t.output_weight_nvfp4_scales.size();
     return total;
 }
 
@@ -940,6 +1121,8 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
     const HostTransformerBytes& h = host.transformer;
     DeviceTransformerWeights& d = device.transformer;
     d.fp16_gemm_backend = host.transformer_fp16_gemm_backend;
+    d.nvfp4_ffn_layer_mask = host.sm120_nvfp4_ffn_layer_mask;
+    d.nvfp4_execution_kind = host.sm120_nvfp4_execution_kind;
     alloc_and_copy(d.fast_slot_projected, h.fast_slot_projected, "fast_slot_projected");
     alloc_and_copy(d.fast_piece_static, h.fast_piece_static, "fast_piece_static");
     alloc_and_copy(d.cls_token, h.cls_token, "cls_token");
@@ -949,9 +1132,21 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
     alloc_and_copy(d.output_ln_beta, h.output_ln_beta, "output_ln_beta");
     d.blocks.resize(h.blocks.size());
     const std::uint32_t fp8_mask = host.sm120_fp8_operator_mask;
+#if BEAM_ENABLE_SM120_FP8
     if (fp8_mask != 0U && !stream1_transformer_sm120_fp8_supported()) {
         throw std::runtime_error("SM120 FP8 operator profile requires a physical sm_120 GPU and sm_120a build");
     }
+    if (host.sm120_nvfp4_ffn_layer_mask != 0U &&
+        !stream1_transformer_sm120_fp8_supported()) {
+        throw std::runtime_error(
+            "SM120 NVFP4 FFN profile requires a physical sm_120 GPU and sm_120a build");
+    }
+#else
+    if (fp8_mask != 0U || host.sm120_nvfp4_ffn_layer_mask != 0U) {
+        throw std::runtime_error(
+            "SM120 FP8/NVFP4 profile requires BEAM_ENABLE_SM120_FP8 build");
+    }
+#endif
     for (std::size_t i = 0; i < h.blocks.size(); ++i) {
         const std::string prefix = "block" + std::to_string(i);
         const HostTransformerBlockBytes& hb = h.blocks[i];
@@ -980,8 +1175,33 @@ inline void upload_transformer_weights(const HostWeightBytes& host, DeviceWeight
             alloc_and_copy_typed(db.ff1_weight_scales, hb.ff1_weight_scales,
                 (prefix + "_ff1_weight_scales").c_str());
         }
+        if ((host.sm120_nvfp4_ffn_layer_mask &
+             stream1_sm120_nvfp4_ffn_bit(static_cast<std::uint32_t>(i))) != 0U) {
+            alloc_and_copy_typed(db.attn_qkv_weight_nvfp4, hb.attn_qkv_weight_nvfp4,
+                (prefix + "_attn_qkv_weight_nvfp4").c_str());
+            alloc_and_copy_typed(db.attn_qkv_weight_nvfp4_scales, hb.attn_qkv_weight_nvfp4_scales,
+                (prefix + "_attn_qkv_weight_nvfp4_scales").c_str());
+            alloc_and_copy_typed(db.attn_out_weight_nvfp4, hb.attn_out_weight_nvfp4,
+                (prefix + "_attn_out_weight_nvfp4").c_str());
+            alloc_and_copy_typed(db.attn_out_weight_nvfp4_scales, hb.attn_out_weight_nvfp4_scales,
+                (prefix + "_attn_out_weight_nvfp4_scales").c_str());
+            alloc_and_copy_typed(db.ff1_weight_nvfp4, hb.ff1_weight_nvfp4,
+                (prefix + "_ff1_weight_nvfp4").c_str());
+            alloc_and_copy_typed(db.ff1_weight_nvfp4_scales, hb.ff1_weight_nvfp4_scales,
+                (prefix + "_ff1_weight_nvfp4_scales").c_str());
+            alloc_and_copy_typed(db.ff2_weight_nvfp4, hb.ff2_weight_nvfp4,
+                (prefix + "_ff2_weight_nvfp4").c_str());
+            alloc_and_copy_typed(db.ff2_weight_nvfp4_scales, hb.ff2_weight_nvfp4_scales,
+                (prefix + "_ff2_weight_nvfp4_scales").c_str());
+        }
     }
     alloc_and_copy(d.output_weight, h.output_weight, "output_weight");
+    if (host.sm120_nvfp4_ffn_layer_mask != 0U) {
+        alloc_and_copy_typed(d.output_weight_nvfp4, h.output_weight_nvfp4,
+            "output_weight_nvfp4");
+        alloc_and_copy_typed(d.output_weight_nvfp4_scales, h.output_weight_nvfp4_scales,
+            "output_weight_nvfp4_scales");
+    }
     alloc_and_copy(d.output_bias, h.output_bias, "output_bias");
     alloc_and_copy_typed(d.piece_positions, h.piece_positions, "piece_positions");
     alloc_and_copy_typed(d.piece_mask, h.piece_mask, "piece_mask");
@@ -1122,8 +1342,18 @@ inline void free_weights(DeviceWeights& device) {
         cudaFree(b.attn_qkv_weight_scales);
         cudaFree(b.ff1_weight_fp8);
         cudaFree(b.ff1_weight_scales);
+        cudaFree(b.ff1_weight_nvfp4);
+        cudaFree(b.ff1_weight_nvfp4_scales);
+        cudaFree(b.ff2_weight_nvfp4);
+        cudaFree(b.ff2_weight_nvfp4_scales);
+        cudaFree(b.attn_qkv_weight_nvfp4);
+        cudaFree(b.attn_qkv_weight_nvfp4_scales);
+        cudaFree(b.attn_out_weight_nvfp4);
+        cudaFree(b.attn_out_weight_nvfp4_scales);
     }
     cudaFree(t.output_weight);
+    cudaFree(t.output_weight_nvfp4);
+    cudaFree(t.output_weight_nvfp4_scales);
     cudaFree(t.output_bias);
     cudaFree(t.piece_positions);
     cudaFree(t.piece_mask);
@@ -1264,7 +1494,15 @@ inline TransformerNetworkViewHolder transformer_network_view(
             b.attn_qkv_weight_fp8,
             b.attn_qkv_weight_scales,
             b.ff1_weight_fp8,
-            b.ff1_weight_scales};
+            b.ff1_weight_scales,
+            b.ff1_weight_nvfp4,
+            b.ff1_weight_nvfp4_scales,
+            b.ff2_weight_nvfp4,
+            b.ff2_weight_nvfp4_scales,
+            b.attn_qkv_weight_nvfp4,
+            b.attn_qkv_weight_nvfp4_scales,
+            b.attn_out_weight_nvfp4,
+            b.attn_out_weight_nvfp4_scales};
     }
     holder.view = Stream1TransformerNetworkView{
         weights.fast_slot_projected,
@@ -1276,12 +1514,16 @@ inline TransformerNetworkViewHolder transformer_network_view(
         weights.output_ln_beta,
         holder.blocks.data(),
         weights.output_weight,
+        weights.output_weight_nvfp4,
+        weights.output_weight_nvfp4_scales,
         weights.output_bias,
         weights.piece_positions,
         weights.piece_mask,
         weights.piece_types,
         transformer_dims(model),
-        weights.fp16_gemm_backend};
+        weights.fp16_gemm_backend,
+        weights.nvfp4_ffn_layer_mask,
+        weights.nvfp4_execution_kind};
     return holder;
 }
 

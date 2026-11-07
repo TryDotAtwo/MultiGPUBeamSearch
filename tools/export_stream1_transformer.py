@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
 import json
 import re
@@ -550,6 +551,7 @@ def export_piece_transformer(
     manifest = {
         **arch,
         "dtype": dtype,
+        "checkpoint_sha256": hashlib.sha256(weights_path.read_bytes()).hexdigest(),
         "source_weights": str(weights_path),
         "source_metadata": str(metadata_path),
         "source_generators": str(generator_path),

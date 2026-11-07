@@ -48,11 +48,16 @@ def load_state_for_detection(weights_path: Path) -> Mapping[str, object]:
     return strip_orig_mod(unwrap_state_dict(checkpoint))
 
 
+def validate_export_dtype(resolved_format: str, dtype: str) -> None:
+    if dtype == "fp32" and resolved_format != "piece-transformer":
+        raise ValueError("fp32 export is only supported for piece-transformer checkpoints")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--weights", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--dtype", choices=["fp16", "bf16"], default="fp16")
+    parser.add_argument("--dtype", choices=["fp16", "bf16", "fp32"], default="fp16")
     parser.add_argument(
         "--format",
         choices=["auto", "piece-transformer", "resmlp-layernorm", "batchnorm-folded"],
@@ -70,6 +75,7 @@ def main() -> None:
     resolved_format = args.format
     if resolved_format == "auto":
         resolved_format = detect_format_from_state_dict(load_state_for_detection(args.weights))
+    validate_export_dtype(resolved_format, args.dtype)
 
     if resolved_format == "piece-transformer":
         export_piece_transformer(

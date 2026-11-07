@@ -4722,6 +4722,7 @@ int production_runner_impl(int argc, char** argv) {
     } else if (stream1_model.backend == STREAM1_BACKEND_PIECE_TRANSFORMER) {
         transformer_view_holder =
             stream1_weights::transformer_network_view(device_weights.transformer, stream1_model);
+        stream1_transformer_prepare_attention_backend(transformer_view_holder.view.dims.dtype);
         network.backend = DispatcherStream1Backend::PieceTransformer;
         network.transformer_view = transformer_view_holder.view;
         network.transformer_micro = stream1_transformer_micro;

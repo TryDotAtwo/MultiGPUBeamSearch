@@ -1,5 +1,768 @@
 # Changelog
 
+## 2026-09-15 — full FF2 void-C gate; user pause
+
+- Binary6ff48648 full oracle completed all51072 rows x2 slots,25 contiguous
+  ranges across logs a-h. Independent numerical and post-Graph coverage audit
+  PASS (`audit_voidc128_coverage_20260915.py --ff2void`). Seven pairs already
+  complete:140.074us vs142.045us matched parent. No1PF/full-model claim.
+- User requested stop Molab and continue later. No further GPU work authorized
+  until resumed; requested normal UI Shutdown. Preserve all retained artifacts.
+
+## 2026-09-15 — FF2 void-C full oracle partial
+
+- Recovery D extends coverage0:24576 both slots/post-Graph, zero mismatches.
+  cgroup v1 reports limit171798691840bytes, sampled max usage1450598400bytes.
+  RLIMIT_AS/CPU unlimited. AgainHTTP410; sampled host usage does not support
+  host OOM, but does not establish the platform termination cause. Resume24576.
+
+- Recovery C adds16384:20480 both slots/post-Graph, zero mismatches. Total
+  contiguous0:20480; resume20480. Again independentHTTP410 after SSE loss.
+
+- Recovery B adds8192:16384 both slots/post-Graph, zero mismatches. Total
+  contiguous0:16384; resume16384. Session independentlyHTTP410 after SSE loss.
+
+- Binary6ff48648 full shape: rows0:8192 both slots, hidden/scales/FF2 and
+  post-Graph zero mismatches. Remaining rows unverified; resume8192.
+- Foreground SSE lost; independent checkHTTP410. Log
+  test_results/molab_ff2void_full_oracle_a_20260915.log. No CUDA failure proven.
+
+## 2026-09-15 — FF2 source-C elimination timing gate
+
+- Added opt-in BEAM_BENCH_FF2_VOID_C: both fixture initializers beta0,
+  BF16 output unchanged; does not apply to a residual-fused production path.
+- Molab build6ff48648 (sourcee4da5fb6) passed; M1024 seeds1/7/17 both slots
+  and post-Graph independent oracle pass. Full-size oracle still pending.
+- Seven alternating matched pairs: control142.045us,candidate140.074us,
+  about1.4% throughput gain. Saved binary2969592bytes decoded SHA verified.
+- Logs molab_ff2void_build/screen/seven_20260915.log; artifact
+  ffn_ff2void_binary_chunked_20260915.txt. Not fully promoted yet.
+
+## 2026-09-15 — full128x128 FF1 epilogue screen
+
+- Added opt-in BEAM_BENCH_FF1_EPILOGUE_128X128, default unchanged.
+- Molab build passed (sourcea21b2d8d,binary2fbf2313). FF1 ptxas168regs,
+  stack32,spill stores138/loads116; static counts not dynamic cost evidence.
+- Independent M1024 seeds1/7/17 both slots/post-Graph passed. Two-pair screen
+  about752-753TF/s, no gain vs same-session64x128. Not promoted; full oracle
+  and seven pairs not run for this non-winning screen. Preserve2e4fe48b.
+- Logs test_results/molab_fulltile_build_20260915.log and
+  test_results/molab_fulltile_screen_20260915.log.
+
+## 2026-09-15 — retained candidate stage isolation
+
+- Same2e4fe48b on Molab: three repeats FF1/ReLU/pack84.717us, FF2/store59.783us,
+  eager144.646us, Graph142.079us. FF1 is larger; Graph benefit2.567us only.
+- Diagnostic screen, not new seven-pair promotion or hardware-counter proof.
+  See test_results/ffn_voidc128_stage_isolation_20260915.md.
+
+## 2026-09-15 — void-C64x128 full oracle gate complete
+
+- Retained2e4fe48b passes all51072 rows x2 slots independent scalar
+  hidden/scales/FF2 and post-Graph oracle. Six sessions,25 contiguous ranges,
+  coverage audit PASS; no claim of uninterrupted execution or sanitizer.
+- Same binary seven-pair median761.773TF/s vs738.745TF/s parent. Remaining
+  1PF latency gap33.495us. Packed hidden still global; full Stream1 untested.
+- Evidence: test_results/ffn_voidc128_validation_20260915.md and
+  test_results/audit_voidc128_coverage_20260915.py.
+
+## 2026-09-15 — void-C64x128 matched seven-pair gate
+
+- Seven alternating pairs completed: 761.773TF/s vs 738.745TF/s same-session
+  void-C64x64, median140.601us vs144.983us. Full oracle pending, not promoted.
+- Recovered expired Molab through normal UI; restored exact2e4fe48b binary
+  and started attached durable full-range oracle. No rebuild or other GPU job.
+- Report: test_results/ffn_voidc128_validation_20260915.md.
+- Recovered run then lost sandbox (SSE ended, independently HTTP410).
+  Full oracle covers rows0:6144 both slots/post-Graph, zero mismatches;
+  remaining rows unverified. No cause established from browser or CUDA logs.
+- Recovery B extends complete coverage to14336 rows both slots/post-Graph,
+  zero mismatches; sandbox again HTTP410. Resume14336; not a full oracle pass.
+
+## 2026-09-15 — void-C permits epilogue64x128
+
+- Molab build2e4fe48b now succeeds with void-C, whereas source-C failed the
+  minimum-two-mainloop-stages constraint. FF2 unchanged.
+- M1024 seeds1/7/17 both slots independent oracle passed. Two-pair screen:
+  control145.212/145.040us, candidate140.490/140.647us (~762TF/s).
+- Candidate downloaded as ffn_voidc128_binary_chunked_20260915.txt, decoded
+  SHA verified. Not promoted; seven pairs/full oracle still pending.
+- Logs molab_voidc128_build_20260915.log and molab_voidc128_screen_retry_20260915.log.
+
+## 2026-09-15 — retained void-C candidate passes full fixture gate
+
+- Saved binary10bdd7da: full51072-row independent oracle both slots, hidden,
+  scales, FF2 and post-Graph checks pass.25 contiguous ranges across recoveries.
+- Same binary seven alternating pairs:735.823TF/s versus714.586TF/s parent.
+- See `test_results/ffn_voidc_saved_validation_20260915.md`. Not full model,
+  not sanitizer coverage, not1PF. Remaining latency gap38.453us for two batches.
+
+## 2026-09-15 — void-C timing gate completed, oracle partial
+
+- Seven same-session alternating pairs: median149.697us ->145.323us,
+  715.482 ->737.018TF/s. Full chain, two batches, unchanged useful FLOPs.
+- Full-shape oracle verified first4096 rows both slots before SSE loss;
+  bounded follow-up HTTP410. No terminal CUDA/OOM cause captured.
+- Not promoted: remaining oracle rows unverified. Source/build/logs retained;
+  candidate binary not exported before sandbox loss.
+
+## 2026-09-15 — optional FF1 source-C removal screen
+
+- Concurrent fixture fixes beta0. Added opt-in FF1_VOID_C builder source type;
+  default unchanged, bias/activation/packing and FF2 unchanged.
+- Molab compiled binary 2b9867e2e22fe4422c6e47d9a41fc0809449dd1c98adcdd361e41f043b8a5cce.
+- Independent M1024 oracle, two slots, seeds1/7/17 plus slot offsets passed.
+- Preliminary two-pair screen ~737TF/s versus ~715TF/s. Not promoted:
+  full M51072 oracle and seven-pair gate still required for this new binary.
+- Logs: molab_voidc_build_20260915.log, molab_voidc_screen_20260915.log.
+
+## 2026-09-15 — FF1 epilogue capacity gate
+
+- Added opt-in benchmark-only 64x128 epilogue candidate, unchanged default.
+- Molab nvcc rejected it: shared-memory carveout leaves one mainloop stage,
+  but SM120 collective requires two. No runtime launch; winner preserved.
+- See `test_results/ffn_epi128_compile_gate_20260915.md` and stage-isolation
+  report. Graph launch savings measured ~2.7us, insufficient for the 1PF gap.
+
+## 2026-09-15 — full-shape partial oracle evidence retained
+
+- Range checking passed rows0..8191 for both slots at GPU M51072, including
+  post-graph output; four completed range records retained locally.
+- Peak sampled process RSS ~1.41 GiB. Next range interrupted; sandbox HTTP410.
+- No full coverage or new speed claim. See `test_results/ffn_exhaustive_partial_20260915.md`.
+
+## 2026-09-15 — bounded row oracle, full GPU shape preserved
+
+- Test-only `BEAM_ORACLE_ROW_BEGIN/END` selects exhaustive reference ranges;
+  GPU M and both slots stay unchanged. Bounds fail closed; defaults remain full.
+- Molab RED then GREEN: M256 rows128..255, both slots, hidden/scales/FF2 and
+  post-graph checks passed. This does not claim full M51072 coverage.
+- Logs: `test_results/molab_oracle_range_{red,green,build}_20260915.log`.
+- Production CUDA operators unchanged; no local GPU tests performed.
+
+## 2026-09-15 — oracle extension small gate passed; full gate interrupted
+
+- M2048/two-slot independent oracle passed, including post-timing checks.
+- Full M51072/two-slot scalar oracle interrupted during slot0; API then HTTP410.
+- No full-size pass claimed. See `test_results/ffn_full_oracle_partial_20260915.md`.
+
+## 2026-09-15 — full-size two-slot oracle extension (validation pending)
+
+- RED on Molab: M2048/two-slot numeric request rejected by the old M1024 gate.
+- Test-only host oracle now supports up to M51072, checks each slot with a
+  distinct seed and checks each complete output again after timed execution.
+- Scalar reference emits progress in 128-row chunks; CUDA operators unchanged.
+- Separate oracle binary is being built; the seven-pair measured binaries
+  remain intact. No full-size correctness claim until target execution passes.
+
+## 2026-09-15 — FFN epilogue64 seven-pair comparison completed
+
+- Molab foreground rebuild and seven alternating pairs completed: control
+  .173685 ms / 616.665 TF/s, candidate .150386 ms / 712.207 TF/s median.
+- Full FF1/ReLU-pack/FF2 boundary, two batches aggregate; not Stream1.
+- M1024 scalar oracle seeds 1/7/17 passed both binaries, zero mismatches.
+- Full-size oracle and 1 PF remain outstanding; no production promotion.
+- Evidence: `test_results/ffn_epi64_completed_20260915.md` and raw logs.
+
+## 2026-09-10 — FF1 epilogue64 compiled and partial A/B on Molab
+
+- Recovered existing notebook; old document cells were absent from runtime
+  graph. A registered durable cell executed the read-back build bodies.
+- Control and epilogue64 candidate built on Molab. Independent numerical
+  checks at M1024 seeds1/7/17 and post-timing output all passed exactly.
+- One full FFN pair: 0.173804 -> 0.150500 ms aggregate (two batches),
+  616.244 -> 711.668 TFLOP/s. Seven-pair gate NOT complete: sandbox then410.
+- No promotion or full Stream1 speed claim. Evidence:
+  test_results/ffn_epi64_partial_20260910.md.
+
+## 2026-09-09 — FF1 epilogue-only experiment prepared
+
+- Added opt-in BEAM_BENCH_FF1_EPILOGUE_64X64; only FF1 epilogue subtile
+  changes from auto64x32 to64x64. MMA tile and FF2 remain unchanged.
+- Recovered the existing Molab notebook through normal UI after HTTP410.
+  New sandbox preflight passed. Source uploaded; pinned CUTLASS download
+  emitted32MiB then stopped reporting progress. Compile/test not confirmed.
+  Native request still open and GET sessions200; no competing execution.
+- Source SHA256 fc5115287bddfd139c037fd9f70e3b08891b5a36235c89f7b6afd98fc2a7073f.
+  Logs and launch script: test_results/molab_epi64_*_20260909.*.
+
+## 2026-09-09 — Isolated FF1 tile experiment prepared
+
+- Added opt-in BEAM_BENCH_FF1_TILE_N64 to the standalone FFN benchmark:
+  FF1 128x64x256 while FF2 remains its original tile. Default unchanged.
+- This isolates accumulator pressure in FF1 after N256 resource audit;
+  no production promotion. Molab build/results recorded separately.
+- Molab compile and M1024 independent/post-timing numeric gates passed.
+  Four complete A/B pairs: 0.172518 ->0.189079ms median (two batches),
+  ~9.6% slower. Requested seven pairs interrupted by SSE closure then HTTP410.
+  Candidate rejected; report test_results/ffn_ff1n64_partial_20260909.md.
+
+## 2026-09-09 — N256 compiler-resource audit
+
+- Rebuilt unchanged FFN source on Molab with ptxas verbose reporting.
+  N256 spill-store reports are 16–17x control; stack grows from 24–32 to
+  1048–1096 bytes. Static evidence, not DRAM counters or causal percentage.
+- Both seed17 M1024 post-timing numeric gates pass. First fresh pair:
+  control620.040 TF/s versus N25693.522 TF/s. Further SSE output stalled;
+  seven-pair completion is not claimed. Production unchanged.
+- See test_results/ffn_resource_audit_20260909.md and raw logs.
+
+## 2026-09-08 — N256 full FFN rejected on Molab
+
+- Seven alternating graph-mode pairs: control median0.170831ms/626.969TF/s;
+  N256 median1.138325ms/94.091TF/s, aggregate for two batches.
+- Both seed17 M1024 post-replay numeric gates passed. Full-size independent
+  oracle and sanitizer remain unverified. No production promotion.
+- Report: test_results/ffn_n256_result_20260908.md. Control preserved.
+
+## 2026-09-05 — Graph comparison completed on recovered Molab
+
+- Seven alternating pairs completed:174.643 ->172.481us aggregate/two batches,
+  613.285 ->620.973TF/s; about1.24% latency reduction, not a path to1PF alone.
+- Post-replay M1024 oracle passed seeds1/7/42,262144 outputs each.
+- Large-output independent readback and sanitizer remain unverified.
+- See test_results/ffn_graph_screen_20260905.md; stock path preserved.
+
+## 2026-09-05 — Complete FFN CUDA Graph screen
+
+- Added optional diagnostic mode4 preserving full FF1/pack/FF2 kernels.
+- Molab compiled and completed four alternating pairs: roughly1.2% latency
+  reduction. Sandbox410 interrupted pair5; no seven-pair claim or promotion.
+- Added post-timing output oracle locally; not yet rebuilt/tested.
+- Evidence: test_results/ffn_graph_screen_20260905.md.
+
+## 2026-09-05 — Molab profiler diagnostics, no new speed claim
+
+- Retained complete FFN runs, but NCU 2026.2 and 2025.3 fail with
+  LibraryNotLoaded; Nsight Systems cuda and cuda-sw fail time conversion.
+- Recorded gVisor sandbox identification as an integration hypothesis, not
+  a proven cause or a physical throughput limit.
+- See test_results/molab_ncu_compatibility_20260905.md. Next controlled
+  experiment is same-kernel graph versus host submission; not yet measured.
+
+## 2026-09-05 — Campaign decision audit and plugin guardrails
+
+- Added test_results/sm120_campaign_decision_audit_20260905.md: retained
+  incumbent versus rejected routes, metric mismatches, feasibility math and
+  bounded next profiling decision. No new GPU run or CUDA change in this audit.
+- Updated and reinstalled personal highload-gpu, gpu-neural-inference and molab
+  plugins; all three plugin and edited-skill validators passed. General methods,
+  model evidence and platform recovery remain separate.
+- Replaced stale automation instructions to repeat rejected smoke with matched
+  incumbent profiling and a bounded counter-backed experiment budget.
+- Neither a physical no-go for substantial speedup nor guaranteed full-model
+  1 PFLOP/s is established. Keep the 611.731 TFLOP/s two-slot FFN incumbent.
+
+## 2026-09-05 — Native Molab recovery and FFN build provenance
+
+- Recovered the exact fast-control binary on the same Molab sandbox: three
+  scalar oracle seeds passed; M51072 measured 560.980 TFLOP/s one slot and
+  611.731 TFLOP/s two slots (100 iterations, one screen each). Keep this as
+  incumbent; the 86.9904-TFLOP/s serial-pair candidate is rejected.
+
+- Reconnected through the notebook's official Pair UI and the existing Windows
+  requests/SSE transport; no expired token replay or detached GPU job.
+- Confirmed the fresh environment has nvcc 13.3.73 but default CUDA runtime
+  headers reporting CUDART_VERSION=13000. Installed notebook-managed
+  nvidia-cuda-cccl==13.3.3.4.1 and nvidia-cuda-runtime==13.3.29, then explicitly
+  selected the matching include directory for the foreground build.
+- CCCL discovery fixes are in commits 3c1367d2 and 108d0b3a. The clean checkout
+  also exposed missing unpublished FF2 physical-layout / CTA-plan definitions;
+  uploaded the existing two local DSM headers for the experimental build,
+  without staging unrelated worktree changes.
+- Logs: test_results/molab_dual_build_20260905_0803.log (toolkit mismatch),
+  0804.log (missing source definitions), 0806.log (candidate rebuild).
+- FF=1024 build and M128 full numerical oracle passed. M51072 graph screen
+  measured 615.618 us / 86.9904 useful TFLOP/s (7 samples, 100 iterations,
+  128 sampled oracle rows, zero bias). This serial-pair topology is not promoted;
+  see test_results/molab_ffn_recovery_20260905.md for scope and hashes.
+
+## 2026-09-04 - Reproducible transposed FF1 screen targets
+
+- Added paired SM120-only CMake targets for the conventional and transposed
+  CUTLASS NVFP4 FF1 no-store screens.
+- Both targets build the same source and differ only by the compile-time
+  orientation switch, preserving exact `K=256` and useful FLOP accounting.
+- This is a diagnostic scheduler/mainloop gate only; production promotion still
+  requires a complete output writer, numeric gates, and paired Molab timing.
+
+## 2026-09-04 — Incomplete dual-math-WG FF1 schedule rejected
+
+- Added an opt-in dual-WG FF1 diagnostic and dedicated Molab build flag.
+- SM120a compilation passed, but two minimal runtime smokes deadlocked even
+  after giving WG2 independent mainloop and epilogue pipeline states.
+- Kept the experiment disabled by default and retained the 615.892-TFLOP/s
+  eligible CUTLASS control.  The next implementation must carry over the full
+  CUTLASS ping-pong ordered-sequence barrier and scheduler contract.
+
+## 2026-09-03 — Native Molab recovery verified, rebuild blocked by TLS
+
+- CDN recovered (HTTP200 both current proxy and direct diagnostic); reloaded same notebook, native Python probe and GPU inventory succeeded. RTX PRO6000SM120 idle. Optional local output logging verified on these probes.
+- Last trained_full_b896.json and stock libraries were not retained in the new sandbox. Prepared bounded recovery source bundle and foreground rebuild/benchmark launcher; checkpoint hash pinned. Rebuild has NOT started.
+- Archive upload failed TLS; subsequent session probes also failed both through proxy and direct, including escalated attempts. Proxy-only attribution is not established. No host/VPN/TLS-verification settings changed.
+- Pair helper now reuses a requests.Session and supports explicit per-invocation --direct, default proxy behavior unchanged. Direct success path remains unverified.
+
+## 2026-09-03 — Trained full-forward execution and artifact-loss recovery
+
+- TrainedB896 three-arm graph run completed withTRAINED_FULL_DONE. Preserved initial samples:FP16~3.45ms, NVFP4FFN~2.40ms, FFN+QKV~2.27ms; full seven-round JSON not yet retrieved afterHTTP410. No fabricated median or production speedup claim.
+- Reopened sameMolab notebook; new endpoint lists0sessions and frontend remainsblank/loading CDN module. No network settings changed. See test_results/trained_full_benchmark_recovery_20260903.md.
+- Native pair helper gains optional exclusive-create output log with per-chunk flush; benchmark emits final full JSON and compact profile names. Success-path verification pending live kernel; no local GPU tests.
+
+## 2026-09-03 — Trained paired solve screen complete
+
+- Molab original archive QSearcher: FP16 and NVFP4 FFN+QKV both solved10/10 shallow seeded cases atbeam65536; all20solutions replay-valid, every paired length and move sequence matched.
+- This is not production C++ search or a deep-state quality certificate. Cold wall times do not establish speedup. Full initial states and moves downloaded under test_results/retrieved_20260903/.
+- Report:test_results/trained_solve_quality_20260903.md. Added next trained full-state benchmark (encoding through24logits); execution pending.
+
+## 2026-09-03 — Trained original-encoder score diagnostic
+
+- Original checkpoint strictly loaded onMolab. Mapped FP32 blocks match original exactly on6batches; valid24move permutations and inverse replay checked.
+- 128walks sampled at0/2/8/16/32/45moves. NVFP4 FFN+QKV argmin agreement79.69..88.28% versusFP16 onnonzero snapshots; errors materially aboveFP16. Allfinite, but no solve-length gate yet. No production promotion.
+- Report:test_results/trained_original_quality_20260903.md. Preserve distinction between legal-walk score diagnostics and replay-valid solved counts/lengths.
+
+## 2026-09-03 — Independent QKV numerical gate and original checkpoint
+
+- Molab9 fixtures across3rowcounts/3seeds: native QKV exactly matches independent CPU FP32 matmul on decoded operands afterFP16 rounding; activation pack also matched host pack ofPyTorchLN. Not a trained solve-quality gate.
+- Recovered original13.56MB checkpoint from existing local bundle intoMolab persistent storage; local/remote SHA25658af301a...63ad3164 match, weights_only load verified4blocks/output24.
+- Evidence:test_results/qkv_independent_gate_20260903.md. No production promotion.
+
+## 2026-09-03 — Native per-column QKV bias full synthetic integration
+
+- Broadcast-C bias regression isolated:485->293us with beta0+separateadd. Native LinCombPerColBias reaches188us versusFP16 control221us forLN/QKV/attention.
+- Full unchanged four-attention B896 graph seven-pair test:448744->481756states/s (+7.36%). Graph/eager exact within arms; cross-arm logitsRMSE~0.0355, trained quality remains open.
+- All builds/runs onMolab; report:test_results/ln_qkv_percol_full_20260903.md. No production promotion or zero-VRAM claim.
+
+## 2026-09-03 — LN/QKV native boundary first gate rejected
+
+- Experimental fusedLN->NVFP4 QKV emits attention-native strided FP16 directly with offline weights. Molab compile and three-input graph/eager checks passed; no trained quality claim.
+- Seven-pair boundary timing regressed220->489us. CUPTI isolates QKV~350us versusLNpack64us andattention77us. Retained fast full-model path unchanged. Next isolate broadcast bias epilogue and QKV tile policy. Report:test_results/ln_qkv_boundary_20260903.md.
+
+## 2026-09-03 — Fused producer profile and batch sweep
+
+- Molab CUPTI profile confirms40 kernels/forward; QKV374us, attention298us, remainingLN263us, fusedLN/pack250us atB896. No measuredDRAM/L2 attribution.
+- Matched seven-pair sweeps atB512/768/896/1024/1536 completed. Best screen468414states/s atB1024, only0.79% aboveB768; synthetic untrained scope remains. Graph/eager exact within each arm onthreeinputs for everybatch.
+- Report: test_results/fused_ln_profile_sweep_20260903.md. Next boundaryLN1/QKV/attention, not a nonexistent transpose kernel.
+
+## 2026-09-03 — Consumer-native LN2 producer matched Molab A/B
+
+- Exposed existing fused LN2/NVFP4 producer through experimental bridge. B896 unchanged four-attention model improved 331890 -> 455303 states/s in seven alternating CUDA Graph samples (2.69969 -> 1.96792 ms).
+- Graph/eager exact within each backend on three inputs; cross-backend not exact (RMSE 0.00024..0.00059). Synthetic untrained token-forward only; trained solve quality and production integration remain unverified.
+- No production CUDA or beam-search changes. Packed global input/hidden still exist; no zero-VRAM claim. Report: test_results/fused_ln_native_handoff_20260903.md.
+
+## 2026-09-03 — Full architecture CUPTI profile identifies activation-pack cost
+
+- B896 unchanged model,44kernels/forward. Graph profile:activationpack793us,LN471us,FF1+FF2combined437us. Prioritize fusedLN/inputpack before more FFN MMA tuning.
+- nsys/ncu absent; PyTorch/CUPTI kernel trace completed. No actualDRAM/L2 counters; logicalbytes not misreported asVRAMtraffic. Report:`test_results/full_arch_profile_20260903.md`.
+
+## 2026-09-03 — Unchanged architecture CUDA Graph comparison
+
+- Four attention256 andfourFFN1024 retained. Graph/eager exact output checks ontwochangedinputs passed forFP16 andnativeNVFP4FFN.
+- Seven alternating samples perpair,B512/896; best339629items/s B896NVFP4graph,graph-alone gains1..3%. Synthetic preencoded scope,nottrainedfullStream1. Report:`test_results/full_arch_graph_20260903.md`.
+
+## 2026-09-03 — Hybrid native FFN architecture measured on Molab
+
+- Offline host-pack bridge added using production E2M1/SFB implementation. Varied-weight numeric diagnostic localizedseed7 discrepancy toone hidden activation;FF2 fromactualhidden exact.
+- Integrated stock nativeNVFP4 FFN into experimental architecture. Seven interleaved samples:combined438630items/s vs417457FP16;control317827vs306089. Preencoded synthetic scope;no trained-model or fullStream1 claim. Report:`test_results/hybrid_architecture_20260903.md`.
+
+## 2026-09-03 — Native stock FFN bridge compiled and smoke-tested on Molab
+
+- Added experimental C ABI adapter for existing stock NVFP4 FFN, caller stream and preallocated scratch. Production source unchanged.
+- Molab build/load passed; exact residual smoke withzero FF2weights passed. General numerical oracle, offline student packing and integrated throughput remain pending. Evidence:`test_results/stock_ffn_bridge_20260903.md`.
+
+## 2026-09-03 — Narrow/alternating attention ablation completed
+
+- Experimental residual256/fourFFN1024 model with attention128, alternating attention, and both.8 configs,7 interleaved samples each onMolab; control exact-equivalence gate passed, all outputs finite.
+- Combined candidate419187items/s vs304067 atB512 (1.379x), untrained FP16 preencoded scope. Params drop25%; no quality/NVFP4/production claim. Report:`test_results/attention_architecture_20260903.md`.
+
+## 2026-09-03 — Molab recovered; first architecture shape screen completed
+
+- Added isolated experimental FP16 preencoded-token screen and visible foreground launcher;16 configurations completed onMolab with7 samples and finite-output checks. No local GPU tests.
+- Batch512 compact128/512:620069items/s versus256/1024:304627;1024/4096:42580 despite higherTFLOP/s. Synthetic weights, no encoding, no trained-model or nativeNVFP4 claim.
+- Evidence: `test_results/transformer_shape_screen_20260903.md`. Production code unchanged; distillation not yet implemented or run.
+
+## 2026-09-03 — Architecture/distillation screening design
+
+- Inspected existing inference wrapper and exporter; exporter enforces FF1024, so arbitrary shapes are not yet production-supported.
+- Recorded candidate widths128..1024, common head_dim32, full-model states/s protocol, teacher-based training and separate quantization/solve gates. No model trained or GPU results produced; Molab connection remains unavailable.
+
+
+## 2026-09-03 — N256 comparison interrupted; control recovered
+
+- Added selectable FF1_TILE_VARIANTS to the experiment runner and a visible base/n256 launch cell; no production kernel change.
+- Recovered three baseline repetitions per K and three small oracle gates. Medians: K768 917.481, K1024 985.811, K2048 1045.342 TFLOP/s including packed output, not full Stream1.
+- N256 build interrupted by SSE loss; one probe confirmed410. Browser acquisition then timed out twice. No candidate performance claim. Report: `test_results/ff1_n256_partial_20260903.md`.
+
+
+## 2026-09-03 — FF1 tile comparison prepared
+
+- Four existing compile-time tile variants:128x128x256 control,128x128x128,128x256x128,256x128x128. K768/1024/2048, same output contract, three alternating control/candidate trials planned.
+- Corrected gtest stub included in fresh input bundle; bounded oracle gate expanded to M<=256 for full256x256 tiles. Production paths unchanged.
+- New Molab GPU showed100% utilization with0MiB/no visible processes before work; unknown external activity/telemetry caveat must accompany absolute timings.
+- Control and K128 both passed3 small output/scale gates. One paired sweep K768/1024/2048 found K128 latency12.23/9.66/1.49% worse. Platform410 interrupted repeats; N256/M256 unrun. Evidence:`test_results/ff1_tile_sweep_20260903.md`.
+
+## 2026-09-03 — Packed FF1 K sweep prepared
+
+- Added opt-in `BEAM_BENCH_K_SWEEP_VERIFY` host-oracle gate for small M<=16 in the standalone concurrent benchmark, outside event timing. Existing default paths unchanged.
+- Added Molab-only attached K256/384/512/768/1024/1536/2048/4096/8192 build/screen scripts; fixed M51072/N1024/one slot, three rotated passes after small oracle gates. Runtime results pending.
+- First oracle failed at K256. Root fixture defect found: benchmark EXPECT_TRUE stub discarded CUTLASS initialize_tensor calls. Added opt-in evaluating/throwing expectations for this sweep; previous default-fixture epilogue report explicitly downgraded pending remeasurement. No production kernel change.
+- Full128x128 oracle passed all9 K after partial M16 exposed an unresolved SFD comparison issue. One timing pass completed through K2048:435.547/522.847/752.563/920.755/994.404/1019.258/1052.679TF/s. No medians: platform returned410 during K4096. Evidence and limitations: `test_results/ff1_k_sweep_20260903.md`.
+
+## 2026-09-03 — FF1 epilogue diagnostic prepared on recovered Molab
+
+- Recovered browser access from `Debugger unattached` via a fresh tab of the same notebook, then native pairing. GPU idle before work; original notebook preserved.
+- Stock diagnostic rebuilt on Molab in71.75s. Added attached diagnostic scripts for NVFP4 packed versus BF16 output at K256/512/1024, fixed M51072/N1024. GPU results pending at preparation time.
+- No production CUDA change. Output semantics and automatic epilogue shared-memory carveout differ between arms; subtraction is not a pure packing/DRAM measurement.
+- Completed18 rows: packed K256/512/1024 medians70.310/76.897/106.994us,380.834/696.424/1001.042TF/s. BF16 output slower at K256 (81.137us). Larger K is diagnostic only, not a1PF actual FF1 achievement. Full limitations in `test_results/ff1_epilogue_screen_20260903.md`.
+- Next read-only native call returned410 after the completed SSE. Local log contains all rows; no timed-output verification or SASS/counters obtained for these new standalone arms.
+
+## 2026-09-03 — Molab stock FFN stage timings obtained
+
+- Recovered native pairing via DOM iframe inspection, verified idle RTX PRO6000 and compiled with Molab nvcc13.3.73. Four pre-timing scalar-chain gates and14-row stage screen completed.
+- Two-slot repeat: FFN614.021TF/s (7 samples), isolated FF1+pack464.486TF/s and FF2+BF16 store902.267TF/s (6 each). Retained same-session control613.659TF/s. FF1 is the next measured target; no pure pack/DRAM attribution yet.
+- Corrected prior report: incumbent uses host-enqueued PDL launches, not cudaGraphExec. Event-instrumented one-slot chain perturbs latency about9.5%.
+- Sandbox terminated withHTTP410 during last repeat. No detached/competing execution, no returned CUDA failure; server reason remains unknown. Completed rows captured locally; final remote download not obtained.
+- Evidence: `test_results/ffn_stage_profile_20260903.md` and build/screen/repeat logs.
+
+## 2026-09-03 — Stock FFN optional stage instrumentation (unvalidated)
+
+- Added opt-in isolated FF1/FF2 and event-delimited chain diagnostics to the retained concurrent benchmark; default timed launch sequence stays unchanged.
+- Stage-specific FLOP counts and per-iteration event intervals are explicit. Instrumented timings may perturb PDL and cannot measure DRAM traffic or pure MMA cost.
+- Browser recovered, but Molab initially reported exhausted sandbox capacity. GPU compilation/tests remain pending; no speedup claim. Plan: `test_results/ffn_stage_profile_20260903.md`.
+
+## 2026-09-03 — Native Molab stock FFN recovery, six completed pairs
+
+- Reopened the existing notebook, paired natively and verified an idle RTX PRO 6000. Reuploaded the hash-matched retained stock FFN executable; no new CUDA build.
+- Three full M1024 scalar gates passed. Six completed alternating one-/two-slot pairs at M51072 gave 564.083/615.040 TFLOP/s medians. The seventh pair and final JSON were not obtained after HTTP410 platform loss.
+- Captured each result locally through attached foreground SSE. Setup-hoist A/B remains unimplemented/unmeasured; no performance promotion.
+- Evidence: `test_results/ffn_stock_recovery_20260903.md` and matching `.log`.
+
+## 2026-09-03 — Evidence-audited inference, GPU and Molab plugins
+
+- Updated and reinstalled three personal plugins from source, separating model-specific experiments, general SM120 lessons and Molab execution guidance.
+- Corrected incomparable throughput claims, invalidated FF1 timings, unsupported DRAM attribution and incomplete correctness/promotion gates. Preserved the 614–660 TFLOP/s FFN incumbent rather than promoting a 130.765 TFLOP/s DSM-local improvement.
+- Three plugin and 18 skill validations passed; 36 Markdown files match source and installed caches by SHA-256. No GPU/solver code changed.
+- Audit and recovery copies: `D:/100XH100/test_results/plugin-audit-2026-09-03/REPORT.md`.
+
+## 2026-09-03 — Completed early-FF1 A/B on recovered latest notebook
+
+- Compared two notebooks; latest experiments are in nb_tefJUzXQJw2NEN2JB1cF6J.
+- Native Molab seven alternating A/B pairs: baseline280.945us, precompute
+  262.759us (1.06921x),130.765TF/s. Full seeded gates and sampled timed checks
+  exact. JSON downloaded. No production promotion; no1PF claim.
+- Same-session stock control five completed pairs: two-slot median614.816TF/s.
+  Then platform HTTP410; seven-pair control series incomplete.
+- Report: test_results/ffn_precompute_results_2026-09-03.md.
+
+
+## 2026-09-03 — Restore fast comparator; prepare early FF1 production
+
+- Recovered exact stock CUTLASS binary from the historical660TF/s lineage.
+  Molab seed1/7/42 scalar gates pass; first one-slot M51072 timing559.330TF/s.
+  Session expiredHTTP410 before seven-run/two-slot series completed.
+- Added default-off ROLE_PRECOMPUTE_FF1 scheduling experiment: compute locally
+  before waiting for consumer destination; preserve source free acknowledgement
+  and wait armed before DSM. Docker compilation passed; Molab runtime untested.
+- Added foreground A/B runner with complete seeded gates and incremental JSON
+  stdout. Report `test_results/ffn_control_recovery_precompute_2026-09-03.md`.
+  No speedup or1PF claim; production defaults unchanged.
+
+## 2026-09-03 — Role-separated native FF1→FF2 candidate
+
+- Connected corrected native FF1 epilogue to existing four-CTA transport:
+  producer CTAs 0/1 keep native shared rings, consumers 2/3 retain FF2 sums.
+  No serial relocation of hidden; direct bulk DSM feeds FF2 stages.
+- Invalidate drained native FF1 barriers before reuse; payload remains alive
+  until both consumers acknowledge source-read completion. Default unchanged.
+- This core-only role variant outputs FP32 FF2, whereas the earlier serial
+  timing includes residual/LN/next-pack. Do not label their ratio as matched
+  speedup. Build and Molab gates passed: seeds 1/7/42, full M128 and M512
+  (three repeats), exact payload/scales/hidden/FF2. M32768 seven process
+  medians: 284.201 us aggregate, 120.899 useful TFLOP/s; timed sampled
+  FF2 checks pass. Not promoted; no residual/LN/next-pack in this path.
+- Production spills reduced to 24 B store / 20 B load, 255 registers;
+  46 active clusters, 87040 B shared per CTA. Repeated FF1 initialization
+  remains a candidate bottleneck, not yet isolated by profiling.
+- Main timing JSON downloaded. Molab expired HTTP410 before additional
+  gate/scaling JSON downloads; successful stdout is recorded in
+  `test_results/ff1_native_ff2_roles_2026-09-03.md` with this limitation.
+
+## 2026-09-03 — Native FF1 epilogue to existing DSM FF2 gate
+
+- Added opt-in FUSED_NATIVE_EPILOGUE to the existing fused numeric harness.
+  It invokes the retained native ReLU/scale/explicit-byte shared visitor,
+  replacing the manual scalar quantizer only in the experimental build.
+- Snapshot native ring and raw accumulator for independent numerical checks;
+  retain overlap-safe relocation and existing two-CTA consumer protocol.
+- First gate explicitly uses zero bias (including independent seeded matrices)
+  because the retained component broadcasts per-row, while model bias is
+  per-output-column. Do not promote this limited gate to a model profile.
+- Initial compilation exposed eager device-callback template instantiation;
+  made nested epilogue dependent on a kernel template. Retry in progress.
+  Existing default path preserved.
+- Native stage1 executes on Molab and raw FF1 is exact (131072 values).
+  First hidden check failed: obsolete norm_constant=6 had been ignored by
+  manual packing. Set unity for native amax/6; residual final-tensor mismatch
+  remains (53474/131072), so FF2 is deliberately not launched yet.
+- Testing source-owned scalar-store map instead of copy destination partition.
+  Immediate register readback from prior work is not a final tensor oracle.
+  Consultation confirmed that final coverage and barrier lifetime must be
+  gated before shared arena reuse. No fused performance claimed.
+- Source/destination map screen produced identical output: rejected as cause.
+  Component audit localized 7/8 missing scale coverage (114688/131072).
+  Root cause: dormant native epilogue call passed subtile_idx=0, executing
+  only first 64x32 of 128x128. Changed to -1 (all subtiles). Added explicit
+  drained FF1 mainloop/epilogue barrier invalidation before shared arena alias.
+  GPU rerun pending; this defect is in the old fused harness invocation, not
+  evidence that the standalone full-kernel FF1 timing skipped these subtiles.
+- All-subtile build now passes FF1-only and complete FF1→FF2 gates on Molab
+  for seeds1/7/42: raw/hidden/payload/scales, FF2, residual and next NVFP4 exact.
+- Serial-reference timing M32768: median of seven process medians1605.67us,
+  21.399TF/s useful FF1+FF2. Not a performance promotion. Compiler confirms
+  255 registers and 1024B stack, 1004B spill stores/512B spill loads.
+  Next task: separate producer/consumer lifetimes to avoid carry spills and
+  serial relocation; preserve this numerical oracle. Full report under
+  test_results/ff1_native_ff2_integration_2026-09-03.md.
+
+## 2026-09-03 — Direct compute-register FP4 shared writer
+
+- Confirmed733TF/s control omits FP4 pack and payload stores, not just the
+  last shared instruction. Added opt-in compute-register hook before generic
+  CUTLASS numeric-array conversion, forwarded explicitly through outer EVT.
+- Candidate packs two scaled FP32 values with cvt.e2m1x2 and immediately
+  st.shared.b8. In diagnostic builds generic conversion is retained ONLY
+  as expected-value oracle; the ordinary payload writer is suppressed.
+- Default unchanged. Reproducible CUTLASS seam patch retained under
+  test_results/ff1_register_compute_seam.patch, build script fails closed
+  if the seam is absent.
+- Molab readback passed seeds 1/7/42: 393216 values, zero mismatches,
+  all group hashes agree with converter reference. This is a component
+  payload check, not model/solve quality certification.
+- Seven alternating timing pairs: direct pack/store 47.4464 us,
+  564.3513 TF/s versus byte baseline 46.6722 us, 573.7128 TF/s.
+  Candidate is 1.63% lower throughput and remains opt-in, not promoted.
+- Target kernel SASS contains 128 OMMA, 4 UTMALDG, 98 STS and zero STG.
+  Evidence: test_results/ff1_direct_pack_2026-09-03.md and associated JSON.
+
+## 2026-09-03 — Resume paired-word gate after Docker recovery
+
+- Docker engine answers normally again; existing unrelated services left
+  untouched. Retrying diagnostic build sequentially. Molab native endpoint
+  remains accessible and no active notebook computation was found.
+- No candidate performance claim until address/value and paired timing gates.
+- Paired-word diagnostic now passes on Molab: all393216 copied values and
+  group hashes match, alignment/address assertions pass. Full logs downloaded
+  as test_results/ff1_pair_logs_2026-09-03.tar.gz; timing still pending.
+- Timing now complete: paired47.205us/567.2373TF/s versus retained
+  byte46.6634us/573.8210TF/s, 7 alternating pairs. Still1.16% slower;
+  not promoted. SASS store count97->65. Source remains opt-in.
+- Preparing explicitly labeled payload ablation to bound the value-copy
+  optimization opportunity, not to claim usable FF1 throughput.
+- Ablation measured in7 alternating pairs: full byte46.6462us versus
+  omitted payload36.5422us. SASS removes64 E2M1 packing instructions and
+  32 E4M3 unpack operations as well as64 payload stores; this is NOT isolated
+  store latency.128 OMMA remain. Diagnostic732.7538TF/s is not full FF1.
+  Target1PF at this shape requires26.776436736us: even this omitted-work
+  control needs9.7658us less. Change focus to mainloop/scale-generation costs.
+  Full JSON: test_results/ff1_payload_ablation_ab_2026-09-03.json.
+
+## 2026-09-03 — FF1 constant-shift XOR gather
+
+- Opt-in XOR gather replaces lane-dependent shifts and shfl_down with two
+  XOR exchanges and constant 8/16-bit shifts. Three-seed copied-payload
+  gate passes393216 values and group hashes on Molab.
+- Seven paired rounds: byte46.664us/573.8136TF/s versus XOR56.9195us/
+  470.4264TF/s. Better than old quad, still slower than byte: no promotion.
+- Preparing paired-word gather: two bytes per lane share two exchanges,
+  byte_perm emits two u32 words in one aligned64-bit shared store. Full
+  address/alignment assertions and value gate required; not yet verified.
+- Both paired-word Docker builds terminated with unexpected EOF from the
+  container service before producing binaries. Docker version probe stalled;
+  Molab has no nvcc/toolchain installed. Paired path remains compile/runtime
+  unverified and disabled. Do not confuse infrastructure loss with GPU failure.
+- Evidence: test_results/ff1_quad_xor_readback_2026-09-03.json and
+  ff1_quad_xor_ab_2026-09-03.json.
+
+## 2026-09-03 — FF1 sync isolation on recovered Molab
+
+- Recovered the existing notebook through browser, new native sandbox;
+  no background runs or unrelated cells executed.
+- Added opt-in byte+syncwarp control. Seven alternating three-arm rounds:
+  byte46.6424us/574.0793TF/s; byte+sync46.4891us/575.9724TF/s;
+  quad135.422us/197.7259TF/s. Added syncwarp does not explain regression.
+- SASS byte+sync versus quad: SHFL73->201, LOP3 228->699,
+  IMAD124->340, MOV227->433; STS97 in both, WARPSYNC5 in both.
+  Quad reduces participating store lanes, not issued store instruction count.
+  Exact hardware stall attribution remains unprofiled; ncu/nsys/sanitizer
+  are not installed in this sandbox. Retain byte default.
+- Full timing JSON downloaded: test_results/ff1_sync_isolation_2026-09-03.json.
+
+## 2026-09-03 — FF1 quad-owned shared word experiment
+
+- Molab compiled address map shows 1024 distinct owned bytes in the first
+  epilogue tile, exactly 256 complete aligned words. Each word is owned by
+  lanes4q..4q+3 at identical fragment indices. Map saved under test_results.
+- Added opt-in STREAM1_HANDOFF_STORE_QUAD: shift bytes, two width4 shuffles,
+  one volatile st.shared.u32 per quartet, warp completion before readback.
+  Diagnostic checks word alignment and all lane addresses for every tile.
+  Default remains the validated explicit-byte writer.
+- Molab quad gate PASS: 393216 raw copied values and all per-group hashes
+  match baseline, all-tile quartet address assertions pass. Timing NEGATIVE:
+  7 alternating pairs median130.84us (204.6502TF/s) versus baseline45.3725us
+  (590.1468TF/s). Candidate remains opt-in, not promoted. Shuffle/sync costs
+  not yet isolated. Evidence: ff1_quad_readback_2026-09-03.json and
+  ff1_quad_ab_console_2026-09-03.csv under test_results. Sandbox HTTP410
+  occurred after completion but before full timing JSON download; CSV is
+  reconstructed from the captured live console, not the missing JSON.
+
+## 2026-09-03 — FF1 timing payload DCE gate
+
+- Non-readback fixed binary SASS still has only 32 scale-byte stores plus
+  initialization; no packed value stores. Passing diagnostic readback does
+  not establish that the timing variant retains the same work. A/B deferred.
+- Tried u32 stores: compile gate correctly rejected ownership of eight
+  nibbles (max_common_vector=2). Retained explicit volatile st.shared.u8 of
+  two owned FP4 nibbles. No subbyte read-modify-write and no global payload.
+- Byte-store compile/SASS PASS: 97 STS versus 33 before (64 payload writes),
+  128 OMMA and 4 UTMALDG, no STG. Molab: all 393216 copied values match
+  the reference; 7 timing runs median45.3275us =590.732706TF/s at
+  M51072,N1024,K256. Component only, uniform input/per-row zero bias.
+  Next opt-in experiment batches compiler memory clobber after stores;
+  no CUDA synchronization or production behavior changed by default.
+- Batched-clobber A/B negative: seven alternating pairs, baseline590.56594
+  versus candidate589.81014TF/s. No promotion; candidate diagnostic gate
+  not run. Report saved in test_results/ff1_batch_clobber_ab_2026-09-03.json.
+- Evidence: test_results/ff1_fixed_complete_raw.sass.txt and
+  test_results/ff1_explicit_shared_store_build.log.
+
+## 2026-09-03 — FF1 payload hook forwarding defect
+
+- Follow-up target gate PASS: 3 seeds x 131072 E2M1 values, no shared-readback
+  mismatches. In addition to forwarding, the producer copy must recast the
+  uint4 MMA-storage view to E2M1 (same physical bits/layout); otherwise CuTe
+  scalar copy performs a numeric FP4->integer4 conversion. The wrong-type
+  copy gave 60315 mismatches on seed1. Merely changing S/D coordinate
+  partition did not help. Raw-copy report and compressed logs saved under
+  test_results/ff1_full_readback_pass_2026-09-03.*.
+  This validates copied component payload, not model quality or 1 PFLOP/s.
+
+- Molab full-payload gate failed with zero value records (scale records existed).
+  Both freshly built generic and fixed diagnostic binaries lacked the value
+  marker. Traced to outer Sm90EVT: standard hooks propagate, custom
+  register_d_ready does not; the collective requires-expression skipped it.
+- Added explicit project-local outer callback forwarding to Store tuple index 1.
+  This is a correctness fix, not a speed result. Rebuild and full Molab readback
+  remain required. Previous component timing numbers do not certify full FF1.
+- Saved failing evidence in test_results/ff1_full_readback_seed1_2026-09-03.log.
+  Molab subsequently returned HTTP 410; browser attachment was unavailable.
+
+## 2026-09-03 — Fixed-affine verification and benchmark bias bound
+
+- Fixed-affine timing screen719TF/s retained as provisional only: found
+  per-row bias allocation N while stride<1,0> requires M. Corrected benchmark
+  allocation/zero fill; both timing arms must be rerun with bounded buffers.
+- Molab instrumented scales:6144 reads,1024 distinct addresses,10 scale
+  values,zero mismatches. Native session returned410 after this completed
+  gate; full E2M1 readback binary built but not yet executed.
+- Added diagnostic all-payload shared reads and deterministic signed inputs.
+  No production default or beam pipeline changed.
+
+## 2026-09-02 — FF1 24/240 positive component screen
+
+- Reverse redistribution24 producer/240 consumer reduces stack72->24B and
+  compiler spill stores/loads254/304->174/192B. SASS retains128 OMMA,no STG.
+- Seven alternating Molab pairs:586.369 vs576.228TFLOP/s (~1.76% gain).
+  Experimental only; default unchanged and full-model quality not established.
+- See test_results/ff1_regs24_240_2026-09-02.md and raw JSON/build logs.
+- Candidate shared-scale readback passed6144 observations with10 distinct
+  expected values and zero address/byte errors on Molab.
+
+## 2026-09-02 — Confirmed FF1 spills; rejected register redistribution
+
+- Resource-audit build confirms72B stack,254B spill stores,304B spill loads.
+  Saved lineinfo SASS; scheduler/pipeline and epilogue annotations both appear.
+- Opt-in56/224 producer/consumer budget regresses:47.5448us vs46.4766us over
+  seven alternating Molab pairs. Compiler spills increase274/316B. Rejected;
+  default40/232 unchanged. Reproducible vendor patcher saved in test_results.
+- NCU2025.1.1 also fails LibraryNotLoaded on Molab. No driver changes or
+  invented profiler counters. See ff1_spills_register_budget_2026-09-02.md.
+
+## 2026-09-02 — Observable FF1 checksum control
+
+- Added opt-in diagnostic control consuming every epilogue fragment into
+  volatile per-CTA checksum slots; capacity checked and concurrency restricted
+  to one. It does not change normal shared-output dispatch.
+- SASS retains128 OMMA (unlike rejected discard control),168 registers and32B
+  stack. Preliminary seven-pair Molab screen:709.510TFLOP/s checksum versus
+  576.355TFLOP/s native. Checksum stores are inside timing; not full FF1.
+- Added host oracle for uniform-fixture written checksums; inactive persistent
+  CTA slots remain zero. Model-level correctness is not implied by this probe.
+- Installed only copied NCU CLI in private /tmp on Molab. Counter collection
+  failed LibraryNotLoaded/LOP initialization; no driver changes. Raw failure
+  log saved. No fabricated stall/occupancy counters.
+- Evidence: test_results/ff1_checksum_control_2026-09-02.md.
+- Strengthened uniform checksum oracle passed seven new pairs:709.615TFLOP/s
+  diagnostic control versus575.875TFLOP/s native. Raw JSON and hashes saved.
+
+## 2026-09-02 — SASS invalidates FF1 discard/values-only ceilings
+
+- Audited exact native/discard/values-only target functions. Native has128
+  OMMA; discard and values-only have ZERO OMMA. Retracted ~921TFLOP/s ceiling,
+  ~17us epilogue-cost subtraction and "free value stores" inference.
+- All three report168 registers/thread; native has72-byte stack and73 LDL /
+  61 STL static instructions. No STG does not exclude local-memory traffic.
+- Molab ncu is absent; counter profiling remains unverified. Saved raw SASS,
+  resources, binary hashes and interpretation under test_results/
+  ff1_sass_comparison_2026-09-02/. No production algorithm changes.
+
+
+## 2026-09-02 — FF1 native shared-scale partition and oracle scope correction
+
+- Defaulted the experimental shared-handoff callback to native CUTLASS tensor
+  partitioning with lane-zero-per-quad ownership; blocked the rejected
+  distributed-quad experiment at compile time.
+- Molab seven-pair A/B: 57.3485 to 46.4779 us, 466.908 to 576.111 useful TFLOP/s.
+- Confirmed unique coverage of all 1024 shared scale addresses. Added volatile
+  shared-byte readback diagnostics and an independent Molab validation script.
+- Found the role4 oracle bypasses this callback via manual register pack; its
+  passing seeds cannot establish callback correctness. Rejected relative-
+  coordinate performance results are explicitly excluded from accepted results.
+- Evidence: test_results/ff1_native_partition_review_2026-09-02.md.
+- Strengthened byte-readback gate initially rejected saturated uniform scale
+  output. Diagnostic norm=1/256 plus varied input scales gives 10 distinct
+  output bytes: 6144 observations, zero mismatches on Molab. Timing fixture
+  remains unchanged by default; model-level quality is still unverified.
+
+
+## 2026-09-02 — full-graph schema-4 NVFP4 export and loader contract
+
+- Preserved the FFN-only component exporter and added a separate fail-closed
+  full-Stream1 package path for all 17 Cube4 Transformer linear operators.
+- Extended the native SM120 encoder to offline E2M1/UE4M3 QKV, attention-out,
+  FF1, FF2 and output-head weights.  The output head records logical N=24 and
+  physical padded N=128; runtime quantization remains forbidden.
+- Extended host/device/network weight views and the schema-4 loader so every
+  full-graph artifact is verified by shape, physical bytes and SHA-256.
+- Molab SM120a compiled the encoder and production runner.  A deterministic
+  synthetic full export produced 34 files; local and Molab C++ contract tests
+  passed.  Production dispatch remains fail-closed until the persistent
+  full-Stream1 kernel exists and passes the complete speed/solve gates.
+- Recorded exact epilogue numerical passes and rejected shared-carry timing in
+  `test_results/sm120_stream1_1pf_implementation_2026-09-02.md`.
+- Corrected the persistent DSM contract target to CUDA C++20 and replaced its
+  custom global wrapper with the supported CUTLASS device entrypoint.  This
+  removed an ignored-`setmaxnreg` ptxas warning.  Molab reports 168 registers,
+  384 threads, 88,064 dynamic shared bytes and one active CTA/SM.  The skeleton
+  remains non-promotable until an integrated FF1 producer passes a numeric
+  FF1->FF2 launch.
+
+## 2026-09-02 - Began fail-closed implementation of the full-Stream1 1-PFLOP/s plan
+
+- Frozen base commit `8d487298334b39e5a5da3adc61810451289f5add` and dirty-tree fingerprints in `test_results/sm120_stream1_1pf_implementation_2026-09-02.md`; preserved inherited changes.
+- Added canonical alternating speed gates and exact three-cohort replay/solution-length quality gates.
+- Added schema-4 immutable NVFP4 component packaging with build, source, checkpoint, report, microbatch, and two-slot provenance. It remains explicitly `ffn_only/component_candidate`.
+- Verified 36 related Python contracts and 18 focused promotion contracts; `git diff --check` passed.
+- Both last authorized Molab pair endpoints were already unavailable. No GPU compile/timing was substituted outside Molab and no production profile was promoted.
+
 ## 2026-08-28 - CUTLASS A/SFA bulk-DSM producer gate on SM120
 
 - Added a real CUTLASS FF2 collective seam in
@@ -1612,6 +2375,15 @@
 - Added a compact fixed-shape CUTLASS SM120 cooperative TMA benchmark target to measure the real-memory FF1 ceiling without the compile cost of NVIDIA's grouped/reference examples.
 - Fixed long Molab compile orchestration: foreground compiler executions now emit five-second SSE heartbeats instead of buffering all output until completion; no detached jobs are used.
 - Measured the real-memory CUTLASS NVFP4 TMA FF1 path at 417.55 TFLOP/s and the fused FF1→ReLU/NVFP4→FF2 path up to 660.03 TFLOP/s at the true Cube4 `M=51072` with two concurrent slots.
+- Recovered the 2026-09-02 Molab SM120 session through the existing local
+  proxy and rebuilt CUDA 13.3/CUTLASS plus the scoped persistent DSM target.
+  The official persistent FF2 entrypoint passed with 168 registers/thread,
+  88,064 bytes shared memory and one CTA/SM.  A new exact topology A/B showed
+  that merely raising the serial fused FFN kernel from 256 to 384 threads is
+  harmful: median latency regressed from 1,827.69 to 2,059.68 us at M=32,768.
+  The 384-thread variant had an idle third warpgroup, so it is rejected; the
+  next production candidate must use a persistent work-tile scheduler with
+  one producer WG and two active ping-pong MMA WGs.
 - Added PDL support to the concurrent FFN benchmark; PDL improved one-slot throughput but two slots remained the measured optimum. Four/eight slots and `M=65536` were rejected as slower.
 - Started an `N=256` CTA-tile experiment, but Molab destroyed the live sandbox during its foreground heartbeat compilation (HTTP 410); no unverified tile selection was retained.
 - Implemented and Molab-verified the first real-weight persistent FFN kernel: 4 producer and 4 consumer warps stream eight K128 hidden slices through two CTA-local barrier-owned buffers with zero global hidden bytes. The numerical oracle is exact and M51072 reaches 328.16 TFLOP/s.
@@ -1817,3 +2589,460 @@
   `load_init` all pass inside the physical two-CTA handoff cluster.
 - The next implementation gate is scheduler-free fixed-tile `load` plus `mma`;
   no end-to-end correctness or throughput claim is made yet.
+
+## 2026-08-29 — complete direct SM120 FF1-to-FF2 numeric seam
+
+- Confirmed from compiler types that the selected RTX PRO 6000 SM120 FF1 MMA
+  accumulator is register-resident rather than SM100 TMEM-resident.
+- Added a scheduler-free two-slice FF1 path that maps register fragments to a
+  shared FP32 tile, applies bias/ReLU, and writes native UE4M3/E2M1 FF2 ring
+  storage without a global hidden tensor.
+- Verified on Molab that both physical CTAs complete and the full FF2 stage
+  returns equal nonzero checksums and equal deterministic packed-ring hashes.
+- Preserved the result as a runtime/checksum smoke. The 2026-08-31 audit
+  corrects the earlier numerical-gate claim: no elementwise oracle was run.
+
+## 2026-08-31 — audit fused FF1/FF2 before further optimization
+
+- Started from `8d487298334b39e5a5da3adc61810451289f5add` on the existing
+  `codex/stream1-generic-seq-align-impl` branch, preserving inherited dirty files.
+- Added a test-only scalar reference for signed, row/column-varying FP4 inputs,
+  per-block input scales, bias/ReLU, quantized hidden values, and full FF2.
+- Instrumented the two-slice test with poisoned output snapshots, per-element
+  checks, explicit structural-only verdicts, repeats, and a consumer-thread
+  contract check before launching an incompatible collective.
+- Corrected diagnostic offsets that previously held stage numbers, and the
+  FF1-only snapshot path that previously returned before copying any data.
+- Updated the compile script to select the direct FF1 collectives rather than
+  the previously rejected nested universal operator. No production kernel or
+  profile was changed in this audit; the stronger gate must run on Molab first.
+- Old Molab sandbox reports HTTP 410; browser reload is awaiting approval after
+  a safety rejection. Local Docker is compile-only, never GPU test evidence.
+
+## 2026-08-31 — restore Molab and fix demonstrated NVFP4 handoff defects
+
+- With explicit user approval, reloaded only `444cubCayleyPy (Copy)` and
+  reconnected natively. Fresh runtime: RTX PRO 6000 Blackwell Server Edition,
+  CUDA 13.3.73, driver 580.126.20. All builds/tests were foreground Molab jobs;
+  prior detached notebook cells were not run.
+- The new type gate caught FF1's invalid 256-consumer launch. The instantiated
+  CUTLASS tiled MMA owns 128 threads; corrected ownership and pipeline count.
+- Varied-input FF2 had 24,576/32,768 mismatches while FF1 and hidden matched.
+  Raw FP4 writers were applying a byte-addressed swizzle to nibble indices.
+  Fixed the raw physical layout using CUTLASS's subbyte layout recast.
+- A separate canonical-view regression found `make_dsm_a_stage_view` used an
+  ordinary typed pointer instead of a subbyte iterator and read out of bounds.
+  Fixed it with the explicitly typed `make_smem_ptr<Storage>(void*)` overload.
+- RED/GREEN Molab regression: baseline writers each had 12,288/16,384 wrong
+  values; the baseline helper caused illegal memory access. Fixed whole-group
+  and lane-pair writers pass through both canonical and helper views, with
+  zero value/scale errors and no CUDA error.
+- Added a CTA-wide rendezvous after FF1 producer/consumer tails, before the
+  scalar tile reuses their arena. This removes a source-level lifetime hazard;
+  it is not a sanitizer-proven race diagnosis.
+- Before final source rebuild: 20 O0 and 80 O3 full two-slice numerical runs
+  passed, followed by 80 O3 runs with the lifetime rendezvous. All three stages
+  matched the independent scalar oracle exactly on the selected fixtures.
+- Compute Sanitizer 13.3.75 and 13.0.85 reported `Device not supported` in this
+  Molab environment. No clean memcheck/racecheck result is claimed.
+- Evidence and reproducible scripts are under `test_results/`; the complete
+  model's eight-slice FFN, solve-quality checks, and full Stream1 throughput
+  remain pending. Public notebooks/profiles were not changed or pushed.
+- Final combined-source O3 build passed 400/400 full two-slice launches
+  (four seeds, 100 repeats each), zero mismatches at all three stages. Binary
+  SHA256: `06f2fe7fe026d90df1735ea8816b284dafd799f1d82b3ea9e1d25c362aa1765d`.
+- Captured all untruncated remote logs and source/binary identities in
+  `test_results/molab_sm120_audit_snapshot_20260831.json`. Local/remote source
+  fingerprints match; `git diff --check` passed; GPU is idle after tests.
+
+## 2026-08-31 — eight-slice H1024 serial-pair correctness reference
+
+- Extended the test-only FF1/FF2 kernel to four drained pairs: eight distinct
+  hidden slices, two physical packed slots, per-slice FF1 bias/weight and FF2
+  K offsets, and FP32 accumulation across pairs. This is not yet overlapped
+  production Stream1. Beam-search architecture and public profiles unchanged.
+- Added a required-hidden argument that rejects mismatched executables before
+  GPU launch; parameterized the scalar reference for H256/H512/H1024.
+- A first H1024 seed17 failure exposed a CPU-oracle division vs GPU reciprocal
+  multiplication mismatch at an exact FP4 rounding midpoint. A separate CPU /
+  CUDA diagnostic confirmed both results. Matched the explicit arithmetic
+  contract without relaxing tolerances or changing the GPU quantizer.
+- Molab H1024 final gate: 10/10 full launches over four seeds plus one FF1-only
+  uniform launch pass with zero error at raw FF1, encoded/decoded hidden and
+  FF2. Binary SHA256:
+  `41826c5f791fee943d213408240e659ef0359c08526a29f68f4111da36a795a7`.
+- Compiler resource report: 168 registers, 1,536-byte stack and register spills
+  in the 384-thread reference. Prepared 256/384-thread and scalar/cooperative
+  relocation benchmarks with poisoned outputs, oracle checks and explicit
+  single-cluster latency scope. These latest candidates are NOT run yet.
+- Molab returned HTTP 410 before benchmark upload; browser read/reload calls
+  timed out and then exposed no open tabs. Completed logs are retained locally;
+  termination cause is unknown. No local GPU tests or detached jobs used.
+- Detailed report: `test_results/sm120_eight_slice_results_2026-08-31.md`.
+
+## 2026-08-31 — recovered Molab and measured the eight-slice candidates
+
+- Restored only the existing Molab notebook through Chrome and reconnected
+  with native pairing. Explicitly selecting the Chrome extension fixed a
+  tooling mix-up with an in-app browser binding; no browser/VPN configuration
+  or credentials were changed. Old detached experiment cells stayed inactive.
+- Built and ran the frozen H1024 benchmark on RTX PRO 6000 Blackwell Server
+  Edition (SM120), nvcc 13.3.73, CUTLASS 7107b055 plus audited patches. All
+  compilation and GPU execution stayed foreground on Molab.
+- Single M128 serial-pair FFN: 384-thread/scalar-copy reference 295.840 us;
+  256-thread/cooperative-copy candidate 238.022 us, 19.54% lower latency.
+  This is neither full-card throughput nor complete Stream1 performance.
+- 160 H1024 and 80 H256/H512 standalone numerical launches pass, plus ten
+  pre-timing gates and ten final timed-output checks. Exact raw/hidden/FF2
+  oracles retained; no tolerance relaxation or model-quality claim.
+- Saved 110 complete remote log/JSON records and binary/source identities in
+  `test_results/molab_sm120_eight_full_snapshot_20260831.json`; all 55 commands
+  returned zero and all 13 bundled local/remote file hashes match.
+- Report: `test_results/sm120_eight_slice_benchmark_results_2026-08-31.md`.
+  The earlier pending-benchmark report and frozen bundle remain historical
+  checkpoints. Production profiles and unrelated dirty changes are untouched.
+- Final native postflight: no audit/compiler or GPU compute process remains;
+  0 MiB device memory and 0% GPU utilization. `git diff --check` passed.
+
+## 2026-08-31 — direct-register experiments and barrier-lifetime correction
+
+- Implemented a test-only exact-layout register-to-NVFP4 packer and verified
+  all 16,384 MMA coordinates, quad scale groups and unique packed-byte owners.
+  ReLU, reciprocal-multiply encoding and strict raw/hidden/FF2 oracles retained.
+- Direct pack, no relocation and retained FF2 accumulator all pass numerical
+  gates, but do not improve the historical 238-us single-cluster reference.
+  Added an opt-in audited CUTLASS carry parameter with unchanged clear-by-default
+  API, after a RED test proved the stock per-call clear loses previous pairs.
+- Full shared carry/one-stage FF1 failed legal stage and shared-memory checks.
+  Preserved those failures; implemented a compact two-stage 32-KiB shared plus
+  64-register partial carry instead. Production beam architecture untouched.
+- Compact reuse exposed deterministic corruption of 32 bytes at the old FF1
+  mbarrier address after the next pipeline initialization. Byte traces proved
+  post-copy data was intact and both FF2 MMA consumers received the corrupted
+  row. A proxy fence alone did not fix it. Explicitly invalidating drained
+  FF1/FF2/handoff barriers before reuse fixes the observed failure.
+- Test harness defaults now include cross-proxy publication and mbarrier
+  lifetime closure. Experimental packing/carry switches stay off. All 160
+  post-fix standalone H256/H512/H1024 launches and eight timed-process gates
+  pass on Molab. No oracle tolerance was relaxed; no sanitizer pass claimed
+  because Compute Sanitizer is unavailable in the current sandbox.
+- Final equally guarded A/B: reference 240.055 us; half-shared candidate
+  253.313 us (5.52% slower), despite local bytes/thread falling 1056 -> 304.
+  Retain the corrected reference. This is one M128 serial FFN cluster, not
+  whole-card or complete Stream1 throughput and not a model-quality result.
+- Saved all failed/successful bundles plus a complete 801,429-byte snapshot
+  with 286 records, 16 source and 17 binary identities and exact vendor headers;
+  all six final bundle files match remote hashes. GPU idle at postflight.
+- Report: `test_results/sm120_direct_register_results_2026-08-31.md`.
+  No commit/push of inherited mixed dirty changes; no local GPU tests,
+  detached jobs, new worktrees, paid services or subagents.
+
+## 2026-08-31 — independent multi-cluster FFN and eager/graph measurement
+
+- Added runtime M-tile count (1..256) to the test-only fused FF1/FF2 executable.
+  Each two-CTA cluster receives distinct input rows and disjoint diagnostics,
+  snapshots and outputs. The scalar host oracle now checks all requested rows.
+- Added matched eager/CUDA-Graph timing with separately measured CPU enqueue
+  cost, output poisoning, full pre/post numerical checks, exact dense useful
+  FLOP numerator and CUDA occupancy/resource reporting. Production unchanged.
+- Molab: 15/15 new standalone numerical launches pass, plus five completed
+  timed processes with pre/post oracles. Max observed absolute error is zero.
+  Existing guarded control also passed two standalone launches before changes.
+- Graph gains only 0.56..0.71% at one/two clusters. M2048/16 clusters reaches
+  248.985 us and 8.62494 useful FFN TFLOP/s. This is a partial occupancy
+  measurement, not full-card saturation or complete Stream1 performance.
+- The 64-cluster request lost SSE during the CPU-reference phase, with no
+  terminal device result. Normal reopening of the same notebook scheduled
+  another sandbox, but native API timed out and UI reported EventSource failure.
+  No crash/OOM cause, idle postflight or complete remote log snapshot is claimed.
+- Frozen source bundles, observed metrics, deterministic foreground runners and
+  detailed report retained under `test_results/sm120_multicluster*`. Prepared
+  large-M control build/run scripts remain unexecuted. No mixed-worktree commit
+  or push; no local GPU tests, detached jobs, new clones, subagents or paid work.
+
+## 2026-09-02 — role-separated SM120 FFN direct fragment handoff
+
+- Added static zero-atomic persistent tile ownership and a two-slot ready/free
+  generation ring for the intended producer/two-consumer topology. Molab
+  ownership and hardware handoff contracts pass on 1,003 tiles.
+- Rejected eight FF2 consumer warps, the M32/512-thread topology, FF2 A/SFA
+  loop hoisting, and serial-FF1 noinline as production directions from matched
+  measurements. The last two reduced registers but did not remove the serial
+  architectural bottleneck.
+- Replaced the M16 row-major FP4 scratch plus repack pass with unique direct
+  packed-byte writes into FF2 physical fragment order. Seven alternating exact
+  Molab pairs improve 51,072-row component median 140.559 -> 130.119 us
+  (1.0802x), about 412 useful TFLOP/s, while registers fall 78 -> 66 and shared
+  storage 6,784 -> 4,736 bytes. This is accepted only as a positive FFN
+  component; full Stream1 and schema-4 production dispatch remain gated.
+- Restored a lost Molab sandbox through the normal UI. The accepted rerun used
+  matching nvcc 13.3.73, runtime headers 13.3.29 and CCCL 13.3.3.4.1 in `/tmp`;
+  no compatibility check was bypassed and no partial pre-loss samples were
+  included.
+2026-09-02: Rejected the SM120 direct-pack M16 `8 producer + 4 consumer`
+topology after seven exact alternating Molab pairs.  It reduced occupancy from
+3 to 2 blocks/SM and regressed `0.130112 ms` to `0.167847 ms` (0.77518x).
+Kept the accepted `4 producer + 4 consumer` default.
+
+## 2026-09-02 — current CUTLASS FFN control and Molab build boundary
+
+- Rejected the M16 `4 producer + 2 consumer` topology after seven exact
+  alternating pairs: `0.130187 -> 0.287724 ms`, registers `66 -> 96`.
+- Reproduced the real CUTLASS NVFP4 global-handoff FFN with an exact scalar
+  oracle and seven alternating large-M pairs.  The current two-slot median is
+  `0.174633 ms / 613.320 aggregate TFLOP/s`; four slots regressed to
+  `531.724 TFLOP/s`.
+- Molab repeatedly terminated sandboxes during long nvcc child processes.
+  Used the previously approved Docker-compile/Molab-run exception with pinned
+  CUDA 13.3.73, runtime 13.3.29, CCCL 13.3.3.4.1 and CUTLASS 7107b055.  Runtime
+  measurements and the exact oracle remained strictly on Molab SM120.  Native
+  Molab compilation remains required before release-profile promotion.
+## 2026-09-02 - Four-CTA FF1/FF2 role separation contract
+
+- Replaced the infeasible assumption that a stock 384-thread CUTLASS FF1 can
+  occupy one 128-thread producer warpgroup with an explicit 2x2 CTA topology:
+  two full FF1 producer CTAs and two full FF2 consumer CTAs.
+- Added a 17-generation bulk-DSM/mbarrier transport oracle with two producer
+  slots, two consumers, no hot-loop cluster rendezvous and no atomic work
+  ownership.  The exact SM120a binary compiles with CUDA 13.3/CUTLASS pinned
+  inputs; target runtime verification remains pending because the Molab CUA
+  session could not be attached.
+## 2026-09-02 - SM120 four-CTA role-separated DSM gate passed on Molab
+
+- Recovered the authorized Molab notebook runtime and pairing endpoint without
+  persisting its credential.
+- Ran the exact SHA-pinned `sm_120a` role-separated contract binary on an
+  NVIDIA RTX PRO 6000 Blackwell Server Edition.
+- The 2-producer/2-consumer, 8-cluster, 17-generation bulk-DSM handoff passed
+  with zero violations and no CUDA/barrier errors.
+- This validates the topology and synchronization contract only.  Numeric
+  FF1 -> FF2 integration and end-to-end performance remain open gates.
+
+## 2026-09-02 - FF1-only pair-packed sparse NVFP4 experiment
+
+- Isolated the requested experiment to FF1 only; FF2 is excluded from both the
+  code path and the useful-throughput numerator.
+- Added an exact algebraic contract for packing two independent `K=256,N=1024`
+  FF1 products into one `K=512,N=2048` 2:4 structured-sparse product.  The
+  contract proves no cross terms, exact two-of-four structure, and the required
+  `/2` conversion from CUTLASS dense-equivalent to useful FF1 throughput.
+- Added the dedicated SM120 target
+  `stream1_transformer_sm120_sparse_nvfp4_pair_ff1_benchmark`; it rejects shapes
+  other than physical `M=2048,K=512` and reports both throughput conventions.
+- Local algebraic verification passed `3/3` tests.  A fresh Molab RTX PRO 6000
+  sandbox reached CUDA 13.3/CUTLASS compilation, then disappeared with HTTP 410
+  and no terminal compiler/CUDA error; classify this attempt as `platform_loss`,
+  not OOM or a performance result.
+
+## 2026-09-02 - FF1 coded-width 2/4/8 SM120 sweep
+
+- Generalized the FF1-only contract to orthogonal non-diagonal width-4 and
+  width-8 transforms with exact 2:4 quartet occupancy and scaled-transpose
+  decoding; local algebraic verification now passes 6/6 tests.
+- Made the coded FF1 CUTLASS benchmark standalone from `beam_cuda`, compiled
+  the exact `sm_120a` binary locally with the pinned CUDA 13.3 toolchain, and
+  verified its SHA-256 after upload to private Molab.
+- Completed 7/7 SM120 runs for physical K=512/1024/2048 at original M=32768.
+  Median dense-equivalent throughput rose 615.904 -> 1125.683 -> 1338.736
+  TFLOP/s, while median useful FF1 throughput fell 307.952 -> 281.421 ->
+  167.342 TFLOP/s.
+- Rejected coded K=1024/2048 for production: larger physical K improves raw
+  occupancy but the unavoidable encoded-work factor dominates useful latency.
+  Continue from the width-2 physical primitive rather than quoting its raw
+  dense-equivalent PFLOP/s as useful model work.
+
+## 2026-09-02 - Cyclic Latin-square sparse FF1 feasibility gate
+
+- Formalized the proposed `1 4 3 2 / 2 1 4 3 / 3 2 1 4 / 4 3 2 1` placement
+  and its width-8 generalization.  Verified exact Latin balance and exact
+  coverage by two complementary 2:4 phases.
+- Added a scalar contraction oracle showing that one sparse MMA sends both
+  selected K products to the same C accumulator.  The proposed phase therefore
+  retains only cross-task pair sums; layout permutation cannot recover the
+  independent outputs after reduction.  The expanded contract passes 10/10
+  tests.
+- CUTLASS SM120 sparse traits confirm `CLayout` depends on M/N and threads, not
+  K metadata.  Two independent expert reviews matched the local result.
+- Do not benchmark the invalid single-accumulator Latin interpretation.  A
+  Latin macro-panel remains usable only with task-local accumulator fragments
+  and separate MMA contractions inside one persistent launch.
+
+## 2026-09-02 - Exact N-packed sparse FF1 and K=512 control
+
+- Corrected the independent-job mapping: put jobs/rows in the free N dimension
+  as `W^T[1024,256] * X^T[256,R]`; physical contraction K remains 256.
+- Extended the standalone benchmark guard with width 1 for this exact path and
+  added an algebraic transpose-equivalence regression test.
+- On Molab SM120, seven alternating runs measured 333.893 useful TFLOP/s for
+  exact N-packed K=256 versus 296.079 useful TFLOP/s for the coded physical
+  K=512 control, a 12.77% advantage.  Retain K=256; reject K=512 enlargement.
+
+## 2026-09-02 - FF1 no-global-hidden correctness and timing gate
+
+- Rebuilt the dense NVFP4 role-separated kernel for exact D256/H1024 and
+  verified raw FF1 plus quantized shared-ring hidden against an independent
+  oracle with zero mismatches.  The timed path has compile-time void D,
+  zero FP32 shared intermediate bytes and zero snapshot writes.
+- The current FF1-only stop gate reached only 13.6064 useful TFLOP/s because it
+  still launches a four-CTA FF1/FF2 cluster with two idle FF2 CTAs and retains
+  the full fused-kernel resource footprint (168 registers, 928 local bytes,
+  87,040 shared bytes, 46 active clusters on 188 SMs).
+- Do not treat this as the optimized FF1 ceiling.  Build a producer-only
+  benchmark with the identical FF1 mainloop/shared-only epilogue and no FF2
+  CTAs/barriers before further arithmetic tuning.
+# 2026-09-02 - Verified producer-only FF1 without global D/SFD materialization
+
+- Added an idempotent CUTLASS patch hook that suppresses only the final global
+  SFD copy in performance builds while preserving scale computation in
+  registers and the shared FF1-to-FF2 handoff.
+- Added runtime and SASS contracts proving the selected FF1 kernel emits no
+  global D/SFD stores while retaining OMMA, TMA loads and shared handoff stores.
+- On Molab SM120, seven alternating M32768 runs improved median useful FF1 from
+  403.838 to 459.591 TFLOP/s.  At canonical M51072, one/two slots reached
+  501.779/542.976 aggregate median TFLOP/s; four slots regressed to 536.564.
+- Retained two physical slots and recorded that the isolated FF1 gap to 1
+  PFLOP/s remains 1.842x.  No full FFN or Stream1 performance claim is made.
+# 2026-09-03 - QKV LayerNorm-to-NVFP4 register-pack boundary
+
+- Specialized QKV pre-norm to skip a known-zero residual-bias load and the
+  redundant rewrite of the unchanged FP16 residual.
+- Reassigned each thread an adjacent value pair and packed the rounded FP16
+  activation directly from registers, removing the 256-half shared roundtrip
+  and final CTA barrier while retaining exact UE4M3 scale layout.
+- Molab component A/B was bit-exact and improved 0.112537 -> 0.105413 ms
+  (1.067x).  Full trained B896 graph improved 2.282717 -> 2.264416 ms and
+  392,515 -> 395,687 states/s (0.81%).
+- Rejected the first register-pack mapping (`tid,tid+128`): it regressed 29.8%
+  from duplicated reductions and higher register pressure.  Applying adjacent
+  ownership to the residual-writing FFN boundary also regressed the full graph
+  by 0.29%, so that call was restored.  The retained change is QKV-only; the
+  next target is eliminating the FP16 attention-out boundary.
+
+# 2026-09-03 - Production deferred-bias LN1-to-NVFP4 QKV
+
+- Integrated the measured contiguous-register LN1 activation producer with
+  the offline-NVFP4 256-to-768 QKV projection in the production generic
+  Transformer loop.
+- Preserved layer-0 residual identity and later-layer deferred FF2-bias
+  semantics; reused the existing FF hidden scratch and added no allocation.
+- Molab trained B896 A/B improved 2.268576 to 2.196699 ms (3.27%) and 394,961
+  to 407,885 states/s.  Ten shallow Cube4 cases remained 10/10 solved,
+  replay-valid, and identical in solution length.
+- Full production `stream1_transformer.cu` compilation passed on SM120; the
+  initial standalone failure was traced to omitted CUTLASS compile macros.
+## 2026-09-04 - Molab SM120a recovery and NVFP4 feature-target correction
+
+- Recovered the exact Cube4 production source/model bundle in a fresh Molab
+  sandbox using foreground chunked transfer and foreground build execution.
+- Corrected the Molab production build harness from CUDA architecture `120`
+  to feature target `120a`; ordinary `sm_120` runs FP16 but deliberately
+  aborts CUTLASS block-scaled NVFP4 MMA.
+- Rebuilt and hashed the production benchmark and stock NVFP4 oracle, passed
+  identity and dense numerical tests, and exported all 17 offline NVFP4
+  linear operators from the FP32 checkpoint with `num_classes=6`.
+- Reproduced the canonical FP16 B896/c1 full-Stream1 control at 2.9735 ms and
+  112.073 dense-equivalent TFLOP/s.  Schema-4 production dispatch remains
+  fail-closed until the persistent full-Stream1 entrypoint and acceptance
+  reports exist.
+- Replaced the stream benchmark report's stale hard-coded `75,86` architecture
+  label with the effective CMake architecture list, so future SM120a evidence
+  cannot be mislabelled as a T4/Ampere build.
+# 2026-09-04 — Reproduced SM120 FFN incumbent and rejected slow persistent candidate
+
+- Rebuilt the retained CUTLASS NVFP4 FF1→ReLU/pack→FF2 benchmark on Molab as
+  `sm_120a`; three independent scalar seeds passed with zero hidden-scale,
+  hidden-payload and BF16-output mismatches.
+- Reproduced `615.892 TFLOP/s` aggregate at M51072 with two physical slots.
+- Built and ran the current zero-global-hidden persistent candidate: its exact
+  numerical gates passed, but M51072 delivered `361.883 TFLOP/s` for one batch
+  and only `429.190 TFLOP/s` aggregate with two slots, so it remains rejected.
+- Added and runtime-verified the benchmark-only two-slot aggregate arm.
+- Rejected the exact `M256` stock CUTLASS tile at `91.661 TFLOP/s`; Molab was
+  lost while compiling the `N256` arm, so no N256 result is claimed.
+- Restored the exact 19,373,448-byte source/model bundle in a fresh Molab
+  sandbox (SHA-256 `908293c1c8da2320fb7a647ebb98b7f9ffade89f097be0372781675e265599ff`),
+  rebuilt production against CUDA 13.3 and CUTLASS `59e3a3338d516ca6ce0e073af8da65289678a35c`,
+  then completed the interrupted `N256` screen.  It was numerically exact but
+  reached only `93.746 TFLOP/s` at M51072/two slots (`1.142512 ms`), so both
+  large-tile variants are rejected.
+- Re-profiled the exact role-separated four-CTA FF1/DSM/FF2 prototype at one
+  occupied SM120 wave (`M=5888`, 46 clusters): structural 6.7584 us, one FF1
+  pair 14.7456 us, one FF1-to-FF2 pair 31.1296 us, and four complete pairs
+  50.9312 us / 121.223 useful TFLOP/s.  Complete output remained numerically
+  exact.  The harness launches only 256 threads and one 128-thread FF1 math
+  warpgroup, unlike the retained stock two-math-warpgroup ping-pong kernel.
+  The next candidate restores dual FF1 math warpgroups and computes two H128
+  slices concurrently per producer CTA; transport-only tuning of the current
+  half-width arithmetic schedule is rejected.
+- Rebuilt the exact role-separated kernel natively on Molab with 384 threads
+  as a control.  Output stayed exact, but the unused third warpgroup introduced
+  a 392-byte stack plus 1,376/1,392-byte spill stores/loads; full one-wave
+  latency regressed 50.9312 -> 74.3424 us and useful throughput 121.223 ->
+  83.0484 TFLOP/s.  A valid dual-math-WG candidate must assign independent
+  H128 slices and accumulator/epilogue state to the third warpgroup; merely
+  increasing block threads is now explicitly rejected.
+- Recovered the terminal HTTP-410 Molab run through the existing Cube4
+  notebook, restarted its unchanged RTX Pro 6000 profile, re-verified the
+  19,373,448-byte restore archive, and rebuilt the identical source with CUDA
+  13.3/CUTLASS `59e3a333...a35c` in a visible durable foreground cell.  CUTLASS
+  inspection fixed the next implementation contract: dual FF1 math warpgroups
+  require distinct H128 tiles, shifted pipeline states, ordered MMA/epilogue
+  ownership and disjoint packed-output slots.
+## 2026-09-04 - Rejected exact dual-WG role4 FFN fusion
+
+- Implemented and Molab-tested two CUTLASS FF1 math warpgroups with stock
+  ordered barriers and offline NVFP4 shared-only epilogue.
+- Fixed a real DSM handoff deadlock by separating logical slice order from the
+  monotonic three-stage pipeline ordinal and using two two-tile subwaves.
+- Exact full FF1/packed hidden/FF2 checks passed, including timed output.
+- At Cube4 `B=896`, the candidate reached only `87.412 TFLOP/s`
+  (`612.649 us` median), versus the eligible `615.892 TFLOP/s` stock control.
+  The route is therefore retained only as diagnostic code behind a default-off
+  macro and is not a production candidate.
+2026-09-04: Rejected the exact dual-math-warpgroup role4 FF1->NVFP4->FF2
+candidate at canonical B896 (87.412 TFLOP/s versus 615.892 stock control).
+Selected a bounded transposed-stock-FF1 A/B as the next gate; it preserves
+K256 and exact model arithmetic and requires payload/scale equality before
+timing or production integration.
+2026-09-04: Superseded the first conventional-versus-transposed SM120 NVFP4
+FF1 orientation screen. Although it reported 53.3552 us versus 52.0544 us,
+both variants accidentally used the per-row bias callback; production
+conventional FF1 uses per-column bias, while only `W^T * X^T` maps the original
+hidden dimension to rows and requires per-row bias. The apparent 2.438% is not
+valid production evidence. The source now selects PerCol/PerRow by orientation;
+a corrected Molab A/B is pending runtime restart.
+2026-09-04: Completed the transposed FF1 output-layout derivation before the
+rerun. Logical `[1024, rows]` now writes column-major D, giving the same physical
+bytes as production row-major `[rows, 1024]` without a relayout; the harness
+also uses CUTLASS' matching MN-major SFD layout for the column-major callback.
+Acceptance requires full packed-output and logical-scale equality, not a
+discard-output timing.
+2026-09-04: Converted the corrected FF1 orientation harness from a
+discard-payload screen to a complete-output gate. Both variants now materialize
+the E2M1 D payload, canonicalize SFD as `(row, hidden_group)`, and print separate
+full-payload and logical-scale hashes for equality checks before timing can be
+accepted.
+2026-09-04: Added `test_results/molab_ff1_orientation_full_output_ab.py`, a
+foreground-only seven-pair Molab runner. It alternates process order, records
+GPU and binary fingerprints, rejects missing/nondeterministic/different payload
+or SFD hashes, and reports median plus conservative nearest-rank p95. Local
+syntax and parser self-checks pass; GPU execution remains Molab-only.
+2026-09-04: Replaced uniform FF1 orientation-screen initialization with the
+same deterministic, non-symmetric logical input/weight tensors, independent
+per-K16 activation/weight scales, and nonzero output bias packed separately for
+each A/B orientation. This closes the false-equality case where a broken
+transpose can appear correct on constant bytes.
+# 2026-09-15 — full-size FFN oracle completed
+
+- Completed all51072 rows, both slots, same restored binary917fa92f, independent
+  scalar hidden/scales/FF2/post-timing checks: zero mismatches across25 ranges.
+- GPU shape unchanged; partitioned only host reference coverage. Final SSE exit0.
+- Report: test_results/ffn_full_oracle_completed_20260915.md. This is synthetic
+  fixture correctness, not trained-model quality, sanitizer or fresh A/B evidence.
+# 2026-09-15 — matched seven-pair FFN refresh completed
+
+- Same-source control/candidate, seven alternating pairs in one Molab session:
+  median .172910 -> .149682ms,619.431 ->715.555TF/s (+15.518%).
+- Exact candidate binary has completed full-size two-slot scalar oracle.
+- Still42.576us aggregate latency above1PF target. Hardware attribution pending;
+  ncu absent, driver RmProfilingAdminOnly=0. Report in test_results/ffn_matched_seven_completed_20260915.md.
