@@ -1,0 +1,264 @@
+{
+  "scope": "correctness and resident lifetime; no performance promotion",
+  "graph_hash": "bc350192707e0d443714b11e5e774a5b042e2a9145bf6d11742ab8d919c5178e",
+  "results": [
+    {
+      "variant": "reference",
+      "world": 1,
+      "sequence": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.48488293599803,
+      "worker_pids": [
+        9644
+      ],
+      "terminal": {
+        "native_seconds": 0.0929263,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 1,
+      "sequence": 1,
+      "path": [
+        3,
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.14195772399398265,
+      "worker_pids": [
+        9644
+      ],
+      "terminal": {
+        "native_seconds": 0.120912,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 1,
+      "sequence": 2,
+      "path": null,
+      "beam_width": 64,
+      "elapsed_seconds": 0.16229726600431604,
+      "worker_pids": [
+        9644
+      ],
+      "terminal": {
+        "native_seconds": 0.14373,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 1,
+      "sequence": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.364275077,
+      "worker_pids": [
+        9658
+      ],
+      "terminal": {
+        "native_seconds": 0.0875394,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 1,
+      "sequence": 1,
+      "path": [
+        3,
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.121887534,
+      "worker_pids": [
+        9658
+      ],
+      "terminal": {
+        "native_seconds": 0.112621,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 1,
+      "sequence": 2,
+      "path": null,
+      "beam_width": 64,
+      "elapsed_seconds": 0.152458624,
+      "worker_pids": [
+        9658
+      ],
+      "terminal": {
+        "native_seconds": 0.140381,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 2,
+      "sequence": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 1.1754874670004938,
+      "worker_pids": [
+        9673,
+        9674
+      ],
+      "terminal": {
+        "native_seconds": 0.143982,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 2,
+      "sequence": 1,
+      "path": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.061672687996178865,
+      "worker_pids": [
+        9673,
+        9674
+      ],
+      "terminal": {
+        "native_seconds": 0.0381779,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "reference",
+      "world": 2,
+      "sequence": 2,
+      "path": null,
+      "beam_width": 64,
+      "elapsed_seconds": 0.061176436000096146,
+      "worker_pids": [
+        9673,
+        9674
+      ],
+      "terminal": {
+        "native_seconds": 0.0415959,
+        "terminal_records": 2,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 2,
+      "sequence": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.970329162,
+      "worker_pids": [
+        9712,
+        9713
+      ],
+      "terminal": {
+        "native_seconds": 0.150566,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 2,
+      "sequence": 1,
+      "path": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "beam_width": 64,
+      "elapsed_seconds": 0.050955168,
+      "worker_pids": [
+        9712,
+        9713
+      ],
+      "terminal": {
+        "native_seconds": 0.0410681,
+        "terminal_records": 1,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    },
+    {
+      "variant": "rust",
+      "world": 2,
+      "sequence": 2,
+      "path": null,
+      "beam_width": 64,
+      "elapsed_seconds": 0.061250174,
+      "worker_pids": [
+        9712,
+        9713
+      ],
+      "terminal": {
+        "native_seconds": 0.0437362,
+        "terminal_records": 2,
+        "observed_parent_batch": null,
+        "observed_inference_rows": null,
+        "observed_stream3_batch_candidates": null
+      }
+    }
+  ]
+}

@@ -30,14 +30,17 @@ def file_sha256(path: Path) -> str:
 
 def source_digest(source: Path, *, cutlass: bool = False) -> str:
     """Hash source content, including dirty files; ignore build/output trees."""
-    roots = [source / "include"] if cutlass else [source / p for p in ("src", "cuda", "tools", "cmake")]
+    roots = [source / "include"] if cutlass else [source / p for p in ("src", "cuda", "tools", "cmake", "native", "rust")]
     if cutlass:
         roots.append(source / "tools" / "util" / "include")
     files = [source / "CMakeLists.txt"] if not cutlass else []
-    extensions = {".h", ".hpp", ".cuh", ".c", ".cpp", ".cu", ".cmake", ".py", ".in"}
+    if not cutlass:
+        files.extend(source / name for name in ("Cargo.toml", "Cargo.lock") if (source / name).is_file())
+    extensions = {".h", ".hpp", ".cuh", ".c", ".cpp", ".cu", ".cmake", ".py", ".in", ".rs", ".toml"}
     for root in roots:
         if root.is_dir():
-            files.extend(p for p in root.rglob("*") if p.is_file() and p.suffix in extensions)
+            files.extend(p for p in root.rglob("*") if p.is_file() and p.suffix in extensions
+                         and not any(part in ("target", "__pycache__", ".pytest_cache") for part in p.relative_to(root).parts))
     digest = hashlib.sha256()
     for path in sorted(set(files)):
         if not path.is_file():

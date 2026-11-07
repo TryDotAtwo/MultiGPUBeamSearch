@@ -10,8 +10,9 @@
 /data/
 /stream1_weights*/
 /history*/
-/test_results/
+/test_results/*
 !/test_results/refactor_20261107/
+!/test_results/refactor_20261107/**
 /CayleyPy/
 /cayleypy_public/
 /FullBeamNice/
@@ -36,3 +37,10 @@ __pycache__/
 *.tmp
 *.log
 /target/
+/_bench_external/
+/meganinx_submission_69315_with_github_best.csv
+/merged_submission_69244_69630_best.csv
+/submit.csv
+/publish_receipts.json
+/publish_status.json
+/skills-lock.json

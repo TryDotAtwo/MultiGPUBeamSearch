@@ -1,4 +1,5 @@
 #pragma once
+#include "../native/engine_control.hpp"
 
 // The owning Python process is the only writer. Every rank observes the same
 // atomically published request; a rank failure invalidates the entire group.
@@ -15,6 +16,7 @@
 
 namespace beam::resident {
 class Mailbox {
+    beam::native::Control* control_ = beam::native::current_control();
     std::filesystem::path root_;
     std::uint32_t rank_;
     std::ofstream log_;
@@ -25,12 +27,18 @@ class Mailbox {
 public:
     Mailbox(std::filesystem::path root, std::uint32_t rank):root_(std::move(root)),rank_(rank) {}
     ~Mailbox() { restore(); }
-    bool enabled() const { return !root_.empty(); }
+    bool enabled() const { return control_ || !root_.empty(); }
     void restore() {
         if(original_) { std::cout.flush(); std::cout.rdbuf(original_); original_=nullptr; }
         if(log_.is_open()) log_.close();
     }
     bool next(std::size_t sequence, nlohmann::json& request) {
+        if(control_) {
+            beam::native::Job job;
+            if(!control_->next(job)) return false;
+            if(job.sequence != sequence) throw std::runtime_error("native request sequence mismatch");
+            request = {{"sequence", job.sequence}, {"start", job.state}, {"run_dir", job.directory}};
+        } else {
         auto path=root_/ ("request-"+std::to_string(sequence)+".json");
         while(!std::filesystem::exists(path)) {
             if(std::filesystem::exists(root_/"stop")) return false;
@@ -43,6 +51,7 @@ public:
         std::ifstream input(path); input>>request;
         if(request.at("sequence").get<std::size_t>()!=sequence)
             throw std::runtime_error("resident request sequence mismatch");
+        }
         const auto directory=std::filesystem::path(request.at("run_dir").get<std::string>());
         if(!directory.is_absolute() || !std::filesystem::is_directory(directory))
             throw std::runtime_error("resident output directory must exist and be absolute");
@@ -53,6 +62,7 @@ public:
     }
     void complete(std::size_t sequence) {
         restore();
+        if(control_) { control_->complete(sequence); return; }
         auto path=root_/("done-"+std::to_string(sequence)+"-"+std::to_string(rank_)+".json");
         auto temporary=path; temporary += ".tmp";
         { std::ofstream out(temporary); out<<nlohmann::json{{"sequence",sequence},{"rank",rank_}};

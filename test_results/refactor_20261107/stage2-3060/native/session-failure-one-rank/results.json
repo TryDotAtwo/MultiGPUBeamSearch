@@ -1,0 +1,20 @@
+[
+  {
+    "mode": "cancel",
+    "error": "resident search cancelled",
+    "exit_codes": [
+      0,
+      0
+    ],
+    "seconds": 1.9295033710004645
+  },
+  {
+    "mode": "failed_rank",
+    "error": "resident worker exited: [None, Some(1)]; logs=/workspace/beam-results/native/session-failure-one-rank/failed_rank/session",
+    "exit_codes": [
+      -1,
+      1
+    ],
+    "seconds": 2.1608297470011166
+  }
+]

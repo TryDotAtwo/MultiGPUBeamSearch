@@ -1,0 +1,207 @@
+========= COMPUTE-SANITIZER
+reference world=1 seconds=7.755
+rust world=1 seconds=7.419
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0x44482] in production_runner
+=========         Host Frame: run_production_runner(int, char**) [0x520fa] in production_runner
+=========         Host Frame: main [0x2f2bf] in production_runner
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0x44482] in production_runner
+=========         Host Frame: run_production_runner(int, char**) [0x520fa] in production_runner
+=========         Host Frame: main [0x2f2bf] in production_runner
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0x44482] in production_runner
+=========         Host Frame: run_production_runner(int, char**) [0x520fa] in production_runner
+=========         Host Frame: main [0x2f2bf] in production_runner
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0x44482] in production_runner
+=========         Host Frame: run_production_runner(int, char**) [0x520fa] in production_runner
+=========         Host Frame: main [0x2f2bf] in production_runner
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0x44482] in production_runner
+=========         Host Frame: run_production_runner(int, char**) [0x520fa] in production_runner
+=========         Host Frame: main [0x2f2bf] in production_runner
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0x44482] in production_runner
+=========         Host Frame: run_production_runner(int, char**) [0x520fa] in production_runner
+=========         Host Frame: main [0x2f2bf] in production_runner
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0x44482] in production_runner
+=========         Host Frame: run_production_runner(int, char**) [0x520fa] in production_runner
+=========         Host Frame: main [0x2f2bf] in production_runner
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0x44482] in production_runner
+=========         Host Frame: run_production_runner(int, char**) [0x520fa] in production_runner
+=========         Host Frame: main [0x2f2bf] in production_runner
+========= 
+reference world=2 seconds=15.124
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0xbb45a] in libbeam_native.so
+=========         Host Frame: run_production_runner(int, char**) [0xc915a] in libbeam_native.so
+=========         Host Frame: std::thread::_State_impl<std::thread::_Invoker<std::tuple<beam_context_prepare::{lambda()#1}> > >::_M_run() [0x23a8c3] in libbeam_native.so
+=========         Host Frame:  [0xdc252] in libstdc++.so.6
+=========         Host Frame:  [0x94ac2] in libc.so.6
+=========         Host Frame: clone [0x125a03] in libc.so.6
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0xbb45a] in libbeam_native.so
+=========         Host Frame: run_production_runner(int, char**) [0xc915a] in libbeam_native.so
+=========         Host Frame: std::thread::_State_impl<std::thread::_Invoker<std::tuple<beam_context_prepare::{lambda()#1}> > >::_M_run() [0x23a8c3] in libbeam_native.so
+=========         Host Frame:  [0xdc252] in libstdc++.so.6
+=========         Host Frame:  [0x94ac2] in libc.so.6
+=========         Host Frame: clone [0x125a03] in libc.so.6
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0xbb45a] in libbeam_native.so
+=========         Host Frame: run_production_runner(int, char**) [0xc915a] in libbeam_native.so
+=========         Host Frame: std::thread::_State_impl<std::thread::_Invoker<std::tuple<beam_context_prepare::{lambda()#1}> > >::_M_run() [0x23a8c3] in libbeam_native.so
+=========         Host Frame:  [0xdc252] in libstdc++.so.6
+=========         Host Frame:  [0x94ac2] in libc.so.6
+=========         Host Frame: clone [0x125a03] in libc.so.6
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0xbb45a] in libbeam_native.so
+=========         Host Frame: run_production_runner(int, char**) [0xc915a] in libbeam_native.so
+=========         Host Frame: std::thread::_State_impl<std::thread::_Invoker<std::tuple<beam_context_prepare::{lambda()#1}> > >::_M_run() [0x23a8c3] in libbeam_native.so
+=========         Host Frame:  [0xdc252] in libstdc++.so.6
+=========         Host Frame:  [0x94ac2] in libc.so.6
+=========         Host Frame: clone [0x125a03] in libc.so.6
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0xbb45a] in libbeam_native.so
+=========         Host Frame: run_production_runner(int, char**) [0xc915a] in libbeam_native.so
+=========         Host Frame: std::thread::_State_impl<std::thread::_Invoker<std::tuple<beam_context_prepare::{lambda()#1}> > >::_M_run() [0x23a8c3] in libbeam_native.so
+=========         Host Frame:  [0xdc252] in libstdc++.so.6
+=========         Host Frame:  [0x94ac2] in libc.so.6
+=========         Host Frame: clone [0x125a03] in libc.so.6
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0xbb45a] in libbeam_native.so
+=========         Host Frame: run_production_runner(int, char**) [0xc915a] in libbeam_native.so
+=========         Host Frame: std::thread::_State_impl<std::thread::_Invoker<std::tuple<beam_context_prepare::{lambda()#1}> > >::_M_run() [0x23a8c3] in libbeam_native.so
+=========         Host Frame:  [0xdc252] in libstdc++.so.6
+=========         Host Frame:  [0x94ac2] in libc.so.6
+=========         Host Frame: clone [0x125a03] in libc.so.6
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0xbb45a] in libbeam_native.so
+=========         Host Frame: run_production_runner(int, char**) [0xc915a] in libbeam_native.so
+=========         Host Frame: std::thread::_State_impl<std::thread::_Invoker<std::tuple<beam_context_prepare::{lambda()#1}> > >::_M_run() [0x23a8c3] in libbeam_native.so
+=========         Host Frame:  [0xdc252] in libstdc++.so.6
+=========         Host Frame:  [0x94ac2] in libc.so.6
+=========         Host Frame: clone [0x125a03] in libc.so.6
+========= 
+========= Program hit cudaErrorNoKernelImageForDevice (error 209) due to "no kernel image is available for execution on the device" on CUDA API call to cudaFuncGetAttributes.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: ncclInitKernelsForDevice(int, int, unsigned long*) in enqueue.cc:40 [0x60bf6] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankFunc(ncclAsyncJob*) in init.cc:1401 [0x74d24] in libnccl.so.2
+=========         Host Frame: ncclAsyncLaunch(ncclAsyncJob*, ncclResult_t (*)(ncclAsyncJob*), void (*)(ncclAsyncJob*), void (*)(void*), ncclComm*) in group.cc:35 [0x6ac20] in libnccl.so.2
+=========         Host Frame: ncclCommInitRankDev(ncclComm**, int, int, ncclUniqueId*, int, int, ncclConfig_v22700*, char const*) in init.cc:1832 [0x7760a] in libnccl.so.2
+=========         Host Frame: pncclCommInitRank in init.cc:1858 [0x77827] in libnccl.so.2
+=========         Host Frame: (anonymous namespace)::create_nccl_runtime(unsigned int, unsigned int) [0xbb45a] in libbeam_native.so
+=========         Host Frame: run_production_runner(int, char**) [0xc915a] in libbeam_native.so
+=========         Host Frame: std::thread::_State_impl<std::thread::_Invoker<std::tuple<beam_context_prepare::{lambda()#1}> > >::_M_run() [0x23a8c3] in libbeam_native.so
+=========         Host Frame:  [0xdc252] in libstdc++.so.6
+=========         Host Frame:  [0x94ac2] in libc.so.6
+=========         Host Frame: clone [0x125a03] in libc.so.6
+========= 
+rust world=2 seconds=13.735
+NATIVE_SESSION_GPU_OK
+========= ERROR SUMMARY: 16 errors

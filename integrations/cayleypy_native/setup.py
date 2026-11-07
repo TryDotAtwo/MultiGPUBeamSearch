@@ -13,12 +13,13 @@ class BuildWithNativeSource(build_py):
         if not (root / "tools/stream1_mlp_libtorch_backend.hpp").is_file():
             raise RuntimeError("Build this wheel from the matching complete native repository checkout")
         target = Path(self.build_lib) / "multigpubeamsearch/_native_source"
-        extensions = {".py", ".cu", ".cuh", ".cpp", ".hpp", ".h", ".cmake", ".sh", ".json", ".txt"}
+        extensions = {".py", ".cu", ".cuh", ".cpp", ".hpp", ".h", ".cmake", ".sh", ".json", ".txt", ".rs", ".toml"}
         files = [root / "CMakeLists.txt", Path(__file__).parent / "LICENSE"]
-        for folder in ("cuda", "src", "tools", "tests", "cmake", "configs", "schemas", "third_party", "profiles"):
+        files.extend(root / name for name in ("Cargo.toml", "Cargo.lock") if (root / name).is_file())
+        for folder in ("cuda", "src", "tools", "tests", "cmake", "configs", "schemas", "third_party", "profiles", "native", "rust"):
             files.extend(path for path in (root / folder).rglob("*") if path.is_file()
                          and (path.suffix in extensions or path.name.startswith("LICENSE"))
-                         and not any(part in (".git", "__pycache__", ".pytest_cache") for part in path.parts))
+                         and not any(part in (".git", "__pycache__", ".pytest_cache", "target") for part in path.parts))
         manifest = {}
         for path in sorted(set(files)):
             relative = Path("LICENSE") if path.name == "LICENSE" and path.parent == Path(__file__).parent else path.relative_to(root)

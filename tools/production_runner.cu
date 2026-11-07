@@ -2202,6 +2202,9 @@ static_assert(alignof(HistoryEntry) == 8);
 
 struct CpuCandidateHistory {
     static constexpr std::uint32_t kWriteChunkEntries = 1U << 20U;
+    ~CpuCandidateHistory() noexcept {
+        try { destroy(); } catch(...) {}
+    }
 
     struct DepthLocation {
         HistoryStorageLocation location = HistoryStorageLocation::None;
@@ -2865,7 +2868,14 @@ struct CpuCandidateHistory {
     }
 
     void destroy() {
-        finish_all();
+        if(slots.empty() && !ram_arena && !copy_stream) return;
+        std::exception_ptr failure;
+        try { finish_all(); } catch(...) { failure = std::current_exception(); }
+        // A file writer may still be reading a pinned slot after its D2H event
+        // completed. Join every reader before releasing either host allocation.
+        if(copy_stream) cudaStreamSynchronize(copy_stream);
+        for(auto& slot : slots) if(slot.writer.valid()) slot.writer.wait();
+        for(auto& job : prune_jobs) if(job.worker.valid()) job.worker.wait();
         for (Slot& slot : slots) {
             if (slot.copy_done != nullptr) {
                 cudaEventDestroy(slot.copy_done);
@@ -2893,6 +2903,7 @@ struct CpuCandidateHistory {
             cudaStreamDestroy(copy_stream);
             copy_stream = nullptr;
         }
+        if(failure) std::rethrow_exception(failure);
     }
 
     HistoryEntry read_entry(std::uint32_t depth_index, std::uint64_t index) const {
@@ -4223,6 +4234,13 @@ void reset_static_memory_for_task(
 } // namespace
 
 #include "resident_search.hpp"
+#include "../native/scope_exit.hpp"
+
+void beam_engine_layout(beam_layout_v1& layout) {
+    layout = {BEAM_NATIVE_ABI_VERSION, sizeof(layout), STATE_LEN, STATE_STORAGE_LEN,
+        STATE_ALIGNMENT, MOVE_COUNT, sizeof(CandidateMeta), alignof(CandidateMeta),
+        sizeof(Hash128), alignof(Hash128)};
+}
 
 int run_production_runner(int argc, char** argv) {
     if(argc==2 && std::string(argv[1])=="--resident-protocol-info") {
@@ -4694,7 +4712,9 @@ int run_production_runner(int argc, char** argv) {
     }
     SolvedNeighborhoodRuntime solved_neighborhood =
         upload_solved_neighborhood_runtime(std::move(initial_solved_neighborhood));
+    beam::native::ScopeExit neighborhood_owner([&] { solved_neighborhood.destroy(); });
     Stream2SuffixRuntime stream2_suffix = build_stream2_suffix_runtime(host_generators);
+    beam::native::ScopeExit suffix_owner([&] { stream2_suffix.destroy(); });
 #if BEAM_ENABLE_DEBUG_LOGS
     std::cout << "real_assets=enabled\n";
     std::cout << "generator_path=" << generator_path.string() << "\n";
@@ -4730,6 +4750,7 @@ int run_production_runner(int argc, char** argv) {
 #endif
 
     StaticDeviceMemory memory;
+    beam::native::ScopeExit arena_owner([&] { free_static_device_memory(memory); });
     allocate_static_device_memory(plan, memory);
     BEAM_CUDA_CHECK(cudaMemset(memory.allocation, 0, memory.allocation_bytes));
     BEAM_CUDA_CHECK(cudaMemset(memory.current_frontier_states, 0, plan.current_frontier_bytes));
@@ -4745,7 +4766,6 @@ int run_production_runner(int argc, char** argv) {
 #if defined(__linux__)
     if(env_bool("BEAM_CALIBRATION_COMPONENT_ONLY",false)) {
         std::cout<<component_probe::run(plan,memory,nccl_runtime.comm).dump()<<std::endl;
-        free_static_device_memory(memory);
         return 0;
     }
 #endif
@@ -4760,6 +4780,9 @@ int run_production_runner(int argc, char** argv) {
     std::uint8_t* generators = nullptr;
     State128* central_state = nullptr;
     Hash128* zobrist = nullptr;
+    beam::native::ScopeExit input_owner([&] {
+        cudaFree(generators); cudaFree(central_state); cudaFree(zobrist);
+    });
     BEAM_CUDA_CHECK(cudaMalloc(&generators, host_generators.size()));
     BEAM_CUDA_CHECK(cudaMalloc(&central_state, sizeof(State128)));
     BEAM_CUDA_CHECK(cudaMalloc(&zobrist, STATE_STORAGE_LEN * STATE_VALUE_PAD * sizeof(Hash128)));
@@ -4771,6 +4794,10 @@ int run_production_runner(int argc, char** argv) {
     BEAM_CUDA_CHECK(cudaMemcpy(zobrist, &host_zobrist[0][0], STATE_STORAGE_LEN * STATE_VALUE_PAD * sizeof(Hash128), cudaMemcpyHostToDevice));
     stream1_weights::DeviceWeights device_weights;
     stream1_weights::ScratchAllocation stream1_scratch;
+    beam::native::ScopeExit scorer_owner([&] {
+        stream1_weights::free_stream1_scratch(stream1_scratch);
+        stream1_weights::free_weights(device_weights);
+    });
     if(!blend_dir.empty()) {
         BEAM_CUDA_CHECK(cudaMalloc(&stream1_scratch.transformer_numeric_error,sizeof(std::uint32_t)));
         BEAM_CUDA_CHECK(cudaMemset(stream1_scratch.transformer_numeric_error,0,sizeof(std::uint32_t)));
@@ -4844,6 +4871,16 @@ int run_production_runner(int argc, char** argv) {
     DispatcherStreams streams;
     DispatcherEvents events;
     CudaGraphJobTemplates graphs;
+    beam::native::ScopeExit dispatch_owner([&] {
+        if(std::uncaught_exceptions() && nccl_runtime.comm) {
+            ncclCommAbort(nccl_runtime.comm);
+            nccl_runtime.comm = nullptr;
+        }
+        cudaDeviceSynchronize();
+        destroy_cuda_graph_job_templates(graphs);
+        destroy_dispatcher_events(events);
+        destroy_dispatcher_streams(streams);
+    });
     create_dispatcher_streams(streams);
     create_dispatcher_events(events);
     const char* stream1_mode_env = std::getenv("BEAM_STREAM1_MODE");
@@ -5263,6 +5300,7 @@ int run_production_runner(int argc, char** argv) {
     bool solve_bucket_found_any = false;
     std::uint32_t solve_bucket_first_found_depth_index = 0;
     for (std::uint32_t depth = 0; depth < depth_limit; ++depth) {
+        beam::native::cancellation_point();
         if(!benchmark_frontier.empty() && depth>0) {
             // Repeat the exact admitted fixture outside the timed depth. Normal
             // searches never enter this branch; native per-depth resets remain
@@ -6118,17 +6156,6 @@ int run_production_runner(int argc, char** argv) {
         resident.complete(task_index);
     }
     }
-    destroy_cuda_graph_job_templates(graphs);
-    destroy_dispatcher_events(events);
-    destroy_dispatcher_streams(streams);
-    free_static_device_memory(memory);
-    solved_neighborhood.destroy();
-    stream2_suffix.destroy();
-    cudaFree(generators);
-    cudaFree(central_state);
-    cudaFree(zobrist);
-    stream1_weights::free_weights(device_weights);
-    stream1_weights::free_stream1_scratch(stream1_scratch);
     if (publish_rank_status) {
         beam::rank_status::publish(required_env_path("BEAM_RANK_STATUS_DIR"),
             rank, cli_puzzle_id, terminal_solution_found, terminal_completed_depths);
@@ -6136,6 +6163,7 @@ int run_production_runner(int argc, char** argv) {
     return 0;
 }
 
+#if !defined(BEAM_NATIVE_SHARED)
 int main(int argc, char** argv) {
     try {
         return run_production_runner(argc, argv);
@@ -6147,3 +6175,4 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
+#endif

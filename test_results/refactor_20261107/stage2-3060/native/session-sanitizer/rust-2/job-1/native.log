@@ -1,0 +1,21 @@
+[rank 0]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+runtime_depth_start=0 frontier_size=1
+runtime_depth_done=0 depth_sec=0.656402
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.107287
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.103126
+runtime_depth_start=3 frontier_size=32
+puzzle_solved=1 puzzle_id=0 seconds=0.910364 solution_length=4 found_depth=4 touch_depth=0 solution=m0.m1.m2.m3
+
+[rank 1]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+runtime_depth_start=0 frontier_size=0
+runtime_depth_done=0 depth_sec=0.657451
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.107663
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.103241
+runtime_depth_start=3 frontier_size=32
+

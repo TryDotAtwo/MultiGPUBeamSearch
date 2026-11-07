@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/rust/beam-python/tests/adapter.py", line 9, in <module>
+    runtime=importlib.util.module_from_spec(spec)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 573, in module_from_spec
+  File "<frozen importlib._bootstrap_external>", line 1233, in create_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+ImportError: dynamic module does not define module export function (PyInit__beam_runtime)

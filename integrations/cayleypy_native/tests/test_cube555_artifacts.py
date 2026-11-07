@@ -81,9 +81,17 @@ def test_script_features_and_fp32_readout(bundle_inputs):
         width = manifest['feature_dim']
         weight = torch.frombuffer(bytearray((member.weights_dir/'output_weight.fp16').read_bytes()), dtype=torch.float16).reshape(width, 30)
         bias = torch.frombuffer(bytearray((member.weights_dir/'output_bias.fp32').read_bytes()), dtype=torch.float32)
+        # Exported representation must remain exact. CPU addmm may fuse the
+        # bias addition whereas mm + bias rounds the product before adding it.
+        torch.testing.assert_close(weight.T, original.q_head.weight, rtol=0, atol=0)
+        torch.testing.assert_close(bias, original.q_head.bias.float(), rtol=0, atol=0)
         actual = feature.float() @ weight.float() + bias
         expected = torch.nn.functional.linear(feature.float(), original.q_head.weight.float(), original.q_head.bias.float())
-        torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+        reference = feature.double() @ weight.double() + bias.double()
+        scale = feature.double().abs() @ weight.double().abs() + bias.double().abs()
+        bound = torch.finfo(torch.float32).eps * (width + 2) * scale
+        assert torch.all((actual.double() - reference).abs() <= bound)
+        assert torch.all((expected.double() - reference).abs() <= bound)
         outputs.append(actual)
         with pytest.raises((RuntimeError, torch.jit.Error), match='uint8'):
             script(states.to(torch.int8))

@@ -42,3 +42,6 @@ Continue improving GNN while measured gains remain, consult Astra as expert, pre
 
 ## 2026-11-07 — approved Rust/CUDA refactor
 User requested implementation of the accepted unified-main + Rust/CUDA/C++ plan in docs/plans/2026-11-07-rust-cuda-runtime.md. Preserve existing specialized inference, public Python adapters, all supported GPU families and algorithmic semantics. Total paid-compute budget USD 50. Follow-up: builds and tests on Vast, all local artifacts on D. Follow-up: publish necessary source to GitHub and keep the local checkout synchronized with the latest main.
+
+
+2026-11-07 resource correction: Ivan questioned the 2xRTX3090 choice and preferred cheaper RTX3060 instances. Use the cheapest adequate remote GPU configuration, keep the USD50 total cap, and retain the earlier instruction to publish verified source and synchronize local main.

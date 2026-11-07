@@ -11,6 +11,7 @@ project(beam_solver_contracts LANGUAGES CXX CUDA)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
@@ -26,6 +27,14 @@ option(BEAM_DEBUG_FINAL_HISTOGRAM_TRACE "Compile final histogram-vs-survivor dia
 option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
+if(BEAM_ENABLE_LIBTORCH_STREAM1)
+    find_package(Torch REQUIRED)
+    # The engine/control transport exchange C++ objects internally. Compile all
+    # producers and consumers with the ABI selected by this exact Torch build.
+    if(TORCH_CXX_FLAGS MATCHES "-D_GLIBCXX_USE_CXX11_ABI=([01])")
+        add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${CMAKE_MATCH_1})
+    endif()
+endif()
 
 set(BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE OFF)
 set(BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE OFF)
@@ -411,15 +420,33 @@ add_executable(static_memory_cuda_tests tests/static_memory_cuda_tests.cu)
 target_link_libraries(static_memory_cuda_tests PRIVATE beam_cuda)
 set_target_properties(static_memory_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
+find_package(Threads REQUIRED)
+add_library(beam_native_transport STATIC native/beam_native.cpp)
+target_include_directories(beam_native_transport PUBLIC native)
+target_link_libraries(beam_native_transport PUBLIC Threads::Threads)
+add_executable(native_abi_tests tests/native_abi_tests.cpp)
+target_link_libraries(native_abi_tests PRIVATE beam_native_transport)
+# Contract tests must execute their assertions in Release builds too.
+target_compile_options(native_abi_tests PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang>:-UNDEBUG>)
+
 add_executable(production_runner tools/production_runner.cu)
 string(REPLACE ";" "," BEAM_BUILD_CUDA_ARCHES "${BEAM_CUDA_ARCHITECTURES}")
-target_link_libraries(production_runner PRIVATE beam_cuda ${CMAKE_DL_LIBS})
+target_link_libraries(production_runner PRIVATE beam_cuda beam_native_transport ${CMAKE_DL_LIBS})
 target_compile_definitions(production_runner PRIVATE
     BEAM_BUILD_CUDA_ARCHES="${BEAM_BUILD_CUDA_ARCHES}"
     BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
     BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>
 )
 set_target_properties(production_runner PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_library(beam_native SHARED tools/production_runner.cu)
+target_link_libraries(beam_native PRIVATE beam_cuda beam_native_transport ${CMAKE_DL_LIBS})
+target_compile_definitions(beam_native PRIVATE BEAM_NATIVE_SHARED=1
+    BEAM_BUILD_CUDA_ARCHES="${BEAM_BUILD_CUDA_ARCHES}"
+    BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
+    BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>)
+set_target_properties(beam_native PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+    CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stream_benchmark
     tools/stream_benchmark.cu
@@ -432,7 +459,6 @@ add_executable(stream_pipeline_benchmark tools/stream_pipeline_benchmark.cu)
 target_link_libraries(stream_pipeline_benchmark PRIVATE beam_cuda)
 set_target_properties(stream_pipeline_benchmark PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 if(BEAM_ENABLE_LIBTORCH_STREAM1)
-    find_package(Torch REQUIRED)
     add_executable(stream1_transformer_libtorch_benchmark
         tools/stream1_transformer_libtorch_benchmark.cpp
         tools/stream1_transformer_libtorch_backend.cpp)
@@ -451,6 +477,19 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
     add_executable(stream1_ensemble_benchmark tools/stream1_ensemble_benchmark.cpp)
     target_sources(stream1_ensemble_benchmark PRIVATE tools/stream1_gnn_projection_libtorch.cpp)
     target_sources(production_runner_libtorch_stream1 PRIVATE tools/stream1_gnn_projection_libtorch.cpp)
+    add_library(beam_native_libtorch SHARED
+        tools/production_runner.cu
+        tools/stream1_libtorch_ring_slot_launcher.cpp
+        tools/stream1_transformer_libtorch_backend.cpp
+        tools/stream1_gnn_projection_libtorch.cpp)
+    target_link_libraries(beam_native_libtorch PRIVATE beam_cuda beam_native_transport "${TORCH_LIBRARIES}" ${CMAKE_DL_LIBS})
+    target_include_directories(beam_native_libtorch PRIVATE "${TORCH_INCLUDE_DIRS}")
+    target_compile_definitions(beam_native_libtorch PRIVATE BEAM_NATIVE_SHARED=1 BEAM_HAS_LIBTORCH_STREAM1=1
+        BEAM_BUILD_CUDA_ARCHES="${BEAM_BUILD_CUDA_ARCHES}"
+        BEAM_ENABLE_DEPTH_LOGS=$<BOOL:${BEAM_ENABLE_DEPTH_LOGS_EFFECTIVE}>
+        BEAM_ENABLE_DEBUG_LOGS=$<BOOL:${BEAM_ENABLE_DEBUG_LOGS_EFFECTIVE}>)
+    set_target_properties(beam_native_libtorch PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}" CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
     add_executable(stream1_native_mlp_benchmark tools/stream1_native_mlp_benchmark.cpp)
     add_executable(stream1_libtorch_mlp_benchmark tools/stream1_libtorch_mlp_benchmark.cpp)
     target_link_libraries(stream1_libtorch_mlp_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")
@@ -462,7 +501,7 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
     target_link_libraries(stream1_ensemble_benchmark PRIVATE beam_cuda "${TORCH_LIBRARIES}")
     target_include_directories(stream1_ensemble_benchmark PRIVATE "${TORCH_INCLUDE_DIRS}")
     set_target_properties(stream1_ensemble_benchmark PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
-    target_link_libraries(production_runner_libtorch_stream1 PRIVATE beam_cuda "${TORCH_LIBRARIES}")
+    target_link_libraries(production_runner_libtorch_stream1 PRIVATE beam_cuda beam_native_transport "${TORCH_LIBRARIES}")
     target_include_directories(production_runner_libtorch_stream1 PRIVATE "${TORCH_INCLUDE_DIRS}")
     target_compile_definitions(production_runner_libtorch_stream1 PRIVATE
         BEAM_BUILD_CUDA_ARCHES="${BEAM_BUILD_CUDA_ARCHES}"
@@ -480,6 +519,7 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
 endif()
 
 enable_testing()
+add_test(NAME native_abi_tests COMMAND native_abi_tests)
 add_test(NAME production_score_request_tests COMMAND production_score_request_tests)
 add_test(NAME stream1_loaded_execution_admission_tests COMMAND stream1_loaded_execution_admission_tests)
 add_test(NAME stream1_execution_contract_tests COMMAND stream1_execution_contract_tests)

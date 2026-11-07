@@ -944,3 +944,11 @@ The public Cube555 notebook now fetches the pinned setup script that installs th
 
 ## 2026-11-07 — recoverable repository consolidation
 Preserved 26 checkouts and their source/index overlays; verified restoration of 24,134 files and all original Git heads. Repaired shallow-clone recovery using published-main ancestors. Archived old checkout directories without deleting their data, retained historical branch tags, consolidated the root to main 0eafb193 and moved build caches to .local on D. Existing inference and search implementations are unchanged at this stage. Rust/CUDA implementation and GPU acceptance remain in progress.
+
+
+## 2026-11-07 — Rust/native context and persistent rank supervision
+- Added beam-core/runtime/native-sys/CLI/PyO3 workspace, versioned coarse C ABI, lazy CUDA library loading and persistent rank workers with cancellation and group cleanup. Native contexts keep their library alive; borrowed input views are copied before submit returns. Specialized inference kernels and public launch defaults remain unchanged.
+- Added native resource unwind cleanup and explicit history slot teardown ordering. Build caches and source distributions now include native/Rust sources and ABI inputs. Documented memory ownership and large copies.
+- Verified remote builds on 2xRTX3060: native CTest57 pass/1 skip, Python510 pass/25 skip, Rust8 CPU tests plus real FFI/PyO3 checks. Native and LibTorch one/two-GPU repeated jobs match reference paths; cancellation and one-rank failure reap the whole group. Narrow memcheck passes; unfiltered NCCL API diagnostics remain recorded. See test_results/refactor_20261107/STAGE2.md.
+- Fixed a baseline CPU test's FP32 operation-order assumption using an independent FP64 roundoff oracle while retaining exact export checks. No numerical inference policy change.
+- History/profile/CNOT control transfer, CUDA optimization, public switching and full hardware/performance acceptance remain in progress.

@@ -30,6 +30,18 @@ def test_dirty_source_content_and_shapes_change_build_keys(tmp_path):
     assert build_key(dict(reversed(list(base.items())))) == first
 
 
+@pytest.mark.parametrize('relative', ['native/beam_native.h', 'native/beam_native.cpp',
+    'rust/beam-runtime/src/lib.rs', 'rust/beam-runtime/Cargo.toml', 'Cargo.toml', 'Cargo.lock'])
+def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
+    (tmp_path/'CMakeLists.txt').write_text('project(example)')
+    path=tmp_path/relative
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text('first source')
+    first=source_digest(tmp_path)
+    path.write_text('changed source')
+    assert source_digest(tmp_path)!=first
+
+
 @pytest.mark.parametrize("logical,physical", [(8, 16), (72, 80), (88, 96), (96, 112), (120, 128), (128, 144)])
 def test_shape_reserves_metadata_padding(logical, physical):
     assert shape_contract(contract(logical))["storage_len"] == physical
