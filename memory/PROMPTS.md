@@ -39,3 +39,6 @@ Continue improving GNN while measured gains remain, consult Astra as expert, pre
 
 
 2026-11-06: Ivan asked to implement what is feasible for issue #6 and ensure the code works with more than eight GPUs, including GPUs distributed across multiple nodes.
+
+## 2026-11-07 — approved Rust/CUDA refactor
+User requested implementation of the accepted unified-main + Rust/CUDA/C++ plan in docs/plans/2026-11-07-rust-cuda-runtime.md. Preserve existing specialized inference, public Python adapters, all supported GPU families and algorithmic semantics. Total paid-compute budget USD 50. Follow-up: builds and tests on Vast, all local artifacts on D. Follow-up: publish necessary source to GitHub and keep the local checkout synchronized with the latest main.

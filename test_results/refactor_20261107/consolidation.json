@@ -1,0 +1,14 @@
+{
+  "baseline": "0eafb19369262a7d254058a0b4839bea7dfa3334",
+  "original_checkouts": 26,
+  "recovered_files": 24134,
+  "distinct_recovery_objects": 8017,
+  "complete_bundle_sha256": "a40fe97f3f3f6333965fb1735c8d3374f01e67b851b1204634edcee22a73050f",
+  "independent_git_restore": "passed",
+  "full_git_fsck": "passed",
+  "verified_original_heads": 26,
+  "active_local_branches": ["main"],
+  "registered_worktrees": 1,
+  "gpu_refactor_acceptance": "pending",
+  "performance_promotion": "none"
+}
