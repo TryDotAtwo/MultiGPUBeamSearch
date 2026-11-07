@@ -1,5 +1,78 @@
 # Changelog
 
+## 2026-09-26 — Bilingual editorial audit completion
+
+Verified F1–F6 and reflowed architecture/result tables without shrinking fonts; retained all measured numbers and scope limitations. Documented distinct C1/C2 scalar timer scopes and added raw comparison evidence to publication staging. EN/RU built twice and all 10/11 pages visually inspected; structural parity and 14 publication tests pass. Updated Prism staging/ZIP and publication manifest/checksums. QA: `test_results/paper_editorial_release_2026-09-26/QA.md`. Online Prism remains unverified; no Computer Use, agents, GPU runs or solver edits.
+
+## 2026-08-18 — One-click MultiGPU Kaggle notebook
+
+- Added a minimal private Kaggle notebook page definition that already attaches the latest reviewer dataset, public benchmark bundle, competition, scalar checkpoint, and private native output-24 checkpoint.
+- The notebook exits successfully on CPU with a clear instruction, while a T4 run automatically executes the latest dataset-mounted MultiGPU benchmark; this permits a committed CPU template without consuming the exhausted owner GPU quota.
+
+## 2026-08-18 — Dataset-mounted notebook launchers
+
+- Refreshed the private reviewer-notebook dataset payload with the current Pilgrim scalar boundary notebook (`6,291,456` and `6,553,600`) and current MultiGPUBeamSearch notebook.
+- Added `run_pilgrim_latest.py` and `run_multigpu_latest.py`; a stable one-line `%run` cell now executes the latest dataset-mounted notebook under Kaggle `Save Version`, avoiding owner-only Quick Save draft semantics.
+- Recomputed SHA-256 manifests and validated both notebook JSON/code cells plus both launcher scripts without running any local GPU workload.
+- Uploaded the new dataset version successfully and verified the six-file remote inventory (two notebooks, two launchers, README, SHA manifest) at `trydotatwo/gpu-beam-search-paper-1xt4-reviewer-notebooks`.
+
+## 2026-08-18 — Pilgrim scalar two-point boundary probe
+
+- Reconfigured the private 1xT4 Pilgrim boundary notebook to test only the native scalar head at `B=6,291,456` and `B=6,553,600`.
+- Kept the fixed Megaminx state, depth 8, 24 generators, attached scalar checkpoint and device-wide peak-memory telemetry unchanged; omitted the already-closed output-24 series from this follow-up run.
+- Replaced the summary policy label with `two_broad_scalar_boundary_probes`; no fine-grained or automatic 1024-wide boundary search is performed.
+- Validated notebook JSON and compiled every Python code cell successfully. Kaggle rejected the launch before creating a new run because the account had reached its `30.00` hour weekly GPU quota; the existing queued kernels were not treated as results.
+
+## 2026-08-18 — Reviewer Quick Save helper
+
+- Added `paper/kaggle_review_sweeps/quick_save_kernel.py`, which explicitly submits Kaggle `QUICK_SAVE` versions and therefore does not start a GPU session.
+- The helper preserves the notebook's private visibility, attached bundle/models/competition, T4 shape, and existing page identity; updating the already shared pages preserves CayleyPy edit access.
+- Created successful no-run Quick Save versions on the two existing CayleyPy-editable pages: Pilgrim v7 and MultiGPUBeamSearch v17. Both API responses reported `error=null` and no invalid dataset, competition, kernel, or model sources.
+- A subsequent version-qualified CLI pull returned HTTP 403 for both interactive Quick Save versions; remote configuration is therefore attested by the successful save responses and the locally validated source, not by a fabricated pull verification.
+- Monitored the pending pre-Quick-Save MultiGPU execution after it transitioned to `ERROR`. Its Papermill traceback is the same preflight-only `bundle_matches=[]` failure at about 7.7 seconds; no solver, model inference, or capacity point ran. The raw Kaggle log is retained under `test_results/paper_benchmarks/multigpu_latest_error_2026-08-18/`. Quick Save v17 remains the corrected reviewer handoff and was not automatically relaunched.
+
+## 2026-08-13
+- Added a reproducible paired Kaggle benchmark package: a private compact source/data bundle plus separate 1xT4 and 1xP100 notebooks. Each notebook runs Pilgrim and MultiGPUBeamSearch across an internal beam sweep for independently trained native scalar (`output_dim=1`) and 24-action Q (`output_dim=24`) checkpoints, verifies SHA-256 provenance, isolates every point in a fresh process, and records maximum completed separately from the first reproduced failure.
+- Published private Kaggle dataset `trydotatwo/paper-paired-megaminx-benchmark-bundle` and private notebook version 1 for `trydotatwo/paper-megaminx-paired-sweep-1xt4` and `trydotatwo/paper-megaminx-paired-sweep-1xp100`. Execution status/results remain to be validated; a pushed or RUNNING notebook is not treated as benchmark evidence.
+- Validated the T4 v4 partial artifacts: native Pilgrim output-1 completed beams 65,536, 262,144, and 1,048,576; beam 4,194,304 reached the explicit 1,800-second point timeout. Updated timeout handling so killed workers inherit only preflight provenance, are reproduced, and do not abort the remaining series. P100 testing was stopped by user direction after both Pilgrim/PyTorch and the CUTLASS runner proved incompatible with SM60.
+- Split the paired T4 orchestrator into independent private Pilgrim and MultiGPUBeamSearch notebooks so each method gets its own Kaggle wall-time budget and reviewer-facing logs. The MultiGPU worker now reuses one pinned native build across its output-1/output-24 sweep points.
+
+## 2026-08-07
+- Fixed promote-ingest check-run creation in `.github/workflows/merge-ingest.yml` by passing the resolved candidate SHA into `head_sha`, so the `cayleypy-results/exact-candidate` check is posted for the real staged commit and the promotion loop no longer aborts after `VALIDATION_OK`.
+
+
+- Published the validated CayleyPy results-repository control plane to
+  `TryDotAtwo/cayleypy-beam-results` main via PR #1. The public repository now
+  has append-only schema/replay validation, deterministic indexes, serialized
+  staging promotion, and an exact-candidate Check Run contract. Main branch
+  protection requires `cayleypy-results/exact-candidate` from the GitHub
+  Actions App (`app_id=15368`), strict up-to-date PRs, and disallows force
+  pushes/deletion. Cloudflare ingest remains disabled until authenticated
+  staging resources, GitHub App secrets, and the 100-publisher recovery gate
+  pass; no beam-search/CUDA architecture was changed.
+
+## 2026-07-22
+- Updated the IHES GitHub-release preparation path to use
+  `p888-t000_1780290207_e40960.pth` as the default model release asset for
+  `hpc/ihes_cube_model/prepare_ihes_cube_model.sh`.
+- Added a `model.pth.release_asset` marker check so the default cluster
+  `model.pth` is re-downloaded and Stream1 weights are re-exported when the
+  configured release asset changes, preventing a stale old checkpoint from
+  being reused silently.
+
+## 2026-06-29
+- Added a separate Stream1 transformer export path for Kaggle
+  `piece_transformer` checkpoints. `tools/export_stream1_transformer.py`
+  detects model dimensions from the checkpoint/metadata/generator files,
+  exports the p900 fast input form (`fast_slot_projected` and
+  `fast_piece_static`), transformer block weights, LayerNorm parameters, and a
+  `backend=piece_transformer` manifest without changing the existing MLP
+  exporter.
+- Added `tools/export_stream1.py`, an auto-detecting Stream1 export entrypoint
+  that selects `piece-transformer`, `resmlp-layernorm`, or
+  `batchnorm-folded` from checkpoint tensor keys while delegating existing MLP
+  formats to the unchanged MLP exporter.
+
 ## 2026-06-20
 - Added `BEAM_SOLVE_BUCKET_MODE` for ordinary solve-to-center runs that keep
   searching after the first hit. Stream2 can now record solved candidates
@@ -743,3 +816,706 @@
 - Updated IHES fresh bucket array documentation to use one shared precompiled production_runner. The documented flow submits prepare_ihes_prebuilt_runner.sh first, then submits the puzzle array with --dependency=afterok:<prebuild_job> and BEAM_PREBUILT_RUNNER=/mnt/pool/6/vokirova/beam8a100/ihes_cube_model/prebuilt-a100-ihes/production_runner so each one-puzzle task reuses the same binary instead of rebuilding.
 
 - Fixed IHES live results publishing index generation after raw/backfill metadata added extra keys. The fresh bucket publisher now includes variants/source_files columns in data/ihes_cube/index.tsv and filters metadata rows to declared fields before writing index/improvements, so older per-puzzle metadata cannot crash publishing.
+
+- Added a Superpowers implementation plan for a separate Stream1
+  `piece_transformer` backend. The plan preserves the existing MLP path, uses
+  automatic transformer manifest generation, requires CUDA correctness against
+  PyTorch reference outputs before dispatcher wiring, and ends with a small
+  2xT4 Kaggle smoke run.
+- Changed MEPhI/HPC shell defaults for `BEAM_FINAL_MATERIALIZE_EXCHANGE_SCALE_PPM` to derive from effective world size as `WORLD_SIZE_EFFECTIVE * 1000000` when the user does not explicitly override the env var. Updated common helpers, solve/reflect/bucket scripts, tuning scripts, legacy start script, and portable 8xA100 80GB docs.
+- Added explicit solve-bucket distributed gather scratch sizing through `BEAM_SOLVE_BUCKET_GATHER_SCRATCH_BYTES`. Static memory planning now includes this requested scratch in `scratch_pool_bytes`, and solve-bucket distributed gather uses `scratch_pool` instead of reusing `next_frontier_states_tmp`, removing the hidden dependency on beam width. Fresh/legacy bucket scripts default this scratch to 2 GiB and log it.
+
+- Validated real Kaggle 2xT4 torchrun and tuned output-24/output-1 runtime parameters. Selected output-24 sh8/B_MICRO=2048/Stream4=98304 and output-1 B_MICRO=49152/sh8/Stream4=98304. Added Kaggle sweep and Tetraminx integration generators. Integrated push is blocked before execution because the trydotatwo account has not accepted the Tetraminx competition rules. See test_results/kaggle_tetraminx_multigpu_2026-07-24.md.
+- Added the design contract for a universal private Kaggle 2xT4 MLP notebook
+  with independently measured output-1/output-move-count profiles at beam
+  anchors `2**16..2**25`. The design preserves the user's exact beam, selects
+  runtime parameters by nearest rounded-log2 anchor, and documents the two
+  supported checkpoint schemas explicitly.
+- Diagnosed integrated Tetraminx Kaggle v1 after completed training/export/build. Both T4 ranks failed the manual layout guard because the `2**21` beam-derived shard capacity was below the output-1 Stream3 batch. Updated only notebook configuration to clamp shard capacity to `196608`; solver algorithms and requested beam are unchanged.
+
+- Tetraminx integrated private Kaggle v2 completed training, output-1 export, CUDA build, real two-rank launch, and solved all puzzles 990..999. Its worker status was ERROR only because an unrelated original paper-table cell assumed a missing `size` key before submission generation. Updated the notebook generator to skip that optional report and to keep `outputs`/`execution_count` only on code cells; local notebook JSON/schema/AST validation passed and private kernel v3 was pushed. No CUDA/C++ algorithm change.
+- Tetraminx private Kaggle v3 solved all ten puzzles on real 2xT4 and generated submission.csv, but an optional legacy analysis cell after submission raised a corrupted-Unicode NameError. The v4 notebook-only fix ends execution immediately after writing submission.csv; local JSON/schema/AST checks passed and private v4 was pushed. No CUDA/C++ or solver change.
+
+- Tetraminx private Kaggle v4 again solved 10/10 on real 2xT4 and created submission.csv, but a retained downstream legacy timed cell still raised a Unicode NameError. Version 5 moves submission generation into the MultiGPU integration cell and terminates the notebook at that cell; JSON/schema/AST checks passed and v5 was pushed privately. No CUDA/C++ or solver change.
+
+- Tetraminx v5 again solved 10/10 on real 2xT4 and wrote a 1000-row submission. The remaining deferred Papermill error was traced exactly to a standalone invalid token èç in upstream %%time execution cell 14. Version 6 removes only that token; all 52 code cells pass IPython-transform-plus-AST validation and v6 was pushed privately. No CUDA/C++ or solver change.
+
+- Tetraminx v6 again completed the real 2xT4 solver path, solved puzzles 990..999 (10/10), and wrote a 1000-row submission. Kaggle remained ERROR because the upstream timed model-size cell contains the standalone Cyrillic token `из`; the v7 notebook-only generator fix removes both the exact Unicode token and the prior mojibake form via escapes. All 31 code cells in the 52-cell notebook pass IPython transform plus AST validation. No CUDA/C++ or solver change.
+
+- Tetraminx private Kaggle v7 completed successfully after the notebook-only Unicode-token fix. On real 2xT4 it solved all puzzles 990..999 with return code 0, both local ranks evidenced in every puzzle log, solution lengths 31..39, per-puzzle wall times 133.767..173.892s, and a 1000-row submission. Kernel status is COMPLETE with no Papermill/NameError/solver fatal. Evidence: test_results/kaggle_tetraminx_multigpu_v7/.
+
+- Added deterministic human-readable CayleyPy result views in the public results repository: long Kaggle-slug competition directories, complete competition index.tsv files, per-puzzle solutions.tsv/best_solution.tsv/metadata.json/summary.md, visible solution paths in global indexes, manifest-based stale cleanup, and exact promotion verification.
+
+- Fixed CayleyPy result promotion rebuilds with native SLURM v2 records by separating the immutable native input path from the generated output directory. The builder keeps its legacy default for existing callers, while GitHub promotion passes `data/v2/slurm` explicitly for both checked-in and temporary rebuilds. Exact payload comparison now reports the mismatching filename instead of failing silently through `cmp --silent`; Kaggle notebooks and the public ingest contract are unchanged.
+- Published the native-v2 promotion fix through cayleypy-beam-results PR 52 and verified workflow run 31273031159 completed successfully. The promotion merged PR 53, advanced `main` to `c6cd1b47af4a15909c12d287e41eb67f12ae8477`, and synchronized `ingest/staging` to the identical commit. Two independent full rebuilds matched byte-for-byte across 1,182 generated files. Removed the local plaintext `gh_token.txt` credential artifact and scrubbed embedded credentials from the results repository remotes; the exposed GitHub token still requires server-side rotation.
+
+
+
+- Started `paper/` as an iterative short-paper project: added a concise LaTeX
+  v0.1, BibTeX database, downloaded primary-source corpus, and a claim evidence
+  ledger distinguishing verified literature statements from the still-needed
+  definitive 700M Megaminx run artifact. The draft formalizes the GPU-resident
+  data plane and CPU-only control/history boundary.
+- Added a synchronized Russian paper source `paper/main_ru.tex`. English and
+  Russian versions now share identical section, equation, contribution, and
+  citation structure and are intended to be updated in lockstep.
+- Rewrote Section 3 in both paper languages as a one-to-one mathematical walk
+  through a search depth: compact candidate representation, concurrent Streams
+  1--2, Stream 3 threshold/dedup/ownership, Stream 5 NCCL exchange, Stream 4
+  persistent A/B survivor shards, final histogram cut, materialization, and the
+  unique-owner equivalence invariant.
+## 2026-08-11 — Formal equivalence of monotone thresholding and global top-B
+
+- Expanded Section 3 in both English and Russian paper variants with a formal
+  definition of classical global top-B, the online histogram threshold update,
+  and an exactness proof based on nested deduplicated survivor sets.
+- Clarified that the B-th distance threshold is monotone non-increasing; online
+  pruning removes only scores strictly above the threshold and preserves the
+  tie boundary for deterministic final selection.
+## 2026-08-11 — Cross-platform experimental sections
+
+- Added synchronized English/Russian experimental sections separating RTX
+  3070, Kaggle 2xT4, and 8xA100 measurements by workload and measurement scope.
+- Added CayleyPy beam-width comparison and an evidence-qualified account of the
+  reported 51-QTM Megaminx superflip result.
+- Kept microkernel throughput, end-to-end time, and capacity probes distinct;
+  retained the missing definitive 700M run bundle as an explicit evidence gap.
+
+## 2026-08-12 — Honest solver comparison benchmark
+
+- Replaced the draft cross-hardware result narrative with a preregistered
+  comparison protocol; no longer includes optimization-history or unmatched
+  microbenchmark figures in the visible paper.
+- Pinned official CayleyPy, AlphaCube, and DeepCubeA commits and added isolated
+  local benchmark harnesses.
+- Measured AlphaCube widths 1,024 through 524,288 on RTX 3070 and recorded time,
+  nodes, solution length, and CUDA peak memory. DeepCubeA weighted A* exceeded
+  the 300-second limit both on official test state 0 and the shared scramble.
+## 2026-08-12 — strict single-GPU Kaggle baseline harness
+
+- Diagnosed private T4 kernel v1 failure from the downloaded Kaggle log: the
+  `NvidiaTeslaT4` machine shape exposed two physical T4 devices and the
+  fail-closed `device_count == 1` assertion stopped the run.
+- Set `CUDA_VISIBLE_DEVICES=0` before importing PyTorch and record the mask in
+  `hardware.json`; this enforces the requested 1×T4 protocol while leaving the
+  second allocated T4 unused.
+## 2026-08-12 — remote capacity sweeps and completed baseline matrix
+
+- Added isolated-process private Kaggle AlphaCube capacity kernels for 1xT4
+  and 1xP100 at widths 786,432 through 2,097,152, with a 1,200 s per-width
+  timeout and distinct CUDA-OOM/process-exit/timeout statuses.
+- Updated the benchmark matrix with downloaded COMPLETE T4/P100 AlphaCube and
+  DeepCubeA measurements, exact runtimes/models/search parameters, derived
+  nodes/s, and peak CUDA allocated/reserved memory.
+- Recorded the RTX 3070 Docker maximum-completed width 786,432 and the
+  1,048,576 SIGKILL boundary without mislabelling it as CUDA OOM; further local
+  GPU work remains paused.
+## 2026-08-12 — T4 AlphaCube capacity boundary
+
+- Downloaded private T4 capacity v1 evidence: widths 786,432, 1,048,576,
+  1,310,720, and 1,572,864 completed; width 2,097,152 exited with SIGKILL
+  (`returncode=-9`) before CUDA telemetry.
+- Updated the matrix with 1,572,864 as the maximum confirmed-complete T4 beam,
+  explicitly separating it from the non-OOM process-failure boundary.
+- Prepared a private refinement/reproduction sweep at widths 1,835,008,
+  1,966,080, and 2,097,152.
+## 2026-08-12 — P100 AlphaCube capacity boundary
+
+- The completed P100 capacity log records widths through 1,572,864 as
+  successful and width 2,097,152 as `returncode=-9`; maximum completed time was
+  768.623 s for 19,561,320 nodes.
+- Updated the matrix without labelling the process kill as CUDA OOM and prepared
+  the same 1,835,008/1,966,080/2,097,152 refinement sweep as on T4.
+## 2026-08-12 — T4 capacity refinement
+
+- T4 width 1,835,008 reproduced `returncode=-9`, narrowing the measured
+  complete/process-failure interval to (1,572,864, 1,835,008).
+- Prepared the next private binary-refinement point at width 1,703,936.
+## 2026-08-12 — P100 capacity refinement
+
+- P100 width 1,835,008 reproduced `returncode=-9`, narrowing its measured
+  complete/process-failure interval to (1,572,864, 1,835,008).
+- Prepared the next private binary-refinement point at width 1,703,936.
+## 2026-08-12 — T4 capacity refinement 2
+
+- T4 width 1,703,936 exited with `returncode=-9`, narrowing the measured
+  complete/process-failure interval to (1,572,864, 1,703,936).
+- Prepared the next binary-refinement point at width 1,638,400.
+## 2026-08-12 — CayleyPy paired-comparison audit
+
+- Verified that CayleyPy provides a standard Cube3 HTM-18 graph, but its
+  pretrained predictor registry contains only lrx-16 and lrx-32 models.
+- Kept the neural Cube3 comparison cell explicitly incompatible instead of
+  substituting CayleyPy's default Hamming heuristic or a different graph/model.
+- Kept our Megaminx production measurements separate because the current
+  checkout has no verified matched Cube3 HTM-18 adapter/checkpoint.
+## 2026-08-12 — P100 capacity refinement 2
+
+- P100 width 1,703,936 exited with `returncode=-9`, matching T4 and narrowing
+  its complete/process-failure interval to (1,572,864, 1,703,936).
+- No further remote binary point was launched because the previous T4 push was
+  blocked pending renewed explicit user authorization.
+## 2026-08-12 — AlphaCube SIGKILL source-level diagnosis
+
+- Traced AlphaCube 0.1.6 `update_candidates`: it materializes all 18B children
+  as CPU NumPy arrays before top-k, including int64 54-entry states and full
+  int8 paths.
+- At B=1,703,936 and depth 16, the repeated state array is 12.340 GiB and the
+  directly accountable minimum temporary layer is about 13.282 GiB before
+  simultaneous copies/workspace/runtime memory, while neural inference remains
+  capped at 65,536 states per GPU batch.
+- Launched private T4/P100 diagnostic kernels with 0.2 s RSS, cgroup memory/event,
+  search-stage, and VRAM telemetry; downloading their terminal artifacts awaits
+  renewed authorization after a safety-channel disconnect.
+
+## 2026-08-12 — CayleyPy remote capacity harness
+
+- Added a private single-visible-GPU CayleyPy capacity harness for Kaggle T4
+  and P100, pinned to commit `fbdde24b891d956b9ec905b939f848ecab711978`.
+- Fixed Cube3 HTM-18, the shared 21-move scramble, advanced beam search,
+  Hamming scoring, history depth zero, automatic packed encoding, and 12 steps.
+- The harness records generated candidates, wall time/rate, path status, exact
+  environment, peak allocated/reserved VRAM, and the first OOM/exit/timeout.
+
+## 2026-08-12 — search-cost benchmark split
+
+- Reframed the paper benchmark around fixed-work memory and time rather than
+  solution length or success.
+- Replaced the proposed common-scorer engine experiment with an unchanged
+  native-system comparison; no algorithm, scorer, model, stopping rule, or data
+  placement is modified.
+- Kept DeepCubeA indexed by its actual weighted-A* batch parameters rather than
+  assigning it a beam width.
+
+## 2026-08-12 — single-GPU Cube4 paired protocol
+
+- Corrected the CayleyPy-versus-MultiGPUBeamSearch Cube4 protocol to use
+  exactly 1xT4 and exactly 1xP100 for both implementations.
+- The T4 run hides Kaggle's second physical device with
+  `CUDA_VISIBLE_DEVICES=0`; our unchanged production runner uses its existing
+  `WORLD_SIZE=1` branch rather than the public exactly-2xT4 launcher.
+- Fixed every paired Cube4 point to exactly ten search depths and made the
+  tenth-layer wall time, candidates/s, frontier/candidate counts, RSS, and VRAM
+  the primary reported metrics rather than an average over startup layers.
+- Reduced the paired protocol to one fixed deterministic Cube4 state and pinned
+  both implementations to the same documented 24-output Q Transformer
+  checkpoint (`58af301a...ad3164`).
+- Completed single-GPU depth-10 telemetry for MultiGPUBeamSearch at beam 65,536
+  on Kaggle T4 and P100.  The tenth layer measured 2.60199 s on T4 and 5.03888 s
+  on P100; raw logs and GPU-monitor CSVs are retained under
+  `test_results/paper_benchmarks/cube4_ours_{t4,p100}_depth10_v{5,4}`.
+- Completed the paired native CayleyPy/Pilgrim Q-beam measurements with the
+  identical state, checkpoint, beam 65,536, microbatch 384, and ten layers.
+  The tenth layer measured 2.76685 s on T4 and 4.87182 s on P100; raw logs are
+  retained under `cube4_pilgrim_{t4,p100}_depth10_v{4,3}`.
+- Extended the paired Cube4 experiment to beam 1,048,576.  At the tenth layer,
+  MultiGPUBeamSearch measured 40.6211 s versus Pilgrim 46.6109 s on T4, and
+  75.1501 s versus 77.9965 s on P100.  Raw artifacts are retained in the four
+  `cube4_{ours,pilgrim}_{t4,p100}_b1m_depth10` benchmark directories.
+- Extended the paired Cube4 experiment to beam 4,194,304.  At the tenth layer,
+  MultiGPUBeamSearch measured 181.282 s versus Pilgrim 198.153 s on T4, and
+  301.955 s versus 314.487 s on P100.  This is a measured 9.31% and 4.15%
+  throughput advantage respectively, with identical checkpoint, state, beam,
+  hardware, and depth.  Raw artifacts are retained in the four
+  `cube4_{ours,pilgrim}_{t4,p100}_b4m_depth10` benchmark directories.
+- 2026-08-13: Added a deterministic builder for private `1xT4` and `1xP100` reviewer-facing Megaminx sweep notebooks. Each notebook defines Pilgrim and MultiGPUBeamSearch with real output dimensions 1 and 24, isolated per-point processes, JSONL/CSV/log artifacts, timeout/CUDA-OOM/SIGKILL classification, one failure reproduction, and maximum-completed versus failure-boundary summaries. The notebooks fail closed on GPU type, one visible device, bundle version, generator count, head dimensions, and SHA-256 integrity. No local GPU work was performed; the minimal private worker bundle remains to be assembled and validated before upload or launch.
+- 2026-08-13: Strengthened the paired notebook preflight and result contract: each head now requires architecture, SHA-256, distinct training-run provenance, exact output dimension, and a `native_head=true` attestation. Every worker result must echo the selected checkpoint digest, observed head dimension, and unchanged 24-generator contract or the notebook fails closed.
+- 2026-08-13: Corrected the native CayleyPy T4 capacity harness to test the paper-relevant high-width points `2^20`, `2^23`, `2^24`, and `2^25` using the pinned original CayleyPy commit. Each width runs in a fresh process with a 1,800-second limit, per-point logs/JSON, and one reproduction of the first failure. This benchmark remains Cube3 HTM-18 with CayleyPy's Hamming predictor and is explicitly separate from the Megaminx Pilgrim neural benchmark.
+- 2026-08-13: Replaced the native CayleyPy fixed-width T4 sweep with adaptive capacity discovery. The notebook starts at `2^25`, halves only on explicit CUDA OOM until it brackets a completed width, refines the completed/OOM interval by aligned binary search to `2^16` granularity, and repeats both final boundary points. Timeout and generic process exit remain explicitly inconclusive and never masquerade as memory limits.
+- 2026-08-13: Rebased the adaptive native CayleyPy T4 harness from the unrelated Cube3/Hamming example onto the public Megaminx baseline `alexandervc/cayleypy-rw-modelbaselines-megaminx`: pinned CayleyPy `e1518b6`, native `CayleyGraph.beam_search` in `iterated` mode with history depth 10, the shared p900 generators/fixed state, and the byte-identical scalar Pilgrim checkpoint SHA `7f5071e...` used by the Pilgrim and MultiGPUBeamSearch sweeps. Native CayleyPy `Predictor` accepts one score per state and is therefore recorded as incompatible with the unchanged 24-action checkpoint rather than modified into a different algorithm.
+- 2026-08-13: Split every combined `CayleyPy/Pilgrim` label in the benchmark matrix and paper. The five-algorithm roster is now explicit: Pilgrim, native CayleyPy, MultiGPUBeamSearch, AlphaCube, and DeepCubeA. Existing matched Q-head measurements are attributed to Pilgrim; native CayleyPy is a separate scalar Megaminx sweep and its unchanged 24-output path is marked incompatible.
+- 2026-08-13: Diagnosed native CayleyPy T4 v1 as a pre-benchmark checkout failure: the harness cloned the obsolete `iKolt/cayleypy` fork, which did not contain the requested commit. Switched the private harness to the official `cayleypy/cayleypy` repository and upstream author's latest working commit `5b2b53f`; no capacity result is claimed from the failed run.
+- 2026-08-13: Diagnosed the 1xT4 MultiGPUBeamSearch sweep failure after a completed scalar `2^20` point: each width re-exported roughly 60 MiB of Stream1 FP16 weights into durable Kaggle output, and the next export was retained with a zero-length tensor file. Changed the worker to cache exactly one export per native head under `/tmp`, exclude weights from reviewer artifacts, and fail closed if any exported file is empty.
+- 2026-08-13: Changed the native CayleyPy and paired 1xT4 capacity protocols from depth 10/12 to depth 8 and removed all per-point 1,800-second subprocess timeouts. Since the 24-generator tree has `24^8` possible paths, depth 8 reaches beyond every tested beam; runs now terminate only by completion, explicit failure/OOM, or Kaggle's platform limit.
+- 2026-08-14: Diagnosed the 1xT4 reviewer worker's apparent 24M/28M scalar boundary and output-24 minimum-beam failure as missing head-specific Stream1 profiles, not a separate WORLD_SIZE=1 capacity limit. Default row budget 8192 becomes only 341 scalar parents/job (24 rows/parent), producing 7,176 graph execs and `cudaGraphInstantiate` OOM at 28M, while it becomes 8,192 output-24 parents/job and fails static budgeting. Applied the already measured symmetric 2,048-parent settings: row budget 49,152 for scalar and 2,048 for output-24, concurrency/ring slots 4, with 256 MiB explicit headroom.
+## 2026-08-14
+
+- Corrected the private 1xT4 native CayleyPy capacity sweep to use `history_depth=0`, matching the MultiGPUBeamSearch comparison contract. The prior `history_depth=10` result remains raw evidence but is excluded from the matched comparison.
+- Diagnosed MultiGPUBeamSearch Kaggle v4 preflight failure as a stale worker SHA followed by a non-recursive dataset upload. The notebook now accepts a single recursively packed `bundle_payload.zip`, extracts it before the existing per-file SHA256 verification, and leaves the worker/search implementation unchanged.
+- Diagnosed MultiGPUBeamSearch Kaggle v6 as an invalid forced static profile: row budgets 49152/2048 combined with concurrency/ring slots 4 fit no T4 runtime configuration even at beam 65536. Restored automatic concurrency/ring selection and added an isolated, recorded descending microbatch-profile search that retries only explicit config-budget/CUDA-OOM failures.
+- Added the reproduced native CayleyPy 1xT4 `history_depth=0` capacity bracket to the benchmark matrix and both paper languages: beam 20,971,520 completes; 21,037,056 CUDA-OOMs; both sides reproduced. Explicitly left nodes/s unmeasured because the harness counters did not intercept the internal iterated path, and left the corrected MultiGPU capacity rerun untested because Kaggle weekly GPU quota was exhausted.
+- Added a four-row native Cube3 baseline table to both paper languages: AlphaCube and DeepCubeA on one visible T4 and P100, with exact native parameters, wall time, nodes/rate, reserved VRAM, solution/failure status, and explicit separation from matched Megaminx/Cube4 comparisons.
+- Reworked the paper comparison into a single 1xT4 four-approach block (AlphaCube, DeepCubeA, native CayleyPy, MultiGPUBeamSearch), added the full AlphaCube width/rate sweep and the completed scalar Megaminx wall curves, and documented why DeepCubeA has no beam width and why missing CayleyPy/MultiGPU node counters remain unreported rather than inferred. Added matched Megaminx wall ratios at 16,777,216 and 20,971,520 while excluding the superseded MultiGPU static-profile failure as a capacity boundary.
+## 2026-08-14 -- Added per-depth and per-native-step timing to paper tables
+
+- Added `s/depth` to the platform summary, AlphaCube capacity curve, matched
+  Cube4 table, and every completed Megaminx sweep point.
+- Added DeepCubeA's evidenced 55-iteration denominator: 146.474 s total gives
+  2.663 s per weighted-A* iteration, explicitly distinguished from beam depth.
+- Added derivation text so averages, saturated-layer timing, and native A*
+  iterations are not conflated.
+## 2026-08-15 -- Replaced fine capacity search with broad measured sweeps
+
+- Superseded the temporary direct-`2^25` MultiGPU configuration with a common
+  powers-of-two grid from `2^10` through the first failure.
+- Pilgrim and MultiGPUBeamSearch now measure both native output-1 and output-24
+  heads; native CayleyPy remains scalar-only and explicitly incompatible with
+  output-24.
+- Added per-point search wall time, seconds/depth, and peak device-memory
+  telemetry. After the first failure each series performs at most one
+  memory-trend-based confirmation below the estimated boundary; there is no
+  binary search or 1024-wide refinement.
+
+## 2026-08-15 -- Added targeted Pilgrim near-limit confirmation
+
+- Derived coarse 1xT4 boundary probes from the completed powers-of-two sweep:
+  4.25/4.5 Mi states for the scalar head and 19/20 Mi states for the native
+  24-output head.
+- Added a separate private notebook so the full sweep is not repeated. The
+  resulting maximum completed point and adjacent failure, if observed, are
+  intended for the paper capacity table.
+
+## 2026-08-15 -- Fixed broad-sweep launchers after fail-closed diagnostics
+
+- Native CayleyPy now resolves `pilgrim_runtime` from either the direct dataset
+  layout or its `bundle_payload/` directory; v6's width-1024 process exit was a
+  missing module path, not a capacity result.
+- MultiGPUBeamSearch restores the previously measured 256 MiB T4 headroom for
+  automatic runtime-profile selection. V8's width-1024 `no runtime config fits`
+  exit at about 105 MiB was a configuration failure and remains excluded.
+- CayleyPy v7 confirmed that the attached legacy dataset exposes only
+  `bundle_payload.zip`; added deterministic extraction and validation under
+  `/tmp`. Its width-1024 process exit is excluded from capacity evidence.
+- Pilgrim boundary v1 completed all four targeted points. The new measured
+  lower bounds are 4,718,592 states for output-1 (1,243.379 s total,
+  155.422 s/depth, 13,557 MiB peak device use) and 20,971,520 for output-24
+  (198.901 s total, 24.863 s/depth, 12,333 MiB). No adjacent failure was
+  observed, so both are labelled maximum tested-complete, not absolute limits.
+- CayleyPy v8 still used the legacy dataset attachment and therefore could not
+  validate the extracted runtime. Switched the private kernel metadata to the
+  verified v3 bundle; v8's width-1024 process exit remains excluded.
+
+## 2026-08-15 -- Restored the MultiGPU powers-of-two sweep at small beams
+
+- Traced the `2^10` MultiGPUBeamSearch failure to batching configuration, not
+  capacity: every prior Stream1 row-budget profile produced a Stream3 ring slot
+  larger than the beam-1024 logical-shard capacity, while device use stayed at
+  about 105 MiB.
+- Extended only the worker's descending microbatch profile grid. The scalar
+  head now reaches a 24-row budget (one expanded parent), and the native
+  24-output head reaches a one-parent budget; checkpoint heads, fixed state,
+  24 generators, requested beam, depth, and production search code are
+  unchanged.
+- Rebuilt and SHA-verified the compact private bundle, uploaded its new v3
+  dataset version, and launched private MultiGPU sweep kernel version 10.
+  Native CayleyPy version 9 remained running and was not relaunched.
+
+## 2026-08-15 -- Integrated the completed native CayleyPy broad sweep
+
+- Validated native CayleyPy version 9 on one visible T4 over every power of two
+  from `2^10` through `2^25`: `2^24` completed in 4,741.581 s
+  (592.698 s/depth, 10,233.7 MiB peak allocated, 14,652 MiB reserved), while
+  `2^25` failed with CUDA OOM.
+- Retained all structured per-width JSON records and the aggregate summary.
+  Kaggle returned zero-length per-width text logs, so paper figures are sourced
+  only from the non-empty JSON evidence; no native node-rate counter was
+  inferred.
+- Added the complete CayleyPy time/memory curve and the broad max-complete and
+  first-failure boundary to the benchmark matrix and both one-to-one paper
+  languages. Recompiled both PDFs twice and verified no undefined references or
+  overfull boxes. MultiGPUBeamSearch version 10 remains `RUNNING` and is not a
+  result.
+
+## 2026-08-15 -- Separated comparisons by identical model contract
+
+- Made the one-T4 summary an inventory rather than a cross-row ranking and
+  separated scalar output-1 comparisons from native output-24 comparisons.
+- Required identical checkpoint, architecture, head, state, generators, depth,
+  beam, dtype, and hardware for every ratio. Explicitly excluded scalar-versus-Q
+  timing as an algorithmic claim; CayleyPy output-24 remains incompatible.
+
+## 2026-08-15 -- Retained the Megaminx output-24 QMLP benchmark contract
+
+- Confirmed that the 1xT4 capacity sweep continues to use the native QMLP2RB
+  output-24 checkpoint `p900-t000-q-sym_1777988767_best.pth` for both Pilgrim
+  and MultiGPUBeamSearch. The available Megaminx Q Transformer was not
+  substituted or launched because it is a distinct model contract.
+
+## 2026-08-15 -- Clarified the primary eight-block comparison model
+
+- Confirmed that the common primary checkpoint is the scalar
+  `weights_megaminx2048_512_8_e4000.pth` (`2048/512`, eight residual blocks,
+  output-1), already attached to the Pilgrim, native CayleyPy, and MultiGPU
+  broad sweeps.
+- Kept the two-block output-24 QMLP only as a separate secondary contract. No
+  eight-block native output-24 checkpoint was found, so none is fabricated.
+- 2026-08-17: Added an exact model-architecture inventory to the benchmark matrix and both paper languages. It records trainable parameter counts and ordered blocks for AlphaCube large (118,939,666), official DeepCubeA cube3 (14,663,001), the shared eight-block scalar Megaminx MLP (34,766,849), the shared output-24 QMLP2RB (23,978,008), and the separate matched Cube4 Q Transformer (3,383,064). Corrected the stale MultiGPU v10 RUNNING label to cancelled/not a result.
+- 2026-08-17: Pushed corrected private MultiGPUBeamSearch 1xT4 notebook version 11 with the byte-identical eight-block scalar checkpoint and output-24 QMLP2RB checkpoint. Kaggle reports RUNNING; this is monitoring state, not benchmark evidence. Completed Pilgrim and native CayleyPy notebooks were not relaunched.
+- 2026-08-17: Prepared a second targeted Pilgrim 1xT4 boundary pass without repeating the broad sweep. Scalar probes 5,111,808/5,242,880 follow the measured 574 MiB per 262,144-state slope; output-24 probes 31,457,280/32,505,856 broadly approach the existing 2^25 OOM from below. These are confirmation candidates, not results until Kaggle completes.
+- 2026-08-17: Integrated Pilgrim boundary v2 point evidence despite the fail-closed notebook ERROR. Scalar 5,242,880 completed in 1,524.970 s at 14,699 MiB peak. Output-24 widths 31,457,280 and 29,360,128 CUDA-OOMed, narrowing the measured upper failure to 29,360,128 while 20,971,520 remains max complete. Prepared one final broad transition probe pair rather than fine search.
+- 2026-08-18: Downloaded and integrated Pilgrim boundary v3 and the cancelled MultiGPU v11 artifacts. Pilgrim scalar completed 5,636,096 in 1,652.754 s at 14,625 MiB; output-24 now has a measured 20,971,520-complete / 25,165,824-OOM bracket. MultiGPU v11 ended `CANCEL_ACKNOWLEDGED` after six completed scalar points through 32,768; their time/memory telemetry is retained, but neither a capacity boundary nor output-24 was reached. Updated the benchmark matrix and both paper languages without treating cancellation as a result boundary.
+- 2026-08-18: Diagnosed MultiGPU v11 cancellation: its last successful scalar point, beam 32,768, consumed 21,172.790 s while using only 417 MiB, so the run was compute/profile-pathological rather than memory-limited. Regenerated the private notebook with a targeted scalar 25.17M/27.26M/29.36M boundary grid and a sparse output-24 1.05M--33.55M grid. JSON and Python AST validation passed. Kaggle rejected the push because the account's 30-hour weekly GPU quota was exhausted; no new version was launched.
+- 2026-08-18: Traced the obsolete MultiGPU output-24 beam-65,536 process exit to the fail-closed runtime-profile guard, not OOM or unsupported Q inference. The forced 2,048-parent microbatch with four ring slots implied a 196,608-candidate Stream3 batch that could not fit the small beam's logical shard capacity. Confirmed that the current worker leaves ring slots automatic and descends output-24 row budgets only for explicit configuration-budget/OOM failures; no CUDA algorithm change was made.
+- 2026-08-18: Packaged the final Pilgrim and MultiGPU one-T4 boundary notebooks as private Kaggle dataset `trydotatwo/gpu-beam-search-paper-1xt4-reviewer-notebooks` so reviewers can launch them without an automatic kernel run. Pilgrim probes scalar 5.636M/5.767M/5.898M and output-24 20.972M/23.069M/25.166M; MultiGPU probes scalar 25.166M/27.263M/29.360M and a sparse output-24 grid through 33.554M. Both notebooks passed JSON/AST validation; remote file inventory, hashes, and `isPrivate=true` were verified. No GPU quota was consumed.
+- 2026-08-18: Replaced the dataset-only reviewer handoff with two real private Kaggle Notebook pages. Updated the Pilgrim page to version 4 and the MultiGPUBeamSearch page to version 12 using Quick Save, preserving their attached competition, benchmark bundle, scalar checkpoint, and native output-24 checkpoint. Both Quick Save operations completed successfully with draft sessions off; no benchmark kernel was started.
+- 2026-08-18: Diagnosed collaborator-run MultiGPU version 13 failing before GPU setup because the private benchmark bundle was attached to the notebook but not readable by the collaborator account (`bundle_matches=[]`, code diff `+0/-0`). Granted the existing private `CayleyPy` group view-only access to the benchmark bundle and the private native output-24 model; the scalar model was already non-private. Restored both reviewer notebook pages to Private while retaining group edit access. No benchmark was relaunched.
+- 2026-08-18: Per explicit user direction, permanently published the compact benchmark bundle `trydotatwo/paper-multigpu-megaminx-benchmark-bundle-v3`. Upgraded the `CayleyPy` private group from Can view to Can edit on both the bundle and the still-private native output-24 model. Both reviewer notebooks already retained CayleyPy Can edit access and remain private.
+- 2026-08-18: Confirmed MultiGPU version 14 was an unchanged (`+0/-0`) 16-second empty-manifest failure created before the bundle became public. It is not evidence against the repaired permissions: Kaggle input mounts are fixed when a run/session starts, so validation requires a fresh version after publication.
+- 2026-08-18: Rebuilt the reviewer handoff around normal Kaggle `Save Version -> Save & Run All`. Dataset `trydotatwo/gpu-beam-search-paper-1xt4-reviewer-notebooks` now contains both exact checkpoints, the compact runtime bundle, fixed inputs, manifests, benchmark notebooks, launchers, and SHA-256 inventory; its remote file listing was verified. Committed MultiGPU page version 22 as a CPU-safe launcher template attached only to that dataset and verified its completed log without the earlier missing-cell-ID warning. The existing Pilgrim page was intentionally left untouched while its active run remained `RUNNING`.
+- 2026-08-18: After the Pilgrim boundary run reached `COMPLETE`, preserved its already-integrated v5 artifacts and committed Pilgrim page version 10 as the matching CPU-safe `Save Version -> Save & Run All` launcher. The version completed and its downloaded log printed the expected T4 selection instruction; it is notebook-plumbing evidence, not a new benchmark result.
+- 2026-08-18: Enabled the prepared Pilgrim scalar and MultiGPU scalar/output-24 reviewer pages for remote T4 execution and attempted both pushes. Kaggle rejected each before creating a kernel because the owner's weekly GPU quota had reached 30.00 hours. No benchmark was launched and no RUNNING state or result was recorded; collaborator execution remains the required path after granting the CayleyPy group access to the private self-contained dataset.
+- 2026-08-18: Integrated the collaborator-run Pilgrim scalar boundary evidence. Beam 6,291,456 CUDA-OOMed after 873.781 s at 14,011 MiB device peak, while the automatic 5,242,880 confirmation completed in 1,307.224 s; combined with the earlier 5,898,240 complete point, the measured bracket is 5,898,240 complete / 6,291,456 OOM. The notebook later failed closed because the scalar checkpoint was attached twice, but both structured point records had already been written, so the terminal notebook error was kept separate from the point classifications. Updated the matrix and both paper languages, regenerated both PDFs twice, and verified their logs contain no undefined references, overfull boxes, LaTeX errors, or fatal stops. MiKTeX returned a nonzero process code only because its user-log file was inaccessible, after both PDFs had been written.
+- 2026-08-18: Downloaded and validated the completed Pilgrim boundary v5 artifacts. Scalar widths 5,636,096, 5,767,168, and 5,898,240 all completed; the widest took 1,462.557 s (182.820 s/depth) at 14,433 MiB. Native output-24 completed 20,971,520 in 197.358 s (24.670 s/depth) at 12,333 MiB and CUDA-OOMed at 23,068,672, giving the measured bracket 20,971,520 complete / 23,068,672 OOM. Updated the benchmark matrix and both paper languages, rebuilt both PDFs twice, and verified no undefined references or overfull boxes. MultiGPU still lacks a post-publication v15 run.
+- 2026-08-18: Added a test-only, isolated WireGuard/SSH Docker environment
+  under `test_results/alexandervc-vpn`. The VPN configuration is never copied
+  into the image and is intended to be mounted read-only at runtime, keeping
+  the route and credentials outside Windows and the user's AmneziaVPN setup.
+- 2026-08-18: Used the isolated tunnel to inventory `mgu-compute`, installed
+  Ubuntu's recommended NVIDIA 580 server driver plus matching utilities for
+  the passed-through Tesla P4, rebooted once, and verified the live NVIDIA
+  runtime. Recorded the evidence and the unresolved `sm_61` workload-profile
+  boundary in `test_results/alexandervc-vpn/2026-08-18-remote-inventory.md`.
+- 2026-08-18: Exported Megaminx Piece Transformer checkpoint `1799900812` to the existing Stream1 FP16 format and deployed it with a clean `codex/stream1-real-state-rank-parity` checkout to the isolated AlexanderVC Tesla P4 VM. Installed CUDA 12.4 and PyTorch 2.6 cu124, built `production_runner_libtorch_stream1` for `sm61`, passed a depth-2 smoke, measured a best tested micro-batch of 512 at about 71k candidates/s, and launched persistent puzzle 108 direct-then-reflected collection at beam 524288, touch-BFS radius 4, and two extra depths after first solve. The archive's search code was not deployed.
+- 2026-08-18: Integrated the collaborator-run final MultiGPU 1xT4 artifacts. The scalar eight-block MLP completed 25,165,824, 27,262,976, and 29,360,128 states; the widest point took 3,168.949 s (396.119 s/depth) at 14,215 MiB, but no larger scalar failure was tested. The matched native output-24 QMLP completed through 29,360,128 in 116.904 s (14.613 s/depth) at 13,717 MiB and CUDA-OOMed at 33,554,432 with a 14,909 MiB peak. Kept the later duplicate-checkpoint fail-closed notebook error separate because all structured point records had already been persisted. Updated the matrix and both paper languages with the complete time/memory curves and honest boundary classifications, rebuilt both PDFs twice, and verified no undefined references, overfull boxes, LaTeX errors, or fatal stops.
+- 2026-08-19: Prepared a scalar-only MultiGPU 1xT4 boundary pass at 31,457,280 and 32,505,856 states. Enabled only the lightweight production per-depth logs and extended the structured result with all completed depth times plus `last_depth_seconds` for `depth_done=7`; the heavier debug traces remain disabled. Rebuilt the self-contained reviewer payload, validated notebook JSON/Python AST, and refreshed its SHA-256 inventory. The Kaggle dataset upload began but could not be verified or launched because the configured localhost proxy on port 3067 stopped accepting connections; no RUNNING state or result is claimed.
+- 2026-08-19: After the configured Kaggle proxy recovered, completed and verified the new self-contained reviewer-dataset version containing scalar-only MultiGPU probes at 31,457,280 and 32,505,856 with per-depth telemetry. Attempted to launch the attached private 1xT4 notebook, but Kaggle rejected the push before creating a kernel because the owner's weekly GPU usage remains at the 30.00-hour limit. The previous notebook status remains ERROR; no RUNNING state or new result is claimed. A CayleyPy-group collaborator can launch the now-mounted latest dataset version through Save Version -> Save & Run All.
+- 2026-08-24: Corrected the recorded comparison methodology to match the user's final decision: primary seconds-per-step is clean total search wall divided by completed native steps (total/8 for the depth-8 Megaminx sweeps); exact final-depth time is auxiliary only. After the weekly Kaggle quota reset, pushed private MultiGPUBeamSearch notebook version 25 with only the prepared scalar probes 31,457,280 and 32,505,856. Kaggle accepted the push and reported `QUEUED`; this is monitoring state, not benchmark evidence.
+- 2026-08-24: Diagnosed MultiGPU scalar boundary version 25 as a preflight/packaging failure, not a capacity result. The scalar-only notebook incorrectly required the bundle head inventory `[1,24]` to equal requested `[1]`, and the worker searched only `/kaggle/input/models` although the self-contained dataset mounts under `/kaggle/input/datasets`. Added two regression tests, observed both fail before the fix and pass afterward, changed the preflight to a requested-head subset check, and made worker checkpoint discovery recursive under `/kaggle/input`. Rebuilt the payload and SHA inventory, validated JSON/Python AST and the worker hash inside the ZIP, published the corrected dataset version, and launched private notebook version 26. Kaggle reported `QUEUED`; no result is claimed yet. Diagnosis and raw logs are under `test_results/paper_benchmarks/multigpu_scalar_boundary_v25_2026-08-24/`.
+- 2026-08-24: Diagnosed MultiGPU scalar boundary version 26 as another packaging failure, not a capacity result. The v25 fixes passed, but the self-contained dataset lacked `puzzle_info.json` and `test.csv`, so the worker stopped before either requested beam. Added a regression contract for both native-runner inputs, copied their exact repository versions into the dataset, recorded their SHA-256 hashes, and verified all three notebook-package tests plus the complete checksum inventory before publication. Raw evidence and diagnosis are under `test_results/paper_benchmarks/multigpu_scalar_boundary_v26_2026-08-24/`.
+- 2026-08-24: Published the corrected self-contained reviewer dataset with the fixed native-runner inputs and launched private MultiGPU scalar boundary notebook version 27. Kaggle accepted the version and reported `QUEUED`; this is monitoring state, not benchmark evidence. Recreated the thread heartbeat `gpu-paper-benchmark-completion` at a 30-minute interval to monitor without duplicate launches, integrate only genuine point evidence into the matrix and exact bilingual paper pair, rebuild and verify both PDFs, and stop once the final scalar boundary is complete. The local RTX 3070 remains untouched.
+- 2026-08-24: Integrated completed MultiGPU scalar boundary version 27. On one visible T4, the scalar eight-block checkpoint completed beam 29,360,128 in 2,817.158 s (352.145 s/depth) at 14,215 MiB, with auxiliary final-depth time 1,644.13 s. Beam 31,457,280 CUDA-OOMed at 14,909 MiB across every row-budget fallback from 49,152 through 24; no 32,505,856 probe was needed after the first measured failure. The final measured bracket is therefore 29,360,128 complete / 31,457,280 OOM. Updated the benchmark matrix and both exact paper languages; raw evidence is under `test_results/paper_benchmarks/multigpu_scalar_boundary_v27_2026-08-24/`. The local RTX 3070 remained untouched.
+- 2026-08-24: Rebuilt both final paper PDFs twice after integrating v27. Direct MiKTeX `pdflatex` wrote the English six-page and Russian seven-page PDFs on both passes; MiKTeX returned a nonzero wrapper status only because its per-user log file was inaccessible. The actual `main.log` and `main_ru.log` contain no undefined references, overfull boxes, LaTeX errors, fatal errors, or emergency stops. Added a concise v27 validation report beside the raw artifacts. All required one-T4 capacity boundaries are now integrated, so the recurring benchmark heartbeat was paused.
+
+## 2026-08-25 -- Refocused and audited the exact multi-GPU beam-search paper
+
+- Reframed both paper languages around one physically sharded global beam,
+  rather than independent beams or local surrogates; replaced the title,
+  tightened the abstract and introduction, moved contributions before the
+  method, merged the protocol with experimental evidence, and added a scoped
+  conclusion.
+- Added a dated primary-source novelty audit covering the closest parallel,
+  distributed, GPU, multi-GPU, billion-state, exact top-k, sequence-decoding,
+  and selected-configuration-interaction systems.  Broad priority claims are
+  explicitly rejected; the article claims only the first reported full
+  path-finding conjunction located by the audit.
+- Corrected the mathematical contract for both scalar and output-24 scoring:
+  candidates are parent--action records, both paths rank the clipped and
+  quantized integer score, duplicate keys retain the lexicographically minimum
+  `(score, payload)`, the online B-th reduced score is monotone, the final
+  result is `min(B, |U|)`, and equal-score IDs are deterministic only for a
+  fixed layout. Exactness is stated for the same score quantization and under
+  the 128-bit-key identity model, not for unquantized floating outputs.
+- Made score quantization unambiguous: the theorem now names the production GPU
+  `rintf` round-to-nearest, ties-to-even conversion, and the evidence ledger
+  states that the mathematical monolithic reference consumes those same
+  integer keys rather than the separate CPU `std::lround` helper.
+- Generalized the paper's downstream contract from a neural-only scorer to a
+  deterministic Stream 1 score-key interface.  Streams 2--5 are scorer-agnostic,
+  but the shipped production Stream 1 backends and measured checkpoints remain
+  neural; a hand-engineered heuristic requires a Stream 1 implementation.  The
+  priority claim is scoped to the full conjunction for implicit combinatorial
+  path finding, not to all beam-search domains or only neural-guided search.
+- Separated the eight-A100 capacity request `B_req=770,883,178` from measured
+  speed.  A saturated 24-generator depth implies at least
+  `18,501,196,272` nominal logical children, while the independently timed
+  2xT4 point reports `30.274M` logical children/s.  The article does not infer
+  missing A100 wall time, exact aligned width, or strong scaling beyond two
+  GPUs.
+- Preserved all benchmark curves, measured boundaries, model architectures,
+  AlphaCube, DeepCubeA, CayleyPy, Pilgrim, and MultiGPU tables while removing
+  obsolete packaging/debug narrative.  Bibliography typography was compacted;
+  the final English PDF is seven pages and the denser Russian translation is
+  eight pages.
+- Rebuilt English and Russian PDFs twice with MiKTeX after the final edits.
+  BibTeX and document logs contain no warnings, undefined references, overfull
+  boxes, LaTeX errors, fatal errors, or emergency stops.  Rendered and visually
+  inspected every page; no clipping, overlap, missing glyphs, or corrupt tables
+  were found.
+- Reframed both paper sources around the direct full-conjunction priority claim:
+  the first published high-throughput multi-GPU beam-search system with one
+  physically sharded global frontier, GPU-resident hot data, global key
+  de-duplication, no shard-local semantic caps, and the stated exact top-B
+  contract.  Rewrote the title, abstract, contributions, related-work priority
+  paragraph, QiankunNet-cuSCI distinction, and conclusion as matched English and
+  Russian text.  Added matched code/artifact-availability sections linking the
+  public paper repository and v1.0.0 release, solver repository and GPU release,
+  self-contained Kaggle dataset, public baseline/capacity notebooks, and two-T4
+  production launcher.  The Qiankun distinction now uses only what that work
+  reports: it is not presented as beam search, retains $K=32{,}000/256{,}000$
+  from roughly one billion raw candidates, and stages full candidates through
+  host memory.  Removed
+  review dates, hedged priority wording, and ``archived'' prose while preserving
+  the separation between eight-A100 capacity-only evidence and measured two-T4
+  throughput.  PDF compilation was deliberately deferred to the next validation
+  step.
+
+## 2026-08-25 -- Published the standalone paper and reproduction repository
+
+- Created public repository
+  `https://github.com/TryDotAtwo/MultiGPUBeamSearchPaper` and published final
+  commit `50228f9967970e2ac35aca2794cb7c3c7b756d7a` on `main`.
+- Published release `v1.0.0` at the same commit with the exact scalar Megaminx,
+  native output-24 Megaminx, and matched Cube4 checkpoints plus both final PDFs
+  and their SHA-256 inventory. GitHub's server-side asset digests match the
+  local manifest for all six assets.
+- Published the final self-contained Kaggle dataset version with four
+  importable notebooks, exact checkpoints, a deterministic 17-member runtime
+  ZIP, a 32-entry mounted-file checksum inventory, component-level CC BY 4.0 /
+  Apache-2.0 scope, and the complete Apache license at both dataset and ZIP
+  level. Kaggle status is `ready`.
+- Added an explicit repository license-scope notice, third-party provenance,
+  deterministic bundle builder, cross-platform POSIX checksum regression test,
+  and Linux verification workflow. Final GitHub Actions run `32896780425`
+  passed all 14 tests, the 51-move replay, and all 105 repository checksums.
+- Revalidated both PDFs (English 8 pages, Russian 9 pages) and all 17 rendered
+  pages. No undefined references/citations, overfull boxes, LaTeX errors,
+  clipping, overlaps, missing glyphs, or unreadable tables were found.
+- Stored the complete publication verification ledger in
+  `test_results/paper_publication_verification_2026-08-25.md`. The local RTX
+  3070 remained untouched.
+
+## 2026-08-28 -- Split personal GPU knowledge into domain plugins
+
+- Refactored the personal `HighloadGpu` plugin back to a general CUDA/GPU
+  engineering role. Removed its embedded beam-search skill and added general
+  throughput-accounting plus a dedicated SM120 / RTX PRO 6000 Blackwell
+  hardware section backed by current NVIDIA/CUTLASS documentation.
+- Added separate `GpuBeamSearch` and `GpuNeuralInference` personal plugins.
+  The former owns frontier/ring/accumulator/final-materialization, exact memory
+  planning, profile tuning, CayleyPy stream invariants, and replay-valid result
+  semantics. The latter owns MLP/Transformer execution, model microbatch and
+  concurrency, fused Transformer paths, offline block-scaled artifacts, the
+  SM120 case study, and numerical/task-level quality gates.
+- Updated the personal `Molab` plugin to own all Molab-specific transport,
+  native marimo pairing, foreground SSE execution, HTTP 410 lifecycle,
+  Windows transport fallback, wedged-GPU precautions, and current artifact
+  persistence policy. Domain-specific beam and inference details are excluded.
+- Added a deterministic separation/knowledge contract and a complete install
+  report under `test_results/`. Four plugin validators, 23 skill validators,
+  source-to-installed SHA-256 checks, local-reference checks, and a credential
+  scan passed. Installed versions are `highload-gpu`/`gpu-beam-search`
+  `0.1.0+codex.20260828131508` and `gpu-neural-inference`/`molab`
+  `0.1.0+codex.20260828131509`.
+
+## 2026-08-28 -- Deep full-history audit and plugin experiment ledgers
+
+- Parsed the complete active Codex rollout sequentially instead of sampling
+  recent context. The initial analysis snapshot covered 88,995 JSONL lines,
+  38,626 normalized events, 562 user messages, 2,639 assistant messages, and
+  35,425 tool events with no malformed source rows. The redacted evidence
+  corpus was regenerated after this implementation through 89,327 source
+  lines and 38,765 events.
+- Added `tools/systematize_rollout.py`, four deterministic extractor/redaction
+  tests, and a private-data-safe chronological corpus under
+  `test_results/plugin_history_audit_2026-08-28/`. Fixed redaction of bare Molab
+  sandbox hostnames found in terminal reconnect output; the final credential
+  scan passed for the report, plugins, messages, and tool evidence.
+- Wrote the exhaustive chronology and decision ledger in
+  `test_results/full_conversation_systematization_2026-08-28.md`. It records the
+  Kaggle/Tetraminx integration, public notebook and Cloudflare/GitHub ingest
+  work, Cube4 `2**26` profiling, Molab execution lessons, exact-FP16 Transformer
+  progression, MXFP8/NVFP4 experiments, persistent/DSM/FlashAttention-4 ideas,
+  failed paths, corrected interpretations, and all currently unverified gates.
+- Added beam-specific experiment and failure ledgers to `GpuBeamSearch`, exact
+  FP16/SM120 low-precision/hot-path/rejected-path ledgers to
+  `GpuNeuralInference`, general evidence and failure taxonomy to `HighloadGpu`,
+  and Molab lifecycle plus foreground-experiment runbooks to `Molab`.
+- Passed both plugin knowledge contracts, all four rollout extractor tests,
+  four plugin validators, all 23 skill validators, and source-to-installed
+  SHA-256 equality for all 46 staged files. Installed all four plugins as
+  `0.1.0+codex.20260828-deep-history-audit`.
+- No beam-search, CUDA, model, or production runtime code was changed in this
+  documentation/plugin audit.
+
+## 2026-08-28 -- Molab SM120 maximum-throughput strategy
+
+- Added `test_results/molab_sm120_max_throughput_strategy_2026-08-28.md`, a
+  project-specific Amdahl/roofline and experiment plan for the Cube4 Piece
+  Transformer on Molab RTX PRO 6000 / SM120.
+- Reconciled two external GPU-specialist reviews with the measured project
+  ledger. Retained their persistent two-slot, producer-side packing, fused
+  epilogue, and Nsight profiling guidance; rejected larger-effective-M and
+  weight-residency as first priorities because `M=51,072` is already the
+  measured optimum, larger M/more slots regress, and persisting-L2 did not win.
+- Counted approximately 295.264M dominant useful FLOPs per parent and 9.907P
+  useful FLOPs at a saturated `2^25` depth. The accepted 80.2952-second control
+  is therefore about 123.39 useful TFLOP/s; 1 PFLOP/s would require about
+  9.91 seconds or an 8.10x speedup.
+- Defined the next safe Molab sequence: corrected logical-singleton runtime,
+  fused numerical/zero-global-hidden gate, `M=51,072` slots-1/2 A/B against
+  660.03 TFLOP/s, Nsight Systems stage accounting, focused Nsight Compute
+  counters, then an evidence-based integrate/revise/reject decision.
+- Documented the broader post-FFN path: static NVFP4 QKV/projection,
+  fixed-sequence FlashAttention-style attention, residual/LayerNorm boundary
+  fusion, and a persistent parent-group work queue. Explicitly retained solve
+  length/solve behavior as the final low-precision quality metric.
+- Checked the strategy against official NVIDIA RTX PRO 6000, Blackwell tuning,
+  Nsight Compute, and CUTLASS SM120 block-scaled documentation.
+- No CUDA, beam-search, model, or production runtime code was changed.
+
+## 2026-08-31 -- CayleyPy upstream and native integration research
+
+- Cloned https://github.com/cayleypy/cayleypy.git into CayleyPy/, full non-shallow history; main at 28f3841b34009ea8d51bb36eece3dd0be757a145, clean working tree. Existing _bench_external/cayleypy and dirty native worktrees were preserved.
+- Added docs/research/CAYLEYPY_INTEGRATION_RESEARCH_2026-08-31.md and three detailed audits under test_results/cayleypy_research_2026-08-31/ covering upstream code, our native contracts, releases/docs/CI/papers, and 178 PR/28 issue inventory snapshots.
+- Verified 133 selected upstream tests on CPU: 82 model/predictor/checkpoint/tokenizer/loss, 20 beam, 31 graph/encoding tests; 7 beam cases deselected. No dependencies installed or downloaded model weights. This is not a full upstream regression or native/GPU benchmark.
+- Added reproducible probes: scalar/Q/MITM LRX paths replay-valid; pinned upstream API/cache/random-walk/matrix edge cases captured in contract_probes.json without changing upstream source.
+- Recommended an optional whole-search backend using existing public-cayleypy-notebook adapter contracts. Documented Q dedup/score differences, incompatible model architectures, explicit state/alphabet/move/rank limits, hash/cache fingerprints, global-beam invariants and pending native licensing/packaging questions.
+- No CUDA, beam-search, model, native configuration, or production runtime code changed. No external PR/comments/publication, commits, pushes, GPU workload or cluster jobs were performed.
+- Artifact verification checked 106 local links, parsed 56 JSON evidence files, confirmed clone cleanliness and exact SHA; native-focused review found no material contradiction in the synthesis.
+
+## 2026-08-31 -- Refine CayleyPy adapter objective and verify native state sizing
+
+- Updated the integration research to make the user's actual objective explicit: convenient CayleyPy API invocation of our own native algorithm; upstream frontier parity and universal arbitrary-model support are not prerequisites.
+- Rechecked StatePacked/State128 alias and compile-time STATE_LEN/STATE_STORAGE_LEN/MOVE_COUNT specialization. Existing CheckBeamStateSizing passed; real CMake sizing probes confirmed logical 8/16/24/32/54/72/96/120 map to storage 16/32/32/48/64/80/112/128 at alignment 16.
+- Re-read saved IHES 72/80/18 CUDA-smoke and Tetraminx state_len=88 two-T4 replay-valid evidence. No new CUDA runs were made and no new solve-quality claim is implied.
+- Documented automatic shape-specific binary selection/build caching and CMakeCache stale-shape avoidance as adapter responsibilities. Kept representation/scorer limits separate from existing smaller-state support.
+- Changed only research/journal files and added the bounded CMake probe under test_results; production source and upstream clone unchanged.
+
+## 2026-08-31 -- Optional CayleyPy native beam adapter
+
+- Added the local Python package integrations/cayleypy_native with reversible enable_native()/disable_native(), single-call dispatch, auto/native/torch selectors and an upstream-compatible NativeBeamSearchResult.
+- Added strict graph/start/center/order/hash validation and independent replay, graph-bound native MLP artifacts, supported Pilgrim/ResMLPDistance export, private shell-free native/torchrun execution, content/shape/SM/toolchain build caching, and binary sidecar validation.
+- Capability fallback ends before native execution. Crashes, timeouts, broken artifacts and replay failures remain explicit errors. Smaller-state builds use actual logical state length and explicit move count; native beam/scoring/dedup implementation was not changed.
+- Independent review corrected PyPI 0.1 API differences, captured-method lifetime, Q flag handling, uint32/uint64 budget ranges, old device selection, BF16 SM80 requirements and Q GEMM alignment restrictions.
+- Verification: 123 integration tests passed, one POSIX descendant-process test skipped on Windows; 20 selected upstream beam tests passed both with dispatch disabled and enabled. Actual MLP exporter processes and fake-worker protocol/crash/timeout fixtures were tested. Wheel build, isolated install and replay-valid examples were checked; published PyPI 0.1 compatibility is covered separately. Current FP16 MLP SM75+ TensorOp requirements are checked before build/launch.
+- Logs, repeatable checks and remaining acceptance gates are in test_results/cayleypy_native_adapter_2026-08-31/. The prior research is updated with the implementation boundary. No native CUDA build/solve, multi-GPU benchmark, external release, commit, push, queue reconfiguration or changes to upstream/native source were performed.
+
+## 2026-08-31 -- Start authorized two-T4 native adapter validation
+
+- Added automatic installed-NCCL discovery, explicit CMake include/library/RPATH selection, dependency content identity in build metadata and prelaunch verification/LD_LIBRARY_PATH precedence. No native or upstream algorithm/source edits.
+- Added deterministic LRX8 public-API acceptance with an exact BFS oracle, six torch/native cases, observed-rank checks, independent replay, per-call timing and failure artifacts. Added a whitelisted private-Kaggle payload builder and bootstrap with exact public native/CayleyPy/CUTLASS revisions.
+- Ordinary Kaggle CLI access and GPU quota were verified; private kernel trydotatwo/cayleypy-native-adapter-2xt4-validation version1 was pushed with NvidiaTeslaT4 and a 1800-second bound. RUNNING is recorded only as scheduler state, not success or GPU execution proof.
+- Current evidence and follow-up results are kept under test_results/cayleypy_native_2xt4_2026-08-31/. Representative Tetraminx validation and overhead comparison are prepared separately from the untrained synthetic smoke.
+
+## 2026-08-31 -- Two-T4 runtime correction and explicit preparation
+
+- Real private Kaggle v1 verified two Tesla T4, a successful N8/G3 native build and 134 passing Linux CPU contract tests, then exposed an automatic-runtime buffer constraint on beam7. The native default8192 inference rows produced8190 candidates against2048 physical shard capacity; this was not actual VRAM exhaustion. Raw failed-run evidence is retained.
+- Corrected only the adapter's inference microbatch budget for small beams, preserving requested global beam and native automatic shard/ring/memory planning. Added actual-config diagnostics and regression coverage; native source remains unchanged.
+- Added optional prepare_native() and PreparedNative: owned model/runner snapshots, explicit model artifact hash pin, one-time export/build, reused verified runner path, unchanged public graph.beam_search call and explicit-only fallback. Prepared artifacts still require the recorded installed native dependencies and fresh worker startup per search.
+- Added authenticated real Tetraminx validation and alternating wrapper/direct native timing pairs, plus a public prepared-API two-GPU harness. Local combined verification:173 passed,1 POSIX-only skipped. Private Kaggle version2 submitted with exact source revisions and required competition/kernel mounts; submission is not an acceptance result.
+
+## 2026-08-31 -- CayleyPy adapter passes real two-T4 acceptance
+
+- Fixed the native runner's private legacy test_results directory and byte-interleaved multi-rank output in the adapter: standard torchrun per-rank redirection, deterministic diagnostic merging in finally, exact complete rank-stream checks on success. No native C++/CUDA or CayleyPy edits.
+- Version2 exposed only a missing POSIX execute bit in a mock test binary; fixed the fixture without weakening production validation. Version3 passed176 Linux tests and found a native solution, but correctly failed on missing legacy result directory. Earlier failures remain preserved alongside successful version4.
+- Private Kaggle version4 completed all181 Linux CPU tests and12 synthetic +2 prepared +10 real-artifact records. Sixteen calls used both actual T4 ranks. Returned paths replayed; native and CayleyPy public pinned source trees stayed clean. Small-state specializations8/16 and88/96 logical/storage bytes were exercised.
+- Real one-move Tetraminx puzzle0 warm medians were7.14s via public API and5.61s via prepared direct native call (three alternating pairs), with global beam65536. Worker wall4.3-4.4s and native search timer~0.09s have distinct boundaries. This is integration/overhead evidence, not a trained Torch speedup or deep-search benchmark.
+- Package verification:147 adapter tests passed with2 Windows-only skips,32 validation tests,20 upstream tests both enabled/disabled, authentic PyPI0.1 smoke and isolated wheel install. Exact package module bytes match the GPU payload. Final documentation, raw outputs and independent offline audit are stored under test_results/cayleypy_native_2xt4_2026-08-31/.
+- Independent downloaded-artifact v4 audit passed: exact source/payload/commands,16 mapped runs,64 rank streams, terminal consistency, budgets/replay and warm-workload identity. Final updated-documentation wheel is33317 bytes, SHA25601b5ec43c2d81d2384bba83fccc31f2fe5bb6ddb5dac34f9c20a4877eedb1da1; isolated install/API smoke passed. No external release or native/upstream Git changes were made.
+
+## 2026-08-31 - Portable CayleyPy adapter and public backend hook
+- Added optional installable cayleypy-native package, explicit pinned/checksummed source setup, wheel smoke/CPU CI, public two-GPU smoke, documentation and MIT license.
+- The companion CayleyPy change adds an opt-in callable/registry hook; native/auto dispatch uses it without monkeypatching. Released CayleyPy 0.1.0 retains reversible compatibility dispatch.
+- Kept the CUDA algorithm unchanged. Default source setup pins the native snapshot already validated on two T4 GPUs; it does not follow moving main.
+- Initial verification: 169 adapter tests passed, two POSIX-only skips on Windows; installed wheel CPU replay passed with both released CayleyPy and the public-hook source. Public-source two-T4 acceptance is recorded separately when complete.
+- Detailed local logs: test_results/cayleypy_public_pr_2026-08-31/.
+
+## 2026-08-31 - Public integration PRs ready for review
+- CayleyPy PR https://github.com/cayleypy/cayleypy/pull/207 at d74c3e1b1e80d7c89910d8c81bf21fded924299b: all 10 CI checks passed; native RST guide avoids existing Markdown parser failure.
+- MultiGPUBeamSearch PR https://github.com/TryDotAtwo/MultiGPUBeamSearch/pull/4 at c40a64d0c33ee3c72d0395b7a28e1c419d4a7c32: MIT, installable adapter, explicit verified source setup; all four CI jobs passed, including real downloads/offline reuse on Linux.
+- Both OPEN, non-draft, mergeable and cross-linked. No merge or PyPI release. Unrelated dirty checkout changes preserved.
+- New two-T4 job could not start: Kaggle returned HTTP 403 for writes and owned-notebook reads, including through the configured proxy/host session. Both PRs disclose the limit separately from earlier GPU evidence.
+- Final evidence: test_results/cayleypy_public_pr_2026-08-31/README.md and final_verification.json.
+## 2026-09-26 - Bilingual paper moved to Prism
+- Uploaded the canonical English and Russian LaTeX manuscripts, shared bibliography, and README to a named Prism project. Both manuscript PDFs compiled in Prism and their first-page previews were checked.
+- Fixed the English title's Prism-rendered `nExact` artifact by replacing its line break with a colon in `paper/main.tex` and the Prism import copy; rebuilt the local import ZIP. Preserved earlier manual/partial remote drafts under noncanonical names. Verification: `test_results/prism_transfer_2026-09-26.md`.
+## 2026-09-26 - Author and measured eight-H200 Cube4 depth
+- Added Ivan Litvak's independent-researcher affiliation and email to both canonical manuscripts. Audited the preserved eight-H200 rank logs: one aligned retained frontier of 2,900,361,216 states completed Cube4 depth 8 in 931.266 s, yielding 69,608,669,184 nominal parent-action pairs and a derived 74.746M pairs/s; the puzzle was not solved. Kept this separate from the two-T4 Megaminx throughput and avoided a strong-scaling claim.
+- Packaged the compact raw rank logs, device telemetry, boundary attempts, and detailed caveats in the public paper repository under `artifacts/results/h200_8x_cube4/`; updated bilingual paper, benchmark matrix, claim ledger, README, manifest, and checksum inventory. Both local PDFs rebuilt without undefined references or overfull boxes; 14 public reproduction tests passed. Evidence: `test_results/h200_paper_evidence_2026-09-26.md`.
+- Published the reviewed package to the public paper repository `main` at `bc2ea63bcc70bb9a39ad4ffb266cf772f402777e`; verified remote/local Git tree identity. Browser control repeatedly timed out before the Prism update, so Prism remains unverified; refreshed the local Prism import ZIP instead. Publication details: `test_results/h200_paper_publication_2026-09-26.md`.
+## 2026-09-26 - Bilingual visual explanation, first approved pass
+- Added the same three vector figure geometries in English and Russian: an illustrative global de-duplication/top-3 step with a tied boundary, one physically distributed global beam with compact CPU metadata separated, and a conceptual five-stream overlap schedule. Added a plain-language introduction and clarified transient child inputs for scalar scoring versus persistent frontier storage; explicit survivor condition is now `s <= T` in both versions.
+- Rebuilt both PDFs; visual inspection of the first four pages found legible figures. Final publication and Prism synchronization status is recorded separately under `test_results/`.
+- Published the paired visual revision to the public paper repository at GitHub `main` commit `6d3322baf2675a0033f6299c125cb4dcf844c103`; remote Git tree equals the reviewed local commit tree. Fourteen reproduction tests passed and both final LaTeX logs have no undefined references or overfull boxes. The local Prism import ZIP is refreshed; signed-in browser control timed out, so Prism contents and the requested model setting remain unverified. Details: `test_results/paper_visual_qa_2026-09-26.md`.
+
+## 2026-09-26 - Recovered paper side-conversation handoff
+- Preserved seven verbatim delivered messages and captured user context from side conversation `01a0dee9-f4be-7dc1-8095-d9d2fb514223`, recovered from the main thread's journal. Created a state audit and detailed main-agent continuation plan under `test_results/paper_side_recovery_2026-09-26/`; the earlier six-storyboard editorial handoff remains intact.
+- Verified the current canonical/staged TeX and bibliography match byte for byte, both manuscripts contain three figures, and existing final LaTeX logs have no listed fatal/reference/overfull diagnostics. Recorded fresh source/PDF/ZIP hashes. Did not rerun builds/tests, modify the manuscripts, publish, run GPUs, or operate Prism. Full standalone side-chat history was unavailable, and that limit is explicit in the recovery files.
+
+## 2026-09-26 - Full bilingual paper snapshot audit
+- Rendered and inspected every page of the current nine-page English and ten-page Russian PDFs. No visible clipping/overlap was found at 100 dpi; dense scaled tables and float placement still warrant reflow. Added a CPU-only snapshot verifier, JSON results and retained style-lint reports under `test_results/paper_side_recovery_2026-09-26/`.
+- Verified ordered label/citation/reference parity, identical display formulas and matching digit-bearing data in all eleven paired tables. Existing logs are clean for fatal/reference/overfull patterns; no fresh compilation was performed because manuscript files were unchanged.
+- Documented source-backed corrections: Cube4 has 96 color positions but 56 piece tokens plus CLS (57 total), and its input LayerNorm is omitted from the architecture row; DeepCubeA weight 0.6 is missing from prose. Also recorded the empty-set top-B definition, owner-label mismatch, collaborator/coauthor translation, stale two-implementation wording, and scalar-cohort provenance clarification. Prepared paired source fragments for the main paper thread; no manuscript, remote, or GPU changes.
+
+## 2026-09-26 - Paired paper corrections after Prism access failure
+- Applied the source-backed EN/RU corrections from `test_results/paper_side_recovery_2026-09-26/EDITORIAL_AUDIT.md` to both manuscripts without changing measured table cells. Distinct scalar run cohorts are now identified in their captions.
+- Rebuilt both PDFs twice with `pdflatex`, checked final logs for reference/overfull/fatal diagnostics, visually inspected affected pages, and refreshed the byte-matched local Prism import ZIP. Details in `test_results/paper_qa_2026-09-26_final/README.md`.
+- Did not use Computer Use after the user's prohibition. The online Prism project and public paper repository remain unchanged in this pass.
+
+## 2026-10-04 - Strong-scaling admission audit and hardware proposal
+- Inspected dirty current HEAD, global alignment, Stream4 dedup, rank-ordered cutoff ties, solution exits and timer/history boundaries. Preserved source/input SHA-256 manifest, dirty patch and local GPU/SSH inspection under `test_results/strong_scaling_20261004/`. Added blocked protocol, machine-readable unmeasured rows and an explicitly unmeasured article fragment. Local hardware is one 8-GiB RTX 3070 Laptop; MEPhI unavailable. Proposed one 8xA100 SXM4 80GB node and bounded rental for user approval. No production edits, GPU experiment or rental.
+
+## 2026-10-04 - RTX 3060 Vast offer lookup
+- Replaced A100 recommendation with user-scoped Vast-only RTX 3060 1/2/4/8 plan in `test_results/strong_scaling_20261004/VAST_3060.md`. Public live offers API returned one 8x12-GiB node at approximately $0.6511/hour including 40-GiB disk; raw offer saved. Authenticated browser session available; existing rented instances untouched. No local trial or paid rental launched; requested total spending ceiling.
+
+## 2026-10-04 - Prepared remote-only strong-scaling overlay
+- Added unexecuted, SHA-guarded remote instrumentation script and acceptance notes under test_results/strong_scaling_20261004. Fixed-step stop control, matching history retention, full synchronized search timing and admission-only frontier dumps are prepared for remote validation. No local build/test and no rental occurred; spending approval remains pending.
+
+2026-10-04: Authorized USD 10 Vast RTX 3060 scaling series. Rented only instance 54143207 (8x RTX3060, quote USD0.535/hr); remote four-hour budget watchdog installed. Current source transferred and measurement-only overlay compiled remotely. Contract/Stream3/Stream4/final tests passed; dispatcher test source has stale network-view initializers and does not compile. No local compute tests run.
+
+2026-10-04: RTX3060 admission rejected before timing. All 1/2/4/8 unique state sets at depth4 match CPU (1303505), but retained record counts differ (1638869/1494538/1303505/1303505). One-GPU physical trace confirms 335364 cross-sibling-buffer duplicate hashes. No warmup/timing repeats started; algorithm untouched. Report and article fragment under test_results/strong_scaling_20261004.
+
+2026-10-04: Admission evidence archive SHA256 verified locally, extracted under test_results/strong_scaling_20261004/evidence. Instance54143207 destroyed via scoped CLI; absence verified in Vast UI. Budget remained below USD10. Ivan explicitly approved transfer of paths/SHA/reproduction/counterexample to Cube4 owner; sent after initial auto-review rejection.
+
+2026-10-04: Prepared immutable current Hopper-source bundle/manifest and SHA-guarded remote measurement overlay under test_results/strong_scaling_20261004/new_version, preserving original p900 inputs and MLP. No local execution or new rental. Same8x3060 machine137843 quotedUSD0.534222/hour; new-rental approval pending after prior instance destruction.
+2026-10-04: Authorized new-version RTX3060 scaling stage USD20; instance54147241 same machine137843. Packaged current Hopper revision81ed9f0 plus dirty SHA pins, originalp900 inputs, measurement-only instrumentation; remoteSM86 build. Supplemental third_party bundle fixes packaging omission; source logic unchanged. Evidence test_results/strong_scaling_20261004/new_version.
+2026-10-04: User approved four-series grid and publicHF. Created TryDotAtwo/multigpu-beam-rtx3060-scaling-20261004; task-scoped token created at explicit request, only repo write. Series1 full raw7.31GB uploaded directlyVast->HF and LFS SHA verified. No further bulk downloads to userPC; stopped/removed partial download. Preparing bounded common/medium/large profile selection with identicalp900 algorithm and fixed12steps.
+2026-10-04: Four-series controller running under supervisor beam_grid on existing instance54147241, immutable binary7c10c4e8cade66d78900946052e0a1ccf08644fa0df37df6b5286fd3028279a2. Public protocol committed to HF. Admission frontiers are archived per depth and removed remotely only after matching HF LFS SHA/size. Same-rental watchdog ceiling extended to8h (compute/disk quote4.274USD plus5USD transfer reserve, below authorized20USD). Prepared report_grid.py and supervisor beam_report to publish tables/plots after completion; no local computational tests.
+2026-10-04: Tightened weak-profile admission: compare canonical state hashes for every full step and reject first membership differences after paired-score depth5 capture as unexplained, rather than assuming later cutoff ties. Controller updated only at an idle GPU archival boundary and resumed existing completed measurements; search binary unchanged. Prior/current controller SHA and update boundary journal preserved remotely. p1 selection medians common85.107, medium63.502, large71.803 seconds; independent final winner repeats retained separately.
+2026-10-04: Independent p1 medium-profile final median63.595126667s, min63.541739574/max63.623749179. p2 medium selection35.340987397s versus common33.951948256s; p2 large admission complete without duplicates, timing pending. Runtime-failed optional candidates now retain verified HF partial-frontier archives/logs and are rejected without timing, instead of aborting the entire grid. Supervisor beam_report publishes all four result tables/CSV/JSON/PNG/PDF and EN/RU article fragments after completion; beam_finish checks public final data and every archive LFS SHA/size before removing remote task token and destroying ONLY owned instance54147241. This is configured background execution, not a claim of completed grid or confirmed destruction. Eight-hour budget stop remains active.
+2026-10-04: Revalidated live supervisor processes. p2 common-profile independent final median33.998143934s; p4 medium selection19.795843672s is slower than common18.727284617s and common selected for final repeats. Remote source inspection confirms full timer brackets GPU/rank synchronization and history flush; fixed-step mode rejects incomplete frontiers/steps and ignores solution-triggered early exits. Final publication audit now rechecks original source/model/input hashes, instrumented runner/binary, timed launch commands, non-dump full-step flags, successful warmups and equal strong-work volumes. Added analysis-library versions and explicit weak-time reference curves for actual-work ideal throughput versus constant-time reference. These are reporting/audit changes, not new GPU experiments.
+2026-10-04: p4 independent final common-profile median18.789272904s. p8 medium/large pass all12 uniqueness/work gates and exact depth5 state/score comparison; selection medians12.432517920/15.233548807s versus common11.366969677s, common selected. Controller terminal failure was HF429 repository commit quota128/hour after completed p8 large repeat2, not native search failure. Updated export handling to retain/defer small checkpoint files on429 and bounded60s retries for required large/archive/final exports; restarted only exited controller on existing rental and reused completed repeat directories. No new rental, no rerun of completed native work, no paidHF upgrade. Final export also publishes latest authoritative grid ledger/controller in one commit; cleanup export quota waiting preserves rental/data until confirmed upload.
+2026-10-04: Strong selected-profile independent final p8 common median11.346553443s (11.338299725–11.379337155). Original weak p2 common capacity655360 failed full admission at depth5 with Stream3 flag3002: selected physical buffer/sibling full and zero spill. Treat as profile admission failure, not algorithm scaling evidence. Preserved failed run/partial frontiers under grid_failed_weak_p2_common_capacity655360. Added separate weak profile files, all candidates/worlds with physical capacity3276800; all other candidate knobs and immutable binary unchanged. Weak p1 now independently admitted/measured instead of reusing differently allocated strong p1; strong completed timings preserved. Resumed controller on same authorized rental, beginning weak p1 common admission. Report/protocol amended to disclose the allocation change, retain failed raw frontiers in final complete archive, and avoid false equal-profile/reuse claims.
+
+## 2026-10-04 — RTX3060 weak p2 completed remotely
+- Same Vast instance 54147241, immutable runner 7c10c4e8cade66d78900946052e0a1ccf08644fa0df37df6b5286fd3028279a2. Global beam 8388608, 12 complete steps; 51733188 parents / 1241596512 actions per timed run.
+- All common/medium/large admission frontiers identical across all 12 steps; unique logical states, balanced ranks. Full raw admission archives exported directly to public HF task repository.
+- Selection medians common 117.355044751 s (range 5.97159%, ineligible for stable profile selection), medium 85.389392281 s, large 69.954148701 s. Selected large.
+- Independent selected-profile warmup + 3 repeats: median 69.979927514 s, min 69.955982050, max 69.983640909. No failed or admission timing included.
+- Remote supervisor beam_grid pid32258 confirmed RUNNING and transitioned to grid_admit_weak_p4_common. Four-series scope remains incomplete; no new rental or local computational execution.
+
+## 2026-10-04 — RTX3060 weak p4 completed remotely
+- Same authorized Vast instance and immutable binary. Global beam 16777216, 12 full steps, actual work 102064836 parents / 2449556064 actions. Filled beam exactly 4194304 states per rank.
+- All common/medium/large admissions: no logical-state duplicates at any of 12 steps, all frontier sets identical across profiles; raw archives SHA/size verified on public HF before scratch deletion.
+- Common median 120.793078979 s (118.352651834–123.812774604); medium selection median 86.060882115 s; large selection median 70.882378490 s. Selected large among three tested candidates.
+- Independent selected large final warmup + 3 repeats: median 70.951101770 s, min 70.795450703, max 71.023069464. Full search metric includes history flush, not initialization or admission dumps.
+- beam_grid pid32258 live, transitioned to grid_admit_weak_p8_common. Scope remains incomplete until weak p8, final report verification and lease cleanup.
+
+## 2026-10-04 — All four RTX3060 series published; final cleanup confirmation pending
+- weak p8 selected large independent median 69.875745411 s, min 69.773165678, max 70.101124069; all 12 frontier sets identical across weak profiles and duplicate-free.
+- All 16 measurement rows complete, three repeats per row. Fixed global-beam actions remain 637616736 on every GPU count; weak p8 actual actions 4501367640.
+- Repaired report-only first-series schema mismatch by reparsing original rank logs for every row and asserting old timing/actions match; no GPU rerun or algorithm change. Immutable 346-file source manifest and runner reverified remotely.
+- Public final report commit c9faf330a47801a8e0e15543d856c4364e9d1bf5. Public text/JSON/CSV hashes match upload receipt. Four figures visually inspected; ideal lines, min–max bars, series bases and actual-work throughput checked.
+- Export cleanup receipt reverified 240 raw frontier archives and runtime archive SHA d0c7734ebf78d92b4d43feb9059870613f282cc0f94a387e8724f392e6f27468 (47921052 bytes). Source/bulk evidence stayed remote→public HF.
+- Remote cleanup intended destruction of only 54147241 after export/token removal. SSH closed. Independent deletion confirmation still pending because CUA kernel reports missing asset path; asked user to check Instances. Quoted compute+disk 3.749475603 USD; bandwidth/invoice not verified.
+
+## 2026-10-04 — RTX3060 task complete; lease deletion confirmed
+- Direct read-only Vast account API returned HTTP 200; task instance 54147241 absent. No other rental was changed. Proof: test_results/strong_scaling_20261004/new_version/final_cleanup_confirmation.json.
+- All four approved series, public evidence, reproducible tables/figures/article and cleanup complete. Compute/disk quote remains approximately USD 3.75; actual bandwidth/invoice unverified.
+
+## 2026-10-04 — Scaling manuscript integration prepared
+Contacted current dot Astra (01a10074-c5d8-77f3-9b0b-6866b689c002) under explicit user authorization. Prepared source-bound EN/RU conclusion and integration constraints in test_results/strong_scaling_20261004/new_version/PAPER_INTEGRATION_20261004.md. Current Prism source identification and manuscript integration remain pending; no old local manuscript overwritten.
+
+2026-10-05: Final source package archived under paper/arxiv-20261005; uploaded and compiled successfully on arXiv; metadata saved; submission 8138889 sent, account status submitted. Evidence: test_results/arxiv-20261005/SUBMISSION_STATUS.md. No public article ID observed yet.
+
+## 2026-10-10 - Cube555 GitHub-only package prepared
+- Pulled current public notebook and prepared kaggle/cube555_github with no dataset/competition/kernel/model attachments.
+- Download inputs from GitHub release cube555-inputs-20261001; verify pinned ZIP SHA-256 and all seven per-file hashes before using weights/CSV. Preserve solver commit a152738740044b683e1fe6e759ccb5b4b095d188, beam/configuration and search behavior.
+- Real public ZIP download, bootstrap execution and Python cell syntax checks passed. Evidence: test_results/cube555_github_20261010/verification.json. GPU search not run. Public push awaits explicit authorization required by work-with-kaggle skill.
+- User explicitly approved public update/run. Kaggle version 22 pushed successfully; pulled published source matches local cells and has zero attached sources. Status QUEUED at verification; GPU completion not yet verified. Receipt: test_results/cube555_github_20261010/publication_receipt.json. Version 21 was superseded to correct provenance version after Kaggle assigned a newer number than the old config indicated.
+
+## 2026-10-10 results catalog and branch consolidation
+Prepared deterministic family/instance Markdown catalogs and moved publisher CLI/plugin into main. Preserved existing TSV/JSON paths. Migrating the service checkpoint from a branch to a mutable tag while retaining exact-candidate validation. Found four invalid historical MoLab-v1 submissions blocking 42 otherwise valid records; originals preserved byte-for-byte in the unvalidated archive. Verification and migration receipts: test_results/results_catalog_20261010/.
+
+2026-10-10 results repository: removed eight extra remote branches atomically after verifying their exact heads and main ancestry; sole branch main. Explicitly approved PR-only protection removal, exact-candidate and strict checks retained. Worker resumed normal mode with unchanged patched bundle and all bindings. Forced live verification run 38059887014 pending; local receipts under test_results/results_catalog_20261010/.
+
+2026-10-10 results cleanup acceptance: GitHub Actions forced full verification 38059887014 completed success on f683dc64ca86408e2f3d4b54bb207b8d75ee5e51. Remote sole main branch and preserved strict exact-candidate check reverified.
+
+## 2026-10-28 — Kaggle Cube555 2.5M solves and 3.5M capacity step
+- Verified completed 2.5M 2×T4 blend runs: puzzle 35 yielded a replay-valid length-12 path; puzzle 835 yielded replay-valid length-103 paths. Both used native LibTorch, collect mode, Transformer 0.8 + MLP 0.2, touch radius 5, API max_steps 115. Existing runs were audited, not duplicated.
+- Confirmed four long-run solution records were ingested and present on cayleypy-beam-results main at 9707955933733e2bdb969a872db49df6b6db1c71.
+- Separately completed a bounded 3.5M capacity run on 2×T4: one full 1.75M-parent-per-rank frontier step took 386.922s; no solution was sought. Evidence and configuration correction are recorded in test_results/kaggle_two_puzzles_20261028/REPORT.md.
+- Publication provenance audit: corrected the strength of the prior claim. The four long-run records reached Cloudflare ingest and GitHub main through bot commits, but the matched Kaggle v2 source hash has `PUBLISH_RESULTS=False`; receipt/status APIs do not identify the submitter. Do not claim automatic Kaggle submission. Evidence: test_results/kaggle_publication_audit_20261028/REPORT.md.
+
+
+## 2026-10-30 — Kaggle Cube555 cold 2.5M one-step acceptance
+- Verified the current public v174 Cube555 notebook through the Chrome extension and Kaggle CLI using a private cold test kernel on 2×Tesla T4. GitHub-backed source/build succeeded at MultiGPUBeamSearch commit d0f8170effcabc32a043e8d1964e62d1ca56a035.
+- Exactly one complete 2.5M frontier step ran at depth 5: 1.25M parents per rank, 294.779 s. Auto-calibration selected LibTorch batch 256; Stream1 best admitted 11,497 parents/s. Run completed in 878.1 s, with both persistent workers/session closed.
+- The one-step test intentionally did not search to a solution and disabled publication. Separate existing Kaggle runs supplied replay-valid length-12 and length-103 evidence; do not conflate those with this cold acceptance.
+- Full receipt/logs and scope limits: beam-api-integration-20261025/test_results/kaggle_cold_current_20261030/REPORT.md.
+
+
+## 2026-10-30 — Audit requested 2.5M Cube555 short and long Kaggle runs
+- Confirmed short puzzle 35: requested/effective beam 2,500,000, 12-move path, native `replay_valid=true`, 2×T4, LibTorch, Transformer 0.8 + MLP 0.2. Confirmed long puzzle 835: requested/effective beam 2,500,000/2,506,752, 103-move solution, 2×T4, same blend settings. Both use collect mode, max steps 115, touch radius 5, extra collect depth 1, reflection off.
+- Long launcher log reports publication complete (5 records, 1 archive), but publication.json Kaggle slug differs from the executed `current-reference` kernel; short notebook has publication disabled. These publication limitations are explicit.
+- Detailed evidence and links: test_results/kaggle_two_puzzles_20261027/TWO_RUNS_AUDIT_20261030.md.

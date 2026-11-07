@@ -639,6 +639,7 @@ StaticMemoryPlan make_static_memory_plan(const RuntimeConfig& config) {
         plan.layout_phase1_streams_bytes,
         plan.layout_phase2_select_bytes,
         plan.layout_phase3_materialize_bytes,
+        static_cast<std::size_t>(config.solve_bucket_gather_scratch_bytes),
     });
     plan.total_device_bytes =
         align_up_size(plan.current_frontier_bytes, 256) +

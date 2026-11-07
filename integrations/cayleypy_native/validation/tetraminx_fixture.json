@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "name": "Professor Tetraminx p888 epoch1024 scalar FP16",
+  "kernel_source": "trydotatwo/cayleypy-2xt4-tetraminx-example",
+  "competition_source": "cayley-py-professor-tetraminx-solve-optimally",
+  "checkpoint_name": "p888-t000_1765097793_e01024.pth",
+  "checkpoint_sha256": "10d0ccebd3bf83c8cb7bf50eb4960430acb1e463fbf24a8c32a91cda119528bf",
+  "shape": {
+    "state_len": 88,
+    "num_classes": 88,
+    "hd1": 256,
+    "hd2": 128,
+    "nrd": 4,
+    "output_dim": 1,
+    "dtype": "fp16",
+    "normalization": "batchnorm_folded"
+  },
+  "move_count": 24,
+  "contract_provenance": "Competition puzzle_info.json/test.csv must be separately mounted; historical kernel output does not retain those files. Artifact SHA authenticates exported bytes, not training-graph provenance.",
+  "files": {
+    "hidden_bias.fp16": {
+      "bytes": 256,
+      "sha256": "aacdb82c1b05240dbd6056e299eb3b38f8c2d512a0ddeffa76a088d4666dc992"
+    },
+    "hidden_weight_hxk.fp16": {
+      "bytes": 65536,
+      "sha256": "7115cc5f067cd5b339a32c5bc476eca51d1064593e58505e8167a9fe0c47bb3e"
+    },
+    "input_bias.fp16": {
+      "bytes": 512,
+      "sha256": "fb5f7dcdac53fcb9e6ed03ccbee9efc24b004a1ea1845afb3c5f6adc44abd8a7"
+    },
+    "input_weight_hxk.fp16": {
+      "bytes": 3964928,
+      "sha256": "4e5daed94e2e24e024b7b23a4c7461757b7375cd08eb5f52b0cabbcdc0db7d83"
+    },
+    "manifest.json": {
+      "bytes": 489,
+      "sha256": "f07a3ce1489a242c38f0ca3b022b9e010725234e88179162bc62b084cbe69546"
+    },
+    "output_bias.fp16": {
+      "bytes": 2,
+      "sha256": "fa24812538a73913577f6d361c4b16606529dc8dfe1f5357f9a83a450a54d14f"
+    },
+    "output_weight_hxk.fp16": {
+      "bytes": 256,
+      "sha256": "73cceb838666644d4ceab9394f895d18ae2ae14db4b7bbac7504c8892dfeb063"
+    },
+    "residual0_fc1_bias.fp16": {
+      "bytes": 256,
+      "sha256": "1129c7d6f5a946abb4e3c88538595ce6bbff784f17fdbfc1537f3c688155cd5a"
+    },
+    "residual0_fc1_weight_hxk.fp16": {
+      "bytes": 32768,
+      "sha256": "10c6fad3d3b9fe0e4470c4c32084f6f8747984dfd97509c5bdb4d1f2e276fb87"
+    },
+    "residual0_fc2_bias.fp16": {
+      "bytes": 256,
+      "sha256": "846b37e87d234b478afc253bc619c805e9e73e77353d42445ccdb082f32642f0"
+    },
+    "residual0_fc2_weight_hxk.fp16": {
+      "bytes": 32768,
+      "sha256": "ff59d3ae1bd3d989e02e8edae849a55106b945e11f3fdbb246be5169ddf3e26a"
+    },
+    "residual1_fc1_bias.fp16": {
+      "bytes": 256,
+      "sha256": "2f4be7e80a4432b841c8cecf30b30eb5d7f8cc86a4f8a938510971edd45100c7"
+    },
+    "residual1_fc1_weight_hxk.fp16": {
+      "bytes": 32768,
+      "sha256": "ddbe6e558c4ce6944d5bb0f7782a69111dae5a517a8a8c31792145e67fba01e0"
+    },
+    "residual1_fc2_bias.fp16": {
+      "bytes": 256,
+      "sha256": "8fdd04fc908a4dea0be432a8ef41d7793d6abb4d5298d88b907a888a5f4fc167"
+    },
+    "residual1_fc2_weight_hxk.fp16": {
+      "bytes": 32768,
+      "sha256": "4da0e0d86d0d77e0e28931e0a377fe221c1111a31bf890c5ccce8178c0c68a73"
+    },
+    "residual2_fc1_bias.fp16": {
+      "bytes": 256,
+      "sha256": "f77de16d63e9c7b3c7e61386ce9cb47237b3ea8a346f55d37c40e902cc86ef23"
+    },
+    "residual2_fc1_weight_hxk.fp16": {
+      "bytes": 32768,
+      "sha256": "95ff3ed0044499955a37aa5a93157867d0234a5faebdd4f33d8a4edd33eef148"
+    },
+    "residual2_fc2_bias.fp16": {
+      "bytes": 256,
+      "sha256": "4d4eb0d58461825d2743d3e7371d486ea62a9566a5c111bc04e45b064d8e4fd7"
+    },
+    "residual2_fc2_weight_hxk.fp16": {
+      "bytes": 32768,
+      "sha256": "5ceefa6ca0acf9018a75e938edcbcebf521dda6a2bb0d2c2c015931a16f836ce"
+    },
+    "residual3_fc1_bias.fp16": {
+      "bytes": 256,
+      "sha256": "b81c1456736680349836eb648745e0fd739cc1ac5eaa179c76534e3d126b9451"
+    },
+    "residual3_fc1_weight_hxk.fp16": {
+      "bytes": 32768,
+      "sha256": "2b66000b2062b0770a46e93e1995d1345e1283ee006c5f704b03fc518cffeeec"
+    },
+    "residual3_fc2_bias.fp16": {
+      "bytes": 256,
+      "sha256": "d1060cb6214b922c34989e84f27ff9eca1f86f182938c8d7e4f2fcb4ea7b46ed"
+    },
+    "residual3_fc2_weight_hxk.fp16": {
+      "bytes": 32768,
+      "sha256": "acb6f1af2eaef3dfa836e10402ac89fe5a3cba5418144890bd632e980865f2b0"
+    }
+  }
+}
