@@ -1,0 +1,25 @@
+PUBLIC_RUST_CASE cutlass world=1 engine=python first
+PUBLIC_RUST_CASE cutlass world=1 engine=python repeat
+PUBLIC_RUST_CASE cutlass world=1 engine=python unsolved
+PUBLIC_RUST_CASE cutlass world=1 engine=python model-change
+PUBLIC_RUST_CASE cutlass world=1 engine=python beam-change
+PUBLIC_RUST_CASE cutlass world=1 engine=python collect
+PUBLIC_RUST_CASE cutlass world=1 engine=rust first
+PUBLIC_RUST_CASE cutlass world=1 engine=rust repeat
+PUBLIC_RUST_CASE cutlass world=1 engine=rust unsolved
+PUBLIC_RUST_CASE cutlass world=1 engine=rust model-change
+PUBLIC_RUST_CASE cutlass world=1 engine=rust beam-change
+PUBLIC_RUST_CASE cutlass world=1 engine=rust collect
+PUBLIC_RUST_CASE cutlass world=2 engine=python first
+PUBLIC_RUST_CASE cutlass world=2 engine=python repeat
+PUBLIC_RUST_CASE cutlass world=2 engine=python unsolved
+PUBLIC_RUST_CASE cutlass world=2 engine=python model-change
+PUBLIC_RUST_CASE cutlass world=2 engine=python beam-change
+PUBLIC_RUST_CASE cutlass world=2 engine=python collect
+PUBLIC_RUST_CASE cutlass world=2 engine=rust first
+PUBLIC_RUST_CASE cutlass world=2 engine=rust repeat
+PUBLIC_RUST_CASE cutlass world=2 engine=rust unsolved
+PUBLIC_RUST_CASE cutlass world=2 engine=rust model-change
+PUBLIC_RUST_CASE cutlass world=2 engine=rust beam-change
+PUBLIC_RUST_CASE cutlass world=2 engine=rust collect
+PUBLIC_RUST_SESSION_GPU_OK

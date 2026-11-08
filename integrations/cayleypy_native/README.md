@@ -743,6 +743,22 @@ session.close()  # Release GPUs when finished.
 The explicit call does not require `enable_native()`. Do not recreate `session`
 in the search cell if the intent is to reuse it across cell executions.
 
+An experimental alternative routes the session's resident rank workers and
+terminal validation through Rust:
+
+```python
+session = NativeSession(engine="rust")
+```
+
+It uses the same `session.beam_search(...)` and `close()` calls. The first
+nontrivial search requires the matching packaged Rust extension and worker, a
+managed source build and its dependencies; it builds and verifies the C ABI
+library on demand. An externally supplied `runner_path` is not supported by
+this experimental mode. Model preparation and calibration still use the
+existing Python path. The default `NativeSession()` remains unchanged while
+the Rust path is compared on real workloads; this option is not a performance
+claim.
+
 
 ### Shared profiles from GitHub
 

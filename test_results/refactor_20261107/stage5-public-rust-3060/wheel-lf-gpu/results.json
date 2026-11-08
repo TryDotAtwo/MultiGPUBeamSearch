@@ -1,0 +1,79 @@
+{
+  "package": "/workspace/beam-results/public-rust/distribution-lf/checkout/installed/multigpubeamsearch/__init__.py",
+  "records": [
+    {
+      "engine": "python",
+      "index": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          13150,
+          13151
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/c663a4f07c8d4b7790fb03fde4c6a408"
+    },
+    {
+      "engine": "python",
+      "index": 1,
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          13150,
+          13151
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/d1c80c60426a46b1bcdc567488ab5e45"
+    },
+    {
+      "engine": "rust",
+      "index": 0,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          13208,
+          13209
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/80cfa306e5b64e0a9fd54890fe545cee"
+    },
+    {
+      "engine": "rust",
+      "index": 1,
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          13208,
+          13209
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/61e909cfd610452d9cfc026562dc56de"
+    }
+  ]
+}

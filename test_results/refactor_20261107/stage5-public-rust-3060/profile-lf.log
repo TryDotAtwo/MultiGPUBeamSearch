@@ -1,0 +1,49 @@
+         190143 function calls (187903 primitive calls) in 2.280 seconds
+
+   Ordered by: cumulative time
+   List reduced from 422 to 40 due to restriction <40>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    2.280    2.280 public-rust-profile.py:33(run)
+        1    0.000    0.000    2.280    2.280 persistent.py:74(beam_search)
+        1    0.000    0.000    2.280    2.280 dispatch.py:267(beam_search)
+        1    0.000    0.000    2.280    2.280 dispatch.py:181(_search)
+        1    0.000    0.000    2.007    2.007 backend.py:148(prepare_runtime)
+        1    0.000    0.000    2.005    2.005 build.py:205(ensure_runner)
+     1026    0.007    0.000    1.740    0.002 build.py:23(file_sha256)
+     4588    1.594    0.000    1.594    0.000 {method 'update' of '_hashlib.HASH' objects}
+        1    0.000    0.000    1.522    1.522 build.py:137(discover_nccl)
+        1    0.000    0.000    1.521    1.521 build.py:127(_nccl_identity)
+        2    0.007    0.003    0.290    0.145 build.py:31(source_digest)
+        1    0.000    0.000    0.250    0.250 backend.py:485(run_native)
+        1    0.000    0.000    0.250    0.250 persistent.py:121(run)
+        1    0.000    0.000    0.235    0.235 rust_resident.py:47(submit)
+        1    0.235    0.235    0.235    0.235 {method 'run' of 'builtins.SearchSession' objects}
+        1    0.000    0.000    0.115    0.115 build.py:93(toolchain_identity)
+        3    0.000    0.000    0.115    0.038 subprocess.py:506(run)
+        3    0.000    0.000    0.112    0.037 subprocess.py:1165(communicate)
+        3    0.000    0.000    0.112    0.037 subprocess.py:2062(_communicate)
+     2482    0.002    0.000    0.111    0.000 build.py:26(<lambda>)
+        6    0.000    0.000    0.111    0.018 selectors.py:402(select)
+        6    0.111    0.018    0.111    0.018 {method 'poll' of 'select.poll' objects}
+     2545    0.110    0.000    0.110    0.000 {method 'read' of '_io.BufferedReader' objects}
+       20    0.000    0.000    0.081    0.004 {method 'extend' of 'list' objects}
+     1028    0.005    0.000    0.080    0.000 build.py:42(<genexpr>)
+        1    0.000    0.000    0.076    0.076 build.py:150(validate_runner)
+     2043    0.011    0.000    0.042    0.000 pathlib.py:703(relative_to)
+     2190    0.003    0.000    0.038    0.000 pathlib.py:1261(is_file)
+     2265    0.002    0.000    0.035    0.000 pathlib.py:1008(stat)
+     2324    0.026    0.000    0.034    0.000 {built-in method posix.stat}
+     2239    0.004    0.000    0.030    0.000 pathlib.py:484(_parse_args)
+     1067    0.001    0.000    0.027    0.000 pathlib.py:1036(open)
+     1095    0.025    0.000    0.027    0.000 {built-in method io.open}
+     2248    0.015    0.000    0.025    0.000 pathlib.py:56(parse_parts)
+     1130    0.000    0.000    0.024    0.000 pathlib.py:956(rglob)
+     1130    0.002    0.000    0.023    0.000 pathlib.py:402(_select_from)
+       34    0.002    0.000    0.013    0.000 {built-in method builtins.sorted}
+        3    0.001    0.000    0.012    0.004 models.py:228(_validate_artifact)
+     4642    0.008    0.000    0.011    0.000 pathlib.py:536(__str__)
+        1    0.000    0.000    0.011    0.011 models.py:709(prepare_model)
+
+
+PUBLIC_RUST_PROFILE_OK

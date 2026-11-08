@@ -24,8 +24,12 @@ class NativeSession:
     worker group before recalibration. Concurrent or nested use is rejected.
     Exiting the context, including on exceptions, frees all owned workers.
     """
-    def __init__(self):
+    def __init__(self, *, engine="python"):
+        if engine not in ("python", "rust"):
+            raise ValueError("engine must be 'python' or 'rust'")
         self._owner_pid = os.getpid()
+        self._engine = engine
+        self._pending = None
         self.closed = False
         self._workers = None
         self._identity = None
@@ -89,10 +93,19 @@ class NativeSession:
             self.closed = True
         finally:self._lock.release()
 
-    def launch(self, command, *, contract, run_dir, env, world, timeout):
+    def launch(self, command, *, contract, run_dir, env, world, timeout, runtime=None):
         from .resident_transport import ResidentWorkers
         import subprocess
         if self._workers is not None:raise NativeBackendError('resident workers already exist')
+        if self._engine == 'rust':
+            if self._pending is None:
+                raise NativeBackendError('Rust resident launch requires a prepared session')
+            from .rust_resident import RustResidentWorkers
+            model, options, max_steps, devices, prepared = self._pending
+            self._workers = RustResidentWorkers(command, contract=contract, model=model,
+                options=options, max_steps=max_steps, devices=devices, runtime=runtime or prepared,
+                run_dir=run_dir, env=env, world=world)
+            return self._workers.submit(contract.start, run_dir, timeout=timeout)
         probe=subprocess.run([command[0],'--resident-protocol-info'],env=env,cwd=run_dir,
             capture_output=True,text=True,timeout=min(timeout,15),check=False)
         if probe.returncode:
@@ -121,7 +134,11 @@ class NativeSession:
             verify_prepared_model(model,contract)
             if identity != self._identity:self._release()
             if self._workers is None:
-                outcome=execute(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+                self._pending=(model,options,max_steps,devices,runtime)
+                try:
+                    outcome=execute(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+                finally:
+                    self._pending=None
                 if self._workers is not None:
                     self._identity=identity
                     self._metadata=deepcopy(outcome.metadata)

@@ -1,0 +1,650 @@
+{
+  "backend": "cutlass",
+  "scope": "public bounded deterministic session correctness; no performance claim",
+  "records": [
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9440
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/ad3045701f7042b3bf26e7e97e967257",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          9440
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/9ac46bacae024ed1866d49b834c71d34",
+      "solutions": [
+        [
+          0,
+          3,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          9440
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/f56d9c3dc00b4e138ce61c0fe1052f6d",
+      "solutions": []
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9464
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/9d067e0239bb48e48f5e8cbaa03664c4",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9475
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/25cf683af6f64c78a5b3168fccb0dd6a",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9508
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/a1ec9760bb9241daac7f20259328caf0",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9531
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/c236a2b8b1824b46a2319ef5fa9242aa",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          9531
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/5e4a614ce076495784bd07cd5a1c4b0d",
+      "solutions": [
+        [
+          0,
+          3,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          9531
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/b0d07012f828422589f45d419accde99",
+      "solutions": []
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9564
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/1089c5e66e17466aa476eb0de59c1160",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9584
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/76a694473c4546608e97f8f0e1d6d265",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9614
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/353261716dc142df9b08ec1d1f0a67ed",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9627,
+          9628
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/3877a1d61cdf4b308c40927b52f97882",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          9627,
+          9628
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/f590bf8eeba248bab28716c8e684dd51",
+      "solutions": [
+        [
+          1,
+          0,
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          9627,
+          9628
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/c292b9df50f64eb4bcfd394292f8f061",
+      "solutions": []
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9676,
+          9677
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/d6e694d459b74bf29c643e320f4bad52",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9720,
+          9721
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/37c9622ac0dd4b61ba559dac117d2ebc",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9749,
+          9750
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/03a13f2363e74665b327508ed73f97f8",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9786,
+          9787
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/87c4520a353b4629b16b270b52fc9b2d",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          9786,
+          9787
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/3230fcc5c41a4ddba548554b228e61f5",
+      "solutions": [
+        [
+          1,
+          0,
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          9786,
+          9787
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/ebab303760764439a2b6dd7f7e0aad17",
+      "solutions": []
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9845,
+          9846
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/37986e4158364831a1e26245865f8f03",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9883,
+          9884
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/af7f6018a812489aaf86cd958395dbcb",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          9931,
+          9932
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/88c7eccf02fc43369a559f3c11f05c60",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    }
+  ]
+}

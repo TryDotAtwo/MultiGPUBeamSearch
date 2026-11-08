@@ -1,0 +1,650 @@
+{
+  "backend": "libtorch",
+  "scope": "public bounded deterministic session correctness; no performance claim",
+  "records": [
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10024
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/4d0c743fcb7443dbb4943812f27ca23b",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          10024
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/3de1ae42815c4ef097d060b94373ebd4",
+      "solutions": [
+        [
+          0,
+          3,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          10024
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/cc7d22cda03c42489214bf9e16022d7f",
+      "solutions": []
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10059
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/13639363fc8441949c78996a0870a712",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10081
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/e05d6053aaff4327a56219d56ade2857",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10103
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/2f4cc11ddbf74e65a0af3ed70e629370",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10134
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/f560368ec7f94deea3f31b198e04b580",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          10134
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/d6599c2af7e9421eabd716dec7f1715c",
+      "solutions": [
+        [
+          0,
+          3,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          10134
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/6fb37213240049668f06019f930a3d69",
+      "solutions": []
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10191
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/4bc40c0028f74327b53c50490a439533",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10222
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/a3bf7f82e9ce4b0bb8d7a04bf77fa4e5",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10261
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/c75d1ff14f1041abaad293d9a1c0f46c",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10285,
+          10286
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/eb52cc928a4c40ffae3bbad9e7be544f",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          10285,
+          10286
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/0843d380aa264f5e9c0be64961fb510a",
+      "solutions": [
+        [
+          1,
+          0,
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          10285,
+          10286
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/acb577780ee543a8b2a1306fc05248ab",
+      "solutions": []
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10370,
+          10371
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/cc66ba05d7b74a1dbc2a5ffbc5733864",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10422,
+          10423
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/cb3c60fc81d64f3c98cc541496d49428",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10486,
+          10487
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/9dca025008024dbd97d96d82b488a548",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10545,
+          10546
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/61f0726583af4101ab442ddd2c7c96de",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          10545,
+          10546
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/b015d2b68ac24933a119836c5e8d0b6b",
+      "solutions": [
+        [
+          1,
+          0,
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          10545,
+          10546
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/c156d28dc5a0459495d1be96c48f95b4",
+      "solutions": []
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10640,
+          10641
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/89c8a28a0b974798bf2cd1c6b0bded3d",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10701,
+          10702
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/f1e96c274be14322a882b65400f3a532",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          10772,
+          10773
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-rust/gpu-libtorch/cache/runs/0dc2f15dfad14343bff384cc9fe3f781",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    }
+  ]
+}

@@ -39,7 +39,8 @@ def check_wheel(wheel: Path, source: Path, out: Path, env: dict[str, str]) -> di
             raise AssertionError("wheel contains duplicate archive paths")
         names = set(members)
         worker_name = "beam-runner.exe" if sys.platform == "win32" else "beam-runner"
-        required = {"multigpubeamsearch/__init__.py", "cayleypy_native/__init__.py",
+        required = {"multigpubeamsearch/__init__.py", "multigpubeamsearch/rust_resident.py",
+                    "cayleypy_native/__init__.py",
                     "multigpubeamsearch/_bin/" + worker_name}
         native_required = {prefix + name for name in (
             "source_manifest.json", "CMakeLists.txt", "cuda/cnot_domain.cu",
@@ -73,6 +74,8 @@ assert runtime.ABI_VERSION == 1
 assert all(hasattr(runtime, n) for n in ("SearchSession", "ResidentWorkers", "FrontierCalibration"))
 assert primary.NativeOptions is compat.NativeOptions
 assert primary.NativeSession is compat.NativeSession
+session = primary.NativeSession(engine="rust")
+session.close()
 from multigpubeamsearch.rust_control import extension, worker_executable
 assert extension() is runtime
 worker = pathlib.Path(primary.__file__).parent / "_bin" / ("beam-runner.exe" if sys.platform == "win32" else "beam-runner")

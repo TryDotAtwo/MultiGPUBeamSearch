@@ -1,7 +1,16 @@
-Warning: truncated output (original token count: 184831)
-Total output lines: 5789
-
 # Changelog
+
+## 2026-11-08 experimental Rust resident session
+- Added explicit `NativeSession(engine="rust")` routing for whole searches to
+  the Rust rank/session owner and native C ABI library. The existing default
+  session, model preparation and calibration remain unchanged. This opt-in
+  requires a managed build and matching packaged Rust artifacts.
+- The Python suite passed 546 tests with nine skips; one- and two-RTX-3060
+  public MLP session fixtures passed with CUTLASS and LibTorch. Five paired
+  repeated public calls showed no material speedup. The installed wheel also
+  passed a two-GPU session smoke test. A single host profile identified NCCL
+  identity hashing as the dominant repeated-call preparation cost. Details
+  and limits are in `test_results/refactor_20261107/STAGE5_PUBLIC_RUST_SESSION.md`.
 
 ## 2026-11-08 reject incomplete PyTorch-dependent runner metadata
 - The on-demand native library builder now requires a PyTorch build identity

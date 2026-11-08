@@ -1,0 +1,13 @@
+PUBLIC_PAIR cold pair=None engine=python wall=5.221370
+PUBLIC_PAIR cold pair=None engine=rust wall=6.952927
+PUBLIC_PAIR repeated pair=0 engine=python wall=2.260944
+PUBLIC_PAIR repeated pair=0 engine=rust wall=2.179104
+PUBLIC_PAIR repeated pair=1 engine=rust wall=2.237768
+PUBLIC_PAIR repeated pair=1 engine=python wall=2.223866
+PUBLIC_PAIR repeated pair=2 engine=python wall=2.195291
+PUBLIC_PAIR repeated pair=2 engine=rust wall=2.212910
+PUBLIC_PAIR repeated pair=3 engine=rust wall=2.174019
+PUBLIC_PAIR repeated pair=3 engine=python wall=2.202495
+PUBLIC_PAIR repeated pair=4 engine=python wall=2.230785
+PUBLIC_PAIR repeated pair=4 engine=rust wall=2.212983
+PUBLIC_RUST_PAIR_GPU_OK

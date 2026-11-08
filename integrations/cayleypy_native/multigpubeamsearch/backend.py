@@ -730,7 +730,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         verify_prepared_model(model, contract)
         if resident_session is not None:
             elapsed=resident_session.launch(args[:4],contract=contract,run_dir=run_dir,env=env,
-                world=len(devices),timeout=options.timeout_seconds)
+                world=len(devices),timeout=options.timeout_seconds,runtime=runtime)
         elif len(devices) > 1:
             from .local_launcher import run_local_ranks
             elapsed = run_local_ranks(args, world_size=len(devices), cwd=run_dir, env=env,
