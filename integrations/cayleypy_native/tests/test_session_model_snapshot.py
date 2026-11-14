@@ -25,9 +25,11 @@ def fixture(tmp_path, monkeypatch):
     monkeypatch.setattr('multigpubeamsearch.bootstrap.prepare_sources', lambda opts: opts)
     monkeypatch.setattr(dispatch, 'prepare_runtime', lambda *args, **kwargs:
                         SimpleNamespace(build_metadata={'inference_backend': 'cutlass'}))
-    monkeypatch.setattr(dispatch, 'run_native', lambda contract, model, options, width, depth,
-                        run_dir, devices, **kwargs: NativeOutcome(
-                            None, 0.01, width, run_dir, {'model_manifest': model.manifest}))
+    def run_native(contract, model, options, width, depth, run_dir, devices, **kwargs):
+        # The real session checks the prepared snapshot before submitting work.
+        models.verify_prepared_model(model, contract)
+        return NativeOutcome(None, 0.01, width, run_dir, {'model_manifest': model.manifest})
+    monkeypatch.setattr(dispatch, 'run_native', run_native)
     options = NativeOptions(cache_dir=tmp_path / 'cache', autotune=False)
     def search(session, predictor=model, native_options=options, backend='native'):
         return session.beam_search(graph, backend=backend, native_options=native_options, start_state=start,
@@ -78,12 +80,13 @@ def test_expected_hash_is_checked_even_when_a_snapshot_is_cached(fixture):
 def test_source_change_during_reuse_fails_before_launch(fixture, monkeypatch):
     source, _, _, search = fixture
     with NativeSession(experimental_reuse_model_snapshot=True) as session:
-        first = search(session)
-        snapshot = Path(first.native_metadata['model_snapshot']['snapshot_dir'])
+        search(session)
         original = models._validate_artifact
+        checks = []
         def validate(path, contract, backend):
             result = original(path, contract, backend)
-            if Path(path) == snapshot:
+            if Path(path) == source and not checks:
+                checks.append(True)
                 (source / 'output_bias.fp16').write_bytes(b'\x00\x3c')
             return result
         monkeypatch.setattr(models, '_validate_artifact', validate)
@@ -99,6 +102,23 @@ def test_result_metadata_mutation_cannot_change_the_cached_manifest(fixture):
         second = search(session)
         assert second.native_metadata['model_snapshot']['reused'] is True
         assert second.native_metadata['model_manifest']['output_dim'] == 1
+
+
+def test_reuse_validates_source_twice_and_snapshot_once(fixture, monkeypatch):
+    source, _, _, search = fixture
+    with NativeSession(experimental_reuse_model_snapshot=True) as session:
+        first = search(session)
+        snapshot = Path(first.native_metadata['model_snapshot']['snapshot_dir'])
+        original = models._validate_artifact
+        checked = []
+        def validate(path, contract, backend):
+            checked.append(Path(path))
+            return original(path, contract, backend)
+        monkeypatch.setattr(models, '_validate_artifact', validate)
+        second = search(session)
+        assert second.native_metadata['model_snapshot']['reused']
+        assert checked.count(source) == 2
+        assert checked.count(snapshot) == 1
 
 
 @pytest.mark.parametrize('damage', ['change', 'missing'])
@@ -271,6 +291,40 @@ def test_incompatible_resident_relaunch_uses_a_fresh_run_snapshot(fixture, monke
         assert second.native_metadata['model_snapshot']['reused'] is False
         assert second.native_metadata['model_snapshot']['copied_bytes'] > 0
         assert first.native_metadata['model_snapshot']['snapshot_dir'] != second.native_metadata['model_snapshot']['snapshot_dir']
+
+
+def test_retained_snapshot_modified_during_runtime_preparation_never_reaches_workers(fixture, monkeypatch):
+    from multigpubeamsearch.persistent import current_session
+
+    _, _, _, search = fixture
+    launches, submits = [], []
+    class Workers:
+        pids = [123]
+        sequence = 1
+        def close(self):pass
+        def submit(self, *args, **kwargs):
+            submits.append(True)
+            raise AssertionError('corrupt snapshot reached a resident worker')
+    def run(contract, prepared, options, width, depth, run_dir, devices, *, runtime):
+        session = current_session()
+        def execute(contract, prepared, options, width, depth, run_dir, devices, *, runtime):
+            launches.append(True)
+            session._workers = Workers()
+            return NativeOutcome(None, .01, width, run_dir,
+                                 {'model_manifest': prepared.manifest, 'requested_beam_width': width,
+                                  'profile': {}, 'terminal_records': 1})
+        return session.run(execute, contract, prepared, options, width, depth, run_dir, devices, runtime=runtime)
+    monkeypatch.setattr(dispatch, 'run_native', run)
+    with NativeSession(experimental_reuse_model_snapshot=True) as session:
+        first = search(session)
+        snapshot = Path(first.native_metadata['model_snapshot']['snapshot_dir'])
+        def prepare(*args, **kwargs):
+            (snapshot / 'output_bias.fp16').write_bytes(b'\x00\x3c')
+            return SimpleNamespace(build_metadata={'inference_backend': 'cutlass'})
+        monkeypatch.setattr(dispatch, 'prepare_runtime', prepare)
+        with pytest.raises(NativeBackendError, match='changed before launch'):
+            search(session)
+        assert len(launches) == 1 and not submits
 
 
 def test_direct_run_never_refreshes_a_different_prepared_model(fixture, tmp_path):

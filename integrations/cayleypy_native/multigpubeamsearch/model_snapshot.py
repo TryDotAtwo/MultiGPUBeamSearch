@@ -1,4 +1,5 @@
 """Session-local reuse of a validated private MLP artifact snapshot."""
+from copy import deepcopy
 from pathlib import Path
 
 
@@ -12,7 +13,7 @@ class ModelSnapshotCache:
         self.last = None
 
     def prepare(self, model, contract, run_dir, cache_dir):
-        from .models import _snapshot_artifact, _validate_artifact, verify_prepared_model
+        from .models import PreparedModel, _snapshot_artifact, verify_prepared_model
         from .errors import NativeBackendError
 
         key = (str(Path(cache_dir).resolve()), contract.graph_hash, model.backend, model.artifact_hash)
@@ -20,13 +21,13 @@ class ModelSnapshotCache:
         self._source = model
         self._prepared = None
         if self._entry is not None and self._entry[0] == key:
-            # Keep only a path in the cache. A manifest returned to the user
-            # can be mutable, so reconstruct the prepared model from disk.
-            snapshot = _validate_artifact(self._entry[1], contract, model.backend)
-            if snapshot.artifact_hash != model.artifact_hash:
-                raise NativeBackendError("native model artifact changed before launch")
-            # The source was validated before lookup. Recheck it after the
-            # retained snapshot so a change during reuse is not hidden.
+            # Reconstruct from the freshly validated source rather than a
+            # previous public manifest. NativeSession.run checks the retained
+            # snapshot once immediately before either submission or reload.
+            snapshot = PreparedModel(self._entry[1], deepcopy(model.manifest), model.backend,
+                                     model.artifact_hash, model.artifact_files)
+            # The source was validated before lookup; retain its second
+            # verification so a change during reuse is not hidden.
             verify_prepared_model(model, contract)
             self.last = {'reused': True, 'copied_bytes': 0, 'snapshot_dir': str(snapshot.weights_dir)}
             self._prepared = snapshot

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-14 snapshot verification pass and first GPU result
+- The first two-RTX-3060 run passed 20 bounded Python/Rust session cases and
+  605 Linux tests (nine skipped). With an 18,369,835-byte synthetic FP16 model,
+  five paired repeats showed median full-call change +4.59%; the worker timer
+  was nearly unchanged. The snapshot option stays off by default.
+- Removed one duplicate retained-snapshot validation on cache hits. The source
+  is still validated twice, and the actual retained snapshot is verified in
+  `NativeSession.run` before submission or reload. A corruption-during-runtime-
+  preparation test exercises that real session path. The revised option awaits
+  a new GPU measurement; see `test_results/refactor_20261114/`.
+
 ## 2026-11-14 experimental session model snapshot reuse
 - Added an explicit, default-OFF session option that reuses one private snapshot
   for a supplied MLP `NativeModel` in strict native mode. Source, retained bytes,
