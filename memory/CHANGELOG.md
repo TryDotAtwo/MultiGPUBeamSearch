@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-14 public index sort: two-RTX-3060 validation
+- The public ON/OFF selection passed 28 bounded session cases per backend on
+  one and two RTX 3060 GPUs, with Python and Rust session owners. Linux tests
+  reported 577 passed and nine skipped; the Rust workspace tests/build passed.
+- Five alternating repeated calls had median wall times 0.414 s OFF and
+  0.394 s ON; median paired change was -2.74%. This is a synthetic public-call
+  fixture, not an isolated saturated-step or per-mode peak-VRAM measurement.
+  The option remains experimental. Results, source/binary checks, provider
+  release receipts and limitations are in `test_results/refactor_20261114/`.
+- Extended the transfer register with the per-call private `NativeModel`
+  snapshot and the session-launch runner/NCCL copies. Snapshot reuse is not
+  implemented; the existing content checks remain mandatory.
+
 ## 2026-11-14 public experimental Stream 4 index-sort option
 - Added explicit `NativeOptions(experimental_index_sort=True)` wiring for the
   existing CUDA index sort, with separate managed build identities, runner and

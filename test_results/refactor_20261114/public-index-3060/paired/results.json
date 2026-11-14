@@ -1,0 +1,331 @@
+{
+  "scope": "five alternating public calls; reported average depth includes startup and frontier growth, and is not an isolated saturated-step measurement",
+  "width": 4096,
+  "max_steps": 6,
+  "num_gpus": 2,
+  "model": "synthetic Hamming FP16",
+  "median_seconds": {
+    "baseline": {
+      "wall_seconds": 0.41377286799252033,
+      "worker_seconds": 0.222066227,
+      "slow_rank_reported_avg_depth_seconds": 0.0348016
+    },
+    "index": {
+      "wall_seconds": 0.393923764990177,
+      "worker_seconds": 0.211925042,
+      "slow_rank_reported_avg_depth_seconds": 0.0333029
+    }
+  },
+  "gpu_memory_mib_with_both_sessions": [
+    "612, 12288",
+    "702, 12288"
+  ],
+  "rows": [
+    {
+      "mode": "baseline",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 2.25673936700332,
+      "worker_seconds": 0.792653648,
+      "rank_reported_avg_depth_seconds": [
+        0.0433836,
+        0.0446634
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0446634,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/973056f5085e485eb1c504c135733a96",
+      "path": null,
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66",
+      "pids": [
+        7908,
+        7909
+      ]
+    },
+    {
+      "mode": "index",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 1.8717265779996524,
+      "worker_seconds": 0.712196691,
+      "rank_reported_avg_depth_seconds": [
+        0.039868,
+        0.0403408
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0403408,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/3abfa5074b324da29e7fa2bb9878648f",
+      "path": null,
+      "build_key": "160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446",
+      "pids": [
+        7953,
+        7954
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "warmup",
+      "pair": null,
+      "wall_seconds": 0.4013919130084105,
+      "worker_seconds": 0.222082065,
+      "rank_reported_avg_depth_seconds": [
+        0.0347408,
+        0.0347893
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0347893,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/24f71a456fbc40388d92afb076a9bf58",
+      "path": null,
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66",
+      "pids": [
+        7908,
+        7909
+      ]
+    },
+    {
+      "mode": "index",
+      "phase": "warmup",
+      "pair": null,
+      "wall_seconds": 0.420260226004757,
+      "worker_seconds": 0.212877482,
+      "rank_reported_avg_depth_seconds": [
+        0.0332216,
+        0.0333092
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0333092,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/5aed7c36980444ab877927ee48577d2f",
+      "path": null,
+      "build_key": "160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446",
+      "pids": [
+        7953,
+        7954
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 0,
+      "wall_seconds": 0.41857057200104464,
+      "worker_seconds": 0.222486642,
+      "rank_reported_avg_depth_seconds": [
+        0.0348016,
+        0.0347945
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0348016,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/80e6a0f7248c46b98a4a3ef1f026e5bc",
+      "path": null,
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66",
+      "pids": [
+        7908,
+        7909
+      ]
+    },
+    {
+      "mode": "index",
+      "phase": "repeat",
+      "pair": 0,
+      "wall_seconds": 0.4128053070016904,
+      "worker_seconds": 0.212386717,
+      "rank_reported_avg_depth_seconds": [
+        0.0333029,
+        0.0332851
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0333029,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/c6737bd79d164163bb05cbc439d660c0",
+      "path": null,
+      "build_key": "160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446",
+      "pids": [
+        7953,
+        7954
+      ]
+    },
+    {
+      "mode": "index",
+      "phase": "repeat",
+      "pair": 1,
+      "wall_seconds": 0.40241999499266967,
+      "worker_seconds": 0.204326052,
+      "rank_reported_avg_depth_seconds": [
+        0.0331607,
+        0.03316
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0331607,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/7674a238d0ad4c71bd3b0f3e3e463a4f",
+      "path": null,
+      "build_key": "160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446",
+      "pids": [
+        7953,
+        7954
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 1,
+      "wall_seconds": 0.41377286799252033,
+      "worker_seconds": 0.222247004,
+      "rank_reported_avg_depth_seconds": [
+        0.03478,
+        0.0347814
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0347814,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/5650016745814bb0be04ba679e65ba3a",
+      "path": null,
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66",
+      "pids": [
+        7908,
+        7909
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 2,
+      "wall_seconds": 0.4075622870004736,
+      "worker_seconds": 0.212190239,
+      "rank_reported_avg_depth_seconds": [
+        0.0347881,
+        0.0347905
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0347905,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/562dbccfffe14b2ead123cf111e1c769",
+      "path": null,
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66",
+      "pids": [
+        7908,
+        7909
+      ]
+    },
+    {
+      "mode": "index",
+      "phase": "repeat",
+      "pair": 2,
+      "wall_seconds": 0.393923764990177,
+      "worker_seconds": 0.211925042,
+      "rank_reported_avg_depth_seconds": [
+        0.0332726,
+        0.0333547
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0333547,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/ec4e100a7ea94b09946d9cff49f76c27",
+      "path": null,
+      "build_key": "160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446",
+      "pids": [
+        7953,
+        7954
+      ]
+    },
+    {
+      "mode": "index",
+      "phase": "repeat",
+      "pair": 3,
+      "wall_seconds": 0.3938185769948177,
+      "worker_seconds": 0.212493327,
+      "rank_reported_avg_depth_seconds": [
+        0.0334005,
+        0.0334124
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0334124,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/5378063a071d49f280cd5037945aeae9",
+      "path": null,
+      "build_key": "160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446",
+      "pids": [
+        7953,
+        7954
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 3,
+      "wall_seconds": 0.4024768459930783,
+      "worker_seconds": 0.222066227,
+      "rank_reported_avg_depth_seconds": [
+        0.0348229,
+        0.0348234
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0348234,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/ba1f19eba45746f89f4fbd731fd5a34b",
+      "path": null,
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66",
+      "pids": [
+        7908,
+        7909
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 4,
+      "wall_seconds": 0.4141227549989708,
+      "worker_seconds": 0.222061187,
+      "rank_reported_avg_depth_seconds": [
+        0.0348332,
+        0.0348212
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0348332,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/34b359456b1f4cbdb99de6ed792237d0",
+      "path": null,
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66",
+      "pids": [
+        7908,
+        7909
+      ]
+    },
+    {
+      "mode": "index",
+      "phase": "repeat",
+      "pair": 4,
+      "wall_seconds": 0.38801309300470166,
+      "worker_seconds": 0.202332203,
+      "rank_reported_avg_depth_seconds": [
+        0.0332187,
+        0.0332259
+      ],
+      "slow_rank_reported_avg_depth_seconds": 0.0332259,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/e6142f6bfb6e4815812d6ceedad7034d",
+      "path": null,
+      "build_key": "160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446",
+      "pids": [
+        7953,
+        7954
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "solved",
+      "pair": null,
+      "wall_seconds": 0.2679391549900174,
+      "worker_seconds": 0.071468177,
+      "rank_reported_avg_depth_seconds": [],
+      "slow_rank_reported_avg_depth_seconds": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/5264031f3f1d494ea842016675715366",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66",
+      "pids": [
+        7908,
+        7909
+      ]
+    },
+    {
+      "mode": "index",
+      "phase": "solved",
+      "pair": null,
+      "wall_seconds": 0.2640700710035162,
+      "worker_seconds": 0.071238639,
+      "rank_reported_avg_depth_seconds": [],
+      "slow_rank_reported_avg_depth_seconds": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/8b0d075d4bbb42f69f030ddbb804c0a1",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "build_key": "160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446",
+      "pids": [
+        7953,
+        7954
+      ]
+    }
+  ]
+}

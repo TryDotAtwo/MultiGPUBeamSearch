@@ -1,2 +1,3 @@
 # Preserve recorded bytes: manifests bind raw logs and binary test fixtures.
 test_results/refactor_20261107/** -text -whitespace
+test_results/refactor_20261114/** -text -whitespace

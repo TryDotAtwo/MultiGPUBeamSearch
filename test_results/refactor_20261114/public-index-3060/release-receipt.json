@@ -1,0 +1,15 @@
+{
+  "instance": 60637377,
+  "label": "codex-beam-public-index-retry-20261114-9b53",
+  "before": {
+    "id": 60637377,
+    "label": "codex-beam-public-index-retry-20261114-9b53",
+    "actual_status": "running",
+    "duration": 2612.632573366165,
+    "dph_total": 0.13481481481481483,
+    "start_date": 1794654951.7426946
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794657608.6563935
+}

@@ -105,7 +105,15 @@ These are source-derived volumes; measured bus traffic must come from profiling.
 | Artifact files → hash accumulator | 64 KiB reusable host buffer per file | prepared model/helper verification, including cache hits | content binding; no model-sized host copy or device transfer |
 | GPU error/solution records → host | valid diagnostic/solution count | error or solution | retain complete records and path replay checks |
 | History entry routing host ↔ GPU/NCCL ↔ host | requested 16-byte entries plus routing fields | distributed path reconstruction | necessary cross-rank dependency; preserve rank/local-index identity |
+| Caller-provided `NativeModel` files → private run `weights` | sum of selected artifact-file bytes | every nontrivial public call, including a reused session | full source and snapshot validation; repeated copies of unchanged files remain a candidate for session-scoped reuse |
+| Managed runner → private run executable | runner file bytes | first call and each incompatible session relaunch; every non-session call | private executable snapshot, verified against the build receipt |
+| Build-pinned NCCL library → private run library | NCCL library file bytes | first call and each incompatible session relaunch; every non-session call | private loader snapshot, verified against the build receipt; a repeated session still verifies its source identity |
 
 Future measurements must separate these logical volumes, representation
 conversions, device allocations, pinned allocations, and actual memory/bus
 traffic. Replacing a sort payload is not by itself an end-to-end speedup claim.
+The model snapshot row describes an explicitly supplied `NativeModel`; exporting
+a live PyTorch model and preparing ensemble members can involve different
+conversion and copy paths. Reusing a private snapshot has not yet been
+implemented: any future cache must validate both caller input and retained
+snapshot, preserve the session lifetime and reject changed or missing bytes.
