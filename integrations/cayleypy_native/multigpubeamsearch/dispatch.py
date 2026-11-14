@@ -211,8 +211,16 @@ def _search(original, graph, kwargs, options, mode):
             model = prepare_model(params["predictor"], contract, options, run_dir)
             if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
                 raise NativeUnavailable("native Q models require use_child_scores=True")
-            runtime = prepare_runtime(contract, model, options, run_dir, devices,
-                                      touch_bfs_radius=effective_touch_bfs_radius)
+            from .persistent import current_session
+            session = current_session()
+            digest_cache = None if session is None else session.nccl_digest_cache
+            runtime_kwargs = {"touch_bfs_radius": effective_touch_bfs_radius}
+            if digest_cache is None:
+                runtime = prepare_runtime(contract, model, options, run_dir, devices, **runtime_kwargs)
+            else:
+                with session.prepare_nccl_identity() as digest_cache:
+                    runtime_kwargs["nccl_digest_cache"] = digest_cache
+                    runtime = prepare_runtime(contract, model, options, run_dir, devices, **runtime_kwargs)
     except NativeUnavailable as exc:
         if mode == "native":
             raise

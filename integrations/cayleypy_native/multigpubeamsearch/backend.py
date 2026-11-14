@@ -146,7 +146,7 @@ def validate_touch_bfs_contract(contract, radius: int, max_entries: int) -> int:
 
 
 def prepare_runtime(contract, model, options, run_dir, devices, *,
-                    touch_bfs_radius: int | None = None) -> PreparedRuntime:
+                    touch_bfs_radius: int | None = None, nccl_digest_cache=None) -> PreparedRuntime:
     """Resolve/build before dispatch closes its capability fallback window."""
     radius = options.touch_bfs_radius if touch_bfs_radius is None else touch_bfs_radius
     if type(radius) is not int or radius < 0:
@@ -182,7 +182,11 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
     from .build import ensure_runner
     run_dir = Path(run_dir).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
-    runner, metadata = ensure_runner(contract, model, options, architectures, run_dir)
+    if nccl_digest_cache is None:
+        runner, metadata = ensure_runner(contract, model, options, architectures, run_dir)
+    else:
+        runner, metadata = ensure_runner(contract, model, options, architectures, run_dir,
+                                         nccl_digest_cache=nccl_digest_cache)
     profile = {"policy": "libtorch-conservative-v1" if executor == "libtorch" else "cutlass-default-v1",
                "inference_backend": executor, "inference_row_limit": 2048 if executor == "libtorch" else 8192,
                "cuda_architectures": list(architectures), "gpu_names": [torch.cuda.get_device_name(d) for d in devices],

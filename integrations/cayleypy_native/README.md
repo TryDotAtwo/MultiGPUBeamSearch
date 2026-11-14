@@ -759,6 +759,23 @@ existing Python path. The default `NativeSession()` remains unchanged while
 the Rust path is compared on real workloads; this option is not a performance
 claim.
 
+An independent experimental option can reduce repeated host-side NCCL identity
+checks for managed builds and prepared runners with NCCL provenance:
+
+```python
+session = NativeSession(engine="rust", experimental_parallel_nccl_identity=True)
+```
+
+The option also works with the Python session owner. It is off by default. The
+session retains the ordinary whole-library SHA-256 and individual block digests;
+every reuse rereads and hashes all library bytes in parallel. Reusing the full
+digest depends on the collision resistance of each block's SHA-256. NCCL headers
+are checked separately, and a file change detected during reading fails the
+check. The cold call does extra hashing, and competing CPU work may make this
+mode slower. For a prepared runner, the recorded header and library must remain
+available and match its build receipt. It has not yet passed a full GPU-search
+performance comparison.
+
 
 ### Shared profiles from GitHub
 

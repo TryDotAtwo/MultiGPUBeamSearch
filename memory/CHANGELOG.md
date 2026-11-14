@@ -1100,3 +1100,7 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 ## 2026-11-08 - Roll back failed GPU arena construction
 - A rollback guard now owns a new static allocation until all layout views and CUB initialization succeed. A rejected reallocation preserves the existing arena.
 - The old union-layout error reproduced the retained allocation. Two invalid layouts and reallocation preservation pass; memcheck/initcheck report zero errors and zero leaked bytes on each RTX3060. Repeated Rust/native sessions matched the prior runner on one/two GPUs. Real OOM and injected multi-rank allocation failure remain untested. See test_results/refactor_20261107/STAGE4_ARENA_ROLLBACK.md.
+
+## 2026-11-14 - Experimental session-owned NCCL identity verification
+- Added an opt-in per-session cache of the conventional full NCCL SHA-256 and fixed-size block digests. Repeated checks reread and hash all library blocks in parallel; detected concurrent file changes fail. The header is checked independently and the default session path is unchanged.
+- CPU tests cover empty and partial blocks, same-size edits with restored mtime, replacement, size changes, detectable concurrent mutation, prepared-runner mismatch and session reuse. The 16 MiB Windows CPU diagnostic is not a GPU-search performance result. GPU validation and performance promotion remain pending. See test_results/refactor_20261114/STAGE_NCCL_IDENTITY.md.

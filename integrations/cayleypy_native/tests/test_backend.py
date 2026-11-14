@@ -212,6 +212,63 @@ def test_touch_bfs_capability_uses_the_effective_radius_during_preparation(monke
     assert runtime.build_metadata == {"test_only": True}
 
 
+def test_runtime_preparation_rechecks_cached_nccl_bytes(monkeypatch, tmp_path):
+    import hashlib
+    import torch
+    import cayleypy_native.build as build
+    from multigpubeamsearch import nccl_digest
+    from cayleypy_native.backend import prepare_runtime
+
+    source, cache_root = tmp_path / "source", tmp_path / "cache"
+    (source / "tools").mkdir(parents=True)
+    (source / "CMakeLists.txt").write_text("production_runner", encoding="utf-8")
+    (source / "tools" / "production_runner.cu").write_text("", encoding="utf-8")
+    build_dir = cache_root / "builds" / "fixture"
+    build_dir.mkdir(parents=True)
+    (build_dir / "native-build.json").write_text("{}", encoding="utf-8")
+    include, libdir = tmp_path / "include", tmp_path / "lib"
+    include.mkdir()
+    libdir.mkdir()
+    (include / "nccl.h").write_bytes(b"header")
+    library = libdir / "libnccl.so.2"
+    library.write_bytes(b"first nccl bytes")
+    monkeypatch.setattr(build, "_nccl_locations", lambda: [(include, libdir)])
+    monkeypatch.setattr(build, "prerequisites", lambda options: {})
+    monkeypatch.setattr(build, "source_digest", lambda *args, **kwargs: "source")
+    monkeypatch.setattr(build, "toolchain_identity", lambda programs: {})
+    monkeypatch.setattr(build, "validate_runner", lambda *args: {"test_only": True})
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (8, 0))
+    specifications = []
+    actual_build_key = build.build_key
+
+    def capture_key(specification):
+        specifications.append((specification["nccl"], actual_build_key(specification)))
+        return "fixture"
+
+    monkeypatch.setattr(build, "build_key", capture_key)
+    partitions = []
+    original_partition = nccl_digest._digest_partition
+
+    def capture_partition(*args):
+        partitions.append(True)
+        return original_partition(*args)
+
+    monkeypatch.setattr(nccl_digest, "_digest_partition", capture_partition)
+    digest_cache = nccl_digest.ChunkDigestCache(chunk_bytes=4, workers=2)
+    options = NativeOptions(source_dir=source, cutlass_dir=tmp_path, cache_dir=cache_root,
+                            inference_backend="cutlass", autotune=False)
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
+    contract = SimpleNamespace(state_len=8, move_count=2)
+    for _ in range(2):
+        prepare_runtime(contract, model, options, tmp_path / "run", (0,), nccl_digest_cache=digest_cache)
+    assert partitions
+    assert specifications[0] == specifications[1]
+    library.write_bytes(b"other nccl bytes")
+    prepare_runtime(contract, model, options, tmp_path / "run", (0,), nccl_digest_cache=digest_cache)
+    assert specifications[-1][0]["library_sha256"] == hashlib.sha256(library.read_bytes()).hexdigest()
+    assert specifications[-1][1] != specifications[0][1]
+
+
 def test_touch_bfs_worst_case_allocation_is_rejected_before_cuda_or_build(monkeypatch, tmp_path):
     import torch
     from cayleypy_native.backend import prepare_runtime

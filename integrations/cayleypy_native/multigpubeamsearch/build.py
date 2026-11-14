@@ -124,17 +124,23 @@ def _nccl_locations() -> list[tuple[Path, Path]]:
     return list(dict.fromkeys(locations))
 
 
-def _nccl_identity(include: Path, library: Path) -> dict[str, str]:
+def _nccl_identity(include: Path, library: Path, *, digest_cache=None) -> dict[str, str]:
     try:
+        include_alias, library_alias = include, library
         include, library = include.resolve(), library.resolve()
-        return {"include_dir": str(include), "library": str(library),
-                "header_sha256": file_sha256(include / "nccl.h"),
-                "library_sha256": file_sha256(library)}
+        header = (include / "nccl.h").resolve() if digest_cache is not None else include / "nccl.h"
+        identity = {"include_dir": str(include), "library": str(library),
+                    "header_sha256": file_sha256(header),
+                    "library_sha256": file_sha256(library) if digest_cache is None else digest_cache.sha256(library)}
+        if digest_cache is not None and (include_alias.resolve() != include or
+                library_alias.resolve() != library or (include / "nccl.h").resolve() != header):
+            raise OSError("NCCL path changed while reading")
+        return identity
     except OSError as exc:
         raise NativeUnavailable(f"cannot read installed NCCL dependency: {exc}") from exc
 
 
-def discover_nccl() -> dict[str, str]:
+def discover_nccl(*, digest_cache=None) -> dict[str, str]:
     """Select an existing header/library pair; never install or invoke a library."""
     for include, libdir in _nccl_locations():
         if not (include / "nccl.h").is_file():
@@ -143,7 +149,9 @@ def discover_nccl() -> dict[str, str]:
         choices.extend(sorted(libdir.glob("libnccl.so.*")))
         for library in dict.fromkeys(choices):
             if library.is_file():
-                return _nccl_identity(include, library)
+                if digest_cache is None:
+                    return _nccl_identity(include, library)
+                return _nccl_identity(include, library, digest_cache=digest_cache)
     raise NativeUnavailable("native build requires installed NCCL headers and libnccl.so (system or nvidia-nccl Python package)")
 
 
@@ -202,12 +210,24 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
     return command
 
 
-def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_dir: Path) -> tuple[Path, dict[str, Any]]:
+def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_dir: Path, *, nccl_digest_cache=None) -> tuple[Path, dict[str, Any]]:
     if options.runner_path is not None:
         metadata = validate_runner(options.runner_path, contract, model.backend, architectures)
         observed = metadata.get("inference_backend", "cutlass")
         if observed != options.inference_backend:
             raise NativeUnavailable("existing runner inference backend does not match GPU selection")
+        if nccl_digest_cache is not None:
+            recorded = metadata.get("nccl")
+            fields = ("include_dir", "library", "header_sha256", "library_sha256")
+            if not isinstance(recorded, dict) or any(not isinstance(recorded.get(name), str) for name in fields):
+                raise NativeBackendError("NCCL provenance is missing from prepared runner metadata")
+            try:
+                current = _nccl_identity(Path(recorded["include_dir"]), Path(recorded["library"]),
+                                         digest_cache=nccl_digest_cache)
+            except NativeUnavailable as exc:
+                raise NativeBackendError("NCCL is unavailable or changed since runner preparation") from exc
+            if any(recorded[name] != current[name] for name in fields):
+                raise NativeBackendError("NCCL changed since runner preparation")
         return options.runner_path, metadata
     programs = prerequisites(options)
     source, cutlass = options.source_dir, options.cutlass_dir
@@ -218,7 +238,7 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
          'stream1_libtorch_mlp_benchmark') if model.backend == 'mlp' and options.autotune else None)
     if target not in cmake_text or (model.backend == "piece_transformer" and "BEAM_ENABLE_LIBTORCH_STREAM1" not in cmake_text):
         raise NativeUnavailable(f"configured native source does not expose compatible target {target}")
-    nccl = discover_nccl()
+    nccl = discover_nccl() if nccl_digest_cache is None else discover_nccl(digest_cache=nccl_digest_cache)
     specification = {"schema_version": 1, "shape": shape_contract(contract), "backend": model.backend,
                      "cuda_architectures": list(architectures), "source_digest": source_digest(source),
                      "cutlass_digest": source_digest(cutlass, cutlass=True),

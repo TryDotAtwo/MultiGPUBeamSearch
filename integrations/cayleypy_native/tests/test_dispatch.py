@@ -1,3 +1,4 @@
+import json
 import warnings
 from types import SimpleNamespace
 
@@ -143,6 +144,139 @@ def test_dispatch_clamps_touch_bfs_to_the_requested_step_budget(tmp_path, monkey
     )
     assert result.path == [2]
     assert observed == [3]
+
+
+@pytest.mark.parametrize("engine", ["python", "rust"])
+def test_dispatch_passes_only_opted_in_session_digest_cache(tmp_path, monkeypatch, engine):
+    from multigpubeamsearch import NativeSession
+
+    fake_native(monkeypatch, tmp_path)
+    observed = []
+
+    def prepare(*args, **kwargs):
+        observed.append(kwargs.get("nccl_digest_cache"))
+        return SimpleNamespace(build_metadata={})
+
+    monkeypatch.setattr(dispatch, "prepare_runtime", prepare)
+    options = NativeOptions(cache_dir=tmp_path)
+    args = dict(backend="native", native_options=options, start_state=[1, 0, 2, 3, 4],
+                max_steps=4, return_path=True)
+    dispatch.beam_search(graph(), **args)
+    with NativeSession(engine=engine, experimental_parallel_nccl_identity=True) as session:
+        dispatch.beam_search(graph(), **args)
+        assert observed == [None, session.nccl_digest_cache]
+
+
+@pytest.mark.parametrize("invalid", ["closed", "other_process"])
+def test_dispatch_rejects_invalid_session_before_digest_preparation(tmp_path, monkeypatch, invalid):
+    from multigpubeamsearch import NativeSession
+
+    fake_native(monkeypatch, tmp_path)
+    monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args, **kwargs: pytest.fail("must reject before preparation"))
+    session = NativeSession(experimental_parallel_nccl_identity=True)
+    with session.activate():
+        owner = session._owner_pid
+        if invalid == "closed":
+            session.close()
+        else:
+            session._owner_pid = -1
+        try:
+            with pytest.raises(RuntimeError, match="closed|process"):
+                dispatch.beam_search(graph(), backend="native", native_options=NativeOptions(cache_dir=tmp_path),
+                                     start_state=[1, 0, 2, 3, 4], max_steps=4)
+        finally:
+            session._owner_pid = owner
+            session.close()
+
+
+def test_session_cannot_close_while_nccl_preparation_is_active(tmp_path, monkeypatch):
+    from multigpubeamsearch import NativeSession
+
+    fake_native(monkeypatch, tmp_path)
+    with NativeSession(experimental_parallel_nccl_identity=True) as session:
+        def prepare(*args, **kwargs):
+            with pytest.raises(RuntimeError, match="during a search"):
+                session.close()
+            return SimpleNamespace(build_metadata={})
+
+        monkeypatch.setattr(dispatch, "prepare_runtime", prepare)
+        dispatch.beam_search(graph(), backend="native", native_options=NativeOptions(cache_dir=tmp_path),
+                             start_state=[1, 0, 2, 3, 4], max_steps=4)
+    assert session.closed
+
+
+def test_prepared_session_reuses_worker_then_rejects_changed_nccl(tmp_path, monkeypatch):
+    import subprocess
+    from multigpubeamsearch import NativeSession, backend, build, models, resident_transport
+    from multigpubeamsearch.contracts import GraphContract
+    from multigpubeamsearch.persistent import current_session
+
+    g = graph()
+    start = [1, 0, 2, 3, 4]
+    contract = GraphContract.from_graph(g, start)
+    runner = tmp_path / "runner"
+    runner.write_bytes(b"fixture executable")
+    runner.chmod(0o755)
+    include = tmp_path / "include"
+    include.mkdir()
+    (include / "nccl.h").write_bytes(b"header")
+    library = tmp_path / "libnccl.so.2"
+    library.write_bytes(b"original nccl")
+    metadata = {"schema_version": 1, "shape": build.shape_contract(contract), "backend": "mlp",
+                "cuda_architectures": [86], "inference_backend": "cutlass",
+                "binary_sha256": build.file_sha256(runner), "nccl": build._nccl_identity(include, library)}
+    (tmp_path / "native-build.json").write_text(json.dumps(metadata), encoding="utf-8")
+    monkeypatch.setattr(dispatch, "runtime_devices", lambda *args: (0,))
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (8, 6))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda d: "Fixture GPU")
+    monkeypatch.setattr(dispatch, "prepare_model", lambda *args: SimpleNamespace(
+        backend="mlp", artifact_hash="fixture-model", manifest={"dtype": "fp16", "output_dim": 1}))
+    monkeypatch.setattr(models, "verify_prepared_model", lambda *args: None)
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(
+        args[0], 0, '{"protocol":"resident-search-v1"}', ""))
+    workers = []
+
+    class FixtureWorkers:
+        def __init__(self, *args, **kwargs):
+            self.pids = [12345]
+            self.sequence = 0
+            self.closed = False
+            workers.append(self)
+
+        def submit(self, start, directory, timeout):
+            self.sequence += 1
+            (directory / "native.log").write_text(
+                "GLOBAL_BEAM_WIDTH_EFFECTIVE=64\n"
+                "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m2\n")
+            return 0.1
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(resident_transport, "ResidentWorkers", FixtureWorkers)
+
+    def execute(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime):
+        session = current_session()
+        elapsed = session.launch([str(runner)], contract=contract, run_dir=run_dir, env={},
+                                 world=len(devices), timeout=5, runtime=runtime)
+        return NativeOutcome((2,), elapsed, beam_width, run_dir,
+                             {"requested_beam_width": beam_width, "profile": {}, "terminal_records": 1})
+
+    monkeypatch.setattr(backend, "_run_native_once", execute)
+    options = NativeOptions(cache_dir=tmp_path / "cache", runner_path=runner, inference_backend="cutlass")
+    args = dict(backend="native", native_options=options, start_state=start,
+                beam_width=64, max_steps=4, return_path=True)
+    with NativeSession(experimental_parallel_nccl_identity=True):
+        first = dispatch.beam_search(g, **args)
+        second = dispatch.beam_search(g, **args)
+        assert first.path == second.path == [2]
+        assert len(workers) == 1 and workers[0].sequence == 2
+        assert second.native_metadata["persistent_session"]["reused"]
+        library.write_bytes(b"modified nccl")
+        with pytest.raises(NativeBackendError, match="NCCL.*changed"):
+            dispatch.beam_search(g, **args)
+        assert workers[0].sequence == 2
+    assert workers[0].closed
 
 
 def test_dispatch_rejects_touch_bfs_bound_before_cuda_or_model(tmp_path, monkeypatch):

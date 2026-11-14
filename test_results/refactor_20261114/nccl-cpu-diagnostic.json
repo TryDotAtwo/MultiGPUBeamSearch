@@ -1,0 +1,34 @@
+{
+  "purpose": "small warmed CPU diagnostic; not an end-to-end or GPU result",
+  "os": "Windows-10-10.0.26200-SP0",
+  "logical_cpus": 16,
+  "bytes": 16777216,
+  "sha256": "341aacac661ccb210720bedaa9ead5d668fe5ea41a73532fc147c71e34040df1",
+  "cold_baseline_seconds": 0.020614500001101987,
+  "cold_cached_seconds": 0.023135999999794876,
+  "pairs": [
+    {
+      "baseline": 0.014230900000256952,
+      "cached": 0.006651099996815901
+    },
+    {
+      "cached": 0.0059098000019730534,
+      "baseline": 0.014362599999003578
+    },
+    {
+      "baseline": 0.014552100001310464,
+      "cached": 0.0060064999997848645
+    },
+    {
+      "cached": 0.005515100001503015,
+      "baseline": 0.01424599999882048
+    },
+    {
+      "baseline": 0.014295299999503186,
+      "cached": 0.005757899998570792
+    }
+  ],
+  "median_baseline_seconds": 0.014295299999503186,
+  "median_cached_seconds": 0.0059098000019730534,
+  "median_change_percent": -58.65913970201086
+}

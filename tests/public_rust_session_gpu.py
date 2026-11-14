@@ -17,6 +17,7 @@ def main():
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--cache', type=Path, help='reuse a previously verified managed build cache')
     parser.add_argument('--backend', choices=('cutlass', 'libtorch'), required=True)
+    parser.add_argument('--experimental-parallel-nccl-identity', action='store_true')
     args = parser.parse_args()
     root = args.out.resolve()
     root.mkdir(parents=True, exist_ok=False)
@@ -51,7 +52,8 @@ def main():
             build_timeout_seconds=1200, timeout_seconds=120)
         for engine in ('python', 'rust'):
             old_pids = []
-            with NativeSession(engine=engine) as session:
+            with NativeSession(engine=engine, experimental_parallel_nccl_identity=
+                               args.experimental_parallel_nccl_identity) as session:
                 for name, start, model, width in (
                     ('first', starts[0], models[0], 64),
                     ('repeat', starts[1], models[0], 64),
@@ -92,6 +94,7 @@ def main():
             pair = [row for row in records if row['world'] == world and row['case'] == case]
             assert len(pair) == 2 and pair[0]['path'] == pair[1]['path'], pair
     (root / 'results.json').write_text(json.dumps(dict(backend=args.backend,
+        experimental_parallel_nccl_identity=args.experimental_parallel_nccl_identity,
         scope='public bounded deterministic session correctness; no performance claim', records=records), indent=2))
     print('PUBLIC_RUST_SESSION_GPU_OK', flush=True)
 

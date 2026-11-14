@@ -23,10 +23,18 @@ class NativeSession:
     Graph/model/runner/topology/beam/depth/options changes release the old
     worker group before recalibration. Concurrent or nested use is rejected.
     Exiting the context, including on exceptions, frees all owned workers.
+    The experimental NCCL identity option retains block digests per session;
+    every repeated check rereads the complete library.
     """
-    def __init__(self, *, engine="python"):
+    def __init__(self, *, engine="python", experimental_parallel_nccl_identity=False):
         if engine not in ("python", "rust"):
             raise ValueError("engine must be 'python' or 'rust'")
+        if type(experimental_parallel_nccl_identity) is not bool:
+            raise ValueError("experimental_parallel_nccl_identity must be a boolean")
+        self.nccl_digest_cache = None
+        if experimental_parallel_nccl_identity:
+            from .nccl_digest import ChunkDigestCache
+            self.nccl_digest_cache = ChunkDigestCache()
         self._owner_pid = os.getpid()
         self._engine = engine
         self._pending = None
@@ -77,6 +85,18 @@ class NativeSession:
         with self.activate():
             return beam_search(graph,**kwargs)
 
+    @contextmanager
+    def prepare_nccl_identity(self):
+        """Hold session ownership while a cache-backed identity is prepared."""
+        self._check_owner()
+        if self.closed:raise RuntimeError('native session is closed')
+        if not self._lock.acquire(blocking=False):
+            raise RuntimeError('concurrent native session searches are unsupported')
+        try:
+            if self.closed:raise RuntimeError('native session is closed')
+            yield self.nccl_digest_cache
+        finally:self._lock.release()
+
     def _release(self):
         if self._workers is not None:self._workers.close()
         self._workers = None
@@ -90,6 +110,7 @@ class NativeSession:
             raise RuntimeError('cannot close a native session during a search')
         try:
             self._release()
+            if self.nccl_digest_cache is not None:self.nccl_digest_cache.clear()
             self.closed = True
         finally:self._lock.release()
 

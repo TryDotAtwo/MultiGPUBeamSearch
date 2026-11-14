@@ -1,0 +1,74 @@
+FF                                                                       [100%]
+================================== FAILURES ===================================
+_________ test_opted_in_prepared_runner_rejects_changed_nccl[library] _________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-pinned-red/test_opted_in_prepared_runner_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002A74BCE9F90>
+changed = 'library'
+
+    @pytest.mark.parametrize("changed", ["library", "header"])
+    def test_opted_in_prepared_runner_rejects_changed_nccl(tmp_path, monkeypatch, changed):
+        from types import SimpleNamespace
+        from multigpubeamsearch import build
+        from multigpubeamsearch.errors import NativeBackendError
+        from multigpubeamsearch.nccl_digest import ChunkDigestCache
+    
+        include = tmp_path / "include"
+        include.mkdir()
+        header, library = include / "nccl.h", tmp_path / "libnccl.so.2"
+        header.write_bytes(b"header one")
+        library.write_bytes(b"library one")
+        metadata = {"inference_backend": "cutlass", "nccl": build._nccl_identity(include, library)}
+        monkeypatch.setattr(build, "validate_runner", lambda *args: metadata)
+        model = SimpleNamespace(backend="mlp")
+        options = SimpleNamespace(runner_path=tmp_path / "runner", inference_backend="cutlass")
+        cache = ChunkDigestCache(chunk_bytes=4, workers=2)
+        assert build.ensure_runner(None, model, options, (86,), tmp_path, nccl_digest_cache=cache)[1] == metadata
+        target = library if changed == "library" else header
+        old = target.stat()
+        target.write_bytes(b"library two" if changed == "library" else b"header two")
+        os.utime(target, ns=(old.st_atime_ns, old.st_mtime_ns))
+>       with pytest.raises(NativeBackendError, match="NCCL.*changed"):
+E       Failed: DID NOT RAISE <class 'multigpubeamsearch.errors.NativeBackendError'>
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:104: Failed
+_________ test_opted_in_prepared_runner_rejects_changed_nccl[header] __________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-pinned-red/test_opted_in_prepared_runner_1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002A74C6D89D0>
+changed = 'header'
+
+    @pytest.mark.parametrize("changed", ["library", "header"])
+    def test_opted_in_prepared_runner_rejects_changed_nccl(tmp_path, monkeypatch, changed):
+        from types import SimpleNamespace
+        from multigpubeamsearch import build
+        from multigpubeamsearch.errors import NativeBackendError
+        from multigpubeamsearch.nccl_digest import ChunkDigestCache
+    
+        include = tmp_path / "include"
+        include.mkdir()
+        header, library = include / "nccl.h", tmp_path / "libnccl.so.2"
+        header.write_bytes(b"header one")
+        library.write_bytes(b"library one")
+        metadata = {"inference_backend": "cutlass", "nccl": build._nccl_identity(include, library)}
+        monkeypatch.setattr(build, "validate_runner", lambda *args: metadata)
+        model = SimpleNamespace(backend="mlp")
+        options = SimpleNamespace(runner_path=tmp_path / "runner", inference_backend="cutlass")
+        cache = ChunkDigestCache(chunk_bytes=4, workers=2)
+        assert build.ensure_runner(None, model, options, (86,), tmp_path, nccl_digest_cache=cache)[1] == metadata
+        target = library if changed == "library" else header
+        old = target.stat()
+        target.write_bytes(b"library two" if changed == "library" else b"header two")
+        os.utime(target, ns=(old.st_atime_ns, old.st_mtime_ns))
+>       with pytest.raises(NativeBackendError, match="NCCL.*changed"):
+E       Failed: DID NOT RAISE <class 'multigpubeamsearch.errors.NativeBackendError'>
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:104: Failed
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_opted_in_prepared_runner_rejects_changed_nccl[library]
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_opted_in_prepared_runner_rejects_changed_nccl[header]
+2 failed, 12 deselected in 0.31s
+Exception ignored in: <function Console.__del__ at 0x000002A74A3874C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

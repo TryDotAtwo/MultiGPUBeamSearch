@@ -1,0 +1,9 @@
+usage: nccl_identity_session_pair_gpu.py [-h] --source SOURCE --cutlass
+                                         CUTLASS --cache CACHE --out OUT
+
+options:
+  -h, --help         show this help message and exit
+  --source SOURCE
+  --cutlass CUTLASS
+  --cache CACHE
+  --out OUT
