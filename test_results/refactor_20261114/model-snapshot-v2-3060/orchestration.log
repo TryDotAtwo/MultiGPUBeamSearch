@@ -1,0 +1,51 @@
+From https://github.com/TryDotAtwo/MultiGPUBeamSearch
+ * branch            main       -> FETCH_HEAD
+   a3b6e8b..46c02ab  main       -> origin/main
+Updating a3b6e8b..46c02ab
+Updating files: 100% (2/2)Updating files: 100% (2/2), done.
+Fast-forward
+ .../multigpubeamsearch/model_snapshot.py           |  17 +-
+ .../tests/test_session_model_snapshot.py           |  66 +-
+ memory/CHANGELOG.md                                |  11 +
+ .../STAGE_MODEL_SNAPSHOT_REUSE.md                  |  47 +-
+ .../model-snapshot-3060/archive-verification.json  |  30 +
+ .../model-snapshot-3060/commit.txt                 |   1 +
+ .../model-snapshot-3060/cpu-tests.log              |  10 +
+ .../model-snapshot-3060/cutlass-commit.txt         |   1 +
+ .../model-snapshot-3060/gpu-probe.log              |   1 +
+ .../refactor_20261114/model-snapshot-3060/gpu.log  |  37 +
+ .../model-snapshot-3060/gpu/results.json           | 760 +++++++++++++++++++++
+ .../refactor_20261114/model-snapshot-3060/gpus.csv |   3 +
+ .../model-snapshot-3060/inputs-after.sha256        |   6 +
+ .../model-snapshot-3060/inputs-before.sha256       |   6 +
+ .../model-snapshot-3060/orchestration.log          |  21 +
+ .../model-snapshot-3060/orchestration.sh           |  52 ++
+ .../model-snapshot-3060/restore.log                |  13 +
+ .../model-snapshot-3060/restore.py                 |  35 +
+ .../model-snapshot-3060/software.txt               |   8 +
+ .../model-snapshot-3060/source-digest.txt          |   2 +
+ .../model-snapshot-3060/status.txt                 |  10 +
+ .../model-snapshot-validation-final.log            |  10 +
+ .../model-snapshot-validation-green.log            |  10 +
+ .../model-snapshot-validation-red.log              |  37 +
+ 24 files changed, 1171 insertions(+), 23 deletions(-)
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/archive-verification.json
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/commit.txt
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/cpu-tests.log
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/cutlass-commit.txt
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/gpu-probe.log
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/gpu.log
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/gpu/results.json
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/gpus.csv
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/inputs-after.sha256
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/inputs-before.sha256
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/orchestration.log
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/orchestration.sh
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/restore.log
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/restore.py
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/software.txt
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/source-digest.txt
+ create mode 100644 test_results/refactor_20261114/model-snapshot-3060/status.txt
+ create mode 100644 test_results/refactor_20261114/model-snapshot-validation-final.log
+ create mode 100644 test_results/refactor_20261114/model-snapshot-validation-green.log
+ create mode 100644 test_results/refactor_20261114/model-snapshot-validation-red.log

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-14 snapshot validation revision: two-RTX-3060 result
+- Commit `46c02ab5` passed 607 Linux tests (nine skipped) and 20 bounded GPU
+  cases on one/two RTX 3060s with both session owners. Five alternating paired
+  repeated full calls gave median 0.818708 s baseline versus 0.824459 s reuse;
+  median pair change was +0.58%, with individual pairs from -1.72% to +4.53%.
+  This is not an acceleration; the option remains default-OFF.
+- The two evidence archives were fully hash-verified and samples restored;
+  task-owned Vast lease 60648840 was destroyed and its absence confirmed.
+  The elapsed GPU/disk estimate is $0.0376, excluding network charges; see
+  `test_results/refactor_20261114/STAGE_MODEL_SNAPSHOT_REUSE.md`.
+
 ## 2026-11-14 snapshot verification pass and first GPU result
 - The first two-RTX-3060 run passed 20 bounded Python/Rust session cases and
   605 Linux tests (nine skipped). With an 18,369,835-byte synthetic FP16 model,

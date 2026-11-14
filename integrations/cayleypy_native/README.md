@@ -794,8 +794,10 @@ Snapshots remain in their run directories after the session closes. As with the
 default loader, a concurrent write after host verification and before native
 reading is not atomically excluded. `result.native_metadata["model_snapshot"]`
 records reuse, the snapshot directory and logical artifact bytes copied for that
-call. This interim Python-owned cache can add validation reads; GPU and
-performance acceptance are pending.
+call. This interim Python-owned cache can add validation reads. On a synthetic
+two-RTX-3060 fixture, five paired repeats did not establish a full-call
+speedup; the option remains off by default. Other workloads and hardware have
+not been established by that test.
 
 The existing Stream 4 index-sort implementation can be explicitly selected for
 a managed build:

@@ -122,6 +122,8 @@ run directory; only a compatible, already-loaded worker avoids that copy. The
 session stops referencing the retained snapshot when it closes.
 Its reported copied bytes are logical artifact bytes, not measured disk traffic.
 The cache does not delete run evidence. Moving preparation ownership to Rust
-and hardware/performance acceptance remain separate work. The existing loader
+and broader hardware/performance acceptance remain separate work. On one
+two-RTX-3060 synthetic fixture the revised option did not establish a full-call
+speedup; it remains off by default. The existing loader
 still opens mutable files after the last host-side verification; the bytes it
 reads are not bound atomically to that verification against concurrent writes.
