@@ -1,6 +1,7 @@
 #include "native_input.hpp"
 #include "../third_party/nlohmann/json.hpp"
 #include "../third_party/picosha2/picosha2.h"
+#include <algorithm>
 #include <charconv>
 #include <cstring>
 #include <fstream>
@@ -8,6 +9,47 @@
 #include <stdexcept>
 
 namespace beam::input {
+bool lowercase_sha256(const std::string& value) {
+    return value.size() == 64 && std::all_of(value.begin(), value.end(), [](char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+    });
+}
+
+std::string mlp_artifact_sha256(const std::string& manifest, const std::string& graph_hash,
+                                std::vector<NamedHostBytes> tensors) {
+    if (!lowercase_sha256(graph_hash))
+        throw std::runtime_error("MLP graph hash must be a lowercase SHA256 digest");
+    std::sort(tensors.begin(), tensors.end(), [](const auto& left, const auto& right) {
+        return left.name < right.name;
+    });
+    picosha2::hash256_one_by_one hasher;
+    // PicoSHA2 uses its own scratch buffer. Bound it even for large weights;
+    // no additional full-sized copy or second file read is required.
+    const auto append = [&](const unsigned char* data, std::size_t size) {
+        constexpr std::size_t chunk_size = 64 * 1024;
+        for (std::size_t offset = 0; offset < size;) {
+            const auto count = std::min(chunk_size, size - offset);
+            hasher.process(data + offset, data + offset + count);
+            offset += count;
+        }
+    };
+    const auto append_string = [&](const std::string& value) {
+        append(reinterpret_cast<const unsigned char*>(value.data()), value.size());
+    };
+    append_string(manifest);
+    append_string(graph_hash);
+    for (std::size_t i = 0; i < tensors.size(); ++i) {
+        const auto& tensor = tensors[i];
+        if (tensor.bytes == nullptr || tensor.name.empty() ||
+            (i && tensors[i - 1].name == tensor.name))
+            throw std::runtime_error("invalid or duplicate MLP host tensor view");
+        append_string(tensor.name);
+        append(reinterpret_cast<const unsigned char*>(tensor.bytes->data()), tensor.bytes->size());
+    }
+    hasher.finish();
+    return picosha2::get_hash_hex_string(hasher);
+}
+
 namespace {
 using Json = nlohmann::ordered_json;
 [[noreturn]] void fail(const std::string& message) { throw std::runtime_error(message); }

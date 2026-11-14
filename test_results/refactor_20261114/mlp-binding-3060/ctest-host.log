@@ -1,0 +1,11 @@
+Internal ctest changing into directory: D:/100XH100/.local/cache/mlp-binding-20261114/ctest-build
+Test project D:/100XH100/.local/cache/mlp-binding-20261114/ctest-build
+    Start 1: mlp_artifact_binding_cpu
+1/1 Test #1: mlp_artifact_binding_cpu .........   Passed    2.67 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+host    =   2.67 sec*proc (1 test)
+
+Total Test time (real) =   2.69 sec

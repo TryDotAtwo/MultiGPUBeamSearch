@@ -1,0 +1,7 @@
+{
+  "commit": "65a1952c265bd60c6d69a7ee90687c0a7d336888",
+  "expected_failure": true,
+  "returncode": 1,
+  "stdout": "",
+  "stderr": "Traceback (most recent call last):\n  File \"/tmp/beam-mlp-binding/tests/mlp_artifact_binding_cpu.py\", line 101, in <module>\n    main()\n    ~~~~^^\n  File \"/tmp/beam-mlp-binding/tests/mlp_artifact_binding_cpu.py\", line 79, in main\n    assert changed.returncode != 0 and \"artifact hash mismatch\" in changed.stderr, (\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ('valid but changed tensor must be rejected', 'loaded_mlp_bytes=1526\\n', '')\n"
+}

@@ -143,6 +143,67 @@ def test_backend_reuses_only_compatible_resources_and_replays(tmp_path, monkeypa
         assert allocations[-1].closed
 
 
+@pytest.mark.parametrize('engine', ['python', 'rust'])
+@pytest.mark.parametrize('executor', ['cutlass', 'libtorch'])
+def test_session_restarts_when_entering_or_leaving_bound_snapshot_mode(tmp_path, monkeypatch, engine, executor):
+    from types import SimpleNamespace
+    from multigpubeamsearch import models
+    from multigpubeamsearch.options import NativeOptions, NativeOutcome
+
+    monkeypatch.setattr(models, 'verify_prepared_model', lambda *args: None)
+    session = NativeSession(engine=engine, experimental_reuse_model_snapshot=True)
+    allocations = []
+    class Workers:
+        pids = [101, 102]
+        sequence = 1
+        closed = False
+        def close(self): self.closed = True
+        def submit(self, start, directory, timeout):
+            self.sequence += 1
+            (Path(directory)/'native.log').write_text(
+                'GLOBAL_BEAM_WIDTH_EFFECTIVE=64\n'
+                'puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n')
+            return .1
+
+    def execute(*args, **kwargs):
+        worker = Workers()
+        allocations.append(worker)
+        session._workers = worker
+        metadata = dict(requested_beam_width=64, profile={}, terminal_records=1)
+        if session.model_snapshot_cache.last is not None and executor == 'cutlass':
+            metadata['mlp_host_binding'] = {'artifact_hash': 'b'*64, 'ranks': 2}
+        return NativeOutcome((1,), .1, 64, args[5], metadata)
+
+    contract = SimpleNamespace(graph_hash='a'*64, start=(1, 0), move_count=2,
+                               replay=lambda path: tuple(path) == (1,))
+    model = SimpleNamespace(artifact_hash='b'*64, backend='mlp')
+    session.model_snapshot_cache._entry = ((str(tmp_path), contract.graph_hash, model.backend, model.artifact_hash), tmp_path)
+    session.model_snapshot_cache._active = model
+    runtime = SimpleNamespace(build_metadata={'binary_sha256': 'c'*64, 'inference_backend': executor})
+    options = NativeOptions()
+    with session:
+        outputs = []
+        for index, snapshot in enumerate((None, {'reused': False}, {'reused': False}, None)):
+            session.model_snapshot_cache.last = snapshot
+            directory = tmp_path/str(index)
+            directory.mkdir()
+            outputs.append(session.run(execute, contract, model, options, 64, 4, directory, (0, 1),
+                                       runtime=runtime))
+            if index == 1:
+                if executor == 'cutlass':
+                    assert len(allocations) == 2 and allocations[0].closed
+                    assert outputs[-1].metadata['mlp_host_binding']['ranks'] == 2
+                else:
+                    assert len(allocations) == 1 and outputs[-1].metadata['persistent_session']['reused']
+            if index == 2:
+                assert len(allocations) == (2 if executor == 'cutlass' else 1)
+                assert outputs[-1].metadata['persistent_session']['reused']
+        if executor == 'cutlass':
+            assert len(allocations) == 3 and allocations[1].closed
+        else:
+            assert len(allocations) == 1 and not allocations[0].closed
+
+
 def test_loader_failure_preserves_diagnostic_before_starting_workers(tmp_path, monkeypatch):
     import subprocess
     from multigpubeamsearch.errors import NativeBackendError

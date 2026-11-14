@@ -1,0 +1,37 @@
+SNAPSHOT_CASE world=1 engine=python first
+SNAPSHOT_CASE world=1 engine=python repeat
+SNAPSHOT_CASE world=1 engine=python unsolved
+SNAPSHOT_CASE world=1 engine=python model-change
+SNAPSHOT_CASE world=1 engine=python beam-change
+SNAPSHOT_CASE world=1 engine=rust first
+SNAPSHOT_CASE world=1 engine=rust repeat
+SNAPSHOT_CASE world=1 engine=rust unsolved
+SNAPSHOT_CASE world=1 engine=rust model-change
+SNAPSHOT_CASE world=1 engine=rust beam-change
+SNAPSHOT_CASE world=2 engine=python first
+SNAPSHOT_CASE world=2 engine=python repeat
+SNAPSHOT_CASE world=2 engine=python unsolved
+SNAPSHOT_CASE world=2 engine=python model-change
+SNAPSHOT_CASE world=2 engine=python beam-change
+SNAPSHOT_CASE world=2 engine=rust first
+SNAPSHOT_CASE world=2 engine=rust repeat
+SNAPSHOT_CASE world=2 engine=rust unsolved
+SNAPSHOT_CASE world=2 engine=rust model-change
+SNAPSHOT_CASE world=2 engine=rust beam-change
+SNAPSHOT_PAIR phase=cold pair=None mode=baseline wall=3.220313
+SNAPSHOT_PAIR phase=cold pair=None mode=reuse wall=3.488747
+SNAPSHOT_PAIR phase=warmup pair=None mode=baseline wall=0.806443
+SNAPSHOT_PAIR phase=warmup pair=None mode=reuse wall=0.776387
+SNAPSHOT_PAIR phase=repeat pair=0 mode=baseline wall=0.905541
+SNAPSHOT_PAIR phase=repeat pair=0 mode=reuse wall=0.879223
+SNAPSHOT_PAIR phase=repeat pair=1 mode=reuse wall=0.824183
+SNAPSHOT_PAIR phase=repeat pair=1 mode=baseline wall=0.848941
+SNAPSHOT_PAIR phase=repeat pair=2 mode=baseline wall=0.830769
+SNAPSHOT_PAIR phase=repeat pair=2 mode=reuse wall=0.804897
+SNAPSHOT_PAIR phase=repeat pair=3 mode=reuse wall=0.829958
+SNAPSHOT_PAIR phase=repeat pair=3 mode=baseline wall=0.840375
+SNAPSHOT_PAIR phase=repeat pair=4 mode=baseline wall=0.888410
+SNAPSHOT_PAIR phase=repeat pair=4 mode=reuse wall=0.865841
+SNAPSHOT_PAIR phase=solved pair=None mode=baseline wall=0.582144
+SNAPSHOT_PAIR phase=solved pair=None mode=reuse wall=0.518140
+PUBLIC_MODEL_SNAPSHOT_GPU_OK

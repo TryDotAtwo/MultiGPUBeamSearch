@@ -3576,6 +3576,9 @@ int run_production_runner(int argc, char** argv) {
     const std::filesystem::path weight_dir = env_path("BEAM_WEIGHT_DIR", "stream1_weights");
     const auto blend_dir=env_path("BEAM_BLEND_DIR", "");
     const bool is_ensemble=!blend_dir.empty() && std::filesystem::exists(blend_dir/"ensemble.json");
+    if ((std::getenv("BEAM_MLP_GRAPH_HASH") || std::getenv("BEAM_MLP_ARTIFACT_HASH")) &&
+        (use_libtorch_stream1_executor || !blend_dir.empty()))
+        throw std::runtime_error("MLP host binding is unavailable for LibTorch and ensemble execution");
     if (!blend_dir.empty() && !use_libtorch_stream1_executor)
         throw std::runtime_error("BEAM_BLEND_DIR requires LibTorch backbone with CUTLASS blend readout");
     stream1_weights::HostWeightBytes host_weights;
@@ -3611,6 +3614,8 @@ int run_production_runner(int argc, char** argv) {
         stream1_manifest_only = stream1_weights::load_stream1_manifest(weight_dir);
     } else {
         host_weights = stream1_weights::load_stream1_weights(weight_dir);
+        if (!host_weights.verified_mlp_artifact.empty())
+            std::cout << "BEAM_MLP_ARTIFACT_VERIFIED=" << host_weights.verified_mlp_artifact << std::endl;
     }
     const Stream1ModelConfig& stream1_model = use_libtorch_stream1_executor ? stream1_manifest_only : host_weights.model;
     beam::input::validate_state(host_initial, host_central, stream1_model.num_classes, "initial_state");

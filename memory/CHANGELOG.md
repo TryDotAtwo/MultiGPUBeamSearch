@@ -1181,3 +1181,25 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 ## 2026-11-14 - Experimental session-owned NCCL identity verification
 - Added an opt-in per-session cache of the conventional full NCCL SHA-256 and fixed-size block digests. Repeated checks reread and hash all library blocks in parallel; detected concurrent file changes fail. The header is checked independently and the default session path is unchanged.
 - CPU tests cover empty and partial blocks, same-size edits with restored mtime, replacement, size changes, detectable concurrent mutation, prepared-runner mismatch and session reuse. The 16 MiB Windows CPU diagnostic is not a GPU-search performance result. GPU validation and performance promotion remain pending. See test_results/refactor_20261114/STAGE_NCCL_IDENTITY.md.
+## 2026-11-14 experimental MLP loaded-buffer binding
+
+- In the opt-in explicit-MLP session with CUTLASS, native ranks now bind the
+  parsed manifest and already-owned host tensor vectors to the Python artifact
+  SHA-256 before GPU upload. Tensor names follow Python's lexicographic order;
+  64 KiB input chunks keep SHA scratch bounded without a second full tensor copy.
+- A new group requires one matching startup receipt per rank. Missing, wrong or
+  duplicate receipts fail the call, including with an older external runner.
+  Compatible repeated calls reuse the original rank verification, not a new
+  GPU-memory hash. The ordinary path, LibTorch, ensembles and CNOT are not
+  covered by this binding.
+- CPU RED/GREEN checks under `test_results/refactor_20261114/mlp-binding-3060/`
+  include Python/C++ digest equivalence, FP16/BF16, LayerNorm, lexical block
+  ordering, buffers above the scratch size, source-file and owned-buffer
+  mutations, and twenty mocked launch/receipt and session-transition cases.
+- Linux CTest and the integration suite passed (627 passed, 9 skipped). CUDA
+  built for SM86; 20 bounded one/two-RTX-3060 cases and four mode-transition
+  groups passed with Python and Rust session owners. Five paired repeat calls
+  on one synthetic fixture gave a median -2.91% wall-time change, below the
+  5% promotion threshold. This is not a saturated GPU-step benchmark; other
+  hardware, model families and calibration overhead remain unverified. See
+  `test_results/refactor_20261114/STAGE_MLP_LOADED_BUFFER_BINDING.md`.

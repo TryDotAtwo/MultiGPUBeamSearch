@@ -1,0 +1,10 @@
+{
+  "base_commit": "65a1952c265bd60c6d69a7ee90687c0a7d336888",
+  "overrides": {
+    "src/native_input.cpp": "ad5966d9576823ebc6b9aa543db0f2a1e9bb1f6ee0e7deb36cd7352c46b62d7f",
+    "src/native_input.hpp": "7313fc0ca7088614aac3786abdd3fae6c4b989f9487b8ca1540addcfbba9cc7f",
+    "tools/stream1_weight_io.hpp": "e488182805c126353db9f99122db59da2c3d24404807e9aa186365491cf777db",
+    "tests/mlp_artifact_binding_cpu.cpp": "648ba1b18f6fa2ee55b8a21ed29ce5df458ddc050ae3ea2ae65e10c416f6683a",
+    "tests/mlp_artifact_binding_cpu.py": "e55e27e0f38e8e958f94cafc4ce0611b6bf92e21c1a1861a7f1f2a315b6972fc"
+  }
+}

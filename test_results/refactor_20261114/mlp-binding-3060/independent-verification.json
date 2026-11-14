@@ -1,0 +1,17 @@
+{
+  "verification": "PASS",
+  "bounded_cases": 20,
+  "transition_groups": 4,
+  "paired_repeats": 5,
+  "median_seconds": {
+    "baseline": {
+      "wall_seconds": 0.8489413630450144,
+      "worker_seconds": 0.306003821
+    },
+    "reuse": {
+      "wall_seconds": 0.8299580190796405,
+      "worker_seconds": 0.305886788
+    }
+  },
+  "median_paired_wall_change": -0.029063864933808414
+}

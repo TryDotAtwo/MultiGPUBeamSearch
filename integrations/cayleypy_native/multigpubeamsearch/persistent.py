@@ -8,6 +8,7 @@ from pathlib import Path
 import threading
 
 from .errors import NativeBackendError
+from .model_snapshot import requires_mlp_host_binding
 from .options import NativeOutcome
 
 _ACTIVE = ContextVar('multigpubeamsearch_native_session', default=None)
@@ -240,7 +241,9 @@ class NativeSession:
         try:
             # Runtime preparation already verifies executable bytes. Start state
             # is intentionally absent; all other search geometry stays fixed.
-            identity=(contract.graph_hash,model.artifact_hash,model.backend,tuple(devices),
+            binding_scope = requires_mlp_host_binding(self.model_snapshot_cache, model, contract,
+                {} if runtime is None else runtime.build_metadata)
+            identity=(contract.graph_hash,model.artifact_hash,model.backend,tuple(devices),binding_scope,
                 beam_width,max_steps,repr(options),
                 os.environ.get('CUDA_VISIBLE_DEVICES'),os.environ.get('CUDA_DEVICE_ORDER'),
                 json.dumps(runtime.build_metadata,sort_keys=True) if runtime is not None else None)

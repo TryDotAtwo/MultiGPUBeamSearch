@@ -1,0 +1,15 @@
+{
+  "instance": 60654136,
+  "label": "codex-beam-mlp-bind-20261114-c38e",
+  "before": {
+    "id": 60654136,
+    "label": "codex-beam-mlp-bind-20261114-c38e",
+    "actual_status": "running",
+    "duration": 1641.0729055404663,
+    "dph_total": 0.14162962962962963,
+    "start_date": 1794664711.5586998
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794666384.2432919
+}

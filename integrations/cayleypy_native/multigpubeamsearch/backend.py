@@ -494,6 +494,25 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     return _run_native_once(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
 
 
+def _verify_mlp_host_binding(run_dir, artifact_hash, world):
+    """Require one receipt from each worker's own startup log."""
+    expected = f"BEAM_MLP_ARTIFACT_VERIFIED={artifact_hash}"
+    for rank in range(world):
+        path = Path(run_dir) / 'resident-session' / f'bootstrap-{rank}.log'
+        count = 0
+        try:
+            with path.open(encoding='utf-8', errors='replace') as source:
+                for line in source:
+                    if line.startswith('BEAM_MLP_ARTIFACT_VERIFIED='):
+                        count += 1
+                        if line.rstrip('\r\n') != expected or count > 1:
+                            raise NativeBackendError(f'MLP host binding receipt invalid for rank {rank}')
+        except OSError as error:
+            raise NativeBackendError(f'MLP host binding receipt unavailable for rank {rank}') from error
+        if count != 1:
+            raise NativeBackendError(f'MLP host binding receipt missing for rank {rank}')
+
+
 def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
     maximum_requested=type(beam_width) is str and beam_width=='max'
     if (not maximum_requested and (type(beam_width) is not int or beam_width <= 0)) or type(max_steps) is not int or max_steps < 0:
@@ -534,6 +553,14 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
                 "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES": str(options.touch_bfs_max_entries),
                 "BEAM_STREAM2_SUFFIX_RADIUS": "0", "BEAM_SOLVE_BUCKET_MODE": "0", "BEAM_HISTORY_MODE": "disk",
                 "BEAM_HISTORY_DIR": str(run_dir / "history"), "BEAM_HISTORY_DISK_PATH": str(run_dir / "history")})
+    from .persistent import current_session
+    from .model_snapshot import requires_mlp_host_binding
+    resident_session = current_session()
+    snapshot_cache = getattr(resident_session, 'model_snapshot_cache', None)
+    mlp_host_binding = requires_mlp_host_binding(snapshot_cache, model, contract, build_metadata)
+    if mlp_host_binding:
+        env.update(BEAM_MLP_GRAPH_HASH=contract.graph_hash,
+                   BEAM_MLP_ARTIFACT_HASH=model.artifact_hash)
     if model.backend == "ensemble":
         env["BEAM_BLEND_DIR"] = str(model.weights_dir)
         if runtime.build_metadata.get('inference_backend'):
@@ -716,8 +743,6 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     log = run_dir / "native.log"
     process_log = log
     log_metadata = {}
-    from .persistent import current_session
-    resident_session=current_session()
     if len(devices) > 1 and resident_session is None:
         worker_logs = run_dir / "worker-logs"
         try:
@@ -753,6 +778,8 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
                     raise
                 if hasattr(failure, "add_note"):
                     failure.add_note(f"native worker log collection also failed: {log_error}")
+    if mlp_host_binding:
+        _verify_mlp_host_binding(run_dir, model.artifact_hash, len(devices))
     path, effective, terminal_metadata = parse_terminal(log, contract, max_steps=max_steps)
     if calibrate and effective is not None:
         from .runtime_report import observed_depths
@@ -770,6 +797,8 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
                 "graph_hash": contract.graph_hash, "devices": list(devices), "requested_beam_width": beam_width,
                 "microbatch": microbatch_metadata, **search_budget,
                 "replay_valid": path is not None, "log_path": str(log), **log_metadata, **terminal_metadata}
+    if mlp_host_binding:
+        metadata['mlp_host_binding'] = {'artifact_hash': model.artifact_hash, 'ranks': len(devices)}
     import re
     execution_parameters = {}
     for file in [log, *run_dir.glob('resident-session/bootstrap-*.log')]:

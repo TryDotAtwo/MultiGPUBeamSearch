@@ -1,5 +1,6 @@
 #pragma once
 #include "types.hpp"
+#include <cstddef>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -7,6 +8,16 @@
 #include <vector>
 
 namespace beam::input {
+// Views borrow host-owned tensor vectors only for the duration of hashing.
+// They are never device pointers and do not outlive the weight loader.
+struct NamedHostBytes {
+    std::string name;
+    const std::vector<std::byte>* bytes;
+};
+std::string mlp_artifact_sha256(const std::string& manifest, const std::string& graph_hash,
+                                std::vector<NamedHostBytes> tensors);
+bool lowercase_sha256(const std::string& value);
+
 // Binds loaded bytes to a manifest; does not authenticate the manifest itself.
 class TensorBinding {
 public:

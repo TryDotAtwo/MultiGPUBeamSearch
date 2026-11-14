@@ -3,6 +3,12 @@ from copy import deepcopy
 from pathlib import Path
 
 
+def requires_mlp_host_binding(cache, model, contract, build_metadata):
+    """Share the exact opt-in predicate between session reuse and launch."""
+    return (cache is not None and cache.binds(model, contract) and model.backend == 'mlp'
+            and build_metadata.get('inference_backend', 'cutlass') == 'cutlass')
+
+
 class ModelSnapshotCache:
     """Retain one snapshot; callers serialize access using the session lock."""
 
@@ -10,6 +16,7 @@ class ModelSnapshotCache:
         self._entry = None
         self._source = None
         self._prepared = None
+        self._active = None
         self.last = None
 
     def prepare(self, model, contract, run_dir, cache_dir):
@@ -20,6 +27,7 @@ class ModelSnapshotCache:
         self.last = None
         self._source = model
         self._prepared = None
+        self._active = None
         if self._entry is not None and self._entry[0] == key:
             # Reconstruct from the freshly validated source rather than a
             # previous public manifest. NativeSession.run checks the retained
@@ -31,6 +39,7 @@ class ModelSnapshotCache:
             verify_prepared_model(model, contract)
             self.last = {'reused': True, 'copied_bytes': 0, 'snapshot_dir': str(snapshot.weights_dir)}
             self._prepared = snapshot
+            self._active = snapshot
             return snapshot
         try:
             copied_bytes = sum((model.weights_dir / name).stat().st_size for name in model.artifact_files)
@@ -39,7 +48,13 @@ class ModelSnapshotCache:
         snapshot = _snapshot_artifact(model, contract, run_dir)
         self._entry = (key, snapshot.weights_dir)
         self.last = {'reused': False, 'copied_bytes': copied_bytes, 'snapshot_dir': str(snapshot.weights_dir)}
+        self._active = snapshot
         return snapshot
+
+    def binds(self, model, contract):
+        """Only the exact snapshot returned for this request opts in to binding."""
+        return (self._active is model and self.last is not None and self._entry is not None
+                and self._entry[0][1:] == (contract.graph_hash, model.backend, model.artifact_hash))
 
     def needs_fresh_worker_snapshot(self, model, contract):
         """Bind a refresh to the exact prepared object of this cache hit."""
@@ -62,6 +77,7 @@ class ModelSnapshotCache:
         snapshot = _snapshot_artifact(self._source, contract, run_dir)
         self._entry = (self._entry[0], snapshot.weights_dir)
         self._prepared = None
+        self._active = snapshot
         self.last = {'reused': False, 'copied_bytes': copied_bytes, 'snapshot_dir': str(snapshot.weights_dir)}
         return snapshot
 
@@ -69,4 +85,5 @@ class ModelSnapshotCache:
         self._entry = None
         self._source = None
         self._prepared = None
+        self._active = None
         self.last = None

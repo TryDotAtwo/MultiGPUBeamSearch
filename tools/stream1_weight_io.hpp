@@ -24,6 +24,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace beam::stream1_weights {
@@ -74,6 +75,8 @@ struct HostTransformerBytes {
 
 struct HostWeightBytes {
     Stream1ModelConfig model;
+    // Nonempty only after the manifest and owned MLP tensors match the request.
+    std::string verified_mlp_artifact;
     // Assigned only after every transformer tensor passed this exact seal
     // and TensorBinding::finish() established complete manifest coverage.
     std::string verified_transformer_manifest;
@@ -365,9 +368,8 @@ inline void validate_transformer_model_config(
     throw std::runtime_error(context + ": unsupported stream1 piece_transformer piece_layout " + piece_layout);
 }
 
-inline Stream1ModelConfig load_stream1_manifest(const std::filesystem::path& dir) {
-    const std::filesystem::path manifest_path = dir / "manifest.json";
-    const std::string text = read_text_exact(manifest_path);
+inline Stream1ModelConfig parse_stream1_manifest(
+    const std::string& text, const std::filesystem::path& manifest_path) {
     const std::string dtype = parse_manifest_string(text, "dtype");
     if (dtype != "fp16" && dtype != "bf16") {
         throw std::runtime_error("stream1 manifest dtype must be fp16 or bf16: " + manifest_path.string());
@@ -420,6 +422,11 @@ inline Stream1ModelConfig load_stream1_manifest(const std::filesystem::path& dir
         return model;
     }
     throw std::runtime_error("stream1 manifest backend must be one of accepted values: mlp, piece_transformer: " + manifest_path.string());
+}
+
+inline Stream1ModelConfig load_stream1_manifest(const std::filesystem::path& dir) {
+    const auto path = dir / "manifest.json";
+    return parse_stream1_manifest(read_text_exact(path), path);
 }
 inline const char* weight_suffix(const Stream1ModelConfig& model) {
     return model.dtype == STREAM1_DTYPE_BF16 ? ".bf16" : ".fp16";
@@ -613,12 +620,67 @@ inline HostWeightBytes load_stream1_transformer_weights(const std::filesystem::p
     return weights;
 }
 
+inline void bind_mlp_artifact(
+    HostWeightBytes& weights, const std::string& manifest,
+    const std::string& graph_hash, const std::string& expected_hash) {
+    weights.verified_mlp_artifact.clear();
+    if (!input::lowercase_sha256(expected_hash))
+        throw std::runtime_error("MLP artifact hash must be a lowercase SHA256 digest");
+    const auto& model = weights.model;
+    const std::string suffix = weight_suffix(model);
+    std::vector<input::NamedHostBytes> tensors;
+    const auto add = [&](const std::string& name, const std::vector<std::byte>& bytes) {
+        tensors.push_back({name + suffix, &bytes});
+    };
+    add("input_weight_hxk", weights.input_weight);
+    add("input_bias", weights.input_bias);
+    add("hidden_weight_hxk", weights.hidden_weight);
+    add("hidden_bias", weights.hidden_bias);
+    add("output_weight_hxk", weights.output_weight);
+    add("output_bias", weights.output_bias);
+    if (model.normalization == STREAM1_NORM_LAYERNORM) {
+        add("input_ln_gamma", weights.input_ln_gamma);
+        add("input_ln_beta", weights.input_ln_beta);
+        add("hidden_ln_gamma", weights.hidden_ln_gamma);
+        add("hidden_ln_beta", weights.hidden_ln_beta);
+    }
+    for (std::uint32_t block = 0; block < model.residual_count; ++block) {
+        const auto prefix = "residual" + std::to_string(block);
+        add(prefix + "_fc1_weight_hxk", weights.residual_fc1_weight[block]);
+        add(prefix + "_fc1_bias", weights.residual_fc1_bias[block]);
+        add(prefix + "_fc2_weight_hxk", weights.residual_fc2_weight[block]);
+        add(prefix + "_fc2_bias", weights.residual_fc2_bias[block]);
+        if (model.normalization == STREAM1_NORM_LAYERNORM) {
+            add(prefix + "_fc1_ln_gamma", weights.residual_fc1_ln_gamma[block]);
+            add(prefix + "_fc1_ln_beta", weights.residual_fc1_ln_beta[block]);
+            add(prefix + "_fc2_ln_gamma", weights.residual_fc2_ln_gamma[block]);
+            add(prefix + "_fc2_ln_beta", weights.residual_fc2_ln_beta[block]);
+        }
+    }
+    const auto actual = input::mlp_artifact_sha256(manifest, graph_hash, std::move(tensors));
+    if (actual != expected_hash)
+        throw std::runtime_error("MLP artifact hash mismatch: expected=" + expected_hash + " actual=" + actual);
+    weights.verified_mlp_artifact = actual;
+}
+
 inline HostWeightBytes load_stream1_weights(const std::filesystem::path& dir) {
-    const Stream1ModelConfig model = load_stream1_manifest(dir);
+    const char* graph_hash = std::getenv("BEAM_MLP_GRAPH_HASH");
+    const char* expected_hash = std::getenv("BEAM_MLP_ARTIFACT_HASH");
+    if ((graph_hash == nullptr) != (expected_hash == nullptr))
+        throw std::runtime_error("MLP binding requires both graph and artifact hashes");
+    // Parse and hash the same manifest bytes; a second file read can race.
+    const auto manifest_path = dir / "manifest.json";
+    const auto manifest = read_text_exact(manifest_path);
+    const Stream1ModelConfig model = parse_stream1_manifest(manifest, manifest_path);
     switch (model.backend) {
-    case STREAM1_BACKEND_MLP:
-        return load_stream1_mlp_weights(dir, model);
+    case STREAM1_BACKEND_MLP: {
+        auto weights = load_stream1_mlp_weights(dir, model);
+        if (graph_hash != nullptr) bind_mlp_artifact(weights, manifest, graph_hash, expected_hash);
+        return weights;
+    }
     case STREAM1_BACKEND_PIECE_TRANSFORMER:
+        if (graph_hash != nullptr)
+            throw std::runtime_error("MLP binding cannot authenticate a transformer model");
         return load_stream1_transformer_weights(dir, model);
     default:
         throw std::runtime_error("unsupported Stream1 backend in weight loader");

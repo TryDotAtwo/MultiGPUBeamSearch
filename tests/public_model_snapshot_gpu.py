@@ -104,6 +104,7 @@ def main():
                         predictor=model, beam_width=width, max_steps=4, return_path=True)
                     meta = result.native_metadata
                     persistent, snapshot = meta['persistent_session'], meta['model_snapshot']
+                    assert meta['mlp_host_binding'] == {'artifact_hash': meta['model_hash'], 'ranks': world}
                     reused = name in ('repeat', 'unsolved')
                     assert persistent['reused'] == reused
                     assert snapshot['reused'] == reused
@@ -124,9 +125,33 @@ def main():
                         assert Path(snapshot['snapshot_dir']) == Path(meta['run_dir']) / 'weights'
                     records.append(dict(world=world, engine=engine, case=name, path=result.path,
                         model_hash=meta['model_hash'], snapshot=snapshot, persistent=persistent,
+                        mlp_host_binding=meta['mlp_host_binding'],
                         run_dir=meta['run_dir'], build_key=meta['build']['build_key']))
                     print(f'SNAPSHOT_CASE world={world} engine={engine} {name}', flush=True)
             assert all(not Path(f'/proc/{pid}').exists() for pid in old_pids)
+            # A prior auto-mode worker was not bound at startup. Entering the
+            # experiment must discard that group before using its receipts.
+            with NativeSession(engine=engine, experimental_reuse_model_snapshot=True,
+                               experimental_parallel_nccl_identity=True) as session:
+                transitions = []
+                for mode in ('auto', 'native', 'native', 'auto'):
+                    result = session.beam_search(graph, backend=mode, native_options=options,
+                        start_state=starts[0], predictor=models[0], beam_width=64, max_steps=4,
+                        return_path=True)
+                    meta = result.native_metadata
+                    assert result.path_found and replace(contract, start=starts[0]).replay(result.path)
+                    pids = meta['persistent_session']['worker_pids']
+                    if mode == 'native':
+                        assert meta['mlp_host_binding'] == {'artifact_hash': meta['model_hash'], 'ranks': world}
+                    else:
+                        assert 'mlp_host_binding' not in meta
+                    transitions.append(dict(mode=mode, pids=pids, run_dir=meta['run_dir'],
+                                            binding=meta.get('mlp_host_binding')))
+                assert transitions[0]['pids'] != transitions[1]['pids']
+                assert transitions[1]['pids'] == transitions[2]['pids']
+                assert transitions[2]['pids'] != transitions[3]['pids']
+                records.append(dict(world=world, engine=engine, case='binding-transitions',
+                                    transitions=transitions))
         for name, *_ in cases:
             pair = [row for row in records if row['world'] == world and row['case'] == name]
             assert len(pair) == 2 and pair[0]['path'] == pair[1]['path']
@@ -152,10 +177,12 @@ def main():
         assert meta['persistent_session']['reused'] == (phase != 'cold')
         if mode == 'reuse':
             snapshot = meta['model_snapshot']
+            assert meta['mlp_host_binding'] == {'artifact_hash': meta['model_hash'], 'ranks': 2}
             assert snapshot['reused'] == (phase != 'cold')
             assert snapshot['copied_bytes'] == (model_bytes if phase == 'cold' else 0)
         else:
             assert 'model_snapshot' not in meta
+            assert 'mlp_host_binding' not in meta
             assert (Path(meta['run_dir']) / 'weights').is_dir()
         if phase == 'solved':
             assert result.path_found and replace(contract, start=state).replay(result.path)

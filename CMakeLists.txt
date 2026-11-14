@@ -574,6 +574,8 @@ if(BEAM_ENABLE_LIBTORCH_STREAM1)
 endif()
 
 enable_testing()
+include(cmake/BeamMlpBindingTests.cmake)
+beam_add_mlp_binding_tests()
 add_test(NAME native_abi_tests COMMAND native_abi_tests)
 add_test(NAME production_score_request_tests COMMAND production_score_request_tests)
 add_test(NAME stream1_loaded_execution_admission_tests COMMAND stream1_loaded_execution_admission_tests)

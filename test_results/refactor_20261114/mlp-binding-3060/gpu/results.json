@@ -1,0 +1,1028 @@
+{
+  "scope": "synthetic public session correctness and five paired full-call timings; not saturated-step measurements",
+  "correctness": [
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/b7ab184a35994919b416fcc5800addc5/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          2877
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/b7ab184a35994919b416fcc5800addc5",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/b7ab184a35994919b416fcc5800addc5/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          2877
+        ],
+        "request_count": 2
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/9e9a977c910c4a7087fbf358d71b1ff1",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/b7ab184a35994919b416fcc5800addc5/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          2877
+        ],
+        "request_count": 3
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/1f752050dd9c430eb3bf094ccd38b764",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/33d6c94bfc084ca7bbf3f1cdc42d4f71/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          2912
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/33d6c94bfc084ca7bbf3f1cdc42d4f71",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/6daf18c467414a5e9d0e86e250b4ff2b/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          2926
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/6daf18c467414a5e9d0e86e250b4ff2b",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "binding-transitions",
+      "transitions": [
+        {
+          "mode": "auto",
+          "pids": [
+            2936
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/7806e6c6a17c4e829c16d224013c2c9f",
+          "binding": null
+        },
+        {
+          "mode": "native",
+          "pids": [
+            2950
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/ced3060a32054a2b8994b1b05d925414",
+          "binding": {
+            "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+            "ranks": 1
+          }
+        },
+        {
+          "mode": "native",
+          "pids": [
+            2950
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/2a1909acc9a24b1e801821b80acffa1d",
+          "binding": {
+            "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+            "ranks": 1
+          }
+        },
+        {
+          "mode": "auto",
+          "pids": [
+            2973
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/0b4fa2d4254f4b41abe52e74dd251da1",
+          "binding": null
+        }
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/ddecde37bec04e0ca6ede39739fcae8b/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3113
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/ddecde37bec04e0ca6ede39739fcae8b",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/ddecde37bec04e0ca6ede39739fcae8b/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3113
+        ],
+        "request_count": 2
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/8bb0d1c0557142ccb851a7892586f684",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/ddecde37bec04e0ca6ede39739fcae8b/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3113
+        ],
+        "request_count": 3
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/40b996df26754113b3e0e2467f1a3213",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/32ec11f3f74645e9b6bd21faa9d6bd9c/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3163
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/32ec11f3f74645e9b6bd21faa9d6bd9c",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/0686eeda12df493aa9f570cc44eeec08/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3184
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+        "ranks": 1
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/0686eeda12df493aa9f570cc44eeec08",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "binding-transitions",
+      "transitions": [
+        {
+          "mode": "auto",
+          "pids": [
+            3201
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/cec3740633dd41d7b375735b0cccacce",
+          "binding": null
+        },
+        {
+          "mode": "native",
+          "pids": [
+            3222
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/143fd64927dd47198b0621be580d2bfe",
+          "binding": {
+            "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+            "ranks": 1
+          }
+        },
+        {
+          "mode": "native",
+          "pids": [
+            3222
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/42b6350d10a14c8191c28bc5460d0a52",
+          "binding": {
+            "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+            "ranks": 1
+          }
+        },
+        {
+          "mode": "auto",
+          "pids": [
+            3253
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/3f98921b4e384ea08414dda874a91bb3",
+          "binding": null
+        }
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/d5036e6b789d452e93532290d5d8b0b5/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3264,
+          3265
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/d5036e6b789d452e93532290d5d8b0b5",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/d5036e6b789d452e93532290d5d8b0b5/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3264,
+          3265
+        ],
+        "request_count": 2
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/42f676c5c99b4fa18d68c093d392ad83",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/d5036e6b789d452e93532290d5d8b0b5/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3264,
+          3265
+        ],
+        "request_count": 3
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/01e5116b2f134b76bd7225ae1a6a7e1d",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/ee8acf9cb1bb4b78a76acf4ccb4318a1/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3325,
+          3326
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/ee8acf9cb1bb4b78a76acf4ccb4318a1",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/61f49389814f40be9addd5677cc54d5a/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3356,
+          3357
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/61f49389814f40be9addd5677cc54d5a",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "binding-transitions",
+      "transitions": [
+        {
+          "mode": "auto",
+          "pids": [
+            3385,
+            3386
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/f4689019e6964e04bd1f92afd85c0990",
+          "binding": null
+        },
+        {
+          "mode": "native",
+          "pids": [
+            3425,
+            3426
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/f4a8aba66824490fa6b677a7ee1860c9",
+          "binding": {
+            "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+            "ranks": 2
+          }
+        },
+        {
+          "mode": "native",
+          "pids": [
+            3425,
+            3426
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/50d062f4e7be4e00ac7b57a5222b6fed",
+          "binding": {
+            "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+            "ranks": 2
+          }
+        },
+        {
+          "mode": "auto",
+          "pids": [
+            3475,
+            3476
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/f9e6141fb7954ed393feded4d90a8511",
+          "binding": null
+        }
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/62d80c5b34bd47769ad5ed58d9b48f86/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3508,
+          3509
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/62d80c5b34bd47769ad5ed58d9b48f86",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/62d80c5b34bd47769ad5ed58d9b48f86/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3508,
+          3509
+        ],
+        "request_count": 2
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/9282179fffc04f4781b20ecd53a0e3f1",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/62d80c5b34bd47769ad5ed58d9b48f86/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3508,
+          3509
+        ],
+        "request_count": 3
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/cc037e6614534d2da5fec828b850be6f",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/c4c34c43dd2d4d6da9d59a7c145a7b9f/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3577,
+          3578
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/c4c34c43dd2d4d6da9d59a7c145a7b9f",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/c1ecf5a260da41809d5319ff997eeebe/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3616,
+          3617
+        ],
+        "request_count": 1
+      },
+      "mlp_host_binding": {
+        "artifact_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+        "ranks": 2
+      },
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/c1ecf5a260da41809d5319ff997eeebe",
+      "build_key": "d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "binding-transitions",
+      "transitions": [
+        {
+          "mode": "auto",
+          "pids": [
+            3651,
+            3652
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/4675a1d351144cc084daf541952c84b9",
+          "binding": null
+        },
+        {
+          "mode": "native",
+          "pids": [
+            3692,
+            3693
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/fbe89bba1d7b45c3963724b70b61c34a",
+          "binding": {
+            "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+            "ranks": 2
+          }
+        },
+        {
+          "mode": "native",
+          "pids": [
+            3692,
+            3693
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/b2c9b1943fb7470ca53ce69cc9ed346c",
+          "binding": {
+            "artifact_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+            "ranks": 2
+          }
+        },
+        {
+          "mode": "auto",
+          "pids": [
+            3743,
+            3744
+          ],
+          "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/2f7dd7cc0b73415685f1e6270eb5bdc3",
+          "binding": null
+        }
+      ]
+    }
+  ],
+  "model_bytes": 18369835,
+  "model": "synthetic Hamming FP16 width 512, 8 residual blocks",
+  "width": 4096,
+  "max_steps": 6,
+  "num_gpus": 2,
+  "median_seconds": {
+    "baseline": {
+      "wall_seconds": 0.8489413630450144,
+      "worker_seconds": 0.306003821
+    },
+    "reuse": {
+      "wall_seconds": 0.8299580190796405,
+      "worker_seconds": 0.305886788
+    }
+  },
+  "paired_wall_changes": [
+    -0.029063864933808414,
+    -0.029164244067101164,
+    -0.031141742881782397,
+    -0.012395907926001537,
+    -0.02540345139190614
+  ],
+  "median_paired_wall_change": -0.029063864933808414,
+  "rows": [
+    {
+      "mode": "baseline",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 3.2203134489245713,
+      "worker_seconds": 1.165072406,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/3bf85f0f3e824047bb4da09f58776e2f",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3778,
+        3779
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 3.4887471930123866,
+      "worker_seconds": 1.266160385,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/4fced287272c42618ecdebbd062a2474",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3821,
+        3822
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "warmup",
+      "pair": null,
+      "wall_seconds": 0.806442556087859,
+      "worker_seconds": 0.305595902,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/36181ba51c8c467d95e1227c58318838",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3778,
+        3779
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "warmup",
+      "pair": null,
+      "wall_seconds": 0.776387105928734,
+      "worker_seconds": 0.294313816,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/6c563e482ca949cfa93f1f610edfa9ba",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3821,
+        3822
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 0,
+      "wall_seconds": 0.9055414739996195,
+      "worker_seconds": 0.306003821,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/11b16d5f1abd4aafa4795bd544bb77e2",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3778,
+        3779
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 0,
+      "wall_seconds": 0.8792229389073327,
+      "worker_seconds": 0.305886788,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/7eb79b3b0b7a4229ad23a7d22c131390",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3821,
+        3822
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 1,
+      "wall_seconds": 0.8241826299345121,
+      "worker_seconds": 0.305053523,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/5a89e211d1124644a61f61fc4e658745",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3821,
+        3822
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 1,
+      "wall_seconds": 0.8489413630450144,
+      "worker_seconds": 0.304261463,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/ac98c144276b4fba8c050509935c82c1",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3778,
+        3779
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 2,
+      "wall_seconds": 0.8307688230415806,
+      "worker_seconds": 0.306469008,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/bc833baf89ec495cbf3556cf323b1c08",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3778,
+        3779
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 2,
+      "wall_seconds": 0.8048972339602187,
+      "worker_seconds": 0.304187714,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/5e6a66ea72be4916b0345b3dc5a87a45",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3821,
+        3822
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 3,
+      "wall_seconds": 0.8299580190796405,
+      "worker_seconds": 0.308052186,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/bbe0ccb97a254966b8ee5ddb7da7ef7f",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3821,
+        3822
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 3,
+      "wall_seconds": 0.8403752330923453,
+      "worker_seconds": 0.306596223,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/a53083355d9243b3bc14b15f296e40d0",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3778,
+        3779
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 4,
+      "wall_seconds": 0.888409715029411,
+      "worker_seconds": 0.303540966,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/c6989e49205a4bb79f92d90002fd9dec",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3778,
+        3779
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 4,
+      "wall_seconds": 0.8658410420175642,
+      "worker_seconds": 0.307417416,
+      "path": null,
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/24a680b1b6164e83ad5c29a1da3861e4",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3821,
+        3822
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "solved",
+      "pair": null,
+      "wall_seconds": 0.5821441509760916,
+      "worker_seconds": 0.083676924,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/4c8f5899de3e479588f54f92eebe926c",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3778,
+        3779
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "solved",
+      "pair": null,
+      "wall_seconds": 0.5181402969174087,
+      "worker_seconds": 0.082783673,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "run_dir": "/workspace/beam-results/mlp-binding-20261114/cache/runs/9b9434cc97c24fcfbabca50e4e1f34ae",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3821,
+        3822
+      ]
+    }
+  ]
+}

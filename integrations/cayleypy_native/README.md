@@ -790,9 +790,18 @@ their existing preparation. Source and retained files are validated again before
 reuse; changed model content or cache directory creates a new snapshot, and a
 damaged retained snapshot fails the call. Only a compatible, already-loaded
 worker avoids a new copy; a worker restart copies to its own run directory.
-Snapshots remain in their run directories after the session closes. As with the
-default loader, a concurrent write after host verification and before native
-reading is not atomically excluded. `result.native_metadata["model_snapshot"]`
+Snapshots remain in their run directories after the session closes. For the
+MLP/CUTLASS path, each newly started rank additionally hashes its own loaded
+host buffers and the exact manifest bytes used for parsing, and the controller
+requires a matching receipt from every rank. `mlp_host_binding` in the result
+metadata describes that initial verification; it is not a GPU-memory rehash.
+An external runner without these receipts fails in this experimental mode.
+This check happens before the result is returned; an older external runner may
+execute the first search and write its private history before it is rejected.
+The binding has CPU tests and bounded one/two-RTX-3060 session checks; other
+hardware and models remain unverified. The ordinary loader and LibTorch/ensemble paths do not
+have this binding and can still encounter a concurrent file change between
+verification and native reading. `result.native_metadata["model_snapshot"]`
 records reuse, the snapshot directory and logical artifact bytes copied for that
 call. This interim Python-owned cache can add validation reads. On a synthetic
 two-RTX-3060 fixture, five paired repeats did not establish a full-call
