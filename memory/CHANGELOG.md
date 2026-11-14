@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-15 single-read native generator ownership
+- The permutation runner now obtains generator bytes and names from one parsed
+  file read, and borrows both vectors from the same owner. It retains the
+  existing device transfer and old separate loader APIs. Bi-uniqueness checking
+  no longer allocates a tree node per permutation index. This prevents pairing
+  generator bytes and names from different reads; it does not bind the loaded
+  file to the Rust graph hash or make concurrent file writes atomic.
+- FIFO and format compatibility tests, Linux ASan/UBSan, the Rust workspace,
+  643 Python integration tests (9 skipped), and four bounded one/two-RTX-3060
+  public searches passed. A five-pair saturated full-step comparison had median
+  +2.160% throughput, below the GPU speedup threshold; requested host-heap peak
+  and uninstrumented loader time fell on the measured synthetic fixtures.
+  Source-bound evidence and limitations are in
+  `test_results/refactor_20261114/STAGE_NATIVE_GENERATOR_SNAPSHOT.md`.
+
 ## 2026-11-15 Rust permutation graph identity validation
 - Rust `SearchSession` now recomputes the CayleyPy checkpoint SHA-256 from the
   ordered permutations and center before accepting an identity, including

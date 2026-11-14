@@ -1,0 +1,44 @@
+{
+  "base_commit": "31240256672aa5b2412294e1e84436599b15dc8f",
+  "baseline_count": 497,
+  "bundle_bytes": 3266560,
+  "bundle_sha256": "e77512f2c8340ea16fbfd89cc528d727c3d0cc19803386932c05110f068c49cf",
+  "inputs": {
+    "graph-archive.py": "c11fd0b932c45cb772ca9244a01e1146abb028ed3c1bf8686aa0011000a4cdbc",
+    "graph-base.tar.gz": "5edbc87768670eac576349acc45e2fb13af989fb667e1a733c1cb6b1b2df0708",
+    "graph-cutlass.tar.gz": "458b5d80f344652d61fe011b557968cd58e9583a96f0ab0823ecc4dc9dc0f0c6",
+    "graph-driver.sh": "337157c3ef338a476073422cfc5f6bff9657cb81c83b58c59e26f4b8241e267e",
+    "graph-overlay.tar.gz": "e1c81a90a3e54b7b93e17d94565139b296ce0f5d73e7c04bf44f0b6c3b5958c8",
+    "graph-run.sh": "f8ddcdebc478173c8c1ba8c310ad1a7e9c28ea6c82c45aa6fdea1692b23323be"
+  },
+  "overlay_files": {
+    "src/native_input.cpp": {
+      "normalized_lf_sha256": "9998c7a4828ce0872f386515a8510e1270d2b08074bb68bc952e376db2734971",
+      "sha256": "240fa1d3195112228f6d84191ff81fafe956dc9107c2761e8194c1acdfec686f"
+    },
+    "src/native_input.hpp": {
+      "normalized_lf_sha256": "fd103f8ac55b765bd4370ffe80d2d9c1308a2833a8af1d1308fa11ec18accaa9",
+      "sha256": "ec6a14db66b9855405ac3d6ec670ac268d27cf4d53e374d10f49f53398a71d32"
+    },
+    "tests/native_generator_parse_bench.py": {
+      "normalized_lf_sha256": "9af3c91163c63c24b0c0cbc9723b5afe417dc101d36ac0eb1d35420175ff0ff6",
+      "sha256": "9af3c91163c63c24b0c0cbc9723b5afe417dc101d36ac0eb1d35420175ff0ff6"
+    },
+    "tests/native_generator_parse_benchmark.cpp": {
+      "normalized_lf_sha256": "9a0aac9912b3b5fb81fa66ed2f387c6753b91c6885aec717ad810c5e05ec6f26",
+      "sha256": "9a0aac9912b3b5fb81fa66ed2f387c6753b91c6885aec717ad810c5e05ec6f26"
+    },
+    "tests/native_generator_snapshot_fifo.py": {
+      "normalized_lf_sha256": "4cbfde65fa863856ce75e2a4b450c3af2d0c2fb2a2a8307faf84089d867d4689",
+      "sha256": "4cbfde65fa863856ce75e2a4b450c3af2d0c2fb2a2a8307faf84089d867d4689"
+    },
+    "tests/native_input_tests.cpp": {
+      "normalized_lf_sha256": "0bdb31344f63bac7578ccfe2ee221de6ea2332845ce4ac5d64276b0b0844bb2a",
+      "sha256": "d9804771af9407b288d28b80215a167bd8acbd40c175efd1f7d236b96cf07555"
+    },
+    "tools/production_runner.cu": {
+      "normalized_lf_sha256": "8ed8c52d7949dc1f341d06b00c9ecd5f9e0b1df965685498edb8035c8b3b012b",
+      "sha256": "6fc7dc114b0308d1440883c55db4f430c19a433a471cee3aaa791e2f831c845f"
+    }
+  }
+}

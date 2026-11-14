@@ -532,9 +532,7 @@ std::uint32_t parse_next_u32(const std::string& text, std::size_t& pos, const ch
 
 using beam::input::read_text_file;
 
-using beam::input::load_p900_generators;
-
-using beam::input::load_p900_move_names;
+using beam::input::load_p900_moves;
 
 using beam::input::load_central_state;
 
@@ -3515,8 +3513,9 @@ int run_production_runner(int argc, char** argv) {
         env_path("BEAM_PUZZLE_INFO_JSON", "data/puzzle_info.json");
     const std::filesystem::path test_csv_path =
         env_path("BEAM_TEST_CSV", "data/test.csv");
-    const std::vector<std::uint8_t> host_generators = load_p900_generators(generator_path);
-    const std::vector<std::string> host_move_names = load_p900_move_names(generator_path);
+    const auto host_moves = load_p900_moves(generator_path);
+    const auto& host_generators = host_moves.data;
+    const auto& host_move_names = host_moves.names;
     const State128 host_central = load_central_state(puzzle_info_path);
     const bool repair_resident_mode = env_present("BEAM_REPAIR_SOLUTIONS_CSV");
     const bool solve_bucket_mode = env_bool("BEAM_SOLVE_BUCKET_MODE", false);

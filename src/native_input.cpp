@@ -2,6 +2,7 @@
 #include "../third_party/nlohmann/json.hpp"
 #include "../third_party/picosha2/picosha2.h"
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstring>
 #include <fstream>
@@ -77,8 +78,7 @@ State128 state(const Json& value) {
         result.v[i] = static_cast<std::uint8_t>(bounded(value[i], STATE_VALUE_PAD));
     return result;
 }
-struct Moves { std::vector<std::uint8_t> data; std::vector<std::string> names; };
-Moves moves(const std::filesystem::path& path) {
+NativeMoves moves(const std::filesystem::path& path) {
     const auto root = json(read_text_file(path));
     if (!root.is_object()) fail("generator root must be object");
     const Json* entries = nullptr;
@@ -89,13 +89,16 @@ Moves moves(const std::filesystem::path& path) {
     }
     if (!entries || (!entries->is_array() && !entries->is_object()) || entries->size() != MOVE_COUNT)
         fail("generator count/type mismatch");
-    Moves result;
+    NativeMoves result;
+    result.data.reserve(MOVE_COUNT * STATE_STORAGE_LEN);
+    result.names.reserve(MOVE_COUNT);
     for (auto it = entries->begin(); it != entries->end(); ++it) {
         if (!it->is_array() || it->size() != STATE_LEN) fail("permutation length mismatch");
-        std::set<std::uint64_t> seen;
+        std::array<bool, STATE_LEN> seen{};
         for (const auto& value : *it) {
             const auto index = bounded(value, STATE_LEN);
-            if (!seen.insert(index).second) fail("permutation is not bijective");
+            if (seen[index]) fail("permutation is not bijective");
+            seen[index] = true;
             result.data.push_back(static_cast<std::uint8_t>(index));
         }
         for (unsigned i = STATE_LEN; i < STATE_STORAGE_LEN; ++i)
@@ -258,6 +261,7 @@ void validate_state(const State128& value, const State128& central, std::uint32_
 }
 std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path& path) { return moves(path).data; }
 std::vector<std::string> load_p900_move_names(const std::filesystem::path& path) { return moves(path).names; }
+NativeMoves load_p900_moves(const std::filesystem::path& path) { return moves(path); }
 std::map<std::uint64_t, State128> load_initial_states_from_test_csv(const std::filesystem::path& path) {
     const auto rows = csv(read_text_file(path));
     if (rows.empty()) fail("missing CSV header");

@@ -40,6 +40,12 @@ State128 parse_state_text(const std::string&, const char*);
 // states against the actual model alphabet before embedding/hash access.
 void validate_state(const State128&, const State128& central, std::uint32_t classes, const char*);
 State128 load_central_state(const std::filesystem::path&);
+// The two vectors are parsed from the same file snapshot and owned together.
+struct NativeMoves {
+    std::vector<std::uint8_t> data;
+    std::vector<std::string> names;
+};
+NativeMoves load_p900_moves(const std::filesystem::path&);
 std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path&);
 std::vector<std::string> load_p900_move_names(const std::filesystem::path&);
 std::map<std::uint64_t, State128> load_initial_states_from_test_csv(const std::filesystem::path&);

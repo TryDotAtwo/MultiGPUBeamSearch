@@ -1,0 +1,3 @@
+native_input checks=45 failures=0
+NATIVE_GENERATOR_ONE_READ_FIFO_OK
+NATIVE_INPUT_ASAN_UBSAN_OK

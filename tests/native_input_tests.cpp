@@ -25,6 +25,24 @@ namespace input = beam::input;
 int main(int argc, char** argv) {
     using namespace beam;
 #ifndef BEAM_TEST_LEGACY_NATIVE_INPUT
+    if (argc == 3 && std::string(argv[1]) == "--snapshot") {
+        // This mode is also used with a FIFO that can be consumed only once.
+        const auto loaded = input::load_p900_moves(argv[2]);
+        if (loaded.names.size() != MOVE_COUNT || loaded.data.size() != MOVE_COUNT * STATE_STORAGE_LEN)
+            throw std::runtime_error("generator snapshot dimensions");
+        for (std::size_t move = 0; move < MOVE_COUNT; ++move) {
+            if (loaded.names[move] != "m" + std::to_string(move))
+                throw std::runtime_error("generator snapshot name/order");
+            for (std::size_t i = 0; i < STATE_LEN; ++i)
+                if (loaded.data[move * STATE_STORAGE_LEN + i] != (i + move) % STATE_LEN)
+                    throw std::runtime_error("generator snapshot data/order");
+            for (std::size_t i = STATE_LEN; i < STATE_STORAGE_LEN; ++i)
+                if (loaded.data[move * STATE_STORAGE_LEN + i] != i)
+                    throw std::runtime_error("generator snapshot padding");
+        }
+        std::cout << "native_generator_snapshot PASS\n";
+        return 0;
+    }
     if (argc == 6) {
         const auto generators = input::load_p900_generators(argv[1]);
         const auto names = input::load_p900_move_names(argv[1]);
@@ -95,6 +113,11 @@ int main(int argc, char** argv) {
     const auto valid_generators = input::load_p900_generators(valid_path);
     require(valid_generators.size() == MOVE_COUNT * STATE_STORAGE_LEN, "generator dimensions");
     require(input::load_p900_move_names(valid_path).size() == MOVE_COUNT, "move count");
+#ifndef BEAM_TEST_LEGACY_NATIVE_INPUT
+    const auto snapshot = input::load_p900_moves(valid_path);
+    require(snapshot.data == valid_generators, "combined generator bytes match existing loader");
+    require(snapshot.names == input::load_p900_move_names(valid_path), "combined names match existing loader");
+#endif
     for (const char* first : {"-1", "1", "255", "0.0"})
         reject("invalid permutation", [&] { input::load_p900_generators(file(generators(first))); });
     reject("extra move", [&] { input::load_p900_generators(file(generators("0", true))); });
