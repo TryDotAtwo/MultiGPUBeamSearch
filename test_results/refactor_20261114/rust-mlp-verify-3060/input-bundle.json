@@ -1,0 +1,11 @@
+{
+  "sha256": "628fba01d3fad93b557cb6af9021721ec6e12e6ee0bdd9a54649e3410761efa7",
+  "bytes": 3235840,
+  "files": {
+    "verify-base.tar.gz": "c1a634885738b09fe6a9e98e366ef0640dfb07dbb832d458d4e63675abce0d6e",
+    "verify-cutlass.tar.gz": "458b5d80f344652d61fe011b557968cd58e9583a96f0ab0823ecc4dc9dc0f0c6",
+    "verify-overlay.tar.gz": "37b573f1c8973193b6c33863d14ff6c5f58604acfdd180c15afb003ad13f08de",
+    "verify-run.sh": "14d4850554d794c9f1a6e63cc2b176d6db48ce2db5e74fabbcae3f562f54433c",
+    "verify-archive.py": "b3464d147b180008378d04c27ed35584aed37ba00486e2154150fa066a5467b9"
+  }
+}

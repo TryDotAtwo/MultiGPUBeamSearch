@@ -1,0 +1,13 @@
+   Compiling beam-runtime v0.1.0 (D:\100XH100\rust\beam-runtime)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\incremental\beam_runtime-3ktr9njgfinsl\s-ho5xixgxsl-0idsb7t-working`
+
+warning: `beam-runtime` (lib) generated 1 warning
+   Compiling beam-python v0.1.0 (D:\100XH100\rust\beam-python)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\incremental\_beam_runtime-1ya0hnym1lmw9\s-ho5xiz6u95-0dsx9aj-working`
+
+warning: linker stdout: Создается библиотека D:/100XH100/.local/cache/rust-mlp-verify-20261114/target\debug\deps\_beam_runtime.dll.lib и объект D:/100XH100/.local/cache/rust-mlp-verify-20261114/target\debug\deps\_beam_runtime.dll.exp
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `beam-python` (lib) generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.17s

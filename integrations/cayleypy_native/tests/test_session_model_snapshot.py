@@ -301,7 +301,8 @@ def test_retained_snapshot_modified_during_runtime_preparation_never_reaches_wor
         from multigpubeamsearch.errors import NativeUnavailable
         from multigpubeamsearch.rust_control import extension
         try:
-            available = hasattr(extension(), 'MlpSnapshotStore')
+            store = getattr(extension(), 'MlpSnapshotStore', None)
+            available = callable(getattr(store, 'prepare_sized_for_session', None))
         except NativeUnavailable:
             available = False
         if not available:
@@ -337,6 +338,173 @@ def test_retained_snapshot_modified_during_runtime_preparation_never_reaches_wor
         with pytest.raises(NativeBackendError, match='changed before launch'):
             search(session)
         assert len(launches) == 1 and not submits
+
+
+def test_rust_session_checks_bound_snapshot_without_python_revalidation(fixture, tmp_path, monkeypatch):
+    from multigpubeamsearch.errors import NativeUnavailable
+    from multigpubeamsearch.rust_control import extension
+
+    try:
+        store = getattr(extension(), 'MlpSnapshotStore', None)
+        available = (callable(getattr(store, 'prepare_sized_for_session', None))
+                     and callable(getattr(store, 'verify_snapshot', None)))
+    except NativeUnavailable:
+        available = False
+    if not available:
+        pytest.skip('matching Rust snapshot extension is not installed')
+    _, predictor, contract, _ = fixture
+    options = NativeOptions(cache_dir=tmp_path / 'cache', autotune=False)
+    run_dir = tmp_path / 'rust-bound-run'
+    executed = []
+    with NativeSession(engine='rust', experimental_reuse_model_snapshot=True) as session:
+        with session.prepare_model_snapshot() as cache:
+            prepared = models.prepare_model(predictor, contract, options, run_dir, _snapshot_cache=cache)
+            assert cache.last['owner'] == 'rust'
+        monkeypatch.setattr(models, 'verify_prepared_model',
+                            lambda *args: pytest.fail('Python revalidated a Rust-owned snapshot'))
+        def execute(contract, prepared, options, width, depth, run_dir, devices, *, runtime):
+            executed.append(True)
+            return NativeOutcome(None, .01, width, run_dir,
+                                 {'requested_beam_width': width, 'profile': {}, 'terminal_records': 1})
+        session.run(execute, contract, prepared, options, 64, 4, run_dir, (0,))
+        (prepared.weights_dir / 'output_bias.fp16').write_bytes(b'\x00\x3c')
+        with pytest.raises(NativeBackendError, match='changed before launch'):
+            session.run(execute, contract, prepared, options, 64, 4, run_dir, (0,))
+    assert len(executed) == 1
+
+
+def test_rust_session_revalidates_changed_contract_geometry(fixture, tmp_path, monkeypatch):
+    from dataclasses import replace
+    from multigpubeamsearch.errors import NativeUnavailable
+    from multigpubeamsearch.rust_control import extension
+
+    try:
+        store = getattr(extension(), 'MlpSnapshotStore', None)
+        available = (callable(getattr(store, 'prepare_sized_for_session', None))
+                     and callable(getattr(store, 'verify_snapshot', None)))
+    except NativeUnavailable:
+        available = False
+    if not available:
+        pytest.skip('matching Rust snapshot extension is not installed')
+    _, predictor, contract, _ = fixture
+    options = NativeOptions(cache_dir=tmp_path / 'cache', autotune=False)
+    run_dir = tmp_path / 'geometry-run'
+    with NativeSession(engine='rust', experimental_reuse_model_snapshot=True) as session:
+        with session.prepare_model_snapshot() as cache:
+            prepared = models.prepare_model(predictor, contract, options, run_dir, _snapshot_cache=cache)
+            assert cache.last['owner'] == 'rust'
+        changed = replace(contract, state_len=contract.state_len + 1)
+        def execute(*args, **kwargs):
+            pytest.fail('mismatched geometry reached a worker')
+        with pytest.raises(NativeBackendError, match='state_len/num_classes'):
+            session.run(execute, changed, prepared, options, 64, 4, run_dir, (0,))
+
+
+@pytest.mark.parametrize('changed_field', ['move_count', 'generators', 'center', 'in_place'])
+def test_changed_graph_restarts_workers_even_with_same_graph_hash(fixture, tmp_path, changed_field):
+    from dataclasses import replace
+
+    _, predictor, contract, _ = fixture
+    if changed_field == 'in_place':
+        contract = replace(contract, center=list(contract.center),
+                           generators=[list(move) for move in contract.generators])
+    options = NativeOptions(cache_dir=tmp_path / 'cache', autotune=False)
+    first_dir = tmp_path / 'geometry-a'
+    second_dir = tmp_path / 'geometry-b'
+    second_dir.mkdir()
+    workers = []
+    class Workers:
+        pids = [123]
+        sequence = 1
+        closed = False
+        def close(self):
+            self.closed = True
+        def submit(self, *args, **kwargs):
+            pytest.fail('worker with the old move count was reused')
+    with NativeSession(engine='rust', experimental_reuse_model_snapshot=True) as session:
+        with session.prepare_model_snapshot() as cache:
+            prepared = models.prepare_model(predictor, contract, options, first_dir, _snapshot_cache=cache)
+        def execute(contract, prepared, options, width, depth, run_dir, devices, *, runtime):
+            worker = Workers()
+            workers.append(worker)
+            session._workers = worker
+            return NativeOutcome(None, .01, width, run_dir,
+                                 {'requested_beam_width': width, 'profile': {}, 'terminal_records': 1})
+        session.run(execute, contract, prepared, options, 64, 4, first_dir, (0,))
+        if changed_field == 'move_count':
+            changed = replace(contract, generators=contract.generators + (contract.generators[0],),
+                              generator_names=contract.generator_names + ('extra',))
+            assert changed.move_count == contract.move_count + 1
+        elif changed_field == 'generators':
+            replacement = tuple(range(contract.state_len))
+            assert replacement != contract.generators[0]
+            changed = replace(contract, generators=(replacement,) + contract.generators[1:])
+            assert changed.move_count == contract.move_count
+        elif changed_field == 'center':
+            changed = replace(contract, center=tuple(reversed(contract.center)))
+            assert changed.center != contract.center
+        else:
+            replacement = list(range(contract.state_len))
+            assert replacement != contract.generators[0]
+            contract.generators[0][:] = replacement
+            changed = contract
+        assert changed.graph_hash == contract.graph_hash
+        session.run(execute, changed, prepared, options, 64, 4, second_dir, (0,))
+        assert len(workers) == 2 and workers[0].closed
+
+
+@pytest.mark.parametrize('phase', ['copy', 'launch'])
+def test_rust_snapshot_rejects_shifted_tensor_boundary_with_same_hash(fixture, tmp_path, monkeypatch, phase):
+    import hashlib
+    from multigpubeamsearch.errors import NativeUnavailable
+    from multigpubeamsearch.rust_control import extension
+
+    try:
+        store = getattr(extension(), 'MlpSnapshotStore', None)
+        available = (callable(getattr(store, 'prepare_sized_for_session', None))
+                     and callable(getattr(store, 'verify_snapshot', None)))
+    except NativeUnavailable:
+        available = False
+    if not available:
+        pytest.skip('matching Rust snapshot extension is not installed')
+    source, predictor, contract, _ = fixture
+    first_name, second_name = 'hidden_weight_hxk.fp16', 'input_bias.fp16'
+    first, second = source / first_name, source / second_name
+    marker, prefix = second_name.encode('ascii'), b'\x00\x00'
+    suffix = bytes(first.stat().st_size - len(prefix) - len(marker))
+    second_bytes = second.read_bytes()
+    first.write_bytes(prefix + marker + suffix)
+    validated = models._validate_artifact(source, contract, 'mlp')
+    options = NativeOptions(cache_dir=tmp_path / 'cache', autotune=False)
+    run_dir = tmp_path / 'boundary-run'
+
+    def move_boundary(directory):
+        (directory / first_name).write_bytes(prefix)
+        (directory / second_name).write_bytes(suffix + marker + second_bytes)
+        digest = hashlib.sha256((directory / 'manifest.json').read_bytes())
+        digest.update(contract.graph_hash.encode('ascii'))
+        for name in validated.artifact_files[1:]:
+            digest.update(name.encode('ascii'))
+            digest.update((directory / name).read_bytes())
+        assert digest.hexdigest() == validated.artifact_hash
+
+    with NativeSession(engine='rust', experimental_reuse_model_snapshot=True) as session:
+        with session.prepare_model_snapshot() as cache:
+            if phase == 'copy':
+                original = models._validate_artifact
+                def mutate_after_validation(path, contract, backend):
+                    result = original(path, contract, backend)
+                    if Path(path) == source:
+                        move_boundary(source)
+                    return result
+                monkeypatch.setattr(models, '_validate_artifact', mutate_after_validation)
+                with pytest.raises(NativeBackendError, match='length mismatch'):
+                    models.prepare_model(predictor, contract, options, run_dir, _snapshot_cache=cache)
+            else:
+                prepared = models.prepare_model(predictor, contract, options, run_dir, _snapshot_cache=cache)
+                move_boundary(prepared.weights_dir)
+                with pytest.raises(NativeBackendError, match='length mismatch'):
+                    cache.verify_for_launch(prepared, contract)
 
 
 def test_direct_run_never_refreshes_a_different_prepared_model(fixture, tmp_path):

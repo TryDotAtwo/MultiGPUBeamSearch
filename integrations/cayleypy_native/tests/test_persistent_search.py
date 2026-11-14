@@ -176,8 +176,9 @@ def test_session_restarts_when_entering_or_leaving_bound_snapshot_mode(tmp_path,
 
     contract = SimpleNamespace(graph_hash='a'*64, start=(1, 0), move_count=2,
                                replay=lambda path: tuple(path) == (1,))
-    model = SimpleNamespace(artifact_hash='b'*64, backend='mlp')
-    session.model_snapshot_cache._entry = ((str(tmp_path), contract.graph_hash, model.backend, model.artifact_hash), tmp_path)
+    model = SimpleNamespace(artifact_hash='b'*64, backend='mlp', artifact_sizes=())
+    session.model_snapshot_cache._entry = ((str(tmp_path), contract.graph_hash, model.backend,
+                                            model.artifact_hash, model.artifact_sizes), tmp_path)
     session.model_snapshot_cache._active = model
     runtime = SimpleNamespace(build_metadata={'binary_sha256': 'c'*64, 'inference_backend': executor})
     options = NativeOptions()

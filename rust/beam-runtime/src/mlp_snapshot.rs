@@ -21,6 +21,9 @@ pub struct MlpSnapshotInput {
     pub artifact_hash: String,
     /// Exact lexicographically ordered runtime tensor filenames.
     pub tensors: Vec<String>,
+    /// Sizes established by the caller's validation: manifest first, then tensors.
+    /// Unsized inputs retain the legacy API but cannot use fast launch verification.
+    pub expected_sizes: Option<Vec<u64>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,6 +39,7 @@ struct Key {
     graph_hash: String,
     artifact_hash: String,
     tensors: Vec<String>,
+    expected_sizes: Option<Vec<u64>>,
 }
 
 #[derive(Default)]
@@ -46,6 +50,44 @@ pub struct MlpSnapshotStore {
 impl MlpSnapshotStore {
     pub fn clear(&mut self) {
         self.entry = None;
+    }
+
+    /// Recheck exact bytes of the currently owned, previously validated
+    /// snapshot before a session submits it. No tensor decoding is needed:
+    /// the digest binds the bytes to the caller's earlier validation.
+    pub fn verify_snapshot_with_cancel(
+        &self,
+        path: &Path,
+        graph_hash: &str,
+        artifact_hash: &str,
+        tensors: &[String],
+        cancel: &AtomicBool,
+    ) -> Result<()> {
+        let (key, owned_path) = self
+            .entry
+            .as_ref()
+            .ok_or_else(|| Error::Message("no owned MLP snapshot".into()))?;
+        if path != owned_path
+            || graph_hash != key.graph_hash
+            || artifact_hash != key.artifact_hash
+            || tensors != key.tensors
+        {
+            return Err(Error::Message("MLP snapshot identity mismatch".into()));
+        }
+        let sizes = key
+            .expected_sizes
+            .as_deref()
+            .ok_or_else(|| Error::Message("MLP snapshot has no validated file sizes".into()))?;
+        hash_and_copy(
+            owned_path,
+            None,
+            &key.graph_hash,
+            &key.artifact_hash,
+            &key.tensors,
+            Some(sizes),
+            cancel,
+        )
+        .map(|_| ())
     }
 
     pub fn prepare(&mut self, input: &MlpSnapshotInput, force_new: bool) -> Result<MlpSnapshot> {
@@ -92,6 +134,7 @@ impl MlpSnapshotStore {
             graph_hash: input.graph_hash.clone(),
             artifact_hash: input.artifact_hash.clone(),
             tensors: input.tensors.clone(),
+            expected_sizes: input.expected_sizes.clone(),
         };
         if !force_new {
             if let Some((old_key, snapshot)) = &self.entry {
@@ -131,7 +174,15 @@ impl MlpSnapshotStore {
             Err(error) => return Err(error.into()),
         }
         let staging = Staging::create(&input.run_dir)?;
-        let copied_bytes = hash_and_copy(&input.source_dir, Some(&staging.path), input, cancel)?;
+        let copied_bytes = hash_and_copy(
+            &input.source_dir,
+            Some(&staging.path),
+            &input.graph_hash,
+            &input.artifact_hash,
+            &input.tensors,
+            input.expected_sizes.as_deref(),
+            cancel,
+        )?;
         // Check the bytes that actually reached the private directory before
         // publishing it, not merely the bytes that were read from the source.
         verify(&staging.path, input, cancel)?;
@@ -178,6 +229,15 @@ fn validate(input: &MlpSnapshotInput) -> Result<()> {
     if input.tensors.is_empty() {
         return Err(Error::Message("MLP tensor list is empty".into()));
     }
+    if input
+        .expected_sizes
+        .as_ref()
+        .is_some_and(|sizes| sizes.len() != input.tensors.len().saturating_add(1))
+    {
+        return Err(Error::Message(
+            "MLP validated file size count mismatch".into(),
+        ));
+    }
     let mut suffix = None;
     for (index, name) in input.tensors.iter().enumerate() {
         let (stem, extension) = name.rsplit_once('.').unwrap_or(("", ""));
@@ -204,25 +264,37 @@ fn check_cancelled(cancel: &AtomicBool) -> Result<()> {
 }
 
 fn verify(path: &Path, input: &MlpSnapshotInput, cancel: &AtomicBool) -> Result<()> {
-    hash_and_copy(path, None, input, cancel).map(|_| ())
+    hash_and_copy(
+        path,
+        None,
+        &input.graph_hash,
+        &input.artifact_hash,
+        &input.tensors,
+        input.expected_sizes.as_deref(),
+        cancel,
+    )
+    .map(|_| ())
 }
 
 fn hash_and_copy(
     source: &Path,
     destination: Option<&Path>,
-    input: &MlpSnapshotInput,
+    graph_hash: &str,
+    artifact_hash: &str,
+    tensors: &[String],
+    expected_sizes: Option<&[u64]>,
     cancel: &AtomicBool,
 ) -> Result<u64> {
     let mut hash = Sha256::new();
     let mut total = 0u64;
     let mut scratch = vec![0u8; 64 * 1024];
     for (index, name) in std::iter::once("manifest.json")
-        .chain(input.tensors.iter().map(String::as_str))
+        .chain(tensors.iter().map(String::as_str))
         .enumerate()
     {
         check_cancelled(cancel)?;
         if index == 1 {
-            hash.update(input.graph_hash.as_bytes());
+            hash.update(graph_hash.as_bytes());
         }
         if index > 0 {
             hash.update(name.as_bytes());
@@ -237,10 +309,19 @@ fn hash_and_copy(
             options.custom_flags(libc::O_NONBLOCK);
         }
         let mut from = options.open(&path)?;
-        if !from.metadata()?.is_file() {
+        let metadata = from.metadata()?;
+        if !metadata.is_file() {
             return Err(Error::Message(format!(
                 "MLP input is not a regular file: {}",
                 path.display()
+            )));
+        }
+        let expected = expected_sizes.map(|sizes| sizes[index]);
+        if expected.is_some_and(|size| metadata.len() != size) {
+            return Err(Error::Message(format!(
+                "MLP input length mismatch for {name}: expected={} actual={}",
+                expected.unwrap(),
+                metadata.len()
             )));
         }
         let mut to = match destination {
@@ -252,11 +333,21 @@ fn hash_and_copy(
             ),
             None => None,
         };
+        let mut file_bytes = 0u64;
         loop {
             check_cancelled(cancel)?;
             let n = from.read(&mut scratch)?;
             if n == 0 {
                 break;
+            }
+            file_bytes = file_bytes
+                .checked_add(n as u64)
+                .ok_or_else(|| Error::Message("MLP file byte count overflow".into()))?;
+            if expected.is_some_and(|size| file_bytes > size) {
+                return Err(Error::Message(format!(
+                    "MLP input length mismatch for {name}: expected={} read at least={file_bytes}",
+                    expected.unwrap()
+                )));
             }
             hash.update(&scratch[..n]);
             if let Some(output) = to.as_mut() {
@@ -266,17 +357,24 @@ fn hash_and_copy(
                 .checked_add(n as u64)
                 .ok_or_else(|| Error::Message("MLP snapshot byte count overflow".into()))?;
         }
+        if expected.is_some_and(|size| file_bytes != size) {
+            return Err(Error::Message(format!(
+                "MLP input length mismatch for {name}: expected={} read={file_bytes}",
+                expected.unwrap()
+            )));
+        }
         if let Some(output) = to.as_mut() {
             output.flush()?;
         }
     }
     let actual = format!("{:x}", hash.finalize());
-    if actual != input.artifact_hash {
+    if actual != artifact_hash {
         return Err(Error::Message(format!(
             "MLP artifact hash mismatch: expected={} actual={actual}",
-            input.artifact_hash
+            artifact_hash
         )));
     }
+    check_cancelled(cancel)?;
     Ok(total)
 }
 

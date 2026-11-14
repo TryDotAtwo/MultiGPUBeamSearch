@@ -48,6 +48,7 @@ impl PyMlpSnapshotStore {
                 graph_hash,
                 artifact_hash,
                 tensors,
+                expected_sizes: None,
             },
             force_new,
             false,
@@ -76,6 +77,37 @@ impl PyMlpSnapshotStore {
                 graph_hash,
                 artifact_hash,
                 tensors,
+                expected_sizes: None,
+            },
+            force_new,
+            true,
+        )
+    }
+
+    /// The sizes must come from the caller's validated manifest and tensors.
+    #[allow(clippy::too_many_arguments)]
+    fn prepare_sized_for_session(
+        &self,
+        py: Python<'_>,
+        source_dir: PathBuf,
+        cache_dir: PathBuf,
+        run_dir: PathBuf,
+        graph_hash: String,
+        artifact_hash: String,
+        tensors: Vec<String>,
+        expected_sizes: Vec<u64>,
+        force_new: bool,
+    ) -> PyResult<(PathBuf, bool, u64)> {
+        self.prepare_impl(
+            py,
+            MlpSnapshotInput {
+                source_dir,
+                cache_dir,
+                run_dir,
+                graph_hash,
+                artifact_hash,
+                tensors,
+                expected_sizes: Some(expected_sizes),
             },
             force_new,
             true,
@@ -84,6 +116,33 @@ impl PyMlpSnapshotStore {
 
     fn cancel(&self) {
         self.cancel.store(true, Ordering::Release);
+    }
+
+    fn verify_snapshot(
+        &self,
+        py: Python<'_>,
+        path: PathBuf,
+        graph_hash: String,
+        artifact_hash: String,
+        tensors: Vec<String>,
+    ) -> PyResult<()> {
+        let _running = self.running.try_lock().map_err(|_| {
+            PyRuntimeError::new_err("concurrent MLP snapshot preparation is unsupported")
+        })?;
+        self.cancel.store(false, Ordering::Release);
+        crate::interrupt::run(py, &self.cancel, || {
+            self.inner
+                .lock()
+                .map_err(runtime_error)?
+                .verify_snapshot_with_cancel(
+                    &path,
+                    &graph_hash,
+                    &artifact_hash,
+                    &tensors,
+                    &self.cancel,
+                )
+                .map_err(runtime_error)
+        })
     }
 
     fn clear(&self) -> PyResult<()> {

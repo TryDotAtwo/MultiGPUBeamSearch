@@ -30,6 +30,7 @@ fn fixture() -> (PathBuf, MlpSnapshotInput) {
         graph_hash,
         artifact_hash,
         tensors,
+        expected_sizes: Some(vec![b"{\"dtype\":\"fp16\"}\n".len() as u64, 2, 2 * 65537]),
     };
     (root, input)
 }
@@ -89,6 +90,207 @@ fn rejects_changed_source_and_retained_snapshot() {
     fs::write(first.path.join("z.fp16"), [0x00, 0x00]).unwrap();
     assert!(store.prepare(&input, false).is_err());
     assert!(!input.run_dir.join("weights").exists());
+}
+
+#[test]
+fn launch_verification_accepts_only_the_owned_unmodified_snapshot() {
+    let (root, input) = fixture();
+    let mut store = MlpSnapshotStore::default();
+    let snapshot = store.prepare(&input, false).unwrap();
+    let cancel = AtomicBool::new(false);
+    let check = |path: &Path, graph: &str, artifact: &str, tensors: &[String]| {
+        store.verify_snapshot_with_cancel(path, graph, artifact, tensors, &cancel)
+    };
+    assert!(check(
+        &snapshot.path,
+        &input.graph_hash,
+        &input.artifact_hash,
+        &input.tensors
+    )
+    .is_ok());
+    assert!(check(
+        &root.join("other"),
+        &input.graph_hash,
+        &input.artifact_hash,
+        &input.tensors
+    )
+    .is_err());
+    assert!(check(
+        &snapshot.path,
+        &"b".repeat(64),
+        &input.artifact_hash,
+        &input.tensors
+    )
+    .is_err());
+    assert!(check(
+        &snapshot.path,
+        &input.graph_hash,
+        &"b".repeat(64),
+        &input.tensors
+    )
+    .is_err());
+    assert!(check(
+        &snapshot.path,
+        &input.graph_hash,
+        &input.artifact_hash,
+        &input.tensors[..1]
+    )
+    .is_err());
+    fs::write(snapshot.path.join("a.fp16"), [0x01, 0x3c]).unwrap();
+    assert!(check(
+        &snapshot.path,
+        &input.graph_hash,
+        &input.artifact_hash,
+        &input.tensors
+    )
+    .is_err());
+}
+
+#[test]
+fn launch_verification_honors_cancellation_and_clear() {
+    let (_, input) = fixture();
+    let mut store = MlpSnapshotStore::default();
+    let snapshot = store.prepare(&input, false).unwrap();
+    let cancelled = AtomicBool::new(true);
+    assert!(store
+        .verify_snapshot_with_cancel(
+            &snapshot.path,
+            &input.graph_hash,
+            &input.artifact_hash,
+            &input.tensors,
+            &cancelled,
+        )
+        .is_err());
+    store.clear();
+    assert!(store
+        .verify_snapshot_with_cancel(
+            &snapshot.path,
+            &input.graph_hash,
+            &input.artifact_hash,
+            &input.tensors,
+            &AtomicBool::new(false),
+        )
+        .is_err());
+}
+
+#[test]
+fn launch_verification_rejects_identical_digest_with_shifted_file_boundaries() {
+    let (_, mut input) = fixture();
+    let a = [b"\x00\x3c".as_slice(), b"z.fp16", b"\x00\x3c"].concat();
+    let b = b"\x00\x3c\x00\x3c";
+    fs::write(input.source_dir.join("a.fp16"), a).unwrap();
+    fs::write(input.source_dir.join("z.fp16"), b).unwrap();
+    input.expected_sizes.as_mut().unwrap()[1..].copy_from_slice(&[10, 4]);
+    input.artifact_hash = digest(&input.source_dir, &input.graph_hash, &input.tensors);
+    let mut store = MlpSnapshotStore::default();
+    let snapshot = store.prepare(&input, false).unwrap();
+    fs::write(snapshot.path.join("a.fp16"), b"\x00\x3c").unwrap();
+    fs::write(
+        snapshot.path.join("z.fp16"),
+        [b"\x00\x3c".as_slice(), b"z.fp16", b].concat(),
+    )
+    .unwrap();
+    assert_eq!(
+        digest(&snapshot.path, &input.graph_hash, &input.tensors),
+        input.artifact_hash
+    );
+    assert!(store
+        .verify_snapshot_with_cancel(
+            &snapshot.path,
+            &input.graph_hash,
+            &input.artifact_hash,
+            &input.tensors,
+            &AtomicBool::new(false),
+        )
+        .is_err());
+}
+
+#[test]
+fn copying_rejects_shifted_boundaries_even_when_digest_is_unchanged() {
+    let (_, mut input) = fixture();
+    let a = [b"\x00\x3c".as_slice(), b"z.fp16", b"\x00\x3c"].concat();
+    let b = b"\x00\x3c\x00\x3c";
+    fs::write(input.source_dir.join("a.fp16"), a).unwrap();
+    fs::write(input.source_dir.join("z.fp16"), b).unwrap();
+    input.expected_sizes.as_mut().unwrap()[1..].copy_from_slice(&[10, 4]);
+    input.artifact_hash = digest(&input.source_dir, &input.graph_hash, &input.tensors);
+    fs::write(input.source_dir.join("a.fp16"), b"\x00\x3c").unwrap();
+    fs::write(
+        input.source_dir.join("z.fp16"),
+        [b"\x00\x3c".as_slice(), b"z.fp16", b].concat(),
+    )
+    .unwrap();
+    assert_eq!(
+        digest(&input.source_dir, &input.graph_hash, &input.tensors),
+        input.artifact_hash
+    );
+    assert!(MlpSnapshotStore::default().prepare(&input, false).is_err());
+    assert!(!input.run_dir.join("weights").exists());
+}
+
+#[test]
+fn verification_rejects_manifest_boundary_shift_with_identical_digest() {
+    let (_, mut input) = fixture();
+    let prefix = b"{\"note\":\"";
+    let suffix = b"\"}\n";
+    let manifest = [
+        prefix.as_slice(),
+        input.graph_hash.as_bytes(),
+        b"a.fp16",
+        suffix,
+    ]
+    .concat();
+    let tensor = fs::read(input.source_dir.join("a.fp16")).unwrap();
+    fs::write(input.source_dir.join("manifest.json"), &manifest).unwrap();
+    input.expected_sizes.as_mut().unwrap()[0] = manifest.len() as u64;
+    input.artifact_hash = digest(&input.source_dir, &input.graph_hash, &input.tensors);
+    let mut store = MlpSnapshotStore::default();
+    let snapshot = store.prepare(&input, false).unwrap();
+    fs::write(snapshot.path.join("manifest.json"), prefix).unwrap();
+    fs::write(
+        snapshot.path.join("a.fp16"),
+        [
+            suffix.as_slice(),
+            input.graph_hash.as_bytes(),
+            b"a.fp16",
+            &tensor,
+        ]
+        .concat(),
+    )
+    .unwrap();
+    assert_eq!(
+        digest(&snapshot.path, &input.graph_hash, &input.tensors),
+        input.artifact_hash
+    );
+    assert!(store
+        .verify_snapshot_with_cancel(
+            &snapshot.path,
+            &input.graph_hash,
+            &input.artifact_hash,
+            &input.tensors,
+            &AtomicBool::new(false),
+        )
+        .is_err());
+}
+
+#[test]
+fn unsized_legacy_snapshot_cannot_use_fast_launch_verification() {
+    let (_, mut input) = fixture();
+    input.expected_sizes = None;
+    let mut store = MlpSnapshotStore::default();
+    let snapshot = store.prepare(&input, false).unwrap();
+    assert!(store
+        .verify_snapshot_with_cancel(
+            &snapshot.path,
+            &input.graph_hash,
+            &input.artifact_hash,
+            &input.tensors,
+            &AtomicBool::new(false),
+        )
+        .is_err());
+    input.run_dir = input.run_dir.with_file_name("run2");
+    input.expected_sizes = Some(vec![1]);
+    assert!(store.prepare(&input, false).is_err());
 }
 
 #[test]

@@ -67,6 +67,8 @@ class PreparedModel:
     backend: str
     artifact_hash: str
     artifact_files: tuple[str, ...]
+    # Manifest length followed by tensor lengths from the validated geometry.
+    artifact_sizes: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -144,7 +146,8 @@ def verify_prepared_model(model: PreparedModel, contract: GraphContract) -> None
     """Fail if any manifest/blob byte changed after preparation."""
     current = (_validate_ensemble(model.weights_dir, contract) if model.backend == "ensemble"
                else _validate_artifact(model.weights_dir, contract, model.backend))
-    if current.artifact_hash != model.artifact_hash:
+    if (current.artifact_hash != model.artifact_hash or
+            (model.artifact_sizes and current.artifact_sizes != model.artifact_sizes)):
         raise NativeBackendError("native model artifact changed before launch")
 
 
@@ -281,20 +284,29 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
         import torch
         blob_dtype = torch.float16 if dtype == "fp16" else torch.bfloat16
         artifact_files = ["manifest.json"]
+        artifact_sizes = [len(manifest_bytes)]
         for name, count in sorted(counts.items()):
             blob = path / f"{name}.{dtype}"
             expected = count * 2
             if not blob.is_file() or blob.stat().st_size != expected:
                 raise NativeBackendError(f"native blob {blob.name} missing or wrong length (expected {expected} bytes)")
             artifact_files.append(blob.name)
+            artifact_sizes.append(expected)
             digest.update(blob.name.encode("ascii"))
             with blob.open("rb") as source:
+                read_bytes = 0
                 while chunk := source.read(1024 * 1024):
+                    read_bytes += len(chunk)
+                    if read_bytes > expected:
+                        raise NativeBackendError(f"native blob {blob.name} changed while being read")
                     digest.update(chunk)
                     values = torch.frombuffer(bytearray(chunk), dtype=blob_dtype)
                     if not torch.isfinite(values).all().item():
                         raise NativeBackendError(f"native artifact contains non-finite values in {blob.name}")
-        return PreparedModel(path, manifest, backend, digest.hexdigest(), tuple(artifact_files))
+                if read_bytes != expected:
+                    raise NativeBackendError(f"native blob {blob.name} changed while being read")
+        return PreparedModel(path, manifest, backend, digest.hexdigest(), tuple(artifact_files),
+                             tuple(artifact_sizes))
     except NativeBackendError:
         raise
     except (OSError, ValueError, TypeError, OverflowError, RuntimeError) as error:
@@ -320,12 +332,13 @@ def _snapshot_artifact(model: PreparedModel, contract: GraphContract, run_dir: P
             shutil.copyfile(model.weights_dir / name, staging / name)
         snapshot = (_validate_ensemble(staging, contract) if model.backend == "ensemble"
                     else _validate_artifact(staging, contract, model.backend))
-        if snapshot.artifact_hash != model.artifact_hash:
+        if (snapshot.artifact_hash != model.artifact_hash or
+                (model.artifact_sizes and snapshot.artifact_sizes != model.artifact_sizes)):
             raise NativeBackendError("native model artifact changed while its private snapshot was copied")
         staging.replace(target)
         published = True
         return PreparedModel(target, snapshot.manifest, snapshot.backend, snapshot.artifact_hash,
-                             snapshot.artifact_files)
+                             snapshot.artifact_files, snapshot.artifact_sizes)
     except NativeBackendError:
         raise
     except OSError as error:

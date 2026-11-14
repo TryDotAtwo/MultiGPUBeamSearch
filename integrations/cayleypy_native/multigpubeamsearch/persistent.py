@@ -243,11 +243,19 @@ class NativeSession:
             # is intentionally absent; all other search geometry stays fixed.
             binding_scope = requires_mlp_host_binding(self.model_snapshot_cache, model, contract,
                 {} if runtime is None else runtime.build_metadata)
-            identity=(contract.graph_hash,model.artifact_hash,model.backend,tuple(devices),binding_scope,
+            geometry=tuple(getattr(contract,name,None) for name in ('state_len','num_classes','move_count'))
+            center=getattr(contract,'center',None)
+            generators=getattr(contract,'generators',None)
+            graph_content=(None if center is None else tuple(center),
+                           None if generators is None else tuple(tuple(move) for move in generators))
+            identity=(contract.graph_hash,geometry,graph_content,model.artifact_hash,getattr(model,'artifact_sizes',()),
+                model.backend,tuple(devices),binding_scope,
                 beam_width,max_steps,repr(options),
                 os.environ.get('CUDA_VISIBLE_DEVICES'),os.environ.get('CUDA_DEVICE_ORDER'),
                 json.dumps(runtime.build_metadata,sort_keys=True) if runtime is not None else None)
-            verify_prepared_model(model,contract)
+            if (self.model_snapshot_cache is None
+                    or not self.model_snapshot_cache.verify_for_launch(model, contract)):
+                verify_prepared_model(model,contract)
             if identity != self._identity:self._release()
             if self._workers is None:
                 if (self.model_snapshot_cache is not None

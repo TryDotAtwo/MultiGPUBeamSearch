@@ -1,0 +1,15 @@
+{
+  "instance": 60669912,
+  "label": "codex-beam-rust-verify-20261114-b927",
+  "before": {
+    "id": 60669912,
+    "label": "codex-beam-rust-verify-20261114-b927",
+    "actual_status": "exited",
+    "duration": 14327.04936504364,
+    "dph_total": 0.14162962962962963,
+    "start_date": 1794674045.639956
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794688427.81354
+}

@@ -1,0 +1,27 @@
+{
+  "archive_sha256": "722613913282a016becc21f72ae5ae424c79b933dd396c5e7c1e39b63befa3b5",
+  "archive_bytes": 16347407,
+  "records": 1244,
+  "blobs": 353,
+  "omitted": 946,
+  "extracted": [
+    "cargo-build.log",
+    "cargo-tests.log",
+    "gpu.log",
+    "gpu/partial.json",
+    "gpu/results.json",
+    "gpus.csv",
+    "inputs-after.txt",
+    "inputs-before.txt",
+    "pip.log",
+    "pyo3-test.log",
+    "python-tests.log",
+    "rust-binaries.sha256",
+    "rustup.log",
+    "software.txt",
+    "status.txt"
+  ],
+  "bootstrap_records": 20,
+  "bootstrap_sha256": "d52cf9eafd3a39b0f873cf1b3cb5fee61b5f449e68f2f06b901d8e2967a98af1",
+  "source_manifest_sha256": "8694c62f0af5954489744c61cd72bf34f546f10e61ce28d529e07577610ea076"
+}

@@ -1,0 +1,146 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\incremental\beam_runtime-3ktr9njgfinsl\s-ho5xixgxsl-0idsb7t-working`
+
+warning: `beam-runtime` (lib) generated 1 warning
+   Compiling beam-python v0.1.0 (D:\100XH100\rust\beam-python)
+   Compiling beam-cli v0.1.0 (D:\100XH100\rust\beam-cli)
+   Compiling beam-runtime v0.1.0 (D:\100XH100\rust\beam-runtime)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\incremental\mlp_snapshot-3dj7xfzgui7pd\s-ho5xr1pcz0-1bqqnpf-working`
+
+warning: `beam-runtime` (test "mlp_snapshot") generated 1 warning
+   Compiling beam-native-sys v0.1.0 (D:\100XH100\rust\beam-native-sys)
+   Compiling beam-core v0.1.0 (D:\100XH100\rust\beam-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 29.14s
+     Running unittests src\main.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\beam_runner-75ed26d1d65ee921.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\beam_core-e710c6c5c60ebe24.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\calibration.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\calibration-5f8e71c02325b370.exe)
+
+running 2 tests
+test complete_slow_rank_cohorts_select_stable_gains_only ... ok
+test optimization_promotion_needs_five_matching_pairs_and_material_full_step_gain ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\capacity.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\capacity-8019dc2b0f8472a0.exe)
+
+running 3 tests
+test large_factorial_is_clamped_without_overflow_or_false_reachability ... ok
+test finite_multiset_bound_excludes_unique_inverse_neighbors ... ok
+test width_mode_is_exact_integer_or_explicit_maximum ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\components.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\components-c91463dfe10d0b81.exe)
+
+running 1 test
+test exact_service_contracts_and_reference_proxy ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\config.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\config-1a596ec4ae7fb588.exe)
+
+running 1 test
+test public_options_roundtrip_and_validation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contracts.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\contracts-b17d6bd0e04da76d.exe)
+
+running 3 tests
+test binary_layout_and_complete_hash_order ... ok
+test domains_do_not_confuse_matrix_words_and_permutation_padding ... ok
+test exact_global_width_and_overflow_diagnostics ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\history.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\history-30b8675c31605453.exe)
+
+running 2 tests
+test full_depth_placement_zero_and_arithmetic_limits ... ok
+test exact_history_reservations_and_tail_fallback ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\inference.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\inference-0148aeda5c23457d.exe)
+
+running 2 tests
+test bounded_inference_candidates_preserve_non_power_of_two_cap ... ok
+test noisy_baseline_does_not_disqualify_complete_stable_inference_cohort ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\planning.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\planning-d653a7e15e1d5894.exe)
+
+running 2 tests
+test exact_width_quotas_do_not_overflow_or_include_spare_slots ... ok
+test admission_requires_every_rank_and_identical_protocol ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\profile_policy.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\profile_policy-832f5b4c1ebaf446.exe)
+
+running 1 test
+test proposals_preserve_frozen_inference_and_semantic_controls ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\search.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\search-9dfd10c480342410.exe)
+
+running 3 tests
+test terminal_replays_original_gather_moves_and_preserves_public_metadata ... ok
+test malformed_incomplete_contradictory_and_invalid_paths_never_become_not_found ... ok
+test collection_is_complete_unique_and_independently_replayed ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\beam_native_sys-784a00410c513b03.exe)
+
+running 3 tests
+test tests::c_layout ... ok
+test history::tests::views_empty_alignment_and_panic_boundary ... ok
+test tests::absent_library_is_an_error_not_a_cuda_import ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\context.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\context-0ca7be4de8f8272e.exe)
+
+running 1 test
+test real_ffi_context_reuses_copied_jobs_and_propagates_errors ... ignored, requires BEAM_TEST_LIBRARY built from the CPU ABI fixture
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\_beam_runtime-e7fe78f8fc5d32f7.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\beam_runtime-3332fc2a09a18cce.exe)
+
+running 1 test
+test history::tests::disk_error_fallback_cannot_overwrite_future_ram_layer ... FAILED
+
+failures:
+
+---- history::tests::disk_error_fallback_cannot_overwrite_future_ram_layer stdout ----
+
+thread 'history::tests::disk_error_fallback_cannot_overwrite_future_ram_layer' (37056) panicked at rust\beam-runtime\src\history.rs:424:51:
+called `Result::unwrap()` on an `Err` value: Io(Custom { kind: Other, error: "physical history reservation requires Linux" })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    history::tests::disk_error_fallback_cannot_overwrite_future_ram_layer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p beam-runtime --lib`

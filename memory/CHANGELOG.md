@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-14 size-bound Rust MLP launch verification
+- The existing default-OFF Rust MLP snapshot path now binds the previously
+  validated manifest and tensor lengths to bounded streaming SHA-256 checks,
+  including during copy and before launch. Legacy extensions use the full
+  Python validation path. Session identity includes immutable graph contents,
+  geometry and model lengths; graph changes release resident workers.
+- Linux `cargo test --workspace --locked` passed with one ignored ABI fixture;
+  the real PyO3 smoke and full Python suite passed (641 passed, 9 skipped).
+  Ten isolated 2xRTX3060 sessions compared the same Rust snapshot owner using
+  Python versus Rust launch verification. The median paired full-call change
+  was -3.59%; the full-step promotion criterion was not measured. The option
+  remains OFF.
+  Source-bound receipts, precise scope, limitations and costs are in
+  `test_results/refactor_20261114/STAGE_RUST_MLP_LAUNCH_VERIFY.md`.
+
 ## 2026-11-14 Rust-owned experimental MLP snapshots
 - The opt-in strict-native MLP path can now delegate bounded snapshot copy,
   identity, staging and reuse to `beam-runtime` via PyO3, while Python retains

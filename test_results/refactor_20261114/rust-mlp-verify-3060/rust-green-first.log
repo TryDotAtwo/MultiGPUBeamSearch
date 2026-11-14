@@ -1,0 +1,86 @@
+   Compiling typenum v1.20.1
+   Compiling generic-array v0.14.7
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling serde_json v1.0.154
+   Compiling thiserror v2.0.21
+   Compiling serde v1.0.229
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling windows-link v0.2.1
+   Compiling libloading v0.8.9
+   Compiling digest v0.10.7
+   Compiling beam-core v0.1.0 (D:\100XH100\rust\beam-core)
+   Compiling libc v0.2.191
+   Compiling cfg-if v1.0.5
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling beam-native-sys v0.1.0 (D:\100XH100\rust\beam-native-sys)
+   Compiling beam-runtime v0.1.0 (D:\100XH100\rust\beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 32.73s
+     Running tests\mlp_snapshot.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\mlp_snapshot-7d77e5671e137c60.exe)
+
+running 9 tests
+test cache_identity_need_not_exist_when_the_run_directory_is_elsewhere ... FAILED
+test cancellation_does_not_publish_or_poison_later_attempts ... FAILED
+test already_prepared_source_at_target_is_reused_without_a_copy ... FAILED
+test rejects_bad_hash_before_publishing_and_preserves_existing_target ... ok
+test creates_reuses_and_refreshes_compatible_snapshots ... FAILED
+test rejects_invalid_or_ambiguous_file_names_and_hashes ... ok
+test launch_verification_accepts_only_the_owned_unmodified_snapshot ... FAILED
+test rejects_changed_source_and_retained_snapshot ... FAILED
+test session_path_defers_retained_validation_until_the_launch_boundary ... FAILED
+
+failures:
+
+---- cache_identity_need_not_exist_when_the_run_directory_is_elsewhere stdout ----
+
+thread 'cache_identity_need_not_exist_when_the_run_directory_is_elsewhere' (27880) panicked at rust\beam-runtime\tests\mlp_snapshot.rs:206:71:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 5, kind: PermissionDenied, message: "Отказано в доступе." })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- cancellation_does_not_publish_or_poison_later_attempts stdout ----
+
+thread 'cancellation_does_not_publish_or_poison_later_attempts' (27864) panicked at rust\beam-runtime\tests\mlp_snapshot.rs:199:43:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 5, kind: PermissionDenied, message: "Отказано в доступе." })
+
+---- already_prepared_source_at_target_is_reused_without_a_copy stdout ----
+
+thread 'already_prepared_source_at_target_is_reused_without_a_copy' (23920) panicked at rust\beam-runtime\tests\mlp_snapshot.rs:216:44:
+called `Result::unwrap()` on an `Err` value: Os { code: 5, kind: PermissionDenied, message: "Отказано в доступе." }
+
+---- creates_reuses_and_refreshes_compatible_snapshots stdout ----
+
+thread 'creates_reuses_and_refreshes_compatible_snapshots' (34792) panicked at rust\beam-runtime\tests\mlp_snapshot.rs:52:46:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 5, kind: PermissionDenied, message: "Отказано в доступе." })
+
+---- launch_verification_accepts_only_the_owned_unmodified_snapshot stdout ----
+
+thread 'launch_verification_accepts_only_the_owned_unmodified_snapshot' (36152) panicked at rust\beam-runtime\tests\mlp_snapshot.rs:98:49:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 5, kind: PermissionDenied, message: "Отказано в доступе." })
+
+---- rejects_changed_source_and_retained_snapshot stdout ----
+
+thread 'rejects_changed_source_and_retained_snapshot' (33632) panicked at rust\beam-runtime\tests\mlp_snapshot.rs:83:46:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 5, kind: PermissionDenied, message: "Отказано в доступе." })
+
+---- session_path_defers_retained_validation_until_the_launch_boundary stdout ----
+
+thread 'session_path_defers_retained_validation_until_the_launch_boundary' (15756) panicked at rust\beam-runtime\tests\mlp_snapshot.rs:152:46:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 5, kind: PermissionDenied, message: "Отказано в доступе." })
+
+
+failures:
+    already_prepared_source_at_target_is_reused_without_a_copy
+    cache_identity_need_not_exist_when_the_run_directory_is_elsewhere
+    cancellation_does_not_publish_or_poison_later_attempts
+    creates_reuses_and_refreshes_compatible_snapshots
+    launch_verification_accepts_only_the_owned_unmodified_snapshot
+    rejects_changed_source_and_retained_snapshot
+    session_path_defers_retained_validation_until_the_launch_boundary
+
+test result: FAILED. 2 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `-p beam-runtime --test mlp_snapshot`
