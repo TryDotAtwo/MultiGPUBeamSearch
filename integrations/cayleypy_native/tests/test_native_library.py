@@ -130,6 +130,26 @@ def test_explicit_backend_mismatch_is_rejected(tmp_path, monkeypatch):
     assert not calls
 
 
+def test_index_sort_library_matches_verified_runner(tmp_path, monkeypatch):
+    native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(native, 'sys', SimpleNamespace(platform='linux'))
+    options = replace(options, experimental_index_sort=True)
+    metadata['experimental_index_sort'] = True
+    (runner.parent / 'native-build.json').write_text(json.dumps(metadata))
+    _, receipt = native.ensure_native_library(graph, model, options, (86,), tmp_path, runner, metadata)
+    assert '-DBEAM_EXPERIMENTAL_INDEX_SORT=ON' in calls[0]
+    assert receipt['specification']['experimental_index_sort'] is True
+
+
+def test_index_sort_runner_mismatch_is_rejected_before_library_build(tmp_path, monkeypatch):
+    native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(native, 'sys', SimpleNamespace(platform='linux'))
+    with pytest.raises(NativeBackendError, match='index.sort'):
+        native.ensure_native_library(graph, model, replace(options, experimental_index_sort=True),
+                                     (86,), tmp_path, runner, metadata)
+    assert not calls
+
+
 @pytest.mark.parametrize('backend', ('auto', 'unexpected', None))
 def test_unresolved_runner_backend_is_rejected(tmp_path, monkeypatch, backend):
     native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)

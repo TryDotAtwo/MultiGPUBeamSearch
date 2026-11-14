@@ -36,6 +36,30 @@ def test_missing_registry_falls_back(tmp_path):
     assert find_profile(tmp_path,{'beam':100}) is None
 
 
+def test_index_sort_cannot_reuse_legacy_off_profile(tmp_path, monkeypatch):
+    from types import SimpleNamespace as NS
+    import torch
+    from multigpubeamsearch import profile_identity, shared_profiles
+    monkeypatch.setattr(profile_identity, 'portable_model_key', lambda model: 'model-key')
+    monkeypatch.setattr(torch.cuda, 'get_device_properties', lambda device: NS(
+        name='test GPU', major=8, minor=6, multi_processor_count=20, total_memory=1234))
+    metadata = dict(source_digest='source', cutlass_digest='cutlass', build_mode='release',
+        cuda_architectures=[86], shape={'state_len': 96}, inference_backend='cutlass')
+    runtime = NS(build_metadata=metadata)
+    contract = NS(graph_hash='graph')
+    options = NS(source_dir=tmp_path)
+    off = shared_profiles.compatibility(contract, object(), runtime, [0], 4096)
+    registry(tmp_path, off)
+    assert shared_profiles.lookup(contract, object(), runtime, options, [0], 4096) is not None
+    runtime.build_metadata = dict(metadata, experimental_index_sort=False)
+    assert shared_profiles.compatibility(contract, object(), runtime, [0], 4096) == off
+    runtime.build_metadata = dict(metadata, experimental_index_sort=True)
+    assert shared_profiles.compatibility(contract, object(), runtime, [0], 4096) != off
+    assert shared_profiles.lookup(contract, object(), runtime, options, [0], 4096) is None
+    runtime.build_metadata = dict(metadata, experimental_index_sort='true')
+    assert shared_profiles.lookup(contract, object(), runtime, options, [0], 4096) is None
+
+
 def test_pipeline_proposal_cannot_change_inference_or_inject_paths():
     from multigpubeamsearch.shared_profiles import pipeline_environment
     env={'BEAM_B_MICRO':'1024','BEAM_ENSEMBLE_INFERENCE_MICRO':'512',

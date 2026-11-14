@@ -20,7 +20,7 @@ def compatibility(contract, model, runtime, devices, beam):
         p=torch.cuda.get_device_properties(device)
         hardware.append(dict(name=p.name,compute=[p.major,p.minor],
             sm_count=p.multi_processor_count,total_memory=p.total_memory))
-    return dict(schema=SCHEMA,graph=contract.graph_hash,models=portable_model_key(model),
+    identity = dict(schema=SCHEMA,graph=contract.graph_hash,models=portable_model_key(model),
         native_source=runtime.build_metadata['source_digest'],
         cutlass_source=runtime.build_metadata.get('cutlass_digest'),
         build_mode=runtime.build_metadata.get('build_mode'),
@@ -28,6 +28,12 @@ def compatibility(contract, model, runtime, devices, beam):
         shape=runtime.build_metadata['shape'],backend=runtime.build_metadata['inference_backend'],
         torch=torch.__version__,cuda=torch.version.cuda,precision='fp16/fp32',
         hardware=hardware,world_size=len(devices),beam=beam)
+    index_sort = runtime.build_metadata.get('experimental_index_sort', False)
+    if type(index_sort) is not bool:
+        raise ValueError('invalid index sort build identity')
+    if index_sort:
+        identity['experimental_index_sort'] = True
+    return identity
 
 
 def _json(path):

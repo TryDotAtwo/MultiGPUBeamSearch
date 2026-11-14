@@ -1,0 +1,39 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+_______________ test_index_sort_cannot_reuse_legacy_off_profile _______________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/pytest-index-profile-red/test_index_sort_cannot_reuse_l0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001DF84433C10>
+
+    def test_index_sort_cannot_reuse_legacy_off_profile(tmp_path, monkeypatch):
+        from types import SimpleNamespace as NS
+        import torch
+        from multigpubeamsearch import profile_identity, shared_profiles
+        monkeypatch.setattr(profile_identity, 'portable_model_key', lambda model: 'model-key')
+        monkeypatch.setattr(torch.cuda, 'get_device_properties', lambda device: NS(
+            name='test GPU', major=8, minor=6, multi_processor_count=20, total_memory=1234))
+        metadata = dict(source_digest='source', cutlass_digest='cutlass', build_mode='release',
+            cuda_architectures=[86], shape={'state_len': 96}, inference_backend='cutlass')
+        runtime = NS(build_metadata=metadata)
+        contract = NS(graph_hash='graph')
+        options = NS(source_dir=tmp_path)
+        off = shared_profiles.compatibility(contract, object(), runtime, [0], 4096)
+        registry(tmp_path, off)
+        assert shared_profiles.lookup(contract, object(), runtime, options, [0], 4096) is not None
+        runtime.build_metadata = dict(metadata, experimental_index_sort=False)
+        assert shared_profiles.compatibility(contract, object(), runtime, [0], 4096) == off
+        runtime.build_metadata = dict(metadata, experimental_index_sort=True)
+>       assert shared_profiles.compatibility(contract, object(), runtime, [0], 4096) != off
+E       AssertionError: assert {'backend': 'cutlass', 'beam': 4096, 'build_mode': 'release', 'cuda': '12.8', ...} != {'backend': 'cutlass', 'beam': 4096, 'build_mode': 'release', 'cuda': '12.8', ...}
+E        +  where {'backend': 'cutlass', 'beam': 4096, 'build_mode': 'release', 'cuda': '12.8', ...} = <function compatibility at 0x000001DF84409260>(namespace(graph_hash='graph'), <object object at 0x000001DFAE730DF0>, namespace(build_metadata={'source_digest': 'source', 'cutlass_digest': 'cutlass', 'build_mode': 'release', 'cuda_architectures': [86], 'shape': {'state_len': 96}, 'inference_backend': 'cutlass', 'experimental_index_sort': True}), [0], 4096)
+E        +    where <function compatibility at 0x000001DF84409260> = <module 'multigpubeamsearch.shared_profiles' from 'D:\\100XH100\\integrations\\cayleypy_native\\multigpubeamsearch\\shared_profiles.py'>.compatibility
+E        +    and   <object object at 0x000001DFAE730DF0> = object()
+
+integrations\cayleypy_native\tests\test_shared_profiles.py:57: AssertionError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_shared_profiles.py::test_index_sort_cannot_reuse_legacy_off_profile
+1 failed, 7 deselected in 2.36s
+Exception ignored in: <function Console.__del__ at 0x000001DF821974C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

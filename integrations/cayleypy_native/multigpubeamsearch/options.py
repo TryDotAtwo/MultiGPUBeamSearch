@@ -32,6 +32,7 @@ class NativeOptions:
     report_calibration: bool = True
     calibration_full_frontier: bool = False
     calibration_discover_capacity: bool = False
+    experimental_index_sort: bool = False
 
     def __post_init__(self):
         if self.solution_mode not in ("first", "collect"):
@@ -62,6 +63,8 @@ class NativeOptions:
                 raise ValueError(f"{name} must be finite and positive")
         if type(self.autotune) is not bool:
             raise ValueError("autotune must be boolean")
+        if type(self.experimental_index_sort) is not bool:
+            raise ValueError("experimental_index_sort must be boolean")
         if type(self.report_calibration) is not bool:
             raise ValueError('report_calibration must be boolean')
         if type(self.calibration_discover_capacity) is not bool:

@@ -1,0 +1,298 @@
+FFFFFF                                                                   [100%]
+================================== FAILURES ===================================
+____________ test_public_index_sort_option_is_explicit_and_boolean ____________
+
+    def test_public_index_sort_option_is_explicit_and_boolean():
+>       assert NativeOptions().experimental_index_sort is False
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'NativeOptions' object has no attribute 'experimental_index_sort'
+
+integrations\cayleypy_native\tests\test_public_index_sort_build.py:16: AttributeError
+_________ test_cmake_index_sort_is_independent_from_other_experiments _________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_cmake_index_sort_is_indep0')
+
+    def test_cmake_index_sort_is_independent_from_other_experiments(tmp_path):
+        contract = SimpleNamespace(state_len=96, move_count=24)
+        programs = dict(cmake='cmake', cxx='c++', nvcc='nvcc')
+>       command = build.configure_command(tmp_path, tmp_path / 'build', tmp_path / 'cutlass',
+            contract, 'mlp', (86,), programs, experimental_index_sort=True)
+E       TypeError: configure_command() got an unexpected keyword argument 'experimental_index_sort'
+
+integrations\cayleypy_native\tests\test_public_index_sort_build.py:27: TypeError
+_____ test_managed_builds_separate_index_mode_and_reject_tampered_receipt _____
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_managed_builds_separate_i0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000021EA2450910>
+
+    def test_managed_builds_separate_index_mode_and_reject_tampered_receipt(tmp_path, monkeypatch):
+        source, cutlass = tmp_path / 'source', tmp_path / 'cutlass'
+        (source / 'tools').mkdir(parents=True)
+        (source / 'CMakeLists.txt').write_text('production_runner')
+        (source / 'tools/production_runner.cu').write_text('production runner')
+        (cutlass / 'include/cutlass').mkdir(parents=True)
+        (cutlass / 'include/cutlass/cutlass.h').write_text('cutlass')
+        graph = SimpleNamespace(state_len=96, move_count=24)
+        model = SimpleNamespace(backend='mlp')
+        programs = dict(cmake='cmake', cxx='c++', nvcc='nvcc')
+        nccl = dict(include_dir='nccl-header', library='nccl-library',
+                    header_sha256='a' * 64, library_sha256='b' * 64)
+        monkeypatch.setattr(build, 'prerequisites', lambda options: programs)
+        monkeypatch.setattr(build, 'toolchain_identity', lambda programs: {'identity': 'test'})
+        monkeypatch.setattr(build, 'discover_nccl', lambda **kwargs: nccl)
+        monkeypatch.setattr(build, '_nccl_identity', lambda *args, **kwargs: nccl)
+        from multigpubeamsearch import backend
+        monkeypatch.setattr(backend, 'child_environment', lambda *args: {})
+        commands = []
+        def fake_process(command, **kwargs):
+            commands.append(command)
+            if '--build' in command:
+                target_dir = Path(command[command.index('--build') + 1])
+                binary = target_dir / 'production_runner'
+                binary.write_bytes(str(target_dir).encode())
+                binary.chmod(0o755)
+        monkeypatch.setattr(backend, 'run_process', fake_process)
+        options = NativeOptions(source_dir=source, cutlass_dir=cutlass, cache_dir=tmp_path / 'cache',
+                                inference_backend='cutlass', autotune=False)
+        off, off_meta = build.ensure_runner(graph, model, options, (86,), tmp_path / 'off')
+>       on_options = replace(options, experimental_index_sort=True)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+integrations\cayleypy_native\tests\test_public_index_sort_build.py:66: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+obj = NativeOptions(source_dir=WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_managed_builds_separate_i0/source')...rontier_max_states=None, report_calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False)
+changes = {'autotune': False, 'build_jobs': 2, 'build_timeout_seconds': 1800.0, 'cache_dir': WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_managed_builds_separate_i0/cache'), ...}
+f = Field(name='calibration_discover_capacity',type='bool',default=False,default_factory=<dataclasses._MISSING_TYPE object...000021E9F2ABF50>,init=True,repr=True,hash=None,compare=True,metadata=mappingproxy({}),kw_only=False,_field_type=_FIELD)
+
+    def replace(obj, /, **changes):
+        """Return a new object replacing specified fields with new values.
+    
+        This is especially useful for frozen classes.  Example usage::
+    
+          @dataclass(frozen=True)
+          class C:
+              x: int
+              y: int
+    
+          c = C(1, 2)
+          c1 = replace(c, x=3)
+          assert c1.x == 3 and c1.y == 2
+        """
+    
+        # We're going to mutate 'changes', but that's okay because it's a
+        # new dict, even if called with 'replace(obj, **my_changes)'.
+    
+        if not _is_dataclass_instance(obj):
+            raise TypeError("replace() should be called on dataclass instances")
+    
+        # It's an error to have init=False fields in 'changes'.
+        # If a field is not in 'changes', read its value from the provided obj.
+    
+        for f in getattr(obj, _FIELDS).values():
+            # Only consider normal fields or InitVars.
+            if f._field_type is _FIELD_CLASSVAR:
+                continue
+    
+            if not f.init:
+                # Error if this field is specified in changes.
+                if f.name in changes:
+                    raise ValueError(f'field {f.name} is declared with '
+                                     'init=False, it cannot be specified with '
+                                     'replace()')
+                continue
+    
+            if f.name not in changes:
+                if f._field_type is _FIELD_INITVAR and f.default is MISSING:
+                    raise ValueError(f"InitVar {f.name!r} "
+                                     'must be specified with replace()')
+                changes[f.name] = getattr(obj, f.name)
+    
+        # Create the new object, which calls __init__() and
+        # __post_init__() (if defined), using all of the init fields we've
+        # added and/or left in 'changes'.  If there are values supplied in
+        # changes that aren't fields, this will correctly raise a
+        # TypeError.
+>       return obj.__class__(**changes)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeOptions.__init__() got an unexpected keyword argument 'experimental_index_sort'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\dataclasses.py:1501: TypeError
+_____________ test_external_runner_must_match_explicit_index_mode _____________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_external_runner_must_matc0')
+
+    def test_external_runner_must_match_explicit_index_mode(tmp_path):
+        graph = SimpleNamespace(state_len=96, move_count=24)
+        model = SimpleNamespace(backend='mlp')
+        runner = tmp_path / 'production_runner'
+        runner.write_bytes(b'fake runner')
+        runner.chmod(0o755)
+        metadata = dict(schema_version=1, shape=build.shape_contract(graph), backend='mlp',
+                        cuda_architectures=[86], binary_sha256=build.file_sha256(runner),
+                        inference_backend='cutlass')
+        (tmp_path / 'native-build.json').write_text(json.dumps(metadata))
+>       opts = NativeOptions(runner_path=runner, inference_backend='cutlass', experimental_index_sort=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeOptions.__init__() got an unexpected keyword argument 'experimental_index_sort'
+
+integrations\cayleypy_native\tests\test_public_index_sort_build.py:92: TypeError
+_______________ test_index_sort_library_matches_verified_runner _______________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_index_sort_library_matche0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000021EF3E6B990>
+
+    def test_index_sort_library_matches_verified_runner(tmp_path, monkeypatch):
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        monkeypatch.setattr(native, 'sys', SimpleNamespace(platform='linux'))
+>       options = replace(options, experimental_index_sort=True)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+integrations\cayleypy_native\tests\test_native_library.py:136: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+obj = NativeOptions(source_dir=WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_index_sort_library_matche0/source')...rontier_max_states=None, report_calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False)
+changes = {'autotune': False, 'build_jobs': 2, 'build_timeout_seconds': 1800.0, 'cache_dir': WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_index_sort_library_matche0/cache'), ...}
+f = Field(name='calibration_discover_capacity',type='bool',default=False,default_factory=<dataclasses._MISSING_TYPE object...000021E9F2ABF50>,init=True,repr=True,hash=None,compare=True,metadata=mappingproxy({}),kw_only=False,_field_type=_FIELD)
+
+    def replace(obj, /, **changes):
+        """Return a new object replacing specified fields with new values.
+    
+        This is especially useful for frozen classes.  Example usage::
+    
+          @dataclass(frozen=True)
+          class C:
+              x: int
+              y: int
+    
+          c = C(1, 2)
+          c1 = replace(c, x=3)
+          assert c1.x == 3 and c1.y == 2
+        """
+    
+        # We're going to mutate 'changes', but that's okay because it's a
+        # new dict, even if called with 'replace(obj, **my_changes)'.
+    
+        if not _is_dataclass_instance(obj):
+            raise TypeError("replace() should be called on dataclass instances")
+    
+        # It's an error to have init=False fields in 'changes'.
+        # If a field is not in 'changes', read its value from the provided obj.
+    
+        for f in getattr(obj, _FIELDS).values():
+            # Only consider normal fields or InitVars.
+            if f._field_type is _FIELD_CLASSVAR:
+                continue
+    
+            if not f.init:
+                # Error if this field is specified in changes.
+                if f.name in changes:
+                    raise ValueError(f'field {f.name} is declared with '
+                                     'init=False, it cannot be specified with '
+                                     'replace()')
+                continue
+    
+            if f.name not in changes:
+                if f._field_type is _FIELD_INITVAR and f.default is MISSING:
+                    raise ValueError(f"InitVar {f.name!r} "
+                                     'must be specified with replace()')
+                changes[f.name] = getattr(obj, f.name)
+    
+        # Create the new object, which calls __init__() and
+        # __post_init__() (if defined), using all of the init fields we've
+        # added and/or left in 'changes'.  If there are values supplied in
+        # changes that aren't fields, this will correctly raise a
+        # TypeError.
+>       return obj.__class__(**changes)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeOptions.__init__() got an unexpected keyword argument 'experimental_index_sort'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\dataclasses.py:1501: TypeError
+______ test_index_sort_runner_mismatch_is_rejected_before_library_build _______
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_index_sort_runner_mismatc0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000021EF3C52ED0>
+
+    def test_index_sort_runner_mismatch_is_rejected_before_library_build(tmp_path, monkeypatch):
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        monkeypatch.setattr(native, 'sys', SimpleNamespace(platform='linux'))
+        with pytest.raises(NativeBackendError, match='index.sort'):
+>           native.ensure_native_library(graph, model, replace(options, experimental_index_sort=True),
+                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                         (86,), tmp_path, runner, metadata)
+
+integrations\cayleypy_native\tests\test_native_library.py:148: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+obj = NativeOptions(source_dir=WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_index_sort_runner_mismatc0/source')...rontier_max_states=None, report_calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False)
+changes = {'autotune': False, 'build_jobs': 2, 'build_timeout_seconds': 1800.0, 'cache_dir': WindowsPath('D:/100XH100/.local/tmp/pytest-index-red/test_index_sort_runner_mismatc0/cache'), ...}
+f = Field(name='calibration_discover_capacity',type='bool',default=False,default_factory=<dataclasses._MISSING_TYPE object...000021E9F2ABF50>,init=True,repr=True,hash=None,compare=True,metadata=mappingproxy({}),kw_only=False,_field_type=_FIELD)
+
+    def replace(obj, /, **changes):
+        """Return a new object replacing specified fields with new values.
+    
+        This is especially useful for frozen classes.  Example usage::
+    
+          @dataclass(frozen=True)
+          class C:
+              x: int
+              y: int
+    
+          c = C(1, 2)
+          c1 = replace(c, x=3)
+          assert c1.x == 3 and c1.y == 2
+        """
+    
+        # We're going to mutate 'changes', but that's okay because it's a
+        # new dict, even if called with 'replace(obj, **my_changes)'.
+    
+        if not _is_dataclass_instance(obj):
+            raise TypeError("replace() should be called on dataclass instances")
+    
+        # It's an error to have init=False fields in 'changes'.
+        # If a field is not in 'changes', read its value from the provided obj.
+    
+        for f in getattr(obj, _FIELDS).values():
+            # Only consider normal fields or InitVars.
+            if f._field_type is _FIELD_CLASSVAR:
+                continue
+    
+            if not f.init:
+                # Error if this field is specified in changes.
+                if f.name in changes:
+                    raise ValueError(f'field {f.name} is declared with '
+                                     'init=False, it cannot be specified with '
+                                     'replace()')
+                continue
+    
+            if f.name not in changes:
+                if f._field_type is _FIELD_INITVAR and f.default is MISSING:
+                    raise ValueError(f"InitVar {f.name!r} "
+                                     'must be specified with replace()')
+                changes[f.name] = getattr(obj, f.name)
+    
+        # Create the new object, which calls __init__() and
+        # __post_init__() (if defined), using all of the init fields we've
+        # added and/or left in 'changes'.  If there are values supplied in
+        # changes that aren't fields, this will correctly raise a
+        # TypeError.
+>       return obj.__class__(**changes)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeOptions.__init__() got an unexpected keyword argument 'experimental_index_sort'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\dataclasses.py:1501: TypeError
+============================== warnings summary ===============================
+tests/test_public_index_sort_build.py::test_managed_builds_separate_index_mode_and_reject_tampered_receipt
+tests/test_public_index_sort_build.py::test_managed_builds_separate_index_mode_and_reject_tampered_receipt
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_public_index_sort_build.py::test_public_index_sort_option_is_explicit_and_boolean
+FAILED integrations\cayleypy_native\tests\test_public_index_sort_build.py::test_cmake_index_sort_is_independent_from_other_experiments
+FAILED integrations\cayleypy_native\tests\test_public_index_sort_build.py::test_managed_builds_separate_index_mode_and_reject_tampered_receipt
+FAILED integrations\cayleypy_native\tests\test_public_index_sort_build.py::test_external_runner_must_match_explicit_index_mode
+FAILED integrations\cayleypy_native\tests\test_native_library.py::test_index_sort_library_matches_verified_runner
+FAILED integrations\cayleypy_native\tests\test_native_library.py::test_index_sort_runner_mismatch_is_rejected_before_library_build
+6 failed, 13 deselected, 2 warnings in 5.52s

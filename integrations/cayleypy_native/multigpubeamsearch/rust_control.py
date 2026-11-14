@@ -35,8 +35,13 @@ def worker_executable():
 
 
 def options_descriptor(options):
+    values = asdict(options)
+    # Omission is also the Rust default, and keeps OFF requests readable by a
+    # previously installed Rust extension that predates the experimental key.
+    if not values['experimental_index_sort']:
+        values.pop('experimental_index_sort')
     return {name: str(value) if isinstance(value, Path) else value
-            for name, value in asdict(options).items()}
+            for name, value in values.items()}
 
 
 def _inference_request(contract, model, runtime, options, devices, beam_width,

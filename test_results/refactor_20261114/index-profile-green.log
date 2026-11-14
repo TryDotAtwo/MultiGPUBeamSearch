@@ -1,0 +1,9 @@
+........                                                                 [100%]
+============================== warnings summary ===============================
+tests/test_shared_profiles.py::test_pipeline_proposal_cannot_change_inference_or_inject_paths
+tests/test_shared_profiles.py::test_pipeline_proposal_cannot_change_inference_or_inject_paths
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+8 passed, 2 warnings in 5.16s

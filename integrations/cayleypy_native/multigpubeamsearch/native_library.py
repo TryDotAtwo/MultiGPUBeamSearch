@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 from .backend import child_environment, run_process
-from .build import (configure_command, discover_nccl, file_sha256, prerequisites, source_digest,
+from .build import (_validate_index_sort, configure_command, discover_nccl, file_sha256, prerequisites, source_digest,
                     toolchain_identity, validate_runner)
 from .errors import NativeBackendError, NativeUnavailable
 from .rust_control import worker_executable
@@ -75,6 +75,7 @@ def ensure_native_library(contract, model, options, architectures, run_dir, runn
     runner, run_dir = Path(runner).resolve(), Path(run_dir).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
     metadata = validate_runner(runner, contract, model.backend, tuple(architectures))
+    _validate_index_sort(metadata, options.experimental_index_sort)
     resolved_backend = metadata.get('inference_backend')
     if (metadata != runner_metadata or resolved_backend not in ('cutlass', 'libtorch')
             or options.inference_backend not in ('auto', resolved_backend)):
@@ -99,6 +100,8 @@ def ensure_native_library(contract, model, options, architectures, run_dir, runn
                          cuda_architectures=metadata['cuda_architectures'], source_digest=metadata['source_digest'],
                          cutlass_digest=metadata['cutlass_digest'], toolchain=metadata['toolchain'], nccl=metadata['nccl'],
                          torch=metadata.get('torch'))
+    if options.experimental_index_sort:
+        specification['experimental_index_sort'] = True
 
     def validated():
         try:
@@ -131,7 +134,8 @@ def ensure_native_library(contract, model, options, architectures, run_dir, runn
         run_process(configure_command(options.source_dir, build_dir, options.cutlass_dir,
                                       contract, model.backend, tuple(metadata['cuda_architectures']), programs,
                                       nccl=metadata['nccl'], inference_backend=resolved_backend,
-                                      calibration=bool(metadata.get('calibration_binary_name'))),
+                                      calibration=bool(metadata.get('calibration_binary_name')),
+                                      experimental_index_sort=options.experimental_index_sort),
                     cwd=run_dir, env=env, timeout=options.build_timeout_seconds,
                     log_path=run_dir / 'native-library-configure.log')
         run_process([programs['cmake'], '--build', str(build_dir), '--target', target,

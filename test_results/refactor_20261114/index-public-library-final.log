@@ -1,0 +1,13 @@
+..                                                                       [100%]
+============================== warnings summary ===============================
+tests/test_native_library.py::test_index_sort_library_matches_verified_runner
+tests/test_native_library.py::test_index_sort_library_matches_verified_runner
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2 passed, 13 deselected, 2 warnings in 5.15s
+Exception ignored in: <function Console.__del__ at 0x00000157A89634C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

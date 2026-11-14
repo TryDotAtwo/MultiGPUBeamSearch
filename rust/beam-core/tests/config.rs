@@ -10,6 +10,10 @@ fn public_options_roundtrip_and_validation() {
     assert_eq!(value["inference_backend"], "auto");
     assert_eq!(value["solution_mode"], "first");
     assert_eq!(value["calibration_max_batch"], 8192);
+    assert_eq!(value["experimental_index_sort"], false);
+    let enabled: NativeOptions =
+        serde_json::from_value(json!({"experimental_index_sort": true})).unwrap();
+    assert!(enabled.experimental_index_sort);
     let decoded: NativeOptions = serde_json::from_value(value.clone()).unwrap();
     assert_eq!(decoded, options);
     for (field, invalid) in [
@@ -38,6 +42,7 @@ fn public_options_roundtrip_and_validation() {
         ("build_jobs", json!(true)),
         ("touch_bfs_max_entries", json!(-1)),
         ("unexpected", json!(1)),
+        ("experimental_index_sort", json!("true")),
     ] {
         let mut bad = value.clone();
         bad[field] = invalid;

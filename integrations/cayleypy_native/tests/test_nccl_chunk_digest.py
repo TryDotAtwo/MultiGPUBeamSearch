@@ -95,7 +95,8 @@ def test_opted_in_prepared_runner_rejects_changed_nccl(tmp_path, monkeypatch, ch
     metadata = {"inference_backend": "cutlass", "nccl": build._nccl_identity(include, library)}
     monkeypatch.setattr(build, "validate_runner", lambda *args: metadata)
     model = SimpleNamespace(backend="mlp")
-    options = SimpleNamespace(runner_path=tmp_path / "runner", inference_backend="cutlass")
+    options = SimpleNamespace(runner_path=tmp_path / "runner", inference_backend="cutlass",
+                              experimental_index_sort=False)
     cache = ChunkDigestCache(chunk_bytes=4, workers=2)
     assert build.ensure_runner(None, model, options, (86,), tmp_path, nccl_digest_cache=cache)[1] == metadata
     target = library if changed == "library" else header

@@ -773,8 +773,26 @@ digest depends on the collision resistance of each block's SHA-256. NCCL headers
 are checked separately, and a file change detected during reading fails the
 check. The cold call does extra hashing, and competing CPU work may make this
 mode slower. For a prepared runner, the recorded header and library must remain
-available and match its build receipt. It has not yet passed a full GPU-search
-performance comparison.
+available and match its build receipt. On one two-RTX-3060 synthetic fixture,
+five paired full repeated calls showed lower wall time; this does not establish
+an isolated GPU-step speedup or performance on other profiles.
+
+The existing Stream 4 index-sort implementation can be explicitly selected for
+a managed build:
+
+```python
+options = NativeOptions(num_gpus=2, experimental_index_sort=True)
+```
+
+The default remains off. The option independently selects Stream 4 index sort;
+it does not enable the other experimental CUDA sort/scan/partition switches.
+Managed runners and the Rust CUDA library must agree on this setting, and the
+setting participates in the build cache identity. A prepared external runner
+requires a build receipt that declares the matching option. Changing the option
+in a resident session releases the old worker group. The Rust owner also requires
+a matching rebuilt Rust extension; older versions do not recognize the enabled
+option. This switch is experimental and does not imply a speedup or validation
+on a user's workload.
 
 
 ### Shared profiles from GitHub

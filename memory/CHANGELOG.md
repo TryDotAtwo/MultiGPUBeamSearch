@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-14 public experimental Stream 4 index-sort option
+- Added explicit `NativeOptions(experimental_index_sort=True)` wiring for the
+  existing CUDA index sort, with separate managed build identities, runner and
+  native-library mode checks, separate shared-profile compatibility, and typed
+  Rust configuration. The default and
+  the other CUDA experiment switches remain unchanged. The OFF Rust descriptor
+  remains readable by the earlier extension.
+- CPU contract/regression evidence and outstanding hardware checks are in
+  `test_results/refactor_20261114/STAGE_PUBLIC_INDEX_SORT.md`.
+
 ## 2026-11-14 two-RTX-3060 NCCL identity validation
 - Linux regression: 570 passed, 9 skipped. CUTLASS and LibTorch public-session
   fixtures passed on one and two RTX 3060 devices, including session reuse and

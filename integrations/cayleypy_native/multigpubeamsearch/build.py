@@ -180,9 +180,17 @@ def validate_runner(runner: Path, contract, backend: str, architectures: tuple[i
     return metadata
 
 
+def _validate_index_sort(metadata: dict, requested: bool) -> None:
+    """Legacy receipts omit this field and represent the default OFF build."""
+    observed = metadata.get("experimental_index_sort", False)
+    if type(observed) is not bool or observed != requested:
+        raise NativeBackendError("runner index sort mode does not match the requested build")
+
+
 def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                       backend: str, architectures: tuple[int, ...], programs: dict[str, str],
-                      *, nccl: dict[str, str] | None = None, inference_backend="cutlass", calibration=False) -> list[str]:
+                      *, nccl: dict[str, str] | None = None, inference_backend="cutlass", calibration=False,
+                      experimental_index_sort=False) -> list[str]:
     shape = shape_contract(contract)
     command = [programs["cmake"], "-S", str(source), "-B", str(build_dir),
                "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_CXX_COMPILER={programs['cxx']}",
@@ -192,7 +200,7 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                f"-DBEAM_MOVE_COUNT={shape['move_count']}",
                "-DBEAM_CUDA_ARCHITECTURES=" + ";".join(map(str, architectures)),
                "-DBEAM_EXPERIMENTAL_RADIX128=OFF",
-               "-DBEAM_EXPERIMENTAL_INDEX_SORT=OFF",
+               "-DBEAM_EXPERIMENTAL_INDEX_SORT=" + ("ON" if experimental_index_sort else "OFF"),
                "-DBEAM_EXPERIMENTAL_STREAM4_SCAN=OFF",
                "-DBEAM_EXPERIMENTAL_OWNER_RADIX=OFF",
                "-DBEAM_EXPERIMENTAL_SCORE_BITS=OFF",
@@ -213,6 +221,7 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
 def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_dir: Path, *, nccl_digest_cache=None) -> tuple[Path, dict[str, Any]]:
     if options.runner_path is not None:
         metadata = validate_runner(options.runner_path, contract, model.backend, architectures)
+        _validate_index_sort(metadata, options.experimental_index_sort)
         observed = metadata.get("inference_backend", "cutlass")
         if observed != options.inference_backend:
             raise NativeUnavailable("existing runner inference backend does not match GPU selection")
@@ -245,6 +254,9 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
                      "toolchain": toolchain_identity(programs), "target": target, "nccl": nccl,
                      "build_mode": "release-debug-logs-v1", "inference_backend": options.inference_backend,
                      'calibration_binary_name': calibration_target}
+    if options.experimental_index_sort:
+        # Omission for the default preserves the identity of legacy OFF builds.
+        specification['experimental_index_sort'] = True
     if calibration_target == 'stream1_ensemble_benchmark':
         helper_source = (source / 'tools' / 'stream1_ensemble_benchmark.cpp').read_text(encoding='utf-8')
         specification['calibration_protocol'] = 'json-session-v1' if '--session' in helper_source else 'oneshot'
@@ -263,7 +275,11 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
     build_dir = options.cache_dir / "builds" / key
     runner = build_dir / target
     if (build_dir / "native-build.json").is_file():
-        return runner, validate_runner(runner, contract, model.backend, architectures)
+        metadata = validate_runner(runner, contract, model.backend, architectures)
+        _validate_index_sort(metadata, options.experimental_index_sort)
+        if metadata.get('build_key') != key or any(metadata.get(k) != v for k, v in specification.items()):
+            raise NativeBackendError("cached native runner build key or provenance does not match the request")
+        return runner, metadata
     build_dir.parent.mkdir(parents=True, exist_ok=True)
     lock = build_dir.parent / (key + ".lock")
     try:
@@ -279,7 +295,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         # wheel, overriding our device-specific CMake CUDA architecture list.
         env["TORCH_CUDA_ARCH_LIST"] = ";".join(f"{sm // 10}.{sm % 10}" for sm in architectures)
         run_process(configure_command(source, build_dir, cutlass, contract, model.backend, architectures, programs, nccl=nccl,
-                                     inference_backend=options.inference_backend, calibration=bool(calibration_target)),
+                                     inference_backend=options.inference_backend, calibration=bool(calibration_target),
+                                     experimental_index_sort=options.experimental_index_sort),
                     cwd=run_dir, env=env, timeout=options.build_timeout_seconds, log_path=run_dir / "cmake-configure.log")
         targets=[target]+([calibration_target] if calibration_target else [])
         run_process([programs["cmake"], "--build", str(build_dir), "--target", *targets,

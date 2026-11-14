@@ -87,6 +87,7 @@ def test_worker_failure_closes_whole_group(tmp_path):
 
 @pytest.mark.parametrize("world", [1, 2])
 def test_backend_reuses_only_compatible_resources_and_replays(tmp_path, monkeypatch, world):
+    from dataclasses import replace
     from types import SimpleNamespace
     from multigpubeamsearch import models
     from multigpubeamsearch.options import NativeOptions, NativeOutcome
@@ -117,12 +118,16 @@ def test_backend_reuses_only_compatible_resources_and_replays(tmp_path, monkeypa
         first=session.run(*args,runtime=runtime)
         second=session.run(*args,runtime=runtime)
         assert len(allocations)==1 and second.metadata['persistent_session']['reused']
+        changed_args = (*args[:3], replace(args[3], experimental_index_sort=True), *args[4:])
+        switched = session.run(*changed_args, runtime=runtime)
+        assert len(allocations) == 2 and allocations[0].closed
+        assert not switched.metadata['persistent_session']['reused']
         model.artifact_hash='changed'
-        session.run(*args,runtime=runtime)
-        assert len(allocations)==2 and allocations[0].closed
+        session.run(*changed_args,runtime=runtime)
+        assert len(allocations)==3 and allocations[1].closed
         contract.replay=lambda path:False
         with pytest.raises(NativeBackendError,match='replay'):
-            session.run(*args,runtime=runtime)
+            session.run(*changed_args,runtime=runtime)
         assert allocations[-1].closed
 
 

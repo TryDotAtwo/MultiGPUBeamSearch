@@ -44,6 +44,7 @@ pub struct NativeOptions {
     pub report_calibration: bool,
     pub calibration_full_frontier: bool,
     pub calibration_discover_capacity: bool,
+    pub experimental_index_sort: bool,
 }
 impl Default for NativeOptions {
     fn default() -> Self {
@@ -72,6 +73,7 @@ impl Default for NativeOptions {
             report_calibration: true,
             calibration_full_frontier: false,
             calibration_discover_capacity: false,
+            experimental_index_sort: false,
         }
     }
 }
