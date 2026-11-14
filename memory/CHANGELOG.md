@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-14 two-RTX-3060 NCCL identity validation
+- Linux regression: 570 passed, 9 skipped. CUTLASS and LibTorch public-session
+  fixtures passed on one and two RTX 3060 devices, including session reuse and
+  model/beam changes. Two setup failures are preserved with the successful retry.
+- Five alternating pairs of complete repeated synthetic FP16 Hamming Rust calls
+  had median wall times of 0.580 s baseline and 0.428 s with the experimental
+  NCCL option; worker medians were approximately equal. The option remains
+  experimental: this measurement is not an isolated GPU-step benchmark or
+  acceptance for other models or accelerators. Evidence and limits are in
+  `test_results/refactor_20261114/STAGE_NCCL_IDENTITY.md`.
+
 ## 2026-11-08 experimental Rust resident session
 - Added explicit `NativeSession(engine="rust")` routing for whole searches to
   the Rust rank/session owner and native C ABI library. The existing default

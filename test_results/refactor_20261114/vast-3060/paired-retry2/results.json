@@ -1,0 +1,233 @@
+{
+  "scope": "five alternating pairs of complete six-depth two-GPU public calls; cold calls share a build cache",
+  "width": 4096,
+  "max_steps": 6,
+  "num_gpus": 2,
+  "model": "synthetic Hamming FP16",
+  "median_wall_seconds": {
+    "baseline": 0.5798425240209326,
+    "parallel": 0.42823409603442997
+  },
+  "gpu_memory_mib_with_both_sessions": [
+    "636, 12288",
+    "613, 12288"
+  ],
+  "rows": [
+    {
+      "mode": "baseline",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 2.0290797259658575,
+      "worker_seconds": 0.773104275,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/5d2c812d330d43aba7131551c13459d0",
+      "path": null,
+      "pids": [
+        2550,
+        2551
+      ]
+    },
+    {
+      "mode": "parallel",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 1.9473103369819,
+      "worker_seconds": 0.743065485,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/056a5665d9ba4b78bbcf3adfeacee35c",
+      "path": null,
+      "pids": [
+        2595,
+        2596
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "warmup",
+      "pair": null,
+      "wall_seconds": 0.5922962609911337,
+      "worker_seconds": 0.232325741,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/1a21c3eed88f4cf09da4f44d1642e5d9",
+      "path": null,
+      "pids": [
+        2550,
+        2551
+      ]
+    },
+    {
+      "mode": "parallel",
+      "phase": "warmup",
+      "pair": null,
+      "wall_seconds": 0.4250434360001236,
+      "worker_seconds": 0.232456273,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/1f2056dd4deb4102a4e3f8a63b474341",
+      "path": null,
+      "pids": [
+        2595,
+        2596
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 0,
+      "wall_seconds": 0.5798425240209326,
+      "worker_seconds": 0.222484037,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/9271a92a845343bda64ca085e84da4a7",
+      "path": null,
+      "pids": [
+        2550,
+        2551
+      ]
+    },
+    {
+      "mode": "parallel",
+      "phase": "repeat",
+      "pair": 0,
+      "wall_seconds": 0.42794502701144665,
+      "worker_seconds": 0.23271182,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/d63a939a51b64205a2dd34b9a9ae686b",
+      "path": null,
+      "pids": [
+        2595,
+        2596
+      ]
+    },
+    {
+      "mode": "parallel",
+      "phase": "repeat",
+      "pair": 1,
+      "wall_seconds": 0.42045331303961575,
+      "worker_seconds": 0.222411194,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/98f0930ee3da4245ae9ebf54dcd949a5",
+      "path": null,
+      "pids": [
+        2595,
+        2596
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 1,
+      "wall_seconds": 0.5770805439678952,
+      "worker_seconds": 0.232762872,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/bb8451044f7c44ebb6fddc48b3e26ede",
+      "path": null,
+      "pids": [
+        2550,
+        2551
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 2,
+      "wall_seconds": 0.5627234460553154,
+      "worker_seconds": 0.222368102,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/e31fc25d090340b98967dcf9f75aa566",
+      "path": null,
+      "pids": [
+        2550,
+        2551
+      ]
+    },
+    {
+      "mode": "parallel",
+      "phase": "repeat",
+      "pair": 2,
+      "wall_seconds": 0.42823409603442997,
+      "worker_seconds": 0.22386597,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/01a93d8bc9b249a69b4da711d2e40b4a",
+      "path": null,
+      "pids": [
+        2595,
+        2596
+      ]
+    },
+    {
+      "mode": "parallel",
+      "phase": "repeat",
+      "pair": 3,
+      "wall_seconds": 0.4318850749405101,
+      "worker_seconds": 0.2326461,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/9aa209a2d21848ebbea3379a2b755fa2",
+      "path": null,
+      "pids": [
+        2595,
+        2596
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 3,
+      "wall_seconds": 0.5874700080603361,
+      "worker_seconds": 0.232345227,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/ad7cbf52371f4b228c822eb27f9091f4",
+      "path": null,
+      "pids": [
+        2550,
+        2551
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 4,
+      "wall_seconds": 0.5908854139270261,
+      "worker_seconds": 0.232684442,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/5ca3d5d123c64aff8bfb55e013fbd19a",
+      "path": null,
+      "pids": [
+        2550,
+        2551
+      ]
+    },
+    {
+      "mode": "parallel",
+      "phase": "repeat",
+      "pair": 4,
+      "wall_seconds": 0.4300664300099015,
+      "worker_seconds": 0.233088888,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/7de458e93d6c440c8a80c0884742a2d2",
+      "path": null,
+      "pids": [
+        2595,
+        2596
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "solved",
+      "pair": null,
+      "wall_seconds": 0.43465753097552806,
+      "worker_seconds": 0.081398537,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/ada791f927084374ab9cfb0ee1805698",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "pids": [
+        2550,
+        2551
+      ]
+    },
+    {
+      "mode": "parallel",
+      "phase": "solved",
+      "pair": null,
+      "wall_seconds": 0.28443536593113095,
+      "worker_seconds": 0.081488003,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/2fbaf0e22ce648cd8c96349846cbc725",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "pids": [
+        2595,
+        2596
+      ]
+    }
+  ]
+}

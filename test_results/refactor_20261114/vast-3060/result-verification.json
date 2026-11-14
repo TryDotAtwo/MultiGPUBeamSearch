@@ -1,0 +1,17 @@
+{
+  "case_counts": {
+    "cutlass": 24,
+    "libtorch": 24
+  },
+  "pair_rows": 16,
+  "legal_paths_checked": true,
+  "paired_repeats_per_mode": 5,
+  "median_wall_seconds": {
+    "baseline": 0.5798425240209326,
+    "parallel": 0.42823409603442997
+  },
+  "median_worker_seconds": {
+    "baseline": 0.232345227,
+    "parallel": 0.2326461
+  }
+}

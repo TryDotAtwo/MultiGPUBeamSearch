@@ -1,0 +1,30 @@
+{
+  "archive_sha256": "e0ba5344fd25e36e02c7e8345f8033ccd48cb7ba83bef243a4f1942d43ccf7b3",
+  "records": 2288,
+  "blobs": 659,
+  "omitted": 39,
+  "extracted": [
+    "beam-results/nccl-identity-20261114/commit.txt",
+    "beam-results/nccl-identity-20261114/cpu-tests.log",
+    "beam-results/nccl-identity-20261114/gpu-cutlass-retry.log",
+    "beam-results/nccl-identity-20261114/gpu-cutlass-retry2.log",
+    "beam-results/nccl-identity-20261114/gpu-cutlass-retry2/results.json",
+    "beam-results/nccl-identity-20261114/gpu-cutlass.log",
+    "beam-results/nccl-identity-20261114/gpu-libtorch-retry2.log",
+    "beam-results/nccl-identity-20261114/gpu-libtorch-retry2/results.json",
+    "beam-results/nccl-identity-20261114/gpus.csv",
+    "beam-results/nccl-identity-20261114/inputs-after.sha256",
+    "beam-results/nccl-identity-20261114/inputs-before.sha256",
+    "beam-results/nccl-identity-20261114/paired-retry2.log",
+    "beam-results/nccl-identity-20261114/paired-retry2/results.json",
+    "beam-results/nccl-identity-20261114/root-inputs-verified.txt",
+    "beam-results/nccl-identity-20261114/root-inputs.sha256",
+    "beam-results/nccl-identity-20261114/software.txt",
+    "beam-results/nccl-identity-20261114/status.txt",
+    "nccl-identity-run.log"
+  ],
+  "restored_samples": [
+    "beam-results/nccl-identity-20261114/gpu-cutlass-retry/alternate/hidden_bias.fp16",
+    "beam-results/public-rust/gpu-cutlass/cache/runs/01a93d8bc9b249a69b4da711d2e40b4a/native.log"
+  ]
+}

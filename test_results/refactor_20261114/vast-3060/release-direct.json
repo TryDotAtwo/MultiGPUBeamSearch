@@ -1,0 +1,15 @@
+{
+  "instance": 60625931,
+  "label": "codex-beam-nccl-direct-20261114-4e72",
+  "before": {
+    "id": 60625931,
+    "label": "codex-beam-nccl-direct-20261114-4e72",
+    "actual_status": "running",
+    "duration": 2087.0719799995422,
+    "dph_total": 0.16148148148148148,
+    "start_date": 1794648080.7816892
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794650204.263666
+}

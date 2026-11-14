@@ -1,0 +1,24 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/public_rust_session_gpu.py", line 103, in <module>
+    main()
+  File "/workspace/beam-work/tests/public_rust_session_gpu.py", line 67, in main
+    result = session.beam_search(graph, native_options=selected,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/persistent.py", line 86, in beam_search
+    return beam_search(graph,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/dispatch.py", line 282, in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/dispatch.py", line 223, in _search
+    runtime = prepare_runtime(contract, model, options, run_dir, devices, **runtime_kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/backend.py", line 188, in prepare_runtime
+    runner, metadata = ensure_runner(contract, model, options, architectures, run_dir,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/build.py", line 232, in ensure_runner
+    programs = prerequisites(options)
+               ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/build.py", line 76, in prerequisites
+    raise NativeUnavailable("building native requires an explicit valid source_dir")
+multigpubeamsearch.errors.NativeUnavailable: building native requires an explicit valid source_dir
