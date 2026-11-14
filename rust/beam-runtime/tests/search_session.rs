@@ -33,7 +33,7 @@ while not (directory/'stop').exists():
             center: vec![0, 1, 2, 3],
             generators: vec![vec![1, 0, 2, 3], vec![0, 1, 3, 2]],
         },
-        graph_hash: "a".repeat(64),
+        graph_hash: "0dfd25a031f018028e013a6cbbf83b3588c61b5b26897bb5321d117d7d3cca8d".into(),
         model_artifact_hash: "b".repeat(64),
         model_backend: "mlp".into(),
         runtime_build: json!({"binary_sha256":"c".repeat(64)}),
@@ -132,6 +132,21 @@ while not (directory/'stop').exists():
         Some(65)
     );
     assert_ne!(session.pids(), previous);
+    identity.graph.center.swap(0, 1);
+    let missing = root.join("stale-graph-must-not-be-created");
+    let err = session
+        .run(
+            &identity,
+            &launch,
+            &identity.graph.center,
+            &missing,
+            Duration::from_secs(5),
+            &metadata,
+        )
+        .unwrap_err();
+    assert!(err.to_string().contains("graph hash"));
+    assert!(session.pids().is_empty());
+    assert!(!missing.exists());
     session.close().unwrap();
     assert!(session.pids().is_empty());
     fs::remove_dir_all(root).unwrap();
@@ -160,7 +175,7 @@ while not (directory/'stop').exists():
             center: vec![0, 1],
             generators: vec![vec![1, 0]],
         },
-        graph_hash: "a".repeat(64),
+        graph_hash: "47d5862a95983115a9c24781d00319694a06c0055a933113ffdee8c5ffb72309".into(),
         model_artifact_hash: "b".repeat(64),
         model_backend: "mlp".into(),
         runtime_build: json!({"binary_sha256":"c".repeat(64)}),

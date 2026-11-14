@@ -41,7 +41,8 @@ with tempfile.TemporaryDirectory() as tmp:
         f'Path({str(pidfile)!r}).write_text(str(os.getpid()))\n'
         'directory=Path(os.environ["BEAM_SESSION_DIR"])\n'
         'while not (directory/"stop").exists():time.sleep(.002)\n')
-    identity=dict(graph=dict(center=[0,1],generators=[[1,0]]),graph_hash='a'*64,
+    identity=dict(graph=dict(center=[0,1],generators=[[1,0]]),
+        graph_hash='47d5862a95983115a9c24781d00319694a06c0055a933113ffdee8c5ffb72309',
         model_artifact_hash='b'*64,model_backend='mlp',runtime_build=dict(binary_sha256='c'*64),
         devices=[0],beam_width=64,max_steps=1,options={},cuda_visible_devices=None,cuda_device_order=None)
     command=[sys.executable,str(worker)]

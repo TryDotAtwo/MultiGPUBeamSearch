@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-15 Rust permutation graph identity validation
+- Rust `SearchSession` now recomputes the CayleyPy checkpoint SHA-256 from the
+  ordered permutations and center before accepting an identity, including
+  trivial requests. A stale hash returns an error and releases resident ranks.
+  The digest is streamed without constructing another whole graph JSON buffer.
+  This does not bind the file subsequently read by the native runner or apply
+  to CNOT. Existing valid public graph hashes retain their format.
+- Linux Rust workspace, release PyO3/worker, cancellation, and 643 Python
+  integration tests passed (9 skipped). Four bounded public Rust-session calls
+  on one/two RTX 3060s returned independently replayed paths and reused the
+  expected resident PIDs. This is not a throughput or sanitizer result.
+  Source-bound evidence, limitations and costs are in
+  `test_results/refactor_20261114/STAGE_RUST_GRAPH_CONTRACT.md`.
+
 ## 2026-11-14 size-bound Rust MLP launch verification
 - The existing default-OFF Rust MLP snapshot path now binds the previously
   validated manifest and tensor lengths to bounded streaming SHA-256 checks,

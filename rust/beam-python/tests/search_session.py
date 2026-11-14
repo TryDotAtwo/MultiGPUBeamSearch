@@ -1,5 +1,6 @@
 """Native result validation and atomic cancellation through the thin adapter."""
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -19,11 +20,26 @@ if '--resident-protocol-info' in sys.argv:
 directory=Path(os.environ['BEAM_SESSION_DIR'])
 while not (directory/'stop').exists():time.sleep(.002)
 ''')
-    identity=dict(graph=dict(center=[0,1],generators=[[1,0]]),graph_hash='a'*64,
+    identity=dict(graph=dict(center=[0,1],generators=[[1,0]]),
+        graph_hash='47d5862a95983115a9c24781d00319694a06c0055a933113ffdee8c5ffb72309',
         model_artifact_hash='b'*64,model_backend='mlp',runtime_build=dict(binary_sha256='c'*64),
         devices=[0],beam_width=64,max_steps=1,options={},cuda_visible_devices=None,cuda_device_order=None)
     command=[sys.executable,str(worker)]
     launch=dict(command=command,protocol_command=command+['--resident-protocol-info'],environment=dict(os.environ),cwd=str(root))
+    for size in (1,2,11,128,129,150):
+        center=[255 if size>128 and i%5==0 else i%4 for i in range(size)]
+        generators=[list(range(size)),list(reversed(range(size)))]
+        data=dict(central_state=center,generators=generators,generators_type='PERMUTATION')
+        digest=hashlib.sha256(json.dumps(data,sort_keys=True).encode()).hexdigest()
+        example=dict(identity,graph=dict(center=center,generators=generators),graph_hash=digest)
+        check=runtime.SearchSession();missing=root/f'no-files-{size}'
+        solved=json.loads(check.run(json.dumps(example),json.dumps(launch),center,missing,1.,'{}'))
+        assert solved['path']==[] and not missing.exists()
+        example['graph_hash']='0'*64 if digest!='0'*64 else '1'*64
+        try:check.run(json.dumps(example),json.dumps(launch),center,missing,1.,'{}')
+        except RuntimeError as error:assert 'graph hash' in str(error),str(error)
+        else:raise AssertionError('stale Python graph hash was accepted')
+        assert check.pids==[] and not missing.exists();check.close()
     owner=runtime.SearchSession();errors=[]
     def search():
         try:owner.run(json.dumps(identity),json.dumps(launch),[1,0],root,30.,'{}')
