@@ -293,9 +293,19 @@ def test_incompatible_resident_relaunch_uses_a_fresh_run_snapshot(fixture, monke
         assert first.native_metadata['model_snapshot']['snapshot_dir'] != second.native_metadata['model_snapshot']['snapshot_dir']
 
 
-def test_retained_snapshot_modified_during_runtime_preparation_never_reaches_workers(fixture, monkeypatch):
+@pytest.mark.parametrize('engine', ['python', 'rust'])
+def test_retained_snapshot_modified_during_runtime_preparation_never_reaches_workers(fixture, monkeypatch, engine):
     from multigpubeamsearch.persistent import current_session
 
+    if engine == 'rust':
+        from multigpubeamsearch.errors import NativeUnavailable
+        from multigpubeamsearch.rust_control import extension
+        try:
+            available = hasattr(extension(), 'MlpSnapshotStore')
+        except NativeUnavailable:
+            available = False
+        if not available:
+            pytest.skip('matching Rust snapshot extension is not installed')
     _, _, _, search = fixture
     launches, submits = [], []
     class Workers:
@@ -315,8 +325,10 @@ def test_retained_snapshot_modified_during_runtime_preparation_never_reaches_wor
                                   'profile': {}, 'terminal_records': 1})
         return session.run(execute, contract, prepared, options, width, depth, run_dir, devices, runtime=runtime)
     monkeypatch.setattr(dispatch, 'run_native', run)
-    with NativeSession(experimental_reuse_model_snapshot=True) as session:
+    with NativeSession(engine=engine, experimental_reuse_model_snapshot=True) as session:
         first = search(session)
+        if engine == 'rust':
+            assert first.native_metadata['model_snapshot']['owner'] == 'rust'
         snapshot = Path(first.native_metadata['model_snapshot']['snapshot_dir'])
         def prepare(*args, **kwargs):
             (snapshot / 'output_bias.fp16').write_bytes(b'\x00\x3c')

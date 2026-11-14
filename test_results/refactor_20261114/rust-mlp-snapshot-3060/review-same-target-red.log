@@ -1,0 +1,22 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/mlp_snapshot.rs (/workspace/target/debug/build/beam-runtime/9e0bae8e9f249675/out/mlp_snapshot-9e0bae8e9f249675)
+
+running 1 test
+test already_prepared_source_at_target_is_reused_without_a_copy ... FAILED
+
+failures:
+
+---- already_prepared_source_at_target_is_reused_without_a_copy stdout ----
+
+thread 'already_prepared_source_at_target_is_reused_without_a_copy' (3036) panicked at rust/beam-runtime/tests/mlp_snapshot.rs:164:71:
+called `Result::unwrap()` on an `Err` value: Message("private native weight snapshot already exists at /workspace/tmp/beam-mlp-snapshot-3035-0/weights")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    already_prepared_source_at_target_is_reused_without_a_copy
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p beam-runtime --test mlp_snapshot`

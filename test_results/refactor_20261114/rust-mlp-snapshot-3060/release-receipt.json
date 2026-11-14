@@ -1,0 +1,15 @@
+{
+  "instance": 60658129,
+  "label": "codex-beam-rust-snapshot-20261114-74b2",
+  "before": {
+    "id": 60658129,
+    "label": "codex-beam-rust-snapshot-20261114-74b2",
+    "actual_status": "running",
+    "duration": 4511.237288475037,
+    "dph_total": 0.13481481481481483,
+    "start_date": 1794667147.76449
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794671718.4800768
+}

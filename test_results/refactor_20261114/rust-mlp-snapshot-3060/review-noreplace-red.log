@@ -1,0 +1,9 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0425]: cannot find function `publish` in this scope
+   --> rust/beam-runtime/src/mlp_snapshot.rs:294:17
+    |
+294 |         assert!(publish(&staging, &target).is_err());
+    |                 ^^^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `beam-runtime` (lib test) due to 1 previous error

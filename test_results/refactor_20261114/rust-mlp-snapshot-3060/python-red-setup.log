@@ -1,0 +1,31 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_rust_session_delegates_snapshot_copy_reuse_and_refresh __________
+integrations/cayleypy_native/multigpubeamsearch/model_snapshot.py:45: in prepare
+    copied_bytes = sum((model.weights_dir / name).stat().st_size for name in model.artifact_files)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations/cayleypy_native/multigpubeamsearch/model_snapshot.py:45: in <genexpr>
+    copied_bytes = sum((model.weights_dir / name).stat().st_size for name in model.artifact_files)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/conda/lib/python3.11/pathlib.py:1013: in stat
+    return os.stat(self, follow_symlinks=follow_symlinks)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/workspace/tmp/rust-snapshot-python-red/test_rust_session_delegates_sn0/source/manifest.json'
+
+The above exception was the direct cause of the following exception:
+integrations/cayleypy_native/tests/test_rust_model_snapshot.py:43: in test_rust_session_delegates_snapshot_copy_reuse_and_refresh
+    first = cache.prepare(model, contract, tmp_path / 'run1', cache_dir)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations/cayleypy_native/multigpubeamsearch/model_snapshot.py:47: in prepare
+    raise NativeBackendError(f"could not inspect native model snapshot inputs: {error}") from error
+E   multigpubeamsearch.errors.NativeBackendError: could not inspect native model snapshot inputs: [Errno 2] No such file or directory: '/workspace/tmp/rust-snapshot-python-red/test_rust_session_delegates_sn0/source/manifest.json'
+_________ test_rust_snapshot_failure_is_not_silently_retried_in_python _________
+integrations/cayleypy_native/tests/test_rust_model_snapshot.py:73: in test_rust_snapshot_failure_is_not_silently_retried_in_python
+    with pytest.raises(NativeBackendError, match='artifact hash mismatch'):
+E   AssertionError: Regex pattern did not match.
+E     Expected regex: 'artifact hash mismatch'
+E     Actual message: "could not inspect native model snapshot inputs: [Errno 2] No such file or directory: '/workspace/tmp/rust-snapshot-python-red/test_rust_snapshot_failure_is_0/source/manifest.json'"
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_rust_model_snapshot.py::test_rust_session_delegates_snapshot_copy_reuse_and_refresh
+FAILED integrations/cayleypy_native/tests/test_rust_model_snapshot.py::test_rust_snapshot_failure_is_not_silently_retried_in_python
+2 failed in 2.08s

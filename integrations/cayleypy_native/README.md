@@ -802,11 +802,17 @@ The binding has CPU tests and bounded one/two-RTX-3060 session checks; other
 hardware and models remain unverified. The ordinary loader and LibTorch/ensemble paths do not
 have this binding and can still encounter a concurrent file change between
 verification and native reading. `result.native_metadata["model_snapshot"]`
-records reuse, the snapshot directory and logical artifact bytes copied for that
-call. This interim Python-owned cache can add validation reads. On a synthetic
-two-RTX-3060 fixture, five paired repeats did not establish a full-call
-speedup; the option remains off by default. Other workloads and hardware have
-not been established by that test.
+records reuse, the snapshot directory and artifact bytes copied for that call.
+With `engine="rust"` and the matching extension, Rust owns snapshot storage,
+content identity, bounded copy and cleanup; the metadata includes
+`model_snapshot.owner == "rust"`. Python still validates model format and the
+retained snapshot before submission. Older extensions without the store keep
+the Python implementation. Linux publishing uses atomic `RENAME_NOREPLACE`;
+unsupported filesystems return an error, and network filesystems used by Slurm
+have not been verified. Cancellation is cooperative and can arrive after the
+final check while the snapshot is being published. The option remains off by
+default; its measured scope and results are recorded in
+`test_results/refactor_20261114/STAGE_RUST_MLP_SNAPSHOT.md`.
 
 The existing Stream 4 index-sort implementation can be explicitly selected for
 a managed build:

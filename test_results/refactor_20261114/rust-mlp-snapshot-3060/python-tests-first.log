@@ -1,0 +1,24 @@
+........................................................................ [ 11%]
+........................................................................ [ 22%]
+......................sss............................................... [ 33%]
+.............s.......................................................... [ 45%]
+..F..................................................................... [ 56%]
+........................................................................ [ 67%]
+........................................................................ [ 78%]
+..............................................sssss..................... [ 90%]
+................................................................         [100%]
+=================================== FAILURES ===================================
+___________ test_cube555_notebook_is_short_and_uses_cayleypy_search ____________
+integrations/cayleypy_native/tests/test_generic_notebook_api.py:11: in test_cube555_notebook_is_short_and_uses_cayleypy_search
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/conda/lib/python3.11/pathlib.py:1058: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/conda/lib/python3.11/pathlib.py:1044: in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/workspace/beam-work/kaggle/cube555_github/cube555-native-2xt4-blend.ipynb'
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_generic_notebook_api.py::test_cube555_notebook_is_short_and_uses_cayleypy_search
+1 failed, 630 passed, 9 skipped in 25.14s

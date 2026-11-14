@@ -1,0 +1,9 @@
+{
+  "archive_sha256": "7e9e0e2c6f59605409b92ac4e7a970e43fdb0f6924d6d7b7c4d9c59f3f85b5c6",
+  "source_manifest_sha256": "6eac495521281d28bfd4299f2760c3f826a286e9b49c39c49dbab7ea48730c6d",
+  "records": 3256,
+  "blobs": 843,
+  "omitted": 975,
+  "bootstrap_records": 66,
+  "bootstrap_sha256": "3fb7c4ef019fca599e45a2f0e88c66185834baf570a41e4f2814aa6c6b4c79ae"
+}

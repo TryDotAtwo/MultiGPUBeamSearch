@@ -44,7 +44,7 @@ class NativeSession:
         self.model_snapshot_cache = None
         if experimental_reuse_model_snapshot:
             from .model_snapshot import ModelSnapshotCache
-            self.model_snapshot_cache = ModelSnapshotCache()
+            self.model_snapshot_cache = ModelSnapshotCache(prefer_rust=engine == 'rust')
         self._owner_pid = os.getpid()
         self._engine = engine
         self._pending = None

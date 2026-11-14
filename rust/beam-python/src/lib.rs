@@ -3,6 +3,7 @@
 mod configuration;
 mod inference;
 mod interrupt;
+mod mlp_snapshot;
 mod pipeline;
 mod planning;
 mod probes;
@@ -123,6 +124,7 @@ fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     inference::register(module)?;
     search_session::register(module)?;
     configuration::register(module)?;
+    mlp_snapshot::register(module)?;
     module.add("ABI_VERSION", 1)?;
     Ok(())
 }

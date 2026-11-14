@@ -105,6 +105,8 @@ def main():
                     meta = result.native_metadata
                     persistent, snapshot = meta['persistent_session'], meta['model_snapshot']
                     assert meta['mlp_host_binding'] == {'artifact_hash': meta['model_hash'], 'ranks': world}
+                    if engine == 'rust':
+                        assert snapshot.get('owner') == 'rust'
                     reused = name in ('repeat', 'unsolved')
                     assert persistent['reused'] == reused
                     assert snapshot['reused'] == reused
@@ -163,21 +165,21 @@ def main():
     options = NativeOptions(source_dir=args.source, cutlass_dir=args.cutlass, cache_dir=args.cache,
         num_gpus=2, inference_backend='cutlass', autotune=False, report_calibration=False,
         build_jobs=2, build_timeout_seconds=1800, timeout_seconds=180)
-    sessions = {mode: NativeSession(engine='rust', experimental_parallel_nccl_identity=True,
-                    experimental_reuse_model_snapshot=(mode == 'reuse')) for mode in ('baseline', 'reuse')}
+    modes = ('baseline', 'python_owner', 'reuse')
     rows = []
 
-    def run(mode, phase, pair, state):
+    def run(session, mode, phase, pair, state, free_before):
         before = time.monotonic()
-        result = sessions[mode].beam_search(graph, native_options=options, start_state=state,
+        result = session.beam_search(graph, native_options=options, start_state=state,
             predictor=model, beam_width=4096, max_steps=6, return_path=True)
         wall = time.monotonic() - before
         meta = result.native_metadata
         assert meta['effective_beam_width'] == 4096
         assert meta['persistent_session']['reused'] == (phase != 'cold')
-        if mode == 'reuse':
+        if mode != 'baseline':
             snapshot = meta['model_snapshot']
             assert meta['mlp_host_binding'] == {'artifact_hash': meta['model_hash'], 'ranks': 2}
+            assert (snapshot.get('owner') == 'rust') == (mode == 'reuse')
             assert snapshot['reused'] == (phase != 'cold')
             assert snapshot['copied_bytes'] == (model_bytes if phase == 'cold' else 0)
         else:
@@ -190,42 +192,50 @@ def main():
             assert not result.path_found and result.path is None
         rows.append(dict(mode=mode, phase=phase, pair=pair, wall_seconds=wall,
             worker_seconds=meta['elapsed_seconds'], path=result.path, run_dir=meta['run_dir'],
-            model_hash=meta['model_hash'], pids=meta['persistent_session']['worker_pids']))
+            model_hash=meta['model_hash'], pids=meta['persistent_session']['worker_pids'],
+            execution_parameters=meta['execution_parameters'], free_before=free_before))
         print(f'SNAPSHOT_PAIR phase={phase} pair={pair} mode={mode} wall={wall:.6f}', flush=True)
 
-    try:
-        for mode in sessions:
-            run(mode, 'cold', None, start_state(contract.center, moves, 12))
-        for mode in sessions:
-            run(mode, 'warmup', None, start_state(contract.center, moves, 12))
-        for pair in range(5):
-            order = ('baseline', 'reuse') if pair % 2 == 0 else ('reuse', 'baseline')
-            for mode in order:
-                run(mode, 'repeat', pair, start_state(contract.center, moves, 12))
-        for mode in sessions:
-            run(mode, 'solved', None, start_state(contract.center, moves, 3))
-    finally:
-        for session in sessions.values():
-            session.close()
-    for mode in sessions:
-        group = [row for row in rows if row['mode'] == mode]
-        assert all(row['pids'] == group[0]['pids'] for row in group)
-        assert all(not Path(f'/proc/{pid}').exists() for pid in group[0]['pids'])
+    # Close each group before launching the next: resident workers allocate
+    # GPU arenas and would otherwise change subsequent admission decisions.
+    for pair in range(5):
+        order = modes if pair % 2 == 0 else tuple(reversed(modes))
+        for mode in order:
+            free_before = [torch.cuda.mem_get_info(device)[0] for device in (0, 1)]
+            with NativeSession(engine='rust', experimental_parallel_nccl_identity=True,
+                               experimental_reuse_model_snapshot=(mode != 'baseline')) as session:
+                if mode == 'python_owner':
+                    session.model_snapshot_cache._prefer_rust = False
+                state = start_state(contract.center, moves, 12)
+                for phase in ('cold', 'warmup', 'repeat'):
+                    run(session, mode, phase, pair, state, free_before)
+                if pair == 0:
+                    run(session, mode, 'solved', pair, start_state(contract.center, moves, 3), free_before)
+                group = [row for row in rows if row['mode'] == mode and row['pair'] == pair]
+                assert all(row['pids'] == group[0]['pids'] for row in group)
+            assert all(not Path(f'/proc/{pid}').exists() for pid in group[0]['pids'])
     assert len({row['model_hash'] for row in rows}) == 1
-    assert rows[-1]['path'] == rows[-2]['path']
+    assert len({tuple(row['path']) for row in rows if row['phase'] == 'solved'}) == 1
+    configurations = {json.dumps(row['execution_parameters'], sort_keys=True)
+                      for row in rows if row['phase'] == 'repeat'}
+    assert len(configurations) == 1, 'GPU execution parameters differ across paired samples'
     medians = {mode: {metric: statistics.median(row[metric] for row in rows
                 if row['mode'] == mode and row['phase'] == 'repeat')
-                for metric in ('wall_seconds', 'worker_seconds')} for mode in sessions}
-    changes = []
+                for metric in ('wall_seconds', 'worker_seconds')} for mode in modes}
+    changes, owner_changes = [], []
     for pair in range(5):
         baseline = next(row for row in rows if row['phase'] == 'repeat' and row['pair'] == pair and row['mode'] == 'baseline')
         reuse = next(row for row in rows if row['phase'] == 'repeat' and row['pair'] == pair and row['mode'] == 'reuse')
+        python_owner = next(row for row in rows if row['phase'] == 'repeat' and row['pair'] == pair and row['mode'] == 'python_owner')
         changes.append(reuse['wall_seconds'] / baseline['wall_seconds'] - 1)
+        owner_changes.append(reuse['wall_seconds'] / python_owner['wall_seconds'] - 1)
     (root / 'results.json').write_text(json.dumps(dict(
         scope='synthetic public session correctness and five paired full-call timings; not saturated-step measurements',
         correctness=records, model_bytes=model_bytes, model='synthetic Hamming FP16 width 512, 8 residual blocks',
         width=4096, max_steps=6, num_gpus=2, median_seconds=medians,
-        paired_wall_changes=changes, median_paired_wall_change=statistics.median(changes), rows=rows), indent=2) + '\n')
+        paired_wall_changes=changes, median_paired_wall_change=statistics.median(changes),
+        paired_owner_changes=owner_changes, median_paired_owner_change=statistics.median(owner_changes),
+        rows=rows), indent=2) + '\n')
     print('PUBLIC_MODEL_SNAPSHOT_GPU_OK', flush=True)
 
 

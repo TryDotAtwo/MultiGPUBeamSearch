@@ -1,0 +1,126 @@
+    Updating crates.io index
+     Locking 5 packages to highest compatible versions
+      Adding bitflags v2.13.2
+      Adding errno v0.3.15
+      Adding linux-raw-sys v0.12.1
+      Adding rustix v1.1.6
+      Adding windows-sys v0.61.2
+ Downloading crates ...
+  Downloaded errno v0.3.15
+  Downloaded bitflags v2.13.2
+  Downloaded rustix v1.1.6
+  Downloaded linux-raw-sys v0.12.1
+   Compiling rustix v1.1.6
+   Compiling linux-raw-sys v0.12.1
+   Compiling bitflags v2.13.2
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.69s
+     Running unittests src/lib.rs (/workspace/target/debug/build/beam-runtime/bb9a5fa88dc5a69d/out/beam_runtime-bb9a5fa88dc5a69d)
+
+running 1 test
+test mlp_snapshot::tests::publish_does_not_replace_an_existing_empty_directory ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/calibration.rs (/workspace/target/debug/build/beam-runtime/21841652eafd1af1/out/calibration-21841652eafd1af1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/component_tuning.rs (/workspace/target/debug/build/beam-runtime/06948e744b9537cf/out/component_tuning-06948e744b9537cf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/downstream_job.rs (/workspace/target/debug/build/beam-runtime/2bccd6b4937d667a/out/downstream_job-2bccd6b4937d667a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/frontier_policy.rs (/workspace/target/debug/build/beam-runtime/de1ab6382e4fd373/out/frontier_policy-de1ab6382e4fd373)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/history.rs (/workspace/target/debug/build/beam-runtime/6025cc4003cedb17/out/history-6025cc4003cedb17)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/inference.rs (/workspace/target/debug/build/beam-runtime/e278a9489e54aed5/out/inference-e278a9489e54aed5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/inference_job.rs (/workspace/target/debug/build/beam-runtime/8a9cdcdd7667b804/out/inference_job-8a9cdcdd7667b804)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/inference_tuning.rs (/workspace/target/debug/build/beam-runtime/b1a9d72425970fdd/out/inference_tuning-b1a9d72425970fdd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/maximum_beam.rs (/workspace/target/debug/build/beam-runtime/96df0bb28d419a2a/out/maximum_beam-96df0bb28d419a2a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/mlp_snapshot.rs (/workspace/target/debug/build/beam-runtime/f43597c0b532c8fb/out/mlp_snapshot-f43597c0b532c8fb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/pipeline.rs (/workspace/target/debug/build/beam-runtime/e0e7e44bef2d0ac0/out/pipeline-e0e7e44bef2d0ac0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/planning.rs (/workspace/target/debug/build/beam-runtime/6d81e2917fc827f9/out/planning-6d81e2917fc827f9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/probes.rs (/workspace/target/debug/build/beam-runtime/f0c42db9ce079ec6/out/probes-f0c42db9ce079ec6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/profile_cache.rs (/workspace/target/debug/build/beam-runtime/ef52f40d80a301a3/out/profile_cache-ef52f40d80a301a3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/resident.rs (/workspace/target/debug/build/beam-runtime/b01adc9d8a47b5bd/out/resident-b01adc9d8a47b5bd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/search_session.rs (/workspace/target/debug/build/beam-runtime/4f97edca3b5288f6/out/search_session-4f97edca3b5288f6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/telemetry.rs (/workspace/target/debug/build/beam-runtime/6a7ce86486203b1f/out/telemetry-6a7ce86486203b1f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

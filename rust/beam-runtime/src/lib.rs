@@ -14,6 +14,7 @@ pub mod inference_admission;
 pub mod inference_job;
 pub mod inference_tuning;
 pub mod maximum_beam;
+pub mod mlp_snapshot;
 pub mod pipeline;
 pub mod pipeline_cache;
 pub mod planning;

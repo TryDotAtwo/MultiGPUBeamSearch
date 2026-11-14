@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-11-14 Rust-owned experimental MLP snapshots
+- The opt-in strict-native MLP path can now delegate bounded snapshot copy,
+  identity, staging and reuse to `beam-runtime` via PyO3, while Python retains
+  model format and launch-boundary validation. Older extensions fall back to
+  the previous Python owner. Linux publication uses `RENAME_NOREPLACE`; Unix
+  input opens cannot block on a FIFO. Cooperative cancellation and unsupported
+  network filesystem behavior are documented.
+- Linux Rust workspace/build and the PyO3 smoke passed; Python reported 631
+  passed and 9 skipped. Twenty bounded one/two-RTX-3060 cases and four mode
+  transition groups passed. Independent validation compared 45 parameters in
+  all 30 rank logs from 15 isolated measurement sessions and replayed paths.
+  The synthetic five-pair median was +0.20% versus reuse OFF and +1.39% versus
+  the Python snapshot owner. The experimental option remains OFF. Evidence,
+  cost, and untested profiles are in `STAGE_RUST_MLP_SNAPSHOT.md`.
+
+## 2026-11-14 opt-in MLP loaded-buffer binding
+- Rank-owned host tensor buffers and the parsed manifest are hashed before GPU
+  upload; each rank must supply its digest receipt before a result is returned.
+  This closes the file-validation-to-loader identity gap for the experimental
+  MLP/CUTLASS path, without adding another complete tensor copy. Its bounded
+  tests and scope are in `STAGE_MLP_LOADED_BUFFER_BINDING.md`.
+
 ## 2026-11-14 snapshot validation revision: two-RTX-3060 result
 - Commit `46c02ab5` passed 607 Linux tests (nine skipped) and 20 bounded GPU
   cases on one/two RTX 3060s with both session owners. Five alternating paired
