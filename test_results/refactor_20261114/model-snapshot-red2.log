@@ -1,0 +1,143 @@
+FFFFFF.FFFF                                                              [100%]
+================================== FAILURES ===================================
+_____ test_opt_in_reuses_validated_private_snapshot_without_copy[python] ______
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red2-20261114/test_opt_in_reuses_validated_p0/source/we...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001CA7F346840>)
+engine = 'python'
+
+    @pytest.mark.parametrize('engine', ['python', 'rust'])
+    def test_opt_in_reuses_validated_private_snapshot_without_copy(fixture, engine):
+        source, _, _, search = fixture
+>       with NativeSession(engine=engine, experimental_reuse_model_snapshot=True) as session:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:40: TypeError
+______ test_opt_in_reuses_validated_private_snapshot_without_copy[rust] _______
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red2-20261114/test_opt_in_reuses_validated_p1/source/we...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001CA7F3471A0>)
+engine = 'rust'
+
+    @pytest.mark.parametrize('engine', ['python', 'rust'])
+    def test_opt_in_reuses_validated_private_snapshot_without_copy(fixture, engine):
+        source, _, _, search = fixture
+>       with NativeSession(engine=engine, experimental_reuse_model_snapshot=True) as session:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:40: TypeError
+___________________ test_source_change_creates_new_snapshot ___________________
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red2-20261114/test_source_change_creates_new0/source/we...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001CA7F3479C0>)
+
+    def test_source_change_creates_new_snapshot(fixture):
+        source, _, _, search = fixture
+>       with NativeSession(experimental_reuse_model_snapshot=True) as session:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:55: TypeError
+____ test_changed_or_missing_private_snapshot_fails_before_launch[change] _____
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red2-20261114/test_changed_or_missing_privat0/source/we...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001CA7F3C00E0>)
+damage = 'change'
+
+    @pytest.mark.parametrize('damage', ['change', 'missing'])
+    def test_changed_or_missing_private_snapshot_fails_before_launch(fixture, damage):
+        _, _, _, search = fixture
+>       with NativeSession(experimental_reuse_model_snapshot=True) as session:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:69: TypeError
+____ test_changed_or_missing_private_snapshot_fails_before_launch[missing] ____
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red2-20261114/test_changed_or_missing_privat1/source/we...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001CA7F3C0860>)
+damage = 'missing'
+
+    @pytest.mark.parametrize('damage', ['change', 'missing'])
+    def test_changed_or_missing_private_snapshot_fails_before_launch(fixture, damage):
+        _, _, _, search = fixture
+>       with NativeSession(experimental_reuse_model_snapshot=True) as session:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:69: TypeError
+_________ test_same_valid_content_from_another_source_reuses_snapshot _________
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red2-20261114/test_same_valid_content_from_a0/source/we...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001CA7F345B20>)
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red2-20261114/test_same_valid_content_from_a0')
+
+    def test_same_valid_content_from_another_source_reuses_snapshot(fixture, tmp_path):
+        source, _, contract, search = fixture
+        alternate = tmp_path / 'alternate'
+        shutil.copytree(source, alternate)
+>       with NativeSession(experimental_reuse_model_snapshot=True) as session:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:85: TypeError
+__________________ test_snapshot_opt_in_requires_boolean[1] ___________________
+
+invalid = 1
+
+    @pytest.mark.parametrize('invalid', [1, 'yes', None])
+    def test_snapshot_opt_in_requires_boolean(invalid):
+        with pytest.raises(ValueError, match='experimental_reuse_model_snapshot'):
+>           NativeSession(experimental_reuse_model_snapshot=invalid)
+E           TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:104: TypeError
+_________________ test_snapshot_opt_in_requires_boolean[yes] __________________
+
+invalid = 'yes'
+
+    @pytest.mark.parametrize('invalid', [1, 'yes', None])
+    def test_snapshot_opt_in_requires_boolean(invalid):
+        with pytest.raises(ValueError, match='experimental_reuse_model_snapshot'):
+>           NativeSession(experimental_reuse_model_snapshot=invalid)
+E           TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:104: TypeError
+_________________ test_snapshot_opt_in_requires_boolean[None] _________________
+
+invalid = None
+
+    @pytest.mark.parametrize('invalid', [1, 'yes', None])
+    def test_snapshot_opt_in_requires_boolean(invalid):
+        with pytest.raises(ValueError, match='experimental_reuse_model_snapshot'):
+>           NativeSession(experimental_reuse_model_snapshot=invalid)
+E           TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:104: TypeError
+____ test_session_cannot_close_while_model_preparation_owns_snapshot_cache ____
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red2-20261114/test_session_cannot_close_whil0/source/we...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001CA7F3C1C60>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001CA7F2B8690>
+
+    def test_session_cannot_close_while_model_preparation_owns_snapshot_cache(fixture, monkeypatch):
+        _, _, _, search = fixture
+>       with NativeSession(experimental_reuse_model_snapshot=True) as session:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:109: TypeError
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_opt_in_reuses_validated_private_snapshot_without_copy[python]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_opt_in_reuses_validated_private_snapshot_without_copy[rust]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_source_change_creates_new_snapshot
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_changed_or_missing_private_snapshot_fails_before_launch[change]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_changed_or_missing_private_snapshot_fails_before_launch[missing]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_same_valid_content_from_another_source_reuses_snapshot
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_snapshot_opt_in_requires_boolean[1]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_snapshot_opt_in_requires_boolean[yes]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_snapshot_opt_in_requires_boolean[None]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_session_cannot_close_while_model_preparation_owns_snapshot_cache
+10 failed, 1 passed, 2 warnings in 21.94s

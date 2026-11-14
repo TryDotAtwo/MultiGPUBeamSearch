@@ -45,6 +45,18 @@ def test_forked_owner_cannot_close_parent_workers(monkeypatch):
     assert not session.closed
 
 
+@pytest.mark.parametrize('state', ['closed', 'forked'])
+def test_closed_or_forked_session_cannot_launch(monkeypatch, tmp_path, state):
+    import multigpubeamsearch.persistent as module
+    session = NativeSession()
+    if state == 'closed':
+        session.close()
+    else:
+        monkeypatch.setattr(module.os, 'getpid', lambda: session._owner_pid + 1)
+    with pytest.raises(RuntimeError, match='closed' if state == 'closed' else 'Python processes'):
+        session.launch(['unused'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+
+
 def test_transport_reuses_pids_and_isolates_logs(tmp_path):
     from multigpubeamsearch.resident_transport import ResidentWorkers
     script = tmp_path / 'worker.py'
@@ -142,6 +154,34 @@ def test_loader_failure_preserves_diagnostic_before_starting_workers(tmp_path, m
         assert session._workers is None
 
 
+def test_direct_launch_failure_releases_only_its_new_worker_group(tmp_path, monkeypatch):
+    import subprocess
+    from types import SimpleNamespace
+    from multigpubeamsearch.errors import NativeBackendError
+    from multigpubeamsearch import resident_transport
+
+    monkeypatch.setattr(subprocess, 'run', lambda *a, **k: subprocess.CompletedProcess(
+        a[0], 0, '{"protocol":"resident-search-v1"}', ''))
+    workers = []
+    class Workers:
+        closed = False
+        def __init__(self, *args, **kwargs):workers.append(self)
+        def submit(self, *args, **kwargs):return .01
+        def close(self):self.closed = True
+    monkeypatch.setattr(resident_transport, 'ResidentWorkers', Workers)
+    with NativeSession() as session:
+        with pytest.raises(AttributeError):
+            session.launch(['runner'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+        assert workers[0].closed and session._workers is None
+        assert session.launch(['runner'], contract=SimpleNamespace(start=(1,)), run_dir=tmp_path,
+                              env={}, world=1, timeout=1) == .01
+        with pytest.raises(NativeBackendError, match='already exist'):
+            session.launch(['runner'], contract=SimpleNamespace(start=(1,)), run_dir=tmp_path,
+                           env={}, world=1, timeout=1)
+        assert session._workers is workers[1] and not workers[1].closed
+    assert workers[1].closed
+
+
 def test_timeout_terminates_workers(tmp_path):
     from multigpubeamsearch.resident_transport import ResidentWorkers
     from multigpubeamsearch.errors import NativeBackendError
@@ -170,3 +210,116 @@ def test_activation_preserves_notebook_lifetime_and_restores_after_error():
     session.close()
     with pytest.raises(RuntimeError,match='closed'):
         with session.activate():pass
+
+
+def test_run_rechecks_closed_after_acquiring_lock(tmp_path):
+    session = NativeSession()
+    class CloseBeforeAcquire:
+        def acquire(self, blocking):
+            session.closed = True
+            return True
+        def release(self):
+            pass
+    session._lock = CloseBeforeAcquire()
+    with pytest.raises(RuntimeError, match='closed'):
+        session.run(lambda *a, **k: None, None, None, None, 1, 1, tmp_path, (0,))
+
+
+def test_public_scope_rejects_a_direct_run_already_in_progress(tmp_path, monkeypatch):
+    import threading
+    from types import SimpleNamespace
+    from multigpubeamsearch import models
+    from multigpubeamsearch.options import NativeOptions, NativeOutcome
+
+    monkeypatch.setattr(models, 'verify_prepared_model', lambda *args: None)
+    session = NativeSession()
+    entered, resume = threading.Event(), threading.Event()
+    errors = []
+    class Workers:
+        pids = [123]
+        sequence = 1
+        def close(self):pass
+    def execute(*args, **kwargs):
+        entered.set()
+        assert resume.wait(timeout=10)
+        session._workers = Workers()
+        return NativeOutcome(None, .01, 1, tmp_path,
+                             {'requested_beam_width': 1, 'profile': {}, 'terminal_records': 1})
+    def work():
+        try:
+            session.run(execute, SimpleNamespace(graph_hash='graph'),
+                        SimpleNamespace(artifact_hash='model', backend='mlp'),
+                        NativeOptions(), 1, 1, tmp_path, (0,))
+        except BaseException as error:
+            errors.append(error)
+    thread = threading.Thread(target=work)
+    thread.start()
+    try:
+        assert entered.wait(timeout=10)
+        with pytest.raises(RuntimeError, match='concurrent native session searches'):
+            with session.search_scope():
+                pass
+        with pytest.raises(RuntimeError, match='concurrent native session searches'):
+            session.launch(['unused'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+    finally:
+        resume.set()
+        thread.join(timeout=10)
+        session.close()
+    assert not thread.is_alive() and not errors
+
+
+def test_pending_contender_does_not_interrupt_running_launch(tmp_path, monkeypatch):
+    import threading
+    from types import SimpleNamespace
+    from multigpubeamsearch import models
+    from multigpubeamsearch.options import NativeOptions, NativeOutcome
+
+    monkeypatch.setattr(models, 'verify_prepared_model', lambda *args: None)
+    session = NativeSession()
+    started, contender_has_lock, launch_done, release_contender, release_run = [threading.Event() for _ in range(5)]
+    errors = []
+    class PausedLock:
+        def __init__(self):self.inner = threading.Lock()
+        def acquire(self, blocking):
+            result = self.inner.acquire(blocking=blocking)
+            if result and threading.current_thread().name == 'contender':
+                contender_has_lock.set()
+                assert release_contender.wait(timeout=10)
+            return result
+        def release(self):self.inner.release()
+        def locked(self):return self.inner.locked()
+    session._operation_lock = PausedLock()
+    monkeypatch.setattr(session, '_launch', lambda *args, **kwargs: .01)
+    def execute(*args, **kwargs):
+        started.set()
+        assert contender_has_lock.wait(timeout=10)
+        session.launch(['runner'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+        launch_done.set()
+        assert release_run.wait(timeout=10)
+        return NativeOutcome(None, .01, 1, tmp_path,
+                             {'requested_beam_width': 1, 'profile': {}, 'terminal_records': 1})
+    def work():
+        try:
+            session.run(execute, SimpleNamespace(graph_hash='graph'),
+                        SimpleNamespace(artifact_hash='model', backend='mlp'),
+                        NativeOptions(), 1, 1, tmp_path, (0,))
+        except BaseException as error:errors.append(error)
+    def contend():
+        try:
+            with session.search_scope():pass
+        except RuntimeError as error:errors.append(error)
+    worker = threading.Thread(target=work)
+    contender = threading.Thread(target=contend, name='contender')
+    worker.start()
+    try:
+        assert started.wait(timeout=10)
+        contender.start()
+        assert launch_done.wait(timeout=5)
+    finally:
+        release_contender.set()
+        contender.join(timeout=10)
+        release_run.set()
+        worker.join(timeout=10)
+        session.close()
+    assert not worker.is_alive() and not contender.is_alive()
+    assert len(errors) == 1 and 'concurrent native session searches' in str(errors[0])

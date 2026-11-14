@@ -1,0 +1,23 @@
+
+=================================== ERRORS ====================================
+____________________ ERROR collecting tests/test_models.py ____________________
+ImportError while importing test module 'D:\100XH100\integrations\cayleypy_native\tests\test_models.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\tests\test_models.py:8: in <module>
+    from cayleypy import CayleyGraph, PermutationGroups, Predictor, ModelConfig
+E   ImportError: cannot import name 'ModelConfig' from 'cayleypy' (C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\cayleypy\__init__.py)
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR integrations\cayleypy_native\tests\test_models.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+2 warnings, 1 error in 16.18s

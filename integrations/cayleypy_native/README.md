@@ -777,6 +777,26 @@ available and match its build receipt. On one two-RTX-3060 synthetic fixture,
 five paired full repeated calls showed lower wall time; this does not establish
 an isolated GPU-step speedup or performance on other profiles.
 
+An additional default-OFF experiment retains one private MLP model snapshot
+within a session:
+
+```python
+session = NativeSession(engine="rust", experimental_reuse_model_snapshot=True)
+```
+
+It applies to an explicit `NativeModel` using the MLP backend in strict
+`backend="native"` mode. Live PyTorch models, ensembles and fallback mode keep
+their existing preparation. Source and retained files are validated again before
+reuse; changed model content or cache directory creates a new snapshot, and a
+damaged retained snapshot fails the call. Only a compatible, already-loaded
+worker avoids a new copy; a worker restart copies to its own run directory.
+Snapshots remain in their run directories after the session closes. As with the
+default loader, a concurrent write after host verification and before native
+reading is not atomically excluded. `result.native_metadata["model_snapshot"]`
+records reuse, the snapshot directory and logical artifact bytes copied for that
+call. This interim Python-owned cache can add validation reads; GPU and
+performance acceptance are pending.
+
 The existing Stream 4 index-sort implementation can be explicitly selected for
 a managed build:
 

@@ -102,10 +102,11 @@ These are source-derived volumes; measured bus traffic must come from profiling.
 | RAM history pruning → remapped adjacent depths | old/current valid entries | RAM pruning only | semantic path-index rewrite; cannot remove without replacement |
 | GPU service counters / flags → host | mostly 4/8-byte fields and rank arrays | scheduling, errors and final selection | batch where dependencies permit; do not remove required NCCL count reads |
 | Host rank offsets/counts → GPU | O(R) | exchange setup | small control transfer; separate from payload cost |
-| Artifact files → hash accumulator | 64 KiB reusable host buffer per file | prepared model/helper verification, including cache hits | content binding; no model-sized host copy or device transfer |
+| MLP artifact → Python validation | chunks up to 1 MiB, plus a `bytearray` and `torch.isfinite` temporaries | source and snapshot validation, including cache hits | SHA-256 and finite-value checks; repeated reads and host allocations must be measured |
+| Runner/helper files → hash accumulator | implementation-dependent bounded chunks | build and helper verification | content binding; separate from the Python MLP validation above |
 | GPU error/solution records → host | valid diagnostic/solution count | error or solution | retain complete records and path replay checks |
 | History entry routing host ↔ GPU/NCCL ↔ host | requested 16-byte entries plus routing fields | distributed path reconstruction | necessary cross-rank dependency; preserve rank/local-index identity |
-| Caller-provided `NativeModel` files → private run `weights` | sum of selected artifact-file bytes | every nontrivial public call, including a reused session | full source and snapshot validation; repeated copies of unchanged files remain a candidate for session-scoped reuse |
+| Caller-provided `NativeModel` files → private run `weights` | sum of selected artifact-file bytes | every nontrivial public call by default | experimental session reuse can retain an explicit MLP snapshot; source and retained bytes are revalidated |
 | Managed runner → private run executable | runner file bytes | first call and each incompatible session relaunch; every non-session call | private executable snapshot, verified against the build receipt |
 | Build-pinned NCCL library → private run library | NCCL library file bytes | first call and each incompatible session relaunch; every non-session call | private loader snapshot, verified against the build receipt; a repeated session still verifies its source identity |
 
@@ -114,6 +115,13 @@ conversions, device allocations, pinned allocations, and actual memory/bus
 traffic. Replacing a sort payload is not by itself an end-to-end speedup claim.
 The model snapshot row describes an explicitly supplied `NativeModel`; exporting
 a live PyTorch model and preparing ensemble members can involve different
-conversion and copy paths. Reusing a private snapshot has not yet been
-implemented: any future cache must validate both caller input and retained
-snapshot, preserve the session lifetime and reject changed or missing bytes.
+conversion and copy paths. The opt-in Python session cache retains one MLP
+snapshot within its original run directory and validates the source and retained
+snapshot on every reuse. A worker restart copies a fresh snapshot into the new
+run directory; only a compatible, already-loaded worker avoids that copy. The
+session stops referencing the retained snapshot when it closes.
+Its reported copied bytes are logical artifact bytes, not measured disk traffic.
+The cache does not delete run evidence. Moving preparation ownership to Rust
+and hardware/performance acceptance remain separate work. The existing loader
+still opens mutable files after the last host-side verification; the bytes it
+reads are not bound atomically to that verification against concurrent writes.

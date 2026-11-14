@@ -1,0 +1,110 @@
+FF                                                                       [100%]
+================================== FAILURES ===================================
+____________ test_session_cannot_close_during_runtime_preparation _____________
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-direct-race-red-20261114/test_session_cannot_close_duri...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x00000199C522E0C0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000199C56A8F50>
+
+    def test_session_cannot_close_during_runtime_preparation(fixture, monkeypatch):
+        import threading
+    
+        _, _, _, search = fixture
+        entered, resume = threading.Event(), threading.Event()
+        errors = []
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            def prepare(*args, **kwargs):
+                entered.set()
+                assert resume.wait(timeout=10)
+                return SimpleNamespace(build_metadata={'inference_backend': 'cutlass'})
+            monkeypatch.setattr(dispatch, 'prepare_runtime', prepare)
+            def work():
+                try:
+                    search(session)
+                except BaseException as error:
+                    errors.append(error)
+            thread = threading.Thread(target=work)
+            thread.start()
+            try:
+                assert entered.wait(timeout=10)
+                with pytest.raises(RuntimeError, match='during a search'):
+                    session.close()
+                with pytest.raises(RuntimeError, match='concurrent native session searches'):
+>                   session.run(lambda *args, **kwargs: None, None, None, None, 1, 1, Path('.'), (0,))
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:205: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <multigpubeamsearch.persistent.NativeSession object at 0x00000199C56AB650>
+execute = <function test_session_cannot_close_during_runtime_preparation.<locals>.<lambda> at 0x00000199C543D800>
+contract = None, model = None, options = None, beam_width = 1, max_steps = 1
+run_dir = WindowsPath('.'), devices = (0,)
+
+    def run(self, execute, contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None):
+        from .backend import parse_terminal
+        from .models import verify_prepared_model
+        self._check_owner()
+        if self.closed:raise RuntimeError('native session is closed')
+        if not self._lock.acquire(blocking=False):raise RuntimeError('concurrent native session searches are unsupported')
+        try:
+            if self.closed:raise RuntimeError('native session is closed')
+            # Runtime preparation already verifies executable bytes. Start state
+            # is intentionally absent; all other search geometry stays fixed.
+>           identity=(contract.graph_hash,model.artifact_hash,model.backend,tuple(devices),
+                      ^^^^^^^^^^^^^^^^^^^
+                beam_width,max_steps,repr(options),
+                os.environ.get('CUDA_VISIBLE_DEVICES'),os.environ.get('CUDA_DEVICE_ORDER'),
+                json.dumps(runtime.build_metadata,sort_keys=True) if runtime is not None else None)
+E               AttributeError: 'NoneType' object has no attribute 'graph_hash'
+
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:190: AttributeError
+_________ test_public_scope_rejects_a_direct_run_already_in_progress __________
+
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-direct-race-red-20261114/test_public_scope_rejects_a_di0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000199C563CB10>
+
+    def test_public_scope_rejects_a_direct_run_already_in_progress(tmp_path, monkeypatch):
+        import threading
+        from types import SimpleNamespace
+        from multigpubeamsearch import models
+        from multigpubeamsearch.options import NativeOptions, NativeOutcome
+    
+        monkeypatch.setattr(models, 'verify_prepared_model', lambda *args: None)
+        session = NativeSession()
+        entered, resume = threading.Event(), threading.Event()
+        errors = []
+        class Workers:
+            pids = [123]
+            sequence = 1
+            def close(self):pass
+        def execute(*args, **kwargs):
+            entered.set()
+            assert resume.wait(timeout=10)
+            session._workers = Workers()
+            return NativeOutcome(None, .01, 1, tmp_path,
+                                 {'requested_beam_width': 1, 'profile': {}, 'terminal_records': 1})
+        def work():
+            try:
+                session.run(execute, SimpleNamespace(graph_hash='graph'),
+                            SimpleNamespace(artifact_hash='model', backend='mlp'),
+                            NativeOptions(), 1, 1, tmp_path, (0,))
+            except BaseException as error:
+                errors.append(error)
+        thread = threading.Thread(target=work)
+        thread.start()
+        try:
+            assert entered.wait(timeout=10)
+>           with pytest.raises(RuntimeError, match='concurrent native session searches'):
+E           Failed: DID NOT RAISE <class 'RuntimeError'>
+
+integrations\cayleypy_native\tests\test_persistent_search.py:219: Failed
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_session_cannot_close_during_runtime_preparation
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_public_scope_rejects_a_direct_run_already_in_progress
+2 failed, 2 warnings in 12.97s

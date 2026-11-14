@@ -25,16 +25,25 @@ class NativeSession:
     Exiting the context, including on exceptions, frees all owned workers.
     The experimental NCCL identity option retains block digests per session;
     every repeated check rereads the complete library.
+    Experimental model-snapshot reuse covers explicit MLP NativeModel inputs
+    in strict native mode; source and retained bytes are revalidated on reuse.
     """
-    def __init__(self, *, engine="python", experimental_parallel_nccl_identity=False):
+    def __init__(self, *, engine="python", experimental_parallel_nccl_identity=False,
+                 experimental_reuse_model_snapshot=False):
         if engine not in ("python", "rust"):
             raise ValueError("engine must be 'python' or 'rust'")
         if type(experimental_parallel_nccl_identity) is not bool:
             raise ValueError("experimental_parallel_nccl_identity must be a boolean")
+        if type(experimental_reuse_model_snapshot) is not bool:
+            raise ValueError("experimental_reuse_model_snapshot must be a boolean")
         self.nccl_digest_cache = None
         if experimental_parallel_nccl_identity:
             from .nccl_digest import ChunkDigestCache
             self.nccl_digest_cache = ChunkDigestCache()
+        self.model_snapshot_cache = None
+        if experimental_reuse_model_snapshot:
+            from .model_snapshot import ModelSnapshotCache
+            self.model_snapshot_cache = ModelSnapshotCache()
         self._owner_pid = os.getpid()
         self._engine = engine
         self._pending = None
@@ -44,10 +53,20 @@ class NativeSession:
         self._metadata = None
         self._token = None
         self._lock = threading.Lock()
+        self._operation_lock = threading.Lock()
+        self._operation_owner = None
+        self._run_owner = None
 
     def _check_owner(self):
         if os.getpid()!=self._owner_pid:
             raise RuntimeError('native session cannot be shared across Python processes')
+
+    def _check_operation_owner(self):
+        # A contender may have acquired _operation_lock but still be unable
+        # to reserve the session because an existing run owns _lock. Only a
+        # published owner may reject that existing run's internal launch.
+        if self._operation_owner is not None and self._operation_owner != threading.get_ident():
+            raise RuntimeError('concurrent native session searches are unsupported')
 
     def __enter__(self):
         self._check_owner()
@@ -86,6 +105,23 @@ class NativeSession:
             return beam_search(graph,**kwargs)
 
     @contextmanager
+    def search_scope(self):
+        """Reserve the session from public dispatch through result assembly."""
+        self._check_owner()
+        if not self._operation_lock.acquire(blocking=False):
+            raise RuntimeError('concurrent native session searches are unsupported')
+        try:
+            if not self._lock.acquire(blocking=False):
+                raise RuntimeError('concurrent native session searches are unsupported')
+            try:
+                if self.closed:raise RuntimeError('native session is closed')
+                self._operation_owner = threading.get_ident()
+            finally:self._lock.release()
+            try:yield
+            finally:self._operation_owner = None
+        finally:self._operation_lock.release()
+
+    @contextmanager
     def prepare_nccl_identity(self):
         """Hold session ownership while a cache-backed identity is prepared."""
         self._check_owner()
@@ -94,7 +130,21 @@ class NativeSession:
             raise RuntimeError('concurrent native session searches are unsupported')
         try:
             if self.closed:raise RuntimeError('native session is closed')
+            self._check_operation_owner()
             yield self.nccl_digest_cache
+        finally:self._lock.release()
+
+    @contextmanager
+    def prepare_model_snapshot(self):
+        """Hold session ownership while validating or storing its snapshot."""
+        self._check_owner()
+        if self.closed:raise RuntimeError('native session is closed')
+        if not self._lock.acquire(blocking=False):
+            raise RuntimeError('concurrent native session searches are unsupported')
+        try:
+            if self.closed:raise RuntimeError('native session is closed')
+            self._check_operation_owner()
+            yield self.model_snapshot_cache
         finally:self._lock.release()
 
     def _release(self):
@@ -106,15 +156,48 @@ class NativeSession:
     def close(self):
         self._check_owner()
         if self.closed:return
-        if not self._lock.acquire(blocking=False):
+        if not self._operation_lock.acquire(blocking=False):
             raise RuntimeError('cannot close a native session during a search')
         try:
-            self._release()
-            if self.nccl_digest_cache is not None:self.nccl_digest_cache.clear()
-            self.closed = True
-        finally:self._lock.release()
+            if not self._lock.acquire(blocking=False):
+                raise RuntimeError('cannot close a native session during a search')
+            try:
+                self._release()
+                if self.nccl_digest_cache is not None:self.nccl_digest_cache.clear()
+                if self.model_snapshot_cache is not None:self.model_snapshot_cache.clear()
+                self.closed = True
+            finally:self._lock.release()
+        finally:self._operation_lock.release()
 
     def launch(self, command, *, contract, run_dir, env, world, timeout, runtime=None):
+        self._check_owner()
+        if self._run_owner == threading.get_ident():
+            if self.closed:raise RuntimeError('native session is closed')
+            self._check_operation_owner()
+            return self._launch(command, contract=contract, run_dir=run_dir, env=env,
+                                world=world, timeout=timeout, runtime=runtime)
+        if not self._operation_lock.acquire(blocking=False):
+            raise RuntimeError('concurrent native session searches are unsupported')
+        try:
+            if not self._lock.acquire(blocking=False):
+                raise RuntimeError('concurrent native session searches are unsupported')
+            try:
+                if self.closed:raise RuntimeError('native session is closed')
+                previous_workers = self._workers
+                try:
+                    return self._launch(command, contract=contract, run_dir=run_dir, env=env,
+                                        world=world, timeout=timeout, runtime=runtime)
+                except BaseException as error:
+                    if previous_workers is None and self._workers is not None:
+                        try:self._release()
+                        except Exception as cleanup_error:
+                            if hasattr(error, 'add_note'):
+                                error.add_note(f'worker cleanup also failed: {cleanup_error}')
+                    raise
+            finally:self._lock.release()
+        finally:self._operation_lock.release()
+
+    def _launch(self, command, *, contract, run_dir, env, world, timeout, runtime=None):
         from .resident_transport import ResidentWorkers
         import subprocess
         if self._workers is not None:raise NativeBackendError('resident workers already exist')
@@ -145,6 +228,15 @@ class NativeSession:
         self._check_owner()
         if self.closed:raise RuntimeError('native session is closed')
         if not self._lock.acquire(blocking=False):raise RuntimeError('concurrent native session searches are unsupported')
+        if self.closed:
+            self._lock.release()
+            raise RuntimeError('native session is closed')
+        try:
+            self._check_operation_owner()
+        except BaseException:
+            self._lock.release()
+            raise
+        self._run_owner = threading.get_ident()
         try:
             # Runtime preparation already verifies executable bytes. Start state
             # is intentionally absent; all other search geometry stays fixed.
@@ -155,6 +247,9 @@ class NativeSession:
             verify_prepared_model(model,contract)
             if identity != self._identity:self._release()
             if self._workers is None:
+                if (self.model_snapshot_cache is not None
+                        and self.model_snapshot_cache.needs_fresh_worker_snapshot(model, contract)):
+                    model = self.model_snapshot_cache.refresh_for_worker(model, contract, run_dir)
                 self._pending=(model,options,max_steps,devices,runtime)
                 try:
                     outcome=execute(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
@@ -194,4 +289,6 @@ class NativeSession:
         except BaseException:
             self._release()
             raise
-        finally:self._lock.release()
+        finally:
+            self._run_owner = None
+            self._lock.release()

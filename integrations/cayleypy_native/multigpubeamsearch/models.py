@@ -707,7 +707,7 @@ def _unwrap_predictor(predictor, contract: GraphContract):
 
 
 def prepare_model(predictor, contract: GraphContract, options: NativeOptions, run_dir: Path,
-                  *, _ensemble_member=False) -> PreparedModel:
+                  *, _ensemble_member=False, _snapshot_cache=None) -> PreparedModel:
     from .pancake_gnn import PancakeGNN
     if isinstance(predictor, PancakeGNN):
         if _ensemble_member:
@@ -759,6 +759,8 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
                     else _validate_artifact(predictor.weights_dir, contract, predictor.backend))
         if predictor.expected_artifact_hash is not None and predictor.expected_artifact_hash != prepared.artifact_hash:
             raise NativeBackendError("native artifact hash changed after the model snapshot was prepared")
+        if _snapshot_cache is not None:
+            return _snapshot_cache.prepare(prepared, contract, run_dir, options.cache_dir)
         return _snapshot_artifact(prepared, contract, run_dir)
     # Unwrap only the exact unchanged wrapper; arbitrary scoring/preprocessing must not disappear.
     model = _unwrap_predictor(predictor, contract)

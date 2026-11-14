@@ -1,0 +1,88 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+_______ test_result_metadata_mutation_cannot_change_the_cached_manifest _______
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-manifest-red-20261114/test_result_metadata_mutation_0/s...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x0000022FFF4B7E20>)
+
+    def test_result_metadata_mutation_cannot_change_the_cached_manifest(fixture):
+        _, _, contract, search = fixture
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            first = search(session)
+            first.native_metadata['model_manifest']['output_dim'] = contract.move_count
+>           second = search(session)
+                     ^^^^^^^^^^^^^^^
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:99: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:33: in search
+    return session.beam_search(graph, backend=backend, native_options=native_options, start_state=start,
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:95: in beam_search
+    return beam_search(graph,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:292: in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+original = <function CayleyGraph.beam_search at 0x0000022FED99B1A0>
+graph = <cayleypy.cayley_graph.CayleyGraph object at 0x0000022FFF4CDFD0>
+kwargs = {'beam_width': 64, 'max_steps': 4, 'predictor': NativeModel(weights_dir=WindowsPath('D:/100XH100/.local/cache/session-...0d6b7e6dc40bf7eb927fcb0c502f', fallback=None, backend='mlp', expected_artifact_hash=None), 'start_state': [1, 0, 2, 3]}
+options = NativeOptions(source_dir=None, cache_dir=WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-manifest-red-20..._calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False, experimental_index_sort=False)
+mode = 'native'
+
+    def _search(original, graph, kwargs, options, mode):
+        mode = _mode(mode)
+        if 'reflect_mode' in kwargs or 'reflection_source' in kwargs:
+            from .reflection import reflected_search
+            return reflected_search(lambda values: _search(original, graph, values, options, mode), graph, kwargs, mode)
+        native_fields = {"bfs_radius": "touch_bfs_radius", "bfs_max_entries": "touch_bfs_max_entries",
+                         "solution_mode": "solution_mode", "collect_extra_depths": "collect_extra_depths",
+                         "max_collected_solutions": "max_collected_solutions"}
+        supplied = {name: kwargs[name] for name in native_fields if name in kwargs}
+        if supplied:
+            if mode != "native":
+                raise ValueError("native search controls require backend='native'; they cannot silently fall back")
+            kwargs = {name: value for name, value in kwargs.items() if name not in supplied}
+            options = replace(options, **{native_fields[name]: value for name, value in supplied.items()})
+        if mode == "torch":
+            return _torch_call(original, graph, kwargs)
+        # NativeUnavailable is recoverable only inside the capability/preparation phase.
+        run_dir = None
+        model_snapshot_info = None
+        try:
+            params = _parameters(kwargs)
+            contract = GraphContract.from_graph(graph, params["start_state"])
+            trivial = contract.start == contract.center or params["max_steps"] == 0
+            devices, model, runtime = (), None, None
+            if not trivial:
+                _, effective_touch_bfs_radius = native_depth_budget(params["max_steps"], options.touch_bfs_radius)
+                validate_touch_bfs_contract(contract, effective_touch_bfs_radius, options.touch_bfs_max_entries)
+                devices = runtime_devices(graph, options)
+                from .bootstrap import prepare_sources
+                options = prepare_sources(options)
+                run_dir = _create_run_dir(options)
+                from .persistent import current_session
+                session = current_session()
+                predictor = params["predictor"]
+                if (mode == "native" and session is not None and session.model_snapshot_cache is not None
+                        and type(predictor) is NativeModel and predictor.backend == "mlp"):
+                    with session.prepare_model_snapshot() as cache:
+                        model = prepare_model(predictor, contract, options, run_dir, _snapshot_cache=cache)
+                        model_snapshot_info = dict(cache.last)
+                else:
+                    model = prepare_model(predictor, contract, options, run_dir)
+                if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
+>                   raise NativeUnavailable("native Q models require use_child_scores=True")
+E                   multigpubeamsearch.errors.NativeUnavailable: native Q models require use_child_scores=True
+
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:223: NativeUnavailable
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_result_metadata_mutation_cannot_change_the_cached_manifest
+1 failed, 2 warnings in 12.67s

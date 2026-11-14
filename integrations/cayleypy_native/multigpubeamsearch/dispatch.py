@@ -179,10 +179,19 @@ def _discard_fallback_run(run_dir: Path | None) -> None:
 
 
 def _search(original, graph, kwargs, options, mode):
+    from .persistent import current_session
+    session = current_session()
+    if session is None:
+        return _search_impl(original, graph, kwargs, options, mode)
+    with session.search_scope():
+        return _search_impl(original, graph, kwargs, options, mode)
+
+
+def _search_impl(original, graph, kwargs, options, mode):
     mode = _mode(mode)
     if 'reflect_mode' in kwargs or 'reflection_source' in kwargs:
         from .reflection import reflected_search
-        return reflected_search(lambda values: _search(original, graph, values, options, mode), graph, kwargs, mode)
+        return reflected_search(lambda values: _search_impl(original, graph, values, options, mode), graph, kwargs, mode)
     native_fields = {"bfs_radius": "touch_bfs_radius", "bfs_max_entries": "touch_bfs_max_entries",
                      "solution_mode": "solution_mode", "collect_extra_depths": "collect_extra_depths",
                      "max_collected_solutions": "max_collected_solutions"}
@@ -196,6 +205,7 @@ def _search(original, graph, kwargs, options, mode):
         return _torch_call(original, graph, kwargs)
     # NativeUnavailable is recoverable only inside the capability/preparation phase.
     run_dir = None
+    model_snapshot_info = None
     try:
         params = _parameters(kwargs)
         contract = GraphContract.from_graph(graph, params["start_state"])
@@ -208,11 +218,20 @@ def _search(original, graph, kwargs, options, mode):
             from .bootstrap import prepare_sources
             options = prepare_sources(options)
             run_dir = _create_run_dir(options)
-            model = prepare_model(params["predictor"], contract, options, run_dir)
-            if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
-                raise NativeUnavailable("native Q models require use_child_scores=True")
             from .persistent import current_session
             session = current_session()
+            if session is not None and session.model_snapshot_cache is not None:
+                session.model_snapshot_cache.last = None
+            predictor = params["predictor"]
+            if (mode == "native" and session is not None and session.model_snapshot_cache is not None
+                    and type(predictor) is NativeModel and predictor.backend == "mlp"):
+                with session.prepare_model_snapshot() as cache:
+                    model = prepare_model(predictor, contract, options, run_dir, _snapshot_cache=cache)
+                    model_snapshot_info = dict(cache.last)
+            else:
+                model = prepare_model(predictor, contract, options, run_dir)
+            if model.manifest["output_dim"] != 1 and not params["use_child_scores"]:
+                raise NativeUnavailable("native Q models require use_child_scores=True")
             digest_cache = None if session is None else session.nccl_digest_cache
             runtime_kwargs = {"touch_bfs_radius": effective_touch_bfs_radius}
             if digest_cache is None:
@@ -244,6 +263,8 @@ def _search(original, graph, kwargs, options, mode):
         if found and not contract.replay(outcome.path):
             raise NativeBackendError("native solution failed independent graph replay")
         metadata = dict(outcome.metadata)
+        if model_snapshot_info is not None:
+            metadata["model_snapshot"] = dict(session.model_snapshot_cache.last)
         metadata.update({"backend": "native", "graph_hash": contract.graph_hash,
                          "inference_backend": None if runtime is None else runtime.build_metadata.get("inference_backend"),
                          "heuristic": None if model is None else model.manifest.get("heuristic"),

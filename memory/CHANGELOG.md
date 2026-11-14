@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-11-14 experimental session model snapshot reuse
+- Added an explicit, default-OFF session option that reuses one private snapshot
+  for a supplied MLP `NativeModel` in strict native mode. Source, retained bytes,
+  graph/content identity and cache directory are checked on reuse. The session
+  cache entry retains a path, and prior run evidence is not deleted. A worker
+  relaunch snapshots again; only already-loaded compatible workers reuse it.
+- A public search now reserves its session through model/runtime preparation
+  and result assembly. `close()` is rejected during this scope, and `run()`
+  rechecks closed state after acquiring its own lock. Direct entry points reject
+  concurrent use, and failed direct launches release newly-created workers.
+  Reload is bound to the exact prepared model; a contention test covers the
+  interval before a competing owner is published. The existing file loader
+  does not atomically bind its read to prior verification against concurrent
+  file mutation; the transfer register now describes Python validation copies.
+- CPU contract/regression checks are recorded under `test_results/refactor_20261114/`.
+  GPU correctness and paired repeated-call performance are pending; this interim
+  cache is Python-owned and does not complete the Rust preparation migration.
+
 ## 2026-11-14 public index sort: two-RTX-3060 validation
 - The public ON/OFF selection passed 28 bounded session cases per backend on
   one and two RTX 3060 GPUs, with Python and Rust session owners. Linux tests
