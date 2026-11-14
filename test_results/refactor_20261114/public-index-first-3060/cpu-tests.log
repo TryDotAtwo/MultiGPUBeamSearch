@@ -1,0 +1,151 @@
+...........................................F............................ [ 12%]
+.......................................................................s [ 24%]
+sssssssss.s.s.s.s.s.s.sss............................................... [ 36%]
+.............s.......................................................... [ 49%]
+........................................................................ [ 61%]
+........................................................................ [ 73%]
+........................................................................ [ 86%]
+....................sssss............................................... [ 98%]
+..........                                                               [100%]
+=================================== FAILURES ===================================
+_____________ test_runtime_preparation_rechecks_cached_nccl_bytes ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f043ab3ded0>
+tmp_path = PosixPath('/workspace/tmp/index-pytest/test_runtime_preparation_reche0')
+
+    def test_runtime_preparation_rechecks_cached_nccl_bytes(monkeypatch, tmp_path):
+        import hashlib
+        import torch
+        import cayleypy_native.build as build
+        from multigpubeamsearch import nccl_digest
+        from cayleypy_native.backend import prepare_runtime
+    
+        source, cache_root = tmp_path / "source", tmp_path / "cache"
+        (source / "tools").mkdir(parents=True)
+        (source / "CMakeLists.txt").write_text("production_runner", encoding="utf-8")
+        (source / "tools" / "production_runner.cu").write_text("", encoding="utf-8")
+        build_dir = cache_root / "builds" / "fixture"
+        build_dir.mkdir(parents=True)
+        (build_dir / "native-build.json").write_text("{}", encoding="utf-8")
+        include, libdir = tmp_path / "include", tmp_path / "lib"
+        include.mkdir()
+        libdir.mkdir()
+        (include / "nccl.h").write_bytes(b"header")
+        library = libdir / "libnccl.so.2"
+        library.write_bytes(b"first nccl bytes")
+        monkeypatch.setattr(build, "_nccl_locations", lambda: [(include, libdir)])
+        monkeypatch.setattr(build, "prerequisites", lambda options: {})
+        monkeypatch.setattr(build, "source_digest", lambda *args, **kwargs: "source")
+        monkeypatch.setattr(build, "toolchain_identity", lambda programs: {})
+        monkeypatch.setattr(build, "validate_runner", lambda *args: {"test_only": True})
+        monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (8, 0))
+        specifications = []
+        actual_build_key = build.build_key
+    
+        def capture_key(specification):
+            specifications.append((specification["nccl"], actual_build_key(specification)))
+            return "fixture"
+    
+        monkeypatch.setattr(build, "build_key", capture_key)
+        partitions = []
+        original_partition = nccl_digest._digest_partition
+    
+        def capture_partition(*args):
+            partitions.append(True)
+            return original_partition(*args)
+    
+        monkeypatch.setattr(nccl_digest, "_digest_partition", capture_partition)
+        digest_cache = nccl_digest.ChunkDigestCache(chunk_bytes=4, workers=2)
+        options = NativeOptions(source_dir=source, cutlass_dir=tmp_path, cache_dir=cache_root,
+                                inference_backend="cutlass", autotune=False)
+        model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
+        contract = SimpleNamespace(state_len=8, move_count=2)
+        for _ in range(2):
+>           prepare_runtime(contract, model, options, tmp_path / "run", (0,), nccl_digest_cache=digest_cache)
+
+integrations/cayleypy_native/tests/test_backend.py:263: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+integrations/cayleypy_native/multigpubeamsearch/backend.py:188: in prepare_runtime
+    runner, metadata = ensure_runner(contract, model, options, architectures, run_dir,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+contract = namespace(state_len=8, move_count=2)
+model = namespace(backend='mlp', manifest={'dtype': 'fp16', 'output_dim': 1})
+options = NativeOptions(source_dir=PosixPath('/workspace/tmp/index-pytest/test_runtime_preparation_reche0/source'), cache_dir=Po..._calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False, experimental_index_sort=False)
+architectures = (80,)
+run_dir = PosixPath('/workspace/tmp/index-pytest/test_runtime_preparation_reche0/run')
+nccl_digest_cache = <multigpubeamsearch.nccl_digest.ChunkDigestCache object at 0x7f043ab3fdd0>
+
+    def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_dir: Path, *, nccl_digest_cache=None) -> tuple[Path, dict[str, Any]]:
+        if options.runner_path is not None:
+            metadata = validate_runner(options.runner_path, contract, model.backend, architectures)
+            _validate_index_sort(metadata, options.experimental_index_sort)
+            observed = metadata.get("inference_backend", "cutlass")
+            if observed != options.inference_backend:
+                raise NativeUnavailable("existing runner inference backend does not match GPU selection")
+            if nccl_digest_cache is not None:
+                recorded = metadata.get("nccl")
+                fields = ("include_dir", "library", "header_sha256", "library_sha256")
+                if not isinstance(recorded, dict) or any(not isinstance(recorded.get(name), str) for name in fields):
+                    raise NativeBackendError("NCCL provenance is missing from prepared runner metadata")
+                try:
+                    current = _nccl_identity(Path(recorded["include_dir"]), Path(recorded["library"]),
+                                             digest_cache=nccl_digest_cache)
+                except NativeUnavailable as exc:
+                    raise NativeBackendError("NCCL is unavailable or changed since runner preparation") from exc
+                if any(recorded[name] != current[name] for name in fields):
+                    raise NativeBackendError("NCCL changed since runner preparation")
+            return options.runner_path, metadata
+        programs = prerequisites(options)
+        source, cutlass = options.source_dir, options.cutlass_dir
+        cmake_text = (source / "CMakeLists.txt").read_text(encoding="utf-8")
+        target = "production_runner_libtorch_stream1" if options.inference_backend == "libtorch" or model.backend != "mlp" else "production_runner"
+        calibration_target = ('stream1_ensemble_benchmark' if model.backend == 'ensemble' else
+            ('stream1_native_mlp_benchmark' if options.inference_backend == 'cutlass' else
+             'stream1_libtorch_mlp_benchmark') if model.backend == 'mlp' and options.autotune else None)
+        if target not in cmake_text or (model.backend == "piece_transformer" and "BEAM_ENABLE_LIBTORCH_STREAM1" not in cmake_text):
+            raise NativeUnavailable(f"configured native source does not expose compatible target {target}")
+        nccl = discover_nccl() if nccl_digest_cache is None else discover_nccl(digest_cache=nccl_digest_cache)
+        specification = {"schema_version": 1, "shape": shape_contract(contract), "backend": model.backend,
+                         "cuda_architectures": list(architectures), "source_digest": source_digest(source),
+                         "cutlass_digest": source_digest(cutlass, cutlass=True),
+                         "toolchain": toolchain_identity(programs), "target": target, "nccl": nccl,
+                         "build_mode": "release-debug-logs-v1", "inference_backend": options.inference_backend,
+                         'calibration_binary_name': calibration_target}
+        if options.experimental_index_sort:
+            # Omission for the default preserves the identity of legacy OFF builds.
+            specification['experimental_index_sort'] = True
+        if calibration_target == 'stream1_ensemble_benchmark':
+            helper_source = (source / 'tools' / 'stream1_ensemble_benchmark.cpp').read_text(encoding='utf-8')
+            specification['calibration_protocol'] = 'json-session-v1' if '--session' in helper_source else 'oneshot'
+        specification['plan_calibration_protocol'] = ('json-session-v1' if
+            'BEAM_CALIBRATION_PLAN_SESSION' in (source / 'tools' / 'production_runner.cu').read_text(encoding='utf-8') else 'oneshot')
+        specification['frontier_calibration_protocol'] = ('natural-growth-v1' if
+            'BEAM_BENCHMARK_GROW_STEPS' in (source / 'tools' / 'production_runner.cu').read_text(encoding='utf-8') else 'fixture-v1')
+        specification['component_calibration_protocol'] = ('exact-capacity-v1' if
+            'BEAM_CALIBRATION_COMPONENT_ONLY' in (source / 'tools' / 'production_runner.cu').read_text(encoding='utf-8') else None)
+        if calibration_target or options.inference_backend == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
+            import torch
+            specification["torch"] = {"version": torch.__version__, "cuda": torch.version.cuda,
+                                      "cxx11_abi": bool(torch._C._GLIBCXX_USE_CXX11_ABI),
+                                      "cmake_prefix": str(torch.utils.cmake_prefix_path)}
+        key = build_key(specification)
+        build_dir = options.cache_dir / "builds" / key
+        runner = build_dir / target
+        if (build_dir / "native-build.json").is_file():
+            metadata = validate_runner(runner, contract, model.backend, architectures)
+            _validate_index_sort(metadata, options.experimental_index_sort)
+            if metadata.get('build_key') != key or any(metadata.get(k) != v for k, v in specification.items()):
+>               raise NativeBackendError("cached native runner build key or provenance does not match the request")
+E               multigpubeamsearch.errors.NativeBackendError: cached native runner build key or provenance does not match the request
+
+integrations/cayleypy_native/multigpubeamsearch/build.py:281: NativeBackendError
+=============================== warnings summary ===============================
+../../opt/conda/lib/python3.11/site-packages/torch/cuda/__init__.py:182
+  /opt/conda/lib/python3.11/site-packages/torch/cuda/__init__.py:182: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+    return torch._C._cuda_getDeviceCount() > 0
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_backend.py::test_runtime_preparation_rechecks_cached_nccl_bytes
+1 failed, 560 passed, 25 skipped, 1 warning in 16.81s

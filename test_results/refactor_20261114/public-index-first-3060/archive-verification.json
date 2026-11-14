@@ -1,0 +1,22 @@
+{
+  "archive_sha256": "145c263c0251ed62e631db12fbb9b4f97f0ed1dd4044ae568c292c68e8c13380",
+  "records": 14,
+  "blobs": 14,
+  "omitted": 0,
+  "extracted": [
+    "beam-results/public-index-20261114/commit.txt",
+    "beam-results/public-index-20261114/cpu-tests.log",
+    "beam-results/public-index-20261114/cutlass-commit.txt",
+    "beam-results/public-index-20261114/gpu-probe.log",
+    "beam-results/public-index-20261114/gpus.csv",
+    "beam-results/public-index-20261114/inputs-before.sha256",
+    "beam-results/public-index-20261114/rust-build.log",
+    "beam-results/public-index-20261114/rust-tests.log",
+    "beam-results/public-index-20261114/software.txt",
+    "beam-results/public-index-20261114/status.txt",
+    "public-index-run.log"
+  ],
+  "restored_samples": [
+    "beam-work/integrations/cayleypy_native/multigpubeamsearch/_bin/beam-runner"
+  ]
+}

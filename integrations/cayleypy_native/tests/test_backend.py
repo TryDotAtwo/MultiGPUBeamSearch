@@ -236,16 +236,20 @@ def test_runtime_preparation_rechecks_cached_nccl_bytes(monkeypatch, tmp_path):
     monkeypatch.setattr(build, "prerequisites", lambda options: {})
     monkeypatch.setattr(build, "source_digest", lambda *args, **kwargs: "source")
     monkeypatch.setattr(build, "toolchain_identity", lambda programs: {})
-    monkeypatch.setattr(build, "validate_runner", lambda *args: {"test_only": True})
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (8, 0))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda d: "mock GPU")
     specifications = []
+    current_specification = []
     actual_build_key = build.build_key
 
     def capture_key(specification):
         specifications.append((specification["nccl"], actual_build_key(specification)))
+        current_specification[:] = [dict(specification)]
         return "fixture"
 
     monkeypatch.setattr(build, "build_key", capture_key)
+    monkeypatch.setattr(build, "validate_runner",
+                        lambda *args: dict(current_specification[0], build_key="fixture"))
     partitions = []
     original_partition = nccl_digest._digest_partition
 

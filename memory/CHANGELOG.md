@@ -9,6 +9,9 @@
   remains readable by the earlier extension.
 - CPU contract/regression evidence and outstanding hardware checks are in
   `test_results/refactor_20261114/STAGE_PUBLIC_INDEX_SORT.md`.
+- The first remote Rust suite passed. Its full Linux suite exposed an obsolete
+  mocked build receipt, now corrected; driver 535 could not initialize the
+  CUDA 12.8 container, so GPU validation moved to a compatible host.
 
 ## 2026-11-14 two-RTX-3060 NCCL identity validation
 - Linux regression: 570 passed, 9 skipped. CUTLASS and LibTorch public-session

@@ -30,3 +30,12 @@ interpreter shutdown; pytest itself exited zero after reporting its result.
 
 Hardware compilation, the Rust test suite, a real public session with option
 changes, and paired end-to-end/step measurements remain pending in this stage.
+
+The first Vast host had two RTX 3060 GPUs but NVIDIA driver 535.161.07. Its Rust
+workspace tests and release build passed, while PyTorch CUDA 12.8 initialization
+failed with error 804; no GPU workload ran. The Linux suite also found an older
+mock that did not produce the now-required build metadata: 560 passed, 25
+skipped, one failed. The corrected CPU fixture passed locally in
+`index-public-backend-fixture-green.log`. This initial host was released after
+its evidence archive was verified; see `public-index-first-3060/`. GPU checks
+still require a host with a compatible driver.
