@@ -29,6 +29,7 @@ class CnotResult:
 class _InputMatrix:
     n: int
     raw: bytes
+    root: torch.Tensor
     rows: tuple[int, ...] | None = None
     rust_matrix: object | None = None
 
@@ -73,7 +74,10 @@ def _input(root, width, shortlist, depth, mode, validation="python"):
         raise ValueError("mode must be qhat or proposal")
     if validation not in ("python", "rust"):
         raise ValueError("validation must be python or rust")
-    raw = root.detach().contiguous().cpu().numpy().tobytes()
+    # Validate and search the same owned tensor. The caller may reuse or mutate
+    # its tensor after admission; a contiguous() call alone can still alias it.
+    snapshot = root.detach().clone(memory_format=torch.contiguous_format)
+    raw = snapshot.cpu().numpy().tobytes()
     if validation == "rust":
         from .errors import NativeUnavailable
         from .rust_control import extension
@@ -81,7 +85,7 @@ def _input(root, width, shortlist, depth, mode, validation="python"):
         matrix_type = getattr(extension(), "CnotMatrix", None)
         if matrix_type is None:
             raise NativeUnavailable("Rust runtime lacks CNOT input validation; rebuild the matching PyO3 module")
-        return _InputMatrix(n, raw, rust_matrix=matrix_type(n, raw))
+        return _InputMatrix(n, raw, snapshot, rust_matrix=matrix_type(n, raw))
     rows = tuple(int.from_bytes(raw[i:i + 8 * words], "little") for i in range(0, len(raw), 8 * words))
     if any(row.bit_length() > n for row in rows):
         raise ValueError("nonzero CNOT row padding")
@@ -92,7 +96,7 @@ def _input(root, width, shortlist, depth, mode, validation="python"):
         if not row:
             raise ValueError("CNOT matrix is singular")
         pivots[row.bit_length()] = row
-    return _InputMatrix(n, raw, rows=rows)
+    return _InputMatrix(n, raw, snapshot, rows=rows)
 
 
 def _goal(world, parents, lex, begin, identity):
@@ -192,6 +196,7 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
     with World(root.device) as world:
         input_matrix = world.checked("validate CNOT input",
                                      lambda: _input(root, width, shortlist, max_depth, mode, validation))
+        root = input_matrix.root
         metadata = getattr(scorer, "metadata", {})
         fingerprints = ("upstream_commit", "checkpoint_sha256", "feature_registry_sha256",
                         "training_manifest_sha256", "training_result_sha256")

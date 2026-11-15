@@ -34,6 +34,11 @@ rank processes after their ABI/layout and specialization checks.
   is a control-major physical ID and construction replay compares all words.
   Each rank must select the same validator; an unavailable extension fails
   closed. This does not move CNOT search or its model scorer into Rust/C++.
+- CNOT validation, rank identity, the identity fast path and search must use
+  the same owned contiguous device snapshot, not a mutable caller alias. The
+  caller must synchronize concurrent writes during snapshot creation; an
+  atomic cross-stream capture is not provided. The retained copy is at most
+  8192 bytes for the supported CNOT geometry.
 - A managed Rust permutation session must bind the validated CayleyPy graph hash
   to the actual center and ordered generators loaded by every native rank. An
   unsupported worker or missing ABI extension must fail before search. The

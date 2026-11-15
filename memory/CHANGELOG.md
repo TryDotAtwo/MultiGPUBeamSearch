@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-15 CNOT input snapshot ownership
+- The CNOT adapter now validates and searches the same owned, contiguous
+  device snapshot. A caller mutation after validation previously could change
+  the searched matrix and even produce an incorrect empty solution. The one
+  extra same-device copy per search is at most 8192 bytes; callers still need
+  to synchronize writes during capture. The Python search loop is unchanged.
+- A regression reproduced the old failure, then passed for both validators and
+  contiguous/strided inputs. The Linux suite reported 651 passed, 11 skipped;
+  public CPU/Gloo and RTX 3060/NCCL tests used the real PyO3 validator on one
+  and two ranks. The source-bound receipt independently replayed 12 paths and
+  checked 24 rank-local snapshot cases. See
+  `test_results/refactor_20261115/STAGE_CNOT_INPUT_SNAPSHOT.md`.
+
 ## 2026-11-15 experimental Stream 4 dirty-run merge
 - Added an off-by-default CMake path that compacts a sorted clean prefix, sorts
   only dirty Hash128/index pairs, merges both runs and applies the existing

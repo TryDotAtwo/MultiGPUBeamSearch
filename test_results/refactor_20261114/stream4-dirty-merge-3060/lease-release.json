@@ -12,8 +12,10 @@
   "estimated_gpu_disk_usd_lower": 0.15714035311922617,
   "estimated_gpu_disk_usd_upper": 0.1732195135799455,
   "cost_scope": "elapsed GPU/disk estimate; excludes network and final invoice adjustments",
-  "destroy_observation": "Destroy CLI exited zero but returned non-JSON text; the wrapper raised a JSON parse error and did not retain that text. Fresh provider inventories then confirmed the instance absent.",
+  "destroy_observation": "Destroy CLI exited zero but returned output that was not valid JSON; the wrapper raised a JSON parse error and did not retain that text. Fresh provider inventories then confirmed the instance absent.",
   "task_guard_pid": 5868,
   "task_guard_state": "no process with this PID exists at verification",
-  "evidence_sha256": "e1ce4689c4a2c74d8387d3036532e14c7bc4dda47181833e6bc100016a073d7f"
+  "evidence_sha256": "e1ce4689c4a2c74d8387d3036532e14c7bc4dda47181833e6bc100016a073d7f",
+  "task_guard_outside_sandbox_check": "PID 5868 absent in a later elevated process inventory",
+  "task_guard_outside_sandbox_check_utc": "2026-11-15T02:38:39.385747+00:00"
 }

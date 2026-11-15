@@ -103,6 +103,48 @@ def test_explicit_rust_validation_fails_closed_for_old_extension(monkeypatch):
                     validation="invalid")
 
 
+@pytest.mark.parametrize("validation", ["python", "rust"])
+@pytest.mark.parametrize("original_gate", [False, True])
+@pytest.mark.parametrize("strided", [False, True])
+def test_validated_cnot_snapshot_is_the_matrix_used_by_search(monkeypatch, validation, original_gate, strided):
+    from types import SimpleNamespace
+    from multigpubeamsearch import rust_control
+
+    class Matrix:
+        def __init__(self, n, raw):
+            self.n = n
+            self.rows = tuple(int.from_bytes(raw[i:i + 8], "little") for i in range(0, len(raw), 8))
+
+        def verifies_construction(self, gates):
+            return replay_cnot(self.n, gates) == self.rows
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(CnotMatrix=Matrix))
+    gate = 0
+    original = replay_cnot(4, (gate,) if original_gate else ())
+    replacement = replay_cnot(4, () if original_gate else (gate,))
+    root = pack_rows(original)
+    if strided:
+        backing = torch.empty((1, 8, 1), dtype=torch.int64)
+        root = backing[:, ::2, :]
+        root.copy_(pack_rows(original))
+        assert not root.is_contiguous()
+    gather_fixed = World.gather_fixed
+    changed = False
+
+    def mutate_caller_tensor_after_validation(world, tensor):
+        nonlocal changed
+        if not changed:
+            root.copy_(pack_rows(replacement))
+            changed = True
+        return gather_fixed(world, tensor)
+
+    monkeypatch.setattr(World, "gather_fixed", mutate_caller_tensor_after_validation)
+    result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1, validation=validation)
+    assert changed and result.status == "solved"
+    assert result.gates == ((gate,) if original_gate else ())
+    assert replay_cnot(4, result.gates) == original
+
+
 def _distributed(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2, timeout=timedelta(seconds=60))

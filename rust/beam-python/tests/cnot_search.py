@@ -17,6 +17,7 @@ sys.modules["_beam_runtime"] = runtime
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
 
 from multigpubeamsearch.cnot import pack_rows, replay_cnot, search_cnot
+from multigpubeamsearch.cnot_collectives import World
 from multigpubeamsearch.rust_control import extension
 from verify_cnot import WireFixture, wide_case
 
@@ -56,6 +57,34 @@ try:
                            for edge in actual.path_routes)
         records.append(dict(rows=list(rows), options=options, reference=asdict(reference),
                             rust=asdict(actual)))
+
+    for validation in ("python", "rust"):
+        for original_gate in (False, True):
+            original = replay_cnot(4, (0,) if original_gate else ())
+            replacement = replay_cnot(4, () if original_gate else (0,))
+            backing = torch.empty((1, 8, 1), dtype=torch.int64, device=device)
+            root = backing[:, ::2, :]
+            root.copy_(pack_rows(original, device=device))
+            assert not root.is_contiguous()
+            gather = World.gather_fixed
+            changed = [False]
+
+            def mutate_after_validation(world, tensor):
+                if not changed[0]:
+                    root.copy_(pack_rows(replacement, device=device))
+                    changed[0] = True
+                return gather(world, tensor)
+
+            World.gather_fixed = mutate_after_validation
+            try:
+                result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1,
+                                     validation=validation)
+            finally:
+                World.gather_fixed = gather
+            assert changed[0] and result.gates == ((0,) if original_gate else ())
+            assert replay_cnot(4, result.gates) == original
+            records.append(dict(snapshot_validation=validation, original_gate=original_gate,
+                                strided_input=True, gates=list(result.gates)))
 
     if distributed:
         try:

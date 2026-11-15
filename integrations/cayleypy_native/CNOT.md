@@ -75,6 +75,11 @@ collectives, and checkpoint scorer still use the existing implementation.
   for 2–256 wires. A 144-wire matrix takes 3,456 bytes. Source rank and physical
   gate each occupy 16 bits in a route. The scheduler entry points accept up to
   128 ranks, the native permutation runner's current exchange limit.
+- Each search copies its input to one owned contiguous tensor on the same device
+  before validation. Its host validation bytes and the search frontier refer to
+  that snapshot, even if the caller later changes the original. The device copy
+  is at most 8192 bytes. Concurrent writes during initial capture must be ordered
+  by the caller; copying is not an atomic cross-stream operation.
 - Before shortlisting, every parent is checked for a one-gate completion over the
   entire alphabet. `qhat` selects smaller action estimates, `proposal` selects
   larger raw logits. Both break head-score ties by physical ID.
