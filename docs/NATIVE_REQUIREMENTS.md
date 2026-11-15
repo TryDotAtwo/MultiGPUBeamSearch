@@ -29,6 +29,11 @@ rank processes after their ABI/layout and specialization checks.
   remains 32 bytes and aligned to 32. Stream3 retains original candidate IDs.
 - Persistent permutation padding stays zero. CNOT packed matrices retain their
   separate geometry and full-word equality checks.
+- A managed Rust permutation session must bind the validated CayleyPy graph hash
+  to the actual center and ordered generators loaded by every native rank. An
+  unsupported worker or missing ABI extension must fail before search. The
+  bound target is the central state; the separate repair mode requires its own
+  contract. Names and storage padding are excluded from this graph hash.
 - All-rank admission preserves the exact requested beam; alignment affects physical
   capacities. Buffer overflow reports required/available sizes, never a smaller search.
 - Stream4 uses threshold, compaction, fixed-scratch sort/reduce and compaction;

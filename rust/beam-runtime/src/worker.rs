@@ -62,6 +62,14 @@ pub fn run_native_worker(library: &NativeLibrary, args: &[String], root: &Path) 
     let owner = beam_native_sys::parent_process_id();
     let stopped = || root.join("stop").exists() || beam_native_sys::parent_process_id() != owner;
     let mut context = library.context()?;
+    if let Some(hash) = env::var_os("BEAM_EXPECTED_GRAPH_HASH") {
+        let hash = hash
+            .into_string()
+            .map_err(|_| Error::Message("expected graph hash is not valid UTF-8".into()))?;
+        context.set_graph_hash(&hash)?;
+    } else if env::var("BEAM_REQUIRE_LOADED_GRAPH_BINDING").as_deref() == Ok("1") {
+        return Err(Error::Message("missing expected graph hash".into()));
+    }
     context.set_history(Box::<crate::history::HistoryService>::default())?;
     context.prepare(args)?;
     while !context.wait(Duration::from_millis(20))? {

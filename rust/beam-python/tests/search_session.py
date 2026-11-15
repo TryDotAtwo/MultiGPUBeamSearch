@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory() as directory:
     worker.write_text('''import sys,os,json,time
 from pathlib import Path
 if '--resident-protocol-info' in sys.argv:
- print('{"protocol":"resident-search-v1"}',flush=True);raise SystemExit(0)
+ print(json.dumps(dict(protocol='resident-search-v1',loaded_graph_binding=1)),flush=True);raise SystemExit(0)
 directory=Path(os.environ['BEAM_SESSION_DIR'])
 while not (directory/'stop').exists():time.sleep(.002)
 ''')

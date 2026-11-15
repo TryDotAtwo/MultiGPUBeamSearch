@@ -285,17 +285,28 @@ impl SearchSession {
                     "empty native launch/protocol command".into(),
                 ));
             }
+            // These values belong to the validated session, not its caller's
+            // environment. Requiring the capability makes an old worker fail
+            // before it can silently ignore the graph identity.
+            let mut environment = launch.environment.clone();
+            environment.insert(
+                "BEAM_EXPECTED_GRAPH_HASH".into(),
+                identity.graph_hash.clone(),
+            );
+            environment.insert("BEAM_REQUIRE_LOADED_GRAPH_BINDING".into(), "1".into());
             let mut probe = ProbeSession::launch(
                 &launch.protocol_command,
                 &launch.cwd,
-                &launch.environment,
+                &environment,
                 &run_dir.join("resident-protocol.log"),
                 remaining()?.min(Duration::from_secs(15)),
             )?;
             probe.bind_cancellation(self.cancellation.clone());
             let reply = probe.receive(remaining()?.min(Duration::from_secs(15)))?;
-            if reply != json!({"protocol":"resident-search-v1"}) {
-                return Err(Error::Message("runner lacks resident-search-v1".into()));
+            if reply != json!({"protocol":"resident-search-v1", "loaded_graph_binding":1}) {
+                return Err(Error::Message(
+                    "runner lacks resident-search-v1 loaded graph binding".into(),
+                ));
             }
             probe.finish(remaining()?.min(Duration::from_secs(15)))?;
             remaining()?;
@@ -304,7 +315,7 @@ impl SearchSession {
                 identity.devices.len() as u32,
                 &run_dir.join("resident-session"),
                 &launch.cwd,
-                &launch.environment,
+                &environment,
             )?;
             workers.bind_parent_cancellation(self.cancellation.clone());
             self.workers = Some(workers);

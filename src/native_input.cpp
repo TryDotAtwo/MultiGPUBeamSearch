@@ -8,12 +8,57 @@
 #include <fstream>
 #include <set>
 #include <stdexcept>
+#include <string_view>
 
 namespace beam::input {
 bool lowercase_sha256(const std::string& value) {
     return value.size() == 64 && std::all_of(value.begin(), value.end(), [](char c) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
     });
+}
+
+std::string loaded_permutation_graph_sha256(const State128& center,
+                                           const std::vector<std::uint8_t>& generators) {
+    if (generators.size() != static_cast<std::size_t>(MOVE_COUNT) * STATE_STORAGE_LEN)
+        throw std::runtime_error("loaded generator buffer size mismatch");
+    picosha2::hash256_one_by_one hasher;
+    std::array<char, 4096> buffer{};
+    std::size_t used = 0;
+    const auto flush = [&] {
+        hasher.process(buffer.data(), buffer.data() + used);
+        used = 0;
+    };
+    const auto append = [&](std::string_view text) {
+        while (!text.empty()) {
+            const auto count = std::min(text.size(), buffer.size() - used);
+            std::memcpy(buffer.data() + used, text.data(), count);
+            used += count;
+            text.remove_prefix(count);
+            if (used == buffer.size()) flush();
+        }
+    };
+    const auto array = [&](const std::uint8_t* values) {
+        append("[");
+        for (std::size_t i = 0; i < STATE_LEN; ++i) {
+            if (i) append(", ");
+            char digits[3];
+            const auto result = std::to_chars(digits, digits + sizeof digits,
+                                              static_cast<unsigned>(values[i]));
+            append(std::string_view(digits, static_cast<std::size_t>(result.ptr - digits)));
+        }
+        append("]");
+    };
+    append("{\"central_state\": ");
+    array(center.v);
+    append(", \"generators\": [");
+    for (std::size_t i = 0; i < MOVE_COUNT; ++i) {
+        if (i) append(", ");
+        array(generators.data() + i * STATE_STORAGE_LEN);
+    }
+    append("], \"generators_type\": \"PERMUTATION\"}");
+    flush();
+    hasher.finish();
+    return picosha2::get_hash_hex_string(hasher);
 }
 
 std::string mlp_artifact_sha256(const std::string& manifest, const std::string& graph_hash,

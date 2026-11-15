@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-11-15 native-loaded permutation graph binding
+- A Rust resident session now supplies its validated graph hash through an
+  optional ABI-1 extension. Each native rank hashes its actual loaded center
+  and ordered generators before model/GPU setup and rejects mismatches; the
+  worker capability probe and missing-extension check fail closed. The normal
+  legacy protocol response remains compatible. Bound sessions reject a changed
+  target and the separate repair mode. CNOT and inference kernels are unchanged.
+- Linux Rust, explicit FFI, ASan/UBSan and CTest checks passed; Python reported
+  643 passed and 9 skipped. Four bounded public one/two-RTX-3060 searches had
+  replayed paths; five mismatched-graph/target/mode cases, including a bad
+  second rank, failed as intended and their workers were reaped. Unfiltered
+  Compute Sanitizer memcheck attached to the real one-GPU rank and reported
+  zero errors and zero bytes leaked. No performance claim is made. Provenance,
+  the initial SIGINT harness failure, cost and limits are recorded in
+  `test_results/refactor_20261114/STAGE_NATIVE_GRAPH_BINDING.md`.
+
 ## 2026-11-15 single-read native generator ownership
 - The permutation runner now obtains generator bytes and names from one parsed
   file read, and borrows both vectors from the same owner. It retains the

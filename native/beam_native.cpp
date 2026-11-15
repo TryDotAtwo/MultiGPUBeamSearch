@@ -61,6 +61,18 @@ beam_result beam_context_create(uint32_t version, beam_context** out) {
     try { *out = new beam_context; return BEAM_OK; }
     catch(...) { occupied = false; return BEAM_FAILED; }
 }
+beam_result beam_context_set_graph_hash(beam_context* ctx, const char* hash, uint64_t length) {
+    if(!ctx || !hash || length != 64) return BEAM_INVALID;
+    try {
+        for(uint64_t i = 0; i < length; ++i)
+            if(!((hash[i] >= '0' && hash[i] <= '9') || (hash[i] >= 'a' && hash[i] <= 'f')))
+                return BEAM_INVALID;
+        std::lock_guard lock(ctx->control.mutex);
+        if(ctx->control.phase != BEAM_CREATED) return BEAM_BUSY;
+        ctx->control.expected_graph_hash.assign(hash, static_cast<std::size_t>(length));
+        return BEAM_OK;
+    } catch(...) { return BEAM_FAILED; }
+}
 beam_result beam_context_prepare(beam_context* ctx, int argc, const char* const* argv) {
     if(!ctx) return BEAM_INVALID;
     try {

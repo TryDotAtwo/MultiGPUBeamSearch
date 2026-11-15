@@ -1,0 +1,8 @@
+[ 83%] Built target beam_core
+[ 83%] Building CXX object CMakeFiles/native_loaded_graph_hash_tests.dir/tests/native_loaded_graph_hash_tests.cpp.o
+[100%] Linking CXX executable native_loaded_graph_hash_tests
+[100%] Built target native_loaded_graph_hash_tests
+[ 50%] Built target beam_native_transport
+[ 50%] Building CXX object CMakeFiles/native_abi_tests.dir/tests/native_abi_tests.cpp.o
+[100%] Linking CXX executable native_abi_tests
+[100%] Built target native_abi_tests

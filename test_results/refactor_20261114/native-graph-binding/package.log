@@ -1,0 +1,100 @@
+warning: in the working copy of 'native/beam_native.cpp', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'native/beam_native.h', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'native/engine_control.hpp', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rust/beam-cli/src/main.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rust/beam-native-sys/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rust/beam-native-sys/tests/context.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rust/beam-python/tests/interrupt.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rust/beam-python/tests/search_session.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rust/beam-runtime/src/search_session.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rust/beam-runtime/src/worker.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rust/beam-runtime/tests/search_session.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/native_abi_tests.cpp', LF will be replaced by CRLF the next time Git touches it
+{
+  "base_commit": "d98b4900a8ba3c7babb300700379ff6b0cd5eb80",
+  "baseline_count": 500,
+  "overlay_files": {
+    "CMakeLists.txt": {
+      "sha256": "fddf7c531260344cc137708df72416ec919e694181f6ac66aa9fc5c8f1d9e1ee",
+      "normalized_lf_sha256": "e95f4303e3be2910b082023d3d7717399324eda5cff8cbcee750cf12fe3d64ed"
+    },
+    "native/beam_native.cpp": {
+      "sha256": "51036ab4ddbf72efa5f96f98bc5519edc1e12e65f1d5012ab1505c88bacf6e53",
+      "normalized_lf_sha256": "51036ab4ddbf72efa5f96f98bc5519edc1e12e65f1d5012ab1505c88bacf6e53"
+    },
+    "native/beam_native.h": {
+      "sha256": "5e5cc458a6332cc1086a58f233433a2438bf672bed245b907b7e22ab5ceaadd8",
+      "normalized_lf_sha256": "5e5cc458a6332cc1086a58f233433a2438bf672bed245b907b7e22ab5ceaadd8"
+    },
+    "native/engine_control.hpp": {
+      "sha256": "ad7e78bba590b8825e607605ab7057ec31d2c83d693c1caca0461166afd88df0",
+      "normalized_lf_sha256": "ad7e78bba590b8825e607605ab7057ec31d2c83d693c1caca0461166afd88df0"
+    },
+    "rust/beam-cli/src/main.rs": {
+      "sha256": "4635483ac4373f5a861b2cf69aa69894bae64324dcc1541aca7373783cf7fa7f",
+      "normalized_lf_sha256": "4635483ac4373f5a861b2cf69aa69894bae64324dcc1541aca7373783cf7fa7f"
+    },
+    "rust/beam-native-sys/src/lib.rs": {
+      "sha256": "a3d968bae28e14db6e75656647d3d7760c3ff979919959f557be0fdefd7be98d",
+      "normalized_lf_sha256": "a3d968bae28e14db6e75656647d3d7760c3ff979919959f557be0fdefd7be98d"
+    },
+    "rust/beam-native-sys/tests/context.rs": {
+      "sha256": "8d12c9b53fc5fb1813e6cf5fe6f69ac63842005e94cea48ab3c6078080ff915c",
+      "normalized_lf_sha256": "8d12c9b53fc5fb1813e6cf5fe6f69ac63842005e94cea48ab3c6078080ff915c"
+    },
+    "rust/beam-python/tests/interrupt.py": {
+      "sha256": "7aaa77af4f8c7e577da0ca72a487ef2d93270454f7307bf31bc540736075307f",
+      "normalized_lf_sha256": "7aaa77af4f8c7e577da0ca72a487ef2d93270454f7307bf31bc540736075307f"
+    },
+    "rust/beam-python/tests/search_session.py": {
+      "sha256": "ca9b413829ee9be77e1a2390ca2b6062ad335405d4a3e6842db08b226c7a4d8f",
+      "normalized_lf_sha256": "ca9b413829ee9be77e1a2390ca2b6062ad335405d4a3e6842db08b226c7a4d8f"
+    },
+    "rust/beam-runtime/src/search_session.rs": {
+      "sha256": "139f7dd52d17c32f503ac9f28e546ae8629d6c1609c40ee4de4b4ec3a9cdc7e2",
+      "normalized_lf_sha256": "139f7dd52d17c32f503ac9f28e546ae8629d6c1609c40ee4de4b4ec3a9cdc7e2"
+    },
+    "rust/beam-runtime/src/worker.rs": {
+      "sha256": "c731a90f22e21db7e0005387547ced15acf3d0538db2591e068e0ece51985d5d",
+      "normalized_lf_sha256": "c731a90f22e21db7e0005387547ced15acf3d0538db2591e068e0ece51985d5d"
+    },
+    "rust/beam-runtime/tests/search_session.rs": {
+      "sha256": "58b61acf884a5f155cb14e086d8207e4e3c302148502f82318b23bf6c1a9b4b8",
+      "normalized_lf_sha256": "58b61acf884a5f155cb14e086d8207e4e3c302148502f82318b23bf6c1a9b4b8"
+    },
+    "src/native_input.cpp": {
+      "sha256": "deacec4221ec0db64a8017b44ffeef008ce43dddb145ecb5b578e913fdf83bc8",
+      "normalized_lf_sha256": "105dde42cd564188495af2730e3d1fe7a06eb92fdefd1f2e984acffc0284df51"
+    },
+    "src/native_input.hpp": {
+      "sha256": "85182f9479e9224298274e86a422d8e2053f5783cf8f46bd575b6edbc5ec6033",
+      "normalized_lf_sha256": "b44df141d2e54973a45503638cf6e1566a7c5b6141495140de2cd256d3d5f9e2"
+    },
+    "tests/native_abi_tests.cpp": {
+      "sha256": "9d42313cc8109ef2905b22f3326a350508d1cd119c2e0449cb0c7ffbbd46df4f",
+      "normalized_lf_sha256": "9d42313cc8109ef2905b22f3326a350508d1cd119c2e0449cb0c7ffbbd46df4f"
+    },
+    "tests/native_loaded_graph_binding_gpu.py": {
+      "sha256": "421cd6fb357c997b05a47a5bd8629872b1174b9a2309ef9cda612f6c98cb0bfb",
+      "normalized_lf_sha256": "421cd6fb357c997b05a47a5bd8629872b1174b9a2309ef9cda612f6c98cb0bfb"
+    },
+    "tests/native_loaded_graph_hash_tests.cpp": {
+      "sha256": "e97cf1bca63c9c97edcdb6ff225dd6df5d8123031163f0c3cd2ee36ac95d0c64",
+      "normalized_lf_sha256": "e97cf1bca63c9c97edcdb6ff225dd6df5d8123031163f0c3cd2ee36ac95d0c64"
+    },
+    "tools/production_runner.cu": {
+      "sha256": "2f798ae5fa31ba6ebf51187b04c9d21064be5bf20033f52fefd251d0e8ab923b",
+      "normalized_lf_sha256": "8bf54363b1951b24107a39db01feed7a52eb3d5a26d40f2b833d1edf3e9092a5"
+    }
+  },
+  "inputs": {
+    "graph-base.tar.gz": "641610a5af8056f08ebf65ce16e8854ec03cb3e3ea2d69f07f4c50fb4fd4a253",
+    "graph-overlay.tar.gz": "7e953ed98b59d5196911877fbaa7437d68d559c5570f0db1ef5e945977982d27",
+    "graph-cutlass.tar.gz": "458b5d80f344652d61fe011b557968cd58e9583a96f0ab0823ecc4dc9dc0f0c6",
+    "graph-run.sh": "132ea09250c1ca7323f0f583f5e8cfa4ae115ae9a592286c94dcddc2b33766fb",
+    "graph-archive.py": "c11fd0b932c45cb772ca9244a01e1146abb028ed3c1bf8686aa0011000a4cdbc",
+    "graph-driver.sh": "337157c3ef338a476073422cfc5f6bff9657cb81c83b58c59e26f4b8241e267e"
+  },
+  "bundle_sha256": "d15b25f4ba1ceb8e3466e38810611fc3b71298278e6bd74f1d6a79662e15f900",
+  "bundle_bytes": 3297280
+}

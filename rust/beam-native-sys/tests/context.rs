@@ -53,6 +53,18 @@ fn real_ffi_context_reuses_copied_jobs_and_propagates_errors() {
     );
     {
         let mut ctx = library.context().unwrap();
+        assert!(ctx.set_graph_hash(&"A".repeat(64)).is_err());
+        assert!(ctx.set_graph_hash(&"a".repeat(63)).is_err());
+        let mut hash = "a".repeat(64);
+        ctx.set_graph_hash(&hash).unwrap();
+        hash.replace_range(0..1, "b");
+        ctx.prepare(&["test".into(), "expect-graph".into()])
+            .unwrap();
+        assert!(ctx.set_graph_hash(&hash).is_err());
+        assert!(ctx.wait(Duration::from_secs(1)).unwrap());
+    }
+    {
+        let mut ctx = library.context().unwrap();
         ctx.prepare(&["test".into(), "ok".into()]).unwrap();
         assert!(ctx.wait(Duration::from_secs(1)).unwrap());
         let mut start = vec![253];
@@ -92,4 +104,16 @@ fn real_ffi_context_reuses_copied_jobs_and_propagates_errors() {
         7
     );
     assert_eq!(*observations.lock().unwrap(), vec![0, u64::MAX]);
+}
+
+#[test]
+#[ignore = "requires BEAM_TEST_LEGACY_LIBRARY built from an older CPU ABI fixture"]
+fn legacy_library_fails_closed_when_graph_binding_is_requested() {
+    let library = NativeLibrary::load(&PathBuf::from(
+        std::env::var_os("BEAM_TEST_LEGACY_LIBRARY").unwrap(),
+    ))
+    .unwrap();
+    let mut ctx = library.context().unwrap();
+    let error = ctx.set_graph_hash(&"a".repeat(64)).unwrap_err();
+    assert!(error.to_string().contains("lacks loaded graph binding"));
 }

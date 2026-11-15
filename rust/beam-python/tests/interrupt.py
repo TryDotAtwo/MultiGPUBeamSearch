@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory() as tmp:
     root=Path(tmp);worker=root/'rank.py';pidfile=root/'child.pid'
     worker.write_text('import sys,os,json,time\nfrom pathlib import Path\n'
         'if "--resident-protocol-info" in sys.argv:\n'
-        ' print(json.dumps(dict(protocol="resident-search-v1")),flush=True);raise SystemExit(0)\n'
+        ' print(json.dumps(dict(protocol="resident-search-v1",loaded_graph_binding=1)),flush=True);raise SystemExit(0)\n'
         f'Path({str(pidfile)!r}).write_text(str(os.getpid()))\n'
         'directory=Path(os.environ["BEAM_SESSION_DIR"])\n'
         'while not (directory/"stop").exists():time.sleep(.002)\n')

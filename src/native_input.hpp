@@ -17,6 +17,10 @@ struct NamedHostBytes {
 std::string mlp_artifact_sha256(const std::string& manifest, const std::string& graph_hash,
                                 std::vector<NamedHostBytes> tensors);
 bool lowercase_sha256(const std::string& value);
+// Canonical CayleyPy SHA-256 of the logical loaded graph. Padding and names
+// are excluded. The input vectors remain owned by the native runner.
+std::string loaded_permutation_graph_sha256(const State128& center,
+                                           const std::vector<std::uint8_t>& generators);
 
 // Binds loaded bytes to a manifest; does not authenticate the manifest itself.
 class TensorBinding {

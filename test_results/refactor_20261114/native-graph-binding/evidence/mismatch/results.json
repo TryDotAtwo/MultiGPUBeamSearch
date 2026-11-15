@@ -1,0 +1,48 @@
+[
+  {
+    "case": "moves",
+    "world": 1,
+    "error": "resident worker exited: [Some(1)]; logs=/workspace/beam-results/native-generator/mismatch/moves/resident-session",
+    "pids": [
+      9234
+    ],
+    "elapsed_seconds": 0.04943983489647508
+  },
+  {
+    "case": "center",
+    "world": 1,
+    "error": "resident worker exited: [Some(1)]; logs=/workspace/beam-results/native-generator/mismatch/center/resident-session",
+    "pids": [
+      9239
+    ],
+    "elapsed_seconds": 0.038381387013942
+  },
+  {
+    "case": "target",
+    "world": 1,
+    "error": "resident worker exited: [Some(1)]; logs=/workspace/beam-results/native-generator/mismatch/target/resident-session",
+    "pids": [
+      9244
+    ],
+    "elapsed_seconds": 0.038117497228085995
+  },
+  {
+    "case": "repair",
+    "world": 1,
+    "error": "resident worker exited: [Some(1)]; logs=/workspace/beam-results/native-generator/mismatch/repair/resident-session",
+    "pids": [
+      9249
+    ],
+    "elapsed_seconds": 0.03818616922944784
+  },
+  {
+    "case": "rank1-center",
+    "world": 2,
+    "error": "resident worker exited: [None, Some(1)]; logs=/workspace/beam-results/native-generator/mismatch/rank1-center/resident-session",
+    "pids": [
+      9254,
+      9255
+    ],
+    "elapsed_seconds": 2.1844034916721284
+  }
+]

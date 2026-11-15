@@ -29,6 +29,8 @@ int run_production_runner(int argc, char** argv) {
         }
         return 7;
     }
+    if (argc == 2 && std::string(argv[1]) == "expect-graph")
+        assert(control->expected_graph_hash == std::string(64, 'a'));
     if(history) history.initialize("{}");
     beam::native::Job job;
     while(control->next(job)) {
@@ -69,6 +71,21 @@ int main() {
     beam_context* ctx = reinterpret_cast<beam_context*>(1);
     assert(beam_context_create(2, &ctx) == BEAM_INVALID && ctx == nullptr);
     assert(beam_context_create(1, nullptr) == BEAM_INVALID);
+    assert(beam_context_create(1, &ctx) == BEAM_OK);
+    std::string expected_hash(64, 'a');
+    assert(beam_context_set_graph_hash(nullptr, expected_hash.data(), expected_hash.size()) == BEAM_INVALID);
+    assert(beam_context_set_graph_hash(ctx, nullptr, 64) == BEAM_INVALID);
+    assert(beam_context_set_graph_hash(ctx, expected_hash.data(), 63) == BEAM_INVALID);
+    expected_hash[0] = 'A';
+    assert(beam_context_set_graph_hash(ctx, expected_hash.data(), expected_hash.size()) == BEAM_INVALID);
+    expected_hash[0] = 'a';
+    assert(beam_context_set_graph_hash(ctx, expected_hash.data(), expected_hash.size()) == BEAM_OK);
+    expected_hash[0] = 'b'; // the context must own a copy
+    const char* graph_args[] = {"test", "expect-graph"};
+    assert(beam_context_prepare(ctx, 2, graph_args) == BEAM_OK);
+    assert(beam_context_set_graph_hash(ctx, expected_hash.data(), expected_hash.size()) == BEAM_BUSY);
+    assert(beam_context_wait(ctx, 1000) == BEAM_OK);
+    assert(beam_context_destroy(ctx) == BEAM_OK);
     ctx = prepared();
     beam_context* duplicate = nullptr;
     assert(beam_context_create(1, &duplicate) == BEAM_BUSY && duplicate == nullptr);

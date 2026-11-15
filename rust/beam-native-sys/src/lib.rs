@@ -65,6 +65,7 @@ type Destroy = unsafe extern "C" fn(*mut c_void) -> i32;
 type Run = unsafe extern "C" fn(i32, *const *const c_char) -> i32;
 type RunWithHistory = unsafe extern "C" fn(i32, *const *const c_char, *const history::Api) -> i32;
 type SetHistory = unsafe extern "C" fn(*mut c_void, *const history::Api) -> i32;
+type SetGraphHash = unsafe extern "C" fn(*mut c_void, *const c_char, u64) -> i32;
 
 struct Bindings {
     _library: Library,
@@ -79,6 +80,7 @@ struct Bindings {
     run: Run,
     layout: GetLayout,
     set_history: Option<SetHistory>,
+    set_graph_hash: Option<SetGraphHash>,
     run_with_history: Option<RunWithHistory>,
 }
 #[derive(Clone)]
@@ -120,6 +122,10 @@ impl NativeLibrary {
                 layout: symbol!("beam_native_layout", GetLayout),
                 set_history: library
                     .get::<SetHistory>(b"beam_context_set_history\0")
+                    .ok()
+                    .map(|s| *s),
+                set_graph_hash: library
+                    .get::<SetGraphHash>(b"beam_context_set_graph_hash\0")
                     .ok()
                     .map(|s| *s),
                 run_with_history: library
@@ -205,6 +211,23 @@ pub struct Context {
     history: Option<Box<history::Bridge>>,
 }
 impl Context {
+    /// Bind the loaded native graph to the validated Rust session identity.
+    /// The native context copies the hash synchronously, before preparation.
+    pub fn set_graph_hash(&mut self, hash: &str) -> Result<()> {
+        if hash.len() != 64
+            || !hash
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(Error("invalid expected graph SHA-256".into()));
+        }
+        let set = self
+            .api
+            .set_graph_hash
+            .ok_or_else(|| Error("native library lacks loaded graph binding extension".into()))?;
+        // SAFETY: hash is borrowed for this call; native copies its 64 bytes.
+        self.check(unsafe { set(self.ptr.as_ptr(), hash.as_ptr().cast(), hash.len() as u64) })
+    }
     pub fn set_history(&mut self, sink: Box<dyn history::HistorySink>) -> Result<()> {
         let install = self
             .api

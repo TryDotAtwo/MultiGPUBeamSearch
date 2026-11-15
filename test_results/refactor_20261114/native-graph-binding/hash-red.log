@@ -1,0 +1,16 @@
+native_loaded_graph_hash_tests.cpp
+tests\native_loaded_graph_hash_tests.cpp(20): error C2039: "loaded_permutation_graph_sha256": не является членом "beam::input".
+D:\100XH100\tests\../src/native_input.hpp(10): note:  см. объявление "beam::input"
+tests\native_loaded_graph_hash_tests.cpp(20): error C3861: loaded_permutation_graph_sha256: идентификатор не найден
+tests\native_loaded_graph_hash_tests.cpp(32): error C2039: "loaded_permutation_graph_sha256": не является членом "beam::input".
+D:\100XH100\tests\../src/native_input.hpp(10): note:  см. объявление "beam::input"
+tests\native_loaded_graph_hash_tests.cpp(32): error C3861: loaded_permutation_graph_sha256: идентификатор не найден
+tests\native_loaded_graph_hash_tests.cpp(35): error C2039: "loaded_permutation_graph_sha256": не является членом "beam::input".
+D:\100XH100\tests\../src/native_input.hpp(10): note:  см. объявление "beam::input"
+tests\native_loaded_graph_hash_tests.cpp(35): error C3861: loaded_permutation_graph_sha256: идентификатор не найден
+tests\native_loaded_graph_hash_tests.cpp(39): error C2039: "loaded_permutation_graph_sha256": не является членом "beam::input".
+D:\100XH100\tests\../src/native_input.hpp(10): note:  см. объявление "beam::input"
+tests\native_loaded_graph_hash_tests.cpp(39): error C3861: loaded_permutation_graph_sha256: идентификатор не найден
+tests\native_loaded_graph_hash_tests.cpp(43): error C2039: "loaded_permutation_graph_sha256": не является членом "beam::input".
+D:\100XH100\tests\../src/native_input.hpp(10): note:  см. объявление "beam::input"
+tests\native_loaded_graph_hash_tests.cpp(43): error C3861: loaded_permutation_graph_sha256: идентификатор не найден

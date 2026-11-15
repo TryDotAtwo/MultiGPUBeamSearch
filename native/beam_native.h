@@ -81,6 +81,9 @@ BEAM_API uint32_t beam_native_abi_version(void);
 BEAM_API beam_result beam_native_layout(beam_layout_v1*);
 BEAM_API beam_result beam_context_create(uint32_t abi_version, beam_context** out);
 BEAM_API beam_result beam_context_set_history(beam_context*, const beam_history_api_v1*);
+/* Optional ABI-1 extension. Exactly 64 lowercase hexadecimal bytes are copied
+ * during this call. Must be set while the context is still CREATED. */
+BEAM_API beam_result beam_context_set_graph_hash(beam_context*, const char* hash, uint64_t length);
 /* argv is copied before returning; prepare starts asynchronous GPU setup. */
 BEAM_API beam_result beam_context_prepare(beam_context*, int argc, const char* const* argv);
 BEAM_API beam_result beam_context_submit(beam_context*, const beam_job_v1*);

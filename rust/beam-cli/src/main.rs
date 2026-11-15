@@ -3,7 +3,11 @@ use std::{env, path::PathBuf};
 fn run() -> Result<i32, Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     if args.get(1).map(String::as_str) == Some("--resident-protocol-info") {
-        println!("{{\"protocol\":\"resident-search-v1\"}}");
+        if env::var("BEAM_REQUIRE_LOADED_GRAPH_BINDING").as_deref() == Ok("1") {
+            println!("{{\"protocol\":\"resident-search-v1\",\"loaded_graph_binding\":1}}");
+        } else {
+            println!("{{\"protocol\":\"resident-search-v1\"}}");
+        }
         return Ok(0);
     }
     let library = env::var_os("BEAM_NATIVE_LIBRARY")

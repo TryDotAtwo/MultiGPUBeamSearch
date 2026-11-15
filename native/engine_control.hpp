@@ -25,6 +25,8 @@ public:
     beam_result result = BEAM_OK;
     std::uint64_t completed = 0;
     std::string error;
+    // Written under mutex before prepare starts the engine; immutable afterward.
+    std::string expected_graph_hash;
     Job pending;
     bool has_pending = false;
     bool stop = false;

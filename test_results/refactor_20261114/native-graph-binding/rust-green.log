@@ -1,0 +1,20 @@
+   Compiling beam-native-sys v0.1.0 (D:\100XH100\rust\beam-native-sys)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\incremental\beam_native_sys-2aanop8vqg74v\s-ho61noknmi-0hqofwm-working`
+
+   Compiling beam-runtime v0.1.0 (D:\100XH100\rust\beam-runtime)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\incremental\beam_runtime-3ktr9njgfinsl\s-ho61nopt8b-1xudtmz-working`
+
+warning: `beam-native-sys` (lib) generated 1 warning
+warning: `beam-runtime` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\incremental\search_session-1ntp0qexrwv0m\s-ho61nrbo1f-1ufb8fc-working`
+
+warning: `beam-runtime` (test "search_session") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.30s
+     Running tests\search_session.rs (.local/cache/rust-mlp-verify-20261114/target\debug\deps\search_session-017fbfb6a05a5547.exe)
+
+running 2 tests
+test session_timeout_includes_protocol_preparation_and_reaps_delayed_workers ... ok
+test session_reuses_compatible_jobs_and_releases_before_model_or_geometry_change ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+

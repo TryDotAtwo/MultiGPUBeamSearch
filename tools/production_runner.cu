@@ -3517,7 +3517,15 @@ int run_production_runner(int argc, char** argv) {
     const auto& host_generators = host_moves.data;
     const auto& host_move_names = host_moves.names;
     const State128 host_central = load_central_state(puzzle_info_path);
+    const auto* control = beam::native::current_control();
+    const bool bound_session = control && !control->expected_graph_hash.empty();
+    if (bound_session &&
+        beam::input::loaded_permutation_graph_sha256(host_central, host_generators) !=
+            control->expected_graph_hash)
+        throw std::runtime_error("native loaded graph hash mismatch");
     const bool repair_resident_mode = env_present("BEAM_REPAIR_SOLUTIONS_CSV");
+    if (bound_session && repair_resident_mode)
+        throw std::runtime_error("bound session cannot use repair mode");
     const bool solve_bucket_mode = env_bool("BEAM_SOLVE_BUCKET_MODE", false);
     const bool publish_rank_status = env_present("BEAM_RANK_STATUS_DIR");
     if (publish_rank_status && (repair_resident_mode || solve_bucket_mode)) {
@@ -3548,6 +3556,8 @@ int run_production_runner(int argc, char** argv) {
         "BEAM_TARGET_STATE_FILE",
         host_target,
         "target_state_override");
+    if (bound_session && !states_equal_storage(host_target, host_central))
+        throw std::runtime_error("bound session target differs from central state");
 
     // Keep owned launch settings stable before weights/scratch/graphs are prepared.
     // Raw selector freezing is not a resolved SM/layout numerical admission gate.

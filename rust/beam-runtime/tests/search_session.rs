@@ -12,8 +12,11 @@ fn session_reuses_compatible_jobs_and_releases_before_model_or_geometry_change()
         r#"import sys,os,json,time
 from pathlib import Path
 if '--resident-protocol-info' in sys.argv:
- print('{"protocol":"resident-search-v1"}',flush=True);raise SystemExit(0)
+ reply=dict(protocol='resident-search-v1')
+ if os.environ.get('BEAM_REQUIRE_LOADED_GRAPH_BINDING')=='1' and os.environ.get('FIXTURE_LEGACY_PROBE')!='1':reply['loaded_graph_binding']=1
+ print(json.dumps(reply),flush=True);raise SystemExit(0)
 directory=Path(os.environ['BEAM_SESSION_DIR']);rank=int(os.environ['RANK']);sequence=0
+assert os.environ['BEAM_EXPECTED_GRAPH_HASH']=='0dfd25a031f018028e013a6cbbf83b3588c61b5b26897bb5321d117d7d3cca8d'
 while not (directory/'stop').exists():
  path=directory/f'request-{sequence}.json'
  if not path.exists():time.sleep(.002);continue
@@ -47,6 +50,8 @@ while not (directory/'stop').exists():
     let command = vec!["python".into(), worker.to_string_lossy().into_owned()];
     let mut env: std::collections::BTreeMap<_, _> = std::env::vars().collect();
     env.insert("FIXTURE_BEAM".into(), "64".into());
+    env.insert("BEAM_EXPECTED_GRAPH_HASH".into(), "caller-spoof".into());
+    env.insert("BEAM_REQUIRE_LOADED_GRAPH_BINDING".into(), "0".into());
     let mut launch = Launch {
         command: command.clone(),
         protocol_command: [command, vec!["--resident-protocol-info".into()]].concat(),
@@ -54,6 +59,30 @@ while not (directory/'stop').exists():
         cwd: root.clone(),
     };
     let metadata = json!({"profile":{"calibration_total_wall_seconds":12.0},"model_artifact_hash":identity.model_artifact_hash});
+    let legacy_dir = root.join("legacy-worker");
+    fs::create_dir(&legacy_dir).unwrap();
+    launch
+        .environment
+        .insert("FIXTURE_LEGACY_PROBE".into(), "1".into());
+    let mut legacy = SearchSession::new();
+    let error = legacy
+        .run(
+            &identity,
+            &launch,
+            &[1, 0, 2, 3],
+            &legacy_dir,
+            Duration::from_secs(5),
+            &metadata,
+        )
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("loaded graph binding"),
+        "{error}"
+    );
+    assert!(legacy.pids().is_empty());
+    assert!(!legacy_dir.join("resident-session").exists());
+    legacy.close().unwrap();
+    launch.environment.remove("FIXTURE_LEGACY_PROBE");
     let mut session = SearchSession::new();
     let mut previous = Vec::new();
     for (index, start) in [vec![1, 0, 2, 3], vec![0, 1, 3, 2], vec![1, 0, 3, 2]]
@@ -160,7 +189,7 @@ fn session_timeout_includes_protocol_preparation_and_reaps_delayed_workers() {
     fs::write(&worker,r#"import os,sys,json,time
 from pathlib import Path
 if '--resident-protocol-info' in sys.argv:
- time.sleep(.3);print('{"protocol":"resident-search-v1"}',flush=True);raise SystemExit(0)
+ time.sleep(.3);print(json.dumps(dict(protocol='resident-search-v1',loaded_graph_binding=1)),flush=True);raise SystemExit(0)
 directory=Path(os.environ['BEAM_SESSION_DIR'])
 while not (directory/'stop').exists():
  path=directory/'request-0.json'
