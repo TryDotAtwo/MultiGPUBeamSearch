@@ -199,6 +199,7 @@ int main() {
             replay_edge(); // All 514 unique entries must survive: no shard cap.
             a.clear(); b.clear(); replay_edge();
             a.push_back(CandidateMeta{{UINT64_MAX, UINT64_MAX}, SCORE_MAX_KEY, 7, 3});
+            replay_edge(); // One valid maximum key must not be mistaken for padding.
             b.push_back(CandidateMeta{{UINT64_MAX, UINT64_MAX}, SCORE_MAX_KEY, 8, 2});
             replay_edge();
             // Full-width key identity and the score/parent/route tie chain.

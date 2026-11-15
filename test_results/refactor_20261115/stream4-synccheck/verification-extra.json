@@ -1,0 +1,11 @@
+{
+  "candidate_archive": "377e78b83be47970a1608f04a0a1019338431946add1a5d02f95ae05cd6fa066",
+  "candidate_bounded_synccheck": "FAIL: reproduced; not promoted",
+  "candidate_direct_runs": 30,
+  "final_baseline_shard_runs": 20,
+  "final_shards_archive": "745d838c9334f4b0d86c372ed471c35da146e5254d96401817cf748e9fe28f40",
+  "minimal_prefix_and_partial": "PASS in tested scope",
+  "partial_archive": "74fd0b1564c33acb5f0bcff30bab9fe581749988eca27ef3c62ba140a3ed2a35",
+  "prefix_archive": "2544784b4dbd944b9fc9a7b138de0833250a3fe27998cfaae6a6bc5d9e124b6c",
+  "union_archive": "b50c3ed0ac7425008ac1f26ffc3f3531d9e412cbfb168fe256871613a6186e8d"
+}

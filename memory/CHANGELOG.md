@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-15 Stream 4 conditional-graph investigation
+- Extended GPU oracle fixtures for empty and singleton clean/dirty runs, valid
+  all-ones hashes, duplicates across runs, and a singleton final union. The
+  unchanged published index and dirty implementations passed direct tests on
+  two RTX 3060s at capacities 1, 2, 3, 4 and 257, with scoped memcheck and
+  ordinary-graph union synccheck passes.
+- Bounded synccheck failures were reproduced. Skipping a one-item radix sort
+  moved the reported error to subsequent kernels, without establishing a fix;
+  that candidate was discarded and retained only as evidence. Minimal chained,
+  prefixed and partially active-kernel variants did not reproduce the error.
+  Bounded graph racecheck and synccheck remain open. See
+  `test_results/refactor_20261115/STAGE_STREAM4_SYNCCHECK.md`.
+
 ## 2026-11-15 experimental borrowed-byte MLP validation
 - Added a separately opt-in Rust/PyO3 finite-value validator for explicit MLP
   snapshots. It borrows immutable little-endian FP16/BF16 chunks and avoids

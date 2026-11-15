@@ -138,6 +138,24 @@ int main(int argc, char** argv) {
                     ++cases;
                 }
             }
+            // Exercise a one-item conditional sort bound and the sentinel
+            // boundary with both an empty and a real all-ones hash. For small
+            // capacities the graph chooses its one-item body even when a
+            // separate clean prefix must still participate in the merge.
+            if (Fixture::cap >= 1) {
+                const CandidateMeta maximum{{UINT64_MAX, UINT64_MAX}, 7, 5, 11};
+                verify_case(f, exec, threshold, threshold_index, {}, {maximum}, 5, cases & 1U, modes); ++cases;
+                verify_case(f, exec, threshold, threshold_index, {maximum}, {}, 5, cases & 1U, modes); ++cases;
+                verify_case(f, exec, threshold, threshold_index, {}, {maximum}, 4, cases & 1U, modes); ++cases;
+            }
+            if (Fixture::cap >= 2) {
+                const CandidateMeta maximum{{UINT64_MAX, UINT64_MAX}, 7, 5, 11};
+                const CandidateMeta better{{UINT64_MAX, UINT64_MAX}, 9, 2, 12};
+                const CandidateMeta low{{0, 0}, 3, 1, 13};
+                verify_case(f, exec, threshold, threshold_index, {maximum}, {better}, 5, cases & 1U, modes); ++cases;
+                verify_case(f, exec, threshold, threshold_index, {maximum}, {low}, 5, cases & 1U, modes); ++cases;
+                verify_case(f, exec, threshold, threshold_index, {low}, {maximum}, 5, cases & 1U, modes); ++cases;
+            }
             for (unsigned mode = 0; mode < 2; ++mode) {
                 if (!(modes & (1U << mode))) continue;
                 check(cudaGraphExecDestroy(exec[mode])); check(cudaGraphDestroy(graph[mode]));
