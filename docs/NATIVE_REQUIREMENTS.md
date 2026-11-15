@@ -44,6 +44,11 @@ rank processes after their ABI/layout and specialization checks.
   unsupported worker or missing ABI extension must fail before search. The
   bound target is the central state; the separate repair mode requires its own
   contract. Names and storage padding are excluded from this graph hash.
+- A public Rust session consumes exactly the Rust-validated terminal result for
+  the matching run directory. Each result is consumed at most once; a failed
+  request invalidates an unconsumed predecessor. Reject an older PyO3 module
+  without terminal-result protocol version 1 before building the native library.
+  Per-run terminal metadata must not inherit stale rank or collection fields.
 - All-rank admission preserves the exact requested beam; alignment affects physical
   capacities. Buffer overflow reports required/available sizes, never a smaller search.
 - Stream4 uses threshold, compaction, fixed-scratch sort/reduce and compaction;

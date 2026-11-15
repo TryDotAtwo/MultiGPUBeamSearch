@@ -1,0 +1,68 @@
+FF                                                                       [100%]
+================================== FAILURES ===================================
+______ test_rust_resident_transfers_one_verified_result_per_matching_job ______
+
+tmp_path = WindowsPath('D:/100XH100/.local/cache/rust-session-result/pytest-red/test_rust_resident_transfers_o0')
+
+    def test_rust_resident_transfers_one_verified_result_per_matching_job(tmp_path):
+        import json
+        from multigpubeamsearch.errors import NativeBackendError
+        from multigpubeamsearch.rust_resident import RustResidentWorkers
+    
+        class Owner:
+            def __init__(self):
+                self.count = 0
+            def run(self, *args):
+                self.count += 1
+                return json.dumps(dict(path=[1], effective_beam_width=64, elapsed_seconds=.2,
+                    metadata=dict(native_seconds=.1, terminal_records=1, observed_parent_batch=32,
+                                  observed_inference_rows=None, observed_stream3_batch_candidates=None,
+                                  persistent_session=dict(request_count=self.count))))
+            def close(self):pass
+    
+        worker = RustResidentWorkers.__new__(RustResidentWorkers)
+        worker._owner = Owner()
+        worker._identity = '{}'
+        worker._launch = '{}'
+        worker.sequence = 0
+        first, second = tmp_path / 'first', tmp_path / 'second'
+        first.mkdir(); second.mkdir()
+        assert worker.submit((1, 0), first, timeout=5) == .2
+        with pytest.raises(NativeBackendError, match='directory'):
+>           worker.take_terminal(second)
+            ^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'RustResidentWorkers' object has no attribute 'take_terminal'
+
+integrations\cayleypy_native\tests\test_persistent_search.py:114: AttributeError
+_________ test_rust_session_uses_worker_result_without_reparsing_log __________
+
+tmp_path = WindowsPath('D:/100XH100/.local/cache/rust-session-result/pytest-red/test_rust_session_uses_worker_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000184598C0310>
+
+    def test_rust_session_uses_worker_result_without_reparsing_log(tmp_path, monkeypatch):
+        from multigpubeamsearch import backend
+        from multigpubeamsearch.errors import NativeBackendError
+    
+        class Worker:
+            def take_terminal(self, directory):
+                assert directory == tmp_path
+                return (1,), 64, {'native_seconds': .1, 'terminal_records': 1}
+            def close(self):pass
+    
+        monkeypatch.setattr(backend, 'parse_terminal', lambda *a, **k: pytest.fail('duplicate log read'))
+        session = NativeSession(engine='rust')
+        session._workers = Worker()
+>       assert session.terminal_result(tmp_path / 'native.log', None, max_steps=3) == (
+               ^^^^^^^^^^^^^^^^^^^^^^^
+            (1,), 64, {'native_seconds': .1, 'terminal_records': 1})
+E       AttributeError: 'NativeSession' object has no attribute 'terminal_result'
+
+integrations\cayleypy_native\tests\test_persistent_search.py:138: AttributeError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_rust_resident_transfers_one_verified_result_per_matching_job
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_rust_session_uses_worker_result_without_reparsing_log
+2 failed, 20 deselected in 4.76s
+Exception ignored in: <function Console.__del__ at 0x0000018459BDF9C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 254, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

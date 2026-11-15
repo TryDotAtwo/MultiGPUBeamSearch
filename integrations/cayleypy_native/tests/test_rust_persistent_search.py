@@ -16,6 +16,20 @@ def test_unknown_session_engine_is_rejected():
         NativeSession(engine="unknown")
 
 
+def test_rust_session_rejects_stale_terminal_protocol_before_native_build(tmp_path, monkeypatch):
+    from multigpubeamsearch import native_library, rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+    from multigpubeamsearch.rust_resident import RustResidentWorkers
+
+    monkeypatch.setattr(rust_control, 'extension', lambda: SimpleNamespace(SearchSession=object))
+    monkeypatch.setattr(native_library, 'ensure_native_library',
+                        lambda *args: pytest.fail('stale runtime must not trigger a native build'))
+    with pytest.raises(NativeUnavailable, match='terminal-result v1'):
+        RustResidentWorkers(['runner', '0', '4', '64'], contract=None, model=None,
+            options=None, max_steps=4, devices=(0,), runtime=object(), run_dir=tmp_path,
+            env={}, world=1)
+
+
 @pytest.mark.parametrize("world", [1, 2])
 def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, world):
     from multigpubeamsearch import models, native_library, rust_control
@@ -48,14 +62,18 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
                 "GLOBAL_BEAM_WIDTH_EFFECTIVE=64\n"
                 "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m0\n"
             )
-            return json.dumps({"elapsed_seconds": 0.1, "metadata": {
+            return json.dumps({"path": [0], "effective_beam_width": 64,
+                "elapsed_seconds": 0.1, "metadata": {"native_seconds": 0.1,
+                "terminal_records": 1, "observed_parent_batch": None,
+                "observed_inference_rows": None, "observed_stream3_batch_candidates": None,
                 "persistent_session": {"request_count": self.count}}})
 
         def close(self):
             self.closed = True
             self.pids = []
 
-    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(SearchSession=Owner))
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(
+        SearchSession=Owner, SEARCH_TERMINAL_RESULT_VERSION=1))
     contract = GraphContract(2, 2, ((1, 0),), ("swap",), (0, 1), (1, 0), "a" * 64)
     model = SimpleNamespace(artifact_hash="b" * 64, backend="mlp")
     runtime = SimpleNamespace(runner=tmp_path / "runner", architectures=(86,),

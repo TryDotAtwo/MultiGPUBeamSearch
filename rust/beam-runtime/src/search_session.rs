@@ -371,6 +371,22 @@ impl SearchSession {
         let fields = output
             .as_object_mut()
             .ok_or_else(|| Error::Message("invalid resident metadata".into()))?;
+        // An earlier run can have rank-specific or collection fields that are
+        // absent in the current run. Do not carry those fields across jobs.
+        for key in [
+            "native_seconds",
+            "terminal_records",
+            "collected_solutions",
+            "collection_status",
+            "observed_parent_batch",
+            "observed_parent_batch_by_rank_values",
+            "observed_inference_rows",
+            "observed_inference_rows_by_rank_values",
+            "observed_stream3_batch_candidates",
+            "observed_stream3_batch_candidates_by_rank_values",
+        ] {
+            fields.remove(key);
+        }
         for (key, value) in terminal.metadata.as_object().unwrap() {
             fields.insert(key.clone(), value.clone());
         }

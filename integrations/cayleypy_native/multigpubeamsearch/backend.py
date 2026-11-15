@@ -780,7 +780,10 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
                     failure.add_note(f"native worker log collection also failed: {log_error}")
     if mlp_host_binding:
         _verify_mlp_host_binding(run_dir, model.artifact_hash, len(devices))
-    path, effective, terminal_metadata = parse_terminal(log, contract, max_steps=max_steps)
+    if resident_session is None:
+        path, effective, terminal_metadata = parse_terminal(log, contract, max_steps=max_steps)
+    else:
+        path, effective, terminal_metadata = resident_session.terminal_result(log, contract, max_steps=max_steps)
     if calibrate and effective is not None:
         from .runtime_report import observed_depths
         reports=observed_depths(log.read_text(errors='replace'),len(devices),effective,

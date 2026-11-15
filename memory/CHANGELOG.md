@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-15 Rust terminal result transfer
+- The opt-in Rust public session now hands its validated terminal result to
+  Python once for the matching job rather than parsing the native log again.
+  Stale sequences/results fail closed, old PyO3 modules are rejected, and
+  per-job terminal metadata no longer inherits absent fields from the first run.
+- Rust workspace tests and the Linux integration suite passed (658 passed,
+  11 skipped). CUTLASS/LibTorch one/two-RTX-3060 tests covered 48 Python/Rust
+  public scenarios; the source-bound verifier replayed 96 path entries. Five
+  matched full-call pairs had a median paired wall change of -1.24%; variance
+  and the 0.742 ms median extra parser time do not establish a GPU speedup.
+  See `test_results/refactor_20261115/STAGE_RUST_TERMINAL_TRANSFER.md`.
+
 ## 2026-11-15 CNOT input snapshot ownership
 - The CNOT adapter now validates and searches the same owned, contiguous
   device snapshot. A caller mutation after validation previously could change

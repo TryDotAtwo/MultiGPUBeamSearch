@@ -86,6 +86,94 @@ while not (root/'stop').exists():
     assert all(p.poll() is not None for p in workers.processes)
 
 
+def test_rust_resident_transfers_one_verified_result_per_matching_job(tmp_path):
+    import json
+    from multigpubeamsearch.errors import NativeBackendError
+    from multigpubeamsearch.rust_resident import RustResidentWorkers
+
+    class Owner:
+        def __init__(self):
+            self.count = 0
+        def run(self, *args):
+            self.count += 1
+            return json.dumps(dict(path=[1], effective_beam_width=64, elapsed_seconds=.2,
+                metadata=dict(native_seconds=.1, terminal_records=1, observed_parent_batch=32,
+                              observed_inference_rows=None, observed_stream3_batch_candidates=None,
+                              persistent_session=dict(request_count=self.count))))
+        def close(self):pass
+
+    worker = RustResidentWorkers.__new__(RustResidentWorkers)
+    worker._owner = Owner()
+    worker._identity = '{}'
+    worker._launch = '{}'
+    worker.sequence = 0
+    first, second = tmp_path / 'first', tmp_path / 'second'
+    first.mkdir(); second.mkdir()
+    assert worker.submit((1, 0), first, timeout=5) == .2
+    with pytest.raises(NativeBackendError, match='directory'):
+        worker.take_terminal(second)
+    path, width, metadata = worker.take_terminal(first)
+    assert path == (1,) and width == 64 and metadata['native_seconds'] == .1
+    assert metadata['observed_parent_batch'] == 32 and metadata['terminal_records'] == 1
+    assert 'persistent_session' not in metadata
+    with pytest.raises(NativeBackendError, match='result'):
+        worker.take_terminal(first)
+    assert worker.submit((1, 0), second, timeout=5) == .2 and worker.sequence == 2
+    assert worker.take_terminal(second)[0] == (1,)
+
+
+def test_rust_session_uses_worker_result_without_reparsing_log(tmp_path, monkeypatch):
+    from multigpubeamsearch import backend
+    from multigpubeamsearch.errors import NativeBackendError
+
+    class Worker:
+        def take_terminal(self, directory):
+            assert directory == tmp_path
+            return (1,), 64, {'native_seconds': .1, 'terminal_records': 1}
+        def close(self):pass
+
+    monkeypatch.setattr(backend, 'parse_terminal', lambda *a, **k: pytest.fail('duplicate log read'))
+    session = NativeSession(engine='rust')
+    session._workers = Worker()
+    assert session.terminal_result(tmp_path / 'native.log', None, max_steps=3) == (
+        (1,), 64, {'native_seconds': .1, 'terminal_records': 1})
+    session.close()
+    with pytest.raises(NativeBackendError, match='workers'):
+        session.terminal_result(tmp_path / 'native.log', None, max_steps=3)
+
+
+@pytest.mark.parametrize('failure', ['owner', 'sequence', 'invalid_path', 'nan_time'])
+def test_rust_resident_rejects_failure_without_exposing_an_earlier_result(tmp_path, failure):
+    import json
+    from multigpubeamsearch.errors import NativeBackendError
+    from multigpubeamsearch.rust_resident import RustResidentWorkers
+
+    class Owner:
+        count = 0
+        def run(self, *args):
+            self.count += 1
+            if self.count == 2 and failure == 'owner':
+                raise RuntimeError('injected worker failure')
+            result = dict(path=[1], effective_beam_width=64, elapsed_seconds=.2,
+                          metadata=dict(native_seconds=.1, terminal_records=1,
+                                        persistent_session=dict(request_count=self.count)))
+            if self.count == 2:
+                if failure == 'sequence': result['metadata']['persistent_session']['request_count'] = 1
+                if failure == 'invalid_path': result['path'] = [True]
+                if failure == 'nan_time': result['elapsed_seconds'] = float('nan')
+            return json.dumps(result)
+        def close(self): pass
+
+    worker = RustResidentWorkers.__new__(RustResidentWorkers)
+    worker._owner, worker._identity, worker._launch, worker.sequence = Owner(), '{}', '{}', 0
+    worker.submit((1, 0), tmp_path, timeout=5)
+    with pytest.raises(NativeBackendError):
+        worker.submit((1, 0), tmp_path, timeout=5)
+    assert worker.sequence == 1
+    with pytest.raises(NativeBackendError, match='result'):
+        worker.take_terminal(tmp_path)
+
+
 def test_worker_failure_closes_whole_group(tmp_path):
     from multigpubeamsearch.resident_transport import ResidentWorkers
     from multigpubeamsearch.errors import NativeBackendError
@@ -164,12 +252,17 @@ def test_session_restarts_when_entering_or_leaving_bound_snapshot_mode(tmp_path,
                 'GLOBAL_BEAM_WIDTH_EFFECTIVE=64\n'
                 'puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n')
             return .1
+        def take_terminal(self, directory):
+            return (1,), 64, dict(native_seconds=.1, terminal_records=1,
+                                  observed_parent_batch=None, observed_inference_rows=None,
+                                  observed_stream3_batch_candidates=None)
 
     def execute(*args, **kwargs):
         worker = Workers()
         allocations.append(worker)
         session._workers = worker
-        metadata = dict(requested_beam_width=64, profile={}, terminal_records=1)
+        metadata = dict(requested_beam_width=64, profile={}, terminal_records=1,
+                        observed_parent_batch_by_rank_values=[32, 64])
         if session.model_snapshot_cache.last is not None and executor == 'cutlass':
             metadata['mlp_host_binding'] = {'artifact_hash': 'b'*64, 'ranks': 2}
         return NativeOutcome((1,), .1, 64, args[5], metadata)
@@ -199,6 +292,7 @@ def test_session_restarts_when_entering_or_leaving_bound_snapshot_mode(tmp_path,
             if index == 2:
                 assert len(allocations) == (2 if executor == 'cutlass' else 1)
                 assert outputs[-1].metadata['persistent_session']['reused']
+                assert 'observed_parent_batch_by_rank_values' not in outputs[-1].metadata
         if executor == 'cutlass':
             assert len(allocations) == 3 and allocations[1].closed
         else:

@@ -7,8 +7,10 @@ import struct
 from types import SimpleNamespace
 
 from multigpubeamsearch import NativeModel, NativeOptions, NativeSession
+from multigpubeamsearch import backend
 from multigpubeamsearch.contracts import GraphContract
 from multigpubeamsearch.hamming import write_hamming_artifact
+from multigpubeamsearch.rust_resident import TERMINAL_FIELDS
 
 
 def main():
@@ -72,10 +74,25 @@ def main():
                                         max_collected_solutions=7) if name == 'collect' else options)
                     if name == 'index-change':
                         selected = replace(selected, experimental_index_sort=not args.experimental_index_sort)
-                    result = session.beam_search(graph, native_options=selected,
-                        start_state=start, predictor=model, beam_width=width,
-                        max_steps=4, return_path=True)
+                    original_parser = backend.parse_terminal
+                    if engine == 'rust':
+                        def reject_duplicate_parse(*args, **kwargs):
+                            raise AssertionError('Rust public session reparsed the terminal log in Python')
+                        backend.parse_terminal = reject_duplicate_parse
+                    try:
+                        result = session.beam_search(graph, native_options=selected,
+                            start_state=start, predictor=model, beam_width=width,
+                            max_steps=4, return_path=True)
+                    finally:
+                        backend.parse_terminal = original_parser
                     meta = result.native_metadata
+                    if engine == 'rust':
+                        parsed_path, parsed_width, parsed_metadata = original_parser(
+                            Path(meta['log_path']), replace(contract, start=start), max_steps=4)
+                        assert parsed_path == (None if result.path is None else tuple(result.path))
+                        assert parsed_width == meta['effective_beam_width']
+                        transferred = {name: meta[name] for name in TERMINAL_FIELDS if name in meta}
+                        assert transferred == parsed_metadata, (transferred, parsed_metadata)
                     persistent = meta['persistent_session']
                     pids = persistent['worker_pids']
                     reused = name in ('repeat', 'unsolved')
@@ -98,7 +115,8 @@ def main():
                         path=result.path, width=meta['effective_beam_width'],
                         experimental_index_sort=selected.experimental_index_sort,
                         build_key=meta['build']['build_key'], persistent=persistent,
-                        run_dir=meta['run_dir'], solutions=result.solutions))
+                        run_dir=meta['run_dir'], solutions=result.solutions,
+                        terminal_python_parity=engine == 'rust'))
                     print(f'PUBLIC_RUST_CASE {args.backend} world={world} engine={engine} {name}', flush=True)
             assert all(not Path(f'/proc/{pid}').exists() for pid in old_pids)
         for case in (entry[0] for entry in cases):

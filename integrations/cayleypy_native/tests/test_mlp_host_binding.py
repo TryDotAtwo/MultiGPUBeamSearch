@@ -53,6 +53,7 @@ def test_experimental_mlp_session_requires_each_loaded_weight_receipt(monkeypatc
         return 0.1
 
     session.launch = launch
+    session.terminal_result = backend.parse_terminal
     monkeypatch.setattr(persistent, 'current_session', lambda: session)
     monkeypatch.setattr(backend, 'verify_prepared_model', lambda *args: None)
     monkeypatch.setattr(backend, 'snapshot_runtime_nccl', lambda *args: tmp_path/'libnccl.so.2')

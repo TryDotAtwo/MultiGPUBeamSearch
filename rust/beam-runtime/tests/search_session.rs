@@ -23,6 +23,7 @@ while not (directory/'stop').exists():
  request=json.loads(path.read_text());start=request['start'];out=Path(request['run_dir'])
  moves='m0' if start==[1,0,2,3] else 'm1' if start==[0,1,3,2] else None
  text='GLOBAL_BEAM_WIDTH_EFFECTIVE='+os.environ['FIXTURE_BEAM']+'\n'
+ text+='B_MICRO='+str(32 if sequence>0 or rank==0 else 64)+'\n'
  if moves is None:text+='puzzle_solved=0 puzzle_id=0 seconds=.1 solution_length=-1 solution=\n'
  elif rank==0:text+='puzzle_solved=1 puzzle_id=0 seconds=.1 solution_length=1 solution='+moves+'\n'
  (out/f'resident-rank-{rank}.log').write_text(text)
@@ -103,6 +104,18 @@ while not (directory/'stop').exists():
             .unwrap();
         assert_eq!(result.effective_beam_width, Some(64));
         assert_eq!(result.metadata["persistent_session"]["reused"], index > 0);
+        if index == 0 {
+            assert_eq!(
+                result.metadata["observed_parent_batch_by_rank_values"],
+                json!([32, 64])
+            );
+        } else {
+            assert_eq!(result.metadata["observed_parent_batch"], 32);
+            assert!(result
+                .metadata
+                .get("observed_parent_batch_by_rank_values")
+                .is_none());
+        }
         if index > 0 {
             assert_eq!(session.pids(), previous);
             assert_eq!(

@@ -94,6 +94,7 @@ fn parse_terminal(
     })
 }
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add("SEARCH_TERMINAL_RESULT_VERSION", 1)?;
     module.add_class::<SearchSession>()?;
     module.add_function(wrap_pyfunction!(parse_terminal, module)?)?;
     Ok(())

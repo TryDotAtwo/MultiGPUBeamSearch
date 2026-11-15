@@ -223,8 +223,15 @@ class NativeSession:
             directory=Path(run_dir)/'resident-session',cwd=run_dir,env=env)
         return self._workers.submit(contract.start, run_dir, timeout=timeout)
 
-    def run(self, execute, contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None):
+    def terminal_result(self, log_path, contract, *, max_steps=None):
+        if self._engine == 'rust':
+            if self._workers is None:
+                raise NativeBackendError('Rust resident workers are unavailable')
+            return self._workers.take_terminal(Path(log_path).parent)
         from .backend import parse_terminal
+        return parse_terminal(Path(log_path), contract, max_steps=max_steps)
+
+    def run(self, execute, contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None):
         from .models import verify_prepared_model
         self._check_owner()
         if self.closed:raise RuntimeError('native session is closed')
@@ -273,10 +280,13 @@ class NativeSession:
             else:
                 directory=Path(run_dir)
                 elapsed=self._workers.submit(contract.start,directory,timeout=options.timeout_seconds)
-                path,effective,terminal=parse_terminal(directory/'native.log',contract,max_steps=max_steps)
+                path,effective,terminal=self.terminal_result(directory/'native.log',contract,max_steps=max_steps)
                 if effective != self._metadata['requested_beam_width']:
                     raise NativeBackendError('resident effective beam changed')
                 metadata=deepcopy(self._metadata)
+                from .rust_resident import TERMINAL_FIELDS
+                for name in TERMINAL_FIELDS:
+                    metadata.pop(name, None)
                 metadata.update(terminal,log_path=str(directory/'native.log'),replay_valid=path is not None)
                 metadata['profile'].pop('observed_saturated_depths',None)
                 metadata['profile']['resident_profile_reused']=True
