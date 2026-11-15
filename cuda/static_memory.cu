@@ -355,6 +355,28 @@ std::size_t stream4_cub_temp_bytes(std::uint32_t stream4_capacity) {
         throw std::runtime_error(cudaGetErrorString(status));
     }
 
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+    // The experimental shard path sorts only a bounded dirty run, while the
+    // final union can still use the ordinary metadata sort. Query both sets of
+    // actual CUB requirements and keep the largest in the shared scratch slot.
+    std::uint32_t* dirty_in = nullptr;
+    std::uint32_t* dirty_out = nullptr;
+    for (const auto items : {stream4_capacity, stream4_capacity / 2U + (stream4_capacity % 2U != 0U),
+                             stream4_capacity / 4U + (stream4_capacity % 4U != 0U)}) {
+        std::size_t required = 0;
+        status = radix128_sort_pairs(nullptr, required, keys, unique_keys,
+                                     dirty_in, dirty_out, static_cast<int>(items), 0);
+        if (status != cudaSuccess) throw std::runtime_error(cudaGetErrorString(status));
+        sort_bytes = std::max(sort_bytes, required);
+    }
+    std::size_t index_reduce_bytes = 0;
+    status = cub::DeviceReduce::ReduceByKey(nullptr, index_reduce_bytes, keys, unique_keys,
+        dirty_in, dirty_out, unique_count, Stream4BestIndex{values, unique_count, stream4_capacity},
+        item_count, 0);
+    if (status != cudaSuccess) throw std::runtime_error(cudaGetErrorString(status));
+    reduce_bytes = std::max(reduce_bytes, index_reduce_bytes);
+#endif
+
     std::uint32_t* score_keys_in = nullptr;
     std::uint32_t* score_keys_out = nullptr;
     std::uint64_t* score_counts_in = nullptr;

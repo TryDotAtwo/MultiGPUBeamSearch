@@ -46,6 +46,16 @@ rank processes after their ABI/layout and specialization checks.
 - Experimental index reduction must reject all indices outside the live compacted
   metadata range, including arbitrary values from inactive CUB lanes. Its live
   count and CUB's unique-count output occupy distinct device locations.
+- `BEAM_EXPERIMENTAL_DIRTY_MERGE` is a CMake-only, off-by-default experiment
+  requiring CUB 2.7 or newer. Its stable compacted clean prefix must be sorted
+  and unique, the dirty run is sorted by the complete Hash128 and merged with
+  the prefix before the existing winner reduction. Metadata stays immutable
+  until gather; sentinel indices are invalid even for the maximum real hash.
+  CUB temp sizes cover each conditional bound and the full reduction. With
+  `BEAM_STREAM4_BOUNDED_SORT=1`, the device chooses a bound for the dirty count;
+  overflow fails rather than silently omitting candidates. The final A/B union
+  remains separate. Conditional-graph sanitizer findings remain unresolved;
+  see `test_results/refactor_20261114/STAGE_STREAM4_DIRTY_MERGE.md`.
 - Experimental Stream4 scans use disjoint input counts, output offsets and total;
   each block participates fully in BlockScan, including inactive tail lanes. CUB
   scratch is queried before execution and is reused only in stream order. An

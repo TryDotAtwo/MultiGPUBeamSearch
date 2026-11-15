@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-15 experimental Stream 4 dirty-run merge
+- Added an off-by-default CMake path that compacts a sorted clean prefix, sorts
+  only dirty Hash128/index pairs, merges both runs and applies the existing
+  deterministic reduction. It reuses existing arenas, queries actual CUB
+  scratch and preserves the final A/B union. The normal public build and
+  specialized inference are unchanged.
+- On two RTX 3060s, CPU-oracle GPU fixtures and compatible three-call resident
+  sessions passed. Two matched five-pair full-step series measured median
+  +1.91% and +1.56%; sampled peak memory was 2 MiB higher per GPU in the second
+  series. This does not meet the default-promotion gate. Unfiltered racecheck
+  and synccheck reported unresolved bounded-graph issues also reproduced in
+  the previous index path. Compile-only SM75/80/90/120 checks do not establish
+  runtime acceptance. Evidence and scoped cost are recorded in
+  `test_results/refactor_20261114/STAGE_STREAM4_DIRTY_MERGE.md`.
+
 ## 2026-11-15 optional Rust CNOT input and path validation
 - Added an owned Rust packed CNOT input contract with GF(2) invertibility,
   full-word construction replay, zero-tail validation and control-major action

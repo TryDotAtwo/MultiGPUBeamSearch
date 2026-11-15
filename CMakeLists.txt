@@ -29,6 +29,7 @@ option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics w
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
 option(BEAM_EXPERIMENTAL_RADIX128 "Use experimental full-width CUB radix sort for hash pairs" OFF)
 option(BEAM_EXPERIMENTAL_INDEX_SORT "Sort Stream 4 metadata indices instead of metadata records" OFF)
+option(BEAM_EXPERIMENTAL_DIRTY_MERGE "Sort only new Stream 4 candidates and merge with the clean run" OFF)
 option(BEAM_EXPERIMENTAL_STREAM4_SCAN "Use CUB device and block scans for Stream 4 compaction" OFF)
 option(BEAM_EXPERIMENTAL_OWNER_RADIX "Use stable CUB radix partition for Stream 3 owner routing" OFF)
 option(BEAM_EXPERIMENTAL_SCORE_BITS "Restrict score histogram radix sort to sentinel-aware key bits" OFF)
@@ -186,6 +187,8 @@ set_source_files_properties(cuda/stream3.cu cuda/stream4.cu cuda/static_memory.c
 set_property(SOURCE cuda/stream4.cu cuda/static_memory.cu APPEND PROPERTY
     COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_INDEX_SORT=$<BOOL:${BEAM_EXPERIMENTAL_INDEX_SORT}>")
 set_property(SOURCE cuda/stream4.cu cuda/static_memory.cu APPEND PROPERTY
+    COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_DIRTY_MERGE=$<BOOL:${BEAM_EXPERIMENTAL_DIRTY_MERGE}>")
+set_property(SOURCE cuda/stream4.cu cuda/static_memory.cu APPEND PROPERTY
     COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_STREAM4_SCAN=$<BOOL:${BEAM_EXPERIMENTAL_STREAM4_SCAN}>")
 set_property(SOURCE cuda/stream3.cu cuda/static_memory.cu cuda/dispatcher.cu APPEND PROPERTY
     COMPILE_DEFINITIONS "BEAM_EXPERIMENTAL_OWNER_RADIX=$<BOOL:${BEAM_EXPERIMENTAL_OWNER_RADIX}>")
@@ -334,6 +337,20 @@ endif()
 add_executable(stream4_cuda_tests tests/stream4_cuda_tests.cu)
 target_link_libraries(stream4_cuda_tests PRIVATE beam_cuda)
 set_target_properties(stream4_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+
+add_executable(stream4_dirty_merge_cuda_tests EXCLUDE_FROM_ALL tests/stream4_dirty_merge_cuda_tests.cu)
+target_link_libraries(stream4_dirty_merge_cuda_tests PRIVATE beam_cuda)
+set_target_properties(stream4_dirty_merge_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+foreach(capacity IN ITEMS 1 257)
+    add_executable(stream4_dirty_merge_${capacity}_cuda_tests EXCLUDE_FROM_ALL tests/stream4_dirty_merge_cuda_tests.cu)
+    target_link_libraries(stream4_dirty_merge_${capacity}_cuda_tests PRIVATE beam_cuda)
+    target_compile_definitions(stream4_dirty_merge_${capacity}_cuda_tests PRIVATE BEAM_TEST_UNION_CAPACITY=${capacity})
+    set_target_properties(stream4_dirty_merge_${capacity}_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+endforeach()
+
+add_executable(stream4_merge_path_cuda_tests EXCLUDE_FROM_ALL tests/stream4_merge_path_cuda_tests.cu)
+target_link_libraries(stream4_merge_path_cuda_tests PRIVATE beam_core)
+set_target_properties(stream4_merge_path_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
 
 add_executable(stream4_scan_cuda_tests EXCLUDE_FROM_ALL tests/stream4_scan_cuda_tests.cu)
 set_target_properties(stream4_scan_cuda_tests PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")

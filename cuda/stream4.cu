@@ -4,6 +4,7 @@
 #include "nvtx_ranges.hpp"
 #include "score_sort_bits.cuh"
 #include "stream4_index.cuh"
+#include "stream4_merge.cuh"
 #include "stream4_scan.cuh"
 
 #include <cub/device/device_merge_sort.cuh>
@@ -362,7 +363,7 @@ __global__ void stream4_compact_valid_unique_kernel(
     }
 }
 
-#if BEAM_EXPERIMENTAL_INDEX_SORT
+#if BEAM_EXPERIMENTAL_INDEX_SORT || BEAM_EXPERIMENTAL_DIRTY_MERGE
 __global__ void stream4_fill_index_pairs_kernel(
     Hash128* keys, std::uint32_t* indices,
     const std::uint32_t* compact_count, std::uint32_t sort_items) {
@@ -434,6 +435,7 @@ __global__ void stream4_compact_valid_unique_indices_kernel(
     }
 }
 
+#if BEAM_EXPERIMENTAL_INDEX_SORT
 void stream4_sort_reduce_indices(
     Hash128* sort_key, Hash128* reduce_key, CandidateMeta* metadata,
     CandidateMeta* value_workspace, CandidateMeta* output,
@@ -472,6 +474,153 @@ void stream4_sort_reduce_indices(
     stream4_compact_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
         metadata, index_a, keep_flags, block_offsets, output,
         clean_count, dirty_count, scratch_count, sort_items);
+}
+#endif
+#endif
+
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+// Compaction is stable: threshold-filtered clean entries precede every dirty
+// entry. The preceding block scan and compaction have finished on this stream.
+// The output scalars borrow two histogram workspaces until histogram creation.
+__global__ void stream4_count_clean_and_dirty_kernel(
+    const std::uint32_t* clean, const std::uint32_t* dirty,
+    const std::uint32_t* flags, const std::uint32_t* offsets,
+    const std::uint32_t* total, std::uint32_t capacity,
+    std::uint32_t* kept_clean, std::uint32_t* kept_dirty) {
+    if (blockIdx.x || threadIdx.x) return;
+    const auto nc = *clean;
+    const auto nd = *dirty;
+    if (nc > capacity || nd > capacity - nc || *total > capacity) {
+        asm("trap;");
+        return;
+    }
+    std::uint32_t accepted = 0;
+    if (nc) {
+        const auto last_block = (nc - 1U) / 256U;
+        accepted = offsets[last_block];
+        for (auto i = last_block * 256U; i < nc; ++i) accepted += flags[i];
+    }
+    if (accepted > *total) {
+        asm("trap;");
+        return;
+    }
+    *kept_clean = accepted;
+    *kept_dirty = *total - accepted;
+}
+
+__global__ void stream4_fill_dirty_pairs_kernel(
+    const CandidateMeta* metadata, const std::uint32_t* kept_clean,
+    const std::uint32_t* kept_dirty, Hash128* keys, std::uint32_t* indices,
+    std::uint32_t sort_items) {
+    const auto i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= sort_items) return;
+    if (*kept_dirty > sort_items) {
+        asm("trap;");
+        return;
+    }
+    if (i < *kept_dirty) {
+        const auto source = *kept_clean + i;
+        keys[i] = metadata[source].hash;
+        indices[i] = source;
+    } else {
+        keys[i] = Hash128{UINT64_MAX, UINT64_MAX};
+        indices[i] = UINT32_MAX;
+    }
+}
+
+// Each CTA owns a consecutive output tile. Two global merge-path searches
+// find the tile boundaries, then threads load the two runs coalesced into
+// shared memory and merge there. Input metadata stays stationary. The padded
+// output tail contains invalid indices, including when a real hash is all ones.
+__global__ void stream4_merge_clean_and_dirty_kernel(
+    const CandidateMeta* metadata, const Hash128* dirty_keys,
+    const std::uint32_t* dirty_indices, const std::uint32_t* kept_clean,
+    const std::uint32_t* total, Hash128* merged_keys,
+    std::uint32_t* merged_indices, std::uint32_t capacity) {
+    __shared__ Hash128 tile_keys[256];
+    __shared__ std::uint32_t tile_indices[256];
+    __shared__ std::uint32_t left_begin, left_end;
+    const auto tid = threadIdx.x;
+    const auto first = blockIdx.x * blockDim.x;
+    const auto n = *total;
+    const auto nc = *kept_clean;
+    if (n > capacity || nc > n) {
+        asm("trap;");
+        return;
+    }
+    const auto nd = n - nc;
+    const auto begin = first < n ? first : n;
+    const auto end = first + blockDim.x < n ? first + blockDim.x : n;
+    const detail::Stream4CandidateKeys left{metadata};
+    const detail::Stream4HashKeys right{dirty_keys};
+    if (tid == 0) left_begin = detail::stream4_merge_partition(left, nc, right, nd, begin);
+    if (tid == 1) left_end = detail::stream4_merge_partition(left, nc, right, nd, end);
+    __syncthreads();
+    const auto right_begin = begin - left_begin;
+    const auto right_end = end - left_end;
+    const auto left_size = left_end - left_begin;
+    const auto right_size = right_end - right_begin;
+    if (tid < left_size) {
+        tile_keys[tid] = metadata[left_begin + tid].hash;
+        tile_indices[tid] = left_begin + tid;
+    }
+    if (tid < right_size) {
+        tile_keys[left_size + tid] = dirty_keys[right_begin + tid];
+        tile_indices[left_size + tid] = dirty_indices[right_begin + tid];
+    }
+    __syncthreads();
+    const auto out = first + tid;
+    if (out >= capacity) return;
+    if (out >= n) {
+        merged_keys[out] = Hash128{UINT64_MAX, UINT64_MAX};
+        merged_indices[out] = UINT32_MAX;
+        return;
+    }
+    const detail::Stream4HashKeys tile_left{tile_keys};
+    const detail::Stream4HashKeys tile_right{tile_keys + left_size};
+    const auto li = detail::stream4_merge_partition(tile_left, left_size, tile_right, right_size, tid);
+    const auto ri = tid - li;
+    const bool take_left = li < left_size &&
+        (ri >= right_size || !detail::stream4_hash_less(tile_right(ri), tile_left(li)));
+    const auto tile_i = take_left ? li : left_size + ri;
+    merged_keys[out] = tile_keys[tile_i];
+    merged_indices[out] = tile_indices[tile_i];
+}
+
+void stream4_sort_dirty_merge_reduce(
+    Hash128* key_a, Hash128* key_b, CandidateMeta* metadata,
+    CandidateMeta* value_workspace, CandidateMeta* output,
+    std::uint32_t* clean, std::uint32_t* dirty, std::uint32_t* flags,
+    std::uint32_t* counts, std::uint32_t* offsets, std::uint32_t* total,
+    const std::uint32_t* kept_clean, const std::uint32_t* kept_dirty,
+    std::uint32_t capacity, std::uint32_t sort_items,
+    void* temp, std::size_t temp_bytes, cudaStream_t stream) {
+    if (!sort_items || sort_items > capacity || capacity > static_cast<std::uint32_t>(INT_MAX))
+        throw std::invalid_argument("stream4 dirty sort exceeds fixed capacity or CUB count range");
+    // value-B has 32*capacity bytes; both index ranges occupy 8*capacity.
+    // metadata/value-A stays immutable until the gather into survivor finishes.
+    auto* index_a = reinterpret_cast<std::uint32_t*>(value_workspace);
+    auto* index_b = index_a + capacity;
+    const auto sort_blocks = sort_items / 256U + (sort_items % 256U != 0U);
+    const auto blocks = capacity / 256U + (capacity % 256U != 0U);
+    stream4_fill_dirty_pairs_kernel<<<sort_blocks, 256, 0, stream>>>(
+        metadata, kept_clean, kept_dirty, key_a, index_a, sort_items);
+    std::size_t bytes = temp_bytes;
+    check_cub(radix128_sort_pairs(temp, bytes, key_a, key_b, index_a, index_b,
+                                 static_cast<int>(sort_items), stream), "CUB stream4 dirty sort");
+    stream4_merge_clean_and_dirty_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, key_b, index_b, kept_clean, total, key_a, index_a, capacity);
+    bytes = temp_bytes;
+    check_cub(cub::DeviceReduce::ReduceByKey(temp, bytes, key_a, key_b, index_a, index_b,
+        offsets, Stream4BestIndex{metadata, total, capacity}, static_cast<int>(capacity), stream),
+        "CUB stream4 dirty merge reduction");
+    // The first compaction offsets die before the reducer writes its unique
+    // count there. Its reader completes before the scan reuses both scalars.
+    stream4_mark_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, index_b, flags, counts, offsets, total, capacity);
+    stream4_scan_block_counts(counts, offsets, total, blocks, temp, temp_bytes, stream);
+    stream4_compact_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, index_b, flags, offsets, output, clean, dirty, total, capacity);
 }
 #endif
 
@@ -796,10 +945,23 @@ void stream4_shard_job_device_threshold_cuda(
         sort_key,
         sort_value,
         capacity);
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+    // These scalar borrows end before stream4_write_shard_histogram reuses
+    // either histogram workspace. Each Stream 4 slot has private workspaces.
+    auto* kept_clean = reinterpret_cast<std::uint32_t*>(score_count_a);
+    auto* kept_dirty = score_key_a;
+    stream4_count_clean_and_dirty_kernel<<<1, 1, 0, stream>>>(
+        clean_count, dirty_count, keep_flags, block_offsets, scratch_count,
+        capacity, kept_clean, kept_dirty);
+#endif
     const auto finish = [&](std::uint32_t sort_items, cudaStream_t stream) {
         const auto sort_blocks = sort_items / block_size + (sort_items % block_size != 0U);
         const dim3 sort_grid(sort_blocks);
-#if BEAM_EXPERIMENTAL_INDEX_SORT
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+    stream4_sort_dirty_merge_reduce(sort_key, reduce_key, sort_value, reduce_value, survivor_shard,
+        clean_count, dirty_count, keep_flags, block_counts, block_offsets, scratch_count,
+        kept_clean, kept_dirty, capacity, sort_items, cub_temp_storage, cub_temp_storage_bytes, stream);
+#elif BEAM_EXPERIMENTAL_INDEX_SORT
     stream4_sort_reduce_indices(sort_key, reduce_key, sort_value, reduce_value, survivor_shard,
         clean_count, dirty_count, keep_flags, block_counts, block_offsets, scratch_count,
         capacity, sort_items, cub_temp_storage, cub_temp_storage_bytes, stream);
@@ -852,7 +1014,11 @@ void stream4_shard_job_device_threshold_cuda(
     stream4_write_shard_histogram(
         survivor_shard,
         clean_count,
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+        capacity,
+#else
         sort_items,
+#endif
         score_key_a,
         score_key_b,
         score_count_a,
@@ -887,7 +1053,12 @@ void stream4_shard_job_device_threshold_cuda(
     const std::uint32_t bounds[3] = {
         capacity / 4U + (capacity % 4U != 0U),
         capacity / 2U + (capacity % 2U != 0U), capacity};
-    stream4_choose_sort_body_kernel<<<1, 1, 0, stream>>>(scratch_count,
+    stream4_choose_sort_body_kernel<<<1, 1, 0, stream>>>(
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+        kept_dirty,
+#else
+        scratch_count,
+#endif
         bounds[0], bounds[1], capacity, handles[0], handles[1], handles[2]);
     // Capture each alternative at startup only. The bodies share one fixed
     // scratch slot and are chained; mutual exclusion is decided on the GPU.

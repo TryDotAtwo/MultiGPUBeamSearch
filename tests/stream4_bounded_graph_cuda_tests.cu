@@ -37,7 +37,9 @@ int main() {
                     }
                     std::vector<CandidateMeta> outputs[2]; std::vector<unsigned> histograms[2];
                     for (unsigned mode = 0; mode < 2; ++mode) {
-                        const unsigned clean = n / 2, dirty = n - clean;
+                        // Input is intentionally unsorted and has duplicates;
+                        // only a sorted, unique run can be marked clean.
+                        const unsigned clean = 0, dirty = n;
                         const unsigned thresholds[2] = {cutoff, cutoff};
                         check(cudaMemcpy(f.states, input.data(), input.size() * sizeof(CandidateMeta), cudaMemcpyHostToDevice));
                         check(cudaMemcpy(f.clean, &clean, sizeof(clean), cudaMemcpyHostToDevice));
