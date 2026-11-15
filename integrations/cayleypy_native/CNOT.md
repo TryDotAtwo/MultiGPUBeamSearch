@@ -64,6 +64,10 @@ The adapter reports the offending rank and feature and stops the collective sear
 Errors while reading scorer metadata or encoding the admission configuration are
 also reported collectively, before ranks exchange input fingerprints. Ranks can
 reuse the process group after such a coordinated admission error.
+Local errors while evaluating a one-gate goal are reported to all ranks through
+the existing goal exchange; a healthy group can be reused after the error. This
+does not recover a failed device or NCCL communicator, or an error that prevents
+the status exchange itself.
 
 The optional `--validation rust` selects the Rust packed-input and construction
 replay validator; the Python API accepts `search_cnot(..., validation="rust")`.

@@ -100,24 +100,37 @@ def _input(root, width, shortlist, depth, mode, validation="python"):
 
 
 def _goal(world, parents, lex, begin, identity):
-    n = parents.size(1)
-    alphabet = n * (n - 1)
     key, slot = 2**63 - 1, -1
-    if len(parents):
-        diff = parents ^ identity
-        changed = diff.ne(0).any(2)
-        target = changed.long().argmax(1)
-        index = torch.arange(len(parents), device=world.device)
-        needed = diff[index, target]
-        matches = (parents == needed[:, None]).all(2)
-        matches[index, target] = False
-        hits = ((changed.sum(1) == 1) & matches.any(1)).nonzero().flatten()
-        if len(hits):
-            hit = hits[lex[hits].argmin()]
-            control = matches[hit].long().argmax()
-            move = control * (n - 1) + target[hit] - (target[hit] > control).long()
-            key, slot = int((lex[hit] * alphabet + move).item()), begin + int(hit.item())
-    best_key, best_slot = min(world.gather_fixed(world.longs([key, slot])).tolist())
+    error = None
+    try:
+        n = parents.size(1)
+        alphabet = n * (n - 1)
+        if len(parents):
+            diff = parents ^ identity
+            changed = diff.ne(0).any(2)
+            target = changed.long().argmax(1)
+            index = torch.arange(len(parents), device=world.device)
+            needed = diff[index, target]
+            matches = (parents == needed[:, None]).all(2)
+            matches[index, target] = False
+            hits = ((changed.sum(1) == 1) & matches.any(1)).nonzero().flatten()
+            if len(hits):
+                hit = hits[lex[hits].argmin()]
+                control = matches[hit].long().argmax()
+                move = control * (n - 1) + target[hit] - (target[hit] > control).long()
+                key, slot = int((lex[hit] * alphabet + move).item()), begin + int(hit.item())
+    except Exception as exc:
+        if world.size == 1:
+            raise
+        error = f"rank {world.rank}: {type(exc).__name__}: {exc}"
+    # Use the existing goal exchange to coordinate failures: no extra
+    # collective or host read is required on the successful path.
+    gathered = world.gather_fixed(world.longs([key, slot, int(error is not None)])).tolist()
+    if any(failed for _, _, failed in gathered):
+        errors = [None] * world.size
+        dist.all_gather_object(errors, error)
+        raise RuntimeError("find CNOT goal failed: " + " | ".join(e for e in errors if e))
+    best_key, best_slot = min((value, index) for value, index, _ in gathered)
     return None if best_slot < 0 else (best_slot, best_key % alphabet)
 
 

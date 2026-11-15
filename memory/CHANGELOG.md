@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-15 - Collective CNOT goal errors
+
+- A local goal-evaluation exception is now carried in the existing goal
+  exchange; every rank reports its source before leaving the search. The
+  successful path does not add a collective or a host read. Single-rank
+  exceptions retain their original type.
+- Baseline RED and fixed GREEN tests cover each Gloo rank, simultaneous
+  failures and group reuse; the full Linux suite reported 675 passed and 17
+  skipped. One/two-RTX-3060 searches matched the original implementation;
+  fault injection on each NCCL rank was followed by a successful replayed
+  search. A broken device/communicator is outside this guarantee. See
+  `test_results/refactor_20261115/STAGE_CNOT_GOAL_COLLECTIVE.md`.
+
 ## 2026-11-15 - Experimental CNOT checkpoint packet ABI
 
 - Added an opt-in packet ABI that submits multiple existing checkpoint scorer
