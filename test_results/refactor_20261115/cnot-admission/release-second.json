@@ -1,0 +1,15 @@
+{
+  "instance": 60748392,
+  "label": "beam-cnot-admission-20261115-a2",
+  "before": {
+    "id": 60748392,
+    "label": "beam-cnot-admission-20261115-a2",
+    "actual_status": "running",
+    "duration": 650.4294726848602,
+    "dph_total": 0.16725925925925927,
+    "start_date": 1794722966.676574
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794723673.8538504
+}

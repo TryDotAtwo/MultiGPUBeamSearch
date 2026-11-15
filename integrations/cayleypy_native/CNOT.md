@@ -61,6 +61,9 @@ to another hash owner, distinct children scored, and frontier states received.
 `path_routes` lists retained reduction edges before the terminal identity check.
 The model explicitly rejects a state that falls outside its feature coverage.
 The adapter reports the offending rank and feature and stops the collective search.
+Errors while reading scorer metadata or encoding the admission configuration are
+also reported collectively, before ranks exchange input fingerprints. Ranks can
+reuse the process group after such a coordinated admission error.
 
 The optional `--validation rust` selects the Rust packed-input and construction
 replay validator; the Python API accepts `search_cnot(..., validation="rust")`.

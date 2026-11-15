@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-15 - Collective CNOT admission errors
+
+- CNOT input validation, scorer metadata reads and configuration fingerprinting
+  now share one rank-coordinated admission boundary. A metadata property or JSON
+  encoding failure on one rank is reported to all ranks before digest exchange;
+  the existing successful fingerprint format and collective count are unchanged.
+- The unfixed source reproduced rank-local failures on two Gloo processes. The
+  corrected source passed 674 Python tests (11 skipped), and one/two-rank CPU
+  and RTX 3060 checks with the Python and Rust validators. Both ranks received
+  each injected metadata error and successfully reused the process group.
+  Twelve returned paths were independently replayed. The synthetic fixtures do
+  not validate a trained checkpoint or complete the CNOT runtime migration; see
+  `test_results/refactor_20261115/STAGE_CNOT_COLLECTIVE_ADMISSION.md`.
+
 ## 2026-11-15 Stream 4 conditional-graph investigation
 - Extended GPU oracle fixtures for empty and singleton clean/dirty runs, valid
   all-ones hashes, duplicates across runs, and a singleton final union. The

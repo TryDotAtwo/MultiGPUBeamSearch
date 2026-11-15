@@ -105,6 +105,33 @@ try:
             records.append(dict(rejected="rank_1_singular", error=str(error)))
         else:
             raise AssertionError("singular matrix on rank 1 was accepted")
+
+        for validation in ("python", "rust"):
+            for fault_rank, failure in ((0, "property"), (1, "json")):
+                class BadMetadata:
+                    @property
+                    def metadata(self):
+                        if rank == fault_rank and failure == "property":
+                            raise ValueError("metadata unavailable")
+                        if rank == fault_rank and failure == "json":
+                            return {"checkpoint_sha256": object()}
+                        return {}
+
+                root = pack_rows((1, 2), device=device)
+                try:
+                    search_cnot(root, BadMetadata(), width=1, shortlist=1, max_depth=1,
+                                validation=validation)
+                except RuntimeError as error:
+                    expected = "metadata unavailable" if failure == "property" else "not JSON serializable"
+                    assert f"rank {fault_rank}:" in str(error) and expected in str(error)
+                    message = str(error)
+                else:
+                    raise AssertionError("rank-local metadata failure was accepted")
+                recovered = search_cnot(root, object(), width=1, shortlist=1, max_depth=1,
+                                        validation=validation)
+                assert recovered.status == "solved" and recovered.gates == ()
+                records.append(dict(rejected="metadata_" + failure, validation=validation,
+                                    fault_rank=fault_rank, error=message, reused=True))
     world_size = dist.get_world_size() if distributed else 1
     if "CNOT_EVIDENCE_DIR" in os.environ:
         output = Path(os.environ["CNOT_EVIDENCE_DIR"])

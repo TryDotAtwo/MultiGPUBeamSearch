@@ -181,6 +181,18 @@ def _reconstruct(world, history, final, input_matrix):
     return gates, routes[::-1]
 
 
+def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation):
+    input_matrix = _input(root, width, shortlist, max_depth, mode, validation)
+    metadata = getattr(scorer, "metadata", {})
+    fingerprints = ("upstream_commit", "checkpoint_sha256", "feature_registry_sha256",
+                    "training_manifest_sha256", "training_result_sha256")
+    config = (width, shortlist, max_depth, mode, audit, validation, tuple(input_matrix.root.shape),
+              tuple(metadata.get(key) for key in fingerprints))
+    hasher = hashlib.sha256(input_matrix.raw)
+    hasher.update(json.dumps(config).encode())
+    return input_matrix, hasher.digest()
+
+
 @torch.inference_mode(False)
 @torch.no_grad()
 def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit=False,
@@ -194,17 +206,9 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
     not change the search loop or scorer.
     """
     with World(root.device) as world:
-        input_matrix = world.checked("validate CNOT input",
-                                     lambda: _input(root, width, shortlist, max_depth, mode, validation))
+        input_matrix, digest = world.checked("validate CNOT input", lambda: _admit(
+            root, scorer, width, shortlist, max_depth, mode, audit, validation))
         root = input_matrix.root
-        metadata = getattr(scorer, "metadata", {})
-        fingerprints = ("upstream_commit", "checkpoint_sha256", "feature_registry_sha256",
-                        "training_manifest_sha256", "training_result_sha256")
-        config = (width, shortlist, max_depth, mode, audit, validation, tuple(root.shape),
-                  tuple(metadata.get(key) for key in fingerprints))
-        hasher = hashlib.sha256(input_matrix.raw)
-        hasher.update(json.dumps(config).encode())
-        digest = hasher.digest()
         identities = world.gather_fixed(world.longs(list(digest)))
         if not (identities == identities[0]).all().item():
             raise ValueError("CNOT root, search settings or scorer fingerprints differ between ranks")
