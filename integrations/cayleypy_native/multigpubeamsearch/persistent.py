@@ -28,15 +28,21 @@ class NativeSession:
     every repeated check rereads the complete library.
     Experimental model-snapshot reuse covers explicit MLP NativeModel inputs
     in strict native mode; source and retained bytes are revalidated on reuse.
+    Experimental Rust MLP finite validation is separately opt-in and only
+    applies to the Rust-owned model snapshot path.
     """
     def __init__(self, *, engine="python", experimental_parallel_nccl_identity=False,
-                 experimental_reuse_model_snapshot=False):
+                 experimental_reuse_model_snapshot=False, experimental_rust_mlp_finite=False):
         if engine not in ("python", "rust"):
             raise ValueError("engine must be 'python' or 'rust'")
         if type(experimental_parallel_nccl_identity) is not bool:
             raise ValueError("experimental_parallel_nccl_identity must be a boolean")
         if type(experimental_reuse_model_snapshot) is not bool:
             raise ValueError("experimental_reuse_model_snapshot must be a boolean")
+        if type(experimental_rust_mlp_finite) is not bool:
+            raise ValueError("experimental_rust_mlp_finite must be a boolean")
+        if experimental_rust_mlp_finite and (engine != 'rust' or not experimental_reuse_model_snapshot):
+            raise ValueError("experimental_rust_mlp_finite requires the Rust snapshot session")
         self.nccl_digest_cache = None
         if experimental_parallel_nccl_identity:
             from .nccl_digest import ChunkDigestCache
@@ -44,7 +50,8 @@ class NativeSession:
         self.model_snapshot_cache = None
         if experimental_reuse_model_snapshot:
             from .model_snapshot import ModelSnapshotCache
-            self.model_snapshot_cache = ModelSnapshotCache(prefer_rust=engine == 'rust')
+            self.model_snapshot_cache = ModelSnapshotCache(prefer_rust=engine == 'rust',
+                                                          enable_rust_finite=experimental_rust_mlp_finite)
         self._owner_pid = os.getpid()
         self._engine = engine
         self._pending = None

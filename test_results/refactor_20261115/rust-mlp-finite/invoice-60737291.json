@@ -1,0 +1,35 @@
+{
+  "instance": 60737291,
+  "queried_unix": 1794718299.8912256,
+  "charges": [
+    {
+      "instance_id": 60737291,
+      "amount": "0.074",
+      "description": "Instance 60737291 GPU  charge:    hours * $/hr",
+      "quantity": "0.521",
+      "rate": "0.1413",
+      "timestamp": 1794700800,
+      "type": "charge"
+    },
+    {
+      "instance_id": 60737291,
+      "amount": "0.015",
+      "description": "Instance 60737291 storage charge: hours * $/hr",
+      "quantity": "0.563",
+      "rate": "0.0259",
+      "timestamp": 1794700800,
+      "type": "charge"
+    },
+    {
+      "instance_id": 60737291,
+      "amount": "0.001",
+      "description": "Instance 60737291 download charge",
+      "quantity": "0.302",
+      "rate": "0.004",
+      "timestamp": 1794700800,
+      "type": "charge"
+    }
+  ],
+  "subtotal_usd": 0.09,
+  "scope": "provider-reported charges at query time, subject to later adjustments"
+}

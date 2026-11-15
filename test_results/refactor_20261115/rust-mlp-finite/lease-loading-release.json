@@ -1,0 +1,16 @@
+{
+  "id": 60736013,
+  "label": "beam-rust-mlp-finite-20261115-01",
+  "gpu": "RTX 3060",
+  "gpu_count": 2,
+  "reason": "image pull remained loading; no task files or work had been transferred",
+  "status_msg": "4f4fb700ef54: Verifying Checksum\n4f4fb700ef54: Download complete",
+  "start_unix": 1794715586.1455777,
+  "last_provider_duration_seconds": 558.5640149116516,
+  "rate_usd_per_hour_gpu_and_disk": 0.16177777777777774,
+  "destroy_request_unix": 1794716144.802979,
+  "provider_inventory_confirmed_absent": true,
+  "absence_confirmed_utc": "2026-11-15T04:15:51.032501+00:00",
+  "estimated_gpu_disk_usd_upper": 0.025385041964495616,
+  "cost_scope": "elapsed GPU/disk estimate; excludes network and final invoice adjustments"
+}

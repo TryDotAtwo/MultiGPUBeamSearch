@@ -228,7 +228,7 @@ def _load_unambiguous_manifest(manifest_path: Path) -> tuple[dict, bytes]:
     return manifest, raw
 
 
-def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> PreparedModel:
+def _validate_artifact(path: Path, contract: GraphContract, backend: str, *, _finite_chunk=None) -> PreparedModel:
     if backend in ("cube555_transformer", "cube555_mlp"):
         from .cube555_artifacts import validate_bundle
         return validate_bundle(path, contract, backend)
@@ -281,8 +281,9 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
                 counts[f"{prefix}_ln_beta"] = width
         digest = hashlib.sha256(manifest_bytes)
         digest.update(contract.graph_hash.encode("ascii"))
-        import torch
-        blob_dtype = torch.float16 if dtype == "fp16" else torch.bfloat16
+        if _finite_chunk is None:
+            import torch
+            blob_dtype = torch.float16 if dtype == "fp16" else torch.bfloat16
         artifact_files = ["manifest.json"]
         artifact_sizes = [len(manifest_bytes)]
         for name, count in sorted(counts.items()):
@@ -300,8 +301,14 @@ def _validate_artifact(path: Path, contract: GraphContract, backend: str) -> Pre
                     if read_bytes > expected:
                         raise NativeBackendError(f"native blob {blob.name} changed while being read")
                     digest.update(chunk)
-                    values = torch.frombuffer(bytearray(chunk), dtype=blob_dtype)
-                    if not torch.isfinite(values).all().item():
+                    if _finite_chunk is None:
+                        values = torch.frombuffer(bytearray(chunk), dtype=blob_dtype)
+                        finite = bool(torch.isfinite(values).all().item())
+                    else:
+                        finite = _finite_chunk(chunk, dtype)
+                        if type(finite) is not bool:
+                            raise NativeBackendError("invalid Rust MLP finite validator result")
+                    if not finite:
                         raise NativeBackendError(f"native artifact contains non-finite values in {blob.name}")
                 if read_bytes != expected:
                     raise NativeBackendError(f"native blob {blob.name} changed while being read")
@@ -768,8 +775,15 @@ def prepare_model(predictor, contract: GraphContract, options: NativeOptions, ru
     if isinstance(predictor, NativeModel):
         if predictor.graph_hash != contract.graph_hash:
             raise NativeUnavailable("NativeModel graph_hash does not match this ordered graph and center")
-        prepared = (_validate_ensemble(predictor.weights_dir, contract) if predictor.backend == "ensemble"
-                    else _validate_artifact(predictor.weights_dir, contract, predictor.backend))
+        finite = (_snapshot_cache.finite_validator()
+                  if _snapshot_cache is not None and predictor.backend == "mlp" else None)
+        if predictor.backend == "ensemble":
+            prepared = _validate_ensemble(predictor.weights_dir, contract)
+        elif finite is None:
+            prepared = _validate_artifact(predictor.weights_dir, contract, predictor.backend)
+        else:
+            prepared = _validate_artifact(predictor.weights_dir, contract, predictor.backend,
+                                          _finite_chunk=finite)
         if predictor.expected_artifact_hash is not None and predictor.expected_artifact_hash != prepared.artifact_hash:
             raise NativeBackendError("native artifact hash changed after the model snapshot was prepared")
         if _snapshot_cache is not None:

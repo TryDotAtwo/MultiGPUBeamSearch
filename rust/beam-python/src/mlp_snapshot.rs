@@ -1,6 +1,11 @@
 use crate::runtime_error;
+use beam_core::precision::{finite_16le, Float16Format};
 use beam_runtime::mlp_snapshot::{MlpSnapshotInput, MlpSnapshotStore};
-use pyo3::{exceptions::PyRuntimeError, prelude::*};
+use pyo3::{
+    exceptions::{PyRuntimeError, PyValueError},
+    prelude::*,
+    types::PyBytes,
+};
 use std::{
     path::PathBuf,
     sync::{
@@ -179,7 +184,21 @@ impl PyMlpSnapshotStore {
     }
 }
 
+/// Borrow immutable Python bytes; the reference stays alive while the GIL is released.
+#[pyfunction]
+fn mlp_finite_16le(py: Python<'_>, data: &Bound<'_, PyBytes>, dtype: &str) -> PyResult<bool> {
+    let format = match dtype {
+        "fp16" => Float16Format::Fp16,
+        "bf16" => Float16Format::Bf16,
+        _ => return Err(PyValueError::new_err("expected fp16 or bf16")),
+    };
+    let bytes = data.as_bytes();
+    py.allow_threads(|| finite_16le(bytes, format))
+        .map_err(runtime_error)
+}
+
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyMlpSnapshotStore>()?;
+    module.add_function(wrap_pyfunction!(mlp_finite_16le, module)?)?;
     Ok(())
 }

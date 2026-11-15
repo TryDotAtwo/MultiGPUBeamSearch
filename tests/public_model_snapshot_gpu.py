@@ -98,7 +98,8 @@ def main():
                      ('unsolved', starts[2], models[0], 64), ('model-change', starts[0], models[1], 64),
                      ('beam-change', starts[0], models[1], 65)]
             with NativeSession(engine=engine, experimental_reuse_model_snapshot=True,
-                               experimental_parallel_nccl_identity=True) as session:
+                               experimental_parallel_nccl_identity=True,
+                               experimental_rust_mlp_finite=(engine == 'rust')) as session:
                 for name, state, model, width in cases:
                     result = session.beam_search(graph, native_options=options, start_state=state,
                         predictor=model, beam_width=width, max_steps=4, return_path=True)
@@ -134,7 +135,8 @@ def main():
             # A prior auto-mode worker was not bound at startup. Entering the
             # experiment must discard that group before using its receipts.
             with NativeSession(engine=engine, experimental_reuse_model_snapshot=True,
-                               experimental_parallel_nccl_identity=True) as session:
+                               experimental_parallel_nccl_identity=True,
+                               experimental_rust_mlp_finite=(engine == 'rust')) as session:
                 transitions = []
                 for mode in ('auto', 'native', 'native', 'auto'):
                     result = session.beam_search(graph, backend=mode, native_options=options,
@@ -203,7 +205,8 @@ def main():
         for mode in order:
             free_before = [torch.cuda.mem_get_info(device)[0] for device in (0, 1)]
             with NativeSession(engine='rust', experimental_parallel_nccl_identity=True,
-                               experimental_reuse_model_snapshot=(mode != 'baseline')) as session:
+                               experimental_reuse_model_snapshot=(mode != 'baseline'),
+                               experimental_rust_mlp_finite=(mode == 'reuse')) as session:
                 if mode == 'python_owner':
                     session.model_snapshot_cache._prefer_rust = False
                 state = start_state(contract.center, moves, 12)

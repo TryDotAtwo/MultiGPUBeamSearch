@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-15 experimental borrowed-byte MLP validation
+- Added a separately opt-in Rust/PyO3 finite-value validator for explicit MLP
+  snapshots. It borrows immutable little-endian FP16/BF16 chunks and avoids
+  the Python bytearray copy and tensor conversion; default validation remains
+  unchanged. Incompatible opt-in configurations and extensions fail closed.
+- The release Rust workspace and PyO3 build passed; 670 Python tests passed,
+  11 skipped. All 131,072 FP16/BF16 encodings agreed with PyTorch. Public
+  one/two-RTX-3060 tests covered 20 snapshot cases, with 16 paths independently
+  replayed. Five paired two-GPU full calls measured median −2.01%, below the
+  promotion threshold. No GPU-step or peak-memory claim follows.
+- A separate minimal CUDA graph reproduced two cross-kernel racecheck reports
+  in the conditional graph while its ordinary graph, memcheck and synccheck
+  passed. The larger conditional racecheck run exited 11. The original Stream 4
+  reports and bounded synccheck issue remain unresolved; the minimal example
+  cannot certify application safety. See
+  `test_results/refactor_20261115/STAGE_RUST_MLP_FINITE.md`.
+
 ## 2026-11-15 Rust terminal result transfer
 - The opt-in Rust public session now hands its validated terminal result to
   Python once for the matching job rather than parsing the native log again.

@@ -1,6 +1,7 @@
 """Session-local reuse of a validated private MLP artifact snapshot."""
 from copy import deepcopy
 from pathlib import Path
+import sys
 
 
 def requires_mlp_host_binding(cache, model, contract, build_metadata):
@@ -12,15 +13,17 @@ def requires_mlp_host_binding(cache, model, contract, build_metadata):
 class ModelSnapshotCache:
     """Retain one snapshot; callers serialize access using the session lock."""
 
-    def __init__(self, *, prefer_rust=False):
+    def __init__(self, *, prefer_rust=False, enable_rust_finite=False):
         self._entry = None
         self._source = None
         self._prepared = None
         self._active = None
         self._geometry = None
         self._prefer_rust = prefer_rust
+        self._enable_rust_finite = enable_rust_finite
         self._rust_checked = False
         self._rust_store = None
+        self._rust_finite = None
         self.last = None
 
     def _rust_owner(self):
@@ -37,8 +40,21 @@ class ModelSnapshotCache:
             # the complete Python snapshot and launch validation path.
             self._rust_store = (candidate if callable(getattr(candidate, 'prepare_sized_for_session', None))
                                 else None)
+            finite = None if self._rust_store is None else getattr(module, 'mlp_finite_16le', None)
+            self._rust_finite = finite if callable(finite) and sys.byteorder == 'little' else None
             self._rust_checked = True
         return self._rust_store
+
+    def finite_validator(self):
+        """The experimental borrowed-bytes checker is explicitly opt-in."""
+        if not self._enable_rust_finite:
+            return None
+        self._rust_owner()
+        if self._rust_finite is None:
+            from .errors import NativeUnavailable
+            raise NativeUnavailable('experimental Rust MLP finite validation requires a matching '
+                                    'Rust snapshot extension and little-endian host')
+        return self._rust_finite
 
     def _prepare_rust(self, owner, model, contract, run_dir, cache_dir, key, *, force_new):
         from .errors import NativeBackendError

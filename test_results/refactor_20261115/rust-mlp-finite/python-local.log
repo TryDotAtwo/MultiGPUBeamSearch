@@ -1,0 +1,210 @@
+...............F.F................sss....ss.                             [100%]
+================================== FAILURES ===================================
+_____________ test_source_change_during_reuse_fails_before_launch _____________
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/rust-mlp-finite/pytest-local/test_source_change_during_reus0/source/weights'), ...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001B92EA27BA0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B92E97A150>
+
+    def test_source_change_during_reuse_fails_before_launch(fixture, monkeypatch):
+        source, _, _, search = fixture
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            search(session)
+            original = models._validate_artifact
+            checks = []
+            def validate(path, contract, backend):
+                result = original(path, contract, backend)
+                if Path(path) == source and not checks:
+                    checks.append(True)
+                    (source / 'output_bias.fp16').write_bytes(b'\x00\x3c')
+                return result
+            monkeypatch.setattr(models, '_validate_artifact', validate)
+            with pytest.raises(NativeBackendError, match='changed before launch'):
+>               search(session)
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:35: in search
+    return session.beam_search(graph, backend=backend, native_options=native_options, start_state=start,
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:106: in beam_search
+    return beam_search(graph,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:303: in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:187: in _search
+    return _search_impl(original, graph, kwargs, options, mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:229: in _search_impl
+    model = prepare_model(predictor, contract, options, run_dir, _snapshot_cache=cache)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predictor = NativeModel(weights_dir=WindowsPath('D:/100XH100/.local/cache/rust-mlp-finite/pytest-local/test_source_change_during_r...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f', fallback=None, backend='mlp', expected_artifact_hash=None)
+contract = GraphContract(state_len=4, num_classes=4, generators=((1, 2, 3, 0), (3, 0, 1, 2), (1, 0, 2, 3)), generator_names=('L',...center=(0, 1, 2, 3), start=(1, 0, 2, 3), graph_hash='b412a54ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f')
+options = NativeOptions(source_dir=None, cache_dir=WindowsPath('D:/100XH100/.local/cache/rust-mlp-finite/pytest-local/test_sourc..._calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False, experimental_index_sort=False)
+run_dir = WindowsPath('D:/100XH100/.local/cache/rust-mlp-finite/pytest-local/test_source_change_during_reus0/cache/runs/5bbe7b3e7813423eba7147bf4a7e5fa2')
+
+    def prepare_model(predictor, contract: GraphContract, options: NativeOptions, run_dir: Path,
+                      *, _ensemble_member=False, _snapshot_cache=None) -> PreparedModel:
+        from .pancake_gnn import PancakeGNN
+        if isinstance(predictor, PancakeGNN):
+            if _ensemble_member:
+                from .gnn_artifacts import export_gnn
+                _require_no_global_forward_hooks()
+                return export_gnn(predictor, contract, run_dir)
+            return prepare_model(NativeEnsemble([predictor], [1.0]), contract, options, run_dir)
+        if isinstance(predictor, NativeModel) and predictor.backend == 'pancake_gnn' and not _ensemble_member:
+            return prepare_model(NativeEnsemble([predictor], [1.0]), contract, options, run_dir)
+        if isinstance(predictor, NativeEnsemble):
+            directory = Path(run_dir).resolve() / "weights"
+            directory.mkdir(parents=True, exist_ok=False)
+            members = []
+            shared_artifacts = {}
+            shared_cube_snapshots = {}
+            for i, (source, coefficient) in enumerate(zip(predictor.models, predictor.coefficients)):
+                if isinstance(source, NativeEnsemble):
+                    raise NativeUnavailable("flatten nested ensembles explicitly to preserve coefficient order")
+                shared_cube=isinstance(source,NativeModel) and source.backend in ('cube444_transformer','cube444_mlp')
+                identity=(source.weights_dir,source.graph_hash) if shared_cube else None
+                member=shared_cube_snapshots.get(identity) if shared_cube else None
+                if member is None:
+                    member = prepare_model(source, contract, options, directory / f"member-{i}", _ensemble_member=True)
+                    if shared_cube:shared_cube_snapshots[identity]=member
+                else:
+                    if source.expected_artifact_hash is not None and source.expected_artifact_hash!=member.artifact_hash:
+                        raise NativeBackendError('native artifact hash changed after the model snapshot was prepared')
+                    member=PreparedModel(member.weights_dir,member.manifest,source.backend,
+                                         member.artifact_hash,member.artifact_files)
+                relative = member.weights_dir.relative_to(directory)
+                # Cube444 heads share one immutable bundle and one native model
+                # cache. Preserve the member family/coefficient, reuse its path.
+                if member.backend in ("cube444_transformer", "cube444_mlp"):
+                    relative = shared_artifacts.setdefault(member.artifact_hash, relative)
+                members.append({"family": member.backend, "weights_dir": relative.as_posix(),
+                                "coefficient": coefficient, "artifact_hash": member.artifact_hash})
+            manifest = {"schema_version": 1, "state_len": contract.state_len,
+                        "output_dim": contract.move_count, "graph_hash": contract.graph_hash,
+                        "score_semantics": "distance_q", "models": members}
+            (directory / "ensemble.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            return _validate_ensemble(directory, contract)
+        if predictor is None:
+            from .hamming import write_hamming_artifact
+            return _validate_artifact(write_hamming_artifact(contract, run_dir), contract, "mlp")
+        if isinstance(predictor, NativeModel):
+            if predictor.graph_hash != contract.graph_hash:
+                raise NativeUnavailable("NativeModel graph_hash does not match this ordered graph and center")
+            finite = (_snapshot_cache.finite_validator()
+                      if _snapshot_cache is not None and predictor.backend == "mlp" else None)
+            prepared = (_validate_ensemble(predictor.weights_dir, contract) if predictor.backend == "ensemble"
+>                       else _validate_artifact(predictor.weights_dir, contract, predictor.backend,
+                                                _finite_chunk=finite))
+E           TypeError: test_source_change_during_reuse_fails_before_launch.<locals>.validate() got an unexpected keyword argument '_finite_chunk'
+
+integrations\cayleypy_native\multigpubeamsearch\models.py:781: TypeError
+_____________ test_reuse_validates_source_twice_and_snapshot_once _____________
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/rust-mlp-finite/pytest-local/test_reuse_validates_source_tw0/source/weights'), ...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000001B92EA74B80>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B92D838910>
+
+    def test_reuse_validates_source_twice_and_snapshot_once(fixture, monkeypatch):
+        source, _, _, search = fixture
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            first = search(session)
+            snapshot = Path(first.native_metadata['model_snapshot']['snapshot_dir'])
+            original = models._validate_artifact
+            checked = []
+            def validate(path, contract, backend):
+                checked.append(Path(path))
+                return original(path, contract, backend)
+            monkeypatch.setattr(models, '_validate_artifact', validate)
+>           second = search(session)
+                     ^^^^^^^^^^^^^^^
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:118: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:35: in search
+    return session.beam_search(graph, backend=backend, native_options=native_options, start_state=start,
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:106: in beam_search
+    return beam_search(graph,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:303: in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:187: in _search
+    return _search_impl(original, graph, kwargs, options, mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:229: in _search_impl
+    model = prepare_model(predictor, contract, options, run_dir, _snapshot_cache=cache)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predictor = NativeModel(weights_dir=WindowsPath('D:/100XH100/.local/cache/rust-mlp-finite/pytest-local/test_reuse_validates_source...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f', fallback=None, backend='mlp', expected_artifact_hash=None)
+contract = GraphContract(state_len=4, num_classes=4, generators=((1, 2, 3, 0), (3, 0, 1, 2), (1, 0, 2, 3)), generator_names=('L',...center=(0, 1, 2, 3), start=(1, 0, 2, 3), graph_hash='b412a54ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f')
+options = NativeOptions(source_dir=None, cache_dir=WindowsPath('D:/100XH100/.local/cache/rust-mlp-finite/pytest-local/test_reuse..._calibration=True, calibration_full_frontier=False, calibration_discover_capacity=False, experimental_index_sort=False)
+run_dir = WindowsPath('D:/100XH100/.local/cache/rust-mlp-finite/pytest-local/test_reuse_validates_source_tw0/cache/runs/b4377c0e0b3f48e0b621b0c6ccef3958')
+
+    def prepare_model(predictor, contract: GraphContract, options: NativeOptions, run_dir: Path,
+                      *, _ensemble_member=False, _snapshot_cache=None) -> PreparedModel:
+        from .pancake_gnn import PancakeGNN
+        if isinstance(predictor, PancakeGNN):
+            if _ensemble_member:
+                from .gnn_artifacts import export_gnn
+                _require_no_global_forward_hooks()
+                return export_gnn(predictor, contract, run_dir)
+            return prepare_model(NativeEnsemble([predictor], [1.0]), contract, options, run_dir)
+        if isinstance(predictor, NativeModel) and predictor.backend == 'pancake_gnn' and not _ensemble_member:
+            return prepare_model(NativeEnsemble([predictor], [1.0]), contract, options, run_dir)
+        if isinstance(predictor, NativeEnsemble):
+            directory = Path(run_dir).resolve() / "weights"
+            directory.mkdir(parents=True, exist_ok=False)
+            members = []
+            shared_artifacts = {}
+            shared_cube_snapshots = {}
+            for i, (source, coefficient) in enumerate(zip(predictor.models, predictor.coefficients)):
+                if isinstance(source, NativeEnsemble):
+                    raise NativeUnavailable("flatten nested ensembles explicitly to preserve coefficient order")
+                shared_cube=isinstance(source,NativeModel) and source.backend in ('cube444_transformer','cube444_mlp')
+                identity=(source.weights_dir,source.graph_hash) if shared_cube else None
+                member=shared_cube_snapshots.get(identity) if shared_cube else None
+                if member is None:
+                    member = prepare_model(source, contract, options, directory / f"member-{i}", _ensemble_member=True)
+                    if shared_cube:shared_cube_snapshots[identity]=member
+                else:
+                    if source.expected_artifact_hash is not None and source.expected_artifact_hash!=member.artifact_hash:
+                        raise NativeBackendError('native artifact hash changed after the model snapshot was prepared')
+                    member=PreparedModel(member.weights_dir,member.manifest,source.backend,
+                                         member.artifact_hash,member.artifact_files)
+                relative = member.weights_dir.relative_to(directory)
+                # Cube444 heads share one immutable bundle and one native model
+                # cache. Preserve the member family/coefficient, reuse its path.
+                if member.backend in ("cube444_transformer", "cube444_mlp"):
+                    relative = shared_artifacts.setdefault(member.artifact_hash, relative)
+                members.append({"family": member.backend, "weights_dir": relative.as_posix(),
+                                "coefficient": coefficient, "artifact_hash": member.artifact_hash})
+            manifest = {"schema_version": 1, "state_len": contract.state_len,
+                        "output_dim": contract.move_count, "graph_hash": contract.graph_hash,
+                        "score_semantics": "distance_q", "models": members}
+            (directory / "ensemble.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            return _validate_ensemble(directory, contract)
+        if predictor is None:
+            from .hamming import write_hamming_artifact
+            return _validate_artifact(write_hamming_artifact(contract, run_dir), contract, "mlp")
+        if isinstance(predictor, NativeModel):
+            if predictor.graph_hash != contract.graph_hash:
+                raise NativeUnavailable("NativeModel graph_hash does not match this ordered graph and center")
+            finite = (_snapshot_cache.finite_validator()
+                      if _snapshot_cache is not None and predictor.backend == "mlp" else None)
+            prepared = (_validate_ensemble(predictor.weights_dir, contract) if predictor.backend == "ensemble"
+>                       else _validate_artifact(predictor.weights_dir, contract, predictor.backend,
+                                                _finite_chunk=finite))
+E           TypeError: test_reuse_validates_source_twice_and_snapshot_once.<locals>.validate() got an unexpected keyword argument '_finite_chunk'
+
+integrations\cayleypy_native\multigpubeamsearch\models.py:781: TypeError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_source_change_during_reuse_fails_before_launch
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_reuse_validates_source_twice_and_snapshot_once
+2 failed, 37 passed, 5 skipped in 14.24s
+Exception ignored in: <function Console.__del__ at 0x000001B97F5EF9C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

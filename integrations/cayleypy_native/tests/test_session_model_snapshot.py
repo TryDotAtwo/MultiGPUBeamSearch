@@ -492,8 +492,8 @@ def test_rust_snapshot_rejects_shifted_tensor_boundary_with_same_hash(fixture, t
         with session.prepare_model_snapshot() as cache:
             if phase == 'copy':
                 original = models._validate_artifact
-                def mutate_after_validation(path, contract, backend):
-                    result = original(path, contract, backend)
+                def mutate_after_validation(path, contract, backend, **kwargs):
+                    result = original(path, contract, backend, **kwargs)
                     if Path(path) == source:
                         move_boundary(source)
                     return result

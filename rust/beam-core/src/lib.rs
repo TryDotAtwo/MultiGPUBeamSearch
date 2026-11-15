@@ -11,6 +11,7 @@ pub mod history;
 pub mod inference;
 mod permutation;
 pub mod planning;
+pub mod precision;
 pub mod profile_policy;
 pub mod search;
 
