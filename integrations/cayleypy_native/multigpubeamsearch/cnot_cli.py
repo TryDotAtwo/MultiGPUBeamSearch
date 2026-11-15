@@ -40,6 +40,8 @@ def main():
     parser.add_argument("--mode", choices=("qhat", "proposal"), default="qhat")
     parser.add_argument("--inference-batch", type=int, default=4)
     parser.add_argument("--audit", action="store_true", help="include all candidates in the JSON for small runs")
+    parser.add_argument("--validation", choices=("python", "rust"), default="python",
+                        help="select the input and construction-replay validator")
     args = parser.parse_args()
     device = initialize_world("nccl")
     try:
@@ -53,7 +55,8 @@ def main():
                              device=device, inference_batch=args.inference_batch)
         with group.checked("load 102-feature scorer", load_scorer) as scorer:
             result = search_cnot(root, scorer, width=args.width, shortlist=args.shortlist,
-                                 max_depth=args.max_depth, mode=args.mode, audit=args.audit)
+                                 max_depth=args.max_depth, mode=args.mode, audit=args.audit,
+                                 validation=args.validation)
             if group.rank == 0:
                 print(json.dumps(dict(**asdict(result), length=result.length, model=scorer.metadata)))
     finally:

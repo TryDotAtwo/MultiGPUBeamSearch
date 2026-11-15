@@ -25,6 +25,19 @@ class CnotResult:
         return None if self.gates is None else len(self.gates)
 
 
+@dataclass(frozen=True)
+class _InputMatrix:
+    n: int
+    raw: bytes
+    rows: tuple[int, ...] | None = None
+    rust_matrix: object | None = None
+
+    def verifies_construction(self, gates):
+        if self.rust_matrix is not None:
+            return self.rust_matrix.verifies_construction(gates)
+        return replay_cnot(self.n, gates) == self.rows
+
+
 def pack_rows(rows, *, device=None):
     """Pack n Python row integers in little-endian 64-bit lanes."""
     n = len(rows)
@@ -47,7 +60,7 @@ def replay_cnot(n, gates):
     return tuple(rows)
 
 
-def _input(root, width, shortlist, depth, mode):
+def _input(root, width, shortlist, depth, mode, validation="python"):
     if root.dtype != torch.int64 or root.ndim != 3 or root.shape[0] != 1:
         raise ValueError("expected one packed int64 matrix [1,n,ceil(n/64)]")
     n, words = root.shape[1:]
@@ -58,7 +71,17 @@ def _input(root, width, shortlist, depth, mode):
         raise ValueError("invalid global width, shortlist, or depth")
     if mode not in ("qhat", "proposal"):
         raise ValueError("mode must be qhat or proposal")
+    if validation not in ("python", "rust"):
+        raise ValueError("validation must be python or rust")
     raw = root.detach().contiguous().cpu().numpy().tobytes()
+    if validation == "rust":
+        from .errors import NativeUnavailable
+        from .rust_control import extension
+
+        matrix_type = getattr(extension(), "CnotMatrix", None)
+        if matrix_type is None:
+            raise NativeUnavailable("Rust runtime lacks CNOT input validation; rebuild the matching PyO3 module")
+        return _InputMatrix(n, raw, rust_matrix=matrix_type(n, raw))
     rows = tuple(int.from_bytes(raw[i:i + 8 * words], "little") for i in range(0, len(raw), 8 * words))
     if any(row.bit_length() > n for row in rows):
         raise ValueError("nonzero CNOT row padding")
@@ -69,7 +92,7 @@ def _input(root, width, shortlist, depth, mode):
         if not row:
             raise ValueError("CNOT matrix is singular")
         pivots[row.bit_length()] = row
-    return rows, raw
+    return _InputMatrix(n, raw, rows=rows)
 
 
 def _goal(world, parents, lex, begin, identity):
@@ -131,7 +154,7 @@ def _distinct(world, incoming, closed, n, words, scorer):
     return children, meta, values
 
 
-def _reconstruct(world, history, final, input_rows):
+def _reconstruct(world, history, final, input_matrix):
     slot, last_move = final
     moves, routes = [last_move], []
     for count, previous_count, records in reversed(history):
@@ -149,39 +172,44 @@ def _reconstruct(world, history, final, input_rows):
         moves.append(move)
         routes.append(dict(source=source, hash_owner=owner, target=target, move=move))
     gates = tuple(moves)  # backtracking reversed the reduction, including its terminal gate
-    if slot != 0 or replay_cnot(len(input_rows), gates) != input_rows:
+    if slot != 0 or not input_matrix.verifies_construction(gates):
         raise RuntimeError("CNOT construction failed bitwise replay from the identity")
     return gates, routes[::-1]
 
 
 @torch.inference_mode(False)
 @torch.no_grad()
-def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit=False):
+def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit=False,
+                validation="python"):
     """Run collectively on the initialized world, or directly on one CPU/GPU.
 
     Every rank supplies the same root, limits and weights. Each rank binds its
     own scorer to its local GPU. Audit records full candidate/winner matrices
-    only when requested for small acceptance runs.
+    only when requested for small acceptance runs. ``validation="rust"``
+    selects the optional Rust input and construction-path validator; it does
+    not change the search loop or scorer.
     """
     with World(root.device) as world:
-        input_rows, raw = world.checked("validate CNOT input",
-                                        lambda: _input(root, width, shortlist, max_depth, mode))
+        input_matrix = world.checked("validate CNOT input",
+                                     lambda: _input(root, width, shortlist, max_depth, mode, validation))
         metadata = getattr(scorer, "metadata", {})
         fingerprints = ("upstream_commit", "checkpoint_sha256", "feature_registry_sha256",
                         "training_manifest_sha256", "training_result_sha256")
-        config = (width, shortlist, max_depth, mode, audit, tuple(root.shape),
+        config = (width, shortlist, max_depth, mode, audit, validation, tuple(root.shape),
                   tuple(metadata.get(key) for key in fingerprints))
-        digest = hashlib.sha256(raw + json.dumps(config).encode()).digest()
+        hasher = hashlib.sha256(input_matrix.raw)
+        hasher.update(json.dumps(config).encode())
+        digest = hasher.digest()
         identities = world.gather_fixed(world.longs(list(digest)))
         if not (identities == identities[0]).all().item():
             raise ValueError("CNOT root, search settings or scorer fingerprints differ between ranks")
-        identity = native.cnot_identity(len(input_rows), device=world.device)
+        identity = native.cnot_identity(input_matrix.n, device=world.device)
         if torch.equal(root, identity):
             return CnotResult("solved", (), [], [])
-        return _search(world, root, identity, input_rows, scorer, width, shortlist, max_depth, mode, audit)
+        return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
 
 
-def _search(world, root, identity, input_rows, scorer, width, shortlist, max_depth, mode, audit):
+def _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit):
     n, words = root.shape[1:]
     k = min(shortlist, n * (n - 1))
     parents = root if world.rank == 0 else root[:0]
@@ -193,7 +221,7 @@ def _search(world, root, identity, input_rows, scorer, width, shortlist, max_dep
     for step in range(max_depth):
         final = _goal(world, parents, lex, begin, identity)
         if final is not None:
-            gates, routes = _reconstruct(world, history, final, input_rows)
+            gates, routes = _reconstruct(world, history, final, input_matrix)
             return CnotResult("solved", gates, layers, routes)
         if step + 1 == max_depth:
             break  # every one-gate completion above was tested over the whole alphabet

@@ -58,6 +58,51 @@ def test_rejects_invalid_input_and_nonfinite_scorer():
         search_cnot(pack_rows((8, 4, 2, 1)), Invalid(0), width=1, shortlist=2, max_depth=3)
 
 
+def test_explicit_rust_validation_owns_input_and_checks_returned_path(monkeypatch):
+    from types import SimpleNamespace
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    class Matrix:
+        def __init__(self, n, raw):
+            self.n = n
+            width = 8 * ((n + 63) // 64)
+            self.rows = tuple(int.from_bytes(raw[i:i + width], "little")
+                              for i in range(0, len(raw), width))
+            calls.append(("load", n, len(raw)))
+
+        def verifies_construction(self, gates):
+            calls.append(("replay", tuple(gates)))
+            return replay_cnot(self.n, gates) == self.rows
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(CnotMatrix=Matrix))
+    rows = replay_cnot(144, (20591,))
+    result = search_cnot(pack_rows(rows), object(), width=1, shortlist=1, max_depth=1,
+                         validation="rust")
+    assert result.gates == (20591,)
+    assert calls == [("load", 144, 3456), ("replay", (20591,))]
+
+    monkeypatch.setattr(Matrix, "verifies_construction", lambda self, gates: False)
+    with pytest.raises(RuntimeError, match="replay"):
+        search_cnot(pack_rows(rows), object(), width=1, shortlist=1, max_depth=1,
+                    validation="rust")
+
+
+def test_explicit_rust_validation_fails_closed_for_old_extension(monkeypatch):
+    from types import SimpleNamespace
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+    with pytest.raises(NativeUnavailable, match="CNOT"):
+        search_cnot(pack_rows((1, 2)), object(), width=1, shortlist=1, max_depth=1,
+                    validation="rust")
+    with pytest.raises(ValueError, match="validation"):
+        search_cnot(pack_rows((1, 2)), object(), width=1, shortlist=1, max_depth=1,
+                    validation="invalid")
+
+
 def _distributed(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2, timeout=timedelta(seconds=60))

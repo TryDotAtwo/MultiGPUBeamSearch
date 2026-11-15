@@ -10,7 +10,7 @@ results and third-party repositories are retained. Raw checks belong under
 
 | Component | Observed build/test environment |
 | --- | --- |
-| Rust | 1.99.1; edition 2021; workspace dependency versions pinned by Cargo.lock |
+| Rust | 1.99.1 and 1.100.0; edition 2021; workspace dependency versions pinned by Cargo.lock |
 | Python/PyO3 | Python 3.11; PyO3 0.24; CPython 3.10+ stable ABI |
 | CUDA | 12.8, Linux development image |
 | PyTorch | CUDA-enabled 2.9.0 for the optional LibTorch and existing CNOT provider |
@@ -29,6 +29,11 @@ rank processes after their ABI/layout and specialization checks.
   remains 32 bytes and aligned to 32. Stream3 retains original candidate IDs.
 - Persistent permutation padding stays zero. CNOT packed matrices retain their
   separate geometry and full-word equality checks.
+- The opt-in Rust CNOT validator requires 2–256 rows of little-endian packed
+  words, zero tail padding, and an invertible GF(2) matrix. Every returned gate
+  is a control-major physical ID and construction replay compares all words.
+  Each rank must select the same validator; an unavailable extension fails
+  closed. This does not move CNOT search or its model scorer into Rust/C++.
 - A managed Rust permutation session must bind the validated CayleyPy graph hash
   to the actual center and ordered generators loaded by every native rank. An
   unsupported worker or missing ABI extension must fail before search. The

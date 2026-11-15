@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "D:\100XH100\rust\beam-python\tests\cnot.py", line 31, in <module>
+    matrix = runtime.CnotMatrix(n, target)
+             ^^^^^^^^^^^^^^^^^^
+AttributeError: module '_beam_runtime' has no attribute 'CnotMatrix'

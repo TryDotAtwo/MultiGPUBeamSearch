@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-15 optional Rust CNOT input and path validation
+- Added an owned Rust packed CNOT input contract with GF(2) invertibility,
+  full-word construction replay, zero-tail validation and control-major action
+  IDs. The opt-in Python/CLI adapter fails closed on missing Rust capability and
+  requires the same validator on every rank. The Python search loop and trained
+  checkpoint scorer are unchanged.
+- Rust workspace tests (two ABI fixtures ignored) and release PyO3 build passed,
+  along with 643 Python tests (11 skipped). Public synthetic CNOT searches agreed across validators on one
+  and two CPU/Gloo and RTX 3060/NCCL ranks; twelve solved rank paths were
+  independently replayed, including a 144-wire cross-rank two-gate path. Both
+  distributed failure cases passed. No performance, checkpoint-quality or
+  other-hardware claim is made. See
+  `test_results/refactor_20261114/STAGE_CNOT_RUST_VALIDATION.md`.
+
 ## 2026-11-15 native-loaded permutation graph binding
 - A Rust resident session now supplies its validated graph hash through an
   optional ABI-1 extension. Each native rank hashes its actual loaded center

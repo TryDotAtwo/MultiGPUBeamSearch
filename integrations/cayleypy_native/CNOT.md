@@ -62,6 +62,13 @@ to another hash owner, distinct children scored, and frontier states received.
 The model explicitly rejects a state that falls outside its feature coverage.
 The adapter reports the offending rank and feature and stops the collective search.
 
+The optional `--validation rust` selects the Rust packed-input and construction
+replay validator; the Python API accepts `search_cnot(..., validation="rust")`.
+It requires the matching PyO3 extension and fails if that capability is absent.
+All ranks must select the same validator. The default remains `python`. This
+option moves input validation and final path replay only; the CNOT search loop,
+collectives, and checkpoint scorer still use the existing implementation.
+
 ## Data movement and limits
 
 - The CNOT domain uses packed `int64[batch,n,ceil(n/64)]` with zero tail bits,
