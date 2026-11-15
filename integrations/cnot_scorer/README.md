@@ -47,3 +47,27 @@ export MGBS_TQP_H07_REFERENCE=/private/receipts/view-spread-result.json
 PYTHONPATH=integrations/cayleypy_native python -m unittest discover \
   -s integrations/cayleypy_native/tests -p test_cnot_scorer.py -v
 ```
+
+## Experimental packet scoring
+
+After rebuilding the bridge, Python callers may explicitly select
+`TQPScorer(..., experimental_native_batch=True)`. This sends one complete packet
+through the optional `mgbs_tqp_score_many` C ABI; the existing scorer still
+evaluates it in sub-packets no larger than `inference_batch`. Without that
+symbol, explicit selection fails before the checkpoint is opened. The ordinary
+per-sub-packet ABI remains the default. Coverage and finite-score checks are
+unchanged. Set `MGBS_TQP_BATCH_TEST=1` to run the optional comparison tests.
+
+The input, scores and coverage buffers are borrowed, contiguous, disjoint
+CUDA allocations in the scorer's process and device. The caller must keep them
+alive until submitted work finishes and must pass their actual available byte
+lengths. The ABI checks declared lengths and offset arithmetic before scoring;
+it does not prove allocation bounds, device identity, or non-overlap. The Python
+adapter owns separate output and coverage tensors and checks its input tensor;
+its existing `rows.contiguous()` can copy a non-contiguous input. The new ABI
+does not add a packet copy or change the model's numerical policy.
+
+On a small GL(4,2) checkpoint fixture the paired complete-search timings did
+not meet the promotion threshold; this is not a saturated inference benchmark.
+The checked inputs, hardware, timing samples and limitations are recorded in
+`test_results/refactor_20261115/STAGE_CNOT_NATIVE_BATCH.md`.

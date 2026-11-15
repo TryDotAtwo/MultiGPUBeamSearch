@@ -21,6 +21,12 @@ def _load_api(path):
         function = getattr(lib, name)
         function.argtypes = args
         function.restype = result
+    batch_score = getattr(lib, "mgbs_tqp_score_many", None)
+    if batch_score is not None:
+        batch_score.argtypes = [C.c_void_p, C.c_uint32, C.c_int64, C.c_int64,
+                                C.c_void_p, C.c_size_t, C.c_void_p, C.c_size_t,
+                                C.c_void_p, C.c_size_t]
+        batch_score.restype = C.c_int
     if lib.mgbs_tqp_abi_version() != 1:
         raise RuntimeError("unsupported CNOT scorer ABI")
     return lib
@@ -29,13 +35,16 @@ def _load_api(path):
 class TQPScorer:
     """One restored field on one rank. Inputs are valid packed GL(n,2) states."""
 
-    def __init__(self, library, manifest, *, n, device, inference_batch=4):
+    def __init__(self, library, manifest, *, n, device, inference_batch=4,
+                 experimental_native_batch=False):
         import torch
 
         if not isinstance(n, int) or not 2 <= n <= 0xFFFFFFFF:
             raise ValueError("n must be a valid CNOT dimension")
         if not isinstance(inference_batch, int) or inference_batch < 1:
             raise ValueError("inference_batch must be positive")
+        if type(experimental_native_batch) is not bool:
+            raise ValueError("experimental_native_batch must be a bool")
         self.device = torch.device(device)
         if self.device.type != "cuda" or self.device.index is None:
             raise ValueError("select an explicit rank-local CUDA device such as cuda:0")
@@ -44,6 +53,9 @@ class TQPScorer:
         self.n = n
         self._lock = threading.Lock()
         self._api = _load_api(library)
+        self._native_batch = experimental_native_batch
+        if self._native_batch and getattr(self._api, "mgbs_tqp_score_many", None) is None:
+            raise RuntimeError("the scorer library lacks the experimental batch scorer ABI")
         manifest = str(Path(manifest).resolve(strict=True)).encode("utf-8")
         with torch.cuda.device(self.device):
             self._handle = self._api.mgbs_tqp_open(manifest, n, self.device.index)
@@ -105,14 +117,24 @@ class TQPScorer:
                 return output
             rows = rows.contiguous()
             status = torch.empty(count, dtype=torch.int64, device=self.device)
-            for start in range(0, count, self._batch):
-                size = min(self._batch, count - start)
-                code = self._api.mgbs_tqp_score(
-                    self._handle, head, size, rows[start:].data_ptr(),
-                    output[start:].data_ptr(), status[start:].data_ptr(),
+            if self._native_batch:
+                code = self._api.mgbs_tqp_score_many(
+                    self._handle, head, count, self._batch,
+                    rows.data_ptr(), rows.numel() * rows.element_size(),
+                    output.data_ptr(), output.numel() * output.element_size(),
+                    status.data_ptr(), status.numel() * status.element_size(),
                 )
                 if code:
                     raise self._native_error()
+            else:
+                for start in range(0, count, self._batch):
+                    size = min(self._batch, count - start)
+                    code = self._api.mgbs_tqp_score(
+                        self._handle, head, size, rows[start:].data_ptr(),
+                        output[start:].data_ptr(), status[start:].data_ptr(),
+                    )
+                    if code:
+                        raise self._native_error()
             finite = output.isfinite().reshape(count, -1).all(dim=1)
             failed = status.ne(0) | ~finite
             # Only admission flags cross to the host. The engine receives the

@@ -72,6 +72,13 @@ All ranks must select the same validator. The default remains `python`. This
 option moves input validation and final path replay only; the CNOT search loop,
 collectives, and checkpoint scorer still use the existing implementation.
 
+Python callers can separately construct `TQPScorer` with
+`experimental_native_batch=True` to submit one borrowed score packet per call
+to a newly built scorer library. Its internal inference sub-packets and checks
+are unchanged. This option remains off by default; it does not migrate the
+search loop to Rust. Its buffer contract and validation limits are described in
+`integrations/cnot_scorer/README.md`.
+
 ## Data movement and limits
 
 - The CNOT domain uses packed `int64[batch,n,ceil(n/64)]` with zero tail bits,

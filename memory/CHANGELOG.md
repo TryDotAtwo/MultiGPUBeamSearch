@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-15 - Experimental CNOT checkpoint packet ABI
+
+- Added an opt-in packet ABI that submits multiple existing checkpoint scorer
+  sub-packets through one Python-to-native call. It checks declared buffer
+  lengths and offset arithmetic before enqueueing; actual CUDA allocation,
+  non-overlap and lifetime remain caller obligations. The existing ABI, model
+  computations, coverage and finite checks remain the default.
+- On both RTX 3060 devices the real pinned GL(4,2) checkpoint passed Qhat,
+  proposal and V comparisons, empty/partial/multiple packet and short-buffer
+  tests. Search results and independently replayed paths matched on one and two
+  GPUs. The upstream canonical-output comparison was skipped in this run.
+- Five paired complete searches gave median paired wall-time changes of -0.25%
+  on one GPU and +0.03% on two; the tiny fixture is not a saturated benchmark.
+  The option stays off. See `test_results/refactor_20261115/STAGE_CNOT_NATIVE_BATCH.md`.
+
 ## 2026-11-15 - Collective CNOT admission errors
 
 - CNOT input validation, scorer metadata reads and configuration fingerprinting

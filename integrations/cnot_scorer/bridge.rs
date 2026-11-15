@@ -205,6 +205,78 @@ pub unsafe extern "C" fn mgbs_tqp_score(
     })
 }
 
+/// Score a complete borrowed packet using the existing fixed-size scorer.
+/// All buffers belong to the caller and must address the scorer's CUDA device.
+/// Byte extents are checked before the first sub-packet is submitted.
+#[no_mangle]
+pub unsafe extern "C" fn mgbs_tqp_score_many(
+    handle: *const c_void,
+    head: u32,
+    batch: i64,
+    batch_limit: i64,
+    rows: *const u8,
+    rows_bytes: usize,
+    output: *mut u8,
+    output_bytes: usize,
+    votes: *mut u8,
+    votes_bytes: usize,
+) -> i32 {
+    boundary(-1, || {
+        let scorer = unsafe { handle.cast::<Scorer>().as_ref() }.ok_or("null scorer")?;
+        if head > 2 || batch < 0 || batch_limit < 1 || batch_limit > scorer.capacity {
+            return Err("invalid scorer head, packet size or batch limit".into());
+        }
+        if batch == 0 {
+            return Ok(0);
+        }
+        if rows.is_null() || output.is_null() || votes.is_null() {
+            return Err("invalid scorer storage".into());
+        }
+        let count = usize::try_from(batch).map_err(|_| "scorer packet size overflow")?;
+        let n = usize::try_from(scorer.alphabet.dimension()).map_err(|_| "CNOT dimension overflow")?;
+        if n < 2 {
+            return Err("invalid CNOT dimension".into());
+        }
+        let words = n.checked_add(63).ok_or("CNOT row width overflow")? / 64;
+        let row_stride = n.checked_mul(words).and_then(|v| v.checked_mul(8))
+            .ok_or("CNOT row byte stride overflow")?;
+        let columns = if head == 2 { 1 } else {
+            n.checked_mul(n.checked_sub(1).ok_or("invalid CNOT dimension")?)
+                .ok_or("CNOT score width overflow")?
+        };
+        let output_stride = columns.checked_mul(4).ok_or("CNOT output stride overflow")?;
+        for (name, stride, available, address) in [
+            ("rows", row_stride, rows_bytes, rows as usize),
+            ("output", output_stride, output_bytes, output as usize),
+            ("votes", 8usize, votes_bytes, votes as usize),
+        ] {
+            let required = count.checked_mul(stride).ok_or("CNOT packet byte size overflow")?;
+            if available < required {
+                return Err(format!("CNOT {name} capacity exceeded: required={required} available={available}"));
+            }
+            address.checked_add(required - 1).ok_or("CNOT device pointer offset overflow")?;
+        }
+        let limit = usize::try_from(batch_limit).map_err(|_| "scorer batch limit overflow")?;
+        tch::no_grad(|| {
+            let mut start = 0usize;
+            while start < count {
+                let size = std::cmp::min(limit, count - start);
+                // These are borrowed CUDA addresses, never Rust references. The
+                // full checked extent above bounds every sub-packet offset.
+                unsafe {
+                    scorer.score(head, size as i64,
+                        rows.wrapping_add(start * row_stride),
+                        output.wrapping_add(start * output_stride),
+                        votes.wrapping_add(start * 8))?;
+                }
+                start += size;
+            }
+            Ok::<(), String>(())
+        })?;
+        Ok(0)
+    })
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn mgbs_tqp_close(handle: *mut c_void) {
     if !handle.is_null() {
