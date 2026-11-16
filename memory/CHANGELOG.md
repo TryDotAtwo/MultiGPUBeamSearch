@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-16 - CNOT Rust controller and native frontier packing
+
+- Added a Rust rank-local CNOT search controller and history reconstruction.
+  A compatible PyO3 module is selected automatically; explicit Python and
+  Rust engine modes remain available. Python tensor/scorer/collective stages
+  remain transitional and retain their existing order and error coordination.
+- Moved CUDA winner-packet creation, received-record sorting and frontier
+  views to C++ ATen operations. Older external operator libraries retain the
+  previous tensor path. The packed-matrix equality, scorer, precision and
+  multi-rank transport are unchanged.
+- Source-pinned checks passed: full Rust workspace; 31 focused CNOT CPU/Gloo
+  tests; eight CUDA frontier-packet cases; the full Python suite (717 passed,
+  10 skipped); and exact Python/Rust one- and two-RTX-3060 comparisons with
+  synthetic scoring and the existing checkpoint provider. Checkpoint qhat
+  replayed `[5, 7, 0]`; proposal's feature coverage rejection matched on both
+  controllers. See `test_results/refactor_20261116/STAGE_CNOT_RUST_CONTROLLER.md`.
+
 ## 2026-11-16 - Rust supervisor for externally scheduled ranks
 
 - Added the opt-in Rust torchrun/Slurm rank supervisor and a thin PyO3 adapter.

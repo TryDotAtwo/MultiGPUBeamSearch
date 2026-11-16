@@ -194,33 +194,61 @@ def _reconstruct(world, history, final, input_matrix):
     return gates, routes[::-1]
 
 
-def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation):
+def _search_engine(engine, max_depth):
+    if engine not in ("auto", "python", "rust"):
+        raise ValueError("CNOT engine must be auto, python, or rust")
+    if engine == "python":
+        return "python", None
+    from .errors import NativeUnavailable
+    from .rust_control import extension
+
+    if max_depth > 2**64 - 1:
+        if engine == "auto":
+            return "python", None
+        raise ValueError("CNOT Rust engine depth exceeds u64")
+    try:
+        run = getattr(extension(), "run_cnot", None)
+    except NativeUnavailable:
+        if engine == "rust":
+            raise
+        return "python", None
+    if run is None:
+        if engine == "rust":
+            raise NativeUnavailable("Rust runtime lacks CNOT search; rebuild the matching PyO3 module")
+        return "python", None
+    return "rust", run
+
+
+def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation, engine):
     input_matrix = _input(root, width, shortlist, max_depth, mode, validation)
+    engine, runner = _search_engine(engine, max_depth)
     metadata = getattr(scorer, "metadata", {})
     fingerprints = ("upstream_commit", "checkpoint_sha256", "feature_registry_sha256",
                     "training_manifest_sha256", "training_result_sha256")
-    config = (width, shortlist, max_depth, mode, audit, validation, tuple(input_matrix.root.shape),
+    config = (width, shortlist, max_depth, mode, audit, validation, engine, tuple(input_matrix.root.shape),
               tuple(metadata.get(key) for key in fingerprints))
     hasher = hashlib.sha256(input_matrix.raw)
     hasher.update(json.dumps(config).encode())
-    return input_matrix, hasher.digest()
+    return input_matrix, hasher.digest(), runner
 
 
 @torch.inference_mode(False)
 @torch.no_grad()
 def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit=False,
-                validation="python"):
+                validation="python", engine="auto"):
     """Run collectively on the initialized world, or directly on one CPU/GPU.
 
     Every rank supplies the same root, limits and weights. Each rank binds its
     own scorer to its local GPU. Audit records full candidate/winner matrices
     only when requested for small acceptance runs. ``validation="rust"``
-    selects the optional Rust input and construction-path validator; it does
-    not change the search loop or scorer.
+    selects the optional Rust input and construction-path validator. The
+    default engine uses the Rust search controller when installed; ``python``
+    retains the reference controller and ``rust`` requires the extension.
+    Tensor operations, scorer callbacks and collectives are unchanged.
     """
     with World(root.device) as world:
-        input_matrix, digest = world.checked("validate CNOT input", lambda: _admit(
-            root, scorer, width, shortlist, max_depth, mode, audit, validation))
+        input_matrix, digest, runner = world.checked("validate CNOT input", lambda: _admit(
+            root, scorer, width, shortlist, max_depth, mode, audit, validation, engine))
         root = input_matrix.root
         identities = world.gather_fixed(world.longs(list(digest)))
         if not (identities == identities[0]).all().item():
@@ -228,6 +256,12 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         identity = native.cnot_identity(input_matrix.n, device=world.device)
         if torch.equal(root, identity):
             return CnotResult("solved", (), [], [])
+        if runner is not None:
+            from .cnot_rust_stages import CnotStages
+
+            stages = CnotStages(world, root, identity, input_matrix, scorer, mode, audit)
+            alphabet = input_matrix.n * (input_matrix.n - 1)
+            return runner(stages, world.rank, world.size, width, min(shortlist, alphabet), alphabet, max_depth)
         return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
 
 

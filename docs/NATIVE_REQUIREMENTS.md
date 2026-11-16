@@ -33,7 +33,17 @@ rank processes after their ABI/layout and specialization checks.
   words, zero tail padding, and an invertible GF(2) matrix. Every returned gate
   is a control-major physical ID and construction replay compares all words.
   Each rank must select the same validator; an unavailable extension fails
-  closed. This does not move CNOT search or its model scorer into Rust/C++.
+  closed. CNOT's Rust controller and validator are independent choices;
+  arbitrary Python scorers and the existing native checkpoint scorer remain
+  supported.
+- `search_cnot(engine="auto")` uses the Rust controller when a matching
+  extension is installed, and otherwise retains the Python reference. All
+  ranks must resolve to the same engine. `engine="rust"` fails closed without
+  the controller. The controller owns stage order and history, while Torch
+  stages, scorer calls and collective management are still transitional.
+  CUDA winner packing and received-frontier handling use C++ ATen when the
+  operator library has the matching symbols; older prebuilt libraries keep
+  the existing tensor implementation.
 - CNOT validation, rank identity, the identity fast path and search must use
   the same owned contiguous device snapshot, not a mutable caller alias. The
   caller must synchronize concurrent writes during snapshot creation; an

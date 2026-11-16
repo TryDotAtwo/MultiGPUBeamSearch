@@ -1,5 +1,24 @@
 # Rust/native runtime
 
+## CNOT controller transition
+
+`search_cnot` selects the Rust controller automatically with a matching
+extension, or the Python reference when it is unavailable. Explicit
+`engine="rust"` requires the controller; `engine="python"` selects the
+reference. The Rust rank-local loop owns the ordering of goal checks,
+expansion, candidate exchange, deduplication, selection, redistribution,
+termination and history reconstruction. It remains on the caller's thread
+to preserve the current CUDA device, stream, inference context and process
+group. Its transitional stage callbacks operate on whole batches or
+collectives; no Rust reference is made from a GPU address.
+
+The CUDA stage library also supports C++ ATen packing and unpacking of the
+selected frontier using the same operations as the reference. Old externally
+provided operator libraries fall back to the existing tensor implementation.
+Full matrix equality and original rank routes remain unchanged. Scoring,
+global selection and collective management are still Python stages, so this
+is not yet a complete Rust/C++ CNOT runtime.
+
 The approved migration is in progress. Existing public Python entry points are
 switched only after their comparative acceptance stage. Rust now owns host history
 for its resident workers and ordinary CLI, plus calibration process primitives.

@@ -24,7 +24,8 @@ def _cuda_ops():
     root = package / "_native_source"
     if not (root / "cuda/cnot_domain.cu").is_file():
         root = package.parents[2]
-    sources = [root / "cuda/cnot_torch.cpp", root / "cuda/cnot_domain.cu", root / "cuda/cnot_unique.cu"]
+    sources = [root / "cuda/cnot_torch.cpp", root / "cuda/cnot_frontier_torch.cpp",
+               root / "cuda/cnot_domain.cu", root / "cuda/cnot_unique.cu"]
     headers = ["cuda/cnot_domain.hpp", "src/cnot_domain.hpp", "src/hash.hpp",
                "src/types.hpp", "src/config.hpp"]
     digest = hashlib.sha256()
