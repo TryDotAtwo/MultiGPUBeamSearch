@@ -53,7 +53,7 @@ at::Tensor owners_impl(const at::Tensor& states, std::int64_t world_size) {
     return output;
 }
 
-at::Tensor first_unseen(const at::Tensor& closed, const at::Tensor& children) {
+at::Tensor first_unseen_impl(const at::Tensor& closed, const at::Tensor& children) {
     const int n = check_states(closed);
     TORCH_CHECK(check_states(children) == n && closed.device() == children.device(),
                 "closed and child CNOT matrices must have the same shape and device");
@@ -92,6 +92,9 @@ at::Tensor children(const at::Tensor& states, const at::Tensor& indices, const a
 at::Tensor owners(const at::Tensor& states, std::int64_t world_size) {
     return owners_impl(states, world_size);
 }
+at::Tensor first_unseen(const at::Tensor& closed, const at::Tensor& children) {
+    return first_unseen_impl(closed, children);
+}
 } // namespace beam::cnot::torch_bridge
 
 TORCH_LIBRARY(multigpubeamsearch_cnot_domain, m) {
@@ -102,5 +105,5 @@ TORCH_LIBRARY(multigpubeamsearch_cnot_domain, m) {
 TORCH_LIBRARY_IMPL(multigpubeamsearch_cnot_domain, CUDA, m) {
     m.impl("children", TORCH_FN(children_impl));
     m.impl("owners", TORCH_FN(owners_impl));
-    m.impl("first_unseen", TORCH_FN(first_unseen));
+    m.impl("first_unseen", TORCH_FN(first_unseen_impl));
 }

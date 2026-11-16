@@ -50,7 +50,16 @@ class CnotStages:
 
     def deduplicate_and_score(self):
         self.children, self.meta, self.values = self.world.checked("deduplicate and evaluate distinct children",
-            lambda: cnot._distinct(self.world, self.incoming, self.closed, self.n, self.words, self.scorer))
+            self._distinct)
+
+    def _distinct(self):
+        ops = native._cuda_ops() if self.incoming.is_cuda else None
+        if ops is None or not hasattr(ops, "distinct_candidates"):
+            return cnot._distinct(self.world, self.incoming, self.closed, self.n, self.words, self.scorer)
+        children, meta = ops.distinct_candidates(self.incoming, self.closed, self.n, self.words)
+        values = (cnot._scores(self.scorer.child_values(children), (len(children),), self.world.device)
+                  if len(children) else torch.empty(0, dtype=torch.float64, device=self.world.device))
+        return children, meta, values
 
     def prepare_selection(self):
         from .cnot_rust_selection import SelectionStages

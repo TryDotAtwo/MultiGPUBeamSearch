@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-16 - C++ ATen CNOT distinct preparation
+
+- Moved generation-order sorting and preparation of distinct CUDA CNOT records
+  into C++ ATen. The existing full-matrix deduplication kernel, Python scorer,
+  multi-rank exchange and compatibility fallback remain in use.
+- Source-pinned Linux tests on one/two RTX 3060 GPUs passed: the Rust workspace,
+  34 focused CPU/Gloo tests, 26 CUDA cases, full Python suite (738 passed, 10
+  skipped), NCCL comparisons and checkpoint comparisons. See
+  `test_results/refactor_20261116/STAGE_CNOT_DISTINCT.md`.
+
 ## 2026-11-16 - C++ ATen CNOT candidate expansion
 
 - Moved the CUDA CNOT batch expansion tensor sequence into C++ ATen, retaining

@@ -42,9 +42,9 @@ rank processes after their ABI/layout and specialization checks.
   the controller. The controller owns stage order, history and the global radix
   cutoff passes; Torch tensor stages, scorer calls and collective management
   are still transitional.
-  CUDA candidate expansion, winner packing and received-frontier handling use
-  C++ ATen when the operator library has the matching symbols; older prebuilt
-  libraries keep the existing tensor implementation.
+  CUDA candidate expansion, full-matrix distinct preparation, winner packing
+  and received-frontier handling use C++ ATen when the operator library has
+  the matching symbols; older prebuilt libraries keep the tensor implementation.
 - CNOT validation, rank identity, the identity fast path and search must use
   the same owned contiguous device snapshot, not a mutable caller alias. The
   caller must synchronize concurrent writes during snapshot creation; an
