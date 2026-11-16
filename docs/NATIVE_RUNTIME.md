@@ -28,7 +28,10 @@ implementation. Python still calls user-provided scorers in batches.
 Full matrix equality and original rank routes remain unchanged. Rust controls
 the global radix cutoff passes, with CUDA key preparation, histogram, mask
 updates and final record ordering in C++ ATen when matching operators are
-available. Remaining tensor stages, scoring and
+available. The new stage backend also retains the selection masks, keys and
+batch handles in Rust; its CUDA and CPU paths use the same Torch operations and
+rank collective schedule. The Python selection adapter remains available for
+the compatible older controller path. Remaining tensor stages, scoring and
 collective management are partly in Python. This is not yet a complete
 Rust/C++ CNOT runtime.
 

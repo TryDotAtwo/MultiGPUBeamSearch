@@ -42,6 +42,9 @@ rank processes after their ABI/layout and specialization checks.
   the controller. The controller owns stage order, history and the global radix
   cutoff passes; CUDA key preparation, radix histograms, mask updates and final
   record ordering use C++ ATen when the matching operators are available.
+  The newer rank-local backend retains the cutoff's keys and masks in Rust;
+  it keeps the same batch operations, rank collective sequence, and legacy
+  Python adapter for older controller/extension combinations.
   The newer stage backend retains rank-local frontier, candidate, closed-set,
   metadata and history tensor handles in Rust while PyTorch owns storage. All
   ranks must advertise that backend; otherwise all use the older Python stage

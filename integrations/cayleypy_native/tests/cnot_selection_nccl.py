@@ -5,6 +5,7 @@ import os
 import torch
 import torch.distributed as dist
 
+from multigpubeamsearch import cnot_native
 from multigpubeamsearch.cnot_collectives import World
 from multigpubeamsearch.cnot_rust_selection import SelectionStages
 from multigpubeamsearch.cnot_selection import global_winners
@@ -31,7 +32,31 @@ def main():
             for width in range(1, sum(map(len, values)) + 2):
                 old = global_winners(world, scores, keys, width)
                 new = extension().run_cnot_selection(SelectionStages(world, scores, keys), width)
+                native = extension().run_cnot_native_selection(world, scores, keys, width)
                 assert all(torch.equal(a, b) for a, b in zip(old, new))
+                assert all(torch.equal(a, b) for a, b in zip(old, native))
+
+        original_ops = cnot_native._cuda_ops
+        ops = original_ops()
+
+        class OlderLibrary:
+            def __getattr__(self, name):
+                if name in ("selection_prepare", "selection_records", "selection_order",
+                            "radix_histogram", "radix_update"):
+                    raise AttributeError(name)
+                return getattr(ops, name)
+
+        if world.rank == 1:
+            cnot_native._cuda_ops = lambda: OlderLibrary()
+        values, words = cases[1]
+        scores = torch.tensor(values[world.rank], dtype=torch.float64, device=device)
+        keys = torch.tensor(words[world.rank], dtype=torch.int64, device=device)
+        for width in range(1, sum(map(len, values)) + 2):
+            old = global_winners(world, scores, keys, width)
+            native = extension().run_cnot_native_selection(world, scores, keys, width)
+            assert all(torch.equal(a, b) for a, b in zip(old, native))
+        cnot_native._cuda_ops = original_ops
+        print(f"CNOT_RADIX_MIXED_OPS_NCCL_OK rank={world.rank}", flush=True)
         print(f"CNOT_RADIX_NCCL_OK rank={world.rank} cases={len(cases)}", flush=True)
     finally:
         dist.destroy_process_group()

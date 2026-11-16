@@ -142,10 +142,6 @@ fn run_cnot_selection(stages: Bound<'_, PyAny>, width: u64) -> PyResult<Py<PyAny
     cnot_selection::select(&mut PySelection { stages }, width)
 }
 
-pub(crate) fn select_stages(stages: Bound<'_, PyAny>, width: u64) -> PyResult<Py<PyAny>> {
-    cnot_selection::select(&mut PySelection { stages }, width)
-}
-
 /// Run on the calling rank's thread: Torch's current device/stream and
 /// inference-mode context are thread-local. Only complete stages cross PyO3.
 #[pyfunction]

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-17 - Rust-owned CNOT global selection stages
+
+- Moved the rank-local global cutoff keys, masks and batch-stage ownership to
+  Rust, preserving the same ATen operators, radix schedule, stable ordering,
+  collectives and older Python selection adapter. PyTorch continues to own
+  tensor storage.
+- Source-pinned Rust, 53 focused CPU/Gloo/CUDA-controller, 62 CUDA and 793
+  Python integration checks passed (10 skipped). One/two RTX 3060 searches and
+  checkpoint scorers matched their references, including mixed old/new CUDA
+  operators across ranks. Filtered Compute Sanitizer results and the remaining
+  Python boundaries are recorded in
+  `test_results/refactor_20261117/STAGE_CNOT_NATIVE_SELECTION.md`.
+
 ## 2026-11-17 - Rust-owned CNOT rank-local stages
 
 - Added a Rust stage backend that retains each rank's frontier, closed-set,

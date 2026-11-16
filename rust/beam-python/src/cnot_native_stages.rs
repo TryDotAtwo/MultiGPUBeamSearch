@@ -397,16 +397,14 @@ impl Backend for NativeStages<'_> {
     }
 
     fn select(&mut self, width: u64) -> PyResult<()> {
-        let stages = self
-            .py
-            .import("multigpubeamsearch.cnot_rust_selection")?
-            .getattr("SelectionStages")?
-            .call1((
-                &self.world,
-                required(&self.values, "values")?,
-                column(&required(&self.meta, "meta")?, 1)?,
-            ))?;
-        let result = crate::cnot::select_stages(stages, width)?.into_bound(self.py);
+        let result = crate::cnot_native_selection::select(
+            self.py,
+            self.world.clone(),
+            required(&self.values, "values")?,
+            column(&required(&self.meta, "meta")?, 1)?,
+            width,
+        )?
+        .into_bound(self.py);
         self.ranks = Some(result.get_item(0)?);
         self.local = Some(result.get_item(1)?);
         self.new_lex = Some(result.get_item(2)?);

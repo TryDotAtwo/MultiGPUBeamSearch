@@ -99,6 +99,26 @@ def test_rust_search_owns_stages_without_python_stage_object(monkeypatch, mode):
     assert cnot.replay_cnot(len(rows), result.gates) == rows
 
 
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_search_owns_selection_without_python_stage_object(monkeypatch, mode):
+    require_controller()
+    from multigpubeamsearch import cnot_rust_selection
+
+    rows, scorer = (8, 4, 2, 1), WireFixture(9)
+    options = dict(width=5, shortlist=9, max_depth=4, mode=mode, audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+    assert reference.layers and any(layer["distinct"] > options["width"] for layer in reference.layers)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("legacy Python CNOT selection owner was instantiated")
+
+    monkeypatch.setattr(cnot_rust_selection.SelectionStages, "__init__", forbidden)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+    assert asdict(result) == asdict(reference)
+    assert verify_layers(rows, scorer, mode, options["width"], options["shortlist"],
+                         result.layers, torch.device("cpu"))
+
+
 def distributed(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2,

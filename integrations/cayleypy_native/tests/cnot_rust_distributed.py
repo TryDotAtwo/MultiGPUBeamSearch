@@ -14,6 +14,7 @@ from verify_cnot import WireFixture, wide_case
 from multigpubeamsearch import cnot
 from multigpubeamsearch import cnot_stream5
 from multigpubeamsearch import cnot_rust_stages
+from multigpubeamsearch import cnot_rust_selection
 
 
 def main():
@@ -34,6 +35,14 @@ def main():
             return original_stages_init(self, *args, **kwargs)
 
         cnot_rust_stages.CnotStages.__init__ = trace_stages
+        legacy_selections = []
+        original_selection_init = cnot_rust_selection.SelectionStages.__init__
+
+        def trace_selection(self, *args, **kwargs):
+            legacy_selections.append(True)
+            return original_selection_init(self, *args, **kwargs)
+
+        cnot_rust_selection.SelectionStages.__init__ = trace_selection
         rust_calls, legacy_calls = [], []
         if distributed:
             original_rust = cnot_stream5.RustStream5.exchange
@@ -71,9 +80,11 @@ def main():
                               result=asdict(new), replay=new.gates is not None))
 
         assert not legacy_stages, "Rust search unexpectedly used the Python stage owner"
+        assert not legacy_selections, "Rust search unexpectedly used the Python selection owner"
         errors = []
         fallback_legacy_calls = 0
         fallback_stage_calls = 0
+        fallback_selection_calls = 0
         if distributed:
             assert rust_calls and legacy_calls, (rank, rust_calls, legacy_calls)
             original_native_backend = cnot._native_stages_runner
@@ -83,6 +94,8 @@ def main():
             assert asdict(fallback) == cases[0]["result"]
             fallback_stage_calls = len(legacy_stages)
             assert fallback_stage_calls > 0
+            fallback_selection_calls = len(legacy_selections)
+            assert fallback_selection_calls > 0
             cnot._native_stages_runner = original_native_backend
 
             original_compatible = cnot_stream5.RustStream5.compatible_library
@@ -94,6 +107,7 @@ def main():
             assert asdict(fallback) == cases[0]["result"]
             fallback_legacy_calls = len(legacy_calls) - prior_legacy
             assert fallback_legacy_calls > 0 and len(rust_calls) == prior_rust
+            assert len(legacy_selections) == fallback_selection_calls
             cnot_stream5.RustStream5.compatible_library = staticmethod(original_compatible)
 
             class RejectOnOne(WireFixture):
@@ -119,7 +133,8 @@ def main():
         (output / f"rank-{rank}.json").write_text(json.dumps(dict(
             rank=rank, world=size, gpu=torch.cuda.get_device_name(device), cases=cases,
             errors=errors, reused_after_failure=bool(errors), rust_transport_calls=len(rust_calls),
-            fallback_legacy_calls=fallback_legacy_calls, fallback_stage_calls=fallback_stage_calls),
+            fallback_legacy_calls=fallback_legacy_calls, fallback_stage_calls=fallback_stage_calls,
+            fallback_selection_calls=fallback_selection_calls),
             indent=2) + "\n", encoding="utf-8")
         print(f"CNOT_RUST_EQUIVALENCE_OK rank={rank} world={size}", flush=True)
     finally:
