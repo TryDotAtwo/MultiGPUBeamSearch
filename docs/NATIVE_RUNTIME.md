@@ -22,7 +22,10 @@ older CUDA operator libraries keep their existing batch fallbacks.
 The CUDA stage library supports C++ ATen local-goal evaluation, candidate
 expansion, full-matrix distinct preparation, and packing and unpacking of the
 selected frontier using the same operations as the reference. Goal failures
-remain coordinated through the existing rank exchange.
+remain coordinated through the existing rank exchange. The Rust stage backend
+owns local-goal orchestration and rank-wide winner/error coordination, using the
+existing ATen operator or the same Torch tensor operations when it is missing.
+The older Python stage adapter retains its original goal implementation.
 Old externally provided operator libraries fall back to the existing tensor
 implementation. Python still calls user-provided scorers in batches.
 Full matrix equality and original rank routes remain unchanged. Rust controls

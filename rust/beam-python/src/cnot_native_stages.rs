@@ -42,31 +42,6 @@ fn checked<'py>(
     world.call_method1("checked", (name, callback))
 }
 
-#[pyclass(unsendable)]
-struct LocalGoal;
-
-#[pymethods]
-impl LocalGoal {
-    fn __call__(
-        &self,
-        py: Python<'_>,
-        parents: Bound<'_, PyAny>,
-        lex: Bound<'_, PyAny>,
-        begin: u64,
-        identity: Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let native = py.import("multigpubeamsearch.cnot_native")?;
-        let ops = native.call_method0("_cuda_ops")?;
-        if ops.hasattr("local_goal")? {
-            Ok(ops
-                .call_method1("local_goal", (parents, lex, begin, identity))?
-                .unbind())
-        } else {
-            Ok(py.None())
-        }
-    }
-}
-
 fn required<'py>(value: &Option<Bound<'py, PyAny>>, name: &str) -> PyResult<Bound<'py, PyAny>> {
     value
         .clone()
@@ -351,15 +326,14 @@ impl Backend for NativeStages<'_> {
     fn goal(&mut self, begin: u64) -> PyResult<Option<Goal>> {
         let parents = required(&self.parents, "parents")?;
         let lex = required(&self.lex, "lex")?;
-        let args = (&self.world, &parents, lex, begin, &self.identity);
-        let result = if parents.getattr("is_cuda")?.extract()? {
-            let kwargs = PyDict::new(self.py);
-            kwargs.set_item("local_goal", Py::new(self.py, LocalGoal)?)?;
-            self.cnot()?.call_method("_goal", args, Some(&kwargs))?
-        } else {
-            self.cnot()?.call_method1("_goal", args)?
-        };
-        let goal: Option<(u64, u32)> = result.extract()?;
+        let goal = crate::cnot_native_goal::goal(
+            self.py,
+            &self.world,
+            &parents,
+            &lex,
+            begin,
+            &self.identity,
+        )?;
         Ok(goal.map(|(slot, movement)| Goal { slot, movement }))
     }
 

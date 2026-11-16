@@ -8,6 +8,8 @@ import torch
 import torch.distributed as dist
 
 from multigpubeamsearch import cnot, cnot_native
+from multigpubeamsearch import rust_control
+from multigpubeamsearch.cnot_collectives import World
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
 from verify_cnot import WireFixture
@@ -22,6 +24,28 @@ try:
     assert size == 2
     ops = original()
     assert hasattr(ops, "local_goal")
+    run = rust_control.extension().run_cnot_native_goal
+    world = World(device)
+    identity = cnot_native.cnot_identity(4, device=device)
+    parent = cnot_native.cnot_children(identity, torch.tensor([0], device=device),
+                                        torch.tensor([rank], device=device))
+    lex = world.longs([1 - rank])
+    expected = cnot._goal(world, parent, lex, rank, identity)
+
+    class MixedOperators:
+        def __getattr__(self, name):
+            if name == "local_goal" and rank == 1:
+                raise AttributeError(name)
+            return getattr(ops, name)
+
+    cnot_native._cuda_ops = lambda: MixedOperators()
+    assert run(world, parent, lex, rank, identity) == expected
+    cnot_native._cuda_ops = original
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("legacy Python goal coordinator was called")
+
+    cnot._goal = forbidden
     for fault_rank in range(size):
         fired = [False]
 
@@ -50,7 +74,7 @@ try:
                                   width=1, shortlist=1, max_depth=1, engine="rust")
         assert result.status == "solved" and result.gates == (0,)
         dist.barrier()
-    print(f"CNOT_NATIVE_GOAL_NCCL_OK rank={rank} cases={size}", flush=True)
+    print(f"CNOT_NATIVE_GOAL_NCCL_OK rank={rank} cases={size} mixed_operators=1", flush=True)
 finally:
     cnot_native._cuda_ops = original
     dist.destroy_process_group()

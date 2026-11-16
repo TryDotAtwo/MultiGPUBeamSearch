@@ -54,7 +54,9 @@ rank processes after their ABI/layout and specialization checks.
   CUDA local-goal evaluation, candidate expansion, full-matrix distinct
   preparation, winner packing and received-frontier handling use C++ ATen when
   the operator library has matching symbols; older prebuilt libraries keep the
-  tensor implementation. Local-goal errors still enter the same rank exchange.
+  tensor implementation. The Rust stage backend coordinates the goal and its
+  errors using the same rank exchange; PyTorch continues to own all tensor
+  storage. The older Python stage adapter retains its previous behavior.
   Multi-rank CUDA send-packet grouping also uses C++ ATen when available;
   stable owner ordering and the existing NCCL transport are retained.
 - Rust-owned CNOT Stream 5 transport requires the existing ABI 1, owned ABI 1

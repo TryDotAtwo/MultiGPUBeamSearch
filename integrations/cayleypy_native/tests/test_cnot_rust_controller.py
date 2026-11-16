@@ -119,6 +119,23 @@ def test_rust_search_owns_selection_without_python_stage_object(monkeypatch, mod
                          result.layers, torch.device("cpu"))
 
 
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_search_owns_goal_without_python_coordinator(monkeypatch, mode):
+    require_controller()
+    rows, scorer = wide_case()
+    options = dict(width=1, shortlist=3, max_depth=3, mode=mode, audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+    assert reference.gates == (18592, 428)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("legacy Python goal coordinator was called")
+
+    monkeypatch.setattr(cnot, "_goal", forbidden)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+    assert asdict(result) == asdict(reference)
+    assert cnot.replay_cnot(len(rows), result.gates) == rows
+
+
 def distributed(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2,

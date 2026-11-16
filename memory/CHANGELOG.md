@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-17 - Rust-owned CNOT goal coordination
+
+- Transferred rank-local goal orchestration and the existing rank-wide
+  winner/error exchange into the Rust stage backend. Torch retains tensor
+  storage and the same CPU or C++ ATen operations; the old Python backend
+  remains available for older extensions. No search or numerical policy changed.
+- Source-pinned Rust, 72 focused CPU/Gloo/CUDA-controller, 62 CUDA and 812
+  Python integration checks passed (10 skipped). One/two RTX 3060 searches,
+  mixed-operator NCCL ranks and checkpoint scorers matched their references.
+  See `test_results/refactor_20261117/STAGE_CNOT_NATIVE_GOAL.md` for complete
+  evidence and remaining hardware limits.
+
 ## 2026-11-17 - Rust-owned CNOT global selection stages
 
 - Moved the rank-local global cutoff keys, masks and batch-stage ownership to

@@ -70,7 +70,16 @@ def main():
             root = cnot.pack_rows(rows, device=device)
             options = dict(width=width, shortlist=k, max_depth=depth, mode=mode, audit=True)
             old = cnot.search_cnot(root, WireFixture(undo), engine="python", **options)
-            new = cnot.search_cnot(root, WireFixture(undo), engine="rust", **options)
+            original_goal = cnot._goal
+
+            def forbidden_goal(*args, **kwargs):
+                raise AssertionError("legacy Python goal coordinator was called")
+
+            cnot._goal = forbidden_goal
+            try:
+                new = cnot.search_cnot(root, WireFixture(undo), engine="rust", **options)
+            finally:
+                cnot._goal = original_goal
             assert asdict(new) == asdict(old), (mode, len(rows), new, old)
             if new.gates is not None:
                 assert cnot.replay_cnot(len(rows), new.gates) == rows
