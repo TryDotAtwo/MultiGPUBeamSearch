@@ -1,4 +1,5 @@
 #include "cnot_domain.hpp"
+#include "cnot_torch_internal.hpp"
 #include "../src/cnot_domain.hpp"
 
 #include <ATen/core/Tensor.h>
@@ -22,7 +23,7 @@ int check_states(const at::Tensor& states) {
     return n;
 }
 
-at::Tensor children(const at::Tensor& states, const at::Tensor& indices, const at::Tensor& moves) {
+at::Tensor children_impl(const at::Tensor& states, const at::Tensor& indices, const at::Tensor& moves) {
     const int n = check_states(states);
     TORCH_CHECK(indices.device() == states.device() && moves.device() == states.device(),
                 "CNOT descriptors and parents must be on the same device");
@@ -41,7 +42,7 @@ at::Tensor children(const at::Tensor& states, const at::Tensor& indices, const a
     return output;
 }
 
-at::Tensor owners(const at::Tensor& states, std::int64_t world_size) {
+at::Tensor owners_impl(const at::Tensor& states, std::int64_t world_size) {
     const int n = check_states(states);
     TORCH_CHECK(world_size >= 1 && world_size <= 65536, "CNOT world size must be in [1, 65536]");
     const c10::cuda::CUDAGuard guard(states.device());
@@ -84,13 +85,22 @@ at::Tensor first_unseen(const at::Tensor& closed, const at::Tensor& children) {
 
 } // namespace
 
+namespace beam::cnot::torch_bridge {
+at::Tensor children(const at::Tensor& states, const at::Tensor& indices, const at::Tensor& moves) {
+    return children_impl(states, indices, moves);
+}
+at::Tensor owners(const at::Tensor& states, std::int64_t world_size) {
+    return owners_impl(states, world_size);
+}
+} // namespace beam::cnot::torch_bridge
+
 TORCH_LIBRARY(multigpubeamsearch_cnot_domain, m) {
     m.def("children(Tensor states, Tensor parent_indices, Tensor moves) -> Tensor");
     m.def("owners(Tensor states, int world_size) -> Tensor");
     m.def("first_unseen(Tensor closed, Tensor children) -> Tensor");
 }
 TORCH_LIBRARY_IMPL(multigpubeamsearch_cnot_domain, CUDA, m) {
-    m.impl("children", TORCH_FN(children));
-    m.impl("owners", TORCH_FN(owners));
+    m.impl("children", TORCH_FN(children_impl));
+    m.impl("owners", TORCH_FN(owners_impl));
     m.impl("first_unseen", TORCH_FN(first_unseen));
 }

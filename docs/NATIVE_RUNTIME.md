@@ -12,9 +12,10 @@ to preserve the current CUDA device, stream, inference context and process
 group. Its transitional stage callbacks operate on whole batches or
 collectives; no Rust reference is made from a GPU address.
 
-The CUDA stage library also supports C++ ATen packing and unpacking of the
-selected frontier using the same operations as the reference. Old externally
-provided operator libraries fall back to the existing tensor implementation.
+The CUDA stage library supports C++ ATen candidate expansion and packing and
+unpacking of the selected frontier using the same operations as the reference.
+Old externally provided operator libraries fall back to the existing tensor
+implementation. Python still calls user-provided scorers in batches.
 Full matrix equality and original rank routes remain unchanged. Rust controls
 the global radix cutoff passes; their batched tensor and collective operations,
 scoring and collective management remain Python stages. This is not yet a

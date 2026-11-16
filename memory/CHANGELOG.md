@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-16 - C++ ATen CNOT candidate expansion
+
+- Moved the CUDA CNOT batch expansion tensor sequence into C++ ATen, retaining
+  the existing CUDA children and owner kernels, stable action order, full-word
+  state handling and physical routes. Arbitrary Python scorers still run as
+  batch providers; CPU and old external operator paths remain available.
+- The source-pinned one/two-RTX-3060 comparison and CUDA and full integration
+  checks are recorded in `test_results/refactor_20261116/STAGE_CNOT_EXPAND.md`.
+
 ## 2026-11-16 - Rust control of the CNOT global cutoff
 
 - Moved the score and lexical radix cutoff pass sequence and boundary decisions

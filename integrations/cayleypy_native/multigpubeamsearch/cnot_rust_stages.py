@@ -30,7 +30,20 @@ class CnotStages:
 
     def expand(self, begin, k):
         self.candidates, self.owners = self.world.checked("rank parent actions and expand",
-            lambda: cnot._expand(self.world, self.parents, self.lex, begin, self.scorer, self.mode, k))
+            lambda: self._expand(begin, k))
+
+    def _expand(self, begin, k):
+        ops = native._cuda_ops() if self.parents.is_cuda else None
+        if ops is None or not hasattr(ops, "expand_candidates"):
+            # Retain CPU support and externally supplied older operator libraries.
+            return cnot._expand(self.world, self.parents, self.lex, begin, self.scorer, self.mode, k)
+        count = len(self.parents)
+        alphabet = self.n * (self.n - 1)
+        scores = (cnot._scores(self.scorer.parent_scores(self.parents, self.mode),
+                               (count, alphabet), self.world.device)
+                  if count and k < alphabet else None)
+        return ops.expand_candidates(self.parents, self.lex, scores, begin, self.world.rank,
+                                     self.world.size, k, self.mode == "proposal")
 
     def exchange_candidates(self):
         self.incoming = self.world.exchange(self.candidates, self.owners)
