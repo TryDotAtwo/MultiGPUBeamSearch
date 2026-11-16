@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-16 - Rust supervisor for externally scheduled ranks
+
+- Added the opt-in Rust torchrun/Slurm rank supervisor and a thin PyO3 adapter.
+  Rank validation, child launch, timeout, peer-failure handling and process
+  cleanup now run in Rust for that mode. The Python supervisor remains the
+  default; the native search, CUDA kernels and NCCL protocol are unchanged.
+- The complete Rust workspace passed with two pre-existing ignored tests;
+  37 focused process tests and the full Python suite (698 passed, 12 skipped)
+  passed on Linux. Both supervisors passed a two-GPU NCCL exchange and the same
+  real production-runner search on two RTX 3060s, with the same replayed path
+  and exact global beam 64. Physical multi-node and real Slurm runs remain
+  unverified. See `test_results/refactor_20261116/STAGE_RUST_CLUSTER_SUPERVISOR.md`.
+
 ## 2026-11-15 - Collective CNOT goal errors
 
 - A local goal-evaluation exception is now carried in the existing goal

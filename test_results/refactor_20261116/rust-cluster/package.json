@@ -1,0 +1,19 @@
+{
+  "base_commit": "448989653d8e910375c6a9f2856adc59c09549db",
+  "baseline_count": 543,
+  "overlays": {
+    "rust/beam-native-sys/src/lib.rs": "db975b3ba9ab28371e9a886631ea6195dbed03f90eab06ac7bb3138d2a7ab945",
+    "rust/beam-python/src/lib.rs": "d3e52a9ea64f58a67a9aee24e16fcdc367d835eafcc96d6c49d9f955857dfc9b",
+    "rust/beam-python/src/cluster.rs": "05e3dfbd8b606f1cd1dd741ec02169ac4bf8624324e26279d97d96b301d65179",
+    "rust/beam-runtime/src/lib.rs": "927769d505ace4c404e09c41d2c44a7cc24f8d6645de56d1c7f4c82da88719ae",
+    "rust/beam-runtime/src/cluster.rs": "edf8efc3bb1cd6dd0a857004456ae439d21ed838024443e078f0a946bb99117d",
+    "rust/beam-runtime/tests/cluster.rs": "e9b7b0cc65a67cfaadb714970312b8614f488fefa32bde58393a60fdbcab448a",
+    "integrations/cayleypy_native/multigpubeamsearch/cluster.py": "9e46869ece675987eaa0274a7c331d68ad6c0a5b88fcd5e8ff98b48cb932140a",
+    "integrations/cayleypy_native/multigpubeamsearch/cluster_worker.py": "3596305ba3bce136eb6d6776f79f59e36cc8c289bdd551d76f4ed283a7bb5f02",
+    "integrations/cayleypy_native/tests/test_cluster_rust.py": "01ae09a9062a07bce9bc769ef30244fc0ad9b22601e12264d2809c82ea05d348",
+    "integrations/cayleypy_native/tests/cluster_rank_nccl.py": "0dade4718f0d06960619c01a197e67cb1b00e40cedec62147888470902820f73"
+  },
+  "base_sha256": "4762e5a1c3b1c879c8df21a932357fad377267fc9078bfd7e238e74ff7a611da",
+  "bundle_sha256": "13435c1a4964d08d55d4c749a5c7d2e4010b6b1fe95e0d33ac67458399594088",
+  "bundle_bytes": 1290240
+}

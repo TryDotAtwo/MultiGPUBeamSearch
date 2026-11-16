@@ -45,3 +45,5 @@ User requested implementation of the accepted unified-main + Rust/CUDA/C++ plan 
 
 
 2026-11-07 resource correction: Ivan questioned the 2xRTX3090 choice and preferred cheaper RTX3060 instances. Use the cheapest adequate remote GPU configuration, keep the USD50 total cap, and retain the earlier instruction to publish verified source and synchronize local main.
+
+2026-11-16: «Продолжай переписывание на раст. Пока просто переписываем. Ничего не улучшаем». Continue the Rust migration while preserving existing algorithms, CUDA kernels, numerical behavior, interfaces and multi-GPU semantics; defer performance optimizations and benchmarking.

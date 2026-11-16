@@ -1,6 +1,7 @@
 //! Thin Python adapter; runtime implementation lives in beam-runtime.
 #![forbid(unsafe_code)]
 mod cnot;
+mod cluster;
 mod configuration;
 mod inference;
 mod interrupt;
@@ -120,6 +121,7 @@ impl ResidentWorkers {
 fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ResidentWorkers>()?;
     cnot::register(module)?;
+    cluster::register(module)?;
     probes::register(module)?;
     planning::register(module)?;
     pipeline::register(module)?;

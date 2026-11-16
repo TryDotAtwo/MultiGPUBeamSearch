@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 pub mod artifacts;
 pub mod calibration;
+pub mod cluster;
 pub mod component_probe;
 pub mod component_tuning;
 mod downstream_full;

@@ -113,13 +113,18 @@ def scheduler_rank(environ=None):
     return ScheduledRank(rank, node, local, world, local_size)
 
 
-def run_cluster_rank(command, *, shared_dir, run_id=None, timeout=3600, environ=None):
+def run_cluster_rank(command, *, shared_dir, run_id=None, timeout=3600, environ=None, engine="python"):
     """Run this scheduler-assigned worker. Return its log and artifact directory.
 
     Every worker must see shared_dir at the same path. CUDA_VISIBLE_DEVICES and
     NCCL transport settings belong to the scheduler. Run IDs are single-use.
     The native process owns all device work and the communicator.
     """
+    if engine == "rust":
+        return _run_cluster_rank_rust(command, shared_dir=shared_dir, run_id=run_id,
+                                      timeout=timeout, environ=environ)
+    if engine != "python":
+        raise ValueError("engine must be 'python' or 'rust'")
     env = dict(os.environ if environ is None else environ)
     rank = scheduler_rank(env)
     if not command or isinstance(command, (str, bytes)) or not math.isfinite(timeout) or timeout <= 0:
@@ -199,3 +204,30 @@ def run_cluster_rank(command, *, shared_dir, run_id=None, timeout=3600, environ=
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
+
+
+def _run_cluster_rank_rust(command, *, shared_dir, run_id, timeout, environ):
+    """Adapt Python paths to the Rust-owned scheduler and child-process loop."""
+    from .errors import NativeUnavailable
+    from .rust_control import extension
+
+    runtime = extension()
+    if getattr(runtime, "CLUSTER_RANK_VERSION", None) != 1:
+        raise NativeUnavailable("Rust runtime does not support cluster ranks; rebuild the matching PyO3 module")
+    env = dict(os.environ if environ is None else environ)
+    # Preserve the legacy validation order before inspecting argv and paths.
+    runtime.validate_cluster_rank(env)
+    if not command or isinstance(command, (str, bytes)) or not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("a native argument vector and a positive finite timeout are required")
+    argv = list(map(os.fspath, command))
+    executable = shutil.which(argv[0], path=env.get("PATH"))
+    executable = None if executable is None else str(Path(executable).resolve())
+    for name, default in (("BEAM_PUZZLE_INFO_JSON", "data/puzzle_info.json"),
+                          ("BEAM_TEST_CSV", "data/test.csv"), ("BEAM_WEIGHT_DIR", "stream1_weights"),
+                          ("BEAM_GENERATOR_PATH", None), ("BEAM_BLEND_DIR", None),
+                          ("BEAM_START_STATE_FILE", None), ("BEAM_TARGET_STATE_FILE", None)):
+        value = env.get(name, default)
+        if value:
+            env[name] = str(Path(value).resolve())
+    return Path(runtime.run_cluster_rank([os.fsdecode(value) for value in argv], executable,
+                                         Path(shared_dir).resolve(), run_id, timeout, env))

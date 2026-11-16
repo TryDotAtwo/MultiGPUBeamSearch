@@ -339,6 +339,29 @@ impl Drop for Context {
 }
 
 /// Process APIs are kept at the same audited FFI boundary as CUDA entry points.
+/// Send SIGTERM to one owned child, matching Python's Popen.terminate().
+pub fn terminate_process(pid: u32) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        let pid = i32::try_from(pid).map_err(|_| std::io::Error::other("pid overflow"))?;
+        if pid <= 1 {
+            return Err(std::io::Error::other("invalid worker pid"));
+        }
+        if unsafe { libc::kill(pid, libc::SIGTERM) } != 0 {
+            let error = std::io::Error::last_os_error();
+            if error.raw_os_error() != Some(libc::ESRCH) {
+                return Err(error);
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = pid;
+    }
+    Ok(())
+}
+
+/// Process APIs are kept at the same audited FFI boundary as CUDA entry points.
 pub fn kill_process_group(pid: u32) -> std::io::Result<()> {
     #[cfg(unix)]
     {

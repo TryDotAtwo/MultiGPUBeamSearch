@@ -55,6 +55,16 @@ rank, node number, node-local task number, world size and local group size.
 Use `rank.cuda_ordinal(torch.cuda.device_count())` to select a CUDA device
 inside that task's visible namespace.
 
+An experimental Rust supervisor is available with `--engine rust` before the
+command separator, or `engine="rust"` in `run_cluster_rank`. It keeps the same
+scheduler placement, shared NCCL ID path, native runner, result directories and
+peer-failure marker. The installed PyO3 runtime must include the matching
+cluster supervisor. The original Python supervisor remains the default while
+the Rust implementation is validated against real multi-node workloads. The
+experimental adapter currently requires UTF-8-compatible arguments and
+environment values; the original supervisor continues to support the existing
+Python/OS representation for other values.
+
 ## Inputs, placement, and results
 
 - `RANK` identifies the communicator peer. In a conventional 2×8 block

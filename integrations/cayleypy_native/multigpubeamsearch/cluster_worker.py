@@ -11,6 +11,7 @@ def main():
     parser.add_argument("--shared-dir", required=True, help="same shared filesystem path on every node")
     parser.add_argument("--run-id", help="fresh ID for this job; defaults to torchrun or Slurm job/step ID")
     parser.add_argument("--timeout", type=float, default=3600, help="worker wall time in seconds")
+    parser.add_argument("--engine", choices=("python", "rust"), default="python", help="rank process supervisor")
     parser.add_argument("--local-rank", "--local_rank", type=int, help=argparse.SUPPRESS)
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- production_runner PUZZLE DEPTH GLOBAL_BEAM")
     args = parser.parse_args()
@@ -25,7 +26,8 @@ def main():
 
     signal.signal(signal.SIGTERM, terminate)
     try:
-        directory = run_cluster_rank(command, shared_dir=args.shared_dir, run_id=args.run_id, timeout=args.timeout)
+        directory = run_cluster_rank(command, shared_dir=args.shared_dir, run_id=args.run_id,
+                                     timeout=args.timeout, engine=args.engine)
     except (OSError, ValueError, RuntimeError) as error:
         print(error, file=sys.stderr, flush=True)
         return 1
