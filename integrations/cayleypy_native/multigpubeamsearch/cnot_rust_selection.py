@@ -8,6 +8,17 @@ class SelectionStages:
 
     def begin(self, width):
         count = int(self.world.sum(self.world.longs([len(self.values)])).item())
+        self.selection_ops = None
+        if self.values.is_cuda:
+            from . import cnot_native as native
+
+            ops = native._cuda_ops()
+            if all(hasattr(ops, name) for name in
+                   ("selection_prepare", "selection_records", "selection_order")):
+                self.selection_ops = ops
+                self.bits, self.selected, self.boundary, self.score_keys = ops.selection_prepare(
+                    self.values, self.word_keys, count > width)
+                return count
         scores = self.values.to(torch.float64) + 0.0
         self.bits = scores.contiguous().view(torch.int64)
         self.selected = torch.ones_like(self.word_keys, dtype=torch.bool)
@@ -40,12 +51,18 @@ class SelectionStages:
         self.selected |= self.boundary
 
     def finish(self, count, width):
-        local = self.selected.nonzero().flatten()
-        records = torch.stack((self.bits[local], self.word_keys[local],
-                               torch.full_like(local, self.world.rank), local), 1)
+        if self.selection_ops is not None:
+            records = self.selection_ops.selection_records(
+                self.bits, self.word_keys, self.selected, self.world.rank)
+        else:
+            local = self.selected.nonzero().flatten()
+            records = torch.stack((self.bits[local], self.word_keys[local],
+                                   torch.full_like(local, self.world.rank), local), 1)
         records = self.world.gather_rows(records)
         if len(records) != min(count, width):
             raise RuntimeError("global radix cutoff returned an inconsistent frontier size")
+        if self.selection_ops is not None:
+            return self.selection_ops.selection_order(records)
         by_word = torch.argsort(records[:, 1], stable=True)
         in_order = by_word[torch.argsort(records[by_word, 0].contiguous().view(torch.float64), stable=True)]
         lexical_rank = torch.empty_like(by_word)

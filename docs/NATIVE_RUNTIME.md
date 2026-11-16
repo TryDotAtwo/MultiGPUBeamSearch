@@ -19,8 +19,9 @@ remain coordinated through the existing rank exchange.
 Old externally provided operator libraries fall back to the existing tensor
 implementation. Python still calls user-provided scorers in batches.
 Full matrix equality and original rank routes remain unchanged. Rust controls
-the global radix cutoff passes, with CUDA histogram and mask updates in C++ ATen
-when matching operators are available. Remaining tensor stages, scoring and
+the global radix cutoff passes, with CUDA key preparation, histogram, mask
+updates and final record ordering in C++ ATen when matching operators are
+available. Remaining tensor stages, scoring and
 collective management are partly in Python. This is not yet a complete
 Rust/C++ CNOT runtime.
 

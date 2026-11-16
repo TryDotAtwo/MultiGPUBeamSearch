@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-16 - C++ ATen CNOT selection preparation and ordering
+
+- Moved CUDA key preparation, selected-record creation and final ordering for
+  the Rust CNOT radix controller into C++ ATen. The same rank collectives,
+  deterministic ordering, CPU path and older-library fallback are retained.
+- Source-pinned Linux checks on one/two RTX 3060 GPUs passed: Rust workspace,
+  34 focused CPU/Gloo tests, 62 CUDA cases, full Python suite (774 passed, 10
+  skipped), complete searches, NCCL tests and checkpoint comparisons. See
+  `test_results/refactor_20261116/STAGE_CNOT_SELECTION_CPP.md`.
+
 ## 2026-11-16 - C++ ATen CNOT exchange packet preparation
 
 - Moved CUDA owner counting and stable record grouping for the Rust CNOT
