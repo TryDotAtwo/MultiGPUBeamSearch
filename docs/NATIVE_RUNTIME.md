@@ -15,9 +15,10 @@ collectives; no Rust reference is made from a GPU address.
 The CUDA stage library also supports C++ ATen packing and unpacking of the
 selected frontier using the same operations as the reference. Old externally
 provided operator libraries fall back to the existing tensor implementation.
-Full matrix equality and original rank routes remain unchanged. Scoring,
-global selection and collective management are still Python stages, so this
-is not yet a complete Rust/C++ CNOT runtime.
+Full matrix equality and original rank routes remain unchanged. Rust controls
+the global radix cutoff passes; their batched tensor and collective operations,
+scoring and collective management remain Python stages. This is not yet a
+complete Rust/C++ CNOT runtime.
 
 The approved migration is in progress. Existing public Python entry points are
 switched only after their comparative acceptance stage. Rust now owns host history

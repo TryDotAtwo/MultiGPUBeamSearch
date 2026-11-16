@@ -1,0 +1,45 @@
+"""Transitional tensor/collective batches for the Rust global cutoff."""
+import torch
+
+
+class SelectionStages:
+    def __init__(self, world, values, word_keys):
+        self.world, self.values, self.word_keys = world, values, word_keys
+
+    def begin(self, width):
+        count = int(self.world.sum(self.world.longs([len(self.values)])).item())
+        scores = self.values.to(torch.float64) + 0.0
+        self.bits = scores.contiguous().view(torch.int64)
+        self.selected = torch.ones_like(self.word_keys, dtype=torch.bool)
+        if count > width:
+            self.selected.zero_()
+            self.boundary = torch.ones_like(self.selected)
+            self.score_keys = torch.where(self.bits < 0, ~self.bits, self.bits ^ -(1 << 63))
+        return count
+
+    def radix_pass(self, key, shift, remaining):
+        keys = self.score_keys if key == 0 else self.word_keys
+        digit = (keys >> shift) & 255
+        hist = self.world.sum(torch.bincount(digit[self.boundary], minlength=256))
+        prefix = torch.cumsum(hist, 0)
+        cutoff = int(torch.searchsorted(prefix, remaining).item())
+        below = int(prefix[cutoff - 1].item()) if cutoff else 0
+        self.selected |= self.boundary & (digit < cutoff)
+        self.boundary &= digit == cutoff
+        return below, int(hist[cutoff].item())
+
+    def accept_boundary(self):
+        self.selected |= self.boundary
+
+    def finish(self, count, width):
+        local = self.selected.nonzero().flatten()
+        records = torch.stack((self.bits[local], self.word_keys[local],
+                               torch.full_like(local, self.world.rank), local), 1)
+        records = self.world.gather_rows(records)
+        if len(records) != min(count, width):
+            raise RuntimeError("global radix cutoff returned an inconsistent frontier size")
+        by_word = torch.argsort(records[:, 1], stable=True)
+        in_order = by_word[torch.argsort(records[by_word, 0].contiguous().view(torch.float64), stable=True)]
+        lexical_rank = torch.empty_like(by_word)
+        lexical_rank[by_word] = torch.arange(len(by_word), device=self.world.device)
+        return records[in_order, 2], records[in_order, 3], lexical_rank[in_order]

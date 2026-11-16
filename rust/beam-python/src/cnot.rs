@@ -1,5 +1,6 @@
 //! Coarse Python adapter for the owned packed CNOT input contract.
 use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
+use beam_runtime::cnot_selection;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -60,7 +61,15 @@ impl Backend for PyStages<'_> {
         Ok(())
     }
     fn select(&mut self, width: u64) -> PyResult<()> {
-        self.stages.call_method1("select", (width,))?;
+        if !self.stages.hasattr("prepare_selection")? {
+            // The previous Python adapter remains usable with a newer module.
+            self.stages.call_method1("select", (width,))?;
+            return Ok(());
+        }
+        let stages = self.stages.call_method0("prepare_selection")?;
+        let mut selection = PySelection { stages };
+        let result = cnot_selection::select(&mut selection, width)?;
+        self.stages.call_method1("commit_selection", (result,))?;
         Ok(())
     }
     fn redistribute(&mut self, depth: u64) -> PyResult<Round<Self::Layer, Self::Records>> {
@@ -98,6 +107,39 @@ impl Backend for PyStages<'_> {
     fn invalid(&self, message: &'static str) -> PyErr {
         PyRuntimeError::new_err(message)
     }
+}
+
+struct PySelection<'py> {
+    stages: Bound<'py, PyAny>,
+}
+
+impl cnot_selection::Backend for PySelection<'_> {
+    type Error = PyErr;
+    type Output = Py<PyAny>;
+
+    fn begin(&mut self, width: u64) -> PyResult<u64> {
+        self.stages.call_method1("begin", (width,))?.extract()
+    }
+    fn radix_pass(&mut self, key: u32, shift: u32, remaining: u64) -> PyResult<(u64, u64)> {
+        self.stages
+            .call_method1("radix_pass", (key, shift, remaining))?
+            .extract()
+    }
+    fn accept_boundary(&mut self) -> PyResult<()> {
+        self.stages.call_method0("accept_boundary")?;
+        Ok(())
+    }
+    fn finish(&mut self, count: u64, width: u64) -> PyResult<Self::Output> {
+        Ok(self.stages.call_method1("finish", (count, width))?.unbind())
+    }
+    fn invalid(&self, message: &'static str) -> PyErr {
+        PyRuntimeError::new_err(message)
+    }
+}
+
+#[pyfunction]
+fn run_cnot_selection(stages: Bound<'_, PyAny>, width: u64) -> PyResult<Py<PyAny>> {
+    cnot_selection::select(&mut PySelection { stages }, width)
 }
 
 /// Run on the calling rank's thread: Torch's current device/stream and
@@ -148,5 +190,6 @@ fn run_cnot<'py>(
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotMatrix>()?;
-    module.add_function(wrap_pyfunction!(run_cnot, module)?)
+    module.add_function(wrap_pyfunction!(run_cnot, module)?)?;
+    module.add_function(wrap_pyfunction!(run_cnot_selection, module)?)
 }

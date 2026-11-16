@@ -39,8 +39,9 @@ rank processes after their ABI/layout and specialization checks.
 - `search_cnot(engine="auto")` uses the Rust controller when a matching
   extension is installed, and otherwise retains the Python reference. All
   ranks must resolve to the same engine. `engine="rust"` fails closed without
-  the controller. The controller owns stage order and history, while Torch
-  stages, scorer calls and collective management are still transitional.
+  the controller. The controller owns stage order, history and the global radix
+  cutoff passes; Torch tensor stages, scorer calls and collective management
+  are still transitional.
   CUDA winner packing and received-frontier handling use C++ ATen when the
   operator library has the matching symbols; older prebuilt libraries keep
   the existing tensor implementation.

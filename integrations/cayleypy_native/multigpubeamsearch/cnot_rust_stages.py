@@ -39,7 +39,17 @@ class CnotStages:
         self.children, self.meta, self.values = self.world.checked("deduplicate and evaluate distinct children",
             lambda: cnot._distinct(self.world, self.incoming, self.closed, self.n, self.words, self.scorer))
 
+    def prepare_selection(self):
+        from .cnot_rust_selection import SelectionStages
+
+        return SelectionStages(self.world, self.values, self.meta[:, 1])
+
+    def commit_selection(self, result):
+        self.ranks, self.local, self.new_lex = result
+
     def select(self, width):
+        # Compatibility with the preceding controller extension, which calls
+        # one Python selection stage rather than the Rust radix controller.
         self.ranks, self.local, self.new_lex = cnot.global_winners(self.world, self.values, self.meta[:, 1], width)
 
     def redistribute(self, depth):

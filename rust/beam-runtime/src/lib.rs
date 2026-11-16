@@ -4,6 +4,7 @@ pub mod artifacts;
 pub mod calibration;
 pub mod cluster;
 pub mod cnot_search;
+pub mod cnot_selection;
 pub mod component_probe;
 pub mod component_tuning;
 mod downstream_full;

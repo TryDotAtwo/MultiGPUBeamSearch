@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 import tarfile
 
 here = Path(__file__).resolve().parent
@@ -16,7 +17,10 @@ with tarfile.open(archive, "r:gz") as tar:
     manifest = json.loads(read("source-manifest.json"))
     assert manifest["base_commit"] == "1f8e40b24e3163b27c4fcd621dc18ac0073ff967"
     for name, digest in manifest["overlays"].items():
-        actual = hashlib.sha256((root / name).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+        # Check the immutable stage commit, so subsequent migration work does
+        # not make this receipt appear invalid merely by editing a source file.
+        raw = subprocess.check_output(["git", "show", "4a2abfabb080f9d8121ec1cfb9c509c2268a0c12:" + name], cwd=root)
+        actual = hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
         assert actual == digest, (name, actual, digest)
     assert read("source-before.txt") == read("source-after.txt")
     assert b"COMPLETE\nEXIT_CODE=0\n" in read("status.txt")

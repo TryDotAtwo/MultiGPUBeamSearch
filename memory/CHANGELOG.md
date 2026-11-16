@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-16 - Rust control of the CNOT global cutoff
+
+- Moved the score and lexical radix cutoff pass sequence and boundary decisions
+  into the Rust CNOT controller. Python still performs the same batched Torch
+  histograms and rank collectives; scoring, order, and full matrix equality are
+  unchanged. Old extensions and old stage adapters retain their existing path.
+- Source-pinned checks passed on Linux with two RTX 3060s: Rust workspace,
+  34 focused CPU/Gloo tests, eight CUDA cases, the complete Python suite (720
+  passed, 10 skipped), two-rank NCCL radix cases and one/two-GPU search and
+  checkpoint comparisons. See
+  `test_results/refactor_20261116/STAGE_CNOT_RUST_SELECTION.md`.
+
 ## 2026-11-16 - CNOT Rust controller and native frontier packing
 
 - Added a Rust rank-local CNOT search controller and history reconstruction.

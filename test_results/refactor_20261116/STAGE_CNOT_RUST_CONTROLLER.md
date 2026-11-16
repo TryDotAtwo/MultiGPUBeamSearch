@@ -5,8 +5,9 @@
 The tested source is Git base `1f8e40b24e3163b27c4fcd621dc18ac0073ff967`
 with the pinned overlays in `cnot-rust-controller/cnot-rust-evidence.tar.gz`.
 The remote job verified 556 source files before and after execution. The local
-`cnot-rust-controller/verify_results.py` checks the archive hash, current
-overlay bytes and the bounded acceptance receipts. The evidence archive's
+`cnot-rust-controller/verify_results.py` checks the archive hash, overlay bytes
+at stage commit `4a2abfabb080f9d8121ec1cfb9c509c2268a0c12` and the bounded
+acceptance receipts. The evidence archive's
 SHA-256 is `16a71d8dee60d443e0ad33c686d284a3e37bd0883265c147d2de137314667b12`.
 
 Rust now controls the CNOT search loop, stage order, termination, rank history
