@@ -30,7 +30,10 @@ The Rust stage backend also owns the existing error vote and failure-message
 gather for initialization, expansion and distinct-child evaluation. Admission
 and the compatibility backend continue to use the Python world adapter.
 Old externally provided operator libraries fall back to the existing tensor
-implementation. Python still calls user-provided scorers in batches.
+implementation, whose expansion, distinct preparation and score validation
+are now orchestrated by Rust. The operations and full-matrix comparisons are
+unchanged, including when individual ranks have different operator symbols.
+User-provided Python scorers continue to receive whole batches.
 Full matrix equality and original rank routes remain unchanged. Rust controls
 the global radix cutoff passes, with CUDA key preparation, histogram, mask
 updates and final record ordering in C++ ATen when matching operators are

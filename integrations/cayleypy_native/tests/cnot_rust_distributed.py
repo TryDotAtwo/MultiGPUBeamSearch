@@ -15,6 +15,7 @@ from multigpubeamsearch import cnot
 from multigpubeamsearch import cnot_stream5
 from multigpubeamsearch import cnot_rust_stages
 from multigpubeamsearch import cnot_rust_selection
+from multigpubeamsearch import cnot_native
 from multigpubeamsearch.cnot_collectives import World
 
 
@@ -73,9 +74,13 @@ def main():
             old = cnot.search_cnot(root, WireFixture(undo), engine="python", **options)
             original_goal = cnot._goal
             original_checked = World.checked
+            batch_helpers = {name: getattr(cnot, name) for name in ("_scores", "_expand", "_distinct")}
 
             def forbidden_goal(*args, **kwargs):
                 raise AssertionError("legacy Python goal coordinator was called")
+
+            def forbidden_batch(*args, **kwargs):
+                raise AssertionError("legacy Python CNOT batch helper was called")
 
             def checked(world, stage, action):
                 if stage in {"initialize CNOT domain", "rank parent actions and expand",
@@ -85,11 +90,15 @@ def main():
 
             cnot._goal = forbidden_goal
             World.checked = checked
+            for name in batch_helpers:
+                setattr(cnot, name, forbidden_batch)
             try:
                 new = cnot.search_cnot(root, WireFixture(undo), engine="rust", **options)
             finally:
                 cnot._goal = original_goal
                 World.checked = original_checked
+                for name, helper in batch_helpers.items():
+                    setattr(cnot, name, helper)
             assert asdict(new) == asdict(old), (mode, len(rows), new, old)
             if new.gates is not None:
                 assert cnot.replay_cnot(len(rows), new.gates) == rows
@@ -104,6 +113,41 @@ def main():
         fallback_legacy_calls = 0
         fallback_stage_calls = 0
         fallback_selection_calls = 0
+        batch_fallbacks = []
+
+        class OlderOps:
+            def __init__(self, wrapped, missing):
+                self.wrapped, self.missing = wrapped, missing
+
+            def __getattr__(self, name):
+                if name in self.missing:
+                    raise AttributeError(name)
+                return getattr(self.wrapped, name)
+
+        original_ops = cnot_native._cuda_ops
+        batch_helpers = {name: getattr(cnot, name) for name in ("_scores", "_expand", "_distinct")}
+
+        def forbidden_batch(*args, **kwargs):
+            raise AssertionError("legacy Python CNOT batch helper was called")
+
+        try:
+            for name in batch_helpers:
+                setattr(cnot, name, forbidden_batch)
+            for scenario in ("expand", "distinct", "both", "mixed"):
+                missing = ({"expand_candidates"} if scenario == "expand" else
+                           {"distinct_candidates"} if scenario == "distinct" else
+                           {"expand_candidates", "distinct_candidates"} if scenario == "both" else
+                           {"expand_candidates"} if rank == 0 else {"distinct_candidates"})
+                cnot_native._cuda_ops = lambda: OlderOps(original_ops(), missing)
+                fallback = cnot.search_cnot(cnot.pack_rows((8, 4, 2, 1), device=device), WireFixture(9),
+                                            width=5, shortlist=9, max_depth=4, audit=True, engine="rust")
+                assert asdict(fallback) == cases[0]["result"], (rank, scenario)
+                batch_fallbacks.append(scenario)
+        finally:
+            cnot_native._cuda_ops = original_ops
+            for name, helper in batch_helpers.items():
+                setattr(cnot, name, helper)
+
         if distributed:
             assert rust_calls and legacy_calls, (rank, rust_calls, legacy_calls)
             original_native_backend = cnot._native_stages_runner
@@ -153,7 +197,7 @@ def main():
             rank=rank, world=size, gpu=torch.cuda.get_device_name(device), cases=cases,
             errors=errors, reused_after_failure=bool(errors), rust_transport_calls=len(rust_calls),
             fallback_legacy_calls=fallback_legacy_calls, fallback_stage_calls=fallback_stage_calls,
-            fallback_selection_calls=fallback_selection_calls),
+            fallback_selection_calls=fallback_selection_calls, batch_fallbacks=batch_fallbacks),
             indent=2) + "\n", encoding="utf-8")
         print(f"CNOT_RUST_EQUIVALENCE_OK rank={rank} world={size}", flush=True)
     finally:

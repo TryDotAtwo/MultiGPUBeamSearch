@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 mod cluster;
 mod cnot;
+mod cnot_native_batch;
 mod cnot_native_checked;
 mod cnot_native_goal;
 mod cnot_native_selection;

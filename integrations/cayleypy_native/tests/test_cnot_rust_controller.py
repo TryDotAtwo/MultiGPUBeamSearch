@@ -158,6 +158,62 @@ def test_rust_search_owns_stage_error_coordination(monkeypatch, mode):
     assert asdict(result) == asdict(reference)
 
 
+@pytest.mark.parametrize("mode,k", [("qhat", 9), ("proposal", 9), ("qhat", 12)])
+def test_rust_search_owns_batch_stages_without_python_helpers(monkeypatch, mode, k):
+    """CPU follows the legacy tensor path, including shortlists and full alphabets."""
+    require_controller()
+    rows, scorer = (8, 4, 2, 1), WireFixture(9)
+    options = dict(width=5, shortlist=k, max_depth=4, mode=mode, audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+    assert reference.layers
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("legacy Python CNOT batch helper was called")
+
+    for name in ("_scores", "_expand", "_distinct"):
+        monkeypatch.setattr(cnot, name, forbidden)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+    assert asdict(result) == asdict(reference)
+    assert verify_layers(rows, scorer, mode, options["width"], k,
+                         result.layers, torch.device("cpu"))
+
+
+@pytest.mark.parametrize("stage,kind", [
+    ("parent", "shape"), ("parent", "device"), ("parent", "dtype"), ("parent", "nonfinite"),
+    ("child", "shape"), ("child", "device"), ("child", "dtype"), ("child", "nonfinite"),
+])
+def test_score_validation_error_matches_python_reference(stage, kind):
+    require_controller()
+
+    class Invalid(WireFixture):
+        def corrupt(self, scores):
+            if kind == "shape":
+                return scores.flatten()[:1]
+            if kind == "dtype":
+                return scores.to(torch.int64)
+            if kind == "device":
+                return torch.empty_like(scores, device="meta")
+            return torch.full_like(scores, float("nan"))
+
+        def parent_scores(self, parents, mode):
+            scores = super().parent_scores(parents, mode)
+            return self.corrupt(scores) if stage == "parent" else scores
+
+        def child_values(self, children):
+            scores = super().child_values(children)
+            return self.corrupt(scores) if stage == "child" else scores
+
+    errors = []
+    for engine in ("python", "rust"):
+        with pytest.raises(ValueError) as exc:
+            cnot.search_cnot(cnot.pack_rows((8, 4, 2, 1)), Invalid(9),
+                             width=5, shortlist=9, max_depth=4, engine=engine)
+        errors.append(str(exc.value))
+    assert errors[0] == errors[1]
+    assert ("nonfinite CNOT model score" if kind == "nonfinite" else
+            "expected floating scores on cpu with shape") in errors[0]
+
+
 def distributed(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2,

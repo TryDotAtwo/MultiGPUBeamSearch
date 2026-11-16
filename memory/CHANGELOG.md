@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-17 - Rust-owned CNOT batch orchestration
+
+- Moved score validation and the existing CPU/older-CUDA candidate expansion
+  and distinct-preparation sequence into the Rust stage backend. Torch retains
+  tensor storage, and C++ ATen/domain operators, rank collectives, scoring,
+  ordering and numerical policy remain unchanged. The older Python stage
+  adapter remains available for compatible older extensions.
+- Source-pinned Rust, 91 focused CPU/Gloo/CUDA-controller, 62 CUDA and 831
+  Python integration tests passed (10 skipped). One/two RTX 3060 CNOT searches,
+  mixed old/new operators and checkpoint scorers matched their references.
+  See `test_results/refactor_20261117/STAGE_CNOT_NATIVE_BATCH.md` for evidence
+  and remaining hardware limits.
+
 ## 2026-11-17 - Rust-owned CNOT stage error coordination
 
 - Moved the rank-wide error vote and failure-message gather for CNOT stage

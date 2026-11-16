@@ -59,6 +59,9 @@ rank processes after their ABI/layout and specialization checks.
   storage. The older Python stage adapter retains its previous behavior.
   The Rust backend also coordinates initialization, expansion and distinct
   stage errors with the existing vote and failure-only message gather.
+  Its score validation and legacy CPU/older-CUDA expansion and distinct
+  sequences are Rust-owned while using the same Torch and domain operators;
+  mixed operator availability on ranks must remain valid.
   Multi-rank CUDA send-packet grouping also uses C++ ATen when available;
   stable owner ordering and the existing NCCL transport are retained.
 - Rust-owned CNOT Stream 5 transport requires the existing ABI 1, owned ABI 1

@@ -2,7 +2,7 @@
 //!
 //! Tensor storage remains owned by PyTorch/CUDA. Existing ATen operators and
 //! rank collectives are invoked on the caller's thread in their former order.
-use crate::cnot_native_checked::checked;
+use crate::{cnot_native_batch, cnot_native_checked::checked};
 use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
@@ -102,10 +102,6 @@ impl<'py> NativeStages<'py> {
         self.py.import("multigpubeamsearch.cnot_native")
     }
 
-    fn cnot(&self) -> PyResult<Bound<'py, PyModule>> {
-        self.py.import("multigpubeamsearch.cnot")
-    }
-
     fn ops(&self, tensor: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
         if tensor.getattr("is_cuda")?.extract()? {
             Ok(Some(self.native()?.call_method0("_cuda_ops")?))
@@ -131,9 +127,11 @@ impl<'py> NativeStages<'py> {
                 let raw = self
                     .scorer
                     .call_method1("parent_scores", (&parents, &self.mode))?;
-                self.cnot()?.call_method1(
-                    "_scores",
-                    (raw, (count, alphabet), self.world.getattr("device")?),
+                cnot_native_batch::scores(
+                    self.py,
+                    raw,
+                    &[count as i64, alphabet],
+                    &self.world.getattr("device")?,
                 )?
             } else {
                 self.py.None().into_bound(self.py)
@@ -152,17 +150,17 @@ impl<'py> NativeStages<'py> {
                 ),
             )
         } else {
-            self.cnot()?.call_method1(
-                "_expand",
-                (
-                    &self.world,
-                    parents,
-                    lex,
-                    begin,
-                    &self.scorer,
-                    &self.mode,
-                    k,
-                ),
+            cnot_native_batch::expand(
+                self.py,
+                &self.world,
+                &parents,
+                &lex,
+                begin,
+                &self.scorer,
+                &self.mode,
+                k,
+                self.n,
+                self.words,
             )
         }
     }
@@ -186,9 +184,11 @@ impl<'py> NativeStages<'py> {
             let meta = pair.get_item(1)?;
             let values = if children.len()? > 0 {
                 let raw = self.scorer.call_method1("child_values", (&children,))?;
-                self.cnot()?.call_method1(
-                    "_scores",
-                    (raw, (children.len()?,), self.world.getattr("device")?),
+                cnot_native_batch::scores(
+                    self.py,
+                    raw,
+                    &[children.len()? as i64],
+                    &self.world.getattr("device")?,
                 )?
             } else {
                 let torch = self.py.import("torch")?;
@@ -199,16 +199,14 @@ impl<'py> NativeStages<'py> {
             };
             Ok(PyTuple::new(self.py, [children, meta, values])?.into_any())
         } else {
-            self.cnot()?.call_method1(
-                "_distinct",
-                (
-                    &self.world,
-                    incoming,
-                    closed,
-                    self.n,
-                    self.words,
-                    &self.scorer,
-                ),
+            cnot_native_batch::distinct(
+                self.py,
+                &self.world,
+                &incoming,
+                &closed,
+                self.n,
+                self.words,
+                &self.scorer,
             )
         }
     }
