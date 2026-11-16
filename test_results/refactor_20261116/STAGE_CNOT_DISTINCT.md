@@ -29,3 +29,9 @@ On Linux with PyTorch 2.9.0+cu128, CUDA 12.8 and two RTX 3060 12 GiB:
 
 Multi-node/Slurm, other architectures, all scorer domains, performance and
 completion of all Python stages are not established by this evidence.
+
+The shared task lease `60933744` was deleted and provider absence was verified
+(`cnot-distinct/release.json`). At the subsequent invoice query the provider
+listed $0.142 for that lease. Known source-identified refactor leases totalled
+$4.38 at that query (`cnot-distinct/prior-invoices.json`); provider charges can
+lag, so this is neither a final invoice nor a complete project-wide total.

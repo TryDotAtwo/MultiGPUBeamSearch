@@ -99,13 +99,16 @@ def _input(root, width, shortlist, depth, mode, validation="python"):
     return _InputMatrix(n, raw, snapshot, rows=rows)
 
 
-def _goal(world, parents, lex, begin, identity):
+def _goal(world, parents, lex, begin, identity, *, local_goal=None):
     key, slot = 2**63 - 1, -1
     error = None
     try:
         n = parents.size(1)
         alphabet = n * (n - 1)
-        if len(parents):
+        result = local_goal(parents, lex, begin, identity) if len(parents) and local_goal else None
+        if result is not None:
+            key, slot = result
+        elif len(parents):
             diff = parents ^ identity
             changed = diff.ne(0).any(2)
             target = changed.long().argmax(1)

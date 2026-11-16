@@ -26,7 +26,16 @@ class CnotStages:
         self.closed = root if owner == world.rank else root[:0]
 
     def goal(self, begin):
-        return cnot._goal(self.world, self.parents, self.lex, begin, self.identity)
+        if not self.parents.is_cuda:
+            return cnot._goal(self.world, self.parents, self.lex, begin, self.identity)
+
+        def local_goal(parents, lex, slot, identity):
+            # Load and call inside _goal's error-coordination boundary.
+            ops = native._cuda_ops()
+            return ops.local_goal(parents, lex, slot, identity) if hasattr(ops, "local_goal") else None
+
+        return cnot._goal(self.world, self.parents, self.lex, begin, self.identity,
+                          local_goal=local_goal)
 
     def expand(self, begin, k):
         self.candidates, self.owners = self.world.checked("rank parent actions and expand",

@@ -36,7 +36,8 @@ faults = []
 try:
     root_rows = (8, 4, 2, 1)
     root = cnot.pack_rows(root_rows, device=device)
-    options = dict(width=5, shortlist=9, max_depth=4, mode="qhat", audit=False)
+    # This fixture patches the Python reference implementation itself.
+    options = dict(width=5, shortlist=9, max_depth=4, mode="qhat", audit=False, engine="python")
 
     if distributed:
         for fault_rank in (0, 1):

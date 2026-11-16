@@ -31,4 +31,4 @@ On Linux with PyTorch 2.9.0+cu128, CUDA 12.8, NCCL and two RTX 3060 12 GiB:
 
 Multi-node/Slurm, other GPU architectures, all scorer domains and cancellation
 during a collective were not established by these checks. Hardware costs and
-cleanup for the shared lease are reported with the following stage.
+cleanup for the shared lease are recorded in `STAGE_CNOT_DISTINCT.md`.

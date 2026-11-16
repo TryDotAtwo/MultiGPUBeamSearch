@@ -27,6 +27,7 @@ def _cuda_ops():
     sources = [root / "cuda/cnot_torch.cpp", root / "cuda/cnot_frontier_torch.cpp",
                root / "cuda/cnot_expand_torch.cpp",
                root / "cuda/cnot_distinct_torch.cpp",
+               root / "cuda/cnot_goal_torch.cpp",
                root / "cuda/cnot_domain.cu", root / "cuda/cnot_unique.cu"]
     headers = ["cuda/cnot_domain.hpp", "cuda/cnot_torch_internal.hpp", "src/cnot_domain.hpp", "src/hash.hpp",
                "src/types.hpp", "src/config.hpp"]

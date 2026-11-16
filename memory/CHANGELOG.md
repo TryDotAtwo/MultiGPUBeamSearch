@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-16 - C++ ATen CNOT local goal
+
+- Moved CUDA local-goal evaluation into C++ ATen for the Rust controller.
+  Rank-local failures still pass through the existing coordinated goal exchange;
+  CPU, Python reference and older external CUDA libraries retain their paths.
+- Source-pinned Linux checks on one/two RTX 3060 GPUs passed: the Rust workspace,
+  34 focused CPU/Gloo tests, 36 CUDA cases, full Python suite (748 passed, 10
+  skipped), full searches, NCCL goal/radix tests and checkpoint comparisons.
+  See `test_results/refactor_20261116/STAGE_CNOT_GOAL_CPP.md`.
+
 ## 2026-11-16 - C++ ATen CNOT distinct preparation
 
 - Moved generation-order sorting and preparation of distinct CUDA CNOT records
