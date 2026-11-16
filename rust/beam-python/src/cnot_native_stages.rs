@@ -2,45 +2,13 @@
 //!
 //! Tensor storage remains owned by PyTorch/CUDA. Existing ATen operators and
 //! rank collectives are invoked on the caller's thread in their former order.
+use crate::cnot_native_checked::checked;
 use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
     types::{PyDict, PyTuple},
 };
-
-#[pyclass(unsendable)]
-struct CheckedResult {
-    result: Result<Py<PyAny>, PyErr>,
-}
-
-#[pymethods]
-impl CheckedResult {
-    fn __call__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        match &self.result {
-            Ok(value) => Ok(value.clone_ref(py)),
-            Err(error) => Err(error.clone_ref(py)),
-        }
-    }
-}
-
-// The fallible operation is evaluated before the existing rank-wide check.
-// The independent callable replays its result inside World.checked, so a
-// failure is still reported on all ranks before the next collective.
-fn checked<'py>(
-    py: Python<'py>,
-    world: &Bound<'py, PyAny>,
-    name: &str,
-    result: PyResult<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let callback = Py::new(
-        py,
-        CheckedResult {
-            result: result.map(Bound::unbind),
-        },
-    )?;
-    world.call_method1("checked", (name, callback))
-}
 
 fn required<'py>(value: &Option<Bound<'py, PyAny>>, name: &str) -> PyResult<Bound<'py, PyAny>> {
     value

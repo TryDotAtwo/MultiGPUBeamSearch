@@ -136,6 +136,28 @@ def test_rust_search_owns_goal_without_python_coordinator(monkeypatch, mode):
     assert cnot.replay_cnot(len(rows), result.gates) == rows
 
 
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_search_owns_stage_error_coordination(monkeypatch, mode):
+    require_controller()
+    from multigpubeamsearch.cnot_collectives import World
+
+    rows, scorer = (8, 4, 2, 1), WireFixture(9)
+    options = dict(width=5, shortlist=9, max_depth=4, mode=mode, audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+    original = World.checked
+    stages = {"initialize CNOT domain", "rank parent actions and expand",
+              "deduplicate and evaluate distinct children"}
+
+    def checked(world, stage, action):
+        if stage in stages:
+            raise AssertionError("legacy Python CNOT stage coordinator was called")
+        return original(world, stage, action)
+
+    monkeypatch.setattr(World, "checked", checked)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+    assert asdict(result) == asdict(reference)
+
+
 def distributed(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2,

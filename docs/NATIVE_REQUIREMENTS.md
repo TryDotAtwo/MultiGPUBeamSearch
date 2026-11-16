@@ -57,6 +57,8 @@ rank processes after their ABI/layout and specialization checks.
   tensor implementation. The Rust stage backend coordinates the goal and its
   errors using the same rank exchange; PyTorch continues to own all tensor
   storage. The older Python stage adapter retains its previous behavior.
+  The Rust backend also coordinates initialization, expansion and distinct
+  stage errors with the existing vote and failure-only message gather.
   Multi-rank CUDA send-packet grouping also uses C++ ATen when available;
   stable owner ordering and the existing NCCL transport are retained.
 - Rust-owned CNOT Stream 5 transport requires the existing ABI 1, owned ABI 1

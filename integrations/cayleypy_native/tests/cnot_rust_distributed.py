@@ -15,6 +15,7 @@ from multigpubeamsearch import cnot
 from multigpubeamsearch import cnot_stream5
 from multigpubeamsearch import cnot_rust_stages
 from multigpubeamsearch import cnot_rust_selection
+from multigpubeamsearch.cnot_collectives import World
 
 
 def main():
@@ -71,15 +72,24 @@ def main():
             options = dict(width=width, shortlist=k, max_depth=depth, mode=mode, audit=True)
             old = cnot.search_cnot(root, WireFixture(undo), engine="python", **options)
             original_goal = cnot._goal
+            original_checked = World.checked
 
             def forbidden_goal(*args, **kwargs):
                 raise AssertionError("legacy Python goal coordinator was called")
 
+            def checked(world, stage, action):
+                if stage in {"initialize CNOT domain", "rank parent actions and expand",
+                             "deduplicate and evaluate distinct children"}:
+                    raise AssertionError("legacy Python CNOT stage coordinator was called")
+                return original_checked(world, stage, action)
+
             cnot._goal = forbidden_goal
+            World.checked = checked
             try:
                 new = cnot.search_cnot(root, WireFixture(undo), engine="rust", **options)
             finally:
                 cnot._goal = original_goal
+                World.checked = original_checked
             assert asdict(new) == asdict(old), (mode, len(rows), new, old)
             if new.gates is not None:
                 assert cnot.replay_cnot(len(rows), new.gates) == rows

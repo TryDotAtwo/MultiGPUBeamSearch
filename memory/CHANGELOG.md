@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-17 - Rust-owned CNOT stage error coordination
+
+- Moved the rank-wide error vote and failure-message gather for CNOT stage
+  initialization, expansion and distinct-child evaluation into the Rust stage
+  backend. The Python admission and legacy backend stay compatible; collective
+  order and original exceptions are preserved.
+- Source-pinned Rust, 80 focused CPU/Gloo/CUDA-controller, 62 CUDA and 820
+  Python integration checks passed (10 skipped). NCCL error injection,
+  one/two-RTX-3060 searches and checkpoint scorers matched the reference.
+  Evidence and remaining limits:
+  `test_results/refactor_20261117/STAGE_CNOT_NATIVE_CHECKED.md`.
+
 ## 2026-11-17 - Rust-owned CNOT goal coordination
 
 - Transferred rank-local goal orchestration and the existing rank-wide

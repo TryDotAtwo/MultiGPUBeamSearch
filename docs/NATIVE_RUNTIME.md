@@ -26,6 +26,9 @@ remain coordinated through the existing rank exchange. The Rust stage backend
 owns local-goal orchestration and rank-wide winner/error coordination, using the
 existing ATen operator or the same Torch tensor operations when it is missing.
 The older Python stage adapter retains its original goal implementation.
+The Rust stage backend also owns the existing error vote and failure-message
+gather for initialization, expansion and distinct-child evaluation. Admission
+and the compatibility backend continue to use the Python world adapter.
 Old externally provided operator libraries fall back to the existing tensor
 implementation. Python still calls user-provided scorers in batches.
 Full matrix equality and original rank routes remain unchanged. Rust controls
