@@ -28,3 +28,7 @@ On Linux with PyTorch 2.9.0+cu128, CUDA 12.8 and one/two RTX 3060 12 GiB:
 These results do not establish multi-node/Slurm behavior, other architectures,
 all model/checkpoint domains, performance or completion of remaining Python
 stages.
+
+The task-owned Vast lease was destroyed after the tests and its absence was
+verified by the provider; see `cnot-selection-stages/release.json`. The adjacent
+invoice snapshot covers only source-identified refactor leases and may lag.
