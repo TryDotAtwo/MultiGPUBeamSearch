@@ -50,11 +50,15 @@ rank processes after their ABI/layout and specialization checks.
   tensor implementation. Local-goal errors still enter the same rank exchange.
   Multi-rank CUDA send-packet grouping also uses C++ ATen when available;
   stable owner ordering and the existing NCCL transport are retained.
-- The test-only Rust Stream 5 communicator owner requires ABI version 1, a
-  valid native ID and rank geometry, the same thread and current CUDA device
-  for initialization and close. The native library outlives its communicator;
-  dropping an open owner aborts it. Search transport remains on the existing
-  Python path until buffer lifetime and rank-wide switching are verified.
+- The test-only Rust Stream 5 communicator owner requires the existing ABI 1,
+  the separate owned ABI 1, a valid native ID and rank geometry, and the same
+  thread for initialization and close. The owned ABI retains the initializing
+  CUDA device and restores the caller's current device after cleanup. The native
+  library outlives its communicator; dropping an open owner aborts it. Search
+  transport remains on the existing Python path until buffer lifetime and
+  rank-wide switching are verified. A failed close consumes the handle and
+  reports the error; an underlying CUDA/NCCL resource may remain allocated and
+  this version cannot retry that handle.
 - CNOT validation, rank identity, the identity fast path and search must use
   the same owned contiguous device snapshot, not a mutable caller alias. The
   caller must synchronize concurrent writes during snapshot creation; an

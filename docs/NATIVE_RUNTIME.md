@@ -33,8 +33,9 @@ Stream 5 transport and rank exchange sequence are unchanged.
 An independent Rust owner can load the existing CNOT Stream 5 ABI and create,
 close or abort an NCCL communicator. It validates the ABI, identity size and
 rank geometry, keeps the native library alive for the communicator's lifetime,
-and is bound to the creating thread. Initialization and close require the same
-current CUDA device. This owner is for comparative tests: active searches
+and is bound to the creating thread. A separate owned ABI remembers the CUDA
+device used at initialization, selects it during close and restores the
+caller's current device. This owner is for comparative tests: active searches
 still use the existing Python transport, and it does not yet exchange buffers.
 
 The approved migration is in progress. Existing public Python entry points are

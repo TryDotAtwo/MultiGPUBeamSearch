@@ -1,11 +1,21 @@
 # Changelog
 
+## 2026-11-16 - Device-bound CNOT Stream 5 owner
+
+- Added a separate owned native ABI that remembers the communicator's CUDA
+  device, selects it for close or abort, and restores the calling thread's
+  current device. The existing Python transport's raw ABI is unchanged; the
+  Rust owner remains experimental and thread-bound.
+- Source-pinned Linux comparisons, including two-rank device-switch lifecycle
+  checks, are recorded in `test_results/refactor_20261116/STAGE_CNOT_STREAM5_DEVICE.md`.
+
 ## 2026-11-16 - Rust-owned CNOT Stream 5 communicator lifecycle
 
 - Added a thread-bound Rust owner for the versioned native CNOT Stream 5
   library and NCCL communicator, exposed for comparative tests through PyO3.
   The existing Python transport remains active and no GPU buffers cross the
-  new interface. Initialization and close require the same current device.
+  new interface. This first version required the same current device for
+  initialization and close; the later device-bound owner removes that constraint.
 - Source-pinned Linux checks passed on one/two RTX 3060 GPUs: Rust workspace,
   39 focused CPU/Gloo tests, 62 CUDA cases, three NCCL lifecycle rounds per
   rank, complete searches, checkpoint comparisons, and the full Python suite

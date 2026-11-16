@@ -1,8 +1,9 @@
 //! Owned, thread-bound handle for the existing versioned CNOT Stream 5 ABI.
 //!
 //! This module does not load CUDA until explicitly requested, and does not
-//! accept device pointers. The caller must use the same CUDA device and thread
-//! for initialization and close. The native library stays loaded until every
+//! accept device pointers. Its native owner retains the initialization device
+//! and restores the caller's current device after cleanup. The owner remains
+//! bound to its creating thread. The native library stays loaded until every
 //! communicator created from it has been closed or dropped.
 use super::{Error, Result};
 use libloading::Library;
@@ -14,6 +15,7 @@ use std::{
 };
 
 const ABI: c_int = 1;
+const OWNED_ABI: c_int = 1;
 const MAX_ID_BYTES: usize = 4096;
 const MAX_WORLD: u32 = 65536;
 
@@ -71,6 +73,15 @@ impl Stream5Library {
                     "CNOT Stream 5 ABI mismatch: required={ABI} available={actual}"
                 )));
             }
+            let owned_version = *library
+                .get::<Version>(b"cnot_s5_owned_abi\0")
+                .map_err(|error| Error(format!("CNOT Stream 5 owned ABI unavailable: {error}")))?;
+            let owned_actual = owned_version();
+            if owned_actual != OWNED_ABI {
+                return Err(Error(format!(
+                    "CNOT Stream 5 owned ABI mismatch: required={OWNED_ABI} available={owned_actual}"
+                )));
+            }
             macro_rules! symbol {
                 ($name:literal, $ty:ty) => {
                     *library
@@ -87,8 +98,8 @@ impl Stream5Library {
             Ok(Self(Rc::new(Bindings {
                 id_size: size as usize,
                 create_id: symbol!("cnot_s5_id", CreateId),
-                init: symbol!("cnot_s5_init", Init),
-                close: symbol!("cnot_s5_close", Close),
+                init: symbol!("cnot_s5_owned_init", Init),
+                close: symbol!("cnot_s5_owned_close", Close),
                 last_error: symbol!("cnot_s5_error", LastError),
                 _library: library,
             })))

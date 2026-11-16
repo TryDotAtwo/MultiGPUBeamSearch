@@ -15,6 +15,13 @@ MOCK = r'''
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef TEST_OWNED_ABI
+#define TEST_OWNED_ABI 1
+#endif
+#ifndef OMIT_OWNED
+#define OMIT_OWNED 0
+#endif
+
 static void event(const char *name, int a, int b) {
     const char *path = getenv("CNOT_S5_TEST_LOG");
     if (path) { FILE *f = fopen(path, "a"); if (f) { fprintf(f, "%s %d %d\n", name, a, b); fclose(f); } }
@@ -36,6 +43,17 @@ int cnot_s5_close(void *comm, int abort) {
     if (!comm) return 1;
     event("close", abort, 0); return getenv("CNOT_S5_FAIL_CLOSE") ? 1 : 0;
 }
+#if !OMIT_OWNED
+int cnot_s5_owned_abi(void) { return TEST_OWNED_ABI; }
+int cnot_s5_owned_init(void **comm, const void *id, int rank, int world) {
+    event("owned_init", rank, world);
+    return cnot_s5_init(comm, id, rank, world);
+}
+int cnot_s5_owned_close(void *comm, int abort) {
+    event("owned_close", abort, 0);
+    return cnot_s5_close(comm, abort);
+}
+#endif
 int cnot_s5_counts(void *comm, void *stream, int rank, int world, void *send, void *recv) {
     (void)comm; (void)stream; (void)rank; (void)world; (void)send; (void)recv; return 0;
 }
@@ -74,7 +92,18 @@ def test_rust_owns_communicator_and_releases_it_once(mock_library):
     comm.close(False)
     del comm
     gc.collect()
-    assert log.read_text().splitlines() == ["id 0 0", "init 1 2", "close 0 0"]
+    assert log.read_text().splitlines() == ["id 0 0", "owned_init 1 2", "init 1 2",
+                                            "owned_close 0 0", "close 0 0"]
+
+
+def test_rust_uses_device_bound_communicator_abi(mock_library):
+    path, log = mock_library
+    library = extension().CnotStream5Library(str(path))
+    communicator = library.init(library.unique_id(), 1, 2)
+    communicator.close(False)
+    events = log.read_text().splitlines()
+    assert "owned_init 1 2" in events, "device-bound initialization was bypassed"
+    assert "owned_close 0 0" in events, "device-bound close was bypassed"
 
 
 def test_rust_aborts_unclosed_communicator(mock_library):
@@ -100,13 +129,20 @@ def test_rust_rejects_bad_identity_or_rank_before_native_init(mock_library):
     assert log.read_text().splitlines() == ["id 0 0"]
 
 
-def test_rust_rejects_incompatible_abi(tmp_path):
+@pytest.mark.parametrize(("abi", "owned_abi", "omit_owned", "message"), [
+    (2, 1, 0, "ABI mismatch"),
+    (1, 2, 0, "owned ABI mismatch"),
+    (1, 1, 1, "owned ABI unavailable"),
+])
+def test_rust_rejects_incompatible_abi(tmp_path, abi, owned_abi, omit_owned, message):
     if os.name != "posix" or shutil.which("cc") is None:
         pytest.skip("mock native library requires a Unix C compiler")
     source, output = tmp_path / "mock.c", tmp_path / "mock.so"
     source.write_text(MOCK, encoding="utf-8")
-    subprocess.run(["cc", "-shared", "-fPIC", "-DTEST_ABI=2", str(source), "-o", str(output)], check=True)
-    with pytest.raises(RuntimeError, match="ABI mismatch"):
+    subprocess.run(["cc", "-shared", "-fPIC", f"-DTEST_ABI={abi}",
+                    f"-DTEST_OWNED_ABI={owned_abi}", f"-DOMIT_OWNED={omit_owned}",
+                    str(source), "-o", str(output)], check=True)
+    with pytest.raises(RuntimeError, match=message):
         extension().CnotStream5Library(str(output))
 
 
