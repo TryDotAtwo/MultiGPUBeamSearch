@@ -40,8 +40,9 @@ rank processes after their ABI/layout and specialization checks.
   extension is installed, and otherwise retains the Python reference. All
   ranks must resolve to the same engine. `engine="rust"` fails closed without
   the controller. The controller owns stage order, history and the global radix
-  cutoff passes; Torch tensor stages, scorer calls and collective management
-  are still transitional.
+  cutoff passes; CUDA radix histograms and mask updates use C++ ATen when the
+  matching operators are available. Other Torch stages, scorer calls and
+  collective management are still transitional.
   CUDA local-goal evaluation, candidate expansion, full-matrix distinct
   preparation, winner packing and received-frontier handling use C++ ATen when
   the operator library has matching symbols; older prebuilt libraries keep the

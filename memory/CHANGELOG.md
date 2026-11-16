@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-16 - C++ ATen CNOT radix tensor stages
+
+- Moved CUDA histogram calculation and mask updates for CNOT radix selection
+  into C++ ATen without changing the cutoff algorithm or collectives. CPU and
+  older external operator libraries retain their existing paths.
+- Source-pinned Linux checks on one/two RTX 3060 GPUs passed: Rust workspace,
+  34 focused CPU/Gloo tests, 49 CUDA cases, full Python suite (761 passed, 10
+  skipped), complete searches, NCCL tests and checkpoint comparisons. See
+  `test_results/refactor_20261116/STAGE_CNOT_RADIX_CPP.md`.
+
 ## 2026-11-16 - C++ ATen CNOT local goal
 
 - Moved CUDA local-goal evaluation into C++ ATen for the Rust controller.

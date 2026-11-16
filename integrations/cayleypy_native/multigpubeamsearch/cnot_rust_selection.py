@@ -19,6 +19,14 @@ class SelectionStages:
 
     def radix_pass(self, key, shift, remaining):
         keys = self.score_keys if key == 0 else self.word_keys
+        if keys.is_cuda:
+            from . import cnot_native as native
+
+            ops = native._cuda_ops()
+            if all(hasattr(ops, name) for name in ("radix_histogram", "radix_update")):
+                digit, hist = ops.radix_histogram(keys, self.boundary, shift)
+                self.world.sum(hist)
+                return ops.radix_update(digit, hist, self.selected, self.boundary, remaining)
         digit = (keys >> shift) & 255
         hist = self.world.sum(torch.bincount(digit[self.boundary], minlength=256))
         prefix = torch.cumsum(hist, 0)
