@@ -25,7 +25,19 @@ void require_cuda(cudaError_t result, const char* operation) {
 struct OwnedCommunicator {
     ncclComm_t comm = nullptr;
     int device = -1;
+    int rank = -1;
+    int world = 0;
 };
+
+OwnedCommunicator& exchange_owner(void* handle) {
+    if (!handle) throw std::invalid_argument("null Stream 5 communicator");
+    auto& owner = *static_cast<OwnedCommunicator*>(handle);
+    int current = -1;
+    require_cuda(cudaGetDevice(&current), "get exchange CUDA device");
+    if (current != owner.device)
+        throw std::invalid_argument("current CUDA device differs from Stream 5 communicator device");
+    return owner;
+}
 
 template<typename Operation>
 int checked(Operation op) {
@@ -64,8 +76,12 @@ int cnot_s5_owned_init(void** out, const ncclUniqueId* id, int rank, int world) 
     return checked([&] {
         if (!out || !id) throw std::invalid_argument("null Stream 5 initialization argument");
         *out = nullptr;
+        if (world <= 0 || rank < 0 || rank >= world)
+            throw std::invalid_argument("invalid Stream 5 rank geometry");
         auto owner = std::make_unique<OwnedCommunicator>();
         require_cuda(cudaGetDevice(&owner->device), "get communicator CUDA device");
+        owner->rank = rank;
+        owner->world = world;
         require_nccl(ncclCommInitRank(&owner->comm, world, *id, rank));
         *out = owner.release();
     });
@@ -83,6 +99,35 @@ int cnot_s5_owned_close(void* handle, int abort) {
         const cudaError_t restore = switched ? cudaSetDevice(previous) : cudaSuccess;
         require_nccl(status);
         require_cuda(restore, "restore current CUDA device");
+    });
+}
+int cnot_s5_owned_exchange_abi() { return 1; }
+int cnot_s5_owned_device(void* handle, int* device) {
+    return checked([&] {
+        if (!handle || !device) throw std::invalid_argument("null Stream 5 device argument");
+        *device = static_cast<OwnedCommunicator*>(handle)->device;
+    });
+}
+int cnot_s5_owned_counts(void* handle, cudaStream_t stream,
+                         const std::uint32_t* send, std::uint32_t* recv) {
+    return checked([&] {
+        if (!send || !recv) throw std::invalid_argument("null Stream 5 count buffer");
+        auto& owner = exchange_owner(handle);
+        beam::stream5_exchange_counts_nccl_cuda(send, recv, owner.rank, owner.world,
+                                                 owner.comm, stream);
+    });
+}
+int cnot_s5_owned_rows(void* handle, cudaStream_t stream, const void* send, void* recv,
+                       const std::uint32_t* send_counts, const std::uint32_t* recv_counts,
+                       std::uint32_t stride) {
+    return checked([&] {
+        if (!send || !recv || !send_counts || !recv_counts || !stride)
+            throw std::invalid_argument("invalid Stream 5 payload argument");
+        auto& owner = exchange_owner(handle);
+        auto send_offsets = offsets(send_counts, owner.world);
+        auto recv_offsets = offsets(recv_counts, owner.world);
+        beam::stream5_exchange_u64_payload_nccl_cuda(send, recv, send_counts, send_offsets.data(),
+            recv_counts, recv_offsets.data(), stride, owner.rank, owner.world, owner.comm, stream);
     });
 }
 int cnot_s5_counts(ncclComm_t comm, cudaStream_t stream, int rank, int world,

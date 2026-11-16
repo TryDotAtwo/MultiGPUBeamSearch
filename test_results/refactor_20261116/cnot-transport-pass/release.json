@@ -1,0 +1,15 @@
+{
+  "instance": 60969024,
+  "label": "codex-cnot-s5-transport-20261116",
+  "before": {
+    "id": 60969024,
+    "label": "codex-cnot-s5-transport-20261116",
+    "actual_status": "running",
+    "duration": 3327.7399289608,
+    "dph_total": 0.16296296296296295,
+    "start_date": 1794859916.3566086
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794863260.3089037
+}

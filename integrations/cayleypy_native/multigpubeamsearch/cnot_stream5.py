@@ -60,6 +60,45 @@ def load_stream5():
     return lib
 
 
+class RustStream5:
+    """Thin adapter for a Rust-owned communicator and whole-record exchange."""
+
+    @staticmethod
+    def compatible_library(lib):
+        try:
+            from .rust_control import extension
+            cls = getattr(extension(), "CnotStream5Library", None)
+            if cls is None:
+                return None
+            library = cls(str(Path(lib._name).resolve(strict=True)))
+            return library if library.supports_exchange else None
+        except Exception:
+            # Older prebuilt Stream 5 libraries and older PyO3 modules retain
+            # the existing transport on every rank, selected collectively.
+            return None
+
+    def __init__(self, library, world):
+        self.world = world
+        identity = [bytes(library.id_size)]
+
+        def create_id():
+            if world.rank == 0:
+                identity[0] = library.unique_id()
+
+        world.checked("create NCCL unique ID", create_id)
+        payload = torch.tensor(list(identity[0]), dtype=torch.uint8, device=world.device)
+        dist.broadcast(payload, 0)
+        self.comm = library.init(bytes(payload.tolist()), world.rank, world.size)
+
+    def close(self, *, abort):
+        self.comm.close(abort)
+
+    def exchange(self, send, counts):
+        self.world.checked("validate Rust Stream 5 exchange",
+                           lambda: self.comm.validate(send, counts, self.world))
+        return self.comm.exchange(send, counts, self.world)
+
+
 class Stream5:
     def __init__(self, lib, world):
         self.lib, self.world, self.comm = lib, world, C.c_void_p()

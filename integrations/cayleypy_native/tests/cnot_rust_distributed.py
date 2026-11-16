@@ -12,6 +12,7 @@ import torch.distributed as dist
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
 from verify_cnot import WireFixture, wide_case
 from multigpubeamsearch import cnot
+from multigpubeamsearch import cnot_stream5
 
 
 def main():
@@ -24,6 +25,21 @@ def main():
     rank = dist.get_rank() if distributed else 0
     size = dist.get_world_size() if distributed else 1
     try:
+        rust_calls, legacy_calls = [], []
+        if distributed:
+            original_rust = cnot_stream5.RustStream5.exchange
+            original_legacy = cnot_stream5.Stream5.exchange
+
+            def trace_rust(self, send, counts):
+                rust_calls.append(len(send))
+                return original_rust(self, send, counts)
+
+            def trace_legacy(self, send, counts):
+                legacy_calls.append(len(send))
+                return original_legacy(self, send, counts)
+
+            cnot_stream5.RustStream5.exchange = trace_rust
+            cnot_stream5.Stream5.exchange = trace_legacy
         cases = []
         wide_rows, _ = wide_case()
         for rows, undo, mode, width, k, depth in (
@@ -46,7 +62,20 @@ def main():
                               result=asdict(new), replay=new.gates is not None))
 
         errors = []
+        fallback_legacy_calls = 0
         if distributed:
+            assert rust_calls and legacy_calls, (rank, rust_calls, legacy_calls)
+            original_compatible = cnot_stream5.RustStream5.compatible_library
+            cnot_stream5.RustStream5.compatible_library = staticmethod(
+                lambda lib: None if rank == 1 else original_compatible(lib))
+            prior_legacy, prior_rust = len(legacy_calls), len(rust_calls)
+            fallback = cnot.search_cnot(cnot.pack_rows((8, 4, 2, 1), device=device), WireFixture(9),
+                                        width=5, shortlist=9, max_depth=4, audit=True, engine="rust")
+            assert asdict(fallback) == cases[0]["result"]
+            fallback_legacy_calls = len(legacy_calls) - prior_legacy
+            assert fallback_legacy_calls > 0 and len(rust_calls) == prior_rust
+            cnot_stream5.RustStream5.compatible_library = staticmethod(original_compatible)
+
             class RejectOnOne(WireFixture):
                 def child_values(self, children):
                     if rank == 1:
@@ -69,7 +98,8 @@ def main():
         output.mkdir(parents=True, exist_ok=True)
         (output / f"rank-{rank}.json").write_text(json.dumps(dict(
             rank=rank, world=size, gpu=torch.cuda.get_device_name(device), cases=cases,
-            errors=errors, reused_after_failure=bool(errors)), indent=2) + "\n", encoding="utf-8")
+            errors=errors, reused_after_failure=bool(errors), rust_transport_calls=len(rust_calls),
+            fallback_legacy_calls=fallback_legacy_calls), indent=2) + "\n", encoding="utf-8")
         print(f"CNOT_RUST_EQUIVALENCE_OK rank={rank} world={size}", flush=True)
     finally:
         if distributed:

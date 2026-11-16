@@ -6,6 +6,7 @@ import shutil
 import subprocess
 
 import pytest
+import torch
 
 from multigpubeamsearch.rust_control import extension
 
@@ -104,6 +105,17 @@ def test_rust_uses_device_bound_communicator_abi(mock_library):
     events = log.read_text().splitlines()
     assert "owned_init 1 2" in events, "device-bound initialization was bypassed"
     assert "owned_close 0 0" in events, "device-bound close was bypassed"
+
+
+def test_rust_exchange_rejects_cpu_buffers_before_native_access(mock_library):
+    path, log = mock_library
+    library = extension().CnotStream5Library(str(path))
+    communicator = library.init(library.unique_id(), 0, 2)
+    with pytest.raises((ValueError, RuntimeError), match="CUDA"):
+        communicator.exchange(torch.zeros((1, 2), dtype=torch.int64),
+                              torch.tensor([1, 0]), object())
+    communicator.close(False)
+    assert not any(row.startswith(("counts ", "rows ")) for row in log.read_text().splitlines())
 
 
 def test_rust_aborts_unclosed_communicator(mock_library):

@@ -256,6 +256,7 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         identities = world.gather_fixed(world.longs(list(digest)))
         if not (identities == identities[0]).all().item():
             raise ValueError("CNOT root, search settings or scorer fingerprints differ between ranks")
+        world.start_transport(prefer_rust=runner is not None)
         identity = native.cnot_identity(input_matrix.n, device=world.device)
         if torch.equal(root, identity):
             return CnotResult("solved", (), [], [])

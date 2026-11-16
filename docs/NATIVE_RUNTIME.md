@@ -26,17 +26,20 @@ collective management are partly in Python. This is not yet a complete
 Rust/C++ CNOT runtime.
 
 For multi-rank Rust CNOT searches, CUDA owner counts and stable send-record
-grouping use C++ ATen when the matching operator is available. Single-rank,
-CPU and older external libraries retain their original paths. The existing
-Stream 5 transport and rank exchange sequence are unchanged.
+grouping use C++ ATen when the matching operator is available. After all ranks
+admit the same engine, they collectively select the Rust-owned Stream 5
+transport only when every rank has its compatible exchange ABI. Otherwise all
+use the existing Python transport. The Python reference continues to use that
+transport; single-rank and CPU paths retain their original behavior.
 
-An independent Rust owner can load the existing CNOT Stream 5 ABI and create,
-close or abort an NCCL communicator. It validates the ABI, identity size and
-rank geometry, keeps the native library alive for the communicator's lifetime,
-and is bound to the creating thread. A separate owned ABI remembers the CUDA
-device used at initialization, selects it during close and restores the
-caller's current device. This owner is for comparative tests: active searches
-still use the existing Python transport, and it does not yet exchange buffers.
+Rust controls the two overflow votes, count exchange and payload exchange in
+the existing NCCL order. Its thread-bound owner validates the ABI, NCCL ID and
+rank geometry, keeps the native library loaded, and records the initialization
+device for close or abort. PyTorch retains CUDA buffer ownership. The FFI layer
+validates device, dtype, shape, capacity and stream, records the stream on the
+tensors and passes borrowed device addresses to C++; the runtime controller
+never constructs Rust references to those addresses. Other rank collectives,
+tensor stages and scorer calls still use Python callbacks.
 
 The approved migration is in progress. Existing public Python entry points are
 switched only after their comparative acceptance stage. Rust now owns host history

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-16 - Rust CNOT Stream 5 record transport
+
+- Moved the CNOT Stream 5 count and payload exchange sequence into the Rust
+  controller, with checked borrowed CUDA tensors and the existing NCCL/CUDA
+  operations. All ranks agree on the Rust transport or the compatible legacy
+  fallback; CPU, single-rank and Python-reference paths remain available.
+- Source-pinned checks and their hardware limits are recorded in
+  `test_results/refactor_20261116/STAGE_CNOT_STREAM5_TRANSPORT.md`.
+
 ## 2026-11-16 - Device-bound CNOT Stream 5 owner
 
 - Added a separate owned native ABI that remembers the communicator's CUDA

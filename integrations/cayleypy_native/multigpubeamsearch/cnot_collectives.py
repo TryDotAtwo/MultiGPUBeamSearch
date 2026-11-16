@@ -13,18 +13,30 @@ class World:
         self.rank = dist.get_rank() if dist.is_initialized() else 0
         self.size = dist.get_world_size() if dist.is_initialized() else 1
         self.transport = None
+        self._stream5_library = None
         if self.size > 65536:
             raise ValueError("CNOT physical routes support at most 65536 world ranks")
 
     def __enter__(self):
         if self.device.type == "cuda" and self.size > 1:
-            from .cnot_stream5 import Stream5, load_stream5
+            from .cnot_stream5 import load_stream5
 
             if dist.get_backend() != "nccl" or torch.cuda.current_device() != self.device.index:
                 raise ValueError("set the process's local CUDA device and initialize the NCCL world")
-            library = self.checked("load native Stream 5", load_stream5)
-            self.transport = Stream5(library, self)
+            self._stream5_library = self.checked("load native Stream 5", load_stream5)
         return self
+
+    def start_transport(self, *, prefer_rust):
+        """Choose one compatible transport for all ranks after engine admission."""
+        if self._stream5_library is None:
+            return
+        from .cnot_stream5 import RustStream5, Stream5
+
+        library = RustStream5.compatible_library(self._stream5_library) if prefer_rust else None
+        if prefer_rust and self.sum(self.longs([int(library is not None)])).item() == self.size:
+            self.transport = RustStream5(library, self)
+        else:
+            self.transport = Stream5(self._stream5_library, self)
 
     def __exit__(self, kind, value, traceback):
         if self.transport is not None:
@@ -80,6 +92,10 @@ class World:
         """Send variable-width int64 records to world ranks, including self and empty splits."""
         if self.size == 1:
             return rows
+        # Older callers that enter World directly still get the original
+        # transport even when they do not perform explicit engine admission.
+        if self._stream5_library is not None and self.transport is None:
+            self.start_transport(prefer_rust=False)
         ops = None
         if native_packet and rows.is_cuda:
             from . import cnot_native

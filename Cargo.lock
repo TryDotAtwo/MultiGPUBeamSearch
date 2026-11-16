@@ -32,6 +32,7 @@ dependencies = [
  "beam-core",
  "libc",
  "libloading",
+ "pyo3",
  "thiserror",
 ]
 
