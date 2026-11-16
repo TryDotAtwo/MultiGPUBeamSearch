@@ -79,6 +79,26 @@ def test_python_scorer_errors_are_preserved():
                              width=1, shortlist=2, max_depth=3, engine=engine)
 
 
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_search_owns_stages_without_python_stage_object(monkeypatch, mode):
+    """Complete audited search must not require the old Python stage owner."""
+    require_controller()
+    from multigpubeamsearch import cnot_rust_stages
+
+    rows, scorer = wide_case()
+    options = dict(width=1, shortlist=3, max_depth=3, mode=mode, audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+    assert reference.gates == (18592, 428)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("legacy Python CNOT stage owner was instantiated")
+
+    monkeypatch.setattr(cnot_rust_stages.CnotStages, "__init__", forbidden)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+    assert asdict(result) == asdict(reference)
+    assert cnot.replay_cnot(len(rows), result.gates) == rows
+
+
 def distributed(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2,
@@ -93,6 +113,25 @@ def distributed(rank, rendezvous):
             assert asdict(old) == asdict(new)
             assert new.gates == (18592, 428)
             assert cnot.replay_cnot(len(rows), new.gates) == rows
+
+        from multigpubeamsearch import cnot_rust_stages
+        legacy_calls = []
+        old_init = cnot_rust_stages.CnotStages.__init__
+        old_runner = cnot._native_stages_runner
+
+        def trace_legacy(self, *args, **kwargs):
+            legacy_calls.append(True)
+            return old_init(self, *args, **kwargs)
+
+        cnot_rust_stages.CnotStages.__init__ = trace_legacy
+        cnot._native_stages_runner = lambda: None if rank == 1 else old_runner()
+        options = dict(width=1, shortlist=3, max_depth=3, mode="qhat", audit=True)
+        fallback_reference = cnot.search_cnot(cnot.pack_rows(rows), WireFixture(428), engine="python", **options)
+        fallback = cnot.search_cnot(cnot.pack_rows(rows), WireFixture(428), engine="rust", **options)
+        assert asdict(fallback) == asdict(fallback_reference)
+        assert legacy_calls, f"rank {rank} did not choose the shared legacy backend"
+        cnot._native_stages_runner = old_runner
+        cnot_rust_stages.CnotStages.__init__ = old_init
 
         class RejectOnOne(WireFixture):
             def child_values(self, children):

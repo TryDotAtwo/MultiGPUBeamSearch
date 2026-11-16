@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
 from verify_cnot import WireFixture, wide_case
 from multigpubeamsearch import cnot
 from multigpubeamsearch import cnot_stream5
+from multigpubeamsearch import cnot_rust_stages
 
 
 def main():
@@ -25,6 +26,14 @@ def main():
     rank = dist.get_rank() if distributed else 0
     size = dist.get_world_size() if distributed else 1
     try:
+        legacy_stages = []
+        original_stages_init = cnot_rust_stages.CnotStages.__init__
+
+        def trace_stages(self, *args, **kwargs):
+            legacy_stages.append(True)
+            return original_stages_init(self, *args, **kwargs)
+
+        cnot_rust_stages.CnotStages.__init__ = trace_stages
         rust_calls, legacy_calls = [], []
         if distributed:
             original_rust = cnot_stream5.RustStream5.exchange
@@ -61,10 +70,21 @@ def main():
             cases.append(dict(wires=len(rows), mode=mode, options=options,
                               result=asdict(new), replay=new.gates is not None))
 
+        assert not legacy_stages, "Rust search unexpectedly used the Python stage owner"
         errors = []
         fallback_legacy_calls = 0
+        fallback_stage_calls = 0
         if distributed:
             assert rust_calls and legacy_calls, (rank, rust_calls, legacy_calls)
+            original_native_backend = cnot._native_stages_runner
+            cnot._native_stages_runner = lambda: None if rank == 1 else original_native_backend()
+            fallback = cnot.search_cnot(cnot.pack_rows((8, 4, 2, 1), device=device), WireFixture(9),
+                                        width=5, shortlist=9, max_depth=4, audit=True, engine="rust")
+            assert asdict(fallback) == cases[0]["result"]
+            fallback_stage_calls = len(legacy_stages)
+            assert fallback_stage_calls > 0
+            cnot._native_stages_runner = original_native_backend
+
             original_compatible = cnot_stream5.RustStream5.compatible_library
             cnot_stream5.RustStream5.compatible_library = staticmethod(
                 lambda lib: None if rank == 1 else original_compatible(lib))
@@ -99,7 +119,8 @@ def main():
         (output / f"rank-{rank}.json").write_text(json.dumps(dict(
             rank=rank, world=size, gpu=torch.cuda.get_device_name(device), cases=cases,
             errors=errors, reused_after_failure=bool(errors), rust_transport_calls=len(rust_calls),
-            fallback_legacy_calls=fallback_legacy_calls), indent=2) + "\n", encoding="utf-8")
+            fallback_legacy_calls=fallback_legacy_calls, fallback_stage_calls=fallback_stage_calls),
+            indent=2) + "\n", encoding="utf-8")
         print(f"CNOT_RUST_EQUIVALENCE_OK rank={rank} world={size}", flush=True)
     finally:
         if distributed:

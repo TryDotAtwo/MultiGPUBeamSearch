@@ -142,6 +142,10 @@ fn run_cnot_selection(stages: Bound<'_, PyAny>, width: u64) -> PyResult<Py<PyAny
     cnot_selection::select(&mut PySelection { stages }, width)
 }
 
+pub(crate) fn select_stages(stages: Bound<'_, PyAny>, width: u64) -> PyResult<Py<PyAny>> {
+    cnot_selection::select(&mut PySelection { stages }, width)
+}
+
 /// Run on the calling rank's thread: Torch's current device/stream and
 /// inference-mode context are thread-local. Only complete stages cross PyO3.
 #[pyfunction]
@@ -167,6 +171,13 @@ fn run_cnot<'py>(
             max_depth,
         },
     )?;
+    outcome_to_python(py, outcome)
+}
+
+pub(crate) fn outcome_to_python(
+    py: Python<'_>,
+    outcome: cnot_search::Outcome<Py<PyAny>>,
+) -> PyResult<Py<PyAny>> {
     let gates = match outcome.gates {
         Some(gates) => PyTuple::new(py, gates)?.into_any().unbind(),
         None => py.None(),

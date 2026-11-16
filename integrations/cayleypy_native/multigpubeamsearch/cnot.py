@@ -222,6 +222,13 @@ def _search_engine(engine, max_depth):
     return "rust", run
 
 
+def _native_stages_runner():
+    """Optional Rust-owned stage backend; older PyO3 modules remain usable."""
+    from .rust_control import extension
+
+    return getattr(extension(), "run_cnot_native", None)
+
+
 def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation, engine):
     input_matrix = _input(root, width, shortlist, max_depth, mode, validation)
     engine, runner = _search_engine(engine, max_depth)
@@ -261,10 +268,15 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         if torch.equal(root, identity):
             return CnotResult("solved", (), [], [])
         if runner is not None:
+            native_runner = _native_stages_runner()
+            use_native = world.sum(world.longs([int(native_runner is not None)])).item() == world.size
+            alphabet = input_matrix.n * (input_matrix.n - 1)
+            if use_native:
+                return native_runner(world, root, identity, input_matrix, scorer, mode, audit,
+                                     width, min(shortlist, alphabet), alphabet, max_depth)
             from .cnot_rust_stages import CnotStages
 
             stages = CnotStages(world, root, identity, input_matrix, scorer, mode, audit)
-            alphabet = input_matrix.n * (input_matrix.n - 1)
             return runner(stages, world.rank, world.size, width, min(shortlist, alphabet), alphabet, max_depth)
         return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
 

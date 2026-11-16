@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-17 - Rust-owned CNOT rank-local stages
+
+- Added a Rust stage backend that retains each rank's frontier, closed-set,
+  candidate, metadata and history tensor handles while PyTorch owns their
+  storage. All ranks agree on availability and jointly fall back to the old
+  Python adapter if one rank has an older extension. Existing operators,
+  numerical policies, record routing and NCCL exchange order are preserved.
+- Source-pinned Rust, 45 CPU/Gloo, 62 CUDA and 785 Python integration checks
+  passed (10 skipped). One/two RTX 3060 searches and checkpoint scorers matched
+  their references. Filtered Compute Sanitizer memcheck reported zero errors;
+  unfiltered NCCL API diagnostics remain a known limitation. See
+  `test_results/refactor_20261117/STAGE_CNOT_NATIVE_STAGES.md`.
+
 ## 2026-11-16 - Rust CNOT Stream 5 record transport
 
 - Moved the CNOT Stream 5 count and payload exchange sequence into the Rust

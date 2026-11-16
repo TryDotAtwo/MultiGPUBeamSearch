@@ -12,6 +12,13 @@ to preserve the current CUDA device, stream, inference context and process
 group. Its transitional stage callbacks operate on whole batches or
 collectives; no Rust reference is made from a GPU address.
 
+The Rust stage backend now retains each rank's frontier, closed states,
+candidates, metadata and history tensor handles. PyTorch still owns their
+storage, and batch operations run on the calling thread. Before starting the
+search, ranks vote on this backend's availability; if any rank has an older
+PyO3 extension, every rank uses the compatible Python stage adapter. CPU and
+older CUDA operator libraries keep their existing batch fallbacks.
+
 The CUDA stage library supports C++ ATen local-goal evaluation, candidate
 expansion, full-matrix distinct preparation, and packing and unpacking of the
 selected frontier using the same operations as the reference. Goal failures
