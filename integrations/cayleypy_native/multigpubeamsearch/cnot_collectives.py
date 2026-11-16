@@ -76,12 +76,19 @@ class World:
             begin += count
         return result
 
-    def exchange(self, rows, targets):
+    def exchange(self, rows, targets, *, native_packet=False):
         """Send variable-width int64 records to world ranks, including self and empty splits."""
         if self.size == 1:
             return rows
-        counts = torch.bincount(targets, minlength=self.size)
-        send = rows.index_select(0, torch.argsort(targets, stable=True)).contiguous()
+        ops = None
+        if native_packet and rows.is_cuda:
+            from . import cnot_native
+            ops = cnot_native._cuda_ops()
+        if ops is not None and hasattr(ops, "exchange_packet"):
+            send, counts = ops.exchange_packet(rows, targets, self.size)
+        else:
+            counts = torch.bincount(targets, minlength=self.size)
+            send = rows.index_select(0, torch.argsort(targets, stable=True)).contiguous()
         if self.transport is not None:
             return self.transport.exchange(send, counts)
         recv_counts = torch.empty_like(counts)

@@ -55,7 +55,7 @@ class CnotStages:
                                      self.world.size, k, self.mode == "proposal")
 
     def exchange_candidates(self):
-        self.incoming = self.world.exchange(self.candidates, self.owners)
+        self.incoming = self.world.exchange(self.candidates, self.owners, native_packet=True)
 
     def deduplicate_and_score(self):
         self.children, self.meta, self.values = self.world.checked("deduplicate and evaluate distinct children",
@@ -103,7 +103,7 @@ class CnotStages:
                                    self.meta[kept, 3], self.ranks[slots]), 1)
             wire = torch.cat((records, owned_rows.reshape(len(kept), n * words)), 1)
             targets = slots * world.size // max(1, count)
-        received = world.exchange(wire, targets)
+        received = world.exchange(wire, targets, native_packet=True)
         received = ops.sort_received(received) if use_native else received[torch.argsort(received[:, 0])]
         stats = world.gather_fixed(world.longs([len(self.parents), len(self.candidates),
             (self.owners != world.rank).sum().item(), len(self.children), len(received)])).tolist()

@@ -24,6 +24,11 @@ when matching operators are available. Remaining tensor stages, scoring and
 collective management are partly in Python. This is not yet a complete
 Rust/C++ CNOT runtime.
 
+For multi-rank Rust CNOT searches, CUDA owner counts and stable send-record
+grouping use C++ ATen when the matching operator is available. Single-rank,
+CPU and older external libraries retain their original paths. The existing
+Stream 5 transport and rank exchange sequence are unchanged.
+
 The approved migration is in progress. Existing public Python entry points are
 switched only after their comparative acceptance stage. Rust now owns host history
 for its resident workers and ordinary CLI, plus calibration process primitives.

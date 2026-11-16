@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-16 - C++ ATen CNOT exchange packet preparation
+
+- Moved CUDA owner counting and stable record grouping for the Rust CNOT
+  controller's multi-rank exchanges into C++ ATen. Stream 5 transport, the
+  single-rank path and compatibility fallbacks remain unchanged.
+- Source-pinned Linux checks on one/two RTX 3060 GPUs passed: Rust workspace,
+  34 focused CPU/Gloo tests, 54 CUDA cases, full Python suite (766 passed, 10
+  skipped), complete searches, NCCL tests and checkpoint comparisons. See
+  `test_results/refactor_20261116/STAGE_CNOT_EXCHANGE_CPP.md`.
+
 ## 2026-11-16 - C++ ATen CNOT radix tensor stages
 
 - Moved CUDA histogram calculation and mask updates for CNOT radix selection

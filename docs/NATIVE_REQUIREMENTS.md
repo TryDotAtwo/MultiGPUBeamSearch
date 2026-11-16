@@ -47,6 +47,8 @@ rank processes after their ABI/layout and specialization checks.
   preparation, winner packing and received-frontier handling use C++ ATen when
   the operator library has matching symbols; older prebuilt libraries keep the
   tensor implementation. Local-goal errors still enter the same rank exchange.
+  Multi-rank CUDA send-packet grouping also uses C++ ATen when available;
+  stable owner ordering and the existing NCCL transport are retained.
 - CNOT validation, rank identity, the identity fast path and search must use
   the same owned contiguous device snapshot, not a mutable caller alias. The
   caller must synchronize concurrent writes during snapshot creation; an
