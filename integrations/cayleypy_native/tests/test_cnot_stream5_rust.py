@@ -1,0 +1,132 @@
+"""Rust owns the versioned Stream 5 communicator and its library lifetime."""
+import gc
+import os
+from pathlib import Path
+import shutil
+import subprocess
+
+import pytest
+
+from multigpubeamsearch.rust_control import extension
+
+
+MOCK = r'''
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+static void event(const char *name, int a, int b) {
+    const char *path = getenv("CNOT_S5_TEST_LOG");
+    if (path) { FILE *f = fopen(path, "a"); if (f) { fprintf(f, "%s %d %d\n", name, a, b); fclose(f); } }
+}
+int cnot_s5_abi(void) { return TEST_ABI; }
+const char *cnot_s5_error(void) { return "injected NCCL failure"; }
+int cnot_s5_id_bytes(void) { return 16; }
+int cnot_s5_id(void *dst) {
+    if (getenv("CNOT_S5_FAIL_ID")) return 1;
+    for (int i = 0; i < 16; ++i) ((unsigned char *)dst)[i] = (unsigned char)i;
+    event("id", 0, 0); return 0;
+}
+int cnot_s5_init(void **comm, const void *id, int rank, int world) {
+    (void)id; event("init", rank, world);
+    if (getenv("CNOT_S5_FAIL_INIT")) return 1;
+    *comm = (void *)(uintptr_t)1; return 0;
+}
+int cnot_s5_close(void *comm, int abort) {
+    if (!comm) return 1;
+    event("close", abort, 0); return getenv("CNOT_S5_FAIL_CLOSE") ? 1 : 0;
+}
+int cnot_s5_counts(void *comm, void *stream, int rank, int world, void *send, void *recv) {
+    (void)comm; (void)stream; (void)rank; (void)world; (void)send; (void)recv; return 0;
+}
+int cnot_s5_rows(void *comm, void *stream, int rank, int world, void *send, void *recv,
+                 const uint32_t *sc, const uint32_t *rc, uint32_t stride) {
+    (void)comm; (void)stream; (void)rank; (void)world; (void)send; (void)recv;
+    (void)sc; (void)rc; (void)stride; return 0;
+}
+'''
+
+
+@pytest.fixture
+def mock_library(tmp_path, monkeypatch):
+    if os.name != "posix" or shutil.which("cc") is None:
+        pytest.skip("mock native library requires a Unix C compiler")
+    source, output, log = tmp_path / "mock.c", tmp_path / "mock.so", tmp_path / "calls.log"
+    source.write_text(MOCK, encoding="utf-8")
+    subprocess.run(["cc", "-shared", "-fPIC", "-DTEST_ABI=1", str(source), "-o", str(output)], check=True)
+    monkeypatch.setenv("CNOT_S5_TEST_LOG", str(log))
+    return output, log
+
+
+def test_rust_owns_communicator_and_releases_it_once(mock_library):
+    path, log = mock_library
+    cls = getattr(extension(), "CnotStream5Library", None)
+    assert cls is not None, "Rust Stream 5 ownership is unavailable"
+    library = cls(str(path))
+    unique_id = library.unique_id()
+    assert unique_id == bytes(range(16))
+    comm = library.init(unique_id, 1, 2)
+    del library
+    gc.collect()
+    assert not comm.closed
+    comm.close(False)
+    assert comm.closed
+    comm.close(False)
+    del comm
+    gc.collect()
+    assert log.read_text().splitlines() == ["id 0 0", "init 1 2", "close 0 0"]
+
+
+def test_rust_aborts_unclosed_communicator(mock_library):
+    path, log = mock_library
+    cls = getattr(extension(), "CnotStream5Library", None)
+    assert cls is not None, "Rust Stream 5 ownership is unavailable"
+    library = cls(str(path))
+    comm = library.init(library.unique_id(), 0, 2)
+    del comm
+    gc.collect()
+    assert log.read_text().splitlines()[-1] == "close 1 0"
+
+
+def test_rust_rejects_bad_identity_or_rank_before_native_init(mock_library):
+    path, log = mock_library
+    cls = getattr(extension(), "CnotStream5Library", None)
+    assert cls is not None, "Rust Stream 5 ownership is unavailable"
+    library = cls(str(path))
+    identity = library.unique_id()
+    for args in ((b"too short", 0, 2), (identity, 2, 2), (identity, 0, 0)):
+        with pytest.raises((RuntimeError, ValueError)):
+            library.init(*args)
+    assert log.read_text().splitlines() == ["id 0 0"]
+
+
+def test_rust_rejects_incompatible_abi(tmp_path):
+    if os.name != "posix" or shutil.which("cc") is None:
+        pytest.skip("mock native library requires a Unix C compiler")
+    source, output = tmp_path / "mock.c", tmp_path / "mock.so"
+    source.write_text(MOCK, encoding="utf-8")
+    subprocess.run(["cc", "-shared", "-fPIC", "-DTEST_ABI=2", str(source), "-o", str(output)], check=True)
+    with pytest.raises(RuntimeError, match="ABI mismatch"):
+        extension().CnotStream5Library(str(output))
+
+
+def test_rust_reports_native_errors_without_double_close(mock_library, monkeypatch):
+    path, log = mock_library
+    library = extension().CnotStream5Library(str(path))
+    monkeypatch.setenv("CNOT_S5_FAIL_ID", "1")
+    with pytest.raises(RuntimeError, match="injected NCCL failure"):
+        library.unique_id()
+    monkeypatch.delenv("CNOT_S5_FAIL_ID")
+    identity = library.unique_id()
+    monkeypatch.setenv("CNOT_S5_FAIL_INIT", "1")
+    with pytest.raises(RuntimeError, match="injected NCCL failure"):
+        library.init(identity, 0, 2)
+    monkeypatch.delenv("CNOT_S5_FAIL_INIT")
+    comm = library.init(identity, 0, 2)
+    monkeypatch.setenv("CNOT_S5_FAIL_CLOSE", "1")
+    with pytest.raises(RuntimeError, match="injected NCCL failure"):
+        comm.close(False)
+    assert comm.closed
+    del comm
+    gc.collect()
+    assert log.read_text().splitlines().count("close 0 0") == 1

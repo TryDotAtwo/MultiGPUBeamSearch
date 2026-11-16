@@ -1,5 +1,6 @@
 //! The only crate permitted to dereference native FFI pointers.
 use libloading::Library;
+pub mod cnot_stream5;
 pub mod history;
 use std::{
     ffi::{c_char, c_void, CString},

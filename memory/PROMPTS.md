@@ -48,4 +48,9 @@ User requested implementation of the accepted unified-main + Rust/CUDA/C++ plan 
 
 2026-11-16: «Продолжай переписывание на раст. Пока просто переписываем. Ничего не улучшаем». Continue the Rust migration while preserving existing algorithms, CUDA kernels, numerical behavior, interfaces and multi-GPU semantics; defer performance optimizations and benchmarking.
 
+2026-11-16 follow-up: Fully transfer beam search, including CNOT, to Rust and
+CUDA/C++, while preserving the multi-GPU architecture and Python/Kaggle
+compatibility. Publish verified changes to GitHub and synchronize local main.
+Keep an active goal until the migration and required verification are complete.
+
 2026-11-16: Ivan requested completing the Rust + CUDA/C++ migration, including CNOT, without optimizations or changes to multi-GPU architecture and compatibility. Retain Python bindings for Kaggle and other environments.

@@ -1,0 +1,15 @@
+{
+  "instance": 60961012,
+  "label": "codex-cnot-s5-rust-20261116",
+  "before": {
+    "id": 60961012,
+    "label": "codex-cnot-s5-rust-20261116",
+    "actual_status": "running",
+    "duration": 2283.8078486919403,
+    "dph_total": 0.14962962962962964,
+    "start_date": 1794854685.6068583
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794856990.237593
+}

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-16 - Rust-owned CNOT Stream 5 communicator lifecycle
+
+- Added a thread-bound Rust owner for the versioned native CNOT Stream 5
+  library and NCCL communicator, exposed for comparative tests through PyO3.
+  The existing Python transport remains active and no GPU buffers cross the
+  new interface. Initialization and close require the same current device.
+- Source-pinned Linux checks passed on one/two RTX 3060 GPUs: Rust workspace,
+  39 focused CPU/Gloo tests, 62 CUDA cases, three NCCL lifecycle rounds per
+  rank, complete searches, checkpoint comparisons, and the full Python suite
+  (779 passed, 10 skipped). See
+  `test_results/refactor_20261116/STAGE_CNOT_STREAM5_RUST.md`.
+
 ## 2026-11-16 - C++ ATen CNOT selection preparation and ordering
 
 - Moved CUDA key preparation, selected-record creation and final ordering for
