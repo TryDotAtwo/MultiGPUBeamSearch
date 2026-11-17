@@ -123,9 +123,25 @@ jobs:
           [[ "$host" =~ ^[0-9.]+$ ]] || { echo "Invalid SSH host for the fixed instance." >&2; exit 1; }
           [[ "$port" =~ ^[0-9]+$ ]] || { echo "Invalid SSH port for the fixed instance." >&2; exit 1; }
           key_blob="$(awk '{print $2}' "$key_file.pub")"
-          ssh_opts=(-i "$key_file" -P "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2)
+          ssh_opts=(-i "$key_file" -p "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2)
+          ready=false
+          for attempt in {1..12}; do
+            if ssh "${ssh_opts[@]}" "root@${host}" true >/dev/null 2>"${RUNNER_TEMP}/vast-ssh-ready.err"; then
+              ready=true
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$ready" != true ]]; then
+            echo "SSH did not become ready after attaching the temporary key." >&2
+            exit 1
+          fi
           remote_archive="/tmp/beam-source-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
-          scp "${ssh_opts[@]}" "$ARCHIVE_PATH" "root@${host}:${remote_archive}" > /dev/null 2> "${RUNNER_TEMP}/vast-scp-stderr.txt"
+          if ! ssh "${ssh_opts[@]}" "root@${host}" "cat > ${remote_archive}" \
+            < "$ARCHIVE_PATH" > /dev/null 2> "${RUNNER_TEMP}/vast-source-send.err"; then
+            echo "Source upload over the established SSH transport failed." >&2
+            exit 1
+          fi
           cat > "${RUNNER_TEMP}/verify-source-transfer.sh" <<'REMOTE'
           set -euo pipefail
           key_blob="$1"
