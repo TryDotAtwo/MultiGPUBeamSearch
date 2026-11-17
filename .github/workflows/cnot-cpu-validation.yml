@@ -1,1 +1,86 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×^úN‹Z–‹­¦ëeŠw¬Õ¹…µ”è9=PAT½µÁ…Ñ¥‰¥±¥Ñä4(4)½¸è4(€Ý½É­™±½Ý}‘¥ÍÁ…Ñ è4(€ÁÕÍ è4(€€€‰É…¹¡•Ìè4(€€€€€€´µ…¥¸4(€€€Á…Ñ¡Ìè4(€€€€€€´€¹¥Ñ¡Õˆ½Ý½É­™±½ÝÌ½¹½ÐµÁÔµÙ…±¥‘‡];êÚ$z{-®éÜj×F–öàÐ¢Fƒ¢FW7E÷&W7VÇG2÷&Vf7F÷%ó##c‚ö6æ÷BÖ6öçG&öÂÖ6öÆÆV7F—fW0Ð¢–bÖæòÖf–ÆW2Öf÷VæC¢–væ÷&PÐ¢&WFVçF–öâÖF—3¢pÐ Ð 
+name: CNOT CPU compatibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cnot-cpu-validation.yml
+      - integrations/cayleypy_native/multigpubeamsearch/cnot.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_cli.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_collectives.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_stream5.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_rust_stages.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_scorer.py
+      - integrations/cayleypy_native/tests/test_cnot_search.py
+      - integrations/cayleypy_native/tests/test_cnot_control_collectives.py
+      - integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py
+      - integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
+      - cuda/cnot_stream5_bridge.cu
+      - integrations/cayleypy_native/CNOT.md
+      - Cargo.toml
+      - Cargo.lock
+      - rust/beam-core/**
+      - rust/beam-python/**
+      - rust/beam-runtime/**
+      - rust/beam-native-sys/**
+
+permissions:
+  contents: read
+
+jobs:
+  cnot-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install CPU test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy pytest
+          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Run Rust CNOT checks
+        run: |
+          mkdir -p test_results/refactor_20261118/cnot-control-collectives
+          set -o pipefail
+          {
+            rustfmt --check --edition 2021 \
+              rust/beam-runtime/src/cnot_search.rs \
+              rust/beam-python/src/cnot.rs \
+              rust/beam-python/src/cnot_native_stages.rs \
+              rust/beam-native-sys/src/cnot_stream5.rs \
+              rust/beam-python/src/cnot_stream5.rs
+            cargo test --locked -p beam-core --test cnot
+            cargo test --locked -p beam-runtime cnot_search
+            cargo check --locked -p beam-python
+          } 2>&1 | tee test_results/refactor_20261118/cnot-control-collectives/cnot-rust-cpu.log
+      - name: Run CNOT CPU compatibility tests
+        env:
+          PYTHONPATH: integrations/cayleypy_native
+        run: |
+          set -o pipefail
+          python -m pytest -q \
+            integrations/cayleypy_native/tests/test_cnot_search.py \
+            integrations/cayleypy_native/tests/test_cnot_control_collectives.py \
+            integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py \
+            2>&1 | tee test_results/refactor_20261118/cnot-control-collectives/cnot-search-cpu.log
+      - name: Check the two-rank NCCL probe syntax
+        run: |
+          python -m py_compile integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cnot-control-collectives-cpu-validation
+          path: test_results/refactor_20261118/cnot-control-collectives
+          if-no-files-found: ignore
+          retention-days: 7
+
