@@ -103,6 +103,46 @@ def test_explicit_rust_validation_fails_closed_for_old_extension(monkeypatch):
                     validation="invalid")
 
 
+def test_default_validation_prefers_rust_when_available(monkeypatch):
+    from types import SimpleNamespace
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    class Matrix:
+        def __init__(self, n, raw):
+            self.n = n
+            self.rows = tuple(int.from_bytes(raw[i:i + 8], "little")
+                              for i in range(0, len(raw), 8))
+            calls.append(("load", n, len(raw)))
+
+        def verifies_construction(self, gates):
+            calls.append(("replay", tuple(gates)))
+            return replay_cnot(self.n, gates) == self.rows
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(CnotMatrix=Matrix))
+    root = pack_rows(replay_cnot(4, (0,)))
+    result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1, engine="python")
+
+    assert result.gates == (0,)
+    assert calls == [("load", 4, 32), ("replay", (0,))]
+
+
+def test_auto_validation_falls_back_when_rust_extension_is_unavailable(monkeypatch):
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    def unavailable():
+        raise NativeUnavailable("test runtime lacks Rust CNOT validation")
+
+    monkeypatch.setattr(rust_control, "extension", unavailable)
+    root = pack_rows(replay_cnot(4, (0,)))
+    result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1,
+                         validation="auto", engine="python")
+
+    assert result.status == "solved" and result.gates == (0,)
+
+
 @pytest.mark.parametrize("validation", ["python", "rust"])
 @pytest.mark.parametrize("original_gate", [False, True])
 @pytest.mark.parametrize("strided", [False, True])
