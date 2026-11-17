@@ -10,6 +10,7 @@ on:
 
 permissions:
   actions: write
+  contents: write
 
 concurrency:
   group: vast-status-61080396
@@ -87,3 +88,39 @@ jobs:
           path: ${{ runner.temp }}/vast-status.json
           if-no-files-found: error
           retention-days: 7
+      - name: Publish sanitized status in test_results
+        if: always() && steps.status.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/vast-status.json"
+          test -s "$report"
+          path="test_results/remote-status/vast-status-latest.json"
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}"
+          metadata="${RUNNER_TEMP}/existing-status-metadata.json"
+          http_code="$(curl --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -o "$metadata" -w '%{http_code}' "${api}?ref=main")"
+          sha=""
+          if [[ "$http_code" == "200" ]]; then
+            sha="$(jq -er '.sha' "$metadata")"
+          elif [[ "$http_code" != "404" ]]; then
+            echo "Could not read the previous sanitized status note." >&2
+            exit 1
+          fi
+          encoded="$(base64 -w 0 "$report")"
+          if [[ -n "$sha" ]]; then
+            payload="$(jq -cn --arg message "ci: update sanitized Vast status" --arg content "$encoded" --arg sha "$sha" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}')"
+          else
+            payload="$(jq -cn --arg message "ci: publish sanitized Vast status" --arg content "$encoded" --arg branch "main" '{message:$message,content:$content,branch:$branch}')"
+          fi
+          curl --fail --silent --show-error --max-time 30 \
+            -X PUT -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Content-Type: application/json" \
+            --data-binary "$payload" --output /dev/null "$api"
