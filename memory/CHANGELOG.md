@@ -9,9 +9,11 @@
 - Выбор проверяет API и исполняемый worker до подготовки модели и CUDA-сборки.
   `backend="torch"` остаётся без изменений. Подготовка модели, калибровка и
   вычислительный C++/CUDA runner ещё не перенесены этим шагом.
-- CPU RED/GREEN workflow и публичное описание миграции добавлены отдельно;
-  multi-GPU/GPU подтверждение для нового default-selection route остаётся
-  обязательным перед объявлением всей миграции завершённой.
+- RED run 44181078596 подтвердил два отсутствующих поведения (2 failed, 2
+  passed). GREEN run 44182404997 прошёл 78 тестов за 5.19 секунд и загрузил
+  artifact 14372272952 (SHA-256 `40342afa5079cfc7121667be570a7d818c02f2f2c7fae52f9f1af2b34790f73f`).
+  Это hosted CPU evidence: feature selection замокан; аппаратный worker,
+  CUDA/NCCL и реальная multi-GPU работа этим прогоном не проверялись.
 
 ## 2026-11-17 - Vast key validation and status publication
 
