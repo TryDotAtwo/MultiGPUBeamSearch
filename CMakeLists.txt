@@ -27,12 +27,29 @@ option(BEAM_DEBUG_FINAL_HISTOGRAM_TRACE "Compile final histogram-vs-survivor dia
 option(BEAM_DEBUG_STREAM4_HISTOGRAM_TRACE "Compile Stream4 histogram A/B diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_DEBUG_DEPTH_FLOW_TRACE "Compile per-depth flow counter diagnostics when BEAM_ENABLE_DEBUG is ON" OFF)
 option(BEAM_ENABLE_LIBTORCH_STREAM1 "Build explicit LibTorch Stream1 transformer tools" OFF)
+option(BEAM_ENABLE_CNOT_OWNED_DOMAIN "Build the standalone CNOT domain C ABI" OFF)
+option(BEAM_CNOT_OWNED_DOMAIN_ONLY "Configure only the standalone CNOT domain C ABI" OFF)
 option(BEAM_EXPERIMENTAL_RADIX128 "Use experimental full-width CUB radix sort for hash pairs" OFF)
 option(BEAM_EXPERIMENTAL_INDEX_SORT "Sort Stream 4 metadata indices instead of metadata records" OFF)
 option(BEAM_EXPERIMENTAL_DIRTY_MERGE "Sort only new Stream 4 candidates and merge with the clean run" OFF)
 option(BEAM_EXPERIMENTAL_STREAM4_SCAN "Use CUB device and block scans for Stream 4 compaction" OFF)
 option(BEAM_EXPERIMENTAL_OWNER_RADIX "Use stable CUB radix partition for Stream 3 owner routing" OFF)
 option(BEAM_EXPERIMENTAL_SCORE_BITS "Restrict score histogram radix sort to sentinel-aware key bits" OFF)
+if(BEAM_ENABLE_CNOT_OWNED_DOMAIN OR BEAM_CNOT_OWNED_DOMAIN_ONLY)
+    add_library(beam_cnot_owned_domain SHARED
+        native/cnot_owned_domain.cu cuda/cnot_domain.cu cuda/cnot_unique.cu)
+    target_compile_definitions(beam_cnot_owned_domain PRIVATE
+        BEAM_CNOT_DOMAIN_BUILD=1
+        BEAM_STATE_LOGICAL_BYTES=${BEAM_STATE_LOGICAL_BYTES}
+        BEAM_STATE_PHYSICAL_BYTES=${BEAM_STATE_PHYSICAL_BYTES}
+        BEAM_STATE_ALIGNMENT=${BEAM_STATE_ALIGNMENT}
+        BEAM_MOVE_COUNT=${BEAM_MOVE_COUNT})
+    set_target_properties(beam_cnot_owned_domain PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        CUDA_RUNTIME_LIBRARY Shared CUDA_ARCHITECTURES "${BEAM_CUDA_ARCHITECTURES}")
+endif()
+if(BEAM_CNOT_OWNED_DOMAIN_ONLY)
+    return()
+endif()
 if(BEAM_ENABLE_LIBTORCH_STREAM1)
     find_package(Torch REQUIRED)
     # The engine/control transport exchange C++ objects internally. Compile all

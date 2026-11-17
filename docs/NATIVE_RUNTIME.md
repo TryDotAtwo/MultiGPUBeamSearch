@@ -1,5 +1,24 @@
 # Rust/native runtime
 
+## Standalone CNOT domain
+
+`BEAM_CNOT_OWNED_DOMAIN_ONLY=ON` builds an optional `beam_cnot_owned_domain`
+library without configuring the full CUTLASS/NCCL engine. The separate
+`beam-native-sys::cnot_domain` owner loads its versioned C ABI explicitly,
+retains the library, and owns a thread-bound CUDA context with fixed-capacity
+buffers and CUB scratch. The C ABI's current inputs and outputs are host slices;
+it uses the existing CUDA CNOT kernels, owner hashing and full-matrix equality.
+The Rust loader is unsafe because the caller selects a trusted native library;
+its subsequent operations own their lifetime and do not expose device pointers.
+Explicit close reports a CUDA cleanup error but consumes the Rust handle; a
+failed native device switch or cleanup can leave resources for process exit.
+
+This is a standalone migration slice, not the backend of `search_cnot`.
+Before connecting it, define GPU-resident borrowed views, stream/event ordering,
+and scorer lifetimes; the existing search and process collectives remain the
+production path. Details and validation scope are in
+`test_results/refactor_20261117/STAGE_CNOT_OWNED_DOMAIN.md`.
+
 ## CNOT controller transition
 
 `search_cnot` selects the Rust controller automatically with a matching

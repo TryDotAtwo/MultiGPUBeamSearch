@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-17 - Standalone Rust-owned CNOT CUDA domain
+
+- Added an optional versioned C ABI and Rust owner for the existing CNOT
+  expansion, owner hashing and full-matrix distinct kernels. The context owns
+  one device, stream, fixed-capacity buffers and queried CUB scratch. Its
+  current host-slice interface is standalone and does not switch search.
+- Two RTX 3060s passed the domain CPU-oracle and Rust ownership checks, plus
+  CUDA memcheck and racecheck. Existing one/two-GPU CNOT searches, the Rust
+  workspace and the Python suite passed; SM75/80/90/120 cross-compilation passed.
+  See `test_results/refactor_20261117/STAGE_CNOT_OWNED_DOMAIN.md` for exact
+  source binding, skips, release receipt and unverified hardware.
+
 ## 2026-11-17 - Rust-owned CNOT record exchange orchestration
 
 - Moved the CNOT stage backend's stable record grouping and exchange dispatch

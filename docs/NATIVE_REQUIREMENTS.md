@@ -25,6 +25,16 @@ rank processes after their ABI/layout and specialization checks.
 
 ## Contracts
 
+- The optional standalone CNOT domain ABI owns one device, one stream and
+  fixed-capacity allocations on its creating thread. It validates ABI version,
+  geometry, descriptors, checked sizes and CUB scratch before use, and reports
+  capacity errors without truncating. Its host slices remain borrowed only for
+  synchronized calls; Rust does not form references to device addresses.
+  The standalone domain is not connected to public search or NCCL and does
+  not replace the GPU-resident Torch path. A Rust close consumes its handle;
+  after a CUDA cleanup/device failure, resource release cannot be retried
+  through that handle. See the source-bound results in
+  `test_results/refactor_20261117/STAGE_CNOT_OWNED_DOMAIN.md`.
 - A logical Hash128 uses every bit, ordered by high half then low half. CandidateMeta
   remains 32 bytes and aligned to 32. Stream3 retains original candidate IDs.
 - Persistent permutation padding stays zero. CNOT packed matrices retain their
