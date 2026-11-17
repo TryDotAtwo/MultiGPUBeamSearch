@@ -69,8 +69,10 @@ the existing goal exchange; a healthy group can be reused after the error. This
 does not recover a failed device or NCCL communicator, or an error that prevents
 the status exchange itself.
 
-The optional `--validation rust` selects the Rust packed-input and construction
-replay validator; the Python API accepts `search_cnot(..., validation="rust")`.
+By default, `search_cnot` and `--validation auto` use the Rust packed-input and
+construction replay validator when the installed extension provides it, and
+retain Python validation as a compatibility fallback. Select `python` to force
+the reference validator or `rust` to fail closed when the extension lacks it.
 It requires the matching PyO3 extension and fails if that capability is absent.
 All ranks must select the same validator. The default remains `python`. This
 option moves input validation and final path replay only; the CNOT search loop,
