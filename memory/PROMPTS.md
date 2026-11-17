@@ -54,3 +54,5 @@ compatibility. Publish verified changes to GitHub and synchronize local main.
 Keep an active goal until the migration and required verification are complete.
 
 2026-11-16: Ivan requested completing the Rust + CUDA/C++ migration, including CNOT, without optimizations or changes to multi-GPU architecture and compatibility. Retain Python bindings for Kaggle and other environments.
+
+2026-11-17 remote-only execution: Ivan instructed that Windows may retain repository code only. Do not download datasets, weights, checkpoints, logs, results, archives or build outputs. Use GitHub-hosted Actions and the already-owned Vast instance; check current status and never start, stop or rent it. No local SSH/SCP; keep raw logs on Vast and expose only sanitized Actions reports. Ivan explicitly approved storing the existing Vast API key as the repository Actions secret.
