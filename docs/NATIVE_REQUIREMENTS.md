@@ -41,15 +41,17 @@ rank processes after their ABI/layout and specialization checks.
   and producer ordering;
   the implementation checks declared sizes, address alignment, pointer device
   and stream context. It does not transfer matrices or owners through the host.
-  The extension is optional for compatibility with the base ABI and does not
-  yet replace any stage of the public search.
+  The extension is optional for compatibility with the base ABI; Rust CNOT
+  search uses it only when `MGBS_CNOT_OWNED_LIBRARY` is explicitly set on the
+  rank-local CUDA call.
 - An additive borrowed-expansion operation accepts int64 parent indices and
   int64 or uint16 moves. The caller guarantees valid descriptor values and
   output/input non-overlap; invalid CUDA descriptors retain the existing
   kernel's device-error behavior. The optional device-only context owns its
   thread-bound stream and configured capacities without allocating host-ABI
   stage buffers; host operations on it return an error. The old full context
-  and libraries remain supported. This operation is not yet in public search.
+  and libraries remain supported. Rust CNOT search uses this operation in the
+  same explicit opt-in path as device ownership.
 - An optional borrowed first-unseen operation preserves full-matrix CNOT
   equality and first-child order. Its caller owns input and output allocations,
   int32 ordinals and count, uint8 flags, and 256-byte-aligned CUB scratch
@@ -57,11 +59,24 @@ rank processes after their ABI/layout and specialization checks.
   the inputs; the call completes the supplied stream before returning. Empty
   batches write a zero device count. No matrix or count is copied to the host.
 - In Rust CNOT search, `MGBS_CNOT_OWNED_LIBRARY` explicitly opts each CUDA rank
-  into this first-unseen operation. The bridge retains Torch tensors through the
-  synchronous call, uses the rank's current stream, and reads the device count
-  on the host for its result view. The default, CPU, NCCL and scorer paths stay
-  unchanged. A selected incompatible library fails through coordinated rank
-  error handling rather than silently changing implementation.
+  into borrowed device expansion, owner assignment and first-unseen selection.
+  Each process owns its thread-bound native context. Torch owns all input,
+  descriptor, output and scratch allocations; the bridge passes checked local
+  device views on the calling rank's current stream and retains the tensor
+  handles through synchronous native completion. Rust does not construct
+  references from CUDA addresses and no device pointer crosses a rank boundary.
+  Existing NCCL transport, CNOT scorer, full-matrix equality and metadata
+  assembly are unchanged. The default, CPU and Python paths stay unchanged. A
+  selected incompatible library fails through coordinated rank error handling
+  rather than silently changing implementation.
+- Before this Rust bridge calls the borrowed expansion ABI, it checks parent
+  indices and physical move IDs on the device, then reads one boolean result
+  from each descriptor tensor on the host. The low-level C ABI still requires
+  valid descriptors. These scalar reads turn invalid values into ordinary
+  rank-local errors before a device assertion can poison the CUDA context; the
+  existing rank-wide stage vote must propagate that error. The two-rank
+  injected-error and post-error reuse check is not yet accepted; see
+  `test_results/refactor_20261117/cnot-device-error/GITHUB_STATUS.md`.
 - A logical Hash128 uses every bit, ordered by high half then low half. CandidateMeta
   remains 32 bytes and aligned to 32. Stream3 retains original candidate IDs.
 - Persistent permutation padding stays zero. CNOT packed matrices retain their
@@ -209,3 +224,4 @@ and unstable measurements cannot produce an accepted default.
 The authorized total is USD 50 including associated costs. This task may operate
 only its own leases. Preserve billing/lease records and stop owned paid resources
 when their work ends; do not infer authorization over another project's instances.
+
