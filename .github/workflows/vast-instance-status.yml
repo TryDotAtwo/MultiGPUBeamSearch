@@ -74,6 +74,12 @@ jobs:
           ' "${VAST_INSTANCE_ID}" <<< "$payload" > "${RUNNER_TEMP}/vast-status.json"
           jq -r '"Instance: \(.instance_id)\nActual status: \(.actual_status)\nIntended status: \(.intended_status)\nGPU: \(.gpu_count // "unknown") x \(.gpu_name)\nChecked: \(.checked_at_utc)"' \
             "${RUNNER_TEMP}/vast-status.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Log sanitized status for API polling
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -c '{instance_id,checked_at_utc,actual_status,intended_status,gpu_name,gpu_count}' "${RUNNER_TEMP}/vast-status.json"
       - name: Upload sanitized status report
         uses: actions/upload-artifact@v4
         with:
