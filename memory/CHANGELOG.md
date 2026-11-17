@@ -1782,6 +1782,10 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   failure-only diagnostics remain on the caller's process group.
 - Added a two-rank NCCL probe and GitHub Actions validation. The initial red
   test run (44190504858) reported the expected 3 failures and 21 passes before
-  the implementation. The new implementation's CPU CI and GPU acceptance are
-  pending; the Vast workflow checks the existing instance and never starts or
-  rents it.
+  the implementation. CPU run 44199043726 passed Rust formatting, 3 core CNOT
+  tests, 4 CNOT runtime tests, the PyO3 cargo check, 24 Python tests, and probe
+  syntax compilation. Full output is retained in its Actions artifact.
+- Vast status run 44199043691 confirmed instance 61080396 was exited/stopped;
+  it skipped the CUDA build and two-rank NCCL test without changing instance
+  state. Physical multi-GPU acceptance remains pending. See
+  `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
