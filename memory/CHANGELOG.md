@@ -1680,3 +1680,8 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   5% promotion threshold. This is not a saturated GPU-step benchmark; other
   hardware, model families and calibration overhead remain unverified. See
   `test_results/refactor_20261114/STAGE_MLP_LOADED_BUFFER_BINDING.md`.
+
+## 2026-11-17 - GitHub-hosted Vast status and descriptor report
+
+- Added Actions workflows for read-only status of fixed Vast instance 61080396 and for reading a sanitized descriptor report only when that existing instance is running. The report contains status, file metadata and selected error-marker flags; raw remote logs remain on Vast. No instance start/stop or GPU work was performed.
+- [Status run 44126220804](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44126220804) and [descriptor-report run 44129242777](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44129242777) completed successfully. The remote descriptor log predates the current uncommitted descriptor-validation change and still contains the earlier async assertion markers; it does not validate that change.
