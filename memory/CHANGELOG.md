@@ -8,7 +8,7 @@
 ## 2026-11-17 - Default Rust CNOT input validation
 
 - `search_cnot` and the CNOT CLI now prefer the Rust packed-matrix validator when installed. Explicit `python` remains available; explicit `rust` fails closed; `auto` falls back to Python when the extension capability is absent.
-- Added a GitHub-hosted CPU compatibility workflow. Run 44150899645 produced the expected RED: the two new cases failed for the missing `auto` behavior and the other 17 cases passed. GREEN rerun is pending.
+- Added a GitHub-hosted CPU verification workflow. Run 44150899645 produced the expected RED: the two new cases failed for missing `auto` behavior, and the other 17 passed. Run 44153448093 passed three `beam-core` CNOT tests, three Rust search-controller tests, the PyO3 compile check, and all 19 Python CNOT tests. It uploaded artifact 14360561194. This is CPU-only evidence; CUDA/NCCL multi-GPU validation remains pending.
 
 ## 2026-11-17 - Rust CNOT search descriptor validation and recovery test
 
