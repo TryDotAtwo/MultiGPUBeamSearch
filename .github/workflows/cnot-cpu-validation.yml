@@ -9,7 +9,12 @@ on:
       - .github/workflows/cnot-cpu-validation.yml
       - integrations/cayleypy_native/multigpubeamsearch/cnot.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_cli.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_collectives.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_stream5.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_rust_stages.py
       - integrations/cayleypy_native/tests/test_cnot_search.py
+      - integrations/cayleypy_native/tests/test_cnot_control_collectives.py
+      - cuda/cnot_stream5_bridge.cu
       - integrations/cayleypy_native/CNOT.md
       - Cargo.toml
       - Cargo.lock
@@ -41,29 +46,34 @@ jobs:
           rustup default stable
       - name: Run Rust CNOT checks
         run: |
-          mkdir -p test_results/refactor_20261118/cnot-root-goal
+          mkdir -p test_results/refactor_20261118/cnot-control-collectives
           set -o pipefail
           {
             rustfmt --check --edition 2021 \
               rust/beam-runtime/src/cnot_search.rs \
               rust/beam-python/src/cnot.rs \
-              rust/beam-python/src/cnot_native_stages.rs
+              rust/beam-python/src/cnot_native_stages.rs \
+              rust/beam-native-sys/src/cnot_stream5.rs \
+              rust/beam-python/src/cnot_stream5.rs
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-runtime cnot_search
             cargo check --locked -p beam-python
-          } 2>&1 | tee test_results/refactor_20261118/cnot-root-goal/cnot-rust-cpu.log
+          } 2>&1 | tee test_results/refactor_20261118/cnot-control-collectives/cnot-rust-cpu.log
       - name: Run CNOT CPU compatibility tests
         env:
           PYTHONPATH: integrations/cayleypy_native
         run: |
           set -o pipefail
-          python -m pytest -q integrations/cayleypy_native/tests/test_cnot_search.py \
-            2>&1 | tee test_results/refactor_20261118/cnot-root-goal/cnot-search-cpu.log
+          python -m pytest -q \
+            integrations/cayleypy_native/tests/test_cnot_search.py \
+            integrations/cayleypy_native/tests/test_cnot_control_collectives.py \
+            2>&1 | tee test_results/refactor_20261118/cnot-control-collectives/cnot-search-cpu.log
       - name: Upload test log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cnot-root-goal-cpu-validation
-          path: test_results/refactor_20261118/cnot-root-goal
+          name: cnot-control-collectives-cpu-validation
+          path: test_results/refactor_20261118/cnot-control-collectives
           if-no-files-found: ignore
           retention-days: 7
+
