@@ -50,6 +50,12 @@ rank processes after their ABI/layout and specialization checks.
   thread-bound stream and configured capacities without allocating host-ABI
   stage buffers; host operations on it return an error. The old full context
   and libraries remain supported. This operation is not yet in public search.
+- An optional borrowed first-unseen operation preserves full-matrix CNOT
+  equality and first-child order. Its caller owns input and output allocations,
+  int32 ordinals and count, uint8 flags, and 256-byte-aligned CUB scratch
+  sized by an explicit query. Used writable ranges cannot overlap each other or
+  the inputs; the call completes the supplied stream before returning. Empty
+  batches write a zero device count. No matrix or count is copied to the host.
 - A logical Hash128 uses every bit, ordered by high half then low half. CandidateMeta
   remains 32 bytes and aligned to 32. Stream3 retains original candidate IDs.
 - Persistent permutation padding stays zero. CNOT packed matrices retain their

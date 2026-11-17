@@ -18,6 +18,7 @@ static_assert(sizeof(beam_cnot_domain_config) == 48);
 static_assert(alignof(beam_cnot_domain_config) == 8);
 static_assert(offsetof(beam_cnot_domain_config, parent_capacity) == 24);
 static_assert(sizeof(beam_cnot_device_view) == 24 && alignof(beam_cnot_device_view) == 8);
+static_assert(sizeof(beam_cnot_unseen_workspace) == 120 && alignof(beam_cnot_unseen_workspace) == 8);
 
 namespace {
 constexpr int invalid = 1, capacity = 2, cuda_failure = 3, wrong_thread = 4, internal = 5;
@@ -214,6 +215,18 @@ void same_stream_context(cudaStream_t owned_stream, cudaStream_t stream) {
     require(owner_status == CUDA_SUCCESS && stream_status == CUDA_SUCCESS && owner == active && source == owner,
             invalid,
             "CUDA stream is not associated with the context device");
+}
+
+std::size_t unseen_scratch(beam_cnot_domain* ctx, std::uint64_t closed, std::uint64_t children) {
+    room(closed, ctx->config.closed_capacity, "device closed capacity");
+    room(children, ctx->config.child_capacity, "device child capacity");
+    if (!children) return 0;
+    std::size_t bytes = 0;
+    cuda_check(beam::cnot::first_unseen(nullptr, bytes, nullptr, static_cast<int>(closed),
+        nullptr, static_cast<int>(children), ctx->config.n, nullptr, nullptr, nullptr,
+        nullptr, ctx->stream), "query borrowed CUB scratch");
+    // A non-null temporary pointer distinguishes execution from the CUB query.
+    return std::max<std::size_t>(1, bytes);
 }
 } // namespace
 
@@ -442,6 +455,67 @@ extern "C" int beam_cnot_domain_children_device(
             static_cast<const std::int64_t*>(indices->data), moves->data, moves_are_u16 != 0,
             static_cast<std::int64_t>(child_count), static_cast<std::int64_t*>(children->data), stream),
             "expand borrowed CNOT children");
+        completion.finish();
+    }, true); });
+}
+
+extern "C" int beam_cnot_domain_unseen_scratch_bytes(
+    beam_cnot_domain* ctx, std::uint64_t closed, std::uint64_t children, std::uint64_t* bytes) {
+    return boundary([&] { use(ctx, [&] {
+        require(bytes != nullptr, invalid, "null CNOT scratch size output");
+        *bytes = unseen_scratch(ctx, closed, children);
+    }, true); });
+}
+
+extern "C" int beam_cnot_domain_first_unseen_device(
+    beam_cnot_domain* ctx, const beam_cnot_device_view* closed, std::uint64_t closed_count,
+    const beam_cnot_device_view* children, std::uint64_t child_count,
+    const beam_cnot_unseen_workspace* workspace, void* raw_stream) {
+    return boundary([&] { use(ctx, [&] {
+        require(workspace != nullptr, invalid, "null CNOT unseen workspace");
+        const auto bytes = unseen_scratch(ctx, closed_count, child_count);
+        const auto closed_words = multiply(closed_count, ctx->stride, "device closed words");
+        const auto child_words = multiply(child_count, ctx->stride, "device child words");
+        const auto ordinal_count = child_count ? closed_count + child_count : 0;
+        device_view(ctx, closed, closed_words, "closed");
+        device_view(ctx, children, child_words, "children");
+        device_view(ctx, &workspace->ordinals, ordinal_count, "ordinals", alignof(int));
+        device_view(ctx, &workspace->flags, child_count, "flags", alignof(std::uint8_t));
+        device_view(ctx, &workspace->selected, child_count, "selected");
+        device_view(ctx, &workspace->count, 1, "count", alignof(int));
+        device_view(ctx, &workspace->scratch, bytes, "CUB scratch", 256);
+
+        struct Region { const beam_cnot_device_view* view; std::uint64_t count; std::size_t width; };
+        const Region inputs[] = {{closed, closed_words, sizeof(std::int64_t)},
+                                 {children, child_words, sizeof(std::int64_t)}};
+        const Region outputs[] = {{&workspace->ordinals, ordinal_count, sizeof(int)},
+            {&workspace->flags, child_count, sizeof(std::uint8_t)},
+            {&workspace->selected, child_count, sizeof(std::int64_t)},
+            {&workspace->count, 1, sizeof(int)}, {&workspace->scratch, bytes, 1}};
+        for (std::size_t i = 0; i < sizeof(outputs) / sizeof(outputs[0]); ++i) {
+            for (const auto& input : inputs)
+                disjoint(*input.view, input.count, input.width,
+                         *outputs[i].view, outputs[i].count, outputs[i].width);
+            for (std::size_t j = 0; j < i; ++j)
+                disjoint(*outputs[j].view, outputs[j].count, outputs[j].width,
+                         *outputs[i].view, outputs[i].count, outputs[i].width);
+        }
+        const auto stream = reinterpret_cast<cudaStream_t>(raw_stream);
+        same_stream_context(ctx->stream, stream);
+        cuda_check(cudaStreamSynchronize(ctx->stream), "drain CNOT domain stream");
+        HostBorrow completion(stream);
+        if (!child_count) {
+            cuda_check(cudaMemsetAsync(workspace->count.data, 0, sizeof(int), stream), "clear CNOT count");
+        } else {
+            auto available = bytes;
+            cuda_check(beam::cnot::first_unseen(workspace->scratch.data, available,
+                static_cast<const std::int64_t*>(closed->data), static_cast<int>(closed_count),
+                static_cast<const std::int64_t*>(children->data), static_cast<int>(child_count),
+                ctx->config.n, static_cast<int*>(workspace->ordinals.data),
+                static_cast<std::uint8_t*>(workspace->flags.data),
+                static_cast<std::int64_t*>(workspace->selected.data),
+                static_cast<int*>(workspace->count.data), stream), "select borrowed unseen CNOT states");
+        }
         completion.finish();
     }, true); });
 }

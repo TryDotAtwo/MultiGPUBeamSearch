@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-17 - Borrowed CNOT full-matrix distinct stage
+
+- Added an optional Rust/CUDA first-unseen ABI with caller-owned device inputs,
+  outputs and explicitly sized CUB workspace. It preserves the existing full
+  matrix comparison and first occurrence order; empty batches set the device
+  count to zero. Existing libraries remain loadable. This standalone operation
+  does not itself switch the public CNOT search.
+- Two RTX 3060s passed the full-matrix oracle, Rust ownership, memory and race
+  checks; the Rust workspace and SM75/80/90/120 cross-compilation passed.
+  The initial test-only pinned host cache diagnostic and verified rerun are
+  retained in `test_results/refactor_20261117/STAGE_CNOT_BORROWED_UNSEEN.md`.
+
 ## 2026-11-17 - Borrowed CNOT child generation
 
 - Added an optional device-only CNOT context and borrowed CUDA expansion using

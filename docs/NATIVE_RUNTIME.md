@@ -32,6 +32,15 @@ guarantees valid descriptor values and no output/input overlap. Invalid CUDA
 descriptors keep the existing device-error behavior. The new symbols are
 optional when loading older libraries.
 
+The optional device selection ABI exposes the existing full-matrix CNOT
+sort/compact stage. It takes caller-owned int32 ordinals and count, uint8
+flags and CUB scratch, and int64 selected original child indices. The caller
+queries scratch for the actual batch dimensions; scratch is 256-byte aligned.
+All writable regions must be disjoint from each other and the inputs. Empty
+child batches set the device count to zero. The call synchronizes the borrowed
+stream and does not copy matrices or the count to host memory. Older libraries
+remain loadable without these optional symbols.
+
 This remains standalone, not the backend of `search_cnot`. Distinct, scorer
 lifetimes and the rank transport still need integration before the new
 owner can be used by the public search. The existing GPU-resident Torch stages

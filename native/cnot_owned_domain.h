@@ -97,6 +97,25 @@ BEAM_CNOT_DOMAIN_API int beam_cnot_domain_children_device(
     uint32_t moves_are_u16, uint64_t child_count, const beam_cnot_device_view* children,
     void* stream);
 
+/* Optional additive full-matrix first-unseen operation. Element types are:
+ * ordinals=int32, flags=uint8, selected=int64, count=int32, scratch=uint8.
+ * The caller reserves ordinals for closed_count+child_count, flags and selected
+ * for child_count, and count for one element. For an empty child batch only
+ * count is needed. Scratch must begin at a 256-byte-aligned CUDA address and
+ * contain at least the bytes reported by the query for this exact geometry.
+ * All writable regions must be mutually disjoint and disjoint from inputs.
+ * Caller retains allocation bounds, lifetime, stream ordering and exclusive
+ * access through this synchronous call. The count stays on the device. */
+typedef struct beam_cnot_unseen_workspace {
+    beam_cnot_device_view ordinals, flags, selected, count, scratch;
+} beam_cnot_unseen_workspace;
+BEAM_CNOT_DOMAIN_API int beam_cnot_domain_unseen_scratch_bytes(
+    beam_cnot_domain*, uint64_t closed_count, uint64_t child_count, uint64_t* bytes);
+BEAM_CNOT_DOMAIN_API int beam_cnot_domain_first_unseen_device(
+    beam_cnot_domain*, const beam_cnot_device_view* closed, uint64_t closed_count,
+    const beam_cnot_device_view* children, uint64_t child_count,
+    const beam_cnot_unseen_workspace*, void* stream);
+
 #ifdef __cplusplus
 }
 #endif

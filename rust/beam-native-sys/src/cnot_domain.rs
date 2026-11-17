@@ -65,6 +65,16 @@ type DeviceChildren = unsafe extern "C" fn(
     *const DeviceView,
     *mut c_void,
 ) -> c_int;
+type UnseenScratch = unsafe extern "C" fn(*mut c_void, u64, u64, *mut u64) -> c_int;
+type DeviceUnseen = unsafe extern "C" fn(
+    *mut c_void,
+    *const DeviceView,
+    u64,
+    *const DeviceView,
+    u64,
+    *const DeviceUnseenWorkspace,
+    *mut c_void,
+) -> c_int;
 
 /// A non-owning CUDA address and its declared size in operation-specific elements.
 /// Constructing this value does not validate or dereference the address.
@@ -86,6 +96,19 @@ impl DeviceView {
             reserved: 0,
         }
     }
+}
+
+/// Caller-owned contiguous CUDA storage for the full-matrix selection stage.
+/// The fields count int32 ordinals, uint8 flags, int64 selected indices,
+/// one int32 count and uint8 scratch bytes, respectively.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct DeviceUnseenWorkspace {
+    pub ordinals: DeviceView,
+    pub flags: DeviceView,
+    pub selected: DeviceView,
+    pub count: DeviceView,
+    pub scratch: DeviceView,
 }
 
 /// Element type used for the physical CNOT move IDs of a borrowed expansion.
@@ -113,6 +136,8 @@ struct Bindings {
     device_owners: Option<DeviceOwners>,
     create_device: Option<Create>,
     device_children: Option<DeviceChildren>,
+    unseen_scratch: Option<UnseenScratch>,
+    device_unseen: Option<DeviceUnseen>,
 }
 
 impl Bindings {
@@ -191,6 +216,19 @@ impl DomainLibrary {
             {
                 return Err(Error("incomplete CNOT device expansion ABI".into()));
             }
+            let unseen_scratch = library
+                .get::<UnseenScratch>(b"beam_cnot_domain_unseen_scratch_bytes\0")
+                .ok()
+                .map(|symbol| *symbol);
+            let device_unseen = library
+                .get::<DeviceUnseen>(b"beam_cnot_domain_first_unseen_device\0")
+                .ok()
+                .map(|symbol| *symbol);
+            if unseen_scratch.is_some() != device_unseen.is_some()
+                || (device_unseen.is_some() && create_device.is_none())
+            {
+                return Err(Error("incomplete CNOT device selection ABI".into()));
+            }
             Ok(Self(Rc::new(Bindings {
                 last_error: symbol!("beam_cnot_domain_error", LastError),
                 create: symbol!("beam_cnot_domain_create", Create),
@@ -207,6 +245,8 @@ impl DomainLibrary {
                 device_owners,
                 create_device,
                 device_children,
+                unseen_scratch,
+                device_unseen,
                 _library: library,
             })))
         }
@@ -218,6 +258,10 @@ impl DomainLibrary {
 
     pub fn supports_device_expansion(&self) -> bool {
         self.0.create_device.is_some() && self.0.device_children.is_some()
+    }
+
+    pub fn supports_device_unseen(&self) -> bool {
+        self.0.unseen_scratch.is_some() && self.0.device_unseen.is_some()
     }
 
     pub fn create(&self, config: Config) -> Result<Domain> {
@@ -406,6 +450,59 @@ impl Domain {
             )
         };
         self.api.check("device expansion", code)
+    }
+
+    /// Query the CUB scratch bytes required for these exact batch dimensions.
+    pub fn unseen_scratch_bytes(&mut self, closed: u64, children: u64) -> Result<u64> {
+        let call = self.api.unseen_scratch.ok_or_else(|| {
+            Error("CNOT domain library lacks the device-selection extension".into())
+        })?;
+        let mut bytes = 0;
+        // SAFETY: the context and the output value are valid for this call.
+        let code = unsafe { call(self.raw(), closed, children, &mut bytes) };
+        self.api.check("device selection scratch", code)?;
+        Ok(bytes)
+    }
+
+    /// Select the original indices of the first unseen full CNOT matrices.
+    ///
+    /// # Safety
+    /// The views must be live, contiguous, accessible CUDA allocations on this
+    /// context's device through the synchronous call. Matrices contain int64
+    /// words. Workspace lane types are documented on `DeviceUnseenWorkspace`;
+    /// writable regions must be mutually disjoint and must not overlap either
+    /// input. The scratch address must be 256-byte aligned and its length must
+    /// cover `unseen_scratch_bytes` for this geometry. `stream` must be a live
+    /// same-context CUDA stream (null is the default), with every producer
+    /// ordered before it. The caller prevents conflicting concurrent access and
+    /// does not transfer device addresses to another rank.
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn first_unseen_device(
+        &mut self,
+        closed: DeviceView,
+        closed_count: u64,
+        children: DeviceView,
+        child_count: u64,
+        workspace: &DeviceUnseenWorkspace,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let call = self.api.device_unseen.ok_or_else(|| {
+            Error("CNOT domain library lacks the device-selection extension".into())
+        })?;
+        // SAFETY: the caller supplies the documented CUDA allocation, stream,
+        // ordering and exclusivity guarantees; native synchronizes on return.
+        let code = unsafe {
+            call(
+                self.raw(),
+                &closed,
+                closed_count,
+                &children,
+                child_count,
+                workspace,
+                stream,
+            )
+        };
+        self.api.check("device first unseen", code)
     }
 
     pub fn children(&mut self) -> Result<Vec<i64>> {
