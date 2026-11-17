@@ -27,10 +27,16 @@ An additive device-only context avoids allocating the base ABI's private
 stage buffers. It supports borrowed owner and child-generation operations;
 host-buffer stages return an error. Borrowed expansion accepts int64 parent
 indices and int64 or uint16 moves, calls the existing CUDA kernel, and applies
-the same stream and memory rules as the owner operation. The caller also
-guarantees valid descriptor values and no output/input overlap. Invalid CUDA
-descriptors keep the existing device-error behavior. The new symbols are
-optional when loading older libraries.
+the same stream and memory rules as the owner operation. The low-level caller
+guarantees valid descriptor values and no output/input overlap. Before invoking
+this ABI, the Rust/PyO3 search bridge checks parent and move ranges on the device
+and reads one boolean scalar per descriptor tensor on the host. Invalid values
+become a rank-local Python error before native execution, allowing the existing
+rank-wide stage vote to run without poisoning the CUDA context. The scalar read
+is an intentional synchronization. Multi-rank error propagation and reuse after
+the error remain unaccepted; see
+`test_results/refactor_20261117/cnot-device-error/GITHUB_STATUS.md`. The new
+symbols are optional when loading older libraries.
 
 The optional device selection ABI exposes the existing full-matrix CNOT
 sort/compact stage. It takes caller-owned int32 ordinals and count, uint8
@@ -49,10 +55,17 @@ it reads the device count on the host to construct the selected view. The
 existing Torch path remains the default, and CPU calls ignore the variable.
 Missing symbols or a failed explicit load produce an error rather than an
 implicit fallback. The caller must order other-stream producers and prevent
-conflicting concurrent tensor access. The other stages and scorer lifetimes
-still need migration; the existing GPU-resident Torch stages and process
-collectives remain in use. See
-`test_results/refactor_20261117/STAGE_CNOT_SEARCH_DEVICE_BRIDGE.md` for validation.
+conflicting concurrent tensor access. With the same opt-in library, the Rust
+search now routes root ownership, batched child expansion and generated-child
+ownership through the borrowed `owners_device` and `children_device` C ABI
+operations. Those calls use the rank-local current stream and keep Torch input,
+descriptor and output tensors alive until native completion. They reuse the
+existing C++ CUDA kernels; metadata assembly, score evaluation, rank exchange,
+full-matrix deduplication and the checkpoint scorer keep their existing paths.
+The default path, CPU behavior and Python reference remain unchanged. The
+source-pinned one/two-RTX-3060 comparison, checkpoint and workspace results are
+in `test_results/refactor_20261117/cnot-search-expansion/`; Compute Sanitizer
+memory checking reported zero errors with CUDA API-error reporting disabled.
 
 ## CNOT controller transition
 
@@ -122,9 +135,12 @@ tensor stages and scorer calls still use Python callbacks.
 The approved migration is in progress. Existing public Python entry points are
 switched only after their comparative acceptance stage. Rust now owns host history
 for its resident workers and ordinary CLI, plus calibration process primitives.
-The frontier controller is available for comparative validation; public launch
-and CNOT orchestration are still being transferred. No
-CUDA sorting optimization or precision policy is enabled here.
+The frontier controller is available for comparative validation. The Rust
+CNOT controller and its rank-wide stage votes already own the search loop; the
+explicit device route now also covers expansion and owner assignment. Public
+launch switching, scorer setup and the remaining CNOT callback/resource paths
+still need their own migration and comparative acceptance. No CUDA sorting
+optimization or precision policy is enabled here.
 
 An opt-in `BEAM_EXPERIMENTAL_RADIX128=ON` CMake build exercises full-key CUB
 radix sorting in Stream 3/4 and the logical union. It requires CUB 2.7 / CUDA
@@ -385,3 +401,4 @@ accepted.
 These checks do not establish trained-model quality or a performance improvement.
 Performance promotion requires the paired full-step measurements in the approved
 plan. Per-device compilation and physical acceptance remain separate records.
+
