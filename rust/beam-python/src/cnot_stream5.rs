@@ -86,10 +86,7 @@ impl PyStream5Communicator {
         self.inner.all_reduce_i64(tensor)
     }
 
-    fn all_gather_i64<'py>(
-        &self,
-        tensor: &Bound<'py, PyAny>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn all_gather_i64<'py>(&self, tensor: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
         self.inner.all_gather_i64(tensor)
     }
 

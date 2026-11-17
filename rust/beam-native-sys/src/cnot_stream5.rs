@@ -36,8 +36,7 @@ type Rows = unsafe extern "C" fn(
     *const u32,
     u32,
 ) -> c_int;
-type AllReduceI64 =
-    unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut c_void) -> c_int;
+type AllReduceI64 = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut c_void) -> c_int;
 type AllGatherI64 =
     unsafe extern "C" fn(*mut c_void, *const c_void, *mut c_void, u64, *mut c_void) -> c_int;
 type BroadcastI64 =
