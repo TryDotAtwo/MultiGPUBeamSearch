@@ -40,8 +40,8 @@ def main():
     parser.add_argument("--mode", choices=("qhat", "proposal"), default="qhat")
     parser.add_argument("--inference-batch", type=int, default=4)
     parser.add_argument("--audit", action="store_true", help="include all candidates in the JSON for small runs")
-    parser.add_argument("--validation", choices=("python", "rust"), default="python",
-                        help="select the input and construction-replay validator")
+    parser.add_argument("--validation", choices=("auto", "python", "rust"), default="auto",
+                        help="use Rust validation when available; select python or rust explicitly")
     args = parser.parse_args()
     device = initialize_world("nccl")
     try:
