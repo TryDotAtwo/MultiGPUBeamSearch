@@ -3,7 +3,12 @@
 ## 2026-11-17 - Vast key validation and status publication
 
 - Confirmed the existing `VAST_API_KEY` Actions secret is populated and accepted by the read-only status request for instance 61080396. At 18:03 UTC it reported `exited`, intended `stopped`, with 2 x RTX 3060; no instance was started.
-- Added the missing `status` step id required by the conditional report publisher. Run 44143759674 uploaded the sanitized status artifact but skipped publishing the JSON to `test_results/remote-status/vast-status-latest.json`; a workflow rerun is pending.
+- Added the missing `status` step id required by the conditional report publisher. Run 44143759674 had skipped publication; follow-up run 44148276778 published the sanitized JSON. At 18:28 UTC it reported `exited`, intended `stopped`, with 2 x RTX 3060; no instance was started.
+
+## 2026-11-17 - Default Rust CNOT input validation
+
+- `search_cnot` and the CNOT CLI now prefer the Rust packed-matrix validator when installed. Explicit `python` remains available; explicit `rust` fails closed; `auto` falls back to Python when the extension capability is absent.
+- Added a GitHub-hosted CPU compatibility workflow. Run 44150899645 produced the expected RED: the two new cases failed for the missing `auto` behavior and the other 17 cases passed. GREEN rerun is pending.
 
 ## 2026-11-17 - Rust CNOT search descriptor validation and recovery test
 
