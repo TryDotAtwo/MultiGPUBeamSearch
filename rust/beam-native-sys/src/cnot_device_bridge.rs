@@ -3,7 +3,9 @@
 //! This opt-in transition keeps Torch tensor storage and the existing rank
 //! collectives. The domain remains on the search's calling thread; no CUDA
 //! address becomes a Rust reference or leaves the rank process.
-use crate::cnot_domain::{Config, DeviceUnseenWorkspace, DeviceView, Domain, DomainLibrary};
+use crate::cnot_domain::{
+    Config, DeviceMoveType, DeviceUnseenWorkspace, DeviceView, Domain, DomainLibrary,
+};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 use std::{ffi::c_void, path::Path};
 
@@ -17,6 +19,7 @@ pub struct DeviceDomain {
     device: i32,
     n: i32,
     world: i32,
+    parent_capacity: u64,
     closed_capacity: u64,
     child_capacity: u64,
 }
@@ -37,33 +40,147 @@ impl DeviceDomain {
             device,
             n,
             world,
+            parent_capacity: 0,
             closed_capacity: 0,
             child_capacity: 0,
         })
     }
 
-    fn domain(&mut self, closed: u64, children: u64) -> PyResult<&mut Domain> {
-        if self.domain.is_none() || closed > self.closed_capacity || children > self.child_capacity
+    fn domain(&mut self, parents: u64, closed: u64, children: u64) -> PyResult<&mut Domain> {
+        if self.domain.is_none()
+            || parents > self.parent_capacity
+            || closed > self.closed_capacity
+            || children > self.child_capacity
         {
+            let parent_capacity = parents.max(self.parent_capacity);
+            let mut closed_capacity = closed.max(self.closed_capacity);
+            let mut child_capacity = children.max(self.child_capacity);
+            if closed_capacity
+                .checked_add(child_capacity)
+                .map_or(true, |sum| sum > i32::MAX as u64)
+            {
+                // Earlier batches may have had a different valid geometry.
+                // Retaining both old maxima must not reject this batch.
+                closed_capacity = closed;
+                child_capacity = children;
+            }
             let config = Config {
                 device: self.device,
                 n: self.n,
                 world: self.world,
-                parent_capacity: 0,
-                child_capacity: children,
-                closed_capacity: closed,
+                parent_capacity,
+                child_capacity,
+                closed_capacity,
             };
             let next = self.library.create_device(config).map_err(native_error)?;
             if let Some(previous) = self.domain.take() {
                 previous.close().map_err(native_error)?;
             }
             self.domain = Some(next);
-            self.closed_capacity = closed;
-            self.child_capacity = children;
+            self.parent_capacity = parent_capacity;
+            self.closed_capacity = closed_capacity;
+            self.child_capacity = child_capacity;
         }
         self.domain
             .as_mut()
             .ok_or_else(|| PyRuntimeError::new_err("CNOT device domain is unavailable"))
+    }
+
+    /// Assign the owner of each complete packed CNOT matrix on this rank.
+    pub fn owners<'py>(
+        &mut self,
+        py: Python<'py>,
+        states: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let torch = py.import("torch")?;
+        exact_tensor(&torch, states)?;
+        let device = states.getattr("device")?;
+        let states = states.call_method0("contiguous")?;
+        let count = check_matrices(py, &states, self.device, self.n)?;
+        let output = empty(py, &torch, &device, "int64", count)?;
+        if count == 0 {
+            return Ok(output);
+        }
+        let words = matrix_words(count, self.n)?;
+        let state_view = tensor_view(&torch, &states, self.device, "int64", words)?;
+        let owner_view = tensor_view(&torch, &output, self.device, "int64", count)?;
+        let stream = current_stream(&torch, &device, self.device)?;
+        let domain = self.domain(0, 0, count)?;
+        // SAFETY: Torch owns separate, checked allocations and retains them
+        // through the call. Input producers precede it on this current stream;
+        // native validates device/overlap and synchronizes before return.
+        unsafe { domain.owners_device(state_view, count, owner_view, stream as *mut c_void) }
+            .map_err(native_error)?;
+        Ok(output)
+    }
+
+    /// Expand checked, generated parent indices and physical moves on this rank.
+    pub fn children<'py>(
+        &mut self,
+        py: Python<'py>,
+        parents: &Bound<'py, PyAny>,
+        indices: &Bound<'py, PyAny>,
+        moves: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let torch = py.import("torch")?;
+        for tensor in [parents, indices, moves] {
+            exact_tensor(&torch, tensor)?;
+        }
+        let device = parents.getattr("device")?;
+        let parents = parents.call_method0("contiguous")?;
+        let indices = indices.call_method0("contiguous")?;
+        let moves = moves.call_method0("contiguous")?;
+        let parent_count = check_matrices(py, &parents, self.device, self.n)?;
+        if indices.call_method0("dim")?.extract::<i32>()? != 1
+            || moves.call_method0("dim")?.extract::<i32>()? != 1
+        {
+            return Err(PyRuntimeError::new_err("invalid CNOT descriptor geometry"));
+        }
+        let count = indices.call_method0("numel")?.extract::<u64>()?;
+        let index_view = tensor_view(&torch, &indices, self.device, "int64", count)?;
+        let move_view = tensor_view(&torch, &moves, self.device, "int64", count)?;
+        let parent_words = matrix_words(parent_count, self.n)?;
+        let child_words = matrix_words(count, self.n)?;
+        let parent_view = tensor_view(&torch, &parents, self.device, "int64", parent_words)?;
+        let child_count = i64::try_from(count)
+            .map_err(|_| PyRuntimeError::new_err("CNOT child count overflow"))?;
+        let output = empty(py, &torch, &device, "int64", child_words)?
+            .call_method1("reshape", (child_count, self.n, (self.n + 63) / 64))?;
+        if count == 0 {
+            return Ok(output);
+        }
+        if parent_count == 0 {
+            return Err(PyRuntimeError::new_err(
+                "cannot expand an empty CNOT frontier",
+            ));
+        }
+        // Validate descriptors before entering native code. A device-side
+        // assert would poison this rank's CUDA context and prevent the
+        // distributed caller from voting on a normal rank-local error.
+        assert_descriptor_range(&torch, &indices, parent_count, "invalid CNOT parent index")?;
+        let alphabet = u64::try_from(self.n * (self.n - 1))
+            .map_err(|_| PyRuntimeError::new_err("invalid CNOT move alphabet"))?;
+        assert_descriptor_range(&torch, &moves, alphabet, "invalid CNOT physical move")?;
+        let child_view = tensor_view(&torch, &output, self.device, "int64", child_words)?;
+        let stream = current_stream(&torch, &device, self.device)?;
+        let domain = self.domain(parent_count, 0, count)?;
+        // SAFETY: the live, contiguous, same-device tensors and separate
+        // output were checked above. Descriptor validation and all producers
+        // precede the synchronous native call on the current stream.
+        unsafe {
+            domain.expand_device(
+                parent_view,
+                parent_count,
+                index_view,
+                move_view,
+                DeviceMoveType::I64,
+                count,
+                child_view,
+                stream as *mut c_void,
+            )
+        }
+        .map_err(native_error)?;
+        Ok(output)
     }
 
     pub fn first_unseen<'py>(
@@ -86,19 +203,10 @@ impl DeviceDomain {
         let total = closed_count
             .checked_add(child_count)
             .ok_or_else(|| PyRuntimeError::new_err("CNOT ordinal count overflow"))?;
-        let n = u64::try_from(self.n)
-            .map_err(|_| PyRuntimeError::new_err("invalid CNOT qubit count"))?;
-        let stride = n
-            .checked_mul((n + 63) / 64)
-            .ok_or_else(|| PyRuntimeError::new_err("CNOT matrix stride overflow"))?;
-        let closed_words = closed_count
-            .checked_mul(stride)
-            .ok_or_else(|| PyRuntimeError::new_err("CNOT closed word count overflow"))?;
-        let child_words = child_count
-            .checked_mul(stride)
-            .ok_or_else(|| PyRuntimeError::new_err("CNOT child word count overflow"))?;
+        let closed_words = matrix_words(closed_count, self.n)?;
+        let child_words = matrix_words(child_count, self.n)?;
         let device_id = self.device;
-        let domain = self.domain(closed_count, child_count)?;
+        let domain = self.domain(0, closed_count, child_count)?;
         let bytes = domain
             .unseen_scratch_bytes(closed_count, child_count)
             .map_err(native_error)?;
@@ -114,23 +222,7 @@ impl DeviceDomain {
             count: tensor_view(&torch, &count, device_id, "int32", 1)?,
             scratch: tensor_view(&torch, &scratch, device_id, "uint8", bytes)?,
         };
-        let cuda = torch.getattr("cuda")?;
-        let current_stream = cuda.call_method1("current_stream", (&device,))?;
-        if !current_stream
-            .get_type()
-            .as_any()
-            .is(&cuda.getattr("Stream")?)
-            || current_stream
-                .getattr("device")?
-                .getattr("index")?
-                .extract::<i32>()?
-                != device_id
-        {
-            return Err(PyRuntimeError::new_err(
-                "CNOT domain requires a plain CUDA stream",
-            ));
-        }
-        let stream: usize = current_stream.getattr("cuda_stream")?.extract()?;
+        let stream = current_stream(&torch, &device, device_id)?;
         // SAFETY: both inputs were checked as contiguous int64 matrices on
         // this device. Torch created each workspace allocation separately,
         // retains it in the bound values above and provides its actual numel.
@@ -155,6 +247,57 @@ impl DeviceDomain {
         }
         selected.call_method1("narrow", (0, 0, found))
     }
+}
+
+fn matrix_words(count: u64, n: i32) -> PyResult<u64> {
+    let n = u64::try_from(n).map_err(|_| PyRuntimeError::new_err("invalid CNOT qubit count"))?;
+    let stride = n
+        .checked_mul((n + 63) / 64)
+        .ok_or_else(|| PyRuntimeError::new_err("CNOT matrix stride overflow"))?;
+    count
+        .checked_mul(stride)
+        .ok_or_else(|| PyRuntimeError::new_err("CNOT matrix word count overflow"))
+}
+
+fn assert_descriptor_range(
+    torch: &Bound<'_, PyModule>,
+    values: &Bound<'_, PyAny>,
+    upper: u64,
+    message: &str,
+) -> PyResult<()> {
+    let upper = i64::try_from(upper)
+        .map_err(|_| PyRuntimeError::new_err("CNOT descriptor bound overflow"))?;
+    let lower_ok = values.call_method1("__ge__", (0,))?;
+    let upper_ok = values.call_method1("__lt__", (upper,))?;
+    let valid = torch
+        .call_method1("logical_and", (lower_ok, upper_ok))?
+        .call_method0("all")?;
+    let valid = valid.call_method0("item")?.extract::<bool>()?;
+    if !valid {
+        return Err(PyRuntimeError::new_err(message.to_owned()));
+    }
+    Ok(())
+}
+
+fn current_stream(
+    torch: &Bound<'_, PyModule>,
+    device: &Bound<'_, PyAny>,
+    device_id: i32,
+) -> PyResult<usize> {
+    let cuda = torch.getattr("cuda")?;
+    let stream = cuda.call_method1("current_stream", (device,))?;
+    if !stream.get_type().as_any().is(&cuda.getattr("Stream")?)
+        || stream
+            .getattr("device")?
+            .getattr("index")?
+            .extract::<i32>()?
+            != device_id
+    {
+        return Err(PyRuntimeError::new_err(
+            "CNOT domain requires a plain CUDA stream",
+        ));
+    }
+    stream.getattr("cuda_stream")?.extract()
 }
 
 fn empty<'py>(
@@ -247,3 +390,4 @@ fn check_matrices(py: Python<'_>, tensor: &Bound<'_, PyAny>, device: i32, n: i32
     }
     tensor.call_method1("size", (0,))?.extract()
 }
+
