@@ -62,6 +62,7 @@ pub(crate) fn expand<'py>(
     k: u32,
     n: i64,
     words: i64,
+    mut device_domain: Option<&mut beam_native_sys::cnot_device_bridge::DeviceDomain>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let torch = py.import("torch")?;
     let native = py.import("multigpubeamsearch.cnot_native")?;
@@ -90,7 +91,10 @@ pub(crate) fn expand<'py>(
         .call_method("arange", (count,), Some(&arange_kwargs))?
         .call_method1("repeat_interleave", (k,))?;
     let moves = moves.call_method1("reshape", (-1,))?;
-    let children = native.call_method1("cnot_children", (parents, &indices, &moves))?;
+    let children = match device_domain.as_deref_mut() {
+        Some(domain) => domain.children(py, parents, &indices, &moves)?,
+        None => native.call_method1("cnot_children", (parents, &indices, &moves))?,
+    };
     let parent_slots = indices.call_method1("__add__", (begin,))?;
     let generation = parent_slots
         .call_method1("__mul__", (alphabet,))?
@@ -114,7 +118,10 @@ pub(crate) fn expand<'py>(
     )?;
     let rows = children.call_method1("reshape", (-1, n * words))?;
     let candidates = torch.call_method1("cat", (PyTuple::new(py, [meta, rows])?, 1))?;
-    let owners = native.call_method1("cnot_owners", (&children, world.getattr("size")?))?;
+    let owners = match device_domain.as_deref_mut() {
+        Some(domain) => domain.owners(py, &children)?,
+        None => native.call_method1("cnot_owners", (&children, world.getattr("size")?))?,
+    };
     Ok(PyTuple::new(py, [candidates, owners])?.into_any())
 }
 
@@ -157,3 +164,4 @@ pub(crate) fn distinct<'py>(
     };
     Ok(PyTuple::new(py, [children, meta, values])?.into_any())
 }
+
