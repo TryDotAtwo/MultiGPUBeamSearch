@@ -555,7 +555,10 @@ mod torch {
             Ok(())
         }
 
-        pub fn all_gather_i64(&self, tensor: &Bound<'_, PyAny>) -> PyResult<Bound<'_, PyAny>> {
+        pub fn all_gather_i64<'py>(
+            &self,
+            tensor: &Bound<'py, PyAny>,
+        ) -> PyResult<Bound<'py, PyAny>> {
             let (collectives, ptr, device) = self.collective_bindings()?;
             let (count, contiguous) = Self::control_tensor(tensor, device)?;
             let received = count
