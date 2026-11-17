@@ -273,8 +273,6 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
             raise ValueError("CNOT root, search settings or scorer fingerprints differ between ranks")
         world.start_transport(prefer_rust=runner is not None)
         identity = native.cnot_identity(input_matrix.n, device=world.device)
-        if torch.equal(root, identity):
-            return CnotResult("solved", (), [], [])
         if runner is not None:
             native_runner = _native_stages_runner()
             use_native = world.sum(world.longs([int(native_runner is not None)])).item() == world.size
@@ -286,6 +284,8 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
 
             stages = CnotStages(world, root, identity, input_matrix, scorer, mode, audit)
             return runner(stages, world.rank, world.size, width, min(shortlist, alphabet), alphabet, max_depth)
+        if torch.equal(root, identity):
+            return CnotResult("solved", (), [], [])
         return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
 
 

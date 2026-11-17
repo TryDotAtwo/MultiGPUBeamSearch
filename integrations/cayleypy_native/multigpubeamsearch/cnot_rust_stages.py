@@ -18,6 +18,9 @@ class CnotStages:
         self.input_matrix, self.scorer, self.mode, self.audit = input_matrix, scorer, mode, audit
         self.n, self.words = root.shape[1:]
 
+    def root_is_goal(self):
+        return torch.equal(self.root, self.identity)
+
     def initialize(self):
         world, root = self.world, self.root
         self.parents = root if world.rank == 0 else root[:0]

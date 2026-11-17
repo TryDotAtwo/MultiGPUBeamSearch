@@ -15,6 +15,16 @@
   Это hosted CPU evidence: feature selection замокан; аппаратный worker,
   CUDA/NCCL и реальная multi-GPU работа этим прогоном не проверялись.
 
+## 2026-11-18 - CNOT identity-root control in Rust
+
+- Перенесено решение для уже целевого начального CNOT-состояния из общего
+  Python dispatch в Rust CNOT controller. Проверка выполняется до
+  инициализации ранговых стадий и возвращает прежний `solved` с пустым путем,
+  без слоев и маршрутов; Python reference route сохранён.
+- Добавлены CPU Rust/Python проверки и сохранение полных логов CNOT workflow в
+  `test_results/refactor_20261118/cnot-root-goal/`. GPU/NCCL acceptance этим
+  изменением не заявляется.
+
 ## 2026-11-17 - Vast key validation and status publication
 
 - Confirmed the existing `VAST_API_KEY` Actions secret is populated and accepted by the read-only status request for instance 61080396. At 18:03 UTC it reported `exited`, intended `stopped`, with 2 x RTX 3060; no instance was started.

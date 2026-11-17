@@ -315,6 +315,13 @@ impl Backend for NativeStages<'_> {
     type Layer = Py<PyAny>;
     type Records = Py<PyAny>;
 
+    fn root_is_goal(&mut self) -> PyResult<bool> {
+        self.py
+            .import("torch")?
+            .call_method1("equal", (&self.root, &self.identity))?
+            .extract()
+    }
+
     fn initialize(&mut self) -> PyResult<()> {
         let empty = self.root.call_method1("narrow", (0, 0, 0))?;
         self.parents = Some(if self.rank == 0 {

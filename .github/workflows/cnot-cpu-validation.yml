@@ -41,26 +41,26 @@ jobs:
           rustup default stable
       - name: Run Rust CNOT checks
         run: |
+          mkdir -p test_results/refactor_20261118/cnot-root-goal
           set -o pipefail
           {
+            cargo fmt --all -- --check
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-runtime cnot_search
             cargo check --locked -p beam-python
-          } 2>&1 | tee "${RUNNER_TEMP}/cnot-rust-cpu.log"
+          } 2>&1 | tee test_results/refactor_20261118/cnot-root-goal/cnot-rust-cpu.log
       - name: Run CNOT CPU compatibility tests
         env:
           PYTHONPATH: integrations/cayleypy_native
         run: |
           set -o pipefail
           python -m pytest -q integrations/cayleypy_native/tests/test_cnot_search.py \
-            2>&1 | tee "${RUNNER_TEMP}/cnot-search-cpu.log"
+            2>&1 | tee test_results/refactor_20261118/cnot-root-goal/cnot-search-cpu.log
       - name: Upload test log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cnot-cpu-validation
-          path: |
-            ${{ runner.temp }}/cnot-rust-cpu.log
-            ${{ runner.temp }}/cnot-search-cpu.log
+          name: cnot-root-goal-cpu-validation
+          path: test_results/refactor_20261118/cnot-root-goal
           if-no-files-found: ignore
           retention-days: 7

@@ -39,6 +39,12 @@ impl Backend for PyStages<'_> {
     type Layer = Py<PyAny>;
     type Records = Py<PyAny>;
 
+    fn root_is_goal(&mut self) -> PyResult<bool> {
+        if !self.stages.hasattr("root_is_goal")? {
+            return Ok(false);
+        }
+        self.stages.call_method0("root_is_goal")?.extract()
+    }
     fn initialize(&mut self) -> PyResult<()> {
         self.stages.call_method0("initialize")?;
         Ok(())

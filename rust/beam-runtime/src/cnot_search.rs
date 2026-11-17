@@ -55,6 +55,9 @@ pub trait Backend {
     type Layer;
     type Records;
 
+    fn root_is_goal(&mut self) -> Result<bool, Self::Error> {
+        Ok(false)
+    }
     fn initialize(&mut self) -> Result<(), Self::Error>;
     fn goal(&mut self, begin: u64) -> Result<Option<Goal>, Self::Error>;
     fn expand(&mut self, begin: u64, k: u32) -> Result<(), Self::Error>;
@@ -141,6 +144,14 @@ pub fn search<B: Backend>(
     {
         return Err(backend.invalid("invalid CNOT search geometry"));
     }
+    if backend.root_is_goal()? {
+        return Ok(Outcome {
+            status: "solved",
+            gates: Some(Vec::new()),
+            layers: Vec::new(),
+            routes: Vec::new(),
+        });
+    }
     backend.initialize()?;
     let mut history = Vec::new();
     let mut layers = Vec::new();
@@ -205,6 +216,7 @@ mod tests {
         counts: VecDeque<u64>,
         fail_stage: Option<&'static str>,
         valid: bool,
+        root_goal: bool,
     }
     impl Mock {
         fn call(
@@ -224,6 +236,11 @@ mod tests {
         type Error = String;
         type Layer = u64;
         type Records = u64;
+        fn root_is_goal(&mut self) -> Result<bool, String> {
+            let goal = self.root_goal;
+            self.call("root_goal", goal)?;
+            Ok(goal)
+        }
         fn initialize(&mut self) -> Result<(), String> {
             self.call("initialize", 0)
         }
@@ -326,6 +343,7 @@ mod tests {
         assert_eq!(
             b.calls,
             [
+                "root_goal:false",
                 "initialize:0",
                 "goal:0",
                 "expand:0,12",
@@ -352,7 +370,7 @@ mod tests {
             let mut b = Mock::default();
             let out = search(&mut b, opts(depth)).unwrap();
             assert_eq!(out.status, "depth_limit");
-            assert_eq!(b.calls.len(), 1 + depth as usize);
+            assert_eq!(b.calls.len(), 2 + depth as usize);
         }
         let mut b = Mock {
             counts: [0].into(),
@@ -362,6 +380,19 @@ mod tests {
         assert_eq!(out.status, "exhausted");
         assert_eq!(out.layers, [1]);
         assert_eq!(b.calls.last().unwrap(), "redistribute:1");
+    }
+    #[test]
+    fn identity_root_returns_empty_solution_before_initialization() {
+        let mut b = Mock {
+            root_goal: true,
+            ..Mock::default()
+        };
+        let out = search(&mut b, opts(0)).unwrap();
+        assert_eq!(out.status, "solved");
+        assert_eq!(out.gates, Some(Vec::new()));
+        assert!(out.layers.is_empty());
+        assert!(out.routes.is_empty());
+        assert_eq!(b.calls, ["root_goal:true"]);
     }
     #[test]
     fn errors_stop_before_the_next_collective_and_replay_is_required() {
