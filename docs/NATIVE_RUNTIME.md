@@ -6,18 +6,28 @@
 library without configuring the full CUTLASS/NCCL engine. The separate
 `beam-native-sys::cnot_domain` owner loads its versioned C ABI explicitly,
 retains the library, and owns a thread-bound CUDA context with fixed-capacity
-buffers and CUB scratch. The C ABI's current inputs and outputs are host slices;
-it uses the existing CUDA CNOT kernels, owner hashing and full-matrix equality.
-The Rust loader is unsafe because the caller selects a trusted native library;
-its subsequent operations own their lifetime and do not expose device pointers.
+buffers and CUB scratch. The base C ABI uses host slices; it invokes the
+existing CUDA CNOT kernels, owner hashing and full-matrix equality. The Rust
+loader is unsafe because the caller selects a trusted native library.
 Explicit close reports a CUDA cleanup error but consumes the Rust handle; a
 failed native device switch or cleanup can leave resources for process exit.
 
-This is a standalone migration slice, not the backend of `search_cnot`.
-Before connecting it, define GPU-resident borrowed views, stream/event ordering,
-and scorer lifetimes; the existing search and process collectives remain the
-production path. Details and validation scope are in
-`test_results/refactor_20261117/STAGE_CNOT_OWNED_DOMAIN.md`.
+An optional device ABI also runs the unchanged owner kernel on borrowed CUDA
+views without a host transfer. Views describe raw device addresses and declared
+element counts; Rust never converts those addresses to references. The unsafe
+caller guarantees actual allocation bounds, context accessibility and lifetime,
+non-overlap, and a live same-context CUDA stream with producer dependencies
+already ordered. The
+native call checks declared sizes, alignment, pointer device and stream context,
+drains its owned stream, and synchronizes the supplied stream before returning.
+The library cannot prove the bounds of foreign allocations. Older libraries
+without this optional extension still load and report it unavailable.
+
+This remains standalone, not the backend of `search_cnot`. Expansion, distinct,
+scorer lifetimes and the rank transport still need integration before the new
+owner can be used by the public search. The existing GPU-resident Torch stages
+and process collectives remain the production path. See
+`test_results/refactor_20261117/STAGE_CNOT_BORROWED_DEVICE.md` for validation.
 
 ## CNOT controller transition
 

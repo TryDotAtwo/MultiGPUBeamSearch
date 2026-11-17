@@ -1,8 +1,8 @@
 //! Thread-bound owner for the standalone CNOT CUDA domain C ABI.
 //!
-//! Host slices are borrowed only for the duration of a synchronous ABI call;
-//! no device address is exposed as a Rust reference. This domain is not yet
-//! connected to the public CNOT search or its multi-rank transport.
+//! Host slices and optional CUDA views are borrowed only for a synchronous
+//! ABI call; no device address is exposed as a Rust reference. This domain is
+//! not yet connected to the public CNOT search or its multi-rank transport.
 use super::{Error, Result};
 use libloading::Library;
 use std::{
@@ -47,6 +47,35 @@ type Descriptors = unsafe extern "C" fn(*mut c_void, *const i64, u64, *const i64
 type Stage = unsafe extern "C" fn(*mut c_void) -> c_int;
 type Select = unsafe extern "C" fn(*mut c_void, *mut u64) -> c_int;
 type Download = unsafe extern "C" fn(*mut c_void, *mut i64, u64) -> c_int;
+type DeviceOwners = unsafe extern "C" fn(
+    *mut c_void,
+    *const DeviceView,
+    u64,
+    *const DeviceView,
+    *mut c_void,
+) -> c_int;
+
+/// A non-owning CUDA address and its declared size in int64 elements.
+/// Constructing this value does not validate or dereference the address.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct DeviceView {
+    data: *mut c_void,
+    elements: u64,
+    device: i32,
+    reserved: u32,
+}
+
+impl DeviceView {
+    pub fn from_raw(data: *mut c_void, elements: u64, device: i32) -> Self {
+        Self {
+            data,
+            elements,
+            device,
+            reserved: 0,
+        }
+    }
+}
 
 struct Bindings {
     _library: Library,
@@ -62,6 +91,7 @@ struct Bindings {
     download_children: Download,
     download_owners: Download,
     download_selected: Download,
+    device_owners: Option<DeviceOwners>,
 }
 
 impl Bindings {
@@ -114,6 +144,19 @@ impl DomainLibrary {
                     "CNOT domain ABI mismatch: required={ABI} available={version}"
                 )));
             }
+            let device_owners =
+                match library.get::<Version>(b"beam_cnot_domain_device_abi_version\0") {
+                    Ok(version) => {
+                        let actual = version();
+                        if actual != 1 {
+                            return Err(Error(format!(
+                                "CNOT device ABI mismatch: required=1 available={actual}"
+                            )));
+                        }
+                        Some(symbol!("beam_cnot_domain_owners_device", DeviceOwners))
+                    }
+                    Err(_) => None,
+                };
             Ok(Self(Rc::new(Bindings {
                 last_error: symbol!("beam_cnot_domain_error", LastError),
                 create: symbol!("beam_cnot_domain_create", Create),
@@ -127,9 +170,14 @@ impl DomainLibrary {
                 download_children: symbol!("beam_cnot_domain_download_children", Download),
                 download_owners: symbol!("beam_cnot_domain_download_owners", Download),
                 download_selected: symbol!("beam_cnot_domain_download_selected", Download),
+                device_owners,
                 _library: library,
             })))
         }
+    }
+
+    pub fn supports_device_owners(&self) -> bool {
+        self.0.device_owners.is_some()
     }
 
     pub fn create(&self, config: Config) -> Result<Domain> {
@@ -231,6 +279,34 @@ impl Domain {
         let code = unsafe { (self.api.owners)(self.raw()) };
         self.api.check("owners", code)?;
         self.download(self.api.download_owners, self.child_count, "owners")
+    }
+
+    /// Compute owners directly in caller-owned CUDA storage on `stream`.
+    ///
+    /// # Safety
+    /// Both views must describe live, correctly sized, contiguous int64 CUDA
+    /// allocations on this domain's device, accessible from its CUDA context.
+    /// Their used regions must not overlap. `stream` must be a valid stream in
+    /// the same CUDA context (null is the default stream), with every input
+    /// producer ordered before it.
+    /// The caller retains the allocations and stream until this synchronous
+    /// call returns and prevents concurrent conflicting access. Addresses are
+    /// never dereferenced by Rust and must not be transferred to another rank.
+    pub unsafe fn owners_device(
+        &mut self,
+        states: DeviceView,
+        count: u64,
+        owners: DeviceView,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let call = self
+            .api
+            .device_owners
+            .ok_or_else(|| Error("CNOT domain library lacks the device-owner extension".into()))?;
+        // SAFETY: the caller supplies the documented CUDA lifetimes, extents
+        // and stream ordering; this call synchronizes before returning.
+        let code = unsafe { call(self.raw(), &states, count, &owners, stream) };
+        self.api.check("device owners", code)
     }
 
     pub fn children(&mut self) -> Result<Vec<i64>> {

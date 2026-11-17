@@ -36,8 +36,10 @@ option(BEAM_EXPERIMENTAL_STREAM4_SCAN "Use CUB device and block scans for Stream
 option(BEAM_EXPERIMENTAL_OWNER_RADIX "Use stable CUB radix partition for Stream 3 owner routing" OFF)
 option(BEAM_EXPERIMENTAL_SCORE_BITS "Restrict score histogram radix sort to sentinel-aware key bits" OFF)
 if(BEAM_ENABLE_CNOT_OWNED_DOMAIN OR BEAM_CNOT_OWNED_DOMAIN_ONLY)
+    find_package(CUDAToolkit REQUIRED)
     add_library(beam_cnot_owned_domain SHARED
         native/cnot_owned_domain.cu cuda/cnot_domain.cu cuda/cnot_unique.cu)
+    target_link_libraries(beam_cnot_owned_domain PRIVATE CUDA::cuda_driver)
     target_compile_definitions(beam_cnot_owned_domain PRIVATE
         BEAM_CNOT_DOMAIN_BUILD=1
         BEAM_STATE_LOGICAL_BYTES=${BEAM_STATE_LOGICAL_BYTES}

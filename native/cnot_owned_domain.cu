@@ -2,6 +2,7 @@
 #include "../cuda/cnot_domain.hpp"
 #include "../src/cnot_domain.hpp"
 
+#include <cuda.h>
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <cstddef>
@@ -16,6 +17,7 @@
 static_assert(sizeof(beam_cnot_domain_config) == 48);
 static_assert(alignof(beam_cnot_domain_config) == 8);
 static_assert(offsetof(beam_cnot_domain_config, parent_capacity) == 24);
+static_assert(sizeof(beam_cnot_device_view) == 24 && alignof(beam_cnot_device_view) == 8);
 
 namespace {
 constexpr int invalid = 1, capacity = 2, cuda_failure = 3, wrong_thread = 4, internal = 5;
@@ -162,6 +164,53 @@ void download(beam_cnot_domain* ctx, const std::int64_t* source, std::int64_t* d
     cuda_check(cudaMemcpyAsync(destination, source, multiply(required, sizeof(std::int64_t), name),
                                cudaMemcpyDeviceToHost, ctx->stream), "download CNOT data");
     borrow.finish();
+}
+
+void device_view(beam_cnot_domain* ctx, const beam_cnot_device_view* view,
+                 std::uint64_t required, const char* name) {
+    require(view != nullptr, invalid, std::string(name) + " view is null");
+    require(view->reserved == 0, invalid, std::string(name) + " reserved field must be zero");
+    require(view->device == ctx->config.device, invalid, std::string(name) + " device differs from context");
+    input(view->data, required, view->elements, name);
+    if (!required) return;
+    require(reinterpret_cast<std::uintptr_t>(view->data) % alignof(std::int64_t) == 0,
+            invalid, std::string(name) + " address is not aligned");
+    cudaPointerAttributes attrs{};
+    const auto status = cudaPointerGetAttributes(&attrs, view->data);
+    if (status == cudaErrorInvalidValue || status == cudaErrorInvalidDevicePointer) {
+        (void)cudaGetLastError();
+        throw Failure(invalid, std::string(name) + " is not a device allocation");
+    }
+    cuda_check(status, "query device pointer");
+    require(attrs.type == cudaMemoryTypeDevice && attrs.device == ctx->config.device,
+            invalid, std::string(name) + " is not on the context device");
+}
+
+void disjoint(const beam_cnot_device_view& states, std::uint64_t state_words,
+              const beam_cnot_device_view& owners, std::uint64_t owner_count) {
+    if (!state_words || !owner_count) return;
+    const auto state_bytes = multiply(state_words, sizeof(std::int64_t), "device state bytes");
+    const auto owner_bytes = multiply(owner_count, sizeof(std::int64_t), "device owner bytes");
+    const auto a = reinterpret_cast<std::uintptr_t>(states.data);
+    const auto b = reinterpret_cast<std::uintptr_t>(owners.data);
+    constexpr auto max = std::numeric_limits<std::uintptr_t>::max();
+    require(state_bytes <= max - a && owner_bytes <= max - b, invalid, "device view address range overflow");
+    require(!(a < b + owner_bytes && b < a + state_bytes), invalid, "device input and output overlap");
+}
+
+void same_stream_context(cudaStream_t owned_stream, cudaStream_t stream) {
+    CUcontext active = nullptr, owner = nullptr, source = nullptr;
+    const auto current_status = cuCtxGetCurrent(&active);
+    if (current_status != CUDA_SUCCESS || !active) {
+        throw Failure(cuda_failure, "cannot query the current CUDA context");
+    }
+    // A caller must supply a valid live stream; CUDA documents an arbitrary
+    // invalid stream handle as undefined behavior even for this query.
+    const auto owner_status = cuStreamGetCtx(reinterpret_cast<CUstream>(owned_stream), &owner);
+    const auto stream_status = cuStreamGetCtx(reinterpret_cast<CUstream>(stream), &source);
+    require(owner_status == CUDA_SUCCESS && stream_status == CUDA_SUCCESS && owner == active && source == owner,
+            invalid,
+            "CUDA stream is not associated with the context device");
 }
 } // namespace
 
@@ -325,4 +374,25 @@ extern "C" int beam_cnot_domain_download_owners(beam_cnot_domain* ctx, std::int6
 }
 extern "C" int beam_cnot_domain_download_selected(beam_cnot_domain* ctx, std::int64_t* out, std::uint64_t cap) {
     return boundary([&] { use(ctx, [&] { download(ctx, ctx->selected, out, ctx->selected_count, cap, ctx->selected_valid, "selected"); }); });
+}
+
+extern "C" std::uint32_t beam_cnot_domain_device_abi_version() { return 1; }
+extern "C" int beam_cnot_domain_owners_device(beam_cnot_domain* ctx, const beam_cnot_device_view* states,
+                                                std::uint64_t count, const beam_cnot_device_view* owners,
+                                                void* raw_stream) {
+    return boundary([&] { use(ctx, [&] {
+        room(count, ctx->config.child_capacity, "device state capacity");
+        const auto words = multiply(count, ctx->stride, "device state words");
+        device_view(ctx, states, words, "states");
+        device_view(ctx, owners, count, "owners");
+        disjoint(*states, words, *owners, count);
+        const auto stream = reinterpret_cast<cudaStream_t>(raw_stream);
+        same_stream_context(ctx->stream, stream);
+        cuda_check(cudaStreamSynchronize(ctx->stream), "drain CNOT domain stream");
+        HostBorrow completion(stream);
+        cuda_check(beam::cnot::launch_owners(static_cast<const std::int64_t*>(states->data), count,
+            ctx->config.n, ctx->config.world, static_cast<std::int64_t*>(owners->data), stream),
+            "compute borrowed CNOT owners");
+        completion.finish();
+    }); });
 }

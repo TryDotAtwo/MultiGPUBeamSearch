@@ -16,7 +16,8 @@
 extern "C" {
 #endif
 
-/* Version 1: all arrays are borrowed host memory, never CUDA pointers. */
+/* Base version 1 uses borrowed host memory. The optional device extension
+ * below has a separate version and explicitly borrows CUDA addresses. */
 typedef struct beam_cnot_domain beam_cnot_domain;
 typedef struct beam_cnot_domain_config {
     uint32_t abi_version;
@@ -56,6 +57,26 @@ BEAM_CNOT_DOMAIN_API int beam_cnot_domain_first_unseen(beam_cnot_domain*, uint64
 BEAM_CNOT_DOMAIN_API int beam_cnot_domain_download_children(beam_cnot_domain*, int64_t*, uint64_t capacity_words);
 BEAM_CNOT_DOMAIN_API int beam_cnot_domain_download_owners(beam_cnot_domain*, int64_t*, uint64_t capacity);
 BEAM_CNOT_DOMAIN_API int beam_cnot_domain_download_selected(beam_cnot_domain*, int64_t*, uint64_t capacity);
+
+/* Optional extension ABI 1. A view describes borrowed device allocation
+ * memory; elements count int64 lanes, and reserved must be zero. The caller
+ * guarantees physical allocation bounds, accessibility from the domain CUDA
+ * context, and lifetime through the call. */
+typedef struct beam_cnot_device_view {
+    void* data;
+    uint64_t elements;
+    int32_t device;
+    uint32_t reserved;
+} beam_cnot_device_view;
+
+BEAM_CNOT_DOMAIN_API uint32_t beam_cnot_domain_device_abi_version(void);
+/* stream must be a valid CUDA stream of this context (NULL means the default
+ * stream). The caller makes inputs ready on that stream before the call and
+ * must not supply overlapping input/output regions. This operation completes
+ * the supplied stream before returning; no host data transfer is performed. */
+BEAM_CNOT_DOMAIN_API int beam_cnot_domain_owners_device(
+    beam_cnot_domain*, const beam_cnot_device_view* states, uint64_t state_count,
+    const beam_cnot_device_view* owners, void* stream);
 
 #ifdef __cplusplus
 }

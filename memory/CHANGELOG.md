@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-17 - Borrowed CUDA views for standalone CNOT ownership
+
+- Added an optional versioned device-view extension for the existing CNOT
+  owner kernel and its unsafe Rust boundary. It accepts caller-owned CUDA
+  allocations and a stream, validates declared extents, devices and overlap,
+  and synchronizes the stream before returning. The base host ABI and old
+  libraries remain supported. Public search and NCCL scheduling are unchanged.
+- Source-pinned one/two RTX 3060 checks, Rust tests, CUDA memcheck/racecheck,
+  833 Python tests and SM75/80/90/120 cross-compilation passed. Twelve Python
+  tests were skipped. The standalone extension is not yet connected to search.
+  The test diagnostics, continuation, hardware limits and provider release are
+  recorded in `test_results/refactor_20261117/STAGE_CNOT_BORROWED_DEVICE.md`.
+
 ## 2026-11-17 - Standalone Rust-owned CNOT CUDA domain
 
 - Added an optional versioned C ABI and Rust owner for the existing CNOT
