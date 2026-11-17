@@ -189,8 +189,7 @@ def _reconstruct(world, history, final, input_matrix):
         if target == world.rank:
             begin = (target * count + world.size - 1) // world.size
             edge.copy_(records[slot - begin])
-        if world.size > 1:
-            dist.broadcast(edge, target)
+        world.broadcast(edge, target)
         slot, route, owner = edge.tolist()
         source, move = divmod(route, 1 << 16)
         if source != slot * world.size // previous_count:

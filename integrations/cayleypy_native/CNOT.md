@@ -78,6 +78,20 @@ All ranks must select the same validator. The default remains `python`. This
 option moves input validation and final path replay only; the CNOT search loop,
 collectives, and checkpoint scorer still use the existing implementation.
 
+## Rust-owned CNOT control collectives, 2026-11-18
+
+When all ranks have the matching PyO3 module and a Stream 5 library advertising
+both the owned-exchange ABI and the additive int64-collectives ABI, the Rust
+Stream 5 communicator carries CNOT `sum`, fixed `all_gather`, and history-row
+`broadcast` calls as well as the existing variable-record exchange. Capability
+selection is collective: if any rank lacks either ABI, all ranks retain the
+previous Torch collective path. Tensor storage remains PyTorch-owned; the FFI
+borrows its device addresses on the current CUDA stream and records that stream
+before NCCL reads or writes the buffers. NCCL unique-ID bootstrap and the
+failure-only `all_gather_object` diagnostic remain on the caller's default
+process group. This transfers collective dispatch, not the full CNOT search or
+checkpoint scorer.
+
 Python callers can separately construct `TQPScorer` with
 `experimental_native_batch=True` to submit one borrowed score packet per call
 to a newly built scorer library. Its internal inference sub-packets and checks

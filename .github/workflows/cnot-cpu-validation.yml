@@ -14,6 +14,7 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/cnot_rust_stages.py
       - integrations/cayleypy_native/tests/test_cnot_search.py
       - integrations/cayleypy_native/tests/test_cnot_control_collectives.py
+      - integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
       - cuda/cnot_stream5_bridge.cu
       - integrations/cayleypy_native/CNOT.md
       - Cargo.toml
@@ -68,6 +69,9 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_search.py \
             integrations/cayleypy_native/tests/test_cnot_control_collectives.py \
             2>&1 | tee test_results/refactor_20261118/cnot-control-collectives/cnot-search-cpu.log
+      - name: Check the two-rank NCCL probe syntax
+        run: |
+          python -m py_compile integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
       - name: Upload test log
         if: always()
         uses: actions/upload-artifact@v4

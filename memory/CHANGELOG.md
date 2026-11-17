@@ -1768,3 +1768,20 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   workflow now waits for the runner-generated key to propagate and streams the
   archive over SSH stdin. This establishes the GitHub-to-Vast source path only;
   it does not validate a build or the local uncommitted descriptor fix.
+
+## 2026-11-18 - Rust-owned CNOT control collectives
+
+- Added a versioned additive C ABI for int64 NCCL all-reduce, fixed all-gather,
+  and broadcast on the existing Stream 5 communicator. Rust/PyO3 checks dense
+  CUDA tensor type, dtype, device, element count, current stream, and borrowed
+  buffer lifetime; CNOT rank-wide selection uses the Rust path only when every
+  rank advertises both exchange and collective ABIs. Older binaries retain the
+  Torch fallback.
+- Routed CNOT counters, fixed metadata gathers, and reconstruction history
+  broadcasts through that selected transport. NCCL-ID bootstrap and
+  failure-only diagnostics remain on the caller's process group.
+- Added a two-rank NCCL probe and GitHub Actions validation. The initial red
+  test run (44190504858) reported the expected 3 failures and 21 passes before
+  the implementation. The new implementation's CPU CI and GPU acceptance are
+  pending; the Vast workflow checks the existing instance and never starts or
+  rents it.

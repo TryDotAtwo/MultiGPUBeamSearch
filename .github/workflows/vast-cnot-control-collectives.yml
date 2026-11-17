@@ -1,0 +1,232 @@
+name: CNOT Rust control collectives on existing Vast
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/vast-cnot-control-collectives.yml
+      - cuda/cnot_stream5_bridge.cu
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_collectives.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_stream5.py
+      - integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
+      - rust/beam-native-sys/src/cnot_stream5.rs
+      - rust/beam-python/src/cnot_stream5.rs
+      - rust/beam-python/src/cnot_native_stages.rs
+      - Cargo.toml
+      - Cargo.lock
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vast-cnot-control-61080396
+  cancel-in-progress: false
+
+jobs:
+  control-collectives:
+    name: Build and exercise two-rank NCCL control collectives
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      VAST_INSTANCE_ID: "61080396"
+      SOURCE_SHA: ${{ github.sha }}
+      REMOTE_ROOT: /workspace/codex-cnot-control-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check the existing Vast instance without changing its state
+        id: status
+        env:
+          VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          instances="${RUNNER_TEMP}/vast-instances.json"
+          status="${RUNNER_TEMP}/vast-status.json"
+          if [[ -z "${VAST_API_KEY}" ]]; then
+            echo "VAST_API_KEY repository secret is missing." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 30 \
+            -H "Authorization: Bearer ${VAST_API_KEY}" \
+            -H "Accept: application/json" \
+            "https://console.vast.ai/api/v0/instances/" > "$instances"
+          python3 - "$VAST_INSTANCE_ID" "$instances" "$status" "$GITHUB_OUTPUT" <<'PY'
+          import datetime, json, sys
+          instance_id = int(sys.argv[1])
+          with open(sys.argv[2], encoding="utf-8") as source:
+              payload = json.load(source)
+          rows = payload.get("instances", []) if isinstance(payload, dict) else payload
+          matches = [row for row in rows if isinstance(row, dict) and str(row.get("id")) == str(instance_id)]
+          if len(matches) != 1:
+              raise SystemExit("Expected exactly one owned Vast instance")
+          row = matches[0]
+          def state(*names):
+              for name in names:
+                  value = row.get(name)
+                  if isinstance(value, dict):
+                      value = value.get("state") or value.get("status")
+                  if isinstance(value, str) and value:
+                      return value
+              return "unknown"
+          actual = state("actual_status", "status", "cur_state")
+          report = {
+              "instance_id": instance_id,
+              "checked_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "actual_status": actual,
+              "intended_status": state("intended_status"),
+              "gpu_name": row.get("gpu_name"),
+              "gpu_count": row.get("num_gpus"),
+              "gpu_test": "not_started" if actual.lower() == "running" else "skipped_instance_not_running",
+          }
+          with open(sys.argv[3], "w", encoding="utf-8") as output:
+              json.dump(report, output, indent=2)
+              output.write("\n")
+          with open(sys.argv[4], "a", encoding="utf-8") as output:
+              output.write(f"instance_running={'true' if actual.lower() == 'running' else 'false'}\n")
+          print(f"Instance {instance_id}: {actual}; GPU test: {report['gpu_test']}")
+          PY
+          if [[ "$(jq -r .gpu_test "$status")" == "skipped_instance_not_running" ]]; then
+            echo "No instance state change was attempted." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Check out the exact tested source
+        if: steps.status.outputs.instance_running == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Create code-only source archive
+        id: archive
+        if: steps.status.outputs.instance_running == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          archive="${RUNNER_TEMP}/beam-cnot-${SOURCE_SHA}.tar.gz"
+          tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native native rust src tools
+          echo "path=$archive" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Transfer, build, and run on the already-running instance
+        id: remote
+        if: steps.status.outputs.instance_running == 'true'
+        env:
+          VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+          ARCHIVE_PATH: ${{ steps.archive.outputs.path }}
+          ARCHIVE_SHA: ${{ steps.archive.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          key_file="${RUNNER_TEMP}/vast_cnot_ed25519"
+          known_hosts="${RUNNER_TEMP}/vast_cnot_known_hosts"
+          remote_log="${RUNNER_TEMP}/cnot-control-nccl.log"
+          trap 'rm -f "$key_file" "$key_file.pub" "$known_hosts"' EXIT
+          ssh-keygen -q -t ed25519 -N "" -C "codex-cnot-${VAST_INSTANCE_ID}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -f "$key_file"
+          public_key="$(cat "$key_file.pub")"
+          request="$(jq -cn --arg ssh_key "$public_key" '{ssh_key:$ssh_key}')"
+          curl --fail --silent --show-error --max-time 30 \
+            -X POST -H "Authorization: Bearer ${VAST_API_KEY}" \
+            -H "Content-Type: application/json" --data-binary "$request" --output /dev/null \
+            "https://console.vast.ai/api/v0/instances/${VAST_INSTANCE_ID}/ssh"
+          instances="${RUNNER_TEMP}/vast-instances.json"
+          host="$(jq -er --arg id "$VAST_INSTANCE_ID" '.instances[] | select((.id|tostring)==$id) | .public_ipaddr | select(type=="string" and length>0)' "$instances")"
+          port="$(jq -er --arg id "$VAST_INSTANCE_ID" '.instances[] | select((.id|tostring)==$id) | .ports["22/tcp"][0].HostPort | tostring | select(test("^[0-9]+$"))' "$instances")"
+          [[ "$host" =~ ^[0-9.]+$ ]]
+          [[ "$port" =~ ^[0-9]+$ ]]
+          key_blob="$(awk '{print $2}' "$key_file.pub")"
+          ssh_opts=(-i "$key_file" -p "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2)
+          ready=false
+          for attempt in {1..12}; do
+            if ssh "${ssh_opts[@]}" "root@${host}" true >/dev/null 2>"${RUNNER_TEMP}/vast-cnot-ssh.err"; then
+              ready=true
+              break
+            fi
+            sleep 5
+          done
+          [[ "$ready" == true ]] || { echo "SSH did not become ready; no instance state change was attempted." >&2; exit 1; }
+          remote_archive="${REMOTE_ROOT}.tar.gz"
+          ssh "${ssh_opts[@]}" "root@${host}" "cat > '${remote_archive}'" < "$ARCHIVE_PATH"
+          cat > "${RUNNER_TEMP}/run-cnot-control.sh" <<'REMOTE'
+          set -euo pipefail
+          source_dir="$1"
+          run_root="$2"
+          key_blob="$3"
+          remote_archive="$4"
+          expected_sha="$5"
+          source_sha="$6"
+          authorized=/root/.ssh/authorized_keys
+          cleanup() {
+            if [[ -f "$authorized" ]]; then
+              temp="${authorized}.codex.$$"
+              awk -v key="$key_blob" '{keep=1; for (i=1; i<=NF; i++) if ($i==key) keep=0; if (keep) print}' "$authorized" > "$temp" || return 0
+              chmod --reference="$authorized" "$temp" 2>/dev/null || chmod 600 "$temp"
+              chown --reference="$authorized" "$temp" 2>/dev/null || true
+              mv "$temp" "$authorized"
+            fi
+          }
+          trap cleanup EXIT
+          actual_sha="$(sha256sum "$remote_archive" | awk '{print $1}')"
+          [[ "$actual_sha" == "$expected_sha" ]] || { echo "Transferred source archive SHA-256 mismatch." >&2; exit 1; }
+          mkdir -p "$source_dir"
+          tar -xzf "$remote_archive" -C "$source_dir"
+          rm -f "$remote_archive"
+          run_test() {
+            set -euo pipefail
+            python_bin="$(command -v python3)"
+            command -v cargo >/dev/null
+            cd "$source_dir"
+            "$python_bin" - <<'PY'
+          import torch
+          if not torch.cuda.is_available() or torch.cuda.device_count() < 2:
+              raise SystemExit("two CUDA devices are required on the existing instance")
+          print("CUDA_DEVICE_COUNT=" + str(torch.cuda.device_count()))
+          PY
+            export CARGO_TARGET_DIR="${run_root}/cargo-target"
+            export PYO3_PYTHON="$python_bin"
+            cargo build --locked --release -p beam-python
+            extension="${CARGO_TARGET_DIR}/release/lib_beam_runtime.so"
+            test -s "$extension"
+            cp "$extension" "$source_dir/integrations/cayleypy_native/multigpubeamsearch/_beam_runtime.so"
+            export PYTHONPATH="$source_dir/integrations/cayleypy_native"
+            export TORCH_EXTENSIONS_DIR="${run_root}/torch-extensions"
+            export RUST_BACKTRACE=1
+            "$python_bin" -m torch.distributed.run --standalone --nproc_per_node=2 \
+              integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
+          }
+          log_dir="${run_root}/test_results/refactor_20261118/cnot-control-collectives"
+          mkdir -p "$log_dir"
+          run_test 2>&1 | tee "${log_dir}/cuda-nccl.log"
+          marker_count="$(grep -c 'CNOT_CONTROL_COLLECTIVES_OK' "${log_dir}/cuda-nccl.log")"
+          [[ "$marker_count" == 2 ]]
+          printf '{"source_sha":"%s","gpu_test":"passed","rank_markers":%s}\n' \
+            "$source_sha" "$marker_count" > "${log_dir}/receipt.json"
+          cat "${log_dir}/receipt.json"
+          REMOTE
+          if ! ssh "${ssh_opts[@]}" "root@${host}" \
+            "bash -s -- '${REMOTE_ROOT}/source' '${REMOTE_ROOT}' '${key_blob}' '${remote_archive}' '${ARCHIVE_SHA}' '${SOURCE_SHA}'" \
+            < "${RUNNER_TEMP}/run-cnot-control.sh" > "$remote_log" 2>&1; then
+            tail -n 100 "$remote_log"
+            exit 1
+          fi
+          cat "$remote_log"
+          marker_count="$(grep -c 'CNOT_CONTROL_COLLECTIVES_OK' "$remote_log")"
+          [[ "$marker_count" == 2 ]]
+          jq --arg sha "$SOURCE_SHA" --arg log "$remote_log" \
+            '.gpu_test="passed" | .source_sha=$sha | .rank_markers=2 | .runner_log=$log' \
+            "${RUNNER_TEMP}/vast-status.json" > "${RUNNER_TEMP}/vast-status-passed.json"
+          mv "${RUNNER_TEMP}/vast-status-passed.json" "${RUNNER_TEMP}/vast-status.json"
+      - name: Report a stopped instance without starting it
+        if: steps.status.outputs.instance_running != 'true'
+        shell: bash
+        run: |
+          echo "Two-rank NCCL test skipped: instance 61080396 is not running. No start, stop, or rent request was made." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sanitized status and remote test log
+        if: always() && steps.status.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vast-cnot-control-collectives-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/vast-status.json
+            ${{ runner.temp }}/cnot-control-nccl.log
+          if-no-files-found: warn
+          retention-days: 7

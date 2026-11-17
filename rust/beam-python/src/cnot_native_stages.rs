@@ -571,11 +571,7 @@ impl Backend for NativeStages<'_> {
         if target == self.rank {
             edge.call_method1("copy_", (records.bind(self.py).get_item(local_index)?,))?;
         }
-        if self.size > 1 {
-            self.py
-                .import("torch.distributed")?
-                .call_method1("broadcast", (&edge, target))?;
-        }
+        self.world.call_method1("broadcast", (&edge, target))?;
         let row: Vec<i64> = edge.call_method0("tolist")?.extract()?;
         if row.len() != 3 {
             return Err(PyValueError::new_err("invalid CNOT history edge"));

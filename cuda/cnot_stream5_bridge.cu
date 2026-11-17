@@ -1,6 +1,8 @@
 #include "stream5.hpp"
 
 #include <cuda_runtime.h>
+#include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <limits>
 #include <memory>
@@ -29,14 +31,21 @@ struct OwnedCommunicator {
     int world = 0;
 };
 
-OwnedCommunicator& exchange_owner(void* handle) {
+OwnedCommunicator& communicator_owner(void* handle) {
     if (!handle) throw std::invalid_argument("null Stream 5 communicator");
     auto& owner = *static_cast<OwnedCommunicator*>(handle);
     int current = -1;
-    require_cuda(cudaGetDevice(&current), "get exchange CUDA device");
+    require_cuda(cudaGetDevice(&current), "get Stream 5 CUDA device");
     if (current != owner.device)
         throw std::invalid_argument("current CUDA device differs from Stream 5 communicator device");
     return owner;
+}
+
+std::size_t checked_count(std::uint64_t count, std::uint32_t multiplier = 1) {
+    const auto maximum = std::numeric_limits<std::size_t>::max();
+    if (multiplier == 0 || count > maximum / multiplier)
+        throw std::overflow_error("Stream 5 collective element count exceeds addressable size");
+    return static_cast<std::size_t>(count);
 }
 
 template<typename Operation>
@@ -102,6 +111,7 @@ int cnot_s5_owned_close(void* handle, int abort) {
     });
 }
 int cnot_s5_owned_exchange_abi() { return 1; }
+int cnot_s5_owned_collectives_abi() { return 1; }
 int cnot_s5_owned_device(void* handle, int* device) {
     return checked([&] {
         if (!handle || !device) throw std::invalid_argument("null Stream 5 device argument");
@@ -112,7 +122,7 @@ int cnot_s5_owned_counts(void* handle, cudaStream_t stream,
                          const std::uint32_t* send, std::uint32_t* recv) {
     return checked([&] {
         if (!send || !recv) throw std::invalid_argument("null Stream 5 count buffer");
-        auto& owner = exchange_owner(handle);
+        auto& owner = communicator_owner(handle);
         beam::stream5_exchange_counts_nccl_cuda(send, recv, owner.rank, owner.world,
                                                  owner.comm, stream);
     });
@@ -123,11 +133,47 @@ int cnot_s5_owned_rows(void* handle, cudaStream_t stream, const void* send, void
     return checked([&] {
         if (!send || !recv || !send_counts || !recv_counts || !stride)
             throw std::invalid_argument("invalid Stream 5 payload argument");
-        auto& owner = exchange_owner(handle);
+        auto& owner = communicator_owner(handle);
         auto send_offsets = offsets(send_counts, owner.world);
         auto recv_offsets = offsets(recv_counts, owner.world);
         beam::stream5_exchange_u64_payload_nccl_cuda(send, recv, send_counts, send_offsets.data(),
             recv_counts, recv_offsets.data(), stride, owner.rank, owner.world, owner.comm, stream);
+    });
+}
+int cnot_s5_owned_allreduce_i64(void* handle, void* data, std::uint64_t count,
+                                void* raw_stream) {
+    return checked([&] {
+        auto& owner = communicator_owner(handle);
+        const auto elements = checked_count(count);
+        if (elements == 0) return;
+        if (!data) throw std::invalid_argument("null Stream 5 all-reduce buffer");
+        require_nccl(ncclAllReduce(data, data, elements, ncclInt64, ncclSum,
+                                   owner.comm, static_cast<cudaStream_t>(raw_stream)));
+    });
+}
+int cnot_s5_owned_allgather_i64(void* handle, const void* send, void* receive,
+                                std::uint64_t count, void* raw_stream) {
+    return checked([&] {
+        auto& owner = communicator_owner(handle);
+        const auto elements = checked_count(count, static_cast<std::uint32_t>(owner.world));
+        if (elements == 0) return;
+        if (!send || !receive)
+            throw std::invalid_argument("null Stream 5 all-gather buffer");
+        require_nccl(ncclAllGather(send, receive, static_cast<std::size_t>(count), ncclInt64,
+                                   owner.comm, static_cast<cudaStream_t>(raw_stream)));
+    });
+}
+int cnot_s5_owned_broadcast_i64(void* handle, void* data, std::uint64_t count,
+                                int root, void* raw_stream) {
+    return checked([&] {
+        auto& owner = communicator_owner(handle);
+        if (root < 0 || root >= owner.world)
+            throw std::invalid_argument("invalid Stream 5 broadcast root");
+        const auto elements = checked_count(count);
+        if (elements == 0) return;
+        if (!data) throw std::invalid_argument("null Stream 5 broadcast buffer");
+        require_nccl(ncclBcast(data, elements, ncclInt64, root, owner.comm,
+                               static_cast<cudaStream_t>(raw_stream)));
     });
 }
 int cnot_s5_counts(ncclComm_t comm, cudaStream_t stream, int rank, int world,

@@ -6,7 +6,7 @@ import torch.distributed as dist
 
 
 class World:
-    """Use the caller's default process group and the matrix's local device."""
+    """Use the caller's world ranks and local device for CNOT collectives."""
 
     def __init__(self, device):
         self.device = torch.device(device)
@@ -27,7 +27,7 @@ class World:
         return self
 
     def start_transport(self, *, prefer_rust):
-        """Choose one compatible transport for all ranks after engine admission."""
+        """Choose one exchange/control transport for all ranks after admission."""
         if self._stream5_library is None:
             return
         from .cnot_stream5 import RustStream5, Stream5
@@ -47,15 +47,28 @@ class World:
 
     def sum(self, tensor):
         if self.size > 1:
-            dist.all_reduce(tensor)
+            if self.transport is not None and hasattr(self.transport, "sum"):
+                self.transport.sum(tensor)
+            else:
+                dist.all_reduce(tensor)
         return tensor
 
     def gather_fixed(self, tensor):
         if self.size == 1:
             return tensor.unsqueeze(0)
+        if self.transport is not None and hasattr(self.transport, "gather_fixed"):
+            return self.transport.gather_fixed(tensor)
         parts = [torch.empty_like(tensor) for _ in range(self.size)]
         dist.all_gather(parts, tensor.contiguous())
         return torch.stack(parts)
+
+    def broadcast(self, tensor, source):
+        if self.size > 1:
+            if self.transport is not None and hasattr(self.transport, "broadcast"):
+                self.transport.broadcast(tensor, source)
+            else:
+                dist.broadcast(tensor, source)
+        return tensor
 
     def checked(self, stage, fn):
         """Coordinate local model/validation failures before peers enter the next exchange."""
@@ -84,7 +97,7 @@ class World:
                 part = result.narrow(0, begin, count)
                 if src == self.rank:
                     part.copy_(rows)
-                dist.broadcast(part, src)
+                self.broadcast(part, src)
             begin += count
         return result
 

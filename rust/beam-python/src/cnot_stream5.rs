@@ -33,6 +33,11 @@ impl PyStream5Library {
     }
 
     #[getter]
+    fn supports_collectives(&self) -> bool {
+        self.inner.supports_collectives()
+    }
+
+    #[getter]
     fn id_size(&self) -> usize {
         self.inner.id_size()
     }
@@ -75,6 +80,21 @@ impl PyStream5Communicator {
         world: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
         self.inner.validate_tensors(send, counts, world)
+    }
+
+    fn all_reduce_i64(&self, tensor: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.inner.all_reduce_i64(tensor)
+    }
+
+    fn all_gather_i64<'py>(
+        &self,
+        tensor: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        self.inner.all_gather_i64(tensor)
+    }
+
+    fn broadcast_i64(&self, tensor: &Bound<'_, PyAny>, source: u32) -> PyResult<()> {
+        self.inner.broadcast_i64(tensor, source)
     }
 
     fn exchange<'py>(

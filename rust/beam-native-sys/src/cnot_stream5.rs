@@ -36,11 +36,23 @@ type Rows = unsafe extern "C" fn(
     *const u32,
     u32,
 ) -> c_int;
+type AllReduceI64 =
+    unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut c_void) -> c_int;
+type AllGatherI64 =
+    unsafe extern "C" fn(*mut c_void, *const c_void, *mut c_void, u64, *mut c_void) -> c_int;
+type BroadcastI64 =
+    unsafe extern "C" fn(*mut c_void, *mut c_void, u64, c_int, *mut c_void) -> c_int;
 
 struct Exchange {
     device: Device,
     counts: Counts,
     rows: Rows,
+}
+
+struct Collectives {
+    all_reduce_i64: AllReduceI64,
+    all_gather_i64: AllGatherI64,
+    broadcast_i64: BroadcastI64,
 }
 
 struct Bindings {
@@ -51,6 +63,7 @@ struct Bindings {
     close: Close,
     last_error: LastError,
     exchange: Option<Exchange>,
+    collectives: Option<Collectives>,
 }
 
 impl Bindings {
@@ -129,6 +142,22 @@ impl Stream5Library {
                 }
                 Err(_) => None,
             };
+            let collectives = match library.get::<Version>(b"cnot_s5_owned_collectives_abi\0") {
+                Ok(version) => {
+                    let actual = version();
+                    if actual != 1 {
+                        return Err(Error(format!(
+                            "CNOT Stream 5 collectives ABI mismatch: required=1 available={actual}"
+                        )));
+                    }
+                    Some(Collectives {
+                        all_reduce_i64: symbol!("cnot_s5_owned_allreduce_i64", AllReduceI64),
+                        all_gather_i64: symbol!("cnot_s5_owned_allgather_i64", AllGatherI64),
+                        broadcast_i64: symbol!("cnot_s5_owned_broadcast_i64", BroadcastI64),
+                    })
+                }
+                Err(_) => None,
+            };
             Ok(Self(Rc::new(Bindings {
                 id_size: size as usize,
                 create_id: symbol!("cnot_s5_id", CreateId),
@@ -136,6 +165,7 @@ impl Stream5Library {
                 close: symbol!("cnot_s5_owned_close", Close),
                 last_error: symbol!("cnot_s5_error", LastError),
                 exchange,
+                collectives,
                 _library: library,
             })))
         }
@@ -143,6 +173,10 @@ impl Stream5Library {
 
     pub fn supports_exchange(&self) -> bool {
         self.0.exchange.is_some()
+    }
+
+    pub fn supports_collectives(&self) -> bool {
+        self.0.collectives.is_some()
     }
 
     pub fn id_size(&self) -> usize {
@@ -317,6 +351,41 @@ mod torch {
             Ok((exchange, ptr, device))
         }
 
+        fn collective_bindings(&self) -> PyResult<(&Collectives, NonNull<c_void>, i32)> {
+            let (_, ptr, device) = self.exchange_bindings()?;
+            let collectives = self.bindings.collectives.as_ref().ok_or_else(|| {
+                PyRuntimeError::new_err("CNOT Stream 5 collectives ABI is unavailable")
+            })?;
+            Ok((collectives, ptr, device))
+        }
+
+        fn control_tensor(tensor: &Bound<'_, PyAny>, device: i32) -> PyResult<(u64, bool)> {
+            let torch = tensor.py().import("torch")?;
+            if !tensor.get_type().as_any().is(&torch.getattr("Tensor")?) {
+                return Err(invalid("Stream 5 requires a plain torch.Tensor"));
+            }
+            if !tensor.getattr("is_cuda")?.extract::<bool>()? {
+                return Err(invalid("Stream 5 requires CUDA tensors"));
+            }
+            if !tensor.getattr("dtype")?.is(&torch.getattr("int64")?) {
+                return Err(invalid("Stream 5 tensor requires dtype int64"));
+            }
+            if !tensor.getattr("layout")?.is(&torch.getattr("strided")?) {
+                return Err(invalid("Stream 5 tensor requires strided storage"));
+            }
+            if tensor
+                .getattr("device")?
+                .getattr("index")?
+                .extract::<i32>()?
+                != device
+            {
+                return Err(invalid("Stream 5 tensor is on a different CUDA device"));
+            }
+            let count = tensor.call_method0("numel")?.extract::<u64>()?;
+            let contiguous = tensor.call_method0("is_contiguous")?.extract::<bool>()?;
+            Ok((count, contiguous))
+        }
+
         pub fn validate_tensors(
             &self,
             send: &Bound<'_, PyAny>,
@@ -445,6 +514,136 @@ mod torch {
                 return Err(PyRuntimeError::new_err(
                     self.bindings.error("exchange rows", code).to_string(),
                 ));
+            }
+            Ok(())
+        }
+
+        pub fn all_reduce_i64(&self, tensor: &Bound<'_, PyAny>) -> PyResult<()> {
+            let (collectives, ptr, device) = self.collective_bindings()?;
+            let (count, contiguous) = Self::control_tensor(tensor, device)?;
+            if count == 0 {
+                return Ok(());
+            }
+            let work = if contiguous {
+                tensor.clone()
+            } else {
+                tensor.call_method0("contiguous")?
+            };
+            let stream = current_stream(tensor.py(), device)?;
+            if !contiguous {
+                tensor.call_method1("record_stream", (&stream,))?;
+            }
+            let data = address(&work, &stream)?;
+            let raw_stream: usize = stream.getattr("cuda_stream")?.extract()?;
+            // SAFETY: work is a checked, stream-recorded PyTorch CUDA tensor;
+            // NCCL performs an in-place reduction on this borrowed allocation.
+            let code = unsafe {
+                (collectives.all_reduce_i64)(
+                    ptr.as_ptr(),
+                    data as *mut c_void,
+                    count,
+                    raw_stream as *mut c_void,
+                )
+            };
+            if code != 0 {
+                return Err(PyRuntimeError::new_err(
+                    self.bindings.error("all-reduce int64", code).to_string(),
+                ));
+            }
+            if !contiguous {
+                tensor.call_method1("copy_", (&work,))?;
+            }
+            Ok(())
+        }
+
+        pub fn all_gather_i64(&self, tensor: &Bound<'_, PyAny>) -> PyResult<Bound<'_, PyAny>> {
+            let (collectives, ptr, device) = self.collective_bindings()?;
+            let (count, contiguous) = Self::control_tensor(tensor, device)?;
+            let received = count
+                .checked_mul(u64::from(self.world))
+                .ok_or_else(|| invalid("Stream 5 fixed gather size overflow"))?;
+            let mut output_shape = vec![u64::from(self.world)];
+            output_shape.extend(tensor.getattr("shape")?.extract::<Vec<u64>>()?);
+            let output = tensor.call_method1("new_empty", (output_shape,))?;
+            if count == 0 {
+                return Ok(output);
+            }
+            let work = if contiguous {
+                tensor.clone()
+            } else {
+                tensor.call_method0("contiguous")?
+            };
+            let stream = current_stream(tensor.py(), device)?;
+            if !contiguous {
+                tensor.call_method1("record_stream", (&stream,))?;
+            }
+            let send = address(&work, &stream)?;
+            let receive = address(&output, &stream)?;
+            if send == receive {
+                return Err(invalid("Stream 5 fixed gather buffers overlap"));
+            }
+            let (output_count, _) = Self::control_tensor(&output, device)?;
+            if output_count != received {
+                return Err(invalid("Stream 5 fixed gather output size is invalid"));
+            }
+            let raw_stream: usize = stream.getattr("cuda_stream")?.extract()?;
+            // SAFETY: both buffers are checked, contiguous, stream-recorded
+            // tensors with the output sized for world * count int64 elements.
+            let code = unsafe {
+                (collectives.all_gather_i64)(
+                    ptr.as_ptr(),
+                    send as *const c_void,
+                    receive as *mut c_void,
+                    count,
+                    raw_stream as *mut c_void,
+                )
+            };
+            if code != 0 {
+                return Err(PyRuntimeError::new_err(
+                    self.bindings.error("all-gather int64", code).to_string(),
+                ));
+            }
+            Ok(output)
+        }
+
+        pub fn broadcast_i64(&self, tensor: &Bound<'_, PyAny>, source: u32) -> PyResult<()> {
+            let (collectives, ptr, device) = self.collective_bindings()?;
+            if source >= self.world {
+                return Err(invalid("Stream 5 broadcast source rank is invalid"));
+            }
+            let (count, contiguous) = Self::control_tensor(tensor, device)?;
+            if count == 0 {
+                return Ok(());
+            }
+            let work = if contiguous {
+                tensor.clone()
+            } else {
+                tensor.call_method0("contiguous")?
+            };
+            let stream = current_stream(tensor.py(), device)?;
+            if !contiguous {
+                tensor.call_method1("record_stream", (&stream,))?;
+            }
+            let data = address(&work, &stream)?;
+            let raw_stream: usize = stream.getattr("cuda_stream")?.extract()?;
+            // SAFETY: work is a checked, stream-recorded CUDA tensor; NCCL's
+            // in-place broadcast updates the same borrowed allocation on each rank.
+            let code = unsafe {
+                (collectives.broadcast_i64)(
+                    ptr.as_ptr(),
+                    data as *mut c_void,
+                    count,
+                    source as c_int,
+                    raw_stream as *mut c_void,
+                )
+            };
+            if code != 0 {
+                return Err(PyRuntimeError::new_err(
+                    self.bindings.error("broadcast int64", code).to_string(),
+                ));
+            }
+            if !contiguous {
+                tensor.call_method1("copy_", (&work,))?;
             }
             Ok(())
         }

@@ -71,7 +71,7 @@ class RustStream5:
             if cls is None:
                 return None
             library = cls(str(Path(lib._name).resolve(strict=True)))
-            return library if library.supports_exchange else None
+            return library if library.supports_exchange and library.supports_collectives else None
         except Exception:
             # Older prebuilt Stream 5 libraries and older PyO3 modules retain
             # the existing transport on every rank, selected collectively.
@@ -92,6 +92,17 @@ class RustStream5:
 
     def close(self, *, abort):
         self.comm.close(abort)
+
+    def sum(self, tensor):
+        self.comm.all_reduce_i64(tensor)
+        return tensor
+
+    def gather_fixed(self, tensor):
+        return self.comm.all_gather_i64(tensor)
+
+    def broadcast(self, tensor, source):
+        self.comm.broadcast_i64(tensor, source)
+        return tensor
 
     def exchange(self, send, counts):
         self.world.checked("validate Rust Stream 5 exchange",

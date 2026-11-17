@@ -6,7 +6,6 @@ are intentionally identical to the reference while the native CNOT stage
 backend is being migrated.
 """
 import torch
-import torch.distributed as dist
 
 from . import cnot_native as native
 from . import cnot
@@ -130,8 +129,7 @@ class CnotStages:
         edge = self.world.longs([0, 0, 0])
         if target == self.world.rank:
             edge.copy_(records[local_index])
-        if self.world.size > 1:
-            dist.broadcast(edge, target)
+        self.world.broadcast(edge, target)
         return tuple(edge.tolist())
 
     def verifies_construction(self, gates):
