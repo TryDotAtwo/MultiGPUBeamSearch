@@ -74,6 +74,7 @@ def main():
             old = cnot.search_cnot(root, WireFixture(undo), engine="python", **options)
             original_goal = cnot._goal
             original_checked = World.checked
+            original_exchange = World.exchange
             batch_helpers = {name: getattr(cnot, name) for name in ("_scores", "_expand", "_distinct")}
 
             def forbidden_goal(*args, **kwargs):
@@ -81,6 +82,9 @@ def main():
 
             def forbidden_batch(*args, **kwargs):
                 raise AssertionError("legacy Python CNOT batch helper was called")
+
+            def forbidden_exchange(*args, **kwargs):
+                raise AssertionError("legacy Python CNOT record exchange was called")
 
             def checked(world, stage, action):
                 if stage in {"initialize CNOT domain", "rank parent actions and expand",
@@ -90,6 +94,7 @@ def main():
 
             cnot._goal = forbidden_goal
             World.checked = checked
+            World.exchange = forbidden_exchange
             for name in batch_helpers:
                 setattr(cnot, name, forbidden_batch)
             try:
@@ -97,6 +102,7 @@ def main():
             finally:
                 cnot._goal = original_goal
                 World.checked = original_checked
+                World.exchange = original_exchange
                 for name, helper in batch_helpers.items():
                     setattr(cnot, name, helper)
             assert asdict(new) == asdict(old), (mode, len(rows), new, old)

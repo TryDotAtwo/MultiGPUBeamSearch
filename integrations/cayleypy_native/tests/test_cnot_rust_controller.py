@@ -214,6 +214,24 @@ def test_score_validation_error_matches_python_reference(stage, kind):
             "expected floating scores on cpu with shape") in errors[0]
 
 
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_search_owns_record_exchange_without_python_world(monkeypatch, mode):
+    require_controller()
+    from multigpubeamsearch.cnot_collectives import World
+
+    rows, scorer = (8, 4, 2, 1), WireFixture(9)
+    options = dict(width=5, shortlist=9, max_depth=4, mode=mode, audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+    assert reference.layers
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("legacy Python CNOT record exchange was called")
+
+    monkeypatch.setattr(World, "exchange", forbidden)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+    assert asdict(result) == asdict(reference)
+
+
 def distributed(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2,
@@ -228,6 +246,19 @@ def distributed(rank, rendezvous):
             assert asdict(old) == asdict(new)
             assert new.gates == (18592, 428)
             assert cnot.replay_cnot(len(rows), new.gates) == rows
+
+        from multigpubeamsearch.cnot_collectives import World
+        options = dict(width=1, shortlist=3, max_depth=3, mode="qhat", audit=True)
+        exchange_reference = cnot.search_cnot(cnot.pack_rows(rows), WireFixture(428), engine="python", **options)
+        original_exchange = World.exchange
+        def forbidden_exchange(*args, **kwargs):
+            raise AssertionError("legacy Python CNOT record exchange was called")
+        World.exchange = forbidden_exchange
+        try:
+            owned_exchange = cnot.search_cnot(cnot.pack_rows(rows), WireFixture(428), engine="rust", **options)
+            assert asdict(owned_exchange) == asdict(exchange_reference)
+        finally:
+            World.exchange = original_exchange
 
         from multigpubeamsearch import cnot_rust_stages
         legacy_calls = []

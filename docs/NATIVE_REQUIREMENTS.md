@@ -63,7 +63,9 @@ rank processes after their ABI/layout and specialization checks.
   sequences are Rust-owned while using the same Torch and domain operators;
   mixed operator availability on ranks must remain valid.
   Multi-rank CUDA send-packet grouping also uses C++ ATen when available;
-  stable owner ordering and the existing NCCL transport are retained.
+  stable owner ordering and the existing NCCL transport are retained. The
+  Rust stage backend orchestrates that exchange, including the old-operator
+  tensor fallback and the existing CPU/Gloo all-to-all sequence.
 - Rust-owned CNOT Stream 5 transport requires the existing ABI 1, owned ABI 1
   and exchange ABI 1, a valid native ID and rank geometry, and the same thread
   for initialization and close. After engine admission, all ranks choose the

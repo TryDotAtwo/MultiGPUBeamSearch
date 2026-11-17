@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-17 - Rust-owned CNOT record exchange orchestration
+
+- Moved the CNOT stage backend's stable record grouping and exchange dispatch
+  into Rust. The same C++ ATen or Torch packet operations, Stream 5 transport,
+  CPU/Gloo collectives, empty splits and rank ordering remain in use.
+- Source-pinned Rust, 95 focused CPU/Gloo/CUDA-controller, 62 CUDA and 835
+  Python integration tests passed (10 skipped). One/two RTX 3060 searches,
+  empty and mixed-operator NCCL exchanges and checkpoint scorers matched
+  their references. See `test_results/refactor_20261117/STAGE_CNOT_NATIVE_RECORD.md`
+  for evidence and remaining hardware limits.
+
 ## 2026-11-17 - Rust-owned CNOT batch orchestration
 
 - Moved score validation and the existing CPU/older-CUDA candidate expansion

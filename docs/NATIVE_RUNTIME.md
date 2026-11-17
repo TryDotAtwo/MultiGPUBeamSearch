@@ -51,6 +51,11 @@ transport only when every rank has its compatible exchange ABI. Otherwise all
 use the existing Python transport. The Python reference continues to use that
 transport; single-rank and CPU paths retain their original behavior.
 
+The Rust CNOT stage backend orchestrates record grouping and exchange, retaining
+the original stable Torch fallback for older CUDA operators and the same two
+CPU/Gloo all-to-all operations. It uses the existing selected Stream 5 transport
+when present; Torch still owns the tensors and the process group.
+
 Rust controls the two overflow votes, count exchange and payload exchange in
 the existing NCCL order. Its thread-bound owner validates the ABI, NCCL ID and
 rank geometry, keeps the native library loaded, and records the initialization

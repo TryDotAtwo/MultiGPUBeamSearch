@@ -4,6 +4,7 @@ mod cluster;
 mod cnot;
 mod cnot_native_batch;
 mod cnot_native_checked;
+mod cnot_native_exchange;
 mod cnot_native_goal;
 mod cnot_native_selection;
 mod cnot_native_stages;
@@ -128,6 +129,7 @@ fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ResidentWorkers>()?;
     cnot::register(module)?;
     cnot_native_checked::register(module)?;
+    cnot_native_exchange::register(module)?;
     cnot_native_goal::register(module)?;
     cnot_native_selection::register(module)?;
     cnot_native_stages::register(module)?;

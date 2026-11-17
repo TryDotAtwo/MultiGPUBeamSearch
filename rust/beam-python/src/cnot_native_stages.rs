@@ -2,7 +2,7 @@
 //!
 //! Tensor storage remains owned by PyTorch/CUDA. Existing ATen operators and
 //! rank collectives are invoked on the caller's thread in their former order.
-use crate::{cnot_native_batch, cnot_native_checked::checked};
+use crate::{cnot_native_batch, cnot_native_checked::checked, cnot_native_exchange};
 use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
@@ -216,10 +216,7 @@ impl<'py> NativeStages<'py> {
         rows: &Bound<'py, PyAny>,
         targets: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let kwargs = PyDict::new(self.py);
-        kwargs.set_item("native_packet", true)?;
-        self.world
-            .call_method("exchange", (rows, targets), Some(&kwargs))
+        cnot_native_exchange::exchange(self.py, &self.world, rows, targets)
     }
 
     fn fallback_winner_packet(
