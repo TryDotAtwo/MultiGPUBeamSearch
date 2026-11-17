@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-17 - Vast key validation and status publication
+
+- Confirmed the existing `VAST_API_KEY` Actions secret is populated and accepted by the read-only status request for instance 61080396. At 18:03 UTC it reported `exited`, intended `stopped`, with 2 x RTX 3060; no instance was started.
+- Added the missing `status` step id required by the conditional report publisher. Run 44143759674 uploaded the sanitized status artifact but skipped publishing the JSON to `test_results/remote-status/vast-status-latest.json`; a workflow rerun is pending.
+
 ## 2026-11-17 - Rust CNOT search descriptor validation and recovery test
 
 - Published the opt-in Rust CNOT search route for root ownership, batched child
