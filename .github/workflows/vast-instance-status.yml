@@ -1,0 +1,78 @@
+name: Vast instance status (read-only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+concurrency:
+  group: vast-status-61080396
+  cancel-in-progress: false
+
+jobs:
+  status:
+    name: Read Vast control-plane status
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Query the fixed instance
+        env:
+          VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+          VAST_INSTANCE_ID: "61080396"
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${VAST_API_KEY}" ]]; then
+            echo "VAST_API_KEY repository secret is missing." >&2
+            exit 1
+          fi
+          payload="$(curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 30 \
+            -H "Authorization: Bearer ${VAST_API_KEY}" \
+            -H "Accept: application/json" \
+            "https://console.vast.ai/api/v0/instances/")"
+          python3 -c '
+          import datetime, json, sys
+          instance_id = int(sys.argv[1])
+          payload = json.load(sys.stdin)
+          records = payload.get("instances", []) if isinstance(payload, dict) else payload
+          if not isinstance(records, list):
+              raise SystemExit("Unexpected Vast API response shape")
+          matches = [r for r in records if isinstance(r, dict) and str(r.get("id")) == str(instance_id)]
+          if len(matches) != 1:
+              raise SystemExit("Expected exactly one matching Vast instance")
+          row = matches[0]
+          def state(*names):
+              for name in names:
+                  value = row.get(name)
+                  if isinstance(value, dict):
+                      value = value.get("state") or value.get("status")
+                  if isinstance(value, str) and value:
+                      return value
+              return "unknown"
+          gpu_name = row.get("gpu_name")
+          if not isinstance(gpu_name, str):
+              gpu_name = "unknown"
+          gpu_count = row.get("num_gpus")
+          if not isinstance(gpu_count, int):
+              gpu_count = None
+          result = {
+              "instance_id": instance_id,
+              "checked_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "actual_status": state("actual_status", "status", "cur_state"),
+              "intended_status": state("intended_status"),
+              "gpu_name": gpu_name,
+              "gpu_count": gpu_count
+          }
+          json.dump(result, sys.stdout, indent=2)
+          sys.stdout.write("\\n")
+          ' "${VAST_INSTANCE_ID}" <<< "$payload" > "${RUNNER_TEMP}/vast-status.json"
+          jq -r '"Instance: \\(.instance_id)\\nActual status: \\(.actual_status)\\nIntended status: \\(.intended_status)\\nGPU: \\(.gpu_count // "unknown") x \\(.gpu_name)\\nChecked: \\(.checked_at_utc)"' \
+            "${RUNNER_TEMP}/vast-status.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sanitized status report
+        uses: actions/upload-artifact@v4
+        with:
+          name: vast-instance-status
+          path: ${{ runner.temp }}/vast-status.json
+          if-no-files-found: error
+          retention-days: 7
