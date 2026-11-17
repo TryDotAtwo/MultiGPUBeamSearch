@@ -632,4 +632,3 @@ fn run_cnot_native<'py>(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_cnot_native, module)?)
 }
-

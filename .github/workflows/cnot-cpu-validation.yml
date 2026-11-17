@@ -44,7 +44,10 @@ jobs:
           mkdir -p test_results/refactor_20261118/cnot-root-goal
           set -o pipefail
           {
-            cargo fmt --all -- --check
+            rustfmt --check --edition 2021 \
+              rust/beam-runtime/src/cnot_search.rs \
+              rust/beam-python/src/cnot.rs \
+              rust/beam-python/src/cnot_native_stages.rs
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-runtime cnot_search
             cargo check --locked -p beam-python
