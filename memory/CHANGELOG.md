@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-11-17 - Rust CNOT search descriptor validation and recovery test
+
+- Published the opt-in Rust CNOT search route for root ownership, batched child
+  generation and generated-child ownership through the existing borrowed CUDA
+  ABI. The default and CPU paths, scorer, numerical policy, full-matrix
+  deduplication, NCCL schedule and history behavior remain unchanged. This is
+  an incremental migration stage, not full CNOT or beam-search completion.
+- Replaced the borrowed expansion bridge's asynchronous device assertion with
+  descriptor range checks and host reads of one boolean per descriptor tensor.
+  An invalid descriptor returns before the native kernel and reaches the
+  existing rank-wide Rust stage vote.
+- The previous two-rank descriptor recovery command exited nonzero. Source
+  review found a likely test-target error: the test injected on the root hash
+  owner, while the initial expansion frontier is on rank 0; the fixture's
+  two-rank hash owner is rank 1. The test now injects on rank 0. This diagnosis
+  is source-derived because the full remote log remains on Vast; the corrected
+  rerun and same-group recovery are pending.
+- The read-only Vast status workflow now has a path-scoped main push trigger,
+  sanitized job output and a configured small status note in `test_results/`.
+  Its latest Actions result has not been read back, so current instance state
+  remains unconfirmed; no remote compute was started by this change.
+
 ## 2026-11-17 - Opt-in CNOT search device selection bridge
 
 - Connected the borrowed full-matrix first-unseen ABI to the Rust CNOT search
