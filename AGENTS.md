@@ -4,7 +4,7 @@
 - Read `AGENTS.md` before project edits.
 - Update `memory/CHANGELOG.md` after meaningful code, config, or architecture changes.
 - Update `memory/PROMPTS.md` with user prompts that define requirements.
-- Store test outputs, logs, and verification notes under `test_results/`.
+- Store test outputs and full logs in remote `test_results/` and GitHub Actions artifacts; keep only small source-controlled verification notes locally.
 - Prefer agent-centered code: explicit contracts, deterministic tests, small files, low hidden state.
 
 ## Architecture Source
@@ -21,8 +21,13 @@
 - Stream 3 payload id must be original candidate id, not compact index.
 - Stream 4 must not apply shard top-k or semantic shard cap.
 
-## Remote Compute and Local Storage
+## Local code only; execution through GitHub (2026-11-17)
 
-- The Windows checkout may contain repository source, code, configuration and documentation. Do not download datasets, model weights, checkpoints, logs, run results, build outputs or archives to the PC.
-- Run builds and remote commands through GitHub-hosted Linux Actions and the existing project Vast instance. Remote SSH/SCP may run only inside those Actions, never from the Windows checkout; do not open interactive windows for remote work.
-- Check the fixed instance's current status before remote access. Workflows must not start, stop or rent instances. Keep raw private logs on Vast and publish only sanitized summaries to Actions; never publish credentials.
+- This user instruction overrides older local-download and local-results guidance.
+- Windows may hold source code and small source-controlled project instructions. Do not download or create experiment datasets, model weights, checkpoints, result archives, runtime/build dependencies, binaries, or full execution logs on the user's computer, including both C: and D:.
+- Commit/publish code through GitHub. Dispatch remote work using GitHub Actions on GitHub-hosted Linux runners. Computation and experiment files remain on the project's remote compute/storage; publish reports and artifacts to GitHub without downloading them to Windows.
+- Do not run ssh/scp/sftp, local backup watchers, local compute, or self-hosted runners on the user's Windows computer. SSH/SCP between a GitHub-hosted runner and the owned remote instance is permitted.
+- Use background API/connector/gh calls for control and summaries. Do not open terminals, browsers, or other windows. If an authorized Windows helper is essential, use CREATE_NO_WINDOW / -WindowStyle Hidden and never give it a data-download path.
+- Respect the project's current resource ownership, budget, and pause state. A transport smoke check does not authorize renting or starting paid compute.
+- Preserve existing unique data and evidence. This policy is not permission for bulk deletion. Do not restart disabled legacy download/watch scripts.
+
