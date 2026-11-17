@@ -1,7 +1,8 @@
 # Native ownership and transfer register
 
-Status: implementation in progress; changes require the acceptance results in
-`test_results/refactor_20261107/`. The reference is main `0eafb193`.
+Status: implementation in progress; record acceptance evidence per stage under
+`test_results/`. Each source-pinned run identifies its exact base commit and
+overlays; successful compilation alone does not establish hardware acceptance.
 
 ## Process and ABI boundary
 
@@ -106,6 +107,8 @@ These are source-derived volumes; measured bus traffic must come from profiling.
 | Runner/helper files → hash accumulator | implementation-dependent bounded chunks | build and helper verification | content binding; separate from the Python MLP validation above |
 | GPU error/solution records → host | valid diagnostic/solution count | error or solution | retain complete records and path replay checks |
 | History entry routing host ↔ GPU/NCCL ↔ host | requested 16-byte entries plus routing fields | distributed path reconstruction | necessary cross-rank dependency; preserve rank/local-index identity |
+| Torch-owned CNOT matrices/descriptors ↔ borrowed C ABI kernels | matrix words, parent indices, physical move IDs and owner outputs | explicit `MGBS_CNOT_OWNED_LIBRARY` CUDA route | same-rank device views; no per-state H2D/D2H copy; `.contiguous()` may materialize only noncontiguous inputs; native call completes before tensor handles are released |
+| CNOT descriptor range checks → host | one boolean per parent-index tensor and move tensor per expansion batch | explicit borrowed-device CNOT expansion | intentional scalar synchronization before the native call; returns an ordinary rank-local error for the existing collective vote, with no per-descriptor copy |
 | Caller-provided `NativeModel` files → private run `weights` | sum of selected artifact-file bytes | every nontrivial public call by default | experimental session reuse can retain an explicit MLP snapshot; source and retained bytes are revalidated |
 | Managed runner → private run executable | runner file bytes | first call and each incompatible session relaunch; every non-session call | private executable snapshot, verified against the build receipt |
 | Build-pinned NCCL library → private run library | NCCL library file bytes | first call and each incompatible session relaunch; every non-session call | private loader snapshot, verified against the build receipt; a repeated session still verifies its source identity |
@@ -127,3 +130,12 @@ two-RTX-3060 synthetic fixture the revised option did not establish a full-call
 speedup; it remains off by default. The existing loader
 still opens mutable files after the last host-side verification; the bytes it
 reads are not bound atomically to that verification against concurrent writes.
+
+The CNOT device row is an ABI boundary, not a separate buffer owner: PyTorch
+owns the tensors, the rank-local Rust context borrows checked device views only
+for the synchronous C++/CUDA call, and no pointer crosses ranks. Tensor and
+descriptor preparation and candidate metadata concatenation remain visible
+operations in the Python/Torch-compatible stage. This migration stage does not
+claim those operations were removed or that the complete search performs fewer
+bytes.
+
