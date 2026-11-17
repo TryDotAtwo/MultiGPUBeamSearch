@@ -183,18 +183,26 @@ jobs:
           status_path, remote_path, output_path, running, outcome = sys.argv[1:]
           with open(status_path, encoding="utf-8") as source:
               result = json.load(source)
-          if os.path.isfile(remote_path):
-              with open(remote_path, encoding="utf-8") as source:
-                  result.update(json.load(source))
+          remote = None
+          if os.path.isfile(remote_path) and os.path.getsize(remote_path) > 0:
+              try:
+                  with open(remote_path, encoding="utf-8") as source:
+                      remote = json.load(source)
+                  if not isinstance(remote, dict):
+                      remote = None
+              except (OSError, json.JSONDecodeError):
+                  remote = None
+          if remote is not None:
+              result.update(remote)
           elif running == "true":
-              result["remote_read"] = "failed" if outcome == "failure" else "unavailable"
+              result["remote_read"] = "failed" if outcome in ("failure", "success") else "unavailable"
           else:
               result["remote_read"] = "skipped_instance_not_running"
           with open(output_path, "w", encoding="utf-8") as output:
               json.dump(result, output, indent=2)
               output.write("\n")
           PY
-          jq -r '"Vast instance: \\(.instance_id)\\nActual status: \\(.actual_status)\\nRemote read: \\(.remote_read)\\nDescriptor log found: \\(.descriptor_log.exists // false)\\nFailure stage: \\(.failed_at // "not reported")\\nExit code: \\(.exit_code // "not reported")"' \
+          jq -r '"Vast instance: \(.instance_id)\nActual status: \(.actual_status)\nRemote read: \(.remote_read)\nDescriptor log found: \(.descriptor_log.exists // false)\nFailure stage: \(.failed_at // "not reported")\nExit code: \(.exit_code // "not reported")"' \
             "${RUNNER_TEMP}/vast-cnot-descriptor-report.json" >> "$GITHUB_STEP_SUMMARY"
           echo "Sanitized descriptor status report:"
           jq -c '{instance_id,actual_status,intended_status,remote_read,status_file,descriptor_log,failed_at,exit_code,markers}' \
