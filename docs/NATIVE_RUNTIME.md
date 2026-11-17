@@ -207,7 +207,10 @@ Rust `ResidentWorkers` owns only its launched process groups, atomic job/complet
 files, sequence, deadline, cancellation token and log merge. A rank exit ends the
 whole group. A two-second cleanup grace period precedes process-group termination
 when a worker cannot leave an external collective. Paths and serialized states
-are the process boundary; a GPU address is never a message payload.
+are the process boundary; a GPU address is never a message payload. Public native
+dispatch selects this Rust owner by default when the matching extension and worker
+are installed. Old installations and explicit `NativeSession(engine="python")`
+continue through the Python compatibility owner; `engine="rust"` fails closed.
 
 The current native engine still uses process environment, cwd and stdout. Run it
 in the dedicated worker, not in a notebook/Python process that owns CUDA tensors.

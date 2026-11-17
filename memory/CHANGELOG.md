@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-18 - Rust владелец публичных native-сессий по умолчанию
+
+- Публичный native dispatch и `NativeSession()` теперь выбирают Rust-владельца
+  ранговых работников, когда доступны совместимый PyO3 API и `beam-runner`.
+  Старые установки автоматически сохраняют прежний Python-владелец; доступны
+  явные `engine="python"` и `engine="rust"`.
+- Выбор проверяет API и исполняемый worker до подготовки модели и CUDA-сборки.
+  `backend="torch"` остаётся без изменений. Подготовка модели, калибровка и
+  вычислительный C++/CUDA runner ещё не перенесены этим шагом.
+- CPU RED/GREEN workflow и публичное описание миграции добавлены отдельно;
+  multi-GPU/GPU подтверждение для нового default-selection route остаётся
+  обязательным перед объявлением всей миграции завершённой.
+
 ## 2026-11-17 - Vast key validation and status publication
 
 - Confirmed the existing `VAST_API_KEY` Actions secret is populated and accepted by the read-only status request for instance 61080396. At 18:03 UTC it reported `exited`, intended `stopped`, with 2 x RTX 3060; no instance was started.

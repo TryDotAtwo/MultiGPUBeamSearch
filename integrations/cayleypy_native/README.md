@@ -743,21 +743,23 @@ session.close()  # Release GPUs when finished.
 The explicit call does not require `enable_native()`. Do not recreate `session`
 in the search cell if the intent is to reuse it across cell executions.
 
-An experimental alternative routes the session's resident rank workers and
-terminal validation through Rust:
+`NativeSession()` selects the Rust owner when the installed package contains
+the matching PyO3 extension and `beam-runner` worker. A direct native search
+also creates a temporary Rust session when no explicit session is active.
+Older installations retain the Python-owned compatibility path; pass
+`engine="python"` to keep that path explicitly or `engine="rust"` to require
+the Rust owner:
 
 ```python
 session = NativeSession(engine="rust")
 ```
 
-It uses the same `session.beam_search(...)` and `close()` calls. The first
-nontrivial search requires the matching packaged Rust extension and worker, a
-managed source build and its dependencies; it builds and verifies the C ABI
-library on demand. An externally supplied `runner_path` is not supported by
-this experimental mode. Model preparation and calibration still use the
-existing Python path. The default `NativeSession()` remains unchanged while
-the Rust path is compared on real workloads; this option is not a performance
-claim.
+The same `session.beam_search(...)` and `close()` calls apply in either mode.
+The first nontrivial Rust-owned search uses the managed source build and its
+dependencies; it builds and verifies the C ABI library on demand. An externally
+supplied `runner_path` is not supported by the Rust owner. Model preparation
+and calibration still use the existing Python path. This is a runtime ownership
+transition, not a performance claim.
 
 An independent experimental option can reduce repeated host-side NCCL identity
 checks for managed builds and prepared runners with NCCL provenance:

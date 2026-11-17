@@ -1,4 +1,4 @@
-"""Experimental bridge from the public session to Rust-owned rank processes."""
+"""Bridge a public session to Rust-owned rank processes."""
 from __future__ import annotations
 
 import json

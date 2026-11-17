@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import threading
 
-from .errors import NativeBackendError
+from .errors import NativeBackendError, NativeUnavailable
 from .model_snapshot import requires_mlp_host_binding
 from .options import NativeOutcome
 
@@ -18,11 +18,30 @@ def current_session():
     return _ACTIVE.get()
 
 
+def _rust_resident_available():
+    """Check for the complete Rust session surface without loading CUDA."""
+    from .rust_control import extension, worker_executable
+
+    try:
+        module = extension()
+        if (not hasattr(module, 'SearchSession')
+                or getattr(module, 'SEARCH_TERMINAL_RESULT_VERSION', None) != 1):
+            return False
+        worker_executable()
+        return True
+    except NativeUnavailable:
+        return False
+
+
 class NativeSession:
     """Keep compatible native workers alive inside ``with NativeSession():``.
 
     Graph/model/runner/topology/beam/depth/options changes release the old
     worker group before recalibration. Concurrent or nested use is rejected.
+    The default selects the Rust owner when its matching runtime and worker
+    are installed; otherwise it retains the Python owner. Pass
+    ``engine="python"`` to force the compatibility owner or
+    ``engine="rust"`` to require Rust.
     Exiting the context, including on exceptions, frees all owned workers.
     The experimental NCCL identity option retains block digests per session;
     every repeated check rereads the complete library.
@@ -31,10 +50,12 @@ class NativeSession:
     Experimental Rust MLP finite validation is separately opt-in and only
     applies to the Rust-owned model snapshot path.
     """
-    def __init__(self, *, engine="python", experimental_parallel_nccl_identity=False,
+    def __init__(self, *, engine="auto", experimental_parallel_nccl_identity=False,
                  experimental_reuse_model_snapshot=False, experimental_rust_mlp_finite=False):
-        if engine not in ("python", "rust"):
-            raise ValueError("engine must be 'python' or 'rust'")
+        if engine not in ("auto", "python", "rust"):
+            raise ValueError("engine must be 'auto', 'python', or 'rust'")
+        if engine == 'auto':
+            engine = 'rust' if _rust_resident_available() else 'python'
         if type(experimental_parallel_nccl_identity) is not bool:
             raise ValueError("experimental_parallel_nccl_identity must be a boolean")
         if type(experimental_reuse_model_snapshot) is not bool:

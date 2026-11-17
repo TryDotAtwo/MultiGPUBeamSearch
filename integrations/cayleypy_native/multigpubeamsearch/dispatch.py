@@ -180,11 +180,24 @@ def _discard_fallback_run(run_dir: Path | None) -> None:
 
 def _search(original, graph, kwargs, options, mode):
     from .persistent import current_session
+    mode = _mode(mode)
     session = current_session()
     if session is None:
+        if mode in ("native", "auto") and _rust_resident_available():
+            from .persistent import NativeSession
+
+            with NativeSession(engine="rust") as rust_session:
+                with rust_session.search_scope():
+                    return _search_impl(original, graph, kwargs, options, mode)
         return _search_impl(original, graph, kwargs, options, mode)
     with session.search_scope():
         return _search_impl(original, graph, kwargs, options, mode)
+
+
+def _rust_resident_available():
+    from .persistent import _rust_resident_available as available
+
+    return available()
 
 
 def _search_impl(original, graph, kwargs, options, mode):

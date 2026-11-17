@@ -10,6 +10,9 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/dispatch.py
       - integrations/cayleypy_native/multigpubeamsearch/persistent.py
       - integrations/cayleypy_native/tests/test_rust_default_owner.py
+      - integrations/cayleypy_native/tests/test_dispatch.py
+      - integrations/cayleypy_native/tests/test_persistent_search.py
+      - integrations/cayleypy_native/tests/test_rust_persistent_search.py
 
 permissions:
   contents: read
@@ -34,7 +37,11 @@ jobs:
         run: |
           mkdir -p test_results/refactor_20261118/rust-public-owner
           set -o pipefail
-          python -m pytest -q integrations/cayleypy_native/tests/test_rust_default_owner.py \
+          python -m pytest -q \
+            integrations/cayleypy_native/tests/test_rust_default_owner.py \
+            integrations/cayleypy_native/tests/test_dispatch.py \
+            integrations/cayleypy_native/tests/test_persistent_search.py \
+            integrations/cayleypy_native/tests/test_rust_persistent_search.py \
             2>&1 | tee test_results/refactor_20261118/rust-public-owner/pytest.log
       - name: Upload test results
         if: always()

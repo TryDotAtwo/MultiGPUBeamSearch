@@ -143,6 +143,10 @@ rank processes after their ABI/layout and specialization checks.
   request invalidates an unconsumed predecessor. Reject an older PyO3 module
   without terminal-result protocol version 1 before building the native library.
   Per-run terminal metadata must not inherit stale rank or collection fields.
+- Unscoped public native searches and `NativeSession()` select the Rust session
+  owner when the matching PyO3 API and packaged `beam-runner` are present.
+  Missing optional Rust runtime files retain the legacy Python owner; explicit
+  `engine="python"` selects it and `engine="rust"` fails closed.
 - All-rank admission preserves the exact requested beam; alignment affects physical
   capacities. Buffer overflow reports required/available sizes, never a smaller search.
 - Stream4 uses threshold, compaction, fixed-scratch sort/reduce and compaction;
