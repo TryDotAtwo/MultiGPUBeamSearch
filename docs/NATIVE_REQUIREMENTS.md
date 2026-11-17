@@ -43,6 +43,13 @@ rank processes after their ABI/layout and specialization checks.
   and stream context. It does not transfer matrices or owners through the host.
   The extension is optional for compatibility with the base ABI and does not
   yet replace any stage of the public search.
+- An additive borrowed-expansion operation accepts int64 parent indices and
+  int64 or uint16 moves. The caller guarantees valid descriptor values and
+  output/input non-overlap; invalid CUDA descriptors retain the existing
+  kernel's device-error behavior. The optional device-only context owns its
+  thread-bound stream and configured capacities without allocating host-ABI
+  stage buffers; host operations on it return an error. The old full context
+  and libraries remain supported. This operation is not yet in public search.
 - A logical Hash128 uses every bit, ordered by high half then low half. CandidateMeta
   remains 32 bytes and aligned to 32. Stream3 retains original candidate IDs.
 - Persistent permutation padding stays zero. CNOT packed matrices retain their

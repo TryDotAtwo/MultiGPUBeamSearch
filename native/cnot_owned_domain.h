@@ -59,9 +59,9 @@ BEAM_CNOT_DOMAIN_API int beam_cnot_domain_download_owners(beam_cnot_domain*, int
 BEAM_CNOT_DOMAIN_API int beam_cnot_domain_download_selected(beam_cnot_domain*, int64_t*, uint64_t capacity);
 
 /* Optional extension ABI 1. A view describes borrowed device allocation
- * memory; elements count int64 lanes, and reserved must be zero. The caller
- * guarantees physical allocation bounds, accessibility from the domain CUDA
- * context, and lifetime through the call. */
+ * memory; elements count lanes of the type specified by the operation, and
+ * reserved must be zero. The caller guarantees physical allocation bounds,
+ * accessibility from the domain CUDA context, and lifetime through the call. */
 typedef struct beam_cnot_device_view {
     void* data;
     uint64_t elements;
@@ -70,13 +70,32 @@ typedef struct beam_cnot_device_view {
 } beam_cnot_device_view;
 
 BEAM_CNOT_DOMAIN_API uint32_t beam_cnot_domain_device_abi_version(void);
-/* stream must be a valid CUDA stream of this context (NULL means the default
- * stream). The caller makes inputs ready on that stream before the call and
+/* states and owners contain int64 lanes. stream must be a valid CUDA stream of
+ * this context (NULL means the default stream). The caller makes inputs ready
+ * on that stream before the call and
  * must not supply overlapping input/output regions. This operation completes
  * the supplied stream before returning; no host data transfer is performed. */
 BEAM_CNOT_DOMAIN_API int beam_cnot_domain_owners_device(
     beam_cnot_domain*, const beam_cnot_device_view* states, uint64_t state_count,
     const beam_cnot_device_view* owners, void* stream);
+
+/* Optional additive device operations. The device-only context retains its
+ * configured capacities but does not allocate host-ABI buffers or CUB scratch;
+ * host-buffer operations return BEAM_CNOT_DOMAIN_INVALID on that context. */
+BEAM_CNOT_DOMAIN_API int beam_cnot_domain_create_device(
+    const beam_cnot_domain_config*, beam_cnot_domain**);
+
+/* Parents, indices and children contain int64 lanes. Moves contain int64
+ * lanes when moves_are_u16=0 and uint16 lanes when it is 1. Each parent index
+ * and physical move must be valid. Output must not overlap an input. The same
+ * stream, lifetime, ordering and synchronous-return rules as owners_device
+ * apply; invalid CUDA descriptor values retain the kernel's device-error
+ * behavior. No host data transfer is performed. */
+BEAM_CNOT_DOMAIN_API int beam_cnot_domain_children_device(
+    beam_cnot_domain*, const beam_cnot_device_view* parents, uint64_t parent_count,
+    const beam_cnot_device_view* indices, const beam_cnot_device_view* moves,
+    uint32_t moves_are_u16, uint64_t child_count, const beam_cnot_device_view* children,
+    void* stream);
 
 #ifdef __cplusplus
 }

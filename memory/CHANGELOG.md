@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-17 - Borrowed CNOT child generation
+
+- Added an optional device-only CNOT context and borrowed CUDA expansion using
+  the existing kernel and int64/uint16 move formats. Caller-owned buffers and
+  stream remain subject to explicit bounds, lifetime, descriptor and ordering
+  contracts; older libraries and the full host-buffer context remain supported.
+  This is standalone and does not switch public search or alter NCCL.
+- Two RTX 3060s passed CPU-oracle tests, Rust ownership checks and CUDA
+  memcheck/racecheck. One/two-GPU search and native checkpoint scorer checks,
+  the Rust workspace and 835 Python tests passed; 10 Python tests were skipped.
+  See `test_results/refactor_20261117/STAGE_CNOT_BORROWED_EXPANSION.md` for
+  source-bound logs, the corrected compatibility fixture and hardware limits.
+
 ## 2026-11-17 - Borrowed CUDA views for standalone CNOT ownership
 
 - Added an optional versioned device-view extension for the existing CNOT

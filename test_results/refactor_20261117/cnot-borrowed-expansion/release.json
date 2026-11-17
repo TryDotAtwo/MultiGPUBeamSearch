@@ -1,0 +1,15 @@
+{
+  "instance": 61002149,
+  "label": "codex-cnot-borrowed-expansion-20261117",
+  "before": {
+    "id": 61002149,
+    "label": "codex-cnot-borrowed-expansion-20261117",
+    "actual_status": "running",
+    "duration": 1047.1889686584473,
+    "dph_total": 0.13155555555555556,
+    "start_date": 1794881088.9038846
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794882152.227998
+}

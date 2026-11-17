@@ -98,6 +98,7 @@ struct beam_cnot_domain {
     std::uint64_t parent_count = 0, closed_count = 0, child_count = 0, selected_count = 0;
     bool parents_valid = false, closed_valid = false, descriptors_valid = false;
     bool children_valid = false, owners_valid = false, selected_valid = false, poisoned = false;
+    bool device_only = false;
 
     cudaError_t release() noexcept {
         cudaError_t first = cudaSuccess;
@@ -130,10 +131,11 @@ template<class T> void allocate(T*& target, std::size_t bytes, const char* name)
     target = static_cast<T*>(raw);
 }
 
-template<class F> void use(beam_cnot_domain* ctx, F&& f, bool allow_poisoned = false) {
+template<class F> void use(beam_cnot_domain* ctx, F&& f, bool allow_device_only = false) {
     require(ctx != nullptr, invalid, "null CNOT domain context");
     require(ctx->thread == std::this_thread::get_id(), wrong_thread, "CNOT domain used from a different thread");
-    require(allow_poisoned || !ctx->poisoned, cuda_failure, "CNOT domain is invalid after a CUDA failure");
+    require(!ctx->poisoned, cuda_failure, "CNOT domain is invalid after a CUDA failure");
+    require(allow_device_only || !ctx->device_only, invalid, "host stages unavailable on device-only CNOT domain");
     try {
         DeviceGuard guard(ctx->config.device);
         f();
@@ -167,13 +169,14 @@ void download(beam_cnot_domain* ctx, const std::int64_t* source, std::int64_t* d
 }
 
 void device_view(beam_cnot_domain* ctx, const beam_cnot_device_view* view,
-                 std::uint64_t required, const char* name) {
+                 std::uint64_t required, const char* name,
+                 std::size_t alignment = alignof(std::int64_t)) {
     require(view != nullptr, invalid, std::string(name) + " view is null");
     require(view->reserved == 0, invalid, std::string(name) + " reserved field must be zero");
     require(view->device == ctx->config.device, invalid, std::string(name) + " device differs from context");
     input(view->data, required, view->elements, name);
     if (!required) return;
-    require(reinterpret_cast<std::uintptr_t>(view->data) % alignof(std::int64_t) == 0,
+    require(reinterpret_cast<std::uintptr_t>(view->data) % alignment == 0,
             invalid, std::string(name) + " address is not aligned");
     cudaPointerAttributes attrs{};
     const auto status = cudaPointerGetAttributes(&attrs, view->data);
@@ -186,16 +189,16 @@ void device_view(beam_cnot_domain* ctx, const beam_cnot_device_view* view,
             invalid, std::string(name) + " is not on the context device");
 }
 
-void disjoint(const beam_cnot_device_view& states, std::uint64_t state_words,
-              const beam_cnot_device_view& owners, std::uint64_t owner_count) {
-    if (!state_words || !owner_count) return;
-    const auto state_bytes = multiply(state_words, sizeof(std::int64_t), "device state bytes");
-    const auto owner_bytes = multiply(owner_count, sizeof(std::int64_t), "device owner bytes");
-    const auto a = reinterpret_cast<std::uintptr_t>(states.data);
-    const auto b = reinterpret_cast<std::uintptr_t>(owners.data);
+void disjoint(const beam_cnot_device_view& first, std::uint64_t first_count, std::size_t first_width,
+              const beam_cnot_device_view& second, std::uint64_t second_count, std::size_t second_width) {
+    if (!first_count || !second_count) return;
+    const auto first_bytes = multiply(first_count, first_width, "device view bytes");
+    const auto second_bytes = multiply(second_count, second_width, "device view bytes");
+    const auto a = reinterpret_cast<std::uintptr_t>(first.data);
+    const auto b = reinterpret_cast<std::uintptr_t>(second.data);
     constexpr auto max = std::numeric_limits<std::uintptr_t>::max();
-    require(state_bytes <= max - a && owner_bytes <= max - b, invalid, "device view address range overflow");
-    require(!(a < b + owner_bytes && b < a + state_bytes), invalid, "device input and output overlap");
+    require(first_bytes <= max - a && second_bytes <= max - b, invalid, "device view address range overflow");
+    require(!(a < b + second_bytes && b < a + first_bytes), invalid, "device input and output overlap");
 }
 
 void same_stream_context(cudaStream_t owned_stream, cudaStream_t stream) {
@@ -217,30 +220,32 @@ void same_stream_context(cudaStream_t owned_stream, cudaStream_t stream) {
 extern "C" std::uint32_t beam_cnot_domain_abi_version() { return 1; }
 extern "C" const char* beam_cnot_domain_error() { return last_error; }
 
-extern "C" int beam_cnot_domain_create(const beam_cnot_domain_config* config, beam_cnot_domain** out) {
-    return boundary([&] {
-        require(out != nullptr, invalid, "null CNOT domain output pointer");
-        *out = nullptr;
-        require(config != nullptr, invalid, "null CNOT domain config");
-        require(config->abi_version == 1 && config->struct_size == sizeof(*config), invalid,
-                "CNOT domain ABI version or config size mismatch");
-        require(config->reserved == 0, invalid, "CNOT domain reserved field must be zero");
-        require(config->device >= 0 && config->n >= 2 && config->n <= 256, invalid,
-                "invalid CNOT device or qubit count");
-        require(config->world >= 1 && config->world <= 65536, invalid, "invalid CNOT world size");
-        constexpr auto max_ordinal = static_cast<std::uint64_t>(std::numeric_limits<int>::max());
-        room(config->child_capacity, max_ordinal, "child ordinal capacity");
-        room(config->closed_capacity, max_ordinal - config->child_capacity, "closed ordinal capacity");
-        const std::size_t stride = static_cast<std::size_t>(config->n) * beam::cnot::words_per_row(config->n);
-        const auto parent_bytes = multiply(multiply(config->parent_capacity, stride, "parents"), 8, "parents");
-        const auto closed_bytes = multiply(multiply(config->closed_capacity, stride, "closed"), 8, "closed");
-        const auto child_bytes = multiply(multiply(config->child_capacity, stride, "children"), 8, "children");
-        const auto vec_bytes = multiply(config->child_capacity, 8, "child vector");
-        const auto ord_bytes = multiply(config->closed_capacity + config->child_capacity, sizeof(int), "ordinals");
-        DeviceGuard guard(config->device);
-        auto ctx = std::make_unique<beam_cnot_domain>();
-        ctx->config = *config; ctx->stride = stride; ctx->thread = std::this_thread::get_id();
-        cuda_check(cudaStreamCreateWithFlags(&ctx->stream, cudaStreamNonBlocking), "create CNOT stream");
+namespace {
+void create_context(const beam_cnot_domain_config* config, beam_cnot_domain** out, bool device_only) {
+    require(out != nullptr, invalid, "null CNOT domain output pointer");
+    *out = nullptr;
+    require(config != nullptr, invalid, "null CNOT domain config");
+    require(config->abi_version == 1 && config->struct_size == sizeof(*config), invalid,
+            "CNOT domain ABI version or config size mismatch");
+    require(config->reserved == 0, invalid, "CNOT domain reserved field must be zero");
+    require(config->device >= 0 && config->n >= 2 && config->n <= 256, invalid,
+            "invalid CNOT device or qubit count");
+    require(config->world >= 1 && config->world <= 65536, invalid, "invalid CNOT world size");
+    constexpr auto max_ordinal = static_cast<std::uint64_t>(std::numeric_limits<int>::max());
+    room(config->child_capacity, max_ordinal, "child ordinal capacity");
+    room(config->closed_capacity, max_ordinal - config->child_capacity, "closed ordinal capacity");
+    const std::size_t stride = static_cast<std::size_t>(config->n) * beam::cnot::words_per_row(config->n);
+    const auto parent_bytes = multiply(multiply(config->parent_capacity, stride, "parents"), 8, "parents");
+    const auto closed_bytes = multiply(multiply(config->closed_capacity, stride, "closed"), 8, "closed");
+    const auto child_bytes = multiply(multiply(config->child_capacity, stride, "children"), 8, "children");
+    const auto vec_bytes = multiply(config->child_capacity, 8, "child vector");
+    const auto ord_bytes = multiply(config->closed_capacity + config->child_capacity, sizeof(int), "ordinals");
+    DeviceGuard guard(config->device);
+    auto ctx = std::make_unique<beam_cnot_domain>();
+    ctx->config = *config; ctx->stride = stride; ctx->thread = std::this_thread::get_id();
+    ctx->device_only = device_only;
+    cuda_check(cudaStreamCreateWithFlags(&ctx->stream, cudaStreamNonBlocking), "create CNOT stream");
+    if (!device_only) {
         allocate(ctx->parents, parent_bytes, "parents");
         allocate(ctx->closed, closed_bytes, "closed");
         allocate(ctx->children, child_bytes, "children");
@@ -257,9 +262,18 @@ extern "C" int beam_cnot_domain_create(const beam_cnot_domain_config* config, be
                 config->n, ctx->ordinals, ctx->flags, ctx->selected, ctx->count, ctx->stream), "query CUB scratch");
             allocate(ctx->temp, std::max<std::size_t>(1, ctx->temp_bytes), "CUB scratch");
         }
-        guard.restore();
-        *out = ctx.release();
-    });
+    }
+    guard.restore();
+    *out = ctx.release();
+}
+} // namespace
+
+extern "C" int beam_cnot_domain_create(const beam_cnot_domain_config* config, beam_cnot_domain** out) {
+    return boundary([&] { create_context(config, out, false); });
+}
+
+extern "C" int beam_cnot_domain_create_device(const beam_cnot_domain_config* config, beam_cnot_domain** out) {
+    return boundary([&] { create_context(config, out, true); });
 }
 
 extern "C" int beam_cnot_domain_destroy(beam_cnot_domain* ctx) {
@@ -385,7 +399,7 @@ extern "C" int beam_cnot_domain_owners_device(beam_cnot_domain* ctx, const beam_
         const auto words = multiply(count, ctx->stride, "device state words");
         device_view(ctx, states, words, "states");
         device_view(ctx, owners, count, "owners");
-        disjoint(*states, words, *owners, count);
+        disjoint(*states, words, sizeof(std::int64_t), *owners, count, sizeof(std::int64_t));
         const auto stream = reinterpret_cast<cudaStream_t>(raw_stream);
         same_stream_context(ctx->stream, stream);
         cuda_check(cudaStreamSynchronize(ctx->stream), "drain CNOT domain stream");
@@ -394,5 +408,40 @@ extern "C" int beam_cnot_domain_owners_device(beam_cnot_domain* ctx, const beam_
             ctx->config.n, ctx->config.world, static_cast<std::int64_t*>(owners->data), stream),
             "compute borrowed CNOT owners");
         completion.finish();
-    }); });
+    }, true); });
+}
+
+extern "C" int beam_cnot_domain_children_device(
+    beam_cnot_domain* ctx, const beam_cnot_device_view* parents, std::uint64_t parent_count,
+    const beam_cnot_device_view* indices, const beam_cnot_device_view* moves,
+    std::uint32_t moves_are_u16, std::uint64_t child_count, const beam_cnot_device_view* children,
+    void* raw_stream) {
+    return boundary([&] { use(ctx, [&] {
+        room(parent_count, ctx->config.parent_capacity, "device parent capacity");
+        room(parent_count, static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()),
+             "device parent count");
+        room(child_count, ctx->config.child_capacity, "device child capacity");
+        require(moves_are_u16 <= 1, invalid, "invalid device move type");
+        require(!child_count || parent_count, invalid, "cannot expand an empty parent frontier");
+        const auto parent_words = multiply(parent_count, ctx->stride, "device parent words");
+        const auto child_words = multiply(child_count, ctx->stride, "device child words");
+        const auto move_width = moves_are_u16 ? sizeof(std::uint16_t) : sizeof(std::int64_t);
+        device_view(ctx, parents, parent_words, "parents");
+        device_view(ctx, indices, child_count, "indices");
+        device_view(ctx, moves, child_count, "moves", move_width);
+        device_view(ctx, children, child_words, "children");
+        disjoint(*parents, parent_words, sizeof(std::int64_t), *children, child_words, sizeof(std::int64_t));
+        disjoint(*indices, child_count, sizeof(std::int64_t), *children, child_words, sizeof(std::int64_t));
+        disjoint(*moves, child_count, move_width, *children, child_words, sizeof(std::int64_t));
+        const auto stream = reinterpret_cast<cudaStream_t>(raw_stream);
+        same_stream_context(ctx->stream, stream);
+        cuda_check(cudaStreamSynchronize(ctx->stream), "drain CNOT domain stream");
+        HostBorrow completion(stream);
+        cuda_check(beam::cnot::launch_children(static_cast<const std::int64_t*>(parents->data),
+            static_cast<std::int64_t>(parent_count), ctx->config.n,
+            static_cast<const std::int64_t*>(indices->data), moves->data, moves_are_u16 != 0,
+            static_cast<std::int64_t>(child_count), static_cast<std::int64_t*>(children->data), stream),
+            "expand borrowed CNOT children");
+        completion.finish();
+    }, true); });
 }

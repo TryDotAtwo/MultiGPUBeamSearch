@@ -23,11 +23,20 @@ drains its owned stream, and synchronizes the supplied stream before returning.
 The library cannot prove the bounds of foreign allocations. Older libraries
 without this optional extension still load and report it unavailable.
 
-This remains standalone, not the backend of `search_cnot`. Expansion, distinct,
-scorer lifetimes and the rank transport still need integration before the new
+An additive device-only context avoids allocating the base ABI's private
+stage buffers. It supports borrowed owner and child-generation operations;
+host-buffer stages return an error. Borrowed expansion accepts int64 parent
+indices and int64 or uint16 moves, calls the existing CUDA kernel, and applies
+the same stream and memory rules as the owner operation. The caller also
+guarantees valid descriptor values and no output/input overlap. Invalid CUDA
+descriptors keep the existing device-error behavior. The new symbols are
+optional when loading older libraries.
+
+This remains standalone, not the backend of `search_cnot`. Distinct, scorer
+lifetimes and the rank transport still need integration before the new
 owner can be used by the public search. The existing GPU-resident Torch stages
 and process collectives remain the production path. See
-`test_results/refactor_20261117/STAGE_CNOT_BORROWED_DEVICE.md` for validation.
+`test_results/refactor_20261117/STAGE_CNOT_BORROWED_EXPANSION.md` for validation.
 
 ## CNOT controller transition
 

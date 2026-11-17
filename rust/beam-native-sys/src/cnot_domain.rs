@@ -54,8 +54,19 @@ type DeviceOwners = unsafe extern "C" fn(
     *const DeviceView,
     *mut c_void,
 ) -> c_int;
+type DeviceChildren = unsafe extern "C" fn(
+    *mut c_void,
+    *const DeviceView,
+    u64,
+    *const DeviceView,
+    *const DeviceView,
+    u32,
+    u64,
+    *const DeviceView,
+    *mut c_void,
+) -> c_int;
 
-/// A non-owning CUDA address and its declared size in int64 elements.
+/// A non-owning CUDA address and its declared size in operation-specific elements.
 /// Constructing this value does not validate or dereference the address.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -77,6 +88,14 @@ impl DeviceView {
     }
 }
 
+/// Element type used for the physical CNOT move IDs of a borrowed expansion.
+#[derive(Clone, Copy, Debug)]
+#[repr(u32)]
+pub enum DeviceMoveType {
+    I64 = 0,
+    U16 = 1,
+}
+
 struct Bindings {
     _library: Library,
     last_error: LastError,
@@ -92,6 +111,8 @@ struct Bindings {
     download_owners: Download,
     download_selected: Download,
     device_owners: Option<DeviceOwners>,
+    create_device: Option<Create>,
+    device_children: Option<DeviceChildren>,
 }
 
 impl Bindings {
@@ -157,6 +178,19 @@ impl DomainLibrary {
                     }
                     Err(_) => None,
                 };
+            let create_device = library
+                .get::<Create>(b"beam_cnot_domain_create_device\0")
+                .ok()
+                .map(|symbol| *symbol);
+            let device_children = library
+                .get::<DeviceChildren>(b"beam_cnot_domain_children_device\0")
+                .ok()
+                .map(|symbol| *symbol);
+            if create_device.is_some() != device_children.is_some()
+                || (create_device.is_some() && device_owners.is_none())
+            {
+                return Err(Error("incomplete CNOT device expansion ABI".into()));
+            }
             Ok(Self(Rc::new(Bindings {
                 last_error: symbol!("beam_cnot_domain_error", LastError),
                 create: symbol!("beam_cnot_domain_create", Create),
@@ -171,6 +205,8 @@ impl DomainLibrary {
                 download_owners: symbol!("beam_cnot_domain_download_owners", Download),
                 download_selected: symbol!("beam_cnot_domain_download_selected", Download),
                 device_owners,
+                create_device,
+                device_children,
                 _library: library,
             })))
         }
@@ -180,7 +216,24 @@ impl DomainLibrary {
         self.0.device_owners.is_some()
     }
 
+    pub fn supports_device_expansion(&self) -> bool {
+        self.0.create_device.is_some() && self.0.device_children.is_some()
+    }
+
     pub fn create(&self, config: Config) -> Result<Domain> {
+        self.create_with(config, self.0.create)
+    }
+
+    /// Create a context for borrowed device operations without host-ABI buffers.
+    pub fn create_device(&self, config: Config) -> Result<Domain> {
+        let create = self
+            .0
+            .create_device
+            .ok_or_else(|| Error("CNOT domain library lacks device expansion support".into()))?;
+        self.create_with(config, create)
+    }
+
+    fn create_with(&self, config: Config, create: Create) -> Result<Domain> {
         if !(2..=256).contains(&config.n) {
             return Err(Error("invalid CNOT qubit count".into()));
         }
@@ -199,7 +252,7 @@ impl DomainLibrary {
         let mut raw = std::ptr::null_mut();
         // SAFETY: config and output are valid for this blocking call; the
         // checked ABI either returns an owned context or a failure.
-        let code = unsafe { (self.0.create)(&native, &mut raw) };
+        let code = unsafe { create(&native, &mut raw) };
         self.0.check("create", code)?;
         let ptr =
             NonNull::new(raw).ok_or_else(|| Error("CNOT domain create returned null".into()))?;
@@ -212,7 +265,8 @@ impl DomainLibrary {
     }
 }
 
-/// Owns one CUDA device's buffers and stream on its creating thread.
+/// Owns one CUDA device's stream and, for a full context, its internal buffers.
+/// All operations and destruction remain on the creating thread.
 ///
 /// ```compile_fail
 /// fn requires_send<T: Send>() {}
@@ -307,6 +361,51 @@ impl Domain {
         // and stream ordering; this call synchronizes before returning.
         let code = unsafe { call(self.raw(), &states, count, &owners, stream) };
         self.api.check("device owners", code)
+    }
+
+    /// Expand CNOT children directly in caller-owned CUDA storage.
+    ///
+    /// # Safety
+    /// All views must describe live, correctly sized, contiguous allocations
+    /// accessible from this domain's CUDA context and remain valid until the
+    /// call returns. Parents and children contain int64 matrix words; indices
+    /// contain int64 parent IDs; moves contain elements of `move_type`.
+    /// Every index and physical move must be in range, and the output region
+    /// must not overlap any input. `stream` must be a live same-context stream
+    /// (null is the default), with all input producers ordered before the call.
+    /// The caller prevents concurrent conflicting access. CUDA addresses are
+    /// not dereferenced by Rust and must not be transferred to another rank.
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn expand_device(
+        &mut self,
+        parents: DeviceView,
+        parent_count: u64,
+        indices: DeviceView,
+        moves: DeviceView,
+        move_type: DeviceMoveType,
+        child_count: u64,
+        children: DeviceView,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let call = self.api.device_children.ok_or_else(|| {
+            Error("CNOT domain library lacks the device-expansion extension".into())
+        })?;
+        // SAFETY: the caller supplies the documented CUDA lifetimes, extents,
+        // valid descriptors and stream ordering; native synchronizes on return.
+        let code = unsafe {
+            call(
+                self.raw(),
+                &parents,
+                parent_count,
+                &indices,
+                &moves,
+                move_type as u32,
+                child_count,
+                &children,
+                stream,
+            )
+        };
+        self.api.check("device expansion", code)
     }
 
     pub fn children(&mut self) -> Result<Vec<i64>> {
