@@ -61,7 +61,7 @@ def replay_cnot(n, gates):
     return tuple(rows)
 
 
-def _input(root, width, shortlist, depth, mode, validation="python"):
+def _input(root, width, shortlist, depth, mode, validation="auto"):
     if root.dtype != torch.int64 or root.ndim != 3 or root.shape[0] != 1:
         raise ValueError("expected one packed int64 matrix [1,n,ceil(n/64)]")
     n, words = root.shape[1:]
@@ -72,20 +72,26 @@ def _input(root, width, shortlist, depth, mode, validation="python"):
         raise ValueError("invalid global width, shortlist, or depth")
     if mode not in ("qhat", "proposal"):
         raise ValueError("mode must be qhat or proposal")
-    if validation not in ("python", "rust"):
-        raise ValueError("validation must be python or rust")
+    if validation not in ("auto", "python", "rust"):
+        raise ValueError("validation must be auto, python, or rust")
     # Validate and search the same owned tensor. The caller may reuse or mutate
     # its tensor after admission; a contiguous() call alone can still alias it.
     snapshot = root.detach().clone(memory_format=torch.contiguous_format)
     raw = snapshot.cpu().numpy().tobytes()
-    if validation == "rust":
+    if validation != "python":
         from .errors import NativeUnavailable
         from .rust_control import extension
 
-        matrix_type = getattr(extension(), "CnotMatrix", None)
-        if matrix_type is None:
+        try:
+            matrix_type = getattr(extension(), "CnotMatrix", None)
+        except NativeUnavailable:
+            if validation == "rust":
+                raise
+            matrix_type = None
+        if matrix_type is not None:
+            return _InputMatrix(n, raw, snapshot, rust_matrix=matrix_type(n, raw))
+        if validation == "rust":
             raise NativeUnavailable("Rust runtime lacks CNOT input validation; rebuild the matching PyO3 module")
-        return _InputMatrix(n, raw, snapshot, rust_matrix=matrix_type(n, raw))
     rows = tuple(int.from_bytes(raw[i:i + 8 * words], "little") for i in range(0, len(raw), 8 * words))
     if any(row.bit_length() > n for row in rows):
         raise ValueError("nonzero CNOT row padding")
@@ -245,15 +251,17 @@ def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation, e
 @torch.inference_mode(False)
 @torch.no_grad()
 def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit=False,
-                validation="python", engine="auto"):
+                validation="auto", engine="auto"):
     """Run collectively on the initialized world, or directly on one CPU/GPU.
 
     Every rank supplies the same root, limits and weights. Each rank binds its
     own scorer to its local GPU. Audit records full candidate/winner matrices
-    only when requested for small acceptance runs. ``validation="rust"``
-    selects the optional Rust input and construction-path validator. The
-    default engine uses the Rust search controller when installed; ``python``
-    retains the reference controller and ``rust`` requires the extension.
+    only when requested for small acceptance runs. ``validation="auto"`` uses
+    Rust input and construction-path validation when available, with Python as
+    the compatibility fallback. ``python`` forces the reference and ``rust``
+    fails closed when the extension lacks the validator. The default engine
+    uses the Rust search controller when installed; ``python`` retains the
+    reference controller and ``rust`` requires the extension.
     Tensor operations, scorer callbacks and collectives are unchanged.
     """
     with World(root.device) as world:
