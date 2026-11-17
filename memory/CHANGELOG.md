@@ -1685,3 +1685,23 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 
 - Added Actions workflows for read-only status of fixed Vast instance 61080396 and for reading a sanitized descriptor report only when that existing instance is running. The report contains status, file metadata and selected error-marker flags; raw remote logs remain on Vast. No instance start/stop or GPU work was performed.
 - [Status run 44126220804](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44126220804) and [descriptor-report run 44129242777](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44129242777) completed successfully. The remote descriptor log predates the current uncommitted descriptor-validation change and still contains the earlier async assertion markers; it does not validate that change.
+## 2026-11-17 - Pinned source transfer to Vast
+
+- The GitHub-hosted workflow checked out published source commit
+  f83b5b658358c5df5067f03dfbb970b2e7551e4e with a code-only sparse checkout,
+  archived CMake/Rust/CUDA/native source and integration code, and transferred
+  it through the Actions runner to the already-running Vast instance. The
+  remote SHA-256 and byte count matched; required source files were present.
+  The archive was unpacked into an isolated, run-specific directory and no
+  build or beam search was launched.
+- Successful transfer run 44132499312:
+  https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44132499312
+  uploaded a 420-byte receipt artifact with SHA-256
+  c4795b7ae89362009ad95608752edb86e3d124327c8e3ddb0fc7428dd406109c. The
+  transferred archive was 811626 bytes with SHA-256
+  3dc6a3ecc3c7e7dcd80fda306d73ee010cd0efd959e2bdededb2daad6100126a;
+  the report counted 457 files.
+- The first SCP attempt failed before remote verification (exit 255). The
+  workflow now waits for the runner-generated key to propagate and streams the
+  archive over SSH stdin. This establishes the GitHub-to-Vast source path only;
+  it does not validate a build or the local uncommitted descriptor fix.
