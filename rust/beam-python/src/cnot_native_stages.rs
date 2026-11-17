@@ -115,9 +115,43 @@ impl<'py> NativeStages<'py> {
         }
     }
 
-    fn expand_batch(&self, begin: u64, k: u32) -> PyResult<Bound<'py, PyAny>> {
+    fn ensure_device_domain(&mut self, tensor: &Bound<'py, PyAny>) -> PyResult<bool> {
+        if !tensor.getattr("is_cuda")?.extract::<bool>()? {
+            return Ok(false);
+        }
+        let Some(path) = &self.device_domain_path else {
+            return Ok(false);
+        };
+        if self.device_domain.is_none() {
+            let device = tensor.getattr("device")?.getattr("index")?.extract()?;
+            self.device_domain = Some(beam_native_sys::cnot_device_bridge::DeviceDomain::load(
+                path,
+                device,
+                self.n as i32,
+                self.size as i32,
+            )?);
+        }
+        Ok(true)
+    }
+
+    fn expand_batch(&mut self, begin: u64, k: u32) -> PyResult<Bound<'py, PyAny>> {
         let parents = required(&self.parents, "parents")?;
         let lex = required(&self.lex, "lex")?;
+        if self.ensure_device_domain(&parents)? {
+            return cnot_native_batch::expand(
+                self.py,
+                &self.world,
+                &parents,
+                &lex,
+                begin,
+                &self.scorer,
+                &self.mode,
+                k,
+                self.n,
+                self.words,
+                self.device_domain.as_mut(),
+            );
+        }
         let ops = self.ops(&parents)?;
         let native = match &ops {
             Some(ops) => ops.hasattr("expand_candidates")?,
@@ -166,6 +200,7 @@ impl<'py> NativeStages<'py> {
                 k,
                 self.n,
                 self.words,
+                None,
             )
         }
     }
@@ -173,29 +208,17 @@ impl<'py> NativeStages<'py> {
     fn distinct_batch(&mut self) -> PyResult<Bound<'py, PyAny>> {
         let incoming = required(&self.incoming, "incoming")?;
         let closed = required(&self.closed, "closed")?;
-        if incoming.getattr("is_cuda")?.extract::<bool>()? {
-            if let Some(path) = &self.device_domain_path {
-                if self.device_domain.is_none() {
-                    let device = incoming.getattr("device")?.getattr("index")?.extract()?;
-                    self.device_domain =
-                        Some(beam_native_sys::cnot_device_bridge::DeviceDomain::load(
-                            path,
-                            device,
-                            self.n as i32,
-                            self.size as i32,
-                        )?);
-                }
-                return cnot_native_batch::distinct(
-                    self.py,
-                    &self.world,
-                    &incoming,
-                    &closed,
-                    self.n,
-                    self.words,
-                    &self.scorer,
-                    self.device_domain.as_mut(),
-                );
-            }
+        if self.ensure_device_domain(&incoming)? {
+            return cnot_native_batch::distinct(
+                self.py,
+                &self.world,
+                &incoming,
+                &closed,
+                self.n,
+                self.words,
+                &self.scorer,
+                self.device_domain.as_mut(),
+            );
         }
         let ops = self.ops(&incoming)?;
         let native = match &ops {
@@ -301,10 +324,19 @@ impl Backend for NativeStages<'_> {
         });
         let initial: Vec<i64> = if self.rank == 0 { vec![0] } else { Vec::new() };
         self.lex = Some(self.world.call_method1("longs", (initial,))?);
+        let root = self.root.clone();
         let owner = (|| {
-            self.native()?
-                .call_method1("cnot_owners", (&self.root, self.size))?
-                .call_method0("item")
+            if self.ensure_device_domain(&root)? {
+                let domain = self
+                    .device_domain
+                    .as_mut()
+                    .ok_or_else(|| PyRuntimeError::new_err("CNOT device domain is unavailable"))?;
+                domain.owners(self.py, &root)?.call_method0("item")
+            } else {
+                self.native()?
+                    .call_method1("cnot_owners", (&root, self.size))?
+                    .call_method0("item")
+            }
         })();
         let owner: u32 =
             checked(self.py, &self.world, "initialize CNOT domain", owner)?.extract()?;
@@ -331,11 +363,12 @@ impl Backend for NativeStages<'_> {
     }
 
     fn expand(&mut self, begin: u64, k: u32) -> PyResult<()> {
+        let batch = self.expand_batch(begin, k);
         let pair = checked(
             self.py,
             &self.world,
             "rank parent actions and expand",
-            self.expand_batch(begin, k),
+            batch,
         )?;
         self.candidates = Some(pair.get_item(0)?);
         self.owners = Some(pair.get_item(1)?);
@@ -592,3 +625,4 @@ fn run_cnot_native<'py>(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_cnot_native, module)?)
 }
+
