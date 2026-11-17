@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 3
     steps:
       - name: Query the fixed instance
+        id: status
         env:
           VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
           VAST_INSTANCE_ID: "61080396"
