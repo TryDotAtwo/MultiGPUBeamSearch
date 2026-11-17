@@ -22,8 +22,14 @@
   инициализации ранговых стадий и возвращает прежний `solved` с пустым путем,
   без слоев и маршрутов; Python reference route сохранён.
 - Добавлены CPU Rust/Python проверки и сохранение полных логов CNOT workflow в
-  `test_results/refactor_20261118/cnot-root-goal/`. GPU/NCCL acceptance этим
-  изменением не заявляется.
+  `test_results/refactor_20261118/cnot-root-goal/`. RED run 44184512164
+  подтвердил пропущенный Rust-вызов (1 failed, 19 passed). GREEN run
+  44186094978 проверил 3 `beam-core` CNOT tests, 4 Rust controller tests,
+  `cargo check -p beam-python` и 20 Python tests. Artifact 14375525292 имеет
+  SHA-256 `a9a783ccf03cf7caa6080fb3a7d4083c4671a2066dbaf80e2bd7bf220b295299`.
+- Промежуточный run 44185419853 остановился до тестов из-за workspace-wide
+  rustfmt-разниц, включая два неизменённых файла; проверка ограничена тремя
+  изменёнными Rust-файлами. Это hosted CPU evidence, не CUDA/NCCL acceptance.
 
 ## 2026-11-17 - Vast key validation and status publication
 
