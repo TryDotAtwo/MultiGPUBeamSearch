@@ -65,9 +65,9 @@ jobs:
               "gpu_count": gpu_count
           }
           json.dump(result, sys.stdout, indent=2)
-          sys.stdout.write("\\n")
+          sys.stdout.write("\n")
           ' "${VAST_INSTANCE_ID}" <<< "$payload" > "${RUNNER_TEMP}/vast-status.json"
-          jq -r '"Instance: \\(.instance_id)\\nActual status: \\(.actual_status)\\nIntended status: \\(.intended_status)\\nGPU: \\(.gpu_count // "unknown") x \\(.gpu_name)\\nChecked: \\(.checked_at_utc)"' \
+          jq -r '"Instance: \(.instance_id)\nActual status: \(.actual_status)\nIntended status: \(.intended_status)\nGPU: \(.gpu_count // "unknown") x \(.gpu_name)\nChecked: \(.checked_at_utc)"' \
             "${RUNNER_TEMP}/vast-status.json" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload sanitized status report
         uses: actions/upload-artifact@v4
