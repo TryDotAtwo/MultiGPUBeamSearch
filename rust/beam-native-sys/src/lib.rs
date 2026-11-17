@@ -1,5 +1,7 @@
 //! The only crate permitted to dereference native FFI pointers.
 use libloading::Library;
+#[cfg(feature = "python")]
+pub mod cnot_device_bridge;
 pub mod cnot_domain;
 pub mod cnot_stream5;
 pub mod history;

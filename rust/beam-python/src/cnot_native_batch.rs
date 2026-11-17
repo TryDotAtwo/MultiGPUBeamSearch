@@ -126,6 +126,7 @@ pub(crate) fn distinct<'py>(
     n: i64,
     words: i64,
     scorer: &Bound<'py, PyAny>,
+    device_domain: Option<&mut beam_native_sys::cnot_device_bridge::DeviceDomain>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let torch = py.import("torch")?;
     let native = py.import("multigpubeamsearch.cnot_native")?;
@@ -138,7 +139,10 @@ pub(crate) fn distinct<'py>(
         .get_item((slice(py, None, None)?, slice(py, Some(4), None)?))?
         .call_method1("reshape", (-1, n, words))?
         .call_method0("contiguous")?;
-    let first = native.call_method1("cnot_first_unseen", (closed, &children))?;
+    let first = match device_domain {
+        Some(domain) => domain.first_unseen(py, closed, &children)?,
+        None => native.call_method1("cnot_first_unseen", (closed, &children))?,
+    };
     let children = children.get_item(&first)?;
     let meta = incoming.get_item((&first, slice(py, None, Some(4))?))?;
     let device = world.getattr("device")?;

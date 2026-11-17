@@ -41,11 +41,18 @@ child batches set the device count to zero. The call synchronizes the borrowed
 stream and does not copy matrices or the count to host memory. Older libraries
 remain loadable without these optional symbols.
 
-This remains standalone, not the backend of `search_cnot`. Distinct, scorer
-lifetimes and the rank transport still need integration before the new
-owner can be used by the public search. The existing GPU-resident Torch stages
-and process collectives remain the production path. See
-`test_results/refactor_20261117/STAGE_CNOT_BORROWED_EXPANSION.md` for validation.
+Rust `search_cnot` can explicitly select the device selection ABI by setting
+`MGBS_CNOT_OWNED_LIBRARY` to a trusted compatible shared library. It is loaded
+on the calling rank inside coordinated error handling. The adapter keeps the
+Torch tensors alive, passes their local current stream and waits for completion;
+it reads the device count on the host to construct the selected view. The
+existing Torch path remains the default, and CPU calls ignore the variable.
+Missing symbols or a failed explicit load produce an error rather than an
+implicit fallback. The caller must order other-stream producers and prevent
+conflicting concurrent tensor access. The other stages and scorer lifetimes
+still need migration; the existing GPU-resident Torch stages and process
+collectives remain in use. See
+`test_results/refactor_20261117/STAGE_CNOT_SEARCH_DEVICE_BRIDGE.md` for validation.
 
 ## CNOT controller transition
 

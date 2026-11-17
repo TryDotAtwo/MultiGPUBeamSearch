@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-17 - Opt-in CNOT search device selection bridge
+
+- Connected the borrowed full-matrix first-unseen ABI to the Rust CNOT search
+  through the explicit `MGBS_CNOT_OWNED_LIBRARY` path. Each rank retains its
+  own context and Torch tensor storage; existing NCCL communication, scorer,
+  default path and CPU behavior remain unchanged. The bridge reads the device
+  count on the host to construct the selected result view.
+- One- and two-RTX-3060 comparisons covered repeated calls, mixed rank paths,
+  a coordinated one-rank load error and the existing checkpoint scorer. A
+  CUDA invalid-handle API diagnostic also reproduced in the old Torch owner
+  operation; the source-pinned memory rerun disabled API-error reporting.
+  Details and limits: `test_results/refactor_20261117/STAGE_CNOT_SEARCH_DEVICE_BRIDGE.md`.
+
 ## 2026-11-17 - Borrowed CNOT full-matrix distinct stage
 
 - Added an optional Rust/CUDA first-unseen ABI with caller-owned device inputs,

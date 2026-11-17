@@ -9,6 +9,7 @@ use pyo3::{
     prelude::*,
     types::{PyDict, PyTuple},
 };
+use std::path::PathBuf;
 
 fn required<'py>(value: &Option<Bound<'py, PyAny>>, name: &str) -> PyResult<Bound<'py, PyAny>> {
     value
@@ -53,6 +54,8 @@ struct NativeStages<'py> {
     ranks: Option<Bound<'py, PyAny>>,
     local: Option<Bound<'py, PyAny>>,
     new_lex: Option<Bound<'py, PyAny>>,
+    device_domain_path: Option<PathBuf>,
+    device_domain: Option<beam_native_sys::cnot_device_bridge::DeviceDomain>,
 }
 
 impl<'py> NativeStages<'py> {
@@ -95,6 +98,8 @@ impl<'py> NativeStages<'py> {
             ranks: None,
             local: None,
             new_lex: None,
+            device_domain_path: std::env::var_os("MGBS_CNOT_OWNED_LIBRARY").map(PathBuf::from),
+            device_domain: None,
         })
     }
 
@@ -165,9 +170,33 @@ impl<'py> NativeStages<'py> {
         }
     }
 
-    fn distinct_batch(&self) -> PyResult<Bound<'py, PyAny>> {
+    fn distinct_batch(&mut self) -> PyResult<Bound<'py, PyAny>> {
         let incoming = required(&self.incoming, "incoming")?;
         let closed = required(&self.closed, "closed")?;
+        if incoming.getattr("is_cuda")?.extract::<bool>()? {
+            if let Some(path) = &self.device_domain_path {
+                if self.device_domain.is_none() {
+                    let device = incoming.getattr("device")?.getattr("index")?.extract()?;
+                    self.device_domain =
+                        Some(beam_native_sys::cnot_device_bridge::DeviceDomain::load(
+                            path,
+                            device,
+                            self.n as i32,
+                            self.size as i32,
+                        )?);
+                }
+                return cnot_native_batch::distinct(
+                    self.py,
+                    &self.world,
+                    &incoming,
+                    &closed,
+                    self.n,
+                    self.words,
+                    &self.scorer,
+                    self.device_domain.as_mut(),
+                );
+            }
+        }
         let ops = self.ops(&incoming)?;
         let native = match &ops {
             Some(ops) => ops.hasattr("distinct_candidates")?,
@@ -207,6 +236,7 @@ impl<'py> NativeStages<'py> {
                 self.n,
                 self.words,
                 &self.scorer,
+                None,
             )
         }
     }
@@ -321,11 +351,12 @@ impl Backend for NativeStages<'_> {
     }
 
     fn deduplicate_and_score(&mut self) -> PyResult<()> {
+        let batch = self.distinct_batch();
         let result = checked(
             self.py,
             &self.world,
             "deduplicate and evaluate distinct children",
-            self.distinct_batch(),
+            batch,
         )?;
         self.children = Some(result.get_item(0)?);
         self.meta = Some(result.get_item(1)?);

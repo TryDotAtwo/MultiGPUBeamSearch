@@ -56,6 +56,12 @@ rank processes after their ABI/layout and specialization checks.
   sized by an explicit query. Used writable ranges cannot overlap each other or
   the inputs; the call completes the supplied stream before returning. Empty
   batches write a zero device count. No matrix or count is copied to the host.
+- In Rust CNOT search, `MGBS_CNOT_OWNED_LIBRARY` explicitly opts each CUDA rank
+  into this first-unseen operation. The bridge retains Torch tensors through the
+  synchronous call, uses the rank's current stream, and reads the device count
+  on the host for its result view. The default, CPU, NCCL and scorer paths stay
+  unchanged. A selected incompatible library fails through coordinated rank
+  error handling rather than silently changing implementation.
 - A logical Hash128 uses every bit, ordered by high half then low half. CandidateMeta
   remains 32 bytes and aligned to 32. Stream3 retains original candidate IDs.
 - Persistent permutation padding stays zero. CNOT packed matrices retain their
