@@ -1,6 +1,6 @@
 use beam_runtime::depth_control::{
-    DepthCheckpoint, SolveBucketStatus, SolveBucketStopReason, TrackedPathStop, continue_after,
-    solve_bucket_stop_reason,
+    continue_after, solve_bucket_stop_reason, DepthCheckpoint, SolveBucketStatus,
+    SolveBucketStopReason, TrackedPathStop,
 };
 
 #[test]
