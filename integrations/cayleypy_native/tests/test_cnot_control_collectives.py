@@ -330,3 +330,135 @@ def test_rust_transport_is_available_when_both_abis_are_supported(monkeypatch):
 
     assert cnot_stream5.RustStream5.compatible_library(native) is not None
 
+
+def test_rust_world_start_transport_abi_is_exposed():
+    native = rust_control.extension()
+    assert callable(getattr(native, "run_cnot_native_start_transport", None))
+
+
+def test_world_start_transport_delegates_to_rust_when_available(monkeypatch):
+    world = _two_rank_world()
+    world._stream5_library = object()
+    compatible = object()
+    selected = object()
+    calls = []
+
+    class FakeRustStream5:
+        @staticmethod
+        def compatible_library(_library):
+            return compatible
+
+        def __new__(cls, _library, _world):
+            return object()
+
+    class FakeStream5:
+        def __new__(cls, _library, _world):
+            return object()
+
+    def start(actual_world, prefer_rust):
+        calls.append((actual_world, prefer_rust))
+        actual_world.transport = selected
+
+    monkeypatch.setattr(cnot_stream5, "RustStream5", FakeRustStream5)
+    monkeypatch.setattr(cnot_stream5, "Stream5", FakeStream5)
+    monkeypatch.setattr(world, "sum", lambda tensor: torch.full_like(tensor, world.size))
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(run_cnot_native_start_transport=start),
+    )
+
+    world.start_transport(prefer_rust=True)
+
+    assert calls == [(world, True)]
+    assert world.transport is selected
+
+
+def test_world_start_transport_keeps_python_path_for_older_extensions(monkeypatch):
+    world = _two_rank_world()
+    world._stream5_library = object()
+    compatible = object()
+    selected = object()
+
+    class FakeRustStream5:
+        @staticmethod
+        def compatible_library(_library):
+            return compatible
+
+        def __new__(cls, _library, _world):
+            return selected
+
+    class FakeStream5:
+        def __new__(cls, _library, _world):
+            return object()
+
+    monkeypatch.setattr(cnot_stream5, "RustStream5", FakeRustStream5)
+    monkeypatch.setattr(cnot_stream5, "Stream5", FakeStream5)
+    monkeypatch.setattr(world, "sum", lambda tensor: torch.full_like(tensor, world.size))
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    world.start_transport(prefer_rust=True)
+
+    assert world.transport is selected
+
+
+def test_rust_start_transport_preserves_rank_consensus_and_fallback(monkeypatch):
+    native = rust_control.extension()
+    start = getattr(native, "run_cnot_native_start_transport", None)
+    assert callable(start)
+
+    world = _two_rank_world()
+    native_library = object()
+    world._stream5_library = native_library
+    library_by_rank = [None]
+    consensus = [1]
+    collectives = []
+    selected = []
+
+    class FakeRustStream5:
+        @staticmethod
+        def compatible_library(_library):
+            return library_by_rank[0]
+
+        def __new__(cls, library, actual_world):
+            transport = object()
+            selected.append(("rust", library, actual_world, transport))
+            return transport
+
+    class FakeStream5:
+        def __new__(cls, library, actual_world):
+            transport = object()
+            selected.append(("python", library, actual_world, transport))
+            return transport
+
+    def longs(values):
+        collectives.append(("longs", list(values)))
+        return torch.tensor(values, dtype=torch.int64)
+
+    def sum(tensor):
+        collectives.append(("sum", tensor.tolist()))
+        return torch.tensor([consensus[0]], dtype=torch.int64)
+
+    monkeypatch.setattr(cnot_stream5, "RustStream5", FakeRustStream5)
+    monkeypatch.setattr(cnot_stream5, "Stream5", FakeStream5)
+    monkeypatch.setattr(world, "longs", longs)
+    monkeypatch.setattr(world, "sum", sum)
+
+    start(world, True)
+    assert selected[-1][0] == "python"
+    assert world.transport is selected[-1][3]
+    assert collectives == [("longs", [0]), ("sum", [0])]
+
+    library_by_rank[0] = object()
+    consensus[0] = 2
+    start(world, True)
+    assert selected[-1][0] == "rust"
+    assert selected[-1][1] is library_by_rank[0]
+    assert world.transport is selected[-1][3]
+
+    before = len(collectives)
+    start(world, False)
+    assert selected[-1][0] == "python"
+    assert world.transport is selected[-1][3]
+    assert len(collectives) == before
+
