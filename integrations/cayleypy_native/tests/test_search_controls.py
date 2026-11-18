@@ -19,7 +19,7 @@ def test_normalized_search_controls_are_delegated_to_rust(monkeypatch):
         raising=False,
     )
 
-    params = dispatch._parameters({"beam_width": 16, "max_steps": 4})
+    params = dispatch._parameters({"start_state": [0, 1], "beam_width": 16, "max_steps": 4})
 
     assert params["beam_width"] == 16
     assert len(seen) == 1
