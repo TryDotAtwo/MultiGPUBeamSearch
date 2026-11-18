@@ -97,13 +97,15 @@ NCCL исполнение проверяется отдельно и сейча�
 
 ## Rust-диспетчеризация управляющих коллективов CNOT, 2026-11-18
 
-Для многорангового CNOT `World.sum`, `World.gather_fixed` и `World.broadcast`
-передают выбор операции в PyO3-функции Rust. Rust сохраняет прежний выбор
-`world.transport` или `torch.distributed`; сами tensor и вызов transport
-остаются во владении PyTorch/Python. Одноранговая семантика не меняется.
-Если расширение старое или соответствующего API нет, остаётся прежний Python
-путь. Этот шаг переносит диспетчеризацию, но не заменяет NCCL/PyTorch transport
-собственным Rust/CUDA collective.
+Для многорангового CNOT `World.sum`, `World.gather_fixed`, `World.broadcast` и
+`World.exchange` передают выбор операции в PyO3-функции Rust. Rust сохраняет
+прежний выбор `world.transport` или `torch.distributed`; сами tensor и вызов
+transport остаются во владении PyTorch/Python. `World.exchange` также сохраняет
+значение `native_packet`: обычный вызов не выбирает CUDA packet operator,
+явный `native_packet=True` оставляет прежний путь. Одноранговая семантика и
+старый прямой ABI exchange не меняются. Если расширение старое или нового API
+нет, остаётся прежний Python путь. Этот шаг переносит диспетчеризацию, но не
+заменяет NCCL/PyTorch transport собственным Rust/CUDA collective.
 
 Hosted Rust/PyO3 и CPU compatibility проверки прошли. Физический NCCL и
 multi-GPU CNOT runtime не проверены: текущий Vast workflow только проверил

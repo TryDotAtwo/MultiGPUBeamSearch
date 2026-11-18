@@ -19,3 +19,14 @@ Source commit: `4be8bb79f0681430c7d1772dd944a716e6041ad0`
 - Vast status workflow [44357542194](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44357542194): confirmed the existing instance was stopped and skipped transfer/build/NCCL execution without changing its state.
 
 The implementation moves control dispatch into Rust while reusing the existing Python/PyTorch transport. No CUDA/NCCL runtime or physical multi-GPU search was executed.
+
+## Rust row-exchange dispatch — 2026-11-18
+
+Source commit: `6d410739ab5c8ce8deb0f09d1f42cb8e1020cee7`
+
+- Test-first CPU workflow [44359803108](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44359803108): expected failure in the new ABI and `World.exchange` dispatch checks (2 failed, 143 passed, 2 skipped).
+- Green CPU workflow [44360850283](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44360850283): Rust formatting/checks, PyO3 build, 145 Python tests passed, 2 skipped, and NCCL probe syntax passed. The included two-rank Gloo test checks row order, empty splits, and process-group reuse.
+- Full hosted test log artifact [14456055164](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44360850283/artifacts/14456055164), SHA-256 `308e8d044b951c8f699acee98b54f07a97fea756da29d8cb100c66ef7c6ab35e`.
+- Vast status workflow [44360849887](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44360849887): instance `61080396` was exited; transfer/build/NCCL were skipped without starting, stopping, or renting compute.
+
+The Rust layer now owns this exchange dispatch but still calls the existing PyTorch transport or CUDA operator. Physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified.

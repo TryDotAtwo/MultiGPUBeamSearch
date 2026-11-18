@@ -1959,3 +1959,20 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   skipped GPU transfer/build/NCCL without changing its state. This is
   CPU/control-flow evidence only; physical CUDA/NCCL and multi-GPU CNOT remain
   unverified. Details: `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
+
+## 2026-11-18 - Rust dispatch for CNOT row exchange
+
+- `World.exchange` now calls the versioned PyO3 exchange API when available;
+  older extensions retain the existing Python path. The Rust helper keeps the
+  chosen transport and collective order, preserves the `native_packet` flag,
+  and leaves the existing direct ABI and native-stage packet path intact.
+- Test-first run 44359803108 failed as intended: the new API/dispatch checks
+  failed (2 failed, 143 passed, 2 skipped). Run 44360850283 passed Rust CNOT
+  checks, formatting for the exchange module, PyO3 check/build, 145 Python
+  tests, 2 skips, and NCCL probe syntax. Its Gloo exchange test covers
+  rank-order, empty splits, and reuse. Artifact 14456055164 SHA-256:
+  `308e8d044b951c8f699acee98b54f07a97fea756da29d8cb100c66ef7c6ab35e`.
+- Vast status run 44360849887 confirmed instance 61080396 was exited and
+  skipped the CUDA/NCCL run without changing instance state. No physical
+  multi-GPU runtime was verified. Details:
+  `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
