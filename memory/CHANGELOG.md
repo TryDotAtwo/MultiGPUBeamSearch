@@ -1942,3 +1942,20 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - The shared Rust extension loader now tries both supported module names and maps missing modules or import/dependency failures to `NativeUnavailable`. CNOT `validation="auto"` and `engine="auto"` can use the Python compatibility path when the optional extension cannot load; explicit `rust` modes still fail closed.
 - Hosted run 44227238318 was the intended red check (1 failed, 121 passed). Run 44227654569 passed Rust CNOT/search/runtime/native-sys checks, PyO3 check/build, 122 Python tests, and the two-rank NCCL probe syntax check. Artifact 14393946014 SHA-256: `6481aa6e633831229d7169fa1464102c17f07107d4148cb4e77f7a62c7608726`.
 - This verifies CPU/control-flow compatibility only. No CUDA kernel, NCCL collective, physical multi-GPU search, or performance run was performed.
+
+## 2026-11-18 - Rust dispatch for CNOT control collectives
+
+- `World.sum`, `World.gather_fixed`, and `World.broadcast` now dispatch through
+  PyO3 functions in Rust when the extension exposes the APIs. Rust preserves
+  the existing selected `world.transport` or `torch.distributed` operation;
+  tensors and the transport implementation remain Python/PyTorch-owned. The
+  single-rank `gather_fixed` path and fallback for older extensions are intact.
+- Test-first run 44356451066 failed as intended: the new ABI/dispatch checks
+  failed (2 failed, 138 passed, 2 skipped). Run 44357542114 then passed Rust
+  CNOT checks, `cargo check`/`cargo build -p beam-python`, 140 Python tests,
+  and NCCL probe syntax. Artifact 14452657387 SHA-256:
+  `6390bd7da9d7cf023985740c579ca03497d1c865e74d52b4bbae29c6de636d1d`.
+- Vast status run 44357542194 confirmed the existing instance was stopped and
+  skipped GPU transfer/build/NCCL without changing its state. This is
+  CPU/control-flow evidence only; physical CUDA/NCCL and multi-GPU CNOT remain
+  unverified. Details: `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
