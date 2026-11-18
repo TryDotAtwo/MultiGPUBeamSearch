@@ -13,6 +13,7 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/cnot_stream5.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_rust_stages.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_scorer.py
+      - integrations/cayleypy_native/multigpubeamsearch/backend.py
       - integrations/cayleypy_native/tests/test_cnot_search.py
       - integrations/cayleypy_native/tests/test_cnot_rust_controller.py
       - integrations/cayleypy_native/tests/test_cnot_control_collectives.py
