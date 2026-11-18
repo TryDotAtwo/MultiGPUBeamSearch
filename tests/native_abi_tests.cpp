@@ -114,7 +114,9 @@ beam_job_v1 job(uint8_t* state, uint64_t sequence, const std::string& dir) {
     return {1, sizeof(beam_job_v1), sequence, state, 1, dir.data(), dir.size()};
 }
 int main() {
-    beam_layout_v1 layout{1, sizeof(beam_layout_v1)};
+    beam_layout_v1 layout{};
+    layout.abi_version = 1;
+    layout.struct_size = sizeof(layout);
     assert(beam_native_layout(&layout) == BEAM_OK);
     assert(layout.state_len == 96 && layout.candidate_alignment == 32);
     const std::string dir = std::filesystem::temp_directory_path().string();
@@ -174,7 +176,9 @@ int main() {
     assert(beam_context_submit(ctx, &task) == BEAM_BUSY);
     assert(beam_context_wait(ctx, 1) == BEAM_TIMEOUT);
     assert(beam_context_wait(ctx, 1000) == BEAM_OK);
-    beam_status_v1 status{1, sizeof(beam_status_v1)};
+    beam_status_v1 status{};
+    status.abi_version = 1;
+    status.struct_size = sizeof(status);
     assert(beam_context_status(ctx, &status) == BEAM_OK);
     assert(status.phase == BEAM_READY && status.completed_jobs == 1);
     assert(beam_context_submit(ctx, &task) == BEAM_INVALID); // stale sequence
