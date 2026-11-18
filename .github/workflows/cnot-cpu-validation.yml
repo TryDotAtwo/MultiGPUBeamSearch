@@ -66,6 +66,11 @@ jobs:
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
           } 2>&1 | tee test_results/refactor_20261118/cnot-tqp-scorer/cnot-rust-cpu.log
+      - name: Build PyO3 extension for Python integration tests
+        run: |
+          cargo build --locked -p beam-python
+          cp target/debug/lib_beam_runtime.so \
+            integrations/cayleypy_native/multigpubeamsearch/_beam_runtime.so
       - name: Run CNOT CPU compatibility tests
         env:
           PYTHONPATH: integrations/cayleypy_native

@@ -1,9 +1,11 @@
 """The packaged Rust extension owns the CNOT scorer when it is available."""
 
 from contextlib import nullcontext
+import importlib
 import json
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 from multigpubeamsearch import cnot_scorer
@@ -54,3 +56,19 @@ def test_public_tqp_scorer_keeps_python_fallback_when_extension_is_missing(monke
 
     assert type(scorer) is cnot_scorer.TQPScorer
     assert scorer.metadata["feature_model_inputs"] == 102
+
+
+def test_installed_pyo3_scorer_is_selected_and_preserves_argument_contract():
+    native = importlib.import_module("multigpubeamsearch._beam_runtime")
+
+    assert cnot_scorer._rust_tqp_scorer() is native.TQPScorer
+    with pytest.raises(ValueError, match="valid CNOT dimension"):
+        cnot_scorer.TQPScorer("unused", "unused", n=1, device="cuda:0")
+    with pytest.raises((TypeError, ValueError)):
+        cnot_scorer.TQPScorer(
+            "unused",
+            "unused",
+            n=4,
+            device="cuda:0",
+            experimental_native_batch=1,
+        )
