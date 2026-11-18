@@ -109,6 +109,7 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_stages_without_python_stage_object \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_batch_stages_without_python_helpers \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch \
+            integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_controller_prepares_typed_input_without_python_builder \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_preserves_compatibility_stage_fallback \
             2>&1 | tee test_results/refactor_20261118/cnot-search-runtime/cnot-search-cpu.log
       - name: Check the two-rank NCCL probe syntax
