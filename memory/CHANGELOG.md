@@ -1865,3 +1865,10 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   2 failed); run 44218056948 caught only rustfmt layout and the correction is
   in `922b1f7e`. The final run above is green. No CUDA kernel, NCCL collective,
   or physical multi-GPU search ran.
+
+## 2026-11-18 - Rust validation for NativeOptions
+
+- Public `NativeOptions` construction now calls the `beam-core` validator through optional PyO3. Python still normalizes paths and devices and keeps its validator for old, missing, or unloadable extensions and values outside Rust's fixed-width ranges. Existing public error messages remain stable.
+- The option descriptor omits `experimental_index_sort` only when the value is exactly `False`; invalid falsey values such as `None` are passed to Rust and rejected. The CPU workflow now covers the complete backend/control test files and triggers on `rust_control.py` changes.
+- Run 44223487738 exposed `None` being dropped (1 failure, 119 passed). Test-only run 44224826858 confirmed the missing extension-import fallback (1 failure, 120 passed). Final hosted run 44225114516 passed Rust CNOT/search/runtime/native-sys checks, PyO3 check/build, 121 Python tests, and the two-rank NCCL probe syntax check. Artifact 14391754257 SHA-256: `44e646ba4a7c5d264baad8c54bd86fce06988ea5b2a97ea71f3fe308160ef0aa`.
+- This is CPU/control-flow evidence. CUDA kernels, NCCL runtime collectives, physical multi-GPU search, and performance were not run.
