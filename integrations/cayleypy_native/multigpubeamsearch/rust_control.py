@@ -38,7 +38,7 @@ def options_descriptor(options):
     values = asdict(options)
     # Omission is also the Rust default, and keeps OFF requests readable by a
     # previously installed Rust extension that predates the experimental key.
-    if not values['experimental_index_sort']:
+    if values['experimental_index_sort'] is False:
         values.pop('experimental_index_sort')
     return {name: str(value) if isinstance(value, Path) else value
             for name, value in values.items()}
@@ -196,3 +196,4 @@ def tune_downstream(contract, model, runtime, options, devices, beam_width,
         raise NativeBackendError(str(error)) from error
     verify_prepared_model(model, contract)
     return result
+
