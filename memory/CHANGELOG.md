@@ -1821,4 +1821,13 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   `parent_scores` / `child_values` Python protocol. The existing score
   validation, call order, and chunking are unchanged.
 - Added the dispatch module to hosted Rust formatting and CNOT CPU validation.
-  GPU scorer loading and multi-GPU CNOT acceptance remain unverified.
+  The first action found only rustfmt diffs; the correction is in commit
+  `6bbd8ada`. Hosted run 44213429756 then passed Rust formatting, 3 core CNOT
+  tests, 4 runtime CNOT tests, 4 native-sys scorer tests, cargo check/build,
+  and 33 Python tests, including two `run_cnot_native` CPU stage tests for
+  Python scorer fallback. Artifact 14387022871 has SHA-256
+  `c2c1b383d37a36357db0ed4f057661a24fb04644646538dd061249945a6e26d7`.
+- The built-in TQP direct call was compile-checked but not invoked. The
+  current Vast status workflow confirmed the instance stopped and skipped the
+  GPU build and two-rank NCCL test without changing its state. CUDA scorer and
+  physical multi-GPU CNOT acceptance remain unverified.
