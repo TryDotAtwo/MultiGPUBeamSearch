@@ -2083,5 +2083,8 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   CNOT CPU compatibility tests, and NCCL probe syntax. Hosted artifact
   14472066732 has SHA-256
   `6dd94319971341e455a170f266fe490ee89318f04c9363a53d31529777b6cac7`.
+  Published main run 44398322200 passed the same checks at
+  `ddc855d734c0897de6af6efef48a6d711a0be998`; artifact 14470868398 has
+  SHA-256 `6cc1a5ca4352fd567e190a47ebbbbdb45f67f467fb0c56746c3a69ef1d72424b`.
   The CPU workflow does not verify physical CUDA/NCCL or multi-GPU execution.
   See `test_results/refactor_20261118/cnot-input-prepare/GITHUB_STATUS.md`.
