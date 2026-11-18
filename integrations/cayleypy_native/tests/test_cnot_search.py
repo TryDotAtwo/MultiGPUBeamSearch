@@ -183,7 +183,9 @@ def test_compatibility_cnot_stage_goal_delegates_to_rust(monkeypatch):
     from types import SimpleNamespace
     from multigpubeamsearch import cnot_rust_stages, rust_control
 
-    world, parents, lex, identity = object(), object(), object(), object()
+    from types import SimpleNamespace
+
+    world, parents, lex, identity = object(), SimpleNamespace(is_cuda=False), object(), object()
     expected = (19, 2)
     calls = []
 
