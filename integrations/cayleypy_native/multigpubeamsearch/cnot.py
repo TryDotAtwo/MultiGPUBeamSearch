@@ -62,14 +62,6 @@ def replay_cnot(n, gates):
 
 
 def _input(root, width, shortlist, depth, mode, validation="auto"):
-    if root.dtype != torch.int64 or root.ndim != 3 or root.shape[0] != 1:
-        raise ValueError("expected one packed int64 matrix [1,n,ceil(n/64)]")
-    n, words = root.shape[1:]
-    if not 2 <= n <= 256 or words != (n + 63) // 64:
-        raise ValueError("CNOT shape requires 2..256 qubits and ceil(n/64) words per row")
-    if any(type(x) is not int for x in (width, shortlist, depth)) or depth < 0:
-        raise ValueError("invalid global width, shortlist, or depth")
-
     native_module = native_error = None
     if validation in ("auto", "rust"):
         from .errors import NativeUnavailable
@@ -79,6 +71,21 @@ def _input(root, width, shortlist, depth, mode, validation="auto"):
             native_module = extension()
         except NativeUnavailable as exc:
             native_error = exc
+        prepare = None if native_module is None else getattr(
+            native_module, "prepare_cnot_input", None)
+        if callable(prepare) and type(mode) is str:
+            n, raw, snapshot, rust_matrix = prepare(
+                root, width, shortlist, depth, mode)
+            return _InputMatrix(n, raw, snapshot, rust_matrix=rust_matrix)
+
+    if root.dtype != torch.int64 or root.ndim != 3 or root.shape[0] != 1:
+        raise ValueError("expected one packed int64 matrix [1,n,ceil(n/64)]")
+    n, words = root.shape[1:]
+    if not 2 <= n <= 256 or words != (n + 63) // 64:
+        raise ValueError("CNOT shape requires 2..256 qubits and ceil(n/64) words per row")
+    if any(type(x) is not int for x in (width, shortlist, depth)) or depth < 0:
+        raise ValueError("invalid global width, shortlist, or depth")
+
     rust_controls = None if native_module is None else getattr(
         native_module, "validate_cnot_search_controls", None)
     if callable(rust_controls) and type(mode) is str:

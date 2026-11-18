@@ -27,6 +27,82 @@ fn validate_cnot_search_controls(
 }
 
 #[pyfunction]
+fn prepare_cnot_input<'py>(
+    py: Python<'py>,
+    root: &Bound<'py, PyAny>,
+    width: &Bound<'py, PyAny>,
+    shortlist: &Bound<'py, PyAny>,
+    depth: &Bound<'py, PyAny>,
+    mode: &Bound<'py, PyAny>,
+) -> PyResult<(u32, Py<PyBytes>, Py<PyAny>, PyCnotMatrix)> {
+    let invalid_shape =
+        || PyValueError::new_err("expected one packed int64 matrix [1,n,ceil(n/64)]");
+    let torch = py.import("torch")?;
+    let dtype_matches = root
+        .getattr("dtype")?
+        .call_method1("__eq__", (torch.getattr("int64")?,))?
+        .is_truthy()?;
+    if !dtype_matches {
+        return Err(invalid_shape());
+    }
+    if root.getattr("ndim")?.extract::<usize>()? != 3
+        || root.getattr("shape")?.get_item(0)?.extract::<usize>()? != 1
+    {
+        return Err(invalid_shape());
+    }
+    let (_, wires, words): (usize, usize, usize) = root.getattr("shape")?.extract()?;
+    if !(2..=256).contains(&wires) || words != wires.div_ceil(64) {
+        return Err(PyValueError::new_err(
+            "CNOT shape requires 2..256 qubits and ceil(n/64) words per row",
+        ));
+    }
+
+    let invalid_controls = || PyValueError::new_err("invalid global width, shortlist, or depth");
+    let builtins = py.import("builtins")?;
+    let type_fn = builtins.getattr("type")?;
+    let int_type = builtins.getattr("int")?;
+    for value in [width, shortlist, depth] {
+        if !type_fn.call1((value,))?.is(&int_type) {
+            return Err(invalid_controls());
+        }
+    }
+    if depth.call_method1("__lt__", (0,))?.is_truthy()? {
+        return Err(invalid_controls());
+    }
+    let width = width.extract::<u64>().map_err(|_| invalid_controls())?;
+    let alphabet = (wires * (wires - 1)) as u64;
+    let shortlist = if shortlist.call_method1("__gt__", (alphabet,))?.is_truthy()? {
+        alphabet
+    } else {
+        shortlist.extract::<u64>().map_err(|_| invalid_controls())?
+    };
+    let mode_text = mode.extract::<String>()?;
+    beam_core::cnot::validate_search_controls(wires as u32, width, shortlist, &mode_text)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+
+    // Retain the exact public snapshot semantics: validation, raw hashing and
+    // replay all refer to this owned contiguous tensor after the caller returns.
+    let mut clone_kwargs = PyDict::new(py);
+    clone_kwargs.set_item("memory_format", torch.getattr("contiguous_format")?)?;
+    let snapshot = root
+        .call_method0("detach")?
+        .call_method("clone", (), Some(&clone_kwargs))?;
+    let raw_object = snapshot
+        .call_method0("cpu")?
+        .call_method0("numpy")?
+        .call_method0("tobytes")?;
+    let raw = raw_object.downcast::<PyBytes>()?.as_bytes();
+    let inner = beam_core::cnot::CnotMatrix::from_le_bytes(wires as u32, raw)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    Ok((
+        wires as u32,
+        PyBytes::new(py, raw).unbind(),
+        snapshot.unbind(),
+        PyCnotMatrix { inner },
+    ))
+}
+
+#[pyfunction]
 fn run_cnot_native_require_consensus(world: Bound<'_, PyAny>, digest: Vec<u8>) -> PyResult<()> {
     let values: Vec<i64> = digest.into_iter().map(i64::from).collect();
     let local = world.call_method1("longs", (values,))?;
@@ -387,6 +463,7 @@ pub(crate) fn outcome_to_python(
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotMatrix>()?;
+    module.add_function(wrap_pyfunction!(prepare_cnot_input, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_require_consensus, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_search, module)?)?;
