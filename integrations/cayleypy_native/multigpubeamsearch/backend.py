@@ -486,7 +486,11 @@ def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int
         native = getattr(extension(), "native_depth_budget", None)
     except NativeUnavailable:
         native = None
-    if native is not None:
+    if (
+        native is not None
+        and max_steps <= (1 << 64) - 1
+        and touch_bfs_radius <= (1 << 32) - 1
+    ):
         return native(max_steps, touch_bfs_radius)
     if max_steps == 0:
         return 0, 0
