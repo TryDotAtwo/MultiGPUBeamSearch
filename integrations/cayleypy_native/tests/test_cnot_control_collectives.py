@@ -336,6 +336,79 @@ def test_rust_world_start_transport_abi_is_exposed():
     assert callable(getattr(native, "run_cnot_native_start_transport", None))
 
 
+def test_rust_world_native_stage_support_abi_is_exposed():
+    native = rust_control.extension()
+    assert callable(getattr(native, "run_cnot_native_all_ranks_support", None))
+
+
+def test_world_native_stage_support_delegates_to_rust_when_available(monkeypatch):
+    world = _two_rank_world()
+    calls = []
+
+    def support(actual_world, local_support):
+        calls.append((actual_world, local_support))
+        return local_support
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(run_cnot_native_all_ranks_support=support),
+    )
+
+    assert world.all_ranks_support(True) is True
+    assert calls == [(world, True)]
+
+
+def test_world_native_stage_support_keeps_python_fallback_for_older_extensions(monkeypatch):
+    world = _two_rank_world()
+    collectives = []
+
+    def longs(values):
+        collectives.append(("longs", list(values)))
+        return torch.tensor(values, dtype=torch.int64)
+
+    def sum(tensor):
+        collectives.append(("sum", tensor.tolist()))
+        return torch.tensor([1], dtype=torch.int64)
+
+    monkeypatch.setattr(world, "longs", longs)
+    monkeypatch.setattr(world, "sum", sum)
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    assert world.all_ranks_support(False) is False
+    assert collectives == [("longs", [0]), ("sum", [0])]
+
+
+def test_rust_native_stage_support_requires_all_rank_votes(monkeypatch):
+    native = rust_control.extension()
+    support = getattr(native, "run_cnot_native_all_ranks_support", None)
+    assert callable(support)
+
+    world = _two_rank_world()
+    votes = []
+    totals = iter((1, 2, 0))
+
+    def longs(values):
+        votes.append(("longs", list(values)))
+        return torch.tensor(values, dtype=torch.int64)
+
+    def sum(tensor):
+        votes.append(("sum", tensor.tolist()))
+        return torch.tensor([next(totals)], dtype=torch.int64)
+
+    monkeypatch.setattr(world, "longs", longs)
+    monkeypatch.setattr(world, "sum", sum)
+
+    assert support(world, False) is False
+    assert support(world, True) is True
+    assert support(world, True) is False
+    assert votes == [
+        ("longs", [0]), ("sum", [0]),
+        ("longs", [1]), ("sum", [1]),
+        ("longs", [1]), ("sum", [1]),
+    ]
+
+
 def test_world_start_transport_delegates_to_rust_when_available(monkeypatch):
     world = _two_rank_world()
     world._stream5_library = object()
