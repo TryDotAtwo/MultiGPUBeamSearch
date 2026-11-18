@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import torch
 import torch.distributed as dist
 
@@ -407,6 +408,81 @@ def test_rust_native_stage_support_requires_all_rank_votes(monkeypatch):
         ("longs", [1]), ("sum", [1]),
         ("longs", [1]), ("sum", [1]),
     ]
+
+
+def test_rust_cnot_identity_consensus_abi_is_exposed():
+    native = rust_control.extension()
+    assert callable(getattr(native, "run_cnot_native_require_consensus", None))
+
+
+def test_world_cnot_identity_consensus_delegates_to_rust(monkeypatch):
+    world = _two_rank_world()
+    digest = bytes(range(32))
+    calls = []
+
+    def require(actual_world, actual_digest):
+        calls.append((actual_world, actual_digest))
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(run_cnot_native_require_consensus=require),
+    )
+
+    assert world.require_consensus(digest) is None
+    assert calls == [(world, digest)]
+
+
+def test_world_cnot_identity_consensus_preserves_python_fallback(monkeypatch):
+    world = _two_rank_world()
+    digest = bytes((1, 2, 3))
+    seen = []
+
+    def longs(items):
+        seen.append(list(items))
+        return torch.tensor(items, dtype=torch.int64)
+
+    monkeypatch.setattr(world, "longs", longs)
+    monkeypatch.setattr(world, "gather_fixed", lambda tensor: torch.stack((tensor, tensor.clone())))
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    assert world.require_consensus(digest) is None
+    monkeypatch.setattr(
+        world,
+        "gather_fixed",
+        lambda tensor: torch.stack((tensor, tensor + torch.tensor([0, 0, 1]))),
+    )
+    with pytest.raises(ValueError, match="CNOT root, search settings or scorer fingerprints differ"):
+        world.require_consensus(digest)
+    assert seen == [[1, 2, 3], [1, 2, 3]]
+
+
+def test_rust_cnot_identity_consensus_accepts_equal_and_rejects_mismatch(monkeypatch):
+    native = rust_control.extension()
+    require = getattr(native, "run_cnot_native_require_consensus", None)
+    assert callable(require)
+
+    world = _two_rank_world()
+    digest = bytes(range(32))
+    seen = []
+
+    def longs(items):
+        seen.append(list(items))
+        return torch.tensor(items, dtype=torch.int64)
+
+    monkeypatch.setattr(world, "longs", longs)
+    monkeypatch.setattr(world, "gather_fixed", lambda tensor: torch.stack((tensor, tensor.clone())))
+
+    assert require(world, digest) is None
+    assert seen == [list(digest)]
+
+    monkeypatch.setattr(
+        world,
+        "gather_fixed",
+        lambda tensor: torch.stack((tensor, tensor + torch.tensor([0] * 31 + [1]))),
+    )
+    with pytest.raises(ValueError, match="CNOT root, search settings or scorer fingerprints differ"):
+        require(world, digest)
 
 
 def test_world_start_transport_delegates_to_rust_when_available(monkeypatch):
