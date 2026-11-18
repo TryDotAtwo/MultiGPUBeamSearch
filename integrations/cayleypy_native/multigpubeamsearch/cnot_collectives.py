@@ -43,6 +43,15 @@ class World:
         else:
             self.transport = Stream5(self._stream5_library, self)
 
+    def all_ranks_support(self, local_support):
+        """Return whether every rank reports support for an optional native stage."""
+        used, result = self._rust_collective(
+            "run_cnot_native_all_ranks_support", bool(local_support)
+        )
+        if used:
+            return result
+        return self.sum(self.longs([int(local_support)])).item() == self.size
+
     def __exit__(self, kind, value, traceback):
         if self.transport is not None:
             self.transport.close(abort=kind is not None)

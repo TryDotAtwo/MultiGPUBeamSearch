@@ -630,6 +630,23 @@ fn run_cnot_native<'py>(
     crate::cnot::outcome_to_python(py, cnot_search::search(&mut backend, options)?)
 }
 
+#[pyfunction]
+fn run_cnot_native_all_ranks_support(
+    world: Bound<'_, PyAny>,
+    local_support: bool,
+) -> PyResult<bool> {
+    let local = world.call_method1(
+        "longs",
+        (vec![if local_support { 1_i64 } else { 0_i64 }],),
+    )?;
+    let total: usize = world
+        .call_method1("sum", (local,))?
+        .call_method0("item")?
+        .extract()?;
+    Ok(total == world.getattr("size")?.extract::<usize>()?)
+}
+
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(run_cnot_native, module)?)
+    module.add_function(wrap_pyfunction!(run_cnot_native, module)?)?;
+    module.add_function(wrap_pyfunction!(run_cnot_native_all_ranks_support, module)?)
 }

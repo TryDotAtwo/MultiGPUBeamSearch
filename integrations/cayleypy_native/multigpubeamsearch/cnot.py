@@ -284,7 +284,7 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         identity = native.cnot_identity(input_matrix.n, device=world.device)
         if runner is not None:
             native_runner = _native_stages_runner()
-            use_native = world.sum(world.longs([int(native_runner is not None)])).item() == world.size
+            use_native = world.all_ranks_support(native_runner is not None)
             alphabet = input_matrix.n * (input_matrix.n - 1)
             if use_native:
                 return native_runner(world, root, identity, input_matrix, scorer, mode, audit,
