@@ -5,10 +5,12 @@ on:
   push:
     branches:
       - main
+      - "codex/**"
     paths:
       - .github/workflows/rust-public-owner-cpu-validation.yml
       - integrations/cayleypy_native/multigpubeamsearch/dispatch.py
       - integrations/cayleypy_native/multigpubeamsearch/persistent.py
+      - integrations/cayleypy_native/multigpubeamsearch/rust_resident.py
       - integrations/cayleypy_native/tests/test_rust_default_owner.py
       - integrations/cayleypy_native/tests/test_dispatch.py
       - integrations/cayleypy_native/tests/test_persistent_search.py
@@ -35,19 +37,19 @@ jobs:
         env:
           PYTHONPATH: integrations/cayleypy_native
         run: |
-          mkdir -p test_results/refactor_20261118/rust-public-owner
+          mkdir -p test_results/refactor_20261119/rust-session-reuse
           set -o pipefail
           python -m pytest -q \
             integrations/cayleypy_native/tests/test_rust_default_owner.py \
             integrations/cayleypy_native/tests/test_dispatch.py \
             integrations/cayleypy_native/tests/test_persistent_search.py \
             integrations/cayleypy_native/tests/test_rust_persistent_search.py \
-            2>&1 | tee test_results/refactor_20261118/rust-public-owner/pytest.log
+            2>&1 | tee test_results/refactor_20261119/rust-session-reuse/pytest.log
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rust-public-owner-cpu-validation
-          path: test_results/refactor_20261118/rust-public-owner
+          name: rust-session-reuse-cpu-validation
+          path: test_results/refactor_20261119/rust-session-reuse
           if-no-files-found: ignore
           retention-days: 7

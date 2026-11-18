@@ -48,6 +48,7 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         def __init__(self):
             self.pids = list(range(100, 100 + world))
             self.closed = False
+            self.identity = None
             self.count = 0
             self.requests = []
             self.fail = False
@@ -56,8 +57,13 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         def run(self, identity, launch, start, run_dir, timeout, metadata):
             if self.fail:
                 raise RuntimeError("injected rank failure")
+            identity = json.loads(identity)
+            reused = identity == self.identity
+            if not reused:
+                self.identity = identity
+                self.count = 0
             self.count += 1
-            self.requests.append((json.loads(identity), json.loads(launch), start, timeout))
+            self.requests.append((identity, json.loads(launch), start, timeout))
             Path(run_dir, "native.log").write_text(
                 "GLOBAL_BEAM_WIDTH_EFFECTIVE=64\n"
                 "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m0\n"
@@ -66,7 +72,7 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
                 "elapsed_seconds": 0.1, "metadata": {"native_seconds": 0.1,
                 "terminal_records": 1, "observed_parent_batch": None,
                 "observed_inference_rows": None, "observed_stream3_batch_candidates": None,
-                "persistent_session": {"request_count": self.count}}})
+                "persistent_session": {"reused": reused, "request_count": self.count}}})
 
         def close(self):
             self.closed = True
@@ -109,12 +115,16 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert launch["environment"]["TEST_ENV"] == "retained"
         assert start == [1, 0] and timeout == 5
         model.artifact_hash = "f" * 64
-        run(3)
-        assert len(owners) == len(calls) == 2 and owners[0].closed
-        owners[1].fail = True
+        changed = run(3)
+        assert not changed.metadata["persistent_session"]["reused"]
+        assert changed.metadata["persistent_session"]["request_count"] == 1
+        assert len(owners) == 1 and len(calls) == 2 and not owners[0].closed
+        assert len(owners[0].requests) == 3
+        assert owners[0].requests[2][0]["model_artifact_hash"] == "f" * 64
+        owners[0].fail = True
         with pytest.raises(NativeBackendError, match="injected rank failure"):
             run(4)
-        assert owners[1].closed
+        assert owners[0].closed
     finally:
         session.close()
     assert all(owner.closed for owner in owners)
