@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-18 - CNOT search control validation in beam-core
+
+- A compatible PyO3 extension now validates the CNOT wire count, global width,
+  shortlist and score mode through `beam-core`. The signed lexical-key width
+  bound and public error messages are preserved.
+- Python keeps exact Python-type and depth checks, the `validation="python"`
+  route, and the fallback for older extensions. CNOT search stages, tensor and
+  scorer calls, collectives and rank topology are unchanged. Hosted CPU
+  validation is pending; this does not claim CUDA/NCCL runtime acceptance.
+
 ## 2026-11-18 - GraphContract construction in beam-core
 
 - The CayleyPy adapter continues to extract list/tuple, NumPy and Torch values

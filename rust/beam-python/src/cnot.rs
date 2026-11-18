@@ -12,6 +12,22 @@ struct PyCnotMatrix {
     inner: beam_core::cnot::CnotMatrix,
 }
 
+#[pyfunction]
+fn validate_cnot_search_controls(
+    wires: u32,
+    width: &Bound<'_, PyAny>,
+    shortlist: &Bound<'_, PyAny>,
+    mode: &str,
+) -> PyResult<()> {
+    let invalid = || PyValueError::new_err("invalid global width, shortlist, or depth");
+    let width = width
+        .extract::<u64>()
+        .map_err(|_| invalid())?;
+    let shortlist = shortlist.extract::<u64>().map_err(|_| invalid())?;
+    beam_core::cnot::validate_search_controls(wires, width, shortlist, mode)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
 #[pymethods]
 impl PyCnotMatrix {
     #[new]
@@ -203,6 +219,7 @@ pub(crate) fn outcome_to_python(
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotMatrix>()?;
+    module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_selection, module)?)
 }

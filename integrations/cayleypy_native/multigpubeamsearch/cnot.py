@@ -67,11 +67,27 @@ def _input(root, width, shortlist, depth, mode, validation="auto"):
     n, words = root.shape[1:]
     if not 2 <= n <= 256 or words != (n + 63) // 64:
         raise ValueError("CNOT shape requires 2..256 qubits and ceil(n/64) words per row")
-    if any(type(x) is not int for x in (width, shortlist, depth)) or not (
-            1 <= width <= (2**63 - 1) // (n * (n - 1)) and shortlist >= 1 and depth >= 0):
+    if any(type(x) is not int for x in (width, shortlist, depth)) or depth < 0:
         raise ValueError("invalid global width, shortlist, or depth")
-    if mode not in ("qhat", "proposal"):
-        raise ValueError("mode must be qhat or proposal")
+
+    native_module = native_error = None
+    if validation in ("auto", "rust"):
+        from .errors import NativeUnavailable
+        from .rust_control import extension
+
+        try:
+            native_module = extension()
+        except NativeUnavailable as exc:
+            native_error = exc
+    rust_controls = None if native_module is None else getattr(
+        native_module, "validate_cnot_search_controls", None)
+    if callable(rust_controls) and type(mode) is str:
+        rust_controls(n, width, min(shortlist, n * (n - 1)), mode)
+    else:
+        if not 1 <= width <= (2**63 - 1) // (n * (n - 1)) or shortlist < 1:
+            raise ValueError("invalid global width, shortlist, or depth")
+        if mode not in ("qhat", "proposal"):
+            raise ValueError("mode must be qhat or proposal")
     if validation not in ("auto", "python", "rust"):
         raise ValueError("validation must be auto, python, or rust")
     # Validate and search the same owned tensor. The caller may reuse or mutate
@@ -79,18 +95,12 @@ def _input(root, width, shortlist, depth, mode, validation="auto"):
     snapshot = root.detach().clone(memory_format=torch.contiguous_format)
     raw = snapshot.cpu().numpy().tobytes()
     if validation != "python":
-        from .errors import NativeUnavailable
-        from .rust_control import extension
-
-        try:
-            matrix_type = getattr(extension(), "CnotMatrix", None)
-        except NativeUnavailable:
-            if validation == "rust":
-                raise
-            matrix_type = None
+        matrix_type = None if native_module is None else getattr(native_module, "CnotMatrix", None)
         if matrix_type is not None:
             return _InputMatrix(n, raw, snapshot, rust_matrix=matrix_type(n, raw))
         if validation == "rust":
+            if native_error is not None:
+                raise native_error
             raise NativeUnavailable("Rust runtime lacks CNOT input validation; rebuild the matching PyO3 module")
     rows = tuple(int.from_bytes(raw[i:i + 8 * words], "little") for i in range(0, len(raw), 8 * words))
     if any(row.bit_length() > n for row in rows):

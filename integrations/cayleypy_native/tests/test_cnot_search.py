@@ -145,6 +145,19 @@ def test_search_control_validation_uses_the_selected_owner(monkeypatch, validati
     assert calls == expected_controls
 
 
+def test_rust_cnot_control_validator_preserves_public_errors():
+    from multigpubeamsearch.rust_control import extension
+
+    validate = getattr(extension(), "validate_cnot_search_controls")
+    assert validate(2, 1, 1, "qhat") is None
+    with pytest.raises(ValueError, match="invalid global width, shortlist, or depth"):
+        validate(2, 0, 1, "qhat")
+    with pytest.raises(ValueError, match="invalid global width, shortlist, or depth"):
+        validate(2, 1, -1, "qhat")
+    with pytest.raises(ValueError, match="mode must be qhat or proposal"):
+        validate(2, 1, 1, "greedy")
+
+
 def test_explicit_rust_validation_fails_closed_for_old_extension(monkeypatch):
     from types import SimpleNamespace
     from multigpubeamsearch import rust_control

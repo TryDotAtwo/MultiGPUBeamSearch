@@ -75,6 +75,7 @@ jobs:
               rust/beam-native-sys/src/cnot_stream5.rs \
               rust/beam-native-sys/src/cnot_tqp_scorer.rs \
               rust/beam-python/src/cnot_stream5.rs
+            rustfmt --check --edition 2021 rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-core --test search
             cargo test --locked -p beam-runtime cnot_search

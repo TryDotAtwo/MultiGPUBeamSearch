@@ -10,6 +10,20 @@ fn identity(n: usize) -> Vec<u8> {
 }
 
 #[test]
+fn cnot_search_controls_keep_public_width_and_mode_contract() {
+    let wires = 144;
+    let alphabet = u64::from(wires) * u64::from(wires - 1);
+    let maximum_width = (i64::MAX as u64) / alphabet;
+    assert!(beam_core::cnot::validate_search_controls(wires, 1, 1, "qhat").is_ok());
+    assert!(beam_core::cnot::validate_search_controls(wires, maximum_width, 99, "proposal").is_ok());
+    assert!(beam_core::cnot::validate_search_controls(wires, 0, 1, "qhat").is_err());
+    assert!(beam_core::cnot::validate_search_controls(wires, maximum_width + 1, 1, "qhat").is_err());
+    assert!(beam_core::cnot::validate_search_controls(wires, 1, 0, "qhat").is_err());
+    assert!(beam_core::cnot::validate_search_controls(wires, 1, 1, "greedy").is_err());
+    assert!(beam_core::cnot::validate_search_controls(1, 1, 1, "qhat").is_err());
+}
+
+#[test]
 fn physical_gate_alphabet_is_control_major_and_round_trips() {
     for n in [2, 3, 63, 64, 65, 127, 128, 129, 144, 255, 256] {
         let mut id = 0;

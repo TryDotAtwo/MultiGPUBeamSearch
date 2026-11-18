@@ -7,11 +7,44 @@ use crate::ContractError;
 
 type Result<T> = std::result::Result<T, ContractError>;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum SearchControlsError {
+    #[error("invalid CNOT wires")]
+    Wires,
+    #[error("invalid global width, shortlist, or depth")]
+    WidthOrShortlist,
+    #[error("mode must be qhat or proposal")]
+    Mode,
+}
+
 fn words_per_row(wires: u32) -> Result<usize> {
     if !(2..=256).contains(&wires) {
         return Err(ContractError::Invalid("CNOT wires"));
     }
     Ok((wires as usize).div_ceil(64))
+}
+
+/// Validate controls shared by the Python and native CNOT search paths.
+///
+/// `width * alphabet` is stored in signed 64-bit lexical keys by the current
+/// public adapter, so preserve that bound before any rank starts work.
+pub fn validate_search_controls(
+    wires: u32,
+    width: u64,
+    shortlist: u64,
+    mode: &str,
+) -> std::result::Result<(), SearchControlsError> {
+    if !(2..=256).contains(&wires) {
+        return Err(SearchControlsError::Wires);
+    }
+    let alphabet = u64::from(wires) * u64::from(wires - 1);
+    if width == 0 || width > (i64::MAX as u64) / alphabet || shortlist == 0 {
+        return Err(SearchControlsError::WidthOrShortlist);
+    }
+    if mode != "qhat" && mode != "proposal" {
+        return Err(SearchControlsError::Mode);
+    }
+    Ok(())
 }
 
 /// The physical alphabet is control-major with the diagonal omitted.
