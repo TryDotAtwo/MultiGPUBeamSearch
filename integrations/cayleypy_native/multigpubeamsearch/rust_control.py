@@ -44,6 +44,54 @@ def options_descriptor(options):
             for name, value in values.items()}
 
 
+def _native_options_supported(options):
+    # Keep Python's historical acceptance of values that its public validator
+    # permits but beam-core cannot represent in its fixed-width fields.
+    if type(options.warn_on_fallback) is not bool:
+        return False
+    if type(options.num_gpus) is int and options.num_gpus > 65535:
+        return False
+    if options.devices is not None and (
+        len(options.devices) > 65535
+        or any(type(device) is int and device > (1 << 32) - 1 for device in options.devices)
+    ):
+        return False
+    if (
+        type(options.calibration_frontier_max_states) is int
+        and options.calibration_frontier_max_states >= 1 << 64
+    ):
+        return False
+    for name in (
+        'timeout_seconds',
+        'build_timeout_seconds',
+        'calibration_seconds',
+        'calibration_pipeline_seconds',
+    ):
+        value = getattr(options, name)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= float(1 << 64):
+            return False
+    return True
+
+
+def validate_options(options):
+    """Validate public options in beam-core when the matching API is present."""
+    if not _native_options_supported(options):
+        return False
+    try:
+        payload = json.dumps(options_descriptor(options), allow_nan=False)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    try:
+        native = extension()
+    except NativeUnavailable:
+        return False
+    validator = getattr(native, 'validate_options', None)
+    if validator is None:
+        return False
+    validator(payload)
+    return True
+
+
 def _inference_request(contract, model, runtime, options, devices, beam_width,
                        run_dir, environment, *, capacity_bootstrap=False):
     from .autotune import calibration_signature

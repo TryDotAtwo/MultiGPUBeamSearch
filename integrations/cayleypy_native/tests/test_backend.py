@@ -70,6 +70,56 @@ def test_native_options_delegate_to_rust_validator_when_available(monkeypatch, t
     assert calls[0]["devices"] == [2, 0]
 
 
+def test_native_options_keep_python_validation_for_old_extensions(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    with pytest.raises(ValueError, match="solution_mode must be first or collect"):
+        NativeOptions(solution_mode="unknown")
+
+
+def test_native_options_keep_python_fallback_outside_rust_integer_ranges(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    calls = []
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(validate_options=lambda payload: calls.append(payload)),
+    )
+
+    NativeOptions(num_gpus=65536)
+
+    assert calls == []
+
+
+def test_native_options_propagate_rust_validation_errors(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    def reject(_payload):
+        raise ValueError("invalid Rust option")
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(validate_options=reject),
+    )
+
+    with pytest.raises(ValueError, match="invalid Rust option"):
+        NativeOptions()
+
+
+def test_rust_extension_exposes_native_options_validator():
+    from multigpubeamsearch.rust_control import extension
+
+    native = extension()
+    result = json.loads(native.validate_options(json.dumps({"cache_dir": ".local/cache"})))
+    assert result["cache_dir"] == ".local/cache"
+    with pytest.raises(ValueError, match="invalid touch BFS bounds"):
+        native.validate_options(json.dumps({"cache_dir": ".local/cache", "touch_bfs_radius": 13}))
+
+
 def invoke_fixture(tmp_path, text, *, code=0):
     """Explicitly fake producer, run by the real subprocess lifetime helper."""
     log = tmp_path / "fake-native.log"

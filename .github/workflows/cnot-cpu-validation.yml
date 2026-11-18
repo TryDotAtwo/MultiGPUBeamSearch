@@ -87,6 +87,10 @@ jobs:
           set -o pipefail
           python -m pytest -q \
             integrations/cayleypy_native/tests/test_backend.py::test_native_options_delegate_to_rust_validator_when_available \
+            integrations/cayleypy_native/tests/test_backend.py::test_native_options_keep_python_validation_for_old_extensions \
+            integrations/cayleypy_native/tests/test_backend.py::test_native_options_keep_python_fallback_outside_rust_integer_ranges \
+            integrations/cayleypy_native/tests/test_backend.py::test_native_options_propagate_rust_validation_errors \
+            integrations/cayleypy_native/tests/test_backend.py::test_rust_extension_exposes_native_options_validator \
             integrations/cayleypy_native/tests/test_cnot_search.py \
             integrations/cayleypy_native/tests/test_cnot_control_collectives.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py \

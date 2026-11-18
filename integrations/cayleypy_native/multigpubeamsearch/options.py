@@ -35,6 +35,20 @@ class NativeOptions:
     experimental_index_sort: bool = False
 
     def __post_init__(self):
+        for name in ("source_dir", "cache_dir", "cutlass_dir", "runner_path"):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(self, name, Path(value).expanduser().resolve())
+        if self.devices is not None:
+            object.__setattr__(self, "devices", tuple(self.devices))
+
+        from .rust_control import validate_options
+
+        if validate_options(self):
+            return
+        self._validate_python()
+
+    def _validate_python(self):
         if self.solution_mode not in ("first", "collect"):
             raise ValueError("solution_mode must be first or collect")
         if type(self.collect_extra_depths) is not int or not 0 <= self.collect_extra_depths < 2**32:
@@ -47,15 +61,10 @@ class NativeOptions:
             raise ValueError("num_gpus must be a positive integer")
         if self.num_gpus is not None and self.devices is not None:
             raise ValueError("specify num_gpus or devices, not both")
-        for name in ("source_dir", "cache_dir", "cutlass_dir", "runner_path"):
-            value = getattr(self, name)
-            if value is not None:
-                object.__setattr__(self, name, Path(value).expanduser().resolve())
         if self.devices is not None:
-            values = tuple(self.devices)
+            values = self.devices
             if not values or any(type(v) is not int or v < 0 for v in values) or len(set(values)) != len(values):
                 raise ValueError("devices must be a nonempty sequence of distinct nonnegative CUDA indices")
-            object.__setattr__(self, "devices", values)
         import math
         for name in ("timeout_seconds", "build_timeout_seconds", "calibration_seconds", "calibration_pipeline_seconds"):
             value = getattr(self, name)
