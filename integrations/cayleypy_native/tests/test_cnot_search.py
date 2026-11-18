@@ -179,6 +179,47 @@ def test_auto_validation_delegates_owned_matrix_preparation(monkeypatch):
     assert result.root is snapshot and result.rust_matrix is marker
 
 
+def test_compatibility_cnot_stage_goal_delegates_to_rust(monkeypatch):
+    from types import SimpleNamespace
+    from multigpubeamsearch import cnot_rust_stages, rust_control
+
+    world, parents, lex, identity = object(), object(), object(), object()
+    expected = (19, 2)
+    calls = []
+
+    def run_goal(actual_world, actual_parents, actual_lex, begin, actual_identity):
+        calls.append((actual_world, actual_parents, actual_lex, begin, actual_identity))
+        return expected
+
+    stages = object.__new__(cnot_rust_stages.CnotStages)
+    stages.world, stages.parents, stages.lex, stages.identity = world, parents, lex, identity
+    monkeypatch.setattr(rust_control, "extension",
+                        lambda: SimpleNamespace(run_cnot_native_goal=run_goal))
+    monkeypatch.setattr(cnot, "_goal", lambda *args, **kwargs: pytest.fail("Python goal ran"))
+
+    assert stages.goal(7) == expected
+    assert calls == [(world, parents, lex, 7, identity)]
+
+
+def test_compatibility_cnot_stage_goal_keeps_old_extension_fallback(monkeypatch):
+    from types import SimpleNamespace
+    from multigpubeamsearch import cnot_rust_stages, rust_control
+
+    world = SimpleNamespace(device=torch.device("cpu"))
+    parents = pack_rows((1, 2))
+    lex = torch.tensor([0], dtype=torch.int64)
+    identity = pack_rows((1, 2))
+    stages = object.__new__(cnot_rust_stages.CnotStages)
+    stages.world, stages.parents, stages.lex, stages.identity = world, parents, lex, identity
+    marker = (123, 4)
+    calls = []
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+    monkeypatch.setattr(cnot, "_goal", lambda *args: calls.append(args) or marker)
+
+    assert stages.goal(9) == marker
+    assert calls == [(world, parents, lex, 9, identity)]
+
+
 def test_rust_input_preparer_owns_snapshot_and_matrix_validation():
     from multigpubeamsearch.rust_control import extension
 
