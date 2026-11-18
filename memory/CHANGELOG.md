@@ -2050,3 +2050,16 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   skipped transfer/build/NCCL without changing its state. Physical CUDA/NCCL
   and multi-GPU CNOT runtime remain unverified. Details:
   `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
+
+## 2026-11-18 - Rust CNOT top-level orchestration (in progress)
+
+- The Rust controller now owns per-call admission coordination, input
+  consensus, transport selection, and native-versus-compatibility stage
+  dispatch. Python remains the public adapter, model/scorer callback boundary,
+  and old-extension/reference fallback. Collective order and stage arguments
+  are pinned by controller tests; no search algorithm or precision policy was
+  changed.
+- Test-first run 44390118399 failed on the two expected missing-controller
+  assertions (157 passed, 2 skipped). The implementation and regression tests
+  are on `codex/cnot-search-runtime`; hosted green verification is pending.
+  CUDA/NCCL runtime is not claimed.

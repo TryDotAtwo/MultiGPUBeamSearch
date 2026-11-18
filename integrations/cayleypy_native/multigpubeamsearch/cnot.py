@@ -244,6 +244,17 @@ def _native_stages_runner():
     return getattr(extension(), "run_cnot_native", None)
 
 
+def _native_search_runner():
+    """Return the Rust rank-control entry point when the matching ABI is present."""
+    from .errors import NativeUnavailable
+    from .rust_control import extension
+
+    try:
+        return getattr(extension(), "run_cnot_native_search", None)
+    except (ImportError, NativeUnavailable):
+        return None
+
+
 def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation, engine):
     input_matrix = _input(root, width, shortlist, max_depth, mode, validation)
     engine, runner = _search_engine(engine, max_depth)
@@ -255,6 +266,35 @@ def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation, e
     hasher = hashlib.sha256(input_matrix.raw)
     hasher.update(json.dumps(config).encode())
     return input_matrix, hasher.digest(), runner
+
+
+def _make_compat_stages(world, root, identity, input_matrix, scorer, mode, audit):
+    from .cnot_rust_stages import CnotStages
+
+    return CnotStages(world, root, identity, input_matrix, scorer, mode, audit)
+
+
+def _search_cnot_compat(world, root, scorer, width, shortlist, max_depth,
+                        mode, audit, validation, engine):
+    """Compatibility orchestration for older PyO3 extensions."""
+    input_matrix, digest, runner = world.checked("validate CNOT input", lambda: _admit(
+        root, scorer, width, shortlist, max_depth, mode, audit, validation, engine))
+    root = input_matrix.root
+    world.require_consensus(digest)
+    world.start_transport(prefer_rust=runner is not None)
+    identity = native.cnot_identity(input_matrix.n, device=world.device)
+    if runner is not None:
+        native_runner = _native_stages_runner()
+        use_native = world.all_ranks_support(native_runner is not None)
+        alphabet = input_matrix.n * (input_matrix.n - 1)
+        if use_native:
+            return native_runner(world, root, identity, input_matrix, scorer, mode, audit,
+                                 width, min(shortlist, alphabet), alphabet, max_depth)
+        stages = _make_compat_stages(world, root, identity, input_matrix, scorer, mode, audit)
+        return runner(stages, world.rank, world.size, width, min(shortlist, alphabet), alphabet, max_depth)
+    if torch.equal(root, identity):
+        return CnotResult("solved", (), [], [])
+    return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
 
 
 @torch.inference_mode(False)
@@ -274,26 +314,14 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
     Tensor operations, scorer callbacks and collectives are unchanged.
     """
     with World(root.device) as world:
-        input_matrix, digest, runner = world.checked("validate CNOT input", lambda: _admit(
-            root, scorer, width, shortlist, max_depth, mode, audit, validation, engine))
-        root = input_matrix.root
-        world.require_consensus(digest)
-        world.start_transport(prefer_rust=runner is not None)
-        identity = native.cnot_identity(input_matrix.n, device=world.device)
-        if runner is not None:
-            native_runner = _native_stages_runner()
-            use_native = world.all_ranks_support(native_runner is not None)
-            alphabet = input_matrix.n * (input_matrix.n - 1)
-            if use_native:
-                return native_runner(world, root, identity, input_matrix, scorer, mode, audit,
-                                     width, min(shortlist, alphabet), alphabet, max_depth)
-            from .cnot_rust_stages import CnotStages
-
-            stages = CnotStages(world, root, identity, input_matrix, scorer, mode, audit)
-            return runner(stages, world.rank, world.size, width, min(shortlist, alphabet), alphabet, max_depth)
-        if torch.equal(root, identity):
-            return CnotResult("solved", (), [], [])
-        return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
+        native_runner = _native_search_runner()
+        if native_runner is not None:
+            options = (width, shortlist, max_depth, mode, audit, validation, engine)
+            callbacks = (_admit, native.cnot_identity, _native_stages_runner,
+                         _make_compat_stages, _search, CnotResult)
+            return native_runner(world, root, scorer, options, callbacks)
+        return _search_cnot_compat(world, root, scorer, width, shortlist,
+                                   max_depth, mode, audit, validation, engine)
 
 
 def _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit):

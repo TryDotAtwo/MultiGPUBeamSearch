@@ -95,7 +95,9 @@ existing ATen operator or the same Torch tensor operations when it is missing.
 The older Python stage adapter retains its original goal implementation.
 The Rust stage backend also owns the existing error vote and failure-message
 gather for initialization, expansion and distinct-child evaluation. Admission
-and the compatibility backend continue to use the Python world adapter.
+now runs under the Rust rank controller and retains the same Python world
+adapter for the existing process-group operations. Older extensions without
+the controller keep the former Python orchestration.
 Old externally provided operator libraries fall back to the existing tensor
 implementation, whose expansion, distinct preparation and score validation
 are now orchestrated by Rust. The operations and full-matrix comparisons are
@@ -107,9 +109,13 @@ updates and final record ordering in C++ ATen when matching operators are
 available. The new stage backend also retains the selection masks, keys and
 batch handles in Rust; its CUDA and CPU paths use the same Torch operations and
 rank collective schedule. The Python selection adapter remains available for
-the compatible older controller path. Remaining tensor stages, scoring and
-collective management are partly in Python. This is not yet a complete
-Rust/C++ CNOT runtime.
+the compatible older controller path. The top-level Rust CNOT controller now
+owns each invocation's admission error coordination, input consensus,
+transport selection, and choice between native and compatibility stage
+providers. PyTorch still owns the rank process group and tensor storage;
+arbitrary Python scorer callbacks and the explicit Python reference engine
+remain supported. The `World` adapter retains the established process-group
+calls. This is not yet a complete Rust/C++ CNOT runtime.
 
 For multi-rank Rust CNOT searches, CUDA owner counts and stable send-record
 grouping use C++ ATen when the matching operator is available. After all ranks

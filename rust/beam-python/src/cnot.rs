@@ -181,6 +181,157 @@ fn run_cnot_selection(stages: Bound<'_, PyAny>, width: u64) -> PyResult<Py<PyAny
     cnot_selection::select(&mut PySelection { stages }, width)
 }
 
+/// Own the CNOT rank-control path while leaving model preparation and
+/// compatibility stage providers behind explicit callbacks. This keeps the
+/// public Python signature intact and preserves the established collective
+/// order for admission, consensus, transport selection, and stage dispatch.
+#[pyfunction]
+fn run_cnot_native_search<'py>(
+    py: Python<'py>,
+    world: Bound<'py, PyAny>,
+    root: Bound<'py, PyAny>,
+    scorer: Bound<'py, PyAny>,
+    options: Bound<'py, PyAny>,
+    callbacks: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let options = options.downcast::<PyTuple>()?;
+    let callbacks = callbacks.downcast::<PyTuple>()?;
+    if options.len() != 7 || callbacks.len() != 6 {
+        return Err(PyRuntimeError::new_err(
+            "invalid Rust CNOT search adapter contract",
+        ));
+    }
+
+    let width = options.get_item(0)?;
+    let shortlist = options.get_item(1)?;
+    let max_depth = options.get_item(2)?;
+    let mode = options.get_item(3)?;
+    let audit = options.get_item(4)?;
+    let validation = options.get_item(5)?;
+    let engine = options.get_item(6)?;
+
+    let admit = callbacks.get_item(0)?;
+    let identity_builder = callbacks.get_item(1)?;
+    let native_stages_builder = callbacks.get_item(2)?;
+    let compatibility_stages_builder = callbacks.get_item(3)?;
+    let reference_search = callbacks.get_item(4)?;
+    let result_type = callbacks.get_item(5)?;
+
+    let admitted = crate::cnot_native_checked::checked(
+        py,
+        &world,
+        "validate CNOT input",
+        admit.call1((
+            root.clone(),
+            scorer.clone(),
+            width.clone(),
+            shortlist.clone(),
+            max_depth.clone(),
+            mode.clone(),
+            audit.clone(),
+            validation,
+            engine,
+        )),
+    )?;
+    let admitted = admitted.downcast::<PyTuple>()?;
+    if admitted.len() != 3 {
+        return Err(PyRuntimeError::new_err(
+            "CNOT admission returned an invalid adapter result",
+        ));
+    }
+    let input_matrix = admitted.get_item(0)?;
+    let digest: Vec<u8> = admitted.get_item(1)?.extract()?;
+    let search_runner = admitted.get_item(2)?;
+
+    world.call_method1("require_consensus", (digest,))?;
+    let transport_args = PyDict::new(py);
+    transport_args.set_item("prefer_rust", !search_runner.is_none())?;
+    world.call_method("start_transport", (), Some(&transport_args))?;
+
+    let wires: u32 = input_matrix.getattr("n")?.extract()?;
+    let identity_args = PyDict::new(py);
+    identity_args.set_item("device", world.getattr("device")?)?;
+    let identity = identity_builder.call((wires,), Some(&identity_args))?;
+    let alphabet = wires * (wires - 1);
+
+    if !search_runner.is_none() {
+        let native_stages = native_stages_builder.call0()?;
+        let supports_native = world
+            .call_method1("all_ranks_support", (!native_stages.is_none(),))?
+            .extract::<bool>()?;
+        let rank: u32 = world.getattr("rank")?.extract()?;
+        let world_size: u32 = world.getattr("size")?.extract()?;
+        let width: u64 = width.extract()?;
+        let shortlist_limit = py
+            .import("builtins")?
+            .getattr("min")?
+            .call1((shortlist, alphabet))?;
+        let shortlist_value: u32 = shortlist_limit.extract()?;
+        let depth: u64 = max_depth.extract()?;
+
+        if supports_native {
+            return native_stages.call1((
+                world,
+                input_matrix.getattr("root")?,
+                identity,
+                input_matrix,
+                scorer,
+                mode,
+                audit,
+                width,
+                shortlist_value,
+                alphabet,
+                depth,
+            ));
+        }
+
+        let stages = compatibility_stages_builder.call1((
+            world,
+            input_matrix.getattr("root")?,
+            identity,
+            input_matrix,
+            scorer,
+            mode,
+            audit,
+        ))?;
+        return search_runner.call1((
+            stages,
+            rank,
+            world_size,
+            width,
+            shortlist_value,
+            alphabet,
+            depth,
+        ));
+    }
+
+    let admitted_root = input_matrix.getattr("root")?;
+    if py
+        .import("torch")?
+        .call_method1("equal", (&admitted_root, &identity))?
+        .extract::<bool>()?
+    {
+        return result_type.call1((
+            "solved",
+            PyTuple::empty(py),
+            PyList::empty(py),
+            PyList::empty(py),
+        ));
+    }
+    reference_search.call1((
+        world,
+        admitted_root,
+        identity,
+        input_matrix,
+        scorer,
+        width,
+        shortlist,
+        max_depth,
+        mode,
+        audit,
+    ))
+}
+
 /// Run on the calling rank's thread: Torch's current device/stream and
 /// inference-mode context are thread-local. Only complete stages cross PyO3.
 #[pyfunction]
@@ -238,6 +389,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotMatrix>()?;
     module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_require_consensus, module)?)?;
+    module.add_function(wrap_pyfunction!(run_cnot_native_search, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_selection, module)?)
 }
