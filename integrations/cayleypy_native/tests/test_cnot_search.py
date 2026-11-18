@@ -221,24 +221,26 @@ def test_compatibility_cnot_stage_goal_keeps_old_extension_fallback(monkeypatch)
 def test_rust_input_preparer_owns_snapshot_and_matrix_validation():
     from multigpubeamsearch.rust_control import extension
 
-    prepare = getattr(extension(), "prepare_cnot_input")
+    native = extension()
     original = replay_cnot(4, (0,))
     root = pack_rows(original)
     expected = root.numpy().tobytes()
-    n, raw, snapshot, matrix = prepare(root, 1, 1, 1, "qhat")
+    prepared = cnot._input(root, 1, 1, 1, "qhat", "auto")
 
+    assert isinstance(prepared, native.CnotSearchInput)
+    assert prepared.n == 4 and prepared.raw == expected
+    snapshot = prepared.root
     root[0, 0, 0] ^= 1
-    assert n == 4 and raw == expected
     assert snapshot.data_ptr() != root.data_ptr()
     assert tuple(int(value) for value in snapshot[0, :, 0].tolist()) == original
-    assert matrix.verifies_construction((0,))
+    assert prepared.verifies_construction((0,))
 
     padded = pack_rows((1, 2, 4))
     padded[0, 0, 0] = -(1 << 63)
     with pytest.raises(ValueError, match="CNOT row padding"):
-        prepare(padded, 1, 1, 1, "qhat")
+        native.prepare_cnot_input(padded, 1, 1, 1, "qhat")
     with pytest.raises(ValueError, match="CNOT matrix is singular"):
-        prepare(pack_rows((1, 1, 2)), 1, 1, 1, "qhat")
+        native.prepare_cnot_input(pack_rows((1, 1, 2)), 1, 1, 1, "qhat")
 
 
 def test_explicit_rust_validation_fails_closed_for_old_extension(monkeypatch):
