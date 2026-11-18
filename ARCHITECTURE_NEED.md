@@ -69,6 +69,14 @@ assert. Эта проверка добавляет синхронизацию с
 ограничение получения его логов описаны в
 `test_results/refactor_20261117/cnot-device-error/GITHUB_STATUS.md`.
 
+## CNOT optional-extension compatibility, 2026-11-18
+
+`rust_control.extension()` tries both supported PyO3 module names. Missing modules and import/dependency failures become `NativeUnavailable`. The public CNOT `validation="auto"` and `engine="auto"` paths can then retain the Python compatibility implementation; explicit `rust` selections fail closed.
+
+With the matching module, all ranks use the Rust CNOT controller and native stage owner when that capability is present. Packed-matrix GPU operations dispatch to existing C++ ATen/CUDA operators, PyTorch continues to own tensor storage, and arbitrary Python scorers remain supported. Older modules keep the compatibility stage adapter. This update changes extension-load error handling only; it does not change the search algorithm or GPU stages.
+
+Hosted validation covered CPU/control flow and extension build/import. CUDA execution, NCCL runtime, and physical multi-GPU search remain unverified.
+
 ## Переход CNOT на Rust, 2026-11-16
 
 `search_cnot` по умолчанию выбирает Rust-контроллер, когда установлен
