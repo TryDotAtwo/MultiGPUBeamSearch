@@ -50,10 +50,12 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
     assert callable(controller), "matching Rust CNOT top-level controller is required"
 
     events = []
-    caller_root, scorer = object(), object()
-    admitted_root, identity = object(), object()
-    input_matrix = SimpleNamespace(root=admitted_root, n=3)
-    digest, result = bytes(range(32)), object()
+    caller_root = object()
+    scorer = SimpleNamespace(metadata={})
+    admitted_root, identity = SimpleNamespace(shape=(1, 3, 1)), object()
+    raw = b"packed-root"
+    input_matrix = SimpleNamespace(root=admitted_root, raw=raw, n=3)
+    result = object()
 
     class World:
         rank, size, device = 0, 1, "cpu"
@@ -70,9 +72,9 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
 
     world = World()
 
-    def admit(*args):
-        events.append(("admit", *args))
-        return input_matrix, digest, object()
+    def prepare_input(*args):
+        events.append(("prepare-input", *args))
+        return input_matrix
 
     def identity_builder(wires, *, device):
         events.append(("identity", wires, device))
@@ -90,11 +92,19 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         raise AssertionError("unexpected Python CNOT fallback callback")
 
     options = (5, 9, 4, "qhat", True, "auto", "rust")
-    callbacks = (admit, identity_builder, native_stages, forbidden, forbidden, cnot.CnotResult)
+    callbacks = (prepare_input, identity_builder, native_stages, forbidden, forbidden,
+                 cnot.CnotResult)
     assert controller(world, caller_root, scorer, options, callbacks) is result
+    import hashlib
+    import json
+
+    config = (5, 9, 4, "qhat", True, "auto", "rust", (1, 3, 1),
+              (None, None, None, None, None))
+    expected_digest = hashlib.sha256(raw)
+    expected_digest.update(json.dumps(config).encode())
     assert events == [
-        ("admit", caller_root, scorer, *options),
-        ("consensus", digest),
+        ("prepare-input", caller_root, 5, 9, 4, "qhat", "auto"),
+        ("consensus", expected_digest.digest()),
         ("transport", True),
         ("identity", 3, "cpu"),
         ("native-runner",),
@@ -110,10 +120,9 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     assert callable(controller), "matching Rust CNOT top-level controller is required"
 
     events = []
-    caller_root, admitted_root, scorer = object(), object(), object()
-    identity, stages, result = object(), object(), object()
-    input_matrix = SimpleNamespace(root=admitted_root, n=4)
-    digest = bytes(range(32))
+    caller_root, scorer = object(), SimpleNamespace(metadata={})
+    admitted_root, identity = SimpleNamespace(shape=(1, 4, 1)), object()
+    input_matrix = SimpleNamespace(root=admitted_root, raw=b"packed-root", n=4)
 
     class World:
         rank, size, device = 1, 2, "cpu"
@@ -138,13 +147,9 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
 
     world = World()
 
-    def admit(*args):
-        events.append(("admit", *args))
-        return input_matrix, digest, rust_search
-
-    def rust_search(*args):
-        events.append(("rust-search", *args))
-        return result
+    def prepare_input(*args):
+        events.append(("prepare-input", *args))
+        return input_matrix
 
     def identity_builder(wires, *, device):
         events.append(("identity", wires, device))
@@ -154,6 +159,13 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
         events.append(("native-runner",))
         return object()
 
+    class Stages:
+        def root_is_goal(self):
+            events.append(("root-is-goal",))
+            return True
+
+    stages = Stages()
+
     def make_stages(*args):
         events.append(("make-stages", *args))
         return stages
@@ -162,21 +174,90 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
         raise AssertionError("unexpected Python reference CNOT search")
 
     options = (7, 12, 8, "proposal", False, "rust", "auto")
-    callbacks = (admit, identity_builder, native_stages, make_stages, forbidden,
+    callbacks = (prepare_input, identity_builder, native_stages, make_stages, forbidden,
                  cnot.CnotResult)
-    assert controller(world, caller_root, scorer, options, callbacks) is result
+    result = controller(world, caller_root, scorer, options, callbacks)
+    assert isinstance(result, cnot.CnotResult)
+    assert result.status == "solved" and result.gates == ()
+    import hashlib
+    import json
+
+    config = (7, 12, 8, "proposal", False, "rust", "rust", (1, 4, 1),
+              (None, None, None, None, None))
+    expected_digest = hashlib.sha256(b"packed-root")
+    expected_digest.update(json.dumps(config).encode())
     assert events == [
-        ("admit", caller_root, scorer, *options),
+        ("prepare-input", caller_root, 7, 12, 8, "proposal", "rust"),
         ("longs", [0]),
         ("sum", [0]),
-        ("consensus", digest),
+        ("consensus", expected_digest.digest()),
         ("transport", True),
         ("identity", 4, "cpu"),
         ("native-runner",),
         ("support", True),
         ("make-stages", world, admitted_root, identity, input_matrix, scorer,
          "proposal", False),
-        ("rust-search", stages, 1, 2, 7, 12, 12, 8),
+        ("root-is-goal",),
+    ]
+
+
+@pytest.mark.parametrize(("engine", "max_depth"), [("python", 2**70), ("auto", 2**64)])
+def test_rust_top_level_controller_routes_python_engine_and_unbounded_depth(
+        monkeypatch, engine, max_depth):
+    require_controller()
+    controller = rust_control.extension().run_cnot_native_search
+    events = []
+    caller_root = object()
+    admitted_root = SimpleNamespace(shape=(1, 2, 1))
+    scorer = SimpleNamespace(metadata={})
+    input_matrix = SimpleNamespace(root=admitted_root, raw=b"packed-root", n=2)
+    identity, result = object(), object()
+
+    class World:
+        rank, size, device = 0, 1, "cpu"
+
+        def require_consensus(self, digest):
+            events.append(("consensus", digest))
+
+        def start_transport(self, *, prefer_rust):
+            events.append(("transport", prefer_rust))
+
+    def prepare_input(root, width, shortlist, depth, mode, validation):
+        events.append(("prepare-input", root, width, shortlist, depth, mode, validation))
+        return input_matrix
+
+    def identity_builder(wires, *, device):
+        events.append(("identity", wires, device))
+        return identity
+
+    def reference(*args):
+        events.append(("reference", *args))
+        return result
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("unexpected Rust CNOT stage")
+
+    monkeypatch.setattr(torch, "equal", lambda *_: False)
+    options = (1, 1, max_depth, "qhat", False, "auto", engine)
+    callbacks = (prepare_input, identity_builder, forbidden, forbidden, reference,
+                 cnot.CnotResult)
+    world = World()
+
+    assert controller(world, caller_root, scorer, options, callbacks) is result
+    import hashlib
+    import json
+
+    config = (1, 1, max_depth, "qhat", False, "auto", "python", (1, 2, 1),
+              (None, None, None, None, None))
+    expected_digest = hashlib.sha256(b"packed-root")
+    expected_digest.update(json.dumps(config).encode())
+    assert events == [
+        ("prepare-input", caller_root, 1, 1, max_depth, "qhat", "auto"),
+        ("consensus", expected_digest.digest()),
+        ("transport", False),
+        ("identity", 2, "cpu"),
+        ("reference", world, admitted_root, identity, input_matrix, scorer,
+         1, 1, max_depth, "qhat", False),
     ]
 
 
