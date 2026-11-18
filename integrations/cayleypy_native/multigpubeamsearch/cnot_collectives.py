@@ -47,6 +47,9 @@ class World:
 
     def sum(self, tensor):
         if self.size > 1:
+            used, result = self._rust_collective("run_cnot_native_sum", tensor)
+            if used:
+                return result
             if self.transport is not None and hasattr(self.transport, "sum"):
                 self.transport.sum(tensor)
             else:
@@ -56,6 +59,9 @@ class World:
     def gather_fixed(self, tensor):
         if self.size == 1:
             return tensor.unsqueeze(0)
+        used, result = self._rust_collective("run_cnot_native_gather_fixed", tensor)
+        if used:
+            return result
         if self.transport is not None and hasattr(self.transport, "gather_fixed"):
             return self.transport.gather_fixed(tensor)
         parts = [torch.empty_like(tensor) for _ in range(self.size)]
@@ -64,6 +70,9 @@ class World:
 
     def broadcast(self, tensor, source):
         if self.size > 1:
+            used, result = self._rust_collective("run_cnot_native_broadcast", tensor, source)
+            if used:
+                return result
             if self.transport is not None and hasattr(self.transport, "broadcast"):
                 self.transport.broadcast(tensor, source)
             else:
@@ -95,6 +104,18 @@ class World:
             dist.all_gather_object(errors, error)
             raise RuntimeError(f"{stage} failed: " + " | ".join(e for e in errors if e))
         return result
+
+    def _rust_collective(self, name, *args):
+        try:
+            from .errors import NativeUnavailable
+            from .rust_control import extension
+
+            operation = getattr(extension(), name, None)
+        except NativeUnavailable:
+            operation = None
+        if callable(operation):
+            return True, operation(self, *args)
+        return False, None
 
     def gather_rows(self, rows):
         """Replicate variable-size metadata with O(total rows) storage, including empty ranks."""

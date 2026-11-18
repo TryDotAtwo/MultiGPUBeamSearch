@@ -6,8 +6,75 @@
 use pyo3::{
     exceptions::{PyOverflowError, PyRuntimeError},
     prelude::*,
-    types::PyDict,
+    types::{PyDict, PyList},
 };
+
+#[pyfunction]
+fn run_cnot_native_sum<'py>(
+    py: Python<'py>,
+    world: Bound<'py, PyAny>,
+    tensor: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let size: usize = world.getattr("size")?.extract()?;
+    if size > 1 {
+        let transport = world.getattr("transport")?;
+        if !transport.is_none() && transport.hasattr("sum")? {
+            transport.call_method1("sum", (&tensor,))?;
+        } else {
+            py.import("torch.distributed")?
+                .call_method1("all_reduce", (&tensor,))?;
+        }
+    }
+    Ok(tensor)
+}
+
+#[pyfunction]
+fn run_cnot_native_gather_fixed<'py>(
+    py: Python<'py>,
+    world: Bound<'py, PyAny>,
+    tensor: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let size: usize = world.getattr("size")?.extract()?;
+    if size == 1 {
+        return tensor.call_method1("unsqueeze", (0,));
+    }
+
+    let transport = world.getattr("transport")?;
+    if !transport.is_none() && transport.hasattr("gather_fixed")? {
+        return transport.call_method1("gather_fixed", (&tensor,));
+    }
+
+    let torch = py.import("torch")?;
+    let mut parts = Vec::with_capacity(size);
+    for _ in 0..size {
+        parts.push(torch.call_method1("empty_like", (&tensor,))?);
+    }
+    let parts = PyList::new(py, parts)?;
+    let contiguous = tensor.call_method0("contiguous")?;
+    py.import("torch.distributed")?
+        .call_method1("all_gather", (&parts, contiguous))?;
+    torch.call_method1("stack", (&parts,))
+}
+
+#[pyfunction]
+fn run_cnot_native_broadcast<'py>(
+    py: Python<'py>,
+    world: Bound<'py, PyAny>,
+    tensor: Bound<'py, PyAny>,
+    source: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let size: usize = world.getattr("size")?.extract()?;
+    if size > 1 {
+        let transport = world.getattr("transport")?;
+        if !transport.is_none() && transport.hasattr("broadcast")? {
+            transport.call_method1("broadcast", (&tensor, &source))?;
+        } else {
+            py.import("torch.distributed")?
+                .call_method1("broadcast", (&tensor, &source))?;
+        }
+    }
+    Ok(tensor)
+}
 
 /// Replicate variable-size rows in source-rank order over the existing world.
 ///
@@ -136,6 +203,9 @@ fn run_cnot_native_exchange<'py>(
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(run_cnot_native_sum, module)?)?;
+    module.add_function(wrap_pyfunction!(run_cnot_native_gather_fixed, module)?)?;
+    module.add_function(wrap_pyfunction!(run_cnot_native_broadcast, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_gather_rows, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_exchange, module)?)
 }
