@@ -19,6 +19,7 @@ on:
       - integrations/cayleypy_native/tests/test_cnot_search.py
       - integrations/cayleypy_native/tests/test_cnot_rust_controller.py
       - integrations/cayleypy_native/tests/test_cnot_control_collectives.py
+      - integrations/cayleypy_native/tests/test_cnot_rust_exchange.py
       - integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py
       - integrations/cayleypy_native/tests/test_cnot_scorer_batch_api.py
       - integrations/cayleypy_native/multigpubeamsearch/rust_control.py
@@ -100,6 +101,7 @@ jobs:
             integrations/cayleypy_native/tests/test_public_index_sort_build.py \
             integrations/cayleypy_native/tests/test_cnot_search.py \
             integrations/cayleypy_native/tests/test_cnot_control_collectives.py \
+            integrations/cayleypy_native/tests/test_cnot_rust_exchange.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_batch_api.py \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_stages_without_python_stage_object \

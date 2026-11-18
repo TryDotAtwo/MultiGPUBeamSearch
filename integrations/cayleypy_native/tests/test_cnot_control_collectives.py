@@ -24,6 +24,10 @@ class RecordingTransport:
         self.calls.append(("broadcast", tensor, source))
         return tensor
 
+    def exchange(self, rows, counts):
+        self.calls.append(("exchange", rows, counts))
+        return rows
+
 
 def _two_rank_world():
     world = World("cpu")
@@ -133,6 +137,57 @@ def test_control_collectives_keep_the_torch_fallback_without_rust_transport(monk
     assert torch.equal(world.gather_fixed(value), torch.tensor([[3, 4], [8, 9]]))
     assert world.broadcast(value, 1) is value
     assert [call[0] for call in calls] == ["sum", "gather_fixed", "broadcast"]
+
+
+def test_rust_world_exchange_abi_is_exposed():
+    native = rust_control.extension()
+    assert callable(getattr(native, "run_cnot_native_world_exchange", None))
+
+
+def test_world_exchange_delegates_to_rust_and_preserves_packet_flag(monkeypatch):
+    world = _two_rank_world()
+    world.transport = RecordingTransport()
+    rows = torch.tensor([[5, 6]], dtype=torch.int64)
+    targets = torch.tensor([1], dtype=torch.int64)
+    expected = {
+        False: torch.tensor([[10, 11]], dtype=torch.int64),
+        True: torch.tensor([[20, 21]], dtype=torch.int64),
+    }
+    calls = []
+
+    def exchange(actual_world, actual_rows, actual_targets, native_packet):
+        calls.append((actual_world, actual_rows, actual_targets, native_packet))
+        return expected[native_packet]
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(run_cnot_native_world_exchange=exchange),
+    )
+
+    assert world.exchange(rows, targets) is expected[False]
+    assert world.exchange(rows, targets, native_packet=True) is expected[True]
+    assert calls == [
+        (world, rows, targets, False),
+        (world, rows, targets, True),
+    ]
+    assert world.transport.calls == []
+
+
+def test_world_exchange_preserves_python_fallback_for_older_extensions(monkeypatch):
+    world = _two_rank_world()
+    transport = RecordingTransport()
+    world.transport = transport
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+    rows = torch.tensor([[30, 31], [10, 11], [20, 21]], dtype=torch.int64)
+    targets = torch.tensor([1, 0, 1], dtype=torch.int64)
+
+    result = world.exchange(rows, targets)
+
+    assert result.tolist() == [[10, 11], [30, 31], [20, 21]]
+    assert [call[0] for call in transport.calls] == ["exchange"]
+    assert transport.calls[0][1].tolist() == [[10, 11], [30, 31], [20, 21]]
+    assert transport.calls[0][2].tolist() == [1, 2]
 
 
 def test_checked_stage_delegates_rank_error_coordination_to_rust(monkeypatch):
