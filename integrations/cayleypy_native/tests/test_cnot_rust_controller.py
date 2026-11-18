@@ -90,7 +90,7 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         raise AssertionError("unexpected Python CNOT fallback callback")
 
     options = (5, 9, 4, "qhat", True, "auto", "rust")
-    callbacks = (admit, identity_builder, native_stages, forbidden, forbidden, CnotResult)
+    callbacks = (admit, identity_builder, native_stages, forbidden, forbidden, cnot.CnotResult)
     assert controller(world, caller_root, scorer, options, callbacks) is result
     assert events == [
         ("admit", caller_root, scorer, *options),
@@ -154,7 +154,8 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
         raise AssertionError("unexpected Python reference CNOT search")
 
     options = (7, 12, 8, "proposal", False, "rust", "auto")
-    callbacks = (admit, identity_builder, native_stages, make_stages, forbidden, CnotResult)
+    callbacks = (admit, identity_builder, native_stages, make_stages, forbidden,
+                 cnot.CnotResult)
     assert controller(world, caller_root, scorer, options, callbacks) is result
     assert events == [
         ("admit", caller_root, scorer, *options),
