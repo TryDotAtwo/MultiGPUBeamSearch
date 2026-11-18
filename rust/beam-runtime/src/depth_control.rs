@@ -1,6 +1,6 @@
 //! Rust-owned decisions at the two nonterminal permutation-depth boundaries.
-pub use beam_native_sys::depth_control::{Checkpoint as DepthCheckpoint, TrackedPathStop};
 use beam_native_sys::depth_control::DepthControlSink;
+pub use beam_native_sys::depth_control::{Checkpoint as DepthCheckpoint, TrackedPathStop};
 
 pub fn continue_after(checkpoint: DepthCheckpoint) -> bool {
     match checkpoint {
