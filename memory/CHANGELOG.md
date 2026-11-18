@@ -2101,5 +2101,8 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   formatting/checks, PyO3 build, 163 Python tests (2 skipped), and NCCL probe
   syntax. Artifact 14471674104 SHA-256:
   `107089bf02bbb70c4184c339f04e57e8a764f496326a2bb3cdc48ba0c7de818e`.
+  Main run 44400879269 passed the same checks with 163 passed and 2 skipped.
+  Artifact 14474065000 SHA-256:
+  `d7393cf17c75f014ce44c81b676103a668e22344df9bb3dde1929a401a21e758`.
   Physical CUDA/NCCL and multi-GPU CNOT execution remain unverified. See
   `test_results/refactor_20261119/cnot-compat-goal/GITHUB_STATUS.md`.
