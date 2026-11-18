@@ -121,6 +121,43 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
     ]
 
 
+def test_rust_controller_prepares_typed_input_without_python_builder(monkeypatch):
+    require_controller()
+    controller = rust_control.extension().run_cnot_native_search
+    root = cnot.pack_rows((1, 2))
+    scorer = SimpleNamespace(metadata={})
+    identity = object()
+
+    class World:
+        rank, size, device = 0, 1, "cpu"
+
+        def require_consensus(self, _digest):
+            pass
+
+        def start_transport(self, *, prefer_rust):
+            assert not prefer_rust
+
+    def python_input_builder(*_args):
+        pytest.fail("Rust admission must construct the typed CNOT input directly")
+
+    def identity_builder(wires, *, device):
+        assert wires == 2 and device == "cpu"
+        return identity
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("identity input must return before search callbacks")
+
+    monkeypatch.setattr(torch, "equal", lambda *_args: True)
+    callbacks = (python_input_builder, identity_builder, forbidden, forbidden,
+                 forbidden, cnot.CnotResult)
+    result = controller(
+        World(), root, scorer,
+        (1, 1, 0, "qhat", False, "auto", "python"), callbacks,
+    )
+
+    assert result == cnot.CnotResult("solved", (), [], [])
+
+
 def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     require_controller()
     controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
