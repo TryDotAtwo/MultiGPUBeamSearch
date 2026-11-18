@@ -128,6 +128,7 @@ pub(crate) fn exchange<'py>(
     world: &Bound<'py, PyAny>,
     rows: &Bound<'py, PyAny>,
     targets: &Bound<'py, PyAny>,
+    native_packet: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let size: usize = world.getattr("size")?.extract()?;
     if size == 1 {
@@ -142,7 +143,7 @@ pub(crate) fn exchange<'py>(
         transport = world.getattr("transport")?;
     }
 
-    let ops = if rows.getattr("is_cuda")?.is_truthy()? {
+    let ops = if native_packet && rows.getattr("is_cuda")?.is_truthy()? {
         Some(
             py.import("multigpubeamsearch.cnot_native")?
                 .call_method0("_cuda_ops")?,
@@ -199,7 +200,18 @@ fn run_cnot_native_exchange<'py>(
     rows: Bound<'py, PyAny>,
     targets: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    exchange(py, &world, &rows, &targets)
+    exchange(py, &world, &rows, &targets, true)
+}
+
+#[pyfunction]
+fn run_cnot_native_world_exchange<'py>(
+    py: Python<'py>,
+    world: Bound<'py, PyAny>,
+    rows: Bound<'py, PyAny>,
+    targets: Bound<'py, PyAny>,
+    native_packet: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    exchange(py, &world, &rows, &targets, native_packet.is_truthy()?)
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -207,5 +219,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_cnot_native_gather_fixed, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_broadcast, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_gather_rows, module)?)?;
-    module.add_function(wrap_pyfunction!(run_cnot_native_exchange, module)?)
+    module.add_function(wrap_pyfunction!(run_cnot_native_exchange, module)?)?;
+    module.add_function(wrap_pyfunction!(run_cnot_native_world_exchange, module)?)
 }

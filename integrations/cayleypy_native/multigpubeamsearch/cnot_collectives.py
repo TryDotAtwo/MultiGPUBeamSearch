@@ -148,6 +148,11 @@ class World:
         """Send variable-width int64 records to world ranks, including self and empty splits."""
         if self.size == 1:
             return rows
+        used, result = self._rust_collective(
+            "run_cnot_native_world_exchange", rows, targets, native_packet
+        )
+        if used:
+            return result
         # Older callers that enter World directly still get the original
         # transport even when they do not perform explicit engine admission.
         if self._stream5_library is not None and self.transport is None:

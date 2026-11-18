@@ -274,7 +274,7 @@ impl<'py> NativeStages<'py> {
         rows: &Bound<'py, PyAny>,
         targets: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        cnot_native_exchange::exchange(self.py, &self.world, rows, targets)
+        cnot_native_exchange::exchange(self.py, &self.world, rows, targets, true)
     }
 
     fn fallback_winner_packet(
