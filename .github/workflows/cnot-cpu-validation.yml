@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - codex/cnot-search-runtime
     paths:
       - .github/workflows/cnot-cpu-validation.yml
       - integrations/cayleypy_native/multigpubeamsearch/cnot.py
@@ -59,7 +60,7 @@ jobs:
           rustup default stable
       - name: Run Rust CNOT checks
         run: |
-          mkdir -p test_results/refactor_20261118/cnot-tqp-scorer
+          mkdir -p test_results/refactor_20261118/cnot-search-runtime
           set -o pipefail
           {
             rustfmt --check --edition 2021 \
@@ -83,7 +84,7 @@ jobs:
             cargo test --locked -p beam-runtime cnot_search
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
-          } 2>&1 | tee test_results/refactor_20261118/cnot-tqp-scorer/cnot-rust-cpu.log
+          } 2>&1 | tee test_results/refactor_20261118/cnot-search-runtime/cnot-rust-cpu.log
       - name: Build PyO3 extension for Python integration tests
         run: |
           cargo build --locked -p beam-python
@@ -107,7 +108,9 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_scorer_batch_api.py \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_stages_without_python_stage_object \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_batch_stages_without_python_helpers \
-            2>&1 | tee test_results/refactor_20261118/cnot-tqp-scorer/cnot-search-cpu.log
+            integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch \
+            integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_preserves_compatibility_stage_fallback \
+            2>&1 | tee test_results/refactor_20261118/cnot-search-runtime/cnot-search-cpu.log
       - name: Check the two-rank NCCL probe syntax
         run: |
           python -m py_compile integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
@@ -115,8 +118,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cnot-tqp-scorer-cpu-validation
-          path: test_results/refactor_20261118/cnot-tqp-scorer
+          name: cnot-search-runtime-cpu-validation
+          path: test_results/refactor_20261118/cnot-search-runtime
           if-no-files-found: ignore
           retention-days: 7
 

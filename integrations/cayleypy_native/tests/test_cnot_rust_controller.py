@@ -44,6 +44,131 @@ def test_engine_resolution_is_explicit_and_old_extensions_fail_closed(monkeypatc
         cnot._search_engine("rust", 2**64)
 
 
+def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
+    require_controller()
+    controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
+    assert callable(controller), "matching Rust CNOT top-level controller is required"
+
+    events = []
+    caller_root, scorer = object(), object()
+    admitted_root, identity = object(), object()
+    input_matrix = SimpleNamespace(root=admitted_root, n=3)
+    digest, result = bytes(range(32)), object()
+
+    class World:
+        rank, size, device = 0, 1, "cpu"
+
+        def require_consensus(self, value):
+            events.append(("consensus", value))
+
+        def start_transport(self, *, prefer_rust):
+            events.append(("transport", prefer_rust))
+
+        def all_ranks_support(self, available):
+            events.append(("support", available))
+            return True
+
+    world = World()
+
+    def admit(*args):
+        events.append(("admit", *args))
+        return input_matrix, digest, object()
+
+    def identity_builder(wires, *, device):
+        events.append(("identity", wires, device))
+        return identity
+
+    def stage_runner(*args):
+        events.append(("native-stages", *args))
+        return result
+
+    def native_stages():
+        events.append(("native-runner",))
+        return stage_runner
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("unexpected Python CNOT fallback callback")
+
+    options = (5, 9, 4, "qhat", True, "auto", "rust")
+    callbacks = (admit, identity_builder, native_stages, forbidden, forbidden, CnotResult)
+    assert controller(world, caller_root, scorer, options, callbacks) is result
+    assert events == [
+        ("admit", caller_root, scorer, *options),
+        ("consensus", digest),
+        ("transport", True),
+        ("identity", 3, "cpu"),
+        ("native-runner",),
+        ("support", True),
+        ("native-stages", world, admitted_root, identity, input_matrix, scorer,
+         "qhat", True, 5, 6, 6, 4),
+    ]
+
+
+def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
+    require_controller()
+    controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
+    assert callable(controller), "matching Rust CNOT top-level controller is required"
+
+    events = []
+    caller_root, admitted_root, scorer = object(), object(), object()
+    identity, stages, result = object(), object(), object()
+    input_matrix = SimpleNamespace(root=admitted_root, n=4)
+    digest = bytes(range(32))
+
+    class World:
+        rank, size, device = 1, 2, "cpu"
+
+        def require_consensus(self, value):
+            events.append(("consensus", value))
+
+        def start_transport(self, *, prefer_rust):
+            events.append(("transport", prefer_rust))
+
+        def all_ranks_support(self, available):
+            events.append(("support", available))
+            return False
+
+    world = World()
+
+    def admit(*args):
+        events.append(("admit", *args))
+        return input_matrix, digest, rust_search
+
+    def rust_search(*args):
+        events.append(("rust-search", *args))
+        return result
+
+    def identity_builder(wires, *, device):
+        events.append(("identity", wires, device))
+        return identity
+
+    def native_stages():
+        events.append(("native-runner",))
+        return object()
+
+    def make_stages(*args):
+        events.append(("make-stages", *args))
+        return stages
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("unexpected Python reference CNOT search")
+
+    options = (7, 12, 8, "proposal", False, "rust", "auto")
+    callbacks = (admit, identity_builder, native_stages, make_stages, forbidden, CnotResult)
+    assert controller(world, caller_root, scorer, options, callbacks) is result
+    assert events == [
+        ("admit", caller_root, scorer, *options),
+        ("consensus", digest),
+        ("transport", True),
+        ("identity", 4, "cpu"),
+        ("native-runner",),
+        ("support", True),
+        ("make-stages", world, admitted_root, identity, input_matrix, scorer,
+         "proposal", False),
+        ("rust-search", stages, 1, 2, 7, 12, 12, 8),
+    ]
+
+
 @pytest.mark.parametrize("mode,k", [("qhat", 7), ("proposal", 7), ("qhat", 12)])
 def test_complete_layers_match_reference_and_independent_oracle(mode, k):
     require_controller()
