@@ -89,6 +89,7 @@ jobs:
             integrations/cayleypy_native/tests/test_backend.py \
             integrations/cayleypy_native/tests/test_search_controls.py \
             integrations/cayleypy_native/tests/test_rust_control.py \
+            integrations/cayleypy_native/tests/test_public_index_sort_build.py \
             integrations/cayleypy_native/tests/test_cnot_search.py \
             integrations/cayleypy_native/tests/test_cnot_control_collectives.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py \

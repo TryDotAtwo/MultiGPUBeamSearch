@@ -88,7 +88,14 @@ def validate_options(options):
     validator = getattr(native, 'validate_options', None)
     if validator is None:
         return False
-    validator(payload)
+    try:
+        validator(payload)
+    except ValueError:
+        # Rust decides validity for supported configurations. For rejected
+        # inputs, run the compatibility validator so existing Python error
+        # messages remain stable at the public API boundary.
+        options._validate_python()
+        raise
     return True
 
 
