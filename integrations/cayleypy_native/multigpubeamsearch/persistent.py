@@ -229,16 +229,29 @@ class NativeSession:
     def _launch(self, command, *, contract, run_dir, env, world, timeout, runtime=None):
         from .resident_transport import ResidentWorkers
         import subprocess
-        if self._workers is not None:raise NativeBackendError('resident workers already exist')
         if self._engine == 'rust':
             if self._pending is None:
                 raise NativeBackendError('Rust resident launch requires a prepared session')
             from .rust_resident import RustResidentWorkers
-            model, options, max_steps, devices, prepared = self._pending
-            self._workers = RustResidentWorkers(command, contract=contract, model=model,
-                options=options, max_steps=max_steps, devices=devices, runtime=runtime or prepared,
-                run_dir=run_dir, env=env, world=world)
-            return self._workers.submit(contract.start, run_dir, timeout=timeout)
+            prepared = self._pending
+            model = prepared['model']
+            options = prepared['options']
+            launch_runtime = runtime or prepared['runtime']
+            launch_inputs = dict(contract=contract, model=model, options=options,
+                max_steps=prepared['max_steps'], devices=prepared['devices'],
+                runtime=launch_runtime, run_dir=run_dir, env=env, world=world,
+                session_identity=prepared['session_identity'])
+            if self._workers is None:
+                self._workers = RustResidentWorkers(command, **launch_inputs)
+            else:
+                configure = getattr(self._workers, 'configure', None)
+                if not callable(configure):
+                    raise NativeBackendError('resident workers cannot be reconfigured')
+                configure(command, **launch_inputs)
+            elapsed = self._workers.submit(contract.start, run_dir, timeout=timeout)
+            prepared['launch_started'] = True
+            return elapsed
+        if self._workers is not None:raise NativeBackendError('resident workers already exist')
         probe=subprocess.run([command[0],'--resident-protocol-info'],env=env,cwd=run_dir,
             capture_output=True,text=True,timeout=min(timeout,15),check=False)
         if probe.returncode:
@@ -291,20 +304,45 @@ class NativeSession:
             if (self.model_snapshot_cache is None
                     or not self.model_snapshot_cache.verify_for_launch(model, contract)):
                 verify_prepared_model(model,contract)
-            if identity != self._identity:self._release()
-            if self._workers is None:
+            identity_changed = identity != self._identity
+            preserve_rust_owner = (identity_changed and self._engine == 'rust'
+                and self._workers is not None
+                and callable(getattr(self._workers, 'configure', None)))
+            if identity_changed and not preserve_rust_owner:self._release()
+            if self._workers is None or identity_changed:
                 if (self.model_snapshot_cache is not None
                         and self.model_snapshot_cache.needs_fresh_worker_snapshot(model, contract)):
                     model = self.model_snapshot_cache.refresh_for_worker(model, contract, run_dir)
-                self._pending=(model,options,max_steps,devices,runtime)
+                artifact_sizes = getattr(model, 'artifact_sizes', ())
+                session_identity = {
+                    'geometry': [getattr(contract, name, None)
+                                 for name in ('state_len', 'num_classes', 'move_count')],
+                    'artifact_sizes': None if artifact_sizes is None else list(artifact_sizes),
+                    'binding_scope': binding_scope,
+                    'options_repr': repr(options),
+                }
+                self._pending = {
+                    'model': model,
+                    'options': options,
+                    'max_steps': max_steps,
+                    'devices': devices,
+                    'runtime': runtime,
+                    'session_identity': session_identity,
+                    'launch_started': False,
+                }
                 try:
                     outcome=execute(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
                 finally:
+                    launch_started = self._pending['launch_started']
                     self._pending=None
                 if self._workers is not None:
-                    self._identity=identity
-                    self._metadata=deepcopy(outcome.metadata)
-                reused=False
+                    if preserve_rust_owner and not launch_started:
+                        self._release()
+                    else:
+                        self._identity=identity
+                        self._metadata=deepcopy(outcome.metadata)
+                reused=bool(self._workers is not None
+                    and getattr(self._workers, '_last_reused', False))
             else:
                 directory=Path(run_dir)
                 elapsed=self._workers.submit(contract.start,directory,timeout=options.timeout_seconds)

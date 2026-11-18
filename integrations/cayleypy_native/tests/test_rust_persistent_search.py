@@ -109,6 +109,10 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert identity["graph"] == {"center": [0, 1], "generators": [[1, 0]]}
         assert identity["devices"] == list(range(world)) and identity["beam_width"] == 64
         assert identity["runtime_build"]["native_library_sha256"] == "d" * 64
+        python_identity = identity["options"]["python_session_identity"]
+        assert python_identity["geometry"] == [2, 2, 1]
+        assert python_identity["artifact_sizes"] == []
+        assert python_identity["binding_scope"] is False
         assert launch["command"] == [str(worker), "0", "4", "64"]
         assert launch["protocol_command"] == [str(worker), "--resident-protocol-info"]
         assert launch["environment"]["BEAM_NATIVE_LIBRARY"] == str(library)

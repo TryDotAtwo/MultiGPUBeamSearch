@@ -99,7 +99,8 @@ def test_rust_resident_transfers_one_verified_result_per_matching_job(tmp_path):
             return json.dumps(dict(path=[1], effective_beam_width=64, elapsed_seconds=.2,
                 metadata=dict(native_seconds=.1, terminal_records=1, observed_parent_batch=32,
                               observed_inference_rows=None, observed_stream3_batch_candidates=None,
-                              persistent_session=dict(request_count=self.count))))
+                              persistent_session=dict(reused=self.count > 1,
+                                                      request_count=self.count))))
         def close(self):pass
 
     worker = RustResidentWorkers.__new__(RustResidentWorkers)
@@ -156,7 +157,8 @@ def test_rust_resident_rejects_failure_without_exposing_an_earlier_result(tmp_pa
                 raise RuntimeError('injected worker failure')
             result = dict(path=[1], effective_beam_width=64, elapsed_seconds=.2,
                           metadata=dict(native_seconds=.1, terminal_records=1,
-                                        persistent_session=dict(request_count=self.count)))
+                                        persistent_session=dict(reused=self.count > 1,
+                                                                request_count=self.count)))
             if self.count == 2:
                 if failure == 'sequence': result['metadata']['persistent_session']['request_count'] = 1
                 if failure == 'invalid_path': result['path'] = [True]
