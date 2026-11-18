@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-18 - Rust controls permutation depth continuation
+
+- Added an optional ABI-1 callback table for two nonterminal depth boundaries.
+  The Rust runtime makes the existing calibration-limit, frontier-empty, and
+  debug-path continuation decisions. The C++ runner still owns the CUDA stages,
+  collective calls, solution paths, and depth finalization. The callback carries
+  scalar flags only and runs twice per completed depth, never per candidate or
+  kernel.
+- `beam-runner` installs the callback for one-shot and persistent Rust paths.
+  Older native libraries and direct C++ launches keep the original C++ rules.
+- The hosted CPU workflow is
+  `.github/workflows/permutation-depth-control-cpu.yml`. CUDA runner compilation,
+  NCCL runtime, and physical multi-GPU behavior remain separate acceptance work.
+
 ## 2026-11-18 - CNOT stage error coordination through Rust
 
 - Multi-rank `World.checked` now delegates callback execution and the existing

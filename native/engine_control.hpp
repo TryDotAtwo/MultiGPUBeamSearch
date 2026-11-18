@@ -31,6 +31,7 @@ public:
     bool has_pending = false;
     bool stop = false;
     beam_history_api_v1 history{};
+    beam_depth_control_api_v1 depth_control{};
 
     bool next(Job& job) {
         std::unique_lock lock(mutex);
@@ -64,6 +65,7 @@ public:
 };
 Control* current_control() noexcept;
 const beam_history_api_v1* current_history() noexcept;
+const beam_depth_control_api_v1* current_depth_control() noexcept;
 inline void cancellation_point() {
     if(auto* control = current_control()) control->throw_if_cancelled();
 }

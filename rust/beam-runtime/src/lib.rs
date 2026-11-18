@@ -8,6 +8,7 @@ pub mod cnot_search;
 pub mod cnot_selection;
 pub mod component_probe;
 pub mod component_tuning;
+pub mod depth_control;
 mod downstream_full;
 pub mod downstream_job;
 pub mod frontier_job;

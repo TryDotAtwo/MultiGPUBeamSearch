@@ -1,4 +1,5 @@
 #include "cuda_check.hpp"
+#include "../native/depth_control_bridge.hpp"
 #include "../native/history_bridge.hpp"
 #include "stream1_weight_io.hpp"
 #include "production_score_mode.hpp"
@@ -4502,6 +4503,7 @@ int run_production_runner(int argc, char** argv) {
     std::set<std::string> solve_bucket_unique_paths;
     bool solve_bucket_found_any = false;
     std::uint32_t solve_bucket_first_found_depth_index = 0;
+    beam::native::DepthControlBridge depth_control;
     for (std::uint32_t depth = 0; depth < depth_limit; ++depth) {
         beam::native::cancellation_point();
         if(!benchmark_frontier.empty() && depth>0) {
@@ -5209,32 +5211,60 @@ int run_production_runner(int argc, char** argv) {
 #endif
         }
 #endif
-        if(benchmark_grow_steps && calibration_saturated_steps == benchmark_grow_steps) break;
-        if (propagate_frontier_live(frontier_size, memory, streams,
-                nccl_runtime.comm, world_size) == 0U) {
+        const bool calibration_limit_reached =
+            benchmark_grow_steps && calibration_saturated_steps == benchmark_grow_steps;
+        if (depth_control) {
+            if (!depth_control.continue_after(
+                    BEAM_DEPTH_BEFORE_FRONTIER_COLLECTIVE,
+                    calibration_limit_reached,
+                    false,
+                    0U)) {
+                break;
+            }
+        } else if (calibration_limit_reached) {
             break;
         }
+        const bool frontier_live = propagate_frontier_live(
+            frontier_size, memory, streams, nccl_runtime.comm, world_size) != 0U;
+        std::uint32_t tracked_path_stop = 0U;
 #if BEAM_DEBUG_PATH_TRACE
         if (tracked_solution.should_stop_after_missing(depth)) {
-            std::cout << "track_solution_stop=1"
-                      << " puzzle_id=" << puzzle_id
-                      << " depth=" << depth
-                      << " reason=tracked_path_missing_extra_depths_elapsed"
-                      << " first_missing_depth=" << tracked_solution.first_missing_depth
-                      << " extra_depths=" << tracked_solution.missing_stop_extra_depths
-                      << "\n";
-            break;
-        }
-        if (tracked_solution.enabled &&
-            tracked_solution.stop_after_path &&
-            depth + 1U >= tracked_solution.moves.size()) {
-            std::cout << "track_solution_stop=1"
-                      << " puzzle_id=" << puzzle_id
-                      << " depth=" << depth
-                      << " reason=tracked_path_exhausted_without_solution\n";
-            break;
+            tracked_path_stop = 1U;
+        } else if (tracked_solution.enabled &&
+                   tracked_solution.stop_after_path &&
+                   depth + 1U >= tracked_solution.moves.size()) {
+            tracked_path_stop = 2U;
         }
 #endif
+        bool continue_depths = true;
+        if (depth_control) {
+            continue_depths = depth_control.continue_after(
+                BEAM_DEPTH_AFTER_FRONTIER_COLLECTIVE,
+                false,
+                frontier_live,
+                tracked_path_stop);
+        } else {
+            continue_depths = frontier_live && tracked_path_stop == 0U;
+        }
+        if (!continue_depths) {
+#if BEAM_DEBUG_PATH_TRACE
+            if (frontier_live && tracked_path_stop == 1U) {
+                std::cout << "track_solution_stop=1"
+                          << " puzzle_id=" << puzzle_id
+                          << " depth=" << depth
+                          << " reason=tracked_path_missing_extra_depths_elapsed"
+                          << " first_missing_depth=" << tracked_solution.first_missing_depth
+                          << " extra_depths=" << tracked_solution.missing_stop_extra_depths
+                          << "\n";
+            } else if (frontier_live && tracked_path_stop == 2U) {
+                std::cout << "track_solution_stop=1"
+                          << " puzzle_id=" << puzzle_id
+                          << " depth=" << depth
+                          << " reason=tracked_path_exhausted_without_solution\n";
+            }
+#endif
+            break;
+        }
     }
     const auto end = std::chrono::steady_clock::now();
     const double elapsed_sec = std::chrono::duration<double>(end - start).count();

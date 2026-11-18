@@ -37,9 +37,19 @@ jobs:
           set -euo pipefail
           mkdir -p test_results/refactor_20261118/permutation-depth-control
           {
+            rustfmt --check --edition 2021 --config skip_children=true \
+              rust/beam-native-sys/src/lib.rs \
+              rust/beam-native-sys/src/depth_control.rs \
+              rust/beam-native-sys/tests/depth_control.rs \
+              rust/beam-runtime/src/lib.rs \
+              rust/beam-runtime/src/depth_control.rs \
+              rust/beam-runtime/src/worker.rs \
+              rust/beam-runtime/tests/depth_control.rs \
+              rust/beam-cli/src/main.rs
             cargo test --locked -p beam-runtime --test depth_control
             cargo test --locked -p beam-native-sys --test depth_control
             cargo check --locked -p beam-python
+            cargo check --locked -p beam-cli
           } 2>&1 | tee test_results/refactor_20261118/permutation-depth-control/rust.log
       - name: Build and run the native C ABI CPU fixture
         shell: bash

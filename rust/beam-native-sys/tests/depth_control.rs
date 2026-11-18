@@ -1,11 +1,8 @@
-use beam_native_sys::depth_control::{Api, Bridge, Input, DepthControlSink};
+use beam_native_sys::depth_control::{Api, Bridge, DepthControlSink, Input};
 
 struct Panics;
 impl DepthControlSink for Panics {
-    fn decide(
-        &self,
-        _: beam_native_sys::depth_control::Checkpoint,
-    ) -> Result<bool, String> {
+    fn decide(&self, _: beam_native_sys::depth_control::Checkpoint) -> Result<bool, String> {
         panic!("depth decision panic")
     }
 }
@@ -35,13 +32,22 @@ fn callback_contains_panics_and_reports_the_failure() {
     assert_eq!(code, 3);
     let mut required = 0;
     // SAFETY: this is the documented error-buffer size query.
-    assert_eq!(unsafe {
-        (api.error)(api.user_data, std::ptr::null_mut(), 0, &mut required)
-    }, 6);
+    assert_eq!(
+        unsafe { (api.error)(api.user_data, std::ptr::null_mut(), 0, &mut required) },
+        6
+    );
     let mut message = vec![0u8; required as usize];
     // SAFETY: message covers the capacity returned by the preceding query.
-    assert_eq!(unsafe {
-        (api.error)(api.user_data, message.as_mut_ptr().cast(), message.len() as u64, &mut required)
-    }, 0);
+    assert_eq!(
+        unsafe {
+            (api.error)(
+                api.user_data,
+                message.as_mut_ptr().cast(),
+                message.len() as u64,
+                &mut required,
+            )
+        },
+        0
+    );
     assert!(String::from_utf8(message).unwrap().contains("panicked"));
 }

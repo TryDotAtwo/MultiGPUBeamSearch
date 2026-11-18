@@ -77,10 +77,37 @@ typedef struct beam_history_api_v1 {
     int32_t (*error)(void*, char*, uint64_t capacity, uint64_t* required);
 } beam_history_api_v1;
 
+typedef enum beam_depth_checkpoint_v1 {
+    BEAM_DEPTH_BEFORE_FRONTIER_COLLECTIVE = 1,
+    BEAM_DEPTH_AFTER_FRONTIER_COLLECTIVE = 2
+} beam_depth_checkpoint_v1;
+typedef struct beam_depth_control_input_v1 {
+    uint32_t abi_version, struct_size;
+    uint32_t checkpoint;
+    uint32_t calibration_limit_reached;
+    uint32_t frontier_live;
+    uint32_t tracked_path_stop;
+} beam_depth_control_input_v1;
+typedef struct beam_depth_control_output_v1 {
+    uint32_t abi_version, struct_size;
+    uint32_t continue_search;
+} beam_depth_control_output_v1;
+/* Optional Rust owner for decisions between full depth dispatches. The
+ * callback receives scalar observations only; it never receives CUDA data. */
+typedef struct beam_depth_control_api_v1 {
+    uint32_t abi_version, struct_size;
+    void* user_data;
+    int32_t (*decide)(void*, const beam_depth_control_input_v1*, beam_depth_control_output_v1*);
+    int32_t (*error)(void*, char*, uint64_t capacity, uint64_t* required);
+} beam_depth_control_api_v1;
+
 BEAM_API uint32_t beam_native_abi_version(void);
 BEAM_API beam_result beam_native_layout(beam_layout_v1*);
 BEAM_API beam_result beam_context_create(uint32_t abi_version, beam_context** out);
 BEAM_API beam_result beam_context_set_history(beam_context*, const beam_history_api_v1*);
+/* Optional ABI-1 extension. Must be set before prepare; native copies the
+ * table and calls it only after existing depth collective boundaries. */
+BEAM_API beam_result beam_context_set_depth_control(beam_context*, const beam_depth_control_api_v1*);
 /* Optional ABI-1 extension. Exactly 64 lowercase hexadecimal bytes are copied
  * during this call. Must be set while the context is still CREATED. */
 BEAM_API beam_result beam_context_set_graph_hash(beam_context*, const char* hash, uint64_t length);
@@ -101,6 +128,10 @@ BEAM_API int beam_native_main(int argc, const char* const* argv);
 /* Blocking CLI/probe entry, with the same host-history lifetime as a context. */
 BEAM_API int beam_native_main_with_history(int argc, const char* const* argv,
                                           const beam_history_api_v1*);
+/* Optional ABI-1 entry point for a Rust-owned depth continuation policy. */
+BEAM_API int beam_native_main_with_history_and_depth_control(
+    int argc, const char* const* argv, const beam_history_api_v1*,
+    const beam_depth_control_api_v1*);
 #ifdef __cplusplus
 }
 #endif

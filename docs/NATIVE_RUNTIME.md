@@ -212,12 +212,32 @@ dispatch selects this Rust owner by default when the matching extension and work
 are installed. Old installations and explicit `NativeSession(engine="python")`
 continue through the Python compatibility owner; `engine="rust"` fails closed.
 
+The optional ABI-1 depth-control table is installed with
+`beam_context_set_depth_control` before `prepare`; the blocking CLI counterpart is
+`beam_native_main_with_history_and_depth_control`. Rust owns a boxed callback
+bridge until native destruction joins the engine thread (or the blocking call
+returns). The table is copied by C++, while `user_data` stays borrowed for that
+interval. Callbacks run only at two existing boundaries per completed depth and
+receive scalar flags; they receive no CUDA pointer or tensor. Old libraries
+without these optional symbols retain the existing C++ continuation checks.
+
+The first migrated decision covers calibration saturation before the existing
+frontier-live NCCL collective. The second covers the already-computed global
+frontier-live result and debug-path stop flags after that collective. CUDA stage
+dispatch, solve handling, history reconstruction and finalization remain in C++.
+The API preserves the previous collective order and does not introduce a
+candidate- or kernel-level Rust/C++ call.
+
 The current native engine still uses process environment, cwd and stdout. Run it
 in the dedicated worker, not in a notebook/Python process that owns CUDA tensors.
 Independent Python sessions use independent worker groups. A `Context` cannot be
 shared across Rust threads, and its native library cannot unload before it.
 
 ## Verification
+
+The optional depth-control callback uses the same panic boundary as host
+history. The Rust policy and C ABI bridge have CPU contract tests; a GPU build,
+physical NCCL execution and multi-rank search still require separate validation.
 
 The ABI-1 optional history extension installs six host callbacks before context
 preparation. The coarse CLI entry has an equivalent blocking extension. Rust

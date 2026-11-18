@@ -4,6 +4,7 @@
 #include "history_bridge.hpp"
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -13,7 +14,7 @@ struct DepthProbe {
     std::uint32_t calls = 0;
 };
 
-int32_t depth_decide(
+extern "C" int32_t depth_decide(
     void* user,
     const beam_depth_control_input_v1* input,
     beam_depth_control_output_v1* output) {
@@ -33,7 +34,7 @@ int32_t depth_decide(
     return BEAM_OK;
 }
 
-int32_t depth_error(void*, char* out, uint64_t capacity, uint64_t* required) {
+extern "C" int32_t depth_error(void*, char* out, uint64_t capacity, uint64_t* required) {
     if (!required) return BEAM_INVALID;
     *required = 1;
     if (capacity == 0) return BEAM_BUFFER_TOO_SMALL;
@@ -135,6 +136,13 @@ int main() {
     assert(beam_context_wait(ctx, 1000) == BEAM_OK);
     assert(depth_probe.calls == 5);
     assert(beam_context_destroy(ctx) == BEAM_OK);
+
+    DepthProbe coarse_depth_probe;
+    beam_depth_control_api_v1 coarse_depth_api{
+        1, sizeof(beam_depth_control_api_v1), &coarse_depth_probe, depth_decide, depth_error};
+    assert(beam_native_main_with_history_and_depth_control(
+               2, depth_args, nullptr, &coarse_depth_api) == 0);
+    assert(coarse_depth_probe.calls == 5);
 
     ctx = nullptr;
     assert(beam_context_create(1, &ctx) == BEAM_OK);

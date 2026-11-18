@@ -71,6 +71,8 @@ pub fn run_native_worker(library: &NativeLibrary, args: &[String], root: &Path) 
         return Err(Error::Message("missing expected graph hash".into()));
     }
     context.set_history(Box::<crate::history::HistoryService>::default())?;
+    let _ =
+        context.set_depth_control(Box::<crate::depth_control::NativeDepthController>::default())?;
     context.prepare(args)?;
     while !context.wait(Duration::from_millis(20))? {
         if stopped() {

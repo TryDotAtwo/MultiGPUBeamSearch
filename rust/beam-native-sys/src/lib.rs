@@ -3,8 +3,9 @@ use libloading::Library;
 #[cfg(feature = "python")]
 pub mod cnot_device_bridge;
 pub mod cnot_domain;
-pub mod cnot_tqp_scorer;
 pub mod cnot_stream5;
+pub mod cnot_tqp_scorer;
+pub mod depth_control;
 pub mod history;
 use std::{
     ffi::{c_char, c_void, CString},
@@ -69,7 +70,14 @@ type GetError = unsafe extern "C" fn(*mut c_void, *mut c_char, u64, *mut u64) ->
 type Destroy = unsafe extern "C" fn(*mut c_void) -> i32;
 type Run = unsafe extern "C" fn(i32, *const *const c_char) -> i32;
 type RunWithHistory = unsafe extern "C" fn(i32, *const *const c_char, *const history::Api) -> i32;
+type RunWithHistoryAndDepthControl = unsafe extern "C" fn(
+    i32,
+    *const *const c_char,
+    *const history::Api,
+    *const depth_control::Api,
+) -> i32;
 type SetHistory = unsafe extern "C" fn(*mut c_void, *const history::Api) -> i32;
+type SetDepthControl = unsafe extern "C" fn(*mut c_void, *const depth_control::Api) -> i32;
 type SetGraphHash = unsafe extern "C" fn(*mut c_void, *const c_char, u64) -> i32;
 
 struct Bindings {
@@ -85,8 +93,10 @@ struct Bindings {
     run: Run,
     layout: GetLayout,
     set_history: Option<SetHistory>,
+    set_depth_control: Option<SetDepthControl>,
     set_graph_hash: Option<SetGraphHash>,
     run_with_history: Option<RunWithHistory>,
+    run_with_history_and_depth_control: Option<RunWithHistoryAndDepthControl>,
 }
 #[derive(Clone)]
 pub struct NativeLibrary(Arc<Bindings>);
@@ -129,12 +139,22 @@ impl NativeLibrary {
                     .get::<SetHistory>(b"beam_context_set_history\0")
                     .ok()
                     .map(|s| *s),
+                set_depth_control: library
+                    .get::<SetDepthControl>(b"beam_context_set_depth_control\0")
+                    .ok()
+                    .map(|s| *s),
                 set_graph_hash: library
                     .get::<SetGraphHash>(b"beam_context_set_graph_hash\0")
                     .ok()
                     .map(|s| *s),
                 run_with_history: library
                     .get::<RunWithHistory>(b"beam_native_main_with_history\0")
+                    .ok()
+                    .map(|s| *s),
+                run_with_history_and_depth_control: library
+                    .get::<RunWithHistoryAndDepthControl>(
+                        b"beam_native_main_with_history_and_depth_control\0",
+                    )
                     .ok()
                     .map(|s| *s),
                 _library: library,
@@ -167,6 +187,7 @@ impl NativeLibrary {
             api: self.0.clone(),
             _thread_owner: PhantomData,
             history: None,
+            depth_control: None,
         })
     }
     pub fn run(&self, args: &[String]) -> Result<i32> {
@@ -192,6 +213,35 @@ impl NativeLibrary {
         // table, boxed callback owner, argv and library all outlive this call.
         Ok(unsafe { run(storage.len() as i32, views.as_ptr(), &table) })
     }
+    pub fn run_with_history_and_depth_control(
+        &self,
+        args: &[String],
+        history_sink: Box<dyn history::HistorySink>,
+        depth_control_sink: Box<dyn depth_control::DepthControlSink>,
+    ) -> Result<i32> {
+        let Some(run) = self.0.run_with_history_and_depth_control else {
+            return self.run_with_history(args, history_sink);
+        };
+        let storage = arguments(args)?;
+        let views = argument_views(&storage);
+        let mut history_bridge = Box::new(history::Bridge::new(history_sink));
+        let history_table = history_bridge.table();
+        let mut depth_control_bridge = Box::new(depth_control::Bridge::new(depth_control_sink));
+        let depth_control_table = depth_control_bridge.table();
+        // Native joins its engine before returning, so both boxed owners, the
+        // callback tables, argv storage and dynamic library outlive all calls.
+        let code = unsafe {
+            run(
+                storage.len() as i32,
+                views.as_ptr(),
+                &history_table,
+                &depth_control_table,
+            )
+        };
+        drop(depth_control_bridge);
+        drop(history_bridge);
+        Ok(code)
+    }
 }
 fn arguments(args: &[String]) -> Result<Vec<CString>> {
     if args.is_empty() || args.len() > 4096 {
@@ -214,6 +264,7 @@ pub struct Context {
     // A context cannot be sent/shared across Rust threads or processes.
     _thread_owner: PhantomData<Rc<()>>,
     history: Option<Box<history::Bridge>>,
+    depth_control: Option<Box<depth_control::Bridge>>,
 }
 impl Context {
     /// Bind the loaded native graph to the validated Rust session identity.
@@ -245,6 +296,21 @@ impl Context {
         self.check(unsafe { install(self.ptr.as_ptr(), &table) })?;
         self.history = Some(bridge);
         Ok(())
+    }
+    pub fn set_depth_control(
+        &mut self,
+        sink: Box<dyn depth_control::DepthControlSink>,
+    ) -> Result<bool> {
+        let Some(install) = self.api.set_depth_control else {
+            return Ok(false);
+        };
+        let mut bridge = Box::new(depth_control::Bridge::new(sink));
+        let table = bridge.table();
+        // Native copies the table and calls it on its engine thread. This
+        // stable boxed owner remains live until destroy joins that thread.
+        self.check(unsafe { install(self.ptr.as_ptr(), &table) })?;
+        self.depth_control = Some(bridge);
+        Ok(true)
     }
     fn check(&self, code: i32) -> Result<()> {
         if code == OK {

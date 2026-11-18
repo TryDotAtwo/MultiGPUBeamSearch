@@ -41,9 +41,10 @@ fn run() -> Result<i32, Box<dyn std::error::Error>> {
         beam_runtime::run_native_worker(&native, &args, &PathBuf::from(root))?;
         Ok(0)
     } else {
-        Ok(native.run_with_history(
+        Ok(native.run_with_history_and_depth_control(
             &args,
             Box::<beam_runtime::history::HistoryService>::default(),
+            Box::<beam_runtime::depth_control::NativeDepthController>::default(),
         )?)
     }
 }
