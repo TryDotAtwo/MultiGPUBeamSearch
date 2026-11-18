@@ -117,6 +117,17 @@ arbitrary Python scorer callbacks and the explicit Python reference engine
 remain supported. The `World` adapter retains the established process-group
 calls. This is not yet a complete Rust/C++ CNOT runtime.
 
+For matching PyO3 extensions, CNOT input admission now runs through the Rust
+`prepare_cnot_input` adapter. It checks the packed tensor layout and search
+controls, asks PyTorch for an independent contiguous snapshot, derives the
+little-endian bytes from that snapshot, and constructs the owned
+`beam_core::cnot::CnotMatrix` before returning. PyTorch continues to own the
+tensor allocation; beam-core owns the validated matrix words. The Python API
+uses the existing path with older extensions, and explicit Python validation
+still selects the reference checks. This moves validation and snapshot
+coordination only; it does not change search steps, matrix semantics, scorer
+callbacks, or multi-rank collectives.
+
 For multi-rank Rust CNOT searches, CUDA owner counts and stable send-record
 grouping use C++ ATen when the matching operator is available. After all ranks
 admit the same engine, they collectively select the Rust-owned Stream 5

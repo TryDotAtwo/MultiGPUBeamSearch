@@ -2070,3 +2070,18 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - This is CPU/control-flow evidence. Physical CUDA/NCCL and multi-GPU CNOT
   runtime remain unverified. Details:
   `test_results/refactor_20261118/cnot-search-runtime/GITHUB_STATUS.md`.
+
+## 2026-11-19 - Rust CNOT input preparation
+
+- Added a PyO3 adapter that validates the packed CNOT tensor geometry and
+  search controls, creates the same detached contiguous snapshot, serializes
+  its little-endian bytes, and constructs the beam-core owned `CnotMatrix`.
+  The Python API delegates to it when the extension supports the method and
+  retains the old-extension and Python-reference paths. Search behavior,
+  scorer callbacks, and collectives are unchanged.
+- Branch run 44397470650 passed Rust checks and formatting, the PyO3 build,
+  CNOT CPU compatibility tests, and NCCL probe syntax. Hosted artifact
+  14472066732 has SHA-256
+  `6dd94319971341e455a170f266fe490ee89318f04c9363a53d31529777b6cac7`.
+  The CPU workflow does not verify physical CUDA/NCCL or multi-GPU execution.
+  See `test_results/refactor_20261118/cnot-input-prepare/GITHUB_STATUS.md`.
