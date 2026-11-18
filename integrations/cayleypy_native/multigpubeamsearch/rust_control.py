@@ -12,16 +12,22 @@ from .errors import NativeBackendError, NativeUnavailable
 
 
 def extension():
+    import_error = None
     for name in ('multigpubeamsearch._beam_runtime', '_beam_runtime'):
         try:
             module = importlib.import_module(name)
         except ModuleNotFoundError as error:
             if error.name != name:
-                raise
+                import_error = error
+            continue
+        except ImportError as error:
+            import_error = error
             continue
         if getattr(module, 'ABI_VERSION', None) != 1 or not hasattr(module, 'InferenceCalibration'):
             raise NativeUnavailable('Rust runtime is incompatible; rebuild the matching PyO3 module')
         return module
+    if import_error is not None:
+        raise NativeUnavailable('the matching Rust/PyO3 runtime could not be loaded') from import_error
     raise NativeUnavailable('the matching Rust/PyO3 runtime is not installed')
 
 
@@ -196,4 +202,5 @@ def tune_downstream(contract, model, runtime, options, devices, beam_width,
         raise NativeBackendError(str(error)) from error
     verify_prepared_model(model, contract)
     return result
+
 
