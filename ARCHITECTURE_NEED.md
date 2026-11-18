@@ -140,6 +140,19 @@ Vast workflow не менял его состояние и пропустил GP
 Hosted Rust/PyO3 и CPU compatibility проверки прошли. Физические CUDA/NCCL
 стадии и multi-GPU CNOT runtime не проверены: Vast-инстанс выключен.
 
+## Rust-проверка совпадения CNOT rank inputs, 2026-11-18
+
+После подготовки CNOT fingerprint Python-адаптер передаёт digest в Rust.
+PyO3 функция формирует локальный `int64` tensor через `World.longs`, вызывает
+прежний `World.gather_fixed` и сравнивает fingerprints всех рангов. При
+различии Rust возвращает тот же `ValueError`; старые расширения сохраняют
+прежнее Python-сравнение. Вычисление digest и предшествующая валидация остаются
+в Python/Rust адаптере; переносится только межранговая проверка. Порядок
+коллективов и multi-GPU топология не меняются.
+
+Hosted Rust/PyO3 и CPU compatibility проверки прошли. Физические CUDA/NCCL и
+multi-GPU CNOT runtime остаются непроверенными: текущий Vast-инстанс выключен.
+
 ## Самостоятельный CUDA-домен CNOT, 2026-11-17
 
 Отдельная необязательная библиотека предоставляет версионированный C ABI для

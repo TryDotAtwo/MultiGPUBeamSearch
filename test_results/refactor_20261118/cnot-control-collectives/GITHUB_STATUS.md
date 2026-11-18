@@ -53,3 +53,15 @@ Implementation source commit: `92e50fa58e2e355e4aa6e619c542fdbdb20b018d`
 - Vast status workflow [44365545577](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44365545577): instance `61080396` was exited; transfer/build/NCCL were skipped without changing instance state.
 
 The Rust helper now owns the native-stage rank vote; the Rust search controller, Python stage adapter, and transport implementations still follow their existing routes. This is CPU/control-flow evidence only; physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified.
+
+## Rust CNOT input consensus — 2026-11-18
+
+Implementation source commit: `095b4297685b5b1b5aad7a2514259249f8c59a54`
+
+- Test-first CPU workflow [44367678468](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44367678468): expected ABI/delegation/fallback failures (4 failed, 153 passed, 2 skipped).
+- Formatting-fix run [44368166271](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44368166271): Rust checks stopped on one rustfmt layout difference before compilation; the signature was reformatted.
+- Green CPU workflow [44368563645](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44368563645): Rust formatting/checks, PyO3 check/build, 157 Python tests passed, 2 skipped, and NCCL probe syntax passed.
+- Full hosted test log artifact [14457527088](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44368563645/artifacts/14457527088), SHA-256 `1a7a6d4a6394a24368e155307cc5cdc31f9140a6947b987a8aef1cc231c3abdc`.
+- Vast status workflow [44368166135](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44368166135): instance `61080396` was exited; transfer/build/NCCL were skipped without changing instance state.
+
+Rust now owns the inter-rank digest comparison and mismatch decision. Python still computes the digest and retains the old-extension fallback. This is CPU/control-flow evidence only; physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified.

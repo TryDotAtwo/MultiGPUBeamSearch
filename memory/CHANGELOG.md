@@ -2012,3 +2012,21 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   skipped transfer/build/NCCL without changing its state. Physical CUDA/NCCL
   and multi-GPU CNOT runtime remain unverified. Details:
   `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
+
+## 2026-11-18 - Rust CNOT rank-input consensus
+
+- `World.require_consensus` now calls a PyO3 Rust helper to perform the
+  existing `World.longs` plus `World.gather_fixed` comparison and preserve the
+  same mismatch error. Python still computes the fingerprint; older extensions
+  keep the equivalent Python comparison. No collective order, rank layout or
+  search decision changed.
+- Test-first run 44367678468 failed on the four new ABI/delegation/fallback
+  cases as expected (4 failed, 153 passed, 2 skipped). Run 44368166271 stopped
+  on one rustfmt layout difference before compilation. Green run 44368563645
+  passed Rust formatting/checks, PyO3 build, 157 Python tests (2 skipped), and
+  NCCL probe syntax. Artifact 14457527088 SHA-256:
+  `1a7a6d4a6394a24368e155307cc5cdc31f9140a6947b987a8aef1cc231c3abdc`.
+- Vast status run 44368166135 confirmed the existing instance was stopped and
+  skipped transfer/build/NCCL without changing its state. Physical CUDA/NCCL
+  and multi-GPU CNOT runtime remain unverified. Details:
+  `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
