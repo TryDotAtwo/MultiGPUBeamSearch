@@ -193,12 +193,13 @@ fn cnot_admission_digest<'py>(
     let config = PyTuple::new(py, config)?;
     // Preserve the Python reference's JSON encoding byte-for-byte while Rust
     // owns field order, selected-engine policy and the consensus fingerprint.
-    let encoded = py
+    let encoded_object = py
         .import("json")?
         .call_method1("dumps", (&config,))?
-        .call_method0("encode")?
-        .downcast::<PyBytes>()?;
-    let raw = input_matrix.getattr("raw")?.downcast::<PyBytes>()?;
+        .call_method0("encode")?;
+    let encoded = encoded_object.downcast::<PyBytes>()?;
+    let raw_object = input_matrix.getattr("raw")?;
+    let raw = raw_object.downcast::<PyBytes>()?;
     let mut hasher = Sha256::new();
     hasher.update(raw.as_bytes());
     hasher.update(encoded.as_bytes());
