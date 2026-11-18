@@ -8,11 +8,18 @@
   same `world.sum` then failure-only `all_gather_object` sequence.
 - Older extensions retain the Python fallback, and one-rank execution is
   unchanged. Added tests for Rust delegation and the old-extension fallback.
-  Hosted runs 44350398748 and 44351320152 stopped at rustfmt in existing CNOT
-  Rust files before compilation or tests; their logs remain in Actions artifacts.
-  Formatting corrections are being sent for another run. No local tests or
-  builds were run. This does not verify CUDA/NCCL runtime behavior or complete
-  the CNOT migration.
+  Hosted run 44352267137 passed Rust formatting/checks, PyO3 build, the CNOT CPU
+  suite and NCCL probe syntax; artifact 14448882195 has SHA-256
+  `4c3f4587e51f2a73e20c6f522e6d49faf9e223923f2fc8b3441b2291757a0ef8`. The
+  associated Vast preflight run 44350398801 confirmed the Actions secret is
+  available but skipped GPU execution because the existing instance was stopped.
+- The follow-up row-gather contract first failed as expected in run
+  44354152193 (2 failed, 135 passed, 2 skipped): the extension had no
+  `run_cnot_native_gather_rows` entry point and `World.gather_rows` did not
+  delegate. Its full log remains in the Actions artifact. Rust row-gather
+  implementation and hosted green verification are in progress. No local tests
+  or builds were run; CUDA/NCCL runtime behavior and full migration remain
+  unverified.
 
 ## 2026-11-18 - CNOT search control validation in beam-core
 

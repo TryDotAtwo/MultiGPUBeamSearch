@@ -100,6 +100,17 @@ class World:
         """Replicate variable-size metadata with O(total rows) storage, including empty ranks."""
         if self.size == 1:
             return rows
+        try:
+            from .errors import NativeUnavailable
+            from .rust_control import extension
+
+            gather = getattr(extension(), "run_cnot_native_gather_rows", None)
+        except NativeUnavailable:
+            gather = None
+        if callable(gather):
+            return gather(self, rows)
+
+        # Compatibility path for older PyO3 modules without the gather ABI.
         counts = self.gather_fixed(self.longs([len(rows)])).flatten().tolist()
         result = rows.new_empty((sum(counts), rows.size(1)))
         begin = 0

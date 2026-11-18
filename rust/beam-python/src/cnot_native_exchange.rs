@@ -3,7 +3,58 @@
 //! PyTorch owns tensors and the caller's process group. The current Stream 5
 //! owner, stable packet grouping, collective sequence and empty splits remain
 //! unchanged; this module does not turn a GPU address into a Rust reference.
-use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
+use pyo3::{
+    exceptions::{PyOverflowError, PyRuntimeError},
+    prelude::*,
+    types::PyDict,
+};
+
+/// Replicate variable-size rows in source-rank order over the existing world.
+///
+/// Counts, allocation, local copy and broadcasts keep the Python path's exact
+/// collective sequence. PyTorch continues to own the row and destination
+/// tensors, and the caller's transport performs each broadcast.
+#[pyfunction]
+fn run_cnot_native_gather_rows<'py>(
+    py: Python<'py>,
+    world: Bound<'py, PyAny>,
+    rows: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let size: usize = world.getattr("size")?.extract()?;
+    if size == 1 {
+        return Ok(rows);
+    }
+
+    let local_count = i64::try_from(rows.len()?)
+        .map_err(|_| PyOverflowError::new_err("CNOT local row count exceeds int64"))?;
+    let local = world.call_method1("longs", (vec![local_count],))?;
+    let counts: Vec<usize> = world
+        .call_method1("gather_fixed", (local,))?
+        .call_method0("flatten")?
+        .call_method0("tolist")?
+        .extract()?;
+    let total = py
+        .import("builtins")?
+        .call_method1("sum", (counts.clone(),))?;
+    let columns = rows.call_method1("size", (1,))?;
+    let result = rows.call_method1("new_empty", ((total, columns),))?;
+    let rank: usize = world.getattr("rank")?.extract()?;
+    let mut begin = 0usize;
+
+    for (source, count) in counts.into_iter().enumerate() {
+        if count != 0 {
+            let part = result.call_method1("narrow", (0, begin, count))?;
+            if source == rank {
+                part.call_method1("copy_", (rows.clone(),))?;
+            }
+            world.call_method1("broadcast", (&part, source))?;
+        }
+        begin = begin
+            .checked_add(count)
+            .ok_or_else(|| PyOverflowError::new_err("CNOT gathered row count exceeds usize"))?;
+    }
+    Ok(result)
+}
 
 pub(crate) fn exchange<'py>(
     py: Python<'py>,
@@ -85,5 +136,6 @@ fn run_cnot_native_exchange<'py>(
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(run_cnot_native_gather_rows, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_exchange, module)?)
 }
