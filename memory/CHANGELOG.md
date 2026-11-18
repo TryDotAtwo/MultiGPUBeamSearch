@@ -17,9 +17,14 @@
   44354152193 (2 failed, 135 passed, 2 skipped): the extension had no
   `run_cnot_native_gather_rows` entry point and `World.gather_rows` did not
   delegate. Its full log remains in the Actions artifact. Rust row-gather
-  implementation and hosted green verification are in progress. No local tests
-  or builds were run; CUDA/NCCL runtime behavior and full migration remain
-  unverified.
+  implementation passed hosted run 44355550826: Rust formatting/checks,
+  PyO3 build, 137 Python tests (2 skipped), and the NCCL probe syntax check.
+  Artifact 14451745790 has SHA-256
+  `6a624e57716f68e3fa315232418dccce96cd489e9f31d2337af2ed5c9c0783ac`. Vast
+  preflight 44355550941 confirmed the repository secret is available but
+  skipped NCCL execution because the existing instance was stopped; no instance
+  state change was attempted. No local tests or builds were run. Physical
+  CUDA/NCCL behavior and full migration remain unverified.
 
 ## 2026-11-18 - CNOT search control validation in beam-core
 
