@@ -1872,3 +1872,9 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - The option descriptor omits `experimental_index_sort` only when the value is exactly `False`; invalid falsey values such as `None` are passed to Rust and rejected. The CPU workflow now covers the complete backend/control test files and triggers on `rust_control.py` changes.
 - Run 44223487738 exposed `None` being dropped (1 failure, 119 passed). Test-only run 44224826858 confirmed the missing extension-import fallback (1 failure, 120 passed). Final hosted run 44225114516 passed Rust CNOT/search/runtime/native-sys checks, PyO3 check/build, 121 Python tests, and the two-rank NCCL probe syntax check. Artifact 14391754257 SHA-256: `44e646ba4a7c5d264baad8c54bd86fce06988ea5b2a97ea71f3fe308160ef0aa`.
 - This is CPU/control-flow evidence. CUDA kernels, NCCL runtime collectives, physical multi-GPU search, and performance were not run.
+
+## 2026-11-18 - CNOT optional extension import fallback
+
+- The shared Rust extension loader now tries both supported module names and maps missing modules or import/dependency failures to `NativeUnavailable`. CNOT `validation="auto"` and `engine="auto"` can use the Python compatibility path when the optional extension cannot load; explicit `rust` modes still fail closed.
+- Hosted run 44227238318 was the intended red check (1 failed, 121 passed). Run 44227654569 passed Rust CNOT/search/runtime/native-sys checks, PyO3 check/build, 122 Python tests, and the two-rank NCCL probe syntax check. Artifact 14393946014 SHA-256: `6481aa6e633831229d7169fa1464102c17f07107d4148cb4e77f7a62c7608726`.
+- This verifies CPU/control-flow compatibility only. No CUDA kernel, NCCL collective, physical multi-GPU search, or performance run was performed.
