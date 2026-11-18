@@ -11,7 +11,10 @@
 - Python-only and older-extension fallback remains. Search stages, model
   preparation, CNOT execution, CUDA/NCCL, candidate order and multi-GPU
   topology are unchanged. Hosted CPU validation is pending; this entry does
-  not claim runtime or multi-GPU acceptance.
+  not claim runtime or multi-GPU acceptance. Initial run 44333600886 passed
+  Rust checks and PyO3 build but test collection found that the pinned
+  `cayleypy==0.1.0` package does not expose `cayleypy.models.checkpoint`; the
+  added test is now self-contained and the hosted retry is pending.
 
 ## 2026-11-18 - Rust validation for normalized public search controls
 

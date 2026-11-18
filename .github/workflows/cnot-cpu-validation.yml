@@ -24,7 +24,7 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/rust_control.py
       - integrations/cayleypy_native/multigpubeamsearch/contracts.py
       - integrations/cayleypy_native/tests/test_backend.py
-      - integrations/cayleypy_native/tests/test_contracts.py
+      - integrations/cayleypy_native/tests/test_rust_graph_contract.py
       - integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
       - cuda/cnot_stream5_bridge.cu
       - integrations/cayleypy_native/CNOT.md
@@ -93,7 +93,7 @@ jobs:
           set -o pipefail
           python -m pytest -q \
             integrations/cayleypy_native/tests/test_backend.py \
-            integrations/cayleypy_native/tests/test_contracts.py \
+            integrations/cayleypy_native/tests/test_rust_graph_contract.py \
             integrations/cayleypy_native/tests/test_search_controls.py \
             integrations/cayleypy_native/tests/test_rust_control.py \
             integrations/cayleypy_native/tests/test_public_index_sort_build.py \
