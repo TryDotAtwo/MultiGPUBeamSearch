@@ -2,6 +2,7 @@
 //!
 //! Torch owns tensor storage and executes the same operations as the Python
 //! reference. The CUDA operators, ordering, and score precision are unchanged.
+use crate::cnot_scorer_dispatch;
 use pyo3::{
     exceptions::PyValueError,
     prelude::*,
@@ -73,7 +74,7 @@ pub(crate) fn expand<'py>(
     arange_kwargs.set_item("device", &device)?;
     let all_ids = torch.call_method("arange", (alphabet,), Some(&arange_kwargs))?;
     let moves = if count > 0 && i64::from(k) < alphabet {
-        let raw = scorer.call_method1("parent_scores", (parents, mode))?;
+        let raw = cnot_scorer_dispatch::parent_scores(py, scorer, parents, mode)?;
         let valid = scores(py, raw, &[count as i64, alphabet], &device)?;
         let kwargs = PyDict::new(py);
         kwargs.set_item("dim", 1)?;
@@ -154,7 +155,7 @@ pub(crate) fn distinct<'py>(
     let meta = incoming.get_item((&first, slice(py, None, Some(4))?))?;
     let device = world.getattr("device")?;
     let values = if children.len()? > 0 {
-        let raw = scorer.call_method1("child_values", (&children,))?;
+        let raw = cnot_scorer_dispatch::child_values(py, scorer, &children)?;
         scores(py, raw, &[children.len()? as i64], &device)?
     } else {
         let empty_kwargs = PyDict::new(py);

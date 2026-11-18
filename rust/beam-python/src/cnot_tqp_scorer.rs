@@ -8,7 +8,7 @@ use pyo3::{
 use std::path::PathBuf;
 
 #[pyclass(name = "TQPScorer", unsendable)]
-struct PyTqpScorer {
+pub(crate) struct PyTqpScorer {
     scorer: Option<TqpScorer>,
     device: Py<PyAny>,
     metadata: Py<PyAny>,
@@ -146,6 +146,25 @@ impl PyTqpScorer {
         rows: Bound<'py, PyAny>,
         mode: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
+        self.parent_scores_native(py, rows, mode)
+    }
+
+    fn child_values<'py>(
+        &self,
+        py: Python<'py>,
+        rows: Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        self.child_values_native(py, rows)
+    }
+}
+
+impl PyTqpScorer {
+    pub(crate) fn parent_scores_native<'py>(
+        &self,
+        py: Python<'py>,
+        rows: Bound<'py, PyAny>,
+        mode: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let head = match mode {
             "qhat" => 0,
             "proposal" => 1,
@@ -158,16 +177,14 @@ impl PyTqpScorer {
         self.score(py, rows, head)
     }
 
-    fn child_values<'py>(
+    pub(crate) fn child_values_native<'py>(
         &self,
         py: Python<'py>,
         rows: Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         self.score(py, rows, 2)
     }
-}
 
-impl PyTqpScorer {
     fn score<'py>(
         &self,
         py: Python<'py>,

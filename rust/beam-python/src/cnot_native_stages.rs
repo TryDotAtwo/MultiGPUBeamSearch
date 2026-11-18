@@ -2,7 +2,10 @@
 //!
 //! Tensor storage remains owned by PyTorch/CUDA. Existing ATen operators and
 //! rank collectives are invoked on the caller's thread in their former order.
-use crate::{cnot_native_batch, cnot_native_checked::checked, cnot_native_exchange};
+use crate::{
+    cnot_native_batch, cnot_native_checked::checked, cnot_native_exchange,
+    cnot_scorer_dispatch,
+};
 use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
@@ -163,9 +166,12 @@ impl<'py> NativeStages<'py> {
             let count = parents.len()?;
             let alphabet = self.n * (self.n - 1);
             let scores = if count > 0 && i64::from(k) < alphabet {
-                let raw = self
-                    .scorer
-                    .call_method1("parent_scores", (&parents, &self.mode))?;
+                let raw = cnot_scorer_dispatch::parent_scores(
+                    self.py,
+                    &self.scorer,
+                    &parents,
+                    &self.mode,
+                )?;
                 cnot_native_batch::scores(
                     self.py,
                     raw,
@@ -235,7 +241,7 @@ impl<'py> NativeStages<'py> {
             let children = pair.get_item(0)?;
             let meta = pair.get_item(1)?;
             let values = if children.len()? > 0 {
-                let raw = self.scorer.call_method1("child_values", (&children,))?;
+                let raw = cnot_scorer_dispatch::child_values(self.py, &self.scorer, &children)?;
                 cnot_native_batch::scores(
                     self.py,
                     raw,

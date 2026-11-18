@@ -8,6 +8,7 @@ mod cnot_native_exchange;
 mod cnot_native_goal;
 mod cnot_native_selection;
 mod cnot_native_stages;
+mod cnot_scorer_dispatch;
 mod cnot_tqp_scorer;
 mod cnot_stream5;
 mod configuration;

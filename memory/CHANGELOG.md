@@ -1813,3 +1813,12 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   loaded; CUDA scoring, NCCL execution, and physical multi-GPU acceptance
   remain unverified. This change does not alter search decisions or model
   numerics.
+
+## 2026-11-18 - Rust CNOT scorer dispatch
+
+- CNOT's Rust-owned stage and batch paths now call the built-in PyO3 TQP
+  scorer's Rust methods directly. Other scorer implementations retain the
+  `parent_scores` / `child_values` Python protocol. The existing score
+  validation, call order, and chunking are unchanged.
+- Added the dispatch module to hosted Rust formatting and CNOT CPU validation.
+  GPU scorer loading and multi-GPU CNOT acceptance remain unverified.

@@ -57,7 +57,9 @@ jobs:
               rust/beam-runtime/src/cnot_search.rs \
               rust/beam-python/src/cnot.rs \
               rust/beam-python/src/cnot_tqp_scorer.rs \
+              rust/beam-python/src/cnot_native_batch.rs \
               rust/beam-python/src/cnot_native_stages.rs \
+              rust/beam-python/src/cnot_scorer_dispatch.rs \
               rust/beam-native-sys/src/cnot_stream5.rs \
               rust/beam-native-sys/src/cnot_tqp_scorer.rs \
               rust/beam-python/src/cnot_stream5.rs
