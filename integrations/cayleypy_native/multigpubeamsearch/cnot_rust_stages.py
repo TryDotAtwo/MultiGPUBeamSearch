@@ -28,6 +28,16 @@ class CnotStages:
         self.closed = root if owner == world.rank else root[:0]
 
     def goal(self, begin):
+        try:
+            from .errors import NativeUnavailable
+            from .rust_control import extension
+
+            rust_goal = getattr(extension(), "run_cnot_native_goal", None)
+        except (ImportError, NativeUnavailable):
+            rust_goal = None
+        if callable(rust_goal):
+            return rust_goal(self.world, self.parents, self.lex, begin, self.identity)
+
         if not self.parents.is_cuda:
             return cnot._goal(self.world, self.parents, self.lex, begin, self.identity)
 
