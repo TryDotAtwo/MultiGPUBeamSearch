@@ -128,6 +128,13 @@ still selects the reference checks. This moves validation and snapshot
 coordination only; it does not change search steps, matrix semantics, scorer
 callbacks, or multi-rank collectives.
 
+When the compatibility stage adapter is needed, its CNOT goal stage now calls
+the Rust `run_cnot_native_goal` helper when the installed extension provides
+it. The helper retains the same local goal selection and existing rank-wide
+goal/error exchange. An older extension without the helper keeps the Python
+goal fallback, and runtime exceptions from the helper are not retried through
+Python. No search iteration, collective sequence, or winner policy changed.
+
 For multi-rank Rust CNOT searches, CUDA owner counts and stable send-record
 grouping use C++ ATen when the matching operator is available. After all ranks
 admit the same engine, they collectively select the Rust-owned Stream 5

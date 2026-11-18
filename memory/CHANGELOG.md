@@ -2088,3 +2088,18 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   SHA-256 `6cc1a5ca4352fd567e190a47ebbbbdb45f67f467fb0c56746c3a69ef1d72424b`.
   The CPU workflow does not verify physical CUDA/NCCL or multi-GPU execution.
   See `test_results/refactor_20261118/cnot-input-prepare/GITHUB_STATUS.md`.
+
+## 2026-11-19 - Rust CNOT goal in the compatibility adapter
+
+- The CNOT compatibility stage now calls the existing Rust goal helper when
+  the PyO3 extension exposes it. Older extensions still use the Python goal
+  path; runtime errors from the Rust helper are propagated and do not retry
+  through Python. The local goal rule and rank-wide collective sequence did
+  not change.
+- Corrected test-first run 44399877219 showed the expected Python-goal call
+  (162 passed, 2 skipped). Green branch run 44400257858 passed Rust
+  formatting/checks, PyO3 build, 163 Python tests (2 skipped), and NCCL probe
+  syntax. Artifact 14471674104 SHA-256:
+  `107089bf02bbb70c4184c339f04e57e8a764f496326a2bb3cdc48ba0c7de818e`.
+  Physical CUDA/NCCL and multi-GPU CNOT execution remain unverified. See
+  `test_results/refactor_20261119/cnot-compat-goal/GITHUB_STATUS.md`.
