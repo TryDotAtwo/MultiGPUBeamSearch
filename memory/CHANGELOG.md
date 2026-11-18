@@ -1831,3 +1831,19 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   current Vast status workflow confirmed the instance stopped and skipped the
   GPU build and two-rank NCCL test without changing its state. CUDA scorer and
   physical multi-GPU CNOT acceptance remain unverified.
+
+## 2026-11-18 - Rust-owned permutation depth budget
+
+- Moved `native_depth_budget` arithmetic into `beam-core` and exposed it via
+  the PyO3 extension. Python still validates inputs and keeps its fallback for
+  older/missing extensions and integers outside Rust's `u64`/`u32` parameter
+  ranges. Search depth and touch-BFS semantics are unchanged.
+- The first hosted run exposed the oversized-integer boundary: 36 Python tests
+  passed and the two new boundary cases failed against the unguarded FFI call.
+  The range guard was added and hosted run 44216092965 then passed formatting,
+  3 core CNOT tests, 4 core search tests, 4 runtime CNOT tests, 4 native-sys
+  scorer tests, PyO3 extension build/check, 38 Python tests, and NCCL probe
+  syntax. Artifact 14388107367 has SHA-256
+  `0ed3aa03c26239652506b4a6cab4896b74a15eaf031123c7b1401b1c172cbfee`.
+- This is CPU/control-flow evidence only. No CUDA kernel, NCCL collective,
+  physical multi-GPU search, or performance path was run.
