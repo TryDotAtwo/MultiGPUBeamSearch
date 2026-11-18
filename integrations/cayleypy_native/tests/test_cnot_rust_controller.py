@@ -160,7 +160,7 @@ def test_rust_controller_prepares_typed_input_without_python_builder(monkeypatch
 
 def test_rust_native_root_goal_uses_typed_matrix_without_torch_equal(monkeypatch):
     require_controller()
-    root = cnot.cnot_identity(3)
+    root = torch.tensor([[[1], [2], [4]]], dtype=torch.int64)
     scorer = SimpleNamespace(metadata={})
 
     def forbidden(*_args, **_kwargs):
