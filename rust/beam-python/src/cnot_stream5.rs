@@ -195,7 +195,49 @@ impl<'py> Backend for TensorExchange<'_, 'py> {
     }
 }
 
+#[pyfunction]
+fn run_cnot_native_start_transport<'py>(
+    py: Python<'py>,
+    world: Bound<'py, PyAny>,
+    prefer_rust: bool,
+) -> PyResult<()> {
+    let native_library = world.getattr("_stream5_library")?;
+    if native_library.is_none() {
+        return Ok(());
+    }
+
+    let module = py.import("multigpubeamsearch.cnot_stream5")?;
+    let rust_transport = module.getattr("RustStream5")?;
+    let python_transport = module.getattr("Stream5")?;
+    let library = if prefer_rust {
+        rust_transport.call_method1("compatible_library", (&native_library,))?
+    } else {
+        py.None().into_bound(py)
+    };
+
+    let use_rust = if prefer_rust {
+        let supported = if library.is_none() { 0_i64 } else { 1_i64 };
+        let local = world.call_method1("longs", (vec![supported],))?;
+        let total: usize = world
+            .call_method1("sum", (local,))?
+            .call_method0("item")?
+            .extract()?;
+        total == world.getattr("size")?.extract::<usize>()?
+    } else {
+        false
+    };
+
+    let transport = if use_rust {
+        rust_transport.call1((library, world.clone()))?
+    } else {
+        python_transport.call1((&native_library, world.clone()))?
+    };
+    world.setattr("transport", transport)?;
+    Ok(())
+}
+
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyStream5Library>()?;
-    module.add_class::<PyStream5Communicator>()
+    module.add_class::<PyStream5Communicator>()?;
+    module.add_function(wrap_pyfunction!(run_cnot_native_start_transport, module)?)
 }

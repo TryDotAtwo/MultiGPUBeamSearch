@@ -28,6 +28,11 @@ class World:
 
     def start_transport(self, *, prefer_rust):
         """Choose one exchange/control transport for all ranks after admission."""
+        used, result = self._rust_collective(
+            "run_cnot_native_start_transport", prefer_rust
+        )
+        if used:
+            return result
         if self._stream5_library is None:
             return
         from .cnot_stream5 import RustStream5, Stream5
