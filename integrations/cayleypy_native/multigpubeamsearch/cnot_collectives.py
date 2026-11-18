@@ -52,6 +52,17 @@ class World:
             return result
         return self.sum(self.longs([int(local_support)])).item() == self.size
 
+    def require_consensus(self, digest):
+        """Reject CNOT setup when the ranks received different search inputs."""
+        used, result = self._rust_collective(
+            "run_cnot_native_require_consensus", digest
+        )
+        if used:
+            return result
+        identities = self.gather_fixed(self.longs(list(digest)))
+        if not (identities == identities[0]).all().item():
+            raise ValueError("CNOT root, search settings or scorer fingerprints differ between ranks")
+
     def __exit__(self, kind, value, traceback):
         if self.transport is not None:
             self.transport.close(abort=kind is not None)

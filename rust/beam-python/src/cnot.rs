@@ -26,6 +26,28 @@ fn validate_cnot_search_controls(
         .map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
+#[pyfunction]
+fn run_cnot_native_require_consensus(
+    world: Bound<'_, PyAny>,
+    digest: Vec<u8>,
+) -> PyResult<()> {
+    let values: Vec<i64> = digest.into_iter().map(i64::from).collect();
+    let local = world.call_method1("longs", (values,))?;
+    let gathered = world.call_method1("gather_fixed", (local,))?;
+    let first = gathered.get_item(0)?;
+    let same = gathered
+        .call_method1("__eq__", (first,))?
+        .call_method0("all")?
+        .call_method0("item")?
+        .extract::<bool>()?;
+    if !same {
+        return Err(PyValueError::new_err(
+            "CNOT root, search settings or scorer fingerprints differ between ranks",
+        ));
+    }
+    Ok(())
+}
+
 #[pymethods]
 impl PyCnotMatrix {
     #[new]
@@ -218,6 +240,7 @@ pub(crate) fn outcome_to_python(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotMatrix>()?;
     module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
+    module.add_function(wrap_pyfunction!(run_cnot_native_require_consensus, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_selection, module)?)
 }

@@ -277,9 +277,7 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         input_matrix, digest, runner = world.checked("validate CNOT input", lambda: _admit(
             root, scorer, width, shortlist, max_depth, mode, audit, validation, engine))
         root = input_matrix.root
-        identities = world.gather_fixed(world.longs(list(digest)))
-        if not (identities == identities[0]).all().item():
-            raise ValueError("CNOT root, search settings or scorer fingerprints differ between ranks")
+        world.require_consensus(digest)
         world.start_transport(prefer_rust=runner is not None)
         identity = native.cnot_identity(input_matrix.n, device=world.device)
         if runner is not None:
