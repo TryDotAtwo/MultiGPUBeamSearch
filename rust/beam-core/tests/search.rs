@@ -1,7 +1,110 @@
 use beam_core::search::{
-    native_depth_budget, search_budget, touch_bfs_worst_case_entries, PermutationGraph,
-    TerminalParser,
+    native_depth_budget, search_budget, touch_bfs_worst_case_entries,
+    validate_public_search_controls, PermutationGraph, PublicSearchControls,
+    SearchControlError, TerminalParser,
 };
+
+fn public_controls(
+    beam_width: serde_json::Value,
+    max_steps: serde_json::Value,
+) -> PublicSearchControls {
+    serde_json::from_value(serde_json::json!({
+        "beam_width": beam_width,
+        "max_steps": max_steps,
+        "beam_mode": {"kind": "str", "value": "simple"},
+        "history_depth": {"kind": "int", "value": "0"},
+        "destination_state_present": false,
+        "bfs_result_for_mitm_present": false,
+        "return_path": {"kind": "bool", "value": true},
+        "use_child_scores": {"kind": "bool", "value": false}
+    }))
+    .unwrap()
+}
+
+#[test]
+fn public_search_controls_accept_fixed_and_maximum_width_requests() {
+    let fixed = public_controls(json_tag("int", "64"), json_tag("int", "8"));
+    assert_eq!(validate_public_search_controls(&fixed), Ok(()));
+    let maximum = public_controls(json_tag("str", "max"), json_tag("int", "0"));
+    assert_eq!(validate_public_search_controls(&maximum), Ok(()));
+    let mut false_history = public_controls(json_tag("int", "1"), json_tag("int", "4"));
+    false_history.history_depth = serde_json::from_value(serde_json::json!({
+        "kind": "bool",
+        "value": false
+    }))
+    .unwrap();
+    assert_eq!(validate_public_search_controls(&false_history), Ok(()));
+    let mut zero_float_history = public_controls(json_tag("int", "1"), json_tag("int", "4"));
+    zero_float_history.history_depth = serde_json::from_value(json_tag("float", "0.0")).unwrap();
+    assert_eq!(validate_public_search_controls(&zero_float_history), Ok(()));
+}
+
+#[test]
+fn public_search_controls_preserve_invalid_and_unsupported_contracts() {
+    let invalid_width = public_controls(json_tag("int", "0"), json_tag("int", "4"));
+    assert_eq!(
+        validate_public_search_controls(&invalid_width),
+        Err(SearchControlError::Invalid("beam_width must be an integer > 0".into()))
+    );
+    let oversized_depth = public_controls(
+        json_tag("int", "1"),
+        json_tag("int", "4294967296"),
+    );
+    assert_eq!(
+        validate_public_search_controls(&oversized_depth),
+        Err(SearchControlError::Invalid(
+            "max_steps exceeds native integer range (4294967295)".into()
+        ))
+    );
+    let oversized_width = public_controls(
+        json_tag("int", "18446744073709551616"),
+        json_tag("int", "4"),
+    );
+    assert_eq!(
+        validate_public_search_controls(&oversized_width),
+        Err(SearchControlError::Invalid(
+            "beam_width exceeds native integer range (18446744073709551615)".into()
+        ))
+    );
+    let boolean_width = public_controls(
+        serde_json::json!({"kind": "bool", "value": true}),
+        json_tag("int", "4"),
+    );
+    assert_eq!(
+        validate_public_search_controls(&boolean_width),
+        Err(SearchControlError::Invalid("beam_width must be an integer > 0".into()))
+    );
+    let mut advanced = public_controls(json_tag("int", "1"), json_tag("int", "4"));
+    advanced.beam_mode = serde_json::from_value(json_tag("str", "advanced")).unwrap();
+    assert_eq!(
+        validate_public_search_controls(&advanced),
+        Err(SearchControlError::Unsupported(
+            "native does not implement the upstream advanced mode; use beam_mode='simple'".into()
+        ))
+    );
+    let mut taboo = public_controls(json_tag("int", "1"), json_tag("int", "4"));
+    taboo.history_depth = serde_json::from_value(json_tag("int", "1")).unwrap();
+    assert!(matches!(
+        validate_public_search_controls(&taboo),
+        Err(SearchControlError::Unsupported(_))
+    ));
+    let mut destination = public_controls(json_tag("int", "1"), json_tag("int", "4"));
+    destination.destination_state_present = true;
+    assert!(matches!(
+        validate_public_search_controls(&destination),
+        Err(SearchControlError::Unsupported(_))
+    ));
+    let mut non_boolean_path = public_controls(json_tag("int", "1"), json_tag("int", "4"));
+    non_boolean_path.return_path = serde_json::from_value(json_tag("int", "1")).unwrap();
+    assert_eq!(
+        validate_public_search_controls(&non_boolean_path),
+        Err(SearchControlError::Invalid("return_path must be bool".into()))
+    );
+}
+
+fn json_tag(kind: &str, value: &str) -> serde_json::Value {
+    serde_json::json!({"kind": kind, "value": value})
+}
 
 #[test]
 fn native_depth_budget_reserves_the_touch_bfs_suffix() {

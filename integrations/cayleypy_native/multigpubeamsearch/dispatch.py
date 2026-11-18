@@ -130,6 +130,10 @@ def _parameters(kwargs):
     unknown = set(params) - _SUPPORTED
     if unknown:
         raise NativeUnavailable("native does not implement upstream options: " + ", ".join(sorted(unknown)))
+    from .rust_control import validate_search_controls
+
+    if validate_search_controls(params):
+        return params
     for name in ("beam_width", "max_steps"):
         value = params[name]
         if name=='beam_width' and type(value) is str and value=='max':

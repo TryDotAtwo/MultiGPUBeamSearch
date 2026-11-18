@@ -6,6 +6,126 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 type Result<T> = std::result::Result<T, ContractError>;
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaggedSearchValue {
+    pub kind: String,
+    pub value: Value,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublicSearchControls {
+    pub beam_width: TaggedSearchValue,
+    pub max_steps: TaggedSearchValue,
+    pub beam_mode: TaggedSearchValue,
+    pub history_depth: TaggedSearchValue,
+    pub destination_state_present: bool,
+    pub bfs_result_for_mitm_present: bool,
+    pub return_path: TaggedSearchValue,
+    pub use_child_scores: TaggedSearchValue,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SearchControlError {
+    Invalid(String),
+    Unsupported(String),
+}
+
+fn tagged_string<'a>(value: &'a TaggedSearchValue, kind: &str) -> Option<&'a str> {
+    (value.kind == kind).then(|| value.value.as_str()).flatten()
+}
+
+fn integer_in_range(
+    value: &TaggedSearchValue,
+    name: &str,
+    maximum: u64,
+    minimum: u64,
+) -> std::result::Result<u64, SearchControlError> {
+    let message = || {
+        format!(
+            "{name} must be an integer {}",
+            if minimum == 1 { "> 0" } else { ">= 0" }
+        )
+    };
+    let Some(text) = tagged_string(value, "int") else {
+        return Err(SearchControlError::Invalid(message()));
+    };
+    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(SearchControlError::Invalid(message()));
+    }
+    let maximum_text = maximum.to_string();
+    if text.len() > maximum_text.len()
+        || (text.len() == maximum_text.len() && text > maximum_text.as_str())
+    {
+        return Err(SearchControlError::Invalid(format!(
+            "{name} exceeds native integer range ({maximum})"
+        )));
+    }
+    let parsed = text
+        .parse::<u64>()
+        .map_err(|_| SearchControlError::Invalid(message()))?;
+    if parsed < minimum {
+        return Err(SearchControlError::Invalid(message()));
+    }
+    Ok(parsed)
+}
+
+/// Validate the normalized public CayleyPy request without owning its signature adapter.
+/// The Python edge tags values so Rust can preserve exact Python type semantics.
+pub fn validate_public_search_controls(
+    controls: &PublicSearchControls,
+) -> std::result::Result<(), SearchControlError> {
+    if tagged_string(&controls.beam_width, "str") == Some("max") {
+        // The runner still checks whether maximum-width autotuning is enabled.
+    } else {
+        integer_in_range(&controls.beam_width, "beam_width", u64::MAX, 1)?;
+    }
+    integer_in_range(&controls.max_steps, "max_steps", u32::MAX.into(), 0)?;
+
+    if tagged_string(&controls.beam_mode, "str") != Some("simple") {
+        return Err(SearchControlError::Unsupported(
+            "native does not implement the upstream advanced mode; use beam_mode='simple'".into(),
+        ));
+    }
+
+    let history_is_zero = match controls.history_depth.kind.as_str() {
+        "int" => controls.history_depth.value.as_str() == Some("0"),
+        "bool" => controls.history_depth.value.as_bool() == Some(false),
+        "float" => controls
+            .history_depth
+            .value
+            .as_str()
+            .and_then(|value| value.parse::<f64>().ok())
+            .is_some_and(|value| value == 0.0),
+        _ => false,
+    };
+    if !history_is_zero {
+        return Err(SearchControlError::Unsupported(
+            "upstream history_depth is a taboo policy, not native reconstruction history".into(),
+        ));
+    }
+    if controls.destination_state_present {
+        return Err(SearchControlError::Unsupported(
+            "native adapter currently targets graph.central_state; destination_state is not supported".into(),
+        ));
+    }
+    if controls.bfs_result_for_mitm_present {
+        return Err(SearchControlError::Unsupported(
+            "upstream BfsResult hashes cannot be reused by native; configure touch_bfs_radius instead".into(),
+        ));
+    }
+    for (name, value) in [
+        ("return_path", &controls.return_path),
+        ("use_child_scores", &controls.use_child_scores),
+    ] {
+        if value.kind != "bool" || value.value.as_bool().is_none() {
+            return Err(SearchControlError::Invalid(format!("{name} must be bool")));
+        }
+    }
+    Ok(())
+}
+
 /// Reserve a suffix of the requested step budget for touch-BFS completion.
 ///
 /// The solved start is handled before launch, so any nontrivial run keeps at

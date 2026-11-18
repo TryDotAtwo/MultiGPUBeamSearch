@@ -27,6 +27,32 @@ def test_normalized_search_controls_are_delegated_to_rust(monkeypatch):
     assert seen[0]["max_steps"] == 4
 
 
+def test_rust_search_control_api_keeps_public_errors():
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    valid = dispatch._parameters({"start_state": [0, 1], "beam_width": 16, "max_steps": 4})
+    assert rust_control.validate_search_controls(valid)
+
+    invalid = dict(valid, beam_width=0)
+    with pytest.raises(ValueError, match="beam_width must be an integer > 0"):
+        rust_control.validate_search_controls(invalid)
+
+    unsupported = dict(valid, beam_mode="advanced")
+    with pytest.raises(NativeUnavailable, match="beam_mode='simple'"):
+        rust_control.validate_search_controls(unsupported)
+
+
+def test_old_rust_extension_falls_back_to_python_search_control_validation(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(ABI_VERSION=1))
+    params = dispatch._parameters({"start_state": [0, 1], "beam_width": 16, "max_steps": 4})
+    assert params["beam_width"] == 16
+
+    with pytest.raises(ValueError, match="beam_width must be an integer > 0"):
+        dispatch._parameters({"start_state": [0, 1], "beam_width": 0, "max_steps": 4})
+
 def test_controls_reach_native_options(tmp_path, monkeypatch):
     graph=CayleyGraph(PermutationGroups.lrx(5),device='cpu')
     monkeypatch.setattr(dispatch,'runtime_devices',lambda *a:(0,1))

@@ -63,6 +63,7 @@ jobs:
               rust/beam-runtime/src/cnot_search.rs \
               rust/beam-core/src/permutation.rs \
               rust/beam-core/src/search.rs \
+              rust/beam-core/tests/search.rs \
               rust/beam-python/src/configuration.rs \
               rust/beam-python/src/cnot.rs \
               rust/beam-python/src/cnot_tqp_scorer.rs \
@@ -111,5 +112,4 @@ jobs:
           path: test_results/refactor_20261118/cnot-tqp-scorer
           if-no-files-found: ignore
           retention-days: 7
-
 

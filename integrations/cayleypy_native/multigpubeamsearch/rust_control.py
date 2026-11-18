@@ -105,6 +105,61 @@ def validate_options(options):
     return True
 
 
+def _tag_search_value(value):
+    if type(value) is int:
+        return {"kind": "int", "value": str(value)}
+    if type(value) is bool:
+        return {"kind": "bool", "value": value}
+    if type(value) is str:
+        return {"kind": "str", "value": value}
+    if type(value) is float:
+        return {"kind": "float", "value": repr(value)}
+    if value is None:
+        return {"kind": "none", "value": None}
+    return {"kind": "other", "value": None}
+
+
+def validate_search_controls(params):
+    """Delegate normalized public search-control checks to beam-core when available."""
+    beam_mode = params["beam_mode"]
+    history_depth = params["history_depth"]
+    # Python permits user-defined equality for these two legacy fields. Keep
+    # that edge case on the compatibility path instead of changing its result.
+    if type(beam_mode) not in (str, bool, int, float) and beam_mode is not None:
+        return False
+    if type(history_depth) not in (str, bool, int, float) and history_depth is not None:
+        return False
+    request = {
+        "beam_width": _tag_search_value(params["beam_width"]),
+        "max_steps": _tag_search_value(params["max_steps"]),
+        "beam_mode": _tag_search_value(beam_mode),
+        "history_depth": _tag_search_value(history_depth),
+        "destination_state_present": params["destination_state"] is not None,
+        "bfs_result_for_mitm_present": params["bfs_result_for_mitm"] is not None,
+        "return_path": _tag_search_value(params["return_path"]),
+        "use_child_scores": _tag_search_value(params["use_child_scores"]),
+    }
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return False
+    validator = getattr(native, "validate_search_controls", None)
+    if validator is None:
+        return False
+    try:
+        status, message = validator(json.dumps(request, allow_nan=False))
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if status == "valid":
+        return True
+    if status == "invalid":
+        raise ValueError(message)
+    if status == "unsupported":
+        raise NativeUnavailable(message)
+    raise NativeBackendError("Rust search-control validator returned an unknown status")
+
+
+
 def _inference_request(contract, model, runtime, options, devices, beam_width,
                        run_dir, environment, *, capacity_bootstrap=False):
     from .autotune import calibration_signature

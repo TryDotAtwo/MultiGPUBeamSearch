@@ -27,6 +27,21 @@ fn validate_options(options: &str) -> PyResult<String> {
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
     serde_json::to_string(&options).map_err(|e| PyValueError::new_err(e.to_string()))
 }
+
+#[pyfunction]
+fn validate_search_controls(request: &str) -> PyResult<(String, String)> {
+    let controls: beam_core::search::PublicSearchControls =
+        serde_json::from_str(request).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    match beam_core::search::validate_public_search_controls(&controls) {
+        Ok(()) => Ok(("valid".into(), String::new())),
+        Err(beam_core::search::SearchControlError::Invalid(message)) => {
+            Ok(("invalid".into(), message))
+        }
+        Err(beam_core::search::SearchControlError::Unsupported(message)) => {
+            Ok(("unsupported".into(), message))
+        }
+    }
+}
 #[pyclass]
 struct InferenceCalibration {
     request: beam_runtime::inference_job::Request,
@@ -133,6 +148,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(native_depth_budget, module)?)?;
     module.add_function(wrap_pyfunction!(touch_bfs_worst_case_entries, module)?)?;
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
+    module.add_function(wrap_pyfunction!(validate_search_controls, module)?)?;
     module.add_class::<InferenceCalibration>()?;
     module.add_class::<DownstreamCalibration>()?;
     module.add_class::<FrontierCalibration>()?;
