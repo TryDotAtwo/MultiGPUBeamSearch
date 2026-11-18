@@ -1847,3 +1847,21 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   `0ed3aa03c26239652506b4a6cab4896b74a15eaf031123c7b1401b1c172cbfee`.
 - This is CPU/control-flow evidence only. No CUDA kernel, NCCL collective,
   physical multi-GPU search, or performance path was run.
+
+## 2026-11-18 - Rust-owned touch-BFS entry budget
+
+- The duplicate-free geometric host-entry bound now runs in `beam-core` and
+  is shared by Rust `search_budget` and the optional PyO3 adapter. Python keeps
+  input checks, maps a rejected cap to the existing `NativeUnavailable`
+  message, and falls back for old extensions or values outside the native
+  parameter ranges. The 32-generator suffix rule remains in the search
+  contract; this changes ownership only.
+- Hosted run 44218335727 passed Rust formatting, 3 core CNOT tests, 5 core
+  search tests, 4 runtime CNOT tests, 4 native-sys scorer tests, PyO3
+  build/check, 44 Python tests, and NCCL probe syntax. Artifact 14388638855
+  has SHA-256
+  `c2e9cc7ba1cf5d4922bae8eb9c127679800f2ba2846d353ab30d643db557c8fc`.
+- First, the new API tests failed as intended on run 44217173408 (39 passed,
+  2 failed); run 44218056948 caught only rustfmt layout and the correction is
+  in `922b1f7e`. The final run above is green. No CUDA kernel, NCCL collective,
+  or physical multi-GPU search ran.
