@@ -33,18 +33,14 @@ def test_rust_controller_owns_initial_identity_result(monkeypatch):
         calls.append("identity-check")
         return torch_equal(left, right)
 
-    def rust_runner(stages, rank, size, width, shortlist, alphabet, max_depth):
-        calls.append("rust-controller")
-        assert stages.root_is_goal()
-        return cnot.CnotResult("solved", (), [], [])
-
     monkeypatch.setattr(torch, "equal", tracked_equal)
-    monkeypatch.setattr(cnot, "_search_engine", lambda *_: ("rust", rust_runner))
+    monkeypatch.setattr(cnot, "_search_engine",
+                        lambda *_: pytest.fail("Python engine selection ran"))
     monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
     result = search_cnot(pack_rows((1, 2)), object(), width=1, shortlist=1,
                          max_depth=0, validation="python", engine="rust")
 
-    assert calls == ["rust-controller", "identity-check"]
+    assert calls == ["identity-check"]
     assert result == cnot.CnotResult("solved", (), [], [])
 
 

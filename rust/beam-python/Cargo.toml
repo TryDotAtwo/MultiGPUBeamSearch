@@ -12,3 +12,4 @@ beam-native-sys = { workspace = true, features = ["python"] }
 beam-runtime.workspace = true
 pyo3.workspace = true
 serde_json.workspace = true
+sha2.workspace = true

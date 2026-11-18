@@ -46,6 +46,7 @@ dependencies = [
  "beam-runtime",
  "pyo3",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

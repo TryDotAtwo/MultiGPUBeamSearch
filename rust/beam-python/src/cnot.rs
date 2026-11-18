@@ -4,8 +4,9 @@ use beam_runtime::cnot_selection;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
-    types::{PyBytes, PyDict, PyList, PyTuple},
+    types::{PyBytes, PyDict, PyList, PyString, PyTuple},
 };
+use sha2::{Digest, Sha256};
 
 #[pyclass(name = "CnotMatrix", frozen)]
 struct PyCnotMatrix {
@@ -119,6 +120,90 @@ fn run_cnot_native_require_consensus(world: Bound<'_, PyAny>, digest: Vec<u8>) -
         ));
     }
     Ok(())
+}
+
+fn select_cnot_engine(
+    py: Python<'_>,
+    engine: &Bound<'_, PyAny>,
+    max_depth: &Bound<'_, PyAny>,
+) -> PyResult<&'static str> {
+    let supported = PyTuple::new(py, ["auto", "python", "rust"])?;
+    if !supported
+        .call_method1("__contains__", (engine,))?
+        .is_truthy()?
+    {
+        return Err(PyValueError::new_err(
+            "CNOT engine must be auto, python, or rust",
+        ));
+    }
+    let equals = py.import("operator")?.getattr("eq")?;
+    if equals.call1((engine, "python"))?.is_truthy()? {
+        return Ok("python");
+    }
+    if max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()? {
+        if equals.call1((engine, "auto"))?.is_truthy()? {
+            return Ok("python");
+        }
+        return Err(PyValueError::new_err("CNOT Rust engine depth exceeds u64"));
+    }
+    Ok("rust")
+}
+
+fn cnot_admission_digest<'py>(
+    py: Python<'py>,
+    input_matrix: &Bound<'py, PyAny>,
+    scorer: &Bound<'py, PyAny>,
+    width: &Bound<'py, PyAny>,
+    shortlist: &Bound<'py, PyAny>,
+    max_depth: &Bound<'py, PyAny>,
+    mode: &Bound<'py, PyAny>,
+    audit: &Bound<'py, PyAny>,
+    validation: &Bound<'py, PyAny>,
+    selected_engine: &str,
+) -> PyResult<Py<PyBytes>> {
+    let builtins = py.import("builtins")?;
+    let metadata = builtins
+        .getattr("getattr")?
+        .call1((scorer, "metadata", PyDict::new(py)))?;
+    let mut fingerprints = Vec::with_capacity(5);
+    for key in [
+        "upstream_commit",
+        "checkpoint_sha256",
+        "feature_registry_sha256",
+        "training_manifest_sha256",
+        "training_result_sha256",
+    ] {
+        fingerprints.push(metadata.call_method1("get", (key,))?);
+    }
+    let fingerprints = PyTuple::new(py, fingerprints)?;
+    let root = input_matrix.getattr("root")?;
+    let shape = builtins
+        .getattr("tuple")?
+        .call1((root.getattr("shape")?,))?;
+    let mut config = Vec::with_capacity(9);
+    config.push(width.clone());
+    config.push(shortlist.clone());
+    config.push(max_depth.clone());
+    config.push(mode.clone());
+    config.push(audit.clone());
+    config.push(validation.clone());
+    config.push(PyString::new(py, selected_engine).into_any());
+    config.push(shape.into_any());
+    config.push(fingerprints.into_any());
+    let config = PyTuple::new(py, config)?;
+    // Preserve the Python reference's JSON encoding byte-for-byte while Rust
+    // owns field order, selected-engine policy and the consensus fingerprint.
+    let encoded = py
+        .import("json")?
+        .call_method1("dumps", (&config,))?
+        .call_method0("encode")?
+        .downcast::<PyBytes>()?;
+    let raw = input_matrix.getattr("raw")?.downcast::<PyBytes>()?;
+    let mut hasher = Sha256::new();
+    hasher.update(raw.as_bytes());
+    hasher.update(encoded.as_bytes());
+    let digest = hasher.finalize();
+    Ok(PyBytes::new(py, digest.as_slice()).unbind())
 }
 
 #[pymethods]
@@ -286,29 +371,47 @@ fn run_cnot_native_search<'py>(
     let validation = options.get_item(5)?;
     let engine = options.get_item(6)?;
 
-    let admit = callbacks.get_item(0)?;
+    let input_builder = callbacks.get_item(0)?;
     let identity_builder = callbacks.get_item(1)?;
     let native_stages_builder = callbacks.get_item(2)?;
     let compatibility_stages_builder = callbacks.get_item(3)?;
     let reference_search = callbacks.get_item(4)?;
     let result_type = callbacks.get_item(5)?;
 
-    let admitted = crate::cnot_native_checked::checked(
-        py,
-        &world,
-        "validate CNOT input",
-        admit.call1((
+    let admission = (|| -> PyResult<Bound<'py, PyAny>> {
+        let input_matrix = input_builder.call1((
             root.clone(),
-            scorer.clone(),
             width.clone(),
             shortlist.clone(),
             max_depth.clone(),
             mode.clone(),
-            audit.clone(),
-            validation,
-            engine,
-        )),
-    )?;
+            validation.clone(),
+        ))?;
+        let selected_engine = select_cnot_engine(py, &engine, &max_depth)?;
+        let digest = cnot_admission_digest(
+            py,
+            &input_matrix,
+            &scorer,
+            &width,
+            &shortlist,
+            &max_depth,
+            &mode,
+            &audit,
+            &validation,
+            selected_engine,
+        )?;
+        let admitted = PyTuple::new(
+            py,
+            [
+                input_matrix,
+                digest.into_bound(py).into_any(),
+                PyString::new(py, selected_engine).into_any(),
+            ],
+        )?;
+        Ok(admitted.into_any())
+    })();
+    let admitted =
+        crate::cnot_native_checked::checked(py, &world, "validate CNOT input", admission)?;
     let admitted = admitted.downcast::<PyTuple>()?;
     if admitted.len() != 3 {
         return Err(PyRuntimeError::new_err(
@@ -317,11 +420,12 @@ fn run_cnot_native_search<'py>(
     }
     let input_matrix = admitted.get_item(0)?;
     let digest: Vec<u8> = admitted.get_item(1)?.extract()?;
-    let search_runner = admitted.get_item(2)?;
+    let selected_engine: String = admitted.get_item(2)?.extract()?;
+    let use_rust = selected_engine == "rust";
 
     world.call_method1("require_consensus", (digest,))?;
     let transport_args = PyDict::new(py);
-    transport_args.set_item("prefer_rust", !search_runner.is_none())?;
+    transport_args.set_item("prefer_rust", use_rust)?;
     world.call_method("start_transport", (), Some(&transport_args))?;
 
     let wires: u32 = input_matrix.getattr("n")?.extract()?;
@@ -330,7 +434,7 @@ fn run_cnot_native_search<'py>(
     let identity = identity_builder.call((wires,), Some(&identity_args))?;
     let alphabet = wires * (wires - 1);
 
-    if !search_runner.is_none() {
+    if use_rust {
         let native_stages = native_stages_builder.call0()?;
         let supports_native = world
             .call_method1("all_ranks_support", (!native_stages.is_none(),))?
@@ -370,7 +474,8 @@ fn run_cnot_native_search<'py>(
             mode,
             audit,
         ))?;
-        return search_runner.call1((
+        return Ok(run_cnot(
+            py,
             stages,
             rank,
             world_size,
@@ -378,7 +483,8 @@ fn run_cnot_native_search<'py>(
             shortlist_value,
             alphabet,
             depth,
-        ));
+        )?
+        .into_bound(py));
     }
 
     let admitted_root = input_matrix.getattr("root")?;

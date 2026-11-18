@@ -324,7 +324,7 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         native_runner = _native_search_runner()
         if native_runner is not None:
             options = (width, shortlist, max_depth, mode, audit, validation, engine)
-            callbacks = (_admit, native.cnot_identity, _native_stages_runner,
+            callbacks = (_input, native.cnot_identity, _native_stages_runner,
                          _make_compat_stages, _search, CnotResult)
             return native_runner(world, root, scorer, options, callbacks)
         return _search_cnot_compat(world, root, scorer, width, shortlist,

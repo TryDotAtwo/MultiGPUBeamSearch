@@ -51,7 +51,14 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
 
     events = []
     caller_root = object()
-    scorer = SimpleNamespace(metadata={})
+    fingerprints = {
+        "upstream_commit": "commit",
+        "checkpoint_sha256": "checkpoint",
+        "feature_registry_sha256": "registry",
+        "training_manifest_sha256": "manifest",
+        "training_result_sha256": "result",
+    }
+    scorer = SimpleNamespace(metadata=fingerprints)
     admitted_root, identity = SimpleNamespace(shape=(1, 3, 1)), object()
     raw = b"packed-root"
     input_matrix = SimpleNamespace(root=admitted_root, raw=raw, n=3)
@@ -99,7 +106,7 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
     import json
 
     config = (5, 9, 4, "qhat", True, "auto", "rust", (1, 3, 1),
-              (None, None, None, None, None))
+              ("commit", "checkpoint", "registry", "manifest", "result"))
     expected_digest = hashlib.sha256(raw)
     expected_digest.update(json.dumps(config).encode())
     assert events == [
@@ -259,6 +266,36 @@ def test_rust_top_level_controller_routes_python_engine_and_unbounded_depth(
         ("reference", world, admitted_root, identity, input_matrix, scorer,
          1, 1, max_depth, "qhat", False),
     ]
+
+
+@pytest.mark.parametrize(
+    ("engine", "max_depth", "message"),
+    [("invalid", 3, "CNOT engine"), ("rust", 2**64, "depth exceeds")],
+)
+def test_rust_top_level_controller_rejects_invalid_engine_before_consensus(
+        engine, max_depth, message):
+    require_controller()
+    controller = rust_control.extension().run_cnot_native_search
+    calls = []
+    caller_root = object()
+    input_matrix = SimpleNamespace(root=SimpleNamespace(shape=(1, 2, 1)), raw=b"root", n=2)
+    scorer = SimpleNamespace(metadata={})
+
+    class World:
+        rank, size, device = 0, 1, "cpu"
+
+    def prepare_input(*args):
+        calls.append("input")
+        return input_matrix
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("search continued after invalid engine configuration")
+
+    options = (1, 1, max_depth, "qhat", False, "auto", engine)
+    callbacks = (prepare_input, forbidden, forbidden, forbidden, forbidden, cnot.CnotResult)
+    with pytest.raises(ValueError, match=message):
+        controller(World(), caller_root, scorer, options, callbacks)
+    assert calls == ["input"]
 
 
 @pytest.mark.parametrize("mode,k", [("qhat", 7), ("proposal", 7), ("qhat", 12)])
