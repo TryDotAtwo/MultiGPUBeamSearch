@@ -21,11 +21,7 @@ pub fn native_depth_budget(max_steps: u64, touch_bfs_radius: u32) -> (u64, u32) 
 /// Return the duplicate-free geometric touch-BFS bound when it fits the cap.
 ///
 /// Checked multiplication and addition match the shared search-budget contract.
-pub fn touch_bfs_worst_case_entries(
-    move_count: u32,
-    radius: u32,
-    max_entries: u64,
-) -> Result<u64> {
+pub fn touch_bfs_worst_case_entries(move_count: u32, radius: u32, max_entries: u64) -> Result<u64> {
     if move_count == 0 || move_count > 255 || radius > 12 || max_entries == 0 {
         return Err(ContractError::Invalid("touch BFS configuration"));
     }

@@ -85,8 +85,7 @@ pub fn search_budget(
     if effective_radius > 0 && moves > 32 {
         return Err(ContractError::Invalid("touch BFS suffix move packing"));
     }
-    let total =
-        crate::search::touch_bfs_worst_case_entries(moves, effective_radius, max_entries)?;
+    let total = crate::search::touch_bfs_worst_case_entries(moves, effective_radius, max_entries)?;
     Ok(SearchBudget {
         requested_max_steps: max_steps,
         native_forward_depth_limit: max_steps - effective_radius,
