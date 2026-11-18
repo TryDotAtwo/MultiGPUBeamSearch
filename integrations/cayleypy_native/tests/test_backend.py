@@ -1,149 +1,801 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×nôÑ:-jZ.¶›­–)Þ³R""$7GVÂ5R7V'&ö6W72f—‡GW&W2fÆ–FFR&÷Fö6öÂöæÇ’ÂæWfW"æF—fR5TDâ"" ¦–×÷'B§6öà¦–×÷'B÷0¦g&öÒF†Æ–"–×÷'BF€¦–×÷'B7—0¦g&öÒG—W2–×÷'B6–×ÆTæÖW76P ¦–×÷'B—FW7@ ¦g&öÒ6–ÆW—•öæF—fRæ&6¶VæB–×÷'B6†–ÆEöVçf—&öæÖVçBÂ'6U÷FW&Ö–æÂÂ'VåöæF—fRÂ'Vå÷&ö6W72Â'VçF–ÖUöFWf–6W0¦g&öÒ6–ÆW—•öæF—fRæW'&÷'2–×÷'BæF—fT&6¶VæDW'&÷"ÂæF—fUVæf–Æ&ÆP¦g&öÒ6–ÆW—•öæF—fRæ÷F–öç2–×÷'BæF—fT÷F–öç0  ¤—FW7Bæf—‡GW&R†WF÷W6SÕG'VR¦FVbf—‡GW&UöFWf–6UöæÖW2†Ööæ¶W—F6‚“ ¢2F†W6R&÷Fö6öÂf—‡GW&W2Öö6²5TD6&–Æ—F–W2æB'VææW"W†V7WF–öâà¢2Fòæ÷B66–FVçFÆÇ’VW'’‡—6–6ÂuRv†–ÆRFW67&–&–ærF†÷6RFWf–6W2à¢–×÷'BF÷&6€¢Ööæ¶W—F6‚ç6WFGG"‡F÷&6‚æ7VFÂ&vWEöFWf–6UöæÖR"ÂÆÖ&FFWf–6S¢%&÷Fö6öÂf—‡GW&RuR"  ¦6Æ72&WÆ”6öçG&7C ¢Ö÷fUö6÷VçBÒ  ¢FVb&WÆ’‡6VÆbÂF‚“ ¢&WGW&âGWÆR‡F‚’ÓÒƒÂ  ¤—FW7BæÖ&²ç&ÖWG&—¦R‚'6öÇfVB"Â´fÇ6RÂG'VUÒ¦FVbFW7EöF—&V7E÷G&—f–ÅöæF—fU÷&W7VÇEöFöW5öæ÷Eö7&VFU÷'VåöF—"‡F×÷F‚Â6öÇfVB“ ¢&Æö6¶VEö66†RÒF×÷F‚ò&66†RÖ—2ÖÖf–ÆR ¢&Æö6¶VEö66†Rçw&—FU÷FW‡B‚&×W7B&VÖ–âVçF÷V6†VB"¢6öçG&7BÒ6–×ÆTæÖW76R‡&WÆ“ÖÆÖ&FFƒ¢6öÇfVB ¢÷WF6öÖRÒ'VåöæF—fR€¢6öçG&7BÀ¢æöæRÀ¢æF—fT÷F–öç2‚’À¢À¢–b6öÇfVBVÇ6RÀ¢&Æö6¶VEö66†Rò''Vâ"À¢‚’À¢ ¢76W'B÷WF6öÖRçF‚ÓÒ‚‚’–b6öÇfVBVÇ6RæöæR¢76W'B÷WF6öÖRç'VåöF—"—2æöæP¢76W'B&Æö6¶VEö66†Rç&VE÷FW‡B‚’ÓÒ&×W7B&VÖ–âVçF÷V6†VB   ¦FVbFW7EöæF—fUö÷F–öç5öFVÆVvFU÷Fõ÷'W7E÷fÆ–FF÷%÷v†Våöf–Æ&ÆR†Ööæ¶W—F6‚ÂF×÷F‚“ ¢g&öÒ×VÇF–wV&V×6V&6‚–×÷'B'W7Eö6öçG&öÀ ¢6ÆÇ2ÒµÐ ¢FVbfÆ–FFUö÷F–öç2‡–ÆöB“ ¢6ÆÇ2æVæB†§6öâæÆöG2‡–ÆöB’¢&WGW&â–Æö@ ¢Ööæ¶W—F6‚ç6WFGG"€¢'W7Eö6öçG&öÂÀ¢&W‡FVç6–öâ"À¢ÆÖ&F¢6–×ÆTæÖW76R‡fÆ–FFUö÷F–öç3×fÆ–FFUö÷F–öç2’À¢ ¢æF—fT÷F–öç2†66†UöF—#×F×÷F‚ÂFWf–6W3Òƒ"Â’ ¢76W'BÆVâ†6ÆÇ2’ÓÒ¢76W'B6ÆÇ5³Õ²&66†UöF—"%ÒÓÒ7G"‡F×÷F‚ç&W6öÇfR‚’¢76W'B6ÆÇ5³Õ²&FWf–6W2%ÒÓÒ³"ÂÐ  ¦FVb–çfö¶Uöf—‡GW&R‡F×÷F‚ÂFW‡BÂ¢Â6öFSÓ“ ¢""$W‡Æ–6—FÇ’f¶R&öGV6W"Â'Vâ'’F†R&VÂ7V'&ö6W72Æ–fWF–ÖR†VÇW"â"" ¢ÆörÒF×÷F‚ò&f¶RÖæF—fRæÆör ¢67&—BÒ&–×÷'B7—3²&–çB‚"²&W"‡FW‡B’²"“²7—2æW†—B‚"²7G"†6öFR’²"’ ¢'Vå÷&ö6W72…·7—2æW†V7WF&ÆRÂ"Ö2"Â67&—EÒÂ7vC×F×÷F‚ÂVçcÖF–7B†÷2æVçf—&öâ’ÂF–ÖV÷WCÓÂÆöu÷FƒÖÆör¢&WGW&âÆöp  ¦FVbFW7E÷&VÅ÷7V'&ö6W75÷fÆ–E÷F…÷'6W5öæE÷&WÆ—2‡F×÷F‚“ ¢ÆörÒ–çfö¶Uöf—‡GW&R‡F×÷F‚Â$tÄô$Åô$TÕõt”ED…ôTddT5D•dSÓ#EÆä%ôÔ”5$óÓcƒ%Æå5E$TÓõ$õu5õU%ô¤ô#Ó#CeÆå5E$TÓ5ô$D4…ô4äD”DDU3Ó#CeÆçW§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Óã6öÇWF–öåöÆVæwFƒÓf÷VæEöFWFƒÓF÷V6…öFWFƒÓ6öÇWF–öãÖÓ"¢F‚Âv–GF‚ÂÖWFFFÒ'6U÷FW&Ö–æÂ†ÆörÂ&WÆ”6öçG&7B‚’¢76W'B‡F‚Âv–GF‚’ÓÒ‚ƒÂ’Â#B¢76W'BÖWFFF²&æF—fU÷6V6öæG2%ÒÓÒã¢76W'BÖWFFF²&ö'6W'fVE÷&VçEö&F6‚%ÒÓÒcƒ ¢76W'BÖWFFF²&ö'6W'fVEö–æfW&Væ6U÷&÷w2%ÒÓÒ#C`¢76W'B§6öâæÆöG2†Æörçv—F…÷7Vff—‚‚"æÆöræ6öÖÖæBæ§6öâ"’ç&VE÷FW‡B‚’•³ÒÓÒ7—2æW†V7WF&ÆP  ¦FVbFW7E÷&VÅ÷7V'&ö6W75öæ÷Eöf÷VæEö—5öF—7F–æ7Eög&öÕö7&6‚‡F×÷F‚“ ¢ÆörÒ–çfö¶Uöf—‡GW&R‡F×÷F‚Â'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Óã"6öÇWF–öåöÆVæwFƒÒÓ6öÇWF–öãÒ"¢76W'B'6U÷FW&Ö–æÂ†ÆörÂ&WÆ”6öçG&7B‚’•³£%ÒÓÒ„æöæRÂæöæR¢76W'B'6U÷FW&Ö–æÂ†ÆörÂ&WÆ”6öçG&7B‚’•³%Õ²&ö'6W'fVE÷&VçEö&F6‚%Ò—2æöæP¢v—F‚—FW7Bç&—6W2„æF—fT&6¶VæDW'&÷"ÂÖF6ƒÒ'&3Ór"“ ¢–çfö¶Uöf—‡GW&R‡F×÷F‚Â'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Ó6öÇWF–öåöÆVæwFƒÒÓ6öÇWF–öãÒ"Â6öFSÓr  ¤—FW7BæÖ&²ç&ÖWG&—¦R‚'&V6÷&BÇ&V6öâ"Â°¢‚'7F'GWöæÇ’"Â'v—F†÷WBFW&Ö–æÂ"’À¢‚'W§¦ÆU÷6öÇfVCÓ&B"Â&ÖÆf÷&ÖVB"’À¢‚'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Ó6öÇWF–öåöÆVæwFƒÓ6öÇWF–öãÖÓ"Â'&WÆ’"’À¢‚'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Ó6öÇWF–öåöÆVæwFƒÓ"6öÇWF–öãÖÓ"Â&ÆVæwF‚"’À¢‚'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Öæâ6öÇWF–öåöÆVæwFƒÓ6öÇWF–öãÖÓ"Â'F–ÖR"’À¢‚'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Ö&B6öÇWF–öåöÆVæwFƒÓ6öÇWF–öãÖÓ"Â'F–ÖR"’À¢‚'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Ó6öÇWF–öåöÆVæwFƒÓ6öÇWF–öã×vV—&BÖæÖR"Â'7–çF†WF–2"’À¢‚'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Ó6öÇWF–öåöÆVæwFƒÓ6öÇWF–öãÖÓ2"Â$”G2"’À¢‚'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Ó6öÇWF–öåöÆVæwFƒÒÓ6öÇWF–öãÖÓ"Â&–æ6öç6—7FVçB"’À¥Ò¦FVbFW7Eö&E÷&÷Fö6öÅöæWfW%öÆöö·5öÆ–¶Uöæ÷Eöf÷VæB‡F×÷F‚Â&V6÷&BÂ&V6öâ“ ¢ÆörÒ–çfö¶Uöf—‡GW&R‡F×÷F‚Â&V6÷&B¢v—F‚—FW7Bç&—6W2„æF—fT&6¶VæDW'&÷"ÂÖF6ƒ×&V6öâ“ ¢'6U÷FW&Ö–æÂ†ÆörÂ&WÆ”6öçG&7B‚’  ¦FVbFW7E÷FW&Ö–æÅ÷6öÇWF–öåö6ææ÷EöW†6VVE÷&WVW7FVE÷7FWö'VFvWB‡F×÷F‚“ ¢6öçG&7BÒ6–×ÆTæÖW76R†Ö÷fUö6÷VçCÓ"Â&WÆ“ÖÆÖ&FFƒ¢GWÆR‡F‚’ÓÒƒÂ’¢ÆörÒ–çfö¶Uöf—‡GW&R€¢F×÷F‚À¢'W§¦ÆU÷6öÇfVCÓW§¦ÆUö–CÓ6V6öæG3Óã6öÇWF–öåöÆVæwFƒÓ"6öÇWF–öãÖÓæÓ"À¢¢v—F‚—FW7Bç&—6W2„æF—fT&6¶VæDW'&÷"ÂÖF6ƒÒ&Ö…÷7FW2"“ ¢'6U÷FW&Ö–æÂ†ÆörÂ6öçG&7BÂÖ…÷7FW3Ó  ¦FVbFW7E÷F–ÖV÷WE÷FW&Ö–æFW5÷&VÅ÷&ö6W72‡F×÷F‚“ ¢v—F‚—FW7Bç&—6W2„æF—fT&6¶VæDW'&÷"ÂÖF6ƒÒ'F–ÖVB÷WB"“ ¢'Vå÷&ö6W72…·7—2æW†V7WF&ÆRÂ"Ö2"Â&–×÷'BF–ÖS²&–çB‚vf¶Rv—F–ærrÂfÇW6ƒÕG'VR“²F–ÖRç6ÆVWƒ3’%ÒÀ¢7vC×F×÷F‚ÂVçcÖF–7B†÷2æVçf—&öâ’ÂF–ÖV÷WCÓã"ÂÆöu÷Fƒ×F×÷F‚ò'F–ÖV÷WBæÆör"  ¦FVbFW7Eö6†–ÆEöVçf—&öæÖVçEö—6öÆFVEöæEöÖ5÷f—6–&ÆUö–æF–6W2‡F×÷F‚“ ¢÷&–v–æÂÒ²%D‚#¢'6fR"Â$$TÕõ$U•%õ4ôÅUD”ôå5ô55b#¢'Vç&VÆFVBæ77b"Â$$TÕõtT”t…EôD•"#¢'w&öær"À¢%tõ$ÄEõ4•¤R#¢#‚"Â%$ä²#¢#2"Â$5TDõd•4”$ÄUôDUd”4U2#¢$uRÖÄuRÖ"ÄuRÖ2"À¢$5TDôDUd”4Uôõ$DU"#¢%4•ô%U5ô”B"Â$5TDôÄTä4…ô$Äô4´”är#¢#"Â$ä44ÅôDT%Tr#¢%E$4R"À¢%5E$TÓEô$D4…ôÄ”täÔTåB#¢#““’"Â%Dõ$4„TÄ5D”5õ%Tåô”B#¢&–æ†W&—FVB"Â%T$Ä•4…õ$U5TÅE2#¢#'Ð¢VçbÒ6†–ÆEöVçf—&öæÖVçB‚ƒ"Â’ÂF×÷F‚Â÷&–v–æÂ¢76W'BVçe²$5TDõd•4”$ÄUôDUd”4U2%ÒÓÒ$uRÖ2ÄuRÖ ¢76W'BVçe²$5TDôDUd”4Uôõ$DU"%ÒÓÒ%4•ô%U5ô”B ¢76W'BVçe²$$TÕôä44Åô”Eôd”ÄR%ÒÓÒ7G"‡F×÷F‚ò&æ66ÂÖ–Bæ&–â"¢76W'Bæ÷Bç’†²–âVçbf÷"²–â‚%$ä²"Â%tõ$ÄEõ4•¤R"Â$$TÕõtT”t…EôD•""Â$$TÕõ$U•%õ4ôÅUD”ôå5ô55b"À¢$5TDôÄTä4…ô$Äô4´”är"Â$ä44ÅôDT%Tr"Â%5E$TÓEô$D4…ôÄ”täÔTåB"Â%T$Ä•4…õ$U5TÅE2"’¢76W'B÷&–v–æÅ²%tõ$ÄEõ4•¤R%ÒÓÒ#‚   ¤—FW7BæÖ&²ç&ÖWG&—¦R‚&Ö÷fW2Æ÷WGWG2Çv÷&ÆBÆ&VÒ"Â°¢ƒ2ÂÂ"Âr’Âƒ#BÂ#BÂ"Âr’Âƒ#BÂÂ"Âr’Âƒ#SbÂ#SbÂ‚Â’Âƒ2ÂÂÂ3#sc‚’À¥Ò¦FVbFW7E÷6ÖÆÅö&VÕöÖ–7&ö&F6…öf—G5öæF—fUöWFõ÷7F÷&vR†Ö÷fW2Â÷WGWG2Âv÷&ÆBÂ&VÒ“ ¢g&öÒ6–ÆW—•öæF—fRæ&6¶VæB–×÷'BÖ–7&ö&F6…öVçf—&öæÖVç@¢VçbÂÖWFFFÒÖ–7&ö&F6…öVçf—&öæÖVçB…6–×ÆTæÖW76R†Ö÷fUö6÷VçCÖÖ÷fW2’À¢6–×ÆTæÖW76R†Öæ–fW7C×²&÷WGWEöF–Ò#¢÷WGWG7Ò’Â&VÒÂv÷&ÆB¢2&6VÆ–æRæF—fRw2–æFWVæFVçB&V¦V7F–öâ6öæF—F–öâ‡'VçF–ÖUö6öæf–ræ7£C#¢2—27G&VÓ2w2öæR×6Æ÷B6†–ÆB6÷VçBâ‡—6–6Â6†&B66—G’à¢&÷w5÷W%÷&VçBÒÖ÷fW2–b÷WGWG2ÓÒVÇ6R¢6öæf–wW&VE÷&÷w2Ò–çB†VçbævWB‚$$TÕô%ôÔ”5$ò"Â#ƒ“""’¢76W'BÃÒ6öæf–wW&VE÷&÷w2ÃÒƒ“ ¢76W'B6öæf–wW&VE÷&÷w2òò&÷w5÷W%÷&VçB¢Ö÷fW2ÃÒÖWFFF²'&VfW&Væ6U÷6†&E÷7F÷&vR%Ð¢76W'B6WB†Vçb’ÃÒ²$$TÕô%ôÔ”5$ò'Ò2æò6VÖçF–2&VÒ÷6†&B6öçG&öÇ0¢–b†Ö÷fW2Â÷WGWG2Âv÷&ÆBÂ&VÒ’ÓÒƒ2ÂÂ"Âr“ ¢76W'Bƒ“"òò2¢2ÓÒƒ“âÖWFFF²'&VfW&Væ6U÷6†&E÷7F÷&vR%ÒÓÒ#C€¢76W'BÖWFFF²&FW&—fVE÷&VçEö&F6‚%ÒÓÒcƒ ¢76W'BVçbÓÒ²$$TÕô%ôÔ”5$ò#¢##Cb'Ð  ¤—FW7BæÖ&²ç&ÖWG&—¦R‚&Ö÷fW2Æ÷WGWG2Æ&VÒ"Â²ƒ2ÂÂcSS3b’Âƒ#BÂÂcSS3b’Âƒ#BÂ#BÂ"¢£#B•Ò¦FVbFW7Eöf—GF–æuö&VÕö¶VW5öæF—fUöFVfVÇEöÖ–7&ö&F6‚†Ö÷fW2Â÷WGWG2Â&VÒ“ ¢g&öÒ6–ÆW—•öæF—fRæ&6¶VæB–×÷'BÖ–7&ö&F6…öVçf—&öæÖVç@¢VçbÂÖWFFFÒÖ–7&ö&F6…öVçf—&öæÖVçB…6–×ÆTæÖW76R†Ö÷fUö6÷VçCÖÖ÷fW2’À¢6–×ÆTæÖW76R†Öæ–fW7C×²&÷WGWEöF–Ò#¢÷WGWG7Ò’Â&VÒÂ"¢76W'BVçbÓÒ·Ð¢76W'BÖWFFF²&6öæf–wW&VE÷&÷uö'VFvWB%ÒÓÒƒ“ ¢76W'Bæ÷BÖWFFF²&F§W7FVEöf÷%÷6ÖÆÅö&VÒ%Ð  ¤—FW7BæÖ&²ç&ÖWG&—¦R€¢&Ö…÷7FW2Ç&F—W2ÆW‡V7FVB"À¢²ƒÂ"ÂƒÂ’’ÂƒBÂ"ÂƒÂ2’’ÂƒBÂ"Âƒ"Â"’’ÂƒBÂÂƒBÂ’•ÒÀ¢¦FVbFW7E÷F÷V6…ö&g5öFWF…ö'VFvWE÷&W6W'fW5÷7Vff—…ö–ç6–FUöÖ…÷7FW2†Ö…÷7FW2Â&F—W2ÂW‡V7FVB“ ¢g&öÒ6–ÆW—•öæF—fRæ&6¶VæB–×÷'BæF—fUöFWF…ö'VFvW@ ¢76W'BæF—fUöFWF…ö'VFvWB†Ö…÷7FW2Â&F—W2’ÓÒW‡V7FV@  ¦FVbFW7EöæF—fUöFWF…ö'VFvWE÷W6W5÷'W7EöW‡FVç6–öå÷v†Våöf–Æ&ÆR†Ööæ¶W—F6‚“ ¢–×÷'B6–ÆW—•öæF—fRæ&6¶VæB2&6¶Væ@¢g&öÒ×VÇF–wV&V×6V&6‚–×÷'B'W7Eö6öçG&öÀ ¢6ÆÇ2ÒµÐ ¢FVbæF—fUö'VFvWB†Ö…÷7FW2Â&F—W2“ ¢6ÆÇ2æVæB‚†Ö…÷7FW2Â&F—W2’¢&WGW&âsrÂ  ¢Ööæ¶W—F6‚ç6WFGG"€¢'W7Eö6öçG&öÂÀ¢&W‡FVç6–öâ"À¢ÆÖ&F¢6–×ÆTæÖW76R†æF—fUöFWF…ö'VFvWCÖæF—fUö'VFvWB’À¢ ¢76W'B&6¶VæBææF—fUöFWF…ö'VFvWBƒBÂ"’ÓÒƒsrÂ"¢76W'B6ÆÇ2ÓÒ²ƒBÂ"•Ð  ¦FVbFW7EöæF—fUöFWF…ö'VFvWEö¶VW5÷—F†öåöfÆÆ&6µ÷v—F†÷WE÷'W7EöÖWF†öB†Ööæ¶W—F6‚“ ¢–×÷'B6–ÆW—•öæF—fRæ&6¶VæB2&6¶Væ@¢g&öÒ×VÇF–wV&V×6V&6‚–×÷'B'W7Eö6öçG&öÀ ¢Ööæ¶W—F6‚ç6WFGG"‡'W7Eö6öçG&öÂÂ&W‡FVç6–öâ"ÂÆÖ&F¢6–×ÆTæÖW76R‚’ ¢76W'B&6¶VæBææF—fUöFWF…ö'VFvWBƒBÂ"’ÓÒƒÂ2  ¦FVbFW7E÷'W7EöW‡FVç6–öåöW‡÷6W5öæF—fUöFWF…ö'VFvWB‚“ ¢g&öÒ×VÇF–wV&V×6V&6‚ç'W7Eö6öçG&öÂ–×÷'BW‡FVç6–öà ¢æF—fRÒW‡FVç6–öâ‚¢76W'BæF—fRææF—fUöFWF…ö'VFvWBƒBÂ"’ÓÒƒÂ2¢76W'BæF—fRææF—fUöFWF…ö'VFvWBƒÂ"’ÓÒƒÂ  ¤—FW7BæÖ&²ç&ÖWG&—¦R€¢&Ö…÷7FW2Ç&F—W2ÆW‡V7FVB"À¢°¢ƒ"¢£cBÂ2Âƒ"¢£cBÒ2Â2’’À¢ƒÂ"¢£3"ÂƒÂ’’’À¢ÒÀ¢¦FVbFW7EöæF—fUöFWF…ö'VFvWEöfÆÇ5ö&6µö÷WG6–FU÷'W7Eö–çFVvW%÷&ævW2€¢Ööæ¶W—F6‚ÂÖ…÷7FW2Â&F—W2ÂW‡V7FV@¢“ ¢–×÷'B6–ÆW—•öæF—fRæ&6¶VæB2&6¶Væ@¢g&öÒ×VÇF–wV&V×6V&6‚–×÷'B'W7Eö6öçG&öÀ ¢6ÆÇ2ÒµÐ ¢FVbæF—fUö'VFvWB†Ö…÷7FW2Â&F—W2“ ¢6ÆÇ2æVæB‚†Ö…÷7FW2Â&F—W2’¢&WGW&âsrÂ  ¢Ööæ¶W—F6‚ç6WFGG"€¢'W7Eö6öçG&öÂÀ¢&W‡FVç6–öâ"À¢ÆÖ&F¢6–×ÆTæÖW76R†æF—fUöFWF…ö'VFvWCÖæF—fUö'VFvWB’À¢ ¢76W'B&6¶VæBææF—fUöFWF…ö'VFvWB†Ö…÷7FW2Â&F—W2’ÓÒW‡V7FV@¢76W'B6ÆÇ2ÓÒµÐ  ¦FVbFW7E÷F÷V6…ö&g5öVçG'•ö'VFvWE÷W6W5÷'W7EöW‡FVç6–öå÷v†Våöf–Æ&ÆR†Ööæ¶W—F6‚“ ¢–×÷'B6–ÆW—•öæF—fRæ&6¶VæB2&6¶Væ@¢g&öÒ×VÇF–wV&V×6V&6‚–×÷'B'W7Eö6öçG&öÀ ¢6ÆÇ2ÒµÐ ¢FVbæF—fUö'VFvWB†Ö÷fUö6÷VçBÂ&F—W2ÂÖ…öVçG&–W2“ ¢6ÆÇ2æVæB‚†Ö÷fUö6÷VçBÂ&F—W2ÂÖ…öVçG&–W2’¢&WGW&âsp ¢Ööæ¶W—F6‚ç6WFGG"€¢'W7Eö6öçG&öÂÀ¢&W‡FVç6–öâ"À¢ÆÖ&F¢6–×ÆTæÖW76R‡F÷V6…ö&g5÷v÷'7Eö66UöVçG&–W3ÖæF—fUö'VFvWB’À¢ ¢76W'B&6¶VæBçF÷V6…ö&g5÷v÷'7Eö66UöVçG&–W2ƒ2Â"Â’ÓÒsp¢76W'B6ÆÇ2ÓÒ²ƒ2Â"Â•Ð  ¦FVbFW7E÷F÷V6…ö&g5öVçG'•ö'VFvWEö¶VW5÷—F†öåöfÆÆ&6µ÷v—F†÷WE÷'W7EöÖWF†öB†Ööæ¶W—F6‚“ ¢–×÷'B6–ÆW—•öæF—fRæ&6¶VæB2&6¶Væ@¢g&öÒ×VÇF–wV&V×6V&6‚–×÷'B'W7Eö6öçG&öÀ ¢Ööæ¶W—F6‚ç6WFGG"‡'W7Eö6öçG&öÂÂ&W‡FVç6–öâ"ÂÆÖ&F¢6–×ÆTæÖW76R‚’ ¢76W'B&6¶VæBçF÷V6…ö&g5÷v÷'7Eö66UöVçG&–W2ƒ2Â"Â2’ÓÒ0  ¤—FW7BæÖ&²ç&ÖWG&—¦R€¢&Ö÷fUö6÷VçBÇ&F—W2ÆÖ…öVçG&–W2ÆW‡V7FVB"À¢°¢ƒ"¢£3"ÂÂ"Â’À¢ƒÂ2ÂBÂB’À¢ƒÂÂ"¢£cBÂ"’À¢ÒÀ¢¦FVbFW7E÷F÷V6…ö&g5öVçG'•ö'VFvWEöfÆÇ5ö&6µö÷WG6–FU÷'W7E÷&ævW2€¢Ööæ¶W—F6‚ÂÖ÷fUö6÷VçBÂ&F—W2ÂÖ…öVçG&–W2ÂW‡V7FV@¢“ ¢–×÷'B6–ÆW—•öæF—fRæ&6¶VæB2&6¶Væ@¢g&öÒ×VÇF–wV&V×6V&6‚–×÷'B'W7Eö6öçG&öÀ ¢6ÆÇ2ÒµÐ ¢FVbæF—fUö'VFvWB‚¦&w2“ ¢6ÆÇ2æVæB†&w2¢&WGW&âsp ¢Ööæ¶W—F6‚ç6WFGG"€¢'W7Eö6öçG&öÂÀ¢&W‡FVç6–öâ"À¢ÆÖ&F¢6–×ÆTæÖW76R‡F÷V6…ö&g5÷v÷'7Eö66UöVçG&–W3ÖæF—fUö'VFvWB’À¢ ¢76W'B&6¶VæBçF÷V6…ö&g5÷v÷'7Eö66UöVçG&–W2†Ö÷fUö6÷VçBÂ&F—W2ÂÖ…öVçG&–W2’ÓÒW‡V7FV@¢76W'B6ÆÇ2ÓÒµÐ  ¦FVbFW7E÷'W7EöW‡FVç6–öåöW‡÷6W5÷F÷V6…ö&g5öVçG'•ö'VFvWB‚“ ¢g&öÒ×VÇF–wV&V×6V&6‚ç'W7Eö6öçG&öÂ–×÷'BW‡FVç6–öà ¢æF—fRÒW‡FVç6–öâ‚¢76W'BæF—fRçF÷V6…ö&g5÷v÷'7Eö66UöVçG&–W2ƒ2Â"Â2’ÓÒ0¢76W'BæF—fRçF÷V6…ö&g5÷v÷'7Eö66UöVçG&–W2ƒ32ÂÂ3B’ÓÒ3@¢v—F‚—FW7Bç&—6W2…fÇVTW'&÷"ÂÖF6ƒÒ'F÷V6‚$e2VçG&–W266—G’W†6VVFVB"“ ¢æF—fRçF÷V6…ö&g5÷v÷'7Eö66UöVçG&–W2ƒ2Â"Â"  ¤—FW7BæÖ&²ç&ÖWG&—¦R‚'fÇVR"Â³ÂÓÂG'VRÂãRÂ"¢£cEÒ¦FVbFW7E÷F÷V6…ö&g5öVçG'•ö'VFvWEö×W7Eö&Uö÷÷6—F—fUö–çFVvW"‡fÇVR“ ¢v—F‚—FW7Bç&—6W2…fÇVTW'&÷"ÂÖF6ƒÒ'F÷V6…ö&g5öÖ…öVçG&–W2"“ ¢æF—fT÷F–öç2‡F÷V6…ö&g5öÖ…öVçG&–W3×fÇVR  ¦FVbFW7E÷'VçF–ÖU÷Væf–Æ&ÆUö&Vf÷&U÷&ö6W75ö7&VF–öâ†Ööæ¶W—F6‚ÂF×÷F‚“ ¢–×÷'B6–ÆW—•öæF—fRæ&6¶VæB2&6¶Væ@¢Ööæ¶W—F6‚ç6WFGG"†&6¶VæBçÆFf÷&ÒÂ'7—7FVÒ"ÂÆÖ&F¢%v–æF÷w2"¢v—F‚—FW7Bç&—6W2„æF—fUVæf–Æ&ÆRÂÖF6ƒÒ$Æ–çW‚"“ ¢'VçF–ÖUöFWf–6W2†ö&¦V7B‚’ÂæF—fT÷F–öç2†66†UöF—#×F×÷F‚’¢Ööæ¶W—F6‚ç6WFGG"†&6¶VæBçÆFf÷&ÒÂ'7—7FVÒ"ÂÆÖ&F¢$Æ–çW‚"¢Ööæ¶W—F6‚ç6WFVçb‚$Äô4Åõ$ä²"Â#"¢v—F‚—FW7Bç&—6W2„æF—fUVæf–Æ&ÆRÂÖF6ƒÒ'F÷&6‡'Vâ"“ ¢'VçF–ÖUöFWf–6W2†ö&¦V7B‚’ÂæF—fT÷F–öç2†66†UöF—#×F×÷F‚’  ¦FVbFW7E÷'VçF–ÖUöFWf–6W5÷7W÷'G5÷—•öw&…öFWf–6UöæEöW‡Æ–6—Eö÷fW'&–FR†Ööæ¶W—F6‚ÂF×÷F‚“ ¢–×÷'BF÷&6€¢–×÷'B6–ÆW—•öæF—fRæ&6¶VæB2&6¶Væ@¢–×÷'B6–ÆW—•öæF—fRæ'V–ÆB2'V–Æ@¢Ööæ¶W—F6‚ç6WFGG"†&6¶VæBçÆFf÷&ÒÂ'7—7FVÒ"ÂÆÖ&F¢$Æ–çW‚"¢Ööæ¶W—F6‚ç6WFGG"‡F÷&6‚æ7VFÂ&—5öf–Æ&ÆR"ÂÆÖ&F¢G'VR¢Ööæ¶W—F6‚ç6WFGG"‡F÷&6‚æ7VFÂ&FWf–6Uö6÷VçB"ÂÆÖ&F¢"¢Ööæ¶W—F6‚ç6WFGG"†'V–ÆBÂ'&W&WV—6—FW2"ÂÆÖ&F÷F–öç3¢æöæR¢f÷"¶W’–â‚%$ä²"Â$Äô4Åõ$ä²"Â%tõ$ÄEõ4•¤R"Â%Dõ$4„TÄ5D”5õ%Tåô”B"“ ¢Ööæ¶W—F6‚æFVÆVçb†¶W’Â&—6–æsÔfÇ6R¢÷F–öç2ÒæF—fT÷F–öç2†66†UöF—#×F×÷F‚¢76W'B'VçF–ÖUöFWf–6W2…6–×ÆTæÖW76R†FWf–6S×F÷&6‚æFWf–6R‚&7VF£"’’Â÷F–öç2’ÓÒƒÂ¢76W'B'VçF–ÖUöFWf–6W2…6–×ÆTæÖW76R†FWf–6S×F÷&6‚æFWf–6R‚&7R"’’Â÷F–öç2’ÓÒƒÂ¢76W'B'VçF–ÖUöFWf–6W2…6–×ÆTæÖW76R†FWf–6S×F÷&6‚æFWf–6R‚&7R"’’À¢æF—fT÷F–öç2†66†UöF—#×F×÷F‚ÂFWf–6W3ÒƒÂ’’’ÓÒƒÂ  ¦FVbFW7E÷F÷V6…ö&g5ö6&–Æ—G•÷W6W5÷F†UöVffV7F—fU÷&F—W5öGW&–æu÷&W&F–öâ†Ööæ¶W—F6‚ÂF×÷F‚“ ¢–×÷'BF÷&6€¢–×÷'B6–ÆW—•öæF—fRæ'V–ÆB2'V–Æ@¢g&öÒ6–ÆW—•öæF—fRæ&6¶VæB–×÷'B&W&U÷'VçF–ÖP ¢6öçG&7BÒ6–×ÆTæÖW76R†Ö÷fUö6÷VçCÓ32¢÷F–öç2ÒæF—fT÷F–öç2†66†UöF—#×F×÷F‚ÂF÷V6…ö&g5÷&F—W3Ó¢v—F‚—FW7Bç&—6W2„æF—fUVæf–Æ&ÆRÂÖF6ƒÒ#3"vVæW&F÷'2"“ ¢&W&U÷'VçF–ÖR†6öçG&7BÂö&¦V7B‚’Â÷F–öç2ÂF×÷F‚ÂƒÂ’ ¢Ööæ¶W—F6‚ç6WFGG"‡F÷&6‚æ7VFÂ&vWEöFWf–6Uö6&–Æ—G’"ÂÆÖ&FC¢ƒ‚Â’¢Ööæ¶W—F6‚ç6WFGG"†'V–ÆBÂ&Vç7W&U÷'VææW""ÂÆÖ&F¦&w3¢‡F×÷F‚ò''VææW""Â²'FW7EööæÇ’#¢G'VWÒ’¢ÖöFVÂÒ6–×ÆTæÖW76R†&6¶VæCÒ&ÖÇ"ÂÖæ–fW7C×²&GG—R#¢&gb"Â&÷WGWEöF–Ò#¢Ò¢'VçF–ÖRÒ&W&U÷'VçF–ÖR†6öçG&7BÂÖöFVÂÂ÷F–öç2ÂF×÷F‚ÂƒÂ’ÂF÷V6…ö&g5÷&F—W3Ó¢76W'B'VçF–ÖRæ'V–ÆEöÖWFFFÓÒ²'FW7EööæÇ’#¢G'VWÐ  ¦FVbFW7E÷'VçF–ÖU÷&W&F–öå÷&V6†V6·5ö66†VEöæ66Åö'—FW2†Ööæ¶W—F6‚ÂF×÷F‚“ ¢–×÷'B†6†Æ– ¢–×÷'BF÷&6€¢»ÓKh‘éì¶»§q«^t‹ˆÈ\ÝÛÛ›HŽˆYK˜š[˜\žWÜÚLMˆŽˆZ[™š[WÜÚLMŠ˜ZÙWÜ[›™\ŠKˆ›˜ØÛŽˆÈ›Xœ˜\žHŽˆÝŠ˜ØÛÛXœ˜\žJK›Xœ˜\žWÜÚLMˆŽˆ˜ØÛÜÚ__JJBˆ[ÛšÙ^\]ÚœÙ][Š“ÓP”T–WÔU‹‹Ý[œ™[]YÛXœ˜\žKÜ]ŠBˆØœÙ\™YHßB‚ˆYˆ˜ZÙWÜ›ØÙ\ÜÊÛÛ[X[™
-ŠšÝØ\™ÜÊN‚ˆ\ÜÙ\
-ÝØ\™ÜÖÈ˜ÝÙ—HÈ\ÝÜ™\Ý[ÈŠKš\×Ù\Š
-K›˜]]™HÛÛ][ÛˆÙÙÚ[™È™\]Z\™\Èš]˜]H\ÝÜ™\Ý[È‚ˆ\ÜÙ\]
-ÛÛ[X[™ÌJHOHÝØ\™ÜÖÈ˜ÝÙ—HÈœ›ÙXÝ[Û—Ü[›™\ˆ‚ˆ\ÜÙ\]
-ÛÛ[X[™ÌJKœ™XYØž]\Ê
-HOHˆ\Ý[Û›H[›™\ˆž]\È‚ˆ˜ØÛÛXœ˜\žKÜš]WØž]\Êˆœ™\XÙ[Y[Y\ˆ™\šYšYYÐÓÛ˜\ÚÝŠBˆØY\—Ù\œÈHÝØ\™ÜÖÈ™[ˆ—VÈ“ÓP”T–WÔU—KœÜ]
-ÜËœ]Ù\
-Bˆ\ÜÙ\]
-ØY\—Ù\œÖÌJHOHÝØ\™ÜÖÈ˜ÝÙ—HÈœ[[YK[XœÈ‚ˆ\ÜÙ\
-]
-ØY\—Ù\œÖÌJHÈ›X›˜ØÛœÛËŒˆŠKœ™XYØž]\Ê
-HOHÜšYÚ[˜[Û˜ØÛˆØœÙ\™Y\]JÛÛ[X[™XÛÛ[X[™
-ŠšÝØ\™ÜÊBˆÝØ\™ÜÖÈ›Ù×Ü]—KÜš]WÝ^
-‘ÓÐSÐ‘PSWÕÒQÑQ‘‘PÕU‘OLLœ^ž›WÜÛÛ™YLH^ž›WÚYLÙXÛÛ™ÏLŒHÛÛ][Û—Û[™ÝLHÛÛ][Û[LWˆŠBˆ™]\›ˆŒB‚ˆ[ÛšÙ^\]ÚœÙ]]Š˜XÚÙ[™œ[—Ü›ØÙ\ÜÈ‹˜ZÙWÜ›ØÙ\ÜÊBˆÈ\È›ÝØÛÛš^\™H\Ù\ÈHX™[Y˜ZÙH[Ù[È™X[ž]H™Z\Ú[™È\ÂˆÈ]ÈÝÛˆ\Y˜XÝX˜XÚÙY™YÜ™\ÜÚ[Ûˆ\Ý™[ÝË‚ˆ[ÛšÙ^\]ÚœÙ]]Š˜XÚÙ[™™\šYžWÜ™\\™YÛ[Ù[‹[X™H
-˜\™ÜÎˆ›Û™JBˆ[ÛšÙ^\]Ú™[[ŠÕQWÕ’TÒP“WÑU’PÑTÈ‹˜Z\Ú[™ÏQ˜[ÙJBˆYˆ\ØÛÝ™\Ž‚ˆœ›ÛH][YÜX™X[\ÙX\˜Ú[\Ü]]Ý[™KX^[][WØ™X[K[™™\™[˜ÙWØYZ\ÜÚ[Û‹\[[™WØ]]Ý[™BˆYX\Ý\™YV×BˆYˆ[™™\™[˜ÙJÛÛ˜XÝ[Ù[[[YKÜ[ÛœË]šXÙ\ËÚY
-˜\™ÜÊN‚ˆ™]\›ˆXÝ
-\™[Ø˜]ÚLM‹™\Ù\™WØž]\ÏLL\ÙOIÚ[™™\™[˜ÙWÝ™\šYšYY	Ëˆ\Ý[X]O^ÉÛYYX[‰Î‹Œ_KÚYÛ˜]\™O^ÉÜ™\]Y\ÝYØ™X[WÝÚY	ÎÚYJBˆ[ÛšÙ^\]ÚœÙ]]Š]]Ý[™K	Ý[™WÚ[™™\™[˜ÙIË[™™\™[˜ÙJBˆ[ÛšÙ^\]ÚœÙ]]ŠX^[][WØ™X[K	ØØ\XÚ]WÜÙYY	Ë[X™H™XÝ
-
-JBˆYˆØ\XÚ]J
-˜\™ÜË
-ŠšÝØ\™ÜÊN‚ˆÈ]]][™È›Ø™HÝ]H]\Ý›ÝXZÈ[ÈH™X[^XÝ][Û‹‚ˆ\™ÜÖÌ×VÉÐ‘PSWÔÒT‘ÐÓÕS•	×OIÌLŽ	Âˆ™]\›ˆXÝ
-Y™™XÝ]™WØ™X[ONNL‹›Ùš[O^ÉÐ‘PSWÔÒT‘ÐÓÕS•	Î‰ÌLŽ	ßKˆÙX\˜ÚØÛÛ\]OQ˜[ÙKØ[ÜÙXÛÛ™ÏKŒJBˆ[ÛšÙ^\]ÚœÙ]]ŠX^[][WØ™X[K	Ù\ØÛÝ™\—ØØ\XÚ]IËØ\XÚ]JBˆÛ\ÜÈÙ\ÜÚ[ÛŽ‚ˆYˆÛÜÙJÙ[ŠNœ\ÜÂˆ[ÛšÙ^\]ÚœÙ]]Š[™™\™[˜ÙWØYZ\ÜÚ[Û‹	ØYZ]Ú[™™\™[˜ÙIËˆ[X™H
-˜\™ÜË
-ŠšÝØ\™ÜÎŠ\™ÜÖËLWKÙ\ÜÚ[ÛŠ
-JJBˆYˆÝÛœÝ™X[JÛÛ˜XÝ[Ù[[[YKÜ[ÛœË]šXÙ\ËÚY[‹[‹
-˜\™ÜË
-ŠšÝØ\™ÜÊN‚ˆYX\Ý\™Y˜\[™
-ÚY
-BˆYˆÚYOLL˜\ÜÙ\	Ð‘PSWÔÒT‘ÐÓÕS•	È›Ý[ˆ[‚ˆ™]\›ˆXÝ
-\ÙOIÜ\[[™WÛYX\Ý\™Y	Ë\[[™WÝ™\šYšYYUYKˆYX\Ý\™[Y[ÜØÛÜOIÙ[Ü™\]Y\ÝYÙœ›ÛY\‰Ëˆ[š\›Û›Y[^ÉÐ‘PSWÐ—ÓRPÔ“ÉÎ‰ÌM‰Ë	Ð‘PSWÑS”ÑSP“WÒS‘‘T‘SÑWÓRPÔ“ÉÎ‰ÌM‰ßJBˆ[ÛšÙ^\]ÚœÙ]]Š\[[™WØ]]Ý[™K	Ý[™WÙÝÛœÝ™X[IËÝÛœÝ™X[JBˆÜ[ÛœÈH˜]]™SÜ[ÛœÊØXÚWÙ\]\Ü]ÝXÚØ™œ×Ü˜Y]\ÏLL‹ÝXÚØ™œ×ÛX^Ù[šY\ÏLLŒÍKˆ]]Ý[™OY\ØÛÝ™\‹Ø[Xœ˜][Û—Ù\ØÛÝ™\—ØØ\XÚ]OY\ØÛÝ™\‹Ø[Xœ˜][Û—Ù[Ùœ›ÛY\Y\ØÛÝ™\‹ˆ™\ÜØØ[Xœ˜][ÛQ˜[ÙJBˆÝ]ÛÛYHH˜XÚÙ[™œ[—Û˜]]™JÛÛ˜XÝ[Ù[Ü[ÛœËL\Ü]Èœ[ˆ‹
-
-JBˆ\ÜÙ\Ý]ÛÛYKœ]OH
-K
-BˆYˆ\ØÛÝ™\Ž‚ˆ\ÜÙ\YX\Ý\™YOVÌLBˆØ\XÚ]WÜ™\Ü[Ý]ÛÛYK›Y]Y]VÉÜ›Ùš[I×VÉÛX^[][WØ™X[I×Bˆ\ÜÙ\Ø\XÚ]WÜ™\Ü™Ù]
-	Ù[ÜÝ\Ý™\šYšYY	Ë˜[ÙJH\È˜[ÙBˆ\ÜÙ\Ø\XÚ]WÜ™\ÜÉÜÙX\˜ÚØÛÛ\]I×H\È˜[ÙBˆ\ÜÙ\Ý]ÛÛYK›Y]Y]VÉÜ™\]Y\ÝYØ™X[WÝÚY	×OOLLˆ\ÜÙ\Ø\XÚ]WÜ™\ÜÉÙ^XÝ][Û—ÝÚYØÚ[™ÙY	×H\È˜[ÙBˆ\ÜÙ\
-\Ü]Èœ[‹Ý\Ý˜ÜÝˆŠKœ™XYÝ^
+"""Actual CPU subprocess fixtures validate protocol only, never native CUDA."""
+import json
+import os
+from pathlib import Path
+import sys
+from types import SimpleNamespace
 
-HOH	Ú[š]X[ÜÝ]WÚY[š]X[ÜÝ]WŒŒK—‰Âˆ\ÜÙ\\Ý
-œÛÛ‹›ØYÊ
-\Ü]Èœ[‹Ü^ž›WÚ[™›ËšœÛÛˆŠKœ™XYÝ^
+import pytest
 
-JVÈ™Ù[™\˜]ÜœÈ—JHOHÈ›L‹›LH—Bˆ\ÜÙ\ØœÙ\™YÈ˜ÛÛ[X[™—VËMN—HOHÈŒ‹ŒH‹ŒL‹ŒH‹Œ—Bˆ\ÜÙ\ØœÙ\™YÈ™[ˆ—VÈ‘PSWÔ•S•SQWÐÓÓ‘’Q×ÓSÑH—HOH˜]]È‚ˆYˆ[Ù[Ø˜XÚÙ[™OH	Ù[œÙ[X›IÎ‚ˆ\ÜÙ\ØœÙ\™YÉÙ[‰×VÉÐ‘PSWÔÕ‘PSLWÑVPÕUÔ‰×HOH	ÛXÜ˜ÚÙXYÙ\‰Âˆ\ÜÙ\ØœÙ\™YÉÙ[‰×VÉÐ‘PSWÐ“S‘ÑT‰×HOHÝŠ[Ù[ÙZYÚ×Ù\ŠBˆ\ÜÙ\ØœÙ\™YÈ™[ˆ—VÈ‘PSWÔÓÓ‘QÓ‘RQÒ“Ô’ÓÑÔQUTÈ—HOHŒÈ‚ˆ\ÜÙ\ØœÙ\™YÈ™[ˆ—VÈ‘PSWÔÓÓ‘QÓ‘RQÒ“Ô’ÓÑÓPVÑS•’QTÈ—HOHŒLŒÍH‚ˆ\ÜÙ\Ý]ÛÛYK›Y]Y]VÈœ™\]Y\ÝYÛX^ÜÝ\È—HOHˆ\ÜÙ\Ý]ÛÛYK›Y]Y]VÈ›˜]]™WÙ›ÜØ\™Ù\Û[Z]—HOHBˆ\ÜÙ\Ý]ÛÛYK›Y]Y]VÈ˜ÛÛ™šYÝ\™YÝÝXÚØ™œ×Ü˜Y]\È—HOHL‚ˆ\ÜÙ\Ý]ÛÛYK›Y]Y]VÈ™Y™™XÝ]™WÝÝXÚØ™œ×Ü˜Y]\È—HOHÂˆ\ÜÙ\œÛÛ‹›ØYÊ
-\Ü]Èœ[‹Ü[[YKXÛÛ™šYËšœÛÛˆŠKœ™XYÝ^
+from cayleypy_native.backend import child_environment, parse_terminal, run_native, run_process, runtime_devices
+from cayleypy_native.errors import NativeBackendError, NativeUnavailable
+from cayleypy_native.options import NativeOptions
 
-JVÈœÙX\˜ÚØYÙ]—HOHÂˆœ™\]Y\ÝYÛX^ÜÝ\ÈŽˆˆ›˜]]™WÙ›ÜØ\™Ù\Û[Z]ŽˆKˆ˜ÛÛ™šYÝ\™YÝÝXÚØ™œ×Ü˜Y]\ÈŽˆL‹ˆ™Y™™XÝ]™WÝÝXÚØ™œ×Ü˜Y]\ÈŽˆËˆÝXÚØ™œ×ÛX^Ù[šY\ÈŽˆLŒÍKˆÝXÚØ™œ×ÝÛÜœÝØØ\ÙWÙ[šY\ÈŽˆMKˆBˆÈ˜]]™H]]È\Ù\ÈLÙÚXØ[ÛÝÈ[™Œ\ÚXØ[ÛÝÈ]\È™X[K‚ˆÈ]È[˜›Ý[™YY˜][ÙˆNLˆÚ[›ÝÜÈ™Z™XÝÈ]™\žHØ[™Y]K‚ˆ\ÜÙ\[
-ØœÙ\™YÈ™[ˆ—VÈ‘PSWÐ—ÓRPÔ“È—JHHŒˆ\ÜÙ\ØœÙ\™YÈ™[ˆ—VÈ‘PSWÒTÕÔ–WÓSÑH—HOH™\ÚÈ‚ˆ\ÜÙ\ØœÙ\™YÈ™[ˆ—VÈ“ÓP”T–WÔU—HOHÝŠ\Ü]Èœ[‹Ü[[YK[XœÈŠH
-ÈÜËœ]Ù\
-È‹Ý[œ™[]YÛXœ˜\žKÜ]‚ˆ[ÛšÙ^\]ÚœÙ]]Š˜XÚÙ[™œ[—Ü›ØÙ\ÜÈ‹[X™H
-˜\™ÜË
-ŠšÝØ\™ÜÎˆ]\Ý™˜Z[
-˜Ú[™ÙYÐÓ]\Ý™]™[][˜ÚŠJBˆÚ]]\Ýœ˜Z\Ù\Ê˜]]™P˜XÚÙ[™\œ›Ü‹X]ÚH“ÐÓXœ˜\žHÚ[™ÙYŠN‚ˆ˜XÚÙ[™œ[—Û˜]]™JÛÛ˜XÝ[Ù[Ü[ÛœËL\Ü]Èœ[‹\™\XÙY‹
-
-JB‚‚™Yˆ\ÝÝÛÜšÙ\—Ý\Ù\×Üš]˜]WÛ[Ù[Ø[™Ü[›™\—ÜÛ˜\ÚÝ×Ø™Y›Ü™WÛ][˜Ú
-[ÛšÙ^\]Ú\Ü]
-N‚ˆ[\ÜØ^[^\WÛ˜]]™K˜˜XÚÙ[™\È˜XÚÙ[™ˆœ›ÛHØ^[^\WÛ˜]]™K˜˜XÚÙ[™[\Ü™\\™Y[[YBˆœ›ÛHØ^[^\WÛ˜]]™K˜Z[[\Üš[WÜÚLM‹Ú\WØÛÛ˜XÝˆœ›ÛHØ^[^\WÛ˜]]™K›[Ù[È[\Ü˜]]™S[Ù[™\\™WÛ[Ù[‚ˆÛÛ˜XÝHÚ[\S˜[Y\ÜXÙJˆÝ]WÛ[L‹ˆ[WØÛ\ÜÙ\ÏL‹ˆ[Ý™WØÛÝ[L‹ˆÝ\JK
-KˆÙ[\JJKˆÜ˜\Ú\ÚH˜Hˆ
-ˆˆ™\^O[[X™H]ˆ\J]
-HOH
-K
-Kˆ×Ü^ž›WÚ[™›Ï[[X™NˆÈ˜Ù[˜[ÜÝ]HŽˆÌWK™Ù[™\˜]ÜœÈŽˆÈ›LŽˆÌWK›LHŽˆÌK__Kˆ
-BˆÙZYÚÈH\Ü]È˜Ø[\‹]ÙZYÚÈ‚ˆÙZYÚË›ZÙ\Š
-BˆX[šY™\ÝHÂˆœÝ]WÛ[ˆŽˆ‹ˆ›[WØÛ\ÜÙ\ÈŽˆ‹ˆšHŽˆˆšˆŽˆˆ›œ™ŽˆKˆ›Ý]]Ù[HŽˆKˆ™\HŽˆ™œMˆ‹ˆ››Ü›X[^˜][ÛˆŽˆ˜˜]Ú›Ü›WÙ›ÛY‹ˆ™Ü˜\Ú\ÚŽˆÛÛ˜XÝ™Ü˜\Ú\ÚˆBˆ
-ÙZYÚÈÈ›X[šY™\ÝšœÛÛˆŠKÜš]WÝ^
-œÛÛ‹™[\ÊX[šY™\Ý
-JBˆÛÝ[ÈHÂˆš[œ]ÝÙZYÚÚÈŽˆÌ‹ˆš[œ]ØšX\ÈŽˆˆšY[—ÝÙZYÚÚÈŽˆˆšY[—ØšX\ÈŽˆˆ›Ý]]ÝÙZYÚÚÈŽˆˆ›Ý]]ØšX\ÈŽˆKˆœ™\ÚYX[Ù˜ÌWÝÙZYÚÚÈŽˆˆœ™\ÚYX[Ù˜ÌWØšX\ÈŽˆˆœ™\ÚYX[Ù˜Ì—ÝÙZYÚÚÈŽˆˆœ™\ÚYX[Ù˜Ì—ØšX\ÈŽˆˆBˆ›Üˆ˜[YKÛÝ[[ˆÛÝ[Ëš][\Ê
-N‚ˆ
-ÙZYÚÈÈˆžÛ˜[Y_K™œMˆŠKÜš]WØž]\Êˆ—ˆ
-ˆ
-ÛÝ[
-ˆŠJBˆ[Ù[H™\\™WÛ[Ù[
-˜]]™S[Ù[
-ÙZYÚËÛÛ˜XÝ™Ü˜\Ú\Ú
-KÛÛ˜XÝ˜]]™SÜ[ÛœÊ
-K\Ü]Èœ™\\™HŠB‚ˆ[›™\ˆH\Ü]Èœ[›™\ˆ‚ˆ[›™\‹Üš]WØž]\Êˆ\Ý[Û›H[›™\ˆŠBˆ˜ØÛÛXœ˜\žHH\Ü]È›X›˜ØÛœÛËŒˆ‚ˆ˜ØÛÛXœ˜\žKÜš]WØž]\Êˆ\Ý[Û›HÐÓŠBˆY]Y]HHÂˆœÚ\HŽˆÚ\WØÛÛ˜XÝ
-ÛÛ˜XÝ
-Kˆ˜˜XÚÙ[™Žˆ›[‹ˆ˜š[˜\žWÜÚLMˆŽˆš[WÜÚLMŠ[›™\ŠKˆ›˜ØÛŽˆÈ›Xœ˜\žHŽˆÝŠ˜ØÛÛXœ˜\žJK›Xœ˜\žWÜÚLMˆŽˆš[WÜÚLMŠ˜ØÛÛXœ˜\žJ_KˆBˆ[[YHH™\\™Y[[YJ[›™\‹Y]Y]K
-ÍK
-JBˆÜšYÚ[˜[Ü[›™\ˆH[›™\‹œ™XYØž]\Ê
-Bˆ
-ÙZYÚÈÈ›Ý]]ØšX\Ë™œMˆŠKÜš]WØž]\Êˆ—WŠHÈØ[YK\Ú^™HØ[\ˆ]]][Û‹‚‚ˆYˆ˜ZÙWÜ›ØÙ\ÜÊÛÛ[X[™
-ŠšÝØ\™ÜÊN‚ˆ][˜ÚYÜ[›™\ˆH]
-ÛÛ[X[™ÌJBˆ\ÜÙ\][˜ÚYÜ[›™\ˆOHÝØ\™ÜÖÈ˜ÝÙ—HÈœ›ÙXÝ[Û—Ü[›™\ˆ‚ˆ\ÜÙ\][˜ÚYÜ[›™\ˆOH[›™\‹œ™\ÛÛ™J
-Bˆ\ÜÙ\][˜ÚYÜ[›™\‹œ™XYØž]\Ê
-HOHÜšYÚ[˜[Ü[›™\‚ˆ[›™\‹Üš]WØž]\Êˆœ™\XÙ[Y[Y\ˆ™\šYšYY][˜ÚÛ˜\ÚÝŠBˆ\ÜÙ\][˜ÚYÜ[›™\‹œ™XYØž]\Ê
-HOHÜšYÚ[˜[Ü[›™\‚ˆ][˜ÚYÝÙZYÚÈH]
-ÝØ\™ÜÖÈ™[ˆ—VÈ‘PSWÕÑRQÒÑTˆ—JBˆ\ÜÙ\][˜ÚYÝÙZYÚÈOH[Ù[ÙZYÚ×Ù\‚ˆ\ÜÙ\][˜ÚYÝÙZYÚÈOHÙZYÚËœ™\ÛÛ™J
-Bˆ\ÜÙ\
-][˜ÚYÝÙZYÚÈÈ›Ý]]ØšX\Ë™œMˆŠKœ™XYØž]\Ê
-HOHˆ—‚ˆÝØ\™ÜÖÈ›Ù×Ü]—KÜš]WÝ^
-ˆ‘ÓÐSÐ‘PSWÕÒQÑQ‘‘PÕU‘OLM—ˆ‚ˆœ^ž›WÜÛÛ™YLH^ž›WÚYLÙXÛÛ™ÏLŒHÛÛ][Û—Û[™ÝLHÛÛ][Û[LWˆ‚ˆ
-Bˆ™]\›ˆŒB‚ˆ[ÛšÙ^\]ÚœÙ]]Š˜XÚÙ[™œ[—Ü›ØÙ\ÜÈ‹˜ZÙWÜ›ØÙ\ÜÊBˆ[ÛšÙ^\]Ú™[[ŠÕQWÕ’TÒP“WÑU’PÑTÈ‹˜Z\Ú[™ÏQ˜[ÙJBˆÝ]ÛÛYHH˜XÚÙ[™œ[—Û˜]]™JÛÛ˜XÝ[Ù[˜]]™SÜ[ÛœÊØXÚWÙ\]\Ü]
-KM‹‹ˆ\Ü]Èœ[ˆ‹
-
-K[[YO\[[YJBˆ\ÜÙ\Ý]ÛÛYKœ]OH
-K
-B‚ˆ[›™\‹Üš]WØž]\ÊÜšYÚ[˜[Ü[›™\ŠBˆ
-[Ù[ÙZYÚ×Ù\ˆÈ›Ý]]ØšX\Ë™œMˆŠKÜš]WØž]\Êˆ——ŠBˆ[ÛšÙ^\]ÚœÙ]]Š˜XÚÙ[™œ[—Ü›ØÙ\ÜÈ‹ˆ[X™H
-˜K
-ŠšÎˆ]\Ý™˜Z[
-˜Ú[™ÙYš]˜]HÛ˜\ÚÝ™XXÚYÛÜšÙ\ˆ][˜ÚŠJBˆÚ]]\Ýœ˜Z\Ù\Ê˜]]™P˜XÚÙ[™\œ›Ü‹X]ÚH›[Ù[\Y˜XÝÚ[™ÙY™Y›Ü™H][˜ÚŠN‚ˆ˜XÚÙ[™œ[—Û˜]]™JÛÛ˜XÝ[Ù[˜]]™SÜ[ÛœÊØXÚWÙ\]\Ü]
-KM‹‹ˆ\Ü]Èœ[‹][\\™Y‹
-
-K[[YO\[[YJB‚‚™YˆÜ˜[š×ÜÝ™X[WÙš^\™J›ÛÝ˜[šË
-‹\›Z[˜[Q˜[ÙK™X[ONNLŠN‚ˆ\™XÝÜžHH›ÛÝÈ\Ý\Ù\ÜÚ[ÛˆˆÈ˜][\ÌˆÈÝŠ˜[šÊBˆ\™XÝÜžK›ZÙ\Š\™[ÏUYJBˆÝÝ]Hˆ•ÓÔ“ÔÒV‘OL—“ÐÐSÔS’Ï^Ü˜[šßWÕQWÑU’PÑWÓÐÐSÔS’Ï^Ü˜[šßW‘ÓÐSÐ‘PSWÕÒQÑQ‘‘PÕU‘O^Ø™X[_Wˆ‚ˆYˆ\›Z[˜[‚ˆÝÝ]
-ÏHœ^ž›WÜÛÛ™YLH^ž›WÚYLÙXÛÛ™ÏLŒHÛÛ][Û—Û[™ÝLHÛÛ][Û[LWˆ‚ˆ
-\™XÝÜžHÈœÝÝ]›ÙÈŠKÜš]WÝ^
-ÝÝ]
-Bˆ
-\™XÝÜžHÈœÝ\œ‹›ÙÈŠKÜš]WÝ^
-ˆœ˜[šÈÜ˜[šßHXYÛ›ÜÝX×ˆŠB‚‚]\Ý›X\šËœ\˜[Y]š^™J›[ÙH‹ÈœÝXØÙ\ÜÈ‹™˜Z[YÜ\X[‹œÝXØÙ\ÜÙ[ÛZ\ÜÚ[™×Ü˜[šÈ—JB™Yˆ\ÝÛ][\˜[š×Ü™Y\™XÝ×ÛY\™ÙWÙ]™[—ÛÛ—Ù˜Z[\™J[ÛšÙ^\]Ú\Ü][ÙJN‚ˆ[\ÜÜ˜Úˆ[\Ü][YÜX™X[\ÙX\˜Ú›ØØ[Û][˜Ú\ˆ\ÈØØ[Û][˜Ú\‚ˆ[\ÜØ^[^\WÛ˜]]™K˜˜XÚÙ[™\È˜XÚÙ[™ˆ[\ÜØ^[^\WÛ˜]]™K˜Z[\ÈZ[ˆÛÛ˜XÝHÚ[\S˜[Y\ÜXÙJÝ]WÛ[L‹[Ý™WØÛÝ[L‹Ý\JK
-KÙ[\JJKÜ˜\Ú\ÚH™Ü˜\‹ˆ™\^O[[X™H]ˆ\J]
-HOH
-K
-Kˆ×Ü^ž›WÚ[™›Ï[[X™NˆÈ˜Ù[˜[ÜÝ]HŽˆÌWK™Ù[™\˜]ÜœÈŽˆÈ›LŽˆÌWK›LHŽˆÌK__JBˆ[Ù[HÚ[\S˜[Y\ÜXÙJÙZYÚ×Ù\]\Ü]ÈÙZYÚÈ‹˜XÚÙ[™H›[‹\Y˜XÝÚ\ÚH›[Ù[‹ˆX[šY™\Ý^È™\HŽˆ™œMˆ‹›Ý]]Ù[HŽˆ_JBˆ[ÛšÙ^\]ÚœÙ]]ŠÜ˜Ú˜ÝYK™Ù]Ù]šXÙWØØ\Xš[]H‹[X™Hˆ
-ËJJBˆ˜ZÙWÜ[›™\ˆH\Ü]È\Ý[Û›K\[›™\ˆ‚ˆ˜ZÙWÜ[›™\‹Üš]WØž]\Êˆ\Ý[Û›H[›™\ˆž]\ÈŠBˆ˜ØÛÛXœ˜\žHH\Ü]È›X›˜ØÛœÛËŒˆ‚ˆ˜ØÛÛXœ˜\žKÜš]WØž]\Êˆ\Ý[Û›HÐÓŠBˆ[ÛšÙ^\]ÚœÙ]]ŠZ[™[œÝ\™WÜ[›™\ˆ‹[X™H
-˜\™ÜÎˆ
-ˆ˜ZÙWÜ[›™\‹È\ÝÛÛ›HŽˆYK˜š[˜\žWÜÚLMˆŽˆZ[™š[WÜÚLMŠ˜ZÙWÜ[›™\ŠKˆ›˜ØÛŽˆÈ›Xœ˜\žHŽˆÝŠ˜ØÛÛXœ˜\žJKˆ›Xœ˜\žWÜÚLMˆŽˆZ[™š[WÜÚLMŠ˜ØÛÛXœ˜\žJ__JJBˆ[ÛšÙ^\]Ú™[[ŠÕQWÕ’TÒP“WÑU’PÑTÈ‹˜Z\Ú[™ÏQ˜[ÙJBˆ[ˆH\Ü]Èœ[ˆ‚‚ˆYˆ˜ZÙWÜ›ØÙ\ÜÊÛÛ[X[™
-ŠšÝØ\™ÜÊN‚ˆ\ÜÙ\
-ÝØ\™ÜÖÈ˜ÝÙ—HÈ\ÝÜ™\Ý[ÈŠKš\×Ù\Š
-Bˆ\ÜÙ\ÝØ\™ÜÖÉÝÛÜšÙ\—ÛÙÜÉ×HOH[ˆÈ	ÝÛÜšÙ\‹[ÙÜÉÂˆ\ÜÙ\ÝØ\™ÜÖÉÝÛÜ›ÜÚ^™I×HOH‚ˆ\ÜÙ\ÝŠ[ˆÈœ›ÙXÝ[Û—Ü[›™\ˆŠH[ˆÛÛ[X[™ˆ\ÜÙ\
-[ˆÈœ›ÙXÝ[Û—Ü[›™\ˆŠKœ™XYØž]\Ê
-HOHˆ\Ý[Û›H[›™\ˆž]\È‚ˆ\ÜÙ\ÝØ\™ÜÖÈ›Ù×Ü]—HOH[ˆÈ›][˜Ú\‹›ÙÈ‚ˆÝØ\™ÜÖÈ›Ù×Ü]—KÜš]WÝ^
-\Ý[Û›H][˜Ú\ˆXYÛ›ÜÝX×ˆŠBˆÜ˜[š×ÜÝ™X[WÙš^\™J[ˆÈÛÜšÙ\‹[ÙÜÈ‹\›Z[˜[UYK™X[OMÊBˆYˆ[ÙHOHœÝXØÙ\ÜÈŽ‚ˆÜ˜[š×ÜÝ™X[WÙš^\™J[ˆÈÛÜšÙ\‹[ÙÜÈ‹K™X[OMÊBˆYˆ[ÙHOH™˜Z[YÜ\X[Ž‚ˆ˜Z\ÙH˜]]™P˜XÚÙ[™\œ›ÜŠ›˜]]™H›ØÙ\ÜÈ˜Z[Y˜ÏMÈŠBˆ™]\›ˆŒ‚‚ˆ[ÛšÙ^\]ÚœÙ]]ŠØØ[Û][˜Ú\‹œ[—ÛØØ[Ü˜[šÜÈ‹˜ZÙWÜ›ØÙ\ÜÊBˆÈ\ÈÙË[Y\™Ú[™Èš^\™H\Ù\ÈHX™[Y˜ZÙH[Ù[˜]\ˆ[ˆÙZYÚË‚ˆ[ÛšÙ^\]ÚœÙ]]Š˜XÚÙ[™™\šYžWÜ™\\™YÛ[Ù[‹[X™H
-˜\™ÜÎˆ›Û™JBˆYˆ[ÙHOHœÝXØÙ\ÜÈŽ‚ˆ™\Ý[H˜XÚÙ[™œ[—Û˜]]™JÛÛ˜XÝ[Ù[˜]]™SÜ[ÛœÊØXÚWÙ\]\Ü]
-KËK[‹
-JJBˆ\ÜÙ\™\Ý[œ]OH
-K
-H[™™\Ý[›Y]Y]VÈÛÜšÙ\—ÛÙÜ×ØÛÛ\]H—Bˆ\ÜÙ\[Š™\Ý[›Y]Y]VÈÛÜšÙ\—ÜÝ™X[\È—JHOHˆ[ÙN‚ˆ™X\ÛÛˆHœ˜ÏMÈˆYˆ[ÙHOH™˜Z[YÜ\X[ˆ[ÙHš[˜ÛÛ\]H˜]]™HÛÜšÙ\ˆÙÜÈ‚ˆÚ]]\Ýœ˜Z\Ù\Ê˜]]™P˜XÚÙ[™\œ›Ü‹X]Ú\™X\ÛÛŠN‚ˆ˜XÚÙ[™œ[—Û˜]]™JÛÛ˜XÝ[Ù[˜]]™SÜ[ÛœÊØXÚWÙ\]\Ü]
-KËK[‹
-JJBˆÛÛXš[™YH
-[ˆÈ›˜]]™K›ÙÈŠKœ™XYÝ^
 
-Bˆ\ÜÙ\–Û][˜Ú\—Hˆ[ˆÛÛXš[™Y[™\Ý[Û›H][˜Ú\ˆXYÛ›ÜÝXÈˆ[ˆÛÛXš[™Yˆ\ÜÙ\–Ü˜[šÈÝÝ]›Ù×Hˆ[ˆÛÛXš[™Y[™–Ü˜[šÈÝ\œ‹›Ù×Hˆ[ˆÛÛXš[™Yˆ\ÜÙ\œ˜[šÈXYÛ›ÜÝXÈˆ[ˆÛÛXš[™YˆYˆ[ÙHOHœÝXØÙ\ÜÈŽ‚ˆ\ÜÙ\–ÛÙÈÛÛXÝ[ÛˆXYÛ›ÜÝXÜ×Hˆ[ˆÛÛXš[™Y‚‚™Yˆ\ÝÜ˜[š×ÛÙ×ØÛÛXÝ[Û—Ü™Z™XÝ×Ý[™^XÝYÜ˜[š×Ø[™ÙÙ\×Û›ÝÜ™XYÚ]
-\Ü]
-N‚ˆœ›ÛHØ^[^\WÛ˜]]™K˜˜XÚÙ[™[\ÜÛÛXÝÝÛÜšÙ\—ÛÙÜÂˆ›ÛÝH\Ü]ÈÛÜšÙ\‹[ÙÜÈ‚ˆ›Üˆ˜[šÈ[ˆ˜[™ÙJÊN‚ˆÜ˜[š×ÜÝ™X[WÙš^\™J›ÛÝ˜[šÊBˆ
-›ÛÝÈ\Ý\Ù\ÜÚ[ÛˆˆÈ˜][\ÌˆÈŒˆˆÈœÝÝ]›ÙÈŠKÜš]WÝ^
-•S‘VPÕQÓÑ×ÓUTÕÓ“ÕÐ‘WÔ‘PQŠBˆ][˜Ú\‹ÛÛXš[™YH\Ü]È›][˜Ú\‹›ÙÈ‹\Ü]È›˜]]™K›ÙÈ‚ˆ][˜Ú\‹Üš]WÝ^
-›][˜Ú\—ˆŠBˆÚ]]\Ýœ˜Z\Ù\Ê˜]]™P˜XÚÙ[™\œ›Ü‹X]ÚHœ˜[šÈ\™XÝÜžHÙ]ŠN‚ˆÛÛXÝÝÛÜšÙ\—ÛÙÜÊ›ÛÝ][˜Ú\‹ÛÛXš[™Y‹ÝšXÝUYJBˆ\ÜÙ\•S‘VPÕQÓÑ×ÓUTÕÓ“ÕÐ‘WÔ‘PQˆ›Ý[ˆÛÛXš[™Yœ™XYÝ^
+@pytest.fixture(autouse=True)
+def fixture_device_names(monkeypatch):
+    # These protocol fixtures mock CUDA capabilities and runner execution.
+    # Do not accidentally query a physical GPU while describing those devices.
+    import torch
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device: "Protocol fixture GPU")
 
-B‚‚™Yˆ\ÝÜ˜[š×ÛÙ×ØÛÛXÝ[Û—ÙÙ\×Û›ÝÙ›ÛÝ×ÜÝ™X[WÜÞ[[[šÊ\Ü]
-N‚ˆœ›ÛHØ^[^\WÛ˜]]™K˜˜XÚÙ[™[\ÜÛÛXÝÝÛÜšÙ\—ÛÙÜÂˆ›ÛÝH\Ü]ÈÛÜšÙ\‹[ÙÜÈ‚ˆÜ˜[š×ÜÝ™X[WÙš^\™J›ÛÝ
-BˆÜ˜[š×ÜÝ™X[WÙš^\™J›ÛÝJBˆÝ]ÚYHH\Ü]È[œ™[]Y›ÙÈ‚ˆÝ]ÚYKÜš]WÝ^
-•S”‘SUQÓÑ×ÓUTÕÓ“ÕÐ‘WÔ‘PQŠBˆ™Y\™XÝYH›ÛÝÈ\Ý\Ù\ÜÚ[ÛˆˆÈ˜][\ÌˆÈŒHˆÈœÝÝ]›ÙÈ‚ˆ™Y\™XÝY[›[šÊ
-BˆžN‚ˆ™Y\™XÝYœÞ[[[š×ÝÊÝ]ÚYJBˆ^Ù\ÔÑ\œ›ÜŽ‚ˆ]\ÝœÚÚ\
-˜Ü™X][™ÈHÞ[[[šÈ\È›Ý\›Z]YÛˆ\ÈÜÝŠBˆ][˜Ú\‹ÛÛXš[™YH\Ü]È›][˜Ú\‹›ÙÈ‹\Ü]È›˜]]™K›ÙÈ‚ˆ][˜Ú\‹Üš]WÝ^
-›][˜Ú\—ˆŠBˆÚ]]\Ýœ˜Z\Ù\Ê˜]]™P˜XÚÙ[™\œ›Ü‹X]ÚH[œØY™H˜[šÈÝ™X[HŠN‚ˆÛÛXÝÝÛÜšÙ\—ÛÙÜÊ›ÛÝ][˜Ú\‹ÛÛXš[™Y‹ÝšXÝUYJBˆ\ÜÙ\•S”‘SUQÓÑ×ÓUTÕÓ“ÕÐ‘WÔ‘PQˆ›Ý[ˆÛÛXš[™Yœ™XYÝ^
 
-B
+class ReplayContract:
+    move_count = 2
+
+    def replay(self, path):
+        return tuple(path) == (1,)
+
+
+@pytest.mark.parametrize("solved", [False, True])
+def test_direct_trivial_native_result_does_not_create_run_dir(tmp_path, solved):
+    blocked_cache = tmp_path / "cache-is-a-file"
+    blocked_cache.write_text("must remain untouched")
+    contract = SimpleNamespace(replay=lambda path: solved)
+
+    outcome = run_native(
+        contract,
+        None,
+        NativeOptions(),
+        1,
+        1 if solved else 0,
+        blocked_cache / "run",
+        (),
+    )
+
+    assert outcome.path == (() if solved else None)
+    assert outcome.run_dir is None
+    assert blocked_cache.read_text() == "must remain untouched"
+
+
+def test_native_options_delegate_to_rust_validator_when_available(monkeypatch, tmp_path):
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    def validate_options(payload):
+        calls.append(json.loads(payload))
+        return payload
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(validate_options=validate_options),
+    )
+
+    NativeOptions(cache_dir=tmp_path, devices=(2, 0))
+
+    assert len(calls) == 1
+    assert calls[0]["cache_dir"] == str(tmp_path.resolve())
+    assert calls[0]["devices"] == [2, 0]
+
+
+def invoke_fixture(tmp_path, text, *, code=0):
+    """Explicitly fake producer, run by the real subprocess lifetime helper."""
+    log = tmp_path / "fake-native.log"
+    script = "import sys; print(" + repr(text) + "); sys.exit(" + str(code) + ")"
+    run_process([sys.executable, "-c", script], cwd=tmp_path, env=dict(os.environ), timeout=10, log_path=log)
+    return log
+
+
+def test_real_subprocess_valid_path_parses_and_replays(tmp_path):
+    log = invoke_fixture(tmp_path, "GLOBAL_BEAM_WIDTH_EFFECTIVE=1024\nB_MICRO=682\nSTREAM1_ROWS_PER_JOB=2046\nSTREAM3_BATCH_CANDIDATES=2046\npuzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 found_depth=1 touch_depth=0 solution=m1")
+    path, width, metadata = parse_terminal(log, ReplayContract())
+    assert (path, width) == ((1,), 1024)
+    assert metadata["native_seconds"] == 0.1
+    assert metadata["observed_parent_batch"] == 682
+    assert metadata["observed_inference_rows"] == 2046
+    assert json.loads(log.with_suffix(".log.command.json").read_text())[0] == sys.executable
+
+
+def test_real_subprocess_not_found_is_distinct_from_crash(tmp_path):
+    log = invoke_fixture(tmp_path, "puzzle_solved=0 puzzle_id=0 seconds=0.2 solution_length=-1 solution=")
+    assert parse_terminal(log, ReplayContract())[:2] == (None, None)
+    assert parse_terminal(log, ReplayContract())[2]["observed_parent_batch"] is None
+    with pytest.raises(NativeBackendError, match="rc=7"):
+        invoke_fixture(tmp_path, "puzzle_solved=0 puzzle_id=0 seconds=0 solution_length=-1 solution=", code=7)
+
+
+@pytest.mark.parametrize("record,reason", [
+    ("startup only", "without a terminal"),
+    ("puzzle_solved=1 bad", "malformed"),
+    ("puzzle_solved=1 puzzle_id=0 seconds=0 solution_length=1 solution=m0", "replay"),
+    ("puzzle_solved=1 puzzle_id=0 seconds=0 solution_length=2 solution=m1", "length"),
+    ("puzzle_solved=1 puzzle_id=0 seconds=nan solution_length=1 solution=m1", "time"),
+    ("puzzle_solved=1 puzzle_id=0 seconds=bad solution_length=1 solution=m1", "time"),
+    ("puzzle_solved=1 puzzle_id=0 seconds=0 solution_length=1 solution=weird-name", "synthetic"),
+    ("puzzle_solved=1 puzzle_id=0 seconds=0 solution_length=1 solution=m3", "IDs"),
+    ("puzzle_solved=0 puzzle_id=0 seconds=0 solution_length=-1 solution=m1", "inconsistent"),
+])
+def test_bad_protocol_never_looks_like_not_found(tmp_path, record, reason):
+    log = invoke_fixture(tmp_path, record)
+    with pytest.raises(NativeBackendError, match=reason):
+        parse_terminal(log, ReplayContract())
+
+
+def test_terminal_solution_cannot_exceed_requested_step_budget(tmp_path):
+    contract = SimpleNamespace(move_count=2, replay=lambda path: tuple(path) == (0, 1))
+    log = invoke_fixture(
+        tmp_path,
+        "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=2 solution=m0.m1",
+    )
+    with pytest.raises(NativeBackendError, match="max_steps"):
+        parse_terminal(log, contract, max_steps=1)
+
+
+def test_timeout_terminates_real_process(tmp_path):
+    with pytest.raises(NativeBackendError, match="timed out"):
+        run_process([sys.executable, "-c", "import time; print('fake waiting', flush=True); time.sleep(30)"],
+                    cwd=tmp_path, env=dict(os.environ), timeout=0.2, log_path=tmp_path / "timeout.log")
+
+
+def test_child_environment_isolated_and_maps_visible_indices(tmp_path):
+    original = {"PATH": "safe", "BEAM_REPAIR_SOLUTIONS_CSV": "unrelated.csv", "BEAM_WEIGHT_DIR": "wrong",
+                "WORLD_SIZE": "8", "RANK": "3", "CUDA_VISIBLE_DEVICES": "GPU-a,GPU-b,GPU-c",
+                "CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_LAUNCH_BLOCKING": "1", "NCCL_DEBUG": "TRACE",
+                "STREAM4_BATCH_ALIGNMENT": "999", "TORCHELASTIC_RUN_ID": "inherited", "PUBLISH_RESULTS": "1"}
+    env = child_environment((2, 0), tmp_path, original)
+    assert env["CUDA_VISIBLE_DEVICES"] == "GPU-c,GPU-a"
+    assert env["CUDA_DEVICE_ORDER"] == "PCI_BUS_ID"
+    assert env["BEAM_NCCL_ID_FILE"] == str(tmp_path / "nccl-id.bin")
+    assert not any(k in env for k in ("RANK", "WORLD_SIZE", "BEAM_WEIGHT_DIR", "BEAM_REPAIR_SOLUTIONS_CSV",
+                                     "CUDA_LAUNCH_BLOCKING", "NCCL_DEBUG", "STREAM4_BATCH_ALIGNMENT", "PUBLISH_RESULTS"))
+    assert original["WORLD_SIZE"] == "8"
+
+
+@pytest.mark.parametrize("moves,outputs,world,beam", [
+    (3, 1, 2, 7), (24, 24, 2, 7), (24, 1, 2, 7), (256, 256, 8, 1), (3, 1, 1, 32768),
+])
+def test_small_beam_microbatch_fits_native_auto_storage(moves, outputs, world, beam):
+    from cayleypy_native.backend import microbatch_environment
+    env, metadata = microbatch_environment(SimpleNamespace(move_count=moves),
+        SimpleNamespace(manifest={"output_dim": outputs}), beam, world)
+    # Baseline native's independent rejection condition (runtime_config.cpp:420)
+    # is Stream3's one-slot child count > physical shard capacity.
+    rows_per_parent = moves if outputs == 1 else 1
+    configured_rows = int(env.get("BEAM_B_MICRO", "8192"))
+    assert 1 <= configured_rows <= 8192
+    assert configured_rows // rows_per_parent * moves <= metadata["reference_shard_storage"]
+    assert set(env) <= {"BEAM_B_MICRO"}  # no semantic beam/shard controls
+    if (moves, outputs, world, beam) == (3, 1, 2, 7):
+        assert 8192 // 3 * 3 == 8190 > metadata["reference_shard_storage"] == 2048
+        assert metadata["derived_parent_batch"] == 682
+        assert env == {"BEAM_B_MICRO": "2046"}
+
+
+@pytest.mark.parametrize("moves,outputs,beam", [(3, 1, 65536), (24, 1, 65536), (24, 24, 2**24)])
+def test_fitting_beam_keeps_native_default_microbatch(moves, outputs, beam):
+    from cayleypy_native.backend import microbatch_environment
+    env, metadata = microbatch_environment(SimpleNamespace(move_count=moves),
+        SimpleNamespace(manifest={"output_dim": outputs}), beam, 2)
+    assert env == {}
+    assert metadata["configured_row_budget"] == 8192
+    assert not metadata["adjusted_for_small_beam"]
+
+
+@pytest.mark.parametrize(
+    "max_steps,radius,expected",
+    [(1, 12, (1, 0)), (4, 12, (1, 3)), (4, 2, (2, 2)), (4, 0, (4, 0))],
+)
+def test_touch_bfs_depth_budget_reserves_suffix_inside_max_steps(max_steps, radius, expected):
+    from cayleypy_native.backend import native_depth_budget
+
+    assert native_depth_budget(max_steps, radius) == expected
+
+
+def test_native_depth_budget_uses_rust_extension_when_available(monkeypatch):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    def native_budget(max_steps, radius):
+        calls.append((max_steps, radius))
+        return 77, 2
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(native_depth_budget=native_budget),
+    )
+
+    assert backend.native_depth_budget(4, 2) == (77, 2)
+    assert calls == [(4, 2)]
+
+
+def test_native_depth_budget_keeps_python_fallback_without_rust_method(monkeypatch):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    assert backend.native_depth_budget(4, 12) == (1, 3)
+
+
+def test_rust_extension_exposes_native_depth_budget():
+    from multigpubeamsearch.rust_control import extension
+
+    native = extension()
+    assert native.native_depth_budget(4, 12) == (1, 3)
+    assert native.native_depth_budget(0, 12) == (0, 0)
+
+
+@pytest.mark.parametrize(
+    "max_steps,radius,expected",
+    [
+        (2**64, 3, (2**64 - 3, 3)),
+        (10, 2**32, (1, 9)),
+    ],
+)
+def test_native_depth_budget_falls_back_outside_rust_integer_ranges(
+    monkeypatch, max_steps, radius, expected
+):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    def native_budget(max_steps, radius):
+        calls.append((max_steps, radius))
+        return 77, 2
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(native_depth_budget=native_budget),
+    )
+
+    assert backend.native_depth_budget(max_steps, radius) == expected
+    assert calls == []
+
+
+def test_touch_bfs_entry_budget_uses_rust_extension_when_available(monkeypatch):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    def native_budget(move_count, radius, max_entries):
+        calls.append((move_count, radius, max_entries))
+        return 77
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(touch_bfs_worst_case_entries=native_budget),
+    )
+
+    assert backend.touch_bfs_worst_case_entries(3, 2, 100) == 77
+    assert calls == [(3, 2, 100)]
+
+
+def test_touch_bfs_entry_budget_keeps_python_fallback_without_rust_method(monkeypatch):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    assert backend.touch_bfs_worst_case_entries(3, 2, 13) == 13
+
+
+@pytest.mark.parametrize(
+    "move_count,radius,max_entries,expected",
+    [
+        (2**32, 0, 2, 1),
+        (1, 13, 14, 14),
+        (1, 1, 2**64, 2),
+    ],
+)
+def test_touch_bfs_entry_budget_falls_back_outside_rust_ranges(
+    monkeypatch, move_count, radius, max_entries, expected
+):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    def native_budget(*args):
+        calls.append(args)
+        return 77
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(touch_bfs_worst_case_entries=native_budget),
+    )
+
+    assert backend.touch_bfs_worst_case_entries(move_count, radius, max_entries) == expected
+    assert calls == []
+
+
+def test_rust_extension_exposes_touch_bfs_entry_budget():
+    from multigpubeamsearch.rust_control import extension
+
+    native = extension()
+    assert native.touch_bfs_worst_case_entries(3, 2, 13) == 13
+    assert native.touch_bfs_worst_case_entries(33, 1, 34) == 34
+    with pytest.raises(ValueError, match="touch BFS entries capacity exceeded"):
+        native.touch_bfs_worst_case_entries(3, 2, 12)
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, 2**64])
+def test_touch_bfs_entry_budget_must_be_a_positive_integer(value):
+    with pytest.raises(ValueError, match="touch_bfs_max_entries"):
+        NativeOptions(touch_bfs_max_entries=value)
+
+
+def test_runtime_unavailable_before_process_creation(monkeypatch, tmp_path):
+    import cayleypy_native.backend as backend
+    monkeypatch.setattr(backend.platform, "system", lambda: "Windows")
+    with pytest.raises(NativeUnavailable, match="Linux"):
+        runtime_devices(object(), NativeOptions(cache_dir=tmp_path))
+    monkeypatch.setattr(backend.platform, "system", lambda: "Linux")
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    with pytest.raises(NativeUnavailable, match="torchrun"):
+        runtime_devices(object(), NativeOptions(cache_dir=tmp_path))
+
+
+def test_runtime_devices_supports_pypi_graph_device_and_explicit_override(monkeypatch, tmp_path):
+    import torch
+    import cayleypy_native.backend as backend
+    import cayleypy_native.build as build
+    monkeypatch.setattr(backend.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 2)
+    monkeypatch.setattr(build, "prerequisites", lambda options: None)
+    for key in ("RANK", "LOCAL_RANK", "WORLD_SIZE", "TORCHELASTIC_RUN_ID"):
+        monkeypatch.delenv(key, raising=False)
+    options = NativeOptions(cache_dir=tmp_path)
+    assert runtime_devices(SimpleNamespace(device=torch.device("cuda:1")), options) == (1,)
+    assert runtime_devices(SimpleNamespace(device=torch.device("cpu")), options) == (0, 1)
+    assert runtime_devices(SimpleNamespace(device=torch.device("cpu")),
+                           NativeOptions(cache_dir=tmp_path, devices=(0,))) == (0,)
+
+
+def test_touch_bfs_capability_uses_the_effective_radius_during_preparation(monkeypatch, tmp_path):
+    import torch
+    import cayleypy_native.build as build
+    from cayleypy_native.backend import prepare_runtime
+
+    contract = SimpleNamespace(move_count=33)
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=1)
+    with pytest.raises(NativeUnavailable, match="32 generators"):
+        prepare_runtime(contract, object(), options, tmp_path, (0,))
+
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (8, 0))
+    monkeypatch.setattr(build, "ensure_runner", lambda *args: (tmp_path / "runner", {"test_only": True}))
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
+    runtime = prepare_runtime(contract, model, options, tmp_path, (0,), touch_bfs_radius=0)
+    assert runtime.build_metadata == {"test_only": True}
+
+
+def test_runtime_preparation_rechecks_cached_nccl_bytes(monkeypatch, tmp_path):
+    import hashlib
+    import torch
+    import cayleypy_native.build as build
+    from multigpubeamsearch import nccl_digest
+    from cayleypy_native.backend import prepare_runtime
+
+    source, cache_root = tmp_path / "source", tmp_path / "cache"
+    (source / "tools").mkdir(parents=True)
+    (source / "CMakeLists.txt").write_text("production_runner", encoding="utf-8")
+    (source / "tools" / "production_runner.cu").write_text("", encoding="utf-8")
+    build_dir = cache_root / "builds" / "fixture"
+    build_dir.mkdir(parents=True)
+    (build_dir / "native-build.json").write_text("{}", encoding="utf-8")
+    include, libdir = tmp_path / "include", tmp_path / "lib"
+    include.mkdir()
+    libdir.mkdir()
+    (include / "nccl.h").write_bytes(b"header")
+    library = libdir / "libnccl.so.2"
+    library.write_bytes(b"first nccl bytes")
+    monkeypatch.setattr(build, "_nccl_locations", lambda: [(include, libdir)])
+    monkeypatch.setattr(build, "prerequisites", lambda options: {})
+    monkeypatch.setattr(build, "source_digest", lambda *args, **kwargs: "source")
+    monkeypatch.setattr(build, "toolchain_identity", lambda programs: {})
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (8, 0))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda d: "mock GPU")
+    specifications = []
+    current_specification = []
+    actual_build_key = build.build_key
+
+    def capture_key(specification):
+        specifications.append((specification["nccl"], actual_build_key(specification)))
+        current_specification[:] = [dict(specification)]
+        return "fixture"
+
+    monkeypatch.setattr(build, "build_key", capture_key)
+    monkeypatch.setattr(build, "validate_runner",
+                        lambda *args: dict(current_specification[0], build_key="fixture"))
+    partitions = []
+    original_partition = nccl_digest._digest_partition
+
+    def capture_partition(*args):
+        partitions.append(True)
+        return original_partition(*args)
+
+    monkeypatch.setattr(nccl_digest, "_digest_partition", capture_partition)
+    digest_cache = nccl_digest.ChunkDigestCache(chunk_bytes=4, workers=2)
+    options = NativeOptions(source_dir=source, cutlass_dir=tmp_path, cache_dir=cache_root,
+                            inference_backend="cutlass", autotune=False)
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
+    contract = SimpleNamespace(state_len=8, move_count=2)
+    for _ in range(2):
+        prepare_runtime(contract, model, options, tmp_path / "run", (0,), nccl_digest_cache=digest_cache)
+    assert partitions
+    assert specifications[0] == specifications[1]
+    library.write_bytes(b"other nccl bytes")
+    prepare_runtime(contract, model, options, tmp_path / "run", (0,), nccl_digest_cache=digest_cache)
+    assert specifications[-1][0]["library_sha256"] == hashlib.sha256(library.read_bytes()).hexdigest()
+    assert specifications[-1][1] != specifications[0][1]
+
+
+def test_touch_bfs_worst_case_allocation_is_rejected_before_cuda_or_build(monkeypatch, tmp_path):
+    import torch
+    from cayleypy_native.backend import prepare_runtime
+
+    monkeypatch.setattr(torch.cuda, "get_device_capability",
+                        lambda device: pytest.fail("unsafe touch-BFS reached CUDA preparation"))
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=5,
+                            touch_bfs_max_entries=1_048_576)
+    with pytest.raises(NativeUnavailable, match="worst-case.*1,048,576"):
+        prepare_runtime(SimpleNamespace(move_count=24), model, options, tmp_path, (0,))
+
+
+def test_bf16_requires_sm80_before_build_or_launch(monkeypatch, tmp_path):
+    import torch
+    from cayleypy_native.backend import prepare_runtime
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (7, 5) if d == 1 else (8, 6))
+    with pytest.raises(NativeUnavailable, match="BF16.*SM80"):
+        prepare_runtime(SimpleNamespace(move_count=24), SimpleNamespace(backend="mlp", manifest={"dtype": "bf16", "output_dim": 1}),
+                        NativeOptions(cache_dir=tmp_path), tmp_path, (0, 1))
+
+
+def test_fp16_requires_sm75_before_build_or_launch(monkeypatch, tmp_path):
+    import torch
+    from cayleypy_native.backend import prepare_runtime
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (6, 1))
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": 1})
+    with pytest.raises(NativeUnavailable, match="SM75"):
+        prepare_runtime(SimpleNamespace(move_count=3), model, NativeOptions(cache_dir=tmp_path), tmp_path, (0,))
+
+
+@pytest.mark.parametrize("outputs", [2, 3, 18])
+def test_q_head_alignment_is_unavailable_before_build_or_launch(tmp_path, outputs):
+    from cayleypy_native.backend import prepare_runtime
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": outputs})
+    with pytest.raises(NativeUnavailable, match="Q-head.*multiple of 8"):
+        prepare_runtime(SimpleNamespace(move_count=outputs), model,
+                        NativeOptions(cache_dir=tmp_path, inference_backend="cutlass"), tmp_path, (0,))
+
+
+@pytest.mark.parametrize("outputs", [1, 8, 24])
+def test_scalar_and_aligned_q_heads_reach_build_preparation(monkeypatch, tmp_path, outputs):
+    import torch
+    import cayleypy_native.build as build
+    from cayleypy_native.backend import prepare_runtime
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (8, 6))
+    monkeypatch.setattr(build, "ensure_runner", lambda *args: (tmp_path / "test-only-runner", {"test_only": True}))
+    model = SimpleNamespace(backend="mlp", manifest={"dtype": "fp16", "output_dim": outputs})
+    runtime = prepare_runtime(SimpleNamespace(move_count=24 if outputs == 1 else outputs), model,
+                              NativeOptions(cache_dir=tmp_path), tmp_path, (0,))
+    assert runtime.architectures == (86,)
+    assert runtime.build_metadata == {"test_only": True}
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Linux process-group behavior requires POSIX")
+def test_timeout_kills_descendant_process(tmp_path):
+    import time
+    marker = tmp_path / "child-survived"
+    child = f"import time; from pathlib import Path; time.sleep(1.2); Path({str(marker)!r}).write_text('survived')"
+    parent = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{child!r}]); time.sleep(30)"
+    with pytest.raises(NativeBackendError, match="timed out"):
+        run_process([sys.executable, "-c", parent], cwd=tmp_path, env=dict(os.environ), timeout=0.3,
+                    log_path=tmp_path / "tree-timeout.log")
+    time.sleep(1.3)
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize('model_backend,discover', [('mlp',False),('ensemble',False),('ensemble',True)])
+def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(monkeypatch, tmp_path, model_backend,discover):
+    import torch
+    import cayleypy_native.backend as backend
+    import cayleypy_native.build as build
+    contract = SimpleNamespace(state_len=2, move_count=2, start=(1, 0), center=(0, 1), graph_hash="graph",
+        replay=lambda path: tuple(path) == (1,),
+        to_puzzle_info=lambda: {"central_state": [0, 1], "generators": {"m0": [0, 1], "m1": [1, 0]}})
+    model = SimpleNamespace(weights_dir=tmp_path / "weights", backend="mlp", artifact_hash="model", manifest={"dtype": "fp16", "output_dim": 1})
+    model.backend = model_backend
+    if model_backend == 'ensemble':
+        model.manifest['ensemble'] = {'models': [{'weights_dir': 'member'}]}
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (7, 5))
+    nccl_dir = tmp_path / "test-only-nccl"
+    nccl_dir.mkdir()
+    nccl_library = nccl_dir / "libnccl.so.2"
+    nccl_library.write_bytes(b"test-only library bytes")
+    original_nccl = nccl_library.read_bytes()
+    nccl_sha = build.file_sha256(nccl_library)
+    fake_runner = tmp_path / "test-only-runner"
+    fake_runner.write_bytes(b"test-only runner bytes")
+    monkeypatch.setattr(build, "ensure_runner", lambda *args: (fake_runner,
+                        {"test_only": True, "binary_sha256": build.file_sha256(fake_runner),
+                         "nccl": {"library": str(nccl_library), "library_sha256": nccl_sha}}))
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/unrelated/library/path")
+    observed = {}
+
+    def fake_process(command, **kwargs):
+        assert (kwargs["cwd"] / "test_results").is_dir(), "native solution logging requires private test_results"
+        assert Path(command[0]) == kwargs["cwd"] / "production_runner"
+        assert Path(command[0]).read_bytes() == b"test-only runner bytes"
+        nccl_library.write_bytes(b"replacement after verified NCCL snapshot")
+        loader_dirs = kwargs["env"]["LD_LIBRARY_PATH"].split(os.pathsep)
+        assert Path(loader_dirs[0]) == kwargs["cwd"] / "runtime-libs"
+        assert (Path(loader_dirs[0]) / "libnccl.so.2").read_bytes() == original_nccl
+        observed.update(command=command, **kwargs)
+        kwargs["log_path"].write_text("GLOBAL_BEAM_WIDTH_EFFECTIVE=1000\npuzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n")
+        return 0.1
+
+    monkeypatch.setattr(backend, "run_process", fake_process)
+    # This protocol fixture uses a labelled fake model; real byte rehashing has
+    # its own artifact-backed regression test below.
+    monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    if discover:
+        from multigpubeamsearch import autotune,maximum_beam,inference_admission,pipeline_autotune
+        measured=[]
+        def inference(contract,model,runtime,options,devices,width,*args):
+            return dict(parent_batch=256,reserve_bytes=100,phase='inference_verified',
+                estimate={'median':.0001},signature={'requested_beam_width':width})
+        monkeypatch.setattr(autotune,'tune_inference',inference)
+        monkeypatch.setattr(maximum_beam,'capacity_seed',lambda x:dict(x))
+        def capacity(*args,**kwargs):
+            # Mutating probe state must not leak into the real execution.
+            args[3]['BEAM_SHARD_COUNT']='128'
+            return dict(effective_beam=8192,profile={'BEAM_SHARD_COUNT':'128'},
+                search_complete=False,wall_seconds=.1)
+        monkeypatch.setattr(maximum_beam,'discover_capacity',capacity)
+        class Session:
+            def close(self):pass
+        monkeypatch.setattr(inference_admission,'admit_inference',
+            lambda *args,**kwargs:(args[-1],Session()))
+        def downstream(contract,model,runtime,options,devices,width,run,env,*args,**kwargs):
+            measured.append(width)
+            if width==1000:assert 'BEAM_SHARD_COUNT' not in env
+            return dict(phase='pipeline_measured',pipeline_verified=True,
+                measurement_scope='full_requested_frontier',
+                environment={'BEAM_B_MICRO':'256','BEAM_ENSEMBLE_INFERENCE_MICRO':'256'})
+        monkeypatch.setattr(pipeline_autotune,'tune_downstream',downstream)
+    options = NativeOptions(cache_dir=tmp_path, touch_bfs_radius=12, touch_bfs_max_entries=12345,
+        autotune=discover,calibration_discover_capacity=discover,calibration_full_frontier=discover,
+        report_calibration=False)
+    outcome = backend.run_native(contract, model, options, 1000, 4, tmp_path / "run", (0,))
+    assert outcome.path == (1,)
+    if discover:
+        assert measured==[1000]
+        capacity_report=outcome.metadata['profile']['maximum_beam']
+        assert capacity_report.get('full_step_verified',False) is False
+        assert capacity_report['search_complete'] is False
+        assert outcome.metadata['requested_beam_width']==1000
+        assert capacity_report['execution_width_changed'] is False
+    assert (tmp_path / "run/test.csv").read_text() == 'initial_state_id,initial_state\n0,"1,0"\n'
+    assert list(json.loads((tmp_path / "run/puzzle_info.json").read_text())["generators"]) == ["m0", "m1"]
+    assert observed["command"][-5:] == ["0", "1", "1000", "1", "0"]
+    assert observed["env"]["BEAM_RUNTIME_CONFIG_MODE"] == "auto"
+    if model_backend == 'ensemble':
+        assert observed['env']['BEAM_STREAM1_EXECUTOR'] == 'libtorch_eager'
+        assert observed['env']['BEAM_BLEND_DIR'] == str(model.weights_dir)
+    assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_RADIUS"] == "3"
+    assert observed["env"]["BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES"] == "12345"
+    assert outcome.metadata["requested_max_steps"] == 4
+    assert outcome.metadata["native_forward_depth_limit"] == 1
+    assert outcome.metadata["configured_touch_bfs_radius"] == 12
+    assert outcome.metadata["effective_touch_bfs_radius"] == 3
+    assert json.loads((tmp_path / "run/runtime-config.json").read_text())["search_budget"] == {
+        "requested_max_steps": 4,
+        "native_forward_depth_limit": 1,
+        "configured_touch_bfs_radius": 12,
+        "effective_touch_bfs_radius": 3,
+        "touch_bfs_max_entries": 12345,
+        "touch_bfs_worst_case_entries": 15,
+    }
+    # Native auto uses 1024 logical slots and 2048 physical slots at this beam.
+    # Its unbounded default of 8192 child rows rejects every candidate.
+    assert int(observed["env"]["BEAM_B_MICRO"]) <= 2048
+    assert observed["env"]["BEAM_HISTORY_MODE"] == "disk"
+    assert observed["env"]["LD_LIBRARY_PATH"] == str(tmp_path / "run/runtime-libs") + os.pathsep + "/unrelated/library/path"
+    monkeypatch.setattr(backend, "run_process", lambda *args, **kwargs: pytest.fail("changed NCCL must prevent launch"))
+    with pytest.raises(NativeBackendError, match="NCCL library changed"):
+        backend.run_native(contract, model, options, 1000, 4, tmp_path / "run-replaced", (0,))
+
+
+def test_worker_uses_private_model_and_runner_snapshots_before_launch(monkeypatch, tmp_path):
+    import cayleypy_native.backend as backend
+    from cayleypy_native.backend import PreparedRuntime
+    from cayleypy_native.build import file_sha256, shape_contract
+    from cayleypy_native.models import NativeModel, prepare_model
+
+    contract = SimpleNamespace(
+        state_len=2,
+        num_classes=2,
+        move_count=2,
+        start=(1, 0),
+        center=(0, 1),
+        graph_hash="a" * 64,
+        replay=lambda path: tuple(path) == (1,),
+        to_puzzle_info=lambda: {"central_state": [0, 1], "generators": {"m0": [0, 1], "m1": [1, 0]}},
+    )
+    weights = tmp_path / "caller-weights"
+    weights.mkdir()
+    manifest = {
+        "state_len": 2,
+        "num_classes": 2,
+        "hd1": 8,
+        "hd2": 8,
+        "nrd": 1,
+        "output_dim": 1,
+        "dtype": "fp16",
+        "normalization": "batchnorm_folded",
+        "graph_hash": contract.graph_hash,
+    }
+    (weights / "manifest.json").write_text(json.dumps(manifest))
+    counts = {
+        "input_weight_hxk": 32,
+        "input_bias": 8,
+        "hidden_weight_hxk": 64,
+        "hidden_bias": 8,
+        "output_weight_hxk": 8,
+        "output_bias": 1,
+        "residual0_fc1_weight_hxk": 64,
+        "residual0_fc1_bias": 8,
+        "residual0_fc2_weight_hxk": 64,
+        "residual0_fc2_bias": 8,
+    }
+    for name, count in counts.items():
+        (weights / f"{name}.fp16").write_bytes(b"\0" * (count * 2))
+    model = prepare_model(NativeModel(weights, contract.graph_hash), contract, NativeOptions(), tmp_path / "prepare")
+
+    runner = tmp_path / "runner"
+    runner.write_bytes(b"test-only runner")
+    nccl_library = tmp_path / "libnccl.so.2"
+    nccl_library.write_bytes(b"test-only NCCL")
+    metadata = {
+        "shape": shape_contract(contract),
+        "backend": "mlp",
+        "binary_sha256": file_sha256(runner),
+        "nccl": {"library": str(nccl_library), "library_sha256": file_sha256(nccl_library)},
+    }
+    runtime = PreparedRuntime(runner, metadata, (75,))
+    original_runner = runner.read_bytes()
+    (weights / "output_bias.fp16").write_bytes(b"\x01\x00")  # Same-size caller mutation.
+
+    def fake_process(command, **kwargs):
+        launched_runner = Path(command[0])
+        assert launched_runner == kwargs["cwd"] / "production_runner"
+        assert launched_runner != runner.resolve()
+        assert launched_runner.read_bytes() == original_runner
+        runner.write_bytes(b"replacement after verified launch snapshot")
+        assert launched_runner.read_bytes() == original_runner
+        launched_weights = Path(kwargs["env"]["BEAM_WEIGHT_DIR"])
+        assert launched_weights == model.weights_dir
+        assert launched_weights != weights.resolve()
+        assert (launched_weights / "output_bias.fp16").read_bytes() == b"\x00\x00"
+        kwargs["log_path"].write_text(
+            "GLOBAL_BEAM_WIDTH_EFFECTIVE=16\n"
+            "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n"
+        )
+        return 0.1
+
+    monkeypatch.setattr(backend, "run_process", fake_process)
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    outcome = backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2,
+                                 tmp_path / "run", (0,), runtime=runtime)
+    assert outcome.path == (1,)
+
+    runner.write_bytes(original_runner)
+    (model.weights_dir / "output_bias.fp16").write_bytes(b"\x02\x00")
+    monkeypatch.setattr(backend, "run_process",
+                        lambda *a, **k: pytest.fail("changed private snapshot reached worker launch"))
+    with pytest.raises(NativeBackendError, match="model artifact changed before launch"):
+        backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2,
+                           tmp_path / "run-tampered", (0,), runtime=runtime)
+
+
+def _rank_stream_fixture(root, rank, *, terminal=False, beam=8192):
+    directory = root / "test-session" / "attempt_0" / str(rank)
+    directory.mkdir(parents=True)
+    stdout = f"WORLD_SIZE=2\nLOCAL_RANK={rank}\nCUDA_DEVICE_LOCAL_RANK={rank}\nGLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
+    if terminal:
+        stdout += "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n"
+    (directory / "stdout.log").write_text(stdout)
+    (directory / "stderr.log").write_text(f"rank {rank} diagnostic\n")
+
+
+@pytest.mark.parametrize("mode", ["success", "failed_partial", "successful_missing_rank"])
+def test_multirank_redirects_merge_even_on_failure(monkeypatch, tmp_path, mode):
+    import torch
+    import multigpubeamsearch.local_launcher as local_launcher
+    import cayleypy_native.backend as backend
+    import cayleypy_native.build as build
+    contract = SimpleNamespace(state_len=2, move_count=2, start=(1, 0), center=(0, 1), graph_hash="graph",
+        replay=lambda path: tuple(path) == (1,),
+        to_puzzle_info=lambda: {"central_state": [0, 1], "generators": {"m0": [0, 1], "m1": [1, 0]}})
+    model = SimpleNamespace(weights_dir=tmp_path / "weights", backend="mlp", artifact_hash="model",
+                            manifest={"dtype": "fp16", "output_dim": 1})
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d: (7, 5))
+    fake_runner = tmp_path / "test-only-runner"
+    fake_runner.write_bytes(b"test-only runner bytes")
+    nccl_library = tmp_path / "libnccl.so.2"
+    nccl_library.write_bytes(b"test-only NCCL")
+    monkeypatch.setattr(build, "ensure_runner", lambda *args: (
+        fake_runner, {"test_only": True, "binary_sha256": build.file_sha256(fake_runner),
+                      "nccl": {"library": str(nccl_library),
+                               "library_sha256": build.file_sha256(nccl_library)}}))
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    run = tmp_path / "run"
+
+    def fake_process(command, **kwargs):
+        assert (kwargs["cwd"] / "test_results").is_dir()
+        assert kwargs['worker_logs'] == run / 'worker-logs'
+        assert kwargs['world_size'] == 2
+        assert str(run / "production_runner") in command
+        assert (run / "production_runner").read_bytes() == b"test-only runner bytes"
+        assert kwargs["log_path"] == run / "launcher.log"
+        kwargs["log_path"].write_text("test-only launcher diagnostic\n")
+        _rank_stream_fixture(run / "worker-logs", 0, terminal=True, beam=7)
+        if mode == "success":
+            _rank_stream_fixture(run / "worker-logs", 1, beam=7)
+        if mode == "failed_partial":
+            raise NativeBackendError("native process failed rc=7")
+        return 0.2
+
+    monkeypatch.setattr(local_launcher, "run_local_ranks", fake_process)
+    # This log-merging fixture uses a labelled fake model rather than weights.
+    monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
+    if mode == "success":
+        result = backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 7, 1, run, (0, 1))
+        assert result.path == (1,) and result.metadata["worker_logs_complete"]
+        assert len(result.metadata["worker_streams"]) == 4
+    else:
+        reason = "rc=7" if mode == "failed_partial" else "incomplete native worker logs"
+        with pytest.raises(NativeBackendError, match=reason):
+            backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 7, 1, run, (0, 1))
+    combined = (run / "native.log").read_text()
+    assert "[launcher]" in combined and "test-only launcher diagnostic" in combined
+    assert "[rank 0 stdout.log]" in combined and "[rank 0 stderr.log]" in combined
+    assert "rank 0 diagnostic" in combined
+    if mode != "success":
+        assert "[log collection diagnostics]" in combined
+
+
+def test_rank_log_collection_rejects_unexpected_rank_and_does_not_read_it(tmp_path):
+    from cayleypy_native.backend import collect_worker_logs
+    root = tmp_path / "worker-logs"
+    for rank in range(3):
+        _rank_stream_fixture(root, rank)
+    (root / "test-session" / "attempt_0" / "2" / "stdout.log").write_text("UNEXPECTED_LOG_MUST_NOT_BE_READ")
+    launcher, combined = tmp_path / "launcher.log", tmp_path / "native.log"
+    launcher.write_text("launcher\n")
+    with pytest.raises(NativeBackendError, match="rank directory set"):
+        collect_worker_logs(root, launcher, combined, 2, strict=True)
+    assert "UNEXPECTED_LOG_MUST_NOT_BE_READ" not in combined.read_text()
+
+
+def test_rank_log_collection_does_not_follow_stream_symlink(tmp_path):
+    from cayleypy_native.backend import collect_worker_logs
+    root = tmp_path / "worker-logs"
+    _rank_stream_fixture(root, 0)
+    _rank_stream_fixture(root, 1)
+    outside = tmp_path / "unrelated.log"
+    outside.write_text("UNRELATED_LOG_MUST_NOT_BE_READ")
+    redirected = root / "test-session" / "attempt_0" / "1" / "stdout.log"
+    redirected.unlink()
+    try:
+        redirected.symlink_to(outside)
+    except OSError:
+        pytest.skip("creating a symlink is not permitted on this host")
+    launcher, combined = tmp_path / "launcher.log", tmp_path / "native.log"
+    launcher.write_text("launcher\n")
+    with pytest.raises(NativeBackendError, match="unsafe rank stream"):
+        collect_worker_logs(root, launcher, combined, 2, strict=True)
+    assert "UNRELATED_LOG_MUST_NOT_BE_READ" not in combined.read_text()
