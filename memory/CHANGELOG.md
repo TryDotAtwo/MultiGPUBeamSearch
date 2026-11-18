@@ -2062,9 +2062,11 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Test-first run 44390118399 failed on the two expected missing-controller
   assertions (157 passed, 2 skipped). Two subsequent runs exposed and fixed
   missing members in the test fixtures; Rust checks and PyO3 build passed on
-  both. Green run 44392740368 passed Rust formatting/checks, PyO3 build, 159
-  Python tests (2 skipped), and NCCL probe syntax. Artifact 14469202830 SHA-256:
-  `b2fb5768a81122c46f8629dda235e4f323eb31937ab7469b665ef7daaf192323`.
+  both. Green branch run 44392740368 passed Rust formatting/checks, PyO3
+  build, 159 Python tests (2 skipped), and NCCL probe syntax. Main run
+  44393853310 passed the same checks. Artifacts 14469202830 and 14469468491
+  SHA-256: `b2fb5768a81122c46f8629dda235e4f323eb31937ab7469b665ef7daaf192323`
+  and `d6b88e8a2fb27c25555f028d35235fbac0a2202f7f3eb00601c14939cc55076b`.
 - This is CPU/control-flow evidence. Physical CUDA/NCCL and multi-GPU CNOT
   runtime remain unverified. Details:
   `test_results/refactor_20261118/cnot-search-runtime/GITHUB_STATUS.md`.
