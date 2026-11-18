@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import torch
+from cayleypy import CayleyGraph, CayleyGraphDef
 
 from multigpubeamsearch import rust_control
 from multigpubeamsearch.contracts import GraphContract
@@ -59,6 +60,41 @@ def test_graph_contract_keeps_python_fallback_for_older_extensions(monkeypatch):
     contract = GraphContract.from_graph(source, np.asarray([1, 2, 3, 0], dtype=np.uint8))
 
     assert contract.graph_hash == expected_graph_hash(source.definition)
+
+
+@pytest.mark.parametrize("center", [None, [0, 0, 1, 1]])
+def test_cayleypy_contract_is_accepted_and_stale_contents_are_rejected(center, tmp_path):
+    runtime = pytest.importorskip("_beam_runtime")
+    definition = CayleyGraphDef.create(
+        [[1, 2, 3, 0], [3, 0, 1, 2]],
+        central_state=center,
+        generator_names=['quoted "name"', "second\nname"],
+    )
+    graph_value = CayleyGraph(definition, device="cpu")
+    contract = GraphContract.from_graph(graph_value, graph_value.central_state)
+    identity = dict(
+        graph=dict(center=contract.center, generators=contract.generators),
+        graph_hash=contract.graph_hash,
+        model_artifact_hash="b" * 64,
+        model_backend="mlp",
+        runtime_build=dict(binary_sha256="c" * 64),
+        devices=[0], beam_width=64, max_steps=1, options={},
+        cuda_visible_devices=None, cuda_device_order=None,
+    )
+    launch = dict(command=[], protocol_command=[], environment={}, cwd=str(tmp_path))
+    owner = runtime.SearchSession()
+    missing = tmp_path / "must-not-exist"
+    result = json.loads(owner.run(json.dumps(identity), json.dumps(launch),
+                                  list(contract.center), missing, 1.0, "{}"))
+    assert result["path"] == []
+    assert not missing.exists()
+
+    identity["graph"]["generators"] = tuple(reversed(contract.generators))
+    with pytest.raises(RuntimeError, match="graph hash"):
+        owner.run(json.dumps(identity), json.dumps(launch),
+                  list(contract.center), missing, 1.0, "{}")
+    assert owner.pids == [] and not missing.exists()
+    owner.close()
 
 
 @pytest.mark.parametrize(
