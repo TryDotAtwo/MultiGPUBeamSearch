@@ -13,6 +13,12 @@
 - The hosted CPU workflow is
   `.github/workflows/permutation-depth-control-cpu.yml`. CUDA runner compilation,
   NCCL runtime, and physical multi-GPU behavior remain separate acceptance work.
+- Commit `697c1d1437d2e4f39cf3cc9c1115280c9e865810` keeps ABI-1 descriptor
+  layouts and the Rust `DepthControlSink` contract intact, while adding separate
+  ABI-2 symbols and layouts for solve-bucket state. GitHub Actions runs
+  `44384857755` (depth-control) and `44384857776` (CNOT CPU compatibility) passed;
+  their artifacts are recorded in
+  `test_results/refactor_20261118/permutation-depth-control/GITHUB_STATUS.md`.
 
 ## 2026-11-18 - CNOT stage error coordination through Rust
 
