@@ -74,6 +74,17 @@ class World:
         """Coordinate local model/validation failures before peers enter the next exchange."""
         if self.size == 1:
             return fn()
+        try:
+            from .errors import NativeUnavailable
+            from .rust_control import extension
+
+            checker = getattr(extension(), "run_cnot_native_checked", None)
+        except NativeUnavailable:
+            checker = None
+        if callable(checker):
+            return checker(self, stage, fn)
+
+        # Compatibility path for older PyO3 modules without the checked ABI.
         result, error = None, None
         try:
             result = fn()

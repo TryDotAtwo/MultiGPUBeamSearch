@@ -97,6 +97,15 @@ def test_checked_stage_delegates_rank_error_coordination_to_rust(monkeypatch):
     assert calls == [(world, "prepare CNOT stage")]
 
 
+def test_checked_stage_keeps_python_fallback_for_older_extensions(monkeypatch):
+    world = _two_rank_world()
+    expected = object()
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+    monkeypatch.setattr(world, "sum", lambda tensor: tensor)
+
+    assert world.checked("prepare CNOT stage", lambda: expected) is expected
+
+
 def test_rust_transport_requires_exchange_and_collective_abi(monkeypatch):
     class NativeLibrary:
         def __init__(self, _path):

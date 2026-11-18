@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-18 - CNOT stage error coordination through Rust
+
+- Multi-rank `World.checked` now delegates callback execution and the existing
+  rank-wide error vote to the PyO3 `run_cnot_native_checked` boundary when the
+  symbol is available. The operation stays on the calling thread and keeps the
+  same `world.sum` then failure-only `all_gather_object` sequence.
+- Older extensions retain the Python fallback, and one-rank execution is
+  unchanged. Added tests for Rust delegation and the old-extension fallback.
+  GitHub Actions verification is pending; no local tests or builds were run.
+  This does not verify CUDA/NCCL runtime behavior or complete the CNOT migration.
+
 ## 2026-11-18 - CNOT search control validation in beam-core
 
 - A compatible PyO3 extension now validates the CNOT wire count, global width,
