@@ -3,7 +3,7 @@ use beam_native_sys::cnot_tqp_scorer::TqpScorer;
 use pyo3::{
     exceptions::{PyOverflowError, PyRuntimeError, PyValueError},
     prelude::*,
-    types::{PyBool, PyDict, PyTuple},
+    types::{PyDict, PyTuple},
 };
 use std::path::PathBuf;
 
@@ -29,7 +29,7 @@ impl PyTqpScorer {
         n: i64,
         device: Bound<'_, PyAny>,
         inference_batch: i64,
-        experimental_native_batch: Bound<'_, PyAny>,
+        experimental_native_batch: bool,
     ) -> PyResult<Self> {
         if !(2..=i64::from(u32::MAX)).contains(&n) {
             return Err(PyValueError::new_err("n must be a valid CNOT dimension"));
@@ -37,13 +37,6 @@ impl PyTqpScorer {
         if inference_batch < 1 {
             return Err(PyValueError::new_err("inference_batch must be positive"));
         }
-        if !experimental_native_batch.is_instance_of::<PyBool>() {
-            return Err(PyValueError::new_err(
-                "experimental_native_batch must be a bool",
-            ));
-        }
-        let experimental_native_batch: bool = experimental_native_batch.extract()?;
-
         let torch = py.import("torch")?;
         let version: String = torch.getattr("__version__")?.extract()?;
         if version.split('+').next() != Some("2.9.0")
