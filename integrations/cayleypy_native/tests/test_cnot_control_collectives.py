@@ -52,6 +52,63 @@ def test_control_collectives_use_the_selected_rust_transport():
     assert transport.calls[2][1:] == (value, 1)
 
 
+def test_rust_world_collective_abi_is_exposed():
+    native = rust_control.extension()
+    assert all(callable(getattr(native, name, None)) for name in (
+        "run_cnot_native_sum",
+        "run_cnot_native_gather_fixed",
+        "run_cnot_native_broadcast",
+    ))
+
+
+def test_world_control_collectives_delegate_to_rust_when_available(monkeypatch):
+    world = _two_rank_world()
+    world.transport = RecordingTransport()
+    value = torch.tensor([5, 6], dtype=torch.int64)
+    calls = []
+
+    def sum_rows(actual_world, tensor):
+        calls.append(("sum", actual_world, tensor))
+        return tensor
+
+    def gather_rows(actual_world, tensor):
+        calls.append(("gather_fixed", actual_world, tensor))
+        return torch.stack((tensor, tensor + 20))
+
+    def broadcast_rows(actual_world, tensor, source):
+        calls.append(("broadcast", actual_world, tensor, source))
+        return tensor
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(
+            run_cnot_native_sum=sum_rows,
+            run_cnot_native_gather_fixed=gather_rows,
+            run_cnot_native_broadcast=broadcast_rows,
+        ),
+    )
+
+    assert world.sum(value) is value
+    assert torch.equal(world.gather_fixed(value), torch.tensor([[5, 6], [25, 26]]))
+    assert world.broadcast(value, 1) is value
+    assert [call[0] for call in calls] == ["sum", "gather_fixed", "broadcast"]
+    assert all(call[1] is world for call in calls)
+
+
+def test_control_collectives_preserve_the_python_path_for_older_extensions(monkeypatch):
+    world = _two_rank_world()
+    transport = RecordingTransport()
+    world.transport = transport
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+    value = torch.tensor([7, 8], dtype=torch.int64)
+
+    assert world.sum(value) is value
+    assert torch.equal(world.gather_fixed(value), torch.tensor([[7, 8], [17, 18]]))
+    assert world.broadcast(value, 1) is value
+    assert [call[0] for call in transport.calls] == ["sum", "gather_fixed", "broadcast"]
+
+
 def test_control_collectives_keep_the_torch_fallback_without_rust_transport(monkeypatch):
     world = _two_rank_world()
     calls = []
