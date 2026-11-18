@@ -69,14 +69,18 @@ the existing goal exchange; a healthy group can be reused after the error. This
 does not recover a failed device or NCCL communicator, or an error that prevents
 the status exchange itself.
 
-By default, `search_cnot` and `--validation auto` use the Rust packed-input and
-construction replay validator when the installed extension provides it, and
-retain Python validation as a compatibility fallback. Select `python` to force
-the reference validator or `rust` to fail closed when the extension lacks it.
-It requires the matching PyO3 extension and fails if that capability is absent.
-All ranks must select the same validator. The default remains `python`. This
-option moves input validation and final path replay only; the CNOT search loop,
-collectives, and checkpoint scorer still use the existing implementation.
+By default, `search_cnot` uses the Rust packed-input and construction replay
+validator when the matching extension loads. `validation="auto"` falls back to
+Python when the extension is absent or cannot load; `validation="python"`
+forces the reference validator, and `validation="rust"` fails closed. All
+ranks must select the same validator.
+
+The default `engine="auto"` uses the Rust search controller and rank-local
+stage owner when the matching capability is available. It falls back to the
+reference path for an absent or unloadable extension; `engine="python"`
+forces that path and `engine="rust"` fails closed. The current Rust stage
+owner dispatches packed-matrix operations to existing C++ ATen/CUDA operators.
+PyTorch owns the tensors, and arbitrary Python scorers remain supported.
 
 ## Rust-owned CNOT control collectives, 2026-11-18
 
