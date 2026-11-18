@@ -118,6 +118,14 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     class World:
         rank, size, device = 1, 2, "cpu"
 
+        def longs(self, values):
+            events.append(("longs", values))
+            return values
+
+        def sum(self, values):
+            events.append(("sum", values))
+            return SimpleNamespace(item=lambda: 0)
+
         def require_consensus(self, value):
             events.append(("consensus", value))
 
@@ -159,6 +167,8 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     assert controller(world, caller_root, scorer, options, callbacks) is result
     assert events == [
         ("admit", caller_root, scorer, *options),
+        ("longs", [0]),
+        ("sum", [0]),
         ("consensus", digest),
         ("transport", True),
         ("identity", 4, "cpu"),
