@@ -152,6 +152,31 @@ def test_default_validation_prefers_rust_when_available(monkeypatch):
     assert calls == [("load", 4, 32), ("replay", (0,))]
 
 
+def test_auto_cnot_falls_back_when_native_extension_import_fails(monkeypatch):
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    real_import = rust_control.importlib.import_module
+
+    def failed_native_import(name, package=None):
+        if name in ("multigpubeamsearch._beam_runtime", "_beam_runtime"):
+            raise ImportError("native dependency is unavailable")
+        return real_import(name, package)
+
+    monkeypatch.setattr(rust_control.importlib, "import_module", failed_native_import)
+    root = pack_rows(replay_cnot(4, (0,)))
+    result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1,
+                         validation="auto", engine="auto")
+    assert result.status == "solved" and result.gates == (0,)
+
+    with pytest.raises(NativeUnavailable, match="could not be loaded"):
+        search_cnot(root, object(), width=1, shortlist=1, max_depth=1,
+                    validation="rust", engine="python")
+    with pytest.raises(NativeUnavailable, match="could not be loaded"):
+        search_cnot(root, object(), width=1, shortlist=1, max_depth=1,
+                    validation="python", engine="rust")
+
+
 def test_auto_validation_falls_back_when_rust_extension_is_unavailable(monkeypatch):
     from multigpubeamsearch import rust_control
     from multigpubeamsearch.errors import NativeUnavailable
