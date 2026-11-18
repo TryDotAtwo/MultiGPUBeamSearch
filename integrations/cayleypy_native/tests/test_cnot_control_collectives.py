@@ -78,6 +78,25 @@ def test_control_collectives_keep_the_torch_fallback_without_rust_transport(monk
     assert [call[0] for call in calls] == ["sum", "gather_fixed", "broadcast"]
 
 
+def test_checked_stage_delegates_rank_error_coordination_to_rust(monkeypatch):
+    world = _two_rank_world()
+    calls = []
+    expected = object()
+
+    def run_native_checked(actual_world, stage, callback):
+        calls.append((actual_world, stage))
+        return callback()
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(run_cnot_native_checked=run_native_checked),
+    )
+
+    assert world.checked("prepare CNOT stage", lambda: expected) is expected
+    assert calls == [(world, "prepare CNOT stage")]
+
+
 def test_rust_transport_requires_exchange_and_collective_abi(monkeypatch):
     class NativeLibrary:
         def __init__(self, _path):
