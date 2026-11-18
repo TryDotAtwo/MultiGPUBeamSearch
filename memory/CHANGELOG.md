@@ -4,7 +4,7 @@
 
 - After Python binds arguments against the installed CayleyPy signature, it now passes normalized search controls to `beam-core`: beam width (including `"max"`), maximum depth, beam mode, taboo history, destination/BFS compatibility, and boolean flags.
 - `beam-core` distinguishes invalid values from unsupported public modes; the PyO3 adapter returns those outcomes to Python without changing their public exception classes or messages. Existing Python validation remains for old extensions and custom objects whose comparison semantics cannot be represented by the adapter.
-- This changes validation ownership only. Search decisions, candidate order, C++/CUDA workers, and multi-GPU topology do not change. Hosted CPU verification is pending.
+- This changes validation ownership only. Search decisions, candidate order, C++/CUDA workers, and multi-GPU topology do not change. Hosted CPU validation passed in Actions run 44249581929, including 125 Python tests, Rust checks, and the PyO3 build. CUDA, NCCL, and physical multi-GPU runtime remain unverified.
 
 ## 2026-11-18 - Rust владелец публичных native-сессий по умолчанию
 
