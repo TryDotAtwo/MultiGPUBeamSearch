@@ -27,10 +27,7 @@ fn validate_cnot_search_controls(
 }
 
 #[pyfunction]
-fn run_cnot_native_require_consensus(
-    world: Bound<'_, PyAny>,
-    digest: Vec<u8>,
-) -> PyResult<()> {
+fn run_cnot_native_require_consensus(world: Bound<'_, PyAny>, digest: Vec<u8>) -> PyResult<()> {
     let values: Vec<i64> = digest.into_iter().map(i64::from).collect();
     let local = world.call_method1("longs", (values,))?;
     let gathered = world.call_method1("gather_fixed", (local,))?;
