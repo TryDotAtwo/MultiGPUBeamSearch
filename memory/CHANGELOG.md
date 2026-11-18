@@ -1994,3 +1994,21 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   skipped transfer/build/NCCL without changing its state. Physical CUDA/NCCL
   and multi-GPU CNOT runtime remain unverified. Details:
   `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
+
+## 2026-11-18 - Rust all-rank vote for native CNOT stages
+
+- `World.all_ranks_support` now delegates the optional native-stage availability
+  vote to PyO3 Rust when the ABI exists. Rust keeps the same `World.longs` and
+  `World.sum` reduction and accepts the stage runner only when every rank
+  supports it. Old extensions retain the former Python vote. The Rust CNOT
+  controller and stage execution paths are unchanged.
+- Test-first run 44364623412 failed on the four expected new ABI/dispatch/vote
+  assertions (4 failed, 149 passed, 2 skipped). Run 44365202646 caught only a
+  rustfmt layout issue before compilation. Run 44365545571 passed Rust
+  formatting/checks, PyO3 build, 153 Python tests (2 skipped), and NCCL probe
+  syntax. Artifact 14456324597 SHA-256:
+  `95979ec2f47c2b6d6b5813d88aabaa38e24f654d71247bc1e1613407e06c0293`.
+- Vast status run 44365545577 confirmed the existing instance was stopped and
+  skipped transfer/build/NCCL without changing its state. Physical CUDA/NCCL
+  and multi-GPU CNOT runtime remain unverified. Details:
+  `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
