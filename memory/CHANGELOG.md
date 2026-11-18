@@ -2106,3 +2106,9 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   `d7393cf17c75f014ce44c81b676103a668e22344df9bb3dde1929a401a21e758`.
   Physical CUDA/NCCL and multi-GPU CNOT execution remain unverified. See
   `test_results/refactor_20261119/cnot-compat-goal/GITHUB_STATUS.md`.
+
+## 2026-11-19 - Rust-owned CNOT admission
+
+- The Rust CNOT controller now resolves the existing engine selector and depth fallback and computes the admission SHA-256 digest while preserving the established Python JSON byte encoding. These steps stay within the existing rank-wide admission vote. Python input preparation and the older-extension compatibility entry remain; search behavior, precision policy, and collective order are unchanged.
+- Test-first run 44403506598 failed on the expected missing-controller assertions (161 passed, 2 skipped). Build run 44404591194 exposed two temporary-lifetime compiler errors, fixed by retaining the Python byte owners. Green branch run 44405036760 passed Rust formatting/checks, PyO3 build, 163 CNOT CPU compatibility tests (2 skipped), and NCCL probe syntax. Hosted artifact 14474283716 SHA-256: `137d8273de03b5329ce907b4be891594625bda79c46021831787ebb824771679`.
+- This is CPU/control-flow evidence. Physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified. Details: `test_results/refactor_20261119/cnot-rust-admission/GITHUB_STATUS.md`.

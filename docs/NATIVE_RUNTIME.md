@@ -117,6 +117,14 @@ arbitrary Python scorer callbacks and the explicit Python reference engine
 remain supported. The `World` adapter retains the established process-group
 calls. This is not yet a complete Rust/C++ CNOT runtime.
 
+The Rust CNOT controller also resolves `auto`/`python`/`rust` and the existing
+u64 depth fallback after input preparation. It assembles the same admission
+configuration, preserves the established Python JSON byte encoding, and
+computes the SHA-256 fingerprint in Rust. These operations remain inside the
+single existing admission error vote; consensus and transport selection keep
+their prior order. Rust calls its search controller directly for the Rust
+engine. Python `_admit` remains for the older-extension compatibility entry.
+
 For matching PyO3 extensions, CNOT input admission now runs through the Rust
 `prepare_cnot_input` adapter. It checks the packed tensor layout and search
 controls, asks PyTorch for an independent contiguous snapshot, derives the
