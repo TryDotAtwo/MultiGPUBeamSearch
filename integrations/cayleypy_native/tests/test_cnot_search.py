@@ -158,6 +158,50 @@ def test_rust_cnot_control_validator_preserves_public_errors():
         validate(2, 1, 1, "greedy")
 
 
+def test_auto_validation_delegates_owned_matrix_preparation(monkeypatch):
+    from types import SimpleNamespace
+    from multigpubeamsearch import rust_control
+
+    caller_root = pack_rows((1, 2))
+    snapshot = caller_root.clone()
+    marker, raw, calls = object(), b"native-owned-matrix", []
+
+    def prepare(root, width, shortlist, depth, mode):
+        calls.append((root, width, shortlist, depth, mode))
+        return 2, raw, snapshot, marker
+
+    monkeypatch.setattr(rust_control, "extension",
+                        lambda: SimpleNamespace(prepare_cnot_input=prepare))
+    result = cnot._input(caller_root, 3, 99, 1, "proposal", "auto")
+
+    assert calls == [(caller_root, 3, 99, 1, "proposal")]
+    assert result.n == 2 and result.raw is raw
+    assert result.root is snapshot and result.rust_matrix is marker
+
+
+def test_rust_input_preparer_owns_snapshot_and_matrix_validation():
+    from multigpubeamsearch.rust_control import extension
+
+    prepare = getattr(extension(), "prepare_cnot_input")
+    original = replay_cnot(4, (0,))
+    root = pack_rows(original)
+    expected = root.numpy().tobytes()
+    n, raw, snapshot, matrix = prepare(root, 1, 1, 1, "qhat")
+
+    root[0, 0, 0] ^= 1
+    assert n == 4 and raw == expected
+    assert snapshot.data_ptr() != root.data_ptr()
+    assert tuple(int(value) for value in snapshot[0, :, 0].tolist()) == original
+    assert matrix.verifies_construction((0,))
+
+    padded = pack_rows((1, 2, 4))
+    padded[0, 0, 0] = -(1 << 63)
+    with pytest.raises(ValueError, match="CNOT row padding"):
+        prepare(padded, 1, 1, 1, "qhat")
+    with pytest.raises(ValueError, match="CNOT matrix is singular"):
+        prepare(pack_rows((1, 1, 2)), 1, 1, 1, "qhat")
+
+
 def test_explicit_rust_validation_fails_closed_for_old_extension(monkeypatch):
     from types import SimpleNamespace
     from multigpubeamsearch import rust_control

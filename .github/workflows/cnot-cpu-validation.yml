@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - codex/cnot-search-runtime
+      - codex/cnot-*
     paths:
       - .github/workflows/cnot-cpu-validation.yml
       - integrations/cayleypy_native/multigpubeamsearch/cnot.py
