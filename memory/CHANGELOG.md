@@ -1801,7 +1801,13 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   type, dtype, device, shape, contiguity, byte extents, and buffer overlap
   before borrowing device addresses. Python API and a reference fallback are
   retained for older or absent extensions.
-- Hosted red/green CPU validation is pending. CUDA checkpoint scoring and
-  physical multi-GPU acceptance remain unverified while the existing Vast
-  instance is stopped. This change does not alter search decisions or model
-  numerics.
+- GitHub CPU run 44208783672 passed Rust formatting, 3 `beam-core` CNOT tests,
+  4 `beam-runtime` CNOT tests, 4 native-sys scorer tests, the `beam-python`
+  compile check, 27 Python CNOT compatibility tests, and NCCL probe syntax
+  compilation. Full output is in artifact 14384877235 (SHA-256
+  `83510320d4f985701d3ab2bb43243dce2aa1d119574eb6bc292d5b17253cb5e7`); see
+  `test_results/refactor_20261118/cnot-tqp-scorer/GITHUB_STATUS.md`.
+- This is CPU and compile evidence only. The Python dispatch test uses a mock;
+  the checkpoint library was not loaded, and CUDA scoring, NCCL execution, and
+  physical multi-GPU acceptance remain unverified. This change does not alter
+  search decisions or model numerics.
